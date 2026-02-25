@@ -1,4 +1,8 @@
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, boolean, json } from "drizzle-orm/mysql-core";
+import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, boolean, json, bigint, index } from "drizzle-orm/mysql-core";
+
+// ════════════════════════════════════════════════════════════
+// EXISTING WHATSAPP API TABLES (preserved)
+// ════════════════════════════════════════════════════════════
 
 export const users = mysqlTable("users", {
   id: int("id").autoincrement().primaryKey(),
@@ -24,7 +28,7 @@ export const whatsappSessions = mysqlTable("whatsapp_sessions", {
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 
-export const messages = mysqlTable("messages", {
+export const waMessages = mysqlTable("messages", {
   id: int("id").autoincrement().primaryKey(),
   sessionId: varchar("sessionId", { length: 128 }).notNull(),
   messageId: varchar("messageId", { length: 256 }),
@@ -56,9 +60,649 @@ export const chatbotSettings = mysqlTable("chatbot_settings", {
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 
+// ════════════════════════════════════════════════════════════
+// ASTRA CRM — CORE / TENANTS
+// ════════════════════════════════════════════════════════════
+
+export const tenants = mysqlTable("tenants", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  plan: mysqlEnum("plan", ["starter", "business", "enterprise"]).default("starter").notNull(),
+  status: mysqlEnum("status", ["active", "suspended", "cancelled"]).default("active").notNull(),
+  billingCustomerId: varchar("billingCustomerId", { length: 128 }),
+  settingsJson: json("settingsJson"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+// ════════════════════════════════════════════════════════════
+// M0 — IAM (Identity & Access Management)
+// ════════════════════════════════════════════════════════════
+
+export const crmUsers = mysqlTable("crm_users", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  email: varchar("email", { length: 320 }).notNull(),
+  phone: varchar("phone", { length: 32 }),
+  passwordHash: varchar("passwordHash", { length: 512 }),
+  status: mysqlEnum("status", ["active", "inactive", "invited"]).default("invited").notNull(),
+  avatarUrl: text("avatarUrl"),
+  lastLoginAt: timestamp("lastLoginAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  createdBy: int("createdBy"),
+  updatedBy: int("updatedBy"),
+}, (t) => [
+  index("crm_users_tenant_idx").on(t.tenantId),
+  index("crm_users_email_idx").on(t.tenantId, t.email),
+]);
+
+export const teams = mysqlTable("teams", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (t) => [index("teams_tenant_idx").on(t.tenantId)]);
+
+export const teamMembers = mysqlTable("team_members", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  userId: int("userId").notNull(),
+  teamId: int("teamId").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (t) => [index("tm_tenant_idx").on(t.tenantId)]);
+
+export const roles = mysqlTable("crm_roles", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  slug: varchar("slug", { length: 64 }).notNull(),
+  name: varchar("name", { length: 128 }).notNull(),
+  isSystemRole: boolean("isSystemRole").default(false).notNull(),
+  description: text("description"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (t) => [index("roles_tenant_idx").on(t.tenantId)]);
+
+export const permissions = mysqlTable("permissions", {
+  id: int("id").autoincrement().primaryKey(),
+  key: varchar("key", { length: 128 }).notNull().unique(),
+  description: text("description"),
+});
+
+export const rolePermissions = mysqlTable("role_permissions", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  roleId: int("roleId").notNull(),
+  permissionId: int("permissionId").notNull(),
+}, (t) => [index("rp_tenant_idx").on(t.tenantId)]);
+
+export const userRoles = mysqlTable("user_roles", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  userId: int("userId").notNull(),
+  roleId: int("roleId").notNull(),
+}, (t) => [index("ur_tenant_idx").on(t.tenantId)]);
+
+export const apiKeys = mysqlTable("api_keys", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  name: varchar("name", { length: 128 }).notNull(),
+  hashedKey: varchar("hashedKey", { length: 512 }).notNull(),
+  scopesJson: json("scopesJson"),
+  lastUsedAt: timestamp("lastUsedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (t) => [index("ak_tenant_idx").on(t.tenantId)]);
+
+// ════════════════════════════════════════════════════════════
+// M2 — CRM (Contacts, Deals, Pipelines)
+// ════════════════════════════════════════════════════════════
+
+export const contacts = mysqlTable("contacts", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  type: mysqlEnum("type", ["person", "company"]).default("person").notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  email: varchar("email", { length: 320 }),
+  phone: varchar("phone", { length: 32 }),
+  docId: varchar("docId", { length: 64 }),
+  tagsJson: json("tagsJson"),
+  source: varchar("source", { length: 64 }),
+  lifecycleStage: mysqlEnum("lifecycleStage", ["lead", "prospect", "customer", "churned"]).default("lead").notNull(),
+  ownerUserId: int("ownerUserId"),
+  teamId: int("teamId"),
+  visibilityScope: mysqlEnum("visibilityScope", ["personal", "team", "global"]).default("global").notNull(),
+  consentStatus: mysqlEnum("consentStatus", ["pending", "granted", "revoked"]).default("pending").notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  createdBy: int("createdBy"),
+  updatedBy: int("updatedBy"),
+}, (t) => [
+  index("contacts_tenant_idx").on(t.tenantId),
+  index("contacts_owner_idx").on(t.tenantId, t.ownerUserId),
+]);
+
+export const accounts = mysqlTable("accounts", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  primaryContactId: int("primaryContactId"),
+  ownerUserId: int("ownerUserId"),
+  teamId: int("teamId"),
+  visibilityScope: mysqlEnum("visibilityScope", ["personal", "team", "global"]).default("global").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  createdBy: int("createdBy"),
+  updatedBy: int("updatedBy"),
+}, (t) => [index("accounts_tenant_idx").on(t.tenantId)]);
+
+export const pipelines = mysqlTable("pipelines", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  name: varchar("name", { length: 128 }).notNull(),
+  isDefault: boolean("isDefault").default(false).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (t) => [index("pipelines_tenant_idx").on(t.tenantId)]);
+
+export const pipelineStages = mysqlTable("pipeline_stages", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  pipelineId: int("pipelineId").notNull(),
+  name: varchar("name", { length: 128 }).notNull(),
+  orderIndex: int("orderIndex").notNull(),
+  probabilityDefault: int("probabilityDefault").default(0),
+  isWon: boolean("isWon").default(false).notNull(),
+  isLost: boolean("isLost").default(false).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (t) => [index("ps_tenant_pipeline_idx").on(t.tenantId, t.pipelineId)]);
+
+export const deals = mysqlTable("deals", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  title: varchar("title", { length: 255 }).notNull(),
+  contactId: int("contactId"),
+  accountId: int("accountId"),
+  pipelineId: int("pipelineId").notNull(),
+  stageId: int("stageId").notNull(),
+  valueCents: bigint("valueCents", { mode: "number" }).default(0),
+  currency: varchar("currency", { length: 3 }).default("BRL"),
+  probability: int("probability").default(0),
+  status: mysqlEnum("status", ["open", "won", "lost"]).default("open").notNull(),
+  expectedCloseAt: timestamp("expectedCloseAt"),
+  ownerUserId: int("ownerUserId"),
+  teamId: int("teamId"),
+  visibilityScope: mysqlEnum("visibilityScope", ["personal", "team", "global"]).default("global").notNull(),
+  channelOrigin: varchar("channelOrigin", { length: 64 }),
+  lastActivityAt: timestamp("lastActivityAt").defaultNow(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  createdBy: int("createdBy"),
+  updatedBy: int("updatedBy"),
+}, (t) => [
+  index("deals_tenant_pipeline_idx").on(t.tenantId, t.pipelineId, t.stageId),
+  index("deals_tenant_status_idx").on(t.tenantId, t.status, t.lastActivityAt),
+  index("deals_tenant_owner_idx").on(t.tenantId, t.ownerUserId),
+]);
+
+export const dealParticipants = mysqlTable("deal_participants", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  dealId: int("dealId").notNull(),
+  contactId: int("contactId").notNull(),
+  role: mysqlEnum("role", ["decision_maker", "traveler", "payer", "companion", "other"]).default("traveler").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (t) => [index("dp_tenant_idx").on(t.tenantId)]);
+
+// ════════════════════════════════════════════════════════════
+// TRIPS (Pós-venda / M2 + M4)
+// ════════════════════════════════════════════════════════════
+
+export const trips = mysqlTable("trips", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  dealId: int("dealId"),
+  status: mysqlEnum("status", ["planning", "confirmed", "in_progress", "completed", "cancelled"]).default("planning").notNull(),
+  startDate: timestamp("startDate"),
+  endDate: timestamp("endDate"),
+  destinationSummary: text("destinationSummary"),
+  totalValueCents: bigint("totalValueCents", { mode: "number" }).default(0),
+  currency: varchar("currency", { length: 3 }).default("BRL"),
+  documentsStatus: mysqlEnum("documentsStatus", ["pending", "partial", "complete"]).default("pending").notNull(),
+  ownerUserId: int("ownerUserId"),
+  teamId: int("teamId"),
+  visibilityScope: mysqlEnum("visibilityScope", ["personal", "team", "global"]).default("global").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  createdBy: int("createdBy"),
+  updatedBy: int("updatedBy"),
+}, (t) => [index("trips_tenant_idx").on(t.tenantId)]);
+
+export const tripItems = mysqlTable("trip_items", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  tripId: int("tripId").notNull(),
+  type: mysqlEnum("type", ["flight", "hotel", "tour", "transfer", "insurance", "other"]).default("other").notNull(),
+  title: varchar("title", { length: 255 }).notNull(),
+  supplier: varchar("supplier", { length: 255 }),
+  detailsJson: json("detailsJson"),
+  priceCents: bigint("priceCents", { mode: "number" }).default(0),
+  currency: varchar("currency", { length: 3 }).default("BRL"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (t) => [index("ti_tenant_idx").on(t.tenantId)]);
+
+// ════════════════════════════════════════════════════════════
+// ACTIVITIES (Tasks, Notes, Attachments)
+// ════════════════════════════════════════════════════════════
+
+export const tasks = mysqlTable("crm_tasks", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  entityType: varchar("entityType", { length: 32 }).notNull(),
+  entityId: int("entityId").notNull(),
+  title: varchar("title", { length: 255 }).notNull(),
+  dueAt: timestamp("dueAt"),
+  status: mysqlEnum("status", ["pending", "in_progress", "done", "cancelled"]).default("pending").notNull(),
+  priority: mysqlEnum("priority", ["low", "medium", "high", "urgent"]).default("medium").notNull(),
+  assignedToUserId: int("assignedToUserId"),
+  createdByUserId: int("createdByUserId"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (t) => [index("tasks_tenant_idx").on(t.tenantId)]);
+
+export const crmNotes = mysqlTable("crm_notes", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  entityType: varchar("entityType", { length: 32 }).notNull(),
+  entityId: int("entityId").notNull(),
+  body: text("body"),
+  createdByUserId: int("createdByUserId"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (t) => [index("notes_tenant_idx").on(t.tenantId)]);
+
+export const crmAttachments = mysqlTable("crm_attachments", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  entityType: varchar("entityType", { length: 32 }).notNull(),
+  entityId: int("entityId").notNull(),
+  fileUrl: text("fileUrl").notNull(),
+  fileName: varchar("fileName", { length: 255 }).notNull(),
+  mimeType: varchar("mimeType", { length: 128 }),
+  sizeBytes: int("sizeBytes"),
+  uploadedByUserId: int("uploadedByUserId"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (t) => [index("attach_tenant_idx").on(t.tenantId)]);
+
+// ════════════════════════════════════════════════════════════
+// M1 — INBOX OMNICHANNEL
+// ════════════════════════════════════════════════════════════
+
+export const channels = mysqlTable("channels", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  type: mysqlEnum("type", ["whatsapp", "instagram", "email", "webchat"]).default("whatsapp").notNull(),
+  connectionId: varchar("connectionId", { length: 128 }),
+  name: varchar("name", { length: 128 }),
+  status: mysqlEnum("status", ["active", "inactive", "error"]).default("inactive").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (t) => [index("channels_tenant_idx").on(t.tenantId)]);
+
+export const conversations = mysqlTable("conversations", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  channelId: int("channelId").notNull(),
+  providerThreadId: varchar("providerThreadId", { length: 256 }),
+  contactId: int("contactId"),
+  dealId: int("dealId"),
+  tripId: int("tripId"),
+  status: mysqlEnum("status", ["open", "pending", "closed"]).default("open").notNull(),
+  assignedToUserId: int("assignedToUserId"),
+  assignedTeamId: int("assignedTeamId"),
+  priority: mysqlEnum("priority", ["low", "medium", "high", "urgent"]).default("medium").notNull(),
+  lastMessageAt: timestamp("lastMessageAt"),
+  slaDueAt: timestamp("slaDueAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (t) => [
+  index("conv_tenant_channel_idx").on(t.tenantId, t.channelId, t.lastMessageAt),
+  index("conv_tenant_status_idx").on(t.tenantId, t.status),
+]);
+
+export const inboxMessages = mysqlTable("inbox_messages", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  conversationId: int("conversationId").notNull(),
+  direction: mysqlEnum("direction", ["inbound", "outbound"]).default("inbound").notNull(),
+  providerMessageId: varchar("providerMessageId", { length: 256 }),
+  senderLabel: varchar("senderLabel", { length: 128 }),
+  bodyText: text("bodyText"),
+  bodyJson: json("bodyJson"),
+  sentAt: timestamp("sentAt"),
+  deliveredAt: timestamp("deliveredAt"),
+  readAt: timestamp("readAt"),
+  status: mysqlEnum("status", ["pending", "sent", "delivered", "read", "failed"]).default("pending").notNull(),
+  errorJson: json("errorJson"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (t) => [index("im_tenant_conv_idx").on(t.tenantId, t.conversationId, t.sentAt)]);
+
+// ════════════════════════════════════════════════════════════
+// M3 — PROPOSTAS
+// ════════════════════════════════════════════════════════════
+
+export const proposalTemplates = mysqlTable("proposal_templates", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  htmlBody: text("htmlBody"),
+  variablesJson: json("variablesJson"),
+  isDefault: boolean("isDefault").default(false).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (t) => [index("pt_tenant_idx").on(t.tenantId)]);
+
+export const proposals = mysqlTable("proposals", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  dealId: int("dealId").notNull(),
+  version: int("version").default(1).notNull(),
+  status: mysqlEnum("status", ["draft", "sent", "viewed", "accepted", "rejected", "expired"]).default("draft").notNull(),
+  totalCents: bigint("totalCents", { mode: "number" }).default(0),
+  currency: varchar("currency", { length: 3 }).default("BRL"),
+  pdfUrl: text("pdfUrl"),
+  sentAt: timestamp("sentAt"),
+  acceptedAt: timestamp("acceptedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  createdBy: int("createdBy"),
+}, (t) => [index("proposals_tenant_idx").on(t.tenantId)]);
+
+export const proposalItems = mysqlTable("proposal_items", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  proposalId: int("proposalId").notNull(),
+  title: varchar("title", { length: 255 }).notNull(),
+  description: text("description"),
+  qty: int("qty").default(1).notNull(),
+  unitPriceCents: bigint("unitPriceCents", { mode: "number" }).default(0),
+  totalCents: bigint("totalCents", { mode: "number" }).default(0),
+  metaJson: json("metaJson"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (t) => [index("pi_tenant_idx").on(t.tenantId)]);
+
+export const proposalSignatures = mysqlTable("proposal_signatures", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  proposalId: int("proposalId").notNull(),
+  signerName: varchar("signerName", { length: 255 }).notNull(),
+  signerEmail: varchar("signerEmail", { length: 320 }),
+  signedAt: timestamp("signedAt"),
+  ip: varchar("ip", { length: 64 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (t) => [index("psig_tenant_idx").on(t.tenantId)]);
+
+// ════════════════════════════════════════════════════════════
+// M4 — PORTAL DO CLIENTE
+// ════════════════════════════════════════════════════════════
+
+export const portalUsers = mysqlTable("portal_users", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  contactId: int("contactId").notNull(),
+  email: varchar("email", { length: 320 }).notNull(),
+  authMethod: varchar("authMethod", { length: 32 }).default("magic_link"),
+  passwordHash: varchar("passwordHash", { length: 512 }),
+  status: mysqlEnum("status", ["active", "inactive"]).default("active").notNull(),
+  lastLoginAt: timestamp("lastLoginAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (t) => [index("pu_tenant_idx").on(t.tenantId)]);
+
+export const portalSessions = mysqlTable("portal_sessions", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  portalUserId: int("portalUserId").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  expiresAt: timestamp("expiresAt"),
+}, (t) => [index("ps_tenant_idx").on(t.tenantId)]);
+
+export const portalTickets = mysqlTable("portal_tickets", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  contactId: int("contactId").notNull(),
+  tripId: int("tripId"),
+  conversationId: int("conversationId"),
+  status: mysqlEnum("status", ["open", "in_progress", "resolved", "closed"]).default("open").notNull(),
+  subject: varchar("subject", { length: 255 }).notNull(),
+  priority: mysqlEnum("priority", ["low", "medium", "high", "urgent"]).default("medium").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (t) => [index("pt_tenant_idx").on(t.tenantId)]);
+
+// ════════════════════════════════════════════════════════════
+// M5 — GESTÃO
+// ════════════════════════════════════════════════════════════
+
+export const goals = mysqlTable("goals", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  periodStart: timestamp("periodStart").notNull(),
+  periodEnd: timestamp("periodEnd").notNull(),
+  teamId: int("teamId"),
+  userId: int("userId"),
+  metricKey: varchar("metricKey", { length: 64 }).notNull(),
+  targetValue: bigint("targetValue", { mode: "number" }).default(0),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (t) => [index("goals_tenant_idx").on(t.tenantId)]);
+
+export const performanceSnapshots = mysqlTable("performance_snapshots", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  periodStart: timestamp("periodStart").notNull(),
+  periodEnd: timestamp("periodEnd").notNull(),
+  entityType: varchar("entityType", { length: 32 }).notNull(),
+  entityId: int("entityId").notNull(),
+  metricsJson: json("metricsJson"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (t) => [index("perf_tenant_idx").on(t.tenantId)]);
+
+// ════════════════════════════════════════════════════════════
+// M6 — INSIGHTS / ANALYTICS
+// ════════════════════════════════════════════════════════════
+
+export const metricsDaily = mysqlTable("metrics_daily", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  date: timestamp("date").notNull(),
+  metricKey: varchar("metricKey", { length: 64 }).notNull(),
+  valueNum: bigint("valueNum", { mode: "number" }).default(0),
+  dimensionsJson: json("dimensionsJson"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (t) => [index("md_tenant_idx").on(t.tenantId)]);
+
+export const alerts = mysqlTable("alerts", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  type: varchar("type", { length: 64 }).notNull(),
+  status: mysqlEnum("status", ["active", "resolved", "dismissed"]).default("active").notNull(),
+  entityType: varchar("entityType", { length: 32 }),
+  entityId: int("entityId"),
+  firedAt: timestamp("firedAt").defaultNow().notNull(),
+  resolvedAt: timestamp("resolvedAt"),
+  payloadJson: json("payloadJson"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (t) => [index("alerts_tenant_idx").on(t.tenantId)]);
+
+// ════════════════════════════════════════════════════════════
+// M7 — ACADEMY
+// ════════════════════════════════════════════════════════════
+
+export const courses = mysqlTable("courses", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  title: varchar("title", { length: 255 }).notNull(),
+  description: text("description"),
+  coverUrl: text("coverUrl"),
+  status: mysqlEnum("status", ["draft", "published", "archived"]).default("draft").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (t) => [index("courses_tenant_idx").on(t.tenantId)]);
+
+export const lessons = mysqlTable("lessons", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  courseId: int("courseId").notNull(),
+  title: varchar("title", { length: 255 }).notNull(),
+  contentUrl: text("contentUrl"),
+  contentBody: text("contentBody"),
+  orderIndex: int("orderIndex").default(0).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (t) => [index("lessons_tenant_idx").on(t.tenantId)]);
+
+export const enrollments = mysqlTable("enrollments", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  userId: int("userId").notNull(),
+  courseId: int("courseId").notNull(),
+  status: mysqlEnum("status", ["enrolled", "in_progress", "completed"]).default("enrolled").notNull(),
+  progressJson: json("progressJson"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (t) => [index("enroll_tenant_idx").on(t.tenantId)]);
+
+// ════════════════════════════════════════════════════════════
+// M8 — INTEGRATION HUB
+// ════════════════════════════════════════════════════════════
+
+export const integrations = mysqlTable("integrations", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  provider: varchar("provider", { length: 64 }).notNull(),
+  name: varchar("name", { length: 128 }).notNull(),
+  status: mysqlEnum("status", ["active", "inactive", "error"]).default("inactive").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (t) => [index("integ_tenant_idx").on(t.tenantId)]);
+
+export const integrationConnections = mysqlTable("integration_connections", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  integrationId: int("integrationId").notNull(),
+  connectionId: varchar("connectionId", { length: 128 }),
+  status: mysqlEnum("status", ["connected", "disconnected", "error"]).default("disconnected").notNull(),
+  lastHealthAt: timestamp("lastHealthAt"),
+  metaJson: json("metaJson"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (t) => [index("ic_tenant_idx").on(t.tenantId)]);
+
+export const integrationCredentials = mysqlTable("integration_credentials", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  provider: varchar("provider", { length: 64 }).notNull(),
+  encryptedSecret: text("encryptedSecret").notNull(),
+  rotatedAt: timestamp("rotatedAt"),
+  status: mysqlEnum("status", ["active", "revoked"]).default("active").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (t) => [index("icred_tenant_idx").on(t.tenantId)]);
+
+export const webhooks = mysqlTable("webhooks", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  provider: varchar("provider", { length: 64 }).notNull(),
+  endpoint: text("endpoint").notNull(),
+  secretHash: varchar("secretHash", { length: 512 }),
+  status: mysqlEnum("status", ["active", "inactive"]).default("active").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (t) => [index("wh_tenant_idx").on(t.tenantId)]);
+
+export const jobs = mysqlTable("jobs", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  type: varchar("type", { length: 64 }).notNull(),
+  status: mysqlEnum("status", ["pending", "running", "completed", "failed"]).default("pending").notNull(),
+  attempts: int("attempts").default(0).notNull(),
+  nextRunAt: timestamp("nextRunAt"),
+  payloadJson: json("payloadJson"),
+  lastError: text("lastError"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (t) => [index("jobs_tenant_idx").on(t.tenantId)]);
+
+export const jobDlq = mysqlTable("job_dlq", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  jobId: int("jobId").notNull(),
+  failedAt: timestamp("failedAt").defaultNow().notNull(),
+  errorJson: json("errorJson"),
+  payloadJson: json("payloadJson"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (t) => [index("dlq_tenant_idx").on(t.tenantId)]);
+
+// ════════════════════════════════════════════════════════════
+// EVENT LOG (Transversal — Auditoria)
+// ════════════════════════════════════════════════════════════
+
+export const eventLog = mysqlTable("event_log", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  occurredAt: timestamp("occurredAt").defaultNow().notNull(),
+  actorUserId: int("actorUserId"),
+  actorType: mysqlEnum("actorType", ["user", "system", "api", "webhook"]).default("user").notNull(),
+  entityType: varchar("entityType", { length: 64 }).notNull(),
+  entityId: int("entityId"),
+  action: varchar("action", { length: 64 }).notNull(),
+  beforeJson: json("beforeJson"),
+  afterJson: json("afterJson"),
+  metadataJson: json("metadataJson"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (t) => [
+  index("el_tenant_idx").on(t.tenantId, t.occurredAt),
+  index("el_entity_idx").on(t.tenantId, t.entityType, t.entityId),
+]);
+
+// ════════════════════════════════════════════════════════════
+// TYPE EXPORTS
+// ════════════════════════════════════════════════════════════
+
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 export type WhatsappSession = typeof whatsappSessions.$inferSelect;
-export type Message = typeof messages.$inferSelect;
+export type WaMessage = typeof waMessages.$inferSelect;
 export type ActivityLog = typeof activityLogs.$inferSelect;
 export type ChatbotSettings = typeof chatbotSettings.$inferSelect;
+export type Tenant = typeof tenants.$inferSelect;
+export type CrmUser = typeof crmUsers.$inferSelect;
+export type Team = typeof teams.$inferSelect;
+export type Role = typeof roles.$inferSelect;
+export type Permission = typeof permissions.$inferSelect;
+export type Contact = typeof contacts.$inferSelect;
+export type Account = typeof accounts.$inferSelect;
+export type Deal = typeof deals.$inferSelect;
+export type Pipeline = typeof pipelines.$inferSelect;
+export type PipelineStage = typeof pipelineStages.$inferSelect;
+export type Trip = typeof trips.$inferSelect;
+export type TripItem = typeof tripItems.$inferSelect;
+export type Task = typeof tasks.$inferSelect;
+export type CrmNote = typeof crmNotes.$inferSelect;
+export type CrmAttachment = typeof crmAttachments.$inferSelect;
+export type Channel = typeof channels.$inferSelect;
+export type Conversation = typeof conversations.$inferSelect;
+export type InboxMessage = typeof inboxMessages.$inferSelect;
+export type ProposalTemplate = typeof proposalTemplates.$inferSelect;
+export type Proposal = typeof proposals.$inferSelect;
+export type ProposalItem = typeof proposalItems.$inferSelect;
+export type PortalUser = typeof portalUsers.$inferSelect;
+export type PortalTicket = typeof portalTickets.$inferSelect;
+export type Goal = typeof goals.$inferSelect;
+export type MetricDaily = typeof metricsDaily.$inferSelect;
+export type Alert = typeof alerts.$inferSelect;
+export type Course = typeof courses.$inferSelect;
+export type Lesson = typeof lessons.$inferSelect;
+export type Enrollment = typeof enrollments.$inferSelect;
+export type Integration = typeof integrations.$inferSelect;
+export type IntegrationConnection = typeof integrationConnections.$inferSelect;
+export type Webhook = typeof webhooks.$inferSelect;
+export type Job = typeof jobs.$inferSelect;
+export type EventLogEntry = typeof eventLog.$inferSelect;

@@ -14,7 +14,7 @@ import fs from "fs";
 import QRCode from "qrcode";
 import { EventEmitter } from "events";
 import { getDb } from "./db";
-import { whatsappSessions, messages, activityLogs, chatbotSettings } from "../drizzle/schema";
+import { whatsappSessions, waMessages as messages, activityLogs, chatbotSettings } from "../drizzle/schema";
 import { eq, desc } from "drizzle-orm";
 import { invokeLLM } from "./_core/llm";
 import { notifyOwner } from "./_core/notification";

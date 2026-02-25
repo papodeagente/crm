@@ -15,6 +15,13 @@
       "when": 1772039347890,
       "tag": "0001_bizarre_texas_twister",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1772049169387,
+      "tag": "0002_sloppy_madame_web",
+      "breakpoints": true
     }
   ]
 }

@@ -1,6 +1,6 @@
 import { eq, desc, and, or, like } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users, whatsappSessions, messages, activityLogs, chatbotSettings } from "../drizzle/schema";
+import { InsertUser, users, whatsappSessions, waMessages as messages, activityLogs, chatbotSettings } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
