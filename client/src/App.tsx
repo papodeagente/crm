@@ -4,7 +4,7 @@ import NotFound from "@/pages/NotFound";
 import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
-import DashboardLayout from "./components/DashboardLayout";
+import TopNavLayout from "./components/TopNavLayout";
 import { lazy, Suspense } from "react";
 import { Loader2 } from "lucide-react";
 
@@ -38,7 +38,7 @@ function PageLoader() {
 
 function Router() {
   return (
-    <DashboardLayout>
+    <TopNavLayout>
       <Suspense fallback={<PageLoader />}>
         <Switch>
           <Route path="/" component={Home} />
@@ -63,7 +63,7 @@ function Router() {
           <Route component={NotFound} />
         </Switch>
       </Suspense>
-    </DashboardLayout>
+    </TopNavLayout>
   );
 }
 

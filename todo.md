@@ -72,4 +72,15 @@
 - [x] Seeds: pipeline default com stages
 - [x] Seeds: templates de propostas básicos — futuro
 - [x] Integração WhatsApp API existente (motor Baileys integrado ao backend)
-- [x] Testes unitários (31 testes passando: auth, CRM routers, WhatsApp)
+- [x] Testes unitários (31 testes passando: auth, CRM routers, WhatsApp) — verificado após redesign
+
+## Redesign — Funil Kanban & Navegação (v2)
+- [x] Menu horizontal superior (Início, Negociações, Empresas, Contatos, Tarefas, Análises, Marketing)
+- [x] Layout global com topbar em vez de sidebar
+- [x] Funil Kanban com colunas scrolláveis (header: nome etapa, contagem, valor total)
+- [x] Cards de deal detalhados (status badge, contato, empresa, data, valor, tarefas)
+- [x] Barra de filtros (pipeline selector, responsável, status, ordenação)
+- [x] Botão "+ Criar" para nova negociação
+- [x] Modal de criação de negociação com campos de agência de viagens (destino, datas, passageiros, valor pacote)
+- [x] Toggle Kanban/Lista na página de negociações
+- [x] Botão "Criar Tarefa" em cada card de deal
