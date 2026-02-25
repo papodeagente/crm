@@ -98,3 +98,19 @@
 - [x] Frontend: Aba de produtos/orçamento com add/edit/remove e totais
 - [x] Frontend: Aba de histórico de movimentações dentro do drawer
 - [x] Testes unitários atualizados (31 passando)
+
+## Redesign UX/UI Completo (v4)
+- [x] Auditar todas as páginas e documentar problemas de corte/layout
+- [x] Redesenhar tema global (index.css): cores modernas, sombras suaves, tipografia refinada
+- [x] Corrigir cortes nas laterais em todas as páginas (padding/margin global)
+- [x] Redesenhar TopNavLayout: espaçamentos, responsividade, micro-interações
+- [x] Redesenhar Home/Dashboard: cards modernos, gradientes sutis, melhor hierarquia visual
+- [x] Redesenhar Pipeline/Kanban: cards mais elegantes, drop zones visuais, animações
+- [x] Redesenhar Drawer de detalhes: melhor organização, tipografia, espaçamento
+- [x] Redesenhar Contatos: tabela moderna, avatares, ações inline
+- [x] Redesenhar Deals: visual consistente com Pipeline
+- [x] Redesenhar Tarefas: layout limpo, status visuais
+- [x] Redesenhar Inbox: 3 colunas com melhor separação visual
+- [x] Redesenhar páginas restantes (Trips, Proposals, Portal, Insights, Goals, Academy, Integrations, Admin, Logs, Messages, SendMessage, ApiDocs, Chatbot, Alerts)
+- [x] Micro-interações: hover states, transições, feedback visual
+- [ ] Verificar responsividade em todas as páginas — pendente

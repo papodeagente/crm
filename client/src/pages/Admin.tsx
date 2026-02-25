@@ -1,16 +1,22 @@
 import { trpc } from "@/lib/trpc";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Shield, Plus, Users, Building2, Key, Activity } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
 const TENANT_ID = 1;
+
+const actionColors: Record<string, { bg: string; text: string }> = {
+  create: { bg: "bg-emerald-50", text: "text-emerald-700" },
+  update: { bg: "bg-blue-50", text: "text-blue-700" },
+  delete: { bg: "bg-red-50", text: "text-red-700" },
+  move: { bg: "bg-amber-50", text: "text-amber-700" },
+};
 
 export default function Admin() {
   const [openUser, setOpenUser] = useState(false);
@@ -33,86 +39,206 @@ export default function Admin() {
   });
 
   return (
-    <div className="space-y-6">
-      <div><h1 className="text-2xl font-bold tracking-tight">Administração</h1><p className="text-muted-foreground">Gerencie usuários, equipes, permissões e auditoria.</p></div>
-      <Tabs defaultValue="users">
-        <TabsList><TabsTrigger value="users">Usuários</TabsTrigger><TabsTrigger value="teams">Equipes</TabsTrigger><TabsTrigger value="roles">Perfis</TabsTrigger><TabsTrigger value="audit">Auditoria</TabsTrigger></TabsList>
+    <div className="p-5 lg:px-8 space-y-5">
+      {/* Header */}
+      <div>
+        <h1 className="text-xl font-bold tracking-tight text-foreground">Administração</h1>
+        <p className="text-[13px] text-muted-foreground mt-0.5">Gerencie usuários, equipes, permissões e auditoria.</p>
+      </div>
 
-        <TabsContent value="users" className="mt-4 space-y-4">
+      <Tabs defaultValue="users" className="space-y-4">
+        <TabsList className="bg-white/80 border border-border/30 rounded-xl p-1 shadow-soft">
+          <TabsTrigger value="users" className="rounded-lg text-[13px] data-[state=active]:bg-primary data-[state=active]:text-white gap-1.5"><Users className="h-3.5 w-3.5" />Usuários</TabsTrigger>
+          <TabsTrigger value="teams" className="rounded-lg text-[13px] data-[state=active]:bg-primary data-[state=active]:text-white gap-1.5"><Building2 className="h-3.5 w-3.5" />Equipes</TabsTrigger>
+          <TabsTrigger value="roles" className="rounded-lg text-[13px] data-[state=active]:bg-primary data-[state=active]:text-white gap-1.5"><Key className="h-3.5 w-3.5" />Perfis</TabsTrigger>
+          <TabsTrigger value="audit" className="rounded-lg text-[13px] data-[state=active]:bg-primary data-[state=active]:text-white gap-1.5"><Activity className="h-3.5 w-3.5" />Auditoria</TabsTrigger>
+        </TabsList>
+
+        {/* Users */}
+        <TabsContent value="users" className="space-y-4">
           <div className="flex justify-end">
             <Dialog open={openUser} onOpenChange={setOpenUser}>
-              <DialogTrigger asChild><Button><Plus className="h-4 w-4 mr-2" />Novo Usuário</Button></DialogTrigger>
-              <DialogContent>
-                <DialogHeader><DialogTitle>Novo Usuário</DialogTitle></DialogHeader>
-                <div className="space-y-4 pt-2">
-                  <div><Label>Nome *</Label><Input value={userName} onChange={(e) => setUserName(e.target.value)} placeholder="Nome completo" /></div>
-                  <div><Label>Email *</Label><Input value={userEmail} onChange={(e) => setUserEmail(e.target.value)} placeholder="email@exemplo.com" type="email" /></div>
-                  <Button className="w-full" disabled={!userName || !userEmail} onClick={() => createUser.mutate({ tenantId: TENANT_ID, name: userName, email: userEmail })}>Criar Usuário</Button>
+              <DialogTrigger asChild>
+                <Button className="h-9 gap-2 px-5 rounded-xl shadow-soft bg-gradient-to-r from-primary to-[oklch(0.50_0.14_264)] hover:opacity-90 text-[13px] font-semibold"><Plus className="h-4 w-4" />Novo Usuário</Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[440px] rounded-2xl">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2.5 text-lg">
+                    <div className="h-9 w-9 rounded-xl bg-primary/10 flex items-center justify-center"><Users className="h-4 w-4 text-primary" /></div>
+                    Novo Usuário
+                  </DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 pt-3">
+                  <div><Label className="text-[12px] font-medium">Nome *</Label><Input value={userName} onChange={(e) => setUserName(e.target.value)} placeholder="Nome completo" className="mt-1.5 h-10 rounded-xl" /></div>
+                  <div><Label className="text-[12px] font-medium">Email *</Label><Input value={userEmail} onChange={(e) => setUserEmail(e.target.value)} placeholder="email@exemplo.com" type="email" className="mt-1.5 h-10 rounded-xl" /></div>
+                  <Button className="w-full h-11 rounded-xl text-[14px] font-semibold shadow-soft bg-gradient-to-r from-primary to-[oklch(0.50_0.14_264)] hover:opacity-90" disabled={!userName || !userEmail || createUser.isPending} onClick={() => createUser.mutate({ tenantId: TENANT_ID, name: userName, email: userEmail })}>
+                    {createUser.isPending ? "Criando..." : "Criar Usuário"}
+                  </Button>
                 </div>
               </DialogContent>
             </Dialog>
           </div>
-          <Card><CardContent className="p-0"><table className="w-full text-sm">
-            <thead><tr className="border-b bg-muted/30"><th className="text-left p-3 font-medium">Nome</th><th className="text-left p-3 font-medium">Email</th><th className="text-left p-3 font-medium">Status</th><th className="text-left p-3 font-medium">Criado em</th></tr></thead>
-            <tbody>
-              {users.isLoading ? <tr><td colSpan={4} className="p-8 text-center text-muted-foreground">Carregando...</td></tr>
-              : !users.data?.length ? <tr><td colSpan={4} className="p-8 text-center text-muted-foreground"><Users className="h-8 w-8 mx-auto mb-2 opacity-40" />Nenhum usuário CRM cadastrado.</td></tr>
-              : users.data.map((u: any) => (
-                <tr key={u.id} className="border-b hover:bg-muted/20"><td className="p-3 font-medium">{u.name}</td><td className="p-3 text-muted-foreground">{u.email}</td><td className="p-3"><Badge variant="secondary">{u.status || "active"}</Badge></td><td className="p-3 text-muted-foreground">{u.createdAt ? new Date(u.createdAt).toLocaleDateString("pt-BR") : "—"}</td></tr>
-              ))}
-            </tbody>
-          </table></CardContent></Card>
+          <Card className="border-0 shadow-soft rounded-2xl overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-[13px]">
+                <thead><tr className="border-b border-border/30 bg-muted/20">
+                  <th className="text-left p-3.5 font-semibold text-muted-foreground">Nome</th>
+                  <th className="text-left p-3.5 font-semibold text-muted-foreground">Email</th>
+                  <th className="text-left p-3.5 font-semibold text-muted-foreground">Status</th>
+                  <th className="text-left p-3.5 font-semibold text-muted-foreground">Criado em</th>
+                </tr></thead>
+                <tbody>
+                  {users.isLoading ? <tr><td colSpan={4} className="p-12 text-center text-muted-foreground text-sm">Carregando...</td></tr>
+                  : !users.data?.length ? (
+                    <tr><td colSpan={4} className="p-12 text-center text-muted-foreground">
+                      <Users className="h-10 w-10 mx-auto mb-3 text-muted-foreground/30" />
+                      <p className="text-sm">Nenhum usuário CRM cadastrado.</p>
+                    </td></tr>
+                  ) : users.data.map((u: any) => (
+                    <tr key={u.id} className="border-b border-border/20 hover:bg-muted/20 transition-colors">
+                      <td className="p-3.5">
+                        <div className="flex items-center gap-2.5">
+                          <div className="h-8 w-8 rounded-full bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center text-[11px] font-bold text-primary">{(u.name || "?")[0]?.toUpperCase()}</div>
+                          <span className="font-semibold">{u.name}</span>
+                        </div>
+                      </td>
+                      <td className="p-3.5 text-muted-foreground">{u.email}</td>
+                      <td className="p-3.5">
+                        <span className="inline-flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700">
+                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />{u.status || "Ativo"}
+                        </span>
+                      </td>
+                      <td className="p-3.5 text-muted-foreground">{u.createdAt ? new Date(u.createdAt).toLocaleDateString("pt-BR") : "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Card>
         </TabsContent>
 
-        <TabsContent value="teams" className="mt-4 space-y-4">
+        {/* Teams */}
+        <TabsContent value="teams" className="space-y-4">
           <div className="flex justify-end">
             <Dialog open={openTeam} onOpenChange={setOpenTeam}>
-              <DialogTrigger asChild><Button><Plus className="h-4 w-4 mr-2" />Nova Equipe</Button></DialogTrigger>
-              <DialogContent>
-                <DialogHeader><DialogTitle>Nova Equipe</DialogTitle></DialogHeader>
-                <div className="space-y-4 pt-2">
-                  <div><Label>Nome *</Label><Input value={teamName} onChange={(e) => setTeamName(e.target.value)} placeholder="Ex: Vendas" /></div>
-                  <Button className="w-full" disabled={!teamName} onClick={() => createTeam.mutate({ tenantId: TENANT_ID, name: teamName })}>Criar Equipe</Button>
+              <DialogTrigger asChild>
+                <Button className="h-9 gap-2 px-5 rounded-xl shadow-soft bg-gradient-to-r from-primary to-[oklch(0.50_0.14_264)] hover:opacity-90 text-[13px] font-semibold"><Plus className="h-4 w-4" />Nova Equipe</Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[440px] rounded-2xl">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2.5 text-lg">
+                    <div className="h-9 w-9 rounded-xl bg-primary/10 flex items-center justify-center"><Building2 className="h-4 w-4 text-primary" /></div>
+                    Nova Equipe
+                  </DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 pt-3">
+                  <div><Label className="text-[12px] font-medium">Nome *</Label><Input value={teamName} onChange={(e) => setTeamName(e.target.value)} placeholder="Ex: Vendas" className="mt-1.5 h-10 rounded-xl" /></div>
+                  <Button className="w-full h-11 rounded-xl text-[14px] font-semibold shadow-soft bg-gradient-to-r from-primary to-[oklch(0.50_0.14_264)] hover:opacity-90" disabled={!teamName || createTeam.isPending} onClick={() => createTeam.mutate({ tenantId: TENANT_ID, name: teamName })}>
+                    {createTeam.isPending ? "Criando..." : "Criar Equipe"}
+                  </Button>
                 </div>
               </DialogContent>
             </Dialog>
           </div>
-          <Card><CardContent className="p-0"><table className="w-full text-sm">
-            <thead><tr className="border-b bg-muted/30"><th className="text-left p-3 font-medium">Nome</th><th className="text-left p-3 font-medium">Criada em</th></tr></thead>
-            <tbody>
-              {teams.isLoading ? <tr><td colSpan={2} className="p-8 text-center text-muted-foreground">Carregando...</td></tr>
-              : !teams.data?.length ? <tr><td colSpan={2} className="p-8 text-center text-muted-foreground"><Building2 className="h-8 w-8 mx-auto mb-2 opacity-40" />Nenhuma equipe cadastrada.</td></tr>
-              : teams.data.map((t: any) => (
-                <tr key={t.id} className="border-b hover:bg-muted/20"><td className="p-3 font-medium">{t.name}</td><td className="p-3 text-muted-foreground">{t.createdAt ? new Date(t.createdAt).toLocaleDateString("pt-BR") : "—"}</td></tr>
-              ))}
-            </tbody>
-          </table></CardContent></Card>
+          <Card className="border-0 shadow-soft rounded-2xl overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-[13px]">
+                <thead><tr className="border-b border-border/30 bg-muted/20">
+                  <th className="text-left p-3.5 font-semibold text-muted-foreground">Nome</th>
+                  <th className="text-left p-3.5 font-semibold text-muted-foreground">Criada em</th>
+                </tr></thead>
+                <tbody>
+                  {teams.isLoading ? <tr><td colSpan={2} className="p-12 text-center text-muted-foreground text-sm">Carregando...</td></tr>
+                  : !teams.data?.length ? (
+                    <tr><td colSpan={2} className="p-12 text-center text-muted-foreground">
+                      <Building2 className="h-10 w-10 mx-auto mb-3 text-muted-foreground/30" />
+                      <p className="text-sm">Nenhuma equipe cadastrada.</p>
+                    </td></tr>
+                  ) : teams.data.map((t: any) => (
+                    <tr key={t.id} className="border-b border-border/20 hover:bg-muted/20 transition-colors">
+                      <td className="p-3.5">
+                        <div className="flex items-center gap-2.5">
+                          <div className="h-8 w-8 rounded-xl bg-blue-50 flex items-center justify-center"><Building2 className="h-4 w-4 text-blue-600" /></div>
+                          <span className="font-semibold">{t.name}</span>
+                        </div>
+                      </td>
+                      <td className="p-3.5 text-muted-foreground">{t.createdAt ? new Date(t.createdAt).toLocaleDateString("pt-BR") : "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Card>
         </TabsContent>
 
-        <TabsContent value="roles" className="mt-4">
-          <Card><CardContent className="p-0"><table className="w-full text-sm">
-            <thead><tr className="border-b bg-muted/30"><th className="text-left p-3 font-medium">Perfil</th><th className="text-left p-3 font-medium">Slug</th><th className="text-left p-3 font-medium">Descrição</th></tr></thead>
-            <tbody>
-              {roles.isLoading ? <tr><td colSpan={3} className="p-8 text-center text-muted-foreground">Carregando...</td></tr>
-              : !roles.data?.length ? <tr><td colSpan={3} className="p-8 text-center text-muted-foreground"><Key className="h-8 w-8 mx-auto mb-2 opacity-40" />Nenhum perfil configurado.</td></tr>
-              : roles.data.map((r: any) => (
-                <tr key={r.id} className="border-b hover:bg-muted/20"><td className="p-3 font-medium">{r.name}</td><td className="p-3"><Badge variant="secondary">{r.slug}</Badge></td><td className="p-3 text-muted-foreground">{r.description || "—"}</td></tr>
-              ))}
-            </tbody>
-          </table></CardContent></Card>
+        {/* Roles */}
+        <TabsContent value="roles">
+          <Card className="border-0 shadow-soft rounded-2xl overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-[13px]">
+                <thead><tr className="border-b border-border/30 bg-muted/20">
+                  <th className="text-left p-3.5 font-semibold text-muted-foreground">Perfil</th>
+                  <th className="text-left p-3.5 font-semibold text-muted-foreground">Slug</th>
+                  <th className="text-left p-3.5 font-semibold text-muted-foreground">Descrição</th>
+                </tr></thead>
+                <tbody>
+                  {roles.isLoading ? <tr><td colSpan={3} className="p-12 text-center text-muted-foreground text-sm">Carregando...</td></tr>
+                  : !roles.data?.length ? (
+                    <tr><td colSpan={3} className="p-12 text-center text-muted-foreground">
+                      <Key className="h-10 w-10 mx-auto mb-3 text-muted-foreground/30" />
+                      <p className="text-sm">Nenhum perfil configurado.</p>
+                    </td></tr>
+                  ) : roles.data.map((r: any) => (
+                    <tr key={r.id} className="border-b border-border/20 hover:bg-muted/20 transition-colors">
+                      <td className="p-3.5">
+                        <div className="flex items-center gap-2.5">
+                          <div className="h-8 w-8 rounded-xl bg-violet-50 flex items-center justify-center"><Shield className="h-4 w-4 text-violet-600" /></div>
+                          <span className="font-semibold">{r.name}</span>
+                        </div>
+                      </td>
+                      <td className="p-3.5"><span className="text-[11px] font-mono bg-muted/40 px-2 py-0.5 rounded-md">{r.slug}</span></td>
+                      <td className="p-3.5 text-muted-foreground">{r.description || "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Card>
         </TabsContent>
 
-        <TabsContent value="audit" className="mt-4">
-          <Card><CardContent className="p-0"><table className="w-full text-sm">
-            <thead><tr className="border-b bg-muted/30"><th className="text-left p-3 font-medium">Ação</th><th className="text-left p-3 font-medium">Entidade</th><th className="text-left p-3 font-medium">Usuário</th><th className="text-left p-3 font-medium">Data</th></tr></thead>
-            <tbody>
-              {eventLog.isLoading ? <tr><td colSpan={4} className="p-8 text-center text-muted-foreground">Carregando...</td></tr>
-              : !eventLog.data?.length ? <tr><td colSpan={4} className="p-8 text-center text-muted-foreground"><Activity className="h-8 w-8 mx-auto mb-2 opacity-40" />Nenhum evento registrado.</td></tr>
-              : eventLog.data.map((e: any) => (
-                <tr key={e.id} className="border-b hover:bg-muted/20"><td className="p-3"><Badge variant="secondary">{e.action}</Badge></td><td className="p-3">{e.entityType} #{e.entityId}</td><td className="p-3 text-muted-foreground">User #{e.actorUserId}</td><td className="p-3 text-muted-foreground">{e.createdAt ? new Date(e.createdAt).toLocaleString("pt-BR") : "—"}</td></tr>
-              ))}
-            </tbody>
-          </table></CardContent></Card>
+        {/* Audit */}
+        <TabsContent value="audit">
+          <Card className="border-0 shadow-soft rounded-2xl overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-[13px]">
+                <thead><tr className="border-b border-border/30 bg-muted/20">
+                  <th className="text-left p-3.5 font-semibold text-muted-foreground">Ação</th>
+                  <th className="text-left p-3.5 font-semibold text-muted-foreground">Entidade</th>
+                  <th className="text-left p-3.5 font-semibold text-muted-foreground">Usuário</th>
+                  <th className="text-left p-3.5 font-semibold text-muted-foreground">Data</th>
+                </tr></thead>
+                <tbody>
+                  {eventLog.isLoading ? <tr><td colSpan={4} className="p-12 text-center text-muted-foreground text-sm">Carregando...</td></tr>
+                  : !eventLog.data?.length ? (
+                    <tr><td colSpan={4} className="p-12 text-center text-muted-foreground">
+                      <Activity className="h-10 w-10 mx-auto mb-3 text-muted-foreground/30" />
+                      <p className="text-sm">Nenhum evento registrado.</p>
+                    </td></tr>
+                  ) : eventLog.data.map((e: any) => {
+                    const ac = actionColors[e.action] || { bg: "bg-slate-50", text: "text-slate-600" };
+                    return (
+                      <tr key={e.id} className="border-b border-border/20 hover:bg-muted/20 transition-colors">
+                        <td className="p-3.5"><span className={`inline-flex text-[11px] font-medium px-2.5 py-1 rounded-full ${ac.bg} ${ac.text}`}>{e.action}</span></td>
+                        <td className="p-3.5">{e.entityType} <span className="text-muted-foreground">#{e.entityId}</span></td>
+                        <td className="p-3.5 text-muted-foreground">User #{e.actorUserId}</td>
+                        <td className="p-3.5 text-muted-foreground">{e.createdAt ? new Date(e.createdAt).toLocaleString("pt-BR") : "—"}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </Card>
         </TabsContent>
       </Tabs>
     </div>

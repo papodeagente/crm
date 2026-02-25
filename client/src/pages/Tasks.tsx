@@ -1,72 +1,153 @@
 import { trpc } from "@/lib/trpc";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, ClipboardList, CheckCircle2, Circle, Clock } from "lucide-react";
+import { Plus, ClipboardList, CheckCircle2, Circle, Clock, AlertTriangle } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
 const TENANT_ID = 1;
-const priorityColors: Record<string, string> = { low: "bg-gray-100 text-gray-700", medium: "bg-blue-100 text-blue-700", high: "bg-amber-100 text-amber-700", urgent: "bg-red-100 text-red-700" };
-const statusIcons: Record<string, any> = { pending: Circle, in_progress: Clock, done: CheckCircle2 };
+
+const priorityStyles: Record<string, { bg: string; text: string; dot: string; label: string }> = {
+  low: { bg: "bg-slate-50", text: "text-slate-600", dot: "bg-slate-400", label: "Baixa" },
+  medium: { bg: "bg-blue-50", text: "text-blue-700", dot: "bg-blue-500", label: "Média" },
+  high: { bg: "bg-amber-50", text: "text-amber-700", dot: "bg-amber-500", label: "Alta" },
+  urgent: { bg: "bg-red-50", text: "text-red-700", dot: "bg-red-500", label: "Urgente" },
+};
+
+const statusConfig: Record<string, { icon: any; color: string; label: string }> = {
+  pending: { icon: Circle, color: "text-muted-foreground", label: "Pendente" },
+  in_progress: { icon: Clock, color: "text-blue-500", label: "Em andamento" },
+  done: { icon: CheckCircle2, color: "text-emerald-500", label: "Concluída" },
+};
 
 export default function Tasks() {
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [priority, setPriority] = useState("medium");
+  const [dueAt, setDueAt] = useState("");
   const utils = trpc.useUtils();
 
   const tasks = trpc.crm.tasks.list.useQuery({ tenantId: TENANT_ID });
   const createTask = trpc.crm.tasks.create.useMutation({
-    onSuccess: () => { utils.crm.tasks.list.invalidate(); setOpen(false); setTitle(""); toast.success("Tarefa criada!"); },
+    onSuccess: () => { utils.crm.tasks.list.invalidate(); setOpen(false); setTitle(""); setDueAt(""); toast.success("Tarefa criada!"); },
   });
   const updateTask = trpc.crm.tasks.update.useMutation({
     onSuccess: () => { utils.crm.tasks.list.invalidate(); toast.success("Tarefa atualizada!"); },
   });
 
+  const pending = (tasks.data || []).filter((t: any) => t.status !== "done").length;
+  const done = (tasks.data || []).filter((t: any) => t.status === "done").length;
+
   return (
-    <div className="space-y-6">
+    <div className="p-5 lg:px-8 space-y-5">
+      {/* Header */}
       <div className="flex items-center justify-between">
-        <div><h1 className="text-2xl font-bold tracking-tight">Tarefas</h1><p className="text-muted-foreground">Acompanhe atividades e follow-ups.</p></div>
+        <div>
+          <h1 className="text-xl font-bold tracking-tight text-foreground">Tarefas</h1>
+          <p className="text-[13px] text-muted-foreground mt-0.5">
+            {pending} pendentes \u2022 {done} concluídas
+          </p>
+        </div>
         <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild><Button><Plus className="h-4 w-4 mr-2" />Nova Tarefa</Button></DialogTrigger>
-          <DialogContent>
-            <DialogHeader><DialogTitle>Nova Tarefa</DialogTitle></DialogHeader>
-            <div className="space-y-4 pt-2">
-              <div><Label>Título *</Label><Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Ex: Ligar para cliente" /></div>
-              <div><Label>Prioridade</Label>
-                <Select value={priority} onValueChange={setPriority}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent><SelectItem value="low">Baixa</SelectItem><SelectItem value="medium">Média</SelectItem><SelectItem value="high">Alta</SelectItem><SelectItem value="urgent">Urgente</SelectItem></SelectContent>
-                </Select>
+          <DialogTrigger asChild>
+            <Button className="h-9 gap-2 px-5 rounded-xl shadow-soft bg-gradient-to-r from-primary to-[oklch(0.50_0.14_264)] hover:opacity-90 text-[13px] font-semibold">
+              <Plus className="h-4 w-4" />Nova Tarefa
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-[440px] rounded-2xl">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2.5 text-lg">
+                <div className="h-9 w-9 rounded-xl bg-primary/10 flex items-center justify-center"><ClipboardList className="h-4 w-4 text-primary" /></div>
+                Nova Tarefa
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 pt-3">
+              <div><Label className="text-[12px] font-medium">Título *</Label><Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Ex: Ligar para confirmar reserva" className="mt-1.5 h-10 rounded-xl" /></div>
+              <div className="grid grid-cols-2 gap-3">
+                <div><Label className="text-[12px] font-medium">Prioridade</Label>
+                  <Select value={priority} onValueChange={setPriority}>
+                    <SelectTrigger className="mt-1.5 h-10 rounded-xl"><SelectValue /></SelectTrigger>
+                    <SelectContent className="rounded-xl">
+                      <SelectItem value="low">Baixa</SelectItem>
+                      <SelectItem value="medium">Média</SelectItem>
+                      <SelectItem value="high">Alta</SelectItem>
+                      <SelectItem value="urgent">Urgente</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div><Label className="text-[12px] font-medium">Vencimento</Label>
+                  <Input type="datetime-local" value={dueAt} onChange={(e) => setDueAt(e.target.value)} className="mt-1.5 h-10 rounded-xl" />
+                </div>
               </div>
-              <Button className="w-full" disabled={!title} onClick={() => createTask.mutate({ tenantId: TENANT_ID, entityType: "general", entityId: 0, title, priority: priority as any })}>Criar Tarefa</Button>
+              <Button className="w-full h-11 rounded-xl text-[14px] font-semibold shadow-soft bg-gradient-to-r from-primary to-[oklch(0.50_0.14_264)] hover:opacity-90" disabled={!title || createTask.isPending} onClick={() => createTask.mutate({ tenantId: TENANT_ID, entityType: "general", entityId: 0, title, priority: priority as any, dueAt: dueAt || undefined })}>
+                {createTask.isPending ? "Criando..." : "Criar Tarefa"}
+              </Button>
             </div>
           </DialogContent>
         </Dialog>
       </div>
-      <Card><CardContent className="p-0"><div className="overflow-x-auto"><table className="w-full text-sm">
-        <thead><tr className="border-b bg-muted/30"><th className="text-left p-3 font-medium">Status</th><th className="text-left p-3 font-medium">Título</th><th className="text-left p-3 font-medium">Prioridade</th><th className="text-left p-3 font-medium">Vencimento</th></tr></thead>
-        <tbody>
-          {tasks.isLoading ? <tr><td colSpan={4} className="p-8 text-center text-muted-foreground">Carregando...</td></tr>
-          : !tasks.data?.length ? <tr><td colSpan={4} className="p-8 text-center text-muted-foreground"><ClipboardList className="h-8 w-8 mx-auto mb-2 opacity-40" />Nenhuma tarefa encontrada.</td></tr>
-          : tasks.data.map((t: any) => {
-            const StatusIcon = statusIcons[t.status] || Circle;
-            return (
-              <tr key={t.id} className="border-b hover:bg-muted/20">
-                <td className="p-3"><button onClick={() => updateTask.mutate({ tenantId: TENANT_ID, id: t.id, status: t.status === "done" ? "pending" : "done" })}><StatusIcon className={`h-5 w-5 ${t.status === "done" ? "text-emerald-500" : "text-muted-foreground"}`} /></button></td>
-                <td className={`p-3 font-medium ${t.status === "done" ? "line-through text-muted-foreground" : ""}`}>{t.title}</td>
-                <td className="p-3"><Badge variant="secondary" className={priorityColors[t.priority] || ""}>{t.priority}</Badge></td>
-                <td className="p-3 text-muted-foreground">{t.dueAt ? new Date(t.dueAt).toLocaleDateString("pt-BR") : "—"}</td>
+
+      {/* Table */}
+      <Card className="border-0 shadow-soft rounded-2xl overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-[13px]">
+            <thead>
+              <tr className="border-b border-border/30 bg-muted/20">
+                <th className="text-left p-3.5 font-semibold text-muted-foreground w-12">Status</th>
+                <th className="text-left p-3.5 font-semibold text-muted-foreground">Título</th>
+                <th className="text-left p-3.5 font-semibold text-muted-foreground">Prioridade</th>
+                <th className="text-left p-3.5 font-semibold text-muted-foreground">Vencimento</th>
               </tr>
-            );
-          })}
-        </tbody>
-      </table></div></CardContent></Card>
+            </thead>
+            <tbody>
+              {tasks.isLoading ? (
+                <tr><td colSpan={4} className="p-12 text-center text-muted-foreground text-sm">Carregando...</td></tr>
+              ) : !tasks.data?.length ? (
+                <tr><td colSpan={4} className="p-12 text-center text-muted-foreground">
+                  <ClipboardList className="h-10 w-10 mx-auto mb-3 text-muted-foreground/30" />
+                  <p className="text-sm">Nenhuma tarefa encontrada.</p>
+                </td></tr>
+              ) : tasks.data.map((t: any) => {
+                const sc = statusConfig[t.status] || statusConfig["pending"];
+                const StatusIcon = sc.icon;
+                const ps = priorityStyles[t.priority] || priorityStyles["medium"];
+                const isOverdue = t.dueAt && t.status !== "done" && new Date(t.dueAt) < new Date();
+                return (
+                  <tr key={t.id} className="border-b border-border/20 hover:bg-muted/20 transition-colors">
+                    <td className="p-3.5">
+                      <button
+                        className="p-1 rounded-lg hover:bg-muted/40 transition-colors"
+                        onClick={() => updateTask.mutate({ tenantId: TENANT_ID, id: t.id, status: t.status === "done" ? "pending" : "done" })}
+                      >
+                        <StatusIcon className={`h-5 w-5 ${sc.color} transition-colors`} />
+                      </button>
+                    </td>
+                    <td className={`p-3.5 font-medium ${t.status === "done" ? "line-through text-muted-foreground" : ""}`}>{t.title}</td>
+                    <td className="p-3.5">
+                      <span className={`inline-flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded-full ${ps.bg} ${ps.text}`}>
+                        <span className={`h-1.5 w-1.5 rounded-full ${ps.dot}`} />
+                        {ps.label}
+                      </span>
+                    </td>
+                    <td className="p-3.5">
+                      {t.dueAt ? (
+                        <span className={`flex items-center gap-1.5 text-[12px] ${isOverdue ? "text-red-600 font-semibold" : "text-muted-foreground"}`}>
+                          {isOverdue && <AlertTriangle className="h-3.5 w-3.5" />}
+                          {new Date(t.dueAt).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                        </span>
+                      ) : <span className="text-muted-foreground">—</span>}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </Card>
     </div>
   );
 }

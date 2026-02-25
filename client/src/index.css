@@ -43,75 +43,75 @@
 }
 
 :root {
-  --radius: 0.5rem;
-  /* ASTRA CRM — Deep Indigo + Teal accent */
-  --background: oklch(0.985 0.002 260);
-  --foreground: oklch(0.145 0.02 260);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0.02 260);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0.02 260);
-  --primary: oklch(0.42 0.12 264);
-  --primary-foreground: oklch(0.985 0.002 260);
-  --secondary: oklch(0.955 0.01 260);
-  --secondary-foreground: oklch(0.25 0.03 260);
-  --muted: oklch(0.955 0.01 260);
-  --muted-foreground: oklch(0.52 0.02 260);
-  --accent: oklch(0.58 0.14 180);
-  --accent-foreground: oklch(0.985 0.002 260);
-  --destructive: oklch(0.55 0.2 27);
-  --destructive-foreground: oklch(0.985 0.002 260);
-  --border: oklch(0.9 0.01 260);
-  --input: oklch(0.9 0.01 260);
-  --ring: oklch(0.42 0.12 264);
-  --chart-1: oklch(0.42 0.12 264);
-  --chart-2: oklch(0.58 0.14 180);
-  --chart-3: oklch(0.65 0.15 145);
-  --chart-4: oklch(0.7 0.12 80);
-  --chart-5: oklch(0.55 0.2 27);
-  --sidebar: oklch(0.17 0.04 264);
+  --radius: 0.625rem;
+  /* ASTRA CRM — Refined Indigo + Teal */
+  --background: oklch(0.975 0.003 260);
+  --foreground: oklch(0.16 0.025 260);
+  --card: oklch(0.995 0.001 260);
+  --card-foreground: oklch(0.16 0.025 260);
+  --popover: oklch(0.995 0.001 260);
+  --popover-foreground: oklch(0.16 0.025 260);
+  --primary: oklch(0.45 0.14 264);
+  --primary-foreground: oklch(0.99 0.001 260);
+  --secondary: oklch(0.96 0.008 260);
+  --secondary-foreground: oklch(0.28 0.03 260);
+  --muted: oklch(0.96 0.008 260);
+  --muted-foreground: oklch(0.50 0.02 260);
+  --accent: oklch(0.55 0.15 180);
+  --accent-foreground: oklch(0.99 0.001 260);
+  --destructive: oklch(0.58 0.22 27);
+  --destructive-foreground: oklch(0.99 0.001 260);
+  --border: oklch(0.92 0.006 260);
+  --input: oklch(0.92 0.006 260);
+  --ring: oklch(0.45 0.14 264);
+  --chart-1: oklch(0.45 0.14 264);
+  --chart-2: oklch(0.55 0.15 180);
+  --chart-3: oklch(0.62 0.16 145);
+  --chart-4: oklch(0.68 0.14 80);
+  --chart-5: oklch(0.58 0.22 27);
+  --sidebar: oklch(0.15 0.04 264);
   --sidebar-foreground: oklch(0.88 0.02 260);
-  --sidebar-primary: oklch(0.58 0.14 180);
-  --sidebar-primary-foreground: oklch(0.985 0.002 260);
-  --sidebar-accent: oklch(0.24 0.04 264);
+  --sidebar-primary: oklch(0.55 0.15 180);
+  --sidebar-primary-foreground: oklch(0.99 0.001 260);
+  --sidebar-accent: oklch(0.22 0.04 264);
   --sidebar-accent-foreground: oklch(0.88 0.02 260);
-  --sidebar-border: oklch(0.28 0.04 264);
-  --sidebar-ring: oklch(0.58 0.14 180);
+  --sidebar-border: oklch(0.26 0.04 264);
+  --sidebar-ring: oklch(0.55 0.15 180);
 }
 
 .dark {
-  --background: oklch(0.12 0.02 264);
+  --background: oklch(0.11 0.02 264);
   --foreground: oklch(0.93 0.01 260);
-  --card: oklch(0.16 0.025 264);
+  --card: oklch(0.15 0.025 264);
   --card-foreground: oklch(0.93 0.01 260);
-  --popover: oklch(0.16 0.025 264);
+  --popover: oklch(0.15 0.025 264);
   --popover-foreground: oklch(0.93 0.01 260);
-  --primary: oklch(0.58 0.14 180);
-  --primary-foreground: oklch(0.12 0.02 264);
-  --secondary: oklch(0.22 0.03 264);
+  --primary: oklch(0.55 0.15 180);
+  --primary-foreground: oklch(0.11 0.02 264);
+  --secondary: oklch(0.20 0.03 264);
   --secondary-foreground: oklch(0.88 0.01 260);
-  --muted: oklch(0.22 0.03 264);
-  --muted-foreground: oklch(0.62 0.02 260);
-  --accent: oklch(0.58 0.14 180);
-  --accent-foreground: oklch(0.12 0.02 264);
-  --destructive: oklch(0.55 0.2 27);
+  --muted: oklch(0.20 0.03 264);
+  --muted-foreground: oklch(0.60 0.02 260);
+  --accent: oklch(0.55 0.15 180);
+  --accent-foreground: oklch(0.11 0.02 264);
+  --destructive: oklch(0.58 0.22 27);
   --destructive-foreground: oklch(0.93 0.01 260);
-  --border: oklch(0.26 0.03 264);
-  --input: oklch(0.26 0.03 264);
-  --ring: oklch(0.58 0.14 180);
-  --chart-1: oklch(0.58 0.14 180);
-  --chart-2: oklch(0.42 0.12 264);
-  --chart-3: oklch(0.65 0.15 145);
-  --chart-4: oklch(0.7 0.12 80);
-  --chart-5: oklch(0.55 0.2 27);
-  --sidebar: oklch(0.1 0.02 264);
+  --border: oklch(0.24 0.03 264);
+  --input: oklch(0.24 0.03 264);
+  --ring: oklch(0.55 0.15 180);
+  --chart-1: oklch(0.55 0.15 180);
+  --chart-2: oklch(0.45 0.14 264);
+  --chart-3: oklch(0.62 0.16 145);
+  --chart-4: oklch(0.68 0.14 80);
+  --chart-5: oklch(0.58 0.22 27);
+  --sidebar: oklch(0.09 0.02 264);
   --sidebar-foreground: oklch(0.88 0.02 260);
-  --sidebar-primary: oklch(0.58 0.14 180);
-  --sidebar-primary-foreground: oklch(0.985 0.002 260);
-  --sidebar-accent: oklch(0.18 0.03 264);
+  --sidebar-primary: oklch(0.55 0.15 180);
+  --sidebar-primary-foreground: oklch(0.99 0.001 260);
+  --sidebar-accent: oklch(0.16 0.03 264);
   --sidebar-accent-foreground: oklch(0.88 0.02 260);
-  --sidebar-border: oklch(0.24 0.03 264);
-  --sidebar-ring: oklch(0.58 0.14 180);
+  --sidebar-border: oklch(0.22 0.03 264);
+  --sidebar-ring: oklch(0.55 0.15 180);
 }
 
 @layer base {
@@ -119,8 +119,10 @@
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground antialiased;
     font-family: "Inter", system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
   button:not(:disabled),
   [role="button"]:not([aria-disabled="true"]),
@@ -140,8 +142,8 @@
     width: 100%;
     margin-left: auto;
     margin-right: auto;
-    padding-left: 1rem;
-    padding-right: 1rem;
+    padding-left: 1.25rem;
+    padding-right: 1.25rem;
   }
   .flex {
     min-height: 0;
@@ -149,32 +151,101 @@
   }
   @media (min-width: 640px) {
     .container {
-      padding-left: 1.5rem;
-      padding-right: 1.5rem;
+      padding-left: 1.75rem;
+      padding-right: 1.75rem;
     }
   }
   @media (min-width: 1024px) {
     .container {
-      padding-left: 2rem;
-      padding-right: 2rem;
-      max-width: 1280px;
+      padding-left: 2.5rem;
+      padding-right: 2.5rem;
+      max-width: 1440px;
     }
+  }
+
+  /* Glass card effect */
+  .glass-card {
+    background: oklch(0.995 0.001 260 / 0.7);
+    backdrop-filter: blur(12px);
+    border: 1px solid oklch(0.92 0.006 260 / 0.6);
+    box-shadow: 0 1px 3px oklch(0 0 0 / 0.04), 0 4px 12px oklch(0 0 0 / 0.03);
+    transition: box-shadow 0.2s ease, transform 0.2s ease;
+  }
+  .glass-card:hover {
+    box-shadow: 0 2px 6px oklch(0 0 0 / 0.06), 0 8px 24px oklch(0 0 0 / 0.05);
+  }
+
+  /* Gradient text */
+  .gradient-text {
+    background: linear-gradient(135deg, oklch(0.45 0.14 264), oklch(0.55 0.15 180));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* Soft shadow for elevated elements */
+  .shadow-soft {
+    box-shadow: 0 1px 2px oklch(0 0 0 / 0.03), 0 2px 8px oklch(0 0 0 / 0.04), 0 4px 16px oklch(0 0 0 / 0.03);
+  }
+  .shadow-soft-lg {
+    box-shadow: 0 2px 4px oklch(0 0 0 / 0.04), 0 4px 12px oklch(0 0 0 / 0.05), 0 8px 32px oklch(0 0 0 / 0.04);
   }
 }
 
 @layer utilities {
   .scrollbar-thin {
     scrollbar-width: thin;
-    scrollbar-color: oklch(0.4 0.02 260) transparent;
+    scrollbar-color: oklch(0.75 0.01 260) transparent;
   }
   .scrollbar-thin::-webkit-scrollbar {
-    width: 6px;
+    width: 5px;
+    height: 5px;
   }
   .scrollbar-thin::-webkit-scrollbar-track {
     background: transparent;
   }
   .scrollbar-thin::-webkit-scrollbar-thumb {
-    background-color: oklch(0.4 0.02 260);
-    border-radius: 3px;
+    background-color: oklch(0.75 0.01 260);
+    border-radius: 10px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background-color: oklch(0.60 0.01 260);
+  }
+
+  /* Page content wrapper — prevents lateral cuts */
+  .page-content {
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+    padding-top: 1.5rem;
+    padding-bottom: 2rem;
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+  @media (min-width: 640px) {
+    .page-content {
+      padding-left: 2rem;
+      padding-right: 2rem;
+      padding-top: 2rem;
+    }
+  }
+  @media (min-width: 1024px) {
+    .page-content {
+      padding-left: 2.5rem;
+      padding-right: 2.5rem;
+    }
+  }
+
+  /* Kanban-specific full-bleed layout */
+  .kanban-content {
+    padding-left: 1.25rem;
+    padding-right: 1.25rem;
+    padding-top: 1rem;
+    padding-bottom: 1rem;
+  }
+  @media (min-width: 640px) {
+    .kanban-content {
+      padding-left: 1.5rem;
+      padding-right: 1.5rem;
+    }
   }
 }
