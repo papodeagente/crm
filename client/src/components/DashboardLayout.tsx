@@ -21,15 +21,19 @@ import {
 } from "@/components/ui/sidebar";
 import { getLoginUrl } from "@/const";
 import { useIsMobile } from "@/hooks/useMobile";
-import { LayoutDashboard, LogOut, PanelLeft, Users } from "lucide-react";
+import { LayoutDashboard, LogOut, PanelLeft, MessageSquare, Activity, Settings, Bot, Send } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
 import { Button } from "./ui/button";
 
 const menuItems = [
-  { icon: LayoutDashboard, label: "Page 1", path: "/" },
-  { icon: Users, label: "Page 2", path: "/some-path" },
+  { icon: LayoutDashboard, label: "Dashboard", path: "/" },
+  { icon: Send, label: "Enviar Mensagem", path: "/send" },
+  { icon: MessageSquare, label: "Mensagens", path: "/messages" },
+  { icon: Activity, label: "Logs", path: "/logs" },
+  { icon: Bot, label: "Chatbot", path: "/chatbot" },
+  { icon: Settings, label: "API Docs", path: "/api-docs" },
 ];
 
 const SIDEBAR_WIDTH_KEY = "sidebar-width";
@@ -65,7 +69,7 @@ export default function DashboardLayout({
               Sign in to continue
             </h1>
             <p className="text-sm text-muted-foreground text-center max-w-sm">
-              Access to this dashboard requires authentication. Continue to launch the login flow.
+              Acesse o painel de controle do WhatsApp API. Faça login para continuar.
             </p>
           </div>
           <Button
@@ -75,7 +79,7 @@ export default function DashboardLayout({
             size="lg"
             className="w-full shadow-lg hover:shadow-xl transition-all"
           >
-            Sign in
+            Entrar
           </Button>
         </div>
       </div>
@@ -170,8 +174,8 @@ function DashboardLayoutContent({
               </button>
               {!isCollapsed ? (
                 <div className="flex items-center gap-2 min-w-0">
-                  <span className="font-semibold tracking-tight truncate">
-                    Navigation
+                  <span className="font-semibold tracking-tight truncate text-primary">
+                    WhatsApp API
                   </span>
                 </div>
               ) : null}

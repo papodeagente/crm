@@ -1,11 +1,10 @@
-import { eq } from "drizzle-orm";
+import { eq, desc, and, or, like } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users } from "../drizzle/schema";
+import { InsertUser, users, whatsappSessions, messages, activityLogs, chatbotSettings } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
-// Lazily create the drizzle instance so local tooling can run without a DB.
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
     try {
@@ -85,8 +84,92 @@ export async function getUserByOpenId(openId: string) {
   }
 
   const result = await db.select().from(users).where(eq(users.openId, openId)).limit(1);
-
   return result.length > 0 ? result[0] : undefined;
 }
 
-// TODO: add feature queries here as your schema grows.
+// WhatsApp Sessions
+export async function getSessionsByUser(userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(whatsappSessions).where(eq(whatsappSessions.userId, userId));
+}
+
+export async function getSessionBySessionId(sessionId: string) {
+  const db = await getDb();
+  if (!db) return null;
+  const result = await db.select().from(whatsappSessions).where(eq(whatsappSessions.sessionId, sessionId)).limit(1);
+  return result[0] || null;
+}
+
+// Messages
+export async function getMessages(sessionId: string, limit = 50, offset = 0) {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select()
+    .from(messages)
+    .where(eq(messages.sessionId, sessionId))
+    .orderBy(desc(messages.createdAt))
+    .limit(limit)
+    .offset(offset);
+}
+
+export async function getMessagesByContact(sessionId: string, remoteJid: string, limit = 50) {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select()
+    .from(messages)
+    .where(and(eq(messages.sessionId, sessionId), eq(messages.remoteJid, remoteJid)))
+    .orderBy(desc(messages.createdAt))
+    .limit(limit);
+}
+
+// Activity Logs
+export async function getLogs(sessionId: string, limit = 100) {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select()
+    .from(activityLogs)
+    .where(eq(activityLogs.sessionId, sessionId))
+    .orderBy(desc(activityLogs.createdAt))
+    .limit(limit);
+}
+
+export async function getAllLogs(limit = 100) {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select()
+    .from(activityLogs)
+    .orderBy(desc(activityLogs.createdAt))
+    .limit(limit);
+}
+
+// Chatbot Settings
+export async function getChatbotSettings(sessionId: string) {
+  const db = await getDb();
+  if (!db) return null;
+  const result = await db.select().from(chatbotSettings).where(eq(chatbotSettings.sessionId, sessionId)).limit(1);
+  return result[0] || null;
+}
+
+export async function upsertChatbotSettings(sessionId: string, enabled: boolean, systemPrompt?: string, maxTokens?: number) {
+  const db = await getDb();
+  if (!db) return;
+  const existing = await getChatbotSettings(sessionId);
+  if (existing) {
+    await db
+      .update(chatbotSettings)
+      .set({ enabled, systemPrompt: systemPrompt ?? existing.systemPrompt, maxTokens: maxTokens ?? existing.maxTokens })
+      .where(eq(chatbotSettings.sessionId, sessionId));
+  } else {
+    await db.insert(chatbotSettings).values({
+      sessionId,
+      enabled,
+      systemPrompt: systemPrompt || "Você é um assistente virtual amigável e prestativo. Responda de forma concisa e educada em português.",
+      maxTokens: maxTokens || 500,
+    });
+  }
+}
