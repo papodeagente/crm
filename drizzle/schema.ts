@@ -256,6 +256,56 @@ export const dealParticipants = mysqlTable("deal_participants", {
 }, (t) => [index("dp_tenant_idx").on(t.tenantId)]);
 
 // ════════════════════════════════════════════════════════════
+// DEAL PRODUCTS (Orçamento / Itens do Deal)
+// ════════════════════════════════════════════════════════════
+
+export const dealProducts = mysqlTable("deal_products", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  dealId: int("dealId").notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  category: mysqlEnum("category", ["flight", "hotel", "tour", "transfer", "insurance", "cruise", "visa", "other"]).default("other").notNull(),
+  quantity: int("quantity").default(1).notNull(),
+  unitPriceCents: bigint("unitPriceCents", { mode: "number" }).default(0).notNull(),
+  discountCents: bigint("discountCents", { mode: "number" }).default(0),
+  currency: varchar("currency", { length: 3 }).default("BRL"),
+  supplier: varchar("supplier", { length: 255 }),
+  checkIn: timestamp("checkIn"),
+  checkOut: timestamp("checkOut"),
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (t) => [
+  index("dp_prod_tenant_deal_idx").on(t.tenantId, t.dealId),
+]);
+
+// ════════════════════════════════════════════════════════════
+// DEAL HISTORY (Histórico de Movimentações)
+// ════════════════════════════════════════════════════════════
+
+export const dealHistory = mysqlTable("deal_history", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  dealId: int("dealId").notNull(),
+  action: varchar("action", { length: 64 }).notNull(),
+  description: text("description").notNull(),
+  fromStageId: int("fromStageId"),
+  toStageId: int("toStageId"),
+  fromStageName: varchar("fromStageName", { length: 128 }),
+  toStageName: varchar("toStageName", { length: 128 }),
+  fieldChanged: varchar("fieldChanged", { length: 64 }),
+  oldValue: text("oldValue"),
+  newValue: text("newValue"),
+  actorUserId: int("actorUserId"),
+  actorName: varchar("actorName", { length: 255 }),
+  metadataJson: json("metadataJson"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (t) => [
+  index("dh_tenant_deal_idx").on(t.tenantId, t.dealId),
+]);
+
+// ════════════════════════════════════════════════════════════
 // TRIPS (Pós-venda / M2 + M4)
 // ════════════════════════════════════════════════════════════
 
@@ -665,6 +715,11 @@ export const eventLog = mysqlTable("event_log", {
 // ════════════════════════════════════════════════════════════
 // TYPE EXPORTS
 // ════════════════════════════════════════════════════════════
+
+export type DealProduct = typeof dealProducts.$inferSelect;
+export type InsertDealProduct = typeof dealProducts.$inferInsert;
+export type DealHistoryEntry = typeof dealHistory.$inferSelect;
+export type InsertDealHistory = typeof dealHistory.$inferInsert;
 
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;

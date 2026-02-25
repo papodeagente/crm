@@ -3,7 +3,7 @@ import { getDb } from "./db";
 import {
   tenants, crmUsers, teams, teamMembers, roles, permissions, rolePermissions, userRoles, apiKeys,
   contacts, accounts, deals, dealParticipants, pipelines, pipelineStages, trips, tripItems,
-  tasks, crmNotes, crmAttachments,
+  tasks, crmNotes, crmAttachments, dealProducts, dealHistory,
   channels, conversations, inboxMessages,
   proposalTemplates, proposals, proposalItems, proposalSignatures,
   portalUsers, portalSessions, portalTickets,
@@ -201,6 +201,70 @@ export async function sumDealValue(tenantId: number, status?: string) {
   if (status) conditions.push(eq(deals.status, status as any));
   const rows = await db.select({ total: sql<number>`COALESCE(SUM(valueCents), 0)` }).from(deals).where(and(...conditions));
   return rows[0]?.total || 0;
+}
+
+// ═══════════════════════════════════════
+// ACCOUNTS
+// ═══════════════════════════════════════
+export async function listAccounts(tenantId: number) {
+  const db = await getDb(); if (!db) return [];
+  return db.select().from(accounts).where(eq(accounts.tenantId, tenantId)).orderBy(desc(accounts.createdAt));
+}
+export async function getAccountById(tenantId: number, id: number) {
+  const db = await getDb(); if (!db) return null;
+  const rows = await db.select().from(accounts).where(and(eq(accounts.id, id), eq(accounts.tenantId, tenantId))).limit(1);
+  return rows[0] || null;
+}
+
+// ═══════════════════════════════════════
+// DEAL PRODUCTS
+// ═══════════════════════════════════════
+export async function createDealProduct(data: { tenantId: number; dealId: number; name: string; description?: string; category?: "flight" | "hotel" | "tour" | "transfer" | "insurance" | "cruise" | "visa" | "other"; quantity?: number; unitPriceCents?: number; discountCents?: number; supplier?: string; checkIn?: Date; checkOut?: Date; notes?: string }) {
+  const db = await getDb(); if (!db) return null;
+  const [result] = await db.insert(dealProducts).values(data).$returningId();
+  return result;
+}
+export async function listDealProducts(tenantId: number, dealId: number) {
+  const db = await getDb(); if (!db) return [];
+  return db.select().from(dealProducts).where(and(eq(dealProducts.tenantId, tenantId), eq(dealProducts.dealId, dealId))).orderBy(desc(dealProducts.createdAt));
+}
+export async function updateDealProduct(tenantId: number, id: number, data: Partial<{ name: string; description: string; category: "flight" | "hotel" | "tour" | "transfer" | "insurance" | "cruise" | "visa" | "other"; quantity: number; unitPriceCents: number; discountCents: number; supplier: string; checkIn: Date; checkOut: Date; notes: string }>) {
+  const db = await getDb(); if (!db) return;
+  await db.update(dealProducts).set(data).where(and(eq(dealProducts.id, id), eq(dealProducts.tenantId, tenantId)));
+}
+export async function deleteDealProduct(tenantId: number, id: number) {
+  const db = await getDb(); if (!db) return;
+  await db.delete(dealProducts).where(and(eq(dealProducts.id, id), eq(dealProducts.tenantId, tenantId)));
+}
+
+// ═══════════════════════════════════════
+// DEAL HISTORY
+// ═══════════════════════════════════════
+export async function createDealHistory(data: { tenantId: number; dealId: number; action: string; description: string; fromStageId?: number; toStageId?: number; fromStageName?: string; toStageName?: string; fieldChanged?: string; oldValue?: string; newValue?: string; actorUserId?: number; actorName?: string; metadataJson?: any }) {
+  const db = await getDb(); if (!db) return null;
+  const [result] = await db.insert(dealHistory).values(data).$returningId();
+  return result;
+}
+export async function listDealHistory(tenantId: number, dealId: number) {
+  const db = await getDb(); if (!db) return [];
+  return db.select().from(dealHistory).where(and(eq(dealHistory.tenantId, tenantId), eq(dealHistory.dealId, dealId))).orderBy(desc(dealHistory.createdAt));
+}
+
+// ═══════════════════════════════════════
+// DEAL PARTICIPANTS
+// ═══════════════════════════════════════
+export async function addDealParticipant(data: { tenantId: number; dealId: number; contactId: number; role?: "decision_maker" | "traveler" | "payer" | "companion" | "other" }) {
+  const db = await getDb(); if (!db) return null;
+  const [result] = await db.insert(dealParticipants).values(data).$returningId();
+  return result;
+}
+export async function listDealParticipants(tenantId: number, dealId: number) {
+  const db = await getDb(); if (!db) return [];
+  return db.select().from(dealParticipants).where(and(eq(dealParticipants.tenantId, tenantId), eq(dealParticipants.dealId, dealId)));
+}
+export async function removeDealParticipant(tenantId: number, id: number) {
+  const db = await getDb(); if (!db) return;
+  await db.delete(dealParticipants).where(and(eq(dealParticipants.id, id), eq(dealParticipants.tenantId, tenantId)));
 }
 
 // ═══════════════════════════════════════

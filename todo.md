@@ -84,3 +84,17 @@
 - [x] Modal de criação de negociação com campos de agência de viagens (destino, datas, passageiros, valor pacote)
 - [x] Toggle Kanban/Lista na página de negociações
 - [x] Botão "Criar Tarefa" em cada card de deal
+
+## Drawer de Deal + Drag-and-Drop + Histórico (v3)
+- [x] Tabela deal_products (produtos/itens do orçamento vinculados ao deal)
+- [x] Tabela deal_history (histórico de movimentações e alterações)
+- [x] Backend: CRUD de deal_products (add, edit, remove, list)
+- [x] Backend: Registro automático de histórico ao mover deal de etapa
+- [x] Backend: Endpoint para mover deal entre stages
+- [x] Backend: Associação de contato e empresa ao deal
+- [x] Frontend: Drag-and-drop no Kanban para mover cards entre colunas
+- [x] Frontend: Drawer lateral ao clicar no card com informações completas
+- [x] Frontend: Aba de associação de contato e empresa dentro do drawer
+- [x] Frontend: Aba de produtos/orçamento com add/edit/remove e totais
+- [x] Frontend: Aba de histórico de movimentações dentro do drawer
+- [x] Testes unitários atualizados (31 passando)
