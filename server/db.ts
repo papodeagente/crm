@@ -1,4 +1,4 @@
-import { eq, desc, and, or, like, lt } from "drizzle-orm";
+import { eq, desc, and, or, like, lt, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import { InsertUser, users, whatsappSessions, waMessages as messages, activityLogs, chatbotSettings, chatbotRules } from "../drizzle/schema";
 import { ENV } from './_core/env';
@@ -221,4 +221,55 @@ export async function removeChatbotRule(id: number) {
   const db = await getDb();
   if (!db) return;
   await db.delete(chatbotRules).where(eq(chatbotRules.id, id));
+}
+
+// WhatsApp Conversations List (grouped by remoteJid)
+export async function getConversationsList(sessionId: string) {
+  const db = await getDb();
+  if (!db) return [];
+  // Get distinct remoteJids with last message info using raw SQL
+  const result = await db.execute(sql`
+    SELECT 
+      m.remoteJid,
+      m.content AS lastMessage,
+      m.messageType AS lastMessageType,
+      m.fromMe AS lastFromMe,
+      m.timestamp AS lastTimestamp,
+      m.status AS lastStatus,
+      (
+        SELECT COUNT(*) FROM messages m2 
+        WHERE m2.sessionId = ${sessionId} 
+        AND m2.remoteJid = m.remoteJid 
+        AND m2.fromMe = 0 
+        AND (m2.status IS NULL OR m2.status = 'received')
+      ) AS unreadCount,
+      (
+        SELECT COUNT(*) FROM messages m3 
+        WHERE m3.sessionId = ${sessionId} 
+        AND m3.remoteJid = m.remoteJid
+      ) AS totalMessages
+    FROM messages m
+    INNER JOIN (
+      SELECT remoteJid, MAX(id) AS maxId
+      FROM messages
+      WHERE sessionId = ${sessionId}
+      GROUP BY remoteJid
+    ) latest ON m.remoteJid = latest.remoteJid AND m.id = latest.maxId
+    WHERE m.sessionId = ${sessionId}
+    ORDER BY m.timestamp DESC
+  `);
+  return (result as any)[0] || [];
+}
+
+// Mark conversation as read
+export async function markConversationRead(sessionId: string, remoteJid: string) {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(messages)
+    .set({ status: "read" })
+    .where(and(
+      eq(messages.sessionId, sessionId),
+      eq(messages.remoteJid, remoteJid),
+      eq(messages.fromMe, false)
+    ));
 }

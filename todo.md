@@ -271,3 +271,23 @@
 - [x] Corrigir formatação para números brasileiros — resolveJid() com onWhatsApp() + fallback 9º dígito
 - [x] Garantir que o JID de envio corresponda ao JID das mensagens recebidas (resolveJid no frontend)
 - [x] Testar envio e recebimento na mesma conversa — 77 testes passando
+
+## Inbox WhatsApp Web (v10)
+
+### Backend
+- [x] Criar endpoint de lista de conversas agrupadas por remoteJid (última mensagem, contagem não lidas, nome)
+- [x] Endpoint de marcar conversa como lida
+
+### Frontend - Layout WhatsApp Web
+- [x] Sidebar esquerda com lista de conversas (foto, nome, última mensagem, hora, badge não lidas)
+- [x] Barra de busca para filtrar conversas
+- [x] Painel direito com a conversa aberta (reutilizar WhatsAppChat)
+- [x] Header do painel com info do contato
+- [x] Estado vazio quando nenhuma conversa selecionada (estilo WhatsApp Web)
+- [x] Responsivo: mobile mostra lista ou conversa, desktop mostra ambos
+- [x] Indicador de conversa ativa/selecionada
+- [x] Ordenação por última mensagem recebida
+- [x] Match de nomes com contatos do CRM
+- [x] Ticks de status na preview da última mensagem
+- [x] Filtros (Todas, Não lidas, Grupos)
+- [x] Testes unitários — 80 testes passando

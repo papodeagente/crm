@@ -58,6 +58,30 @@ describe("WhatsApp API Routes", () => {
     expect(result.user).toBeNull();
   });
 
+  // ─── Conversations & Mark Read ───
+  it("whatsapp.conversations returns empty array for unknown session", async () => {
+    const { ctx } = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    const result = await caller.whatsapp.conversations({ sessionId: "nonexistent-session" });
+    expect(Array.isArray(result)).toBe(true);
+    expect(result.length).toBe(0);
+  });
+
+  it("whatsapp.markRead succeeds for any session/jid", async () => {
+    const { ctx } = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    const result = await caller.whatsapp.markRead({ sessionId: "test-session", remoteJid: "5511999999999@s.whatsapp.net" });
+    expect(result).toEqual({ success: true });
+  });
+
+  it("whatsapp.conversations returns empty for blank sessionId", async () => {
+    const { ctx } = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    const result = await caller.whatsapp.conversations({ sessionId: "blank-session" });
+    expect(Array.isArray(result)).toBe(true);
+    expect(result.length).toBe(0);
+  });
+
   it("whatsapp.sendMessage rejects when session is not connected", async () => {
     const { ctx } = createAuthContext();
     const caller = appRouter.createCaller(ctx);

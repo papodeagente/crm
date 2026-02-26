@@ -1,324 +1,433 @@
+import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { trpc } from "@/lib/trpc";
-import { Button } from "@/components/ui/button";
+import { useSocket } from "@/hooks/useSocket";
+import WhatsAppChat from "@/components/WhatsAppChat";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  Inbox as InboxIcon, Send, Search, User, Clock,
-  MessageSquare, Hash, Globe, Phone, Mail, MapPin,
-  Briefcase, FileText, Paperclip, Smile,
+  Search, MessageSquare, Filter, MoreVertical, ArrowLeft,
+  Check, CheckCheck, Clock, Mic, Image as ImageIcon, Video,
+  FileText, Phone, Loader2, Users, ChevronDown
 } from "lucide-react";
-import { useState, useRef, useEffect } from "react";
 
-const TENANT_ID = 1;
-
-const statusConfig: Record<string, { dot: string; label: string }> = {
-  open: { dot: "bg-blue-500", label: "Aberta" },
-  pending: { dot: "bg-amber-500", label: "Pendente" },
-  resolved: { dot: "bg-emerald-500", label: "Resolvida" },
-  closed: { dot: "bg-neutral-400", label: "Fechada" },
-};
-
-function timeAgo(date: string | Date | null | undefined) {
+// ─── Helpers ───
+function formatTime(date: string | Date | null | undefined) {
   if (!date) return "";
   const d = new Date(date);
   const now = new Date();
-  const diff = Math.floor((now.getTime() - d.getTime()) / 60000);
-  if (diff < 1) return "agora";
-  if (diff < 60) return `${diff}min`;
-  if (diff < 1440) return `${Math.floor(diff / 60)}h`;
-  return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+  const diffMs = now.getTime() - d.getTime();
+  const diffDays = Math.floor(diffMs / 86400000);
+
+  if (diffDays === 0) {
+    return d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+  }
+  if (diffDays === 1) return "Ontem";
+  if (diffDays < 7) {
+    return d.toLocaleDateString("pt-BR", { weekday: "short" });
+  }
+  return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit" });
 }
 
-export default function InboxPage() {
-  const [selectedConv, setSelectedConv] = useState<number | null>(null);
-  const [messageText, setMessageText] = useState("");
-  const [search, setSearch] = useState("");
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const utils = trpc.useUtils();
+function getContactName(jid: string): string {
+  if (!jid) return "Desconhecido";
+  // Group JID
+  if (jid.includes("@g.us")) {
+    return jid.split("@")[0];
+  }
+  // Extract phone number from JID
+  const phone = jid.split("@")[0];
+  // Format Brazilian number
+  if (phone.startsWith("55") && phone.length >= 12) {
+    const ddd = phone.substring(2, 4);
+    const num = phone.substring(4);
+    if (num.length === 9) {
+      return `(${ddd}) ${num.substring(0, 5)}-${num.substring(5)}`;
+    }
+    if (num.length === 8) {
+      return `(${ddd}) ${num.substring(0, 4)}-${num.substring(4)}`;
+    }
+  }
+  return phone;
+}
 
-  const conversations = trpc.inbox.conversations.list.useQuery({ tenantId: TENANT_ID, limit: 50 });
-  const messages = trpc.inbox.messages.list.useQuery(
-    { tenantId: TENANT_ID, conversationId: selectedConv ?? 0, limit: 100 },
-    { enabled: !!selectedConv }
-  );
-  const sendMessage = trpc.inbox.messages.send.useMutation({
-    onSuccess: () => { utils.inbox.messages.list.invalidate(); setMessageText(""); },
-  });
+function getMessagePreview(content: string | null, messageType: string | null): string {
+  if (!messageType || messageType === "text" || messageType === "conversation" || messageType === "extendedTextMessage") {
+    return content || "";
+  }
+  if (messageType === "imageMessage" || messageType === "image") return "📷 Foto";
+  if (messageType === "videoMessage" || messageType === "video") return "📹 Vídeo";
+  if (messageType === "audioMessage" || messageType === "audio") return "🎤 Áudio";
+  if (messageType === "documentMessage" || messageType === "document") return "📄 Documento";
+  if (messageType === "stickerMessage") return "🏷️ Sticker";
+  if (messageType === "contactMessage") return "👤 Contato";
+  if (messageType === "locationMessage") return "📍 Localização";
+  return content || `[${messageType}]`;
+}
 
-  const activeConv = conversations.data?.find((c: any) => c.id === selectedConv);
+// ─── Status Ticks for conversation list ───
+function ConvStatusTick({ status, fromMe }: { status: string | null; fromMe: boolean }) {
+  if (!fromMe) return null;
+  switch (status) {
+    case "pending":
+      return <Clock className="w-3.5 h-3.5 text-[#667781]/60 shrink-0" />;
+    case "sent":
+      return <Check className="w-3.5 h-3.5 text-[#667781]/60 shrink-0" />;
+    case "delivered":
+      return <CheckCheck className="w-3.5 h-3.5 text-[#667781]/60 shrink-0" />;
+    case "read":
+    case "played":
+      return <CheckCheck className="w-3.5 h-3.5 text-[#53bdeb] shrink-0" />;
+    default:
+      return <Check className="w-3.5 h-3.5 text-[#667781]/60 shrink-0" />;
+  }
+}
 
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages.data]);
-
-  const filteredConvs = (conversations.data || []).filter((c: any) => {
-    if (!search) return true;
-    const s = search.toLowerCase();
-    return String(c.id).includes(s) || (c.lastMessagePreview || "").toLowerCase().includes(s);
-  });
+// ─── WhatsApp Avatar ───
+function WaAvatar({ name, size = 49, isGroup = false }: { name: string; size?: number; isGroup?: boolean }) {
+  const initials = name
+    .split(" ")
+    .map((w) => w[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
 
   return (
-    <div className="flex h-[calc(100vh-56px)] overflow-hidden">
-      {/* ─── Column 1: Conversations ─── */}
-      <div className="w-[320px] border-r border-border/40 flex flex-col shrink-0 bg-[var(--sidebar-bg,oklch(0.985_0_0))]">
+    <div
+      className="rounded-full bg-[#DFE5E7] flex items-center justify-center shrink-0 overflow-hidden"
+      style={{ width: size, height: size }}
+    >
+      {isGroup ? (
+        <Users className="text-white" style={{ width: size * 0.45, height: size * 0.45 }} />
+      ) : (
+        <svg viewBox="0 0 212 212" width={size} height={size}>
+          <path fill="#DFE5E7" d="M106 0C47.5 0 0 47.5 0 106s47.5 106 106 106 106-47.5 106-106S164.5 0 106 0z" />
+          <path fill="#FFF" d="M106 45c-20.7 0-37.5 16.8-37.5 37.5S85.3 120 106 120s37.5-16.8 37.5-37.5S126.7 45 106 45zm0 105c-28.3 0-52.5 14.3-52.5 32v10h105v-10c0-17.7-24.2-32-52.5-32z" />
+        </svg>
+      )}
+    </div>
+  );
+}
+
+// ─── Conversation Item ───
+interface ConvItem {
+  remoteJid: string;
+  lastMessage: string | null;
+  lastMessageType: string | null;
+  lastFromMe: boolean | number;
+  lastTimestamp: string | Date | null;
+  lastStatus: string | null;
+  unreadCount: number | string;
+  totalMessages: number | string;
+}
+
+function ConversationItem({
+  conv,
+  isActive,
+  contactName,
+  onClick,
+}: {
+  conv: ConvItem;
+  isActive: boolean;
+  contactName: string;
+  onClick: () => void;
+}) {
+  const isGroup = conv.remoteJid.includes("@g.us");
+  const fromMe = conv.lastFromMe === true || conv.lastFromMe === 1;
+  const unread = Number(conv.unreadCount) || 0;
+  const preview = getMessagePreview(conv.lastMessage, conv.lastMessageType);
+
+  return (
+    <button
+      onClick={onClick}
+      className={`w-full text-left flex items-center gap-3 px-3 py-2.5 transition-colors duration-75 ${
+        isActive
+          ? "bg-[#F0F2F5]"
+          : "hover:bg-[#F5F6F6]"
+      }`}
+    >
+      <WaAvatar name={contactName} size={49} isGroup={isGroup} />
+      <div className="flex-1 min-w-0 border-b border-[#E9EDEF] py-0.5" style={{ borderBottom: "none" }}>
+        <div className="flex items-center justify-between">
+          <p className="text-[16px] text-[#111B21] truncate font-normal leading-tight">
+            {contactName}
+          </p>
+          <span className={`text-[12px] shrink-0 ml-2 ${unread > 0 ? "text-[#25D366] font-medium" : "text-[#667781]"}`}>
+            {formatTime(conv.lastTimestamp)}
+          </span>
+        </div>
+        <div className="flex items-center gap-1 mt-0.5">
+          <ConvStatusTick status={conv.lastStatus} fromMe={fromMe} />
+          <p className="text-[14px] text-[#667781] truncate flex-1 leading-tight">
+            {preview || "Sem mensagens"}
+          </p>
+          {unread > 0 && (
+            <span className="bg-[#25D366] text-white text-[11px] font-bold rounded-full min-w-[20px] h-[20px] flex items-center justify-center px-1.5 shrink-0">
+              {unread > 99 ? "99+" : unread}
+            </span>
+          )}
+        </div>
+      </div>
+    </button>
+  );
+}
+
+// ─── Empty State (WhatsApp Web style) ───
+function EmptyChat() {
+  return (
+    <div className="flex-1 flex items-center justify-center bg-[#F0F2F5]">
+      <div className="text-center max-w-md px-6">
+        <div className="w-[320px] h-[188px] mx-auto mb-8 relative">
+          <svg viewBox="0 0 303 172" width="320" height="188">
+            <path fill="#DAF7C3" d="M229.565 160.229c32.647-16.166 55.349-51.227 55.349-91.229 0-56.243-45.694-101.937-101.937-101.937S80.04 12.757 80.04 69c0 40.002 22.702 75.063 55.349 91.229L151.5 172l15.612-11.771h62.453z"/>
+            <path fill="#FFF" d="M180.5 84.5c0 16.016-12.984 29-29 29s-29-12.984-29-29 12.984-29 29-29 29 12.984 29 29z"/>
+            <path fill="#DAF7C3" d="M151.5 60.5c-13.255 0-24 10.745-24 24s10.745 24 24 24 24-10.745 24-24-10.745-24-24-24zm-3.6 36l-12-12 3.4-3.4 8.6 8.6 18.6-18.6 3.4 3.4-22 22z"/>
+          </svg>
+        </div>
+        <h2 className="text-[32px] font-light text-[#41525D] mb-4">WhatsApp Web</h2>
+        <p className="text-[14px] text-[#667781] leading-relaxed">
+          Envie e receba mensagens diretamente do seu CRM. Selecione uma conversa ao lado para começar.
+        </p>
+        <div className="mt-8 flex items-center justify-center gap-2 text-[13px] text-[#667781]/60">
+          <span className="inline-block w-1.5 h-1.5 rounded-full bg-[#25D366]" />
+          Conectado e sincronizado
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── MAIN PAGE ───
+export default function InboxPage() {
+  const { lastMessage } = useSocket();
+  const [selectedJid, setSelectedJid] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [showMobileChat, setShowMobileChat] = useState(false);
+
+  // Get active WhatsApp session
+  const sessionsQ = trpc.whatsapp.sessions.useQuery();
+  const activeSession = useMemo(
+    () => (sessionsQ.data || []).find((s: any) => s.liveStatus === "connected"),
+    [sessionsQ.data]
+  );
+
+  // Get conversations list
+  const conversationsQ = trpc.whatsapp.conversations.useQuery(
+    { sessionId: activeSession?.sessionId || "" },
+    { enabled: !!activeSession?.sessionId, refetchInterval: 10000 }
+  );
+
+  // Get CRM contacts to match names
+  const contactsQ = trpc.crm.contacts.list.useQuery(
+    { tenantId: 1, limit: 500 },
+    { enabled: true }
+  );
+
+  // Mark as read mutation
+  const markRead = trpc.whatsapp.markRead.useMutation({
+    onSuccess: () => conversationsQ.refetch(),
+  });
+
+  // Build contact name map from CRM contacts (phone -> name)
+  const contactNameMap = useMemo(() => {
+    const map = new Map<string, { id: number; name: string; phone: string; email?: string; avatarUrl?: string }>();
+    for (const c of (contactsQ.data as any[]) || []) {
+      if (c.phone) {
+        const cleaned = c.phone.replace(/\D/g, "");
+        // Store with and without country code
+        map.set(cleaned, { id: c.id, name: c.name, phone: c.phone, email: c.email || undefined, avatarUrl: undefined });
+        if (cleaned.startsWith("55")) {
+          map.set(cleaned.substring(2), { id: c.id, name: c.name, phone: c.phone, email: c.email || undefined, avatarUrl: undefined });
+        } else {
+          map.set(`55${cleaned}`, { id: c.id, name: c.name, phone: c.phone, email: c.email || undefined, avatarUrl: undefined });
+        }
+      }
+    }
+    return map;
+  }, [contactsQ.data]);
+
+  // Find CRM contact for a JID
+  const getContactForJid = useCallback((jid: string) => {
+    const phone = jid.split("@")[0];
+    return contactNameMap.get(phone) || null;
+  }, [contactNameMap]);
+
+  // Get display name for a JID
+  const getDisplayName = useCallback((jid: string) => {
+    const contact = getContactForJid(jid);
+    if (contact) return contact.name;
+    return getContactName(jid);
+  }, [getContactForJid]);
+
+  // Refetch on new messages
+  useEffect(() => {
+    if (lastMessage) {
+      conversationsQ.refetch();
+    }
+  }, [lastMessage]);
+
+  // Select conversation
+  const handleSelectConv = useCallback((jid: string) => {
+    setSelectedJid(jid);
+    setShowMobileChat(true);
+    // Mark as read
+    if (activeSession?.sessionId) {
+      markRead.mutate({ sessionId: activeSession.sessionId, remoteJid: jid });
+    }
+  }, [activeSession?.sessionId, markRead]);
+
+  // Filter conversations
+  const filteredConvs = useMemo(() => {
+    const convs = (conversationsQ.data || []) as ConvItem[];
+    if (!search) return convs;
+    const s = search.toLowerCase();
+    return convs.filter((c) => {
+      const name = getDisplayName(c.remoteJid).toLowerCase();
+      const phone = c.remoteJid.split("@")[0];
+      const msg = (c.lastMessage || "").toLowerCase();
+      return name.includes(s) || phone.includes(s) || msg.includes(s);
+    });
+  }, [conversationsQ.data, search, getDisplayName]);
+
+  // Selected contact for WhatsAppChat
+  const selectedContact = useMemo(() => {
+    if (!selectedJid) return null;
+    const crmContact = getContactForJid(selectedJid);
+    if (crmContact) return crmContact;
+    // Create a virtual contact
+    const phone = selectedJid.split("@")[0];
+    return { id: 0, name: getContactName(selectedJid), phone, email: undefined, avatarUrl: undefined };
+  }, [selectedJid, getContactForJid]);
+
+  // No session state
+  if (!activeSession && !sessionsQ.isLoading) {
+    return (
+      <div className="flex h-[calc(100vh-56px)] items-center justify-center bg-[#F0F2F5]">
+        <div className="text-center max-w-md px-6">
+          <div className="w-20 h-20 rounded-full bg-[#25D366]/10 flex items-center justify-center mx-auto mb-4">
+            <MessageSquare className="w-10 h-10 text-[#25D366]" />
+          </div>
+          <h2 className="text-xl font-medium text-[#111B21] mb-2">Nenhuma sessão WhatsApp ativa</h2>
+          <p className="text-[14px] text-[#667781] mb-4">
+            Conecte uma sessão na página WhatsApp para ver suas conversas aqui.
+          </p>
+          <a
+            href="/whatsapp"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-[#25D366] text-white rounded-lg text-sm font-medium hover:bg-[#20BA5C] transition-colors"
+          >
+            <Phone className="w-4 h-4" />
+            Ir para WhatsApp
+          </a>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex h-[calc(100vh-56px)] overflow-hidden bg-[#F0F2F5]">
+      {/* ─── LEFT PANEL: Conversations List ─── */}
+      <div
+        className={`w-full md:w-[420px] lg:w-[440px] border-r border-[#E9EDEF] flex flex-col bg-white shrink-0 ${
+          showMobileChat ? "hidden md:flex" : "flex"
+        }`}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-4 py-2.5 bg-[#F0F2F5]">
+          <div className="flex items-center gap-3">
+            <WaAvatar name="Me" size={40} />
+          </div>
+          <div className="flex items-center gap-2">
+            <button className="p-2 hover:bg-[#DFE5E7] rounded-full transition-colors">
+              <Filter className="w-5 h-5 text-[#54656F]" />
+            </button>
+            <button className="p-2 hover:bg-[#DFE5E7] rounded-full transition-colors">
+              <MoreVertical className="w-5 h-5 text-[#54656F]" />
+            </button>
+          </div>
+        </div>
+
         {/* Search */}
-        <div className="p-3.5">
+        <div className="px-2.5 py-1.5">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/60" />
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[#54656F]" />
             <Input
-              className="pl-9 h-8 rounded-lg bg-muted/50 border-0 text-[13px] placeholder:text-muted-foreground/50 focus-visible:ring-1 focus-visible:ring-primary/30"
-              placeholder="Buscar..."
+              className="pl-10 h-[35px] rounded-lg bg-[#F0F2F5] border-0 text-[14px] text-[#111B21] placeholder:text-[#667781] focus-visible:ring-0 focus-visible:ring-offset-0"
+              placeholder="Pesquisar ou começar uma nova conversa"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
         </div>
 
-        {/* List */}
+        {/* Filter tabs */}
+        <div className="flex items-center gap-1.5 px-3 py-1.5">
+          <button className="px-3 py-1 rounded-full bg-[#25D366]/10 text-[#25D366] text-[13px] font-medium">
+            Todas
+          </button>
+          <button className="px-3 py-1 rounded-full bg-[#F0F2F5] text-[#54656F] text-[13px] hover:bg-[#E9EDEF] transition-colors">
+            Não lidas
+          </button>
+          <button className="px-3 py-1 rounded-full bg-[#F0F2F5] text-[#54656F] text-[13px] hover:bg-[#E9EDEF] transition-colors">
+            Grupos
+          </button>
+        </div>
+
+        {/* Conversations list */}
         <ScrollArea className="flex-1">
-          {conversations.isLoading ? (
-            <div className="p-8 text-center">
-              <div className="h-5 w-5 border-2 border-primary/30 border-t-primary rounded-full animate-spin mx-auto" />
+          {conversationsQ.isLoading || sessionsQ.isLoading ? (
+            <div className="flex items-center justify-center py-16">
+              <Loader2 className="w-6 h-6 text-[#25D366] animate-spin" />
             </div>
-          ) : !filteredConvs.length ? (
-            <div className="p-10 text-center">
-              <InboxIcon className="h-8 w-8 mx-auto mb-2 text-muted-foreground/20" />
-              <p className="text-[13px] text-muted-foreground/60">Nenhuma conversa</p>
+          ) : filteredConvs.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
+              <MessageSquare className="w-12 h-12 text-[#667781]/20 mb-3" />
+              <p className="text-[14px] text-[#667781]">
+                {search ? "Nenhuma conversa encontrada" : "Nenhuma conversa ainda"}
+              </p>
+              {!search && (
+                <p className="text-[13px] text-[#667781]/60 mt-1">
+                  Envie uma mensagem para iniciar uma conversa
+                </p>
+              )}
             </div>
-          ) : filteredConvs.map((conv: any) => {
-            const sc = statusConfig[conv.status] || statusConfig["open"];
-            const isActive = selectedConv === conv.id;
-            return (
-              <button
-                key={conv.id}
-                onClick={() => setSelectedConv(conv.id)}
-                className={`w-full text-left px-3.5 py-3 transition-colors duration-100 ${
-                  isActive ? "bg-primary/[0.08]" : "hover:bg-muted/40"
-                }`}
-              >
-                <div className="flex items-start gap-3">
-                  <div className="relative shrink-0">
-                    <div className="h-10 w-10 rounded-full bg-muted/60 flex items-center justify-center">
-                      <User className="h-4.5 w-4.5 text-muted-foreground/70" />
-                    </div>
-                    <span className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-white ${sc.dot}`} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between">
-                      <p className={`text-[13px] truncate ${isActive ? "font-semibold text-foreground" : "font-medium text-foreground/90"}`}>
-                        Conversa #{conv.id}
-                      </p>
-                      <span className="text-[11px] text-muted-foreground/60 shrink-0 ml-2">
-                        {timeAgo(conv.updatedAt || conv.createdAt)}
-                      </span>
-                    </div>
-                    <p className="text-[12px] text-muted-foreground/70 truncate mt-0.5 leading-relaxed">
-                      {conv.lastMessagePreview || "Sem mensagens"}
-                    </p>
-                  </div>
-                </div>
-              </button>
-            );
-          })}
+          ) : (
+            filteredConvs.map((conv) => (
+              <ConversationItem
+                key={conv.remoteJid}
+                conv={conv}
+                isActive={selectedJid === conv.remoteJid}
+                contactName={getDisplayName(conv.remoteJid)}
+                onClick={() => handleSelectConv(conv.remoteJid)}
+              />
+            ))
+          )}
         </ScrollArea>
       </div>
 
-      {/* ─── Column 2: Messages (iMessage style) ─── */}
-      <div className="flex-1 flex flex-col bg-white">
-        {!selectedConv ? (
-          <div className="flex-1 flex items-center justify-center">
-            <div className="text-center">
-              <div className="h-16 w-16 rounded-full bg-muted/40 flex items-center justify-center mx-auto mb-4">
-                <MessageSquare className="h-7 w-7 text-muted-foreground/30" />
-              </div>
-              <p className="text-[15px] font-medium text-muted-foreground/50">Selecione uma conversa</p>
-              <p className="text-[13px] text-muted-foreground/35 mt-1">Escolha uma conversa ao lado para ver as mensagens</p>
-            </div>
-          </div>
+      {/* ─── RIGHT PANEL: Chat ─── */}
+      <div
+        className={`flex-1 flex flex-col ${
+          !showMobileChat ? "hidden md:flex" : "flex"
+        }`}
+      >
+        {!selectedJid || !activeSession ? (
+          <EmptyChat />
         ) : (
-          <>
-            {/* Chat header */}
-            <div className="px-5 py-3 border-b border-border/30 flex items-center justify-between bg-white">
-              <div className="flex items-center gap-3">
-                <div className="h-9 w-9 rounded-full bg-muted/50 flex items-center justify-center">
-                  <User className="h-4 w-4 text-muted-foreground/70" />
-                </div>
-                <div>
-                  <p className="text-[14px] font-semibold text-foreground">Conversa #{selectedConv}</p>
-                  <p className="text-[11px] text-muted-foreground/60">
-                    {statusConfig[activeConv?.status || "open"]?.label || "Aberta"}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-1">
-                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg text-muted-foreground/60 hover:text-foreground">
-                  <Phone className="h-4 w-4" />
-                </Button>
-                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg text-muted-foreground/60 hover:text-foreground">
-                  <Search className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
+          <div className="flex flex-col h-full relative">
+            {/* Mobile back button */}
+            <button
+              onClick={() => { setShowMobileChat(false); }}
+              className="md:hidden absolute top-3 left-2 z-20 p-1.5 bg-white/80 rounded-full shadow-sm"
+            >
+              <ArrowLeft className="w-5 h-5 text-[#54656F]" />
+            </button>
 
-            {/* Messages — iMessage bubbles */}
-            <div className="flex-1 overflow-y-auto px-5 py-5">
-              {messages.isLoading ? (
-                <div className="flex justify-center py-12">
-                  <div className="h-5 w-5 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
-                </div>
-              ) : !messages.data?.length ? (
-                <div className="text-center py-16">
-                  <MessageSquare className="h-8 w-8 mx-auto mb-2 text-muted-foreground/15" />
-                  <p className="text-[13px] text-muted-foreground/40">Nenhuma mensagem</p>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {messages.data.map((msg: any, i: number) => {
-                    const isOut = msg.direction === "outbound";
-                    const prev = messages.data[i - 1];
-                    const showGap = prev && (new Date(msg.createdAt).getTime() - new Date(prev.createdAt).getTime() > 300000);
-
-                    return (
-                      <div key={msg.id}>
-                        {showGap && (
-                          <div className="flex justify-center py-3">
-                            <span className="text-[11px] text-muted-foreground/40 bg-muted/30 px-3 py-1 rounded-full">
-                              {new Date(msg.createdAt).toLocaleDateString("pt-BR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
-                            </span>
-                          </div>
-                        )}
-                        <div className={`flex ${isOut ? "justify-end" : "justify-start"}`}>
-                          <div className={`max-w-[60%] px-4 py-2.5 text-[13.5px] leading-relaxed ${
-                            isOut
-                              ? "bg-primary text-primary-foreground rounded-[20px] rounded-br-[6px]"
-                              : "bg-muted/50 text-foreground rounded-[20px] rounded-bl-[6px]"
-                          }`}>
-                            <p className="whitespace-pre-wrap">{msg.bodyText}</p>
-                            <p className={`text-[10px] mt-1 text-right ${isOut ? "text-primary-foreground/50" : "text-muted-foreground/50"}`}>
-                              {msg.createdAt ? new Date(msg.createdAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : ""}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                  <div ref={messagesEndRef} />
-                </div>
-              )}
-            </div>
-
-            {/* Input — clean Apple style */}
-            <div className="px-4 py-3 border-t border-border/30 bg-white">
-              <div className="flex items-end gap-2">
-                <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full text-muted-foreground/50 hover:text-foreground shrink-0">
-                  <Paperclip className="h-4.5 w-4.5" />
-                </Button>
-                <div className="flex-1 relative">
-                  <Input
-                    value={messageText}
-                    onChange={(e) => setMessageText(e.target.value)}
-                    placeholder="Mensagem..."
-                    className="h-10 rounded-full border-border/40 bg-muted/20 text-[13.5px] pr-10 focus-visible:ring-1 focus-visible:ring-primary/30"
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && !e.shiftKey && messageText.trim()) {
-                        e.preventDefault();
-                        sendMessage.mutate({ tenantId: TENANT_ID, conversationId: selectedConv!, bodyText: messageText });
-                      }
-                    }}
-                  />
-                  <Button variant="ghost" size="icon" className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 rounded-full text-muted-foreground/40">
-                    <Smile className="h-4 w-4" />
-                  </Button>
-                </div>
-                <Button
-                  size="icon"
-                  className="h-9 w-9 rounded-full bg-primary hover:bg-primary/90 shadow-sm shrink-0 transition-colors"
-                  disabled={!messageText.trim() || sendMessage.isPending}
-                  onClick={() => sendMessage.mutate({ tenantId: TENANT_ID, conversationId: selectedConv!, bodyText: messageText })}
-                >
-                  <Send className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-          </>
-        )}
-      </div>
-
-      {/* ─── Column 3: Contact details with tabs ─── */}
-      {selectedConv && activeConv && (
-        <div className="w-[300px] border-l border-border/30 hidden xl:flex flex-col bg-white">
-          {/* Profile header */}
-          <div className="p-5 border-b border-border/30 text-center">
-            <div className="h-16 w-16 rounded-full bg-muted/50 flex items-center justify-center mx-auto mb-3">
-              <User className="h-7 w-7 text-muted-foreground/50" />
-            </div>
-            <p className="text-[15px] font-semibold text-foreground">Conversa #{selectedConv}</p>
-            <div className="flex items-center justify-center gap-1.5 mt-1">
-              <span className={`h-2 w-2 rounded-full ${statusConfig[activeConv.status]?.dot || "bg-blue-500"}`} />
-              <span className="text-[12px] text-muted-foreground">{statusConfig[activeConv.status]?.label || "Aberta"}</span>
-            </div>
+            <WhatsAppChat
+              contact={selectedContact}
+              sessionId={activeSession.sessionId}
+              remoteJid={selectedJid}
+            />
           </div>
-
-          {/* Tabs */}
-          <Tabs defaultValue="info" className="flex-1 flex flex-col overflow-hidden">
-            <TabsList className="w-full justify-start rounded-none border-b border-border/30 bg-transparent px-3 h-10 gap-0">
-              <TabsTrigger value="info" className="text-[12px] font-medium data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-3 py-2">
-                Info
-              </TabsTrigger>
-              <TabsTrigger value="deals" className="text-[12px] font-medium data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-3 py-2">
-                Negociações
-              </TabsTrigger>
-              <TabsTrigger value="tasks" className="text-[12px] font-medium data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-3 py-2">
-                Tarefas
-              </TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="info" className="flex-1 overflow-auto m-0">
-              <div className="p-4 space-y-4">
-                <DetailRow icon={Hash} label="ID" value={`#${activeConv.id}`} />
-                <DetailRow icon={Globe} label="Canal" value={activeConv.channelId ? `Canal #${activeConv.channelId}` : "Direto"} />
-                <DetailRow icon={Clock} label="Criada em" value={activeConv.createdAt ? new Date(activeConv.createdAt).toLocaleDateString("pt-BR") : "—"} />
-                <DetailRow icon={Mail} label="E-mail" value="—" />
-                <DetailRow icon={Phone} label="Telefone" value="—" />
-                <DetailRow icon={MapPin} label="Localização" value="—" />
-              </div>
-            </TabsContent>
-
-            <TabsContent value="deals" className="flex-1 overflow-auto m-0">
-              <div className="p-4">
-                <div className="text-center py-8">
-                  <Briefcase className="h-7 w-7 mx-auto mb-2 text-muted-foreground/20" />
-                  <p className="text-[12px] text-muted-foreground/50">Nenhuma negociação vinculada</p>
-                </div>
-              </div>
-            </TabsContent>
-
-            <TabsContent value="tasks" className="flex-1 overflow-auto m-0">
-              <div className="p-4">
-                <div className="text-center py-8">
-                  <FileText className="h-7 w-7 mx-auto mb-2 text-muted-foreground/20" />
-                  <p className="text-[12px] text-muted-foreground/50">Nenhuma tarefa vinculada</p>
-                </div>
-              </div>
-            </TabsContent>
-          </Tabs>
-        </div>
-      )}
-    </div>
-  );
-}
-
-/* ─── Detail Row ─── */
-function DetailRow({ icon: Icon, label, value }: { icon: any; label: string; value: string }) {
-  return (
-    <div className="flex items-center gap-3">
-      <div className="h-8 w-8 rounded-lg bg-muted/40 flex items-center justify-center shrink-0">
-        <Icon className="h-3.5 w-3.5 text-muted-foreground/60" />
-      </div>
-      <div className="min-w-0">
-        <p className="text-[11px] text-muted-foreground/60 font-medium">{label}</p>
-        <p className="text-[13px] text-foreground truncate">{value}</p>
+        )}
       </div>
     </div>
   );

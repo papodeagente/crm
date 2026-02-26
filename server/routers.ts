@@ -15,6 +15,8 @@ import {
   getChatbotRules,
   addChatbotRule,
   removeChatbotRule,
+  getConversationsList,
+  markConversationRead,
 } from "./db";
 import { storagePut } from "./storage";
 import { nanoid } from "nanoid";
@@ -137,6 +139,17 @@ export const appRouter = router({
       .input(z.object({ id: z.number() }))
       .mutation(async ({ input }) => {
         await removeChatbotRule(input.id);
+        return { success: true };
+      }),
+    // Conversations list (grouped by remoteJid with last message)
+    conversations: protectedProcedure
+      .input(z.object({ sessionId: z.string() }))
+      .query(async ({ input }) => getConversationsList(input.sessionId)),
+    // Mark conversation as read
+    markRead: protectedProcedure
+      .input(z.object({ sessionId: z.string(), remoteJid: z.string() }))
+      .mutation(async ({ input }) => {
+        await markConversationRead(input.sessionId, input.remoteJid);
         return { success: true };
       }),
     uploadMedia: protectedProcedure
