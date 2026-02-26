@@ -438,6 +438,238 @@ function CreateDealDialog({
 }
 
 /* ═══════════════════════════════════════════════════════
+   NEW CHAT PANEL (slide-over on left panel)
+   ═══════════════════════════════════════════════════════ */
+
+function NewChatPanel({
+  open,
+  onClose,
+  onSelectJid,
+  sessionId,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onSelectJid: (jid: string, name: string) => void;
+  sessionId: string;
+}) {
+  const [searchTerm, setSearchTerm] = useState("");
+  const [phoneInput, setPhoneInput] = useState("");
+  const [resolving, setResolving] = useState(false);
+  const [resolveError, setResolveError] = useState("");
+
+  const contactsQ = trpc.crm.contacts.list.useQuery(
+    { tenantId: 1, limit: 500 },
+    { enabled: open }
+  );
+
+  const trpcUtils = trpc.useUtils();
+
+  const contacts = useMemo(() => {
+    const list = (contactsQ.data || []) as Array<{ id: number; name: string; phone?: string | null; email?: string | null; accountName?: string | null }>;
+    if (!searchTerm.trim()) return list.filter((c) => c.phone);
+    const q = searchTerm.toLowerCase();
+    return list.filter(
+      (c) =>
+        c.phone &&
+        (c.name.toLowerCase().includes(q) ||
+          (c.phone && c.phone.includes(q)) ||
+          (c.accountName && c.accountName.toLowerCase().includes(q)))
+    );
+  }, [contactsQ.data, searchTerm]);
+
+  const handleSelectContact = async (contact: { name: string; phone?: string | null }) => {
+    if (!contact.phone) return;
+    setResolving(true);
+    setResolveError("");
+    try {
+      const result = await trpcUtils.whatsapp.resolveJid.fetch({
+        sessionId,
+        phone: contact.phone,
+      });
+      if (result.jid) {
+        onSelectJid(result.jid, contact.name);
+        onClose();
+      } else {
+        setResolveError(`${contact.name} não está no WhatsApp`);
+      }
+    } catch {
+      setResolveError("Erro ao verificar número no WhatsApp");
+    } finally {
+      setResolving(false);
+    }
+  };
+
+  const handlePhoneSubmit = async () => {
+    const cleaned = phoneInput.replace(/\D/g, "");
+    if (cleaned.length < 8) {
+      setResolveError("Digite um número válido");
+      return;
+    }
+    setResolving(true);
+    setResolveError("");
+    try {
+      const result = await trpcUtils.whatsapp.resolveJid.fetch({
+        sessionId,
+        phone: cleaned,
+      });
+      if (result.jid) {
+        onSelectJid(result.jid, formatPhoneNumber(result.jid));
+        onClose();
+      } else {
+        setResolveError("Número não encontrado no WhatsApp");
+      }
+    } catch {
+      setResolveError("Erro ao verificar número no WhatsApp");
+    } finally {
+      setResolving(false);
+    }
+  };
+
+  if (!open) return null;
+
+  return (
+    <div
+      className="absolute inset-0 z-20 flex flex-col bg-white"
+      style={{ animation: "slideInLeft 0.2s ease-out" }}
+    >
+      {/* Header */}
+      <div
+        className="flex items-center gap-4 shrink-0"
+        style={{
+          height: "59px",
+          padding: "10px 16px",
+          backgroundColor: "#008069",
+        }}
+      >
+        <button
+          onClick={() => { onClose(); setSearchTerm(""); setPhoneInput(""); setResolveError(""); }}
+          className="w-[28px] h-[28px] flex items-center justify-center text-white hover:opacity-80 transition-opacity"
+        >
+          <ArrowLeft className="w-[22px] h-[22px]" />
+        </button>
+        <h2 className="text-[16px] font-medium text-white">Nova conversa</h2>
+      </div>
+
+      {/* Search */}
+      <div className="shrink-0" style={{ padding: "7px 12px", backgroundColor: "#FFFFFF" }}>
+        <div
+          className="flex items-center rounded-lg overflow-hidden"
+          style={{ height: "35px", backgroundColor: "#F0F2F5", padding: "0 8px 0 12px" }}
+        >
+          <Search className="shrink-0" style={{ width: "16px", height: "16px", color: "#54656F" }} />
+          <input
+            type="text"
+            placeholder="Pesquisar contatos"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="flex-1 bg-transparent border-none outline-none text-[14px] text-[#111B21] placeholder:text-[#667781]"
+            style={{ paddingLeft: "12px", height: "100%" }}
+            autoFocus
+          />
+        </div>
+      </div>
+
+      {/* Phone input section */}
+      <div className="shrink-0 px-4 py-3 border-b border-[#E9EDEF]">
+        <label className="text-[12px] text-[#667781] uppercase tracking-wide font-medium mb-2 block">
+          Digitar número
+        </label>
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 px-3 py-2 bg-[#F0F2F5] rounded-lg text-sm text-[#667781] shrink-0">
+            <span>🇧🇷</span>
+            <span>+55</span>
+          </div>
+          <input
+            type="tel"
+            placeholder="(84) 99999-9999"
+            value={phoneInput}
+            onChange={(e) => { setPhoneInput(e.target.value); setResolveError(""); }}
+            onKeyDown={(e) => { if (e.key === "Enter") handlePhoneSubmit(); }}
+            className="flex-1 px-3 py-2 border border-[#D1D7DB] rounded-lg text-sm text-[#111B21] focus:outline-none focus:border-[#25D366] focus:ring-1 focus:ring-[#25D366]"
+          />
+          <button
+            onClick={handlePhoneSubmit}
+            disabled={resolving || phoneInput.replace(/\D/g, "").length < 8}
+            className="px-3 py-2 bg-[#25D366] text-white rounded-lg text-sm font-medium hover:bg-[#20BA5C] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+          >
+            {resolving ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <MessageCircle className="w-4 h-4" />
+            )}
+          </button>
+        </div>
+        {resolveError && (
+          <p className="text-[12px] text-red-500 mt-1.5">{resolveError}</p>
+        )}
+      </div>
+
+      {/* Contacts list */}
+      <div className="shrink-0 px-4 pt-3 pb-1">
+        <p className="text-[12px] text-[#008069] uppercase tracking-wide font-medium">
+          Contatos do CRM ({contacts.length})
+        </p>
+      </div>
+
+      <div className="flex-1 overflow-y-auto" style={{ overscrollBehavior: "contain" }}>
+        {contactsQ.isLoading ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="w-5 h-5 text-[#25D366] animate-spin" />
+          </div>
+        ) : contacts.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
+            <Users className="w-10 h-10 text-[#667781]/20 mb-2" />
+            <p className="text-[13px] text-[#667781]">
+              {searchTerm ? "Nenhum contato encontrado" : "Nenhum contato com telefone cadastrado"}
+            </p>
+          </div>
+        ) : (
+          contacts.map((contact) => (
+            <button
+              key={contact.id}
+              onClick={() => handleSelectContact(contact)}
+              disabled={resolving}
+              className="w-full flex items-center gap-3 px-4 py-[10px] hover:bg-[#F0F2F5] transition-colors text-left disabled:opacity-60"
+            >
+              <div className="w-[49px] h-[49px] rounded-full bg-[#DFE5E7] flex items-center justify-center shrink-0">
+                <svg viewBox="0 0 212 212" width={49} height={49}>
+                  <path fill="#DFE5E7" d="M106 0C47.5 0 0 47.5 0 106s47.5 106 106 106 106-47.5 106-106S164.5 0 106 0z" />
+                  <path fill="#FFF" d="M106 45c-20.7 0-37.5 16.8-37.5 37.5S85.3 120 106 120s37.5-16.8 37.5-37.5S126.7 45 106 45zm0 105c-28.3 0-52.5 14.3-52.5 32v10h105v-10c0-17.7-24.2-32-52.5-32z" />
+                </svg>
+              </div>
+              <div className="flex-1 min-w-0 border-b border-[#E9EDEF] py-[6px]">
+                <p className="text-[16px] text-[#111B21] truncate">{contact.name}</p>
+                <p className="text-[13px] text-[#667781] truncate">
+                  {contact.phone || "Sem telefone"}
+                  {contact.accountName ? ` · ${contact.accountName}` : ""}
+                </p>
+              </div>
+            </button>
+          ))
+        )}
+      </div>
+
+      {/* Resolving overlay */}
+      {resolving && (
+        <div className="absolute inset-0 z-30 bg-white/70 flex items-center justify-center">
+          <div className="flex flex-col items-center gap-3">
+            <Loader2 className="w-8 h-8 text-[#25D366] animate-spin" />
+            <p className="text-[14px] text-[#667781]">Verificando no WhatsApp...</p>
+          </div>
+        </div>
+      )}
+
+      <style>{`
+        @keyframes slideInLeft {
+          from { transform: translateX(-100%); }
+          to { transform: translateX(0); }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════
    EMPTY CHAT STATE (WhatsApp Web default screen)
    ═══════════════════════════════════════════════════════ */
 
@@ -509,6 +741,7 @@ export default function InboxPage() {
   const [showMobileChat, setShowMobileChat] = useState(false);
   const [filter, setFilter] = useState<"all" | "unread" | "groups">("all");
   const [showCreateDeal, setShowCreateDeal] = useState(false);
+  const [showNewChat, setShowNewChat] = useState(false);
   const [isMuted, setIsMuted] = useState(() => {
     try { return localStorage.getItem(MUTE_KEY) === "true"; } catch { return false; }
   });
@@ -714,8 +947,19 @@ export default function InboxPage() {
           maxWidth: "440px",
           minWidth: "340px",
           borderRight: "1px solid #d1d7db",
+          position: "relative",
         }}
       >
+        {/* New Chat Panel (slide-over) */}
+        <NewChatPanel
+          open={showNewChat}
+          onClose={() => setShowNewChat(false)}
+          onSelectJid={(jid, name) => {
+            handleSelectConv(jid);
+            setShowNewChat(false);
+          }}
+          sessionId={activeSession?.sessionId || ""}
+        />
         {/* ── Header ── */}
         <div
           className="flex items-center justify-between shrink-0"
@@ -742,7 +986,11 @@ export default function InboxPage() {
                 {isMuted ? "Som desativado" : "Som ativado"}
               </span>
             </button>
-            <button className="w-[40px] h-[40px] flex items-center justify-center rounded-full hover:bg-[#D9DBDE] transition-colors">
+            <button
+              onClick={() => setShowNewChat(true)}
+              className="w-[40px] h-[40px] flex items-center justify-center rounded-full hover:bg-[#D9DBDE] transition-colors"
+              title="Nova conversa"
+            >
               <MessageCircle className="w-[22px] h-[22px] text-[#54656F]" />
             </button>
             <button className="w-[40px] h-[40px] flex items-center justify-center rounded-full hover:bg-[#D9DBDE] transition-colors">
@@ -853,6 +1101,8 @@ export default function InboxPage() {
           </div>
         )}
       </div>
+
+      {/* ═══ NEW CHAT PANEL (mobile) ═══ */}
 
       {/* ═══ CREATE DEAL DIALOG ═══ */}
       {selectedJid && activeSession && (

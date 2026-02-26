@@ -466,6 +466,41 @@ describe("WhatsApp API Routes", () => {
     ).rejects.toThrow();
   });
 
+  // ─── ResolveJid (used by NewChatPanel) ───
+
+  it("whatsapp.resolveJid throws for disconnected session", async () => {
+    const { ctx } = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    await expect(
+      caller.whatsapp.resolveJid({
+        sessionId: "nonexistent-session",
+        phone: "84999999999",
+      })
+    ).rejects.toThrow();
+  });
+
+  it("whatsapp.resolveJid validates phone input is not empty", async () => {
+    const { ctx } = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    await expect(
+      caller.whatsapp.resolveJid({
+        sessionId: "test",
+        phone: "",
+      })
+    ).rejects.toThrow();
+  });
+
+  it("whatsapp.resolveJid validates sessionId is required", async () => {
+    const { ctx } = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    await expect(
+      caller.whatsapp.resolveJid({
+        sessionId: "",
+        phone: "84999999999",
+      } as any)
+    ).rejects.toThrow();
+  });
+
   it("whatsapp.updateChatbotSettings partial update preserves existing values", async () => {
     const { ctx } = createAuthContext();
     const caller = appRouter.createCaller(ctx);

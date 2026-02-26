@@ -336,3 +336,15 @@
 - [x] Ordenação por timestamp da última mensagem DESC — já estava correto no SQL
 - [x] pushName do WhatsApp como fallback — salvo no banco e retornado na query
 - [x] Prioridade de nomes: CRM > pushName > número formatado (grupos: groupName > ID)
+
+## Nova Conversa no Inbox (v13)
+
+- [x] Botão "+" no header da lista de conversas para iniciar nova conversa
+- [x] Painel slide-over estilo WhatsApp Web com busca de contatos do CRM (nome, telefone, empresa)
+- [x] Input para digitar número de telefone novo manualmente com bandeira BR
+- [x] Validação e formatação do número (código do país BR +55)
+- [x] Ao selecionar contato ou digitar número, abrir a conversa no painel direito
+- [x] Resolver JID real via onWhatsApp() (trpcUtils.fetch) antes de abrir a conversa
+- [x] Feedback visual se o número não estiver registrado no WhatsApp
+- [x] Animação slide-in da esquerda e overlay de loading durante verificação
+- [x] Testes unitários para resolveJid — 83 testes passando
