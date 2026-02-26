@@ -26,8 +26,9 @@ const Academy = lazy(() => import("./pages/Academy"));
 const Integrations = lazy(() => import("./pages/Integrations"));
 const Admin = lazy(() => import("./pages/Admin"));
 const ApiDocs = lazy(() => import("./pages/ApiDocs"));
-const Alerts = lazy(() => import("./pages/Alerts"));
 const DealDetail = lazy(() => import("./pages/DealDetail"));
+const SettingsPage = lazy(() => import("./pages/Settings"));
+const NotificationsPage = lazy(() => import("./pages/Notifications"));
 
 function PageLoader() {
   return (
@@ -42,25 +43,34 @@ function Router() {
     <TopNavLayout>
       <Suspense fallback={<PageLoader />}>
         <Switch>
+          {/* Main nav */}
           <Route path="/" component={Home} />
-          <Route path="/contacts" component={Contacts} />
-          <Route path="/deals" component={Deals} />
           <Route path="/pipeline" component={Pipeline} />
-          <Route path="/deal/:id" component={DealDetail} />
-          <Route path="/trips" component={Trips} />
+          <Route path="/contacts" component={Contacts} />
           <Route path="/tasks" component={Tasks} />
+          <Route path="/insights" component={Insights} />
+          <Route path="/goals" component={Goals} />
+
+          {/* Detail pages */}
+          <Route path="/deal/:id" component={DealDetail} />
+          <Route path="/deals" component={Deals} />
+
+          {/* Settings sub-pages (accessible from Settings hub) */}
+          <Route path="/settings" component={SettingsPage} />
           <Route path="/inbox" component={InboxPage} />
           <Route path="/whatsapp" component={WhatsApp} />
           <Route path="/chatbot" component={Chatbot} />
           <Route path="/proposals" component={Proposals} />
           <Route path="/portal" component={Portal} />
-          <Route path="/insights" component={Insights} />
-          <Route path="/goals" component={Goals} />
+          <Route path="/trips" component={Trips} />
           <Route path="/academy" component={Academy} />
           <Route path="/integrations" component={Integrations} />
           <Route path="/admin" component={Admin} />
           <Route path="/api-docs" component={ApiDocs} />
-          <Route path="/alerts" component={Alerts} />
+
+          {/* Notifications */}
+          <Route path="/notifications" component={NotificationsPage} />
+
           <Route path="/404" component={NotFound} />
           <Route component={NotFound} />
         </Switch>

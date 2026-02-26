@@ -367,3 +367,33 @@
 - [x] Verificar que histórico de conversa completo é carregado (messaging-history.set + messages.upsert)
 - [x] Verificar que o endpoint de conversas retorna dados completos e ordenados (ORDER BY timestamp DESC)
 - [x] Testes unitários — 83 testes passando, 0 erros TypeScript
+
+## Reestruturação de Navegação + Cores (v15)
+
+### Navegação Top Nav Apple 2026
+- [x] Substituir sidebar por top nav horizontal com 5 itens: Início, Negociações, Contatos, Tarefas, Análises
+- [x] Início → Dashboard com indicadores (Home.tsx)
+- [x] Negociações → Pipeline (Pipeline.tsx)
+- [x] Contatos → Contatos + Empresas integradas dentro (Contacts.tsx)
+- [x] Tarefas → Página de tarefas (Tasks.tsx)
+- [x] Análises → Insights + Metas (sem Alertas, que vai para Notificações)
+- [x] Sino de notificação no header → direciona para /notifications (nova página) com dot vermelho
+- [x] Engrenagem de configurações no header → direciona para /settings (nova página)
+
+### Página de Configurações (/settings)
+- [x] Menu Comunicação: Inbox, WhatsApp, Chatbot IA
+- [x] Menu Comercial: Propostas, Portal, Viagens
+- [x] Menu Plataforma: Academy, Integrações, Admin, API Docs
+
+### Página de Notificações (/notifications)
+- [x] Migrar conteúdo de Alertas para Notificações
+- [x] Badge de contagem no sino (dot vermelho animado)
+
+### Paleta de Cores Vibrante
+- [x] Atualizar CSS variables para cores mais vibrantes e saturadas (indigo primary)
+- [x] Adicionar gradientes e acentos coloridos nos cards e indicadores
+- [x] Manter padrão Apple 2026 com cores ricas
+
+### Testes e Verificação
+- [x] TypeScript sem erros
+- [x] Testes unitários passando — 83 testes, 0 falhas

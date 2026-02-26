@@ -8,22 +8,24 @@ import {
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
 
-/* ─── Metric Card ─── */
-function MetricCard({ label, value, change, changeType, icon: Icon }: {
-  label: string; value: string; change?: string; changeType?: "up" | "down"; icon: any;
+/* ─── Metric Card with gradient accent ─── */
+function MetricCard({ label, value, change, changeType, icon: Icon, gradient, iconBg, iconColor }: {
+  label: string; value: string; change?: string; changeType?: "up" | "down"; icon: any; gradient: string; iconBg: string; iconColor: string;
 }) {
   return (
-    <div className="surface p-5 flex flex-col gap-3">
+    <div className="surface p-5 flex flex-col gap-3 relative overflow-hidden group hover:scale-[1.01] transition-transform duration-200">
+      {/* Subtle gradient accent bar */}
+      <div className="absolute top-0 left-0 right-0 h-[3px] rounded-t-xl" style={{ background: gradient }} />
       <div className="flex items-center justify-between">
-        <span className="text-[12px] font-medium text-muted-foreground uppercase tracking-wide">{label}</span>
-        <div className="h-8 w-8 rounded-lg bg-primary/[0.06] flex items-center justify-center">
-          <Icon className="h-4 w-4 text-primary" />
+        <span className="text-[11.5px] font-semibold text-muted-foreground uppercase tracking-wider">{label}</span>
+        <div className={`h-9 w-9 rounded-xl flex items-center justify-center ${iconBg}`}>
+          <Icon className={`h-4 w-4 ${iconColor}`} />
         </div>
       </div>
       <div className="flex items-end gap-2">
-        <span className="text-2xl font-semibold tracking-tight text-foreground">{value}</span>
+        <span className="text-[28px] font-bold tracking-tight text-foreground leading-none">{value}</span>
         {change && (
-          <span className={`flex items-center gap-0.5 text-[12px] font-medium mb-0.5 ${
+          <span className={`flex items-center gap-0.5 text-[12px] font-semibold mb-1 ${
             changeType === "up" ? "text-emerald-600" : "text-red-500"
           }`}>
             {changeType === "up" ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
@@ -41,8 +43,8 @@ function ActivityItem({ title, subtitle, time, icon: Icon, color }: {
 }) {
   return (
     <div className="flex items-start gap-3 py-3 group">
-      <div className={`h-8 w-8 rounded-lg flex items-center justify-center shrink-0 ${color}`}>
-        <Icon className="h-3.5 w-3.5" />
+      <div className={`h-9 w-9 rounded-xl flex items-center justify-center shrink-0 ${color}`}>
+        <Icon className="h-4 w-4" />
       </div>
       <div className="flex-1 min-w-0">
         <p className="text-[13px] font-medium text-foreground leading-snug">{title}</p>
@@ -65,7 +67,7 @@ function TaskItem({ title, dueTime, priority }: {
 
   return (
     <div className="flex items-center gap-3 py-2.5 group">
-      <div className={`h-2 w-2 rounded-full shrink-0 ${priorityColors[priority]}`} />
+      <div className={`h-2.5 w-2.5 rounded-full shrink-0 ${priorityColors[priority]}`} />
       <span className="text-[13px] text-foreground flex-1 truncate">{title}</span>
       <span className="text-[11px] text-muted-foreground shrink-0 flex items-center gap-1">
         <Clock className="h-3 w-3" />
@@ -76,18 +78,29 @@ function TaskItem({ title, dueTime, priority }: {
 }
 
 /* ─── Quick Action ─── */
-function QuickAction({ label, icon: Icon, href }: { label: string; icon: any; href: string }) {
+function QuickAction({ label, icon: Icon, href, iconColor }: { label: string; icon: any; href: string; iconColor: string }) {
   return (
     <Link
       href={href}
-      className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-lg bg-muted/40 hover:bg-muted/80 border border-transparent hover:border-border transition-all duration-150 group"
+      className="flex items-center gap-3 px-4 py-3 rounded-xl bg-muted/30 hover:bg-muted/60 border border-transparent hover:border-border/50 transition-all duration-200 group"
     >
-      <Icon className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors duration-150" />
+      <div className={`h-8 w-8 rounded-lg flex items-center justify-center ${iconColor}`}>
+        <Icon className="h-4 w-4" />
+      </div>
       <span className="text-[13px] font-medium text-foreground">{label}</span>
-      <ChevronRight className="h-3 w-3 text-muted-foreground/40 ml-auto group-hover:text-muted-foreground transition-colors duration-150" />
+      <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/30 ml-auto group-hover:text-muted-foreground transition-colors duration-150" />
     </Link>
   );
 }
+
+/* ─── Pipeline Stage Bar ─── */
+const stageColors = [
+  "bg-indigo-500",
+  "bg-blue-500",
+  "bg-cyan-500",
+  "bg-emerald-500",
+  "bg-amber-500",
+];
 
 /* ─── Main Dashboard ─── */
 export default function Home() {
@@ -111,13 +124,15 @@ export default function Home() {
       {/* Header */}
       <div className="flex items-start justify-between mb-8">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+          <h1 className="text-[26px] font-bold tracking-tight text-foreground">
             {greeting}, {user?.name?.split(" ")[0] || "Usuário"}
           </h1>
           <p className="text-[13px] text-muted-foreground mt-1 capitalize">{today}</p>
         </div>
         <Link href="/pipeline">
-          <Button size="sm" className="h-8 rounded-lg text-[13px] font-medium gap-1.5">
+          <Button size="sm" className="h-9 rounded-xl text-[13px] font-medium gap-1.5 shadow-sm" style={{
+            background: "linear-gradient(135deg, oklch(0.50 0.22 265), oklch(0.45 0.20 290))"
+          }}>
             <Plus className="h-3.5 w-3.5" />
             Nova Negociação
           </Button>
@@ -126,10 +141,44 @@ export default function Home() {
 
       {/* Metrics row */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        <MetricCard label="Negociações Ativas" value="24" change="+12%" changeType="up" icon={Briefcase} />
-        <MetricCard label="Contatos" value="156" change="+8%" changeType="up" icon={Users} />
-        <MetricCard label="Viagens em Andamento" value="7" change="-3%" changeType="down" icon={Plane} />
-        <MetricCard label="Tarefas Pendentes" value="12" icon={CheckSquare} />
+        <MetricCard
+          label="Negociações Ativas"
+          value="24"
+          change="+12%"
+          changeType="up"
+          icon={Briefcase}
+          gradient="linear-gradient(135deg, oklch(0.50 0.22 265), oklch(0.55 0.20 290))"
+          iconBg="bg-indigo-50"
+          iconColor="text-indigo-600"
+        />
+        <MetricCard
+          label="Contatos"
+          value="156"
+          change="+8%"
+          changeType="up"
+          icon={Users}
+          gradient="linear-gradient(135deg, oklch(0.55 0.22 160), oklch(0.60 0.20 145))"
+          iconBg="bg-emerald-50"
+          iconColor="text-emerald-600"
+        />
+        <MetricCard
+          label="Viagens em Andamento"
+          value="7"
+          change="-3%"
+          changeType="down"
+          icon={Plane}
+          gradient="linear-gradient(135deg, oklch(0.58 0.24 25), oklch(0.62 0.22 40))"
+          iconBg="bg-orange-50"
+          iconColor="text-orange-600"
+        />
+        <MetricCard
+          label="Tarefas Pendentes"
+          value="12"
+          icon={CheckSquare}
+          gradient="linear-gradient(135deg, oklch(0.55 0.20 290), oklch(0.50 0.22 310))"
+          iconBg="bg-violet-50"
+          iconColor="text-violet-600"
+        />
       </div>
 
       {/* Two-column layout */}
@@ -140,14 +189,16 @@ export default function Home() {
           <div className="surface p-5">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
-                <Zap className="h-4 w-4 text-amber-500" />
+                <div className="h-6 w-6 rounded-lg bg-amber-100 flex items-center justify-center">
+                  <Zap className="h-3.5 w-3.5 text-amber-600" />
+                </div>
                 <h2 className="text-[14px] font-semibold text-foreground">Foco do Dia</h2>
               </div>
               <Link href="/tasks" className="text-[12px] text-primary font-medium hover:underline">
                 Ver todas
               </Link>
             </div>
-            <div className="divide-y divide-border">
+            <div className="divide-y divide-border/50">
               <TaskItem title="Retornar contato — Ana Cembrani (Tz Viagens)" dueTime="10:00" priority="high" />
               <TaskItem title="Enviar proposta — Pacote Cancún família Silva" dueTime="14:00" priority="high" />
               <TaskItem title="Follow-up — Renovação contrato Victory Travel" dueTime="16:30" priority="medium" />
@@ -163,7 +214,7 @@ export default function Home() {
                 Ver mais
               </Link>
             </div>
-            <div className="divide-y divide-border">
+            <div className="divide-y divide-border/50">
               <ActivityItem
                 icon={MessageSquare}
                 color="bg-emerald-50 text-emerald-600"
@@ -173,14 +224,14 @@ export default function Home() {
               />
               <ActivityItem
                 icon={Briefcase}
-                color="bg-blue-50 text-blue-600"
+                color="bg-indigo-50 text-indigo-600"
                 title="Negociação movida para Sondagem"
                 subtitle="Sondagem — Maicon · Kairos Destinos"
                 time="há 23 min"
               />
               <ActivityItem
                 icon={TrendingUp}
-                color="bg-purple-50 text-purple-600"
+                color="bg-violet-50 text-violet-600"
                 title="Proposta visualizada"
                 subtitle="Acelera 10x — Victory · R$ 4.997,00"
                 time="há 1h"
@@ -209,10 +260,10 @@ export default function Home() {
           <div className="surface p-5">
             <h2 className="text-[14px] font-semibold text-foreground mb-4">Ações Rápidas</h2>
             <div className="space-y-2">
-              <QuickAction label="Nova Negociação" icon={Briefcase} href="/pipeline" />
-              <QuickAction label="Novo Contato" icon={Users} href="/contacts" />
-              <QuickAction label="Enviar Mensagem" icon={MessageSquare} href="/whatsapp" />
-              <QuickAction label="Criar Proposta" icon={Plane} href="/proposals" />
+              <QuickAction label="Nova Negociação" icon={Briefcase} href="/pipeline" iconColor="bg-indigo-50 text-indigo-600" />
+              <QuickAction label="Novo Contato" icon={Users} href="/contacts" iconColor="bg-emerald-50 text-emerald-600" />
+              <QuickAction label="Enviar Mensagem" icon={MessageSquare} href="/inbox" iconColor="bg-blue-50 text-blue-600" />
+              <QuickAction label="Criar Proposta" icon={Plane} href="/proposals" iconColor="bg-amber-50 text-amber-600" />
             </div>
           </div>
 
@@ -224,22 +275,22 @@ export default function Home() {
                 Abrir
               </Link>
             </div>
-            <div className="space-y-3">
+            <div className="space-y-3.5">
               {[
-                { stage: "Pré-venda", count: 15, value: "R$ 231.710", pct: 85 },
-                { stage: "Atendimento", count: 14, value: "R$ 90.923", pct: 65 },
-                { stage: "Sondagem", count: 28, value: "R$ 496.735", pct: 100 },
-                { stage: "Apresentação", count: 7, value: "R$ 766.746", pct: 45 },
-                { stage: "Fechamento", count: 4, value: "R$ 189.400", pct: 25 },
+                { stage: "Pré-venda", count: 15, value: "R$ 231.710", pct: 85, color: "bg-indigo-500" },
+                { stage: "Atendimento", count: 14, value: "R$ 90.923", pct: 65, color: "bg-blue-500" },
+                { stage: "Sondagem", count: 28, value: "R$ 496.735", pct: 100, color: "bg-cyan-500" },
+                { stage: "Apresentação", count: 7, value: "R$ 766.746", pct: 45, color: "bg-emerald-500" },
+                { stage: "Fechamento", count: 4, value: "R$ 189.400", pct: 25, color: "bg-amber-500" },
               ].map((s) => (
                 <div key={s.stage}>
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-[12px] font-medium text-foreground">{s.stage}</span>
-                    <span className="text-[11px] text-muted-foreground">{s.count} · {s.value}</span>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-[12.5px] font-medium text-foreground">{s.stage}</span>
+                    <span className="text-[11px] text-muted-foreground font-medium">{s.count} · {s.value}</span>
                   </div>
-                  <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                  <div className="h-2 rounded-full bg-muted/60 overflow-hidden">
                     <div
-                      className="h-full rounded-full bg-primary/70 transition-all duration-500"
+                      className={`h-full rounded-full ${s.color} transition-all duration-700`}
                       style={{ width: `${s.pct}%` }}
                     />
                   </div>
@@ -251,7 +302,9 @@ export default function Home() {
           {/* Upcoming */}
           <div className="surface p-5">
             <div className="flex items-center gap-2 mb-4">
-              <Calendar className="h-4 w-4 text-muted-foreground" />
+              <div className="h-6 w-6 rounded-lg bg-blue-50 flex items-center justify-center">
+                <Calendar className="h-3.5 w-3.5 text-blue-600" />
+              </div>
               <h2 className="text-[14px] font-semibold text-foreground">Próximos Eventos</h2>
             </div>
             <div className="space-y-3">
@@ -260,9 +313,9 @@ export default function Home() {
                 { title: "Embarque — Família Santos", time: "Amanhã, 06:30", type: "trip" },
                 { title: "Vencimento proposta — Victory", time: "28 Fev", type: "deadline" },
               ].map((e, i) => (
-                <div key={i} className="flex items-center gap-3 py-1">
-                  <div className={`h-2 w-2 rounded-full shrink-0 ${
-                    e.type === "meeting" ? "bg-primary" : e.type === "trip" ? "bg-emerald-500" : "bg-amber-500"
+                <div key={i} className="flex items-center gap-3 py-1.5">
+                  <div className={`h-2.5 w-2.5 rounded-full shrink-0 ${
+                    e.type === "meeting" ? "bg-indigo-500" : e.type === "trip" ? "bg-emerald-500" : "bg-amber-500"
                   }`} />
                   <div className="flex-1 min-w-0">
                     <p className="text-[13px] text-foreground truncate">{e.title}</p>
