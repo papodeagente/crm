@@ -5,8 +5,10 @@ import WhatsAppChat from "@/components/WhatsAppChat";
 import {
   Search, MessageSquare, MoreVertical, ArrowLeft,
   Check, CheckCheck, Clock, Phone, Loader2, Users,
-  MessageCircle
+  MessageCircle, Briefcase, Plus, X
 } from "lucide-react";
+import { toast } from "sonner";
+import { useLocation } from "wouter";
 
 /* ═══════════════════════════════════════════════════════
    HELPERS
@@ -51,6 +53,9 @@ function getMessagePreview(content: string | null, messageType: string | null): 
     locationMessage: "📍 Localização",
     templateMessage: "📋 Template",
     interactiveMessage: "📋 Mensagem interativa",
+    listMessage: "📋 Lista",
+    protocolMessage: "⚙️ Protocolo",
+    senderKeyDistributionMessage: "🔑 Chave",
   };
   return typeMap[messageType] || content || `[${messageType}]`;
 }
@@ -72,10 +77,29 @@ const StatusTick = memo(({ status, fromMe }: { status: string | null; fromMe: bo
 StatusTick.displayName = "StatusTick";
 
 /* ═══════════════════════════════════════════════════════
-   AVATAR (WhatsApp style)
+   AVATAR with real profile picture
    ═══════════════════════════════════════════════════════ */
 
-function WaAvatar({ name, size = 49, isGroup = false }: { name: string; size?: number; isGroup?: boolean }) {
+const WaAvatar = memo(({ name, size = 49, isGroup = false, pictureUrl }: { name: string; size?: number; isGroup?: boolean; pictureUrl?: string | null }) => {
+  const [imgError, setImgError] = useState(false);
+
+  if (pictureUrl && !imgError) {
+    return (
+      <div
+        className="rounded-full shrink-0 overflow-hidden"
+        style={{ width: size, height: size }}
+      >
+        <img
+          src={pictureUrl}
+          alt={name}
+          className="w-full h-full object-cover"
+          onError={() => setImgError(true)}
+          loading="lazy"
+        />
+      </div>
+    );
+  }
+
   return (
     <div
       className="rounded-full bg-[#DFE5E7] flex items-center justify-center shrink-0"
@@ -91,7 +115,8 @@ function WaAvatar({ name, size = 49, isGroup = false }: { name: string; size?: n
       )}
     </div>
   );
-}
+});
+WaAvatar.displayName = "WaAvatar";
 
 /* ═══════════════════════════════════════════════════════
    CONVERSATION ITEM
@@ -109,9 +134,9 @@ interface ConvItem {
 }
 
 const ConversationItem = memo(({
-  conv, isActive, contactName, onClick,
+  conv, isActive, contactName, pictureUrl, onClick,
 }: {
-  conv: ConvItem; isActive: boolean; contactName: string; onClick: () => void;
+  conv: ConvItem; isActive: boolean; contactName: string; pictureUrl?: string | null; onClick: () => void;
 }) => {
   const isGroup = conv.remoteJid.includes("@g.us");
   const fromMe = conv.lastFromMe === true || conv.lastFromMe === 1;
@@ -127,7 +152,7 @@ const ConversationItem = memo(({
       }`}
     >
       <div className="py-[6px] pr-[13px]">
-        <WaAvatar name={contactName} size={49} isGroup={isGroup} />
+        <WaAvatar name={contactName} size={49} isGroup={isGroup} pictureUrl={pictureUrl} />
       </div>
       <div className="flex-1 min-w-0 py-[6px] border-b border-[#E9EDEF]">
         <div className="flex items-baseline justify-between mb-[2px]">
@@ -156,6 +181,214 @@ const ConversationItem = memo(({
   );
 });
 ConversationItem.displayName = "ConversationItem";
+
+/* ═══════════════════════════════════════════════════════
+   CREATE DEAL DIALOG
+   ═══════════════════════════════════════════════════════ */
+
+function CreateDealDialog({
+  open, onClose, contactName, contactPhone, contactJid, sessionId,
+}: {
+  open: boolean; onClose: () => void; contactName: string; contactPhone: string; contactJid: string; sessionId: string;
+}) {
+  const [, navigate] = useLocation();
+  const [title, setTitle] = useState(`Negociação - ${contactName}`);
+  const [value, setValue] = useState("");
+
+  // Get pipelines and stages
+  const pipelinesQ = trpc.crm.pipelines.list.useQuery({ tenantId: 1 });
+  const pipelines = (pipelinesQ.data || []) as any[];
+  const [selectedPipelineId, setSelectedPipelineId] = useState<number | null>(null);
+
+  const stagesQ = trpc.crm.pipelines.stages.useQuery(
+    { tenantId: 1, pipelineId: selectedPipelineId! },
+    { enabled: !!selectedPipelineId }
+  );
+  const stages = (stagesQ.data || []) as any[];
+  const [selectedStageId, setSelectedStageId] = useState<number | null>(null);
+
+  // Auto-select first pipeline
+  useEffect(() => {
+    if (pipelines.length > 0 && !selectedPipelineId) {
+      setSelectedPipelineId(pipelines[0].id);
+    }
+  }, [pipelines, selectedPipelineId]);
+
+  // Auto-select first stage
+  useEffect(() => {
+    if (stages.length > 0 && !selectedStageId) {
+      setSelectedStageId(stages[0].id);
+    }
+  }, [stages, selectedStageId]);
+
+  // Find or create contact
+  const contactsQ = trpc.crm.contacts.list.useQuery({ tenantId: 1, search: contactPhone.replace(/\D/g, ""), limit: 5 });
+  const existingContact = useMemo(() => {
+    const cleaned = contactPhone.replace(/\D/g, "");
+    return ((contactsQ.data || []) as any[]).find((c: any) => {
+      const cPhone = (c.phone || "").replace(/\D/g, "");
+      return cPhone === cleaned || cPhone === `55${cleaned}` || `55${cPhone}` === cleaned;
+    });
+  }, [contactsQ.data, contactPhone]);
+
+  const createContact = trpc.crm.contacts.create.useMutation();
+  const createDeal = trpc.crm.deals.create.useMutation();
+
+  const [creating, setCreating] = useState(false);
+
+  const handleCreate = async () => {
+    if (!title.trim() || !selectedPipelineId || !selectedStageId) {
+      toast.error("Preencha todos os campos obrigatórios");
+      return;
+    }
+
+    setCreating(true);
+    try {
+      let contactId = existingContact?.id;
+
+      // Create contact if not exists
+      if (!contactId) {
+        const newContact = await createContact.mutateAsync({
+          tenantId: 1,
+          name: contactName,
+          phone: contactPhone,
+          source: "whatsapp",
+        });
+        contactId = (newContact as any)?.id;
+      }
+
+      // Create deal
+      const deal = await createDeal.mutateAsync({
+        tenantId: 1,
+        title: title.trim(),
+        contactId,
+        pipelineId: selectedPipelineId,
+        stageId: selectedStageId,
+        valueCents: value ? Math.round(parseFloat(value) * 100) : undefined,
+      });
+
+      toast.success("Negociação criada com sucesso!");
+      onClose();
+
+      // Navigate to deal
+      if ((deal as any)?.id) {
+        navigate(`/deal/${(deal as any).id}`);
+      }
+    } catch (e) {
+      toast.error("Erro ao criar negociação");
+      console.error(e);
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
+      <div
+        className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-[#E9EDEF]">
+          <h3 className="text-[16px] font-semibold text-[#111B21]">Nova Negociação</h3>
+          <button onClick={onClose} className="p-1 hover:bg-[#F0F2F5] rounded-full">
+            <X className="w-5 h-5 text-[#54656F]" />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="px-5 py-4 space-y-4">
+          {/* Contact info */}
+          <div className="flex items-center gap-3 p-3 bg-[#F0F2F5] rounded-lg">
+            <div className="w-10 h-10 rounded-full bg-[#25D366] flex items-center justify-center text-white font-bold text-sm">
+              {contactName.charAt(0).toUpperCase()}
+            </div>
+            <div>
+              <p className="text-sm font-medium text-[#111B21]">{contactName}</p>
+              <p className="text-xs text-[#667781]">{contactPhone}</p>
+            </div>
+            {existingContact && (
+              <span className="ml-auto text-[11px] bg-[#E7FCE3] text-[#008069] px-2 py-0.5 rounded-full">
+                Contato CRM
+              </span>
+            )}
+          </div>
+
+          {/* Title */}
+          <div>
+            <label className="text-[13px] text-[#667781] mb-1 block">Título da negociação *</label>
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              className="w-full px-3 py-2 border border-[#D1D7DB] rounded-lg text-sm text-[#111B21] focus:outline-none focus:border-[#25D366] focus:ring-1 focus:ring-[#25D366]"
+            />
+          </div>
+
+          {/* Value */}
+          <div>
+            <label className="text-[13px] text-[#667781] mb-1 block">Valor (R$)</label>
+            <input
+              type="number"
+              value={value}
+              onChange={(e) => setValue(e.target.value)}
+              placeholder="0,00"
+              className="w-full px-3 py-2 border border-[#D1D7DB] rounded-lg text-sm text-[#111B21] focus:outline-none focus:border-[#25D366] focus:ring-1 focus:ring-[#25D366]"
+            />
+          </div>
+
+          {/* Pipeline */}
+          <div>
+            <label className="text-[13px] text-[#667781] mb-1 block">Pipeline *</label>
+            <select
+              value={selectedPipelineId || ""}
+              onChange={(e) => { setSelectedPipelineId(Number(e.target.value)); setSelectedStageId(null); }}
+              className="w-full px-3 py-2 border border-[#D1D7DB] rounded-lg text-sm text-[#111B21] focus:outline-none focus:border-[#25D366] focus:ring-1 focus:ring-[#25D366] bg-white"
+            >
+              {pipelines.map((p: any) => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Stage */}
+          <div>
+            <label className="text-[13px] text-[#667781] mb-1 block">Etapa *</label>
+            <select
+              value={selectedStageId || ""}
+              onChange={(e) => setSelectedStageId(Number(e.target.value))}
+              className="w-full px-3 py-2 border border-[#D1D7DB] rounded-lg text-sm text-[#111B21] focus:outline-none focus:border-[#25D366] focus:ring-1 focus:ring-[#25D366] bg-white"
+            >
+              {stages.map((s: any) => (
+                <option key={s.id} value={s.id}>{s.name}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-end gap-3 px-5 py-4 border-t border-[#E9EDEF]">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-sm text-[#667781] hover:bg-[#F0F2F5] rounded-lg transition-colors"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={handleCreate}
+            disabled={creating || !title.trim() || !selectedPipelineId || !selectedStageId}
+            className="px-4 py-2 text-sm text-white bg-[#25D366] hover:bg-[#20BA5C] rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+          >
+            {creating && <Loader2 className="w-4 h-4 animate-spin" />}
+            Criar Negociação
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 /* ═══════════════════════════════════════════════════════
    EMPTY CHAT STATE (WhatsApp Web default screen)
@@ -228,6 +461,7 @@ export default function InboxPage() {
   const [searchFocused, setSearchFocused] = useState(false);
   const [showMobileChat, setShowMobileChat] = useState(false);
   const [filter, setFilter] = useState<"all" | "unread" | "groups">("all");
+  const [showCreateDeal, setShowCreateDeal] = useState(false);
 
   // Get active WhatsApp session
   const sessionsQ = trpc.whatsapp.sessions.useQuery();
@@ -247,6 +481,20 @@ export default function InboxPage() {
     { tenantId: 1, limit: 500 },
     { enabled: true }
   );
+
+  // Batch fetch profile pictures
+  const convJids = useMemo(() => {
+    return ((conversationsQ.data || []) as ConvItem[]).map((c) => c.remoteJid);
+  }, [conversationsQ.data]);
+
+  const profilePicsQ = trpc.whatsapp.profilePictures.useQuery(
+    { sessionId: activeSession?.sessionId || "", jids: convJids.slice(0, 50) },
+    { enabled: !!activeSession?.sessionId && convJids.length > 0, staleTime: 5 * 60 * 1000 }
+  );
+
+  const profilePicMap = useMemo(() => {
+    return (profilePicsQ.data || {}) as Record<string, string | null>;
+  }, [profilePicsQ.data]);
 
   // Mark as read mutation
   const markRead = trpc.whatsapp.markRead.useMutation({
@@ -300,14 +548,12 @@ export default function InboxPage() {
   const filteredConvs = useMemo(() => {
     let convs = (conversationsQ.data || []) as ConvItem[];
 
-    // Apply filter
     if (filter === "unread") {
       convs = convs.filter((c) => Number(c.unreadCount) > 0);
     } else if (filter === "groups") {
       convs = convs.filter((c) => c.remoteJid.includes("@g.us"));
     }
 
-    // Apply search
     if (search) {
       const s = search.toLowerCase();
       convs = convs.filter((c) => {
@@ -320,14 +566,15 @@ export default function InboxPage() {
     return convs;
   }, [conversationsQ.data, search, filter, getDisplayName]);
 
-  // Selected contact for WhatsAppChat
+  // Selected contact for WhatsAppChat (with profile picture)
   const selectedContact = useMemo(() => {
     if (!selectedJid) return null;
     const crmContact = getContactForJid(selectedJid);
-    if (crmContact) return crmContact;
+    const pic = profilePicMap[selectedJid] || undefined;
+    if (crmContact) return { ...crmContact, avatarUrl: pic };
     const phone = selectedJid.split("@")[0];
-    return { id: 0, name: formatPhoneNumber(selectedJid), phone, email: undefined, avatarUrl: undefined };
-  }, [selectedJid, getContactForJid]);
+    return { id: 0, name: formatPhoneNumber(selectedJid), phone, email: undefined, avatarUrl: pic };
+  }, [selectedJid, getContactForJid, profilePicMap]);
 
   // No session state
   if (!activeSession && !sessionsQ.isLoading) {
@@ -379,28 +626,14 @@ export default function InboxPage() {
         </div>
 
         {/* ── Search Bar ── */}
-        <div
-          className="shrink-0"
-          style={{
-            padding: "7px 12px",
-            backgroundColor: "#FFFFFF",
-          }}
-        >
+        <div className="shrink-0" style={{ padding: "7px 12px", backgroundColor: "#FFFFFF" }}>
           <div
             className="flex items-center rounded-lg overflow-hidden"
-            style={{
-              height: "35px",
-              backgroundColor: "#F0F2F5",
-              padding: "0 8px 0 12px",
-            }}
+            style={{ height: "35px", backgroundColor: "#F0F2F5", padding: "0 8px 0 12px" }}
           >
             <Search
               className="shrink-0 transition-all duration-200"
-              style={{
-                width: "16px",
-                height: "16px",
-                color: searchFocused ? "#25D366" : "#54656F",
-              }}
+              style={{ width: "16px", height: "16px", color: searchFocused ? "#25D366" : "#54656F" }}
             />
             <input
               type="text"
@@ -416,10 +649,7 @@ export default function InboxPage() {
         </div>
 
         {/* ── Filter Tabs ── */}
-        <div
-          className="flex items-center gap-[6px] shrink-0"
-          style={{ padding: "6px 12px" }}
-        >
+        <div className="flex items-center gap-[6px] shrink-0" style={{ padding: "6px 12px" }}>
           {(["all", "unread", "groups"] as const).map((f) => {
             const labels = { all: "Todas", unread: "Não lidas", groups: "Grupos" };
             const active = filter === f;
@@ -460,6 +690,7 @@ export default function InboxPage() {
                 conv={conv}
                 isActive={selectedJid === conv.remoteJid}
                 contactName={getDisplayName(conv.remoteJid)}
+                pictureUrl={profilePicMap[conv.remoteJid]}
                 onClick={() => handleSelectConv(conv.remoteJid)}
               />
             ))
@@ -491,10 +722,23 @@ export default function InboxPage() {
               contact={selectedContact}
               sessionId={activeSession.sessionId}
               remoteJid={selectedJid}
+              onCreateDeal={() => setShowCreateDeal(true)}
             />
           </div>
         )}
       </div>
+
+      {/* ═══ CREATE DEAL DIALOG ═══ */}
+      {selectedJid && activeSession && (
+        <CreateDealDialog
+          open={showCreateDeal}
+          onClose={() => setShowCreateDeal(false)}
+          contactName={selectedContact?.name || "Contato"}
+          contactPhone={selectedJid.split("@")[0]}
+          contactJid={selectedJid}
+          sessionId={activeSession.sessionId}
+        />
+      )}
     </div>
   );
 }

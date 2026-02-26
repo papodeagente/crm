@@ -302,3 +302,18 @@
 - [x] Falta separador visual (border) entre lista e chat
 - [x] Falta o fundo padrão WhatsApp no painel de chat
 - [x] Layout não está dividido corretamente — agora 440px fixo + flex-1
+
+## Fotos de Perfil + Criar Negociação no Chat (v11)
+
+### Fotos de perfil do WhatsApp
+- [x] Backend: endpoint para buscar foto de perfil via Baileys profilePictureUrl
+- [x] Backend: batch endpoint para buscar múltiplas fotos de perfil (staleTime 5min)
+- [x] Frontend: exibir foto de perfil real na lista de conversas do Inbox
+- [x] Frontend: exibir foto de perfil no header da conversa
+
+### Criar negociação de dentro da conversa
+- [x] Botão no header da conversa para criar negociação CRM
+- [x] Dialog/modal para preencher dados da negociação (título, valor, pipeline, etapa)
+- [x] Auto-vincular contato da conversa à negociação
+- [x] Auto-criar contato no CRM se não existir
+- [x] Navegar automaticamente para o deal após criação

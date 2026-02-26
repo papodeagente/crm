@@ -492,6 +492,44 @@ class WhatsAppManager extends EventEmitter {
     return this.resolveJid(sessionId, phone);
   }
 
+  /** Get profile picture URL for a JID */
+  async getProfilePicture(sessionId: string, jid: string): Promise<string | null> {
+    const session = this.sessions.get(sessionId);
+    if (!session?.socket || session.status !== "connected") return null;
+    try {
+      const formattedJid = jid.includes("@") ? jid : `${jid}@s.whatsapp.net`;
+      const url = await session.socket.profilePictureUrl(formattedJid, "image");
+      return url || null;
+    } catch {
+      return null;
+    }
+  }
+
+  /** Get profile pictures for multiple JIDs (batch) */
+  async getProfilePictures(sessionId: string, jids: string[]): Promise<Record<string, string | null>> {
+    const result: Record<string, string | null> = {};
+    const session = this.sessions.get(sessionId);
+    if (!session?.socket || session.status !== "connected") {
+      for (const jid of jids) result[jid] = null;
+      return result;
+    }
+    // Process in parallel with concurrency limit
+    const batchSize = 5;
+    for (let i = 0; i < jids.length; i += batchSize) {
+      const batch = jids.slice(i, i + batchSize);
+      const promises = batch.map(async (jid) => {
+        try {
+          const url = await session.socket!.profilePictureUrl(jid, "image");
+          result[jid] = url || null;
+        } catch {
+          result[jid] = null;
+        }
+      });
+      await Promise.all(promises);
+    }
+    return result;
+  }
+
   async sendTextMessage(sessionId: string, jid: string, text: string): Promise<any> {
     const session = this.sessions.get(sessionId);
     if (!session?.socket || session.status !== "connected") {

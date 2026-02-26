@@ -152,6 +152,20 @@ export const appRouter = router({
         await markConversationRead(input.sessionId, input.remoteJid);
         return { success: true };
       }),
+    // Get profile picture for a single JID
+    profilePicture: protectedProcedure
+      .input(z.object({ sessionId: z.string(), jid: z.string() }))
+      .query(async ({ input }) => {
+        const url = await whatsappManager.getProfilePicture(input.sessionId, input.jid);
+        return { url };
+      }),
+    // Get profile pictures for multiple JIDs (batch)
+    profilePictures: protectedProcedure
+      .input(z.object({ sessionId: z.string(), jids: z.array(z.string()).max(50) }))
+      .query(async ({ input }) => {
+        const pictures = await whatsappManager.getProfilePictures(input.sessionId, input.jids);
+        return pictures;
+      }),
     uploadMedia: protectedProcedure
       .input(z.object({ fileName: z.string(), fileBase64: z.string(), contentType: z.string() }))
       .mutation(async ({ input }) => {

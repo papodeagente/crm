@@ -31,6 +31,7 @@ interface WhatsAppChatProps {
   contact: { id: number; name: string; phone: string; email?: string; avatarUrl?: string } | null;
   sessionId: string;
   remoteJid: string;
+  onCreateDeal?: () => void;
 }
 
 // ─── Status Ticks Component ───
@@ -383,7 +384,7 @@ function VoiceRecorder({ onSend, onCancel }: { onSend: (blob: Blob, duration: nu
 }
 
 // ─── MAIN COMPONENT ───
-export default function WhatsAppChat({ contact, sessionId, remoteJid }: WhatsAppChatProps) {
+export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDeal }: WhatsAppChatProps) {
   const { lastMessage } = useSocket();
   const [messageText, setMessageText] = useState("");
   const [showAttach, setShowAttach] = useState(false);
@@ -642,7 +643,21 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid }: WhatsApp
           <p className="text-[16px] font-medium text-[#111B21] truncate">{contact?.name || "Contato"}</p>
           <p className="text-[13px] text-[#667781] truncate">{contact?.phone || ""}</p>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2">
+          {onCreateDeal && (
+            <button
+              onClick={onCreateDeal}
+              className="p-1.5 hover:bg-[#DFE5E7] rounded-full transition-colors group relative"
+              title="Criar negociação"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#54656F" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="2" y="7" width="20" height="14" rx="2" ry="2"/>
+                <path d="M16 3h-8l-2 4h12z"/>
+                <line x1="12" y1="12" x2="12" y2="18"/>
+                <line x1="9" y1="15" x2="15" y2="15"/>
+              </svg>
+            </button>
+          )}
           <button className="p-1.5 hover:bg-[#DFE5E7] rounded-full transition-colors">
             <Search className="w-5 h-5 text-[#54656F]" />
           </button>
