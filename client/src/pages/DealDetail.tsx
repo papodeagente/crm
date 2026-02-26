@@ -722,14 +722,14 @@ function HistoryTab({ history }: { history: any[] }) {
   };
 
   const actionColors: Record<string, string> = {
-    created: "bg-green-100 text-green-700",
-    stage_moved: "bg-blue-100 text-blue-700",
-    field_changed: "bg-yellow-100 text-yellow-700",
-    status_changed: "bg-purple-100 text-purple-700",
-    product_added: "bg-teal-100 text-teal-700",
-    product_removed: "bg-red-100 text-red-700",
-    participant_added: "bg-indigo-100 text-indigo-700",
-    participant_removed: "bg-red-100 text-red-700",
+    created: "bg-green-500/15 text-green-500",
+    stage_moved: "bg-blue-500/15 text-blue-500",
+    field_changed: "bg-yellow-500/15 text-yellow-500",
+    status_changed: "bg-purple-500/15 text-purple-500",
+    product_added: "bg-teal-500/15 text-teal-500",
+    product_removed: "bg-red-500/15 text-red-500",
+    participant_added: "bg-indigo-500/15 text-indigo-500",
+    participant_removed: "bg-red-500/15 text-red-500",
   };
 
   return (
@@ -745,7 +745,7 @@ function HistoryTab({ history }: { history: any[] }) {
           <div className="space-y-0">
             {history.map((h: any, i: number) => {
               const Icon = actionIcons[h.action] || History;
-              const color = actionColors[h.action] || "bg-gray-100 text-gray-700";
+              const color = actionColors[h.action] || "bg-muted text-muted-foreground";
               return (
                 <div key={h.id} className="relative flex gap-3 pb-5 pl-0">
                   <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 z-10 ${color}`}>

@@ -90,7 +90,7 @@ export default function Contacts() {
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-xl border border-border/40 overflow-hidden">
+      <div className="bg-card rounded-xl border border-border/40 overflow-hidden">
         <table className="w-full text-[13px]">
           <thead>
             <tr className="border-b border-border/40">

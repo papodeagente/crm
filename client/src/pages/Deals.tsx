@@ -73,16 +73,16 @@ export default function Deals() {
 
       {/* Summary cards */}
       <div className="grid grid-cols-3 gap-4">
-        <div className="rounded-xl bg-white border border-border/40 shadow-none p-4 flex items-center gap-3">
-          <div className="h-10 w-10 rounded-xl bg-blue-50 flex items-center justify-center"><Briefcase className="h-5 w-5 text-blue-600" /></div>
+        <div className="rounded-xl bg-card border border-border/40 shadow-none p-4 flex items-center gap-3">
+          <div className="h-10 w-10 rounded-xl bg-blue-500/10 flex items-center justify-center"><Briefcase className="h-5 w-5 text-blue-500" /></div>
           <div><p className="text-[11px] font-bold uppercase tracking-[0.1em] text-muted-foreground">Abertos</p><p className="text-lg font-bold">{openCount}</p></div>
         </div>
-        <div className="rounded-xl bg-white border border-border/40 shadow-none p-4 flex items-center gap-3">
-          <div className="h-10 w-10 rounded-xl bg-emerald-50 flex items-center justify-center"><TrendingUp className="h-5 w-5 text-emerald-600" /></div>
+        <div className="rounded-xl bg-card border border-border/40 shadow-none p-4 flex items-center gap-3">
+          <div className="h-10 w-10 rounded-xl bg-emerald-500/10 flex items-center justify-center"><TrendingUp className="h-5 w-5 text-emerald-500" /></div>
           <div><p className="text-[11px] font-bold uppercase tracking-[0.1em] text-muted-foreground">Ganhos</p><p className="text-lg font-bold">{wonCount}</p></div>
         </div>
-        <div className="rounded-xl bg-white border border-border/40 shadow-none p-4 flex items-center gap-3">
-          <div className="h-10 w-10 rounded-xl bg-violet-50 flex items-center justify-center"><DollarSign className="h-5 w-5 text-violet-600" /></div>
+        <div className="rounded-xl bg-card border border-border/40 shadow-none p-4 flex items-center gap-3">
+          <div className="h-10 w-10 rounded-xl bg-violet-500/10 flex items-center justify-center"><DollarSign className="h-5 w-5 text-violet-500" /></div>
           <div><p className="text-[11px] font-bold uppercase tracking-[0.1em] text-muted-foreground">Valor Total</p><p className="text-lg font-bold">{new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(totalValue / 100)}</p></div>
         </div>
       </div>

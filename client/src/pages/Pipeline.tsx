@@ -165,19 +165,19 @@ export default function Pipeline() {
   return (
     <div className="flex flex-col h-[calc(100vh-56px)]">
       {/* Toolbar */}
-      <div className="border-b border-border/40 bg-white/80 backdrop-blur-sm px-5 lg:px-8 py-3.5">
+      <div className="border-b border-border/40 bg-card/80 backdrop-blur-sm px-5 lg:px-8 py-3.5">
         <div className="flex items-center gap-2.5 flex-wrap">
           {/* View toggle */}
           <div className="flex bg-muted/60 rounded-xl p-1 gap-0.5">
             <button
               onClick={() => setViewMode("kanban")}
-              className={`p-2 rounded-lg transition-all duration-200 ${viewMode === "kanban" ? "bg-white text-primary shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+              className={`p-2 rounded-lg transition-all duration-200 ${viewMode === "kanban" ? "bg-card text-primary shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
             >
               <LayoutGrid className="h-4 w-4" />
             </button>
             <button
               onClick={() => setViewMode("list")}
-              className={`p-2 rounded-lg transition-all duration-200 ${viewMode === "list" ? "bg-white text-primary shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+              className={`p-2 rounded-lg transition-all duration-200 ${viewMode === "list" ? "bg-card text-primary shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
             >
               <List className="h-4 w-4" />
             </button>
@@ -185,7 +185,7 @@ export default function Pipeline() {
 
           {/* Pipeline selector */}
           <Select value={String(activePipeline?.id ?? "")} onValueChange={(v) => setSelectedPipelineId(Number(v))}>
-            <SelectTrigger className="w-[200px] h-9 text-[13px] rounded-xl border-border/50 bg-white">
+            <SelectTrigger className="w-[200px] h-9 text-[13px] rounded-xl border-border/50 bg-card">
               <SelectValue placeholder="Selecionar funil" />
             </SelectTrigger>
             <SelectContent className="rounded-xl">
@@ -197,7 +197,7 @@ export default function Pipeline() {
 
           {/* Status filter */}
           <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-[170px] h-9 text-[13px] rounded-xl border-border/50 bg-white">
+            <SelectTrigger className="w-[170px] h-9 text-[13px] rounded-xl border-border/50 bg-card">
               <SelectValue placeholder="Todos os status" />
             </SelectTrigger>
             <SelectContent className="rounded-xl">
@@ -210,7 +210,7 @@ export default function Pipeline() {
 
           {/* Sort */}
           <Select value={sortMode} onValueChange={(v) => setSortMode(v as SortMode)}>
-            <SelectTrigger className="w-[180px] h-9 text-[13px] rounded-xl border-border/50 bg-white">
+            <SelectTrigger className="w-[180px] h-9 text-[13px] rounded-xl border-border/50 bg-card">
               <ArrowUpDown className="h-3.5 w-3.5 mr-1.5 text-muted-foreground" />
               <SelectValue />
             </SelectTrigger>
@@ -286,7 +286,7 @@ export default function Pipeline() {
                     <div className={`flex-1 rounded-2xl border transition-all duration-200 overflow-y-auto scrollbar-thin ${
                       isDragOver
                         ? "bg-primary/[0.04] border-primary/30 ring-2 ring-primary/20"
-                        : "bg-white/50 border-border/30"
+                        : "bg-card/50 border-border/30"
                     }`}>
                       <div className="p-2.5 space-y-2.5 min-h-[200px]">
                         {stageDeals.map((deal: any) => (
@@ -382,7 +382,7 @@ function DealCard({ deal, contacts, tasks, onCreateTask, onOpenDrawer, onDragSta
       draggable
       onDragStart={(e) => onDragStart(e, deal.id)}
       onDragEnd={onDragEnd}
-      className={`bg-white rounded-xl border border-border/40 p-3.5 shadow-[0_1px_3px_oklch(0_0_0/0.03)] hover:shadow-sm transition-all duration-200 cursor-grab active:cursor-grabbing space-y-2.5 ${isDragging ? "opacity-40 scale-95" : ""}`}
+      className={`bg-card rounded-xl border border-border/40 p-3.5 shadow-[0_1px_3px_oklch(0_0_0/0.03)] hover:shadow-sm transition-all duration-200 cursor-grab active:cursor-grabbing space-y-2.5 ${isDragging ? "opacity-40 scale-95" : ""}`}
     >
       {/* Status + actions */}
       <div className="flex items-center justify-between">
@@ -513,9 +513,9 @@ function DealDrawer({ dealId, onClose, contacts, accounts, stages }: {
     <div className="fixed inset-0 z-50 flex justify-end">
       <div className="absolute inset-0 bg-black/20 backdrop-blur-[2px]" onClick={onClose} />
 
-      <div className="relative w-full max-w-[680px] bg-white shadow-2xl flex flex-col animate-in slide-in-from-right duration-300">
+      <div className="relative w-full max-w-[680px] bg-card shadow-2xl flex flex-col animate-in slide-in-from-right duration-300">
         {/* Header */}
-        <div className="px-6 py-5 border-b border-border/40 bg-gradient-to-r from-white to-muted/20">
+        <div className="px-6 py-5 border-b border-border/40 bg-gradient-to-r from-card to-muted/20">
           <div className="flex items-start justify-between">
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-2">
@@ -642,7 +642,7 @@ function DealDrawer({ dealId, onClose, contacts, accounts, stages }: {
               <div className="space-y-3">
                 <Label className="text-[11px] font-bold uppercase tracking-[0.1em] text-muted-foreground">Tarefas</Label>
                 {(dealTasks.data || []).map((t: any) => (
-                  <div key={t.id} className={`flex items-center gap-2.5 text-[13px] p-3 rounded-xl border border-border/40 ${t.status === "done" ? "bg-emerald-50/50 line-through text-muted-foreground" : "bg-white"}`}>
+                  <div key={t.id} className={`flex items-center gap-2.5 text-[13px] p-3 rounded-xl border border-border/40 ${t.status === "done" ? "bg-emerald-500/10 line-through text-muted-foreground" : "bg-card"}`}>
                     <Clock className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                     <span className="flex-1 truncate">{t.title}</span>
                     {t.dueAt && <span className="text-[11px] text-muted-foreground shrink-0">{formatDate(t.dueAt)}</span>}
@@ -661,7 +661,7 @@ function DealDrawer({ dealId, onClose, contacts, accounts, stages }: {
               </div>
 
               {(products.data || []).map((p: any) => (
-                <div key={p.id} className="border border-border/40 rounded-xl p-4 bg-white space-y-2 hover:shadow-sm transition-shadow">
+                <div key={p.id} className="border border-border/40 rounded-xl p-4 bg-card space-y-2 hover:shadow-sm transition-shadow">
                   <div className="flex items-start justify-between">
                     <div className="flex items-center gap-2.5">
                       <span className="text-lg">{categoryIcons[p.category] || "\uD83D\uDCE6"}</span>
@@ -706,7 +706,7 @@ function DealDrawer({ dealId, onClose, contacts, accounts, stages }: {
               {(participants.data || []).map((p: any) => {
                 const pc = contacts.find((c: any) => c.id === p.contactId);
                 return (
-                  <div key={p.id} className="flex items-center justify-between border border-border/40 rounded-xl p-3.5 bg-white hover:shadow-sm transition-shadow">
+                  <div key={p.id} className="flex items-center justify-between border border-border/40 rounded-xl p-3.5 bg-card hover:shadow-sm transition-shadow">
                     <div className="flex items-center gap-3">
                       <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-primary/10 to-accent/10 flex items-center justify-center text-[13px] font-bold text-primary">
                         {pc?.name?.charAt(0) || "?"}

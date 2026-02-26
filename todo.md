@@ -506,3 +506,30 @@
 - [x] TypeScript sem erros
 - [x] 110 testes passando, 8 arquivos
 - [x] Visual consistente com a identidade da marca (screenshot verificado)
+
+## Correção Tema Dark + Toggle Dark/Light (v20)
+
+### Correção de Tema
+- [x] Corrigir variáveis CSS do tema light para funcionar com identidade ENTUR OS
+- [x] Corrigir variáveis CSS do tema dark para consistência em todas as páginas
+- [x] Garantir que Pipeline, Contatos, Tarefas, Análises usem cores semânticas (bg-background, bg-card, text-foreground)
+- [x] Remover cores hardcoded (bg-gray-*, bg-white, text-gray-*) e substituir por variáveis semânticas
+- [x] Cards do Pipeline usando bg-card
+- [x] Colunas do Pipeline usando bg-muted
+- [x] DealDetail actionColors usando /15 opacity
+- [x] Deals.tsx summary cards usando bg-card
+- [x] NotFound.tsx usando cores semânticas
+- [x] ManusDialog.tsx usando cores semânticas
+- [x] Inbox.tsx bg-white → bg-card (6 ocorrências)
+
+### Toggle de Tema
+- [x] Criar botão/switch de tema no dropdown do usuário (TopNavLayout)
+- [x] Usar ThemeContext existente com switchable=true
+- [x] Persistir preferência do usuário no localStorage
+- [x] Ícone de sol (Tema Claro) / lua (Tema Escuro) no toggle
+
+### Verificação
+- [x] Dashboard dark theme consistente e bonito (screenshot verificado)
+- [x] Variáveis light e dark definidas no index.css
+- [x] TypeScript sem erros (LSP + tsc)
+- [x] 110 testes passando, 8 arquivos

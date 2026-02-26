@@ -77,7 +77,7 @@ function TaskItem({ title, dueTime, priority }: {
 
   return (
     <div className="flex items-center gap-3 py-2.5 group">
-      <div className={`h-2.5 w-2.5 rounded-full shrink-0 ${priorityColors[priority] || "bg-gray-400"}`} />
+      <div className={`h-2.5 w-2.5 rounded-full shrink-0 ${priorityColors[priority] || "bg-muted-foreground"}`} />
       <span className="text-[13px] text-foreground flex-1 truncate">{title}</span>
       <span className="text-[11px] text-muted-foreground shrink-0 flex items-center gap-1">
         <Clock className="h-3 w-3" />
@@ -316,7 +316,7 @@ export default function Home() {
             ) : activityQ.data && activityQ.data.length > 0 ? (
               <div className="divide-y divide-border/50">
                 {activityQ.data.map(a => {
-                  const iconInfo = actionIcons[a.action] || { icon: Briefcase, color: "bg-gray-50 text-gray-600" };
+                  const iconInfo = actionIcons[a.action] || { icon: Briefcase, color: "bg-muted text-muted-foreground" };
                   const subtitle = a.fromStageName && a.toStageName
                     ? `${a.fromStageName} → ${a.toStageName}`
                     : a.description.length > 60

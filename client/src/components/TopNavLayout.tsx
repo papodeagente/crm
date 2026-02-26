@@ -12,9 +12,10 @@ import { getLoginUrl } from "@/const";
 import {
   Home, Briefcase, Users, CheckSquare, BarChart3,
   Bell, Settings, Search, ChevronRight, LogOut, Menu, X,
-  Loader2, User, Building2, ListTodo, Phone, Mail,
+  Loader2, User, Building2, ListTodo, Phone, Mail, Sun, Moon,
 } from "lucide-react";
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useTheme } from "@/contexts/ThemeContext";
 import { Link, useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from "./DashboardLayoutSkeleton";
 import { trpc } from "@/lib/trpc";
@@ -367,6 +368,7 @@ function TopBar({ onSearchOpen, mobileMenuOpen, onToggleMobile }: {
 }) {
   const { user, logout } = useAuth();
   const [location, setLocation] = useLocation();
+  const themeCtx = useTheme();
   const unreadCount = trpc.notifications.unreadCount.useQuery(
     { tenantId: 1 },
     { refetchInterval: 30000 }
@@ -481,6 +483,10 @@ function TopBar({ onSearchOpen, mobileMenuOpen, onToggleMobile }: {
                 <DropdownMenuItem onClick={() => setLocation("/settings")} className="cursor-pointer rounded-lg px-3 py-2 text-[13px] gap-2.5">
                   <Settings className="h-3.5 w-3.5 text-muted-foreground" />
                   Configurações
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={(e) => { e.preventDefault(); themeCtx.toggleTheme?.(); }} className="cursor-pointer rounded-lg px-3 py-2 text-[13px] gap-2.5">
+                  {themeCtx.theme === "dark" ? <Sun className="h-3.5 w-3.5 text-amber-500" /> : <Moon className="h-3.5 w-3.5 text-indigo-500" />}
+                  {themeCtx.theme === "dark" ? "Tema Claro" : "Tema Escuro"}
                 </DropdownMenuItem>
                 <DropdownMenuSeparator className="my-1" />
                 <DropdownMenuItem onClick={logout} className="cursor-pointer rounded-lg px-3 py-2 text-[13px] gap-2.5 text-destructive focus:text-destructive">

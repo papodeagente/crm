@@ -328,7 +328,7 @@ function CreateDealDialog({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
       <div
-        className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4"
+        className="bg-card rounded-xl shadow-xl w-full max-w-md mx-4"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -386,7 +386,7 @@ function CreateDealDialog({
             <select
               value={selectedPipelineId || ""}
               onChange={(e) => { setSelectedPipelineId(Number(e.target.value)); setSelectedStageId(null); }}
-              className="w-full px-3 py-2 border border-[#D1D7DB] rounded-lg text-sm text-[#111B21] focus:outline-none focus:border-[#25D366] focus:ring-1 focus:ring-[#25D366] bg-white"
+              className="w-full px-3 py-2 border border-[#D1D7DB] rounded-lg text-sm text-[#111B21] focus:outline-none focus:border-[#25D366] focus:ring-1 focus:ring-[#25D366] bg-card"
             >
               {pipelines.map((p: any) => (
                 <option key={p.id} value={p.id}>{p.name}</option>
@@ -400,7 +400,7 @@ function CreateDealDialog({
             <select
               value={selectedStageId || ""}
               onChange={(e) => setSelectedStageId(Number(e.target.value))}
-              className="w-full px-3 py-2 border border-[#D1D7DB] rounded-lg text-sm text-[#111B21] focus:outline-none focus:border-[#25D366] focus:ring-1 focus:ring-[#25D366] bg-white"
+              className="w-full px-3 py-2 border border-[#D1D7DB] rounded-lg text-sm text-[#111B21] focus:outline-none focus:border-[#25D366] focus:ring-1 focus:ring-[#25D366] bg-card"
             >
               {stages.map((s: any) => (
                 <option key={s.id} value={s.id}>{s.name}</option>
@@ -523,7 +523,7 @@ function NewChatPanel({
 
   return (
     <div
-      className="absolute inset-0 z-20 flex flex-col bg-white"
+      className="absolute inset-0 z-20 flex flex-col bg-card"
       style={{ animation: "slideInLeft 0.2s ease-out" }}
     >
       {/* Header */}
@@ -645,7 +645,7 @@ function NewChatPanel({
 
       {/* Resolving overlay */}
       {resolving && (
-        <div className="absolute inset-0 z-30 bg-white/70 flex items-center justify-center">
+        <div className="absolute inset-0 z-30 bg-card/70 flex items-center justify-center">
           <div className="flex flex-col items-center gap-3">
             <Loader2 className="w-8 h-8 text-[#25D366] animate-spin" />
             <p className="text-[14px] text-[#667781]">Verificando no WhatsApp...</p>
@@ -913,7 +913,7 @@ export default function InboxPage() {
     >
       {/* ═══ LEFT PANEL: Conversations List ═══ */}
       <div
-        className={`flex flex-col bg-white ${
+        className={`flex flex-col bg-card ${
           showMobileChat ? "hidden md:flex" : "flex"
         }`}
         style={{

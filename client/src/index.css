@@ -42,56 +42,90 @@
   --color-sidebar-ring: var(--sidebar-ring);
 }
 
-/* ─── ENTUR OS — Dark Premium Theme ─── */
-/* Inspired by the brand: deep dark backgrounds, purple→magenta→cyan gradient accents */
+/* ─── ENTUR OS — Light Theme ─── */
 :root {
   --radius: 0.625rem;
 
-  /* Backgrounds — deep dark navy */
-  --background: oklch(0.14 0.015 280);
-  --foreground: oklch(0.93 0.005 270);
+  --background: oklch(0.975 0.002 270);
+  --foreground: oklch(0.15 0.015 270);
 
-  /* Cards — slightly lighter dark surface */
-  --card: oklch(0.18 0.015 280);
-  --card-foreground: oklch(0.93 0.005 270);
+  --card: oklch(1.0 0 0);
+  --card-foreground: oklch(0.15 0.015 270);
 
-  /* Popovers */
-  --popover: oklch(0.18 0.015 280);
-  --popover-foreground: oklch(0.93 0.005 270);
+  --popover: oklch(1.0 0 0);
+  --popover-foreground: oklch(0.15 0.015 270);
 
-  /* Primary — vibrant purple-magenta (ENTUR OS signature gradient midpoint) */
-  --primary: oklch(0.60 0.25 300);
+  --primary: oklch(0.55 0.25 290);
   --primary-foreground: oklch(1.0 0 0);
 
-  /* Secondary — dark elevated surface */
-  --secondary: oklch(0.22 0.015 280);
-  --secondary-foreground: oklch(0.88 0.005 270);
+  --secondary: oklch(0.955 0.008 270);
+  --secondary-foreground: oklch(0.25 0.015 270);
 
-  /* Muted — subtle dark gray with purple tint */
-  --muted: oklch(0.22 0.012 280);
-  --muted-foreground: oklch(0.58 0.012 270);
+  --muted: oklch(0.955 0.008 270);
+  --muted-foreground: oklch(0.48 0.012 270);
 
-  /* Accent — purple-tinted dark surface */
-  --accent: oklch(0.24 0.025 290);
-  --accent-foreground: oklch(0.93 0.005 270);
+  --accent: oklch(0.945 0.015 290);
+  --accent-foreground: oklch(0.20 0.015 270);
 
-  /* Destructive — vivid coral red */
   --destructive: oklch(0.58 0.24 25);
   --destructive-foreground: oklch(1.0 0 0);
 
-  /* Borders — subtle purple-tinted edges */
+  --border: oklch(0.90 0.005 270);
+  --input: oklch(0.90 0.005 270);
+  --ring: oklch(0.55 0.25 290);
+
+  --chart-1: oklch(0.55 0.25 290);
+  --chart-2: oklch(0.58 0.20 200);
+  --chart-3: oklch(0.50 0.25 330);
+  --chart-4: oklch(0.62 0.18 180);
+  --chart-5: oklch(0.45 0.22 270);
+
+  --sidebar: oklch(0.97 0.002 270);
+  --sidebar-foreground: oklch(0.40 0.008 270);
+  --sidebar-primary: oklch(0.55 0.25 290);
+  --sidebar-primary-foreground: oklch(1.0 0 0);
+  --sidebar-accent: oklch(0.945 0.015 290);
+  --sidebar-accent-foreground: oklch(0.20 0.015 270);
+  --sidebar-border: oklch(0.90 0.005 270);
+  --sidebar-ring: oklch(0.55 0.25 290);
+}
+
+/* ─── ENTUR OS — Dark Theme ─── */
+.dark {
+  --background: oklch(0.14 0.015 280);
+  --foreground: oklch(0.93 0.005 270);
+
+  --card: oklch(0.18 0.015 280);
+  --card-foreground: oklch(0.93 0.005 270);
+
+  --popover: oklch(0.18 0.015 280);
+  --popover-foreground: oklch(0.93 0.005 270);
+
+  --primary: oklch(0.60 0.25 300);
+  --primary-foreground: oklch(1.0 0 0);
+
+  --secondary: oklch(0.22 0.015 280);
+  --secondary-foreground: oklch(0.88 0.005 270);
+
+  --muted: oklch(0.22 0.012 280);
+  --muted-foreground: oklch(0.58 0.012 270);
+
+  --accent: oklch(0.24 0.025 290);
+  --accent-foreground: oklch(0.93 0.005 270);
+
+  --destructive: oklch(0.58 0.24 25);
+  --destructive-foreground: oklch(1.0 0 0);
+
   --border: oklch(0.28 0.015 280);
   --input: oklch(0.24 0.015 280);
   --ring: oklch(0.60 0.25 300);
 
-  /* Charts — ENTUR OS gradient palette */
   --chart-1: oklch(0.60 0.25 300);
   --chart-2: oklch(0.65 0.20 200);
   --chart-3: oklch(0.55 0.25 330);
   --chart-4: oklch(0.70 0.18 180);
   --chart-5: oklch(0.50 0.22 270);
 
-  /* Sidebar / Nav */
   --sidebar: oklch(0.12 0.015 280);
   --sidebar-foreground: oklch(0.68 0.008 270);
   --sidebar-primary: oklch(0.60 0.25 300);
@@ -162,19 +196,25 @@
     }
   }
 
-  /* ENTUR OS surface card — dark elevated with glow */
+  /* ENTUR OS surface card — theme-aware */
   .surface {
-    background: oklch(0.18 0.015 280);
-    border: 1px solid oklch(1 1 1 / 0.06);
+    @apply bg-card border border-border/50;
     border-radius: 0.875rem;
+    box-shadow: 0 1px 3px oklch(0 0 0 / 0.04), 0 2px 8px oklch(0 0 0 / 0.03);
+    transition: box-shadow 0.25s ease, transform 0.25s ease;
+  }
+  .dark .surface {
+    border-color: oklch(1 1 1 / 0.06);
     box-shadow:
       0 0 0 0.5px oklch(1 1 1 / 0.03),
       0 1px 2px oklch(0 0 0 / 0.2),
       0 3px 10px oklch(0 0 0 / 0.15),
       0 8px 30px oklch(0 0 0 / 0.1);
-    transition: box-shadow 0.25s ease, transform 0.25s ease;
   }
   .surface:hover {
+    box-shadow: 0 2px 6px oklch(0 0 0 / 0.06), 0 4px 16px oklch(0 0 0 / 0.04);
+  }
+  .dark .surface:hover {
     box-shadow:
       0 0 0 0.5px oklch(1 1 1 / 0.05),
       0 2px 4px oklch(0 0 0 / 0.25),
@@ -182,25 +222,22 @@
       0 0 40px oklch(0.60 0.25 300 / 0.04);
   }
 
-  /* Glassmorphism — dark variant */
+  /* Glassmorphism — theme-aware */
   .glass {
-    background: oklch(0.14 0.015 280 / 0.85);
-    backdrop-filter: blur(24px) saturate(1.4);
-    -webkit-backdrop-filter: blur(24px) saturate(1.4);
-    border-bottom: 1px solid oklch(1 1 1 / 0.06);
+    @apply bg-background/85 backdrop-blur-xl border-b border-border/50;
+  }
+  .dark .glass {
+    border-bottom-color: oklch(1 1 1 / 0.06);
   }
 
-  /* Dark inset input */
+  /* Input inset — theme-aware */
   .input-inset {
-    background: oklch(0.12 0.015 280);
-    border: 1px solid oklch(1 1 1 / 0.08);
-    border-radius: 0.5rem;
+    @apply bg-muted border border-border/60 rounded-lg;
     transition: all 0.15s ease;
   }
   .input-inset:focus-within {
-    background: oklch(0.16 0.015 280);
-    border-color: oklch(0.60 0.25 300 / 0.5);
-    box-shadow: 0 0 0 3px oklch(0.60 0.25 300 / 0.15);
+    @apply bg-background border-primary/50;
+    box-shadow: 0 0 0 3px oklch(0.55 0.25 290 / 0.15);
   }
 
   /* Section label */
@@ -209,7 +246,7 @@
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.06em;
-    color: oklch(0.55 0.012 270);
+    @apply text-muted-foreground;
     padding: 0 0.75rem;
     margin-bottom: 0.25rem;
   }
@@ -237,9 +274,12 @@
 }
 
 @layer utilities {
-  /* Thin scrollbar — dark style */
+  /* Thin scrollbar — theme-aware */
   .scrollbar-thin {
     scrollbar-width: thin;
+    scrollbar-color: oklch(0.80 0.005 270) transparent;
+  }
+  .dark .scrollbar-thin {
     scrollbar-color: oklch(0.35 0.01 280) transparent;
   }
   .scrollbar-thin::-webkit-scrollbar {
@@ -250,10 +290,16 @@
     background: transparent;
   }
   .scrollbar-thin::-webkit-scrollbar-thumb {
-    background-color: oklch(0.35 0.01 280);
+    background-color: oklch(0.80 0.005 270);
     border-radius: 10px;
   }
+  .dark .scrollbar-thin::-webkit-scrollbar-thumb {
+    background-color: oklch(0.35 0.01 280);
+  }
   .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background-color: oklch(0.70 0.005 270);
+  }
+  .dark .scrollbar-thin::-webkit-scrollbar-thumb:hover {
     background-color: oklch(0.45 0.01 280);
   }
 
