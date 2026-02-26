@@ -348,3 +348,22 @@
 - [x] Feedback visual se o número não estiver registrado no WhatsApp
 - [x] Animação slide-in da esquerda e overlay de loading durante verificação
 - [x] Testes unitários para resolveJid — 83 testes passando
+
+## Remover Grupos + Verificar Importação (v14)
+
+### Remover grupos da Inbox e importação
+- [x] Backend: filtrar mensagens de grupo (@g.us) na importação de histórico (messaging-history.set)
+- [x] Backend: filtrar grupos na query de conversas (getConversationsList)
+- [x] Backend: filtrar grupos no backup diário de conversas para deal_history (já usava phoneToJid @s.whatsapp.net)
+- [x] Backend: não salvar mensagens de grupo no banco (messages.upsert handler)
+- [x] Backend: remover endpoint groupNames do router
+- [x] Frontend: remover filtro "Grupos" da Inbox (só "Todas" e "Não lidas")
+- [x] Frontend: remover lógica de groupMetadata/groupNames/groupJids
+- [x] Frontend: remover ícone/lógica de grupo do avatar e display name
+
+### Verificar importação correta de dados
+- [x] Verificar que nomes de contatos CRM aparecem corretamente na Inbox (contactNameMap com matching +55)
+- [x] Verificar que pushName do WhatsApp é salvo e exibido como fallback (pushNameMap)
+- [x] Verificar que histórico de conversa completo é carregado (messaging-history.set + messages.upsert)
+- [x] Verificar que o endpoint de conversas retorna dados completos e ordenados (ORDER BY timestamp DESC)
+- [x] Testes unitários — 83 testes passando, 0 erros TypeScript

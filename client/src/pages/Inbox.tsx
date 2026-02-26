@@ -4,7 +4,7 @@ import { useSocket } from "@/hooks/useSocket";
 import WhatsAppChat from "@/components/WhatsAppChat";
 import {
   Search, MessageSquare, MoreVertical, ArrowLeft,
-  Check, CheckCheck, Clock, Phone, Loader2, Users,
+  Check, CheckCheck, Clock, Phone, Loader2,
   MessageCircle, Briefcase, Plus, X, Volume2, VolumeX
 } from "lucide-react";
 import { toast } from "sonner";
@@ -74,7 +74,6 @@ function formatTime(date: string | Date | null | undefined) {
 
 function formatPhoneNumber(jid: string): string {
   if (!jid) return "Desconhecido";
-  if (jid.includes("@g.us")) return jid.split("@")[0];
   const phone = jid.split("@")[0];
   if (phone.startsWith("55") && phone.length >= 12) {
     const ddd = phone.substring(2, 4);
@@ -151,14 +150,10 @@ const WaAvatar = memo(({ name, size = 49, isGroup = false, pictureUrl }: { name:
       className="rounded-full bg-[#DFE5E7] flex items-center justify-center shrink-0"
       style={{ width: size, height: size }}
     >
-      {isGroup ? (
-        <Users className="text-white" style={{ width: size * 0.45, height: size * 0.45 }} />
-      ) : (
-        <svg viewBox="0 0 212 212" width={size} height={size}>
+      <svg viewBox="0 0 212 212" width={size} height={size}>
           <path fill="#DFE5E7" d="M106 0C47.5 0 0 47.5 0 106s47.5 106 106 106 106-47.5 106-106S164.5 0 106 0z" />
           <path fill="#FFF" d="M106 45c-20.7 0-37.5 16.8-37.5 37.5S85.3 120 106 120s37.5-16.8 37.5-37.5S126.7 45 106 45zm0 105c-28.3 0-52.5 14.3-52.5 32v10h105v-10c0-17.7-24.2-32-52.5-32z" />
         </svg>
-      )}
     </div>
   );
 });
@@ -185,7 +180,6 @@ const ConversationItem = memo(({
 }: {
   conv: ConvItem; isActive: boolean; contactName: string; pictureUrl?: string | null; onClick: () => void;
 }) => {
-  const isGroup = conv.remoteJid.includes("@g.us");
   const fromMe = conv.lastFromMe === true || conv.lastFromMe === 1;
   const unread = Number(conv.unreadCount) || 0;
   const preview = getMessagePreview(conv.lastMessage, conv.lastMessageType);
@@ -199,7 +193,7 @@ const ConversationItem = memo(({
       }`}
     >
       <div className="py-[6px] pr-[13px]">
-        <WaAvatar name={contactName} size={49} isGroup={isGroup} pictureUrl={pictureUrl} />
+        <WaAvatar name={contactName} size={49} pictureUrl={pictureUrl} />
       </div>
       <div className="flex-1 min-w-0 py-[6px] border-b border-[#E9EDEF]">
         <div className="flex items-baseline justify-between mb-[2px]">
@@ -618,7 +612,7 @@ function NewChatPanel({
           </div>
         ) : contacts.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
-            <Users className="w-10 h-10 text-[#667781]/20 mb-2" />
+            <Phone className="w-10 h-10 text-[#667781]/20 mb-2" />
             <p className="text-[13px] text-[#667781]">
               {searchTerm ? "Nenhum contato encontrado" : "Nenhum contato com telefone cadastrado"}
             </p>
@@ -739,7 +733,7 @@ export default function InboxPage() {
   const [search, setSearch] = useState("");
   const [searchFocused, setSearchFocused] = useState(false);
   const [showMobileChat, setShowMobileChat] = useState(false);
-  const [filter, setFilter] = useState<"all" | "unread" | "groups">("all");
+  const [filter, setFilter] = useState<"all" | "unread">("all");
   const [showCreateDeal, setShowCreateDeal] = useState(false);
   const [showNewChat, setShowNewChat] = useState(false);
   const [isMuted, setIsMuted] = useState(() => {
@@ -766,12 +760,10 @@ export default function InboxPage() {
     { enabled: true }
   );
 
-  // Separate group JIDs and contact JIDs
+  // Contact JIDs for profile pictures
   const convJids = useMemo(() => {
     return ((conversationsQ.data || []) as ConvItem[]).map((c) => c.remoteJid);
   }, [conversationsQ.data]);
-
-  const groupJids = useMemo(() => convJids.filter((j) => j.includes("@g.us")), [convJids]);
 
   // Batch fetch profile pictures
   const profilePicsQ = trpc.whatsapp.profilePictures.useQuery(
@@ -782,16 +774,6 @@ export default function InboxPage() {
   const profilePicMap = useMemo(() => {
     return (profilePicsQ.data || {}) as Record<string, string | null>;
   }, [profilePicsQ.data]);
-
-  // Fetch group names
-  const groupNamesQ = trpc.whatsapp.groupNames.useQuery(
-    { sessionId: activeSession?.sessionId || "", jids: groupJids.slice(0, 50) },
-    { enabled: !!activeSession?.sessionId && groupJids.length > 0, staleTime: 5 * 60 * 1000 }
-  );
-
-  const groupNameMap = useMemo(() => {
-    return (groupNamesQ.data || {}) as Record<string, string | null>;
-  }, [groupNamesQ.data]);
 
   // Build pushName map from conversations data
   const pushNameMap = useMemo(() => {
@@ -833,21 +815,15 @@ export default function InboxPage() {
   }, [contactNameMap]);
 
   const getDisplayName = useCallback((jid: string) => {
-    // 1. Groups: use group name from Baileys
-    if (jid.includes("@g.us")) {
-      const groupName = groupNameMap[jid];
-      if (groupName) return groupName;
-      return jid.split("@")[0]; // fallback to group ID
-    }
-    // 2. CRM contact name
+    // 1. CRM contact name
     const contact = getContactForJid(jid);
     if (contact) return contact.name;
-    // 3. WhatsApp pushName (name set by the contact on their WhatsApp)
+    // 2. WhatsApp pushName (name set by the contact on their WhatsApp)
     const pushName = pushNameMap.get(jid);
     if (pushName) return pushName;
-    // 4. Formatted phone number
+    // 3. Formatted phone number
     return formatPhoneNumber(jid);
-  }, [getContactForJid, groupNameMap, pushNameMap]);
+  }, [getContactForJid, pushNameMap]);
 
   // Refetch on new messages + play notification sound
   useEffect(() => {
@@ -884,8 +860,6 @@ export default function InboxPage() {
 
     if (filter === "unread") {
       convs = convs.filter((c) => Number(c.unreadCount) > 0);
-    } else if (filter === "groups") {
-      convs = convs.filter((c) => c.remoteJid.includes("@g.us"));
     }
 
     if (search) {
@@ -1024,8 +998,8 @@ export default function InboxPage() {
 
         {/* ── Filter Tabs ── */}
         <div className="flex items-center gap-[6px] shrink-0" style={{ padding: "6px 12px" }}>
-          {(["all", "unread", "groups"] as const).map((f) => {
-            const labels = { all: "Todas", unread: "Não lidas", groups: "Grupos" };
+          {(["all", "unread"] as const).map((f) => {
+            const labels: Record<string, string> = { all: "Todas", unread: "Não lidas" };
             const active = filter === f;
             return (
               <button

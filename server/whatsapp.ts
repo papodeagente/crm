@@ -173,6 +173,8 @@ class WhatsAppManager extends EventEmitter {
           if (existing.length > 0) continue;
 
           const remoteJid = msg.key.remoteJid || "";
+          // Skip group messages — CRM only handles individual contacts
+          if (remoteJid.endsWith("@g.us")) continue;
           const fromMe = msg.key.fromMe || false;
           const messageType = Object.keys(msg.message)[0] || "unknown";
           let content = "";
@@ -210,6 +212,8 @@ class WhatsAppManager extends EventEmitter {
         if (!msg.message) continue;
 
         const remoteJid = msg.key.remoteJid || "";
+        // Skip group messages — CRM only handles individual contacts
+        if (remoteJid.endsWith("@g.us")) continue;
         const fromMe = msg.key.fromMe || false;
         const messageType = Object.keys(msg.message)[0] || "unknown";
         let content = "";

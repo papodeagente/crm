@@ -262,9 +262,11 @@ export async function getConversationsList(sessionId: string) {
       SELECT remoteJid, MAX(id) AS maxId
       FROM messages
       WHERE sessionId = ${sessionId}
+      AND remoteJid NOT LIKE '%@g.us'
       GROUP BY remoteJid
     ) latest ON m.remoteJid = latest.remoteJid AND m.id = latest.maxId
     WHERE m.sessionId = ${sessionId}
+    AND m.remoteJid NOT LIKE '%@g.us'
     ORDER BY m.timestamp DESC
   `);
   return (result as any)[0] || [];
