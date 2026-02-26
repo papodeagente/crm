@@ -12,6 +12,9 @@ import {
   getAllLogs,
   getChatbotSettings,
   upsertChatbotSettings,
+  getChatbotRules,
+  addChatbotRule,
+  removeChatbotRule,
 } from "./db";
 import { storagePut } from "./storage";
 import { nanoid } from "nanoid";
@@ -85,9 +88,48 @@ export const appRouter = router({
       .input(z.object({ sessionId: z.string() }))
       .query(async ({ input }) => getChatbotSettings(input.sessionId)),
     updateChatbotSettings: protectedProcedure
-      .input(z.object({ sessionId: z.string(), enabled: z.boolean(), systemPrompt: z.string().optional(), maxTokens: z.number().min(50).max(4000).optional() }))
+      .input(z.object({
+        sessionId: z.string(),
+        enabled: z.boolean().optional(),
+        systemPrompt: z.string().optional(),
+        maxTokens: z.number().min(50).max(4000).optional(),
+        mode: z.enum(["all", "whitelist", "blacklist"]).optional(),
+        respondGroups: z.boolean().optional(),
+        respondPrivate: z.boolean().optional(),
+        onlyWhenMentioned: z.boolean().optional(),
+        triggerWords: z.string().nullable().optional(),
+        welcomeMessage: z.string().nullable().optional(),
+        awayMessage: z.string().nullable().optional(),
+        businessHoursEnabled: z.boolean().optional(),
+        businessHoursStart: z.string().optional(),
+        businessHoursEnd: z.string().optional(),
+        businessHoursDays: z.string().optional(),
+        businessHoursTimezone: z.string().optional(),
+        replyDelay: z.number().min(0).max(60).optional(),
+        contextMessageCount: z.number().min(1).max(50).optional(),
+        rateLimitPerHour: z.number().min(0).optional(),
+        rateLimitPerDay: z.number().min(0).optional(),
+        temperature: z.string().optional(),
+      }))
       .mutation(async ({ input }) => {
-        await upsertChatbotSettings(input.sessionId, input.enabled, input.systemPrompt, input.maxTokens);
+        const { sessionId, ...data } = input;
+        await upsertChatbotSettings(sessionId, data as any);
+        return { success: true };
+      }),
+    // Chatbot Rules (whitelist/blacklist)
+    getChatbotRules: protectedProcedure
+      .input(z.object({ sessionId: z.string(), ruleType: z.enum(["whitelist", "blacklist"]).optional() }))
+      .query(async ({ input }) => getChatbotRules(input.sessionId, input.ruleType)),
+    addChatbotRule: protectedProcedure
+      .input(z.object({ sessionId: z.string(), remoteJid: z.string().min(1), ruleType: z.enum(["whitelist", "blacklist"]), contactName: z.string().optional() }))
+      .mutation(async ({ input }) => {
+        await addChatbotRule(input.sessionId, input.remoteJid, input.ruleType, input.contactName);
+        return { success: true };
+      }),
+    removeChatbotRule: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        await removeChatbotRule(input.id);
         return { success: true };
       }),
     uploadMedia: protectedProcedure

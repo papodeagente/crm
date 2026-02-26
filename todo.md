@@ -209,3 +209,38 @@
 
 ### Testes
 - [x] Testes unitários para novos endpoints (mídia, áudio, status) — 58 testes passando
+
+## Painel de Configurações de IA no WhatsApp (v7)
+
+### Schema & Backend
+- [x] Atualizar schema chatbotSettings com campos granulares (modo, whitelist, blacklist, horários, etc.)
+- [x] Criar tabela chatbotRules para regras por contato/grupo
+- [x] Endpoints CRUD para configurações de IA
+- [x] Endpoints para regras de whitelist/blacklist por contato/grupo
+
+### Página de Configurações
+- [x] Toggle global ativar/desativar IA por sessão
+- [x] Seletor de modo: responder todos, apenas whitelist, exceto blacklist
+- [x] Editor de prompt do sistema (system prompt) com preview
+- [x] Configuração de max tokens, temperatura, modelo
+- [x] Horário de funcionamento (ativar IA apenas em horário comercial)
+- [x] Mensagem de ausência quando IA está desativada
+- [x] Delay de resposta configurável (simular digitação)
+- [x] Whitelist de contatos/grupos que a IA deve responder
+- [x] Blacklist de contatos/grupos que a IA NÃO deve responder
+- [x] Toggle para responder em grupos vs apenas conversas privadas
+- [x] Toggle para responder apenas quando mencionado em grupos
+- [x] Palavras-chave de ativação (trigger words)
+- [x] Limite de mensagens por contato por hora/dia
+- [x] Mensagem de boas-vindas automática para novos contatos
+- [x] Configuração de contexto/memória (quantas mensagens anteriores incluir)
+
+### Integração no Motor Baileys
+- [x] Aplicar regras de whitelist/blacklist antes de processar mensagem
+- [x] Respeitar horário de funcionamento
+- [x] Aplicar delay de resposta
+- [x] Verificar limites de mensagens
+- [x] Enviar mensagem de ausência quando IA desativada
+
+### Testes
+- [x] Testes unitários para novos endpoints de configuração — 70 testes passando

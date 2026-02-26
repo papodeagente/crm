@@ -256,4 +256,217 @@ describe("WhatsApp API Routes", () => {
     });
     expect(Array.isArray(result)).toBe(true);
   });
+
+  // ─── Chatbot Settings (expanded) ───
+
+  it("whatsapp.updateChatbotSettings saves all new fields", async () => {
+    const { ctx } = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    const sessionId = `test-full-settings-${Date.now()}`;
+    const result = await caller.whatsapp.updateChatbotSettings({
+      sessionId,
+      enabled: true,
+      systemPrompt: "Test prompt",
+      maxTokens: 300,
+      mode: "whitelist",
+      respondGroups: false,
+      respondPrivate: true,
+      onlyWhenMentioned: true,
+      triggerWords: "ajuda,suporte",
+      welcomeMessage: "Bem-vindo!",
+      awayMessage: "Estamos fora do horário.",
+      businessHoursEnabled: true,
+      businessHoursStart: "08:00",
+      businessHoursEnd: "20:00",
+      businessHoursDays: "1,2,3,4,5,6",
+      businessHoursTimezone: "America/Sao_Paulo",
+      replyDelay: 5,
+      contextMessageCount: 20,
+      rateLimitPerHour: 10,
+      rateLimitPerDay: 50,
+      temperature: "0.50",
+    });
+    expect(result).toEqual({ success: true });
+
+    const settings = await caller.whatsapp.getChatbotSettings({ sessionId });
+    expect(settings).toBeDefined();
+    expect(settings?.mode).toBe("whitelist");
+    expect(settings?.respondGroups).toBe(false);
+    expect(settings?.respondPrivate).toBe(true);
+    expect(settings?.onlyWhenMentioned).toBe(true);
+    expect(settings?.triggerWords).toBe("ajuda,suporte");
+    expect(settings?.welcomeMessage).toBe("Bem-vindo!");
+    expect(settings?.awayMessage).toBe("Estamos fora do horário.");
+    expect(settings?.businessHoursEnabled).toBe(true);
+    expect(settings?.businessHoursStart).toBe("08:00");
+    expect(settings?.businessHoursEnd).toBe("20:00");
+    expect(settings?.businessHoursDays).toBe("1,2,3,4,5,6");
+    expect(settings?.replyDelay).toBe(5);
+    expect(settings?.contextMessageCount).toBe(20);
+    expect(settings?.rateLimitPerHour).toBe(10);
+    expect(settings?.rateLimitPerDay).toBe(50);
+  });
+
+  it("whatsapp.updateChatbotSettings validates mode enum", async () => {
+    const { ctx } = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    await expect(
+      caller.whatsapp.updateChatbotSettings({
+        sessionId: "test",
+        mode: "invalid" as any,
+      })
+    ).rejects.toThrow();
+  });
+
+  it("whatsapp.updateChatbotSettings validates replyDelay range", async () => {
+    const { ctx } = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    await expect(
+      caller.whatsapp.updateChatbotSettings({
+        sessionId: "test",
+        replyDelay: 100, // max is 60
+      })
+    ).rejects.toThrow();
+  });
+
+  it("whatsapp.updateChatbotSettings validates contextMessageCount range", async () => {
+    const { ctx } = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    await expect(
+      caller.whatsapp.updateChatbotSettings({
+        sessionId: "test",
+        contextMessageCount: 0, // min is 1
+      })
+    ).rejects.toThrow();
+  });
+
+  // ─── Chatbot Rules (whitelist/blacklist) ───
+
+  it("whatsapp.getChatbotRules returns empty for new session", async () => {
+    const { ctx } = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    const result = await caller.whatsapp.getChatbotRules({ sessionId: "nonexistent-rules" });
+    expect(Array.isArray(result)).toBe(true);
+    expect(result.length).toBe(0);
+  });
+
+  it("whatsapp.addChatbotRule adds a whitelist rule", async () => {
+    const { ctx } = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    const sessionId = `test-rules-${Date.now()}`;
+    const result = await caller.whatsapp.addChatbotRule({
+      sessionId,
+      remoteJid: "5511999999999@s.whatsapp.net",
+      ruleType: "whitelist",
+      contactName: "João Silva",
+    });
+    expect(result).toEqual({ success: true });
+
+    const rules = await caller.whatsapp.getChatbotRules({ sessionId });
+    expect(rules.length).toBe(1);
+    expect(rules[0].ruleType).toBe("whitelist");
+    expect(rules[0].contactName).toBe("João Silva");
+  });
+
+  it("whatsapp.addChatbotRule adds a blacklist rule", async () => {
+    const { ctx } = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    const sessionId = `test-blacklist-${Date.now()}`;
+    const result = await caller.whatsapp.addChatbotRule({
+      sessionId,
+      remoteJid: "120363xxx@g.us",
+      ruleType: "blacklist",
+      contactName: "Grupo Spam",
+    });
+    expect(result).toEqual({ success: true });
+
+    const rules = await caller.whatsapp.getChatbotRules({ sessionId, ruleType: "blacklist" });
+    expect(rules.length).toBe(1);
+    expect(rules[0].ruleType).toBe("blacklist");
+  });
+
+  it("whatsapp.getChatbotRules filters by ruleType", async () => {
+    const { ctx } = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    const sessionId = `test-filter-${Date.now()}`;
+
+    await caller.whatsapp.addChatbotRule({ sessionId, remoteJid: "111@s.whatsapp.net", ruleType: "whitelist" });
+    await caller.whatsapp.addChatbotRule({ sessionId, remoteJid: "222@s.whatsapp.net", ruleType: "blacklist" });
+
+    const whitelistOnly = await caller.whatsapp.getChatbotRules({ sessionId, ruleType: "whitelist" });
+    expect(whitelistOnly.length).toBe(1);
+    expect(whitelistOnly[0].remoteJid).toBe("111@s.whatsapp.net");
+
+    const blacklistOnly = await caller.whatsapp.getChatbotRules({ sessionId, ruleType: "blacklist" });
+    expect(blacklistOnly.length).toBe(1);
+    expect(blacklistOnly[0].remoteJid).toBe("222@s.whatsapp.net");
+  });
+
+  it("whatsapp.removeChatbotRule removes a rule by id", async () => {
+    const { ctx } = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    const sessionId = `test-remove-${Date.now()}`;
+
+    await caller.whatsapp.addChatbotRule({ sessionId, remoteJid: "333@s.whatsapp.net", ruleType: "whitelist" });
+    const rules = await caller.whatsapp.getChatbotRules({ sessionId });
+    expect(rules.length).toBe(1);
+
+    const result = await caller.whatsapp.removeChatbotRule({ id: rules[0].id });
+    expect(result).toEqual({ success: true });
+
+    const afterRemove = await caller.whatsapp.getChatbotRules({ sessionId });
+    expect(afterRemove.length).toBe(0);
+  });
+
+  it("whatsapp.addChatbotRule rejects empty remoteJid", async () => {
+    const { ctx } = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    await expect(
+      caller.whatsapp.addChatbotRule({
+        sessionId: "test",
+        remoteJid: "",
+        ruleType: "whitelist",
+      })
+    ).rejects.toThrow();
+  });
+
+  it("whatsapp.addChatbotRule rejects invalid ruleType", async () => {
+    const { ctx } = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    await expect(
+      caller.whatsapp.addChatbotRule({
+        sessionId: "test",
+        remoteJid: "555@s.whatsapp.net",
+        ruleType: "invalid" as any,
+      })
+    ).rejects.toThrow();
+  });
+
+  it("whatsapp.updateChatbotSettings partial update preserves existing values", async () => {
+    const { ctx } = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    const sessionId = `test-partial-${Date.now()}`;
+
+    // Create initial settings
+    await caller.whatsapp.updateChatbotSettings({
+      sessionId,
+      enabled: true,
+      systemPrompt: "Initial prompt",
+      maxTokens: 300,
+      mode: "all",
+    });
+
+    // Partial update - only change mode
+    await caller.whatsapp.updateChatbotSettings({
+      sessionId,
+      mode: "blacklist",
+    });
+
+    const settings = await caller.whatsapp.getChatbotSettings({ sessionId });
+    expect(settings?.mode).toBe("blacklist");
+    // Other fields should remain
+    expect(settings?.enabled).toBe(true);
+    expect(settings?.systemPrompt).toBe("Initial prompt");
+    expect(settings?.maxTokens).toBe(300);
+  });
 });

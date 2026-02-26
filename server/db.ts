@@ -1,6 +1,6 @@
 import { eq, desc, and, or, like, lt } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users, whatsappSessions, waMessages as messages, activityLogs, chatbotSettings } from "../drizzle/schema";
+import { InsertUser, users, whatsappSessions, waMessages as messages, activityLogs, chatbotSettings, chatbotRules } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -159,21 +159,66 @@ export async function getChatbotSettings(sessionId: string) {
   return result[0] || null;
 }
 
-export async function upsertChatbotSettings(sessionId: string, enabled: boolean, systemPrompt?: string, maxTokens?: number) {
+export async function upsertChatbotSettings(sessionId: string, data: Partial<typeof chatbotSettings.$inferInsert>) {
   const db = await getDb();
   if (!db) return;
   const existing = await getChatbotSettings(sessionId);
   if (existing) {
     await db
       .update(chatbotSettings)
-      .set({ enabled, systemPrompt: systemPrompt ?? existing.systemPrompt, maxTokens: maxTokens ?? existing.maxTokens })
+      .set(data)
       .where(eq(chatbotSettings.sessionId, sessionId));
   } else {
     await db.insert(chatbotSettings).values({
       sessionId,
-      enabled,
-      systemPrompt: systemPrompt || "Você é um assistente virtual amigável e prestativo. Responda de forma concisa e educada em português.",
-      maxTokens: maxTokens || 500,
+      enabled: data.enabled ?? false,
+      systemPrompt: data.systemPrompt || "Você é um assistente virtual amigável e prestativo. Responda de forma concisa e educada em português.",
+      maxTokens: data.maxTokens || 500,
+      mode: data.mode || "all",
+      respondGroups: data.respondGroups ?? true,
+      respondPrivate: data.respondPrivate ?? true,
+      onlyWhenMentioned: data.onlyWhenMentioned ?? false,
+      triggerWords: data.triggerWords || null,
+      welcomeMessage: data.welcomeMessage || null,
+      awayMessage: data.awayMessage || null,
+      businessHoursEnabled: data.businessHoursEnabled ?? false,
+      businessHoursStart: data.businessHoursStart || "09:00",
+      businessHoursEnd: data.businessHoursEnd || "18:00",
+      businessHoursDays: data.businessHoursDays || "1,2,3,4,5",
+      businessHoursTimezone: data.businessHoursTimezone || "America/Sao_Paulo",
+      replyDelay: data.replyDelay ?? 0,
+      contextMessageCount: data.contextMessageCount ?? 10,
+      rateLimitPerHour: data.rateLimitPerHour ?? 0,
+      rateLimitPerDay: data.rateLimitPerDay ?? 0,
+      temperature: data.temperature || "0.70",
     });
   }
+}
+
+// Chatbot Rules (whitelist/blacklist)
+export async function getChatbotRules(sessionId: string, ruleType?: "whitelist" | "blacklist") {
+  const db = await getDb();
+  if (!db) return [];
+  const conditions = [eq(chatbotRules.sessionId, sessionId)];
+  if (ruleType) conditions.push(eq(chatbotRules.ruleType, ruleType));
+  return db.select().from(chatbotRules).where(and(...conditions)).orderBy(desc(chatbotRules.createdAt));
+}
+
+export async function addChatbotRule(sessionId: string, remoteJid: string, ruleType: "whitelist" | "blacklist", contactName?: string) {
+  const db = await getDb();
+  if (!db) return;
+  // Upsert: if exists, update ruleType
+  try {
+    await db.insert(chatbotRules).values({ sessionId, remoteJid, ruleType, contactName: contactName || null });
+  } catch (e: any) {
+    if (e.code === "ER_DUP_ENTRY") {
+      await db.update(chatbotRules).set({ ruleType, contactName: contactName || null }).where(and(eq(chatbotRules.sessionId, sessionId), eq(chatbotRules.remoteJid, remoteJid)));
+    } else throw e;
+  }
+}
+
+export async function removeChatbotRule(id: number) {
+  const db = await getDb();
+  if (!db) return;
+  await db.delete(chatbotRules).where(eq(chatbotRules.id, id));
 }

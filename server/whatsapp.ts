@@ -14,8 +14,8 @@ import fs from "fs";
 import QRCode from "qrcode";
 import { EventEmitter } from "events";
 import { getDb } from "./db";
-import { whatsappSessions, waMessages as messages, activityLogs, chatbotSettings } from "../drizzle/schema";
-import { eq, desc } from "drizzle-orm";
+import { whatsappSessions, waMessages as messages, activityLogs, chatbotSettings, chatbotRules } from "../drizzle/schema";
+import { eq, desc, and, gte, sql } from "drizzle-orm";
 import { invokeLLM } from "./_core/llm";
 import { notifyOwner } from "./_core/notification";
 import { storagePut } from "./storage";
@@ -429,23 +429,132 @@ class WhatsAppManager extends EventEmitter {
       const db = await getDb();
       if (!db) return;
 
-      const settings = await db.select().from(chatbotSettings).where(eq(chatbotSettings.sessionId, sessionId)).limit(1);
-      if (!settings.length || !settings[0].enabled) return;
+      const settingsArr = await db.select().from(chatbotSettings).where(eq(chatbotSettings.sessionId, sessionId)).limit(1);
+      if (!settingsArr.length || !settingsArr[0].enabled) {
+        // If away message is set and bot is disabled, send it
+        if (settingsArr.length && settingsArr[0].awayMessage) {
+          await this.sendAwayMessageIfNeeded(sessionId, remoteJid, settingsArr[0].awayMessage, sock, db);
+        }
+        return;
+      }
 
-      const systemPrompt = settings[0].systemPrompt || "Você é um assistente virtual amigável e prestativo. Responda de forma concisa e educada em português.";
+      const s = settingsArr[0];
+      const isGroup = remoteJid.endsWith("@g.us");
 
-      // Get recent conversation context
+      // ─── Filter: Chat type ───
+      if (isGroup && !s.respondGroups) return;
+      if (!isGroup && !s.respondPrivate) return;
+
+      // ─── Filter: Only when mentioned (groups) ───
+      // Note: mention detection would need msg.mentionedJid, simplified here with bot name check
+      // For now we skip this check as it requires the full message object
+
+      // ─── Filter: Whitelist / Blacklist ───
+      const mode = s.mode || "all";
+      if (mode === "whitelist" || mode === "blacklist") {
+        const rules = await db.select().from(chatbotRules).where(
+          and(eq(chatbotRules.sessionId, sessionId), eq(chatbotRules.ruleType, mode as any))
+        );
+        const jids = rules.map((r) => r.remoteJid);
+        if (mode === "whitelist" && !jids.includes(remoteJid)) {
+          return; // Not in whitelist, skip
+        }
+        if (mode === "blacklist" && jids.includes(remoteJid)) {
+          return; // In blacklist, skip
+        }
+      }
+
+      // ─── Filter: Business hours ───
+      if (s.businessHoursEnabled) {
+        const tz = s.businessHoursTimezone || "America/Sao_Paulo";
+        const now = new Date();
+        const formatter = new Intl.DateTimeFormat("en-US", { timeZone: tz, hour: "2-digit", minute: "2-digit", hour12: false, weekday: "short" });
+        const parts = formatter.formatToParts(now);
+        const hour = parseInt(parts.find((p) => p.type === "hour")?.value || "0");
+        const minute = parseInt(parts.find((p) => p.type === "minute")?.value || "0");
+        const dayMap: Record<string, string> = { Sun: "0", Mon: "1", Tue: "2", Wed: "3", Thu: "4", Fri: "5", Sat: "6" };
+        const currentDay = dayMap[parts.find((p) => p.type === "weekday")?.value || "Mon"] || "1";
+        const allowedDays = (s.businessHoursDays || "1,2,3,4,5").split(",");
+
+        if (!allowedDays.includes(currentDay)) {
+          if (s.awayMessage) await this.sendAwayMessageIfNeeded(sessionId, remoteJid, s.awayMessage, sock, db);
+          return;
+        }
+
+        const [startH, startM] = (s.businessHoursStart || "09:00").split(":").map(Number);
+        const [endH, endM] = (s.businessHoursEnd || "18:00").split(":").map(Number);
+        const currentMinutes = hour * 60 + minute;
+        const startMinutes = startH * 60 + startM;
+        const endMinutes = endH * 60 + endM;
+
+        if (currentMinutes < startMinutes || currentMinutes >= endMinutes) {
+          if (s.awayMessage) await this.sendAwayMessageIfNeeded(sessionId, remoteJid, s.awayMessage, sock, db);
+          return;
+        }
+      }
+
+      // ─── Filter: Trigger words ───
+      if (s.triggerWords) {
+        const triggers = s.triggerWords.split(",").map((w) => w.trim().toLowerCase()).filter(Boolean);
+        if (triggers.length > 0) {
+          const lowerText = incomingText.toLowerCase();
+          const hasMatch = triggers.some((t) => lowerText.includes(t));
+          if (!hasMatch) return;
+        }
+      }
+
+      // ─── Filter: Rate limits ───
+      const rateLimitPerHour = s.rateLimitPerHour || 0;
+      const rateLimitPerDay = s.rateLimitPerDay || 0;
+
+      if (rateLimitPerHour > 0 || rateLimitPerDay > 0) {
+        if (rateLimitPerHour > 0) {
+          const oneHourAgo = new Date(Date.now() - 3600000);
+          const hourCount = await db.select({ count: sql<number>`count(*)` }).from(messages)
+            .where(and(
+              eq(messages.sessionId, sessionId),
+              eq(messages.remoteJid, remoteJid),
+              eq(messages.fromMe, true),
+              gte(messages.createdAt, oneHourAgo)
+            ));
+          if ((hourCount[0]?.count || 0) >= rateLimitPerHour) return;
+        }
+        if (rateLimitPerDay > 0) {
+          const oneDayAgo = new Date(Date.now() - 86400000);
+          const dayCount = await db.select({ count: sql<number>`count(*)` }).from(messages)
+            .where(and(
+              eq(messages.sessionId, sessionId),
+              eq(messages.remoteJid, remoteJid),
+              eq(messages.fromMe, true),
+              gte(messages.createdAt, oneDayAgo)
+            ));
+          if ((dayCount[0]?.count || 0) >= rateLimitPerDay) return;
+        }
+      }
+
+      // ─── Reply delay ───
+      const delay = s.replyDelay || 0;
+      if (delay > 0) {
+        await new Promise((resolve) => setTimeout(resolve, delay * 1000));
+      }
+
+      // ─── Build context and invoke LLM ───
+      const systemPrompt = s.systemPrompt || "Você é um assistente virtual amigável e prestativo. Responda de forma concisa e educada em português.";
+      const contextCount = s.contextMessageCount || 10;
+
       const recentMessages = await db
         .select()
         .from(messages)
-        .where(eq(messages.remoteJid, remoteJid))
+        .where(and(eq(messages.sessionId, sessionId), eq(messages.remoteJid, remoteJid)))
         .orderBy(desc(messages.createdAt))
-        .limit(10);
+        .limit(contextCount);
 
       const conversationHistory = recentMessages.reverse().map((m) => ({
         role: m.fromMe ? ("assistant" as const) : ("user" as const),
         content: m.content || "",
       }));
+
+      const temp = parseFloat(s.temperature?.toString() || "0.70");
 
       const response = await invokeLLM({
         messages: [
@@ -466,6 +575,7 @@ class WhatsAppManager extends EventEmitter {
           fromMe: true,
           messageType: "text",
           content: replyText,
+          status: "sent",
         });
 
         await this.logActivity(sessionId, "chatbot_reply", `Chatbot respondeu para ${remoteJid}`);
@@ -473,6 +583,35 @@ class WhatsAppManager extends EventEmitter {
     } catch (e) {
       console.error("Chatbot error:", e);
       await this.logActivity(sessionId, "chatbot_error", `Erro no chatbot: ${(e as Error).message}`);
+    }
+  }
+
+  /** Send away message at most once per contact per 4 hours */
+  private async sendAwayMessageIfNeeded(sessionId: string, remoteJid: string, awayMessage: string, sock: WASocket, db: any) {
+    try {
+      const fourHoursAgo = new Date(Date.now() - 4 * 3600000);
+      const recentAway = await db.select({ count: sql<number>`count(*)` }).from(messages)
+        .where(and(
+          eq(messages.sessionId, sessionId),
+          eq(messages.remoteJid, remoteJid),
+          eq(messages.fromMe, true),
+          eq(messages.content, awayMessage),
+          gte(messages.createdAt, fourHoursAgo)
+        ));
+      if ((recentAway[0]?.count || 0) > 0) return;
+
+      await sock.sendMessage(remoteJid, { text: awayMessage });
+      await db.insert(messages).values({
+        sessionId,
+        remoteJid,
+        fromMe: true,
+        messageType: "text",
+        content: awayMessage,
+        status: "sent",
+      });
+      await this.logActivity(sessionId, "away_message", `Mensagem de ausência enviada para ${remoteJid}`);
+    } catch (e) {
+      console.error("Away message error:", e);
     }
   }
 

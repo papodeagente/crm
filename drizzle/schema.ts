@@ -1,4 +1,4 @@
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, boolean, json, bigint, index } from "drizzle-orm/mysql-core";
+import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, boolean, json, bigint, index, decimal } from "drizzle-orm/mysql-core";
 
 // ════════════════════════════════════════════════════════════
 // EXISTING WHATSAPP API TABLES (preserved)
@@ -62,8 +62,42 @@ export const chatbotSettings = mysqlTable("chatbot_settings", {
   enabled: boolean("enabled").default(false).notNull(),
   systemPrompt: text("systemPrompt"),
   maxTokens: int("maxTokens").default(500),
+  // Mode: 'all' = respond to everyone, 'whitelist' = only listed, 'blacklist' = everyone except listed
+  mode: varchar("mode", { length: 32 }).default("all").notNull(),
+  // Chat type filters
+  respondGroups: boolean("respondGroups").default(true).notNull(),
+  respondPrivate: boolean("respondPrivate").default(true).notNull(),
+  onlyWhenMentioned: boolean("onlyWhenMentioned").default(false).notNull(),
+  // Trigger words (comma-separated)
+  triggerWords: text("triggerWords"),
+  // Auto messages
+  welcomeMessage: text("welcomeMessage"),
+  awayMessage: text("awayMessage"),
+  // Business hours
+  businessHoursEnabled: boolean("businessHoursEnabled").default(false).notNull(),
+  businessHoursStart: varchar("businessHoursStart", { length: 5 }).default("09:00"),
+  businessHoursEnd: varchar("businessHoursEnd", { length: 5 }).default("18:00"),
+  businessHoursDays: varchar("businessHoursDays", { length: 32 }).default("1,2,3,4,5"),
+  businessHoursTimezone: varchar("businessHoursTimezone", { length: 64 }).default("America/Sao_Paulo"),
+  // Behavior
+  replyDelay: int("replyDelay").default(0),
+  contextMessageCount: int("contextMessageCount").default(10),
+  rateLimitPerHour: int("rateLimitPerHour").default(0),
+  rateLimitPerDay: int("rateLimitPerDay").default(0),
+  temperature: decimal("temperature", { precision: 3, scale: 2 }).default("0.70"),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
+
+export const chatbotRules = mysqlTable("chatbot_rules", {
+  id: int("id").autoincrement().primaryKey(),
+  sessionId: varchar("sessionId", { length: 128 }).notNull(),
+  remoteJid: varchar("remoteJid", { length: 128 }).notNull(),
+  contactName: varchar("contactName", { length: 255 }),
+  ruleType: mysqlEnum("ruleType", ["whitelist", "blacklist"]).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (t) => [
+  index("idx_session_type").on(t.sessionId, t.ruleType),
+]);
 
 // ════════════════════════════════════════════════════════════
 // ASTRA CRM — CORE / TENANTS
