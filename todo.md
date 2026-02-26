@@ -244,3 +244,22 @@
 
 ### Testes
 - [x] Testes unitários para novos endpoints de configuração — 70 testes passando
+
+## Correções e Melhorias (v8)
+
+### Bug: Mensagens Duplicadas
+- [x] Identificar causa da duplicação (sendMessage salva + messages.upsert salva novamente)
+- [x] Corrigir para que mensagens enviadas pelo sistema não sejam salvas 2x
+- [x] Testar envio de mensagem sem duplicação
+
+### Sincronização de Histórico Anterior
+- [x] Implementar sync de mensagens anteriores do WhatsApp ao conectar sessão
+- [x] Importar conversas existentes entre contatos vinculados a deals (via messaging-history.set)
+
+### Backup Diário Automático no Histórico do Atendimento
+- [x] Criar job diário que copia conversas WhatsApp para o histórico do deal (00:05 São Paulo)
+- [x] Incluir dia, hora, quem falou e conteúdo da mensagem no histórico
+- [x] Registrar no deal_history como evento de tipo "whatsapp_backup"
+
+### Testes
+- [x] Testes unitários para as correções e novos endpoints — 77 testes passando

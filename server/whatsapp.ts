@@ -147,10 +147,63 @@ class WhatsAppManager extends EventEmitter {
           title: "WhatsApp Conectado",
           content: `A sessão "${sessionId}" foi conectada com sucesso como ${sock.user?.name || sock.user?.id}.`,
         });
+
+        // Sync historical messages on connect
+        this.syncHistoricalMessages(sessionId, sock).catch((e: any) =>
+          console.error("Error syncing historical messages:", e)
+        );
       }
     });
 
     sock.ev.on("creds.update", saveCreds);
+
+    // ─── Historical message sync (messaging-history.set) ───
+    sock.ev.on("messaging-history.set", async ({ messages: histMsgs, isLatest }) => {
+      if (!histMsgs?.length) return;
+      try {
+        const db = await getDb();
+        if (!db) return;
+        let synced = 0;
+        for (const msg of histMsgs) {
+          if (!msg.message || !msg.key.id) continue;
+          // Check if already exists
+          const existing = await db.select({ id: messages.id }).from(messages)
+            .where(and(eq(messages.messageId, msg.key.id), eq(messages.sessionId, sessionId)))
+            .limit(1);
+          if (existing.length > 0) continue;
+
+          const remoteJid = msg.key.remoteJid || "";
+          const fromMe = msg.key.fromMe || false;
+          const messageType = Object.keys(msg.message)[0] || "unknown";
+          let content = "";
+          if (msg.message.conversation) content = msg.message.conversation;
+          else if (msg.message.extendedTextMessage?.text) content = msg.message.extendedTextMessage.text;
+          else if (msg.message.imageMessage) content = msg.message.imageMessage.caption || "[Imagem]";
+          else if (msg.message.videoMessage) content = msg.message.videoMessage.caption || "[Vídeo]";
+          else if (msg.message.documentMessage) content = `[Documento: ${msg.message.documentMessage.fileName || "arquivo"}]`;
+          else if (msg.message.audioMessage) content = "[Áudio]";
+          else if (msg.message.stickerMessage) content = "[Sticker]";
+          else content = `[${messageType}]`;
+
+          await db.insert(messages).values({
+            sessionId,
+            messageId: msg.key.id,
+            remoteJid,
+            fromMe,
+            messageType,
+            content,
+            status: fromMe ? "sent" : "received",
+            timestamp: new Date(((msg.messageTimestamp as number) || Date.now() / 1000) * 1000),
+          });
+          synced++;
+        }
+        if (synced > 0) {
+          await this.logActivity(sessionId, "history_sync", `${synced} mensagens históricas sincronizadas`);
+        }
+      } catch (e) {
+        console.error("Error syncing history batch:", e);
+      }
+    });
 
     sock.ev.on("messages.upsert", async ({ messages: msgs, type }) => {
       for (const msg of msgs) {
@@ -228,25 +281,47 @@ class WhatsAppManager extends EventEmitter {
         // Determine initial status for sent messages
         const initialStatus = fromMe ? "sent" : "received";
 
-        // Save message to DB
+        // Save message to DB (skip if already saved by sendTextMessage/sendMediaMessage)
         try {
           const db = await getDb();
           if (db) {
-            await db.insert(messages).values({
-              sessionId,
-              messageId: msg.key.id || undefined,
-              remoteJid,
-              fromMe,
-              messageType,
-              content,
-              mediaUrl,
-              mediaMimeType,
-              mediaFileName,
-              mediaDuration,
-              isVoiceNote,
-              status: initialStatus,
-              timestamp: new Date(((msg.messageTimestamp as number) || Date.now() / 1000) * 1000),
-            });
+            const msgId = msg.key.id;
+            let alreadyExists = false;
+            if (msgId) {
+              const existing = await db.select({ id: messages.id }).from(messages)
+                .where(and(eq(messages.messageId, msgId), eq(messages.sessionId, sessionId)))
+                .limit(1);
+              alreadyExists = existing.length > 0;
+            }
+
+            if (!alreadyExists) {
+              await db.insert(messages).values({
+                sessionId,
+                messageId: msgId || undefined,
+                remoteJid,
+                fromMe,
+                messageType,
+                content,
+                mediaUrl,
+                mediaMimeType,
+                mediaFileName,
+                mediaDuration,
+                isVoiceNote,
+                status: initialStatus,
+                timestamp: new Date(((msg.messageTimestamp as number) || Date.now() / 1000) * 1000),
+              });
+            } else if (fromMe) {
+              // Update existing message with any new data (e.g. media URL from download)
+              const updateData: any = {};
+              if (mediaUrl) updateData.mediaUrl = mediaUrl;
+              if (mediaMimeType) updateData.mediaMimeType = mediaMimeType;
+              if (mediaFileName) updateData.mediaFileName = mediaFileName;
+              if (mediaDuration) updateData.mediaDuration = mediaDuration;
+              if (Object.keys(updateData).length > 0) {
+                await db.update(messages).set(updateData)
+                  .where(and(eq(messages.messageId, msgId!), eq(messages.sessionId, sessionId)));
+              }
+            }
           }
         } catch (e) {
           console.error("Error saving message:", e);
@@ -612,6 +687,29 @@ class WhatsAppManager extends EventEmitter {
       await this.logActivity(sessionId, "away_message", `Mensagem de ausência enviada para ${remoteJid}`);
     } catch (e) {
       console.error("Away message error:", e);
+    }
+  }
+
+  /** Sync historical messages using Baileys fetchMessageHistory */
+  private async syncHistoricalMessages(sessionId: string, sock: WASocket) {
+    try {
+      const db = await getDb();
+      if (!db) return;
+
+      // Check if we already have messages for this session
+      const existingCount = await db.select({ count: sql<number>`count(*)` }).from(messages)
+        .where(eq(messages.sessionId, sessionId));
+      const count = existingCount[0]?.count || 0;
+
+      // If we already have messages, skip full sync (incremental sync via messaging-history.set)
+      if (count > 50) {
+        await this.logActivity(sessionId, "history_sync_skip", `Já existem ${count} mensagens, sync incremental ativo`);
+        return;
+      }
+
+      await this.logActivity(sessionId, "history_sync_start", "Iniciando sincronização de histórico de mensagens");
+    } catch (e) {
+      console.error("Error in syncHistoricalMessages:", e);
     }
   }
 

@@ -140,6 +140,13 @@ export const appRouter = router({
         const { url } = await storagePut(fileKey, fileBuffer, input.contentType);
         return { url, fileKey };
       }),
+    // Manual trigger for daily backup
+    triggerDailyBackup: protectedProcedure
+      .mutation(async () => {
+        const { runDailyWhatsAppBackup } = await import("./whatsappDailyBackup");
+        const result = await runDailyWhatsAppBackup();
+        return result;
+      }),
   }),
 
   // ─── ASTRA CRM Modules ───
