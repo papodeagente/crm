@@ -533,3 +533,23 @@
 - [x] Variáveis light e dark definidas no index.css
 - [x] TypeScript sem erros (LSP + tsc)
 - [x] 110 testes passando, 8 arquivos
+
+## Criar Contato CRM da Conversa (v21)
+
+### Botão no header do chat
+- [x] Detectar se o número da conversa ativa já tem contato CRM vinculado (hasCrmContact computed)
+- [x] Exibir botão verde "Criar Contato" com ícone UserPlus no header do chat quando não há contato vinculado
+- [x] Esconder botão automaticamente quando já existe contato CRM para o número
+- [x] Props onCreateContact e hasCrmContact adicionadas ao WhatsAppChat
+
+### Modal de criação de contato
+- [x] CreateContactDialog com formulário completo
+- [x] Telefone pré-preenchido e formatado (read-only) com o número da conversa
+- [x] Campos: nome (pré-preenchido com pushName), email, observações
+- [x] Usar mutation trpc.crm.contacts.create com source "whatsapp"
+- [x] Após criar, refetch contactsQ para atualizar o nome exibido na conversa automaticamente
+- [x] Toast de sucesso/erro e loading state
+
+### Verificação
+- [x] TypeScript sem erros (LSP + tsc)
+- [x] 110 testes passando, 8 arquivos

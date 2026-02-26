@@ -32,6 +32,8 @@ interface WhatsAppChatProps {
   sessionId: string;
   remoteJid: string;
   onCreateDeal?: () => void;
+  onCreateContact?: () => void;
+  hasCrmContact?: boolean;
 }
 
 // ─── Status Ticks Component ───
@@ -384,7 +386,7 @@ function VoiceRecorder({ onSend, onCancel }: { onSend: (blob: Blob, duration: nu
 }
 
 // ─── MAIN COMPONENT ───
-export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDeal }: WhatsAppChatProps) {
+export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDeal, onCreateContact, hasCrmContact }: WhatsAppChatProps) {
   const { lastMessage } = useSocket();
   const [messageText, setMessageText] = useState("");
   const [showAttach, setShowAttach] = useState(false);
@@ -643,7 +645,22 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
           <p className="text-[16px] font-medium text-[#111B21] truncate">{contact?.name || "Contato"}</p>
           <p className="text-[13px] text-[#667781] truncate">{contact?.phone || ""}</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
+          {onCreateContact && !hasCrmContact && (
+            <button
+              onClick={onCreateContact}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 bg-[#25D366] hover:bg-[#1da851] text-white text-xs font-medium rounded-full transition-colors"
+              title="Criar contato no CRM"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
+                <circle cx="9" cy="7" r="4"/>
+                <line x1="19" y1="8" x2="19" y2="14"/>
+                <line x1="16" y1="11" x2="22" y2="11"/>
+              </svg>
+              Criar Contato
+            </button>
+          )}
           {onCreateDeal && (
             <button
               onClick={onCreateDeal}

@@ -432,6 +432,163 @@ function CreateDealDialog({
 }
 
 /* ═══════════════════════════════════════════════════════
+   CREATE CONTACT DIALOG (from chat header)
+   ═══════════════════════════════════════════════════════ */
+
+function CreateContactDialog({
+  open, onClose, phone, pushName, onCreated,
+}: {
+  open: boolean; onClose: () => void; phone: string; pushName: string; onCreated: () => void;
+}) {
+  const [name, setName] = useState(pushName || "");
+  const [email, setEmail] = useState("");
+  const [notes, setNotes] = useState("");
+  const [creating, setCreating] = useState(false);
+
+  const createContact = trpc.crm.contacts.create.useMutation();
+
+  // Reset form when dialog opens
+  useEffect(() => {
+    if (open) {
+      setName(pushName || "");
+      setEmail("");
+      setNotes("");
+    }
+  }, [open, pushName]);
+
+  const formattedPhone = useMemo(() => {
+    const p = phone.replace(/\D/g, "");
+    if (p.startsWith("55") && p.length >= 12) {
+      const ddd = p.substring(2, 4);
+      const num = p.substring(4);
+      if (num.length === 9) return `+55 (${ddd}) ${num.substring(0, 5)}-${num.substring(5)}`;
+      if (num.length === 8) return `+55 (${ddd}) ${num.substring(0, 4)}-${num.substring(4)}`;
+    }
+    return `+${p}`;
+  }, [phone]);
+
+  const handleCreate = async () => {
+    if (!name.trim()) {
+      toast.error("Informe o nome do contato");
+      return;
+    }
+    setCreating(true);
+    try {
+      await createContact.mutateAsync({
+        tenantId: 1,
+        name: name.trim(),
+        phone: phone,
+        email: email.trim() || undefined,
+        source: "whatsapp",
+      });
+      toast.success(`Contato "${name.trim()}" criado com sucesso!`);
+      onCreated();
+    } catch (e) {
+      toast.error("Erro ao criar contato");
+      console.error(e);
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
+      <div
+        className="bg-card rounded-xl shadow-xl w-full max-w-md mx-4"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-full bg-[#25D366] flex items-center justify-center">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
+                <circle cx="9" cy="7" r="4"/>
+                <line x1="19" y1="8" x2="19" y2="14"/>
+                <line x1="16" y1="11" x2="22" y2="11"/>
+              </svg>
+            </div>
+            <h3 className="text-[16px] font-semibold text-foreground">Novo Contato</h3>
+          </div>
+          <button onClick={onClose} className="p-1 hover:bg-muted rounded-full">
+            <X className="w-5 h-5 text-muted-foreground" />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="px-5 py-4 space-y-4">
+          {/* Phone (read-only) */}
+          <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
+            <Phone className="w-5 h-5 text-[#25D366]" />
+            <div>
+              <p className="text-xs text-muted-foreground">Telefone (WhatsApp)</p>
+              <p className="text-sm font-medium text-foreground">{formattedPhone}</p>
+            </div>
+          </div>
+
+          {/* Name */}
+          <div>
+            <label className="text-[13px] text-muted-foreground mb-1 block">Nome *</label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Nome do contato"
+              className="w-full px-3 py-2 border border-border rounded-lg text-sm text-foreground bg-background focus:outline-none focus:border-[#25D366] focus:ring-1 focus:ring-[#25D366]"
+              autoFocus
+            />
+          </div>
+
+          {/* Email */}
+          <div>
+            <label className="text-[13px] text-muted-foreground mb-1 block">Email</label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="email@exemplo.com"
+              className="w-full px-3 py-2 border border-border rounded-lg text-sm text-foreground bg-background focus:outline-none focus:border-[#25D366] focus:ring-1 focus:ring-[#25D366]"
+            />
+          </div>
+
+          {/* Notes */}
+          <div>
+            <label className="text-[13px] text-muted-foreground mb-1 block">Observações</label>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Observações sobre o contato..."
+              rows={2}
+              className="w-full px-3 py-2 border border-border rounded-lg text-sm text-foreground bg-background focus:outline-none focus:border-[#25D366] focus:ring-1 focus:ring-[#25D366] resize-none"
+            />
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-end gap-3 px-5 py-4 border-t border-border">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-sm text-muted-foreground hover:bg-muted rounded-lg transition-colors"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={handleCreate}
+            disabled={creating || !name.trim()}
+            className="px-4 py-2 text-sm text-white bg-[#25D366] hover:bg-[#1da851] rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+          >
+            {creating && <Loader2 className="w-4 h-4 animate-spin" />}
+            Criar Contato
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════
    NEW CHAT PANEL (slide-over on left panel)
    ═══════════════════════════════════════════════════════ */
 
@@ -735,6 +892,7 @@ export default function InboxPage() {
   const [showMobileChat, setShowMobileChat] = useState(false);
   const [filter, setFilter] = useState<"all" | "unread">("all");
   const [showCreateDeal, setShowCreateDeal] = useState(false);
+  const [showCreateContact, setShowCreateContact] = useState(false);
   const [showNewChat, setShowNewChat] = useState(false);
   const [isMuted, setIsMuted] = useState(() => {
     try { return localStorage.getItem(MUTE_KEY) === "true"; } catch { return false; }
@@ -884,6 +1042,12 @@ export default function InboxPage() {
     const phone = selectedJid.split("@")[0];
     return { id: 0, name: displayName, phone, email: undefined, avatarUrl: pic };
   }, [selectedJid, getContactForJid, profilePicMap, getDisplayName]);
+
+  // Check if selected conversation has a CRM contact
+  const hasCrmContact = useMemo(() => {
+    if (!selectedJid) return false;
+    return !!getContactForJid(selectedJid);
+  }, [selectedJid, getContactForJid]);
 
   // Toggle mute
   const toggleMute = useCallback(() => {
@@ -1071,6 +1235,8 @@ export default function InboxPage() {
               sessionId={activeSession.sessionId}
               remoteJid={selectedJid}
               onCreateDeal={() => setShowCreateDeal(true)}
+              onCreateContact={() => setShowCreateContact(true)}
+              hasCrmContact={hasCrmContact}
             />
           </div>
         )}
@@ -1087,6 +1253,20 @@ export default function InboxPage() {
           contactPhone={selectedJid.split("@")[0]}
           contactJid={selectedJid}
           sessionId={activeSession.sessionId}
+        />
+      )}
+
+      {/* ═══ CREATE CONTACT DIALOG ═══ */}
+      {selectedJid && (
+        <CreateContactDialog
+          open={showCreateContact}
+          onClose={() => setShowCreateContact(false)}
+          phone={selectedJid.split("@")[0]}
+          pushName={selectedContact?.name || ""}
+          onCreated={() => {
+            contactsQ.refetch();
+            setShowCreateContact(false);
+          }}
         />
       )}
     </div>
