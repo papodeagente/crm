@@ -1,14 +1,60 @@
-import { useState, useMemo, useEffect, useCallback, memo } from "react";
+import { useState, useMemo, useEffect, useCallback, useRef, memo } from "react";
 import { trpc } from "@/lib/trpc";
 import { useSocket } from "@/hooks/useSocket";
 import WhatsAppChat from "@/components/WhatsAppChat";
 import {
   Search, MessageSquare, MoreVertical, ArrowLeft,
   Check, CheckCheck, Clock, Phone, Loader2, Users,
-  MessageCircle, Briefcase, Plus, X
+  MessageCircle, Briefcase, Plus, X, Volume2, VolumeX
 } from "lucide-react";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
+
+/* ═══════════════════════════════════════════════════════
+   NOTIFICATION SOUND (Web Audio API)
+   ═══════════════════════════════════════════════════════ */
+
+const MUTE_KEY = "astra_inbox_muted";
+
+function createNotificationSound(): () => void {
+  let audioCtx: AudioContext | null = null;
+
+  return () => {
+    try {
+      if (!audioCtx) audioCtx = new AudioContext();
+      const ctx = audioCtx;
+
+      const now = ctx.currentTime;
+      const gain = ctx.createGain();
+      gain.connect(ctx.destination);
+      gain.gain.setValueAtTime(0.15, now);
+      gain.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
+
+      const osc1 = ctx.createOscillator();
+      osc1.type = "sine";
+      osc1.frequency.setValueAtTime(880, now);
+      osc1.connect(gain);
+      osc1.start(now);
+      osc1.stop(now + 0.12);
+
+      const gain2 = ctx.createGain();
+      gain2.connect(ctx.destination);
+      gain2.gain.setValueAtTime(0.12, now + 0.13);
+      gain2.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
+
+      const osc2 = ctx.createOscillator();
+      osc2.type = "sine";
+      osc2.frequency.setValueAtTime(660, now + 0.13);
+      osc2.connect(gain2);
+      osc2.start(now + 0.13);
+      osc2.stop(now + 0.3);
+    } catch {
+      // Audio not supported or blocked
+    }
+  };
+}
+
+const playNotification = createNotificationSound();
 
 /* ═══════════════════════════════════════════════════════
    HELPERS
@@ -462,6 +508,10 @@ export default function InboxPage() {
   const [showMobileChat, setShowMobileChat] = useState(false);
   const [filter, setFilter] = useState<"all" | "unread" | "groups">("all");
   const [showCreateDeal, setShowCreateDeal] = useState(false);
+  const [isMuted, setIsMuted] = useState(() => {
+    try { return localStorage.getItem(MUTE_KEY) === "true"; } catch { return false; }
+  });
+  const prevMessageRef = useRef<typeof lastMessage>(null);
 
   // Get active WhatsApp session
   const sessionsQ = trpc.whatsapp.sessions.useQuery();
@@ -530,9 +580,24 @@ export default function InboxPage() {
     return formatPhoneNumber(jid);
   }, [getContactForJid]);
 
-  // Refetch on new messages
+  // Refetch on new messages + play notification sound
   useEffect(() => {
-    if (lastMessage) conversationsQ.refetch();
+    if (!lastMessage) return;
+    conversationsQ.refetch();
+
+    // Play sound only for incoming messages (not from me)
+    const isNew = !prevMessageRef.current ||
+      lastMessage.timestamp !== prevMessageRef.current.timestamp ||
+      lastMessage.remoteJid !== prevMessageRef.current.remoteJid ||
+      lastMessage.content !== prevMessageRef.current.content;
+
+    if (isNew && !lastMessage.fromMe && !isMuted) {
+      const isCurrentConv = selectedJid === lastMessage.remoteJid;
+      if (!isCurrentConv) {
+        playNotification();
+      }
+    }
+    prevMessageRef.current = lastMessage;
   }, [lastMessage]);
 
   // Select conversation
@@ -576,6 +641,15 @@ export default function InboxPage() {
     return { id: 0, name: formatPhoneNumber(selectedJid), phone, email: undefined, avatarUrl: pic };
   }, [selectedJid, getContactForJid, profilePicMap]);
 
+  // Toggle mute
+  const toggleMute = useCallback(() => {
+    setIsMuted(prev => {
+      const next = !prev;
+      try { localStorage.setItem(MUTE_KEY, String(next)); } catch {}
+      return next;
+    });
+  }, []);
+
   // No session state
   if (!activeSession && !sessionsQ.isLoading) {
     return (
@@ -616,6 +690,21 @@ export default function InboxPage() {
         >
           <WaAvatar name="Eu" size={40} />
           <div className="flex items-center gap-[10px]">
+            <button
+              onClick={toggleMute}
+              className="w-[40px] h-[40px] flex items-center justify-center rounded-full hover:bg-[#D9DBDE] transition-colors relative group"
+              title={isMuted ? "Ativar som de notificação" : "Silenciar notificações"}
+            >
+              {isMuted ? (
+                <VolumeX className="w-[22px] h-[22px] text-[#EA4335]" />
+              ) : (
+                <Volume2 className="w-[22px] h-[22px] text-[#54656F]" />
+              )}
+              {/* Tooltip */}
+              <span className="absolute -bottom-8 left-1/2 -translate-x-1/2 bg-[#111B21] text-white text-[11px] px-2 py-1 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+                {isMuted ? "Som desativado" : "Som ativado"}
+              </span>
+            </button>
             <button className="w-[40px] h-[40px] flex items-center justify-center rounded-full hover:bg-[#D9DBDE] transition-colors">
               <MessageCircle className="w-[22px] h-[22px] text-[#54656F]" />
             </button>

@@ -317,3 +317,13 @@
 - [x] Auto-vincular contato da conversa à negociação
 - [x] Auto-criar contato no CRM se não existir
 - [x] Navegar automaticamente para o deal após criação
+
+## Notificação Sonora no Inbox (v12)
+
+- [x] Gerar som de notificação WhatsApp (Web Audio API — dois tons sine wave)
+- [x] Detectar novas mensagens recebidas via WebSocket no Inbox
+- [x] Tocar som ao receber mensagem nova (apenas mensagens não enviadas por mim)
+- [x] Botão de silenciar/ativar som no header da lista de conversas
+- [x] Persistir preferência de mute no localStorage
+- [x] Ícone visual indicando estado mudo/ativo (Volume2 verde / VolumeX vermelho + tooltip)
+- [x] Não tocar som se a conversa da mensagem já estiver selecionada e visível
