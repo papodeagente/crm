@@ -27,6 +27,7 @@ const Integrations = lazy(() => import("./pages/Integrations"));
 const Admin = lazy(() => import("./pages/Admin"));
 const ApiDocs = lazy(() => import("./pages/ApiDocs"));
 const Alerts = lazy(() => import("./pages/Alerts"));
+const DealDetail = lazy(() => import("./pages/DealDetail"));
 
 function PageLoader() {
   return (
@@ -45,6 +46,7 @@ function Router() {
           <Route path="/contacts" component={Contacts} />
           <Route path="/deals" component={Deals} />
           <Route path="/pipeline" component={Pipeline} />
+          <Route path="/deal/:id" component={DealDetail} />
           <Route path="/trips" component={Trips} />
           <Route path="/tasks" component={Tasks} />
           <Route path="/inbox" component={InboxPage} />

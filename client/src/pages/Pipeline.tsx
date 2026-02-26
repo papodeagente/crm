@@ -16,6 +16,7 @@ import {
   Package, History, Trash2, Pencil, Link2, Unlink,
 } from "lucide-react";
 import { useState, useMemo, useCallback } from "react";
+import { useLocation } from "wouter";
 import { toast } from "sonner";
 
 const TENANT_ID = 1;
@@ -64,7 +65,7 @@ export default function Pipeline() {
   const [sortMode, setSortMode] = useState<SortMode>("created_desc");
   const [showCreateDeal, setShowCreateDeal] = useState(false);
   const [showCreateTask, setShowCreateTask] = useState<number | null>(null);
-  const [selectedDealId, setSelectedDealId] = useState<number | null>(null);
+  const [, setLocation] = useLocation();
   const [draggedDealId, setDraggedDealId] = useState<number | null>(null);
   const [dragOverStageId, setDragOverStageId] = useState<number | null>(null);
 
@@ -295,7 +296,7 @@ export default function Pipeline() {
                             contacts={contacts.data || []}
                             tasks={(tasks.data || []).filter((t: any) => t.entityId === deal.id)}
                             onCreateTask={() => setShowCreateTask(deal.id)}
-                            onOpenDrawer={() => setSelectedDealId(deal.id)}
+                            onOpenDrawer={() => setLocation(`/deal/${deal.id}`)}
                             onDragStart={handleDragStart}
                             onDragEnd={handleDragEnd}
                             isDragging={draggedDealId === deal.id}
@@ -335,7 +336,7 @@ export default function Pipeline() {
                   const stage = (stages.data || []).find((s: any) => s.id === deal.stageId);
                   const style = getStatusStyle(deal.status);
                   return (
-                    <tr key={deal.id} className="border-b border-border/30 hover:bg-muted/20 transition-colors cursor-pointer" onClick={() => setSelectedDealId(deal.id)}>
+                    <tr key={deal.id} className="border-b border-border/30 hover:bg-muted/20 transition-colors cursor-pointer" onClick={() => setLocation(`/deal/${deal.id}`)}>
                       <td className="p-3.5 font-medium">{deal.title}</td>
                       <td className="p-3.5 text-muted-foreground">{contact?.name || "—"}</td>
                       <td className="p-3.5"><Badge variant="secondary" className="text-[11px] rounded-lg">{stage?.name || "—"}</Badge></td>
@@ -362,7 +363,6 @@ export default function Pipeline() {
       {/* Dialogs */}
       <CreateDealDialog open={showCreateDeal} onOpenChange={setShowCreateDeal} pipelineId={activePipeline?.id} stages={stages.data || []} contacts={contacts.data || []} />
       {showCreateTask !== null && <CreateTaskDialog open={true} onOpenChange={() => setShowCreateTask(null)} dealId={showCreateTask} />}
-      {selectedDealId !== null && <DealDrawer dealId={selectedDealId} onClose={() => setSelectedDealId(null)} contacts={contacts.data || []} accounts={allAccounts.data || []} stages={stages.data || []} />}
     </div>
   );
 }

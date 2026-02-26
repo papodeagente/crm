@@ -159,3 +159,17 @@
 
 ### Páginas Secundárias
 - [x] Redesenhar todas as páginas com o novo design system Apple (18 páginas atualizadas)
+
+## Página Dedicada de Negociação + WhatsApp Integrado
+
+- [x] Criar página DealDetail.tsx com layout completo (não drawer)
+- [x] Seção de informações do deal (título, valor, etapa, contato, empresa)
+- [x] Seção de orçamento (produtos, totais)
+- [x] Seção de participantes
+- [x] Seção de histórico de movimentações
+- [x] Conversa WhatsApp integrada — mensagens em tempo real do contato via Baileys
+- [x] Envio de mensagens WhatsApp direto da página do deal
+- [x] Botão de voltar para o Pipeline
+- [x] Atualizar Pipeline para navegar para /deal/:id ao clicar no card
+- [x] Registrar rota /deal/:id no App.tsx
+- [x] Testes unitários para endpoints da página DealDetail (20 testes adicionais, 51 total)
