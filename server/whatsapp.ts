@@ -158,6 +158,14 @@ class WhatsAppManager extends EventEmitter {
     sock.ev.on("creds.update", saveCreds);
 
     // ─── Historical message sync (messaging-history.set) ───
+    // Internal Baileys message types that should be skipped (not real user messages)
+    const SKIP_MESSAGE_TYPES = new Set([
+      "protocolMessage", "senderKeyDistributionMessage", "messageContextInfo",
+      "reactionMessage", "ephemeralMessage", "deviceSentMessage",
+      "bcallMessage", "callLogMesssage", "keepInChatMessage",
+      "encReactionMessage", "editedMessage", "viewOnceMessageV2Extension",
+    ]);
+
     sock.ev.on("messaging-history.set", async ({ messages: histMsgs, isLatest }) => {
       if (!histMsgs?.length) return;
       try {
@@ -176,7 +184,14 @@ class WhatsAppManager extends EventEmitter {
           // Skip group messages — CRM only handles individual contacts
           if (remoteJid.endsWith("@g.us")) continue;
           const fromMe = msg.key.fromMe || false;
-          const messageType = Object.keys(msg.message)[0] || "unknown";
+          
+          // Determine the real message type, skipping internal protocol types
+          const msgKeys = Object.keys(msg.message);
+          const realType = msgKeys.find(k => !SKIP_MESSAGE_TYPES.has(k) && k !== "messageContextInfo") || msgKeys[0] || "unknown";
+          // Skip entirely internal protocol messages (no user-visible content)
+          if (SKIP_MESSAGE_TYPES.has(realType)) continue;
+          
+          const messageType = realType;
           let content = "";
           if (msg.message.conversation) content = msg.message.conversation;
           else if (msg.message.extendedTextMessage?.text) content = msg.message.extendedTextMessage.text;
@@ -185,6 +200,17 @@ class WhatsAppManager extends EventEmitter {
           else if (msg.message.documentMessage) content = `[Documento: ${msg.message.documentMessage.fileName || "arquivo"}]`;
           else if (msg.message.audioMessage) content = "[Áudio]";
           else if (msg.message.stickerMessage) content = "[Sticker]";
+          else if (msg.message.contactMessage || msg.message.contactsArrayMessage) content = "[Contato]";
+          else if (msg.message.locationMessage || msg.message.liveLocationMessage) content = "[Localização]";
+          else if (msg.message.templateMessage) content = msg.message.templateMessage?.hydratedTemplate?.hydratedContentText || "[Template]";
+          else if (msg.message.buttonsMessage) content = msg.message.buttonsMessage?.contentText || "[Botões]";
+          else if (msg.message.listMessage) content = msg.message.listMessage?.description || "[Lista]";
+          else if (msg.message.viewOnceMessage || msg.message.viewOnceMessageV2) {
+            const inner = (msg.message.viewOnceMessage || msg.message.viewOnceMessageV2)?.message;
+            if (inner?.imageMessage) content = "[Foto única]";
+            else if (inner?.videoMessage) content = "[Vídeo único]";
+            else content = "[Visualização única]";
+          }
           else content = `[${messageType}]`;
 
           await db.insert(messages).values({
@@ -192,6 +218,7 @@ class WhatsAppManager extends EventEmitter {
             messageId: msg.key.id,
             remoteJid,
             fromMe,
+            pushName: msg.pushName || null,
             messageType,
             content,
             status: fromMe ? "sent" : "received",
@@ -215,7 +242,14 @@ class WhatsAppManager extends EventEmitter {
         // Skip group messages — CRM only handles individual contacts
         if (remoteJid.endsWith("@g.us")) continue;
         const fromMe = msg.key.fromMe || false;
-        const messageType = Object.keys(msg.message)[0] || "unknown";
+        
+        // Determine the real message type, skipping internal protocol types
+        const upsertKeys = Object.keys(msg.message);
+        const upsertRealType = upsertKeys.find(k => !SKIP_MESSAGE_TYPES.has(k) && k !== "messageContextInfo") || upsertKeys[0] || "unknown";
+        // Skip entirely internal protocol messages (no user-visible content)
+        if (SKIP_MESSAGE_TYPES.has(upsertRealType)) continue;
+        
+        const messageType = upsertRealType;
         let content = "";
         let mediaUrl: string | undefined;
         let mediaMimeType: string | undefined;

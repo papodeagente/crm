@@ -91,18 +91,30 @@ function getMessagePreview(content: string | null, messageType: string | null): 
   const typeMap: Record<string, string> = {
     imageMessage: "📷 Foto", image: "📷 Foto",
     videoMessage: "📹 Vídeo", video: "📹 Vídeo",
-    audioMessage: "🎤 Áudio", audio: "🎤 Áudio",
+    audioMessage: "🎤 Áudio", audio: "🎤 Áudio", pttMessage: "🎤 Áudio",
     documentMessage: "📄 Documento", document: "📄 Documento",
+    documentWithCaptionMessage: "📄 Documento",
     stickerMessage: "🏷️ Sticker",
-    contactMessage: "👤 Contato",
-    locationMessage: "📍 Localização",
+    contactMessage: "👤 Contato", contactsArrayMessage: "👥 Contatos",
+    locationMessage: "📍 Localização", liveLocationMessage: "📍 Localização ao vivo",
     templateMessage: "📋 Template",
     interactiveMessage: "📋 Mensagem interativa",
     listMessage: "📋 Lista",
-    protocolMessage: "⚙️ Protocolo",
-    senderKeyDistributionMessage: "🔑 Chave",
+    buttonsMessage: "📋 Botões", buttonsResponseMessage: "📋 Resposta",
+    listResponseMessage: "📋 Resposta de lista",
+    viewOnceMessage: "📷 Visualização única", viewOnceMessageV2: "📷 Visualização única",
+    orderMessage: "📭 Pedido",
+    productMessage: "🛒 Produto",
+    pollCreationMessage: "📊 Enquete", pollCreationMessageV3: "📊 Enquete",
+    eventMessage: "📅 Evento",
+    invoiceMessage: "💰 Fatura",
   };
-  return typeMap[messageType] || content || `[${messageType}]`;
+  // If content already has a readable preview from backend, prefer it
+  if (content && (content.startsWith("[") || content.length > 0)) {
+    const mapped = typeMap[messageType];
+    if (mapped) return content.startsWith("[") ? mapped : content;
+  }
+  return typeMap[messageType] || content || "";
 }
 
 /* ═══════════════════════════════════════════════════════
@@ -112,11 +124,11 @@ function getMessagePreview(content: string | null, messageType: string | null): 
 const StatusTick = memo(({ status, fromMe }: { status: string | null; fromMe: boolean }) => {
   if (!fromMe) return null;
   switch (status) {
-    case "pending": return <Clock className="w-[14px] h-[14px] text-[#8696a0] shrink-0" />;
-    case "sent": return <Check className="w-[16px] h-[16px] text-[#8696a0] shrink-0" />;
-    case "delivered": return <CheckCheck className="w-[16px] h-[16px] text-[#8696a0] shrink-0" />;
-    case "read": case "played": return <CheckCheck className="w-[16px] h-[16px] text-[#53bdeb] shrink-0" />;
-    default: return <Check className="w-[16px] h-[16px] text-[#8696a0] shrink-0" />;
+    case "pending": return <Clock className="w-[14px] h-[14px] text-muted-foreground shrink-0" />;
+    case "sent": return <Check className="w-[16px] h-[16px] text-muted-foreground shrink-0" />;
+    case "delivered": return <CheckCheck className="w-[16px] h-[16px] text-muted-foreground shrink-0" />;
+    case "read": case "played": return <CheckCheck className="w-[16px] h-[16px] text-sky-400 shrink-0" />;
+    default: return <Check className="w-[16px] h-[16px] text-muted-foreground shrink-0" />;
   }
 });
 StatusTick.displayName = "StatusTick";
@@ -147,7 +159,7 @@ const WaAvatar = memo(({ name, size = 49, isGroup = false, pictureUrl }: { name:
 
   return (
     <div
-      className="rounded-full bg-[#DFE5E7] flex items-center justify-center shrink-0"
+      className="rounded-full bg-muted flex items-center justify-center shrink-0"
       style={{ width: size, height: size }}
     >
       <svg viewBox="0 0 212 212" width={size} height={size}>
@@ -189,30 +201,30 @@ const ConversationItem = memo(({
     <div
       onClick={onClick}
       className={`flex items-center px-3 cursor-pointer transition-colors duration-100 ${
-        isActive ? "bg-[#F0F2F5]" : "hover:bg-[#F5F6F6]"
+        isActive ? "bg-accent" : "hover:bg-muted/50"
       }`}
     >
       <div className="py-[6px] pr-[13px]">
         <WaAvatar name={contactName} size={49} pictureUrl={pictureUrl} />
       </div>
-      <div className="flex-1 min-w-0 py-[6px] border-b border-[#E9EDEF]">
+      <div className="flex-1 min-w-0 py-[6px] border-b border-border">
         <div className="flex items-baseline justify-between mb-[2px]">
-          <span className="text-[17px] text-[#111B21] truncate leading-[21px]">
+          <span className="text-[17px] text-foreground truncate leading-[21px] font-medium">
             {contactName}
           </span>
           <span className={`text-[12px] ml-[6px] shrink-0 leading-[14px] ${
-            unread > 0 ? "text-[#25D366]" : "text-[#667781]"
+            unread > 0 ? "text-emerald-500" : "text-muted-foreground"
           }`}>
             {time}
           </span>
         </div>
         <div className="flex items-center gap-[3px]">
           <StatusTick status={conv.lastStatus} fromMe={fromMe} />
-          <span className="text-[14px] text-[#667781] truncate flex-1 leading-[20px]">
+          <span className="text-[14px] text-muted-foreground truncate flex-1 leading-[20px]">
             {preview || "Sem mensagens"}
           </span>
           {unread > 0 && (
-            <span className="bg-[#25D366] text-white text-[11px] font-bold rounded-full min-w-[20px] h-[20px] flex items-center justify-center px-[6px] shrink-0 ml-[6px]">
+            <span className="bg-emerald-500 text-white text-[11px] font-bold rounded-full min-w-[20px] h-[20px] flex items-center justify-center px-[6px] shrink-0 ml-[6px]">
               {unread > 99 ? "99+" : unread}
             </span>
           )}
@@ -332,26 +344,26 @@ function CreateDealDialog({
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-[#E9EDEF]">
-          <h3 className="text-[16px] font-semibold text-[#111B21]">Nova Negociação</h3>
-          <button onClick={onClose} className="p-1 hover:bg-[#F0F2F5] rounded-full">
-            <X className="w-5 h-5 text-[#54656F]" />
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+          <h3 className="text-[16px] font-semibold text-foreground">Nova Negociação</h3>
+          <button onClick={onClose} className="p-1 hover:bg-muted rounded-full">
+            <X className="w-5 h-5 text-muted-foreground" />
           </button>
         </div>
 
         {/* Body */}
         <div className="px-5 py-4 space-y-4">
           {/* Contact info */}
-          <div className="flex items-center gap-3 p-3 bg-[#F0F2F5] rounded-lg">
-            <div className="w-10 h-10 rounded-full bg-[#25D366] flex items-center justify-center text-white font-bold text-sm">
+          <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
+            <div className="w-10 h-10 rounded-full bg-emerald-500 flex items-center justify-center text-white font-bold text-sm">
               {contactName.charAt(0).toUpperCase()}
             </div>
             <div>
-              <p className="text-sm font-medium text-[#111B21]">{contactName}</p>
-              <p className="text-xs text-[#667781]">{contactPhone}</p>
+              <p className="text-sm font-medium text-foreground">{contactName}</p>
+              <p className="text-xs text-muted-foreground">{contactPhone}</p>
             </div>
             {existingContact && (
-              <span className="ml-auto text-[11px] bg-[#E7FCE3] text-[#008069] px-2 py-0.5 rounded-full">
+              <span className="ml-auto text-[11px] bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 px-2 py-0.5 rounded-full">
                 Contato CRM
               </span>
             )}
@@ -359,34 +371,34 @@ function CreateDealDialog({
 
           {/* Title */}
           <div>
-            <label className="text-[13px] text-[#667781] mb-1 block">Título da negociação *</label>
+            <label className="text-[13px] text-muted-foreground mb-1 block">Título da negociação *</label>
             <input
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="w-full px-3 py-2 border border-[#D1D7DB] rounded-lg text-sm text-[#111B21] focus:outline-none focus:border-[#25D366] focus:ring-1 focus:ring-[#25D366]"
+              className="w-full px-3 py-2 border border-border rounded-lg text-sm text-foreground bg-background focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
             />
           </div>
 
           {/* Value */}
           <div>
-            <label className="text-[13px] text-[#667781] mb-1 block">Valor (R$)</label>
+            <label className="text-[13px] text-muted-foreground mb-1 block">Valor (R$)</label>
             <input
               type="number"
               value={value}
               onChange={(e) => setValue(e.target.value)}
               placeholder="0,00"
-              className="w-full px-3 py-2 border border-[#D1D7DB] rounded-lg text-sm text-[#111B21] focus:outline-none focus:border-[#25D366] focus:ring-1 focus:ring-[#25D366]"
+              className="w-full px-3 py-2 border border-border rounded-lg text-sm text-foreground bg-background focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
             />
           </div>
 
           {/* Pipeline */}
           <div>
-            <label className="text-[13px] text-[#667781] mb-1 block">Pipeline *</label>
+            <label className="text-[13px] text-muted-foreground mb-1 block">Pipeline *</label>
             <select
               value={selectedPipelineId || ""}
               onChange={(e) => { setSelectedPipelineId(Number(e.target.value)); setSelectedStageId(null); }}
-              className="w-full px-3 py-2 border border-[#D1D7DB] rounded-lg text-sm text-[#111B21] focus:outline-none focus:border-[#25D366] focus:ring-1 focus:ring-[#25D366] bg-card"
+              className="w-full px-3 py-2 border border-border rounded-lg text-sm text-foreground bg-background focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
             >
               {pipelines.map((p: any) => (
                 <option key={p.id} value={p.id}>{p.name}</option>
@@ -396,11 +408,11 @@ function CreateDealDialog({
 
           {/* Stage */}
           <div>
-            <label className="text-[13px] text-[#667781] mb-1 block">Etapa *</label>
+            <label className="text-[13px] text-muted-foreground mb-1 block">Etapa *</label>
             <select
               value={selectedStageId || ""}
               onChange={(e) => setSelectedStageId(Number(e.target.value))}
-              className="w-full px-3 py-2 border border-[#D1D7DB] rounded-lg text-sm text-[#111B21] focus:outline-none focus:border-[#25D366] focus:ring-1 focus:ring-[#25D366] bg-card"
+              className="w-full px-3 py-2 border border-border rounded-lg text-sm text-foreground bg-background focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
             >
               {stages.map((s: any) => (
                 <option key={s.id} value={s.id}>{s.name}</option>
@@ -410,17 +422,17 @@ function CreateDealDialog({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-3 px-5 py-4 border-t border-[#E9EDEF]">
+        <div className="flex items-center justify-end gap-3 px-5 py-4 border-t border-border">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-sm text-[#667781] hover:bg-[#F0F2F5] rounded-lg transition-colors"
+            className="px-4 py-2 text-sm text-muted-foreground hover:bg-muted rounded-lg transition-colors"
           >
             Cancelar
           </button>
           <button
             onClick={handleCreate}
             disabled={creating || !title.trim() || !selectedPipelineId || !selectedStageId}
-            className="px-4 py-2 text-sm text-white bg-[#25D366] hover:bg-[#20BA5C] rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            className="px-4 py-2 text-sm text-white bg-emerald-500 hover:bg-emerald-600 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           >
             {creating && <Loader2 className="w-4 h-4 animate-spin" />}
             Criar Negociação
@@ -502,7 +514,7 @@ function CreateContactDialog({
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-full bg-[#25D366] flex items-center justify-center">
+            <div className="w-9 h-9 rounded-full bg-emerald-500 flex items-center justify-center">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
                 <circle cx="9" cy="7" r="4"/>
@@ -521,7 +533,7 @@ function CreateContactDialog({
         <div className="px-5 py-4 space-y-4">
           {/* Phone (read-only) */}
           <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
-            <Phone className="w-5 h-5 text-[#25D366]" />
+            <Phone className="w-5 h-5 text-emerald-500" />
             <div>
               <p className="text-xs text-muted-foreground">Telefone (WhatsApp)</p>
               <p className="text-sm font-medium text-foreground">{formattedPhone}</p>
@@ -536,7 +548,7 @@ function CreateContactDialog({
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Nome do contato"
-              className="w-full px-3 py-2 border border-border rounded-lg text-sm text-foreground bg-background focus:outline-none focus:border-[#25D366] focus:ring-1 focus:ring-[#25D366]"
+              className="w-full px-3 py-2 border border-border rounded-lg text-sm text-foreground bg-background focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
               autoFocus
             />
           </div>
@@ -549,7 +561,7 @@ function CreateContactDialog({
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="email@exemplo.com"
-              className="w-full px-3 py-2 border border-border rounded-lg text-sm text-foreground bg-background focus:outline-none focus:border-[#25D366] focus:ring-1 focus:ring-[#25D366]"
+              className="w-full px-3 py-2 border border-border rounded-lg text-sm text-foreground bg-background focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
             />
           </div>
 
@@ -561,7 +573,7 @@ function CreateContactDialog({
               onChange={(e) => setNotes(e.target.value)}
               placeholder="Observações sobre o contato..."
               rows={2}
-              className="w-full px-3 py-2 border border-border rounded-lg text-sm text-foreground bg-background focus:outline-none focus:border-[#25D366] focus:ring-1 focus:ring-[#25D366] resize-none"
+              className="w-full px-3 py-2 border border-border rounded-lg text-sm text-foreground bg-background focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 resize-none"
             />
           </div>
         </div>
@@ -577,7 +589,7 @@ function CreateContactDialog({
           <button
             onClick={handleCreate}
             disabled={creating || !name.trim()}
-            className="px-4 py-2 text-sm text-white bg-[#25D366] hover:bg-[#1da851] rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            className="px-4 py-2 text-sm text-white bg-emerald-500 hover:bg-emerald-600 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           >
             {creating && <Loader2 className="w-4 h-4 animate-spin" />}
             Criar Contato
@@ -713,7 +725,7 @@ function NewChatPanel({
             placeholder="Pesquisar contatos"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="flex-1 bg-transparent border-none outline-none text-[14px] text-[#111B21] placeholder:text-[#667781]"
+            className="flex-1 bg-transparent border-none outline-none text-[14px] text-foreground placeholder:text-muted-foreground"
             style={{ paddingLeft: "12px", height: "100%" }}
             autoFocus
           />
@@ -721,12 +733,12 @@ function NewChatPanel({
       </div>
 
       {/* Phone input section */}
-      <div className="shrink-0 px-4 py-3 border-b border-[#E9EDEF]">
-        <label className="text-[12px] text-[#667781] uppercase tracking-wide font-medium mb-2 block">
+      <div className="shrink-0 px-4 py-3 border-b border-border">
+        <label className="text-[12px] text-muted-foreground uppercase tracking-wide font-medium mb-2 block">
           Digitar número
         </label>
         <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1 px-3 py-2 bg-[#F0F2F5] rounded-lg text-sm text-[#667781] shrink-0">
+          <div className="flex items-center gap-1 px-3 py-2 bg-muted rounded-lg text-sm text-muted-foreground shrink-0">
             <span>🇧🇷</span>
             <span>+55</span>
           </div>
@@ -736,12 +748,12 @@ function NewChatPanel({
             value={phoneInput}
             onChange={(e) => { setPhoneInput(e.target.value); setResolveError(""); }}
             onKeyDown={(e) => { if (e.key === "Enter") handlePhoneSubmit(); }}
-            className="flex-1 px-3 py-2 border border-[#D1D7DB] rounded-lg text-sm text-[#111B21] focus:outline-none focus:border-[#25D366] focus:ring-1 focus:ring-[#25D366]"
+            className="flex-1 px-3 py-2 border border-border rounded-lg text-sm text-foreground focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
           />
           <button
             onClick={handlePhoneSubmit}
             disabled={resolving || phoneInput.replace(/\D/g, "").length < 8}
-            className="px-3 py-2 bg-[#25D366] text-white rounded-lg text-sm font-medium hover:bg-[#20BA5C] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+            className="px-3 py-2 bg-emerald-500 text-white rounded-lg text-sm font-medium hover:bg-emerald-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
           >
             {resolving ? (
               <Loader2 className="w-4 h-4 animate-spin" />
@@ -757,7 +769,7 @@ function NewChatPanel({
 
       {/* Contacts list */}
       <div className="shrink-0 px-4 pt-3 pb-1">
-        <p className="text-[12px] text-[#008069] uppercase tracking-wide font-medium">
+        <p className="text-[12px] text-emerald-600 dark:text-emerald-400 uppercase tracking-wide font-medium">
           Contatos do CRM ({contacts.length})
         </p>
       </div>
@@ -765,12 +777,12 @@ function NewChatPanel({
       <div className="flex-1 overflow-y-auto" style={{ overscrollBehavior: "contain" }}>
         {contactsQ.isLoading ? (
           <div className="flex items-center justify-center py-12">
-            <Loader2 className="w-5 h-5 text-[#25D366] animate-spin" />
+            <Loader2 className="w-5 h-5 text-emerald-500 animate-spin" />
           </div>
         ) : contacts.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
-            <Phone className="w-10 h-10 text-[#667781]/20 mb-2" />
-            <p className="text-[13px] text-[#667781]">
+            <Phone className="w-10 h-10 text-muted-foreground/20 mb-2" />
+            <p className="text-[13px] text-muted-foreground">
               {searchTerm ? "Nenhum contato encontrado" : "Nenhum contato com telefone cadastrado"}
             </p>
           </div>
@@ -780,17 +792,17 @@ function NewChatPanel({
               key={contact.id}
               onClick={() => handleSelectContact(contact)}
               disabled={resolving}
-              className="w-full flex items-center gap-3 px-4 py-[10px] hover:bg-[#F0F2F5] transition-colors text-left disabled:opacity-60"
+              className="w-full flex items-center gap-3 px-4 py-[10px] hover:bg-muted transition-colors text-left disabled:opacity-60"
             >
-              <div className="w-[49px] h-[49px] rounded-full bg-[#DFE5E7] flex items-center justify-center shrink-0">
+              <div className="w-[49px] h-[49px] rounded-full bg-muted flex items-center justify-center shrink-0">
                 <svg viewBox="0 0 212 212" width={49} height={49}>
                   <path fill="#DFE5E7" d="M106 0C47.5 0 0 47.5 0 106s47.5 106 106 106 106-47.5 106-106S164.5 0 106 0z" />
                   <path fill="#FFF" d="M106 45c-20.7 0-37.5 16.8-37.5 37.5S85.3 120 106 120s37.5-16.8 37.5-37.5S126.7 45 106 45zm0 105c-28.3 0-52.5 14.3-52.5 32v10h105v-10c0-17.7-24.2-32-52.5-32z" />
                 </svg>
               </div>
-              <div className="flex-1 min-w-0 border-b border-[#E9EDEF] py-[6px]">
-                <p className="text-[16px] text-[#111B21] truncate">{contact.name}</p>
-                <p className="text-[13px] text-[#667781] truncate">
+              <div className="flex-1 min-w-0 border-b border-border py-[6px]">
+                <p className="text-[16px] text-foreground truncate">{contact.name}</p>
+                <p className="text-[13px] text-muted-foreground truncate">
                   {contact.phone || "Sem telefone"}
                   {contact.accountName ? ` · ${contact.accountName}` : ""}
                 </p>
@@ -804,8 +816,8 @@ function NewChatPanel({
       {resolving && (
         <div className="absolute inset-0 z-30 bg-card/70 flex items-center justify-center">
           <div className="flex flex-col items-center gap-3">
-            <Loader2 className="w-8 h-8 text-[#25D366] animate-spin" />
-            <p className="text-[14px] text-[#667781]">Verificando no WhatsApp...</p>
+            <Loader2 className="w-8 h-8 text-emerald-500 animate-spin" />
+            <p className="text-[14px] text-muted-foreground">Verificando no WhatsApp...</p>
           </div>
         </div>
       )}
@@ -834,17 +846,17 @@ function EmptyChat() {
             <path fill="#FFF" d="M180.5 84.5c0 16.016-12.984 29-29 29s-29-12.984-29-29 12.984-29 29-29 29 12.984 29 29z"/>
           </svg>
         </div>
-        <h1 className="text-[32px] font-light text-[#41525D] leading-[38px] mb-[14px]">
+        <h1 className="text-[32px] font-light text-foreground/70 leading-[38px] mb-[14px]">
           ENTUR OS WhatsApp
         </h1>
-        <p className="text-[14px] text-[#667781] leading-[20px]">
+        <p className="text-[14px] text-muted-foreground leading-[20px]">
           Envie e receba mensagens sem manter seu celular conectado.
           <br />
           Selecione uma conversa ao lado para começar.
         </p>
-        <div className="mt-[40px] pt-[20px] border-t border-[#E9EDEF]">
-          <p className="text-[14px] text-[#667781]/60 flex items-center justify-center gap-[6px]">
-            <span className="inline-block w-[6px] h-[6px] rounded-full bg-[#25D366]" />
+        <div className="mt-[40px] pt-[20px] border-t border-border">
+          <p className="text-[14px] text-muted-foreground/60 flex items-center justify-center gap-[6px]">
+            <span className="inline-block w-[6px] h-[6px] rounded-full bg-emerald-500" />
             Criptografia de ponta a ponta
           </p>
         </div>
@@ -861,16 +873,16 @@ function NoSession() {
   return (
     <div className="flex h-full items-center justify-center" style={{ backgroundColor: "#F0F2F5" }}>
       <div className="text-center max-w-md px-6">
-        <div className="w-20 h-20 rounded-full bg-[#25D366]/10 flex items-center justify-center mx-auto mb-4">
-          <MessageSquare className="w-10 h-10 text-[#25D366]" />
+        <div className="w-20 h-20 rounded-full bg-emerald-500/10 flex items-center justify-center mx-auto mb-4">
+          <MessageSquare className="w-10 h-10 text-emerald-500" />
         </div>
-        <h2 className="text-xl font-medium text-[#111B21] mb-2">Nenhuma sessão WhatsApp ativa</h2>
-        <p className="text-[14px] text-[#667781] mb-4">
+        <h2 className="text-xl font-medium text-foreground mb-2">Nenhuma sessão WhatsApp ativa</h2>
+        <p className="text-[14px] text-muted-foreground mb-4">
           Conecte uma sessão na página WhatsApp para ver suas conversas aqui.
         </p>
         <a
           href="/whatsapp"
-          className="inline-flex items-center gap-2 px-4 py-2 bg-[#25D366] text-white rounded-lg text-sm font-medium hover:bg-[#20BA5C] transition-colors"
+          className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-500 text-white rounded-lg text-sm font-medium hover:bg-emerald-600 transition-colors"
         >
           <Phone className="w-4 h-4" />
           Ir para WhatsApp
@@ -1111,28 +1123,28 @@ export default function InboxPage() {
           <div className="flex items-center gap-[10px]">
             <button
               onClick={toggleMute}
-              className="w-[40px] h-[40px] flex items-center justify-center rounded-full hover:bg-[#D9DBDE] transition-colors relative group"
+              className="w-[40px] h-[40px] flex items-center justify-center rounded-full hover:bg-muted transition-colors relative group"
               title={isMuted ? "Ativar som de notificação" : "Silenciar notificações"}
             >
               {isMuted ? (
-                <VolumeX className="w-[22px] h-[22px] text-[#EA4335]" />
+                <VolumeX className="w-[22px] h-[22px] text-red-500" />
               ) : (
-                <Volume2 className="w-[22px] h-[22px] text-[#54656F]" />
+                <Volume2 className="w-[22px] h-[22px] text-muted-foreground" />
               )}
               {/* Tooltip */}
-              <span className="absolute -bottom-8 left-1/2 -translate-x-1/2 bg-[#111B21] text-white text-[11px] px-2 py-1 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+              <span className="absolute -bottom-8 left-1/2 -translate-x-1/2 bg-popover text-white text-[11px] px-2 py-1 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
                 {isMuted ? "Som desativado" : "Som ativado"}
               </span>
             </button>
             <button
               onClick={() => setShowNewChat(true)}
-              className="w-[40px] h-[40px] flex items-center justify-center rounded-full hover:bg-[#D9DBDE] transition-colors"
+              className="w-[40px] h-[40px] flex items-center justify-center rounded-full hover:bg-muted transition-colors"
               title="Nova conversa"
             >
-              <MessageCircle className="w-[22px] h-[22px] text-[#54656F]" />
+              <MessageCircle className="w-[22px] h-[22px] text-muted-foreground" />
             </button>
-            <button className="w-[40px] h-[40px] flex items-center justify-center rounded-full hover:bg-[#D9DBDE] transition-colors">
-              <MoreVertical className="w-[22px] h-[22px] text-[#54656F]" />
+            <button className="w-[40px] h-[40px] flex items-center justify-center rounded-full hover:bg-muted transition-colors">
+              <MoreVertical className="w-[22px] h-[22px] text-muted-foreground" />
             </button>
           </div>
         </div>
@@ -1154,7 +1166,7 @@ export default function InboxPage() {
               onChange={(e) => setSearch(e.target.value)}
               onFocus={() => setSearchFocused(true)}
               onBlur={() => setSearchFocused(false)}
-              className="flex-1 bg-transparent border-none outline-none text-[14px] text-[#111B21] placeholder:text-[#667781]"
+              className="flex-1 bg-transparent border-none outline-none text-[14px] text-foreground placeholder:text-muted-foreground"
               style={{ paddingLeft: "12px", height: "100%" }}
             />
           </div>
@@ -1186,12 +1198,12 @@ export default function InboxPage() {
         <div className="flex-1 overflow-y-auto" style={{ overscrollBehavior: "contain" }}>
           {conversationsQ.isLoading || sessionsQ.isLoading ? (
             <div className="flex items-center justify-center py-16">
-              <Loader2 className="w-6 h-6 text-[#25D366] animate-spin" />
+              <Loader2 className="w-6 h-6 text-emerald-500 animate-spin" />
             </div>
           ) : filteredConvs.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
-              <MessageSquare className="w-12 h-12 text-[#667781]/20 mb-3" />
-              <p className="text-[14px] text-[#667781]">
+              <MessageSquare className="w-12 h-12 text-muted-foreground/20 mb-3" />
+              <p className="text-[14px] text-muted-foreground">
                 {search ? "Nenhuma conversa encontrada" : filter === "unread" ? "Nenhuma conversa não lida" : "Nenhuma conversa ainda"}
               </p>
             </div>
@@ -1227,7 +1239,7 @@ export default function InboxPage() {
               className="md:hidden absolute top-[10px] left-[6px] z-30 p-[6px] rounded-full"
               style={{ backgroundColor: "rgba(255,255,255,0.85)", boxShadow: "0 1px 3px rgba(0,0,0,0.1)" }}
             >
-              <ArrowLeft className="w-5 h-5 text-[#54656F]" />
+              <ArrowLeft className="w-5 h-5 text-muted-foreground" />
             </button>
 
             <WhatsAppChat

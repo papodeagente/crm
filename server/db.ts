@@ -227,7 +227,16 @@ export async function removeChatbotRule(id: number) {
 export async function getConversationsList(sessionId: string) {
   const db = await getDb();
   if (!db) return [];
-  // Get distinct remoteJids with last message info + pushName from most recent non-fromMe message
+  // Internal Baileys types to exclude from conversation preview
+  const skipTypes = [
+    'protocolMessage','senderKeyDistributionMessage','messageContextInfo',
+    'reactionMessage','ephemeralMessage','deviceSentMessage',
+    'bcallMessage','callLogMesssage','keepInChatMessage',
+    'encReactionMessage','editedMessage','viewOnceMessageV2Extension'
+  ];
+  const skipTypesSQL = skipTypes.map(t => `'${t}'`).join(',');
+  
+  // Get distinct remoteJids with last REAL message info + pushName
   const result = await db.execute(sql`
     SELECT 
       m.remoteJid,
@@ -251,11 +260,13 @@ export async function getConversationsList(sessionId: string) {
         AND m2.remoteJid = m.remoteJid 
         AND m2.fromMe = 0 
         AND (m2.status IS NULL OR m2.status = 'received')
+        AND m2.messageType NOT IN (${sql.raw(skipTypesSQL)})
       ) AS unreadCount,
       (
         SELECT COUNT(*) FROM messages m3 
         WHERE m3.sessionId = ${sessionId} 
         AND m3.remoteJid = m.remoteJid
+        AND m3.messageType NOT IN (${sql.raw(skipTypesSQL)})
       ) AS totalMessages
     FROM messages m
     INNER JOIN (
@@ -263,6 +274,7 @@ export async function getConversationsList(sessionId: string) {
       FROM messages
       WHERE sessionId = ${sessionId}
       AND remoteJid NOT LIKE '%@g.us'
+      AND messageType NOT IN (${sql.raw(skipTypesSQL)})
       GROUP BY remoteJid
     ) latest ON m.remoteJid = latest.remoteJid AND m.id = latest.maxId
     WHERE m.sessionId = ${sessionId}

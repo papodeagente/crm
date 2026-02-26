@@ -553,3 +553,42 @@
 ### Verificação
 - [x] TypeScript sem erros (LSP + tsc)
 - [x] 110 testes passando, 8 arquivos
+
+## Correção Inbox - Nomes, Fotos, Sincronização (v22)
+
+### Backend - Query de conversas
+- [x] Filtrar tipos internos do Baileys (protocolMessage, senderKeyDistributionMessage, messageContextInfo, reactionMessage) na importação e tempo real
+- [x] Filtrar tipos internos na query getConversationsList (WHERE NOT IN)
+- [x] pushName salvo corretamente no messages.upsert e messaging-history.set
+- [x] Preview de mensagens usa texto real, não tipos internos
+
+### Backend - Fotos de perfil
+- [x] Endpoint profilePictures já funciona para todos os contatos da lista
+- [x] Fotos buscadas em batch por JID
+
+### Backend - Sincronização em tempo real
+- [x] Socket.IO emite newMessage que refetch a lista de conversas
+- [x] refetchInterval 8s no messagesByContact + 15s no conversations
+
+### Frontend - Exibição de nomes
+- [x] Prioridade: 1) Nome CRM (contactNameMap), 2) pushName (pushNameMap), 3) Número formatado
+- [x] pushName recuperado do banco via pushNameMap
+- [x] Nome exibido na lista E no header do chat
+
+### Frontend - Fotos de perfil
+- [x] Fotos de perfil carregadas e exibidas na lista e no chat header
+- [x] Fallback com iniciais do nome quando foto não disponível
+
+### Frontend - Preview de mensagens
+- [x] getMessagePreview traduz tipos para preview legível
+- [x] Ícones para mídia (📷 Foto, 🎵 Áudio, 📄 Documento, 📹 Vídeo, 🔑 Chave, etc.)
+
+### Frontend - Cores semânticas WhatsAppChat.tsx
+- [x] Todas as 58 cores hardcoded substituídas por variáveis semânticas
+- [x] Funciona em dark mode e light mode
+
+### Verificação
+- [x] Tipos internos filtrados na importação e query
+- [x] Nomes e fotos aparecem corretamente
+- [x] TypeScript sem erros (LSP + tsc)
+- [x] 110 testes passando, 8 arquivos
