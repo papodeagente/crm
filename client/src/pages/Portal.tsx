@@ -31,13 +31,13 @@ export default function Portal() {
           <h1 className="text-xl font-bold tracking-tight text-foreground">Portal do Cliente</h1>
           <p className="text-[13px] text-muted-foreground mt-0.5">Gerencie tickets e acesso dos clientes.</p>
         </div>
-        <Button className="h-9 gap-2 px-5 rounded-xl shadow-soft bg-gradient-to-r from-primary to-[oklch(0.50_0.14_264)] hover:opacity-90 text-[13px] font-semibold" onClick={() => toast("Criação de ticket em breve")}>
+        <Button className="h-9 gap-2 px-5 rounded-lg bg-primary hover:bg-primary/90 shadow-sm text-[13px] font-medium transition-colors" onClick={() => toast("Criação de ticket em breve")}>
           <Plus className="h-4 w-4" />Novo Ticket
         </Button>
       </div>
 
       {/* Table */}
-      <Card className="border-0 shadow-soft rounded-2xl overflow-hidden">
+      <Card className="border border-border/40 shadow-none rounded-xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-[13px]">
             <thead>

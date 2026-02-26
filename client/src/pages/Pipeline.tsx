@@ -170,13 +170,13 @@ export default function Pipeline() {
           <div className="flex bg-muted/60 rounded-xl p-1 gap-0.5">
             <button
               onClick={() => setViewMode("kanban")}
-              className={`p-2 rounded-lg transition-all duration-200 ${viewMode === "kanban" ? "bg-white text-primary shadow-soft" : "text-muted-foreground hover:text-foreground"}`}
+              className={`p-2 rounded-lg transition-all duration-200 ${viewMode === "kanban" ? "bg-white text-primary shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
             >
               <LayoutGrid className="h-4 w-4" />
             </button>
             <button
               onClick={() => setViewMode("list")}
-              className={`p-2 rounded-lg transition-all duration-200 ${viewMode === "list" ? "bg-white text-primary shadow-soft" : "text-muted-foreground hover:text-foreground"}`}
+              className={`p-2 rounded-lg transition-all duration-200 ${viewMode === "list" ? "bg-white text-primary shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
             >
               <List className="h-4 w-4" />
             </button>
@@ -234,7 +234,7 @@ export default function Pipeline() {
 
           <Button
             onClick={() => setShowCreateDeal(true)}
-            className="h-9 gap-2 px-5 rounded-xl shadow-soft bg-gradient-to-r from-primary to-[oklch(0.50_0.14_264)] hover:opacity-90 transition-opacity text-[13px] font-semibold"
+            className="h-9 gap-2 px-5 rounded-lg shadow-sm bg-primary hover:bg-primary/90 transition-colors text-[13px] font-medium text-primary-foreground"
           >
             <Plus className="h-4 w-4" />
             Criar
@@ -317,7 +317,7 @@ export default function Pipeline() {
       ) : (
         /* List view */
         <div className="flex-1 overflow-auto p-5 lg:px-8 bg-muted/20">
-          <Card className="border-0 shadow-soft rounded-2xl overflow-hidden">
+          <Card className="border-0 shadow-sm rounded-2xl overflow-hidden">
             <table className="w-full text-[13px]">
               <thead>
                 <tr className="border-b bg-muted/30">
@@ -382,7 +382,7 @@ function DealCard({ deal, contacts, tasks, onCreateTask, onOpenDrawer, onDragSta
       draggable
       onDragStart={(e) => onDragStart(e, deal.id)}
       onDragEnd={onDragEnd}
-      className={`bg-white rounded-xl border border-border/40 p-3.5 shadow-[0_1px_3px_oklch(0_0_0/0.03)] hover:shadow-soft transition-all duration-200 cursor-grab active:cursor-grabbing space-y-2.5 ${isDragging ? "opacity-40 scale-95" : ""}`}
+      className={`bg-white rounded-xl border border-border/40 p-3.5 shadow-[0_1px_3px_oklch(0_0_0/0.03)] hover:shadow-sm transition-all duration-200 cursor-grab active:cursor-grabbing space-y-2.5 ${isDragging ? "opacity-40 scale-95" : ""}`}
     >
       {/* Status + actions */}
       <div className="flex items-center justify-between">
@@ -661,7 +661,7 @@ function DealDrawer({ dealId, onClose, contacts, accounts, stages }: {
               </div>
 
               {(products.data || []).map((p: any) => (
-                <div key={p.id} className="border border-border/40 rounded-xl p-4 bg-white space-y-2 hover:shadow-soft transition-shadow">
+                <div key={p.id} className="border border-border/40 rounded-xl p-4 bg-white space-y-2 hover:shadow-sm transition-shadow">
                   <div className="flex items-start justify-between">
                     <div className="flex items-center gap-2.5">
                       <span className="text-lg">{categoryIcons[p.category] || "\uD83D\uDCE6"}</span>
@@ -706,7 +706,7 @@ function DealDrawer({ dealId, onClose, contacts, accounts, stages }: {
               {(participants.data || []).map((p: any) => {
                 const pc = contacts.find((c: any) => c.id === p.contactId);
                 return (
-                  <div key={p.id} className="flex items-center justify-between border border-border/40 rounded-xl p-3.5 bg-white hover:shadow-soft transition-shadow">
+                  <div key={p.id} className="flex items-center justify-between border border-border/40 rounded-xl p-3.5 bg-white hover:shadow-sm transition-shadow">
                     <div className="flex items-center gap-3">
                       <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-primary/10 to-accent/10 flex items-center justify-center text-[13px] font-bold text-primary">
                         {pc?.name?.charAt(0) || "?"}
@@ -840,7 +840,7 @@ function AddProductForm({ dealId, onAdd }: { dealId: number; onAdd: (data: any) 
   }
 
   return (
-    <div className="border border-border/40 rounded-2xl p-4 bg-muted/20 space-y-4">
+    <div className="border border-border/40 rounded-xl p-4 bg-muted/20 space-y-4">
       <div className="flex items-center justify-between">
         <p className="text-[11px] font-bold uppercase tracking-[0.1em] text-muted-foreground">Novo Produto</p>
         <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg" onClick={() => setExpanded(false)}>
@@ -878,7 +878,7 @@ function AddProductForm({ dealId, onAdd }: { dealId: number; onAdd: (data: any) 
           <Input value={supplier} onChange={(e) => setSupplier(e.target.value)} placeholder="Opcional" className="mt-1 h-9 text-[13px] rounded-xl" />
         </div>
       </div>
-      <Button className="w-full rounded-xl h-10 text-[13px] font-semibold shadow-soft bg-gradient-to-r from-primary to-[oklch(0.50_0.14_264)] hover:opacity-90" onClick={handleSubmit}>
+      <Button className="w-full rounded-lg h-10 text-[13px] font-medium shadow-sm bg-primary hover:bg-primary/90 transition-colors text-primary-foreground" onClick={handleSubmit}>
         Adicionar ao Orçamento
       </Button>
     </div>
@@ -985,7 +985,7 @@ function CreateDealDialog({ open, onOpenChange, pipelineId, stages, contacts }: 
             </div>
           </div>
 
-          <div className="border border-border/40 rounded-2xl p-4 bg-muted/20 space-y-4">
+          <div className="border border-border/40 rounded-xl p-4 bg-muted/20 space-y-4">
             <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-[0.1em] flex items-center gap-1.5">
               <Plane className="h-3.5 w-3.5" /> Dados da Viagem
             </p>
@@ -1012,7 +1012,7 @@ function CreateDealDialog({ open, onOpenChange, pipelineId, stages, contacts }: 
           </div>
 
           <Button
-            className="w-full h-11 rounded-xl text-[14px] font-semibold shadow-soft bg-gradient-to-r from-primary to-[oklch(0.50_0.14_264)] hover:opacity-90 transition-opacity"
+            className="w-full h-11 rounded-lg text-[14px] font-medium shadow-sm bg-primary hover:bg-primary/90 transition-colors text-primary-foreground"
             onClick={handleSubmit}
             disabled={createDeal.isPending}
           >
@@ -1048,7 +1048,7 @@ function CreateTaskDialog({ open, onOpenChange, dealId }: { open: boolean; onOpe
             <Input type="datetime-local" value={dueAt} onChange={(e) => setDueAt(e.target.value)} className="mt-1.5 h-10 rounded-xl" />
           </div>
           <Button
-            className="w-full h-11 rounded-xl text-[14px] font-semibold shadow-soft bg-gradient-to-r from-primary to-[oklch(0.50_0.14_264)] hover:opacity-90"
+            className="w-full h-11 rounded-lg text-[14px] font-medium shadow-sm bg-primary hover:bg-primary/90 transition-colors text-primary-foreground"
             disabled={!title || createTask.isPending}
             onClick={() => createTask.mutate({ tenantId: TENANT_ID, entityType: "deal", entityId: dealId, title, dueAt: dueAt || undefined })}
           >

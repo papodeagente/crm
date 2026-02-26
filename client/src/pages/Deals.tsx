@@ -46,7 +46,7 @@ export default function Deals() {
         </div>
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
-            <Button className="h-9 gap-2 px-5 rounded-xl shadow-soft bg-gradient-to-r from-primary to-[oklch(0.50_0.14_264)] hover:opacity-90 text-[13px] font-semibold">
+            <Button className="h-9 gap-2 px-5 rounded-lg bg-primary hover:bg-primary/90 shadow-sm text-[13px] font-medium transition-colors">
               <Plus className="h-4 w-4" />Novo Negócio
             </Button>
           </DialogTrigger>
@@ -60,7 +60,7 @@ export default function Deals() {
             <div className="space-y-4 pt-3">
               <div><Label className="text-[12px] font-medium">Título *</Label><Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Ex: Pacote Cancún - João" className="mt-1.5 h-10 rounded-xl" /></div>
               <div><Label className="text-[12px] font-medium">Valor (R$)</Label><Input value={value} onChange={(e) => setValue(e.target.value)} placeholder="5000.00" type="number" className="mt-1.5 h-10 rounded-xl" /></div>
-              <Button className="w-full h-11 rounded-xl text-[14px] font-semibold shadow-soft bg-gradient-to-r from-primary to-[oklch(0.50_0.14_264)] hover:opacity-90" disabled={!title || createDeal.isPending} onClick={() => {
+              <Button className="w-full h-11 rounded-lg text-[14px] font-medium bg-primary hover:bg-primary/90 shadow-sm transition-colors" disabled={!title || createDeal.isPending} onClick={() => {
                 if (!defaultPipeline) { toast.error("Crie um pipeline primeiro na seção Funil."); return; }
                 createDeal.mutate({ tenantId: TENANT_ID, title, pipelineId: defaultPipeline.id, stageId: 1, valueCents: value ? Math.round(parseFloat(value) * 100) : undefined });
               }}>
@@ -73,22 +73,22 @@ export default function Deals() {
 
       {/* Summary cards */}
       <div className="grid grid-cols-3 gap-4">
-        <div className="rounded-2xl bg-white border-0 shadow-soft p-4 flex items-center gap-3">
+        <div className="rounded-xl bg-white border border-border/40 shadow-none p-4 flex items-center gap-3">
           <div className="h-10 w-10 rounded-xl bg-blue-50 flex items-center justify-center"><Briefcase className="h-5 w-5 text-blue-600" /></div>
           <div><p className="text-[11px] font-bold uppercase tracking-[0.1em] text-muted-foreground">Abertos</p><p className="text-lg font-bold">{openCount}</p></div>
         </div>
-        <div className="rounded-2xl bg-white border-0 shadow-soft p-4 flex items-center gap-3">
+        <div className="rounded-xl bg-white border border-border/40 shadow-none p-4 flex items-center gap-3">
           <div className="h-10 w-10 rounded-xl bg-emerald-50 flex items-center justify-center"><TrendingUp className="h-5 w-5 text-emerald-600" /></div>
           <div><p className="text-[11px] font-bold uppercase tracking-[0.1em] text-muted-foreground">Ganhos</p><p className="text-lg font-bold">{wonCount}</p></div>
         </div>
-        <div className="rounded-2xl bg-white border-0 shadow-soft p-4 flex items-center gap-3">
+        <div className="rounded-xl bg-white border border-border/40 shadow-none p-4 flex items-center gap-3">
           <div className="h-10 w-10 rounded-xl bg-violet-50 flex items-center justify-center"><DollarSign className="h-5 w-5 text-violet-600" /></div>
           <div><p className="text-[11px] font-bold uppercase tracking-[0.1em] text-muted-foreground">Valor Total</p><p className="text-lg font-bold">{new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(totalValue / 100)}</p></div>
         </div>
       </div>
 
       {/* Table */}
-      <Card className="border-0 shadow-soft rounded-2xl overflow-hidden">
+      <Card className="border border-border/40 shadow-none rounded-xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-[13px]">
             <thead>

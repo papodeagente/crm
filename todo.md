@@ -114,3 +114,48 @@
 - [x] Redesenhar páginas restantes (Trips, Proposals, Portal, Insights, Goals, Academy, Integrations, Admin, Logs, Messages, SendMessage, ApiDocs, Chatbot, Alerts)
 - [x] Micro-interações: hover states, transições, feedback visual
 - [ ] Verificar responsividade em todas as páginas — pendente
+
+## Redesign Apple/macOS Premium (v5)
+
+### Design System
+- [x] Sistema de cores Apple-inspired (#F5F5F7 fundo, sidebar mais escura, azul macOS primário)
+- [x] Tipografia SF Pro / Inter com hierarquia clara (600 títulos, 400 corpo)
+- [x] Glassmorphism leve e sombreamento sutil
+- [x] Transições suaves (ease-in-out 150-200ms)
+- [x] Eliminar poluição visual, bordas pesadas, cards exagerados
+
+### Layout Global
+- [x] Sidebar fixa estilo Finder (ícones monocromáticos, labels discretos, hover cinza neutro)
+- [x] Top bar minimalista com busca central inteligente
+- [x] Layout em camadas com profundidade suave
+
+### Dashboard
+- [x] Blocos organizados (estratégicos vs operacionais)
+- [x] Área de foco do dia
+- [x] Métricas com clareza, sem excesso de cards
+
+### Pipeline
+- [x] Cards simples com informações essenciais apenas
+- [x] Indicadores discretos de urgência
+- [x] Drag-and-drop fluido
+- [x] Visual limpo e respirável
+
+### Inbox/Conversa
+- [x] Layout estilo iMessage com bolhas suaves
+- [x] Espaçamento confortável
+- [x] Área lateral com dados do cliente em abas (Info, Negociações, Tarefas)
+- [ ] Sugestões de IA discretas — futuro
+
+### Tela de Cliente (Contatos)
+- [x] Visual estilo painel de perfil (avatar + info organizada)
+- [x] Linha do tempo clara (tabela limpa)
+- [ ] Abas (Histórico, Propostas, Tarefas, Financeiro)
+
+### Microinterações
+- [x] Feedback visual suave ao clicar
+- [x] Hover states elegantes
+- [x] Skeleton loading minimalista (spinner circular)
+- [x] Transições de página com fade leve
+
+### Páginas Secundárias
+- [x] Redesenhar todas as páginas com o novo design system Apple (18 páginas atualizadas)

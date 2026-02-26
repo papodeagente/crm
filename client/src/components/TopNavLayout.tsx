@@ -10,56 +10,62 @@ import {
 import { Button } from "@/components/ui/button";
 import { getLoginUrl } from "@/const";
 import {
-  LayoutDashboard, LogOut, Settings, Users, Building2, Inbox, Send, Bot,
-  FileText, Globe, BarChart3, GraduationCap, Plug, Shield, Briefcase, Plane,
-  ClipboardList, Bell, ChevronDown, Search, Calendar, TrendingUp, Menu, X,
+  LayoutGrid, LogOut, Settings, Users, Inbox, Send, Bot,
+  FileText, BarChart3, GraduationCap, Plug, Shield, Briefcase, Plane,
+  CheckSquare, Bell, Search, TrendingUp, ChevronRight, MessageSquare,
+  Globe, Zap, BookOpen, Layers, Home, PanelLeft,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link, useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from "./DashboardLayoutSkeleton";
 
-interface NavItem {
+/* ─── Navigation structure ─── */
+interface SidebarItem {
   icon: any;
   label: string;
   path: string;
 }
 
-interface NavGroup {
+interface SidebarSection {
   label: string;
-  icon: any;
-  items: NavItem[];
+  items: SidebarItem[];
 }
 
-const mainNavItems: NavItem[] = [
-  { icon: LayoutDashboard, label: "Início", path: "/" },
-  { icon: Briefcase, label: "Negociações", path: "/pipeline" },
-  { icon: Building2, label: "Empresas", path: "/deals" },
-  { icon: Users, label: "Contatos", path: "/contacts" },
-  { icon: ClipboardList, label: "Tarefas", path: "/tasks" },
-];
-
-const moreMenuGroups: NavGroup[] = [
+const sidebarSections: SidebarSection[] = [
+  {
+    label: "",
+    items: [
+      { icon: Home, label: "Início", path: "/" },
+      { icon: Search, label: "Buscar", path: "__search__" },
+    ],
+  },
+  {
+    label: "CRM",
+    items: [
+      { icon: Briefcase, label: "Negociações", path: "/pipeline" },
+      { icon: Users, label: "Contatos", path: "/contacts" },
+      { icon: Layers, label: "Empresas", path: "/deals" },
+      { icon: Plane, label: "Viagens", path: "/trips" },
+      { icon: CheckSquare, label: "Tarefas", path: "/tasks" },
+    ],
+  },
   {
     label: "Comunicação",
-    icon: Inbox,
     items: [
       { icon: Inbox, label: "Inbox", path: "/inbox" },
-      { icon: Send, label: "WhatsApp", path: "/whatsapp" },
+      { icon: MessageSquare, label: "WhatsApp", path: "/whatsapp" },
       { icon: Bot, label: "Chatbot IA", path: "/chatbot" },
     ],
   },
   {
     label: "Comercial",
-    icon: FileText,
     items: [
-      { icon: Plane, label: "Viagens", path: "/trips" },
       { icon: FileText, label: "Propostas", path: "/proposals" },
-      { icon: Globe, label: "Portal Cliente", path: "/portal" },
+      { icon: Globe, label: "Portal", path: "/portal" },
     ],
   },
   {
     label: "Análises",
-    icon: BarChart3,
     items: [
       { icon: BarChart3, label: "Insights", path: "/insights" },
       { icon: TrendingUp, label: "Metas", path: "/goals" },
@@ -68,16 +74,92 @@ const moreMenuGroups: NavGroup[] = [
   },
   {
     label: "Plataforma",
-    icon: Settings,
     items: [
       { icon: GraduationCap, label: "Academy", path: "/academy" },
       { icon: Plug, label: "Integrações", path: "/integrations" },
       { icon: Shield, label: "Admin", path: "/admin" },
-      { icon: Settings, label: "API Docs", path: "/api-docs" },
+      { icon: BookOpen, label: "API", path: "/api-docs" },
     ],
   },
 ];
 
+/* ─── Search Palette ─── */
+function SearchPalette({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [query, setQuery] = useState("");
+  const [, setLocation] = useLocation();
+
+  useEffect(() => {
+    if (open) {
+      setTimeout(() => inputRef.current?.focus(), 50);
+      setQuery("");
+    }
+  }, [open]);
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        if (open) onClose();
+        else onClose(); // toggle handled by parent
+      }
+      if (e.key === "Escape" && open) onClose();
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [open, onClose]);
+
+  if (!open) return null;
+
+  const allItems = sidebarSections.flatMap((s) => s.items).filter((i) => i.path !== "__search__");
+  const filtered = query
+    ? allItems.filter((i) => i.label.toLowerCase().includes(query.toLowerCase()))
+    : allItems;
+
+  return (
+    <div className="fixed inset-0 z-[100]" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/20 backdrop-blur-sm" />
+      <div
+        className="relative mx-auto mt-[15vh] w-full max-w-lg"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="surface overflow-hidden" style={{ borderRadius: "0.875rem" }}>
+          <div className="flex items-center gap-3 px-4 border-b border-border">
+            <Search className="h-4 w-4 text-muted-foreground shrink-0" />
+            <input
+              ref={inputRef}
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Buscar páginas, contatos, negociações..."
+              className="flex-1 h-12 bg-transparent text-[14px] text-foreground placeholder:text-muted-foreground outline-none"
+            />
+            <kbd className="hidden sm:inline-flex h-5 items-center gap-0.5 rounded border border-border bg-muted px-1.5 text-[10px] font-medium text-muted-foreground">
+              ESC
+            </kbd>
+          </div>
+          <div className="max-h-[320px] overflow-y-auto scrollbar-thin p-1.5">
+            {filtered.length === 0 && (
+              <p className="text-center text-[13px] text-muted-foreground py-8">Nenhum resultado encontrado</p>
+            )}
+            {filtered.map((item) => (
+              <button
+                key={item.path}
+                onClick={() => { setLocation(item.path); onClose(); }}
+                className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-left text-[13px] text-foreground hover:bg-accent transition-colors duration-100"
+              >
+                <item.icon className="h-4 w-4 text-muted-foreground" />
+                <span className="font-medium">{item.label}</span>
+                <ChevronRight className="h-3 w-3 text-muted-foreground/50 ml-auto" />
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─── Main Layout ─── */
 export default function TopNavLayout({ children }: { children: React.ReactNode }) {
   const { loading, user } = useAuth();
 
@@ -85,23 +167,22 @@ export default function TopNavLayout({ children }: { children: React.ReactNode }
 
   if (!user) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-[oklch(0.96_0.02_264)] via-background to-[oklch(0.96_0.02_180)]">
-        <div className="flex flex-col items-center gap-8 p-10 max-w-md w-full glass-card rounded-2xl">
-          <div className="flex flex-col items-center gap-4">
-            <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-soft-lg">
-              <span className="text-2xl font-extrabold text-white tracking-tight">A</span>
+      <div className="flex items-center justify-center min-h-screen bg-background">
+        <div className="flex flex-col items-center gap-8 p-10 max-w-sm w-full">
+          <div className="flex flex-col items-center gap-5">
+            <div className="h-14 w-14 rounded-2xl bg-gradient-to-b from-primary to-[oklch(0.45_0.19_255)] flex items-center justify-center shadow-lg">
+              <span className="text-xl font-bold text-white tracking-tight">A</span>
             </div>
             <div className="text-center">
-              <h1 className="text-2xl font-bold tracking-tight gradient-text">ASTRA CRM</h1>
-              <p className="text-sm text-muted-foreground mt-2 max-w-xs leading-relaxed">
-                Plataforma completa de CRM para agências de viagens. Gerencie contatos, negociações e viagens em um só lugar.
+              <h1 className="text-xl font-semibold tracking-tight text-foreground">ASTRA CRM</h1>
+              <p className="text-[13px] text-muted-foreground mt-2 leading-relaxed max-w-[280px]">
+                Plataforma de CRM para agências de viagens.
               </p>
             </div>
           </div>
           <Button
             onClick={() => { window.location.href = getLoginUrl(); }}
-            size="lg"
-            className="w-full h-12 text-[15px] font-semibold shadow-soft-lg hover:shadow-xl transition-all duration-200 rounded-xl bg-gradient-to-r from-primary to-[oklch(0.50_0.14_264)] hover:opacity-90"
+            className="w-full h-11 text-[14px] font-medium rounded-lg"
           >
             Entrar com Manus
           </Button>
@@ -110,171 +191,225 @@ export default function TopNavLayout({ children }: { children: React.ReactNode }
     );
   }
 
+  return <AppShell>{children}</AppShell>;
+}
+
+/* ─── App Shell: Sidebar + Topbar + Content ─── */
+function AppShell({ children }: { children: React.ReactNode }) {
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+
+  // Cmd+K handler
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        setSearchOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
+
   return (
-    <div className="min-h-screen bg-background flex flex-col">
-      <TopNav />
-      <main className="flex-1">{children}</main>
+    <div className="flex h-screen overflow-hidden bg-background">
+      {/* Sidebar */}
+      <Sidebar collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} onSearchOpen={() => setSearchOpen(true)} />
+
+      {/* Main area */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <Topbar onSearchOpen={() => setSearchOpen(true)} onToggleSidebar={() => setSidebarCollapsed(!sidebarCollapsed)} sidebarCollapsed={sidebarCollapsed} />
+        <main className="flex-1 overflow-y-auto scrollbar-thin">{children}</main>
+      </div>
+
+      {/* Search palette */}
+      <SearchPalette open={searchOpen} onClose={() => setSearchOpen(false)} />
     </div>
   );
 }
 
-function TopNav() {
-  const { user, logout } = useAuth();
-  const [location, setLocation] = useLocation();
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const [openDropdown, setOpenDropdown] = useState<string | null>(null);
+/* ─── Sidebar — Finder-style ─── */
+function Sidebar({ collapsed, onToggle, onSearchOpen }: { collapsed: boolean; onToggle: () => void; onSearchOpen: () => void }) {
+  const [location] = useLocation();
 
   return (
-    <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-border/40 shadow-[0_1px_3px_oklch(0_0_0/0.04)]">
-      <div className="flex items-center h-[56px] px-5 lg:px-8 gap-1">
-        {/* Logo */}
-        <Link href="/" className="flex items-center gap-2.5 mr-6 shrink-0 group">
-          <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-sm group-hover:shadow-md transition-shadow duration-200">
-            <span className="text-sm font-extrabold text-white">A</span>
+    <aside
+      className={`hidden md:flex flex-col border-r border-border bg-sidebar shrink-0 transition-all duration-200 ease-in-out ${
+        collapsed ? "w-[52px]" : "w-[220px]"
+      }`}
+    >
+      {/* Logo area */}
+      <div className={`flex items-center h-[52px] shrink-0 border-b border-sidebar-border ${collapsed ? "justify-center px-0" : "px-4 gap-3"}`}>
+        {!collapsed && (
+          <Link href="/" className="flex items-center gap-2.5 group">
+            <div className="h-7 w-7 rounded-lg bg-gradient-to-b from-primary to-[oklch(0.45_0.19_255)] flex items-center justify-center">
+              <span className="text-[11px] font-bold text-white">A</span>
+            </div>
+            <span className="text-[13px] font-semibold text-foreground tracking-tight">ASTRA</span>
+          </Link>
+        )}
+        {collapsed && (
+          <div className="h-7 w-7 rounded-lg bg-gradient-to-b from-primary to-[oklch(0.45_0.19_255)] flex items-center justify-center">
+            <span className="text-[11px] font-bold text-white">A</span>
           </div>
-          <span className="font-bold text-[15px] tracking-tight text-foreground hidden sm:inline">CRM</span>
-        </Link>
-
-        {/* Main nav items (desktop) */}
-        <nav className="hidden md:flex items-center gap-0.5">
-          {mainNavItems.map((item) => {
-            const isActive = item.path === "/" ? location === "/" : location.startsWith(item.path);
-            return (
-              <Link
-                key={item.path}
-                href={item.path}
-                className={`relative px-3.5 py-2 text-[13px] font-medium rounded-lg transition-all duration-150 ${
-                  isActive
-                    ? "text-primary bg-primary/[0.06]"
-                    : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
-                }`}
-              >
-                {item.label}
-                {isActive && (
-                  <span className="absolute bottom-0 left-3 right-3 h-[2px] bg-primary rounded-full translate-y-[12px]" />
-                )}
-              </Link>
-            );
-          })}
-
-          {/* Dropdown groups */}
-          {moreMenuGroups.map((group) => (
-            <DropdownMenu key={group.label} open={openDropdown === group.label} onOpenChange={(open) => setOpenDropdown(open ? group.label : null)}>
-              <DropdownMenuTrigger asChild>
-                <button className="flex items-center gap-1 px-3.5 py-2 text-[13px] font-medium text-muted-foreground hover:text-foreground hover:bg-muted/60 rounded-lg transition-all duration-150">
-                  {group.label}
-                  <ChevronDown className={`h-3 w-3 transition-transform duration-200 ${openDropdown === group.label ? "rotate-180" : ""}`} />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-52 p-1.5 shadow-soft-lg border-border/50 rounded-xl">
-                {group.items.map((item) => (
-                  <DropdownMenuItem
-                    key={item.path}
-                    onClick={() => { setLocation(item.path); setOpenDropdown(null); }}
-                    className="cursor-pointer rounded-lg px-3 py-2.5 text-[13px] font-medium gap-3"
-                  >
-                    <div className="h-7 w-7 rounded-md bg-muted/80 flex items-center justify-center shrink-0">
-                      <item.icon className="h-3.5 w-3.5 text-muted-foreground" />
-                    </div>
-                    <span>{item.label}</span>
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          ))}
-        </nav>
-
-        {/* Right side */}
-        <div className="ml-auto flex items-center gap-1">
-          <Button variant="ghost" size="icon" className="h-9 w-9 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-all duration-150">
-            <Search className="h-4 w-4" />
-          </Button>
-          <Button variant="ghost" size="icon" className="h-9 w-9 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-all duration-150 relative">
-            <Bell className="h-4 w-4" />
-          </Button>
-          <Button variant="ghost" size="icon" className="h-9 w-9 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-all duration-150">
-            <Calendar className="h-4 w-4" />
-          </Button>
-
-          <div className="w-px h-6 bg-border/60 mx-2 hidden lg:block" />
-
-          {/* User dropdown */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button className="flex items-center gap-2.5 rounded-xl px-2.5 py-1.5 hover:bg-muted/60 transition-all duration-150 ml-0.5">
-                <Avatar className="h-8 w-8 ring-2 ring-border/40 ring-offset-1 ring-offset-background">
-                  <AvatarFallback className="text-xs font-semibold bg-gradient-to-br from-primary/20 to-accent/20 text-primary">
-                    {user?.name?.charAt(0).toUpperCase()}{user?.name?.split(" ")[1]?.charAt(0).toUpperCase() || ""}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="hidden lg:block text-left">
-                  <p className="text-[13px] font-semibold leading-none text-foreground">{user?.name || "-"}</p>
-                  <p className="text-[11px] text-muted-foreground mt-0.5 truncate max-w-[140px]">{user?.email || "-"}</p>
-                </div>
-                <ChevronDown className="h-3 w-3 text-muted-foreground hidden lg:block" />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-52 p-1.5 shadow-soft-lg border-border/50 rounded-xl">
-              <DropdownMenuItem onClick={() => setLocation("/admin")} className="cursor-pointer rounded-lg px-3 py-2.5 text-[13px] font-medium gap-3">
-                <div className="h-7 w-7 rounded-md bg-muted/80 flex items-center justify-center shrink-0">
-                  <Settings className="h-3.5 w-3.5 text-muted-foreground" />
-                </div>
-                <span>Configurações</span>
-              </DropdownMenuItem>
-              <DropdownMenuSeparator className="my-1" />
-              <DropdownMenuItem onClick={logout} className="cursor-pointer rounded-lg px-3 py-2.5 text-[13px] font-medium gap-3 text-destructive focus:text-destructive">
-                <div className="h-7 w-7 rounded-md bg-destructive/10 flex items-center justify-center shrink-0">
-                  <LogOut className="h-3.5 w-3.5" />
-                </div>
-                <span>Sair</span>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          {/* Mobile hamburger */}
-          <Button variant="ghost" size="icon" className="h-9 w-9 rounded-lg md:hidden" onClick={() => setMobileOpen(!mobileOpen)}>
-            {mobileOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
-          </Button>
-        </div>
+        )}
       </div>
 
-      {/* Mobile menu */}
-      {mobileOpen && (
-        <div className="md:hidden border-t border-border/40 bg-white/95 backdrop-blur-xl px-5 py-4 space-y-1 max-h-[75vh] overflow-y-auto scrollbar-thin">
-          {mainNavItems.map((item) => {
-            const isActive = item.path === "/" ? location === "/" : location.startsWith(item.path);
-            return (
-              <Link
-                key={item.path}
-                href={item.path}
-                onClick={() => setMobileOpen(false)}
-                className={`flex items-center gap-3 px-3.5 py-2.5 text-sm font-medium rounded-xl transition-all duration-150 ${
-                  isActive ? "bg-primary/[0.06] text-primary" : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
-                }`}
-              >
-                <item.icon className="h-4 w-4" />
-                {item.label}
-              </Link>
-            );
-          })}
-          {moreMenuGroups.map((group) => (
-            <div key={group.label} className="pt-3">
-              <p className="px-3.5 pb-1.5 text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground/70">{group.label}</p>
-              {group.items.map((item) => (
-                <Link
-                  key={item.path}
-                  href={item.path}
-                  onClick={() => setMobileOpen(false)}
-                  className="flex items-center gap-3 px-3.5 py-2.5 text-sm font-medium rounded-xl hover:bg-muted/60 transition-all duration-150 text-muted-foreground hover:text-foreground"
-                >
-                  <item.icon className="h-4 w-4" />
-                  {item.label}
-                </Link>
-              ))}
+      {/* Nav sections */}
+      <nav className="flex-1 overflow-y-auto scrollbar-none py-2">
+        {sidebarSections.map((section, si) => (
+          <div key={si} className={si > 0 ? "mt-4" : ""}>
+            {section.label && !collapsed && (
+              <p className="section-label mb-1">{section.label}</p>
+            )}
+            {collapsed && si > 0 && <div className="mx-2.5 my-2 h-px bg-sidebar-border" />}
+            <div className="space-y-0.5 px-2">
+              {section.items.map((item) => {
+                if (item.path === "__search__") {
+                  return (
+                    <button
+                      key="search"
+                      onClick={onSearchOpen}
+                      className={`flex items-center w-full rounded-md transition-colors duration-100 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground ${
+                        collapsed ? "justify-center h-8 w-8 mx-auto" : "gap-2.5 px-2.5 h-8"
+                      }`}
+                      title={collapsed ? "Buscar (⌘K)" : undefined}
+                    >
+                      <item.icon className="h-[15px] w-[15px] shrink-0" />
+                      {!collapsed && (
+                        <>
+                          <span className="text-[13px] font-normal flex-1">{item.label}</span>
+                          <kbd className="text-[10px] text-muted-foreground/60 font-medium">⌘K</kbd>
+                        </>
+                      )}
+                    </button>
+                  );
+                }
+
+                const isActive = item.path === "/" ? location === "/" : location.startsWith(item.path);
+                return (
+                  <Link
+                    key={item.path}
+                    href={item.path}
+                    className={`flex items-center rounded-md transition-colors duration-100 ${
+                      collapsed ? "justify-center h-8 w-8 mx-auto" : "gap-2.5 px-2.5 h-8"
+                    } ${
+                      isActive
+                        ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+                        : "text-sidebar-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground"
+                    }`}
+                    title={collapsed ? item.label : undefined}
+                  >
+                    <item.icon className={`h-[15px] w-[15px] shrink-0 ${isActive ? "text-sidebar-primary" : ""}`} />
+                    {!collapsed && <span className="text-[13px]">{item.label}</span>}
+                  </Link>
+                );
+              })}
             </div>
-          ))}
-        </div>
-      )}
+          </div>
+        ))}
+      </nav>
+
+      {/* Collapse toggle */}
+      <div className="shrink-0 border-t border-sidebar-border p-2">
+        <button
+          onClick={onToggle}
+          className={`flex items-center rounded-md text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors duration-100 ${
+            collapsed ? "justify-center h-8 w-8 mx-auto" : "gap-2.5 px-2.5 h-8 w-full"
+          }`}
+          title={collapsed ? "Expandir" : "Recolher"}
+        >
+          <PanelLeft className={`h-[15px] w-[15px] shrink-0 transition-transform duration-200 ${collapsed ? "rotate-180" : ""}`} />
+          {!collapsed && <span className="text-[13px]">Recolher</span>}
+        </button>
+      </div>
+    </aside>
+  );
+}
+
+/* ─── Topbar — minimal ─── */
+function Topbar({ onSearchOpen, onToggleSidebar, sidebarCollapsed }: { onSearchOpen: () => void; onToggleSidebar: () => void; sidebarCollapsed: boolean }) {
+  const { user, logout } = useAuth();
+  const [, setLocation] = useLocation();
+
+  return (
+    <header className="flex items-center h-[52px] shrink-0 border-b border-border bg-card/60 glass px-4 gap-3">
+      {/* Mobile sidebar toggle */}
+      <Button
+        variant="ghost"
+        size="icon"
+        className="md:hidden h-8 w-8 rounded-md text-muted-foreground hover:text-foreground"
+        onClick={onToggleSidebar}
+      >
+        <PanelLeft className="h-4 w-4" />
+      </Button>
+
+      {/* Search bar — central */}
+      <button
+        onClick={onSearchOpen}
+        className="hidden sm:flex items-center gap-2.5 h-8 px-3 rounded-lg bg-muted/60 border border-transparent hover:border-border text-muted-foreground text-[13px] transition-all duration-150 w-full max-w-[320px]"
+      >
+        <Search className="h-3.5 w-3.5" />
+        <span>Buscar...</span>
+        <kbd className="ml-auto text-[10px] font-medium bg-background/80 border border-border rounded px-1.5 py-0.5">⌘K</kbd>
+      </button>
+
+      {/* Spacer */}
+      <div className="flex-1" />
+
+      {/* Right actions */}
+      <div className="flex items-center gap-1">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors duration-100 relative"
+          onClick={() => setLocation("/alerts")}
+        >
+          <Bell className="h-4 w-4" />
+        </Button>
+
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors duration-100"
+          onClick={() => setLocation("/admin")}
+        >
+          <Settings className="h-4 w-4" />
+        </Button>
+
+        <div className="w-px h-5 bg-border mx-1.5" />
+
+        {/* User */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button className="flex items-center gap-2 rounded-lg px-1.5 py-1 hover:bg-accent transition-colors duration-100">
+              <Avatar className="h-7 w-7">
+                <AvatarFallback className="text-[11px] font-medium bg-muted text-muted-foreground">
+                  {user?.name?.charAt(0).toUpperCase() || "U"}
+                </AvatarFallback>
+              </Avatar>
+              <span className="hidden lg:block text-[13px] font-medium text-foreground max-w-[120px] truncate">
+                {user?.name?.split(" ")[0] || "Usuário"}
+              </span>
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-48 p-1 rounded-lg">
+            <div className="px-3 py-2 border-b border-border mb-1">
+              <p className="text-[13px] font-medium text-foreground">{user?.name || "Usuário"}</p>
+              <p className="text-[11px] text-muted-foreground truncate">{user?.email || ""}</p>
+            </div>
+            <DropdownMenuItem onClick={() => setLocation("/admin")} className="cursor-pointer rounded-md px-3 py-2 text-[13px] gap-2.5">
+              <Settings className="h-3.5 w-3.5 text-muted-foreground" />
+              Configurações
+            </DropdownMenuItem>
+            <DropdownMenuSeparator className="my-1" />
+            <DropdownMenuItem onClick={logout} className="cursor-pointer rounded-md px-3 py-2 text-[13px] gap-2.5 text-destructive focus:text-destructive">
+              <LogOut className="h-3.5 w-3.5" />
+              Sair
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
     </header>
   );
 }

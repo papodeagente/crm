@@ -57,7 +57,7 @@ export default function Chatbot() {
       </div>
 
       {/* Session selector */}
-      <Card className="border-0 shadow-soft rounded-2xl">
+      <Card className="border border-border/40 shadow-none rounded-xl">
         <div className="p-5">
           <div className="flex items-center gap-2.5 mb-4">
             <div className="h-9 w-9 rounded-xl bg-violet-50 flex items-center justify-center"><Sparkles className="h-4 w-4 text-violet-600" /></div>
@@ -79,7 +79,7 @@ export default function Chatbot() {
       {sessionId && (
         <>
           {/* Settings */}
-          <Card className="border-0 shadow-soft rounded-2xl">
+          <Card className="border border-border/40 shadow-none rounded-xl">
             <div className="p-5 space-y-5">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
@@ -129,7 +129,7 @@ export default function Chatbot() {
               <Button
                 onClick={handleSave}
                 disabled={updateMutation.isPending}
-                className="w-full h-11 rounded-xl text-[14px] font-semibold shadow-soft bg-gradient-to-r from-primary to-[oklch(0.50_0.14_264)] hover:opacity-90"
+                className="w-full h-11 rounded-lg text-[14px] font-medium bg-primary hover:bg-primary/90 shadow-sm transition-colors"
               >
                 <Save className="h-4 w-4 mr-2" />
                 {updateMutation.isPending ? "Salvando..." : "Salvar Configurações"}
@@ -138,7 +138,7 @@ export default function Chatbot() {
           </Card>
 
           {/* How it works */}
-          <Card className="border-0 shadow-soft rounded-2xl">
+          <Card className="border border-border/40 shadow-none rounded-xl">
             <div className="p-5">
               <div className="flex items-center gap-2.5 mb-4">
                 <div className="h-9 w-9 rounded-xl bg-blue-50 flex items-center justify-center"><Cpu className="h-4 w-4 text-blue-600" /></div>

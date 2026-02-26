@@ -39,7 +39,7 @@ export default function ApiDocs() {
         <p className="text-[13px] text-muted-foreground mt-0.5">Endpoints REST para integração externa com o WhatsApp.</p>
       </div>
 
-      <Card className="border-0 shadow-soft rounded-2xl">
+      <Card className="border border-border/40 shadow-none rounded-xl">
         <div className="p-5">
           <div className="flex items-center gap-2.5 mb-3">
             <div className="h-9 w-9 rounded-xl bg-primary/10 flex items-center justify-center"><Globe className="h-4 w-4 text-primary" /></div>
@@ -50,14 +50,14 @@ export default function ApiDocs() {
       </Card>
 
       <Tabs defaultValue="status" className="space-y-4">
-        <TabsList className="bg-white/80 border border-border/30 rounded-xl p-1 shadow-soft">
+        <TabsList className="bg-muted/30 border-0 rounded-lg p-1">
           <TabsTrigger value="status" className="rounded-lg text-[13px] data-[state=active]:bg-primary data-[state=active]:text-white gap-1.5"><Wifi className="h-3.5 w-3.5" />Status</TabsTrigger>
           <TabsTrigger value="send-text" className="rounded-lg text-[13px] data-[state=active]:bg-primary data-[state=active]:text-white gap-1.5"><Send className="h-3.5 w-3.5" />Enviar Texto</TabsTrigger>
           <TabsTrigger value="send-media" className="rounded-lg text-[13px] data-[state=active]:bg-primary data-[state=active]:text-white gap-1.5"><Code className="h-3.5 w-3.5" />Enviar Mídia</TabsTrigger>
         </TabsList>
 
         <TabsContent value="status">
-          <Card className="border-0 shadow-soft rounded-2xl">
+          <Card className="border border-border/40 shadow-none rounded-xl">
             <div className="p-5 space-y-4">
               <div className="flex items-center gap-3">
                 <MethodBadge method="GET" />
@@ -77,7 +77,7 @@ export default function ApiDocs() {
         </TabsContent>
 
         <TabsContent value="send-text">
-          <Card className="border-0 shadow-soft rounded-2xl">
+          <Card className="border border-border/40 shadow-none rounded-xl">
             <div className="p-5 space-y-4">
               <div className="flex items-center gap-3">
                 <MethodBadge method="POST" />
@@ -97,7 +97,7 @@ export default function ApiDocs() {
         </TabsContent>
 
         <TabsContent value="send-media">
-          <Card className="border-0 shadow-soft rounded-2xl">
+          <Card className="border border-border/40 shadow-none rounded-xl">
             <div className="p-5 space-y-4">
               <div className="flex items-center gap-3">
                 <MethodBadge method="POST" />
@@ -121,7 +121,7 @@ export default function ApiDocs() {
         </TabsContent>
       </Tabs>
 
-      <Card className="border-0 shadow-soft rounded-2xl">
+      <Card className="border border-border/40 shadow-none rounded-xl">
         <div className="p-5 space-y-4">
           <div className="flex items-center gap-2.5 mb-1">
             <div className="h-9 w-9 rounded-xl bg-violet-50 flex items-center justify-center"><Wifi className="h-4 w-4 text-violet-600" /></div>

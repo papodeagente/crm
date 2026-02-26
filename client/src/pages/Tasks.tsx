@@ -54,7 +54,7 @@ export default function Tasks() {
         </div>
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
-            <Button className="h-9 gap-2 px-5 rounded-xl shadow-soft bg-gradient-to-r from-primary to-[oklch(0.50_0.14_264)] hover:opacity-90 text-[13px] font-semibold">
+            <Button className="h-9 gap-2 px-5 rounded-lg bg-primary hover:bg-primary/90 shadow-sm text-[13px] font-medium transition-colors">
               <Plus className="h-4 w-4" />Nova Tarefa
             </Button>
           </DialogTrigger>
@@ -83,7 +83,7 @@ export default function Tasks() {
                   <Input type="datetime-local" value={dueAt} onChange={(e) => setDueAt(e.target.value)} className="mt-1.5 h-10 rounded-xl" />
                 </div>
               </div>
-              <Button className="w-full h-11 rounded-xl text-[14px] font-semibold shadow-soft bg-gradient-to-r from-primary to-[oklch(0.50_0.14_264)] hover:opacity-90" disabled={!title || createTask.isPending} onClick={() => createTask.mutate({ tenantId: TENANT_ID, entityType: "general", entityId: 0, title, priority: priority as any, dueAt: dueAt || undefined })}>
+              <Button className="w-full h-11 rounded-lg text-[14px] font-medium bg-primary hover:bg-primary/90 shadow-sm transition-colors" disabled={!title || createTask.isPending} onClick={() => createTask.mutate({ tenantId: TENANT_ID, entityType: "general", entityId: 0, title, priority: priority as any, dueAt: dueAt || undefined })}>
                 {createTask.isPending ? "Criando..." : "Criar Tarefa"}
               </Button>
             </div>
@@ -92,7 +92,7 @@ export default function Tasks() {
       </div>
 
       {/* Table */}
-      <Card className="border-0 shadow-soft rounded-2xl overflow-hidden">
+      <Card className="border border-border/40 shadow-none rounded-xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-[13px]">
             <thead>

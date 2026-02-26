@@ -51,7 +51,7 @@ export default function Messages() {
         <p className="text-[13px] text-muted-foreground mt-0.5">Histórico de mensagens enviadas e recebidas.</p>
       </div>
 
-      <Card className="border-0 shadow-soft rounded-2xl">
+      <Card className="border border-border/40 shadow-none rounded-xl">
         <div className="p-5">
           <div className="flex items-center gap-2.5 mb-3">
             <div className="h-9 w-9 rounded-xl bg-primary/10 flex items-center justify-center"><MessageSquare className="h-4 w-4 text-primary" /></div>
@@ -69,7 +69,7 @@ export default function Messages() {
       </Card>
 
       {sessionId && messagesList.length === 0 && !messagesQuery.isLoading && (
-        <Card className="border-0 shadow-soft rounded-2xl">
+        <Card className="border border-border/40 shadow-none rounded-xl">
           <div className="py-16 text-center">
             <MessageSquare className="h-12 w-12 text-muted-foreground/20 mx-auto mb-4" />
             <p className="text-[14px] font-medium text-muted-foreground/60">Nenhuma mensagem encontrada</p>
@@ -83,7 +83,7 @@ export default function Messages() {
             const msgs = contactGroups[jid];
             const sortedMsgs = [...msgs].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
             return (
-              <Card key={jid} className="border-0 shadow-soft rounded-2xl">
+              <Card key={jid} className="border border-border/40 shadow-none rounded-xl">
                 <div className="p-5 pb-3 border-b border-border/20">
                   <div className="flex items-center gap-2.5">
                     <div className="h-9 w-9 rounded-full bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center text-[12px] font-bold text-primary">

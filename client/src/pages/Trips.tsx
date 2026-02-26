@@ -41,7 +41,7 @@ export default function Trips() {
         </div>
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
-            <Button className="h-9 gap-2 px-5 rounded-xl shadow-soft bg-gradient-to-r from-primary to-[oklch(0.50_0.14_264)] hover:opacity-90 text-[13px] font-semibold">
+            <Button className="h-9 gap-2 px-5 rounded-lg bg-primary hover:bg-primary/90 shadow-sm text-[13px] font-medium transition-colors">
               <Plus className="h-4 w-4" />Nova Viagem
             </Button>
           </DialogTrigger>
@@ -58,7 +58,7 @@ export default function Trips() {
                 <div><Label className="text-[12px] font-medium">Ida</Label><Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="mt-1.5 h-10 rounded-xl" /></div>
                 <div><Label className="text-[12px] font-medium">Volta</Label><Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="mt-1.5 h-10 rounded-xl" /></div>
               </div>
-              <Button className="w-full h-11 rounded-xl text-[14px] font-semibold shadow-soft bg-gradient-to-r from-primary to-[oklch(0.50_0.14_264)] hover:opacity-90" disabled={!dest || createTrip.isPending} onClick={() => createTrip.mutate({ tenantId: TENANT_ID, destinationSummary: dest, startDate: startDate || undefined, endDate: endDate || undefined })}>
+              <Button className="w-full h-11 rounded-lg text-[14px] font-medium bg-primary hover:bg-primary/90 shadow-sm transition-colors" disabled={!dest || createTrip.isPending} onClick={() => createTrip.mutate({ tenantId: TENANT_ID, destinationSummary: dest, startDate: startDate || undefined, endDate: endDate || undefined })}>
                 {createTrip.isPending ? "Criando..." : "Criar Viagem"}
               </Button>
             </div>
@@ -67,7 +67,7 @@ export default function Trips() {
       </div>
 
       {/* Table */}
-      <Card className="border-0 shadow-soft rounded-2xl overflow-hidden">
+      <Card className="border border-border/40 shadow-none rounded-xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-[13px]">
             <thead>

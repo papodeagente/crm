@@ -25,7 +25,7 @@ export default function Alerts() {
       {alerts.isLoading ? (
         <p className="text-[13px] text-muted-foreground text-center py-12">Carregando...</p>
       ) : !alerts.data?.length ? (
-        <Card className="border-0 shadow-soft rounded-2xl">
+        <Card className="border border-border/40 shadow-none rounded-xl">
           <div className="p-12 text-center text-muted-foreground">
             <Bell className="h-12 w-12 mx-auto mb-4 text-muted-foreground/20" />
             <p className="text-[14px] font-medium text-muted-foreground/60">Nenhum alerta no momento</p>
@@ -38,7 +38,7 @@ export default function Alerts() {
             const cfg = severityConfig[a.severity] || severityConfig["info"];
             const Icon = cfg.icon;
             return (
-              <Card key={a.id} className={`border-0 shadow-soft rounded-2xl overflow-hidden ${cfg.bg}`}>
+              <Card key={a.id} className={`border border-border/40 shadow-none rounded-xl overflow-hidden ${cfg.bg}`}>
                 <div className="p-5 flex items-start gap-4">
                   <div className={`h-10 w-10 rounded-xl ${cfg.iconBg} flex items-center justify-center shrink-0`}>
                     <Icon className={`h-5 w-5 ${cfg.iconColor}`} />

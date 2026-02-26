@@ -23,7 +23,7 @@ export default function Academy() {
           <h1 className="text-xl font-bold tracking-tight text-foreground">Academy</h1>
           <p className="text-[13px] text-muted-foreground mt-0.5">Treinamentos e capacitação da equipe.</p>
         </div>
-        <Button className="h-9 gap-2 px-5 rounded-xl shadow-soft bg-gradient-to-r from-primary to-[oklch(0.50_0.14_264)] hover:opacity-90 text-[13px] font-semibold" onClick={() => toast("Criação de curso em breve")}>
+        <Button className="h-9 gap-2 px-5 rounded-lg bg-primary hover:bg-primary/90 shadow-sm text-[13px] font-medium transition-colors" onClick={() => toast("Criação de curso em breve")}>
           <Plus className="h-4 w-4" />Novo Curso
         </Button>
       </div>
@@ -32,7 +32,7 @@ export default function Academy() {
       {courses.isLoading ? (
         <p className="text-[13px] text-muted-foreground text-center py-12">Carregando...</p>
       ) : !courses.data?.length ? (
-        <Card className="border-0 shadow-soft rounded-2xl">
+        <Card className="border border-border/40 shadow-none rounded-xl">
           <div className="p-12 text-center text-muted-foreground">
             <GraduationCap className="h-12 w-12 mx-auto mb-4 text-muted-foreground/20" />
             <p className="text-[14px] font-medium text-muted-foreground/60">Nenhum curso disponível</p>
@@ -44,7 +44,7 @@ export default function Academy() {
           {courses.data.map((c: any) => {
             const ss = courseStatusStyles[c.status] || courseStatusStyles["draft"];
             return (
-              <Card key={c.id} className="border-0 shadow-soft rounded-2xl hover:shadow-md transition-shadow cursor-pointer group">
+              <Card key={c.id} className="border border-border/40 shadow-none rounded-xl hover:shadow-md transition-shadow cursor-pointer group">
                 <div className="p-5">
                   <div className="flex items-start gap-3.5">
                     <div className="h-11 w-11 rounded-xl bg-gradient-to-br from-violet-50 to-blue-50 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">

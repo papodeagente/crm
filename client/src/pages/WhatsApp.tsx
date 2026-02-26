@@ -54,7 +54,7 @@ export default function WhatsApp() {
         </div>
         <Dialog open={openConnect} onOpenChange={setOpenConnect}>
           <DialogTrigger asChild>
-            <Button className="h-9 gap-2 px-5 rounded-xl shadow-soft bg-gradient-to-r from-emerald-600 to-emerald-500 hover:opacity-90 text-[13px] font-semibold text-white">
+            <Button className="h-9 gap-2 px-5 rounded-xl shadow-sm bg-emerald-600 hover:bg-emerald-700 text-[13px] font-medium text-white transition-colors">
               <Plus className="h-4 w-4" />Nova Sessão
             </Button>
           </DialogTrigger>
@@ -67,7 +67,7 @@ export default function WhatsApp() {
             </DialogHeader>
             <div className="space-y-4 pt-3">
               <div><Label className="text-[12px] font-medium">Nome da Sessão *</Label><Input value={sessionName} onChange={(e) => setSessionName(e.target.value)} placeholder="Ex: principal" className="mt-1.5 h-10 rounded-xl" /></div>
-              <Button className="w-full h-11 rounded-xl text-[14px] font-semibold shadow-soft bg-gradient-to-r from-emerald-600 to-emerald-500 hover:opacity-90 text-white" disabled={!sessionName || connect.isPending} onClick={() => { connect.mutate({ sessionId: sessionName }); setSelectedSession(sessionName); }}>
+              <Button className="w-full h-11 rounded-xl text-[14px] font-semibold shadow-sm bg-emerald-600 hover:bg-emerald-700 text-white transition-colors" disabled={!sessionName || connect.isPending} onClick={() => { connect.mutate({ sessionId: sessionName }); setSelectedSession(sessionName); }}>
                 {connect.isPending ? "Conectando..." : "Conectar"}
               </Button>
             </div>
@@ -76,7 +76,7 @@ export default function WhatsApp() {
       </div>
 
       <Tabs defaultValue="sessions" className="space-y-4">
-        <TabsList className="bg-white/80 border border-border/30 rounded-xl p-1 shadow-soft">
+        <TabsList className="bg-muted/30 border-0 rounded-lg p-1">
           <TabsTrigger value="sessions" className="rounded-lg text-[13px] data-[state=active]:bg-primary data-[state=active]:text-white">Sessões</TabsTrigger>
           <TabsTrigger value="send" className="rounded-lg text-[13px] data-[state=active]:bg-primary data-[state=active]:text-white">Enviar Mensagem</TabsTrigger>
         </TabsList>
@@ -84,14 +84,14 @@ export default function WhatsApp() {
         <TabsContent value="sessions" className="space-y-4">
           {/* QR Code */}
           {qrCode && (
-            <Card className="border-0 shadow-soft rounded-2xl overflow-hidden">
+            <Card className="border border-border/40 shadow-none rounded-xl overflow-hidden">
               <div className="p-5">
                 <div className="flex items-center gap-2.5 mb-4">
                   <div className="h-8 w-8 rounded-xl bg-emerald-50 flex items-center justify-center"><QrCode className="h-4 w-4 text-emerald-600" /></div>
                   <p className="text-[14px] font-semibold">QR Code — Escaneie com seu WhatsApp</p>
                 </div>
                 <div className="flex justify-center">
-                  <img src={qrCode} alt="QR Code" className="max-w-[260px] rounded-2xl shadow-soft" />
+                  <img src={qrCode} alt="QR Code" className="max-w-[260px] rounded-2xl shadow-sm" />
                 </div>
               </div>
             </Card>
@@ -102,7 +102,7 @@ export default function WhatsApp() {
             {sessions.isLoading ? (
               <p className="text-muted-foreground col-span-3 text-[13px]">Carregando...</p>
             ) : !sessions.data?.length ? (
-              <Card className="col-span-3 border-0 shadow-soft rounded-2xl">
+              <Card className="col-span-3 border border-border/40 shadow-none rounded-xl">
                 <div className="p-12 text-center text-muted-foreground">
                   <Smartphone className="h-12 w-12 mx-auto mb-4 text-muted-foreground/20" />
                   <p className="text-[14px] font-medium text-muted-foreground/60">Nenhuma sessão</p>
@@ -110,7 +110,7 @@ export default function WhatsApp() {
                 </div>
               </Card>
             ) : sessions.data.map((s: any) => (
-              <Card key={s.sessionId} className="border-0 shadow-soft rounded-2xl hover:shadow-md transition-shadow">
+              <Card key={s.sessionId} className="border border-border/40 shadow-none rounded-xl hover:shadow-md transition-shadow">
                 <div className="p-5">
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-2.5">
@@ -145,7 +145,7 @@ export default function WhatsApp() {
         </TabsContent>
 
         <TabsContent value="send">
-          <Card className="border-0 shadow-soft rounded-2xl">
+          <Card className="border border-border/40 shadow-none rounded-xl">
             <div className="p-6 space-y-5">
               <div className="flex items-center gap-2.5 mb-1">
                 <div className="h-9 w-9 rounded-xl bg-primary/10 flex items-center justify-center"><MessageSquare className="h-4 w-4 text-primary" /></div>
@@ -168,7 +168,7 @@ export default function WhatsApp() {
                 <Label className="text-[12px] font-medium">Mensagem</Label>
                 <Textarea value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Digite sua mensagem..." rows={4} className="mt-1.5 rounded-xl resize-none" />
               </div>
-              <Button className="w-full h-11 rounded-xl text-[14px] font-semibold shadow-soft bg-gradient-to-r from-primary to-[oklch(0.50_0.14_264)] hover:opacity-90" disabled={!selectedSession || !number || !message || sendMsg.isPending} onClick={() => sendMsg.mutate({ sessionId: selectedSession, number, message })}>
+              <Button className="w-full h-11 rounded-lg text-[14px] font-medium bg-primary hover:bg-primary/90 shadow-sm transition-colors" disabled={!selectedSession || !number || !message || sendMsg.isPending} onClick={() => sendMsg.mutate({ sessionId: selectedSession, number, message })}>
                 <Send className="h-4 w-4 mr-2" />{sendMsg.isPending ? "Enviando..." : "Enviar Mensagem"}
               </Button>
             </div>

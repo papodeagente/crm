@@ -61,7 +61,7 @@ export default function SendMessage() {
       </div>
 
       {/* Destinatário */}
-      <Card className="border-0 shadow-soft rounded-2xl">
+      <Card className="border border-border/40 shadow-none rounded-xl">
         <div className="p-5 space-y-4">
           <div className="flex items-center gap-2.5 mb-1">
             <div className="h-9 w-9 rounded-xl bg-primary/10 flex items-center justify-center"><Phone className="h-4 w-4 text-primary" /></div>
@@ -96,16 +96,16 @@ export default function SendMessage() {
 
       {/* Tabs */}
       <Tabs defaultValue="text" className="space-y-4">
-        <TabsList className="bg-white/80 border border-border/30 rounded-xl p-1 shadow-soft">
+        <TabsList className="bg-muted/30 border-0 rounded-lg p-1">
           <TabsTrigger value="text" className="rounded-lg text-[13px] data-[state=active]:bg-primary data-[state=active]:text-white gap-1.5"><Send className="h-3.5 w-3.5" />Texto</TabsTrigger>
           <TabsTrigger value="media" className="rounded-lg text-[13px] data-[state=active]:bg-primary data-[state=active]:text-white gap-1.5"><Upload className="h-3.5 w-3.5" />Mídia</TabsTrigger>
         </TabsList>
 
         <TabsContent value="text">
-          <Card className="border-0 shadow-soft rounded-2xl">
+          <Card className="border border-border/40 shadow-none rounded-xl">
             <div className="p-5 space-y-4">
               <Textarea placeholder="Digite sua mensagem aqui..." value={message} onChange={(e) => setMessage(e.target.value)} rows={5} className="rounded-xl resize-none text-[13px]" />
-              <Button onClick={handleSendText} disabled={sendMessageMutation.isPending || !sessionId || !number || !message} className="w-full h-11 rounded-xl text-[14px] font-semibold shadow-soft bg-gradient-to-r from-primary to-[oklch(0.50_0.14_264)] hover:opacity-90">
+              <Button onClick={handleSendText} disabled={sendMessageMutation.isPending || !sessionId || !number || !message} className="w-full h-11 rounded-lg text-[14px] font-medium bg-primary hover:bg-primary/90 shadow-sm transition-colors">
                 {sendMessageMutation.isPending ? "Enviando..." : "Enviar Mensagem"}
                 <Send className="h-4 w-4 ml-2" />
               </Button>
@@ -114,7 +114,7 @@ export default function SendMessage() {
         </TabsContent>
 
         <TabsContent value="media">
-          <Card className="border-0 shadow-soft rounded-2xl">
+          <Card className="border border-border/40 shadow-none rounded-xl">
             <div className="p-5 space-y-4">
               <div>
                 <Label className="text-[12px] font-medium">Tipo de Mídia</Label>

@@ -47,7 +47,7 @@ export default function Admin() {
       </div>
 
       <Tabs defaultValue="users" className="space-y-4">
-        <TabsList className="bg-white/80 border border-border/30 rounded-xl p-1 shadow-soft">
+        <TabsList className="bg-muted/30 border-0 rounded-lg p-1">
           <TabsTrigger value="users" className="rounded-lg text-[13px] data-[state=active]:bg-primary data-[state=active]:text-white gap-1.5"><Users className="h-3.5 w-3.5" />Usuários</TabsTrigger>
           <TabsTrigger value="teams" className="rounded-lg text-[13px] data-[state=active]:bg-primary data-[state=active]:text-white gap-1.5"><Building2 className="h-3.5 w-3.5" />Equipes</TabsTrigger>
           <TabsTrigger value="roles" className="rounded-lg text-[13px] data-[state=active]:bg-primary data-[state=active]:text-white gap-1.5"><Key className="h-3.5 w-3.5" />Perfis</TabsTrigger>
@@ -59,7 +59,7 @@ export default function Admin() {
           <div className="flex justify-end">
             <Dialog open={openUser} onOpenChange={setOpenUser}>
               <DialogTrigger asChild>
-                <Button className="h-9 gap-2 px-5 rounded-xl shadow-soft bg-gradient-to-r from-primary to-[oklch(0.50_0.14_264)] hover:opacity-90 text-[13px] font-semibold"><Plus className="h-4 w-4" />Novo Usuário</Button>
+                <Button className="h-9 gap-2 px-5 rounded-lg bg-primary hover:bg-primary/90 shadow-sm text-[13px] font-medium transition-colors"><Plus className="h-4 w-4" />Novo Usuário</Button>
               </DialogTrigger>
               <DialogContent className="sm:max-w-[440px] rounded-2xl">
                 <DialogHeader>
@@ -71,14 +71,14 @@ export default function Admin() {
                 <div className="space-y-4 pt-3">
                   <div><Label className="text-[12px] font-medium">Nome *</Label><Input value={userName} onChange={(e) => setUserName(e.target.value)} placeholder="Nome completo" className="mt-1.5 h-10 rounded-xl" /></div>
                   <div><Label className="text-[12px] font-medium">Email *</Label><Input value={userEmail} onChange={(e) => setUserEmail(e.target.value)} placeholder="email@exemplo.com" type="email" className="mt-1.5 h-10 rounded-xl" /></div>
-                  <Button className="w-full h-11 rounded-xl text-[14px] font-semibold shadow-soft bg-gradient-to-r from-primary to-[oklch(0.50_0.14_264)] hover:opacity-90" disabled={!userName || !userEmail || createUser.isPending} onClick={() => createUser.mutate({ tenantId: TENANT_ID, name: userName, email: userEmail })}>
+                  <Button className="w-full h-11 rounded-lg text-[14px] font-medium bg-primary hover:bg-primary/90 shadow-sm transition-colors" disabled={!userName || !userEmail || createUser.isPending} onClick={() => createUser.mutate({ tenantId: TENANT_ID, name: userName, email: userEmail })}>
                     {createUser.isPending ? "Criando..." : "Criar Usuário"}
                   </Button>
                 </div>
               </DialogContent>
             </Dialog>
           </div>
-          <Card className="border-0 shadow-soft rounded-2xl overflow-hidden">
+          <Card className="border border-border/40 shadow-none rounded-xl overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-[13px]">
                 <thead><tr className="border-b border-border/30 bg-muted/20">
@@ -122,7 +122,7 @@ export default function Admin() {
           <div className="flex justify-end">
             <Dialog open={openTeam} onOpenChange={setOpenTeam}>
               <DialogTrigger asChild>
-                <Button className="h-9 gap-2 px-5 rounded-xl shadow-soft bg-gradient-to-r from-primary to-[oklch(0.50_0.14_264)] hover:opacity-90 text-[13px] font-semibold"><Plus className="h-4 w-4" />Nova Equipe</Button>
+                <Button className="h-9 gap-2 px-5 rounded-lg bg-primary hover:bg-primary/90 shadow-sm text-[13px] font-medium transition-colors"><Plus className="h-4 w-4" />Nova Equipe</Button>
               </DialogTrigger>
               <DialogContent className="sm:max-w-[440px] rounded-2xl">
                 <DialogHeader>
@@ -133,14 +133,14 @@ export default function Admin() {
                 </DialogHeader>
                 <div className="space-y-4 pt-3">
                   <div><Label className="text-[12px] font-medium">Nome *</Label><Input value={teamName} onChange={(e) => setTeamName(e.target.value)} placeholder="Ex: Vendas" className="mt-1.5 h-10 rounded-xl" /></div>
-                  <Button className="w-full h-11 rounded-xl text-[14px] font-semibold shadow-soft bg-gradient-to-r from-primary to-[oklch(0.50_0.14_264)] hover:opacity-90" disabled={!teamName || createTeam.isPending} onClick={() => createTeam.mutate({ tenantId: TENANT_ID, name: teamName })}>
+                  <Button className="w-full h-11 rounded-lg text-[14px] font-medium bg-primary hover:bg-primary/90 shadow-sm transition-colors" disabled={!teamName || createTeam.isPending} onClick={() => createTeam.mutate({ tenantId: TENANT_ID, name: teamName })}>
                     {createTeam.isPending ? "Criando..." : "Criar Equipe"}
                   </Button>
                 </div>
               </DialogContent>
             </Dialog>
           </div>
-          <Card className="border-0 shadow-soft rounded-2xl overflow-hidden">
+          <Card className="border border-border/40 shadow-none rounded-xl overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-[13px]">
                 <thead><tr className="border-b border-border/30 bg-muted/20">
@@ -173,7 +173,7 @@ export default function Admin() {
 
         {/* Roles */}
         <TabsContent value="roles">
-          <Card className="border-0 shadow-soft rounded-2xl overflow-hidden">
+          <Card className="border border-border/40 shadow-none rounded-xl overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-[13px]">
                 <thead><tr className="border-b border-border/30 bg-muted/20">
@@ -208,7 +208,7 @@ export default function Admin() {
 
         {/* Audit */}
         <TabsContent value="audit">
-          <Card className="border-0 shadow-soft rounded-2xl overflow-hidden">
+          <Card className="border border-border/40 shadow-none rounded-xl overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-[13px]">
                 <thead><tr className="border-b border-border/30 bg-muted/20">

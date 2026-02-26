@@ -20,13 +20,13 @@ export default function Integrations() {
           <h1 className="text-xl font-bold tracking-tight text-foreground">Integrações</h1>
           <p className="text-[13px] text-muted-foreground mt-0.5">Conecte serviços externos e gerencie webhooks.</p>
         </div>
-        <Button className="h-9 gap-2 px-5 rounded-xl shadow-soft bg-gradient-to-r from-primary to-[oklch(0.50_0.14_264)] hover:opacity-90 text-[13px] font-semibold" onClick={() => toast("Criação de integração em breve")}>
+        <Button className="h-9 gap-2 px-5 rounded-lg bg-primary hover:bg-primary/90 shadow-sm text-[13px] font-medium transition-colors" onClick={() => toast("Criação de integração em breve")}>
           <Plus className="h-4 w-4" />Nova Integração
         </Button>
       </div>
 
       <Tabs defaultValue="integrations" className="space-y-4">
-        <TabsList className="bg-white/80 border border-border/30 rounded-xl p-1 shadow-soft">
+        <TabsList className="bg-muted/30 border-0 rounded-lg p-1">
           <TabsTrigger value="integrations" className="rounded-lg text-[13px] data-[state=active]:bg-primary data-[state=active]:text-white gap-1.5"><Zap className="h-3.5 w-3.5" />Conectores</TabsTrigger>
           <TabsTrigger value="webhooks" className="rounded-lg text-[13px] data-[state=active]:bg-primary data-[state=active]:text-white gap-1.5"><Webhook className="h-3.5 w-3.5" />Webhooks</TabsTrigger>
           <TabsTrigger value="jobs" className="rounded-lg text-[13px] data-[state=active]:bg-primary data-[state=active]:text-white gap-1.5"><Globe className="h-3.5 w-3.5" />Jobs</TabsTrigger>
@@ -36,7 +36,7 @@ export default function Integrations() {
           {integrations.isLoading ? (
             <p className="text-[13px] text-muted-foreground text-center py-12">Carregando...</p>
           ) : !integrations.data?.length ? (
-            <Card className="border-0 shadow-soft rounded-2xl">
+            <Card className="border border-border/40 shadow-none rounded-xl">
               <div className="p-12 text-center text-muted-foreground">
                 <Plug className="h-12 w-12 mx-auto mb-4 text-muted-foreground/20" />
                 <p className="text-[14px] font-medium text-muted-foreground/60">Nenhuma integração configurada</p>
@@ -46,7 +46,7 @@ export default function Integrations() {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {integrations.data.map((i: any) => (
-                <Card key={i.id} className="border-0 shadow-soft rounded-2xl hover:shadow-md transition-shadow cursor-pointer group">
+                <Card key={i.id} className="border border-border/40 shadow-none rounded-xl hover:shadow-md transition-shadow cursor-pointer group">
                   <div className="p-5">
                     <div className="flex items-center gap-3.5">
                       <div className="h-11 w-11 rounded-xl bg-gradient-to-br from-amber-50 to-orange-50 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
@@ -69,7 +69,7 @@ export default function Integrations() {
         </TabsContent>
 
         <TabsContent value="webhooks">
-          <Card className="border-0 shadow-soft rounded-2xl overflow-hidden">
+          <Card className="border border-border/40 shadow-none rounded-xl overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-[13px]">
                 <thead><tr className="border-b border-border/30 bg-muted/20">
@@ -102,7 +102,7 @@ export default function Integrations() {
         </TabsContent>
 
         <TabsContent value="jobs">
-          <Card className="border-0 shadow-soft rounded-2xl overflow-hidden">
+          <Card className="border border-border/40 shadow-none rounded-xl overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-[13px]">
                 <thead><tr className="border-b border-border/30 bg-muted/20">

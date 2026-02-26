@@ -46,7 +46,7 @@ export default function Logs() {
         </Select>
       </div>
 
-      <Card className="border-0 shadow-soft rounded-2xl">
+      <Card className="border border-border/40 shadow-none rounded-xl">
         {logs.length === 0 ? (
           <div className="py-16 text-center">
             <Activity className="h-12 w-12 text-muted-foreground/20 mx-auto mb-4" />

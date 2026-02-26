@@ -26,7 +26,7 @@ export default function Insights() {
       {/* Metric cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {metrics.map((m) => (
-          <Card key={m.label} className="border-0 shadow-soft rounded-2xl hover:shadow-md transition-shadow">
+          <Card key={m.label} className="border border-border/40 shadow-none rounded-xl hover:shadow-md transition-shadow">
             <div className="p-5 flex items-center gap-4">
               <div className={`h-11 w-11 rounded-xl ${m.bg} flex items-center justify-center shrink-0`}>
                 <m.icon className={`h-5 w-5 ${m.iconColor}`} />
@@ -41,7 +41,7 @@ export default function Insights() {
       </div>
 
       {/* Pipeline value */}
-      <Card className="border-0 shadow-soft rounded-2xl">
+      <Card className="border border-border/40 shadow-none rounded-xl">
         <div className="p-6">
           <div className="flex items-center gap-3 mb-5">
             <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-primary/10 to-accent/10 flex items-center justify-center">
