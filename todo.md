@@ -419,3 +419,23 @@
 ### Testes
 - [x] 9 testes unitários para dashboard (metrics, pipelineSummary, recentActivity, upcomingTasks)
 - [x] TypeScript sem erros — 92 testes passando, 6 arquivos
+
+## Busca Global ⌘K (v17)
+
+### Backend - Endpoint de busca
+- [x] Criar helper globalSearch no db.ts (busca em contatos, negociações e tarefas por LIKE)
+- [x] Criar endpoint tRPC search.global (protectedProcedure) com input de query string + limit
+- [x] Retornar resultados agrupados por tipo (contacts, deals, tasks) com limite por categoria
+
+### Frontend - CommandPalette funcional
+- [x] Substituir busca estática por busca real via trpc.search.global.useQuery
+- [x] Debounce de 300ms no input para evitar queries excessivas
+- [x] Exibir resultados agrupados com badges de contagem por categoria
+- [x] Navegação para a página correta ao clicar no resultado
+- [x] Estado de loading (spinner), estado vazio e navegação rápida de páginas
+- [x] Manter atalho ⌘K funcional + navegação por teclado (↑↓ Enter Esc)
+- [x] Footer com hints de atalhos de teclado
+
+### Testes
+- [x] 9 testes unitários para search.global (shape, limites, validação)
+- [x] TypeScript sem erros — 101 testes passando, 7 arquivos

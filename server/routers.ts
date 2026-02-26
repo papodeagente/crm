@@ -21,6 +21,7 @@ import {
   getPipelineSummary,
   getRecentActivity,
   getUpcomingTasks,
+  globalSearch,
 } from "./db";
 import { storagePut } from "./storage";
 import { nanoid } from "nanoid";
@@ -208,6 +209,15 @@ export const appRouter = router({
       .input(z.object({ tenantId: z.number(), limit: z.number().optional() }))
       .query(async ({ input }) => {
         return getUpcomingTasks(input.tenantId, input.limit);
+      }),
+  }),
+
+  // ─── Global Search ───
+  search: router({
+    global: protectedProcedure
+      .input(z.object({ tenantId: z.number(), query: z.string().min(1).max(100), limit: z.number().optional() }))
+      .query(async ({ input }) => {
+        return globalSearch(input.tenantId, input.query, input.limit);
       }),
   }),
 

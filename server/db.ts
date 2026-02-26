@@ -452,3 +452,76 @@ export async function getUpcomingTasks(tenantId: number, limit = 6) {
     entityId: Number(r.entityId),
   }));
 }
+
+
+// ─── Global Search ───
+
+export async function globalSearch(tenantId: number, query: string, limit = 5) {
+  const db = await getDb();
+  if (!db || !query.trim()) {
+    return { contacts: [], deals: [], tasks: [] };
+  }
+
+  const searchTerm = `%${query.trim()}%`;
+
+  // Search contacts (name, email, phone)
+  const [contactRows] = await db.execute(sql`
+    SELECT id, name, email, phone, type, lifecycleStage
+    FROM contacts
+    WHERE tenantId = ${tenantId}
+      AND (name LIKE ${searchTerm} OR email LIKE ${searchTerm} OR phone LIKE ${searchTerm})
+    ORDER BY updatedAt DESC
+    LIMIT ${limit}
+  `);
+
+  // Search deals (title)
+  const [dealRows] = await db.execute(sql`
+    SELECT d.id, d.title, d.valueCents, d.status,
+           ps.name AS stageName
+    FROM deals d
+    LEFT JOIN pipeline_stages ps ON ps.id = d.stageId
+    WHERE d.tenantId = ${tenantId}
+      AND d.title LIKE ${searchTerm}
+    ORDER BY d.updatedAt DESC
+    LIMIT ${limit}
+  `);
+
+  // Search tasks (title)
+  const [taskRows] = await db.execute(sql`
+    SELECT id, title, dueAt, priority, status, entityType, entityId
+    FROM crm_tasks
+    WHERE tenantId = ${tenantId}
+      AND title LIKE ${searchTerm}
+    ORDER BY updatedAt DESC
+    LIMIT ${limit}
+  `);
+
+  const contacts = (contactRows as unknown as any[]).map((r: any) => ({
+    id: Number(r.id),
+    name: String(r.name),
+    email: r.email ? String(r.email) : null,
+    phone: r.phone ? String(r.phone) : null,
+    type: String(r.type) as "person" | "company",
+    lifecycleStage: String(r.lifecycleStage),
+  }));
+
+  const deals = (dealRows as unknown as any[]).map((r: any) => ({
+    id: Number(r.id),
+    title: String(r.title),
+    valueCents: Number(r.valueCents) || 0,
+    status: String(r.status),
+    stageName: r.stageName ? String(r.stageName) : null,
+  }));
+
+  const tasks = (taskRows as unknown as any[]).map((r: any) => ({
+    id: Number(r.id),
+    title: String(r.title),
+    dueAt: r.dueAt ? new Date(r.dueAt).getTime() : null,
+    priority: String(r.priority) as "low" | "medium" | "high" | "urgent",
+    status: String(r.status),
+    entityType: String(r.entityType),
+    entityId: Number(r.entityId),
+  }));
+
+  return { contacts, deals, tasks };
+}
