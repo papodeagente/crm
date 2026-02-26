@@ -300,6 +300,7 @@ class WhatsAppManager extends EventEmitter {
                 messageId: msgId || undefined,
                 remoteJid,
                 fromMe,
+                pushName: msg.pushName || null,
                 messageType,
                 content,
                 mediaUrl,
@@ -490,6 +491,45 @@ class WhatsAppManager extends EventEmitter {
   /** Public wrapper for resolveJid to be called from router */
   async resolveJidPublic(sessionId: string, phone: string): Promise<string> {
     return this.resolveJid(sessionId, phone);
+  }
+
+  /** Get group names for multiple group JIDs */
+  async getGroupNames(sessionId: string, groupJids: string[]): Promise<Record<string, string>> {
+    const result: Record<string, string> = {};
+    const session = this.sessions.get(sessionId);
+    if (!session?.socket || session.status !== "connected") return result;
+    const batchSize = 5;
+    for (let i = 0; i < groupJids.length; i += batchSize) {
+      const batch = groupJids.slice(i, i + batchSize);
+      await Promise.all(batch.map(async (jid) => {
+        try {
+          const metadata = await session.socket!.groupMetadata(jid);
+          if (metadata?.subject) result[jid] = metadata.subject;
+        } catch {
+          // Group not found or no access
+        }
+      }));
+    }
+    return result;
+  }
+
+  /** Get contact/push names from the store */
+  async getContactNames(sessionId: string, jids: string[]): Promise<Record<string, string>> {
+    const result: Record<string, string> = {};
+    const session = this.sessions.get(sessionId);
+    if (!session?.socket || session.status !== "connected") return result;
+    // Try to get push names from the store
+    for (const jid of jids) {
+      try {
+        if (jid.includes("@g.us")) continue; // Skip groups
+        const contacts = await session.socket.onWhatsApp(jid.split("@")[0]);
+        const contact = contacts?.[0];
+        // onWhatsApp doesn't return names, but we can try the contact store
+      } catch {
+        // ignore
+      }
+    }
+    return result;
   }
 
   /** Get profile picture URL for a JID */

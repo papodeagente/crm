@@ -175,6 +175,7 @@ interface ConvItem {
   lastFromMe: boolean | number;
   lastTimestamp: string | Date | null;
   lastStatus: string | null;
+  contactPushName: string | null;
   unreadCount: number | string;
   totalMessages: number | string;
 }
@@ -532,11 +533,14 @@ export default function InboxPage() {
     { enabled: true }
   );
 
-  // Batch fetch profile pictures
+  // Separate group JIDs and contact JIDs
   const convJids = useMemo(() => {
     return ((conversationsQ.data || []) as ConvItem[]).map((c) => c.remoteJid);
   }, [conversationsQ.data]);
 
+  const groupJids = useMemo(() => convJids.filter((j) => j.includes("@g.us")), [convJids]);
+
+  // Batch fetch profile pictures
   const profilePicsQ = trpc.whatsapp.profilePictures.useQuery(
     { sessionId: activeSession?.sessionId || "", jids: convJids.slice(0, 50) },
     { enabled: !!activeSession?.sessionId && convJids.length > 0, staleTime: 5 * 60 * 1000 }
@@ -545,6 +549,27 @@ export default function InboxPage() {
   const profilePicMap = useMemo(() => {
     return (profilePicsQ.data || {}) as Record<string, string | null>;
   }, [profilePicsQ.data]);
+
+  // Fetch group names
+  const groupNamesQ = trpc.whatsapp.groupNames.useQuery(
+    { sessionId: activeSession?.sessionId || "", jids: groupJids.slice(0, 50) },
+    { enabled: !!activeSession?.sessionId && groupJids.length > 0, staleTime: 5 * 60 * 1000 }
+  );
+
+  const groupNameMap = useMemo(() => {
+    return (groupNamesQ.data || {}) as Record<string, string | null>;
+  }, [groupNamesQ.data]);
+
+  // Build pushName map from conversations data
+  const pushNameMap = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const c of (conversationsQ.data || []) as ConvItem[]) {
+      if (c.contactPushName) {
+        map.set(c.remoteJid, c.contactPushName);
+      }
+    }
+    return map;
+  }, [conversationsQ.data]);
 
   // Mark as read mutation
   const markRead = trpc.whatsapp.markRead.useMutation({
@@ -575,10 +600,21 @@ export default function InboxPage() {
   }, [contactNameMap]);
 
   const getDisplayName = useCallback((jid: string) => {
+    // 1. Groups: use group name from Baileys
+    if (jid.includes("@g.us")) {
+      const groupName = groupNameMap[jid];
+      if (groupName) return groupName;
+      return jid.split("@")[0]; // fallback to group ID
+    }
+    // 2. CRM contact name
     const contact = getContactForJid(jid);
     if (contact) return contact.name;
+    // 3. WhatsApp pushName (name set by the contact on their WhatsApp)
+    const pushName = pushNameMap.get(jid);
+    if (pushName) return pushName;
+    // 4. Formatted phone number
     return formatPhoneNumber(jid);
-  }, [getContactForJid]);
+  }, [getContactForJid, groupNameMap, pushNameMap]);
 
   // Refetch on new messages + play notification sound
   useEffect(() => {
@@ -636,10 +672,11 @@ export default function InboxPage() {
     if (!selectedJid) return null;
     const crmContact = getContactForJid(selectedJid);
     const pic = profilePicMap[selectedJid] || undefined;
+    const displayName = getDisplayName(selectedJid);
     if (crmContact) return { ...crmContact, avatarUrl: pic };
     const phone = selectedJid.split("@")[0];
-    return { id: 0, name: formatPhoneNumber(selectedJid), phone, email: undefined, avatarUrl: pic };
-  }, [selectedJid, getContactForJid, profilePicMap]);
+    return { id: 0, name: displayName, phone, email: undefined, avatarUrl: pic };
+  }, [selectedJid, getContactForJid, profilePicMap, getDisplayName]);
 
   // Toggle mute
   const toggleMute = useCallback(() => {

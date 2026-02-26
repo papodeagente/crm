@@ -152,6 +152,12 @@ export const appRouter = router({
         await markConversationRead(input.sessionId, input.remoteJid);
         return { success: true };
       }),
+    // Get group names for group JIDs
+    groupNames: protectedProcedure
+      .input(z.object({ sessionId: z.string(), jids: z.array(z.string()).max(50) }))
+      .query(async ({ input }) => {
+        return whatsappManager.getGroupNames(input.sessionId, input.jids);
+      }),
     // Get profile picture for a single JID
     profilePicture: protectedProcedure
       .input(z.object({ sessionId: z.string(), jid: z.string() }))

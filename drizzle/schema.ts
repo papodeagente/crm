@@ -34,6 +34,7 @@ export const waMessages = mysqlTable("messages", {
   messageId: varchar("messageId", { length: 256 }),
   remoteJid: varchar("remoteJid", { length: 128 }).notNull(),
   fromMe: boolean("fromMe").default(false).notNull(),
+  pushName: varchar("pushName", { length: 128 }),
   messageType: varchar("messageType", { length: 32 }).default("text").notNull(),
   content: text("content"),
   mediaUrl: text("mediaUrl"),

@@ -327,3 +327,12 @@
 - [x] Persistir preferência de mute no localStorage
 - [x] Ícone visual indicando estado mudo/ativo (Volume2 verde / VolumeX vermelho + tooltip)
 - [x] Não tocar som se a conversa da mensagem já estiver selecionada e visível
+
+## Correção Inbox v12.1
+
+- [x] Nomes de contatos salvos no CRM aparecem — matching melhorado com/sem 55
+- [x] Nomes de grupos do WhatsApp — busca via groupMetadata do Baileys (endpoint groupNames)
+- [x] Números formatados corretamente — formato BR (DDD) XXXXX-XXXX
+- [x] Ordenação por timestamp da última mensagem DESC — já estava correto no SQL
+- [x] pushName do WhatsApp como fallback — salvo no banco e retornado na query
+- [x] Prioridade de nomes: CRM > pushName > número formatado (grupos: groupName > ID)

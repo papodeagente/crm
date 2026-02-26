@@ -227,7 +227,7 @@ export async function removeChatbotRule(id: number) {
 export async function getConversationsList(sessionId: string) {
   const db = await getDb();
   if (!db) return [];
-  // Get distinct remoteJids with last message info using raw SQL
+  // Get distinct remoteJids with last message info + pushName from most recent non-fromMe message
   const result = await db.execute(sql`
     SELECT 
       m.remoteJid,
@@ -236,6 +236,15 @@ export async function getConversationsList(sessionId: string) {
       m.fromMe AS lastFromMe,
       m.timestamp AS lastTimestamp,
       m.status AS lastStatus,
+      (
+        SELECT m4.pushName FROM messages m4 
+        WHERE m4.sessionId = ${sessionId} 
+        AND m4.remoteJid = m.remoteJid 
+        AND m4.fromMe = 0 
+        AND m4.pushName IS NOT NULL 
+        AND m4.pushName != ''
+        ORDER BY m4.id DESC LIMIT 1
+      ) AS contactPushName,
       (
         SELECT COUNT(*) FROM messages m2 
         WHERE m2.sessionId = ${sessionId} 
