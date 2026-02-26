@@ -476,3 +476,33 @@
 ### Testes
 - [x] 9 testes unitários para endpoints de notificações (list, unreadCount, markRead, markAllRead, shape)
 - [x] TypeScript sem erros — 110 testes passando, 8 arquivos
+
+## Rebranding ENTUR OS (v19)
+
+### Imagens e Favicon
+- [x] Processar e fazer upload da logo ENTUR OS para S3 (CDN)
+- [x] Processar e fazer upload do favicon/ícone para S3 (ICO + PNG 192/512)
+- [x] Atualizar favicon no index.html (link rel icon + apple-touch-icon)
+- [x] VITE_APP_TITLE/LOGO são built-in — título atualizado diretamente no HTML e componentes
+
+### Paleta de Cores
+- [x] Atualizar index.css com tema escuro baseado na identidade ENTUR OS
+- [x] Gradiente primário: roxo → magenta → ciano (oklch 270→320→200)
+- [x] Fundo escuro (oklch 0.14 dark navy) como na imagem da marca
+- [x] Todas as variáveis CSS atualizadas (background, card, primary, accent, border, etc.)
+- [x] Classes .entur-gradient e .entur-gradient-text criadas
+- [x] ThemeProvider mudado de light para dark
+
+### Substituição de Marca
+- [x] Substituir "ASTRA" por "ENTUR OS" no TopNavLayout (logo real + texto gradiente)
+- [x] Substituir "ASTRA" no DashboardLayout (login + sidebar)
+- [x] Substituir "ASTRA" no Inbox (MUTE_KEY + header)
+- [x] Substituir "ASTRA" no routers.ts (comentário)
+- [x] Substituir ícone "A" por imagem real da marca em todos os locais
+- [x] Atualizar título da aba do navegador para "ENTUR OS"
+- [x] Atualizar cores de todas as páginas para tema dark (Home, Settings, Notifications)
+
+### Verificação
+- [x] TypeScript sem erros
+- [x] 110 testes passando, 8 arquivos
+- [x] Visual consistente com a identidade da marca (screenshot verificado)

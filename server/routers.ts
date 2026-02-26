@@ -261,7 +261,7 @@ export const appRouter = router({
       }),
   }),
 
-  // ─── ASTRA CRM Modules ───
+  // ─── ENTUR OS CRM Modules ───
   admin: adminRouter,       // M0: Admin/IAM
   crm: crmRouter,           // M2: CRM (Contacts, Deals, Pipelines, Trips, Tasks, Notes)
   inbox: inboxRouter,       // M1: Inbox Omnichannel

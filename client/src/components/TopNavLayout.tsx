@@ -303,13 +303,13 @@ export default function TopNavLayout({ children }: { children: React.ReactNode }
       <div className="flex items-center justify-center min-h-screen bg-background">
         <div className="flex flex-col items-center gap-8 p-10 max-w-sm w-full">
           <div className="flex flex-col items-center gap-5">
-            <div className="h-16 w-16 rounded-2xl flex items-center justify-center shadow-lg" style={{
-              background: "linear-gradient(135deg, oklch(0.50 0.22 265), oklch(0.45 0.20 290))"
-            }}>
-              <span className="text-2xl font-bold text-white tracking-tight">A</span>
-            </div>
+            <img
+              src="https://files.manuscdn.com/user_upload_by_module/session_file/310519663249817763/XXuAsdiNIcgnwwra.png"
+              alt="ENTUR OS"
+              className="h-16 w-16 rounded-2xl shadow-lg"
+            />
             <div className="text-center">
-              <h1 className="text-xl font-semibold tracking-tight text-foreground">ASTRA CRM</h1>
+              <h1 className="text-xl font-semibold tracking-tight entur-gradient-text">ENTUR OS</h1>
               <p className="text-[13px] text-muted-foreground mt-2 leading-relaxed max-w-[280px]">
                 Plataforma de CRM para agências de viagens.
               </p>
@@ -318,7 +318,7 @@ export default function TopNavLayout({ children }: { children: React.ReactNode }
           <Button
             onClick={() => { window.location.href = getLoginUrl(); }}
             className="w-full h-11 text-[14px] font-medium rounded-xl"
-            style={{ background: "linear-gradient(135deg, oklch(0.50 0.22 265), oklch(0.45 0.20 290))" }}
+            style={{ background: "linear-gradient(135deg, oklch(0.55 0.25 270), oklch(0.60 0.25 320), oklch(0.65 0.20 200))" }}
           >
             Entrar com Manus
           </Button>
@@ -378,12 +378,12 @@ function TopBar({ onSearchOpen, mobileMenuOpen, onToggleMobile }: {
         <div className="flex items-center h-[56px] px-4 lg:px-6 gap-2">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2.5 shrink-0 mr-2">
-            <div className="h-8 w-8 rounded-xl flex items-center justify-center" style={{
-              background: "linear-gradient(135deg, oklch(0.50 0.22 265), oklch(0.45 0.20 290))"
-            }}>
-              <span className="text-[12px] font-bold text-white">A</span>
-            </div>
-            <span className="hidden sm:block text-[15px] font-semibold text-foreground tracking-tight">ASTRA</span>
+            <img
+              src="https://files.manuscdn.com/user_upload_by_module/session_file/310519663249817763/XXuAsdiNIcgnwwra.png"
+              alt="ENTUR OS"
+              className="h-8 w-8 rounded-lg"
+            />
+            <span className="hidden sm:block text-[15px] font-semibold tracking-tight entur-gradient-text">ENTUR OS</span>
           </Link>
 
           {/* Desktop Nav */}
@@ -463,7 +463,7 @@ function TopBar({ onSearchOpen, mobileMenuOpen, onToggleMobile }: {
                 <button className="flex items-center gap-2 rounded-xl px-1.5 py-1 hover:bg-accent transition-all duration-150">
                   <Avatar className="h-8 w-8">
                     <AvatarFallback className="text-[12px] font-semibold text-white" style={{
-                      background: "linear-gradient(135deg, oklch(0.55 0.20 265), oklch(0.50 0.18 290))"
+                      background: "linear-gradient(135deg, oklch(0.55 0.25 270), oklch(0.60 0.25 320), oklch(0.65 0.20 200))"
                     }}>
                       {user?.name?.charAt(0).toUpperCase() || "U"}
                     </AvatarFallback>

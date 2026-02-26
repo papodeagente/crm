@@ -140,12 +140,12 @@ function formatTaskDue(ts: number | null): string {
 }
 
 const actionIcons: Record<string, { icon: any; color: string }> = {
-  stage_change: { icon: TrendingUp, color: "bg-indigo-50 text-indigo-600" },
-  created: { icon: Plus, color: "bg-emerald-50 text-emerald-600" },
-  note_added: { icon: MessageSquare, color: "bg-blue-50 text-blue-600" },
-  whatsapp_backup: { icon: MessageSquare, color: "bg-green-50 text-green-600" },
-  value_changed: { icon: TrendingUp, color: "bg-violet-50 text-violet-600" },
-  status_changed: { icon: Briefcase, color: "bg-amber-50 text-amber-600" },
+  stage_change: { icon: TrendingUp, color: "bg-purple-500/15 text-purple-400" },
+  created: { icon: Plus, color: "bg-emerald-500/15 text-emerald-400" },
+  note_added: { icon: MessageSquare, color: "bg-blue-500/15 text-blue-400" },
+  whatsapp_backup: { icon: MessageSquare, color: "bg-green-500/15 text-green-400" },
+  value_changed: { icon: TrendingUp, color: "bg-violet-500/15 text-violet-400" },
+  status_changed: { icon: Briefcase, color: "bg-amber-500/15 text-amber-400" },
 };
 
 const stageBarColors = [
@@ -204,7 +204,7 @@ export default function Home() {
         </div>
         <Link href="/pipeline">
           <Button size="sm" className="h-9 rounded-xl text-[13px] font-medium gap-1.5 shadow-sm" style={{
-            background: "linear-gradient(135deg, oklch(0.50 0.22 265), oklch(0.45 0.20 290))"
+            background: "linear-gradient(135deg, oklch(0.55 0.25 270), oklch(0.60 0.25 320), oklch(0.65 0.20 200))"
           }}>
             <Plus className="h-3.5 w-3.5" />
             Nova Negociação
@@ -220,9 +220,9 @@ export default function Home() {
           change={dealsChange.text}
           changeType={dealsChange.type}
           icon={Briefcase}
-          gradient="linear-gradient(135deg, oklch(0.50 0.22 265), oklch(0.55 0.20 290))"
-          iconBg="bg-indigo-50"
-          iconColor="text-indigo-600"
+          gradient="linear-gradient(135deg, oklch(0.55 0.25 270), oklch(0.60 0.25 320))"
+          iconBg="bg-purple-500/15"
+          iconColor="text-purple-400"
           loading={loading}
         />
         <MetricCard
@@ -231,9 +231,9 @@ export default function Home() {
           change={contactsChange.text}
           changeType={contactsChange.type}
           icon={Users}
-          gradient="linear-gradient(135deg, oklch(0.55 0.22 160), oklch(0.60 0.20 145))"
-          iconBg="bg-emerald-50"
-          iconColor="text-emerald-600"
+          gradient="linear-gradient(135deg, oklch(0.60 0.22 180), oklch(0.65 0.20 200))"
+          iconBg="bg-cyan-500/15"
+          iconColor="text-cyan-400"
           loading={loading}
         />
         <MetricCard
@@ -242,9 +242,9 @@ export default function Home() {
           change={tripsChange.text}
           changeType={tripsChange.type}
           icon={Plane}
-          gradient="linear-gradient(135deg, oklch(0.58 0.24 25), oklch(0.62 0.22 40))"
-          iconBg="bg-orange-50"
-          iconColor="text-orange-600"
+          gradient="linear-gradient(135deg, oklch(0.60 0.25 320), oklch(0.55 0.25 340))"
+          iconBg="bg-pink-500/15"
+          iconColor="text-pink-400"
           loading={loading}
         />
         <MetricCard
@@ -253,9 +253,9 @@ export default function Home() {
           change={tasksChange.text}
           changeType={tasksChange.type}
           icon={CheckSquare}
-          gradient="linear-gradient(135deg, oklch(0.55 0.20 290), oklch(0.50 0.22 310))"
-          iconBg="bg-violet-50"
-          iconColor="text-violet-600"
+          gradient="linear-gradient(135deg, oklch(0.50 0.22 270), oklch(0.65 0.20 200))"
+          iconBg="bg-indigo-500/15"
+          iconColor="text-indigo-400"
           loading={loading}
         />
       </div>
@@ -268,8 +268,8 @@ export default function Home() {
           <div className="surface p-5">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
-                <div className="h-6 w-6 rounded-lg bg-amber-100 flex items-center justify-center">
-                  <Zap className="h-3.5 w-3.5 text-amber-600" />
+                <div className="h-6 w-6 rounded-lg bg-amber-500/15 flex items-center justify-center">
+                  <Zap className="h-3.5 w-3.5 text-amber-400" />
                 </div>
                 <h2 className="text-[14px] font-semibold text-foreground">Foco do Dia</h2>
               </div>
@@ -350,10 +350,10 @@ export default function Home() {
           <div className="surface p-5">
             <h2 className="text-[14px] font-semibold text-foreground mb-4">Ações Rápidas</h2>
             <div className="space-y-2">
-              <QuickAction label="Nova Negociação" icon={Briefcase} href="/pipeline" iconColor="bg-indigo-50 text-indigo-600" />
-              <QuickAction label="Novo Contato" icon={Users} href="/contacts" iconColor="bg-emerald-50 text-emerald-600" />
-              <QuickAction label="Enviar Mensagem" icon={MessageSquare} href="/inbox" iconColor="bg-blue-50 text-blue-600" />
-              <QuickAction label="Criar Proposta" icon={Plane} href="/proposals" iconColor="bg-amber-50 text-amber-600" />
+              <QuickAction label="Nova Negociação" icon={Briefcase} href="/pipeline" iconColor="bg-purple-500/15 text-purple-400" />
+              <QuickAction label="Novo Contato" icon={Users} href="/contacts" iconColor="bg-cyan-500/15 text-cyan-400" />
+              <QuickAction label="Enviar Mensagem" icon={MessageSquare} href="/inbox" iconColor="bg-blue-500/15 text-blue-400" />
+              <QuickAction label="Criar Proposta" icon={Plane} href="/proposals" iconColor="bg-pink-500/15 text-pink-400" />
             </div>
           </div>
 
@@ -401,11 +401,11 @@ export default function Home() {
           {metrics && metrics.totalDealValueCents > 0 && (
             <div className="surface p-5 relative overflow-hidden">
               <div className="absolute top-0 left-0 right-0 h-[3px] rounded-t-xl" style={{
-                background: "linear-gradient(135deg, oklch(0.55 0.22 160), oklch(0.50 0.22 265))"
+                background: "linear-gradient(135deg, oklch(0.55 0.25 270), oklch(0.60 0.25 320), oklch(0.65 0.20 200))"
               }} />
               <div className="flex items-center gap-2 mb-2">
-                <div className="h-6 w-6 rounded-lg bg-emerald-50 flex items-center justify-center">
-                  <TrendingUp className="h-3.5 w-3.5 text-emerald-600" />
+                <div className="h-6 w-6 rounded-lg bg-emerald-500/15 flex items-center justify-center">
+                  <TrendingUp className="h-3.5 w-3.5 text-emerald-400" />
                 </div>
                 <span className="text-[11.5px] font-semibold text-muted-foreground uppercase tracking-wider">
                   Valor Total em Pipeline

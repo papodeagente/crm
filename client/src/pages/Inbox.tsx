@@ -14,7 +14,7 @@ import { useLocation } from "wouter";
    NOTIFICATION SOUND (Web Audio API)
    ═══════════════════════════════════════════════════════ */
 
-const MUTE_KEY = "astra_inbox_muted";
+const MUTE_KEY = "entur_inbox_muted";
 
 function createNotificationSound(): () => void {
   let audioCtx: AudioContext | null = null;
@@ -678,7 +678,7 @@ function EmptyChat() {
           </svg>
         </div>
         <h1 className="text-[32px] font-light text-[#41525D] leading-[38px] mb-[14px]">
-          ASTRA WhatsApp
+          ENTUR OS WhatsApp
         </h1>
         <p className="text-[14px] text-[#667781] leading-[20px]">
           Envie e receba mensagens sem manter seu celular conectado.

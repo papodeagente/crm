@@ -114,10 +114,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <div className="flex items-center justify-center min-h-screen bg-background">
         <div className="flex flex-col items-center gap-8 p-8 max-w-md w-full">
           <div className="flex flex-col items-center gap-3">
-            <div className="h-14 w-14 rounded-xl bg-primary flex items-center justify-center">
-              <span className="text-2xl font-bold text-primary-foreground">A</span>
-            </div>
-            <h1 className="text-2xl font-bold tracking-tight text-center">ASTRA CRM</h1>
+            <img
+              src="https://files.manuscdn.com/user_upload_by_module/session_file/310519663249817763/XXuAsdiNIcgnwwra.png"
+              alt="ENTUR OS"
+              className="h-14 w-14 rounded-xl shadow-lg"
+            />
+            <h1 className="text-2xl font-bold tracking-tight text-center entur-gradient-text">ENTUR OS</h1>
             <p className="text-sm text-muted-foreground text-center max-w-sm">
               Plataforma completa de CRM para agências de viagens. Faça login para acessar o painel.
             </p>
@@ -198,11 +200,13 @@ function DashboardLayoutContent({
               </button>
               {!isCollapsed && (
                 <div className="flex items-center gap-2 min-w-0">
-                  <div className="h-7 w-7 rounded-md bg-sidebar-primary flex items-center justify-center shrink-0">
-                    <span className="text-sm font-bold text-sidebar-primary-foreground">A</span>
-                  </div>
-                  <span className="font-semibold tracking-tight truncate text-sidebar-foreground">
-                    ASTRA CRM
+                  <img
+                    src="https://files.manuscdn.com/user_upload_by_module/session_file/310519663249817763/XXuAsdiNIcgnwwra.png"
+                    alt="ENTUR OS"
+                    className="h-7 w-7 rounded-md shrink-0"
+                  />
+                  <span className="font-semibold tracking-tight truncate entur-gradient-text">
+                    ENTUR OS
                   </span>
                 </div>
               )}

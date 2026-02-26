@@ -1,10 +1,9 @@
-import { useState } from "react";
 import { useLocation } from "wouter";
 import {
   Settings, Inbox, MessageSquare, Bot,
   FileText, Globe, Plane,
   GraduationCap, Plug, Shield, BookOpen,
-  ChevronRight, ArrowLeft,
+  ChevronRight,
 } from "lucide-react";
 
 /* ─── Settings Menu Structure ─── */
@@ -33,24 +32,24 @@ const settingsSections: SettingsSection[] = [
         label: "Inbox",
         description: "Caixa de entrada unificada de mensagens",
         path: "/inbox",
-        color: "text-blue-600",
-        bgColor: "bg-blue-50",
+        color: "text-blue-400",
+        bgColor: "bg-blue-500/15",
       },
       {
         icon: MessageSquare,
         label: "WhatsApp",
         description: "Conexão e gerenciamento de sessões WhatsApp",
         path: "/whatsapp",
-        color: "text-emerald-600",
-        bgColor: "bg-emerald-50",
+        color: "text-emerald-400",
+        bgColor: "bg-emerald-500/15",
       },
       {
         icon: Bot,
         label: "Chatbot IA",
         description: "Configurações do assistente inteligente",
         path: "/chatbot",
-        color: "text-violet-600",
-        bgColor: "bg-violet-50",
+        color: "text-violet-400",
+        bgColor: "bg-violet-500/15",
       },
     ],
   },
@@ -63,24 +62,24 @@ const settingsSections: SettingsSection[] = [
         label: "Propostas",
         description: "Modelos e propostas comerciais",
         path: "/proposals",
-        color: "text-amber-600",
-        bgColor: "bg-amber-50",
+        color: "text-amber-400",
+        bgColor: "bg-amber-500/15",
       },
       {
         icon: Globe,
         label: "Portal do Cliente",
         description: "Portal de acesso para seus clientes",
         path: "/portal",
-        color: "text-cyan-600",
-        bgColor: "bg-cyan-50",
+        color: "text-cyan-400",
+        bgColor: "bg-cyan-500/15",
       },
       {
         icon: Plane,
         label: "Viagens",
         description: "Gestão de pacotes e roteiros de viagem",
         path: "/trips",
-        color: "text-sky-600",
-        bgColor: "bg-sky-50",
+        color: "text-sky-400",
+        bgColor: "bg-sky-500/15",
       },
     ],
   },
@@ -93,32 +92,32 @@ const settingsSections: SettingsSection[] = [
         label: "Academy",
         description: "Central de aprendizado e tutoriais",
         path: "/academy",
-        color: "text-indigo-600",
-        bgColor: "bg-indigo-50",
+        color: "text-purple-400",
+        bgColor: "bg-purple-500/15",
       },
       {
         icon: Plug,
         label: "Integrações",
         description: "Conecte ferramentas e serviços externos",
         path: "/integrations",
-        color: "text-orange-600",
-        bgColor: "bg-orange-50",
+        color: "text-orange-400",
+        bgColor: "bg-orange-500/15",
       },
       {
         icon: Shield,
         label: "Administração",
         description: "Usuários, permissões e segurança",
         path: "/admin",
-        color: "text-rose-600",
-        bgColor: "bg-rose-50",
+        color: "text-rose-400",
+        bgColor: "bg-rose-500/15",
       },
       {
         icon: BookOpen,
         label: "Documentação API",
         description: "Referência técnica e endpoints",
         path: "/api-docs",
-        color: "text-slate-600",
-        bgColor: "bg-slate-50",
+        color: "text-slate-400",
+        bgColor: "bg-slate-500/15",
       },
     ],
   },
@@ -133,7 +132,7 @@ export default function SettingsPage() {
       <div className="mb-8">
         <div className="flex items-center gap-3 mb-1">
           <div className="h-10 w-10 rounded-xl flex items-center justify-center" style={{
-            background: "linear-gradient(135deg, oklch(0.50 0.22 265), oklch(0.45 0.20 290))"
+            background: "linear-gradient(135deg, oklch(0.55 0.25 270), oklch(0.60 0.25 320), oklch(0.65 0.20 200))"
           }}>
             <Settings className="h-5 w-5 text-white" />
           </div>

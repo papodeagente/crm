@@ -9,40 +9,40 @@ const typeConfig: Record<string, { icon: any; bg: string; iconBg: string; iconCo
   whatsapp_message: {
     icon: MessageSquare,
     bg: "border-l-4 border-l-emerald-500",
-    iconBg: "bg-emerald-50",
-    iconColor: "text-emerald-600",
+    iconBg: "bg-emerald-500/15",
+    iconColor: "text-emerald-400",
     label: "WhatsApp",
     route: () => "/settings/inbox",
   },
   deal_moved: {
     icon: ArrowRightLeft,
     bg: "border-l-4 border-l-indigo-500",
-    iconBg: "bg-indigo-50",
-    iconColor: "text-indigo-600",
+    iconBg: "bg-indigo-500/15",
+    iconColor: "text-indigo-400",
     label: "Pipeline",
     route: (id) => `/deals/${id}`,
   },
   deal_created: {
     icon: Briefcase,
     bg: "border-l-4 border-l-blue-500",
-    iconBg: "bg-blue-50",
-    iconColor: "text-blue-600",
+    iconBg: "bg-blue-500/15",
+    iconColor: "text-blue-400",
     label: "Negociação",
     route: (id) => `/deals/${id}`,
   },
   contact_created: {
     icon: UserPlus,
     bg: "border-l-4 border-l-violet-500",
-    iconBg: "bg-violet-50",
-    iconColor: "text-violet-600",
+    iconBg: "bg-violet-500/15",
+    iconColor: "text-violet-400",
     label: "Contato",
     route: (id) => `/contacts?id=${id}`,
   },
   task_created: {
     icon: ClipboardList,
     bg: "border-l-4 border-l-amber-500",
-    iconBg: "bg-amber-50",
-    iconColor: "text-amber-600",
+    iconBg: "bg-amber-500/15",
+    iconColor: "text-amber-400",
     label: "Tarefa",
     route: () => "/tasks",
   },
@@ -97,7 +97,7 @@ export default function NotificationsPage() {
       <div className="mb-8 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="h-10 w-10 rounded-xl flex items-center justify-center" style={{
-            background: "linear-gradient(135deg, oklch(0.65 0.24 25), oklch(0.58 0.24 15))"
+            background: "linear-gradient(135deg, oklch(0.55 0.25 270), oklch(0.60 0.25 320), oklch(0.65 0.20 200))"
           }}>
             <Bell className="h-5 w-5 text-white" />
           </div>
