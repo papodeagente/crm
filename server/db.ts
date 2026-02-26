@@ -525,3 +525,93 @@ export async function globalSearch(tenantId: number, query: string, limit = 5) {
 
   return { contacts, deals, tasks };
 }
+
+
+// ─── Notifications ───
+
+export async function createNotification(tenantId: number, data: {
+  type: string;
+  title: string;
+  body?: string;
+  entityType?: string;
+  entityId?: string;
+}) {
+  const db = await getDb();
+  if (!db) return null;
+
+  const [result] = await db.execute(sql`
+    INSERT INTO notifications (tenantId, type, title, body, entityType, entityId)
+    VALUES (${tenantId}, ${data.type}, ${data.title}, ${data.body || null}, ${data.entityType || null}, ${data.entityId || null})
+  `);
+
+  return result;
+}
+
+export async function getNotifications(tenantId: number, opts?: { onlyUnread?: boolean; limit?: number; offset?: number }) {
+  const db = await getDb();
+  if (!db) return [];
+
+  const limit = opts?.limit ?? 50;
+  const offset = opts?.offset ?? 0;
+
+  let rows: any;
+  if (opts?.onlyUnread) {
+    [rows] = await db.execute(sql`
+      SELECT id, tenantId, type, title, body, entityType, entityId, isRead, createdAt
+      FROM notifications
+      WHERE tenantId = ${tenantId} AND isRead = false
+      ORDER BY createdAt DESC
+      LIMIT ${limit} OFFSET ${offset}
+    `);
+  } else {
+    [rows] = await db.execute(sql`
+      SELECT id, tenantId, type, title, body, entityType, entityId, isRead, createdAt
+      FROM notifications
+      WHERE tenantId = ${tenantId}
+      ORDER BY createdAt DESC
+      LIMIT ${limit} OFFSET ${offset}
+    `);
+  }
+
+  return (rows as unknown as any[]).map((r: any) => ({
+    id: Number(r.id),
+    tenantId: Number(r.tenantId),
+    type: String(r.type),
+    title: String(r.title),
+    body: r.body ? String(r.body) : null,
+    entityType: r.entityType ? String(r.entityType) : null,
+    entityId: r.entityId ? String(r.entityId) : null,
+    isRead: Boolean(r.isRead),
+    createdAt: new Date(r.createdAt).getTime(),
+  }));
+}
+
+export async function getUnreadNotificationCount(tenantId: number): Promise<number> {
+  const db = await getDb();
+  if (!db) return 0;
+
+  const [rows] = await db.execute(sql`
+    SELECT COUNT(*) AS cnt FROM notifications
+    WHERE tenantId = ${tenantId} AND isRead = false
+  `);
+
+  return Number((rows as unknown as any[])[0]?.cnt) || 0;
+}
+
+export async function markNotificationRead(id: number) {
+  const db = await getDb();
+  if (!db) return;
+
+  await db.execute(sql`
+    UPDATE notifications SET isRead = true WHERE id = ${id}
+  `);
+}
+
+export async function markAllNotificationsRead(tenantId: number) {
+  const db = await getDb();
+  if (!db) return;
+
+  await db.execute(sql`
+    UPDATE notifications SET isRead = true WHERE tenantId = ${tenantId} AND isRead = false
+  `);
+}

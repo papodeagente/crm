@@ -22,6 +22,11 @@ import {
   getRecentActivity,
   getUpcomingTasks,
   globalSearch,
+  createNotification,
+  getNotifications,
+  getUnreadNotificationCount,
+  markNotificationRead,
+  markAllNotificationsRead,
 } from "./db";
 import { storagePut } from "./storage";
 import { nanoid } from "nanoid";
@@ -218,6 +223,41 @@ export const appRouter = router({
       .input(z.object({ tenantId: z.number(), query: z.string().min(1).max(100), limit: z.number().optional() }))
       .query(async ({ input }) => {
         return globalSearch(input.tenantId, input.query, input.limit);
+      }),
+  }),
+
+  // ─── Notifications ───
+  notifications: router({
+    list: protectedProcedure
+      .input(z.object({
+        tenantId: z.number(),
+        onlyUnread: z.boolean().optional(),
+        limit: z.number().optional(),
+        offset: z.number().optional(),
+      }))
+      .query(async ({ input }) => {
+        return getNotifications(input.tenantId, {
+          onlyUnread: input.onlyUnread,
+          limit: input.limit,
+          offset: input.offset,
+        });
+      }),
+    unreadCount: protectedProcedure
+      .input(z.object({ tenantId: z.number() }))
+      .query(async ({ input }) => {
+        return getUnreadNotificationCount(input.tenantId);
+      }),
+    markRead: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        await markNotificationRead(input.id);
+        return { success: true };
+      }),
+    markAllRead: protectedProcedure
+      .input(z.object({ tenantId: z.number() }))
+      .mutation(async ({ input }) => {
+        await markAllNotificationsRead(input.tenantId);
+        return { success: true };
       }),
   }),
 

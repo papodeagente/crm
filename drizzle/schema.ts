@@ -801,3 +801,24 @@ export type IntegrationConnection = typeof integrationConnections.$inferSelect;
 export type Webhook = typeof webhooks.$inferSelect;
 export type Job = typeof jobs.$inferSelect;
 export type EventLogEntry = typeof eventLog.$inferSelect;
+
+// ════════════════════════════════════════════════════════════
+// NOTIFICATIONS
+// ════════════════════════════════════════════════════════════
+
+export const notifications = mysqlTable("notifications", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  type: varchar("type", { length: 64 }).notNull(), // whatsapp_message, deal_moved, task_due, contact_created, deal_created
+  title: varchar("title", { length: 500 }).notNull(),
+  body: text("body"),
+  entityType: varchar("entityType", { length: 64 }), // deal, contact, task, message
+  entityId: varchar("entityId", { length: 128 }), // ID or JID
+  isRead: boolean("isRead").default(false).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (t) => [
+  index("notif_tenant_idx").on(t.tenantId),
+  index("notif_tenant_read_idx").on(t.tenantId, t.isRead),
+]);
+
+export type Notification = typeof notifications.$inferSelect;

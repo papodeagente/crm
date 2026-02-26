@@ -439,3 +439,40 @@
 ### Testes
 - [x] 9 testes unitários para search.global (shape, limites, validação)
 - [x] TypeScript sem erros — 101 testes passando, 7 arquivos
+
+## Notificações em Tempo Real (v18)
+
+### Backend - Schema e tabela
+- [x] Criar tabela notifications no schema (id, tenantId, type, title, body, entityType, entityId, isRead, createdAt)
+- [x] Gerar e aplicar migração SQL
+
+### Backend - Helpers e endpoints
+- [x] Criar helper createNotification no db.ts
+- [x] Criar helper getNotifications (com filtro read/unread e paginação)
+- [x] Criar helper getUnreadCount
+- [x] Criar helper markNotificationRead e markAllRead
+- [x] Criar endpoints tRPC notifications.list, notifications.unreadCount, notifications.markRead, notifications.markAllRead
+
+### Backend - Emissão de notificações nos eventos
+- [x] Nova mensagem WhatsApp recebida → notificação "Nova mensagem de {pushName}"
+- [x] Deal movido de etapa → notificação "Negociação movida para {etapa}"
+- [x] Deal criado → notificação "Nova negociação: {título}"
+- [x] Novo contato criado → notificação "Novo contato: {nome}"
+- [x] Nova tarefa criada → notificação "Nova tarefa: {título}"
+
+### Frontend - Página de Notificações
+- [x] Substituir dados estáticos por dados reais via trpc.notifications.list.useQuery
+- [x] Botão "Marcar todas como lidas" com CheckCheck icon
+- [x] Marcar individual como lida ao clicar (botão Check)
+- [x] Navegação para a entidade ao clicar na notificação (deals, contacts, tasks, inbox)
+- [x] Ícones e cores por tipo (WhatsApp verde, Pipeline indigo, Contato violet, Tarefa amber)
+- [x] timeAgo relativo (agora, há Xmin, há Xh, há Xd)
+
+### Frontend - Badge dinâmico no sino
+- [x] trpc.notifications.unreadCount.useQuery com refetchInterval 30s
+- [x] Badge com contagem real no sino do TopNav (99+ overflow)
+- [x] Badge oculto quando 0 não lidas
+
+### Testes
+- [x] 9 testes unitários para endpoints de notificações (list, unreadCount, markRead, markAllRead, shape)
+- [x] TypeScript sem erros — 110 testes passando, 8 arquivos

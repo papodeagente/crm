@@ -2,6 +2,7 @@ import { z } from "zod";
 import { protectedProcedure, router } from "../_core/trpc";
 import * as crm from "../crmDb";
 import { emitEvent } from "../middleware/eventLog";
+import { createNotification } from "../db";
 
 export const crmRouter = router({
   // ─── CONTACTS ───
@@ -25,6 +26,14 @@ export const crmRouter = router({
       .mutation(async ({ ctx, input }) => {
         const result = await crm.createContact({ ...input, createdBy: ctx.user.id });
         await emitEvent({ tenantId: input.tenantId, actorUserId: ctx.user.id, entityType: "contact", entityId: result?.id, action: "create" });
+        // In-app notification
+        await createNotification(input.tenantId, {
+          type: "contact_created",
+          title: `Novo contato: ${input.name}`,
+          body: input.email || input.phone || undefined,
+          entityType: "contact",
+          entityId: String(result?.id),
+        });
         return result;
       }),
     update: protectedProcedure
@@ -125,6 +134,14 @@ export const crmRouter = router({
           });
         }
         await emitEvent({ tenantId: input.tenantId, actorUserId: ctx.user.id, entityType: "deal", entityId: result?.id, action: "create" });
+        // In-app notification
+        await createNotification(input.tenantId, {
+          type: "deal_created",
+          title: `Nova negociação: "${input.title}"`,
+          body: input.valueCents ? `Valor: R$ ${(input.valueCents / 100).toFixed(2)}` : undefined,
+          entityType: "deal",
+          entityId: String(result?.id),
+        });
         return result;
       }),
     update: protectedProcedure
@@ -206,6 +223,14 @@ export const crmRouter = router({
           actorName: ctx.user.name || "Sistema",
         });
         await emitEvent({ tenantId: input.tenantId, actorUserId: ctx.user.id, entityType: "deal", entityId: input.dealId, action: "stage_moved" });
+        // In-app notification
+        await createNotification(input.tenantId, {
+          type: "deal_moved",
+          title: `Negociação movida para "${input.toStageName}"`,
+          body: `De "${input.fromStageName}" para "${input.toStageName}"`,
+          entityType: "deal",
+          entityId: String(input.dealId),
+        });
         return { success: true };
       }),
     count: protectedProcedure
@@ -375,6 +400,14 @@ export const crmRouter = router({
           ...input,
           dueAt: input.dueAt ? new Date(input.dueAt) : undefined,
           createdByUserId: ctx.user.id,
+        });
+        // In-app notification
+        await createNotification(input.tenantId, {
+          type: "task_created",
+          title: `Nova tarefa: ${input.title}`,
+          body: input.dueAt ? `Vencimento: ${new Date(input.dueAt).toLocaleDateString("pt-BR")}` : undefined,
+          entityType: "task",
+          entityId: String(result?.id),
         });
         return result;
       }),

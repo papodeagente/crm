@@ -367,6 +367,10 @@ function TopBar({ onSearchOpen, mobileMenuOpen, onToggleMobile }: {
 }) {
   const { user, logout } = useAuth();
   const [location, setLocation] = useLocation();
+  const unreadCount = trpc.notifications.unreadCount.useQuery(
+    { tenantId: 1 },
+    { refetchInterval: 30000 }
+  );
 
   return (
     <>
@@ -428,10 +432,13 @@ function TopBar({ onSearchOpen, mobileMenuOpen, onToggleMobile }: {
               onClick={() => setLocation("/notifications")}
             >
               <Bell className="h-[18px] w-[18px]" />
-              {/* Notification dot */}
-              <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full" style={{
-                background: "linear-gradient(135deg, oklch(0.65 0.24 25), oklch(0.58 0.24 15))"
-              }} />
+              {(unreadCount.data ?? 0) > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full flex items-center justify-center text-[10px] font-bold text-white" style={{
+                  background: "linear-gradient(135deg, oklch(0.65 0.24 25), oklch(0.58 0.24 15))"
+                }}>
+                  {(unreadCount.data ?? 0) > 99 ? "99+" : unreadCount.data}
+                </span>
+              )}
             </Button>
 
             {/* Settings gear */}

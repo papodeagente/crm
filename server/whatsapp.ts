@@ -13,7 +13,7 @@ import path from "path";
 import fs from "fs";
 import QRCode from "qrcode";
 import { EventEmitter } from "events";
-import { getDb } from "./db";
+import { getDb, createNotification } from "./db";
 import { whatsappSessions, waMessages as messages, activityLogs, chatbotSettings, chatbotRules } from "../drizzle/schema";
 import { eq, desc, and, gte, sql } from "drizzle-orm";
 import { invokeLLM } from "./_core/llm";
@@ -341,11 +341,21 @@ class WhatsAppManager extends EventEmitter {
 
         // Notify owner of incoming messages
         if (!fromMe && content) {
-          const senderName = remoteJid.replace("@s.whatsapp.net", "");
+          const senderName = msg.pushName || remoteJid.replace("@s.whatsapp.net", "");
           await notifyOwner({
             title: "Nova Mensagem no WhatsApp",
             content: `De: ${senderName}\nMensagem: ${content.substring(0, 200)}`,
           });
+          // Create in-app notification
+          try {
+            await createNotification(1, {
+              type: "whatsapp_message",
+              title: `Nova mensagem de ${senderName}`,
+              body: content.substring(0, 300),
+              entityType: "message",
+              entityId: remoteJid,
+            });
+          } catch (e) { console.error("Error creating notification:", e); }
         }
       }
     });
