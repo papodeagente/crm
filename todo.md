@@ -263,3 +263,11 @@
 
 ### Testes
 - [x] Testes unitários para as correções e novos endpoints — 77 testes passando
+
+## Correções (v9)
+
+### Bug: Mensagem cria conversa separada e não chega ao contato
+- [x] Analisar formatação do JID no envio de mensagens (sendTextMessage/sendMediaMessage)
+- [x] Corrigir formatação para números brasileiros — resolveJid() com onWhatsApp() + fallback 9º dígito
+- [x] Garantir que o JID de envio corresponda ao JID das mensagens recebidas (resolveJid no frontend)
+- [x] Testar envio e recebimento na mesma conversa — 77 testes passando

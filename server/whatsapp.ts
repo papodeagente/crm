@@ -421,13 +421,84 @@ class WhatsAppManager extends EventEmitter {
     await this.logActivity(sessionId, "manual_disconnect", "Sessão desconectada manualmente");
   }
 
+  /**
+   * Normalize a phone number to a valid WhatsApp JID.
+   * Handles Brazilian numbers: adds country code 55 if missing,
+   * and uses onWhatsApp() to verify the actual registered JID.
+   */
+  private async resolveJid(sessionId: string, input: string): Promise<string> {
+    const session = this.sessions.get(sessionId);
+    if (!session?.socket) throw new Error("Sessão não conectada");
+
+    // If already a full JID, return as-is
+    if (input.includes("@")) return input;
+
+    // Strip all non-digit characters
+    let digits = input.replace(/\D/g, "");
+
+    // Add Brazil country code if not present
+    if (!digits.startsWith("55") && digits.length <= 11) {
+      digits = `55${digits}`;
+    }
+
+    // Try to find the real WhatsApp JID using onWhatsApp()
+    try {
+      const results = await session.socket.onWhatsApp(digits);
+      if (results && results.length > 0 && results[0].exists) {
+        console.log(`[JID Resolve] ${input} -> ${results[0].jid} (verified)`);
+        return results[0].jid;
+      }
+    } catch (e) {
+      console.warn("[JID Resolve] onWhatsApp failed, using fallback:", e);
+    }
+
+    // Fallback: for Brazilian mobile numbers, try with and without 9th digit
+    if (digits.startsWith("55") && digits.length >= 12) {
+      const ddd = digits.substring(2, 4);
+      const rest = digits.substring(4);
+
+      // If number has 9 digits after DDD (with 9th digit), try without it
+      if (rest.length === 9 && rest.startsWith("9")) {
+        const without9 = `55${ddd}${rest.substring(1)}`;
+        try {
+          const results = await session.socket.onWhatsApp(without9);
+          if (results && results.length > 0 && results[0].exists) {
+            console.log(`[JID Resolve] ${input} -> ${results[0].jid} (verified without 9th digit)`);
+            return results[0].jid;
+          }
+        } catch (e) { /* ignore */ }
+      }
+
+      // If number has 8 digits after DDD (without 9th digit), try with it
+      if (rest.length === 8) {
+        const with9 = `55${ddd}9${rest}`;
+        try {
+          const results = await session.socket.onWhatsApp(with9);
+          if (results && results.length > 0 && results[0].exists) {
+            console.log(`[JID Resolve] ${input} -> ${results[0].jid} (verified with 9th digit)`);
+            return results[0].jid;
+          }
+        } catch (e) { /* ignore */ }
+      }
+    }
+
+    // Final fallback: just use digits@s.whatsapp.net
+    console.log(`[JID Resolve] ${input} -> ${digits}@s.whatsapp.net (fallback)`);
+    return `${digits}@s.whatsapp.net`;
+  }
+
+  /** Public wrapper for resolveJid to be called from router */
+  async resolveJidPublic(sessionId: string, phone: string): Promise<string> {
+    return this.resolveJid(sessionId, phone);
+  }
+
   async sendTextMessage(sessionId: string, jid: string, text: string): Promise<any> {
     const session = this.sessions.get(sessionId);
     if (!session?.socket || session.status !== "connected") {
       throw new Error("Sessão não conectada");
     }
 
-    const formattedJid = jid.includes("@") ? jid : `${jid}@s.whatsapp.net`;
+    const formattedJid = await this.resolveJid(sessionId, jid);
     const result = await session.socket.sendMessage(formattedJid, { text });
 
     // Save sent message
@@ -458,7 +529,7 @@ class WhatsAppManager extends EventEmitter {
       throw new Error("Sessão não conectada");
     }
 
-    const formattedJid = jid.includes("@") ? jid : `${jid}@s.whatsapp.net`;
+    const formattedJid = await this.resolveJid(sessionId, jid);
     let messageContent: any;
 
     if (mediaType === "image") {

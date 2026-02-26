@@ -782,12 +782,12 @@ function WhatsAppTab({ contact }: { contact: any }) {
   const sessionsQ = trpc.whatsapp.sessions.useQuery();
   const activeSession = (sessionsQ.data || []).find((s: any) => s.liveStatus === "connected");
 
-  // Build remoteJid from contact phone
-  const remoteJid = useMemo(() => {
-    if (!contact?.phone) return null;
-    const cleaned = contact.phone.replace(/\D/g, "");
-    return `${cleaned}@s.whatsapp.net`;
-  }, [contact?.phone]);
+  // Resolve the real WhatsApp JID from the contact phone using the backend
+  const resolveQ = trpc.whatsapp.resolveJid.useQuery(
+    { sessionId: activeSession?.sessionId || "", phone: contact?.phone || "" },
+    { enabled: !!activeSession?.sessionId && !!contact?.phone }
+  );
+  const remoteJid = resolveQ.data?.jid || null;
 
   if (!contact) {
     return (
@@ -822,7 +822,24 @@ function WhatsAppTab({ contact }: { contact: any }) {
     );
   }
 
-  if (!remoteJid) return null;
+  if (resolveQ.isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full py-16 text-muted-foreground">
+        <Loader2 className="h-8 w-8 mb-3 animate-spin opacity-40" />
+        <p className="text-sm">Verificando número no WhatsApp...</p>
+      </div>
+    );
+  }
+
+  if (!remoteJid) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full py-16 text-muted-foreground">
+        <Phone className="h-12 w-12 mb-3 opacity-20" />
+        <p className="text-sm font-medium">Número não encontrado no WhatsApp</p>
+        <p className="text-xs mt-1">O número {contact.phone} não foi encontrado no WhatsApp</p>
+      </div>
+    );
+  }
 
   return (
     <div className="h-[calc(100vh-220px)] relative">

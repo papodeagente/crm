@@ -63,11 +63,18 @@ export const appRouter = router({
         return { ...s, liveStatus: live?.status || "disconnected", qrDataUrl: live?.qrDataUrl || null, user: live?.user || null };
       });
     }),
+    // Resolve a phone number to the actual WhatsApp JID
+    resolveJid: protectedProcedure
+      .input(z.object({ sessionId: z.string(), phone: z.string().min(1) }))
+      .query(async ({ input }) => {
+        const jid = await whatsappManager.resolveJidPublic(input.sessionId, input.phone);
+        return { jid };
+      }),
     sendMessage: protectedProcedure
       .input(z.object({ sessionId: z.string(), number: z.string().min(1), message: z.string().min(1) }))
       .mutation(async ({ input }) => {
         const result = await whatsappManager.sendTextMessage(input.sessionId, input.number, input.message);
-        return { success: true, messageId: result?.key?.id };
+        return { success: true, messageId: result?.key?.id, remoteJid: result?.key?.remoteJid };
       }),
     sendMedia: protectedProcedure
       .input(z.object({ sessionId: z.string(), number: z.string().min(1), mediaUrl: z.string().url(), mediaType: z.enum(["image", "audio", "document", "video"]), caption: z.string().optional(), fileName: z.string().optional(), ptt: z.boolean().optional(), mimetype: z.string().optional(), duration: z.number().optional() }))
