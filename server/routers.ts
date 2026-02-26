@@ -17,6 +17,10 @@ import {
   removeChatbotRule,
   getConversationsList,
   markConversationRead,
+  getDashboardMetrics,
+  getPipelineSummary,
+  getRecentActivity,
+  getUpcomingTasks,
 } from "./db";
 import { storagePut } from "./storage";
 import { nanoid } from "nanoid";
@@ -180,6 +184,30 @@ export const appRouter = router({
         const { runDailyWhatsAppBackup } = await import("./whatsappDailyBackup");
         const result = await runDailyWhatsAppBackup();
         return result;
+      }),
+  }),
+
+  // ─── Dashboard ───
+  dashboard: router({
+    metrics: protectedProcedure
+      .input(z.object({ tenantId: z.number() }))
+      .query(async ({ input }) => {
+        return getDashboardMetrics(input.tenantId);
+      }),
+    pipelineSummary: protectedProcedure
+      .input(z.object({ tenantId: z.number() }))
+      .query(async ({ input }) => {
+        return getPipelineSummary(input.tenantId);
+      }),
+    recentActivity: protectedProcedure
+      .input(z.object({ tenantId: z.number(), limit: z.number().optional() }))
+      .query(async ({ input }) => {
+        return getRecentActivity(input.tenantId, input.limit);
+      }),
+    upcomingTasks: protectedProcedure
+      .input(z.object({ tenantId: z.number(), limit: z.number().optional() }))
+      .query(async ({ input }) => {
+        return getUpcomingTasks(input.tenantId, input.limit);
       }),
   }),
 

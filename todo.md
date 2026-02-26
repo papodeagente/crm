@@ -397,3 +397,25 @@
 ### Testes e Verificação
 - [x] TypeScript sem erros
 - [x] Testes unitários passando — 83 testes, 0 falhas
+
+## Dashboard com Dados Reais (v16)
+
+### Backend - Endpoints de métricas
+- [x] Criar helper getDashboardMetrics no db.ts (negociações ativas, contatos, viagens, tarefas pendentes)
+- [x] Criar helpers getPipelineSummary, getRecentActivity, getUpcomingTasks no db.ts
+- [x] Criar endpoints tRPC dashboard.metrics, pipelineSummary, recentActivity, upcomingTasks
+- [x] Incluir variação percentual comparando período atual vs anterior (últimos 30 dias vs 30 dias anteriores)
+
+### Frontend - Cards dinâmicos
+- [x] Substituir valores estáticos dos MetricCards por dados reais via trpc.dashboard.metrics.useQuery
+- [x] Exibir loading skeleton enquanto carrega
+- [x] Exibir variação percentual real (up/down/neutral)
+- [x] Foco do Dia com tarefas reais (upcomingTasks)
+- [x] Atividade Recente com deal_history real
+- [x] Pipeline Summary com dados reais de etapas
+- [x] Card de Valor Total em Pipeline
+- [x] Estados vazios para cada seção
+
+### Testes
+- [x] 9 testes unitários para dashboard (metrics, pipelineSummary, recentActivity, upcomingTasks)
+- [x] TypeScript sem erros — 92 testes passando, 6 arquivos

@@ -1,20 +1,25 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
+import { useMemo } from "react";
 import {
   Briefcase, Users, Plane, CheckSquare, MessageSquare,
   TrendingUp, ArrowUpRight, ArrowDownRight, Clock, Calendar,
-  ChevronRight, Plus, Zap,
+  ChevronRight, Plus, Zap, Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
 
+/* ─── Skeleton Pulse ─── */
+function Skeleton({ className = "" }: { className?: string }) {
+  return <div className={`animate-pulse rounded-lg bg-muted/60 ${className}`} />;
+}
+
 /* ─── Metric Card with gradient accent ─── */
-function MetricCard({ label, value, change, changeType, icon: Icon, gradient, iconBg, iconColor }: {
-  label: string; value: string; change?: string; changeType?: "up" | "down"; icon: any; gradient: string; iconBg: string; iconColor: string;
+function MetricCard({ label, value, change, changeType, icon: Icon, gradient, iconBg, iconColor, loading }: {
+  label: string; value: string; change?: string; changeType?: "up" | "down" | "neutral"; icon: any; gradient: string; iconBg: string; iconColor: string; loading?: boolean;
 }) {
   return (
     <div className="surface p-5 flex flex-col gap-3 relative overflow-hidden group hover:scale-[1.01] transition-transform duration-200">
-      {/* Subtle gradient accent bar */}
       <div className="absolute top-0 left-0 right-0 h-[3px] rounded-t-xl" style={{ background: gradient }} />
       <div className="flex items-center justify-between">
         <span className="text-[11.5px] font-semibold text-muted-foreground uppercase tracking-wider">{label}</span>
@@ -23,8 +28,12 @@ function MetricCard({ label, value, change, changeType, icon: Icon, gradient, ic
         </div>
       </div>
       <div className="flex items-end gap-2">
-        <span className="text-[28px] font-bold tracking-tight text-foreground leading-none">{value}</span>
-        {change && (
+        {loading ? (
+          <Skeleton className="h-8 w-16" />
+        ) : (
+          <span className="text-[28px] font-bold tracking-tight text-foreground leading-none">{value}</span>
+        )}
+        {!loading && change && changeType !== "neutral" && (
           <span className={`flex items-center gap-0.5 text-[12px] font-semibold mb-1 ${
             changeType === "up" ? "text-emerald-600" : "text-red-500"
           }`}>
@@ -57,9 +66,10 @@ function ActivityItem({ title, subtitle, time, icon: Icon, color }: {
 
 /* ─── Task Item ─── */
 function TaskItem({ title, dueTime, priority }: {
-  title: string; dueTime: string; priority: "high" | "medium" | "low";
+  title: string; dueTime: string; priority: "high" | "medium" | "low" | "urgent";
 }) {
-  const priorityColors = {
+  const priorityColors: Record<string, string> = {
+    urgent: "bg-red-600",
     high: "bg-red-500",
     medium: "bg-amber-500",
     low: "bg-emerald-500",
@@ -67,7 +77,7 @@ function TaskItem({ title, dueTime, priority }: {
 
   return (
     <div className="flex items-center gap-3 py-2.5 group">
-      <div className={`h-2.5 w-2.5 rounded-full shrink-0 ${priorityColors[priority]}`} />
+      <div className={`h-2.5 w-2.5 rounded-full shrink-0 ${priorityColors[priority] || "bg-gray-400"}`} />
       <span className="text-[13px] text-foreground flex-1 truncate">{title}</span>
       <span className="text-[11px] text-muted-foreground shrink-0 flex items-center gap-1">
         <Clock className="h-3 w-3" />
@@ -93,18 +103,81 @@ function QuickAction({ label, icon: Icon, href, iconColor }: { label: string; ic
   );
 }
 
-/* ─── Pipeline Stage Bar ─── */
-const stageColors = [
-  "bg-indigo-500",
-  "bg-blue-500",
-  "bg-cyan-500",
-  "bg-emerald-500",
-  "bg-amber-500",
+/* ─── Helpers ─── */
+function formatCurrency(cents: number): string {
+  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(cents / 100);
+}
+
+function formatChange(pct: number): { text: string; type: "up" | "down" | "neutral" } {
+  if (pct === 0) return { text: "", type: "neutral" };
+  return { text: `${pct > 0 ? "+" : ""}${pct}%`, type: pct > 0 ? "up" : "down" };
+}
+
+function timeAgo(ts: number): string {
+  const diff = Date.now() - ts;
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "agora";
+  if (mins < 60) return `há ${mins} min`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `há ${hours}h`;
+  const days = Math.floor(hours / 24);
+  return `há ${days}d`;
+}
+
+function formatTaskDue(ts: number | null): string {
+  if (!ts) return "Sem prazo";
+  const d = new Date(ts);
+  const now = new Date();
+  const isToday = d.toDateString() === now.toDateString();
+  const tomorrow = new Date(now);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const isTomorrow = d.toDateString() === tomorrow.toDateString();
+
+  const time = d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+  if (isToday) return time;
+  if (isTomorrow) return `Amanhã, ${time}`;
+  return d.toLocaleDateString("pt-BR", { day: "numeric", month: "short" });
+}
+
+const actionIcons: Record<string, { icon: any; color: string }> = {
+  stage_change: { icon: TrendingUp, color: "bg-indigo-50 text-indigo-600" },
+  created: { icon: Plus, color: "bg-emerald-50 text-emerald-600" },
+  note_added: { icon: MessageSquare, color: "bg-blue-50 text-blue-600" },
+  whatsapp_backup: { icon: MessageSquare, color: "bg-green-50 text-green-600" },
+  value_changed: { icon: TrendingUp, color: "bg-violet-50 text-violet-600" },
+  status_changed: { icon: Briefcase, color: "bg-amber-50 text-amber-600" },
+};
+
+const stageBarColors = [
+  "bg-indigo-500", "bg-blue-500", "bg-cyan-500", "bg-emerald-500",
+  "bg-amber-500", "bg-orange-500", "bg-rose-500", "bg-violet-500",
 ];
 
 /* ─── Main Dashboard ─── */
 export default function Home() {
   const { user } = useAuth();
+
+  // Use tenantId 1 as default (single-tenant for now)
+  const tenantId = 1;
+
+  const metricsQ = trpc.dashboard.metrics.useQuery({ tenantId });
+  const pipelineQ = trpc.dashboard.pipelineSummary.useQuery({ tenantId });
+  const activityQ = trpc.dashboard.recentActivity.useQuery({ tenantId, limit: 5 });
+  const tasksQ = trpc.dashboard.upcomingTasks.useQuery({ tenantId, limit: 5 });
+
+  const metrics = metricsQ.data;
+  const loading = metricsQ.isLoading;
+
+  const dealsChange = useMemo(() => formatChange(metrics?.activeDealsChange ?? 0), [metrics]);
+  const contactsChange = useMemo(() => formatChange(metrics?.totalContactsChange ?? 0), [metrics]);
+  const tripsChange = useMemo(() => formatChange(metrics?.activeTripsChange ?? 0), [metrics]);
+  const tasksChange = useMemo(() => formatChange(metrics?.pendingTasksChange ?? 0), [metrics]);
+
+  // Pipeline max for bar widths
+  const pipelineMax = useMemo(() => {
+    if (!pipelineQ.data?.length) return 1;
+    return Math.max(...pipelineQ.data.map(s => s.dealCount), 1);
+  }, [pipelineQ.data]);
 
   const greeting = (() => {
     const hour = new Date().getHours();
@@ -143,41 +216,47 @@ export default function Home() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         <MetricCard
           label="Negociações Ativas"
-          value="24"
-          change="+12%"
-          changeType="up"
+          value={String(metrics?.activeDeals ?? 0)}
+          change={dealsChange.text}
+          changeType={dealsChange.type}
           icon={Briefcase}
           gradient="linear-gradient(135deg, oklch(0.50 0.22 265), oklch(0.55 0.20 290))"
           iconBg="bg-indigo-50"
           iconColor="text-indigo-600"
+          loading={loading}
         />
         <MetricCard
           label="Contatos"
-          value="156"
-          change="+8%"
-          changeType="up"
+          value={String(metrics?.totalContacts ?? 0)}
+          change={contactsChange.text}
+          changeType={contactsChange.type}
           icon={Users}
           gradient="linear-gradient(135deg, oklch(0.55 0.22 160), oklch(0.60 0.20 145))"
           iconBg="bg-emerald-50"
           iconColor="text-emerald-600"
+          loading={loading}
         />
         <MetricCard
           label="Viagens em Andamento"
-          value="7"
-          change="-3%"
-          changeType="down"
+          value={String(metrics?.activeTrips ?? 0)}
+          change={tripsChange.text}
+          changeType={tripsChange.type}
           icon={Plane}
           gradient="linear-gradient(135deg, oklch(0.58 0.24 25), oklch(0.62 0.22 40))"
           iconBg="bg-orange-50"
           iconColor="text-orange-600"
+          loading={loading}
         />
         <MetricCard
           label="Tarefas Pendentes"
-          value="12"
+          value={String(metrics?.pendingTasks ?? 0)}
+          change={tasksChange.text}
+          changeType={tasksChange.type}
           icon={CheckSquare}
           gradient="linear-gradient(135deg, oklch(0.55 0.20 290), oklch(0.50 0.22 310))"
           iconBg="bg-violet-50"
           iconColor="text-violet-600"
+          loading={loading}
         />
       </div>
 
@@ -185,7 +264,7 @@ export default function Home() {
       <div className="grid lg:grid-cols-5 gap-6">
         {/* Left — 3 cols */}
         <div className="lg:col-span-3 space-y-6">
-          {/* Focus of the day */}
+          {/* Focus of the day — upcoming tasks */}
           <div className="surface p-5">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
@@ -198,12 +277,28 @@ export default function Home() {
                 Ver todas
               </Link>
             </div>
-            <div className="divide-y divide-border/50">
-              <TaskItem title="Retornar contato — Ana Cembrani (Tz Viagens)" dueTime="10:00" priority="high" />
-              <TaskItem title="Enviar proposta — Pacote Cancún família Silva" dueTime="14:00" priority="high" />
-              <TaskItem title="Follow-up — Renovação contrato Victory Travel" dueTime="16:30" priority="medium" />
-              <TaskItem title="Revisar orçamento — Grupo corporativo Techcorp" dueTime="17:00" priority="low" />
-            </div>
+            {tasksQ.isLoading ? (
+              <div className="space-y-3">
+                {[1,2,3].map(i => <Skeleton key={i} className="h-10 w-full" />)}
+              </div>
+            ) : tasksQ.data && tasksQ.data.length > 0 ? (
+              <div className="divide-y divide-border/50">
+                {tasksQ.data.map(t => (
+                  <TaskItem
+                    key={t.id}
+                    title={t.title}
+                    dueTime={formatTaskDue(t.dueAt)}
+                    priority={t.priority}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="py-8 text-center">
+                <CheckSquare className="h-8 w-8 text-muted-foreground/30 mx-auto mb-2" />
+                <p className="text-[13px] text-muted-foreground">Nenhuma tarefa pendente</p>
+                <p className="text-[11px] text-muted-foreground/60 mt-1">Crie tarefas nas negociações para vê-las aqui</p>
+              </div>
+            )}
           </div>
 
           {/* Recent Activity */}
@@ -214,43 +309,38 @@ export default function Home() {
                 Ver mais
               </Link>
             </div>
-            <div className="divide-y divide-border/50">
-              <ActivityItem
-                icon={MessageSquare}
-                color="bg-emerald-50 text-emerald-600"
-                title="Nova mensagem de Flavia Medeiros"
-                subtitle="WhatsApp — Consulta sobre pacote Europa"
-                time="há 5 min"
-              />
-              <ActivityItem
-                icon={Briefcase}
-                color="bg-indigo-50 text-indigo-600"
-                title="Negociação movida para Sondagem"
-                subtitle="Sondagem — Maicon · Kairos Destinos"
-                time="há 23 min"
-              />
-              <ActivityItem
-                icon={TrendingUp}
-                color="bg-violet-50 text-violet-600"
-                title="Proposta visualizada"
-                subtitle="Acelera 10x — Victory · R$ 4.997,00"
-                time="há 1h"
-              />
-              <ActivityItem
-                icon={Users}
-                color="bg-amber-50 text-amber-600"
-                title="Novo contato adicionado"
-                subtitle="Bruna Loippo — via formulário do site"
-                time="há 2h"
-              />
-              <ActivityItem
-                icon={Plane}
-                color="bg-cyan-50 text-cyan-600"
-                title="Viagem confirmada"
-                subtitle="Família Santos — Maldivas · 15-22 Mar"
-                time="há 3h"
-              />
-            </div>
+            {activityQ.isLoading ? (
+              <div className="space-y-3">
+                {[1,2,3,4].map(i => <Skeleton key={i} className="h-14 w-full" />)}
+              </div>
+            ) : activityQ.data && activityQ.data.length > 0 ? (
+              <div className="divide-y divide-border/50">
+                {activityQ.data.map(a => {
+                  const iconInfo = actionIcons[a.action] || { icon: Briefcase, color: "bg-gray-50 text-gray-600" };
+                  const subtitle = a.fromStageName && a.toStageName
+                    ? `${a.fromStageName} → ${a.toStageName}`
+                    : a.description.length > 60
+                      ? a.description.slice(0, 60) + "…"
+                      : a.description;
+                  return (
+                    <ActivityItem
+                      key={a.id}
+                      icon={iconInfo.icon}
+                      color={iconInfo.color}
+                      title={a.description.length > 50 ? a.description.slice(0, 50) + "…" : a.description}
+                      subtitle={subtitle}
+                      time={timeAgo(a.createdAt)}
+                    />
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="py-8 text-center">
+                <TrendingUp className="h-8 w-8 text-muted-foreground/30 mx-auto mb-2" />
+                <p className="text-[13px] text-muted-foreground">Nenhuma atividade recente</p>
+                <p className="text-[11px] text-muted-foreground/60 mt-1">Movimentações de negociações aparecerão aqui</p>
+              </div>
+            )}
           </div>
         </div>
 
@@ -267,7 +357,7 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Pipeline Summary */}
+          {/* Pipeline Summary — real data */}
           <div className="surface p-5">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-[14px] font-semibold text-foreground">Pipeline</h2>
@@ -275,56 +365,57 @@ export default function Home() {
                 Abrir
               </Link>
             </div>
-            <div className="space-y-3.5">
-              {[
-                { stage: "Pré-venda", count: 15, value: "R$ 231.710", pct: 85, color: "bg-indigo-500" },
-                { stage: "Atendimento", count: 14, value: "R$ 90.923", pct: 65, color: "bg-blue-500" },
-                { stage: "Sondagem", count: 28, value: "R$ 496.735", pct: 100, color: "bg-cyan-500" },
-                { stage: "Apresentação", count: 7, value: "R$ 766.746", pct: 45, color: "bg-emerald-500" },
-                { stage: "Fechamento", count: 4, value: "R$ 189.400", pct: 25, color: "bg-amber-500" },
-              ].map((s) => (
-                <div key={s.stage}>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-[12.5px] font-medium text-foreground">{s.stage}</span>
-                    <span className="text-[11px] text-muted-foreground font-medium">{s.count} · {s.value}</span>
+            {pipelineQ.isLoading ? (
+              <div className="space-y-3">
+                {[1,2,3,4].map(i => <Skeleton key={i} className="h-8 w-full" />)}
+              </div>
+            ) : pipelineQ.data && pipelineQ.data.length > 0 ? (
+              <div className="space-y-3.5">
+                {pipelineQ.data.map((s, i) => (
+                  <div key={s.stageId}>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-[12.5px] font-medium text-foreground">{s.stageName}</span>
+                      <span className="text-[11px] text-muted-foreground font-medium">
+                        {s.dealCount} · {formatCurrency(s.totalValueCents)}
+                      </span>
+                    </div>
+                    <div className="h-2 rounded-full bg-muted/60 overflow-hidden">
+                      <div
+                        className={`h-full rounded-full ${stageBarColors[i % stageBarColors.length]} transition-all duration-700`}
+                        style={{ width: `${Math.max((s.dealCount / pipelineMax) * 100, 4)}%` }}
+                      />
+                    </div>
                   </div>
-                  <div className="h-2 rounded-full bg-muted/60 overflow-hidden">
-                    <div
-                      className={`h-full rounded-full ${s.color} transition-all duration-700`}
-                      style={{ width: `${s.pct}%` }}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <div className="py-6 text-center">
+                <Briefcase className="h-7 w-7 text-muted-foreground/30 mx-auto mb-2" />
+                <p className="text-[13px] text-muted-foreground">Pipeline vazio</p>
+                <p className="text-[11px] text-muted-foreground/60 mt-1">Configure etapas em Configurações</p>
+              </div>
+            )}
           </div>
 
-          {/* Upcoming */}
-          <div className="surface p-5">
-            <div className="flex items-center gap-2 mb-4">
-              <div className="h-6 w-6 rounded-lg bg-blue-50 flex items-center justify-center">
-                <Calendar className="h-3.5 w-3.5 text-blue-600" />
-              </div>
-              <h2 className="text-[14px] font-semibold text-foreground">Próximos Eventos</h2>
-            </div>
-            <div className="space-y-3">
-              {[
-                { title: "Reunião — Kairos Destinos", time: "Hoje, 15:00", type: "meeting" },
-                { title: "Embarque — Família Santos", time: "Amanhã, 06:30", type: "trip" },
-                { title: "Vencimento proposta — Victory", time: "28 Fev", type: "deadline" },
-              ].map((e, i) => (
-                <div key={i} className="flex items-center gap-3 py-1.5">
-                  <div className={`h-2.5 w-2.5 rounded-full shrink-0 ${
-                    e.type === "meeting" ? "bg-indigo-500" : e.type === "trip" ? "bg-emerald-500" : "bg-amber-500"
-                  }`} />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[13px] text-foreground truncate">{e.title}</p>
-                  </div>
-                  <span className="text-[11px] text-muted-foreground shrink-0">{e.time}</span>
+          {/* Total Value Card */}
+          {metrics && metrics.totalDealValueCents > 0 && (
+            <div className="surface p-5 relative overflow-hidden">
+              <div className="absolute top-0 left-0 right-0 h-[3px] rounded-t-xl" style={{
+                background: "linear-gradient(135deg, oklch(0.55 0.22 160), oklch(0.50 0.22 265))"
+              }} />
+              <div className="flex items-center gap-2 mb-2">
+                <div className="h-6 w-6 rounded-lg bg-emerald-50 flex items-center justify-center">
+                  <TrendingUp className="h-3.5 w-3.5 text-emerald-600" />
                 </div>
-              ))}
+                <span className="text-[11.5px] font-semibold text-muted-foreground uppercase tracking-wider">
+                  Valor Total em Pipeline
+                </span>
+              </div>
+              <span className="text-[24px] font-bold tracking-tight text-foreground">
+                {formatCurrency(metrics.totalDealValueCents)}
+              </span>
             </div>
-          </div>
+          )}
         </div>
       </div>
     </div>
