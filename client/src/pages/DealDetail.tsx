@@ -2,6 +2,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import { useSocket } from "@/hooks/useSocket";
 import { useState, useMemo, useRef, useEffect } from "react";
+import WhatsAppChat from "@/components/WhatsAppChat";
 import { useRoute, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -775,12 +776,8 @@ function HistoryTab({ history }: { history: any[] }) {
   );
 }
 
-// ─── WHATSAPP TAB ───
+// ─── WHATSAPP TAB (uses WhatsAppChat component) ───
 function WhatsAppTab({ contact }: { contact: any }) {
-  const { lastMessage } = useSocket();
-  const [messageText, setMessageText] = useState("");
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-
   // Get active WhatsApp sessions
   const sessionsQ = trpc.whatsapp.sessions.useQuery();
   const activeSession = (sessionsQ.data || []).find((s: any) => s.liveStatus === "connected");
@@ -791,33 +788,6 @@ function WhatsAppTab({ contact }: { contact: any }) {
     const cleaned = contact.phone.replace(/\D/g, "");
     return `${cleaned}@s.whatsapp.net`;
   }, [contact?.phone]);
-
-  // Get messages for this contact
-  const messagesQ = trpc.whatsapp.messagesByContact.useQuery(
-    { sessionId: activeSession?.sessionId || "", remoteJid: remoteJid || "", limit: 100 },
-    { enabled: !!activeSession?.sessionId && !!remoteJid, refetchInterval: 5000 }
-  );
-
-  const sendMessage = trpc.whatsapp.sendMessage.useMutation({
-    onSuccess: () => {
-      setMessageText("");
-      messagesQ.refetch();
-      toast.success("Mensagem enviada");
-    },
-    onError: () => toast.error("Erro ao enviar mensagem"),
-  });
-
-  // Scroll to bottom on new messages
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messagesQ.data, lastMessage]);
-
-  // Refetch when new message arrives for this contact
-  useEffect(() => {
-    if (lastMessage && lastMessage.remoteJid === remoteJid) {
-      messagesQ.refetch();
-    }
-  }, [lastMessage]);
 
   if (!contact) {
     return (
@@ -852,97 +822,15 @@ function WhatsAppTab({ contact }: { contact: any }) {
     );
   }
 
-  const messages = messagesQ.data || [];
+  if (!remoteJid) return null;
 
   return (
-    <div className="flex flex-col h-[calc(100vh-220px)] max-w-3xl">
-      {/* Header */}
-      <div className="flex items-center gap-3 pb-3 border-b border-border/30">
-        <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
-          <MessageCircle className="h-5 w-5 text-green-600" />
-        </div>
-        <div>
-          <p className="text-sm font-semibold">{contact.name}</p>
-          <p className="text-xs text-muted-foreground">{contact.phone} · via {activeSession.sessionId}</p>
-        </div>
-        <div className="ml-auto flex items-center gap-1.5">
-          <span className="w-2 h-2 rounded-full bg-green-500" />
-          <span className="text-xs text-green-600">Conectado</span>
-        </div>
-      </div>
-
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto py-4 space-y-3">
-        {messages.length === 0 ? (
-          <div className="text-center py-12 text-muted-foreground">
-            <MessageCircle className="h-8 w-8 mx-auto mb-2 opacity-20" />
-            <p className="text-sm">Nenhuma mensagem ainda</p>
-            <p className="text-xs mt-1">Envie a primeira mensagem para {contact.name}</p>
-          </div>
-        ) : (
-          messages.map((msg: any, i: number) => (
-            <div key={msg.id || i} className={`flex ${msg.fromMe ? "justify-end" : "justify-start"}`}>
-              <div
-                className={`max-w-[70%] px-3.5 py-2.5 rounded-2xl text-sm ${
-                  msg.fromMe
-                    ? "bg-[#007AFF] text-white rounded-br-md"
-                    : "bg-[#E9E9EB] text-gray-900 rounded-bl-md"
-                }`}
-              >
-                <p className="whitespace-pre-wrap break-words">{msg.content}</p>
-                <p className={`text-[10px] mt-1 ${msg.fromMe ? "text-white/60" : "text-gray-500"}`}>
-                  {formatTime(msg.timestamp || msg.createdAt)}
-                </p>
-              </div>
-            </div>
-          ))
-        )}
-        <div ref={messagesEndRef} />
-      </div>
-
-      {/* Input */}
-      <div className="pt-3 border-t border-border/30">
-        <div className="flex items-end gap-2">
-          <Textarea
-            value={messageText}
-            onChange={(e) => setMessageText(e.target.value)}
-            placeholder={`Mensagem para ${contact.name}...`}
-            className="min-h-[44px] max-h-[120px] resize-none text-sm rounded-2xl"
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                if (messageText.trim() && activeSession) {
-                  sendMessage.mutate({
-                    sessionId: activeSession.sessionId,
-                    number: contact.phone.replace(/\D/g, ""),
-                    message: messageText.trim(),
-                  });
-                }
-              }
-            }}
-          />
-          <Button
-            size="icon"
-            className="h-[44px] w-[44px] rounded-full shrink-0"
-            disabled={!messageText.trim() || sendMessage.isPending}
-            onClick={() => {
-              if (messageText.trim() && activeSession) {
-                sendMessage.mutate({
-                  sessionId: activeSession.sessionId,
-                  number: contact.phone.replace(/\D/g, ""),
-                  message: messageText.trim(),
-                });
-              }
-            }}
-          >
-            {sendMessage.isPending ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Send className="h-4 w-4" />
-            )}
-          </Button>
-        </div>
-      </div>
+    <div className="h-[calc(100vh-220px)] relative">
+      <WhatsAppChat
+        contact={contact}
+        sessionId={activeSession.sessionId}
+        remoteJid={remoteJid}
+      />
     </div>
   );
 }

@@ -67,17 +67,17 @@ export const appRouter = router({
         return { success: true, messageId: result?.key?.id };
       }),
     sendMedia: protectedProcedure
-      .input(z.object({ sessionId: z.string(), number: z.string().min(1), mediaUrl: z.string().url(), mediaType: z.enum(["image", "audio", "document"]), caption: z.string().optional(), fileName: z.string().optional() }))
+      .input(z.object({ sessionId: z.string(), number: z.string().min(1), mediaUrl: z.string().url(), mediaType: z.enum(["image", "audio", "document", "video"]), caption: z.string().optional(), fileName: z.string().optional(), ptt: z.boolean().optional(), mimetype: z.string().optional(), duration: z.number().optional() }))
       .mutation(async ({ input }) => {
-        const result = await whatsappManager.sendMediaMessage(input.sessionId, input.number, input.mediaUrl, input.mediaType, input.caption, input.fileName);
+        const result = await whatsappManager.sendMediaMessage(input.sessionId, input.number, input.mediaUrl, input.mediaType, input.caption, input.fileName, { ptt: input.ptt, mimetype: input.mimetype, duration: input.duration });
         return { success: true, messageId: result?.key?.id };
       }),
     messages: protectedProcedure
       .input(z.object({ sessionId: z.string(), limit: z.number().min(1).max(200).default(50), offset: z.number().min(0).default(0) }))
       .query(async ({ input }) => getMessages(input.sessionId, input.limit, input.offset)),
     messagesByContact: protectedProcedure
-      .input(z.object({ sessionId: z.string(), remoteJid: z.string(), limit: z.number().min(1).max(200).default(50) }))
-      .query(async ({ input }) => getMessagesByContact(input.sessionId, input.remoteJid, input.limit)),
+      .input(z.object({ sessionId: z.string(), remoteJid: z.string(), limit: z.number().min(1).max(200).default(50), beforeId: z.number().optional() }))
+      .query(async ({ input }) => getMessagesByContact(input.sessionId, input.remoteJid, input.limit, input.beforeId)),
     logs: protectedProcedure
       .input(z.object({ sessionId: z.string().optional(), limit: z.number().min(1).max(500).default(100) }))
       .query(async ({ input }) => input.sessionId ? getLogs(input.sessionId, input.limit) : getAllLogs(input.limit)),

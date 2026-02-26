@@ -160,20 +160,73 @@ class WhatsAppManager extends EventEmitter {
         const fromMe = msg.key.fromMe || false;
         const messageType = Object.keys(msg.message)[0] || "unknown";
         let content = "";
+        let mediaUrl: string | undefined;
+        let mediaMimeType: string | undefined;
+        let mediaFileName: string | undefined;
+        let mediaDuration: number | undefined;
+        let isVoiceNote = false;
 
         if (msg.message.conversation) {
           content = msg.message.conversation;
         } else if (msg.message.extendedTextMessage?.text) {
           content = msg.message.extendedTextMessage.text;
-        } else if (msg.message.imageMessage?.caption) {
-          content = msg.message.imageMessage.caption;
-        } else if (msg.message.videoMessage?.caption) {
-          content = msg.message.videoMessage.caption;
-        } else if (msg.message.documentMessage?.fileName) {
-          content = `[Documento: ${msg.message.documentMessage.fileName}]`;
+        } else if (msg.message.imageMessage) {
+          content = msg.message.imageMessage.caption || "";
+          mediaMimeType = msg.message.imageMessage.mimetype || "image/jpeg";
+          // Download and upload image to S3
+          try {
+            const buffer = await downloadMediaMessage(msg, "buffer", {}, { logger, reuploadRequest: sock.updateMediaMessage });
+            const ext = mediaMimeType.split("/")[1] || "jpg";
+            const key = `whatsapp-media/${nanoid()}.${ext}`;
+            const { url } = await storagePut(key, buffer as Buffer, mediaMimeType);
+            mediaUrl = url;
+          } catch (e) { console.error("Error downloading image:", e); }
+        } else if (msg.message.videoMessage) {
+          content = msg.message.videoMessage.caption || "";
+          mediaMimeType = msg.message.videoMessage.mimetype || "video/mp4";
+          mediaDuration = msg.message.videoMessage.seconds || undefined;
+          try {
+            const buffer = await downloadMediaMessage(msg, "buffer", {}, { logger, reuploadRequest: sock.updateMediaMessage });
+            const ext = mediaMimeType.split("/")[1] || "mp4";
+            const key = `whatsapp-media/${nanoid()}.${ext}`;
+            const { url } = await storagePut(key, buffer as Buffer, mediaMimeType);
+            mediaUrl = url;
+          } catch (e) { console.error("Error downloading video:", e); }
+        } else if (msg.message.documentMessage) {
+          mediaFileName = msg.message.documentMessage.fileName || "document";
+          mediaMimeType = msg.message.documentMessage.mimetype || "application/octet-stream";
+          content = msg.message.documentMessage.caption || `[Documento: ${mediaFileName}]`;
+          try {
+            const buffer = await downloadMediaMessage(msg, "buffer", {}, { logger, reuploadRequest: sock.updateMediaMessage });
+            const key = `whatsapp-media/${nanoid()}-${mediaFileName}`;
+            const { url } = await storagePut(key, buffer as Buffer, mediaMimeType);
+            mediaUrl = url;
+          } catch (e) { console.error("Error downloading document:", e); }
         } else if (msg.message.audioMessage) {
-          content = "[Áudio]";
+          mediaMimeType = msg.message.audioMessage.mimetype || "audio/ogg";
+          mediaDuration = msg.message.audioMessage.seconds || undefined;
+          isVoiceNote = msg.message.audioMessage.ptt || false;
+          content = isVoiceNote ? "[Áudio]" : "[Áudio]";
+          try {
+            const buffer = await downloadMediaMessage(msg, "buffer", {}, { logger, reuploadRequest: sock.updateMediaMessage });
+            const ext = isVoiceNote ? "ogg" : (mediaMimeType.split("/")[1] || "ogg");
+            const key = `whatsapp-media/${nanoid()}.${ext}`;
+            const { url } = await storagePut(key, buffer as Buffer, mediaMimeType);
+            mediaUrl = url;
+          } catch (e) { console.error("Error downloading audio:", e); }
+        } else if (msg.message.stickerMessage) {
+          content = "[Sticker]";
+          mediaMimeType = "image/webp";
+          try {
+            const buffer = await downloadMediaMessage(msg, "buffer", {}, { logger, reuploadRequest: sock.updateMediaMessage });
+            const key = `whatsapp-media/${nanoid()}.webp`;
+            const { url } = await storagePut(key, buffer as Buffer, "image/webp");
+            mediaUrl = url;
+          } catch (e) { console.error("Error downloading sticker:", e); }
         }
+
+        // Determine initial status for sent messages
+        const initialStatus = fromMe ? "sent" : "received";
 
         // Save message to DB
         try {
@@ -186,6 +239,12 @@ class WhatsAppManager extends EventEmitter {
               fromMe,
               messageType,
               content,
+              mediaUrl,
+              mediaMimeType,
+              mediaFileName,
+              mediaDuration,
+              isVoiceNote,
+              status: initialStatus,
               timestamp: new Date(((msg.messageTimestamp as number) || Date.now() / 1000) * 1000),
             });
           }
@@ -193,7 +252,7 @@ class WhatsAppManager extends EventEmitter {
           console.error("Error saving message:", e);
         }
 
-        this.emit("message", { sessionId, message: msg, content, fromMe, remoteJid, messageType });
+        this.emit("message", { sessionId, message: msg, content, fromMe, remoteJid, messageType, mediaUrl, mediaMimeType, mediaFileName, mediaDuration, isVoiceNote, status: initialStatus });
 
         // Chatbot auto-reply
         if (!fromMe && content && type === "notify") {
@@ -207,6 +266,64 @@ class WhatsAppManager extends EventEmitter {
             title: "Nova Mensagem no WhatsApp",
             content: `De: ${senderName}\nMensagem: ${content.substring(0, 200)}`,
           });
+        }
+      }
+    });
+
+    // ─── Message Receipt Updates (delivered / read) ───
+    sock.ev.on("message-receipt.update", async (updates) => {
+      for (const update of updates) {
+        const msgId = update.key.id;
+        const receiptType = update.receipt?.receiptTimestamp ? "delivered" : "sent";
+        let newStatus = receiptType;
+
+        // readTimestamp indicates the message was read
+        if (update.receipt?.readTimestamp) {
+          newStatus = "read";
+        } else if ((update as any).receipt?.receiptTimestamp) {
+          newStatus = "delivered";
+        }
+
+        try {
+          const db = await getDb();
+          if (db && msgId) {
+            await db.update(messages)
+              .set({ status: newStatus })
+              .where(eq(messages.messageId, msgId));
+          }
+        } catch (e) {
+          console.error("Error updating message status:", e);
+        }
+
+        this.emit("message:status", { sessionId, messageId: msgId, status: newStatus });
+      }
+    });
+
+    // ─── Message Update (status changes from Baileys) ───
+    sock.ev.on("messages.update", async (updates) => {
+      for (const update of updates) {
+        const msgId = update.key.id;
+        const statusMap: Record<number, string> = {
+          2: "sent",      // MESSAGE_STATUS_SERVER_ACK
+          3: "delivered", // MESSAGE_STATUS_DELIVERY_ACK  
+          4: "read",      // MESSAGE_STATUS_READ
+          5: "played",    // MESSAGE_STATUS_PLAYED (for audio)
+        };
+        const newStatus = statusMap[(update.update as any)?.status] || null;
+
+        if (newStatus && msgId) {
+          try {
+            const db = await getDb();
+            if (db) {
+              await db.update(messages)
+                .set({ status: newStatus })
+                .where(eq(messages.messageId, msgId));
+            }
+          } catch (e) {
+            console.error("Error updating message status:", e);
+          }
+
+          this.emit("message:status", { sessionId, messageId: msgId, status: newStatus });
         }
       }
     });
@@ -249,6 +366,7 @@ class WhatsAppManager extends EventEmitter {
           fromMe: true,
           messageType: "text",
           content: text,
+          status: "sent",
         });
       }
     } catch (e) {
@@ -259,7 +377,7 @@ class WhatsAppManager extends EventEmitter {
     return result;
   }
 
-  async sendMediaMessage(sessionId: string, jid: string, mediaUrl: string, mediaType: "image" | "audio" | "document", caption?: string, fileName?: string): Promise<any> {
+  async sendMediaMessage(sessionId: string, jid: string, mediaUrl: string, mediaType: "image" | "audio" | "document" | "video", caption?: string, fileName?: string, opts?: { ptt?: boolean; mimetype?: string; duration?: number }): Promise<any> {
     const session = this.sessions.get(sessionId);
     if (!session?.socket || session.status !== "connected") {
       throw new Error("Sessão não conectada");
@@ -271,9 +389,11 @@ class WhatsAppManager extends EventEmitter {
     if (mediaType === "image") {
       messageContent = { image: { url: mediaUrl }, caption: caption || "" };
     } else if (mediaType === "audio") {
-      messageContent = { audio: { url: mediaUrl }, mimetype: "audio/mpeg" };
+      messageContent = { audio: { url: mediaUrl }, mimetype: opts?.mimetype || "audio/ogg; codecs=opus", ptt: opts?.ptt ?? true };
+    } else if (mediaType === "video") {
+      messageContent = { video: { url: mediaUrl }, caption: caption || "" };
     } else {
-      messageContent = { document: { url: mediaUrl }, mimetype: "application/octet-stream", fileName: fileName || "document" };
+      messageContent = { document: { url: mediaUrl }, mimetype: opts?.mimetype || "application/octet-stream", fileName: fileName || "document" };
     }
 
     const result = await session.socket.sendMessage(formattedJid, messageContent);
@@ -287,8 +407,13 @@ class WhatsAppManager extends EventEmitter {
           remoteJid: formattedJid,
           fromMe: true,
           messageType: mediaType,
-          content: caption || `[${mediaType}]`,
+          content: caption || (mediaType === "audio" ? "[Áudio]" : `[${mediaType}]`),
           mediaUrl,
+          mediaMimeType: opts?.mimetype,
+          mediaFileName: fileName,
+          mediaDuration: opts?.duration,
+          isVoiceNote: opts?.ptt || false,
+          status: "sent",
         });
       }
     } catch (e) {

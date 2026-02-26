@@ -1,4 +1,4 @@
-import { eq, desc, and, or, like } from "drizzle-orm";
+import { eq, desc, and, or, like, lt } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import { InsertUser, users, whatsappSessions, waMessages as messages, activityLogs, chatbotSettings } from "../drizzle/schema";
 import { ENV } from './_core/env';
@@ -114,13 +114,17 @@ export async function getMessages(sessionId: string, limit = 50, offset = 0) {
     .offset(offset);
 }
 
-export async function getMessagesByContact(sessionId: string, remoteJid: string, limit = 50) {
+export async function getMessagesByContact(sessionId: string, remoteJid: string, limit = 50, beforeId?: number) {
   const db = await getDb();
   if (!db) return [];
+  const conditions = [eq(messages.sessionId, sessionId), eq(messages.remoteJid, remoteJid)];
+  if (beforeId) {
+    conditions.push(lt(messages.id, beforeId));
+  }
   return db
     .select()
     .from(messages)
-    .where(and(eq(messages.sessionId, sessionId), eq(messages.remoteJid, remoteJid)))
+    .where(and(...conditions))
     .orderBy(desc(messages.createdAt))
     .limit(limit);
 }

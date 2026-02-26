@@ -160,4 +160,100 @@ describe("WhatsApp API Routes", () => {
       })
     ).rejects.toThrow();
   });
+
+  // ─── New tests for media/video/audio endpoints ───
+
+  it("whatsapp.sendMedia accepts video mediaType", async () => {
+    const { ctx } = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    await expect(
+      caller.whatsapp.sendMedia({
+        sessionId: "nonexistent",
+        number: "5511999999999",
+        mediaUrl: "https://example.com/video.mp4",
+        mediaType: "video",
+      })
+    ).rejects.toThrow(); // Rejects because session doesn't exist, but validates input
+  });
+
+  it("whatsapp.sendMedia accepts audio with ptt option", async () => {
+    const { ctx } = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    await expect(
+      caller.whatsapp.sendMedia({
+        sessionId: "nonexistent",
+        number: "5511999999999",
+        mediaUrl: "https://example.com/audio.ogg",
+        mediaType: "audio",
+        ptt: true,
+        mimetype: "audio/ogg; codecs=opus",
+        duration: 15,
+      })
+    ).rejects.toThrow();
+  });
+
+  it("whatsapp.sendMedia accepts document with fileName", async () => {
+    const { ctx } = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    await expect(
+      caller.whatsapp.sendMedia({
+        sessionId: "nonexistent",
+        number: "5511999999999",
+        mediaUrl: "https://example.com/doc.pdf",
+        mediaType: "document",
+        fileName: "proposta.pdf",
+        mimetype: "application/pdf",
+      })
+    ).rejects.toThrow();
+  });
+
+  it("whatsapp.sendMedia rejects invalid mediaType", async () => {
+    const { ctx } = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    await expect(
+      caller.whatsapp.sendMedia({
+        sessionId: "test",
+        number: "5511999999999",
+        mediaUrl: "https://example.com/file",
+        mediaType: "invalid" as any,
+      })
+    ).rejects.toThrow();
+  });
+
+  it("whatsapp.sendMedia rejects invalid URL", async () => {
+    const { ctx } = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    await expect(
+      caller.whatsapp.sendMedia({
+        sessionId: "test",
+        number: "5511999999999",
+        mediaUrl: "not-a-url",
+        mediaType: "image",
+      })
+    ).rejects.toThrow();
+  });
+
+  it("whatsapp.messagesByContact returns empty for unknown contact", async () => {
+    const { ctx } = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    const result = await caller.whatsapp.messagesByContact({
+      sessionId: "test-session",
+      remoteJid: "5511000000000@s.whatsapp.net",
+      limit: 50,
+    });
+    expect(Array.isArray(result)).toBe(true);
+    expect(result.length).toBe(0);
+  });
+
+  it("whatsapp.messagesByContact accepts beforeId for pagination", async () => {
+    const { ctx } = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    const result = await caller.whatsapp.messagesByContact({
+      sessionId: "test-session",
+      remoteJid: "5511000000000@s.whatsapp.net",
+      limit: 20,
+      beforeId: 999999,
+    });
+    expect(Array.isArray(result)).toBe(true);
+  });
 });

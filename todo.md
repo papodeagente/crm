@@ -173,3 +173,39 @@
 - [x] Atualizar Pipeline para navegar para /deal/:id ao clicar no card
 - [x] Registrar rota /deal/:id no App.tsx
 - [x] Testes unitários para endpoints da página DealDetail (20 testes adicionais, 51 total)
+
+## Experiência WhatsApp Web na Página de Negociação (v6)
+
+### Visual & Layout
+- [x] Redesenhar aba WhatsApp com visual idêntico ao WhatsApp Web (fundo com padrão, bolhas verdes/brancas)
+- [x] Header da conversa com avatar, nome, status online/offline e último acesso
+- [x] Footer com barra de input estilo WhatsApp (emoji, anexo, texto, áudio)
+
+### Envio de Mídia & Arquivos
+- [x] Botão de anexar com menu (Fotos/Vídeos, Câmera, Documento)
+- [x] Preview de imagem/vídeo antes de enviar
+- [x] Upload de arquivos via S3 e envio pelo Baileys
+- [x] Exibição de imagens, vídeos, documentos e áudios inline nas bolhas
+
+### Gravação de Áudio
+- [x] Botão de microfone para gravar áudio (hold ou toggle)
+- [x] Visualização de onda sonora durante gravação
+- [x] Envio de áudio como mensagem de voz (PTT)
+- [x] Player de áudio inline nas bolhas de mensagem
+
+### Indicadores de Status (Ticks)
+- [x] Ícone de relógio (⏱) para mensagem pendente/enviando
+- [x] Um tick (✓) para mensagem enviada ao servidor
+- [x] Dois ticks (✓✓) para mensagem entregue ao destinatário
+- [x] Dois ticks azuis (✓✓) para mensagem lida pelo destinatário
+- [x] Backend: capturar eventos de receipt (delivered/read) do Baileys
+- [x] Backend: armazenar status de entrega/leitura no banco de dados
+
+### Performance
+- [x] Virtualização da lista de mensagens (renderizar apenas mensagens visíveis)
+- [x] Lazy loading de mídia (carregar imagens/vídeos sob demanda)
+- [x] Paginação eficiente com scroll infinito para cima (mensagens antigas)
+- [x] Otimizar re-renders com React.memo e useCallback
+
+### Testes
+- [x] Testes unitários para novos endpoints (mídia, áudio, status) — 58 testes passando
