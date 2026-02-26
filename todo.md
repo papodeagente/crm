@@ -291,3 +291,14 @@
 - [x] Ticks de status na preview da última mensagem
 - [x] Filtros (Todas, Não lidas, Grupos)
 - [x] Testes unitários — 80 testes passando
+
+## Correção UX Inbox (v10.1)
+
+- [x] Lista de conversas sem header WhatsApp (falta avatar do usuário, ícones)
+- [x] Faltam horas/datas à direita de cada conversa na lista
+- [x] Painel de chat à direita não mostra mensagens, só barra de input
+- [x] Números internacionais aparecem crus (sem formatação)
+- [x] Lista ocupa toda a largura sem divisão clara com o chat
+- [x] Falta separador visual (border) entre lista e chat
+- [x] Falta o fundo padrão WhatsApp no painel de chat
+- [x] Layout não está dividido corretamente — agora 440px fixo + flex-1
