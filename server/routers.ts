@@ -110,7 +110,11 @@ export const appRouter = router({
       const dbSessions = await getSessionsByUser(ctx.user.id);
       return dbSessions.map((s) => {
         const live = whatsappManager.getSession(s.sessionId);
-        return { ...s, liveStatus: live?.status || "disconnected", qrDataUrl: live?.qrDataUrl || null, user: live?.user || null };
+        // Use live status if available, otherwise fall back to DB status
+        // This allows the Inbox to work even when the server was restarted
+        // and the Baileys session hasn't been reconnected yet
+        const liveStatus = live?.status || (s.status === "connected" ? "connected" : "disconnected");
+        return { ...s, liveStatus, qrDataUrl: live?.qrDataUrl || null, user: live?.user || null };
       });
     }),
     // Resolve a phone number to the actual WhatsApp JID

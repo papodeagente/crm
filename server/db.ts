@@ -247,24 +247,11 @@ export async function getConversationsList(sessionId: string) {
   ];
   const skipTypesSQL = skipTypes.map(t => `'${t}'`).join(',');
   
-  // Use a SQL expression to normalize Brazilian JIDs:
-  // For 55+DDD+8digits (12 total), add the 9th digit after DDD
-  // This ensures both 5584999838420 and 558499838420 map to the same normalized key
-  const normalizeJidSQL = `
-    CASE 
-      WHEN remoteJid LIKE '55%@s.whatsapp.net' 
-        AND LENGTH(REPLACE(remoteJid, '@s.whatsapp.net', '')) = 12
-        AND SUBSTRING(remoteJid, 5, 1) != '9'
-      THEN CONCAT('55', SUBSTRING(remoteJid, 3, 2), '9', SUBSTRING(remoteJid, 5, 8), '@s.whatsapp.net')
-      ELSE remoteJid
-    END
-  `;
-  
-  // Get distinct normalized JIDs with last REAL message info + pushName
+  // JIDs are now pre-normalized in the database (migration applied),
+  // so we can use simple GROUP BY without expensive CASE WHEN expressions
   const result = await db.execute(sql`
     SELECT 
       m.remoteJid,
-      ${sql.raw(normalizeJidSQL.replace(/remoteJid/g, 'm.remoteJid'))} AS normalizedJid,
       m.content AS lastMessage,
       m.messageType AS lastMessageType,
       m.fromMe AS lastFromMe,
@@ -273,7 +260,7 @@ export async function getConversationsList(sessionId: string) {
       (
         SELECT m4.pushName FROM messages m4 
         WHERE m4.sessionId = ${sessionId} 
-        AND ${sql.raw(normalizeJidSQL.replace(/remoteJid/g, 'm4.remoteJid'))} = ${sql.raw(normalizeJidSQL.replace(/remoteJid/g, 'm.remoteJid'))}
+        AND m4.remoteJid = m.remoteJid
         AND m4.fromMe = 0 
         AND m4.pushName IS NOT NULL 
         AND m4.pushName != ''
@@ -282,7 +269,7 @@ export async function getConversationsList(sessionId: string) {
       (
         SELECT COUNT(*) FROM messages m2 
         WHERE m2.sessionId = ${sessionId} 
-        AND ${sql.raw(normalizeJidSQL.replace(/remoteJid/g, 'm2.remoteJid'))} = ${sql.raw(normalizeJidSQL.replace(/remoteJid/g, 'm.remoteJid'))}
+        AND m2.remoteJid = m.remoteJid
         AND m2.fromMe = 0 
         AND (m2.status IS NULL OR m2.status = 'received')
         AND m2.messageType NOT IN (${sql.raw(skipTypesSQL)})
@@ -290,29 +277,27 @@ export async function getConversationsList(sessionId: string) {
       (
         SELECT COUNT(*) FROM messages m3 
         WHERE m3.sessionId = ${sessionId} 
-        AND ${sql.raw(normalizeJidSQL.replace(/remoteJid/g, 'm3.remoteJid'))} = ${sql.raw(normalizeJidSQL.replace(/remoteJid/g, 'm.remoteJid'))}
+        AND m3.remoteJid = m.remoteJid
         AND m3.messageType NOT IN (${sql.raw(skipTypesSQL)})
       ) AS totalMessages
     FROM messages m
     INNER JOIN (
-      SELECT ${sql.raw(normalizeJidSQL)} AS normJid, MAX(id) AS maxId
+      SELECT remoteJid, MAX(id) AS maxId
       FROM messages
       WHERE sessionId = ${sessionId}
       AND remoteJid NOT LIKE '%@g.us'
+      AND remoteJid != 'status@broadcast'
       AND messageType NOT IN (${sql.raw(skipTypesSQL)})
-      GROUP BY normJid
-    ) latest ON ${sql.raw(normalizeJidSQL.replace(/remoteJid/g, 'm.remoteJid'))} = latest.normJid AND m.id = latest.maxId
+      GROUP BY remoteJid
+    ) latest ON m.remoteJid = latest.remoteJid AND m.id = latest.maxId
     WHERE m.sessionId = ${sessionId}
     AND m.remoteJid NOT LIKE '%@g.us'
+    AND m.remoteJid != 'status@broadcast'
     ORDER BY m.timestamp DESC
   `);
   
-  // Post-process: use normalizedJid as the canonical remoteJid
   const rows = (result as any)[0] || [];
-  return rows.map((row: any) => ({
-    ...row,
-    remoteJid: row.normalizedJid || row.remoteJid,
-  }));
+  return rows;
 }
 
 // Mark conversation as read (handles both JID variants)
@@ -459,17 +444,6 @@ export async function getConversationsListMultiAgent(sessionId: string, tenantId
   ];
   const skipTypesSQL = skipTypes.map(t => `'${t}'`).join(',');
   
-  // SQL expression to normalize Brazilian JIDs (add 9th digit if missing)
-  const normalizeJidSQL = `
-    CASE 
-      WHEN remoteJid LIKE '55%@s.whatsapp.net' 
-        AND LENGTH(REPLACE(remoteJid, '@s.whatsapp.net', '')) = 12
-        AND SUBSTRING(remoteJid, 5, 1) != '9'
-      THEN CONCAT('55', SUBSTRING(remoteJid, 3, 2), '9', SUBSTRING(remoteJid, 5, 8), '@s.whatsapp.net')
-      ELSE remoteJid
-    END
-  `;
-  
   // Build WHERE clause for assignment filters
   let assignmentFilter = '';
   if (filter?.assignedUserId) {
@@ -485,10 +459,11 @@ export async function getConversationsListMultiAgent(sessionId: string, tenantId
     assignmentFilter += ` AND ca.assignedUserId IS NULL`;
   }
 
+  // JIDs are now pre-normalized in the database (migration applied),
+  // so we can use simple GROUP BY without expensive CASE WHEN expressions
   const result = await db.execute(sql`
     SELECT 
       m.remoteJid,
-      ${sql.raw(normalizeJidSQL.replace(/remoteJid/g, 'm.remoteJid'))} AS normalizedJid,
       m.content AS lastMessage,
       m.messageType AS lastMessageType,
       m.fromMe AS lastFromMe,
@@ -498,7 +473,7 @@ export async function getConversationsListMultiAgent(sessionId: string, tenantId
       (
         SELECT m4.pushName FROM messages m4 
         WHERE m4.sessionId = ${sessionId} 
-        AND ${sql.raw(normalizeJidSQL.replace(/remoteJid/g, 'm4.remoteJid'))} = ${sql.raw(normalizeJidSQL.replace(/remoteJid/g, 'm.remoteJid'))}
+        AND m4.remoteJid = m.remoteJid
         AND m4.fromMe = 0 
         AND m4.pushName IS NOT NULL 
         AND m4.pushName != ''
@@ -507,7 +482,7 @@ export async function getConversationsListMultiAgent(sessionId: string, tenantId
       (
         SELECT COUNT(*) FROM messages m2 
         WHERE m2.sessionId = ${sessionId} 
-        AND ${sql.raw(normalizeJidSQL.replace(/remoteJid/g, 'm2.remoteJid'))} = ${sql.raw(normalizeJidSQL.replace(/remoteJid/g, 'm.remoteJid'))}
+        AND m2.remoteJid = m.remoteJid
         AND m2.fromMe = 0 
         AND (m2.status IS NULL OR m2.status = 'received')
         AND m2.messageType NOT IN (${sql.raw(skipTypesSQL)})
@@ -515,7 +490,7 @@ export async function getConversationsListMultiAgent(sessionId: string, tenantId
       (
         SELECT COUNT(*) FROM messages m3 
         WHERE m3.sessionId = ${sessionId} 
-        AND ${sql.raw(normalizeJidSQL.replace(/remoteJid/g, 'm3.remoteJid'))} = ${sql.raw(normalizeJidSQL.replace(/remoteJid/g, 'm.remoteJid'))}
+        AND m3.remoteJid = m.remoteJid
         AND m3.messageType NOT IN (${sql.raw(skipTypesSQL)})
       ) AS totalMessages,
       ca.assignedUserId,
@@ -526,30 +501,28 @@ export async function getConversationsListMultiAgent(sessionId: string, tenantId
       agent.avatarUrl AS assignedAgentAvatar
     FROM messages m
     INNER JOIN (
-      SELECT ${sql.raw(normalizeJidSQL)} AS normJid, MAX(id) AS maxId
+      SELECT remoteJid, MAX(id) AS maxId
       FROM messages
       WHERE sessionId = ${sessionId}
       AND remoteJid NOT LIKE '%@g.us'
+      AND remoteJid != 'status@broadcast'
       AND messageType NOT IN (${sql.raw(skipTypesSQL)})
-      GROUP BY normJid
-    ) latest ON ${sql.raw(normalizeJidSQL.replace(/remoteJid/g, 'm.remoteJid'))} = latest.normJid AND m.id = latest.maxId
+      GROUP BY remoteJid
+    ) latest ON m.remoteJid = latest.remoteJid AND m.id = latest.maxId
     LEFT JOIN conversation_assignments ca 
       ON ca.sessionId = ${sessionId} 
-      AND (ca.remoteJid = m.remoteJid OR ca.remoteJid = ${sql.raw(normalizeJidSQL.replace(/remoteJid/g, 'm.remoteJid'))})
+      AND ca.remoteJid = m.remoteJid
       AND ca.tenantId = ${tenantId}
     LEFT JOIN crm_users agent ON agent.id = ca.assignedUserId
     WHERE m.sessionId = ${sessionId}
     AND m.remoteJid NOT LIKE '%@g.us'
+    AND m.remoteJid != 'status@broadcast'
     ${sql.raw(assignmentFilter)}
     ORDER BY m.timestamp DESC
   `);
   
-  // Post-process: use normalizedJid as the canonical remoteJid
   const rows = (result as any)[0] || [];
-  return rows.map((row: any) => ({
-    ...row,
-    remoteJid: row.normalizedJid || row.remoteJid,
-  }));
+  return rows;
 }
 
 // Round-robin assignment: get next agent for a tenant

@@ -943,3 +943,19 @@
 ### Testes
 - [x] Testes do endpoint de análise de atendimento (5 testes passando)
 - [x] 231 testes passando no total (1 falha pré-existente no backup diário)
+
+## Contatos Fantasma WhatsApp & Inbox Não Carrega
+
+### Investigação
+- [x] Verificar JIDs duplicados/fantasma na tabela messages (encontrados 87 JIDs com 13 dígitos duplicados)
+- [x] Verificar se normalização de telefone está funcionando corretamente (phoneUtils.ts já aplicado)
+- [x] Verificar se o Inbox está falhando ao carregar (query SQL com CASE WHEN normalização causava timeout >60s)
+- [x] Identificar causa raiz: JIDs não migrados + query SQL pesada com subconsultas correlacionadas
+
+### Correção
+- [x] Migrar JIDs de 12 dígitos para 13 dígitos no banco (messages + conversation_assignments)
+- [x] Simplificar query getConversationsList e getConversationsListMultiAgent (de >60s para ~1.6s)
+- [x] Excluir status@broadcast e grupos (@g.us) do Inbox
+- [x] Fallback para status do banco quando sessão não está em memória
+- [x] Inbox carregando corretamente com 841 conversas sem duplicações
+- [x] 231 testes passando (1 falha pré-existente no backup diário)
