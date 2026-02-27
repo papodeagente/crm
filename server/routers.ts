@@ -27,6 +27,14 @@ import {
   getUnreadNotificationCount,
   markNotificationRead,
   markAllNotificationsRead,
+  // Multi-agent / SaaS
+  getConversationsListMultiAgent,
+  assignConversation,
+  updateAssignmentStatus,
+  getAssignmentForConversation,
+  getAgentsForTenant,
+  getTeamsForTenant,
+  getNextRoundRobinAgent,
 } from "./db";
 import { storagePut } from "./storage";
 import { nanoid } from "nanoid";
@@ -155,6 +163,89 @@ export const appRouter = router({
     conversations: protectedProcedure
       .input(z.object({ sessionId: z.string() }))
       .query(async ({ input }) => getConversationsList(input.sessionId)),
+    // Conversations list with multi-agent assignment info
+    conversationsMultiAgent: protectedProcedure
+      .input(z.object({
+        sessionId: z.string(),
+        tenantId: z.number().default(1),
+        assignedUserId: z.number().optional(),
+        assignedTeamId: z.number().optional(),
+        status: z.enum(["open", "pending", "resolved", "closed"]).optional(),
+        unassignedOnly: z.boolean().optional(),
+      }))
+      .query(async ({ input }) => {
+        const { sessionId, tenantId, ...filter } = input;
+        return getConversationsListMultiAgent(sessionId, tenantId, filter);
+      }),
+    // Assign conversation to an agent
+    assignConversation: protectedProcedure
+      .input(z.object({
+        tenantId: z.number().default(1),
+        sessionId: z.string(),
+        remoteJid: z.string(),
+        assignedUserId: z.number().nullable(),
+        assignedTeamId: z.number().nullable().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const result = await assignConversation(input.tenantId, input.sessionId, input.remoteJid, input.assignedUserId, input.assignedTeamId);
+        return result;
+      }),
+    // Transfer conversation to another agent
+    transferConversation: protectedProcedure
+      .input(z.object({
+        tenantId: z.number().default(1),
+        sessionId: z.string(),
+        remoteJid: z.string(),
+        toUserId: z.number(),
+        toTeamId: z.number().nullable().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const result = await assignConversation(input.tenantId, input.sessionId, input.remoteJid, input.toUserId, input.toTeamId);
+        return result;
+      }),
+    // Update conversation assignment status
+    updateAssignmentStatus: protectedProcedure
+      .input(z.object({
+        tenantId: z.number().default(1),
+        sessionId: z.string(),
+        remoteJid: z.string(),
+        status: z.enum(["open", "pending", "resolved", "closed"]),
+      }))
+      .mutation(async ({ input }) => {
+        await updateAssignmentStatus(input.tenantId, input.sessionId, input.remoteJid, input.status);
+        return { success: true };
+      }),
+    // Get assignment for a specific conversation
+    getAssignment: protectedProcedure
+      .input(z.object({
+        tenantId: z.number().default(1),
+        sessionId: z.string(),
+        remoteJid: z.string(),
+      }))
+      .query(async ({ input }) => {
+        return getAssignmentForConversation(input.tenantId, input.sessionId, input.remoteJid);
+      }),
+    // Get available agents for a tenant
+    agents: protectedProcedure
+      .input(z.object({ tenantId: z.number().default(1) }))
+      .query(async ({ input }) => getAgentsForTenant(input.tenantId)),
+    // Get teams for a tenant
+    teams: protectedProcedure
+      .input(z.object({ tenantId: z.number().default(1) }))
+      .query(async ({ input }) => getTeamsForTenant(input.tenantId)),
+    // Auto-assign via round-robin
+    autoAssign: protectedProcedure
+      .input(z.object({
+        tenantId: z.number().default(1),
+        sessionId: z.string(),
+        remoteJid: z.string(),
+      }))
+      .mutation(async ({ input }) => {
+        const agentId = await getNextRoundRobinAgent(input.tenantId);
+        if (!agentId) return { assigned: false, reason: "Nenhum agente disponível" };
+        const result = await assignConversation(input.tenantId, input.sessionId, input.remoteJid, agentId);
+        return { assigned: true, assignment: result };
+      }),
     // Mark conversation as read
     markRead: protectedProcedure
       .input(z.object({ sessionId: z.string(), remoteJid: z.string() }))

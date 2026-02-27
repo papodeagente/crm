@@ -20,20 +20,25 @@ export const whatsappSessions = mysqlTable("whatsapp_sessions", {
   id: int("id").autoincrement().primaryKey(),
   sessionId: varchar("sessionId", { length: 128 }).notNull().unique(),
   userId: int("userId").notNull(),
+  tenantId: int("tenantId").default(1).notNull(),
   status: mysqlEnum("status", ["connecting", "connected", "disconnected"]).default("disconnected").notNull(),
   phoneNumber: varchar("phoneNumber", { length: 32 }),
   pushName: varchar("pushName", { length: 128 }),
   platform: varchar("platform", { length: 64 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-});
+}, (t) => [
+  index("ws_tenant_idx").on(t.tenantId),
+]);
 
 export const waMessages = mysqlTable("messages", {
   id: int("id").autoincrement().primaryKey(),
   sessionId: varchar("sessionId", { length: 128 }).notNull(),
+  tenantId: int("tenantId").default(1).notNull(),
   messageId: varchar("messageId", { length: 256 }),
   remoteJid: varchar("remoteJid", { length: 128 }).notNull(),
   fromMe: boolean("fromMe").default(false).notNull(),
+  senderAgentId: int("senderAgentId"),
   pushName: varchar("pushName", { length: 128 }),
   messageType: varchar("messageType", { length: 32 }).default("text").notNull(),
   content: text("content"),
@@ -46,7 +51,10 @@ export const waMessages = mysqlTable("messages", {
   status: varchar("status", { length: 32 }).default("sent"),
   timestamp: timestamp("timestamp").defaultNow().notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-});
+}, (t) => [
+  index("msg_tenant_idx").on(t.tenantId),
+  index("msg_session_jid_idx").on(t.sessionId, t.remoteJid, t.timestamp),
+]);
 
 export const activityLogs = mysqlTable("activity_logs", {
   id: int("id").autoincrement().primaryKey(),
@@ -98,6 +106,32 @@ export const chatbotRules = mysqlTable("chatbot_rules", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 }, (t) => [
   index("idx_session_type").on(t.sessionId, t.ruleType),
+]);
+
+// ════════════════════════════════════════════════════════════
+// CONVERSATION ASSIGNMENTS (Multi-Agent / SaaS)
+// ════════════════════════════════════════════════════════════
+
+export const conversationAssignments = mysqlTable("conversation_assignments", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  sessionId: varchar("sessionId", { length: 128 }).notNull(),
+  remoteJid: varchar("remoteJid", { length: 128 }).notNull(),
+  assignedUserId: int("assignedUserId"),
+  assignedTeamId: int("assignedTeamId"),
+  status: mysqlEnum("status", ["open", "pending", "resolved", "closed"]).default("open").notNull(),
+  priority: mysqlEnum("priority", ["low", "medium", "high", "urgent"]).default("medium").notNull(),
+  lastAssignedAt: timestamp("lastAssignedAt"),
+  firstResponseAt: timestamp("firstResponseAt"),
+  resolvedAt: timestamp("resolvedAt"),
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (t) => [
+  index("ca_tenant_session_jid_idx").on(t.tenantId, t.sessionId, t.remoteJid),
+  index("ca_tenant_user_idx").on(t.tenantId, t.assignedUserId),
+  index("ca_tenant_team_idx").on(t.tenantId, t.assignedTeamId),
+  index("ca_tenant_status_idx").on(t.tenantId, t.status),
 ]);
 
 // ════════════════════════════════════════════════════════════

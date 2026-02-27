@@ -6,7 +6,8 @@ import {
   Search, MessageSquare, MoreVertical, ArrowLeft,
   Check, CheckCheck, Clock, Phone, Loader2,
   MessageCircle, Briefcase, Plus, X, Volume2, VolumeX,
-  UserPlus, Lock
+  UserPlus, Lock, Users, UserCheck, UserX, ArrowRightLeft,
+  CircleDot, ChevronDown
 } from "lucide-react";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
@@ -167,7 +168,43 @@ interface ConvItem {
   contactPushName: string | null;
   unreadCount: number | string;
   totalMessages: number | string;
+  // Multi-agent fields
+  assignedUserId?: number | null;
+  assignedTeamId?: number | null;
+  assignmentStatus?: string | null;
+  assignmentPriority?: string | null;
+  assignedAgentName?: string | null;
+  assignedAgentAvatar?: string | null;
+  lastSenderAgentId?: number | null;
 }
+
+const AgentBadge = memo(({ name, avatarUrl }: { name?: string | null; avatarUrl?: string | null }) => {
+  if (!name) return null;
+  const initials = name.split(" ").map(w => w[0]).join("").substring(0, 2).toUpperCase();
+  return (
+    <div className="flex items-center gap-1 shrink-0" title={`Atribuído a ${name}`}>
+      <div className="w-[18px] h-[18px] rounded-full bg-wa-tint/20 flex items-center justify-center overflow-hidden">
+        {avatarUrl ? (
+          <img src={avatarUrl} alt={name} className="w-full h-full object-cover" />
+        ) : (
+          <span className="text-[9px] font-bold text-wa-tint">{initials}</span>
+        )}
+      </div>
+    </div>
+  );
+});
+AgentBadge.displayName = "AgentBadge";
+
+const StatusDot = memo(({ status }: { status?: string | null }) => {
+  if (!status || status === "open") return null;
+  const colors: Record<string, string> = {
+    pending: "bg-yellow-400",
+    resolved: "bg-green-500",
+    closed: "bg-muted-foreground/40",
+  };
+  return <div className={`w-[7px] h-[7px] rounded-full shrink-0 ${colors[status] || ""}`} title={status} />;
+});
+StatusDot.displayName = "StatusDot";
 
 const ConversationItem = memo(({
   conv, isActive, contactName, pictureUrl, onClick,
@@ -186,19 +223,28 @@ const ConversationItem = memo(({
         isActive ? "bg-wa-active" : "hover:bg-wa-hover"
       }`}
     >
-      <div className="py-[6px] pr-[13px]">
+      <div className="py-[6px] pr-[13px] relative">
         <WaAvatar name={contactName} size={49} pictureUrl={pictureUrl} />
+        {/* Assignment status dot */}
+        {conv.assignmentStatus && conv.assignmentStatus !== "open" && (
+          <div className="absolute bottom-[6px] right-[10px]">
+            <StatusDot status={conv.assignmentStatus} />
+          </div>
+        )}
       </div>
       <div className="flex-1 min-w-0 py-[10px] border-b border-wa-divider">
-        <div className="flex items-baseline justify-between mb-[2px]">
-          <span className="text-[16px] text-foreground truncate leading-[21px] font-normal">
+        <div className="flex items-center justify-between mb-[2px] gap-1">
+          <span className="text-[16px] text-foreground truncate leading-[21px] font-normal flex-1 min-w-0">
             {contactName}
           </span>
-          <span className={`text-[12px] ml-[6px] shrink-0 leading-[14px] ${
-            unread > 0 ? "text-wa-unread font-medium" : "text-muted-foreground"
-          }`}>
-            {time}
-          </span>
+          <div className="flex items-center gap-[5px] shrink-0">
+            <AgentBadge name={conv.assignedAgentName} avatarUrl={conv.assignedAgentAvatar} />
+            <span className={`text-[12px] leading-[14px] ${
+              unread > 0 ? "text-wa-unread font-medium" : "text-muted-foreground"
+            }`}>
+              {time}
+            </span>
+          </div>
         </div>
         <div className="flex items-center gap-[3px]">
           <StatusTick status={conv.lastStatus} fromMe={fromMe} />
@@ -668,16 +714,19 @@ function NoSession() {
    MAIN INBOX PAGE
    ═══════════════════════════════════════════════════════ */
 
+type AgentFilter = "all" | "unread" | "mine" | "unassigned";
+
 export default function InboxPage() {
   const { lastMessage } = useSocket();
   const [selectedJid, setSelectedJid] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [searchFocused, setSearchFocused] = useState(false);
   const [showMobileChat, setShowMobileChat] = useState(false);
-  const [filter, setFilter] = useState<"all" | "unread">("all");
+  const [filter, setFilter] = useState<AgentFilter>("all");
   const [showCreateDeal, setShowCreateDeal] = useState(false);
   const [showCreateContact, setShowCreateContact] = useState(false);
   const [showNewChat, setShowNewChat] = useState(false);
+  const [showAssignPanel, setShowAssignPanel] = useState(false);
   const [isMuted, setIsMuted] = useState(() => {
     try { return localStorage.getItem(MUTE_KEY) === "true"; } catch { return false; }
   });
@@ -690,10 +739,24 @@ export default function InboxPage() {
     [sessionsQ.data]
   );
 
-  const conversationsQ = trpc.whatsapp.conversations.useQuery(
-    { sessionId: activeSession?.sessionId || "" },
+  // Multi-agent: use the new conversationsMultiAgent endpoint
+  const conversationsQ = trpc.whatsapp.conversationsMultiAgent.useQuery(
+    { sessionId: activeSession?.sessionId || "", tenantId: 1 },
     { enabled: !!activeSession?.sessionId, refetchInterval: 8000 }
   );
+
+  // Agents list for assignment
+  const agentsQ = trpc.whatsapp.agents.useQuery({ tenantId: 1 });
+  const agents = useMemo(() => (agentsQ.data || []) as Array<{ id: number; name: string; email: string; avatarUrl?: string | null; status: string }>, [agentsQ.data]);
+
+  // Assignment mutations
+  const assignMutation = trpc.whatsapp.assignConversation.useMutation({
+    onSuccess: () => { conversationsQ.refetch(); toast.success("Conversa atribuída com sucesso"); },
+    onError: (e) => toast.error(e.message || "Erro ao atribuir conversa"),
+  });
+  const updateStatusMutation = trpc.whatsapp.updateAssignmentStatus.useMutation({
+    onSuccess: () => { conversationsQ.refetch(); },
+  });
 
   const contactsQ = trpc.crm.contacts.list.useQuery(
     { tenantId: 1, limit: 500 },
@@ -777,10 +840,14 @@ export default function InboxPage() {
     }
   }, [activeSession?.sessionId, markRead]);
 
-  // Filter conversations
+  // Filter conversations (multi-agent aware)
   const filteredConvs = useMemo(() => {
     let convs = (conversationsQ.data || []) as ConvItem[];
+    // Agent-based filters
     if (filter === "unread") convs = convs.filter((c) => Number(c.unreadCount) > 0);
+    else if (filter === "mine") convs = convs.filter((c) => c.assignedUserId != null);
+    else if (filter === "unassigned") convs = convs.filter((c) => c.assignedUserId == null);
+    // Search filter
     if (search) {
       const s = search.toLowerCase();
       convs = convs.filter((c) => {
@@ -791,6 +858,40 @@ export default function InboxPage() {
     }
     return convs;
   }, [conversationsQ.data, search, filter, getDisplayName]);
+
+  // Get assignment for selected conversation
+  const selectedAssignment = useMemo(() => {
+    if (!selectedJid) return null;
+    const conv = (conversationsQ.data as ConvItem[] || []).find(c => c.remoteJid === selectedJid);
+    if (!conv) return null;
+    return {
+      assignedUserId: conv.assignedUserId,
+      assignedAgentName: conv.assignedAgentName,
+      assignmentStatus: conv.assignmentStatus,
+      assignmentPriority: conv.assignmentPriority,
+    };
+  }, [selectedJid, conversationsQ.data]);
+
+  const handleAssign = useCallback((agentId: number | null) => {
+    if (!selectedJid || !activeSession?.sessionId) return;
+    assignMutation.mutate({
+      tenantId: 1,
+      sessionId: activeSession.sessionId,
+      remoteJid: selectedJid,
+      assignedUserId: agentId,
+    });
+    setShowAssignPanel(false);
+  }, [selectedJid, activeSession?.sessionId, assignMutation]);
+
+  const handleStatusChange = useCallback((status: "open" | "pending" | "resolved" | "closed") => {
+    if (!selectedJid || !activeSession?.sessionId) return;
+    updateStatusMutation.mutate({
+      tenantId: 1,
+      sessionId: activeSession.sessionId,
+      remoteJid: selectedJid,
+      status,
+    });
+  }, [selectedJid, activeSession?.sessionId, updateStatusMutation]);
 
   // Selected contact info
   const selectedContact = useMemo(() => {
@@ -883,20 +984,27 @@ export default function InboxPage() {
           </div>
         </div>
 
-        {/* ── Filter Tabs ── */}
-        <div className="flex items-center gap-[6px] shrink-0 px-3 py-[6px]">
-          {(["all", "unread"] as const).map((f) => {
-            const labels: Record<string, string> = { all: "Todas", unread: "Não lidas" };
+        {/* ── Filter Tabs (Multi-Agent) ── */}
+        <div className="flex items-center gap-[6px] shrink-0 px-3 py-[6px] overflow-x-auto scrollbar-none">
+          {(["all", "unread", "mine", "unassigned"] as const).map((f) => {
+            const labels: Record<AgentFilter, string> = { all: "Todas", unread: "Não lidas", mine: "Minhas", unassigned: "Sem agente" };
+            const icons: Record<AgentFilter, React.ReactNode> = {
+              all: null,
+              unread: null,
+              mine: <UserCheck className="w-[12px] h-[12px]" />,
+              unassigned: <UserX className="w-[12px] h-[12px]" />,
+            };
             const active = filter === f;
             return (
               <button
                 key={f} onClick={() => setFilter(f)}
-                className={`rounded-full text-[13px] font-medium transition-colors px-3 py-[5px] ${
+                className={`rounded-full text-[13px] font-medium transition-colors px-3 py-[5px] flex items-center gap-1 shrink-0 ${
                   active
                     ? "bg-wa-tint/15 text-wa-tint"
                     : "bg-wa-search-bg text-muted-foreground hover:bg-wa-hover"
                 }`}
               >
+                {icons[f]}
                 {labels[f]}
               </button>
             );
@@ -952,6 +1060,10 @@ export default function InboxPage() {
               onCreateDeal={() => setShowCreateDeal(true)}
               onCreateContact={() => setShowCreateContact(true)}
               hasCrmContact={hasCrmContact}
+              assignment={selectedAssignment}
+              agents={agents}
+              onAssign={handleAssign}
+              onStatusChange={handleStatusChange}
             />
           </div>
         )}

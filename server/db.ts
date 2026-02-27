@@ -1,6 +1,6 @@
 import { eq, desc, and, or, like, lt, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users, whatsappSessions, waMessages as messages, activityLogs, chatbotSettings, chatbotRules } from "../drizzle/schema";
+import { InsertUser, users, whatsappSessions, waMessages as messages, activityLogs, chatbotSettings, chatbotRules, conversationAssignments, crmUsers, teams, teamMembers } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -297,6 +297,218 @@ export async function markConversationRead(sessionId: string, remoteJid: string)
     ));
 }
 
+
+// ─── Conversation Assignments (Multi-Agent) ───
+
+export async function getOrCreateAssignment(tenantId: number, sessionId: string, remoteJid: string) {
+  const db = await getDb();
+  if (!db) return null;
+  const existing = await db.select().from(conversationAssignments)
+    .where(and(
+      eq(conversationAssignments.tenantId, tenantId),
+      eq(conversationAssignments.sessionId, sessionId),
+      eq(conversationAssignments.remoteJid, remoteJid)
+    )).limit(1);
+  if (existing.length > 0) return existing[0];
+  // Auto-create assignment with status open, no agent assigned
+  await db.insert(conversationAssignments).values({ tenantId, sessionId, remoteJid, status: "open" });
+  const created = await db.select().from(conversationAssignments)
+    .where(and(
+      eq(conversationAssignments.tenantId, tenantId),
+      eq(conversationAssignments.sessionId, sessionId),
+      eq(conversationAssignments.remoteJid, remoteJid)
+    )).limit(1);
+  return created[0] || null;
+}
+
+export async function assignConversation(tenantId: number, sessionId: string, remoteJid: string, assignedUserId: number | null, assignedTeamId?: number | null) {
+  const db = await getDb();
+  if (!db) return null;
+  // Ensure assignment exists
+  await getOrCreateAssignment(tenantId, sessionId, remoteJid);
+  const updateData: any = { assignedUserId, lastAssignedAt: new Date() };
+  if (assignedTeamId !== undefined) updateData.assignedTeamId = assignedTeamId;
+  await db.update(conversationAssignments)
+    .set(updateData)
+    .where(and(
+      eq(conversationAssignments.tenantId, tenantId),
+      eq(conversationAssignments.sessionId, sessionId),
+      eq(conversationAssignments.remoteJid, remoteJid)
+    ));
+  return getOrCreateAssignment(tenantId, sessionId, remoteJid);
+}
+
+export async function updateAssignmentStatus(tenantId: number, sessionId: string, remoteJid: string, status: "open" | "pending" | "resolved" | "closed") {
+  const db = await getDb();
+  if (!db) return;
+  const updateData: any = { status };
+  if (status === "resolved") updateData.resolvedAt = new Date();
+  await db.update(conversationAssignments)
+    .set(updateData)
+    .where(and(
+      eq(conversationAssignments.tenantId, tenantId),
+      eq(conversationAssignments.sessionId, sessionId),
+      eq(conversationAssignments.remoteJid, remoteJid)
+    ));
+}
+
+export async function getAssignmentsForSession(tenantId: number, sessionId: string) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(conversationAssignments)
+    .where(and(
+      eq(conversationAssignments.tenantId, tenantId),
+      eq(conversationAssignments.sessionId, sessionId)
+    ));
+}
+
+export async function getAssignmentForConversation(tenantId: number, sessionId: string, remoteJid: string) {
+  const db = await getDb();
+  if (!db) return null;
+  const result = await db.select().from(conversationAssignments)
+    .where(and(
+      eq(conversationAssignments.tenantId, tenantId),
+      eq(conversationAssignments.sessionId, sessionId),
+      eq(conversationAssignments.remoteJid, remoteJid)
+    )).limit(1);
+  return result[0] || null;
+}
+
+// Get agents (crmUsers) for a tenant
+export async function getAgentsForTenant(tenantId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select({
+    id: crmUsers.id,
+    name: crmUsers.name,
+    email: crmUsers.email,
+    avatarUrl: crmUsers.avatarUrl,
+    status: crmUsers.status,
+  }).from(crmUsers)
+    .where(and(
+      eq(crmUsers.tenantId, tenantId),
+      eq(crmUsers.status, "active")
+    ));
+}
+
+// Get teams for a tenant
+export async function getTeamsForTenant(tenantId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(teams).where(eq(teams.tenantId, tenantId));
+}
+
+// Get conversations list with assignment info (multi-agent aware)
+export async function getConversationsListMultiAgent(sessionId: string, tenantId: number, filter?: { assignedUserId?: number; assignedTeamId?: number; status?: string; unassignedOnly?: boolean }) {
+  const db = await getDb();
+  if (!db) return [];
+  const skipTypes = [
+    'protocolMessage','senderKeyDistributionMessage','messageContextInfo',
+    'reactionMessage','ephemeralMessage','deviceSentMessage',
+    'bcallMessage','callLogMesssage','keepInChatMessage',
+    'encReactionMessage','editedMessage','viewOnceMessageV2Extension'
+  ];
+  const skipTypesSQL = skipTypes.map(t => `'${t}'`).join(',');
+  
+  // Build WHERE clause for assignment filters
+  let assignmentFilter = '';
+  if (filter?.assignedUserId) {
+    assignmentFilter += ` AND ca.assignedUserId = ${filter.assignedUserId}`;
+  }
+  if (filter?.assignedTeamId) {
+    assignmentFilter += ` AND ca.assignedTeamId = ${filter.assignedTeamId}`;
+  }
+  if (filter?.status) {
+    assignmentFilter += ` AND ca.status = '${filter.status}'`;
+  }
+  if (filter?.unassignedOnly) {
+    assignmentFilter += ` AND ca.assignedUserId IS NULL`;
+  }
+
+  const result = await db.execute(sql`
+    SELECT 
+      m.remoteJid,
+      m.content AS lastMessage,
+      m.messageType AS lastMessageType,
+      m.fromMe AS lastFromMe,
+      m.timestamp AS lastTimestamp,
+      m.status AS lastStatus,
+      m.senderAgentId AS lastSenderAgentId,
+      (
+        SELECT m4.pushName FROM messages m4 
+        WHERE m4.sessionId = ${sessionId} 
+        AND m4.remoteJid = m.remoteJid 
+        AND m4.fromMe = 0 
+        AND m4.pushName IS NOT NULL 
+        AND m4.pushName != ''
+        ORDER BY m4.id DESC LIMIT 1
+      ) AS contactPushName,
+      (
+        SELECT COUNT(*) FROM messages m2 
+        WHERE m2.sessionId = ${sessionId} 
+        AND m2.remoteJid = m.remoteJid 
+        AND m2.fromMe = 0 
+        AND (m2.status IS NULL OR m2.status = 'received')
+        AND m2.messageType NOT IN (${sql.raw(skipTypesSQL)})
+      ) AS unreadCount,
+      (
+        SELECT COUNT(*) FROM messages m3 
+        WHERE m3.sessionId = ${sessionId} 
+        AND m3.remoteJid = m.remoteJid
+        AND m3.messageType NOT IN (${sql.raw(skipTypesSQL)})
+      ) AS totalMessages,
+      ca.assignedUserId,
+      ca.assignedTeamId,
+      ca.status AS assignmentStatus,
+      ca.priority AS assignmentPriority,
+      agent.name AS assignedAgentName,
+      agent.avatarUrl AS assignedAgentAvatar
+    FROM messages m
+    INNER JOIN (
+      SELECT remoteJid, MAX(id) AS maxId
+      FROM messages
+      WHERE sessionId = ${sessionId}
+      AND remoteJid NOT LIKE '%@g.us'
+      AND messageType NOT IN (${sql.raw(skipTypesSQL)})
+      GROUP BY remoteJid
+    ) latest ON m.remoteJid = latest.remoteJid AND m.id = latest.maxId
+    LEFT JOIN conversation_assignments ca 
+      ON ca.sessionId = ${sessionId} 
+      AND ca.remoteJid = m.remoteJid
+      AND ca.tenantId = ${tenantId}
+    LEFT JOIN crm_users agent ON agent.id = ca.assignedUserId
+    WHERE m.sessionId = ${sessionId}
+    AND m.remoteJid NOT LIKE '%@g.us'
+    ${sql.raw(assignmentFilter)}
+    ORDER BY m.timestamp DESC
+  `);
+  return (result as any)[0] || [];
+}
+
+// Round-robin assignment: get next agent for a tenant
+export async function getNextRoundRobinAgent(tenantId: number): Promise<number | null> {
+  const db = await getDb();
+  if (!db) return null;
+  // Get all active agents
+  const agents = await db.select({ id: crmUsers.id }).from(crmUsers)
+    .where(and(eq(crmUsers.tenantId, tenantId), eq(crmUsers.status, "active")));
+  if (agents.length === 0) return null;
+  // Get the agent with the fewest open assignments
+  const result = await db.execute(sql`
+    SELECT cu.id, COUNT(ca.id) as assignmentCount
+    FROM crm_users cu
+    LEFT JOIN conversation_assignments ca 
+      ON ca.assignedUserId = cu.id 
+      AND ca.tenantId = ${tenantId}
+      AND ca.status IN ('open', 'pending')
+    WHERE cu.tenantId = ${tenantId} AND cu.status = 'active'
+    GROUP BY cu.id
+    ORDER BY assignmentCount ASC, cu.id ASC
+    LIMIT 1
+  `);
+  const rows = (result as any)[0];
+  return rows?.[0]?.id || null;
+}
 
 // ─── Dashboard Metrics ───
 

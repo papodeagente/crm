@@ -632,3 +632,37 @@
 - [x] Preview de mensagens legível
 - [x] Testes passando — 116 testes, 8 arquivos
 - [x] TypeScript sem erros
+
+## Multi-Usuário / SaaS Ready (v24)
+
+### Schema & Banco
+- [x] Criar tabela conversation_assignments (tenantId, sessionId, remoteJid, assignedUserId, assignedTeamId, status, lastAssignedAt)
+- [x] Adicionar tenantId à tabela whatsapp_sessions para isolamento multi-tenant
+- [x] Adicionar tenantId à tabela messages para isolamento multi-tenant
+- [x] Vincular whatsapp_sessions ao tenant (não apenas ao userId do Manus auth)
+
+### Backend — Atribuição de Conversas
+- [x] Procedure para atribuir conversa a um agente (crmUser)
+- [x] Procedure para transferir conversa entre agentes
+- [x] Procedure para listar conversas filtradas por agente/equipe/status
+- [x] Procedure para listar agentes disponíveis no tenant
+- [x] Atribuição automática round-robin quando nova conversa chega (opcional)
+- [x] Filtro de conversas por: minhas, da equipe, não atribuídas, todas
+
+### Backend — Isolamento Multi-Tenant
+- [x] getConversationsList filtrado por tenantId
+- [x] Sessões WhatsApp vinculadas ao tenant
+- [x] Mensagens filtradas por tenant
+- [x] Notificações direcionadas ao agente atribuído
+
+### Frontend — Inbox Multi-Agente
+- [x] Filtros no sidebar: Minhas, Equipe, Não atribuídas, Todas
+- [x] Indicador de agente atribuído em cada conversa
+- [x] Botão de atribuir/transferir no header do chat
+- [x] Dropdown de seleção de agente com avatar e nome
+- [x] Badge com iniciais do agente na lista de conversas
+
+### Testes
+- [x] Testes de atribuição de conversa
+- [x] Testes de filtro por agente/equipe
+- [x] Testes de isolamento multi-tenant — 131 testes, 8 arquivos, todos passando

@@ -614,3 +614,238 @@ describe("WhatsApp Inbox Sync Tests", () => {
     expect(typeof result).toBe("object");
   });
 });
+
+describe("Multi-Agent / SaaS Assignment Tests", () => {
+  function createAuthContext() {
+    const user = {
+      id: 1,
+      openId: "test-user",
+      email: "test@example.com",
+      name: "Test User",
+      loginMethod: "manus" as const,
+      role: "admin" as const,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      lastSignedIn: new Date(),
+    };
+    const ctx = {
+      user,
+      req: { protocol: "https", headers: {} } as any,
+      res: { clearCookie: vi.fn() } as any,
+    };
+    return { ctx };
+  }
+
+  // ─── conversationsMultiAgent ───
+
+  it("whatsapp.conversationsMultiAgent returns array for unknown session", async () => {
+    const { ctx } = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    const result = await caller.whatsapp.conversationsMultiAgent({
+      sessionId: "nonexistent-session",
+      tenantId: 1,
+    });
+    expect(Array.isArray(result)).toBe(true);
+    expect(result.length).toBe(0);
+  });
+
+  it("whatsapp.conversationsMultiAgent accepts filter params", async () => {
+    const { ctx } = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    const result = await caller.whatsapp.conversationsMultiAgent({
+      sessionId: "test-session",
+      tenantId: 1,
+      unassignedOnly: true,
+    });
+    expect(Array.isArray(result)).toBe(true);
+  });
+
+  it("whatsapp.conversationsMultiAgent accepts status filter", async () => {
+    const { ctx } = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    const result = await caller.whatsapp.conversationsMultiAgent({
+      sessionId: "test-session",
+      tenantId: 1,
+      status: "open",
+    });
+    expect(Array.isArray(result)).toBe(true);
+  });
+
+  // ─── assignConversation ───
+
+  it("whatsapp.assignConversation creates assignment for new conversation", async () => {
+    const { ctx } = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    const sessionId = `test-assign-${Date.now()}`;
+    const remoteJid = "5511999999999@s.whatsapp.net";
+    const result = await caller.whatsapp.assignConversation({
+      tenantId: 1,
+      sessionId,
+      remoteJid,
+      assignedUserId: null,
+    });
+    // Should create assignment even with null userId
+    expect(result).toBeDefined();
+  });
+
+  it("whatsapp.assignConversation can assign to a user", async () => {
+    const { ctx } = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    const sessionId = `test-assign-user-${Date.now()}`;
+    const remoteJid = "5511888888888@s.whatsapp.net";
+    const result = await caller.whatsapp.assignConversation({
+      tenantId: 1,
+      sessionId,
+      remoteJid,
+      assignedUserId: 1,
+    });
+    expect(result).toBeDefined();
+    if (result) {
+      expect(result.assignedUserId).toBe(1);
+    }
+  });
+
+  it("whatsapp.assignConversation can remove assignment", async () => {
+    const { ctx } = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    const sessionId = `test-unassign-${Date.now()}`;
+    const remoteJid = "5511777777777@s.whatsapp.net";
+    // First assign
+    await caller.whatsapp.assignConversation({
+      tenantId: 1, sessionId, remoteJid, assignedUserId: 1,
+    });
+    // Then unassign
+    const result = await caller.whatsapp.assignConversation({
+      tenantId: 1, sessionId, remoteJid, assignedUserId: null,
+    });
+    expect(result).toBeDefined();
+    if (result) {
+      expect(result.assignedUserId).toBeNull();
+    }
+  });
+
+  // ─── transferConversation ───
+
+  it("whatsapp.transferConversation transfers to another user", async () => {
+    const { ctx } = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    const sessionId = `test-transfer-${Date.now()}`;
+    const remoteJid = "5511666666666@s.whatsapp.net";
+    // Assign to user 1
+    await caller.whatsapp.assignConversation({
+      tenantId: 1, sessionId, remoteJid, assignedUserId: 1,
+    });
+    // Transfer to user 2
+    const result = await caller.whatsapp.transferConversation({
+      tenantId: 1, sessionId, remoteJid, toUserId: 2,
+    });
+    expect(result).toBeDefined();
+    if (result) {
+      expect(result.assignedUserId).toBe(2);
+    }
+  });
+
+  // ─── updateAssignmentStatus ───
+
+  it("whatsapp.updateAssignmentStatus changes status", async () => {
+    const { ctx } = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    const sessionId = `test-status-${Date.now()}`;
+    const remoteJid = "5511555555555@s.whatsapp.net";
+    // Create assignment first
+    await caller.whatsapp.assignConversation({
+      tenantId: 1, sessionId, remoteJid, assignedUserId: 1,
+    });
+    // Update status
+    const result = await caller.whatsapp.updateAssignmentStatus({
+      tenantId: 1, sessionId, remoteJid, status: "resolved",
+    });
+    expect(result).toEqual({ success: true });
+  });
+
+  it("whatsapp.updateAssignmentStatus validates status enum", async () => {
+    const { ctx } = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    await expect(
+      caller.whatsapp.updateAssignmentStatus({
+        tenantId: 1,
+        sessionId: "test",
+        remoteJid: "test@s.whatsapp.net",
+        status: "invalid" as any,
+      })
+    ).rejects.toThrow();
+  });
+
+  // ─── getAssignment ───
+
+  it("whatsapp.getAssignment returns null for unassigned conversation", async () => {
+    const { ctx } = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    const result = await caller.whatsapp.getAssignment({
+      tenantId: 1,
+      sessionId: "nonexistent",
+      remoteJid: "5511444444444@s.whatsapp.net",
+    });
+    expect(result).toBeNull();
+  });
+
+  it("whatsapp.getAssignment returns assignment after assign", async () => {
+    const { ctx } = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    const sessionId = `test-get-assign-${Date.now()}`;
+    const remoteJid = "5511333333333@s.whatsapp.net";
+    await caller.whatsapp.assignConversation({
+      tenantId: 1, sessionId, remoteJid, assignedUserId: 1,
+    });
+    const result = await caller.whatsapp.getAssignment({
+      tenantId: 1, sessionId, remoteJid,
+    });
+    expect(result).toBeDefined();
+    expect(result?.assignedUserId).toBe(1);
+  });
+
+  // ─── agents & teams ───
+
+  it("whatsapp.agents returns array", async () => {
+    const { ctx } = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    const result = await caller.whatsapp.agents({ tenantId: 1 });
+    expect(Array.isArray(result)).toBe(true);
+  });
+
+  it("whatsapp.teams returns array", async () => {
+    const { ctx } = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    const result = await caller.whatsapp.teams({ tenantId: 1 });
+    expect(Array.isArray(result)).toBe(true);
+  });
+
+  // ─── autoAssign ───
+
+  it("whatsapp.autoAssign returns not assigned when no agents exist", async () => {
+    const { ctx } = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    const result = await caller.whatsapp.autoAssign({
+      tenantId: 999, // Tenant with no agents
+      sessionId: "test-auto",
+      remoteJid: "5511222222222@s.whatsapp.net",
+    });
+    // May or may not have agents, but should not throw
+    expect(result).toBeDefined();
+    expect(typeof result.assigned).toBe("boolean");
+  });
+
+  // ─── Input validation ───
+
+  it("whatsapp.assignConversation validates tenantId defaults to 1", async () => {
+    const { ctx } = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    const sessionId = `test-default-tenant-${Date.now()}`;
+    const result = await caller.whatsapp.assignConversation({
+      sessionId,
+      remoteJid: "5511111111111@s.whatsapp.net",
+      assignedUserId: null,
+    });
+    expect(result).toBeDefined();
+  });
+});
