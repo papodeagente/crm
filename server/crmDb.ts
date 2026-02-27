@@ -174,7 +174,7 @@ export async function listDeletedContacts(tenantId: number, limit = 50) {
 }
 export async function countContacts(tenantId: number) {
   const db = await getDb(); if (!db) return 0;
-  const rows = await db.select({ count: sql<number>`count(*)` }).from(contacts).where(eq(contacts.tenantId, tenantId));
+  const rows = await db.select({ count: sql<number>`count(*)` }).from(contacts).where(and(eq(contacts.tenantId, tenantId), isNull(contacts.deletedAt)));
   return rows[0]?.count || 0;
 }
 
@@ -252,14 +252,14 @@ export async function updateDeal(tenantId: number, id: number, data: Partial<{ t
 }
 export async function countDeals(tenantId: number, status?: string) {
   const db = await getDb(); if (!db) return 0;
-  const conditions = [eq(deals.tenantId, tenantId)];
+  const conditions: any[] = [eq(deals.tenantId, tenantId), isNull(deals.deletedAt)];
   if (status) conditions.push(eq(deals.status, status as any));
   const rows = await db.select({ count: sql<number>`count(*)` }).from(deals).where(and(...conditions));
   return rows[0]?.count || 0;
 }
 export async function sumDealValue(tenantId: number, status?: string) {
   const db = await getDb(); if (!db) return 0;
-  const conditions = [eq(deals.tenantId, tenantId)];
+  const conditions: any[] = [eq(deals.tenantId, tenantId), isNull(deals.deletedAt)];
   if (status) conditions.push(eq(deals.status, status as any));
   const rows = await db.select({ total: sql<number>`COALESCE(SUM(valueCents), 0)` }).from(deals).where(and(...conditions));
   return rows[0]?.total || 0;

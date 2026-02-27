@@ -574,19 +574,19 @@ export async function getDashboardMetrics(tenantId: number) {
 
   const [result] = await db.execute(sql`
     SELECT
-      -- Active deals (status = 'open')
-      (SELECT COUNT(*) FROM deals WHERE tenantId = ${tenantId} AND status = 'open') AS activeDeals,
+      -- Active deals (status = 'open', not deleted)
+      (SELECT COUNT(*) FROM deals WHERE tenantId = ${tenantId} AND status = 'open' AND deletedAt IS NULL) AS activeDeals,
       -- Deals created in last 30 days
-      (SELECT COUNT(*) FROM deals WHERE tenantId = ${tenantId} AND status = 'open' AND createdAt >= ${thirtyDaysAgo}) AS dealsLast30,
+      (SELECT COUNT(*) FROM deals WHERE tenantId = ${tenantId} AND status = 'open' AND deletedAt IS NULL AND createdAt >= ${thirtyDaysAgo}) AS dealsLast30,
       -- Deals created in previous 30 days (30-60 days ago)
-      (SELECT COUNT(*) FROM deals WHERE tenantId = ${tenantId} AND status = 'open' AND createdAt >= ${sixtyDaysAgo} AND createdAt < ${thirtyDaysAgo}) AS dealsPrev30,
+      (SELECT COUNT(*) FROM deals WHERE tenantId = ${tenantId} AND status = 'open' AND deletedAt IS NULL AND createdAt >= ${sixtyDaysAgo} AND createdAt < ${thirtyDaysAgo}) AS dealsPrev30,
 
-      -- Total contacts
-      (SELECT COUNT(*) FROM contacts WHERE tenantId = ${tenantId}) AS totalContacts,
+      -- Total contacts (not deleted)
+      (SELECT COUNT(*) FROM contacts WHERE tenantId = ${tenantId} AND deletedAt IS NULL) AS totalContacts,
       -- Contacts created in last 30 days
-      (SELECT COUNT(*) FROM contacts WHERE tenantId = ${tenantId} AND createdAt >= ${thirtyDaysAgo}) AS contactsLast30,
+      (SELECT COUNT(*) FROM contacts WHERE tenantId = ${tenantId} AND deletedAt IS NULL AND createdAt >= ${thirtyDaysAgo}) AS contactsLast30,
       -- Contacts created in previous 30 days
-      (SELECT COUNT(*) FROM contacts WHERE tenantId = ${tenantId} AND createdAt >= ${sixtyDaysAgo} AND createdAt < ${thirtyDaysAgo}) AS contactsPrev30,
+      (SELECT COUNT(*) FROM contacts WHERE tenantId = ${tenantId} AND deletedAt IS NULL AND createdAt >= ${sixtyDaysAgo} AND createdAt < ${thirtyDaysAgo}) AS contactsPrev30,
 
       -- Active trips (planning, confirmed, in_progress)
       (SELECT COUNT(*) FROM trips WHERE tenantId = ${tenantId} AND status IN ('planning', 'confirmed', 'in_progress')) AS activeTrips,
@@ -641,7 +641,7 @@ export async function getPipelineSummary(tenantId: number) {
       COUNT(d.id) AS dealCount,
       COALESCE(SUM(d.valueCents), 0) AS totalValueCents
     FROM pipeline_stages ps
-    LEFT JOIN deals d ON d.stageId = ps.id AND d.tenantId = ${tenantId} AND d.status = 'open'
+    LEFT JOIN deals d ON d.stageId = ps.id AND d.tenantId = ${tenantId} AND d.status = 'open' AND d.deletedAt IS NULL
     WHERE ps.tenantId = ${tenantId}
     GROUP BY ps.id, ps.name, ps.orderIndex
     ORDER BY ps.orderIndex ASC

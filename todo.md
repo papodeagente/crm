@@ -1079,11 +1079,18 @@
 
 ## Bug: Criação Aleatória de Funis e Filtro de Funis Ativos
 
-- [ ] Corrigir bug de criação aleatória de funis e etapas
-- [ ] Filtrar apenas funis ativos (não arquivados) no seletor de pipeline
+- [x] Corrigir bug de criação aleatória de funis e etapas
+- [x] Filtrar apenas funis ativos (não arquivados) no seletor de pipeline
 
 ## Bug: Exclusão de negociações não funciona + Adicionar na visão de lista do Pipeline
 
 - [x] Corrigir exclusão de negociações que não está funcionando
 - [x] Adicionar seleção múltipla e exclusão em massa na visão de lista do Pipeline
 - [x] Filtrar apenas funis ativos no seletor do Pipeline
+
+## Integrar Monitor no Dashboard de Análises + Dados Reais
+
+- [x] Mover painel de monitoramento de mensagens para dentro do dashboard de Análises
+- [x] Deixar claro que são dados de mensagens WhatsApp no dashboard de Análises
+- [x] Ativar captação de dados reais em todos os dashboards (Home, Análises)
+- [x] Remover rota e link do Monitor antigo da navegação
