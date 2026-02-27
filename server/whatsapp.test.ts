@@ -1201,4 +1201,61 @@ describe("customFields", () => {
       await caller.customFields.delete({ tenantId: 1, id: created.id });
     });
   });
+
+  /* ════════════════════════════════════════════════════════════ */
+  /* DealDetail Page Backend Tests                                */
+  /* ════════════════════════════════════════════════════════════ */
+  describe("DealDetail page backend", () => {
+    it("should list deal history entries", async () => {
+      const caller = appRouter.createCaller(createAuthContext().ctx);
+      const result = await caller.crm.deals.history.list({ tenantId: 1, dealId: 9999 });
+      expect(Array.isArray(result)).toBe(true);
+    });
+
+    it("should list deal notes", async () => {
+      const caller = appRouter.createCaller(createAuthContext().ctx);
+      const result = await caller.crm.notes.list({ tenantId: 1, entityType: "deal", entityId: 9999 });
+      expect(Array.isArray(result)).toBe(true);
+    });
+
+    it("should list deal products", async () => {
+      const caller = appRouter.createCaller(createAuthContext().ctx);
+      const result = await caller.crm.deals.products.list({ tenantId: 1, dealId: 9999 });
+      expect(Array.isArray(result)).toBe(true);
+    });
+
+    it("should list deal participants", async () => {
+      const caller = appRouter.createCaller(createAuthContext().ctx);
+      const result = await caller.crm.deals.participants.list({ tenantId: 1, dealId: 9999 });
+      expect(Array.isArray(result)).toBe(true);
+    });
+
+    it("should list deal tasks", async () => {
+      const caller = appRouter.createCaller(createAuthContext().ctx);
+      const result = await caller.crm.tasks.list({ tenantId: 1, entityType: "deal", entityId: 9999 });
+      expect(Array.isArray(result)).toBe(true);
+    });
+
+    it("should get custom field values for a deal", async () => {
+      const caller = appRouter.createCaller(createAuthContext().ctx);
+      const result = await caller.contactProfile.getCustomFieldValues({ tenantId: 1, entityType: "deal", entityId: 9999 });
+      expect(Array.isArray(result)).toBe(true);
+    });
+
+    it("should list custom fields for deal entity", async () => {
+      const caller = appRouter.createCaller(createAuthContext().ctx);
+      const result = await caller.customFields.list({ tenantId: 1, entity: "deal" });
+      expect(Array.isArray(result)).toBe(true);
+    });
+
+    it("should list pipeline stages", async () => {
+      const caller = appRouter.createCaller(createAuthContext().ctx);
+      const pipelines = await caller.crm.pipelines.list({ tenantId: 1 });
+      expect(Array.isArray(pipelines)).toBe(true);
+      if (pipelines.length > 0) {
+        const stages = await caller.crm.pipelines.stages({ tenantId: 1, pipelineId: pipelines[0].id });
+        expect(Array.isArray(stages)).toBe(true);
+      }
+    });
+  });
 });

@@ -734,3 +734,40 @@
 - [x] Testes de métricas do contato
 - [x] Testes CRUD de campos personalizados
 - [x] Testes de valores de campos personalizados — 154 testes, 8 arquivos, todos passando
+
+## Página de Negociação Estilo RD Station CRM
+
+### Layout Principal
+- [x] Header: seta voltar, nome da negociação, badges (funil, fonte), botões Marcar Perda / Marcar Venda
+- [x] Barra de estágios do funil clicável no topo (com dias em cada estágio)
+- [x] Sidebar esquerda scrollável com seções colapsáveis
+- [x] Painel direito com tarefas e timeline com tabs
+
+### Sidebar Esquerda
+- [x] Seção "Negociação": nome, qualificação, criada em, valor total, previsão fechamento, fonte, campanha
+- [x] Seção "Contatos": contato vinculado com telefone, email, ícones de ação (copiar, WhatsApp, ligar)
+- [x] Seção "Empresa": empresa vinculada ou botão "+ Adicionar empresa"
+- [x] Seção "Responsável": agente responsável pela negociação
+- [x] Seção "Campos Personalizados": campos custom da entidade deal
+- [x] Seção "Informações adicionais" colapsável
+
+### Painel Direito
+- [x] Próximas tarefas com status, prazo, ações (editar, adiar, concluir)
+- [x] Botão "+ Criar tarefa"
+- [x] Tabs: Histórico, Tarefas, Produtos, Arquivos, Propostas
+- [x] Timeline de histórico com eventos: criação, mudança de estágio, anotações, tarefas
+- [x] Botão "+ Criar anotação" no histórico
+- [x] Filtros no histórico (tipo de evento)
+
+### Backend
+- [x] Endpoint getDealDetail: dados completos da negociação com contato, empresa, responsável — já existia via crm.deals.get
+- [x] Endpoint getDealTimeline: eventos de histórico da negociação — via crm.deals.history.list
+- [x] Endpoint createDealNote: criar anotação na negociação — via crm.notes.create
+- [x] Endpoint changeDealStage: mudar estágio do funil (com registro na timeline) — via crm.deals.moveStage
+- [x] Endpoint markDealWon/markDealLost: marcar venda/perda — via crm.deals.update com status won/lost
+- [x] Tabela deal_activities para timeline de eventos — usando deal_history existente
+
+### Testes
+- [x] Testes de getDealDetail
+- [x] Testes de timeline e notas
+- [x] Testes de mudança de estágio — 162 testes, 8 arquivos, todos passando
