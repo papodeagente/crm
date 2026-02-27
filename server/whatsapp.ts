@@ -17,7 +17,7 @@ import { getDb, createNotification } from "./db";
 import { whatsappSessions, waMessages as messages, activityLogs, chatbotSettings, chatbotRules } from "../drizzle/schema";
 import { eq, desc, and, gte, sql } from "drizzle-orm";
 import { invokeLLM } from "./_core/llm";
-import { notifyOwner } from "./_core/notification";
+// notifyOwner desativado — todas as notificações são apenas in-app
 import { storagePut } from "./storage";
 import { nanoid } from "nanoid";
 import { normalizeJid } from "./phoneUtils";
@@ -117,10 +117,16 @@ class WhatsAppManager extends EventEmitter {
         await this.logActivity(sessionId, "disconnected", `Desconectado. Código: ${statusCode}`);
         await this.updateSessionDb(sessionId, userId, "disconnected");
 
-        await notifyOwner({
-          title: "WhatsApp Desconectado",
-          content: `A sessão "${sessionId}" foi desconectada. Código: ${statusCode}. ${shouldReconnect ? "Tentando reconectar..." : "Sessão encerrada pelo usuário."}`,
-        });
+        // notifyOwner desativado — notificações apenas in-app
+        try {
+          await createNotification(1, {
+            type: "whatsapp_disconnected",
+            title: "WhatsApp Desconectado",
+            body: `Sessão "${sessionId}" desconectada. Código: ${statusCode}. ${shouldReconnect ? "Tentando reconectar..." : "Sessão encerrada."}`,
+            entityType: "session",
+            entityId: sessionId,
+          });
+        } catch (e) { console.error("Error creating disconnect notification:", e); }
 
         if (shouldReconnect) {
           const timer = setTimeout(() => {
@@ -144,10 +150,16 @@ class WhatsAppManager extends EventEmitter {
         await this.logActivity(sessionId, "connected", `Conectado como ${sock.user?.name || sock.user?.id}`);
         await this.updateSessionDb(sessionId, userId, "connected", sock.user);
 
-        await notifyOwner({
-          title: "WhatsApp Conectado",
-          content: `A sessão "${sessionId}" foi conectada com sucesso como ${sock.user?.name || sock.user?.id}.`,
-        });
+        // notifyOwner desativado — notificações apenas in-app
+        try {
+          await createNotification(1, {
+            type: "whatsapp_connected",
+            title: "WhatsApp Conectado",
+            body: `Sessão "${sessionId}" conectada como ${sock.user?.name || sock.user?.id}.`,
+            entityType: "session",
+            entityId: sessionId,
+          });
+        } catch (e) { console.error("Error creating connect notification:", e); }
 
         // Sync historical messages on connect
         this.syncHistoricalMessages(sessionId, sock).catch((e: any) =>
@@ -376,14 +388,9 @@ class WhatsAppManager extends EventEmitter {
           await this.handleChatbot(sessionId, remoteJid, content, sock);
         }
 
-        // Notify owner of incoming messages
+        // Notificação apenas in-app (notifyOwner/email desativado)
         if (!fromMe && content) {
           const senderName = msg.pushName || remoteJid.replace("@s.whatsapp.net", "");
-          await notifyOwner({
-            title: "Nova Mensagem no WhatsApp",
-            content: `De: ${senderName}\nMensagem: ${content.substring(0, 200)}`,
-          });
-          // Create in-app notification
           try {
             await createNotification(1, {
               type: "whatsapp_message",
