@@ -1,4 +1,4 @@
-import { eq, and, desc, asc, like, sql, inArray, count, sum, gte, lt } from "drizzle-orm";
+import { eq, and, desc, asc, like, sql, inArray, count, sum, gte, lt, isNull, isNotNull } from "drizzle-orm";
 import { getDb } from "./db";
 import {
   tenants, crmUsers, teams, teamMembers, roles, permissions, rolePermissions, userRoles, apiKeys,
@@ -129,13 +129,12 @@ export async function getContactById(tenantId: number, id: number) {
   const rows = await db.select().from(contacts).where(and(eq(contacts.id, id), eq(contacts.tenantId, tenantId))).limit(1);
   return rows[0] || null;
 }
-export async function listContacts(tenantId: number, opts?: { search?: string; stage?: string; limit?: number; offset?: number }) {
+export async function listContacts(tenantId: number, opts?: { search?: string; stage?: string; limit?: number; offset?: number; includeDeleted?: boolean }) {
   const db = await getDb(); if (!db) return [];
-  let q = db.select().from(contacts).where(eq(contacts.tenantId, tenantId));
-  if (opts?.search) {
-    q = db.select().from(contacts).where(and(eq(contacts.tenantId, tenantId), like(contacts.name, `%${opts.search}%`)));
-  }
-  return q.orderBy(desc(contacts.updatedAt)).limit(opts?.limit || 50).offset(opts?.offset || 0);
+  const conditions: any[] = [eq(contacts.tenantId, tenantId)];
+  if (!opts?.includeDeleted) conditions.push(isNull(contacts.deletedAt));
+  if (opts?.search) conditions.push(like(contacts.name, `%${opts.search}%`));
+  return db.select().from(contacts).where(and(...conditions)).orderBy(desc(contacts.updatedAt)).limit(opts?.limit || 50).offset(opts?.offset || 0);
 }
 export async function updateContact(tenantId: number, id: number, data: Partial<{ name: string; email: string; phone: string; lifecycleStage: "lead" | "prospect" | "customer" | "churned"; notes: string; ownerUserId: number; updatedBy: number }>) {
   const db = await getDb(); if (!db) return;
@@ -149,7 +148,29 @@ export async function updateContact(tenantId: number, id: number, data: Partial<
 }
 export async function deleteContact(tenantId: number, id: number) {
   const db = await getDb(); if (!db) return;
-  await db.delete(contacts).where(and(eq(contacts.id, id), eq(contacts.tenantId, tenantId)));
+  await db.update(contacts).set({ deletedAt: new Date() }).where(and(eq(contacts.id, id), eq(contacts.tenantId, tenantId)));
+}
+export async function bulkSoftDeleteContacts(tenantId: number, ids: number[]) {
+  const db = await getDb(); if (!db) return 0;
+  if (ids.length === 0) return 0;
+  const result = await db.update(contacts).set({ deletedAt: new Date() }).where(and(eq(contacts.tenantId, tenantId), inArray(contacts.id, ids)));
+  return (result as any)[0]?.affectedRows ?? ids.length;
+}
+export async function hardDeleteContacts(tenantId: number, ids: number[]) {
+  const db = await getDb(); if (!db) return 0;
+  if (ids.length === 0) return 0;
+  const result = await db.delete(contacts).where(and(eq(contacts.tenantId, tenantId), inArray(contacts.id, ids)));
+  return (result as any)[0]?.affectedRows ?? ids.length;
+}
+export async function restoreContacts(tenantId: number, ids: number[]) {
+  const db = await getDb(); if (!db) return 0;
+  if (ids.length === 0) return 0;
+  const result = await db.update(contacts).set({ deletedAt: null }).where(and(eq(contacts.tenantId, tenantId), inArray(contacts.id, ids)));
+  return (result as any)[0]?.affectedRows ?? ids.length;
+}
+export async function listDeletedContacts(tenantId: number, limit = 50) {
+  const db = await getDb(); if (!db) return [];
+  return db.select().from(contacts).where(and(eq(contacts.tenantId, tenantId), isNotNull(contacts.deletedAt))).orderBy(desc(contacts.deletedAt)).limit(limit);
 }
 export async function countContacts(tenantId: number) {
   const db = await getDb(); if (!db) return 0;
@@ -192,12 +213,35 @@ export async function getDealById(tenantId: number, id: number) {
   const rows = await db.select().from(deals).where(and(eq(deals.id, id), eq(deals.tenantId, tenantId))).limit(1);
   return rows[0] || null;
 }
-export async function listDeals(tenantId: number, opts?: { pipelineId?: number; stageId?: number; status?: string; limit?: number; offset?: number }) {
+export async function listDeals(tenantId: number, opts?: { pipelineId?: number; stageId?: number; status?: string; limit?: number; offset?: number; includeDeleted?: boolean }) {
   const db = await getDb(); if (!db) return [];
-  const conditions = [eq(deals.tenantId, tenantId)];
+  const conditions: any[] = [eq(deals.tenantId, tenantId)];
+  if (!opts?.includeDeleted) conditions.push(isNull(deals.deletedAt));
   if (opts?.pipelineId) conditions.push(eq(deals.pipelineId, opts.pipelineId));
   if (opts?.stageId) conditions.push(eq(deals.stageId, opts.stageId));
   return db.select().from(deals).where(and(...conditions)).orderBy(desc(deals.lastActivityAt)).limit(opts?.limit || 50).offset(opts?.offset || 0);
+}
+export async function bulkSoftDeleteDeals(tenantId: number, ids: number[]) {
+  const db = await getDb(); if (!db) return 0;
+  if (ids.length === 0) return 0;
+  const result = await db.update(deals).set({ deletedAt: new Date() }).where(and(eq(deals.tenantId, tenantId), inArray(deals.id, ids)));
+  return (result as any)[0]?.affectedRows ?? ids.length;
+}
+export async function hardDeleteDeals(tenantId: number, ids: number[]) {
+  const db = await getDb(); if (!db) return 0;
+  if (ids.length === 0) return 0;
+  const result = await db.delete(deals).where(and(eq(deals.tenantId, tenantId), inArray(deals.id, ids)));
+  return (result as any)[0]?.affectedRows ?? ids.length;
+}
+export async function restoreDeals(tenantId: number, ids: number[]) {
+  const db = await getDb(); if (!db) return 0;
+  if (ids.length === 0) return 0;
+  const result = await db.update(deals).set({ deletedAt: null }).where(and(eq(deals.tenantId, tenantId), inArray(deals.id, ids)));
+  return (result as any)[0]?.affectedRows ?? ids.length;
+}
+export async function listDeletedDeals(tenantId: number, limit = 50) {
+  const db = await getDb(); if (!db) return [];
+  return db.select().from(deals).where(and(eq(deals.tenantId, tenantId), isNotNull(deals.deletedAt))).orderBy(desc(deals.deletedAt)).limit(limit);
 }
 export async function updateDeal(tenantId: number, id: number, data: Partial<{ title: string; stageId: number; status: "open" | "won" | "lost"; valueCents: number; probability: number; ownerUserId: number; updatedBy: number }>) {
   const db = await getDb(); if (!db) return;

@@ -60,6 +60,36 @@ export const crmRouter = router({
       .query(async ({ input }) => {
         return crm.countContacts(input.tenantId);
       }),
+    bulkDelete: protectedProcedure
+      .input(z.object({ tenantId: z.number(), ids: z.array(z.number()).min(1).max(500) }))
+      .mutation(async ({ ctx, input }) => {
+        const count = await crm.bulkSoftDeleteContacts(input.tenantId, input.ids);
+        for (const id of input.ids) {
+          await emitEvent({ tenantId: input.tenantId, actorUserId: ctx.user.id, entityType: "contact", entityId: id, action: "delete" });
+        }
+        return { success: true, count };
+      }),
+    listDeleted: protectedProcedure
+      .input(z.object({ tenantId: z.number(), limit: z.number().default(50) }))
+      .query(async ({ input }) => {
+        return crm.listDeletedContacts(input.tenantId, input.limit);
+      }),
+    restore: protectedProcedure
+      .input(z.object({ tenantId: z.number(), ids: z.array(z.number()).min(1).max(500) }))
+      .mutation(async ({ ctx, input }) => {
+        const count = await crm.restoreContacts(input.tenantId, input.ids);
+        for (const id of input.ids) {
+          await emitEvent({ tenantId: input.tenantId, actorUserId: ctx.user.id, entityType: "contact", entityId: id, action: "restore" });
+        }
+        return { success: true, count };
+      }),
+    hardDelete: protectedProcedure
+      .input(z.object({ tenantId: z.number(), ids: z.array(z.number()).min(1).max(500) }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.role !== "admin") throw new Error("Apenas administradores podem excluir permanentemente.");
+        const count = await crm.hardDeleteContacts(input.tenantId, input.ids);
+        return { success: true, count };
+      }),
   }),
 
   // ─── ACCOUNTS ───
@@ -330,6 +360,46 @@ export const crmRouter = router({
       .input(z.object({ tenantId: z.number(), status: z.string().optional() }))
       .query(async ({ input }) => {
         return crm.countDeals(input.tenantId, input.status);
+      }),
+    bulkDelete: protectedProcedure
+      .input(z.object({ tenantId: z.number(), ids: z.array(z.number()).min(1).max(500) }))
+      .mutation(async ({ ctx, input }) => {
+        const count = await crm.bulkSoftDeleteDeals(input.tenantId, input.ids);
+        for (const id of input.ids) {
+          await crm.createDealHistory({
+            tenantId: input.tenantId, dealId: id, action: "deleted",
+            description: "Negociação movida para lixeira",
+            actorUserId: ctx.user.id, actorName: ctx.user.name || "Sistema",
+          });
+          await emitEvent({ tenantId: input.tenantId, actorUserId: ctx.user.id, entityType: "deal", entityId: id, action: "delete" });
+        }
+        return { success: true, count };
+      }),
+    listDeleted: protectedProcedure
+      .input(z.object({ tenantId: z.number(), limit: z.number().default(50) }))
+      .query(async ({ input }) => {
+        return crm.listDeletedDeals(input.tenantId, input.limit);
+      }),
+    restore: protectedProcedure
+      .input(z.object({ tenantId: z.number(), ids: z.array(z.number()).min(1).max(500) }))
+      .mutation(async ({ ctx, input }) => {
+        const count = await crm.restoreDeals(input.tenantId, input.ids);
+        for (const id of input.ids) {
+          await crm.createDealHistory({
+            tenantId: input.tenantId, dealId: id, action: "restored",
+            description: "Negociação restaurada da lixeira",
+            actorUserId: ctx.user.id, actorName: ctx.user.name || "Sistema",
+          });
+          await emitEvent({ tenantId: input.tenantId, actorUserId: ctx.user.id, entityType: "deal", entityId: id, action: "restore" });
+        }
+        return { success: true, count };
+      }),
+    hardDelete: protectedProcedure
+      .input(z.object({ tenantId: z.number(), ids: z.array(z.number()).min(1).max(500) }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.role !== "admin") throw new Error("Apenas administradores podem excluir permanentemente.");
+        const count = await crm.hardDeleteDeals(input.tenantId, input.ids);
+        return { success: true, count };
       }),
     totalValue: protectedProcedure
       .input(z.object({ tenantId: z.number(), status: z.string().optional() }))

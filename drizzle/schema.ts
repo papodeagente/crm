@@ -288,6 +288,7 @@ export const contacts = mysqlTable("contacts", {
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   createdBy: int("createdBy"),
   updatedBy: int("updatedBy"),
+  deletedAt: timestamp("deletedAt"),
 }, (t) => [
   index("contacts_tenant_idx").on(t.tenantId),
   index("contacts_owner_idx").on(t.tenantId, t.ownerUserId),
@@ -381,6 +382,7 @@ export const deals = mysqlTable("deals", {
   createdBy: int("createdBy"),
   updatedBy: int("updatedBy"),
   waConversationId: int("waConversationId"),
+  deletedAt: timestamp("deletedAt"),
 }, (t) => [
   index("deals_tenant_pipeline_idx").on(t.tenantId, t.pipelineId, t.stageId),
   index("deals_tenant_status_idx").on(t.tenantId, t.status, t.lastActivityAt),

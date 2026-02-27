@@ -4,10 +4,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Plus, Briefcase, MoreHorizontal, Trash2, TrendingUp, DollarSign } from "lucide-react";
-import { useState } from "react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Plus, Briefcase, MoreHorizontal, Trash2, TrendingUp, DollarSign, RotateCcw, AlertTriangle, Archive } from "lucide-react";
+import { useState, useMemo } from "react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
+import { useAuth } from "@/_core/hooks/useAuth";
 
 const TENANT_ID = 1;
 
@@ -21,18 +23,74 @@ export default function Deals() {
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [value, setValue] = useState("");
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [showTrash, setShowTrash] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [confirmHardDelete, setConfirmHardDelete] = useState(false);
   const utils = trpc.useUtils();
+  const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
 
-  const deals = trpc.crm.deals.list.useQuery({ tenantId: TENANT_ID, limit: 100 });
+  const deals = trpc.crm.deals.list.useQuery({ tenantId: TENANT_ID, limit: 200 });
+  const deletedDeals = trpc.crm.deals.listDeleted.useQuery({ tenantId: TENANT_ID, limit: 100 }, { enabled: showTrash });
   const pipelines = trpc.crm.pipelines.list.useQuery({ tenantId: TENANT_ID });
+
   const createDeal = trpc.crm.deals.create.useMutation({
     onSuccess: () => { utils.crm.deals.list.invalidate(); setOpen(false); setTitle(""); setValue(""); toast.success("Negócio criado!"); },
   });
+  const bulkDelete = trpc.crm.deals.bulkDelete.useMutation({
+    onSuccess: (data) => {
+      utils.crm.deals.list.invalidate();
+      utils.crm.deals.listDeleted.invalidate();
+      setSelectedIds(new Set());
+      setConfirmDelete(false);
+      toast.success(`${data.count} negociação(ões) movida(s) para a lixeira`);
+    },
+    onError: (err) => toast.error(err.message),
+  });
+  const restoreDeals = trpc.crm.deals.restore.useMutation({
+    onSuccess: (data) => {
+      utils.crm.deals.list.invalidate();
+      utils.crm.deals.listDeleted.invalidate();
+      setSelectedIds(new Set());
+      toast.success(`${data.count} negociação(ões) restaurada(s)`);
+    },
+    onError: (err) => toast.error(err.message),
+  });
+  const hardDelete = trpc.crm.deals.hardDelete.useMutation({
+    onSuccess: (data) => {
+      utils.crm.deals.list.invalidate();
+      utils.crm.deals.listDeleted.invalidate();
+      setSelectedIds(new Set());
+      setConfirmHardDelete(false);
+      toast.success(`${data.count} negociação(ões) excluída(s) permanentemente`);
+    },
+    onError: (err) => toast.error(err.message),
+  });
 
   const defaultPipeline = pipelines.data?.[0];
+  const currentList = showTrash ? (deletedDeals.data || []) : (deals.data || []);
   const totalValue = (deals.data || []).reduce((sum: number, d: any) => sum + (d.valueCents || 0), 0);
   const openCount = (deals.data || []).filter((d: any) => d.status === "open").length;
   const wonCount = (deals.data || []).filter((d: any) => d.status === "won").length;
+
+  const allSelected = currentList.length > 0 && currentList.every((d: any) => selectedIds.has(d.id));
+  const someSelected = selectedIds.size > 0;
+
+  const toggleSelect = (id: number) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+  const toggleAll = () => {
+    if (allSelected) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(currentList.map((d: any) => d.id)));
+    }
+  };
 
   return (
     <div className="p-5 lg:px-8 space-y-5">
@@ -41,51 +99,102 @@ export default function Deals() {
         <div>
           <h1 className="text-xl font-bold tracking-tight text-foreground">Negócios</h1>
           <p className="text-[13px] text-muted-foreground mt-0.5">
-            {openCount} abertos \u2022 {wonCount} ganhos \u2022 Total: {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(totalValue / 100)}
+            {openCount} abertos &bull; {wonCount} ganhos &bull; Total: {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(totalValue / 100)}
           </p>
         </div>
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild>
-            <Button className="h-9 gap-2 px-5 rounded-lg bg-primary hover:bg-primary/90 shadow-sm text-[13px] font-medium transition-colors">
-              <Plus className="h-4 w-4" />Novo Negócio
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-[460px] rounded-2xl">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2.5 text-lg">
-                <div className="h-9 w-9 rounded-xl bg-primary/10 flex items-center justify-center"><Briefcase className="h-4 w-4 text-primary" /></div>
-                Novo Negócio
-              </DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4 pt-3">
-              <div><Label className="text-[12px] font-medium">Título *</Label><Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Ex: Pacote Cancún - João" className="mt-1.5 h-10 rounded-xl" /></div>
-              <div><Label className="text-[12px] font-medium">Valor (R$)</Label><Input value={value} onChange={(e) => setValue(e.target.value)} placeholder="5000.00" type="number" className="mt-1.5 h-10 rounded-xl" /></div>
-              <Button className="w-full h-11 rounded-lg text-[14px] font-medium bg-primary hover:bg-primary/90 shadow-sm transition-colors" disabled={!title || createDeal.isPending} onClick={() => {
-                if (!defaultPipeline) { toast.error("Crie um pipeline primeiro na seção Funil."); return; }
-                createDeal.mutate({ tenantId: TENANT_ID, title, pipelineId: defaultPipeline.id, stageId: 1, valueCents: value ? Math.round(parseFloat(value) * 100) : undefined });
-              }}>
-                {createDeal.isPending ? "Criando..." : "Criar Negócio"}
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+        <div className="flex items-center gap-2">
+          <Button
+            variant={showTrash ? "default" : "outline"}
+            size="sm"
+            className="h-9 gap-2 rounded-lg text-[13px]"
+            onClick={() => { setShowTrash(!showTrash); setSelectedIds(new Set()); }}
+          >
+            <Archive className="h-4 w-4" />
+            Lixeira{deletedDeals.data?.length ? ` (${deletedDeals.data.length})` : ""}
+          </Button>
+          {!showTrash && (
+            <Dialog open={open} onOpenChange={setOpen}>
+              <DialogTrigger asChild>
+                <Button className="h-9 gap-2 px-5 rounded-lg bg-primary hover:bg-primary/90 shadow-sm text-[13px] font-medium transition-colors">
+                  <Plus className="h-4 w-4" />Novo Negócio
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[460px] rounded-2xl">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2.5 text-lg">
+                    <div className="h-9 w-9 rounded-xl bg-primary/10 flex items-center justify-center"><Briefcase className="h-4 w-4 text-primary" /></div>
+                    Novo Negócio
+                  </DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 pt-3">
+                  <div><Label className="text-[12px] font-medium">Título *</Label><Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Ex: Pacote Cancún - João" className="mt-1.5 h-10 rounded-xl" /></div>
+                  <div><Label className="text-[12px] font-medium">Valor (R$)</Label><Input value={value} onChange={(e) => setValue(e.target.value)} placeholder="5000.00" type="number" className="mt-1.5 h-10 rounded-xl" /></div>
+                  <Button className="w-full h-11 rounded-lg text-[14px] font-medium bg-primary hover:bg-primary/90 shadow-sm transition-colors" disabled={!title || createDeal.isPending} onClick={() => {
+                    if (!defaultPipeline) { toast.error("Crie um pipeline primeiro na seção Funil."); return; }
+                    createDeal.mutate({ tenantId: TENANT_ID, title, pipelineId: defaultPipeline.id, stageId: 1, valueCents: value ? Math.round(parseFloat(value) * 100) : undefined });
+                  }}>
+                    {createDeal.isPending ? "Criando..." : "Criar Negócio"}
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+          )}
+        </div>
       </div>
 
       {/* Summary cards */}
-      <div className="grid grid-cols-3 gap-4">
-        <div className="rounded-xl bg-card border border-border/40 shadow-none p-4 flex items-center gap-3">
-          <div className="h-10 w-10 rounded-xl bg-blue-500/10 flex items-center justify-center"><Briefcase className="h-5 w-5 text-blue-500" /></div>
-          <div><p className="text-[11px] font-bold uppercase tracking-[0.1em] text-muted-foreground">Abertos</p><p className="text-lg font-bold">{openCount}</p></div>
+      {!showTrash && (
+        <div className="grid grid-cols-3 gap-4">
+          <div className="rounded-xl bg-card border border-border/40 shadow-none p-4 flex items-center gap-3">
+            <div className="h-10 w-10 rounded-xl bg-blue-500/10 flex items-center justify-center"><Briefcase className="h-5 w-5 text-blue-500" /></div>
+            <div><p className="text-[11px] font-bold uppercase tracking-[0.1em] text-muted-foreground">Abertos</p><p className="text-lg font-bold">{openCount}</p></div>
+          </div>
+          <div className="rounded-xl bg-card border border-border/40 shadow-none p-4 flex items-center gap-3">
+            <div className="h-10 w-10 rounded-xl bg-emerald-500/10 flex items-center justify-center"><TrendingUp className="h-5 w-5 text-emerald-500" /></div>
+            <div><p className="text-[11px] font-bold uppercase tracking-[0.1em] text-muted-foreground">Ganhos</p><p className="text-lg font-bold">{wonCount}</p></div>
+          </div>
+          <div className="rounded-xl bg-card border border-border/40 shadow-none p-4 flex items-center gap-3">
+            <div className="h-10 w-10 rounded-xl bg-violet-500/10 flex items-center justify-center"><DollarSign className="h-5 w-5 text-violet-500" /></div>
+            <div><p className="text-[11px] font-bold uppercase tracking-[0.1em] text-muted-foreground">Valor Total</p><p className="text-lg font-bold">{new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(totalValue / 100)}</p></div>
+          </div>
         </div>
-        <div className="rounded-xl bg-card border border-border/40 shadow-none p-4 flex items-center gap-3">
-          <div className="h-10 w-10 rounded-xl bg-emerald-500/10 flex items-center justify-center"><TrendingUp className="h-5 w-5 text-emerald-500" /></div>
-          <div><p className="text-[11px] font-bold uppercase tracking-[0.1em] text-muted-foreground">Ganhos</p><p className="text-lg font-bold">{wonCount}</p></div>
+      )}
+
+      {/* Bulk action bar */}
+      {someSelected && (
+        <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-xl border border-border/40">
+          <span className="text-[13px] font-medium text-foreground">{selectedIds.size} selecionado(s)</span>
+          <div className="flex-1" />
+          {showTrash ? (
+            <>
+              <Button variant="outline" size="sm" className="h-8 gap-1.5 text-[12px] rounded-lg" onClick={() => restoreDeals.mutate({ tenantId: TENANT_ID, ids: Array.from(selectedIds) })} disabled={restoreDeals.isPending}>
+                <RotateCcw className="h-3.5 w-3.5" />Restaurar
+              </Button>
+              {isAdmin && (
+                <Button variant="destructive" size="sm" className="h-8 gap-1.5 text-[12px] rounded-lg" onClick={() => setConfirmHardDelete(true)} disabled={hardDelete.isPending}>
+                  <Trash2 className="h-3.5 w-3.5" />Excluir Permanentemente
+                </Button>
+              )}
+            </>
+          ) : (
+            <Button variant="destructive" size="sm" className="h-8 gap-1.5 text-[12px] rounded-lg" onClick={() => setConfirmDelete(true)} disabled={bulkDelete.isPending}>
+              <Trash2 className="h-3.5 w-3.5" />Excluir Selecionados
+            </Button>
+          )}
+          <Button variant="ghost" size="sm" className="h-8 text-[12px] rounded-lg" onClick={() => setSelectedIds(new Set())}>
+            Limpar seleção
+          </Button>
         </div>
-        <div className="rounded-xl bg-card border border-border/40 shadow-none p-4 flex items-center gap-3">
-          <div className="h-10 w-10 rounded-xl bg-violet-500/10 flex items-center justify-center"><DollarSign className="h-5 w-5 text-violet-500" /></div>
-          <div><p className="text-[11px] font-bold uppercase tracking-[0.1em] text-muted-foreground">Valor Total</p><p className="text-lg font-bold">{new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(totalValue / 100)}</p></div>
+      )}
+
+      {/* Trash header */}
+      {showTrash && (
+        <div className="flex items-center gap-2 p-3 bg-amber-50 dark:bg-amber-950/30 rounded-xl border border-amber-200 dark:border-amber-800/40">
+          <Archive className="h-4 w-4 text-amber-600" />
+          <span className="text-[13px] font-medium text-amber-800 dark:text-amber-300">Lixeira de Negociações</span>
+          <span className="text-[12px] text-amber-600 dark:text-amber-400 ml-1">Itens na lixeira podem ser restaurados ou excluídos permanentemente (admin).</span>
         </div>
-      </div>
+      )}
 
       {/* Table */}
       <Card className="border border-border/40 shadow-none rounded-xl overflow-hidden">
@@ -93,32 +202,47 @@ export default function Deals() {
           <table className="w-full text-[13px]">
             <thead>
               <tr className="border-b border-border/30 bg-muted/20">
+                <th className="p-3.5 w-10">
+                  <Checkbox checked={allSelected} onCheckedChange={toggleAll} />
+                </th>
                 <th className="text-left p-3.5 font-semibold text-muted-foreground">Título</th>
                 <th className="text-left p-3.5 font-semibold text-muted-foreground">Valor</th>
                 <th className="text-left p-3.5 font-semibold text-muted-foreground">Status</th>
-                <th className="text-left p-3.5 font-semibold text-muted-foreground">Probabilidade</th>
-                <th className="text-left p-3.5 font-semibold text-muted-foreground">Criado em</th>
+                <th className="text-left p-3.5 font-semibold text-muted-foreground">{showTrash ? "Excluído em" : "Criado em"}</th>
                 <th className="p-3.5 w-12"></th>
               </tr>
             </thead>
             <tbody>
-              {deals.isLoading ? (
+              {(showTrash ? deletedDeals.isLoading : deals.isLoading) ? (
                 <tr><td colSpan={6} className="p-12 text-center text-muted-foreground text-sm">Carregando...</td></tr>
-              ) : !deals.data?.length ? (
+              ) : !currentList.length ? (
                 <tr><td colSpan={6} className="p-12 text-center text-muted-foreground">
-                  <Briefcase className="h-10 w-10 mx-auto mb-3 text-muted-foreground/30" />
-                  <p className="text-sm">Nenhum negócio encontrado.</p>
+                  {showTrash ? (
+                    <>
+                      <Archive className="h-10 w-10 mx-auto mb-3 text-muted-foreground/30" />
+                      <p className="text-sm">Lixeira vazia.</p>
+                    </>
+                  ) : (
+                    <>
+                      <Briefcase className="h-10 w-10 mx-auto mb-3 text-muted-foreground/30" />
+                      <p className="text-sm">Nenhum negócio encontrado.</p>
+                    </>
+                  )}
                 </td></tr>
-              ) : deals.data.map((d: any) => {
+              ) : currentList.map((d: any) => {
                 const ss = statusStyles[d.status] || statusStyles["open"];
+                const isSelected = selectedIds.has(d.id);
                 return (
-                  <tr key={d.id} className="border-b border-border/20 hover:bg-muted/20 transition-colors">
+                  <tr key={d.id} className={`border-b border-border/20 hover:bg-muted/20 transition-colors ${isSelected ? "bg-primary/5" : ""}`}>
+                    <td className="p-3.5">
+                      <Checkbox checked={isSelected} onCheckedChange={() => toggleSelect(d.id)} />
+                    </td>
                     <td className="p-3.5">
                       <div className="flex items-center gap-3">
                         <div className="h-8 w-8 rounded-xl bg-gradient-to-br from-primary/10 to-accent/10 flex items-center justify-center text-[12px] font-bold text-primary shrink-0">
                           {d.title?.charAt(0)?.toUpperCase() || "N"}
                         </div>
-                        <span className="font-semibold">{d.title}</span>
+                        <span className={`font-semibold ${showTrash ? "text-muted-foreground line-through" : ""}`}>{d.title}</span>
                       </div>
                     </td>
                     <td className="p-3.5 font-semibold">{d.valueCents ? new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(d.valueCents / 100) : "—"}</td>
@@ -128,23 +252,35 @@ export default function Deals() {
                         {ss.label}
                       </span>
                     </td>
-                    <td className="p-3.5">
-                      {d.probability != null ? (
-                        <div className="flex items-center gap-2">
-                          <div className="w-16 h-1.5 rounded-full bg-muted overflow-hidden">
-                            <div className="h-full rounded-full bg-primary" style={{ width: `${d.probability}%` }} />
-                          </div>
-                          <span className="text-[12px] text-muted-foreground">{d.probability}%</span>
-                        </div>
-                      ) : "—"}
+                    <td className="p-3.5 text-muted-foreground">
+                      {showTrash
+                        ? (d.deletedAt ? new Date(d.deletedAt).toLocaleDateString("pt-BR") : "—")
+                        : (d.createdAt ? new Date(d.createdAt).toLocaleDateString("pt-BR") : "—")
+                      }
                     </td>
-                    <td className="p-3.5 text-muted-foreground">{d.createdAt ? new Date(d.createdAt).toLocaleDateString("pt-BR") : "—"}</td>
                     <td className="p-3.5">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="rounded-xl">
-                          <DropdownMenuItem onClick={() => toast("Edição em breve")}>Editar</DropdownMenuItem>
-                          <DropdownMenuItem className="text-destructive"><Trash2 className="mr-2 h-4 w-4" />Excluir</DropdownMenuItem>
+                          {showTrash ? (
+                            <>
+                              <DropdownMenuItem onClick={() => restoreDeals.mutate({ tenantId: TENANT_ID, ids: [d.id] })}>
+                                <RotateCcw className="mr-2 h-4 w-4" />Restaurar
+                              </DropdownMenuItem>
+                              {isAdmin && (
+                                <DropdownMenuItem className="text-destructive" onClick={() => hardDelete.mutate({ tenantId: TENANT_ID, ids: [d.id] })}>
+                                  <Trash2 className="mr-2 h-4 w-4" />Excluir Permanentemente
+                                </DropdownMenuItem>
+                              )}
+                            </>
+                          ) : (
+                            <>
+                              <DropdownMenuItem onClick={() => toast("Edição em breve")}>Editar</DropdownMenuItem>
+                              <DropdownMenuItem className="text-destructive" onClick={() => bulkDelete.mutate({ tenantId: TENANT_ID, ids: [d.id] })}>
+                                <Trash2 className="mr-2 h-4 w-4" />Excluir
+                              </DropdownMenuItem>
+                            </>
+                          )}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </td>
@@ -155,6 +291,52 @@ export default function Deals() {
           </table>
         </div>
       </Card>
+
+      {/* Confirm bulk soft-delete dialog */}
+      <Dialog open={confirmDelete} onOpenChange={setConfirmDelete}>
+        <DialogContent className="sm:max-w-[440px] rounded-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2.5 text-lg text-destructive">
+              <AlertTriangle className="h-5 w-5" />
+              Excluir {selectedIds.size} negociação(ões)?
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <p className="text-[13px] text-muted-foreground">
+              As negociações serão movidas para a lixeira. Os <strong>contatos vinculados não serão afetados</strong>. Você pode restaurá-las a qualquer momento.
+            </p>
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" className="rounded-lg" onClick={() => setConfirmDelete(false)}>Cancelar</Button>
+              <Button variant="destructive" className="rounded-lg" disabled={bulkDelete.isPending} onClick={() => bulkDelete.mutate({ tenantId: TENANT_ID, ids: Array.from(selectedIds) })}>
+                {bulkDelete.isPending ? "Excluindo..." : "Excluir"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirm hard-delete dialog */}
+      <Dialog open={confirmHardDelete} onOpenChange={setConfirmHardDelete}>
+        <DialogContent className="sm:max-w-[440px] rounded-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2.5 text-lg text-destructive">
+              <AlertTriangle className="h-5 w-5" />
+              Excluir permanentemente {selectedIds.size} negociação(ões)?
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <p className="text-[13px] text-muted-foreground">
+              Esta ação é <strong>irreversível</strong>. As negociações serão excluídas permanentemente do banco de dados. Os contatos vinculados não serão afetados.
+            </p>
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" className="rounded-lg" onClick={() => setConfirmHardDelete(false)}>Cancelar</Button>
+              <Button variant="destructive" className="rounded-lg" disabled={hardDelete.isPending} onClick={() => hardDelete.mutate({ tenantId: TENANT_ID, ids: Array.from(selectedIds) })}>
+                {hardDelete.isPending ? "Excluindo..." : "Excluir Permanentemente"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

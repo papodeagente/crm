@@ -1066,3 +1066,13 @@
 - [x] Notificar o owner do deal (atribuído por round-robin) e o admin
 - [x] Incluir nome do lead, origem e link para a negociação na notificação
 - [x] Testes automatizados para a notificação de novo lead
+
+## Exclusão em Massa de Negociações e Contatos
+
+- [x] Backend: endpoint de exclusão em massa de negociações (soft-delete, sem apagar contatos)
+- [x] Backend: endpoint de exclusão em massa de contatos (soft-delete)
+- [x] Frontend: seleção múltipla na lista de negociações com checkbox
+- [x] Frontend: botão "Excluir selecionados" na lista de negociações com confirmação
+- [x] Frontend: seleção múltipla na lista de contatos com checkbox
+- [x] Frontend: botão "Excluir selecionados" na lista de contatos com confirmação
+- [x] Testes automatizados para exclusão em massa
