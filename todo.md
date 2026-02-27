@@ -1004,3 +1004,7 @@
 - [x] Variações de número (+55 (84) 99983-8420, 5584999838420, 08499838420) resultam no mesmo phone_e164
 - [x] Reconcile migra mensagens de fantasma e mantém 1 thread
 - [x] Inbox e negociação exibem o mesmo conversation_id para o mesmo contact_id
+
+## Bug Crítico: Resposta vai para número fantasma
+- [x] Corrigir envio de resposta: mensagem está sendo enviada para JID fantasma em vez do JID real do contato
+- [x] Garantir que sendTextMessage/sendMediaMessage usem o JID real do WhatsApp (não o normalizado pelo resolver)

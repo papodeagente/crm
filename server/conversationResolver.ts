@@ -16,7 +16,7 @@
 import { getDb } from "./db";
 import { waConversations, waIdentities, waAuditLog, contacts } from "../drizzle/schema";
 import { eq, and, sql, or, inArray } from "drizzle-orm";
-import { normalizeBrazilianPhone, normalizeJid, getAllJidVariants } from "./phoneUtils";
+import { normalizeBrazilianPhone, getAllJidVariants } from "./phoneUtils";
 
 // ════════════════════════════════════════════════════════════
 // TYPES
@@ -217,24 +217,28 @@ export async function resolveIdentity(
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
-  const normalizedJid = normalizeJid(remoteJid);
-  const jidDigits = normalizedJid.replace(/@.*$/, "");
+  // Extract digits from the raw JID for phone normalization
+  const jidDigits = remoteJid.replace(/@.*$/, "").replace(/\D/g, "");
   const phone = phoneE164 || normalizePhone(jidDigits).phoneE164;
 
-  // Upsert: buscar por sessionId + remoteJid
-  const existing = await db.select({ id: waIdentities.id })
+  // For identity lookup, we need to match by phoneE164 (canonical)
+  // because the same contact may appear with different JID formats
+  // First try exact JID match, then phoneE164 match
+  const existing = await db.select({ id: waIdentities.id, remoteJid: waIdentities.remoteJid })
     .from(waIdentities)
     .where(and(
       eq(waIdentities.sessionId, sessionId),
-      eq(waIdentities.remoteJid, normalizedJid),
+      eq(waIdentities.phoneE164, phone),
     ))
     .limit(1);
 
   if (existing.length > 0) {
-    // Atualizar lastSeenAt e contactId se fornecido
+    // Atualizar lastSeenAt, contactId e remoteJid (raw) se fornecido
     const updateData: any = { lastSeenAt: new Date() };
     if (contactId) updateData.contactId = contactId;
     if (phone) updateData.phoneE164 = phone;
+    // Always update remoteJid with the latest raw JID from WhatsApp
+    updateData.remoteJid = remoteJid;
 
     await db.update(waIdentities)
       .set(updateData)
@@ -243,12 +247,12 @@ export async function resolveIdentity(
     return { identityId: existing[0].id, isNew: false };
   }
 
-  // Criar nova identidade
+  // Criar nova identidade — store raw JID
   const result = await db.insert(waIdentities).values({
     tenantId,
     sessionId,
     contactId: contactId || null,
-    remoteJid: normalizedJid,
+    remoteJid: remoteJid, // RAW JID from WhatsApp
     waId: jidDigits,
     phoneE164: phone,
     confidenceScore: 80,
@@ -277,11 +281,13 @@ export async function resolveConversation(
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
-  const normalizedJid = normalizeJid(remoteJid);
-  const jidDigits = normalizedJid.replace(/@.*$/, "");
+  // IMPORTANT: Use normalizePhone for the CANONICAL KEY (deduplication),
+  // but preserve the raw remoteJid for storage (used for sending replies).
+  // The raw JID is what WhatsApp actually recognizes.
+  const jidDigits = remoteJid.replace(/@.*$/, "").replace(/\D/g, "");
   const phone = normalizePhone(jidDigits);
 
-  // Usar phoneE164 digits como chave canônica
+  // Usar phoneE164 digits como chave canônica (deduplication only)
   const keyDigits = phone.valid ? phone.digitsOnly : jidDigits;
   const conversationKey = buildConversationKey(sessionId, keyDigits);
 
@@ -305,11 +311,13 @@ export async function resolveConversation(
       convId = existing[0].mergedIntoId;
     }
 
-    // Atualizar pushName e contactId se fornecidos
+    // Atualizar pushName, contactId e remoteJid (raw) se fornecidos
     const updateData: any = {};
     if (pushName) updateData.contactPushName = pushName;
     if (contactId) updateData.contactId = contactId;
-    updateData.remoteJid = normalizedJid;
+    // Always update remoteJid with the RAW JID from WhatsApp
+    // This ensures replies go to the correct JID
+    updateData.remoteJid = remoteJid;
 
     if (Object.keys(updateData).length > 0) {
       await db.update(waConversations)
@@ -320,12 +328,12 @@ export async function resolveConversation(
     return { conversationId: convId, isNew: false, conversationKey };
   }
 
-  // Criar nova conversa
+  // Criar nova conversa — store the RAW JID, not normalized
   const result = await db.insert(waConversations).values({
     tenantId,
     sessionId,
     contactId: contactId || null,
-    remoteJid: normalizedJid,
+    remoteJid: remoteJid, // RAW JID from WhatsApp — critical for replies
     conversationKey,
     phoneE164: phone.valid ? phone.phoneE164 : null,
     phoneDigits: phone.valid ? phone.digitsOnly : jidDigits,
@@ -411,8 +419,8 @@ export async function resolveInbound(
   remoteJid: string,
   pushName?: string | null,
 ): Promise<ResolvedConversation> {
-  const normalizedJid = normalizeJid(remoteJid);
-  const jidDigits = normalizedJid.replace(/@.*$/, "");
+  // Use raw JID for storage, but normalize phone for canonical key/deduplication
+  const jidDigits = remoteJid.replace(/@.*$/, "").replace(/\D/g, "");
   const phone = normalizePhone(jidDigits);
 
   let contactId: number | null = null;
@@ -427,15 +435,15 @@ export async function resolveInbound(
     }
   }
 
-  // Resolver identidade
-  const identity = await resolveIdentity(tenantId, sessionId, normalizedJid, contactId, phone.valid ? phone.phoneE164 : null);
+  // Resolver identidade — pass raw JID so it's stored as-is
+  const identity = await resolveIdentity(tenantId, sessionId, remoteJid, contactId, phone.valid ? phone.phoneE164 : null);
 
-  // Resolver conversa
-  const conversation = await resolveConversation(tenantId, sessionId, normalizedJid, contactId, pushName);
+  // Resolver conversa — pass raw JID so it's stored as-is
+  const conversation = await resolveConversation(tenantId, sessionId, remoteJid, contactId, pushName);
 
   // Audit log
   await logAudit(tenantId, "conversation_resolved", "wa_conversation", String(conversation.conversationId), {
-    remoteJid: normalizedJid,
+    remoteJid: remoteJid,
     phoneE164: phone.phoneE164,
     contactId,
     identityId: identity.identityId,
@@ -701,8 +709,8 @@ export async function getConversationByJid(
   const db = await getDb();
   if (!db) return null;
 
-  const normalizedJid = normalizeJid(remoteJid);
-  const jidDigits = normalizedJid.replace(/@.*$/, "");
+  // Extract digits directly — do not normalize the JID
+  const jidDigits = remoteJid.replace(/@.*$/, "").replace(/\D/g, "");
   const phone = normalizePhone(jidDigits);
   const keyDigits = phone.valid ? phone.digitsOnly : jidDigits;
   const conversationKey = buildConversationKey(sessionId, keyDigits);

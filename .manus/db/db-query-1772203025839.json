@@ -1,0 +1,90 @@
+{
+  "query": "SELECT remoteJid, COUNT(*) as cnt FROM messages WHERE sessionId IS NOT NULL AND remoteJid NOT LIKE '%@g.us' AND remoteJid != 'status@broadcast' GROUP BY remoteJid ORDER BY cnt DESC LIMIT 20;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute SELECT remoteJid, COUNT(*) as cnt FROM messages WHERE sessionId IS NOT NULL AND remoteJid NOT LIKE '%@g.us' AND remoteJid != 'status@broadcast' GROUP BY remoteJid ORDER BY cnt DESC LIMIT 20;",
+  "rows": [
+    {
+      "remoteJid": "558496051655@s.whatsapp.net",
+      "cnt": "8041"
+    },
+    {
+      "remoteJid": "554892118034@s.whatsapp.net",
+      "cnt": "4353"
+    },
+    {
+      "remoteJid": "5567984691185@s.whatsapp.net",
+      "cnt": "1477"
+    },
+    {
+      "remoteJid": "558499445034@s.whatsapp.net",
+      "cnt": "1174"
+    },
+    {
+      "remoteJid": "5567940427650@s.whatsapp.net",
+      "cnt": "992"
+    },
+    {
+      "remoteJid": "558499380266@s.whatsapp.net",
+      "cnt": "858"
+    },
+    {
+      "remoteJid": "558496441702@s.whatsapp.net",
+      "cnt": "850"
+    },
+    {
+      "remoteJid": "5511951982627@s.whatsapp.net",
+      "cnt": "617"
+    },
+    {
+      "remoteJid": "558494120000@s.whatsapp.net",
+      "cnt": "601"
+    },
+    {
+      "remoteJid": "555193337027@s.whatsapp.net",
+      "cnt": "582"
+    },
+    {
+      "remoteJid": "5584986023735@s.whatsapp.net",
+      "cnt": "581"
+    },
+    {
+      "remoteJid": "554199811717@s.whatsapp.net",
+      "cnt": "569"
+    },
+    {
+      "remoteJid": "5584931902438@s.whatsapp.net",
+      "cnt": "532"
+    },
+    {
+      "remoteJid": "5511958040334@s.whatsapp.net",
+      "cnt": "441"
+    },
+    {
+      "remoteJid": "558498282118@s.whatsapp.net",
+      "cnt": "435"
+    },
+    {
+      "remoteJid": "558491812894@s.whatsapp.net",
+      "cnt": "415"
+    },
+    {
+      "remoteJid": "5511930812692@s.whatsapp.net",
+      "cnt": "359"
+    },
+    {
+      "remoteJid": "558494569566@s.whatsapp.net",
+      "cnt": "348"
+    },
+    {
+      "remoteJid": "5547988682735@s.whatsapp.net",
+      "cnt": "311"
+    },
+    {
+      "remoteJid": "5591984039473@s.whatsapp.net",
+      "cnt": "311"
+    }
+  ],
+  "messages": [],
+  "stdout": "remoteJid\tcnt\n558496051655@s.whatsapp.net\t8041\n554892118034@s.whatsapp.net\t4353\n5567984691185@s.whatsapp.net\t1477\n558499445034@s.whatsapp.net\t1174\n5567940427650@s.whatsapp.net\t992\n558499380266@s.whatsapp.net\t858\n558496441702@s.whatsapp.net\t850\n5511951982627@s.whatsapp.net\t617\n558494120000@s.whatsapp.net\t601\n555193337027@s.whatsapp.net\t582\n5584986023735@s.whatsapp.net\t581\n554199811717@s.whatsapp.net\t569\n5584931902438@s.whatsapp.net\t532\n5511958040334@s.whatsapp.net\t441\n558498282118@s.whatsapp.net\t435\n558491812894@s.whatsapp.net\t415\n5511930812692@s.whatsapp.net\t359\n558494569566@s.whatsapp.net\t348\n5547988682735@s.whatsapp.net\t311\n5591984039473@s.whatsapp.net\t311\n",
+  "stderr": "",
+  "execution_time_ms": 424
+}

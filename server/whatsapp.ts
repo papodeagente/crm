@@ -255,8 +255,11 @@ class WhatsAppManager extends EventEmitter {
         const rawRemoteJid = msg.key.remoteJid || "";
         // Skip group messages — CRM only handles individual contacts
         if (rawRemoteJid.endsWith("@g.us")) continue;
-        // Normalize Brazilian phone JID to canonical format (always 13 digits with 9th digit)
-        const remoteJid = normalizeJid(rawRemoteJid);
+        // IMPORTANT: Use the raw JID from WhatsApp as-is for storage and replies.
+        // Do NOT normalize here — normalizing changes the JID (e.g. 12→13 digits)
+        // which causes replies to go to a "ghost" number that doesn't exist on WhatsApp.
+        // The Conversation Identity Resolver handles deduplication via phoneE164/conversationKey.
+        const remoteJid = rawRemoteJid;
         const fromMe = msg.key.fromMe || false;
         
         // Determine the real message type, skipping internal protocol types
@@ -518,27 +521,34 @@ class WhatsAppManager extends EventEmitter {
     const session = this.sessions.get(sessionId);
     if (!session?.socket) throw new Error("Sessão não conectada");
 
-    // If already a full JID, normalize and return
-    if (input.includes("@")) return normalizeJid(input);
-
-    // Strip all non-digit characters
-    let digits = input.replace(/\D/g, "");
+    // Extract digits from input (strip @s.whatsapp.net suffix, +, spaces, etc.)
+    let digits: string;
+    if (input.includes("@")) {
+      // Already a JID — extract the number part
+      digits = input.replace(/@.*$/, "").replace(/\D/g, "");
+    } else {
+      digits = input.replace(/\D/g, "");
+    }
 
     // Add Brazil country code if not present
     if (!digits.startsWith("55") && digits.length <= 11) {
       digits = `55${digits}`;
     }
 
-    // Try to find the real WhatsApp JID using onWhatsApp()
+    // ALWAYS verify with onWhatsApp() to get the REAL registered JID
+    // This is critical: WhatsApp may register the number with or without the 9th digit,
+    // and we must send to the exact JID that WhatsApp recognizes.
     try {
       const results = await session.socket.onWhatsApp(digits);
       if (results && results.length > 0 && results[0].exists) {
-        const resolvedJid = normalizeJid(results[0].jid);
-        console.log(`[JID Resolve] ${input} -> ${resolvedJid} (verified + normalized)`);
-        return resolvedJid;
+        // Use the JID returned by WhatsApp AS-IS (only add suffix if needed)
+        // Do NOT normalize — WhatsApp knows the correct format for this contact
+        const realJid = results[0].jid;
+        console.log(`[JID Resolve] ${input} -> ${realJid} (verified by onWhatsApp)`);
+        return realJid;
       }
     } catch (e) {
-      console.warn("[JID Resolve] onWhatsApp failed, using fallback:", e);
+      console.warn("[JID Resolve] onWhatsApp failed, trying variants:", e);
     }
 
     // Fallback: for Brazilian mobile numbers, try with and without 9th digit
@@ -552,9 +562,9 @@ class WhatsAppManager extends EventEmitter {
         try {
           const results = await session.socket.onWhatsApp(without9);
           if (results && results.length > 0 && results[0].exists) {
-            const resolvedJid = normalizeJid(results[0].jid);
-            console.log(`[JID Resolve] ${input} -> ${resolvedJid} (verified without 9th digit + normalized)`);
-            return resolvedJid;
+            const realJid = results[0].jid;
+            console.log(`[JID Resolve] ${input} -> ${realJid} (verified without 9th digit by onWhatsApp)`);
+            return realJid;
           }
         } catch (e) { /* ignore */ }
       }
@@ -565,17 +575,24 @@ class WhatsAppManager extends EventEmitter {
         try {
           const results = await session.socket.onWhatsApp(with9);
           if (results && results.length > 0 && results[0].exists) {
-            const resolvedJid = normalizeJid(results[0].jid);
-            console.log(`[JID Resolve] ${input} -> ${resolvedJid} (verified with 9th digit + normalized)`);
-            return resolvedJid;
+            const realJid = results[0].jid;
+            console.log(`[JID Resolve] ${input} -> ${realJid} (verified with 9th digit by onWhatsApp)`);
+            return realJid;
           }
         } catch (e) { /* ignore */ }
       }
     }
 
-    // Final fallback: normalize and use @s.whatsapp.net
-    const fallbackJid = normalizeJid(`${digits}@s.whatsapp.net`);
-    console.log(`[JID Resolve] ${input} -> ${fallbackJid} (fallback + normalized)`);
+    // Final fallback: if onWhatsApp() failed for all variants,
+    // use the original JID if it was a full JID, otherwise construct one
+    if (input.includes("@")) {
+      // Return the original JID as-is — do NOT normalize
+      // This preserves the JID format that WhatsApp originally sent us
+      console.log(`[JID Resolve] ${input} -> ${input} (original JID preserved as fallback)`);
+      return input;
+    }
+    const fallbackJid = `${digits}@s.whatsapp.net`;
+    console.log(`[JID Resolve] ${input} -> ${fallbackJid} (fallback, no verification)`);
     return fallbackJid;
   }
 
