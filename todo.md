@@ -1102,3 +1102,9 @@
 - [x] Adicionar guards para impedir criação de funis/etapas sem ação explícita do usuário
 - [x] Limpar funis e etapas fantasma do banco de dados
 - [x] Garantir que testes não poluam o banco de produção com funis/etapas
+
+## Bug: Testes Criando Negociações no Banco de Produção
+
+- [x] Investigar todos os testes que criam deals, contacts e outros dados no banco real
+- [x] Reescrever testes para usar mocks ou ser read-only, sem poluir o banco
+- [x] Limpar negociações e dados de teste do banco de produção

@@ -1,0 +1,22 @@
+{
+  "query": "SELECT 'deals_test' as type, COUNT(*) as cnt FROM deals \nWHERE title LIKE '%Test Lead • %' \n   OR title LIKE '%Idempotent Lead • %' \n   OR title LIKE '%Meta Lead • %' \n   OR title LIKE '%Notification Test Lead • %' \n   OR title LIKE '%No Dup Notif • %'\n   OR title LIKE '%Meta Notif Lead • %'\nUNION ALL\nSELECT 'contacts_test' as type, COUNT(*) as cnt FROM contacts \nWHERE email IN ('testlead@example.com', 'idempotent@example.com', 'metalead@example.com', 'notiftest@example.com', 'nodup@example.com', 'metanotif@example.com')\nUNION ALL\nSELECT 'event_log_test' as type, COUNT(*) as cnt FROM lead_event_log \nWHERE dedupeKey LIKE 'landing:test-%' \n   OR dedupeKey LIKE 'landing:idempotent-%' \n   OR dedupeKey LIKE 'meta_lead_ads:meta-%' \n   OR dedupeKey LIKE 'landing:notif-test-%'\n   OR dedupeKey LIKE 'landing:no-dup-notif-%'\n   OR dedupeKey LIKE 'meta_lead_ads:meta-notif-%';",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute SELECT 'deals_test' as type, COUNT(*) as cnt FROM deals \nWHERE title LIKE '%Test Lead • %' \n   OR title LIKE '%Idempotent Lead • %' \n   OR title LIKE '%Meta Lead • %' \n   OR title LIKE '%Notification Test Lead • %' \n   OR title LIKE '%No Dup Notif • %'\n   OR title LIKE '%Meta Notif Lead • %'\nUNION ALL\nSELECT 'contacts_test' as type, COUNT(*) as cnt FROM contacts \nWHERE email IN ('testlead@example.com', 'idempotent@example.com', 'metalead@example.com', 'notiftest@example.com', 'nodup@example.com', 'metanotif@example.com')\nUNION ALL\nSELECT 'event_log_test' as type, COUNT(*) as cnt FROM lead_event_log \nWHERE dedupeKey LIKE 'landing:test-%' \n   OR dedupeKey LIKE 'landing:idempotent-%' \n   OR dedupeKey LIKE 'meta_lead_ads:meta-%' \n   OR dedupeKey LIKE 'landing:notif-test-%'\n   OR dedupeKey LIKE 'landing:no-dup-notif-%'\n   OR dedupeKey LIKE 'meta_lead_ads:meta-notif-%';",
+  "rows": [
+    {
+      "type": "event_log_test",
+      "cnt": "0"
+    },
+    {
+      "type": "deals_test",
+      "cnt": "0"
+    },
+    {
+      "type": "contacts_test",
+      "cnt": "0"
+    }
+  ],
+  "messages": [],
+  "stdout": "type\tcnt\nevent_log_test\t0\ndeals_test\t0\ncontacts_test\t0\n",
+  "stderr": "",
+  "execution_time_ms": 352
+}

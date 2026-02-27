@@ -1,0 +1,26 @@
+{
+  "query": "SELECT 'deals_test' as type, COUNT(*) as cnt FROM deals \nWHERE title LIKE '%Test Lead • %' \n   OR title LIKE '%Idempotent Lead • %' \n   OR title LIKE '%Meta Lead • %' \n   OR title LIKE '%Notification Test Lead • %' \n   OR title LIKE '%No Dup Notif • %'\n   OR title LIKE '%Meta Notif Lead • %'\nUNION ALL\nSELECT 'contacts_test' as type, COUNT(*) as cnt FROM contacts \nWHERE email LIKE '%testlead@%' \n   OR email LIKE '%idempotent@%' \n   OR email LIKE '%metalead@%' \n   OR email LIKE '%notiftest@%' \n   OR email LIKE '%nodup@%' \n   OR email LIKE '%metanotif@%'\nUNION ALL\nSELECT 'event_log_test' as type, COUNT(*) as cnt FROM lead_event_log \nWHERE dedupeKey LIKE 'landing:test-%' \n   OR dedupeKey LIKE 'landing:idempotent-%' \n   OR dedupeKey LIKE 'meta_lead_ads:meta-%' \n   OR dedupeKey LIKE 'landing:notif-test-%'\n   OR dedupeKey LIKE 'landing:no-dup-notif-%'\n   OR dedupeKey LIKE 'meta_lead_ads:meta-notif-%'\nUNION ALL\nSELECT 'notifications_test' as type, COUNT(*) as cnt FROM notifications \nWHERE type = 'new_lead' AND title LIKE '%Test Lead%' OR title LIKE '%Idempotent%' OR title LIKE '%Meta Lead%' OR title LIKE '%No Dup%' OR title LIKE '%Notif%Lead%';",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute SELECT 'deals_test' as type, COUNT(*) as cnt FROM deals \nWHERE title LIKE '%Test Lead • %' \n   OR title LIKE '%Idempotent Lead • %' \n   OR title LIKE '%Meta Lead • %' \n   OR title LIKE '%Notification Test Lead • %' \n   OR title LIKE '%No Dup Notif • %'\n   OR title LIKE '%Meta Notif Lead • %'\nUNION ALL\nSELECT 'contacts_test' as type, COUNT(*) as cnt FROM contacts \nWHERE email LIKE '%testlead@%' \n   OR email LIKE '%idempotent@%' \n   OR email LIKE '%metalead@%' \n   OR email LIKE '%notiftest@%' \n   OR email LIKE '%nodup@%' \n   OR email LIKE '%metanotif@%'\nUNION ALL\nSELECT 'event_log_test' as type, COUNT(*) as cnt FROM lead_event_log \nWHERE dedupeKey LIKE 'landing:test-%' \n   OR dedupeKey LIKE 'landing:idempotent-%' \n   OR dedupeKey LIKE 'meta_lead_ads:meta-%' \n   OR dedupeKey LIKE 'landing:notif-test-%'\n   OR dedupeKey LIKE 'landing:no-dup-notif-%'\n   OR dedupeKey LIKE 'meta_lead_ads:meta-notif-%'\nUNION ALL\nSELECT 'notifications_test' as type, COUNT(*) as cnt FROM notifications \nWHERE type = 'new_lead' AND title LIKE '%Test Lead%' OR title LIKE '%Idempotent%' OR title LIKE '%Meta Lead%' OR title LIKE '%No Dup%' OR title LIKE '%Notif%Lead%';",
+  "rows": [
+    {
+      "type": "contacts_test",
+      "cnt": "6"
+    },
+    {
+      "type": "deals_test",
+      "cnt": "42"
+    },
+    {
+      "type": "event_log_test",
+      "cnt": "42"
+    },
+    {
+      "type": "notifications_test",
+      "cnt": "12"
+    }
+  ],
+  "messages": [],
+  "stdout": "type\tcnt\ncontacts_test\t6\ndeals_test\t42\nevent_log_test\t42\nnotifications_test\t12\n",
+  "stderr": "",
+  "execution_time_ms": 360
+}

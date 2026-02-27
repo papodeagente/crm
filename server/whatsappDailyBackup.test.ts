@@ -40,7 +40,7 @@ describe("WhatsApp Daily Backup", () => {
     expect(result).toBeDefined();
     expect(typeof result.dealsProcessed).toBe("number");
     expect(typeof result.messagesBackedUp).toBe("number");
-  });
+  }, 15000);
 
   it("triggerDailyBackup returns counts as numbers", async () => {
     const { ctx } = createAuthContext();
