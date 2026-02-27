@@ -114,6 +114,12 @@ export async function assignPermissionToRole(data: { tenantId: number; roleId: n
 // ═══════════════════════════════════════
 export async function createContact(data: { tenantId: number; name: string; type?: "person" | "company"; email?: string; phone?: string; source?: string; ownerUserId?: number; teamId?: number; createdBy?: number }) {
   const db = await getDb(); if (!db) return null;
+  // Normalize phone to canonical Brazilian format (+55DDNNNNNNNNN)
+  if (data.phone) {
+    const { normalizeBrazilianPhone } = await import("./phoneUtils");
+    const normalized = normalizeBrazilianPhone(data.phone);
+    if (normalized) data.phone = `+${normalized}`;
+  }
   const [result] = await db.insert(contacts).values(data).$returningId();
   return result;
 }
@@ -132,6 +138,12 @@ export async function listContacts(tenantId: number, opts?: { search?: string; s
 }
 export async function updateContact(tenantId: number, id: number, data: Partial<{ name: string; email: string; phone: string; lifecycleStage: "lead" | "prospect" | "customer" | "churned"; notes: string; ownerUserId: number; updatedBy: number }>) {
   const db = await getDb(); if (!db) return;
+  // Normalize phone to canonical Brazilian format (+55DDNNNNNNNNN)
+  if (data.phone) {
+    const { normalizeBrazilianPhone } = await import("./phoneUtils");
+    const normalized = normalizeBrazilianPhone(data.phone);
+    if (normalized) data.phone = `+${normalized}`;
+  }
   await db.update(contacts).set(data).where(and(eq(contacts.id, id), eq(contacts.tenantId, tenantId)));
 }
 export async function deleteContact(tenantId: number, id: number) {
@@ -912,10 +924,8 @@ export async function getProductAnalyticsTopDestinations(tenantId: number, limit
 // ═══════════════════════════════════════
 
 /** Convert phone number to WhatsApp JID */
-function phoneToJid(phone: string): string {
-  const digits = phone.replace(/\D/g, "");
-  return `${digits}@s.whatsapp.net`;
-}
+// Use centralized phone normalization
+import { phoneToJid, getAllJidVariants } from "./phoneUtils";
 
 /** Get all WhatsApp messages for a deal's contact, across all sessions */
 export async function getWhatsAppMessagesByDeal(dealId: number, tenantId: number, opts?: { limit?: number; beforeId?: number }) {
@@ -935,7 +945,8 @@ export async function getWhatsAppMessagesByDeal(dealId: number, tenantId: number
   const contact = contactRows[0];
   if (!contact?.phone) return { messages: [], contact, sessions: [] };
 
-  const jid = phoneToJid(contact.phone);
+  // Get all possible JID variants for this phone (with and without 9th digit)
+  const jidVariants = getAllJidVariants(contact.phone);
 
   // 3. Get all sessions for this tenant
   const sessions = await db.select({
@@ -948,10 +959,12 @@ export async function getWhatsAppMessagesByDeal(dealId: number, tenantId: number
 
   const sessionIds = sessions.map(s => s.sessionId);
 
-  // 4. Get all messages for this JID across all sessions
+  // 4. Get all messages for ALL JID variants across all sessions (handles duplicated JIDs)
   const conditions = [
     inArray(waMessages.sessionId, sessionIds),
-    eq(waMessages.remoteJid, jid),
+    jidVariants.length === 1 
+      ? eq(waMessages.remoteJid, jidVariants[0])
+      : inArray(waMessages.remoteJid, jidVariants),
   ];
   if (opts?.beforeId) {
     conditions.push(lt(waMessages.id, opts.beforeId));
@@ -1009,7 +1022,8 @@ export async function countWhatsAppMessagesByDeal(dealId: number, tenantId: numb
   const contact = contactRows[0];
   if (!contact?.phone) return 0;
 
-  const jid = phoneToJid(contact.phone);
+  // Get all possible JID variants for this phone (with and without 9th digit)
+  const jidVariants = getAllJidVariants(contact.phone);
 
   const sessions = await db.select({ sessionId: whatsappSessions.sessionId })
     .from(whatsappSessions).where(eq(whatsappSessions.tenantId, tenantId));
@@ -1017,7 +1031,12 @@ export async function countWhatsAppMessagesByDeal(dealId: number, tenantId: numb
 
   const sessionIds = sessions.map(s => s.sessionId);
   const result = await db.select({ total: count() }).from(waMessages)
-    .where(and(inArray(waMessages.sessionId, sessionIds), eq(waMessages.remoteJid, jid)));
+    .where(and(
+      inArray(waMessages.sessionId, sessionIds),
+      jidVariants.length === 1
+        ? eq(waMessages.remoteJid, jidVariants[0])
+        : inArray(waMessages.remoteJid, jidVariants)
+    ));
 
   return result[0]?.total || 0;
 }

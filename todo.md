@@ -899,3 +899,23 @@
 
 ### Testes
 - [x] Testes do endpoint dealWhatsApp (6 testes passando)
+
+## Correção de Duplicação de Conversas WhatsApp no Inbox
+
+### Problema
+- [x] Conversas duplicadas para o mesmo contato (uma quando agente envia primeiro, outra quando contato responde)
+- [x] Formato de telefone não normalizado (ex: +5584999838420 vs 5584999838420 vs 84999838420)
+
+### Correções
+- [x] Criar módulo centralizado phoneUtils.ts (normalizeBrazilianPhone, normalizeJid, getAllJidVariants, etc.)
+- [x] Normalizar JID do WhatsApp para formato consistente (55DDNNNNNNNNN@s.whatsapp.net)
+- [x] Corrigir fluxo de mensagens recebidas para normalizar JID antes de salvar
+- [x] Corrigir fluxo de mensagens enviadas (resolveJid) para retornar JID normalizado
+- [x] Unificar conversas no inbox via SQL normalization (getConversationsList + getConversationsListMultiAgent)
+- [x] Normalizar getMessagesByContact para buscar todas as variantes de JID
+- [x] Normalizar markConversationRead para marcar todas as variantes
+- [x] Normalizar getOrCreateAssignment para evitar assignments duplicados
+- [x] Normalizar telefones no cadastro de contatos (createContact, updateContact)
+- [x] Normalizar phoneToJid no crmDb.ts e whatsappDailyBackup.ts
+- [x] Testes unitários para phoneUtils (27 testes passando)
+- [x] 226 testes passando no total (1 falha pré-existente no backup diário)

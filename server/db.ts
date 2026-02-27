@@ -2,6 +2,7 @@ import { eq, desc, and, or, like, lt, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import { InsertUser, users, whatsappSessions, waMessages as messages, activityLogs, chatbotSettings, chatbotRules, conversationAssignments, crmUsers, teams, teamMembers, distributionRules, customFields, customFieldValues } from "../drizzle/schema";
 import { ENV } from './_core/env';
+import { normalizeJid } from "./phoneUtils";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
@@ -117,7 +118,16 @@ export async function getMessages(sessionId: string, limit = 50, offset = 0) {
 export async function getMessagesByContact(sessionId: string, remoteJid: string, limit = 50, beforeId?: number) {
   const db = await getDb();
   if (!db) return [];
-  const conditions = [eq(messages.sessionId, sessionId), eq(messages.remoteJid, remoteJid)];
+  // Get all JID variants to fetch messages stored under either format
+  const { getAllJidVariants } = await import("./phoneUtils");
+  const jidVariants = getAllJidVariants(remoteJid);
+  
+  const conditions: any[] = [
+    eq(messages.sessionId, sessionId),
+    jidVariants.length === 1
+      ? eq(messages.remoteJid, jidVariants[0])
+      : or(...jidVariants.map(jid => eq(messages.remoteJid, jid))),
+  ];
   if (beforeId) {
     conditions.push(lt(messages.id, beforeId));
   }
@@ -224,6 +234,7 @@ export async function removeChatbotRule(id: number) {
 }
 
 // WhatsApp Conversations List (grouped by remoteJid)
+// Uses normalization to merge conversations that differ only by 9th digit
 export async function getConversationsList(sessionId: string) {
   const db = await getDb();
   if (!db) return [];
@@ -236,10 +247,24 @@ export async function getConversationsList(sessionId: string) {
   ];
   const skipTypesSQL = skipTypes.map(t => `'${t}'`).join(',');
   
-  // Get distinct remoteJids with last REAL message info + pushName
+  // Use a SQL expression to normalize Brazilian JIDs:
+  // For 55+DDD+8digits (12 total), add the 9th digit after DDD
+  // This ensures both 5584999838420 and 558499838420 map to the same normalized key
+  const normalizeJidSQL = `
+    CASE 
+      WHEN remoteJid LIKE '55%@s.whatsapp.net' 
+        AND LENGTH(REPLACE(remoteJid, '@s.whatsapp.net', '')) = 12
+        AND SUBSTRING(remoteJid, 5, 1) != '9'
+      THEN CONCAT('55', SUBSTRING(remoteJid, 3, 2), '9', SUBSTRING(remoteJid, 5, 8), '@s.whatsapp.net')
+      ELSE remoteJid
+    END
+  `;
+  
+  // Get distinct normalized JIDs with last REAL message info + pushName
   const result = await db.execute(sql`
     SELECT 
       m.remoteJid,
+      ${sql.raw(normalizeJidSQL.replace(/remoteJid/g, 'm.remoteJid'))} AS normalizedJid,
       m.content AS lastMessage,
       m.messageType AS lastMessageType,
       m.fromMe AS lastFromMe,
@@ -248,7 +273,7 @@ export async function getConversationsList(sessionId: string) {
       (
         SELECT m4.pushName FROM messages m4 
         WHERE m4.sessionId = ${sessionId} 
-        AND m4.remoteJid = m.remoteJid 
+        AND ${sql.raw(normalizeJidSQL.replace(/remoteJid/g, 'm4.remoteJid'))} = ${sql.raw(normalizeJidSQL.replace(/remoteJid/g, 'm.remoteJid'))}
         AND m4.fromMe = 0 
         AND m4.pushName IS NOT NULL 
         AND m4.pushName != ''
@@ -257,7 +282,7 @@ export async function getConversationsList(sessionId: string) {
       (
         SELECT COUNT(*) FROM messages m2 
         WHERE m2.sessionId = ${sessionId} 
-        AND m2.remoteJid = m.remoteJid 
+        AND ${sql.raw(normalizeJidSQL.replace(/remoteJid/g, 'm2.remoteJid'))} = ${sql.raw(normalizeJidSQL.replace(/remoteJid/g, 'm.remoteJid'))}
         AND m2.fromMe = 0 
         AND (m2.status IS NULL OR m2.status = 'received')
         AND m2.messageType NOT IN (${sql.raw(skipTypesSQL)})
@@ -265,36 +290,48 @@ export async function getConversationsList(sessionId: string) {
       (
         SELECT COUNT(*) FROM messages m3 
         WHERE m3.sessionId = ${sessionId} 
-        AND m3.remoteJid = m.remoteJid
+        AND ${sql.raw(normalizeJidSQL.replace(/remoteJid/g, 'm3.remoteJid'))} = ${sql.raw(normalizeJidSQL.replace(/remoteJid/g, 'm.remoteJid'))}
         AND m3.messageType NOT IN (${sql.raw(skipTypesSQL)})
       ) AS totalMessages
     FROM messages m
     INNER JOIN (
-      SELECT remoteJid, MAX(id) AS maxId
+      SELECT ${sql.raw(normalizeJidSQL)} AS normJid, MAX(id) AS maxId
       FROM messages
       WHERE sessionId = ${sessionId}
       AND remoteJid NOT LIKE '%@g.us'
       AND messageType NOT IN (${sql.raw(skipTypesSQL)})
-      GROUP BY remoteJid
-    ) latest ON m.remoteJid = latest.remoteJid AND m.id = latest.maxId
+      GROUP BY normJid
+    ) latest ON ${sql.raw(normalizeJidSQL.replace(/remoteJid/g, 'm.remoteJid'))} = latest.normJid AND m.id = latest.maxId
     WHERE m.sessionId = ${sessionId}
     AND m.remoteJid NOT LIKE '%@g.us'
     ORDER BY m.timestamp DESC
   `);
-  return (result as any)[0] || [];
+  
+  // Post-process: use normalizedJid as the canonical remoteJid
+  const rows = (result as any)[0] || [];
+  return rows.map((row: any) => ({
+    ...row,
+    remoteJid: row.normalizedJid || row.remoteJid,
+  }));
 }
 
-// Mark conversation as read
+// Mark conversation as read (handles both JID variants)
 export async function markConversationRead(sessionId: string, remoteJid: string) {
   const db = await getDb();
   if (!db) return;
-  await db.update(messages)
-    .set({ status: "read" })
-    .where(and(
-      eq(messages.sessionId, sessionId),
-      eq(messages.remoteJid, remoteJid),
-      eq(messages.fromMe, false)
-    ));
+  // Normalize the JID and get all variants to mark all messages as read
+  const { getAllJidVariants } = await import("./phoneUtils");
+  const jidVariants = getAllJidVariants(remoteJid);
+  
+  for (const jid of jidVariants) {
+    await db.update(messages)
+      .set({ status: "read" })
+      .where(and(
+        eq(messages.sessionId, sessionId),
+        eq(messages.remoteJid, jid),
+        eq(messages.fromMe, false)
+      ));
+  }
 }
 
 
@@ -303,20 +340,31 @@ export async function markConversationRead(sessionId: string, remoteJid: string)
 export async function getOrCreateAssignment(tenantId: number, sessionId: string, remoteJid: string) {
   const db = await getDb();
   if (!db) return null;
-  const existing = await db.select().from(conversationAssignments)
-    .where(and(
-      eq(conversationAssignments.tenantId, tenantId),
-      eq(conversationAssignments.sessionId, sessionId),
-      eq(conversationAssignments.remoteJid, remoteJid)
-    )).limit(1);
-  if (existing.length > 0) return existing[0];
-  // Auto-create assignment with status open, no agent assigned
-  await db.insert(conversationAssignments).values({ tenantId, sessionId, remoteJid, status: "open" });
+  // Normalize JID to canonical format to prevent duplicate assignments
+  const normalizedJid = normalizeJid(remoteJid);
+  
+  // Also check for the non-normalized variant in case it was stored before normalization
+  const { getAllJidVariants } = await import("./phoneUtils");
+  const jidVariants = getAllJidVariants(normalizedJid);
+  
+  // Search for existing assignment with any variant
+  for (const jid of jidVariants) {
+    const existing = await db.select().from(conversationAssignments)
+      .where(and(
+        eq(conversationAssignments.tenantId, tenantId),
+        eq(conversationAssignments.sessionId, sessionId),
+        eq(conversationAssignments.remoteJid, jid)
+      )).limit(1);
+    if (existing.length > 0) return existing[0];
+  }
+  
+  // Auto-create assignment with normalized JID
+  await db.insert(conversationAssignments).values({ tenantId, sessionId, remoteJid: normalizedJid, status: "open" });
   const created = await db.select().from(conversationAssignments)
     .where(and(
       eq(conversationAssignments.tenantId, tenantId),
       eq(conversationAssignments.sessionId, sessionId),
-      eq(conversationAssignments.remoteJid, remoteJid)
+      eq(conversationAssignments.remoteJid, normalizedJid)
     )).limit(1);
   return created[0] || null;
 }
@@ -399,6 +447,7 @@ export async function getTeamsForTenant(tenantId: number) {
 }
 
 // Get conversations list with assignment info (multi-agent aware)
+// Uses normalization to merge conversations that differ only by 9th digit
 export async function getConversationsListMultiAgent(sessionId: string, tenantId: number, filter?: { assignedUserId?: number; assignedTeamId?: number; status?: string; unassignedOnly?: boolean }) {
   const db = await getDb();
   if (!db) return [];
@@ -409,6 +458,17 @@ export async function getConversationsListMultiAgent(sessionId: string, tenantId
     'encReactionMessage','editedMessage','viewOnceMessageV2Extension'
   ];
   const skipTypesSQL = skipTypes.map(t => `'${t}'`).join(',');
+  
+  // SQL expression to normalize Brazilian JIDs (add 9th digit if missing)
+  const normalizeJidSQL = `
+    CASE 
+      WHEN remoteJid LIKE '55%@s.whatsapp.net' 
+        AND LENGTH(REPLACE(remoteJid, '@s.whatsapp.net', '')) = 12
+        AND SUBSTRING(remoteJid, 5, 1) != '9'
+      THEN CONCAT('55', SUBSTRING(remoteJid, 3, 2), '9', SUBSTRING(remoteJid, 5, 8), '@s.whatsapp.net')
+      ELSE remoteJid
+    END
+  `;
   
   // Build WHERE clause for assignment filters
   let assignmentFilter = '';
@@ -428,6 +488,7 @@ export async function getConversationsListMultiAgent(sessionId: string, tenantId
   const result = await db.execute(sql`
     SELECT 
       m.remoteJid,
+      ${sql.raw(normalizeJidSQL.replace(/remoteJid/g, 'm.remoteJid'))} AS normalizedJid,
       m.content AS lastMessage,
       m.messageType AS lastMessageType,
       m.fromMe AS lastFromMe,
@@ -437,7 +498,7 @@ export async function getConversationsListMultiAgent(sessionId: string, tenantId
       (
         SELECT m4.pushName FROM messages m4 
         WHERE m4.sessionId = ${sessionId} 
-        AND m4.remoteJid = m.remoteJid 
+        AND ${sql.raw(normalizeJidSQL.replace(/remoteJid/g, 'm4.remoteJid'))} = ${sql.raw(normalizeJidSQL.replace(/remoteJid/g, 'm.remoteJid'))}
         AND m4.fromMe = 0 
         AND m4.pushName IS NOT NULL 
         AND m4.pushName != ''
@@ -446,7 +507,7 @@ export async function getConversationsListMultiAgent(sessionId: string, tenantId
       (
         SELECT COUNT(*) FROM messages m2 
         WHERE m2.sessionId = ${sessionId} 
-        AND m2.remoteJid = m.remoteJid 
+        AND ${sql.raw(normalizeJidSQL.replace(/remoteJid/g, 'm2.remoteJid'))} = ${sql.raw(normalizeJidSQL.replace(/remoteJid/g, 'm.remoteJid'))}
         AND m2.fromMe = 0 
         AND (m2.status IS NULL OR m2.status = 'received')
         AND m2.messageType NOT IN (${sql.raw(skipTypesSQL)})
@@ -454,7 +515,7 @@ export async function getConversationsListMultiAgent(sessionId: string, tenantId
       (
         SELECT COUNT(*) FROM messages m3 
         WHERE m3.sessionId = ${sessionId} 
-        AND m3.remoteJid = m.remoteJid
+        AND ${sql.raw(normalizeJidSQL.replace(/remoteJid/g, 'm3.remoteJid'))} = ${sql.raw(normalizeJidSQL.replace(/remoteJid/g, 'm.remoteJid'))}
         AND m3.messageType NOT IN (${sql.raw(skipTypesSQL)})
       ) AS totalMessages,
       ca.assignedUserId,
@@ -465,16 +526,16 @@ export async function getConversationsListMultiAgent(sessionId: string, tenantId
       agent.avatarUrl AS assignedAgentAvatar
     FROM messages m
     INNER JOIN (
-      SELECT remoteJid, MAX(id) AS maxId
+      SELECT ${sql.raw(normalizeJidSQL)} AS normJid, MAX(id) AS maxId
       FROM messages
       WHERE sessionId = ${sessionId}
       AND remoteJid NOT LIKE '%@g.us'
       AND messageType NOT IN (${sql.raw(skipTypesSQL)})
-      GROUP BY remoteJid
-    ) latest ON m.remoteJid = latest.remoteJid AND m.id = latest.maxId
+      GROUP BY normJid
+    ) latest ON ${sql.raw(normalizeJidSQL.replace(/remoteJid/g, 'm.remoteJid'))} = latest.normJid AND m.id = latest.maxId
     LEFT JOIN conversation_assignments ca 
       ON ca.sessionId = ${sessionId} 
-      AND ca.remoteJid = m.remoteJid
+      AND (ca.remoteJid = m.remoteJid OR ca.remoteJid = ${sql.raw(normalizeJidSQL.replace(/remoteJid/g, 'm.remoteJid'))})
       AND ca.tenantId = ${tenantId}
     LEFT JOIN crm_users agent ON agent.id = ca.assignedUserId
     WHERE m.sessionId = ${sessionId}
@@ -482,7 +543,13 @@ export async function getConversationsListMultiAgent(sessionId: string, tenantId
     ${sql.raw(assignmentFilter)}
     ORDER BY m.timestamp DESC
   `);
-  return (result as any)[0] || [];
+  
+  // Post-process: use normalizedJid as the canonical remoteJid
+  const rows = (result as any)[0] || [];
+  return rows.map((row: any) => ({
+    ...row,
+    remoteJid: row.normalizedJid || row.remoteJid,
+  }));
 }
 
 // Round-robin assignment: get next agent for a tenant

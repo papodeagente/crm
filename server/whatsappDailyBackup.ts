@@ -8,17 +8,13 @@
 
 import { getDb } from "./db";
 import { waMessages as messages, deals, contacts, dealHistory, whatsappSessions } from "../drizzle/schema";
-import { eq, and, gte, lt, desc, sql } from "drizzle-orm";
+import { eq, and, gte, lt, desc, sql, inArray } from "drizzle-orm";
 
 const TIMEZONE = "America/Sao_Paulo";
 
 /** Format a phone number to WhatsApp JID */
-function phoneToJid(phone: string): string {
-  // Remove all non-digit characters
-  const digits = phone.replace(/\D/g, "");
-  // If starts with +, remove it (already handled by replace above)
-  return `${digits}@s.whatsapp.net`;
-}
+// Use centralized phone normalization
+import { phoneToJid, getAllJidVariants } from "./phoneUtils";
 
 /** Format timestamp to readable Brazilian format */
 function formatTimestamp(date: Date): string {
@@ -131,7 +127,8 @@ export async function runDailyWhatsAppBackup(): Promise<{ dealsProcessed: number
       const contact = contactRows[0];
       if (!contact?.phone) continue;
 
-      const jid = phoneToJid(contact.phone);
+      // Get all possible JID variants for this phone (handles 9th digit discrepancy)
+      const jidVariants = getAllJidVariants(contact.phone);
 
       // Find messages for this contact across all sessions in the date range
       for (const session of sessions) {
@@ -143,7 +140,9 @@ export async function runDailyWhatsAppBackup(): Promise<{ dealsProcessed: number
         }).from(messages).where(
           and(
             eq(messages.sessionId, session.sessionId),
-            eq(messages.remoteJid, jid),
+            jidVariants.length === 1
+              ? eq(messages.remoteJid, jidVariants[0])
+              : inArray(messages.remoteJid, jidVariants),
             gte(messages.timestamp, start),
             lt(messages.timestamp, end),
           )

@@ -20,6 +20,7 @@ import { invokeLLM } from "./_core/llm";
 import { notifyOwner } from "./_core/notification";
 import { storagePut } from "./storage";
 import { nanoid } from "nanoid";
+import { normalizeJid } from "./phoneUtils";
 
 const logger = pino({ level: "silent" });
 
@@ -238,9 +239,11 @@ class WhatsAppManager extends EventEmitter {
       for (const msg of msgs) {
         if (!msg.message) continue;
 
-        const remoteJid = msg.key.remoteJid || "";
+        const rawRemoteJid = msg.key.remoteJid || "";
         // Skip group messages — CRM only handles individual contacts
-        if (remoteJid.endsWith("@g.us")) continue;
+        if (rawRemoteJid.endsWith("@g.us")) continue;
+        // Normalize Brazilian phone JID to canonical format (always 13 digits with 9th digit)
+        const remoteJid = normalizeJid(rawRemoteJid);
         const fromMe = msg.key.fromMe || false;
         
         // Determine the real message type, skipping internal protocol types
@@ -479,8 +482,8 @@ class WhatsAppManager extends EventEmitter {
     const session = this.sessions.get(sessionId);
     if (!session?.socket) throw new Error("Sessão não conectada");
 
-    // If already a full JID, return as-is
-    if (input.includes("@")) return input;
+    // If already a full JID, normalize and return
+    if (input.includes("@")) return normalizeJid(input);
 
     // Strip all non-digit characters
     let digits = input.replace(/\D/g, "");
@@ -494,8 +497,9 @@ class WhatsAppManager extends EventEmitter {
     try {
       const results = await session.socket.onWhatsApp(digits);
       if (results && results.length > 0 && results[0].exists) {
-        console.log(`[JID Resolve] ${input} -> ${results[0].jid} (verified)`);
-        return results[0].jid;
+        const resolvedJid = normalizeJid(results[0].jid);
+        console.log(`[JID Resolve] ${input} -> ${resolvedJid} (verified + normalized)`);
+        return resolvedJid;
       }
     } catch (e) {
       console.warn("[JID Resolve] onWhatsApp failed, using fallback:", e);
@@ -512,8 +516,9 @@ class WhatsAppManager extends EventEmitter {
         try {
           const results = await session.socket.onWhatsApp(without9);
           if (results && results.length > 0 && results[0].exists) {
-            console.log(`[JID Resolve] ${input} -> ${results[0].jid} (verified without 9th digit)`);
-            return results[0].jid;
+            const resolvedJid = normalizeJid(results[0].jid);
+            console.log(`[JID Resolve] ${input} -> ${resolvedJid} (verified without 9th digit + normalized)`);
+            return resolvedJid;
           }
         } catch (e) { /* ignore */ }
       }
@@ -524,16 +529,18 @@ class WhatsAppManager extends EventEmitter {
         try {
           const results = await session.socket.onWhatsApp(with9);
           if (results && results.length > 0 && results[0].exists) {
-            console.log(`[JID Resolve] ${input} -> ${results[0].jid} (verified with 9th digit)`);
-            return results[0].jid;
+            const resolvedJid = normalizeJid(results[0].jid);
+            console.log(`[JID Resolve] ${input} -> ${resolvedJid} (verified with 9th digit + normalized)`);
+            return resolvedJid;
           }
         } catch (e) { /* ignore */ }
       }
     }
 
-    // Final fallback: just use digits@s.whatsapp.net
-    console.log(`[JID Resolve] ${input} -> ${digits}@s.whatsapp.net (fallback)`);
-    return `${digits}@s.whatsapp.net`;
+    // Final fallback: normalize and use @s.whatsapp.net
+    const fallbackJid = normalizeJid(`${digits}@s.whatsapp.net`);
+    console.log(`[JID Resolve] ${input} -> ${fallbackJid} (fallback + normalized)`);
+    return fallbackJid;
   }
 
   /** Public wrapper for resolveJid to be called from router */
