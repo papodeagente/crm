@@ -845,3 +845,25 @@
 - [x] Testes CRUD de catálogo de produtos
 - [x] Testes de vinculação produto-deal
 - [x] Testes de queries de relatórios
+
+## Melhoria de Contraste e UX (Referência: RD Station CRM)
+
+### Pipeline
+- [x] Cards de negociação com fundo branco/claro, bordas suaves e sombra leve
+- [x] Cabeçalho de coluna com nome da etapa, contagem e valor total
+- [x] Barra de status "Em andamento" com cor ciano/teal nos cards
+- [x] Melhor espaçamento e tipografia nos cards (nome, data, tarefa)
+- [x] Fundo geral mais claro (cinza suave) para contrastar com cards brancos
+
+### DealDetail
+- [x] Barra de etapas horizontal colorida (etapa atual destacada em ciano/teal)
+- [x] Sidebar esquerda com informações da negociação (nome, qualificação, data, valor, fonte)
+- [x] Área de tarefas próximas com badge de status e prazo
+- [x] Tabs (Histórico, E-mail, Tarefas, Produtos, Arquivos, Propostas) com estilo limpo
+- [x] Timeline de histórico com pontos e datas formatadas
+- [x] Botões "Marcar perda" e "Marcar venda" destacados no header
+
+### CSS Global
+- [x] Ajustar variáveis de tema claro para melhor contraste (fundo cinza suave, cards brancos)
+- [x] Ajustar variáveis de tema escuro para manter consistência
+- [x] Melhorar contraste de texto (foreground vs background) em ambos os temas

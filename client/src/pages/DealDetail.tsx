@@ -195,7 +195,7 @@ export default function DealDetail() {
       {/* ════════════════════════════════════════════════════════ */}
       {/* TOP HEADER — Title + Pipeline badge + Action buttons    */}
       {/* ════════════════════════════════════════════════════════ */}
-      <div className="shrink-0 border-b border-border/40 bg-card/80 backdrop-blur-sm">
+      <div className="shrink-0 border-b border-border bg-card">
         <div className="flex items-center justify-between px-5 py-3">
           <div className="flex items-center gap-3 min-w-0">
             <button
@@ -242,7 +242,7 @@ export default function DealDetail() {
                 </Button>
                 <Button
                   size="sm"
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                  className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm"
                   onClick={() => setShowWonDialog(true)}
                 >
                   <ThumbsUp className="h-3.5 w-3.5 mr-1.5" />
@@ -257,25 +257,25 @@ export default function DealDetail() {
         {/* STAGE BAR — Clickable pipeline stages                   */}
         {/* ════════════════════════════════════════════════════════ */}
         {stages.length > 0 && deal.status === "open" && (
-          <div className="flex items-stretch px-5 pb-3 gap-0 overflow-x-auto">
+          <div className="flex items-stretch px-5 pb-3 gap-0.5 overflow-x-auto">
             {stages.map((stage: any, idx: number) => {
               const isActive = stage.id === deal.stageId;
               const isPast = idx < currentStageIdx;
               const isWon = stage.isWon;
               const isLost = stage.isLost;
 
-              let bgClass = "bg-muted/40 text-muted-foreground hover:bg-muted/70";
-              if (isActive) bgClass = "bg-primary text-primary-foreground shadow-sm";
-              else if (isPast) bgClass = "bg-primary/20 text-primary dark:bg-primary/15";
-              if (isWon) bgClass = isPast || isActive ? "bg-emerald-500 text-white" : "bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 dark:text-emerald-400";
-              if (isLost) bgClass = isPast || isActive ? "bg-red-500 text-white" : "bg-red-500/10 text-red-600 hover:bg-red-500/20 dark:text-red-400";
+              let bgClass = "bg-muted/50 dark:bg-muted/30 text-muted-foreground hover:bg-muted/80";
+              if (isActive) bgClass = "bg-primary text-primary-foreground shadow-sm font-semibold";
+              else if (isPast) bgClass = "bg-primary/30 text-primary dark:bg-primary/20 dark:text-primary";
+              if (isWon) bgClass = isPast || isActive ? "bg-emerald-500 text-white font-semibold" : "bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 dark:text-emerald-400";
+              if (isLost) bgClass = isPast || isActive ? "bg-red-500 text-white font-semibold" : "bg-red-500/10 text-red-600 hover:bg-red-500/20 dark:text-red-400";
 
               return (
                 <button
                   key={stage.id}
                   onClick={() => handleMoveStage(stage)}
                   disabled={moveStage.isPending}
-                  className={`relative flex-1 min-w-0 py-2 px-3 text-xs font-medium truncate transition-all
+                  className={`relative flex-1 min-w-0 py-2.5 px-3 text-xs font-medium truncate transition-all
                     ${idx === 0 ? "rounded-l-lg" : ""} ${idx === stages.length - 1 ? "rounded-r-lg" : ""}
                     ${bgClass}
                     ${!isActive ? "cursor-pointer" : "cursor-default"}
@@ -285,7 +285,7 @@ export default function DealDetail() {
                   <span className="truncate block text-center">
                     {stage.name}
                     {isActive && (
-                      <span className="ml-1 opacity-75">({daysInStage(deal.lastActivityAt || deal.createdAt)})</span>
+                      <span className="ml-1 opacity-80">({daysInStage(deal.lastActivityAt || deal.createdAt)})</span>
                     )}
                   </span>
                 </button>
@@ -300,7 +300,7 @@ export default function DealDetail() {
       {/* ════════════════════════════════════════════════════════ */}
       <div className="flex-1 flex overflow-hidden">
         {/* ─── LEFT SIDEBAR ─── */}
-        <aside className="w-[380px] shrink-0 border-r border-border/30 bg-card/50 overflow-y-auto hidden lg:block">
+        <aside className="w-[380px] shrink-0 border-r border-border bg-card overflow-y-auto hidden lg:block">
           <div className="p-4 space-y-0">
             {/* ── Negociação ── */}
             <SidebarSection
@@ -431,7 +431,7 @@ export default function DealDetail() {
         {/* ─── RIGHT CONTENT ─── */}
         <div className="flex-1 flex flex-col overflow-hidden">
           {/* ── Próximas Tarefas (top card) ── */}
-          <div className="shrink-0 border-b border-border/30 bg-card/30 p-4">
+          <div className="shrink-0 border-b border-border bg-card p-4">
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
                 <ClipboardList className="h-4 w-4 text-muted-foreground" />
@@ -456,7 +456,7 @@ export default function DealDetail() {
           </div>
 
           {/* ── Tab bar ── */}
-          <div className="shrink-0 flex items-center gap-0 px-4 border-b border-border/30 bg-card/20">
+          <div className="shrink-0 flex items-center gap-0 px-4 border-b border-border bg-card">
             {[
               { key: "history" as const, label: "Histórico", icon: History },
               { key: "tasks" as const, label: "Tarefas", icon: ClipboardList, count: (tasksQ.data || []).length },
@@ -605,7 +605,7 @@ function SidebarSection({ title, open, onToggle, children }: {
 }
 
 function SidebarDivider() {
-  return <div className="border-b border-border/30" />;
+  return <div className="border-b border-border" />;
 }
 
 function SidebarField({ label, value, className }: { label: string; value: string; className?: string }) {
@@ -805,7 +805,7 @@ function TaskRow({ task, onUpdate }: { task: any; onUpdate: () => void }) {
 
   return (
     <div className={`flex items-center gap-3 p-2.5 rounded-lg border transition-colors ${
-      isOverdue ? "border-red-500/30 bg-red-500/5" : "border-border/30 bg-background/50 hover:border-border/60"
+      isOverdue ? "border-red-500/40 bg-red-500/5 dark:bg-red-500/10" : "border-border bg-background hover:border-primary/30 hover:shadow-sm"
     }`}>
       <button
         onClick={() => updateTask.mutate({ tenantId: TENANT_ID, id: task.id, status: "done" })}
@@ -914,7 +914,7 @@ function HistoryPanel({ history, notes, dealId, onNoteCreated }: {
         </div>
       ) : (
         <div className="relative">
-          <div className="absolute left-4 top-0 bottom-0 w-px bg-border/40" />
+          <div className="absolute left-4 top-0 bottom-0 w-px bg-border" />
           <div className="space-y-0">
             {timeline.map((item: any) => {
               const Icon = actionIcons[item.action] || History;
@@ -1046,7 +1046,7 @@ function ProductsPanel({ products, dealId, onRefresh }: { products: any[]; dealI
             const Icon = categoryIcons[p.category] || Package;
             const itemTotal = p.quantity * p.unitPriceCents - (p.discountCents || 0);
             return (
-              <div key={p.id} className="flex items-center gap-3 p-3 bg-background border border-border/30 rounded-lg hover:border-border/60 transition-colors group">
+              <div key={p.id} className="flex items-center gap-3 p-3 bg-background border border-border rounded-lg hover:border-primary/30 hover:shadow-sm transition-all group">
                 <div className="w-9 h-9 rounded-lg bg-muted/50 flex items-center justify-center shrink-0">
                   <Icon className="h-4 w-4 text-muted-foreground" />
                 </div>
@@ -1161,7 +1161,7 @@ function ParticipantsPanel({ participants, contacts, dealId, onRefresh }: any) {
           {participants.map((p: any) => {
             const c = contacts.find((ct: any) => ct.id === p.contactId);
             return (
-              <div key={p.id} className="flex items-center gap-3 p-3 bg-background border border-border/30 rounded-lg group">
+              <div key={p.id} className="flex items-center gap-3 p-3 bg-background border border-border rounded-lg hover:shadow-sm transition-all group">
                 <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
                   <User className="h-4 w-4 text-primary" />
                 </div>

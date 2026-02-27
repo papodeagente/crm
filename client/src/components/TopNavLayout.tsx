@@ -376,7 +376,7 @@ function TopBar({ onSearchOpen, mobileMenuOpen, onToggleMobile }: {
 
   return (
     <>
-      <header className="shrink-0 glass z-50 sticky top-0">
+      <header className="shrink-0 glass z-50 sticky top-0 border-b border-border">
         <div className="flex items-center h-[56px] px-4 lg:px-6 gap-2">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2.5 shrink-0 mr-2">
@@ -400,7 +400,7 @@ function TopBar({ onSearchOpen, mobileMenuOpen, onToggleMobile }: {
                   href={item.path}
                   className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-[13.5px] font-medium transition-all duration-200 ${
                     isActive
-                      ? "bg-primary/10 text-primary"
+                      ? "bg-primary/15 text-primary font-semibold border-b-2 border-primary"
                       : "text-muted-foreground hover:text-foreground hover:bg-accent"
                   }`}
                 >

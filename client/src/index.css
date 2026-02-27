@@ -59,122 +59,122 @@
 :root {
   --radius: 0.625rem;
 
-  --background: oklch(0.975 0.002 270);
-  --foreground: oklch(0.15 0.015 270);
+  --background: oklch(0.965 0.003 250);
+  --foreground: oklch(0.18 0.02 260);
 
-  --card: oklch(1.0 0 0);
-  --card-foreground: oklch(0.15 0.015 270);
+  --card: oklch(0.995 0 0);
+  --card-foreground: oklch(0.18 0.02 260);
 
-  --popover: oklch(1.0 0 0);
-  --popover-foreground: oklch(0.15 0.015 270);
+  --popover: oklch(0.995 0 0);
+  --popover-foreground: oklch(0.18 0.02 260);
 
-  --primary: oklch(0.55 0.25 290);
+  --primary: oklch(0.62 0.16 195);
   --primary-foreground: oklch(1.0 0 0);
 
-  --secondary: oklch(0.955 0.008 270);
-  --secondary-foreground: oklch(0.25 0.015 270);
+  --secondary: oklch(0.955 0.006 250);
+  --secondary-foreground: oklch(0.25 0.015 260);
 
-  --muted: oklch(0.955 0.008 270);
-  --muted-foreground: oklch(0.48 0.012 270);
+  --muted: oklch(0.950 0.006 250);
+  --muted-foreground: oklch(0.42 0.012 260);
 
-  --accent: oklch(0.945 0.015 290);
-  --accent-foreground: oklch(0.20 0.015 270);
+  --accent: oklch(0.945 0.012 195);
+  --accent-foreground: oklch(0.20 0.015 260);
 
   --destructive: oklch(0.58 0.24 25);
   --destructive-foreground: oklch(1.0 0 0);
 
-  --border: oklch(0.90 0.005 270);
-  --input: oklch(0.90 0.005 270);
-  --ring: oklch(0.55 0.25 290);
+  --border: oklch(0.86 0.008 250);
+  --input: oklch(0.86 0.008 250);
+  --ring: oklch(0.62 0.16 195);
 
-  --chart-1: oklch(0.55 0.25 290);
-  --chart-2: oklch(0.58 0.20 200);
+  --chart-1: oklch(0.62 0.16 195);
+  --chart-2: oklch(0.55 0.25 290);
   --chart-3: oklch(0.50 0.25 330);
-  --chart-4: oklch(0.62 0.18 180);
+  --chart-4: oklch(0.62 0.18 150);
   --chart-5: oklch(0.45 0.22 270);
 
-  --sidebar: oklch(0.97 0.002 270);
-  --sidebar-foreground: oklch(0.40 0.008 270);
-  --sidebar-primary: oklch(0.55 0.25 290);
+  --sidebar: oklch(0.97 0.002 250);
+  --sidebar-foreground: oklch(0.35 0.01 260);
+  --sidebar-primary: oklch(0.62 0.16 195);
   --sidebar-primary-foreground: oklch(1.0 0 0);
-  --sidebar-accent: oklch(0.945 0.015 290);
-  --sidebar-accent-foreground: oklch(0.20 0.015 270);
-  --sidebar-border: oklch(0.90 0.005 270);
-  --sidebar-ring: oklch(0.55 0.25 290);
+  --sidebar-accent: oklch(0.945 0.012 195);
+  --sidebar-accent-foreground: oklch(0.20 0.015 260);
+  --sidebar-border: oklch(0.88 0.006 250);
+  --sidebar-ring: oklch(0.62 0.16 195);
 
   /* WhatsApp Inbox — Light */
   --wa-panel: oklch(1.0 0 0);
-  --wa-panel-header: oklch(0.96 0.003 270);
-  --wa-search-bg: oklch(0.955 0.005 270);
+  --wa-panel-header: oklch(0.96 0.003 250);
+  --wa-search-bg: oklch(0.955 0.005 250);
   --wa-chat-bg: oklch(0.93 0.008 80);
   --wa-bubble-out: oklch(0.90 0.04 155);
   --wa-bubble-in: oklch(1.0 0 0);
-  --wa-active: oklch(0.945 0.015 290);
-  --wa-hover: oklch(0.96 0.005 270);
+  --wa-active: oklch(0.945 0.012 195);
+  --wa-hover: oklch(0.96 0.005 250);
   --wa-unread: oklch(0.55 0.18 155);
   --wa-tint: oklch(0.55 0.18 155);
-  --wa-divider: oklch(0.92 0.003 270);
+  --wa-divider: oklch(0.92 0.003 250);
   --wa-input-bg: oklch(1.0 0 0);
 }
 
 /* ─── ENTUR OS — Dark Theme ─── */
 .dark {
-  --background: oklch(0.14 0.015 280);
-  --foreground: oklch(0.93 0.005 270);
+  --background: oklch(0.14 0.015 270);
+  --foreground: oklch(0.93 0.005 260);
 
-  --card: oklch(0.18 0.015 280);
-  --card-foreground: oklch(0.93 0.005 270);
+  --card: oklch(0.19 0.015 270);
+  --card-foreground: oklch(0.93 0.005 260);
 
-  --popover: oklch(0.18 0.015 280);
-  --popover-foreground: oklch(0.93 0.005 270);
+  --popover: oklch(0.19 0.015 270);
+  --popover-foreground: oklch(0.93 0.005 260);
 
-  --primary: oklch(0.60 0.25 300);
-  --primary-foreground: oklch(1.0 0 0);
+  --primary: oklch(0.70 0.14 195);
+  --primary-foreground: oklch(0.12 0.02 270);
 
-  --secondary: oklch(0.22 0.015 280);
-  --secondary-foreground: oklch(0.88 0.005 270);
+  --secondary: oklch(0.22 0.015 270);
+  --secondary-foreground: oklch(0.88 0.005 260);
 
-  --muted: oklch(0.22 0.012 280);
-  --muted-foreground: oklch(0.58 0.012 270);
+  --muted: oklch(0.22 0.012 270);
+  --muted-foreground: oklch(0.62 0.012 260);
 
-  --accent: oklch(0.24 0.025 290);
-  --accent-foreground: oklch(0.93 0.005 270);
+  --accent: oklch(0.24 0.025 200);
+  --accent-foreground: oklch(0.93 0.005 260);
 
   --destructive: oklch(0.58 0.24 25);
   --destructive-foreground: oklch(1.0 0 0);
 
-  --border: oklch(0.28 0.015 280);
-  --input: oklch(0.24 0.015 280);
-  --ring: oklch(0.60 0.25 300);
+  --border: oklch(0.30 0.015 270);
+  --input: oklch(0.26 0.015 270);
+  --ring: oklch(0.70 0.14 195);
 
-  --chart-1: oklch(0.60 0.25 300);
-  --chart-2: oklch(0.65 0.20 200);
+  --chart-1: oklch(0.70 0.14 195);
+  --chart-2: oklch(0.65 0.20 290);
   --chart-3: oklch(0.55 0.25 330);
-  --chart-4: oklch(0.70 0.18 180);
+  --chart-4: oklch(0.70 0.18 150);
   --chart-5: oklch(0.50 0.22 270);
 
-  --sidebar: oklch(0.12 0.015 280);
-  --sidebar-foreground: oklch(0.68 0.008 270);
-  --sidebar-primary: oklch(0.60 0.25 300);
-  --sidebar-primary-foreground: oklch(1.0 0 0);
-  --sidebar-accent: oklch(0.22 0.02 290);
-  --sidebar-accent-foreground: oklch(0.93 0.005 270);
-  --sidebar-border: oklch(0.26 0.015 280);
-  --sidebar-ring: oklch(0.60 0.25 300);
+  --sidebar: oklch(0.12 0.015 270);
+  --sidebar-foreground: oklch(0.68 0.008 260);
+  --sidebar-primary: oklch(0.70 0.14 195);
+  --sidebar-primary-foreground: oklch(0.12 0.02 270);
+  --sidebar-accent: oklch(0.22 0.02 200);
+  --sidebar-accent-foreground: oklch(0.93 0.005 260);
+  --sidebar-border: oklch(0.26 0.015 270);
+  --sidebar-ring: oklch(0.70 0.14 195);
 
   /* WhatsApp Inbox — Dark */
-  --wa-panel: oklch(0.17 0.012 280);
-  --wa-panel-header: oklch(0.20 0.015 280);
-  --wa-search-bg: oklch(0.15 0.012 280);
-  --wa-chat-bg: oklch(0.10 0.012 280);
+  --wa-panel: oklch(0.17 0.012 270);
+  --wa-panel-header: oklch(0.20 0.015 270);
+  --wa-search-bg: oklch(0.15 0.012 270);
+  --wa-chat-bg: oklch(0.10 0.012 270);
   --wa-bubble-out: oklch(0.25 0.06 170);
-  --wa-bubble-in: oklch(0.22 0.015 280);
-  --wa-active: oklch(0.22 0.025 290);
-  --wa-hover: oklch(0.20 0.012 280);
+  --wa-bubble-in: oklch(0.22 0.015 270);
+  --wa-active: oklch(0.22 0.025 200);
+  --wa-hover: oklch(0.20 0.012 270);
   --wa-unread: oklch(0.55 0.18 155);
   --wa-tint: oklch(0.55 0.18 155);
-  --wa-divider: oklch(0.24 0.012 280);
-  --wa-input-bg: oklch(0.20 0.012 280);
+  --wa-divider: oklch(0.24 0.012 270);
+  --wa-input-bg: oklch(0.20 0.012 270);
 }
 
 @layer base {
@@ -239,7 +239,7 @@
 
   /* ENTUR OS surface card — theme-aware */
   .surface {
-    @apply bg-card border border-border/50;
+    @apply bg-card border border-border;
     border-radius: 0.875rem;
     box-shadow: 0 1px 3px oklch(0 0 0 / 0.04), 0 2px 8px oklch(0 0 0 / 0.03);
     transition: box-shadow 0.25s ease, transform 0.25s ease;
@@ -265,7 +265,7 @@
 
   /* Glassmorphism — theme-aware */
   .glass {
-    @apply bg-background/85 backdrop-blur-xl border-b border-border/50;
+    @apply bg-background/90 backdrop-blur-xl;
   }
   .dark .glass {
     border-bottom-color: oklch(1 1 1 / 0.06);

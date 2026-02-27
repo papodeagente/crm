@@ -25,9 +25,9 @@ type ViewMode = "kanban" | "list";
 type SortMode = "created_desc" | "created_asc" | "value_desc" | "value_asc";
 
 const statusColors: Record<string, { bg: string; text: string; dot: string }> = {
-  open: { bg: "bg-blue-50", text: "text-blue-700", dot: "bg-blue-500" },
-  won: { bg: "bg-emerald-50", text: "text-emerald-700", dot: "bg-emerald-500" },
-  lost: { bg: "bg-red-50", text: "text-red-700", dot: "bg-red-500" },
+  open: { bg: "bg-teal-50 dark:bg-teal-500/15", text: "text-teal-700 dark:text-teal-300", dot: "bg-teal-500" },
+  won: { bg: "bg-emerald-50 dark:bg-emerald-500/15", text: "text-emerald-700 dark:text-emerald-300", dot: "bg-emerald-500" },
+  lost: { bg: "bg-red-50 dark:bg-red-500/15", text: "text-red-700 dark:text-red-300", dot: "bg-red-500" },
 };
 
 const categoryLabels: Record<string, string> = {
@@ -165,7 +165,7 @@ export default function Pipeline() {
   return (
     <div className="flex flex-col h-[calc(100vh-56px)]">
       {/* Toolbar */}
-      <div className="border-b border-border/40 bg-card/80 backdrop-blur-sm px-5 lg:px-8 py-3.5">
+      <div className="border-b border-border bg-card px-5 lg:px-8 py-3.5">
         <div className="flex items-center gap-2.5 flex-wrap">
           {/* View toggle */}
           <div className="flex bg-muted/60 rounded-xl p-1 gap-0.5">
@@ -249,7 +249,7 @@ export default function Pipeline() {
 
       {/* Kanban Board */}
       {viewMode === "kanban" ? (
-        <div className="flex-1 overflow-x-auto overflow-y-hidden bg-muted/20">
+        <div className="flex-1 overflow-x-auto overflow-y-hidden bg-background">
           <div className="flex gap-4 p-5 lg:px-8 h-full min-w-max">
             {stages.isLoading ? (
               <p className="text-muted-foreground p-4 text-sm">Carregando etapas...</p>
@@ -277,7 +277,7 @@ export default function Pipeline() {
                         <h3 className="font-semibold text-[13px] text-foreground truncate max-w-[150px]">{stage.name}</h3>
                         <span className="text-[12px] text-muted-foreground font-medium">({stageDeals.length})</span>
                       </div>
-                      <span className="text-[12px] font-semibold text-muted-foreground">
+                      <span className="text-[12px] font-semibold text-primary">
                         {stageValue > 0 ? formatCurrency(stageValue) : "R$ 0,00"}
                       </span>
                     </div>
@@ -285,8 +285,8 @@ export default function Pipeline() {
                     {/* Cards container */}
                     <div className={`flex-1 rounded-2xl border transition-all duration-200 overflow-y-auto scrollbar-thin ${
                       isDragOver
-                        ? "bg-primary/[0.04] border-primary/30 ring-2 ring-primary/20"
-                        : "bg-card/50 border-border/30"
+                        ? "bg-primary/[0.06] border-primary/40 ring-2 ring-primary/20"
+                        : "bg-muted/30 dark:bg-card/30 border-border/40"
                     }`}>
                       <div className="p-2.5 space-y-2.5 min-h-[200px]">
                         {stageDeals.map((deal: any) => (
@@ -317,7 +317,7 @@ export default function Pipeline() {
         </div>
       ) : (
         /* List view */
-        <div className="flex-1 overflow-auto p-5 lg:px-8 bg-muted/20">
+        <div className="flex-1 overflow-auto p-5 lg:px-8 bg-background">
           <Card className="border-0 shadow-sm rounded-2xl overflow-hidden">
             <table className="w-full text-[13px]">
               <thead>
@@ -382,13 +382,13 @@ function DealCard({ deal, contacts, tasks, onCreateTask, onOpenDrawer, onDragSta
       draggable
       onDragStart={(e) => onDragStart(e, deal.id)}
       onDragEnd={onDragEnd}
-      className={`bg-card rounded-xl border border-border/40 p-3.5 shadow-[0_1px_3px_oklch(0_0_0/0.03)] hover:shadow-sm transition-all duration-200 cursor-grab active:cursor-grabbing space-y-2.5 ${isDragging ? "opacity-40 scale-95" : ""}`}
+      className={`bg-card rounded-xl border border-border/50 p-3.5 shadow-[0_1px_4px_oklch(0_0_0/0.06)] hover:shadow-md transition-all duration-200 cursor-grab active:cursor-grabbing space-y-2.5 ${isDragging ? "opacity-40 scale-95" : ""}`}
     >
       {/* Status + actions */}
       <div className="flex items-center justify-between">
-        <span className={`inline-flex items-center gap-1.5 text-[11px] font-medium px-2 py-0.5 rounded-full ${style.bg} ${style.text}`}>
+        <span className={`inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-md ${style.bg} ${style.text}`}>
           <span className={`h-1.5 w-1.5 rounded-full ${style.dot}`} />
-          {deal.status === "open" ? "Nova" : deal.status === "won" ? "Ganha" : "Perdida"}
+          {deal.status === "open" ? "Em andamento" : deal.status === "won" ? "Ganha" : "Perdida"}
         </span>
         <button className="p-1 hover:bg-muted/60 rounded-lg transition-colors" onClick={(e) => { e.stopPropagation(); onOpenDrawer(); }}>
           <Info className="h-3.5 w-3.5 text-muted-foreground" />
@@ -396,7 +396,7 @@ function DealCard({ deal, contacts, tasks, onCreateTask, onOpenDrawer, onDragSta
       </div>
 
       {/* Title */}
-      <p className="font-semibold text-[13px] leading-snug text-foreground cursor-pointer hover:text-primary transition-colors" onClick={onOpenDrawer}>
+      <p className="font-bold text-[13.5px] leading-snug text-foreground cursor-pointer hover:text-primary transition-colors" onClick={onOpenDrawer}>
         {deal.title}
       </p>
 
@@ -410,7 +410,8 @@ function DealCard({ deal, contacts, tasks, onCreateTask, onOpenDrawer, onDragSta
           {formatDate(deal.createdAt)}
         </span>
         {deal.valueCents > 0 && (
-          <span className="flex items-center gap-1 font-semibold text-foreground">
+          <span className="flex items-center gap-1 font-bold text-foreground">
+            <DollarSign className="h-3 w-3 text-primary" />
             {formatCurrency(deal.valueCents)}
           </span>
         )}
@@ -418,21 +419,23 @@ function DealCard({ deal, contacts, tasks, onCreateTask, onOpenDrawer, onDragSta
 
       {/* Next task */}
       {nextTask && (
-        <div className="flex items-center gap-1.5 text-[11px] text-primary bg-primary/[0.06] px-2.5 py-1.5 rounded-lg">
-          <Clock className="h-3 w-3 shrink-0" />
-          <span className="truncate flex-1">{nextTask.title}</span>
-          {nextTask.dueAt && <span className="shrink-0 text-muted-foreground">{formatDate(nextTask.dueAt)}</span>}
+        <div className="flex items-center gap-1.5 text-[11px] bg-primary/[0.08] dark:bg-primary/[0.12] border border-primary/15 px-2.5 py-2 rounded-lg">
+          <Clock className="h-3 w-3 shrink-0 text-primary" />
+          <span className="truncate flex-1 text-foreground font-medium">{nextTask.title}</span>
+          {nextTask.dueAt && <span className="shrink-0 text-muted-foreground text-[10px]">{formatDateTime(nextTask.dueAt)}</span>}
         </div>
       )}
 
       {/* Create task */}
-      <button
-        onClick={(e) => { e.stopPropagation(); onCreateTask(); }}
-        className="flex items-center gap-1.5 text-[12px] text-muted-foreground hover:text-foreground w-full justify-center py-2 border border-dashed border-border/50 rounded-xl hover:border-border/80 transition-all duration-200"
-      >
-        <Plus className="h-3 w-3" />
-        Criar Tarefa
-      </button>
+      {!nextTask && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onCreateTask(); }}
+          className="flex items-center gap-1.5 text-[12px] text-muted-foreground hover:text-primary w-full justify-center py-2 border border-dashed border-border/50 rounded-xl hover:border-primary/40 transition-all duration-200"
+        >
+          <Plus className="h-3 w-3" />
+          Criar Tarefa
+        </button>
+      )}
     </div>
   );
 }
