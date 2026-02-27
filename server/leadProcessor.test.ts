@@ -288,3 +288,125 @@ describe("Lead Processor — processInboundLead", () => {
     expect(result.dedupeKey).toMatch(/^meta_lead_ads:/);
   });
 });
+
+describe("Lead Processor — Notification on new lead", () => {
+  it("creates an in-app notification when a new lead is processed", async () => {
+    const { processInboundLead } = await import("./leadProcessor");
+    const { getDb } = await import("./db");
+    const { sql } = await import("drizzle-orm");
+
+    const leadId = `notif-test-${Date.now()}`;
+
+    const result = await processInboundLead(1, {
+      name: "Notification Test Lead",
+      email: "notiftest@example.com",
+      phone: "+5584999990099",
+      source: "landing",
+      lead_id: leadId,
+      utm: { source: "google", campaign: "summer-2026" },
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.dealId).toBeTruthy();
+
+    // Check that a notification was created for this deal
+    const db = await getDb();
+    const [rows] = await db!.execute(sql`
+      SELECT id, type, title, body, entityType, entityId
+      FROM notifications
+      WHERE tenantId = 1
+        AND type = 'new_lead'
+        AND entityType = 'deal'
+        AND entityId = ${String(result.dealId)}
+      ORDER BY id DESC
+      LIMIT 1
+    `);
+
+    const notifications = rows as any[];
+    expect(notifications.length).toBeGreaterThanOrEqual(1);
+
+    const notif = notifications[0];
+    expect(notif.type).toBe("new_lead");
+    expect(notif.title).toContain("Novo lead via Landing Page");
+    expect(notif.body).toContain("Notification Test Lead");
+    expect(notif.body).toContain("notiftest@example.com");
+    expect(notif.body).toContain("Campanha: summer-2026");
+    expect(notif.entityType).toBe("deal");
+    expect(notif.entityId).toBe(String(result.dealId));
+  });
+
+  it("notification includes Meta Lead Ads label for meta source", async () => {
+    const { processInboundLead } = await import("./leadProcessor");
+    const { getDb } = await import("./db");
+    const { sql } = await import("drizzle-orm");
+
+    const leadId = `meta-notif-${Date.now()}`;
+
+    const result = await processInboundLead(1, {
+      name: "Meta Notif Lead",
+      email: "metanotif@example.com",
+      phone: "+5584999990098",
+      source: "meta_lead_ads",
+      lead_id: leadId,
+    });
+
+    expect(result.success).toBe(true);
+
+    const db = await getDb();
+    const [rows] = await db!.execute(sql`
+      SELECT title, body FROM notifications
+      WHERE tenantId = 1 AND type = 'new_lead' AND entityId = ${String(result.dealId)}
+      ORDER BY id DESC LIMIT 1
+    `);
+
+    const notifications = rows as any[];
+    expect(notifications.length).toBeGreaterThanOrEqual(1);
+    expect(notifications[0].title).toContain("Novo lead via Meta Lead Ads");
+    expect(notifications[0].body).toContain("Meta Notif Lead");
+  });
+
+  it("does not create duplicate notification for idempotent lead", async () => {
+    const { processInboundLead } = await import("./leadProcessor");
+    const { getDb } = await import("./db");
+    const { sql } = await import("drizzle-orm");
+
+    const leadId = `no-dup-notif-${Date.now()}`;
+
+    const first = await processInboundLead(1, {
+      name: "No Dup Notif",
+      email: "nodup@example.com",
+      phone: "+5584999990097",
+      source: "landing",
+      lead_id: leadId,
+    });
+
+    expect(first.success).toBe(true);
+    expect(first.isExisting).toBe(false);
+
+    // Count notifications for this deal
+    const db = await getDb();
+    const [countBefore] = await db!.execute(sql`
+      SELECT COUNT(*) as cnt FROM notifications
+      WHERE tenantId = 1 AND type = 'new_lead' AND entityId = ${String(first.dealId)}
+    `);
+
+    // Process same lead again (idempotent)
+    const second = await processInboundLead(1, {
+      name: "No Dup Notif",
+      email: "nodup@example.com",
+      phone: "+5584999990097",
+      source: "landing",
+      lead_id: leadId,
+    });
+
+    expect(second.isExisting).toBe(true);
+
+    // Count should NOT increase (idempotent leads skip notification)
+    const [countAfter] = await db!.execute(sql`
+      SELECT COUNT(*) as cnt FROM notifications
+      WHERE tenantId = 1 AND type = 'new_lead' AND entityId = ${String(first.dealId)}
+    `);
+
+    expect(Number((countAfter as any[])[0].cnt)).toBe(Number((countBefore as any[])[0].cnt));
+  });
+});

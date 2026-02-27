@@ -16,7 +16,7 @@
  *   7. On error → log failure in EventLog
  */
 
-import { getDb } from "./db";
+import { getDb, createNotification } from "./db";
 import { createHash } from "crypto";
 import {
   contacts, deals, pipelines, pipelineStages,
@@ -336,6 +336,24 @@ export async function processInboundLead(
       .where(eq(leadEventLog.id, eventLogId));
 
     console.log(`[LeadProcessor] Lead processed: ${dedupeKey} → deal #${dealId}, contact #${contact.id} (${contact.isNew ? "new" : "existing"})`);
+
+    // 10. Notificação in-app para a equipe
+    try {
+      const sourceLabel = payload.source === "meta_lead_ads" ? "Meta Lead Ads" : payload.source === "landing" ? "Landing Page" : payload.source;
+      const contactInfo = [normalizedName];
+      if (normalizedEmail) contactInfo.push(normalizedEmail);
+      if (normalizedPhone) contactInfo.push(normalizedPhone);
+
+      await createNotification(tenantId, {
+        type: "new_lead",
+        title: `Novo lead via ${sourceLabel}`,
+        body: `${contactInfo.join(" • ")}${payload.utm?.campaign ? ` — Campanha: ${payload.utm.campaign}` : ""}`,
+        entityType: "deal",
+        entityId: String(dealId),
+      });
+    } catch (notifErr) {
+      console.warn(`[LeadProcessor] Falha ao criar notificação para lead ${dedupeKey}:`, notifErr);
+    }
 
     return {
       success: true,

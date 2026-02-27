@@ -1059,3 +1059,10 @@
 - [x] Testes para process_inbound_lead (idempotência, upsert, dedupe)
 - [x] Testes para endpoints webhook (auth, validação, processamento)
 - [x] Testes para event log queries
+
+## Notificação In-App ao Receber Lead
+
+- [x] Adicionar notificação in-app automática quando novo lead entrar via webhook
+- [x] Notificar o owner do deal (atribuído por round-robin) e o admin
+- [x] Incluir nome do lead, origem e link para a negociação na notificação
+- [x] Testes automatizados para a notificação de novo lead
