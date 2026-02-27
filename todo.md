@@ -1094,3 +1094,11 @@
 - [x] Deixar claro que são dados de mensagens WhatsApp no dashboard de Análises
 - [x] Ativar captação de dados reais em todos os dashboards (Home, Análises)
 - [x] Remover rota e link do Monitor antigo da navegação
+
+## Bug Crítico: Criação Automática de Funis e Etapas
+
+- [x] Investigar todas as fontes de criação automática de funis e etapas
+- [x] Remover toda criação automática de funis/etapas (seeds, testes, leadProcessor, etc.)
+- [x] Adicionar guards para impedir criação de funis/etapas sem ação explícita do usuário
+- [x] Limpar funis e etapas fantasma do banco de dados
+- [x] Garantir que testes não poluam o banco de produção com funis/etapas
