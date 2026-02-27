@@ -83,10 +83,26 @@ export const crmRouter = router({
       .query(async ({ input }) => {
         return crm.listPipelines(input.tenantId);
       }),
+    get: protectedProcedure
+      .input(z.object({ tenantId: z.number(), id: z.number() }))
+      .query(async ({ input }) => {
+        return crm.getPipelineById(input.tenantId, input.id);
+      }),
     create: protectedProcedure
-      .input(z.object({ tenantId: z.number(), name: z.string().min(1), isDefault: z.boolean().optional() }))
+      .input(z.object({ tenantId: z.number(), name: z.string().min(1), description: z.string().optional(), color: z.string().optional(), pipelineType: z.enum(["sales", "post_sale", "support", "custom"]).optional(), isDefault: z.boolean().optional() }))
       .mutation(async ({ input }) => {
         return crm.createPipeline(input);
+      }),
+    update: protectedProcedure
+      .input(z.object({ tenantId: z.number(), id: z.number(), name: z.string().optional(), description: z.string().optional(), color: z.string().optional(), pipelineType: z.string().optional(), isDefault: z.boolean().optional(), isArchived: z.boolean().optional() }))
+      .mutation(async ({ input }) => {
+        const { tenantId, id, ...data } = input;
+        return crm.updatePipeline(tenantId, id, data);
+      }),
+    delete: protectedProcedure
+      .input(z.object({ tenantId: z.number(), id: z.number() }))
+      .mutation(async ({ input }) => {
+        return crm.deletePipeline(input.tenantId, input.id);
       }),
     stages: protectedProcedure
       .input(z.object({ tenantId: z.number(), pipelineId: z.number() }))
@@ -94,9 +110,68 @@ export const crmRouter = router({
         return crm.listStages(input.tenantId, input.pipelineId);
       }),
     createStage: protectedProcedure
-      .input(z.object({ tenantId: z.number(), pipelineId: z.number(), name: z.string(), orderIndex: z.number(), probabilityDefault: z.number().optional(), isWon: z.boolean().optional(), isLost: z.boolean().optional() }))
+      .input(z.object({ tenantId: z.number(), pipelineId: z.number(), name: z.string(), color: z.string().optional(), orderIndex: z.number(), probabilityDefault: z.number().optional(), isWon: z.boolean().optional(), isLost: z.boolean().optional() }))
       .mutation(async ({ input }) => {
         return crm.createStage(input);
+      }),
+    updateStage: protectedProcedure
+      .input(z.object({ tenantId: z.number(), id: z.number(), name: z.string().optional(), color: z.string().optional(), orderIndex: z.number().optional(), probabilityDefault: z.number().optional(), isWon: z.boolean().optional(), isLost: z.boolean().optional() }))
+      .mutation(async ({ input }) => {
+        const { tenantId, id, ...data } = input;
+        return crm.updateStage(tenantId, id, data);
+      }),
+    deleteStage: protectedProcedure
+      .input(z.object({ tenantId: z.number(), id: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        const count = await crm.countDealsInStage(input.tenantId, input.id);
+        if (count > 0) throw new Error(`Não é possível excluir: ${count} negociação(ões) ativa(s) nesta etapa. Mova-as primeiro.`);
+        return crm.deleteStage(input.tenantId, input.id);
+      }),
+    reorderStages: protectedProcedure
+      .input(z.object({ tenantId: z.number(), pipelineId: z.number(), stageOrders: z.array(z.object({ id: z.number(), orderIndex: z.number() })) }))
+      .mutation(async ({ input }) => {
+        return crm.reorderStages(input.tenantId, input.pipelineId, input.stageOrders);
+      }),
+    countDealsInStage: protectedProcedure
+      .input(z.object({ tenantId: z.number(), stageId: z.number() }))
+      .query(async ({ input }) => {
+        return crm.countDealsInStage(input.tenantId, input.stageId);
+      }),
+  }),
+
+  // ─── PIPELINE AUTOMATIONS ───
+  pipelineAutomations: router({
+    list: protectedProcedure
+      .input(z.object({ tenantId: z.number(), sourcePipelineId: z.number().optional() }))
+      .query(async ({ input }) => {
+        return crm.listPipelineAutomations(input.tenantId, input.sourcePipelineId);
+      }),
+    create: protectedProcedure
+      .input(z.object({
+        tenantId: z.number(), name: z.string().min(1), sourcePipelineId: z.number(),
+        triggerEvent: z.enum(["deal_won", "deal_lost", "stage_reached"]),
+        triggerStageId: z.number().optional(), targetPipelineId: z.number(), targetStageId: z.number(),
+        copyProducts: z.boolean().optional(), copyParticipants: z.boolean().optional(), copyCustomFields: z.boolean().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        return crm.createPipelineAutomation(input);
+      }),
+    update: protectedProcedure
+      .input(z.object({
+        tenantId: z.number(), id: z.number(), name: z.string().optional(),
+        triggerEvent: z.string().optional(), triggerStageId: z.number().optional(),
+        targetPipelineId: z.number().optional(), targetStageId: z.number().optional(),
+        copyProducts: z.boolean().optional(), copyParticipants: z.boolean().optional(),
+        copyCustomFields: z.boolean().optional(), isActive: z.boolean().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const { tenantId, id, ...data } = input;
+        return crm.updatePipelineAutomation(tenantId, id, data);
+      }),
+    delete: protectedProcedure
+      .input(z.object({ tenantId: z.number(), id: z.number() }))
+      .mutation(async ({ input }) => {
+        return crm.deletePipelineAutomation(input.tenantId, input.id);
       }),
   }),
 
@@ -181,6 +256,24 @@ export const crmRouter = router({
               fieldChanged: "status", oldValue: currentDeal.status || "", newValue: data.status,
               actorUserId: ctx.user.id, actorName: ctx.user.name || "Sistema",
             });
+            // Trigger pipeline automations on won/lost
+            if (data.status === "won" || data.status === "lost") {
+              const triggerEvent = data.status === "won" ? "deal_won" : "deal_lost";
+              try {
+                const createdDeals = await crm.executePipelineAutomation(tenantId, id, triggerEvent, ctx.user.id);
+                if (createdDeals.length > 0) {
+                  await createNotification(tenantId, {
+                    type: "automation_triggered",
+                    title: `Automação executada: ${createdDeals.length} negociação(ões) criada(s)`,
+                    body: `Negociação #${id} ${data.status === "won" ? "ganha" : "perdida"} disparou automação`,
+                    entityType: "deal",
+                    entityId: String(id),
+                  });
+                }
+              } catch (e) {
+                console.error("Pipeline automation error:", e);
+              }
+            }
           }
           if (data.contactId !== undefined && data.contactId !== currentDeal.contactId) {
             await crm.createDealHistory({

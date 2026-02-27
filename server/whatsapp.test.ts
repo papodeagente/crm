@@ -1259,3 +1259,170 @@ describe("customFields", () => {
     });
   });
 });
+
+
+/* ─── Pipeline Management Tests ─── */
+describe("Pipeline Management", () => {
+  const caller = appRouter.createCaller(createAuthContext().ctx);
+  const tenantId = 1;
+
+  describe("CRUD Pipelines", () => {
+    it("should create a pipeline", async () => {
+      const result = await caller.crm.pipelines.create({
+        tenantId,
+        name: "Test Pipeline",
+        description: "Test description",
+        color: "#FF5733",
+        pipelineType: "sales",
+      });
+      expect(result).toBeDefined();
+      expect(result.id).toBeGreaterThan(0);
+    });
+
+    it("should list pipelines", async () => {
+      const result = await caller.crm.pipelines.list({ tenantId });
+      expect(Array.isArray(result)).toBe(true);
+      expect(result.length).toBeGreaterThan(0);
+    });
+
+    it("should update a pipeline name", async () => {
+      const pipelines = await caller.crm.pipelines.list({ tenantId });
+      const testPipeline = pipelines.find((p: any) => p.name === "Test Pipeline");
+      if (testPipeline) {
+        const result = await caller.crm.pipelines.update({
+          tenantId,
+          id: testPipeline.id,
+          name: "Updated Pipeline",
+          description: "Updated desc",
+        });
+        expect(result.success).toBe(true);
+      }
+    });
+  });
+
+  describe("CRUD Stages", () => {
+    it("should create a stage in a pipeline", async () => {
+      const pipelines = await caller.crm.pipelines.list({ tenantId });
+      const pipeline = pipelines[0];
+      if (pipeline) {
+        const result = await caller.crm.pipelines.createStage({
+          tenantId,
+          pipelineId: pipeline.id,
+          name: "Test Stage",
+          color: "#10B981",
+          orderIndex: 99,
+        });
+        expect(result).toBeDefined();
+        expect(result.id).toBeGreaterThan(0);
+      }
+    });
+
+    it("should list stages for a pipeline", async () => {
+      const pipelines = await caller.crm.pipelines.list({ tenantId });
+      const pipeline = pipelines[0];
+      if (pipeline) {
+        const result = await caller.crm.pipelines.stages({
+          tenantId,
+          pipelineId: pipeline.id,
+        });
+        expect(Array.isArray(result)).toBe(true);
+      }
+    });
+
+    it("should update a stage", async () => {
+      const pipelines = await caller.crm.pipelines.list({ tenantId });
+      const pipeline = pipelines[0];
+      if (pipeline) {
+        const stages = await caller.crm.pipelines.stages({ tenantId, pipelineId: pipeline.id });
+        const testStage = stages.find((s: any) => s.name === "Test Stage");
+        if (testStage) {
+          const result = await caller.crm.pipelines.updateStage({
+            tenantId,
+            id: testStage.id,
+            name: "Updated Stage",
+            color: "#3B82F6",
+          });
+          expect(result.success).toBe(true);
+        }
+      }
+    });
+  });
+
+  describe("Pipeline Automations", () => {
+    it("should create an automation", async () => {
+      const pipelines = await caller.crm.pipelines.list({ tenantId });
+      if (pipelines.length >= 2) {
+        const source = pipelines[0];
+        const target = pipelines[1];
+        const targetStages = await caller.crm.pipelines.stages({ tenantId, pipelineId: target.id });
+        if (targetStages.length > 0) {
+          const result = await caller.crm.pipelineAutomations.create({
+            tenantId,
+            name: "Test Automation",
+            sourcePipelineId: source.id,
+            triggerEvent: "deal_won",
+            targetPipelineId: target.id,
+            targetStageId: targetStages[0].id,
+            isActive: true,
+            copyProducts: true,
+            copyParticipants: false,
+            copyCustomFields: false,
+          });
+          expect(result).toBeDefined();
+          expect(result.id).toBeGreaterThan(0);
+        }
+      }
+    });
+
+    it("should list automations", async () => {
+      const result = await caller.crm.pipelineAutomations.list({ tenantId });
+      expect(Array.isArray(result)).toBe(true);
+    });
+
+    it("should toggle automation active state", async () => {
+      const automations = await caller.crm.pipelineAutomations.list({ tenantId });
+      const auto = automations.find((a: any) => a.name === "Test Automation");
+      if (auto) {
+        const result = await caller.crm.pipelineAutomations.toggle({
+          tenantId,
+          id: auto.id,
+          isActive: false,
+        });
+        expect(result.success).toBe(true);
+      }
+    });
+  });
+
+  describe("Post-Sale Pipeline (Viagens)", () => {
+    it("should create a post_sale pipeline", async () => {
+      const result = await caller.crm.pipelines.create({
+        tenantId,
+        name: "Pós-Venda / Viagens",
+        description: "Funil de pós-venda para gestão de viagens",
+        pipelineType: "post_sale",
+      });
+      expect(result).toBeDefined();
+      expect(result.id).toBeGreaterThan(0);
+
+      // Create stages for it
+      const stages = ["Documentação", "Reservas", "Pagamentos", "Pré-Viagem", "Em Viagem", "Pós-Viagem"];
+      for (let i = 0; i < stages.length; i++) {
+        await caller.crm.pipelines.createStage({
+          tenantId,
+          pipelineId: result.id,
+          name: stages[i],
+          orderIndex: i + 1,
+        });
+      }
+
+      const createdStages = await caller.crm.pipelines.stages({ tenantId, pipelineId: result.id });
+      expect(createdStages.length).toBe(6);
+    });
+
+    it("should list post_sale pipelines", async () => {
+      const pipelines = await caller.crm.pipelines.list({ tenantId });
+      const postSale = pipelines.filter((p: any) => p.pipelineType === "post_sale");
+      expect(postSale.length).toBeGreaterThan(0);
+    });
+  });
+});

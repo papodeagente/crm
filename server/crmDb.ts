@@ -2,7 +2,7 @@ import { eq, and, desc, asc, like, sql, inArray } from "drizzle-orm";
 import { getDb } from "./db";
 import {
   tenants, crmUsers, teams, teamMembers, roles, permissions, rolePermissions, userRoles, apiKeys,
-  contacts, accounts, deals, dealParticipants, pipelines, pipelineStages, trips, tripItems,
+  contacts, accounts, deals, dealParticipants, pipelines, pipelineStages, pipelineAutomations, trips, tripItems,
   tasks, crmNotes, crmAttachments, dealProducts, dealHistory,
   channels, conversations, inboxMessages,
   proposalTemplates, proposals, proposalItems, proposalSignatures,
@@ -533,4 +533,160 @@ export async function listEventLog(tenantId: number, opts?: { entityType?: strin
   if (opts?.entityType) conditions.push(eq(eventLog.entityType, opts.entityType));
   if (opts?.entityId) conditions.push(eq(eventLog.entityId, opts.entityId));
   return db.select().from(eventLog).where(and(...conditions)).orderBy(desc(eventLog.occurredAt)).limit(opts?.limit || 50).offset(opts?.offset || 0);
+}
+
+// ═══════════════════════════════════════
+// PIPELINES — CRUD Completo
+// ═══════════════════════════════════════
+export async function updatePipeline(tenantId: number, id: number, data: { name?: string; description?: string; color?: string; pipelineType?: string; isDefault?: boolean; isArchived?: boolean }) {
+  const db = await getDb(); if (!db) return null;
+  await db.update(pipelines).set(data as any).where(and(eq(pipelines.tenantId, tenantId), eq(pipelines.id, id)));
+  return { success: true };
+}
+export async function deletePipeline(tenantId: number, id: number) {
+  const db = await getDb(); if (!db) return null;
+  // Soft delete via archive
+  await db.update(pipelines).set({ isArchived: true } as any).where(and(eq(pipelines.tenantId, tenantId), eq(pipelines.id, id)));
+  return { success: true };
+}
+export async function getPipelineById(tenantId: number, id: number) {
+  const db = await getDb(); if (!db) return null;
+  const [result] = await db.select().from(pipelines).where(and(eq(pipelines.tenantId, tenantId), eq(pipelines.id, id)));
+  return result || null;
+}
+
+// ═══════════════════════════════════════
+// STAGES — CRUD Completo
+// ═══════════════════════════════════════
+export async function updateStage(tenantId: number, id: number, data: { name?: string; color?: string; orderIndex?: number; probabilityDefault?: number; isWon?: boolean; isLost?: boolean }) {
+  const db = await getDb(); if (!db) return null;
+  await db.update(pipelineStages).set(data as any).where(and(eq(pipelineStages.tenantId, tenantId), eq(pipelineStages.id, id)));
+  return { success: true };
+}
+export async function deleteStage(tenantId: number, id: number) {
+  const db = await getDb(); if (!db) return null;
+  await db.delete(pipelineStages).where(and(eq(pipelineStages.tenantId, tenantId), eq(pipelineStages.id, id)));
+  return { success: true };
+}
+export async function reorderStages(tenantId: number, pipelineId: number, stageOrders: { id: number; orderIndex: number }[]) {
+  const db = await getDb(); if (!db) return null;
+  for (const s of stageOrders) {
+    await db.update(pipelineStages).set({ orderIndex: s.orderIndex }).where(and(eq(pipelineStages.tenantId, tenantId), eq(pipelineStages.id, s.id)));
+  }
+  return { success: true };
+}
+export async function countDealsInStage(tenantId: number, stageId: number) {
+  const db = await getDb(); if (!db) return 0;
+  const [result] = await db.select({ count: sql<number>`count(*)` }).from(deals).where(and(eq(deals.tenantId, tenantId), eq(deals.stageId, stageId), eq(deals.status, "open")));
+  return result?.count || 0;
+}
+
+// ═══════════════════════════════════════
+// PIPELINE AUTOMATIONS — CRUD
+// ═══════════════════════════════════════
+export async function createPipelineAutomation(data: {
+  tenantId: number; name: string; sourcePipelineId: number; triggerEvent: string;
+  triggerStageId?: number; targetPipelineId: number; targetStageId: number;
+  copyProducts?: boolean; copyParticipants?: boolean; copyCustomFields?: boolean;
+}) {
+  const db = await getDb(); if (!db) return null;
+  const [result] = await db.insert(pipelineAutomations).values(data as any).$returningId();
+  return result;
+}
+export async function listPipelineAutomations(tenantId: number, sourcePipelineId?: number) {
+  const db = await getDb(); if (!db) return [];
+  const conditions = [eq(pipelineAutomations.tenantId, tenantId)];
+  if (sourcePipelineId) conditions.push(eq(pipelineAutomations.sourcePipelineId, sourcePipelineId));
+  return db.select().from(pipelineAutomations).where(and(...conditions)).orderBy(desc(pipelineAutomations.createdAt));
+}
+export async function updatePipelineAutomation(tenantId: number, id: number, data: {
+  name?: string; triggerEvent?: string; triggerStageId?: number;
+  targetPipelineId?: number; targetStageId?: number;
+  copyProducts?: boolean; copyParticipants?: boolean; copyCustomFields?: boolean; isActive?: boolean;
+}) {
+  const db = await getDb(); if (!db) return null;
+  await db.update(pipelineAutomations).set(data as any).where(and(eq(pipelineAutomations.tenantId, tenantId), eq(pipelineAutomations.id, id)));
+  return { success: true };
+}
+export async function deletePipelineAutomation(tenantId: number, id: number) {
+  const db = await getDb(); if (!db) return null;
+  await db.delete(pipelineAutomations).where(and(eq(pipelineAutomations.tenantId, tenantId), eq(pipelineAutomations.id, id)));
+  return { success: true };
+}
+export async function getActiveAutomations(tenantId: number, sourcePipelineId: number, triggerEvent: string) {
+  const db = await getDb(); if (!db) return [];
+  return db.select().from(pipelineAutomations).where(and(
+    eq(pipelineAutomations.tenantId, tenantId),
+    eq(pipelineAutomations.sourcePipelineId, sourcePipelineId),
+    eq(pipelineAutomations.triggerEvent, triggerEvent as any),
+    eq(pipelineAutomations.isActive, true),
+  ));
+}
+
+// ═══════════════════════════════════════
+// AUTOMATION TRIGGER — Execute on deal_won/lost
+// ═══════════════════════════════════════
+export async function executePipelineAutomation(tenantId: number, dealId: number, triggerEvent: "deal_won" | "deal_lost" | "stage_reached", actorUserId?: number) {
+  const db = await getDb(); if (!db) return [];
+  const deal = await getDealById(tenantId, dealId);
+  if (!deal) return [];
+
+  const automations = await getActiveAutomations(tenantId, deal.pipelineId, triggerEvent);
+  const createdDeals: number[] = [];
+
+  for (const auto of automations) {
+    // Create new deal in target pipeline
+    const newDealData: any = {
+      tenantId,
+      title: deal.title,
+      contactId: deal.contactId,
+      accountId: deal.accountId,
+      pipelineId: auto.targetPipelineId,
+      stageId: auto.targetStageId,
+      valueCents: deal.valueCents,
+      currency: deal.currency,
+      ownerUserId: deal.ownerUserId,
+      teamId: deal.teamId,
+      channelOrigin: deal.channelOrigin,
+      createdBy: actorUserId || deal.createdBy,
+    };
+    const newDeal = await createDeal(newDealData);
+    if (!newDeal) continue;
+    createdDeals.push(newDeal.id);
+
+    // Copy products if configured
+    if (auto.copyProducts) {
+      const products = await listDealProducts(tenantId, dealId);
+      for (const p of products) {
+        await createDealProduct({
+          tenantId, dealId: newDeal.id, name: p.name, description: p.description || undefined,
+          category: p.category as any, quantity: p.quantity, unitPriceCents: p.unitPriceCents,
+          discountCents: p.discountCents || 0,
+          supplier: p.supplier || undefined, notes: p.notes || undefined,
+        });
+      }
+    }
+
+    // Copy participants if configured
+    if (auto.copyParticipants) {
+      const participants = await listDealParticipants(tenantId, dealId);
+      for (const p of participants) {
+        await addDealParticipant({ tenantId, dealId: newDeal.id, contactId: p.contactId, role: p.role as any });
+      }
+    }
+
+    // Record in history
+    await createDealHistory({
+      tenantId, dealId: newDeal.id, action: "automation_created",
+      description: `Negociação criada automaticamente a partir da negociação #${dealId} (${auto.name})`,
+      actorUserId, actorName: "Automação",
+    });
+    await createDealHistory({
+      tenantId, dealId, action: "automation_triggered",
+      description: `Automação "${auto.name}" criou nova negociação #${newDeal.id} no funil destino`,
+      actorUserId, actorName: "Automação",
+    });
+  }
+
+  return createdDeals;
 }

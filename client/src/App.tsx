@@ -32,6 +32,7 @@ const AgentManagement = lazy(() => import("./pages/AgentManagement"));
 const NotificationsPage = lazy(() => import("./pages/Notifications"));
 const ContactProfile = lazy(() => import("./pages/ContactProfile"));
 const CustomFieldsSettings = lazy(() => import("./pages/CustomFieldsSettings"));
+const PipelineSettings = lazy(() => import("./pages/PipelineSettings"));
 
 function PageLoader() {
   return (
@@ -62,6 +63,7 @@ function Router() {
           <Route path="/settings" component={SettingsPage} />
           <Route path="/settings/agents" component={AgentManagement} />
           <Route path="/settings/custom-fields" component={CustomFieldsSettings} />
+          <Route path="/settings/pipelines" component={PipelineSettings} />
           <Route path="/contact/:id" component={ContactProfile} />
           <Route path="/inbox" component={InboxPage} />
           <Route path="/whatsapp" component={WhatsApp} />

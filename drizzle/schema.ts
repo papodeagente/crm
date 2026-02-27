@@ -306,16 +306,41 @@ export const pipelines = mysqlTable("pipelines", {
   id: int("id").autoincrement().primaryKey(),
   tenantId: int("tenantId").notNull(),
   name: varchar("name", { length: 128 }).notNull(),
+  description: text("description"),
+  color: varchar("color", { length: 32 }),
+  pipelineType: mysqlEnum("pipelineType", ["sales", "post_sale", "support", "custom"]).default("sales").notNull(),
   isDefault: boolean("isDefault").default(false).notNull(),
+  isArchived: boolean("isArchived").default(false).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 }, (t) => [index("pipelines_tenant_idx").on(t.tenantId)]);
+
+export const pipelineAutomations = mysqlTable("pipeline_automations", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  sourcePipelineId: int("sourcePipelineId").notNull(),
+  triggerEvent: mysqlEnum("triggerEvent", ["deal_won", "deal_lost", "stage_reached"]).default("deal_won").notNull(),
+  triggerStageId: int("triggerStageId"),
+  targetPipelineId: int("targetPipelineId").notNull(),
+  targetStageId: int("targetStageId").notNull(),
+  copyProducts: boolean("copyProducts").default(true).notNull(),
+  copyParticipants: boolean("copyParticipants").default(true).notNull(),
+  copyCustomFields: boolean("copyCustomFields").default(true).notNull(),
+  isActive: boolean("isActive").default(true).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (t) => [
+  index("pa_tenant_idx").on(t.tenantId),
+  index("pa_source_idx").on(t.tenantId, t.sourcePipelineId),
+]);
 
 export const pipelineStages = mysqlTable("pipeline_stages", {
   id: int("id").autoincrement().primaryKey(),
   tenantId: int("tenantId").notNull(),
   pipelineId: int("pipelineId").notNull(),
   name: varchar("name", { length: 128 }).notNull(),
+  color: varchar("color", { length: 32 }),
   orderIndex: int("orderIndex").notNull(),
   probabilityDefault: int("probabilityDefault").default(0),
   isWon: boolean("isWon").default(false).notNull(),
@@ -884,6 +909,7 @@ export type Account = typeof accounts.$inferSelect;
 export type Deal = typeof deals.$inferSelect;
 export type Pipeline = typeof pipelines.$inferSelect;
 export type PipelineStage = typeof pipelineStages.$inferSelect;
+export type PipelineAutomation = typeof pipelineAutomations.$inferSelect;
 export type Trip = typeof trips.$inferSelect;
 export type TripItem = typeof tripItems.$inferSelect;
 export type Task = typeof tasks.$inferSelect;

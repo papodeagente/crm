@@ -771,3 +771,30 @@
 - [x] Testes de getDealDetail
 - [x] Testes de timeline e notas
 - [x] Testes de mudança de estágio — 162 testes, 8 arquivos, todos passando
+
+## Gestão de Funis, Automação e Pós-Venda
+
+### Gestão de Funis (Pipelines)
+- [x] CRUD de pipelines: criar, editar nome/descrição/cor/tipo, arquivar
+- [x] CRUD de stages: criar, editar nome/cor/probabilidade, excluir com validação, reordenar
+- [x] Página /settings/pipelines com lista de funis e editor de etapas
+- [x] Setas para reordenar etapas (reorderStages endpoint)
+- [x] Validação: não permitir excluir etapa com deals ativos (mover antes)
+
+### Automação de Transição entre Funis
+- [x] Tabela pipeline_automations (sourcePipelineId, triggerEvent, targetPipelineId, targetStageId, isActive, config)
+- [x] Configuração: ao ganhar venda no funil X, criar deal automaticamente no funil Y na etapa Z
+- [x] Backend: trigger automático no updateDeal quando status = won ou lost
+- [x] UI: configuração de automações por funil (origem → destino)
+- [x] Toggle ativar/desativar automação
+
+### Viagens como Funil de Pós-Venda
+- [x] Criar pipeline "Pós-Venda / Viagens" com etapas padrão (configurável via Settings)
+- [x] Vincular deals de viagem ao funil pós-venda automaticamente após venda ganha
+- [x] Página de Viagens usa o funil pós-venda como base (Kanban board)
+- [x] Etapas configuráveis pelo usuário (via Settings > Funis & Etapas)
+
+### Testes
+- [x] Testes CRUD de pipelines e stages
+- [x] Testes de automação de transição
+- [x] Testes de funil pós-venda — 173 testes, 8 arquivos, todos passando

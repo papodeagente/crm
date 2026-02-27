@@ -64,6 +64,13 @@
       "when": 1772157198523,
       "tag": "0008_oval_longshot",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "5",
+      "when": 1772160345891,
+      "tag": "0009_fearless_frog_thor",
+      "breakpoints": true
     }
   ]
 }

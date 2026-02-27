@@ -3,7 +3,7 @@ import {
   Settings, Inbox, MessageSquare, Bot,
   FileText, Globe, Plane,
   GraduationCap, Plug, Shield, BookOpen,
-  ChevronRight, Users, Tag,
+  ChevronRight, Users, Tag, GitBranch,
 } from "lucide-react";
 
 /* ─── Settings Menu Structure ─── */
@@ -126,6 +126,14 @@ const settingsSections: SettingsSection[] = [
         path: "/settings/custom-fields",
         color: "text-teal-400",
         bgColor: "bg-teal-500/15",
+      },
+      {
+        icon: GitBranch,
+        label: "Funis & Etapas",
+        description: "Gerencie funis de vendas, pós-venda e automações de transição",
+        path: "/settings/pipelines",
+        color: "text-emerald-400",
+        bgColor: "bg-emerald-500/15",
       },
       {
         icon: BookOpen,
