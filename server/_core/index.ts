@@ -10,6 +10,7 @@ import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { whatsappManager } from "../whatsapp";
 import { startDailyBackupScheduler } from "../whatsappDailyBackup";
+import { webhookRouter } from "../webhookRoutes";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -115,6 +116,9 @@ async function startServer() {
       res.status(500).json({ error: error.message });
     }
   });
+
+  // Webhook routes for lead capture (Landing Page + Meta Lead Ads)
+  app.use(webhookRouter);
 
   // OAuth callback under /api/oauth/callback
   registerOAuthRoutes(app);

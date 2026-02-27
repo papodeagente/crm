@@ -370,6 +370,11 @@ export const deals = mysqlTable("deals", {
   teamId: int("teamId"),
   visibilityScope: mysqlEnum("visibilityScope", ["personal", "team", "global"]).default("global").notNull(),
   channelOrigin: varchar("channelOrigin", { length: 64 }),
+  leadSource: varchar("leadSource", { length: 64 }),
+  utmJson: json("utmJson"),
+  metaJson: json("metaJson"),
+  rawPayloadJson: json("rawPayloadJson"),
+  dedupeKey: varchar("dedupeKey", { length: 255 }),
   lastActivityAt: timestamp("lastActivityAt").defaultNow(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
@@ -1120,3 +1125,54 @@ export type InsertWaConversation = typeof waConversations.$inferInsert;
 export type WaIdentity = typeof waIdentities.$inferSelect;
 export type InsertWaIdentity = typeof waIdentities.$inferInsert;
 export type WaAuditLogEntry = typeof waAuditLog.$inferSelect;
+
+
+// ════════════════════════════════════════════════════════════
+// LEAD CAPTURE & INTEGRATIONS
+// ════════════════════════════════════════════════════════════
+
+export const leadEventLog = mysqlTable("lead_event_log", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull().default(1),
+  type: varchar("type", { length: 64 }).notNull().default("inbound_lead"),
+  source: varchar("source", { length: 64 }).notNull(),
+  dedupeKey: varchar("dedupeKey", { length: 255 }).notNull(),
+  payload: json("payload"),
+  status: varchar("status", { length: 32 }).notNull().default("pending"),
+  error: text("error"),
+  dealId: int("dealId"),
+  contactId: int("contactId"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (t) => [
+  index("idx_lel_tenant_source").on(t.tenantId, t.source, t.createdAt),
+  index("idx_lel_tenant_status").on(t.tenantId, t.status, t.createdAt),
+]);
+
+export const metaIntegrationConfig = mysqlTable("meta_integration_config", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull().default(1),
+  pageId: varchar("pageId", { length: 128 }),
+  pageName: varchar("pageName", { length: 255 }),
+  accessToken: text("accessToken"),
+  appSecret: varchar("appSecret", { length: 255 }),
+  verifyToken: varchar("verifyToken", { length: 128 }),
+  formsJson: json("formsJson"),
+  status: varchar("status", { length: 32 }).notNull().default("disconnected"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export const webhookConfig = mysqlTable("webhook_config", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull().default(1),
+  webhookSecret: varchar("webhookSecret", { length: 128 }).notNull(),
+  isActive: boolean("isActive").default(true).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type LeadEventLog = typeof leadEventLog.$inferSelect;
+export type InsertLeadEventLog = typeof leadEventLog.$inferInsert;
+export type MetaIntegrationConfig = typeof metaIntegrationConfig.$inferSelect;
+export type WebhookConfig = typeof webhookConfig.$inferSelect;

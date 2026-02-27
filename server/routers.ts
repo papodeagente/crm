@@ -86,6 +86,17 @@ import { inboxRouter } from "./routers/inboxRouter";
 import { proposalRouter, portalRouter, managementRouter, insightsRouter, academyRouter, integrationHubRouter } from "./routers/featureRouters";
 import { productCatalogRouter } from "./routers/productCatalogRouter";
 import { aiAnalysisRouter } from "./routers/aiAnalysisRouter";
+import {
+  listLeadEvents,
+  countLeadEvents,
+  reprocessLeadEvent,
+  getWebhookConfig,
+  upsertWebhookConfig,
+  getMetaConfig,
+  upsertMetaConfig,
+  disconnectMeta,
+} from "./leadProcessor";
+import { randomBytes } from "crypto";
 
 export const appRouter = router({
   system: systemRouter,
@@ -736,6 +747,87 @@ export const appRouter = router({
       .mutation(async ({ input }) => {
         await reorderCustomFields(input.tenantId, input.entity, input.orderedIds);
         return { success: true };
+      }),
+  }),
+
+  // ═══════════════════════════════════════
+  // LEAD CAPTURE & INTEGRATIONS
+  // ═══════════════════════════════════════
+  leadCapture: router({
+    // Webhook config
+    getWebhookConfig: protectedProcedure
+      .input(z.object({ tenantId: z.number() }))
+      .query(async ({ input }) => {
+        const config = await getWebhookConfig(input.tenantId);
+        return config;
+      }),
+    generateWebhookToken: protectedProcedure
+      .input(z.object({ tenantId: z.number() }))
+      .mutation(async ({ input }) => {
+        const secret = randomBytes(32).toString("hex");
+        const config = await upsertWebhookConfig(input.tenantId, secret);
+        return config;
+      }),
+
+    // Meta integration
+    getMetaConfig: protectedProcedure
+      .input(z.object({ tenantId: z.number() }))
+      .query(async ({ input }) => {
+        const config = await getMetaConfig(input.tenantId);
+        // Don't expose full access token to frontend
+        if (config?.accessToken) {
+          return { ...config, accessToken: "••••" + config.accessToken.slice(-8) };
+        }
+        return config;
+      }),
+    connectMeta: protectedProcedure
+      .input(z.object({
+        tenantId: z.number(),
+        pageId: z.string(),
+        pageName: z.string().optional(),
+        accessToken: z.string(),
+        appSecret: z.string().optional(),
+        verifyToken: z.string().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const verifyToken = input.verifyToken || randomBytes(16).toString("hex");
+        const config = await upsertMetaConfig(input.tenantId, {
+          pageId: input.pageId,
+          pageName: input.pageName,
+          accessToken: input.accessToken,
+          appSecret: input.appSecret,
+          verifyToken,
+          status: "connected",
+        });
+        return config;
+      }),
+    disconnectMeta: protectedProcedure
+      .input(z.object({ tenantId: z.number() }))
+      .mutation(async ({ input }) => {
+        await disconnectMeta(input.tenantId);
+        return { success: true };
+      }),
+
+    // Event logs
+    listEvents: protectedProcedure
+      .input(z.object({
+        tenantId: z.number(),
+        source: z.string().optional(),
+        status: z.string().optional(),
+        limit: z.number().optional(),
+        offset: z.number().optional(),
+      }))
+      .query(async ({ input }) => {
+        const [events, total] = await Promise.all([
+          listLeadEvents(input.tenantId, input),
+          countLeadEvents(input.tenantId, input),
+        ]);
+        return { events, total };
+      }),
+    reprocessEvent: protectedProcedure
+      .input(z.object({ tenantId: z.number(), eventId: z.number() }))
+      .mutation(async ({ input }) => {
+        return reprocessLeadEvent(input.tenantId, input.eventId);
       }),
   }),
 });

@@ -1022,3 +1022,40 @@
 - [x] Frontend: filtros por período e sessão
 - [x] Registrar rota no App.tsx e navegação
 - [x] Testes automatizados para os endpoints de métricas
+
+## Sistema de Captura de Leads (Webhook + Meta Lead Ads)
+
+### Schema / Banco
+- [x] Criar tabela lead_event_log (id, type, source, dedupe_key, payload, status, error, deal_id, created_at)
+- [x] Criar tabela meta_integration_config (id, tenant_id, page_id, page_name, access_token, app_secret, forms, status, created_at)
+- [x] Adicionar colunas source, utm_json, meta_json, raw_payload_json na tabela deals
+- [x] Adicionar coluna dedupe_key na tabela lead_event_log com UNIQUE index
+
+### Backend: Processamento
+- [x] Implementar função process_inbound_lead(source, payload) com idempotência
+- [x] Normalização: phone E164, email lower, remover espaços/acentos
+- [x] Dedupe: source + (lead_id || hash(email+phone))
+- [x] Upsert Contact: criar ou atualizar campos vazios + anexar origem
+- [x] Create Deal: pipeline padrão, stage "Novo lead", title "{name} • {source}"
+- [x] Round-robin owner assignment (fallback admin)
+- [x] Event log: registrar success/failed com deal_id ou error
+
+### Backend: Endpoints Webhook
+- [x] POST /webhooks/leads — Landing Page webhook com Bearer token auth
+- [x] POST /webhooks/meta — Meta Lead Ads webhook com X-Hub-Signature-256
+- [x] GET /webhooks/meta — Meta verification challenge (hub.verify_token)
+- [x] Buscar lead details via Graph API usando access_token
+
+### Backend: Endpoints Admin (tRPC)
+- [x] Meta connect/disconnect (salvar tokens/contas/forms)
+- [x] Webhook config (gerar/regenerar token, mostrar URL)
+- [x] Event log: listar com filtro source/status, reprocessar eventoFrontend: UI
+- [x] Página de Integrações: Meta (conectar, selecionar page/forms)
+- [x] Página de Integrações: Webhook (mostrar URL e token, copiar)
+- [x] Página de Logs: lista de EventLog com filtro source/status + botão reprocessar
+- [x] Registrar rotas no App.tsx
+
+### Testes
+- [x] Testes para process_inbound_lead (idempotência, upsert, dedupe)
+- [x] Testes para endpoints webhook (auth, validação, processamento)
+- [x] Testes para event log queries
