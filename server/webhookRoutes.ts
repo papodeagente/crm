@@ -16,8 +16,10 @@ import {
   type InboundLeadPayload,
 } from "./leadProcessor";
 import { getDb } from "./db";
-import { eventLog } from "../drizzle/schema";
+import { eventLog, trackingTokens } from "../drizzle/schema";
+import { eq, and, sql } from "drizzle-orm";
 import { ENV } from "./_core/env";
+import { generateTrackerScript } from "./tracker-script";
 
 const router = Router();
 
@@ -452,6 +454,215 @@ router.post("/webhooks/meta", async (req: Request, res: Response) => {
     // Still return 200 to prevent Meta from retrying
     return res.status(200).send("OK");
   }
+});
+
+// ─── Tracking Script: GET /tracker.js ──────────────────
+
+router.get("/tracker.js", async (req: Request, res: Response) => {
+  const token = req.query.t as string;
+  if (!token) {
+    return res.status(400).type("text/plain").send("// Missing token parameter");
+  }
+
+  try {
+    const db = await getDb();
+    if (!db) {
+      return res.status(500).type("text/plain").send("// Service unavailable");
+    }
+
+    // Validate token exists and is active
+    const rows = await db
+      .select()
+      .from(trackingTokens)
+      .where(and(eq(trackingTokens.token, token), eq(trackingTokens.isActive, true)))
+      .limit(1);
+
+    if (rows.length === 0) {
+      return res.status(404).type("text/plain").send("// Invalid or inactive token");
+    }
+
+    // Update lastSeenAt
+    await db
+      .update(trackingTokens)
+      .set({ lastSeenAt: new Date() })
+      .where(eq(trackingTokens.id, rows[0]!.id));
+
+    // Determine base URL from request
+    const proto = req.headers["x-forwarded-proto"] || req.protocol || "https";
+    const host = req.headers["x-forwarded-host"] || req.headers.host || "";
+    const baseUrl = `${proto}://${host}`;
+
+    const script = generateTrackerScript(token, baseUrl);
+
+    res.set({
+      "Content-Type": "application/javascript; charset=utf-8",
+      "Cache-Control": "public, max-age=300", // 5 min cache
+      "Access-Control-Allow-Origin": "*",
+    });
+    return res.status(200).send(script);
+  } catch (error: any) {
+    console.error("[Tracker] Error serving script:", error.message);
+    return res.status(500).type("text/plain").send("// Internal error");
+  }
+});
+
+// ─── Tracking Script: POST /api/collect ─────────────────
+
+router.post("/api/collect", async (req: Request, res: Response) => {
+  // CORS headers for cross-origin form capture
+  res.set({
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type",
+  });
+
+  const clientIp = req.ip || req.socket.remoteAddress || "unknown";
+
+  try {
+    // Rate limiting (shares the same store as wp-leads)
+    const rateCheck = checkRateLimit(clientIp);
+    if (!rateCheck.allowed) {
+      return res.status(429).json({ error: "Rate limit exceeded" });
+    }
+
+    // Parse body — sendBeacon sends as text/plain, so handle both
+    let body = req.body;
+    if (typeof body === "string") {
+      try { body = JSON.parse(body); } catch { return res.status(400).json({ error: "Invalid JSON" }); }
+    }
+    if (!body || typeof body !== "object") {
+      return res.status(400).json({ error: "Invalid payload" });
+    }
+
+    const { token, name, email, phone, message, utm, page, extra } = body;
+
+    // 1. Validate token
+    if (!token || typeof token !== "string") {
+      return res.status(401).json({ error: "Missing token" });
+    }
+
+    const db = await getDb();
+    if (!db) {
+      return res.status(500).json({ error: "Service unavailable" });
+    }
+
+    const tokenRows = await db
+      .select()
+      .from(trackingTokens)
+      .where(and(eq(trackingTokens.token, token), eq(trackingTokens.isActive, true)))
+      .limit(1);
+
+    if (tokenRows.length === 0) {
+      await logEvent({
+        tenantId: 1,
+        actorType: "webhook",
+        entityType: "lead",
+        action: "auth_failed",
+        metadataJson: { ip: clientIp, reason: "invalid_tracking_token", origin: "tracking_script" },
+      });
+      return res.status(401).json({ error: "Invalid token" });
+    }
+
+    const tokenRow = tokenRows[0]!;
+    const tenantId = tokenRow.tenantId;
+
+    // 2. Validate domain if allowedDomains is set
+    const allowedDomains = tokenRow.allowedDomains as string[] | null;
+    if (allowedDomains && allowedDomains.length > 0 && page?.url) {
+      try {
+        const pageHost = new URL(page.url).hostname.toLowerCase();
+        const isAllowed = allowedDomains.some((d: string) => {
+          const domain = d.toLowerCase().replace(/^\*\./, "");
+          return pageHost === domain || pageHost.endsWith("." + domain);
+        });
+        if (!isAllowed) {
+          await logEvent({
+            tenantId,
+            actorType: "webhook",
+            entityType: "lead",
+            action: "domain_rejected",
+            metadataJson: { ip: clientIp, domain: pageHost, origin: "tracking_script" },
+          });
+          return res.status(403).json({ error: "Domain not allowed" });
+        }
+      } catch { /* ignore URL parse errors */ }
+    }
+
+    // 3. Must have at least email or phone
+    if ((!email || typeof email !== "string" || !email.trim()) &&
+        (!phone || typeof phone !== "string" || !phone.trim())) {
+      return res.status(400).json({ error: "Email or phone required" });
+    }
+
+    // 4. Build InboundLeadPayload
+    const payload: InboundLeadPayload = {
+      name: name ? String(name).trim() : undefined,
+      email: email ? String(email).trim() : undefined,
+      phone: phone ? String(phone).trim() : undefined,
+      message: message ? String(message).trim() : undefined,
+      source: "tracking_script",
+      utm: utm || undefined,
+      meta: {
+        channel: "form_capture",
+        page_url: page?.url || undefined,
+        page_title: page?.title || undefined,
+        referrer: page?.referrer || undefined,
+        ip: clientIp,
+        token_name: tokenRow.name,
+        extra: extra || undefined,
+      },
+      raw: body,
+    };
+
+    // 5. Process the lead
+    const result = await processInboundLead(tenantId, payload);
+
+    // 6. Update token stats
+    if (result.success) {
+      await db
+        .update(trackingTokens)
+        .set({
+          totalLeads: sql`${trackingTokens.totalLeads} + 1`,
+          lastSeenAt: new Date(),
+        })
+        .where(eq(trackingTokens.id, tokenRow.id));
+
+      await logEvent({
+        tenantId,
+        actorType: "webhook",
+        entityType: "lead",
+        entityId: result.dealId,
+        action: "lead_created",
+        metadataJson: {
+          origin: "tracking_script",
+          dealId: result.dealId,
+          contactId: result.contactId,
+          dedupeKey: result.dedupeKey,
+          isExisting: result.isExisting,
+          source: "tracking_script",
+          channel: "form_capture",
+          page_url: page?.url,
+        },
+      });
+    }
+
+    // Return minimal response (script doesn't read it, but useful for debugging)
+    return res.status(200).json({ ok: true });
+  } catch (error: any) {
+    console.error("[Collect] Error:", error.message);
+    return res.status(500).json({ error: "Internal error" });
+  }
+});
+
+// CORS preflight for /api/collect
+router.options("/api/collect", (_req: Request, res: Response) => {
+  res.set({
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type",
+    "Access-Control-Max-Age": "86400",
+  });
+  return res.status(204).send();
 });
 
 export { router as webhookRouter };

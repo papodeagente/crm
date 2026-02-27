@@ -1123,3 +1123,17 @@
 - [x] Logar tentativas inválidas no EventLog
 - [x] Testes unitários para o endpoint
 - [x] Configurar secret WP_SECRET via webdev_request_secrets
+
+## Tracking Script (estilo RD Station) — Captação Automática de Formulários
+
+- [x] Criar tabela tracking_tokens no schema (token por tenant, domínios permitidos, status)
+- [x] Migrar banco com a nova tabela
+- [x] Implementar tracker.js (intercepta submit de todos os forms, identifica campos por heurística, envia para /api/collect)
+- [x] Implementar endpoint GET /tracker.js?t=TOKEN para servir o script
+- [x] Implementar endpoint POST /api/collect para receber dados do tracker (validação de token, CORS, rate limit)
+- [x] Integrar com processInboundLead (source=tracking_script, channel=form_capture)
+- [x] Criar tRPC procedures para gerenciar tokens (gerar, listar, revogar)
+- [x] Criar página de Integrações no painel (snippet para copiar, token visível, domínios, instruções visuais)
+- [x] Adicionar rota /integrations no App.tsx e link na navegação/configurações
+- [x] Testes unitários para heurística de campos, endpoint /api/collect e token validation
+- [x] Teste ponta a ponta com formulário HTML real

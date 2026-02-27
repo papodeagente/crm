@@ -1174,6 +1174,24 @@ export const webhookConfig = mysqlTable("webhook_config", {
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 
+// ─── Tracking Script Tokens ─────────────────────────────
+
+export const trackingTokens = mysqlTable("tracking_tokens", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull().default(1),
+  token: varchar("token", { length: 64 }).notNull().unique(),
+  name: varchar("name", { length: 255 }).notNull().default("Meu Site"),
+  allowedDomains: json("allowedDomains"), // string[] — empty = allow all
+  isActive: boolean("isActive").default(true).notNull(),
+  lastSeenAt: timestamp("lastSeenAt"),
+  totalLeads: int("totalLeads").default(0).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type TrackingToken = typeof trackingTokens.$inferSelect;
+export type InsertTrackingToken = typeof trackingTokens.$inferInsert;
+
 export type LeadEventLog = typeof leadEventLog.$inferSelect;
 export type InsertLeadEventLog = typeof leadEventLog.$inferInsert;
 export type MetaIntegrationConfig = typeof metaIntegrationConfig.$inferSelect;

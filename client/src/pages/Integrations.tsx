@@ -6,13 +6,18 @@ import { Label } from "@/components/ui/label";
 import {
   Plug, Plus, Webhook, Zap, Globe, Facebook, Copy, RefreshCw, Check,
   AlertCircle, CheckCircle2, Clock, XCircle, RotateCcw, Eye, EyeOff,
-  Link2, ArrowRight, FileText, Filter,
+  Link2, ArrowRight, FileText, Filter, Code2, Trash2, Power, Edit2,
+  ExternalLink, Shield,
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { useState, useMemo } from "react";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
+} from "@/components/ui/dialog";
+import { Switch } from "@/components/ui/switch";
 
 const TENANT_ID = 1;
 
@@ -307,12 +312,239 @@ function MetaLeadAdsTab() {
       </Card>
     </div>
   );
+}// ─── Tracking Script Tab ──────────────────────────────────────
+
+function TrackingScriptTab() {
+  const tokens = trpc.leadCapture.listTrackingTokens.useQuery({ tenantId: TENANT_ID });
+  const createToken = trpc.leadCapture.createTrackingToken.useMutation({
+    onSuccess: () => { tokens.refetch(); toast.success("Token criado!"); setShowCreate(false); setNewName(""); setNewDomains(""); },
+    onError: (e) => toast.error(e.message),
+  });
+  const updateToken = trpc.leadCapture.updateTrackingToken.useMutation({
+    onSuccess: () => { tokens.refetch(); toast.success("Atualizado!"); },
+    onError: (e) => toast.error(e.message),
+  });
+  const deleteToken = trpc.leadCapture.deleteTrackingToken.useMutation({
+    onSuccess: () => { tokens.refetch(); toast.success("Token removido!"); },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const [showCreate, setShowCreate] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [newDomains, setNewDomains] = useState("");
+  const [copiedId, setCopiedId] = useState<number | null>(null);
+  const [expandedId, setExpandedId] = useState<number | null>(null);
+
+  const baseUrl = window.location.origin;
+
+  function getSnippet(token: string) {
+    return `<script>\n(function(t,r){var s=document.createElement('script');\ns.async=true;s.src=r+'/tracker.js?t='+t;\ndocument.head.appendChild(s);\n})('${token}','${baseUrl}');\n</script>`;
+  }
+
+  function copySnippet(token: string, id: number) {
+    navigator.clipboard.writeText(getSnippet(token));
+    setCopiedId(id);
+    toast.success("Código copiado!");
+    setTimeout(() => setCopiedId(null), 2000);
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Header */}
+      <Card className="border border-border/40 shadow-none rounded-xl">
+        <div className="p-5 space-y-4">
+          <div className="flex items-start gap-4">
+            <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-violet-500/10 to-purple-500/10 flex items-center justify-center shrink-0">
+              <Code2 className="h-6 w-6 text-violet-600" />
+            </div>
+            <div className="flex-1">
+              <h3 className="text-[15px] font-semibold text-foreground">Tracking Script</h3>
+              <p className="text-[13px] text-muted-foreground mt-0.5">
+                Instale um código no seu site para capturar automaticamente todos os formulários.
+                Funciona com Elementor, Contact Form 7, Gravity Forms, ou qualquer formulário HTML.
+              </p>
+            </div>
+            <Button
+              size="sm"
+              className="gap-1.5"
+              onClick={() => setShowCreate(true)}
+            >
+              <Plus className="h-3.5 w-3.5" />Novo Token
+            </Button>
+          </div>
+
+          {/* How it works */}
+          <div className="bg-violet-500/5 border border-violet-500/10 rounded-lg p-4">
+            <h4 className="text-[13px] font-semibold text-violet-600 mb-2 flex items-center gap-1.5">
+              <Shield className="h-3.5 w-3.5" />Como funciona
+            </h4>
+            <ol className="text-[12px] text-muted-foreground space-y-1.5 list-decimal list-inside">
+              <li>Crie um token para o seu site (botão acima)</li>
+              <li>Copie o código de instalação gerado</li>
+              <li>Cole no <code className="bg-muted px-1 rounded">&lt;head&gt;</code> ou <code className="bg-muted px-1 rounded">&lt;body&gt;</code> do seu site (via WordPress, GTM, ou direto no HTML)</li>
+              <li>Pronto! Todos os formulários serão capturados automaticamente</li>
+            </ol>
+          </div>
+        </div>
+      </Card>
+
+      {/* Token List */}
+      {tokens.isLoading ? (
+        <p className="text-[13px] text-muted-foreground text-center py-8">Carregando...</p>
+      ) : !tokens.data?.length ? (
+        <Card className="border border-border/40 shadow-none rounded-xl">
+          <div className="p-12 text-center text-muted-foreground">
+            <Code2 className="h-12 w-12 mx-auto mb-4 text-muted-foreground/20" />
+            <p className="text-[14px] font-medium text-muted-foreground/60">Nenhum token criado</p>
+            <p className="text-[13px] text-muted-foreground/40 mt-1">Crie um token para começar a capturar leads do seu site.</p>
+          </div>
+        </Card>
+      ) : (
+        <div className="space-y-3">
+          {tokens.data.map((t: any) => (
+            <Card key={t.id} className="border border-border/40 shadow-none rounded-xl">
+              <div className="p-4 space-y-3">
+                {/* Token header */}
+                <div className="flex items-center gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="text-[14px] font-semibold">{t.name}</p>
+                      <span className={`inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full ${
+                        t.isActive ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"
+                      }`}>
+                        <span className={`h-1 w-1 rounded-full ${t.isActive ? "bg-emerald-500" : "bg-slate-400"}`} />
+                        {t.isActive ? "Ativo" : "Inativo"}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3 mt-1 text-[11px] text-muted-foreground">
+                      <span>{t.totalLeads} lead(s) capturado(s)</span>
+                      {t.lastSeenAt && <span>· Último acesso: {new Date(t.lastSeenAt).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</span>}
+                      {t.allowedDomains && (t.allowedDomains as string[]).length > 0 && (
+                        <span>· Domínios: {(t.allowedDomains as string[]).join(", ")}</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-8 gap-1.5 text-[12px]"
+                      onClick={() => copySnippet(t.token, t.id)}
+                    >
+                      {copiedId === t.id ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                      {copiedId === t.id ? "Copiado!" : "Copiar Código"}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 w-8 p-0"
+                      title={expandedId === t.id ? "Recolher" : "Ver código"}
+                      onClick={() => setExpandedId(expandedId === t.id ? null : t.id)}
+                    >
+                      <Code2 className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 w-8 p-0"
+                      title={t.isActive ? "Desativar" : "Ativar"}
+                      onClick={() => updateToken.mutate({ tenantId: TENANT_ID, tokenId: t.id, isActive: !t.isActive })}
+                    >
+                      <Power className={`h-3.5 w-3.5 ${t.isActive ? "text-emerald-600" : "text-muted-foreground"}`} />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                      title="Excluir token"
+                      onClick={() => {
+                        if (confirm("Tem certeza? O script parará de funcionar no site.")) {
+                          deleteToken.mutate({ tenantId: TENANT_ID, tokenId: t.id });
+                        }
+                      }}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Expanded: show snippet */}
+                {expandedId === t.id && (
+                  <div className="bg-slate-950 rounded-lg p-4 relative">
+                    <p className="text-[11px] text-slate-400 mb-2">Cole este código no <code>&lt;head&gt;</code> ou <code>&lt;body&gt;</code> do seu site:</p>
+                    <pre className="text-[12px] text-emerald-400 font-mono whitespace-pre-wrap break-all leading-relaxed">{getSnippet(t.token)}</pre>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="absolute top-2 right-2 h-7 text-[11px] text-slate-400 hover:text-white gap-1"
+                      onClick={() => copySnippet(t.token, t.id)}
+                    >
+                      <Copy className="h-3 w-3" />{copiedId === t.id ? "Copiado!" : "Copiar"}
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {/* Create Token Dialog */}
+      <Dialog open={showCreate} onOpenChange={setShowCreate}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Novo Token de Tracking</DialogTitle>
+            <DialogDescription>
+              Crie um token para capturar leads de um site específico.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <Label className="text-[12px]">Nome do site *</Label>
+              <Input
+                placeholder="Ex: Meu Site Principal"
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                className="text-[13px]"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-[12px]">Domínios permitidos (opcional)</Label>
+              <Input
+                placeholder="Ex: meusite.com.br, lp.meusite.com.br"
+                value={newDomains}
+                onChange={(e) => setNewDomains(e.target.value)}
+                className="text-[13px]"
+              />
+              <p className="text-[11px] text-muted-foreground">Separe por vírgula. Deixe vazio para aceitar de qualquer domínio.</p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowCreate(false)}>Cancelar</Button>
+            <Button
+              onClick={() => {
+                if (!newName.trim()) { toast.error("Informe o nome do site"); return; }
+                const domains = newDomains.split(",").map(d => d.trim()).filter(Boolean);
+                createToken.mutate({
+                  tenantId: TENANT_ID,
+                  name: newName.trim(),
+                  allowedDomains: domains.length > 0 ? domains : undefined,
+                });
+              }}
+              disabled={createToken.isPending}
+            >
+              {createToken.isPending ? "Criando..." : "Criar Token"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
 }
 
-// ─── Event Logs Tab ──────────────────────────────────────
+// ─── Event Logs Tab ──────────────────────────────────────────
 
-function EventLogsTab() {
-  const [sourceFilter, setSourceFilter] = useState<string>("all");
+function EventLogsTab() { const [sourceFilter, setSourceFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [page, setPage] = useState(0);
   const LIMIT = 20;
@@ -356,6 +588,8 @@ function EventLogsTab() {
             <SelectItem value="all">Todas origens</SelectItem>
             <SelectItem value="landing">Landing Page</SelectItem>
             <SelectItem value="meta_lead_ads">Meta Lead Ads</SelectItem>
+            <SelectItem value="wordpress">WordPress</SelectItem>
+            <SelectItem value="tracking_script">Tracking Script</SelectItem>
           </SelectContent>
         </Select>
         <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setPage(0); }}>
@@ -488,6 +722,9 @@ export default function Integrations() {
           <TabsTrigger value="logs" className="rounded-lg text-[13px] data-[state=active]:bg-primary data-[state=active]:text-white gap-1.5">
             <FileText className="h-3.5 w-3.5" />Event Logs
           </TabsTrigger>
+          <TabsTrigger value="tracking" className="rounded-lg text-[13px] data-[state=active]:bg-primary data-[state=active]:text-white gap-1.5">
+            <Code2 className="h-3.5 w-3.5" />Tracking Script
+          </TabsTrigger>
           <TabsTrigger value="connectors" className="rounded-lg text-[13px] data-[state=active]:bg-primary data-[state=active]:text-white gap-1.5">
             <Zap className="h-3.5 w-3.5" />Conectores
           </TabsTrigger>
@@ -503,6 +740,10 @@ export default function Integrations() {
 
         <TabsContent value="logs">
           <EventLogsTab />
+        </TabsContent>
+
+        <TabsContent value="tracking">
+          <TrackingScriptTab />
         </TabsContent>
 
         <TabsContent value="connectors">

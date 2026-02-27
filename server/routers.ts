@@ -97,6 +97,9 @@ import {
   disconnectMeta,
 } from "./leadProcessor";
 import { randomBytes } from "crypto";
+import { getDb } from "./db";
+import { trackingTokens } from "../drizzle/schema";
+import { eq, and, desc } from "drizzle-orm";
 
 export const appRouter = router({
   system: systemRouter,
@@ -828,6 +831,72 @@ export const appRouter = router({
       .input(z.object({ tenantId: z.number(), eventId: z.number() }))
       .mutation(async ({ input }) => {
         return reprocessLeadEvent(input.tenantId, input.eventId);
+      }),
+
+    // ─── Tracking Script Tokens ────────────────────────
+    listTrackingTokens: protectedProcedure
+      .input(z.object({ tenantId: z.number() }))
+      .query(async ({ input }) => {
+        const db = await getDb();
+        if (!db) return [];
+        return db
+          .select()
+          .from(trackingTokens)
+          .where(eq(trackingTokens.tenantId, input.tenantId))
+          .orderBy(desc(trackingTokens.createdAt));
+      }),
+
+    createTrackingToken: protectedProcedure
+      .input(z.object({
+        tenantId: z.number(),
+        name: z.string().min(1).max(255),
+        allowedDomains: z.array(z.string()).optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const db = await getDb();
+        if (!db) throw new Error("Database not available");
+        const token = randomBytes(32).toString("hex");
+        const [result] = await db.insert(trackingTokens).values({
+          tenantId: input.tenantId,
+          token,
+          name: input.name,
+          allowedDomains: input.allowedDomains || null,
+        }).$returningId();
+        return { id: result!.id, token, name: input.name };
+      }),
+
+    updateTrackingToken: protectedProcedure
+      .input(z.object({
+        tenantId: z.number(),
+        tokenId: z.number(),
+        name: z.string().min(1).max(255).optional(),
+        allowedDomains: z.array(z.string()).optional(),
+        isActive: z.boolean().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const db = await getDb();
+        if (!db) throw new Error("Database not available");
+        const updates: Record<string, any> = {};
+        if (input.name !== undefined) updates.name = input.name;
+        if (input.allowedDomains !== undefined) updates.allowedDomains = input.allowedDomains;
+        if (input.isActive !== undefined) updates.isActive = input.isActive;
+        if (Object.keys(updates).length === 0) return { success: true };
+        await db
+          .update(trackingTokens)
+          .set(updates)
+          .where(and(eq(trackingTokens.id, input.tokenId), eq(trackingTokens.tenantId, input.tenantId)));
+        return { success: true };
+      }),
+
+    deleteTrackingToken: protectedProcedure
+      .input(z.object({ tenantId: z.number(), tokenId: z.number() }))
+      .mutation(async ({ input }) => {
+        const db = await getDb();
+        if (!db) throw new Error("Database not available");
+        await db
+          .delete(trackingTokens)
+          .where(and(eq(trackingTokens.id, input.tokenId), eq(trackingTokens.tenantId, input.tenantId)));
+        return { success: true };
       }),
   }),
 });
