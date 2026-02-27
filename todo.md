@@ -1142,3 +1142,9 @@
 
 - [x] Criar endpoint backend para verificar se o tracking script está instalado em uma URL
 - [x] Criar UI de validação na aba Tracking Script (campo de URL + botão verificar + resultado visual)
+
+## Bug: Tracking Script não capta leads de formulário pop-up Elementor
+
+- [x] Investigar como o Elementor envia formulários pop-up (AJAX vs submit nativo)
+- [x] Corrigir tracker.js para interceptar envios AJAX do Elementor
+- [x] Testar e validar a correção

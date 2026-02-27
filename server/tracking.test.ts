@@ -62,13 +62,253 @@ describe("generateTrackerScript", () => {
     const script = generateTrackerScript("tok", "https://x.com");
     expect(script).toContain("data-entur-ignore");
   });
+
+  // ─── Elementor-specific interception ──────────────────
+
+  it("should contain Elementor form_fields pattern matching", () => {
+    const script = generateTrackerScript("tok", "https://x.com");
+    expect(script).toContain("form_fields");
+    expect(script).toContain("classifyElementorField");
+  });
+
+  it("should hook into jQuery submit_success event for Elementor Pro", () => {
+    const script = generateTrackerScript("tok", "https://x.com");
+    expect(script).toContain("submit_success");
+    expect(script).toContain("elementor-form");
+    expect(script).toContain("hookElementorEvents");
+  });
+
+  it("should hook into jQuery ajaxComplete for AJAX form submissions", () => {
+    const script = generateTrackerScript("tok", "https://x.com");
+    expect(script).toContain("ajaxComplete");
+    expect(script).toContain("elementor_pro_forms_send_form");
+    expect(script).toContain("hookJQueryAjax");
+  });
+
+  it("should intercept XMLHttpRequest.send for non-jQuery AJAX", () => {
+    const script = generateTrackerScript("tok", "https://x.com");
+    expect(script).toContain("XMLHttpRequest.prototype.send");
+    expect(script).toContain("XMLHttpRequest.prototype.open");
+    expect(script).toContain("admin-ajax.php");
+  });
+
+  it("should intercept fetch API for modern AJAX submissions", () => {
+    const script = generateTrackerScript("tok", "https://x.com");
+    expect(script).toContain("window.fetch");
+    expect(script).toContain("origFetch");
+  });
+
+  it("should contain MutationObserver for dynamic popup forms", () => {
+    const script = generateTrackerScript("tok", "https://x.com");
+    expect(script).toContain("MutationObserver");
+    expect(script).toContain("elementor-message-success");
+  });
+
+  it("should contain deduplication logic to prevent double-sends", () => {
+    const script = generateTrackerScript("tok", "https://x.com");
+    expect(script).toContain("SENT_FORMS");
+    expect(script).toContain("formFingerprint");
+    expect(script).toContain("5000"); // 5 second dedup window
+  });
+
+  it("should retry jQuery hooks for late-loading jQuery", () => {
+    const script = generateTrackerScript("tok", "https://x.com");
+    expect(script).toContain("initHooks");
+    expect(script).toContain("setTimeout(initHooks");
+    expect(script).toContain("DOMContentLoaded");
+  });
+
+  it("should support multiple WordPress form plugins", () => {
+    const script = generateTrackerScript("tok", "https://x.com");
+    // Elementor
+    expect(script).toContain("elementor_pro_forms_send_form");
+    // WPForms
+    expect(script).toContain("wpforms_submit");
+    // Gravity Forms
+    expect(script).toContain("gform_submit");
+    // Contact Form 7
+    expect(script).toContain("cf7");
+    // Fluent Forms
+    expect(script).toContain("fluentform");
+    // Forminator
+    expect(script).toContain("forminator_submit");
+  });
+
+  it("should skip WordPress system hidden fields", () => {
+    const script = generateTrackerScript("tok", "https://x.com");
+    expect(script).toContain("post_id");
+    expect(script).toContain("form_id");
+    expect(script).toContain("referer_title");
+    expect(script).toContain("queried_id");
+    expect(script).toContain("_wpnonce");
+  });
+});
+
+// ─── Elementor field classification logic ──────────────
+
+describe("Elementor field classification", () => {
+  // Simulate the classifyElementorField logic
+  function classifyElementorFieldKey(fieldKey: string, inputType?: string, inputId?: string): string | null {
+    const fk = fieldKey.toLowerCase();
+    if (/^e-?mail$/.test(fk)) return "email";
+    if (/^(phone|tel|fone|celular|whatsapp|wpp|mobile|telefone)$/.test(fk)) return "phone";
+    if (/^(name|nome|full_?name|nome_?completo|first_?name|primeiro_?nome)$/.test(fk)) return "name";
+    if (/^(message|mensagem|comment|descri|observa|assunto|subject)$/.test(fk)) return "message";
+
+    // Check by input type
+    if (inputType === "email") return "email";
+    if (inputType === "tel") return "phone";
+
+    // Check by id
+    const id = (inputId || "").toLowerCase();
+    if (/email/.test(id)) return "email";
+    if (/phone|tel|fone|celular|whatsapp|wpp|telefone/.test(id)) return "phone";
+    if (/^form-field-name$/.test(id) || /^form-field-nome$/.test(id)) return "name";
+
+    return null;
+  }
+
+  it("should classify form_fields[email] as email", () => {
+    expect(classifyElementorFieldKey("email")).toBe("email");
+  });
+
+  it("should classify form_fields[e-mail] as email", () => {
+    expect(classifyElementorFieldKey("e-mail")).toBe("email");
+  });
+
+  it("should classify form_fields[telefone] as phone", () => {
+    expect(classifyElementorFieldKey("telefone")).toBe("phone");
+  });
+
+  it("should classify form_fields[whatsapp] as phone", () => {
+    expect(classifyElementorFieldKey("whatsapp")).toBe("phone");
+  });
+
+  it("should classify form_fields[name] as name", () => {
+    expect(classifyElementorFieldKey("name")).toBe("name");
+  });
+
+  it("should classify form_fields[nome] as name", () => {
+    expect(classifyElementorFieldKey("nome")).toBe("name");
+  });
+
+  it("should classify form_fields[mensagem] as message", () => {
+    expect(classifyElementorFieldKey("mensagem")).toBe("message");
+  });
+
+  it("should classify unknown field by input type=email", () => {
+    expect(classifyElementorFieldKey("custom_field", "email")).toBe("email");
+  });
+
+  it("should classify unknown field by input type=tel", () => {
+    expect(classifyElementorFieldKey("custom_field", "tel")).toBe("phone");
+  });
+
+  it("should classify by input id containing 'email'", () => {
+    expect(classifyElementorFieldKey("field_abc", "text", "form-field-email")).toBe("email");
+  });
+
+  it("should classify by input id containing 'telefone'", () => {
+    expect(classifyElementorFieldKey("field_xyz", "text", "form-field-telefone")).toBe("phone");
+  });
+
+  it("should return null for unrecognized fields", () => {
+    expect(classifyElementorFieldKey("programa")).toBeNull();
+    expect(classifyElementorFieldKey("field_aa0d6d6")).toBeNull();
+  });
+});
+
+// ─── AJAX data parsing logic ───────────────────────────
+
+describe("AJAX form data parsing", () => {
+  // Simulate parsing Elementor AJAX body
+  function parseElementorAjaxBody(body: string): Record<string, string | null> {
+    const params = new URLSearchParams(body);
+    const formData: Record<string, string | null> = {
+      name: null,
+      email: null,
+      phone: null,
+      message: null,
+    };
+
+    params.forEach((value, key) => {
+      if (!value) return;
+      const fieldMatch = key.match(/form_fields\[([^\]]+)\]/);
+      if (fieldMatch) {
+        const fieldKey = fieldMatch[1].toLowerCase();
+        if (/^e-?mail$/.test(fieldKey) && !formData.email) formData.email = value;
+        else if (/^(phone|tel|fone|celular|whatsapp|wpp|mobile|telefone)$/.test(fieldKey) && !formData.phone) formData.phone = value;
+        else if (/^(name|nome|full_?name|nome_?completo|first_?name|primeiro_?nome)$/.test(fieldKey) && !formData.name) formData.name = value;
+        else if (/^(message|mensagem|comment|descri|observa|assunto|subject)$/.test(fieldKey) && !formData.message) formData.message = value;
+      }
+    });
+
+    return formData;
+  }
+
+  it("should parse Elementor Pro AJAX body with form_fields", () => {
+    const body = "action=elementor_pro_forms_send_form&form_fields%5Bname%5D=Jo%C3%A3o+Silva&form_fields%5Bemail%5D=joao%40test.com&form_fields%5Btelefone%5D=84999887766&post_id=585&form_id=b250930";
+    const result = parseElementorAjaxBody(body);
+    expect(result.name).toBe("João Silva");
+    expect(result.email).toBe("joao@test.com");
+    expect(result.phone).toBe("84999887766");
+  });
+
+  it("should handle Elementor body with whatsapp field name", () => {
+    const body = "action=elementor_pro_forms_send_form&form_fields%5Bnome%5D=Maria&form_fields%5Bemail%5D=maria%40test.com&form_fields%5Bwhatsapp%5D=11999887766";
+    const result = parseElementorAjaxBody(body);
+    expect(result.name).toBe("Maria");
+    expect(result.email).toBe("maria@test.com");
+    expect(result.phone).toBe("11999887766");
+  });
+
+  it("should handle body with no recognizable fields gracefully", () => {
+    const body = "action=elementor_pro_forms_send_form&form_fields%5Bprograma%5D=Sim&form_fields%5Bfield_abc%5D=Nao";
+    const result = parseElementorAjaxBody(body);
+    expect(result.name).toBeNull();
+    expect(result.email).toBeNull();
+    expect(result.phone).toBeNull();
+  });
+
+  it("should parse body matching crienatal.com.br popup form", () => {
+    // Simulating the actual form from crienatal.com.br
+    const body = "action=elementor_pro_forms_send_form&form_fields%5Bname%5D=Bruno+Teste&form_fields%5Bemail%5D=bruno%40crienatal.com.br&form_fields%5Btelefone%5D=84999001122&form_fields%5Bprograma%5D=Sim&form_fields%5Bfield_aa0d6d6%5D=N%C3%A3o&form_fields%5Butm_source%5D=google&form_fields%5Butm_medium%5D=cpc&post_id=585&form_id=b250930&referer_title=CRIE+Lagoinha+Natal&queried_id=907";
+    const result = parseElementorAjaxBody(body);
+    expect(result.name).toBe("Bruno Teste");
+    expect(result.email).toBe("bruno@crienatal.com.br");
+    expect(result.phone).toBe("84999001122");
+  });
+});
+
+// ─── Deduplication logic ───────────────────────────────
+
+describe("Deduplication logic", () => {
+  function formFingerprint(formData: { email?: string; phone?: string; name?: string }): string {
+    return (formData.email || "") + "|" + (formData.phone || "") + "|" + (formData.name || "");
+  }
+
+  it("should generate same fingerprint for identical data", () => {
+    const a = formFingerprint({ email: "a@b.com", phone: "123", name: "Test" });
+    const b = formFingerprint({ email: "a@b.com", phone: "123", name: "Test" });
+    expect(a).toBe(b);
+  });
+
+  it("should generate different fingerprints for different data", () => {
+    const a = formFingerprint({ email: "a@b.com", phone: "123" });
+    const b = formFingerprint({ email: "c@d.com", phone: "456" });
+    expect(a).not.toBe(b);
+  });
+
+  it("should handle missing fields in fingerprint", () => {
+    const a = formFingerprint({ email: "a@b.com" });
+    expect(a).toBe("a@b.com||");
+  });
 });
 
 // ─── /api/collect endpoint logic (mocked) ───────────────
 
 describe("/api/collect validation logic", () => {
   it("should require token field", () => {
-    // Simulating validation: no token → 401
     const body = { email: "test@test.com", phone: "123" };
     expect(body).not.toHaveProperty("token");
   });
