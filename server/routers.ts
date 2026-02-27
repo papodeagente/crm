@@ -99,6 +99,7 @@ import {
 import { randomBytes } from "crypto";
 import { getDb } from "./db";
 import { trackingTokens } from "../drizzle/schema";
+import { generateTrackerScript } from "./tracker-script";
 import { eq, and, desc } from "drizzle-orm";
 
 export const appRouter = router({
@@ -899,6 +900,26 @@ export const appRouter = router({
         return { success: true };
       }),
 
+    getTrackingSnippet: protectedProcedure
+      .input(z.object({
+        tenantId: z.number(),
+        tokenId: z.number(),
+        collectUrl: z.string().url(),
+      }))
+      .query(async ({ input }) => {
+        const db = await getDb();
+        if (!db) throw new Error("Database not available");
+        const rows = await db
+          .select()
+          .from(trackingTokens)
+          .where(and(eq(trackingTokens.id, input.tokenId), eq(trackingTokens.tenantId, input.tenantId)))
+          .limit(1);
+        if (rows.length === 0) throw new Error("Token not found");
+        const tokenRow = rows[0]!;
+        const script = generateTrackerScript(tokenRow.token, input.collectUrl);
+        return { snippet: `<script>\n${script}\n</script>` };
+      }),
+
     verifyTrackingInstallation: protectedProcedure
       .input(z.object({
         tenantId: z.number(),
@@ -966,7 +987,7 @@ export const appRouter = router({
           }
 
           // Check if there's ANY entur tracker script (maybe wrong token)
-          const hasTrackerRef = html.includes("/tracker.js") || html.includes("__entur_tracker_loaded");
+          const hasTrackerRef = html.includes("/tracker.js") || html.includes("__entur_tracker_loaded") || html.includes("/api/collect");
           if (hasTrackerRef) {
             return {
               installed: false,

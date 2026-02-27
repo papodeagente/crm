@@ -337,16 +337,43 @@ function TrackingScriptTab() {
   const [copiedId, setCopiedId] = useState<number | null>(null);
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [verifyUrl, setVerifyUrl] = useState("");
+  const [snippetCache, setSnippetCache] = useState<Record<number, string>>({});
+  const [loadingSnippet, setLoadingSnippet] = useState<number | null>(null);
 
-  const baseUrl = window.location.origin;
+  const collectUrl = window.location.origin;
+  const utils = trpc.useUtils();
 
-  function getSnippet(token: string) {
-    return `<script>\n(function(t,r){var s=document.createElement('script');\ns.async=true;s.src=r+'/tracker.js?t='+t;\ndocument.head.appendChild(s);\n})('${token}','${baseUrl}');\n</script>`;
+  async function loadSnippet(tokenId: number) {
+    if (snippetCache[tokenId]) return;
+    setLoadingSnippet(tokenId);
+    try {
+      const result = await utils.client.leadCapture.getTrackingSnippet.query({
+        tenantId: TENANT_ID,
+        tokenId,
+        collectUrl,
+      });
+      setSnippetCache(prev => ({ ...prev, [tokenId]: result.snippet }));
+    } catch (err) {
+      toast.error("Erro ao carregar snippet");
+    } finally {
+      setLoadingSnippet(null);
+    }
   }
 
-  function copySnippet(token: string, id: number) {
-    navigator.clipboard.writeText(getSnippet(token));
-    setCopiedId(id);
+  function handleExpand(tokenId: number) {
+    if (expandedId === tokenId) {
+      setExpandedId(null);
+    } else {
+      setExpandedId(tokenId);
+      loadSnippet(tokenId);
+    }
+  }
+
+  function copySnippet(tokenId: number) {
+    const snippet = snippetCache[tokenId];
+    if (!snippet) return;
+    navigator.clipboard.writeText(snippet);
+    setCopiedId(tokenId);
     toast.success("Código copiado!");
     setTimeout(() => setCopiedId(null), 2000);
   }
@@ -432,7 +459,7 @@ function TrackingScriptTab() {
                       variant="outline"
                       size="sm"
                       className="h-8 gap-1.5 text-[12px]"
-                      onClick={() => copySnippet(t.token, t.id)}
+                      onClick={() => copySnippet(t.id)}
                     >
                       {copiedId === t.id ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
                       {copiedId === t.id ? "Copiado!" : "Copiar Código"}
@@ -442,7 +469,7 @@ function TrackingScriptTab() {
                       size="sm"
                       className="h-8 w-8 p-0"
                       title={expandedId === t.id ? "Recolher" : "Ver código"}
-                      onClick={() => setExpandedId(expandedId === t.id ? null : t.id)}
+                      onClick={() => handleExpand(t.id)}
                     >
                       <Code2 className="h-3.5 w-3.5" />
                     </Button>
@@ -475,12 +502,19 @@ function TrackingScriptTab() {
                 {expandedId === t.id && (
                   <div className="bg-slate-950 rounded-lg p-4 relative">
                     <p className="text-[11px] text-slate-400 mb-2">Cole este código no <code>&lt;head&gt;</code> ou <code>&lt;body&gt;</code> do seu site:</p>
-                    <pre className="text-[12px] text-emerald-400 font-mono whitespace-pre-wrap break-all leading-relaxed">{getSnippet(t.token)}</pre>
+                    {loadingSnippet === t.id ? (
+                      <div className="text-[12px] text-slate-400 font-mono py-4 text-center">Carregando código...</div>
+                    ) : snippetCache[t.id] ? (
+                      <pre className="text-[12px] text-emerald-400 font-mono whitespace-pre-wrap break-all leading-relaxed max-h-[300px] overflow-y-auto">{snippetCache[t.id]}</pre>
+                    ) : (
+                      <div className="text-[12px] text-slate-400 font-mono py-4 text-center">Erro ao carregar snippet</div>
+                    )}
                     <Button
                       variant="ghost"
                       size="sm"
                       className="absolute top-2 right-2 h-7 text-[11px] text-slate-400 hover:text-white gap-1"
-                      onClick={() => copySnippet(t.token, t.id)}
+                      onClick={() => copySnippet(t.id)}
+                      disabled={!snippetCache[t.id]}
                     >
                       <Copy className="h-3 w-3" />{copiedId === t.id ? "Copiado!" : "Copiar"}
                     </Button>

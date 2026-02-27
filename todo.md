@@ -1148,3 +1148,9 @@
 - [x] Investigar como o Elementor envia formulários pop-up (AJAX vs submit nativo)
 - [x] Corrigir tracker.js para interceptar envios AJAX do Elementor
 - [x] Testar e validar a correção
+
+## Bug: Tracking Script não funciona no teste real do crienatal.com.br
+
+- [x] Investigar o tracker.js carregado no site real e monitorar envio do formulário (causa: ERR_SSL_PROTOCOL_ERROR no domínio manus.space impede carregamento do script externo)
+- [x] Identificar causa raiz e corrigir (snippet agora é inline completo, não depende de /tracker.js externo)
+- [x] Testar e validar a correção (389 testes passando)

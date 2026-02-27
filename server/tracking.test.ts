@@ -417,7 +417,7 @@ describe("Verify Installation - HTML scanning logic", () => {
   }
 
   function detectTrackerPresence(html: string): boolean {
-    return html.includes("/tracker.js") || html.includes("__entur_tracker_loaded");
+    return html.includes("/tracker.js") || html.includes("__entur_tracker_loaded") || html.includes("/api/collect");
   }
 
   it("should find token in HTML with script tag", () => {
@@ -443,6 +443,16 @@ describe("Verify Installation - HTML scanning logic", () => {
   it("should not detect tracker in clean HTML", () => {
     const html = `<html><head><title>My Site</title></head><body><form><input name="email"></form></body></html>`;
     expect(detectTrackerPresence(html)).toBe(false);
+  });
+
+  it("should detect inline tracker script with /api/collect", () => {
+    const html = `<html><head><script>(function(){"use strict";if(window.__entur_tracker_loaded)return;var BASE="https://example.com";var url=BASE+"/api/collect";})();</script></head></html>`;
+    expect(detectTrackerPresence(html)).toBe(true);
+  });
+
+  it("should find token in inline tracker script", () => {
+    const html = `<html><head><script>(function(){var TOKEN="mytoken123";var BASE="https://example.com";})();</script></head></html>`;
+    expect(findTokenInHtml(html, ["mytoken123"])).toBe("mytoken123");
   });
 
   it("should match first token from multiple", () => {
@@ -490,5 +500,45 @@ describe("Tracking payload construction", () => {
     expect(payload).not.toHaveProperty("name");
     expect(payload).not.toHaveProperty("phone");
     expect(payload).not.toHaveProperty("utm");
+  });
+});
+
+// ─── Inline snippet generation ─────────────────────────
+
+describe("Inline snippet generation", () => {
+  it("should generate a complete inline script wrapped in <script> tags", () => {
+    const script = generateTrackerScript("mytoken", "https://myapp.com");
+    const snippet = `<script>\n${script}\n</script>`;
+    expect(snippet).toMatch(/^<script>/);
+    expect(snippet).toMatch(/<\/script>$/);
+    expect(snippet).toContain("mytoken");
+    expect(snippet).toContain("https://myapp.com");
+  });
+
+  it("should contain all interception strategies inline (no external load needed)", () => {
+    const script = generateTrackerScript("tok", "https://app.com");
+    // Must contain all strategies inline
+    expect(script).toContain("addEventListener");
+    expect(script).toContain("submit_success");
+    expect(script).toContain("ajaxComplete");
+    expect(script).toContain("XMLHttpRequest.prototype");
+    expect(script).toContain("window.fetch");
+    expect(script).toContain("MutationObserver");
+    // Must NOT reference external script loading
+    expect(script).not.toContain("document.createElement('script')");
+    expect(script).not.toContain(".src=");
+  });
+
+  it("should use collectUrl as BASE for /api/collect endpoint", () => {
+    const script = generateTrackerScript("tok", "https://myapp.manus.space");
+    expect(script).toContain("https://myapp.manus.space");
+    expect(script).toContain("/api/collect");
+  });
+
+  it("should be self-contained and not depend on external resources", () => {
+    const script = generateTrackerScript("tok", "https://app.com");
+    // Should not try to load any external JS file
+    expect(script).not.toContain("createElement('script')");
+    expect(script).not.toContain('createElement("script")');
   });
 });
