@@ -959,3 +959,9 @@
 - [x] Fallback para status do banco quando sessão não está em memória
 - [x] Inbox carregando corretamente com 841 conversas sem duplicações
 - [x] 231 testes passando (1 falha pré-existente no backup diário)
+
+## Correção de Status de Conexão WhatsApp
+
+- [x] Reverter fallback de status do banco — agora usa apenas status em memória (live)
+- [x] Inbox funciona para ver histórico com sessão desconectada (banner amarelo "Reconectar")
+- [x] Reconexão via QR code funciona normalmente quando sessão não está ativa

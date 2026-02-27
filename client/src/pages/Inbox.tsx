@@ -7,7 +7,7 @@ import {
   Check, CheckCheck, Clock, Phone, Loader2,
   MessageCircle, Briefcase, Plus, X, Volume2, VolumeX,
   UserPlus, Lock, Users, UserCheck, UserX, ArrowRightLeft,
-  CircleDot, ChevronDown
+  CircleDot, ChevronDown, WifiOff
 } from "lucide-react";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
@@ -734,15 +734,26 @@ export default function InboxPage() {
 
   // ─── Data queries ───
   const sessionsQ = trpc.whatsapp.sessions.useQuery();
+  // Find connected session first, otherwise use any session for offline history viewing
   const activeSession = useMemo(
-    () => (sessionsQ.data || []).find((s: any) => s.liveStatus === "connected"),
+    () => {
+      const sessions = sessionsQ.data || [];
+      const connected = sessions.find((s: any) => s.liveStatus === "connected");
+      if (connected) return connected;
+      // Fallback: use first session from DB so we can still show conversation history
+      return sessions.length > 0 ? sessions[0] : undefined;
+    },
+    [sessionsQ.data]
+  );
+  const isConnected = useMemo(
+    () => (sessionsQ.data || []).some((s: any) => s.liveStatus === "connected"),
     [sessionsQ.data]
   );
 
   // Multi-agent: use the new conversationsMultiAgent endpoint
   const conversationsQ = trpc.whatsapp.conversationsMultiAgent.useQuery(
     { sessionId: activeSession?.sessionId || "", tenantId: 1 },
-    { enabled: !!activeSession?.sessionId, refetchInterval: 8000 }
+    { enabled: !!activeSession?.sessionId, refetchInterval: isConnected ? 8000 : 30000 }
   );
 
   // Agents list for assignment
@@ -923,7 +934,20 @@ export default function InboxPage() {
   }
 
   return (
-    <div className="flex h-full overflow-hidden bg-wa-chat-bg">
+    <div className="flex flex-col h-full overflow-hidden bg-wa-chat-bg">
+      {/* ═══ RECONNECTION BANNER ═══ */}
+      {!isConnected && activeSession && (
+        <div className="shrink-0 flex items-center justify-between px-4 py-2 bg-amber-500/90 text-white text-sm">
+          <div className="flex items-center gap-2">
+            <WifiOff className="w-4 h-4" />
+            <span>WhatsApp desconectado — visualizando histórico. Reconecte para enviar mensagens.</span>
+          </div>
+          <a href="/whatsapp" className="px-3 py-1 bg-white/20 hover:bg-white/30 rounded-lg text-xs font-medium transition-colors">
+            Reconectar
+          </a>
+        </div>
+      )}
+      <div className="flex flex-1 overflow-hidden">
       {/* ═══ LEFT PANEL: Conversations List ═══ */}
       <div
         className={`flex flex-col bg-wa-panel ${showMobileChat ? "hidden md:flex" : "flex"}`}
@@ -1089,6 +1113,7 @@ export default function InboxPage() {
           onCreated={() => { contactsQ.refetch(); setShowCreateContact(false); }}
         />
       )}
+      </div>
     </div>
   );
 }

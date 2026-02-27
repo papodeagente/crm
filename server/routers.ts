@@ -110,10 +110,10 @@ export const appRouter = router({
       const dbSessions = await getSessionsByUser(ctx.user.id);
       return dbSessions.map((s) => {
         const live = whatsappManager.getSession(s.sessionId);
-        // Use live status if available, otherwise fall back to DB status
-        // This allows the Inbox to work even when the server was restarted
-        // and the Baileys session hasn't been reconnected yet
-        const liveStatus = live?.status || (s.status === "connected" ? "connected" : "disconnected");
+        // Only use the live in-memory status — do NOT fall back to DB status
+        // If the session is not in memory (e.g. after server restart), show as disconnected
+        // so the user knows they need to reconnect
+        const liveStatus = live?.status || "disconnected";
         return { ...s, liveStatus, qrDataUrl: live?.qrDataUrl || null, user: live?.user || null };
       });
     }),
