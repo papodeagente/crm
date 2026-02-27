@@ -849,3 +849,136 @@ describe("Multi-Agent / SaaS Assignment Tests", () => {
     expect(result).toBeDefined();
   });
 });
+
+// ════════════════════════════════════════════════════════════
+// TEAM MANAGEMENT TESTS
+// ════════════════════════════════════════════════════════════
+
+describe("Team Management API Routes", () => {
+  function createAuthCtx() {
+    const user: NonNullable<TrpcContext["user"]> = {
+      id: 1,
+      openId: "test-user",
+      email: "test@example.com",
+      name: "Test User",
+      loginMethod: "manus",
+      role: "admin",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      lastSignedIn: new Date(),
+    };
+    return {
+      ctx: {
+        user,
+        req: { protocol: "https", headers: {} } as TrpcContext["req"],
+        res: { clearCookie: vi.fn() } as unknown as TrpcContext["res"],
+      } as TrpcContext,
+    };
+  }
+
+  it("teamManagement.listTeams returns an array", async () => {
+    const { ctx } = createAuthCtx();
+    const caller = appRouter.createCaller(ctx);
+    const result = await caller.teamManagement.listTeams({ tenantId: 1 });
+    expect(Array.isArray(result)).toBe(true);
+  });
+
+  it("teamManagement.listAgents returns an array", async () => {
+    const { ctx } = createAuthCtx();
+    const caller = appRouter.createCaller(ctx);
+    const result = await caller.teamManagement.listAgents({ tenantId: 1 });
+    expect(Array.isArray(result)).toBe(true);
+  });
+
+  it("teamManagement.listRules returns an array", async () => {
+    const { ctx } = createAuthCtx();
+    const caller = appRouter.createCaller(ctx);
+    const result = await caller.teamManagement.listRules({ tenantId: 1 });
+    expect(Array.isArray(result)).toBe(true);
+  });
+
+  it("teamManagement.createTeam creates a team and returns it", async () => {
+    const { ctx } = createAuthCtx();
+    const caller = appRouter.createCaller(ctx);
+    const result = await caller.teamManagement.createTeam({
+      tenantId: 1,
+      name: "Test Team " + Date.now(),
+      description: "Test team description",
+      color: "#6366f1",
+    });
+    expect(result).toBeDefined();
+    if (result) {
+      expect(result.name).toContain("Test Team");
+    }
+  });
+
+  it("teamManagement.createRule creates a distribution rule", async () => {
+    const { ctx } = createAuthCtx();
+    const caller = appRouter.createCaller(ctx);
+    const result = await caller.teamManagement.createRule({
+      tenantId: 1,
+      name: "Test Rule " + Date.now(),
+      strategy: "round_robin",
+      priority: 5,
+    });
+    expect(result).toBeDefined();
+    if (result) {
+      expect(result.name).toContain("Test Rule");
+    }
+  });
+
+  it("teamManagement.toggleRule toggles a rule active state", async () => {
+    const { ctx } = createAuthCtx();
+    const caller = appRouter.createCaller(ctx);
+    // First create a rule
+    const rule = await caller.teamManagement.createRule({
+      tenantId: 1,
+      name: "Toggle Test " + Date.now(),
+      strategy: "manual",
+      priority: 1,
+    });
+    if (rule) {
+      const result = await caller.teamManagement.toggleRule({
+        tenantId: 1,
+        id: rule.id,
+        isActive: false,
+      });
+      expect(result).toEqual({ success: true });
+    }
+  });
+
+  it("teamManagement.deleteTeam removes a team", async () => {
+    const { ctx } = createAuthCtx();
+    const caller = appRouter.createCaller(ctx);
+    // Create then delete
+    const team = await caller.teamManagement.createTeam({
+      tenantId: 1,
+      name: "Delete Test " + Date.now(),
+    });
+    if (team) {
+      const result = await caller.teamManagement.deleteTeam({
+        tenantId: 1,
+        id: team.id,
+      });
+      expect(result).toEqual({ success: true });
+    }
+  });
+
+  it("teamManagement.deleteRule removes a distribution rule", async () => {
+    const { ctx } = createAuthCtx();
+    const caller = appRouter.createCaller(ctx);
+    const rule = await caller.teamManagement.createRule({
+      tenantId: 1,
+      name: "Delete Rule Test " + Date.now(),
+      strategy: "least_busy",
+      priority: 0,
+    });
+    if (rule) {
+      const result = await caller.teamManagement.deleteRule({
+        tenantId: 1,
+        id: rule.id,
+      });
+      expect(result).toEqual({ success: true });
+    }
+  });
+});

@@ -35,6 +35,23 @@ import {
   getAgentsForTenant,
   getTeamsForTenant,
   getNextRoundRobinAgent,
+  // Team management
+  createTeam,
+  updateTeam,
+  deleteTeam,
+  getTeamWithMembers,
+  addTeamMember,
+  removeTeamMember,
+  updateTeamMemberRole,
+  // Agent management
+  getAgentsWithTeams,
+  updateAgentStatus,
+  // Distribution rules
+  getDistributionRules,
+  createDistributionRule,
+  updateDistributionRule,
+  deleteDistributionRule,
+  toggleDistributionRule,
 } from "./db";
 import { storagePut } from "./storage";
 import { nanoid } from "nanoid";
@@ -348,6 +365,141 @@ export const appRouter = router({
       .input(z.object({ tenantId: z.number() }))
       .mutation(async ({ input }) => {
         await markAllNotificationsRead(input.tenantId);
+        return { success: true };
+      }),
+  }),
+
+  // ─── Team & Agent Management ───
+  teamManagement: router({
+    // ── Teams CRUD ──
+    listTeams: protectedProcedure
+      .input(z.object({ tenantId: z.number().default(1) }))
+      .query(async ({ input }) => getTeamsForTenant(input.tenantId)),
+    getTeam: protectedProcedure
+      .input(z.object({ tenantId: z.number().default(1), teamId: z.number() }))
+      .query(async ({ input }) => getTeamWithMembers(input.teamId, input.tenantId)),
+    createTeam: protectedProcedure
+      .input(z.object({
+        tenantId: z.number().default(1),
+        name: z.string().min(1).max(255),
+        description: z.string().optional(),
+        color: z.string().optional(),
+        maxMembers: z.number().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const { tenantId, ...data } = input;
+        return createTeam(tenantId, data);
+      }),
+    updateTeam: protectedProcedure
+      .input(z.object({
+        tenantId: z.number().default(1),
+        id: z.number(),
+        name: z.string().min(1).max(255).optional(),
+        description: z.string().optional(),
+        color: z.string().optional(),
+        maxMembers: z.number().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const { tenantId, id, ...data } = input;
+        return updateTeam(id, tenantId, data);
+      }),
+    deleteTeam: protectedProcedure
+      .input(z.object({ tenantId: z.number().default(1), id: z.number() }))
+      .mutation(async ({ input }) => {
+        await deleteTeam(input.id, input.tenantId);
+        return { success: true };
+      }),
+    // ── Team Members ──
+    addMember: protectedProcedure
+      .input(z.object({
+        tenantId: z.number().default(1),
+        teamId: z.number(),
+        userId: z.number(),
+        role: z.enum(["member", "leader"]).default("member"),
+      }))
+      .mutation(async ({ input }) => addTeamMember(input.tenantId, input.teamId, input.userId, input.role)),
+    removeMember: protectedProcedure
+      .input(z.object({
+        tenantId: z.number().default(1),
+        teamId: z.number(),
+        userId: z.number(),
+      }))
+      .mutation(async ({ input }) => {
+        await removeTeamMember(input.tenantId, input.teamId, input.userId);
+        return { success: true };
+      }),
+    updateMemberRole: protectedProcedure
+      .input(z.object({
+        tenantId: z.number().default(1),
+        teamId: z.number(),
+        userId: z.number(),
+        role: z.enum(["member", "leader"]),
+      }))
+      .mutation(async ({ input }) => {
+        await updateTeamMemberRole(input.tenantId, input.teamId, input.userId, input.role);
+        return { success: true };
+      }),
+    // ── Agents ──
+    listAgents: protectedProcedure
+      .input(z.object({ tenantId: z.number().default(1) }))
+      .query(async ({ input }) => getAgentsWithTeams(input.tenantId)),
+    updateAgentStatus: protectedProcedure
+      .input(z.object({
+        tenantId: z.number().default(1),
+        userId: z.number(),
+        status: z.enum(["active", "inactive", "invited"]),
+      }))
+      .mutation(async ({ input }) => {
+        await updateAgentStatus(input.tenantId, input.userId, input.status);
+        return { success: true };
+      }),
+    // ── Distribution Rules ──
+    listRules: protectedProcedure
+      .input(z.object({ tenantId: z.number().default(1) }))
+      .query(async ({ input }) => getDistributionRules(input.tenantId)),
+    createRule: protectedProcedure
+      .input(z.object({
+        tenantId: z.number().default(1),
+        name: z.string().min(1).max(255),
+        description: z.string().optional(),
+        strategy: z.enum(["round_robin", "least_busy", "manual", "team_round_robin"]),
+        teamId: z.number().nullable().optional(),
+        isActive: z.boolean().optional(),
+        isDefault: z.boolean().optional(),
+        priority: z.number().optional(),
+        configJson: z.any().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const { tenantId, ...data } = input;
+        return createDistributionRule(tenantId, data);
+      }),
+    updateRule: protectedProcedure
+      .input(z.object({
+        tenantId: z.number().default(1),
+        id: z.number(),
+        name: z.string().min(1).max(255).optional(),
+        description: z.string().optional(),
+        strategy: z.enum(["round_robin", "least_busy", "manual", "team_round_robin"]).optional(),
+        teamId: z.number().nullable().optional(),
+        isActive: z.boolean().optional(),
+        isDefault: z.boolean().optional(),
+        priority: z.number().optional(),
+        configJson: z.any().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const { tenantId, id, ...data } = input;
+        return updateDistributionRule(id, tenantId, data);
+      }),
+    deleteRule: protectedProcedure
+      .input(z.object({ tenantId: z.number().default(1), id: z.number() }))
+      .mutation(async ({ input }) => {
+        await deleteDistributionRule(input.id, input.tenantId);
+        return { success: true };
+      }),
+    toggleRule: protectedProcedure
+      .input(z.object({ tenantId: z.number().default(1), id: z.number(), isActive: z.boolean() }))
+      .mutation(async ({ input }) => {
+        await toggleDistributionRule(input.id, input.tenantId, input.isActive);
         return { success: true };
       }),
   }),

@@ -176,6 +176,9 @@ export const teams = mysqlTable("teams", {
   id: int("id").autoincrement().primaryKey(),
   tenantId: int("tenantId").notNull(),
   name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  color: varchar("color", { length: 7 }).default("#6366f1"),
+  maxMembers: int("maxMembers").default(50),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 }, (t) => [index("teams_tenant_idx").on(t.tenantId)]);
@@ -185,8 +188,36 @@ export const teamMembers = mysqlTable("team_members", {
   tenantId: int("tenantId").notNull(),
   userId: int("userId").notNull(),
   teamId: int("teamId").notNull(),
+  role: mysqlEnum("role", ["member", "leader"]).default("member").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-}, (t) => [index("tm_tenant_idx").on(t.tenantId)]);
+}, (t) => [
+  index("tm_tenant_idx").on(t.tenantId),
+  index("tm_team_idx").on(t.teamId),
+  index("tm_user_idx").on(t.userId),
+]);
+
+// ════════════════════════════════════════════════════════════
+// DISTRIBUTION RULES (Auto-assignment strategies)
+// ════════════════════════════════════════════════════════════
+
+export const distributionRules = mysqlTable("distribution_rules", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  strategy: mysqlEnum("strategy", ["round_robin", "least_busy", "manual", "team_round_robin"]).default("round_robin").notNull(),
+  teamId: int("teamId"),
+  isActive: boolean("isActive").default(true).notNull(),
+  isDefault: boolean("isDefault").default(false).notNull(),
+  priority: int("priority").default(0).notNull(),
+  // Config JSON: { maxOpenPerAgent, businessHoursOnly, businessHoursStart, businessHoursEnd, businessHoursDays, businessHoursTimezone }
+  configJson: json("configJson"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (t) => [
+  index("dr_tenant_idx").on(t.tenantId),
+  index("dr_tenant_active_idx").on(t.tenantId, t.isActive),
+]);
 
 export const roles = mysqlTable("crm_roles", {
   id: int("id").autoincrement().primaryKey(),
@@ -804,6 +835,8 @@ export type ChatbotSettings = typeof chatbotSettings.$inferSelect;
 export type Tenant = typeof tenants.$inferSelect;
 export type CrmUser = typeof crmUsers.$inferSelect;
 export type Team = typeof teams.$inferSelect;
+export type TeamMember = typeof teamMembers.$inferSelect;
+export type DistributionRule = typeof distributionRules.$inferSelect;
 export type Role = typeof roles.$inferSelect;
 export type Permission = typeof permissions.$inferSelect;
 export type Contact = typeof contacts.$inferSelect;

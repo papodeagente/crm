@@ -3,7 +3,7 @@ import {
   Settings, Inbox, MessageSquare, Bot,
   FileText, Globe, Plane,
   GraduationCap, Plug, Shield, BookOpen,
-  ChevronRight,
+  ChevronRight, Users,
 } from "lucide-react";
 
 /* ─── Settings Menu Structure ─── */
@@ -110,6 +110,14 @@ const settingsSections: SettingsSection[] = [
         path: "/admin",
         color: "text-rose-400",
         bgColor: "bg-rose-500/15",
+      },
+      {
+        icon: Users,
+        label: "Agentes & Equipes",
+        description: "Gerencie agentes, equipes e distribuição de conversas",
+        path: "/settings/agents",
+        color: "text-indigo-400",
+        bgColor: "bg-indigo-500/15",
       },
       {
         icon: BookOpen,

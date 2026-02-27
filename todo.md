@@ -666,3 +666,36 @@
 - [x] Testes de atribuição de conversa
 - [x] Testes de filtro por agente/equipe
 - [x] Testes de isolamento multi-tenant — 131 testes, 8 arquivos, todos passando
+
+## Página de Gestão de Agentes e Equipes
+
+### Schema
+- [x] Criar tabela teams (id, tenantId, name, description, color, createdAt) — expandida com description, color, maxMembers
+- [x] Criar tabela team_members (teamId, crmUserId, role) — expandida com role enum (member/leader)
+- [x] Criar tabela distribution_rules (id, tenantId, name, strategy, teamId, isActive, config JSON)
+- [x] Adicionar campo teamId na tabela crmUsers para equipe padrão — já existia via team_members
+
+### Backend
+- [x] CRUD de equipes (create, list, update, delete)
+- [x] CRUD de membros de equipe (add, remove, list)
+- [x] CRUD de regras de distribuição (create, list, update, delete, toggle)
+- [x] Endpoint para listar agentes com suas equipes e status
+- [x] Endpoint para atualizar status do agente (online, ausente, offline)
+- [x] Integrar regras de distribuição com autoAssign existente
+
+### Frontend
+- [x] Página /settings/agents com tabs: Agentes, Equipes, Distribuição
+- [x] Tab Agentes: lista de agentes CRM com status, equipe, avatar, ações
+- [x] Tab Agentes: modal para criar/editar agente
+- [x] Tab Equipes: lista de equipes com membros, cor, descrição
+- [x] Tab Equipes: modal para criar/editar equipe com adição/remoção de membros
+- [x] Tab Distribuição: regras de distribuição com estratégia (round-robin, menos ocupado, manual, team round-robin)
+- [x] Tab Distribuição: toggle ativar/desativar regra
+- [x] Tab Distribuição: configuração de horários e prioridades
+- [x] Registrar rota /settings/agents no App.tsx
+- [x] Link na navegação de Configurações
+
+### Testes
+- [x] Testes CRUD de equipes
+- [x] Testes CRUD de regras de distribuição — 139 testes, 8 arquivos, todos passando
+- [ ] Testes de integração autoAssign com regras

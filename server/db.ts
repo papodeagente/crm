@@ -1,6 +1,6 @@
 import { eq, desc, and, or, like, lt, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users, whatsappSessions, waMessages as messages, activityLogs, chatbotSettings, chatbotRules, conversationAssignments, crmUsers, teams, teamMembers } from "../drizzle/schema";
+import { InsertUser, users, whatsappSessions, waMessages as messages, activityLogs, chatbotSettings, chatbotRules, conversationAssignments, crmUsers, teams, teamMembers, distributionRules } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -838,4 +838,273 @@ export async function markAllNotificationsRead(tenantId: number) {
   await db.execute(sql`
     UPDATE notifications SET isRead = true WHERE tenantId = ${tenantId} AND isRead = false
   `);
+}
+
+
+// ════════════════════════════════════════════════════════════
+// TEAM MANAGEMENT (CRUD)
+// ════════════════════════════════════════════════════════════
+
+export async function createTeam(tenantId: number, data: { name: string; description?: string; color?: string; maxMembers?: number }) {
+  const db = await getDb();
+  if (!db) return null;
+  const [result] = await db.execute(sql`
+    INSERT INTO teams (tenantId, name, description, color, maxMembers)
+    VALUES (${tenantId}, ${data.name}, ${data.description || null}, ${data.color || "#6366f1"}, ${data.maxMembers || 50})
+  `);
+  const insertId = (result as any).insertId;
+  return { id: insertId, tenantId, ...data };
+}
+
+export async function updateTeam(id: number, tenantId: number, data: { name?: string; description?: string; color?: string; maxMembers?: number }) {
+  const db = await getDb();
+  if (!db) return null;
+  const sets: string[] = [];
+  if (data.name !== undefined) sets.push(`name = ${db.execute(sql`SELECT ${data.name}`)}`);
+  // Use raw SQL for flexibility
+  const updates: string[] = [];
+  if (data.name !== undefined) updates.push("name");
+  if (data.description !== undefined) updates.push("description");
+  if (data.color !== undefined) updates.push("color");
+  if (data.maxMembers !== undefined) updates.push("maxMembers");
+  
+  await db.execute(sql`
+    UPDATE teams SET
+      name = COALESCE(${data.name ?? null}, name),
+      description = ${data.description !== undefined ? data.description : sql`description`},
+      color = COALESCE(${data.color ?? null}, color),
+      maxMembers = COALESCE(${data.maxMembers ?? null}, maxMembers)
+    WHERE id = ${id} AND tenantId = ${tenantId}
+  `);
+  return { id, ...data };
+}
+
+export async function deleteTeam(id: number, tenantId: number) {
+  const db = await getDb();
+  if (!db) return;
+  // Remove all team members first
+  await db.execute(sql`DELETE FROM team_members WHERE teamId = ${id} AND tenantId = ${tenantId}`);
+  // Remove distribution rules linked to this team
+  await db.execute(sql`UPDATE distribution_rules SET teamId = NULL WHERE teamId = ${id} AND tenantId = ${tenantId}`);
+  // Delete the team
+  await db.execute(sql`DELETE FROM teams WHERE id = ${id} AND tenantId = ${tenantId}`);
+}
+
+export async function getTeamWithMembers(teamId: number, tenantId: number) {
+  const db = await getDb();
+  if (!db) return null;
+  const [teamRows] = await db.execute(sql`
+    SELECT id, tenantId, name, description, color, maxMembers, createdAt, updatedAt
+    FROM teams WHERE id = ${teamId} AND tenantId = ${tenantId} LIMIT 1
+  `);
+  const team = (teamRows as unknown as any[])[0];
+  if (!team) return null;
+  
+  const [memberRows] = await db.execute(sql`
+    SELECT tm.id AS membershipId, tm.userId, tm.role, tm.createdAt,
+           cu.name, cu.email, cu.avatarUrl, cu.status
+    FROM team_members tm
+    JOIN crm_users cu ON cu.id = tm.userId
+    WHERE tm.teamId = ${teamId} AND tm.tenantId = ${tenantId}
+    ORDER BY tm.role DESC, cu.name ASC
+  `);
+  
+  return {
+    ...team,
+    members: (memberRows as unknown as any[]).map((m: any) => ({
+      membershipId: Number(m.membershipId),
+      userId: Number(m.userId),
+      role: String(m.role),
+      name: String(m.name),
+      email: String(m.email),
+      avatarUrl: m.avatarUrl ? String(m.avatarUrl) : null,
+      status: String(m.status),
+      createdAt: m.createdAt,
+    })),
+  };
+}
+
+// ════════════════════════════════════════════════════════════
+// TEAM MEMBERS (CRUD)
+// ════════════════════════════════════════════════════════════
+
+export async function addTeamMember(tenantId: number, teamId: number, userId: number, role: "member" | "leader" = "member") {
+  const db = await getDb();
+  if (!db) return null;
+  // Check if already a member
+  const [existing] = await db.execute(sql`
+    SELECT id FROM team_members WHERE tenantId = ${tenantId} AND teamId = ${teamId} AND userId = ${userId} LIMIT 1
+  `);
+  if ((existing as unknown as any[]).length > 0) return { alreadyMember: true };
+  
+  const [result] = await db.execute(sql`
+    INSERT INTO team_members (tenantId, teamId, userId, role)
+    VALUES (${tenantId}, ${teamId}, ${userId}, ${role})
+  `);
+  return { id: (result as any).insertId, tenantId, teamId, userId, role };
+}
+
+export async function removeTeamMember(tenantId: number, teamId: number, userId: number) {
+  const db = await getDb();
+  if (!db) return;
+  await db.execute(sql`
+    DELETE FROM team_members WHERE tenantId = ${tenantId} AND teamId = ${teamId} AND userId = ${userId}
+  `);
+}
+
+export async function updateTeamMemberRole(tenantId: number, teamId: number, userId: number, role: "member" | "leader") {
+  const db = await getDb();
+  if (!db) return;
+  await db.execute(sql`
+    UPDATE team_members SET role = ${role}
+    WHERE tenantId = ${tenantId} AND teamId = ${teamId} AND userId = ${userId}
+  `);
+}
+
+// ════════════════════════════════════════════════════════════
+// AGENT MANAGEMENT (extended)
+// ════════════════════════════════════════════════════════════
+
+export async function getAgentsWithTeams(tenantId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  const [rows] = await db.execute(sql`
+    SELECT cu.id, cu.name, cu.email, cu.phone, cu.avatarUrl, cu.status, cu.lastLoginAt, cu.createdAt,
+      (SELECT GROUP_CONCAT(CONCAT(t.id, ':', t.name, ':', COALESCE(t.color, '#6366f1')) SEPARATOR '|')
+       FROM team_members tm JOIN teams t ON t.id = tm.teamId
+       WHERE tm.userId = cu.id AND tm.tenantId = ${tenantId}
+      ) AS teamsList,
+      (SELECT COUNT(*) FROM conversation_assignments ca
+       WHERE ca.assignedUserId = cu.id AND ca.tenantId = ${tenantId} AND ca.status IN ('open', 'pending')
+      ) AS openAssignments
+    FROM crm_users cu
+    WHERE cu.tenantId = ${tenantId}
+    ORDER BY cu.status ASC, cu.name ASC
+  `);
+  return (rows as unknown as any[]).map((r: any) => ({
+    id: Number(r.id),
+    name: String(r.name),
+    email: String(r.email),
+    phone: r.phone ? String(r.phone) : null,
+    avatarUrl: r.avatarUrl ? String(r.avatarUrl) : null,
+    status: String(r.status),
+    lastLoginAt: r.lastLoginAt ? new Date(r.lastLoginAt).getTime() : null,
+    createdAt: new Date(r.createdAt).getTime(),
+    openAssignments: Number(r.openAssignments) || 0,
+    teams: r.teamsList ? String(r.teamsList).split("|").map((t: string) => {
+      const [id, name, color] = t.split(":");
+      return { id: Number(id), name, color };
+    }) : [],
+  }));
+}
+
+export async function updateAgentStatus(tenantId: number, userId: number, status: "active" | "inactive" | "invited") {
+  const db = await getDb();
+  if (!db) return;
+  await db.execute(sql`
+    UPDATE crm_users SET status = ${status} WHERE id = ${userId} AND tenantId = ${tenantId}
+  `);
+}
+
+// ════════════════════════════════════════════════════════════
+// DISTRIBUTION RULES (CRUD)
+// ════════════════════════════════════════════════════════════
+
+export async function getDistributionRules(tenantId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  const [rows] = await db.execute(sql`
+    SELECT dr.*, t.name AS teamName, t.color AS teamColor
+    FROM distribution_rules dr
+    LEFT JOIN teams t ON t.id = dr.teamId
+    WHERE dr.tenantId = ${tenantId}
+    ORDER BY dr.priority DESC, dr.createdAt ASC
+  `);
+  return (rows as unknown as any[]).map((r: any) => ({
+    id: Number(r.id),
+    tenantId: Number(r.tenantId),
+    name: String(r.name),
+    description: r.description ? String(r.description) : null,
+    strategy: String(r.strategy),
+    teamId: r.teamId ? Number(r.teamId) : null,
+    teamName: r.teamName ? String(r.teamName) : null,
+    teamColor: r.teamColor ? String(r.teamColor) : null,
+    isActive: Boolean(r.isActive),
+    isDefault: Boolean(r.isDefault),
+    priority: Number(r.priority),
+    configJson: r.configJson || null,
+    createdAt: new Date(r.createdAt).getTime(),
+    updatedAt: new Date(r.updatedAt).getTime(),
+  }));
+}
+
+export async function createDistributionRule(tenantId: number, data: {
+  name: string;
+  description?: string;
+  strategy: "round_robin" | "least_busy" | "manual" | "team_round_robin";
+  teamId?: number | null;
+  isActive?: boolean;
+  isDefault?: boolean;
+  priority?: number;
+  configJson?: any;
+}) {
+  const db = await getDb();
+  if (!db) return null;
+  
+  // If this is set as default, unset other defaults
+  if (data.isDefault) {
+    await db.execute(sql`UPDATE distribution_rules SET isDefault = false WHERE tenantId = ${tenantId}`);
+  }
+  
+  const [result] = await db.execute(sql`
+    INSERT INTO distribution_rules (tenantId, name, description, strategy, teamId, isActive, isDefault, priority, configJson)
+    VALUES (${tenantId}, ${data.name}, ${data.description || null}, ${data.strategy}, ${data.teamId || null}, 
+            ${data.isActive !== false}, ${data.isDefault || false}, ${data.priority || 0}, ${data.configJson ? JSON.stringify(data.configJson) : null})
+  `);
+  return { id: (result as any).insertId, tenantId, ...data };
+}
+
+export async function updateDistributionRule(id: number, tenantId: number, data: {
+  name?: string;
+  description?: string;
+  strategy?: "round_robin" | "least_busy" | "manual" | "team_round_robin";
+  teamId?: number | null;
+  isActive?: boolean;
+  isDefault?: boolean;
+  priority?: number;
+  configJson?: any;
+}) {
+  const db = await getDb();
+  if (!db) return null;
+  
+  // If this is set as default, unset other defaults
+  if (data.isDefault) {
+    await db.execute(sql`UPDATE distribution_rules SET isDefault = false WHERE tenantId = ${tenantId} AND id != ${id}`);
+  }
+  
+  await db.execute(sql`
+    UPDATE distribution_rules SET
+      name = COALESCE(${data.name ?? null}, name),
+      description = ${data.description !== undefined ? (data.description || null) : sql`description`},
+      strategy = COALESCE(${data.strategy ?? null}, strategy),
+      teamId = ${data.teamId !== undefined ? (data.teamId || null) : sql`teamId`},
+      isActive = COALESCE(${data.isActive !== undefined ? data.isActive : null}, isActive),
+      isDefault = COALESCE(${data.isDefault !== undefined ? data.isDefault : null}, isDefault),
+      priority = COALESCE(${data.priority ?? null}, priority),
+      configJson = ${data.configJson !== undefined ? (data.configJson ? JSON.stringify(data.configJson) : null) : sql`configJson`}
+    WHERE id = ${id} AND tenantId = ${tenantId}
+  `);
+  return { id, ...data };
+}
+
+export async function deleteDistributionRule(id: number, tenantId: number) {
+  const db = await getDb();
+  if (!db) return;
+  await db.execute(sql`DELETE FROM distribution_rules WHERE id = ${id} AND tenantId = ${tenantId}`);
+}
+
+export async function toggleDistributionRule(id: number, tenantId: number, isActive: boolean) {
+  const db = await getDb();
+  if (!db) return;
+  await db.execute(sql`UPDATE distribution_rules SET isActive = ${isActive} WHERE id = ${id} AND tenantId = ${tenantId}`);
 }
