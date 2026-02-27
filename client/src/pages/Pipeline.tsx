@@ -5,15 +5,17 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Plus, LayoutGrid, List, Calendar as CalendarIcon,
   RefreshCw, TrendingUp, Info, Filter, ArrowUpDown, Plane, X,
   DollarSign, MapPin, Clock, GripVertical, Building2, User,
-  Package, History, Trash2, Pencil, Link2, Unlink,
+  Package, History, Trash2, Pencil, Link2, Unlink, RotateCcw,
 } from "lucide-react";
 import { useState, useMemo, useCallback } from "react";
 import { useLocation } from "wouter";
@@ -68,6 +70,9 @@ export default function Pipeline() {
   const [, setLocation] = useLocation();
   const [draggedDealId, setDraggedDealId] = useState<number | null>(null);
   const [dragOverStageId, setDragOverStageId] = useState<number | null>(null);
+  const [selectedDealIds, setSelectedDealIds] = useState<Set<number>>(new Set());
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [listTab, setListTab] = useState<"active" | "trash">("active");
 
   const utils = trpc.useUtils();
   const pipelines = trpc.crm.pipelines.list.useQuery({ tenantId: TENANT_ID });
@@ -88,6 +93,47 @@ export default function Pipeline() {
   const contacts = trpc.crm.contacts.list.useQuery({ tenantId: TENANT_ID, limit: 200 });
   const allAccounts = trpc.crm.accounts.list.useQuery({ tenantId: TENANT_ID });
   const tasks = trpc.crm.tasks.list.useQuery({ tenantId: TENANT_ID, entityType: "deal" });
+
+  const deletedDeals = trpc.crm.deals.listDeleted.useQuery(
+    { tenantId: TENANT_ID },
+    { enabled: listTab === "trash" }
+  );
+
+  const bulkDeleteDeals = trpc.crm.deals.bulkDelete.useMutation({
+    onSuccess: (data) => {
+      toast.success(`${data.count} negociação(ões) movida(s) para a lixeira`);
+      setSelectedDealIds(new Set());
+      utils.crm.deals.list.invalidate();
+      utils.crm.deals.listDeleted.invalidate();
+    },
+    onError: () => toast.error("Erro ao excluir negociações"),
+  });
+
+  const restoreDeals = trpc.crm.deals.restore.useMutation({
+    onSuccess: (data) => {
+      toast.success(`${data.count} negociação(ões) restaurada(s)`);
+      setSelectedDealIds(new Set());
+      utils.crm.deals.list.invalidate();
+      utils.crm.deals.listDeleted.invalidate();
+    },
+    onError: () => toast.error("Erro ao restaurar negociações"),
+  });
+
+  const toggleSelectDeal = useCallback((dealId: number) => {
+    setSelectedDealIds(prev => {
+      const next = new Set(prev);
+      if (next.has(dealId)) next.delete(dealId); else next.add(dealId);
+      return next;
+    });
+  }, []);
+
+  const toggleSelectAll = useCallback((dealIds: number[]) => {
+    setSelectedDealIds(prev => {
+      const allSelected = dealIds.every(id => prev.has(id));
+      if (allSelected) return new Set();
+      return new Set(dealIds);
+    });
+  }, []);
 
   const moveStage = trpc.crm.deals.moveStage.useMutation({
     onMutate: async ({ dealId, toStageId }) => {
@@ -189,7 +235,7 @@ export default function Pipeline() {
               <SelectValue placeholder="Selecionar funil" />
             </SelectTrigger>
             <SelectContent className="rounded-xl">
-              {pipelines.data?.map((p: any) => (
+              {pipelines.data?.filter((p: any) => !p.isArchived).map((p: any) => (
                 <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>
               ))}
             </SelectContent>
@@ -318,47 +364,166 @@ export default function Pipeline() {
       ) : (
         /* List view */
         <div className="flex-1 overflow-auto p-5 lg:px-8 bg-background">
-          <Card className="border-0 shadow-sm rounded-2xl overflow-hidden">
-            <table className="w-full text-[13px]">
-              <thead>
-                <tr className="border-b bg-muted/30">
-                  <th className="text-left p-3.5 font-semibold text-muted-foreground">Negociação</th>
-                  <th className="text-left p-3.5 font-semibold text-muted-foreground">Contato</th>
-                  <th className="text-left p-3.5 font-semibold text-muted-foreground">Etapa</th>
-                  <th className="text-left p-3.5 font-semibold text-muted-foreground">Status</th>
-                  <th className="text-right p-3.5 font-semibold text-muted-foreground">Valor</th>
-                  <th className="text-left p-3.5 font-semibold text-muted-foreground">Criado em</th>
-                </tr>
-              </thead>
-              <tbody>
-                {sortedDeals.map((deal: any) => {
-                  const contact = (contacts.data || []).find((c: any) => c.id === deal.contactId);
-                  const stage = (stages.data || []).find((s: any) => s.id === deal.stageId);
-                  const style = getStatusStyle(deal.status);
-                  return (
-                    <tr key={deal.id} className="border-b border-border/30 hover:bg-muted/20 transition-colors cursor-pointer" onClick={() => setLocation(`/deal/${deal.id}`)}>
-                      <td className="p-3.5 font-medium">{deal.title}</td>
-                      <td className="p-3.5 text-muted-foreground">{contact?.name || "—"}</td>
-                      <td className="p-3.5"><Badge variant="secondary" className="text-[11px] rounded-lg">{stage?.name || "—"}</Badge></td>
-                      <td className="p-3.5">
-                        <span className={`inline-flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded-full ${style.bg} ${style.text}`}>
-                          <span className={`h-1.5 w-1.5 rounded-full ${style.dot}`} />
-                          {deal.status === "open" ? "Em aberto" : deal.status === "won" ? "Ganho" : "Perdido"}
-                        </span>
-                      </td>
-                      <td className="p-3.5 text-right font-semibold">{deal.valueCents ? formatCurrency(deal.valueCents) : "—"}</td>
-                      <td className="p-3.5 text-muted-foreground">{formatDate(deal.createdAt)}</td>
-                    </tr>
-                  );
-                })}
-                {sortedDeals.length === 0 && (
-                  <tr><td colSpan={6} className="p-12 text-center text-muted-foreground text-sm">Nenhuma negociação encontrada.</td></tr>
+          {/* Tabs: Ativas / Lixeira */}
+          <div className="flex items-center gap-3 mb-4">
+            <div className="flex bg-muted/60 rounded-xl p-1 gap-0.5">
+              <button
+                onClick={() => { setListTab("active"); setSelectedDealIds(new Set()); }}
+                className={`px-4 py-1.5 text-[13px] font-medium rounded-lg transition-all duration-200 ${listTab === "active" ? "bg-card text-primary shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+              >
+                Ativas
+              </button>
+              <button
+                onClick={() => { setListTab("trash"); setSelectedDealIds(new Set()); }}
+                className={`px-4 py-1.5 text-[13px] font-medium rounded-lg transition-all duration-200 flex items-center gap-1.5 ${listTab === "trash" ? "bg-card text-destructive shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                Lixeira
+              </button>
+            </div>
+
+            {selectedDealIds.size > 0 && (
+              <div className="flex items-center gap-2 ml-auto">
+                <span className="text-[13px] text-muted-foreground font-medium">{selectedDealIds.size} selecionada(s)</span>
+                {listTab === "active" ? (
+                  <Button variant="destructive" size="sm" className="h-8 gap-1.5 text-[12px] rounded-lg" onClick={() => setShowDeleteConfirm(true)}>
+                    <Trash2 className="h-3.5 w-3.5" />
+                    Excluir
+                  </Button>
+                ) : (
+                  <Button variant="outline" size="sm" className="h-8 gap-1.5 text-[12px] rounded-lg" onClick={() => restoreDeals.mutate({ tenantId: TENANT_ID, ids: Array.from(selectedDealIds) })}>
+                    <RotateCcw className="h-3.5 w-3.5" />
+                    Restaurar
+                  </Button>
                 )}
-              </tbody>
-            </table>
-          </Card>
+              </div>
+            )}
+          </div>
+
+          {listTab === "active" ? (
+            <Card className="border-0 shadow-sm rounded-2xl overflow-hidden">
+              <table className="w-full text-[13px]">
+                <thead>
+                  <tr className="border-b bg-muted/30">
+                    <th className="p-3.5 w-10">
+                      <Checkbox
+                        checked={sortedDeals.length > 0 && sortedDeals.every((d: any) => selectedDealIds.has(d.id))}
+                        onCheckedChange={() => toggleSelectAll(sortedDeals.map((d: any) => d.id))}
+                      />
+                    </th>
+                    <th className="text-left p-3.5 font-semibold text-muted-foreground">Negociação</th>
+                    <th className="text-left p-3.5 font-semibold text-muted-foreground">Contato</th>
+                    <th className="text-left p-3.5 font-semibold text-muted-foreground">Etapa</th>
+                    <th className="text-left p-3.5 font-semibold text-muted-foreground">Status</th>
+                    <th className="text-right p-3.5 font-semibold text-muted-foreground">Valor</th>
+                    <th className="text-left p-3.5 font-semibold text-muted-foreground">Criado em</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sortedDeals.map((deal: any) => {
+                    const contact = (contacts.data || []).find((c: any) => c.id === deal.contactId);
+                    const stage = (stages.data || []).find((s: any) => s.id === deal.stageId);
+                    const style = getStatusStyle(deal.status);
+                    const isSelected = selectedDealIds.has(deal.id);
+                    return (
+                      <tr key={deal.id} className={`border-b border-border/30 hover:bg-muted/20 transition-colors cursor-pointer ${isSelected ? "bg-primary/5" : ""}`}>
+                        <td className="p-3.5" onClick={(e) => e.stopPropagation()}>
+                          <Checkbox checked={isSelected} onCheckedChange={() => toggleSelectDeal(deal.id)} />
+                        </td>
+                        <td className="p-3.5 font-medium" onClick={() => setLocation(`/deal/${deal.id}`)}>{deal.title}</td>
+                        <td className="p-3.5 text-muted-foreground" onClick={() => setLocation(`/deal/${deal.id}`)}>{contact?.name || "—"}</td>
+                        <td className="p-3.5" onClick={() => setLocation(`/deal/${deal.id}`)}><Badge variant="secondary" className="text-[11px] rounded-lg">{stage?.name || "—"}</Badge></td>
+                        <td className="p-3.5" onClick={() => setLocation(`/deal/${deal.id}`)}>
+                          <span className={`inline-flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded-full ${style.bg} ${style.text}`}>
+                            <span className={`h-1.5 w-1.5 rounded-full ${style.dot}`} />
+                            {deal.status === "open" ? "Em aberto" : deal.status === "won" ? "Ganho" : "Perdido"}
+                          </span>
+                        </td>
+                        <td className="p-3.5 text-right font-semibold" onClick={() => setLocation(`/deal/${deal.id}`)}>{deal.valueCents ? formatCurrency(deal.valueCents) : "—"}</td>
+                        <td className="p-3.5 text-muted-foreground" onClick={() => setLocation(`/deal/${deal.id}`)}>{formatDate(deal.createdAt)}</td>
+                      </tr>
+                    );
+                  })}
+                  {sortedDeals.length === 0 && (
+                    <tr><td colSpan={7} className="p-12 text-center text-muted-foreground text-sm">Nenhuma negociação encontrada.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </Card>
+          ) : (
+            <Card className="border-0 shadow-sm rounded-2xl overflow-hidden">
+              <table className="w-full text-[13px]">
+                <thead>
+                  <tr className="border-b bg-muted/30">
+                    <th className="p-3.5 w-10">
+                      <Checkbox
+                        checked={(deletedDeals.data || []).length > 0 && (deletedDeals.data || []).every((d: any) => selectedDealIds.has(d.id))}
+                        onCheckedChange={() => toggleSelectAll((deletedDeals.data || []).map((d: any) => d.id))}
+                      />
+                    </th>
+                    <th className="text-left p-3.5 font-semibold text-muted-foreground">Negociação</th>
+                    <th className="text-left p-3.5 font-semibold text-muted-foreground">Contato</th>
+                    <th className="text-left p-3.5 font-semibold text-muted-foreground">Status</th>
+                    <th className="text-right p-3.5 font-semibold text-muted-foreground">Valor</th>
+                    <th className="text-left p-3.5 font-semibold text-muted-foreground">Excluído em</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(deletedDeals.data || []).map((deal: any) => {
+                    const contact = (contacts.data || []).find((c: any) => c.id === deal.contactId);
+                    const style = getStatusStyle(deal.status);
+                    const isSelected = selectedDealIds.has(deal.id);
+                    return (
+                      <tr key={deal.id} className={`border-b border-border/30 hover:bg-muted/20 transition-colors ${isSelected ? "bg-primary/5" : ""}`}>
+                        <td className="p-3.5">
+                          <Checkbox checked={isSelected} onCheckedChange={() => toggleSelectDeal(deal.id)} />
+                        </td>
+                        <td className="p-3.5 font-medium text-muted-foreground line-through">{deal.title}</td>
+                        <td className="p-3.5 text-muted-foreground">{contact?.name || "—"}</td>
+                        <td className="p-3.5">
+                          <span className={`inline-flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded-full ${style.bg} ${style.text}`}>
+                            <span className={`h-1.5 w-1.5 rounded-full ${style.dot}`} />
+                            {deal.status === "open" ? "Em aberto" : deal.status === "won" ? "Ganho" : "Perdido"}
+                          </span>
+                        </td>
+                        <td className="p-3.5 text-right font-semibold text-muted-foreground">{deal.valueCents ? formatCurrency(deal.valueCents) : "—"}</td>
+                        <td className="p-3.5 text-muted-foreground">{deal.deletedAt ? formatDate(deal.deletedAt) : "—"}</td>
+                      </tr>
+                    );
+                  })}
+                  {(deletedDeals.data || []).length === 0 && (
+                    <tr><td colSpan={6} className="p-12 text-center text-muted-foreground text-sm">Lixeira vazia.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </Card>
+          )}
         </div>
       )}
+
+      {/* Delete confirmation dialog */}
+      <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <AlertDialogContent className="rounded-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir negociações</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja mover {selectedDealIds.size} negociação(ões) para a lixeira? Os contatos vinculados não serão apagados.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="rounded-lg">Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="rounded-lg bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                bulkDeleteDeals.mutate({ tenantId: TENANT_ID, ids: Array.from(selectedDealIds) });
+                setShowDeleteConfirm(false);
+              }}
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Dialogs */}
       <CreateDealDialog open={showCreateDeal} onOpenChange={setShowCreateDeal} pipelineId={activePipeline?.id} stages={stages.data || []} contacts={contacts.data || []} />

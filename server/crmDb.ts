@@ -186,9 +186,12 @@ export async function createPipeline(data: { tenantId: number; name: string; isD
   const [result] = await db.insert(pipelines).values(data).$returningId();
   return result;
 }
-export async function listPipelines(tenantId: number) {
+export async function listPipelines(tenantId: number, includeArchived = false) {
   const db = await getDb(); if (!db) return [];
-  return db.select().from(pipelines).where(eq(pipelines.tenantId, tenantId));
+  if (includeArchived) {
+    return db.select().from(pipelines).where(eq(pipelines.tenantId, tenantId));
+  }
+  return db.select().from(pipelines).where(and(eq(pipelines.tenantId, tenantId), eq(pipelines.isArchived, false)));
 }
 export async function createStage(data: { tenantId: number; pipelineId: number; name: string; orderIndex: number; probabilityDefault?: number; isWon?: boolean; isLost?: boolean }) {
   const db = await getDb(); if (!db) return null;

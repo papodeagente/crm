@@ -1076,3 +1076,14 @@
 - [x] Frontend: seleção múltipla na lista de contatos com checkbox
 - [x] Frontend: botão "Excluir selecionados" na lista de contatos com confirmação
 - [x] Testes automatizados para exclusão em massa
+
+## Bug: Criação Aleatória de Funis e Filtro de Funis Ativos
+
+- [ ] Corrigir bug de criação aleatória de funis e etapas
+- [ ] Filtrar apenas funis ativos (não arquivados) no seletor de pipeline
+
+## Bug: Exclusão de negociações não funciona + Adicionar na visão de lista do Pipeline
+
+- [x] Corrigir exclusão de negociações que não está funcionando
+- [x] Adicionar seleção múltipla e exclusão em massa na visão de lista do Pipeline
+- [x] Filtrar apenas funis ativos no seletor do Pipeline

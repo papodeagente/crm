@@ -109,9 +109,9 @@ export const crmRouter = router({
   // ─── PIPELINES & STAGES ───
   pipelines: router({
     list: protectedProcedure
-      .input(z.object({ tenantId: z.number() }))
+      .input(z.object({ tenantId: z.number(), includeArchived: z.boolean().optional() }))
       .query(async ({ input }) => {
-        return crm.listPipelines(input.tenantId);
+        return crm.listPipelines(input.tenantId, input.includeArchived ?? false);
       }),
     get: protectedProcedure
       .input(z.object({ tenantId: z.number(), id: z.number() }))

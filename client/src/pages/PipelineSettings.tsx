@@ -89,7 +89,7 @@ export default function PipelineSettings() {
   });
 
   // Queries
-  const pipelinesQ = trpc.crm.pipelines.list.useQuery({ tenantId });
+  const pipelinesQ = trpc.crm.pipelines.list.useQuery({ tenantId, includeArchived: true });
   const pipelines = (pipelinesQ.data || []) as unknown as PipelineData[];
   const activePipelines = pipelines.filter(p => !p.isArchived);
 
