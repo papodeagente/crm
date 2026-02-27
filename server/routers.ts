@@ -67,6 +67,14 @@ import {
   getWaConversationsList,
   getMessagesByConversationId,
   markWaConversationReadDb,
+  // Message monitoring metrics
+  getMessageStatusMetrics,
+  getMessageVolumeOverTime,
+  getDeliveryRateMetrics,
+  getRecentMessageActivity,
+  getMessageTypeDistribution,
+  getTopContactsByVolume,
+  getResponseTimeMetrics,
 } from "./db";
 import { storagePut } from "./storage";
 import { nanoid } from "nanoid";
@@ -380,6 +388,45 @@ export const appRouter = router({
           .orderBy(desc(waIdentities.lastSeenAt))
           .limit(100);
         return { conversations: convs, identities: ids };
+      }),
+  }),
+
+  // ─── Message Monitoring ───
+  monitoring: router({
+    statusMetrics: protectedProcedure
+      .input(z.object({ sessionId: z.string(), periodDays: z.number().min(1).max(365).default(7) }))
+      .query(async ({ input }) => {
+        return getMessageStatusMetrics(input.sessionId, input.periodDays);
+      }),
+    volumeOverTime: protectedProcedure
+      .input(z.object({ sessionId: z.string(), periodDays: z.number().min(1).max(365).default(7), granularity: z.enum(["hour", "day"]).default("day") }))
+      .query(async ({ input }) => {
+        return getMessageVolumeOverTime(input.sessionId, input.periodDays, input.granularity);
+      }),
+    deliveryRate: protectedProcedure
+      .input(z.object({ sessionId: z.string(), periodDays: z.number().min(1).max(365).default(7) }))
+      .query(async ({ input }) => {
+        return getDeliveryRateMetrics(input.sessionId, input.periodDays);
+      }),
+    recentActivity: protectedProcedure
+      .input(z.object({ sessionId: z.string(), limit: z.number().min(1).max(200).default(50) }))
+      .query(async ({ input }) => {
+        return getRecentMessageActivity(input.sessionId, input.limit);
+      }),
+    typeDistribution: protectedProcedure
+      .input(z.object({ sessionId: z.string(), periodDays: z.number().min(1).max(365).default(7) }))
+      .query(async ({ input }) => {
+        return getMessageTypeDistribution(input.sessionId, input.periodDays);
+      }),
+    topContacts: protectedProcedure
+      .input(z.object({ sessionId: z.string(), periodDays: z.number().min(1).max(365).default(7), limit: z.number().min(1).max(50).default(10) }))
+      .query(async ({ input }) => {
+        return getTopContactsByVolume(input.sessionId, input.periodDays, input.limit);
+      }),
+    responseTime: protectedProcedure
+      .input(z.object({ sessionId: z.string(), periodDays: z.number().min(1).max(365).default(7) }))
+      .query(async ({ input }) => {
+        return getResponseTimeMetrics(input.sessionId, input.periodDays);
       }),
   }),
 

@@ -23,12 +23,20 @@ interface WhatsAppMessageEvent {
   timestamp: number;
 }
 
+export interface WhatsAppMessageStatusEvent {
+  sessionId: string;
+  messageId: string;
+  status: string;
+  timestamp: number;
+}
+
 export function useSocket() {
   const socketRef = useRef<Socket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [qrData, setQrData] = useState<WhatsAppQREvent | null>(null);
   const [waStatus, setWaStatus] = useState<WhatsAppStatusEvent | null>(null);
   const [lastMessage, setLastMessage] = useState<WhatsAppMessageEvent | null>(null);
+  const [lastStatusUpdate, setLastStatusUpdate] = useState<WhatsAppMessageStatusEvent | null>(null);
 
   useEffect(() => {
     const socket = io(window.location.origin, {
@@ -56,6 +64,10 @@ export function useSocket() {
       setLastMessage(data);
     });
 
+    socket.on("whatsapp:message:status", (data: WhatsAppMessageStatusEvent) => {
+      setLastStatusUpdate(data);
+    });
+
     return () => {
       socket.disconnect();
     };
@@ -63,5 +75,5 @@ export function useSocket() {
 
   const clearQr = useCallback(() => setQrData(null), []);
 
-  return { isConnected, qrData, waStatus, lastMessage, clearQr };
+  return { isConnected, qrData, waStatus, lastMessage, lastStatusUpdate, clearQr };
 }

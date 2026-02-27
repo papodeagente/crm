@@ -1008,3 +1008,17 @@
 ## Bug Crítico: Resposta vai para número fantasma
 - [x] Corrigir envio de resposta: mensagem está sendo enviada para JID fantasma em vez do JID real do contato
 - [x] Garantir que sendTextMessage/sendMediaMessage usem o JID real do WhatsApp (não o normalizado pelo resolver)
+
+## Painel de Monitoramento em Tempo Real
+
+- [x] Backend: endpoint de métricas de mensagens (total enviadas, recebidas, entregues, lidas, falhas)
+- [x] Backend: endpoint de métricas por período (hoje, 7 dias, 30 dias) com agrupamento por hora/dia
+- [x] Backend: endpoint de feed de atividade recente (últimas mensagens com status)
+- [x] Backend: emitir eventos Socket.IO para atualizações de status em tempo real
+- [x] Frontend: página de monitoramento com cards de métricas resumidas
+- [x] Frontend: gráfico de mensagens por hora/dia (enviadas vs recebidas)
+- [x] Frontend: indicadores de status de entrega (enviado, entregue, lido, falha)
+- [x] Frontend: feed de atividade em tempo real com atualizações via Socket.IO
+- [x] Frontend: filtros por período e sessão
+- [x] Registrar rota no App.tsx e navegação
+- [x] Testes automatizados para os endpoints de métricas

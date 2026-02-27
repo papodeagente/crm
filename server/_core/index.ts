@@ -60,6 +60,16 @@ async function startServer() {
     });
   });
 
+  // Forward message status updates to Socket.IO clients (delivered, read, played)
+  whatsappManager.on("message:status", (data) => {
+    io.emit("whatsapp:message:status", {
+      sessionId: data.sessionId,
+      messageId: data.messageId,
+      status: data.status,
+      timestamp: Date.now(),
+    });
+  });
+
   io.on("connection", (socket) => {
     console.log("Socket.IO client connected:", socket.id);
     socket.on("disconnect", () => {

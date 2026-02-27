@@ -1472,3 +1472,220 @@ export async function markWaConversationReadDb(conversationId: number) {
       eq(messages.fromMe, false),
     ));
 }
+
+
+// ════════════════════════════════════════════════════════════
+// MESSAGE MONITORING METRICS
+// ════════════════════════════════════════════════════════════
+
+/**
+ * Get message status distribution for a given period.
+ * Returns counts for each status: sent, delivered, read, played, received, failed.
+ */
+export async function getMessageStatusMetrics(sessionId: string, periodDays: number = 7) {
+  const db = await getDb();
+  if (!db) return [];
+
+  const result = await db.execute(sql`
+    SELECT 
+      CASE 
+        WHEN fromMe = 1 THEN COALESCE(status, 'sent')
+        ELSE 'received'
+      END AS statusGroup,
+      COUNT(*) AS count
+    FROM messages
+    WHERE sessionId = ${sessionId}
+      AND timestamp >= DATE_SUB(NOW(), INTERVAL ${periodDays} DAY)
+      AND remoteJid NOT LIKE '%@g.us'
+      AND remoteJid != 'status@broadcast'
+      AND messageType NOT IN ('protocolMessage','senderKeyDistributionMessage','messageContextInfo','reactionMessage','ephemeralMessage','deviceSentMessage','bcallMessage','callLogMesssage','keepInChatMessage','encReactionMessage','editedMessage','viewOnceMessageV2Extension')
+    GROUP BY statusGroup
+    ORDER BY count DESC
+  `);
+  return (result as any)[0] || [];
+}
+
+/**
+ * Get message volume over time (hourly or daily buckets).
+ * Returns sent/received counts per time bucket.
+ */
+export async function getMessageVolumeOverTime(sessionId: string, periodDays: number = 7, granularity: "hour" | "day" = "day") {
+  const db = await getDb();
+  if (!db) return [];
+
+  const dateFormat = granularity === "hour" ? "%Y-%m-%d %H:00" : "%Y-%m-%d";
+
+  const result = await db.execute(sql`
+    SELECT 
+      DATE_FORMAT(timestamp, ${dateFormat}) AS timeBucket,
+      SUM(CASE WHEN fromMe = 1 THEN 1 ELSE 0 END) AS sent,
+      SUM(CASE WHEN fromMe = 0 THEN 1 ELSE 0 END) AS received,
+      COUNT(*) AS total
+    FROM messages
+    WHERE sessionId = ${sessionId}
+      AND timestamp >= DATE_SUB(NOW(), INTERVAL ${periodDays} DAY)
+      AND remoteJid NOT LIKE '%@g.us'
+      AND remoteJid != 'status@broadcast'
+      AND messageType NOT IN ('protocolMessage','senderKeyDistributionMessage','messageContextInfo','reactionMessage','ephemeralMessage','deviceSentMessage','bcallMessage','callLogMesssage','keepInChatMessage','encReactionMessage','editedMessage','viewOnceMessageV2Extension')
+    GROUP BY timeBucket
+    ORDER BY timeBucket ASC
+  `);
+  return (result as any)[0] || [];
+}
+
+/**
+ * Get delivery rate metrics: percentage of sent messages that were delivered/read.
+ */
+export async function getDeliveryRateMetrics(sessionId: string, periodDays: number = 7) {
+  const db = await getDb();
+  if (!db) return null;
+
+  const result = await db.execute(sql`
+    SELECT 
+      COUNT(*) AS totalSent,
+      SUM(CASE WHEN status IN ('delivered','read','played') THEN 1 ELSE 0 END) AS delivered,
+      SUM(CASE WHEN status IN ('read','played') THEN 1 ELSE 0 END) AS readCount,
+      SUM(CASE WHEN status = 'played' THEN 1 ELSE 0 END) AS played,
+      SUM(CASE WHEN status = 'failed' OR status = 'error' THEN 1 ELSE 0 END) AS failed,
+      SUM(CASE WHEN status = 'sent' OR status IS NULL THEN 1 ELSE 0 END) AS pending
+    FROM messages
+    WHERE sessionId = ${sessionId}
+      AND fromMe = 1
+      AND timestamp >= DATE_SUB(NOW(), INTERVAL ${periodDays} DAY)
+      AND remoteJid NOT LIKE '%@g.us'
+      AND remoteJid != 'status@broadcast'
+      AND messageType NOT IN ('protocolMessage','senderKeyDistributionMessage','messageContextInfo','reactionMessage','ephemeralMessage','deviceSentMessage','bcallMessage','callLogMesssage','keepInChatMessage','encReactionMessage','editedMessage','viewOnceMessageV2Extension')
+  `);
+  const rows = (result as any)[0] || [];
+  return rows[0] || null;
+}
+
+/**
+ * Get recent message activity feed (latest messages with status info).
+ */
+export async function getRecentMessageActivity(sessionId: string, limit: number = 50) {
+  const db = await getDb();
+  if (!db) return [];
+
+  const result = await db.execute(sql`
+    SELECT 
+      m.id,
+      m.messageId,
+      m.remoteJid,
+      m.fromMe,
+      m.pushName,
+      m.messageType,
+      m.content,
+      m.status,
+      m.timestamp,
+      m.senderAgentId
+    FROM messages m
+    WHERE m.sessionId = ${sessionId}
+      AND m.remoteJid NOT LIKE '%@g.us'
+      AND m.remoteJid != 'status@broadcast'
+      AND m.messageType NOT IN ('protocolMessage','senderKeyDistributionMessage','messageContextInfo','reactionMessage','ephemeralMessage','deviceSentMessage','bcallMessage','callLogMesssage','keepInChatMessage','encReactionMessage','editedMessage','viewOnceMessageV2Extension')
+    ORDER BY m.timestamp DESC
+    LIMIT ${limit}
+  `);
+  return (result as any)[0] || [];
+}
+
+/**
+ * Get message type distribution for the period.
+ */
+export async function getMessageTypeDistribution(sessionId: string, periodDays: number = 7) {
+  const db = await getDb();
+  if (!db) return [];
+
+  const result = await db.execute(sql`
+    SELECT 
+      messageType,
+      COUNT(*) AS count,
+      SUM(CASE WHEN fromMe = 1 THEN 1 ELSE 0 END) AS sentCount,
+      SUM(CASE WHEN fromMe = 0 THEN 1 ELSE 0 END) AS receivedCount
+    FROM messages
+    WHERE sessionId = ${sessionId}
+      AND timestamp >= DATE_SUB(NOW(), INTERVAL ${periodDays} DAY)
+      AND remoteJid NOT LIKE '%@g.us'
+      AND remoteJid != 'status@broadcast'
+      AND messageType NOT IN ('protocolMessage','senderKeyDistributionMessage','messageContextInfo','reactionMessage','ephemeralMessage','deviceSentMessage','bcallMessage','callLogMesssage','keepInChatMessage','encReactionMessage','editedMessage','viewOnceMessageV2Extension')
+    GROUP BY messageType
+    ORDER BY count DESC
+  `);
+  return (result as any)[0] || [];
+}
+
+/**
+ * Get top contacts by message volume.
+ */
+export async function getTopContactsByVolume(sessionId: string, periodDays: number = 7, limit: number = 10) {
+  const db = await getDb();
+  if (!db) return [];
+
+  const result = await db.execute(sql`
+    SELECT 
+      m.remoteJid,
+      (
+        SELECT m2.pushName FROM messages m2 
+        WHERE m2.sessionId = ${sessionId} 
+        AND m2.remoteJid = m.remoteJid
+        AND m2.fromMe = 0 
+        AND m2.pushName IS NOT NULL 
+        AND m2.pushName != ''
+        ORDER BY m2.id DESC LIMIT 1
+      ) AS contactName,
+      COUNT(*) AS totalMessages,
+      SUM(CASE WHEN m.fromMe = 1 THEN 1 ELSE 0 END) AS sent,
+      SUM(CASE WHEN m.fromMe = 0 THEN 1 ELSE 0 END) AS received,
+      MAX(m.timestamp) AS lastActivity
+    FROM messages m
+    WHERE m.sessionId = ${sessionId}
+      AND m.timestamp >= DATE_SUB(NOW(), INTERVAL ${periodDays} DAY)
+      AND m.remoteJid NOT LIKE '%@g.us'
+      AND m.remoteJid != 'status@broadcast'
+      AND m.messageType NOT IN ('protocolMessage','senderKeyDistributionMessage','messageContextInfo','reactionMessage','ephemeralMessage','deviceSentMessage','bcallMessage','callLogMesssage','keepInChatMessage','encReactionMessage','editedMessage','viewOnceMessageV2Extension')
+    GROUP BY m.remoteJid
+    ORDER BY totalMessages DESC
+    LIMIT ${limit}
+  `);
+  return (result as any)[0] || [];
+}
+
+/**
+ * Get response time metrics (average time between received and first reply).
+ */
+export async function getResponseTimeMetrics(sessionId: string, periodDays: number = 7) {
+  const db = await getDb();
+  if (!db) return null;
+
+  const result = await db.execute(sql`
+    SELECT 
+      COUNT(*) AS totalConversations,
+      AVG(response_time_seconds) AS avgResponseTimeSec,
+      MIN(response_time_seconds) AS minResponseTimeSec,
+      MAX(response_time_seconds) AS maxResponseTimeSec,
+      PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY response_time_seconds) AS medianResponseTimeSec
+    FROM (
+      SELECT 
+        m_in.remoteJid,
+        m_in.id AS inbound_id,
+        m_in.timestamp AS inbound_time,
+        MIN(m_out.timestamp) AS first_reply_time,
+        TIMESTAMPDIFF(SECOND, m_in.timestamp, MIN(m_out.timestamp)) AS response_time_seconds
+      FROM messages m_in
+      INNER JOIN messages m_out ON m_out.sessionId = m_in.sessionId
+        AND m_out.remoteJid = m_in.remoteJid
+        AND m_out.fromMe = 1
+        AND m_out.timestamp > m_in.timestamp
+        AND m_out.timestamp <= DATE_ADD(m_in.timestamp, INTERVAL 24 HOUR)
+      WHERE m_in.sessionId = ${sessionId}
+        AND m_in.fromMe = 0
+        AND m_in.timestamp >= DATE_SUB(NOW(), INTERVAL ${periodDays} DAY)
+        AND m_in.remoteJid NOT LIKE '%@g.us'
+        AND m_in.remoteJid != 'status@broadcast'
+      GROUP BY m_in.remoteJid, m_in.id, m_in.timestamp
+    ) response_data
+  `);
+  const rows = (result as any)[0] || [];
+  return rows[0] || null;
+}
