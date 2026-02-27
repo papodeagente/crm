@@ -1,6 +1,6 @@
 import { eq, desc, and, or, like, lt, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users, whatsappSessions, waMessages as messages, activityLogs, chatbotSettings, chatbotRules, conversationAssignments, crmUsers, teams, teamMembers, distributionRules, customFields, customFieldValues } from "../drizzle/schema";
+import { InsertUser, users, whatsappSessions, waMessages as messages, activityLogs, chatbotSettings, chatbotRules, conversationAssignments, crmUsers, teams, teamMembers, distributionRules, customFields, customFieldValues, waConversations } from "../drizzle/schema";
 import { ENV } from './_core/env';
 import { normalizeJid } from "./phoneUtils";
 
@@ -1343,4 +1343,132 @@ export async function setCustomFieldValues(tenantId: number, entityType: string,
   for (const v of values) {
     await setCustomFieldValue(tenantId, v.fieldId, entityType, entityId, v.value);
   }
+}
+
+// ════════════════════════════════════════════════════════════
+// WA Conversations — Queries baseadas na tabela canônica
+// ════════════════════════════════════════════════════════════
+
+/**
+ * Lista conversas usando wa_conversations como fonte primária.
+ * Muito mais eficiente que agrupar messages por remoteJid.
+ * Inclui dados de assignment (multi-agent).
+ */
+export async function getWaConversationsList(
+  sessionId: string,
+  tenantId: number,
+  filter?: {
+    assignedUserId?: number;
+    assignedTeamId?: number;
+    status?: string;
+    unassignedOnly?: boolean;
+  }
+) {
+  const db = await getDb();
+  if (!db) return [];
+
+  // Build WHERE clause for assignment filters
+  let assignmentFilter = '';
+  if (filter?.assignedUserId) {
+    assignmentFilter += ` AND ca.assignedUserId = ${filter.assignedUserId}`;
+  }
+  if (filter?.assignedTeamId) {
+    assignmentFilter += ` AND ca.assignedTeamId = ${filter.assignedTeamId}`;
+  }
+  if (filter?.status) {
+    assignmentFilter += ` AND ca.status = '${filter.status}'`;
+  }
+  if (filter?.unassignedOnly) {
+    assignmentFilter += ` AND ca.assignedUserId IS NULL`;
+  }
+
+  const result = await db.execute(sql`
+    SELECT 
+      wc.id AS conversationId,
+      wc.remoteJid,
+      wc.phoneE164,
+      wc.contactId,
+      wc.contactPushName,
+      wc.lastMessagePreview AS lastMessage,
+      wc.lastMessageType,
+      wc.lastFromMe,
+      wc.lastMessageAt AS lastTimestamp,
+      wc.lastStatus,
+      wc.unreadCount,
+      wc.status AS conversationStatus,
+      wc.conversationKey,
+      ca.assignedUserId,
+      ca.assignedTeamId,
+      ca.status AS assignmentStatus,
+      ca.priority AS assignmentPriority,
+      agent.name AS assignedAgentName,
+      agent.avatarUrl AS assignedAgentAvatar,
+      c.name AS contactName,
+      c.email AS contactEmail,
+      c.phone AS contactPhone
+    FROM wa_conversations wc
+    LEFT JOIN conversation_assignments ca 
+      ON ca.sessionId = wc.sessionId 
+      AND ca.remoteJid = wc.remoteJid
+      AND ca.tenantId = wc.tenantId
+    LEFT JOIN crm_users agent ON agent.id = ca.assignedUserId
+    LEFT JOIN contacts c ON c.id = wc.contactId
+    WHERE wc.sessionId = ${sessionId}
+    AND wc.tenantId = ${tenantId}
+    AND wc.mergedIntoId IS NULL
+    AND wc.lastMessageAt IS NOT NULL
+    ${sql.raw(assignmentFilter)}
+    ORDER BY wc.lastMessageAt DESC
+  `);
+
+  const rows = (result as any)[0] || [];
+  return rows;
+}
+
+/**
+ * Busca mensagens por waConversationId (conversa canônica).
+ * Garante que Inbox e Negociação exibam exatamente o mesmo thread.
+ */
+export async function getMessagesByConversationId(
+  conversationId: number,
+  limit = 50,
+  beforeId?: number,
+) {
+  const db = await getDb();
+  if (!db) return [];
+
+  const conditions: any[] = [
+    eq(messages.waConversationId, conversationId),
+  ];
+  if (beforeId) {
+    conditions.push(lt(messages.id, beforeId));
+  }
+
+  return db
+    .select()
+    .from(messages)
+    .where(and(...conditions))
+    .orderBy(desc(messages.createdAt))
+    .limit(limit);
+}
+
+/**
+ * Marca conversa como lida via wa_conversations + messages.
+ */
+export async function markWaConversationReadDb(conversationId: number) {
+  const db = await getDb();
+  if (!db) return;
+
+  // Zerar unreadCount na wa_conversations
+  await db.update(waConversations)
+    .set({ unreadCount: 0 })
+    .where(eq(waConversations.id, conversationId));
+
+  // Marcar mensagens como lidas
+  await db.update(messages)
+    .set({ status: "read" })
+    .where(and(
+      eq(messages.waConversationId, conversationId),
+      eq(messages.fromMe, false),
+    ));
 }

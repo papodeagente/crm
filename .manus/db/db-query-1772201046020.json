@@ -1,0 +1,52 @@
+{
+  "query": "SELECT id, name, phone, tenantId FROM contacts WHERE phone IS NOT NULL AND phone != '' LIMIT 20;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute SELECT id, name, phone, tenantId FROM contacts WHERE phone IS NOT NULL AND phone != '' LIMIT 20;",
+  "rows": [
+    {
+      "id": "1",
+      "name": "Bruno Barbosa da Silva",
+      "phone": "+5584999838420",
+      "tenantId": "1"
+    },
+    {
+      "id": "2",
+      "name": "Grace Moura",
+      "phone": "84996051655",
+      "tenantId": "1"
+    },
+    {
+      "id": "3",
+      "name": "Grace Moura 55",
+      "phone": "+5584996051655",
+      "tenantId": "1"
+    },
+    {
+      "id": "30001",
+      "name": "Marthinara - Entur",
+      "phone": "558431902438",
+      "tenantId": "1"
+    },
+    {
+      "id": "60001",
+      "name": "Drica Bonito Way",
+      "phone": "+556784691185",
+      "tenantId": "1"
+    },
+    {
+      "id": "60002",
+      "name": "Bruno Barbosa",
+      "phone": "+558499838420",
+      "tenantId": "1"
+    },
+    {
+      "id": "60003",
+      "name": "Alexandry Diniz",
+      "phone": "+558498282118",
+      "tenantId": "1"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tname\tphone\ttenantId\n1\tBruno Barbosa da Silva\t+5584999838420\t1\n2\tGrace Moura\t84996051655\t1\n3\tGrace Moura 55\t+5584996051655\t1\n30001\tMarthinara - Entur\t558431902438\t1\n60001\tDrica Bonito Way\t+556784691185\t1\n60002\tBruno Barbosa\t+558499838420\t1\n60003\tAlexandry Diniz\t+558498282118\t1\n",
+  "stderr": "",
+  "execution_time_ms": 349
+}

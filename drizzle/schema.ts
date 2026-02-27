@@ -50,10 +50,12 @@ export const waMessages = mysqlTable("messages", {
   quotedMessageId: varchar("quoted_message_id", { length: 256 }),
   status: varchar("status", { length: 32 }).default("sent"),
   timestamp: timestamp("timestamp").defaultNow().notNull(),
+  waConversationId: int("waConversationId"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 }, (t) => [
   index("msg_tenant_idx").on(t.tenantId),
   index("msg_session_jid_idx").on(t.sessionId, t.remoteJid, t.timestamp),
+  index("idx_msg_wa_conv").on(t.waConversationId),
 ]);
 
 export const activityLogs = mysqlTable("activity_logs", {
@@ -270,6 +272,9 @@ export const contacts = mysqlTable("contacts", {
   name: varchar("name", { length: 255 }).notNull(),
   email: varchar("email", { length: 320 }),
   phone: varchar("phone", { length: 32 }),
+  phoneE164: varchar("phoneE164", { length: 32 }),
+  phoneDigits: varchar("phoneDigits", { length: 32 }),
+  phoneLast11: varchar("phoneLast11", { length: 16 }),
   docId: varchar("docId", { length: 64 }),
   tagsJson: json("tagsJson"),
   source: varchar("source", { length: 64 }),
@@ -370,10 +375,12 @@ export const deals = mysqlTable("deals", {
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   createdBy: int("createdBy"),
   updatedBy: int("updatedBy"),
+  waConversationId: int("waConversationId"),
 }, (t) => [
   index("deals_tenant_pipeline_idx").on(t.tenantId, t.pipelineId, t.stageId),
   index("deals_tenant_status_idx").on(t.tenantId, t.status, t.lastActivityAt),
   index("deals_tenant_owner_idx").on(t.tenantId, t.ownerUserId),
+  index("idx_deals_wa_conv").on(t.waConversationId),
 ]);
 
 export const dealParticipants = mysqlTable("deal_participants", {
@@ -1041,3 +1048,75 @@ export const aiConversationAnalyses = mysqlTable("ai_conversation_analyses", {
 ]);
 export type AiConversationAnalysis = typeof aiConversationAnalyses.$inferSelect;
 export type InsertAiConversationAnalysis = typeof aiConversationAnalyses.$inferInsert;
+
+
+// ════════════════════════════════════════════════════════════
+// CONVERSATION IDENTITY RESOLVER
+// ════════════════════════════════════════════════════════════
+
+export const waConversations = mysqlTable("wa_conversations", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull().default(1),
+  sessionId: varchar("sessionId", { length: 128 }).notNull(),
+  contactId: int("contactId"),
+  remoteJid: varchar("remoteJid", { length: 128 }).notNull(),
+  conversationKey: varchar("conversationKey", { length: 256 }).notNull(),
+  phoneE164: varchar("phoneE164", { length: 32 }),
+  phoneDigits: varchar("phoneDigits", { length: 32 }),
+  phoneLast11: varchar("phoneLast11", { length: 16 }),
+  lastMessageAt: timestamp("lastMessageAt"),
+  lastMessagePreview: text("lastMessagePreview"),
+  lastMessageType: varchar("lastMessageType", { length: 32 }),
+  lastFromMe: boolean("lastFromMe").default(false),
+  lastStatus: varchar("lastStatus", { length: 32 }),
+  unreadCount: int("unreadCount").default(0),
+  status: mysqlEnum("status", ["open", "pending", "resolved", "closed"]).default("open").notNull(),
+  contactPushName: varchar("contactPushName", { length: 128 }),
+  mergedIntoId: int("mergedIntoId"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (t) => [
+  index("idx_wc_tenant_session").on(t.tenantId, t.sessionId, t.lastMessageAt),
+  index("idx_wc_tenant_contact").on(t.tenantId, t.contactId),
+  index("idx_wc_tenant_jid").on(t.tenantId, t.sessionId, t.remoteJid),
+  index("idx_wc_phone").on(t.tenantId, t.phoneE164),
+  index("idx_wc_merged").on(t.mergedIntoId),
+]);
+
+export const waIdentities = mysqlTable("wa_identities", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull().default(1),
+  sessionId: varchar("sessionId", { length: 128 }).notNull(),
+  contactId: int("contactId"),
+  remoteJid: varchar("remoteJid", { length: 128 }),
+  waId: varchar("waId", { length: 128 }),
+  phoneE164: varchar("phoneE164", { length: 32 }),
+  confidenceScore: int("confidenceScore").default(60),
+  firstSeenAt: timestamp("firstSeenAt").defaultNow().notNull(),
+  lastSeenAt: timestamp("lastSeenAt").defaultNow().onUpdateNow().notNull(),
+}, (t) => [
+  index("idx_wi_tenant_session").on(t.tenantId, t.sessionId),
+  index("idx_wi_contact").on(t.tenantId, t.contactId),
+  index("idx_wi_phone").on(t.tenantId, t.phoneE164),
+]);
+
+export const waAuditLog = mysqlTable("wa_audit_log", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull().default(1),
+  action: varchar("action", { length: 64 }).notNull(),
+  entityType: varchar("entityType", { length: 64 }),
+  entityId: varchar("entityId", { length: 128 }),
+  inputsJson: json("inputsJson"),
+  outputsJson: json("outputsJson"),
+  correlationId: varchar("correlationId", { length: 64 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (t) => [
+  index("idx_wal_tenant_action").on(t.tenantId, t.action, t.createdAt),
+  index("idx_wal_correlation").on(t.correlationId),
+]);
+
+export type WaConversation = typeof waConversations.$inferSelect;
+export type InsertWaConversation = typeof waConversations.$inferInsert;
+export type WaIdentity = typeof waIdentities.$inferSelect;
+export type InsertWaIdentity = typeof waIdentities.$inferInsert;
+export type WaAuditLogEntry = typeof waAuditLog.$inferSelect;

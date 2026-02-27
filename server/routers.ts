@@ -63,6 +63,10 @@ import {
   reorderCustomFields,
   getCustomFieldValues,
   setCustomFieldValues,
+  // WA Conversations (canônico)
+  getWaConversationsList,
+  getMessagesByConversationId,
+  markWaConversationReadDb,
 } from "./db";
 import { storagePut } from "./storage";
 import { nanoid } from "nanoid";
@@ -193,11 +197,11 @@ export const appRouter = router({
         await removeChatbotRule(input.id);
         return { success: true };
       }),
-    // Conversations list (grouped by remoteJid with last message)
+    // Conversations list (grouped by remoteJid with last message) — LEGACY
     conversations: protectedProcedure
       .input(z.object({ sessionId: z.string() }))
       .query(async ({ input }) => getConversationsList(input.sessionId)),
-    // Conversations list with multi-agent assignment info
+    // Conversations list with multi-agent assignment info — LEGACY
     conversationsMultiAgent: protectedProcedure
       .input(z.object({
         sessionId: z.string(),
@@ -210,6 +214,35 @@ export const appRouter = router({
       .query(async ({ input }) => {
         const { sessionId, tenantId, ...filter } = input;
         return getConversationsListMultiAgent(sessionId, tenantId, filter);
+      }),
+    // ─── WA Conversations (canônico — usa wa_conversations) ───
+    waConversations: protectedProcedure
+      .input(z.object({
+        sessionId: z.string(),
+        tenantId: z.number().default(1),
+        assignedUserId: z.number().optional(),
+        assignedTeamId: z.number().optional(),
+        status: z.enum(["open", "pending", "resolved", "closed"]).optional(),
+        unassignedOnly: z.boolean().optional(),
+      }))
+      .query(async ({ input }) => {
+        const { sessionId, tenantId, ...filter } = input;
+        return getWaConversationsList(sessionId, tenantId, filter);
+      }),
+    // Messages by canonical conversation ID
+    messagesByConversation: protectedProcedure
+      .input(z.object({
+        conversationId: z.number(),
+        limit: z.number().min(1).max(200).default(50),
+        beforeId: z.number().optional(),
+      }))
+      .query(async ({ input }) => getMessagesByConversationId(input.conversationId, input.limit, input.beforeId)),
+    // Mark wa_conversation as read
+    markWaConversationRead: protectedProcedure
+      .input(z.object({ conversationId: z.number() }))
+      .mutation(async ({ input }) => {
+        await markWaConversationReadDb(input.conversationId);
+        return { success: true };
       }),
     // Assign conversation to an agent
     assignConversation: protectedProcedure
@@ -315,6 +348,38 @@ export const appRouter = router({
         const { runDailyWhatsAppBackup } = await import("./whatsappDailyBackup");
         const result = await runDailyWhatsAppBackup();
         return result;
+      }),
+    // ─── Conversation Identity Resolver: Migration & Reconciliation ───
+    migrateConversations: protectedProcedure
+      .input(z.object({ tenantId: z.number().default(1) }))
+      .mutation(async ({ input }) => {
+        const { migrateExistingData } = await import("./conversationResolver");
+        return migrateExistingData(input.tenantId);
+      }),
+    reconcileGhosts: protectedProcedure
+      .input(z.object({ tenantId: z.number().default(1), sessionId: z.string() }))
+      .mutation(async ({ input }) => {
+        const { reconcileGhostThreads } = await import("./conversationResolver");
+        return reconcileGhostThreads(input.tenantId, input.sessionId);
+      }),
+    // Get wa_conversations debug info
+    debugConversations: protectedProcedure
+      .input(z.object({ tenantId: z.number().default(1), sessionId: z.string() }))
+      .query(async ({ input }) => {
+        const db = (await import("./db")).getDb;
+        const dbInst = await db();
+        if (!dbInst) return { conversations: [], identities: [] };
+        const { waConversations, waIdentities } = await import("../drizzle/schema");
+        const { eq, and, desc } = await import("drizzle-orm");
+        const convs = await dbInst.select().from(waConversations)
+          .where(and(eq(waConversations.tenantId, input.tenantId), eq(waConversations.sessionId, input.sessionId)))
+          .orderBy(desc(waConversations.lastMessageAt))
+          .limit(100);
+        const ids = await dbInst.select().from(waIdentities)
+          .where(and(eq(waIdentities.tenantId, input.tenantId), eq(waIdentities.sessionId, input.sessionId)))
+          .orderBy(desc(waIdentities.lastSeenAt))
+          .limit(100);
+        return { conversations: convs, identities: ids };
       }),
   }),
 

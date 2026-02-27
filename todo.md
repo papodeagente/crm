@@ -969,3 +969,38 @@
 ## Desativar Notificações por E-mail
 
 - [x] Desativar todas as notificações por e-mail — zero notificações por email, manter apenas na área de notificações do app
+
+## Conversation Identity Resolver (Solução Definitiva Anti-Duplicação)
+
+### Schema & Migrações
+- [x] Criar tabela wa_conversations (id, tenantId, sessionId, contactId, remoteJid, conversationKey, phoneE164, phoneDigits, phoneLast11, lastMessageAt, lastMessagePreview, lastMessageType, lastFromMe, unreadCount, status, contactPushName, createdAt, updatedAt)
+- [x] Criar tabela wa_identities (id, tenantId, sessionId, contactId, remoteJid, waId, phoneE164, confidenceScore, firstSeenAt, lastSeenAt)
+- [x] Adicionar coluna conversationId na tabela deals (FK para wa_conversations)
+- [x] Adicionar coluna waConversationId na tabela messages
+- [x] Criar constraints UNIQUE e índices otimizados
+- [x] Migrar dados existentes: popular wa_conversations a partir de messages agrupados por remoteJid
+
+### Módulo ConversationIdentityResolver
+- [x] normalizePhone(input, defaultCountry) — retorna phone_e164, digits_only, last11BR, valid, reason
+- [x] resolveContact(tenantId, phoneE164, name?) — upsert em contacts por (tenantId, phone_e164)
+- [x] resolveIdentity(tenantId, sessionId, remoteJid, waId?, phoneE164?) — upsert em wa_identities
+- [x] resolveConversation(tenantId, sessionId, contactId?, remoteJid, phoneE164?) — upsert em wa_conversations por conversationKey
+- [x] reconcileGhostThreads(tenantId, sessionId) — deduplicar threads fantasma
+
+### Integração nos Fluxos
+- [x] Integrar resolver no webhook de mensagem recebida (messages.upsert)
+- [x] Integrar resolver no envio de mensagens (sendTextMessage/sendMediaMessage)
+- [x] Ajustar query da Inbox para usar wa_conversations
+- [x] Ajustar chat da negociação para usar wa_conversations.id (conversation_id)
+- [x] Inbox e Negociação exibem exatamente o mesmo thread
+
+### Observabilidade
+- [x] Logs de auditoria: conversation_resolved, message_ingested, message_sent, ghost_merge_performed
+- [x] Painel de debug admin: dado um phone ou contact_id, mostrar identities, conversation_key, conversas mescladas
+
+### Testes Obrigatórios
+- [x] Envio outbound para contato novo cria 1 conversa e 1 identity
+- [x] Recebimento inbound do mesmo número cai na mesma conversa
+- [x] Variações de número (+55 (84) 99983-8420, 5584999838420, 08499838420) resultam no mesmo phone_e164
+- [x] Reconcile migra mensagens de fantasma e mantém 1 thread
+- [x] Inbox e negociação exibem o mesmo conversation_id para o mesmo contact_id

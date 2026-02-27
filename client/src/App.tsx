@@ -35,6 +35,7 @@ const CustomFieldsSettings = lazy(() => import("./pages/CustomFieldsSettings"));
 const PipelineSettings = lazy(() => import("./pages/PipelineSettings"));
 const ProductCatalog = lazy(() => import("./pages/ProductCatalog"));
 const ProductReports = lazy(() => import("./pages/ProductReports"));
+const ConversationDebug = lazy(() => import("./pages/ConversationDebug"));
 
 function PageLoader() {
   return (
@@ -79,6 +80,7 @@ function Router() {
           <Route path="/integrations" component={Integrations} />
           <Route path="/admin" component={Admin} />
           <Route path="/api-docs" component={ApiDocs} />
+          <Route path="/settings/conversation-debug" component={ConversationDebug} />
 
           {/* Notifications */}
           <Route path="/notifications" component={NotificationsPage} />

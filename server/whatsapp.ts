@@ -21,6 +21,7 @@ import { invokeLLM } from "./_core/llm";
 import { storagePut } from "./storage";
 import { nanoid } from "nanoid";
 import { normalizeJid } from "./phoneUtils";
+import { resolveInbound, resolveOutbound, updateConversationLastMessage } from "./conversationResolver";
 
 const logger = pino({ level: "silent" });
 
@@ -334,7 +335,17 @@ class WhatsAppManager extends EventEmitter {
         // Determine initial status for sent messages
         const initialStatus = fromMe ? "sent" : "received";
 
+        // ─── Conversation Identity Resolver ───
+        let waConversationId: number | undefined;
+        try {
+          const resolved = await resolveInbound(1, sessionId, remoteJid, msg.pushName || null);
+          waConversationId = resolved.conversationId;
+        } catch (e) {
+          console.error("[ConvResolver] Error resolving inbound:", e);
+        }
+
         // Save message to DB (skip if already saved by sendTextMessage/sendMediaMessage)
+        const msgTimestamp = new Date(((msg.messageTimestamp as number) || Date.now() / 1000) * 1000);
         try {
           const db = await getDb();
           if (db) {
@@ -361,8 +372,9 @@ class WhatsAppManager extends EventEmitter {
                 mediaFileName,
                 mediaDuration,
                 isVoiceNote,
+                waConversationId: waConversationId || undefined,
                 status: initialStatus,
-                timestamp: new Date(((msg.messageTimestamp as number) || Date.now() / 1000) * 1000),
+                timestamp: msgTimestamp,
               });
             } else if (fromMe) {
               // Update existing message with any new data (e.g. media URL from download)
@@ -371,6 +383,7 @@ class WhatsAppManager extends EventEmitter {
               if (mediaMimeType) updateData.mediaMimeType = mediaMimeType;
               if (mediaFileName) updateData.mediaFileName = mediaFileName;
               if (mediaDuration) updateData.mediaDuration = mediaDuration;
+              if (waConversationId) updateData.waConversationId = waConversationId;
               if (Object.keys(updateData).length > 0) {
                 await db.update(messages).set(updateData)
                   .where(and(eq(messages.messageId, msgId!), eq(messages.sessionId, sessionId)));
@@ -379,6 +392,22 @@ class WhatsAppManager extends EventEmitter {
           }
         } catch (e) {
           console.error("Error saving message:", e);
+        }
+
+        // ─── Update conversation last message ───
+        if (waConversationId) {
+          try {
+            await updateConversationLastMessage(waConversationId, {
+              content,
+              messageType,
+              fromMe,
+              status: initialStatus,
+              timestamp: msgTimestamp,
+              incrementUnread: !fromMe,
+            });
+          } catch (e) {
+            console.error("[ConvResolver] Error updating last message:", e);
+          }
         }
 
         this.emit("message", { sessionId, message: msg, content, fromMe, remoteJid, messageType, mediaUrl, mediaMimeType, mediaFileName, mediaDuration, isVoiceNote, status: initialStatus });
@@ -641,6 +670,15 @@ class WhatsAppManager extends EventEmitter {
     const formattedJid = await this.resolveJid(sessionId, jid);
     const result = await session.socket.sendMessage(formattedJid, { text });
 
+    // ─── Resolve outbound conversation ───
+    let waConversationId: number | undefined;
+    try {
+      const resolved = await resolveOutbound(1, sessionId, formattedJid);
+      waConversationId = resolved.conversationId;
+    } catch (e) {
+      console.error("[ConvResolver] Error resolving outbound:", e);
+    }
+
     // Save sent message
     try {
       const db = await getDb();
@@ -652,11 +690,27 @@ class WhatsAppManager extends EventEmitter {
           fromMe: true,
           messageType: "text",
           content: text,
+          waConversationId: waConversationId || undefined,
           status: "sent",
         });
       }
     } catch (e) {
       console.error("Error saving sent message:", e);
+    }
+
+    // Update conversation last message
+    if (waConversationId) {
+      try {
+        await updateConversationLastMessage(waConversationId, {
+          content: text,
+          messageType: "text",
+          fromMe: true,
+          status: "sent",
+          timestamp: new Date(),
+        });
+      } catch (e) {
+        console.error("[ConvResolver] Error updating outbound last message:", e);
+      }
     }
 
     await this.logActivity(sessionId, "message_sent", `Mensagem enviada para ${formattedJid}`);
@@ -684,6 +738,16 @@ class WhatsAppManager extends EventEmitter {
 
     const result = await session.socket.sendMessage(formattedJid, messageContent);
 
+    // ─── Resolve outbound conversation ───
+    let waConversationId: number | undefined;
+    try {
+      const resolved = await resolveOutbound(1, sessionId, formattedJid);
+      waConversationId = resolved.conversationId;
+    } catch (e) {
+      console.error("[ConvResolver] Error resolving outbound media:", e);
+    }
+
+    const mediaContent = caption || (mediaType === "audio" ? "[Áudio]" : `[${mediaType}]`);
     try {
       const db = await getDb();
       if (db) {
@@ -693,17 +757,33 @@ class WhatsAppManager extends EventEmitter {
           remoteJid: formattedJid,
           fromMe: true,
           messageType: mediaType,
-          content: caption || (mediaType === "audio" ? "[Áudio]" : `[${mediaType}]`),
+          content: mediaContent,
           mediaUrl,
           mediaMimeType: opts?.mimetype,
           mediaFileName: fileName,
           mediaDuration: opts?.duration,
           isVoiceNote: opts?.ptt || false,
+          waConversationId: waConversationId || undefined,
           status: "sent",
         });
       }
     } catch (e) {
       console.error("Error saving media message:", e);
+    }
+
+    // Update conversation last message
+    if (waConversationId) {
+      try {
+        await updateConversationLastMessage(waConversationId, {
+          content: mediaContent,
+          messageType: mediaType,
+          fromMe: true,
+          status: "sent",
+          timestamp: new Date(),
+        });
+      } catch (e) {
+        console.error("[ConvResolver] Error updating outbound media last message:", e);
+      }
     }
 
     await this.logActivity(sessionId, "media_sent", `Mídia (${mediaType}) enviada para ${formattedJid}`);
