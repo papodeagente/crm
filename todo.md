@@ -592,3 +592,43 @@
 - [x] Nomes e fotos aparecem corretamente
 - [x] TypeScript sem erros (LSP + tsc)
 - [x] 110 testes passando, 8 arquivos
+
+## Reescrita Completa da Inbox WhatsApp Web (v23)
+
+### Backend - Sincronização e Dados
+- [x] Auditar message-handler.ts: verificar se pushName é salvo corretamente em TODOS os eventos
+- [x] Auditar message-handler.ts: verificar filtro de mensagens de protocolo
+- [x] Auditar whatsapp.ts router: verificar query getConversationsList retorna dados corretos
+- [x] Corrigir query de conversas: incluir pushName, lastMessage real, timestamp correto
+- [x] Corrigir importação de histórico: garantir pushName salvo por JID
+- [x] Endpoint de fotos de perfil: garantir que funciona e retorna URLs válidas
+- [x] Salvar pushName em tabela/campo dedicado para lookup rápido
+
+### Frontend - Layout WhatsApp Web Autêntico
+- [x] Reescrever Inbox.tsx com layout fiel ao WhatsApp Web
+- [x] Sidebar esquerda: header com avatar do usuário, busca, filtros
+- [x] Lista de conversas: avatar com foto real, nome, preview, hora, badge não lidas, ticks
+- [x] Painel direito: chat completo com header (nome, foto, status), mensagens, input
+- [x] Estado vazio: ilustração estilo WhatsApp Web quando nenhuma conversa selecionada
+- [x] Responsivo: mobile mostra lista OU chat, desktop mostra ambos
+
+### Frontend - Detalhes UX
+- [x] Datas formatadas corretamente (hoje=hora, ontem="Ontem", antes=dd/mm/yyyy)
+- [x] Ticks de status (✓ enviado, ✓✓ entregue, ✓✓ azul lido)
+- [x] Preview de mensagens com ícones (📷 Foto, 🎵 Áudio, 📄 Documento, etc.)
+- [x] Busca funcional filtrando conversas por nome/número
+- [x] Animações suaves de transição entre conversas
+
+### Frontend - Cores e Tema
+- [x] ZERO cores hardcoded - todas via variáveis semânticas CSS
+- [x] Dark mode e light mode perfeitos
+- [x] Gradientes ENTUR OS nos elementos de destaque
+
+### Verificação Final
+- [x] Conversas sincronizadas corretamente com WhatsApp
+- [x] Nomes aparecem (CRM > pushName > número)
+- [x] Fotos de perfil carregam
+- [x] Datas e horas corretas
+- [x] Preview de mensagens legível
+- [x] Testes passando — 116 testes, 8 arquivos
+- [x] TypeScript sem erros

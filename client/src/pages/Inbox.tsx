@@ -5,67 +5,62 @@ import WhatsAppChat from "@/components/WhatsAppChat";
 import {
   Search, MessageSquare, MoreVertical, ArrowLeft,
   Check, CheckCheck, Clock, Phone, Loader2,
-  MessageCircle, Briefcase, Plus, X, Volume2, VolumeX
+  MessageCircle, Briefcase, Plus, X, Volume2, VolumeX,
+  UserPlus, Lock
 } from "lucide-react";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
 
 /* ═══════════════════════════════════════════════════════
-   NOTIFICATION SOUND (Web Audio API)
+   NOTIFICATION SOUND (Web Audio API — WhatsApp style)
    ═══════════════════════════════════════════════════════ */
 
 const MUTE_KEY = "entur_inbox_muted";
 
 function createNotificationSound(): () => void {
   let audioCtx: AudioContext | null = null;
-
   return () => {
     try {
       if (!audioCtx) audioCtx = new AudioContext();
       const ctx = audioCtx;
-
       const now = ctx.currentTime;
       const gain = ctx.createGain();
       gain.connect(ctx.destination);
       gain.gain.setValueAtTime(0.15, now);
       gain.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
-
       const osc1 = ctx.createOscillator();
       osc1.type = "sine";
       osc1.frequency.setValueAtTime(880, now);
       osc1.connect(gain);
       osc1.start(now);
       osc1.stop(now + 0.12);
-
       const gain2 = ctx.createGain();
       gain2.connect(ctx.destination);
       gain2.gain.setValueAtTime(0.12, now + 0.13);
       gain2.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
-
       const osc2 = ctx.createOscillator();
       osc2.type = "sine";
       osc2.frequency.setValueAtTime(660, now + 0.13);
       osc2.connect(gain2);
       osc2.start(now + 0.13);
       osc2.stop(now + 0.3);
-    } catch {
-      // Audio not supported or blocked
-    }
+    } catch { /* Audio not supported */ }
   };
 }
-
 const playNotification = createNotificationSound();
 
 /* ═══════════════════════════════════════════════════════
    HELPERS
    ═══════════════════════════════════════════════════════ */
 
-function formatTime(date: string | Date | null | undefined) {
+function formatTime(date: string | Date | null | undefined): string {
   if (!date) return "";
   const d = new Date(date);
+  if (isNaN(d.getTime())) return "";
   const now = new Date();
-  const diffMs = now.getTime() - d.getTime();
-  const diffDays = Math.floor(diffMs / 86400000);
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const msgDay = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const diffDays = Math.round((today.getTime() - msgDay.getTime()) / 86400000);
   if (diffDays === 0) return d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
   if (diffDays === 1) return "Ontem";
   if (diffDays < 7) return d.toLocaleDateString("pt-BR", { weekday: "short" });
@@ -81,7 +76,7 @@ function formatPhoneNumber(jid: string): string {
     if (num.length === 9) return `(${ddd}) ${num.substring(0, 5)}-${num.substring(5)}`;
     if (num.length === 8) return `(${ddd}) ${num.substring(0, 4)}-${num.substring(4)}`;
   }
-  return phone;
+  return `+${phone}`;
 }
 
 function getMessagePreview(content: string | null, messageType: string | null): string {
@@ -97,22 +92,14 @@ function getMessagePreview(content: string | null, messageType: string | null): 
     stickerMessage: "🏷️ Sticker",
     contactMessage: "👤 Contato", contactsArrayMessage: "👥 Contatos",
     locationMessage: "📍 Localização", liveLocationMessage: "📍 Localização ao vivo",
-    templateMessage: "📋 Template",
-    interactiveMessage: "📋 Mensagem interativa",
-    listMessage: "📋 Lista",
-    buttonsMessage: "📋 Botões", buttonsResponseMessage: "📋 Resposta",
-    listResponseMessage: "📋 Resposta de lista",
     viewOnceMessage: "📷 Visualização única", viewOnceMessageV2: "📷 Visualização única",
-    orderMessage: "📭 Pedido",
-    productMessage: "🛒 Produto",
     pollCreationMessage: "📊 Enquete", pollCreationMessageV3: "📊 Enquete",
     eventMessage: "📅 Evento",
-    invoiceMessage: "💰 Fatura",
   };
-  // If content already has a readable preview from backend, prefer it
-  if (content && (content.startsWith("[") || content.length > 0)) {
+  if (content && content.length > 0 && !content.startsWith("[")) {
     const mapped = typeMap[messageType];
-    if (mapped) return content.startsWith("[") ? mapped : content;
+    if (mapped && content.startsWith("[")) return mapped;
+    return content;
   }
   return typeMap[messageType] || content || "";
 }
@@ -124,28 +111,25 @@ function getMessagePreview(content: string | null, messageType: string | null): 
 const StatusTick = memo(({ status, fromMe }: { status: string | null; fromMe: boolean }) => {
   if (!fromMe) return null;
   switch (status) {
-    case "pending": return <Clock className="w-[14px] h-[14px] text-muted-foreground shrink-0" />;
-    case "sent": return <Check className="w-[16px] h-[16px] text-muted-foreground shrink-0" />;
-    case "delivered": return <CheckCheck className="w-[16px] h-[16px] text-muted-foreground shrink-0" />;
-    case "read": case "played": return <CheckCheck className="w-[16px] h-[16px] text-sky-400 shrink-0" />;
-    default: return <Check className="w-[16px] h-[16px] text-muted-foreground shrink-0" />;
+    case "pending": return <Clock className="w-[14px] h-[14px] text-muted-foreground/60 shrink-0" />;
+    case "sent": return <Check className="w-[15px] h-[15px] text-muted-foreground/60 shrink-0" />;
+    case "delivered": return <CheckCheck className="w-[15px] h-[15px] text-muted-foreground/60 shrink-0" />;
+    case "read": case "played": return <CheckCheck className="w-[15px] h-[15px] text-wa-tint shrink-0" />;
+    default: return <Check className="w-[15px] h-[15px] text-muted-foreground/60 shrink-0" />;
   }
 });
 StatusTick.displayName = "StatusTick";
 
 /* ═══════════════════════════════════════════════════════
-   AVATAR with real profile picture
+   AVATAR — WhatsApp style with real profile picture
    ═══════════════════════════════════════════════════════ */
 
-const WaAvatar = memo(({ name, size = 49, isGroup = false, pictureUrl }: { name: string; size?: number; isGroup?: boolean; pictureUrl?: string | null }) => {
+const WaAvatar = memo(({ name, size = 49, pictureUrl }: { name: string; size?: number; pictureUrl?: string | null }) => {
   const [imgError, setImgError] = useState(false);
 
   if (pictureUrl && !imgError) {
     return (
-      <div
-        className="rounded-full shrink-0 overflow-hidden"
-        style={{ width: size, height: size }}
-      >
+      <div className="rounded-full shrink-0 overflow-hidden" style={{ width: size, height: size }}>
         <img
           src={pictureUrl}
           alt={name}
@@ -157,22 +141,20 @@ const WaAvatar = memo(({ name, size = 49, isGroup = false, pictureUrl }: { name:
     );
   }
 
+  // Default WhatsApp avatar SVG
   return (
-    <div
-      className="rounded-full bg-muted flex items-center justify-center shrink-0"
-      style={{ width: size, height: size }}
-    >
+    <div className="rounded-full bg-muted/60 shrink-0 overflow-hidden" style={{ width: size, height: size }}>
       <svg viewBox="0 0 212 212" width={size} height={size}>
-          <path fill="#DFE5E7" d="M106 0C47.5 0 0 47.5 0 106s47.5 106 106 106 106-47.5 106-106S164.5 0 106 0z" />
-          <path fill="#FFF" d="M106 45c-20.7 0-37.5 16.8-37.5 37.5S85.3 120 106 120s37.5-16.8 37.5-37.5S126.7 45 106 45zm0 105c-28.3 0-52.5 14.3-52.5 32v10h105v-10c0-17.7-24.2-32-52.5-32z" />
-        </svg>
+        <path className="fill-muted" d="M106 0C47.5 0 0 47.5 0 106s47.5 106 106 106 106-47.5 106-106S164.5 0 106 0z" />
+        <path className="fill-muted-foreground/30" d="M106 45c-20.7 0-37.5 16.8-37.5 37.5S85.3 120 106 120s37.5-16.8 37.5-37.5S126.7 45 106 45zm0 105c-28.3 0-52.5 14.3-52.5 32v10h105v-10c0-17.7-24.2-32-52.5-32z" />
+      </svg>
     </div>
   );
 });
 WaAvatar.displayName = "WaAvatar";
 
 /* ═══════════════════════════════════════════════════════
-   CONVERSATION ITEM
+   CONVERSATION ITEM — WhatsApp Web faithful
    ═══════════════════════════════════════════════════════ */
 
 interface ConvItem {
@@ -200,31 +182,33 @@ const ConversationItem = memo(({
   return (
     <div
       onClick={onClick}
-      className={`flex items-center px-3 cursor-pointer transition-colors duration-100 ${
-        isActive ? "bg-accent" : "hover:bg-muted/50"
+      className={`flex items-center px-3 cursor-pointer transition-colors duration-75 ${
+        isActive ? "bg-wa-active" : "hover:bg-wa-hover"
       }`}
     >
       <div className="py-[6px] pr-[13px]">
         <WaAvatar name={contactName} size={49} pictureUrl={pictureUrl} />
       </div>
-      <div className="flex-1 min-w-0 py-[6px] border-b border-border">
+      <div className="flex-1 min-w-0 py-[10px] border-b border-wa-divider">
         <div className="flex items-baseline justify-between mb-[2px]">
-          <span className="text-[17px] text-foreground truncate leading-[21px] font-medium">
+          <span className="text-[16px] text-foreground truncate leading-[21px] font-normal">
             {contactName}
           </span>
           <span className={`text-[12px] ml-[6px] shrink-0 leading-[14px] ${
-            unread > 0 ? "text-emerald-500" : "text-muted-foreground"
+            unread > 0 ? "text-wa-unread font-medium" : "text-muted-foreground"
           }`}>
             {time}
           </span>
         </div>
         <div className="flex items-center gap-[3px]">
           <StatusTick status={conv.lastStatus} fromMe={fromMe} />
-          <span className="text-[14px] text-muted-foreground truncate flex-1 leading-[20px]">
+          <span className={`text-[13.5px] truncate flex-1 leading-[20px] ${
+            unread > 0 ? "text-foreground/80" : "text-muted-foreground"
+          }`}>
             {preview || "Sem mensagens"}
           </span>
           {unread > 0 && (
-            <span className="bg-emerald-500 text-white text-[11px] font-bold rounded-full min-w-[20px] h-[20px] flex items-center justify-center px-[6px] shrink-0 ml-[6px]">
+            <span className="bg-wa-unread text-white text-[11px] font-bold rounded-full min-w-[20px] h-[20px] flex items-center justify-center px-[5px] shrink-0 ml-[4px]">
               {unread > 99 ? "99+" : unread}
             </span>
           )}
@@ -234,6 +218,122 @@ const ConversationItem = memo(({
   );
 });
 ConversationItem.displayName = "ConversationItem";
+
+/* ═══════════════════════════════════════════════════════
+   CREATE CONTACT DIALOG
+   ═══════════════════════════════════════════════════════ */
+
+function CreateContactDialog({
+  open, onClose, phone, pushName, onCreated,
+}: {
+  open: boolean; onClose: () => void; phone: string; pushName: string; onCreated: () => void;
+}) {
+  const [name, setName] = useState(pushName || "");
+  const [email, setEmail] = useState("");
+  const [notes, setNotes] = useState("");
+  const [creating, setCreating] = useState(false);
+
+  const formattedPhone = formatPhoneNumber(phone + "@s.whatsapp.net");
+
+  useEffect(() => {
+    if (open) {
+      setName(pushName || "");
+      setEmail("");
+      setNotes("");
+    }
+  }, [open, pushName]);
+
+  const createContact = trpc.crm.contacts.create.useMutation();
+
+  const handleCreate = async () => {
+    if (!name.trim()) return;
+    setCreating(true);
+    try {
+      const cleaned = phone.replace(/\D/g, "");
+      const formatted = cleaned.startsWith("55") ? `+${cleaned}` : `+55${cleaned}`;
+      await createContact.mutateAsync({
+        tenantId: 1,
+        name: name.trim(),
+        phone: formatted,
+        email: email.trim() || undefined,
+      });
+      toast.success(`Contato "${name.trim()}" criado com sucesso`);
+      onCreated();
+    } catch (e: any) {
+      toast.error(e?.message || "Erro ao criar contato");
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={onClose}>
+      <div className="bg-card rounded-2xl shadow-2xl w-full max-w-md mx-4 border border-border/50" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-full bg-wa-tint flex items-center justify-center">
+              <UserPlus className="w-[18px] h-[18px] text-white" />
+            </div>
+            <h3 className="text-[16px] font-semibold text-foreground">Novo Contato</h3>
+          </div>
+          <button onClick={onClose} className="p-1.5 hover:bg-muted rounded-full transition-colors">
+            <X className="w-5 h-5 text-muted-foreground" />
+          </button>
+        </div>
+        <div className="px-5 py-4 space-y-4">
+          <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-xl">
+            <Phone className="w-5 h-5 text-wa-tint" />
+            <div>
+              <p className="text-xs text-muted-foreground">Telefone (WhatsApp)</p>
+              <p className="text-sm font-medium text-foreground">{formattedPhone}</p>
+            </div>
+          </div>
+          <div>
+            <label className="text-[13px] text-muted-foreground mb-1.5 block font-medium">Nome *</label>
+            <input
+              type="text" value={name} onChange={(e) => setName(e.target.value)}
+              placeholder="Nome do contato"
+              className="w-full px-3 py-2.5 border border-border rounded-xl text-sm text-foreground bg-background focus:outline-none focus:border-wa-tint focus:ring-1 focus:ring-wa-tint/30 transition-colors"
+              autoFocus
+            />
+          </div>
+          <div>
+            <label className="text-[13px] text-muted-foreground mb-1.5 block font-medium">Email</label>
+            <input
+              type="email" value={email} onChange={(e) => setEmail(e.target.value)}
+              placeholder="email@exemplo.com"
+              className="w-full px-3 py-2.5 border border-border rounded-xl text-sm text-foreground bg-background focus:outline-none focus:border-wa-tint focus:ring-1 focus:ring-wa-tint/30 transition-colors"
+            />
+          </div>
+          <div>
+            <label className="text-[13px] text-muted-foreground mb-1.5 block font-medium">Observações</label>
+            <textarea
+              value={notes} onChange={(e) => setNotes(e.target.value)}
+              placeholder="Observações sobre o contato..."
+              rows={2}
+              className="w-full px-3 py-2.5 border border-border rounded-xl text-sm text-foreground bg-background focus:outline-none focus:border-wa-tint focus:ring-1 focus:ring-wa-tint/30 resize-none transition-colors"
+            />
+          </div>
+        </div>
+        <div className="flex items-center justify-end gap-3 px-5 py-4 border-t border-border">
+          <button onClick={onClose} className="px-4 py-2 text-sm text-muted-foreground hover:bg-muted rounded-xl transition-colors">
+            Cancelar
+          </button>
+          <button
+            onClick={handleCreate}
+            disabled={creating || !name.trim()}
+            className="px-4 py-2 text-sm text-white bg-wa-tint hover:opacity-90 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+          >
+            {creating && <Loader2 className="w-4 h-4 animate-spin" />}
+            Criar Contato
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 /* ═══════════════════════════════════════════════════════
    CREATE DEAL DIALOG
@@ -248,7 +348,6 @@ function CreateDealDialog({
   const [title, setTitle] = useState(`Negociação - ${contactName}`);
   const [value, setValue] = useState("");
 
-  // Get pipelines and stages
   const pipelinesQ = trpc.crm.pipelines.list.useQuery({ tenantId: 1 });
   const pipelines = (pipelinesQ.data || []) as any[];
   const [selectedPipelineId, setSelectedPipelineId] = useState<number | null>(null);
@@ -260,181 +359,103 @@ function CreateDealDialog({
   const stages = (stagesQ.data || []) as any[];
   const [selectedStageId, setSelectedStageId] = useState<number | null>(null);
 
-  // Auto-select first pipeline
   useEffect(() => {
-    if (pipelines.length > 0 && !selectedPipelineId) {
-      setSelectedPipelineId(pipelines[0].id);
-    }
+    if (pipelines.length > 0 && !selectedPipelineId) setSelectedPipelineId(pipelines[0].id);
   }, [pipelines, selectedPipelineId]);
 
-  // Auto-select first stage
   useEffect(() => {
-    if (stages.length > 0 && !selectedStageId) {
-      setSelectedStageId(stages[0].id);
-    }
+    if (stages.length > 0 && !selectedStageId) setSelectedStageId(stages[0].id);
   }, [stages, selectedStageId]);
 
-  // Find or create contact
-  const contactsQ = trpc.crm.contacts.list.useQuery({ tenantId: 1, search: contactPhone.replace(/\D/g, ""), limit: 5 });
-  const existingContact = useMemo(() => {
-    const cleaned = contactPhone.replace(/\D/g, "");
-    return ((contactsQ.data || []) as any[]).find((c: any) => {
-      const cPhone = (c.phone || "").replace(/\D/g, "");
-      return cPhone === cleaned || cPhone === `55${cleaned}` || `55${cPhone}` === cleaned;
-    });
-  }, [contactsQ.data, contactPhone]);
+  useEffect(() => {
+    if (open) setTitle(`Negociação - ${contactName}`);
+  }, [open, contactName]);
 
-  const createContact = trpc.crm.contacts.create.useMutation();
   const createDeal = trpc.crm.deals.create.useMutation();
-
-  const [creating, setCreating] = useState(false);
+  const createContact = trpc.crm.contacts.create.useMutation();
+  const contactsQ = trpc.crm.contacts.list.useQuery({ tenantId: 1, limit: 500 });
 
   const handleCreate = async () => {
-    if (!title.trim() || !selectedPipelineId || !selectedStageId) {
-      toast.error("Preencha todos os campos obrigatórios");
-      return;
-    }
-
-    setCreating(true);
+    if (!title.trim() || !selectedPipelineId || !selectedStageId) return;
     try {
-      let contactId = existingContact?.id;
+      const cleaned = contactPhone.replace(/\D/g, "");
+      const formatted = cleaned.startsWith("55") ? `+${cleaned}` : `+55${cleaned}`;
+      const contacts = (contactsQ.data || []) as any[];
+      let contactId = contacts.find((c: any) => {
+        const cPhone = c.phone?.replace(/\D/g, "") || "";
+        return cPhone === cleaned || cPhone === cleaned.replace(/^55/, "") || `55${cPhone}` === cleaned;
+      })?.id;
 
-      // Create contact if not exists
       if (!contactId) {
         const newContact = await createContact.mutateAsync({
-          tenantId: 1,
-          name: contactName,
-          phone: contactPhone,
-          source: "whatsapp",
+          tenantId: 1, name: contactName, phone: formatted,
         });
-        contactId = (newContact as any)?.id;
+        contactId = (newContact as any).id;
       }
 
-      // Create deal
       const deal = await createDeal.mutateAsync({
-        tenantId: 1,
-        title: title.trim(),
-        contactId,
-        pipelineId: selectedPipelineId,
-        stageId: selectedStageId,
-        valueCents: value ? Math.round(parseFloat(value) * 100) : undefined,
+        tenantId: 1, title: title.trim(), valueCents: value ? Math.round(parseFloat(value) * 100) : 0,
+        pipelineId: selectedPipelineId, stageId: selectedStageId,
+        contactId: contactId || undefined,
       });
-
       toast.success("Negociação criada com sucesso!");
       onClose();
-
-      // Navigate to deal
-      if ((deal as any)?.id) {
-        navigate(`/deal/${(deal as any).id}`);
-      }
-    } catch (e) {
-      toast.error("Erro ao criar negociação");
-      console.error(e);
-    } finally {
-      setCreating(false);
+      navigate(`/deal/${(deal as any).id}`);
+    } catch (e: any) {
+      toast.error(e?.message || "Erro ao criar negociação");
     }
   };
 
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
-      <div
-        className="bg-card rounded-xl shadow-xl w-full max-w-md mx-4"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={onClose}>
+      <div className="bg-card rounded-2xl shadow-2xl w-full max-w-md mx-4 border border-border/50" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
-          <h3 className="text-[16px] font-semibold text-foreground">Nova Negociação</h3>
-          <button onClick={onClose} className="p-1 hover:bg-muted rounded-full">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-full bg-primary flex items-center justify-center">
+              <Briefcase className="w-[18px] h-[18px] text-white" />
+            </div>
+            <h3 className="text-[16px] font-semibold text-foreground">Nova Negociação</h3>
+          </div>
+          <button onClick={onClose} className="p-1.5 hover:bg-muted rounded-full transition-colors">
             <X className="w-5 h-5 text-muted-foreground" />
           </button>
         </div>
-
-        {/* Body */}
         <div className="px-5 py-4 space-y-4">
-          {/* Contact info */}
-          <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
-            <div className="w-10 h-10 rounded-full bg-emerald-500 flex items-center justify-center text-white font-bold text-sm">
-              {contactName.charAt(0).toUpperCase()}
-            </div>
+          <div>
+            <label className="text-[13px] text-muted-foreground mb-1.5 block font-medium">Título *</label>
+            <input type="text" value={title} onChange={(e) => setTitle(e.target.value)}
+              className="w-full px-3 py-2.5 border border-border rounded-xl text-sm text-foreground bg-background focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/30 transition-colors" />
+          </div>
+          <div>
+            <label className="text-[13px] text-muted-foreground mb-1.5 block font-medium">Valor (R$)</label>
+            <input type="number" value={value} onChange={(e) => setValue(e.target.value)} placeholder="0,00"
+              className="w-full px-3 py-2.5 border border-border rounded-xl text-sm text-foreground bg-background focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/30 transition-colors" />
+          </div>
+          {pipelines.length > 0 && (
             <div>
-              <p className="text-sm font-medium text-foreground">{contactName}</p>
-              <p className="text-xs text-muted-foreground">{contactPhone}</p>
+              <label className="text-[13px] text-muted-foreground mb-1.5 block font-medium">Pipeline</label>
+              <select value={selectedPipelineId || ""} onChange={(e) => { setSelectedPipelineId(Number(e.target.value)); setSelectedStageId(null); }}
+                className="w-full px-3 py-2.5 border border-border rounded-xl text-sm text-foreground bg-background focus:outline-none focus:border-primary">
+                {pipelines.map((p: any) => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
             </div>
-            {existingContact && (
-              <span className="ml-auto text-[11px] bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 px-2 py-0.5 rounded-full">
-                Contato CRM
-              </span>
-            )}
-          </div>
-
-          {/* Title */}
-          <div>
-            <label className="text-[13px] text-muted-foreground mb-1 block">Título da negociação *</label>
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              className="w-full px-3 py-2 border border-border rounded-lg text-sm text-foreground bg-background focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
-            />
-          </div>
-
-          {/* Value */}
-          <div>
-            <label className="text-[13px] text-muted-foreground mb-1 block">Valor (R$)</label>
-            <input
-              type="number"
-              value={value}
-              onChange={(e) => setValue(e.target.value)}
-              placeholder="0,00"
-              className="w-full px-3 py-2 border border-border rounded-lg text-sm text-foreground bg-background focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
-            />
-          </div>
-
-          {/* Pipeline */}
-          <div>
-            <label className="text-[13px] text-muted-foreground mb-1 block">Pipeline *</label>
-            <select
-              value={selectedPipelineId || ""}
-              onChange={(e) => { setSelectedPipelineId(Number(e.target.value)); setSelectedStageId(null); }}
-              className="w-full px-3 py-2 border border-border rounded-lg text-sm text-foreground bg-background focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
-            >
-              {pipelines.map((p: any) => (
-                <option key={p.id} value={p.id}>{p.name}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Stage */}
-          <div>
-            <label className="text-[13px] text-muted-foreground mb-1 block">Etapa *</label>
-            <select
-              value={selectedStageId || ""}
-              onChange={(e) => setSelectedStageId(Number(e.target.value))}
-              className="w-full px-3 py-2 border border-border rounded-lg text-sm text-foreground bg-background focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
-            >
-              {stages.map((s: any) => (
-                <option key={s.id} value={s.id}>{s.name}</option>
-              ))}
-            </select>
-          </div>
+          )}
+          {stages.length > 0 && (
+            <div>
+              <label className="text-[13px] text-muted-foreground mb-1.5 block font-medium">Etapa</label>
+              <select value={selectedStageId || ""} onChange={(e) => setSelectedStageId(Number(e.target.value))}
+                className="w-full px-3 py-2.5 border border-border rounded-xl text-sm text-foreground bg-background focus:outline-none focus:border-primary">
+                {stages.map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
+              </select>
+            </div>
+          )}
         </div>
-
-        {/* Footer */}
         <div className="flex items-center justify-end gap-3 px-5 py-4 border-t border-border">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-sm text-muted-foreground hover:bg-muted rounded-lg transition-colors"
-          >
-            Cancelar
-          </button>
-          <button
-            onClick={handleCreate}
-            disabled={creating || !title.trim() || !selectedPipelineId || !selectedStageId}
-            className="px-4 py-2 text-sm text-white bg-emerald-500 hover:bg-emerald-600 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-          >
-            {creating && <Loader2 className="w-4 h-4 animate-spin" />}
+          <button onClick={onClose} className="px-4 py-2 text-sm text-muted-foreground hover:bg-muted rounded-xl transition-colors">Cancelar</button>
+          <button onClick={handleCreate} disabled={!title.trim() || !selectedStageId}
+            className="px-4 py-2 text-sm text-white bg-primary hover:opacity-90 rounded-xl transition-all disabled:opacity-50 flex items-center gap-2">
             Criar Negociação
           </button>
         </div>
@@ -444,379 +465,133 @@ function CreateDealDialog({
 }
 
 /* ═══════════════════════════════════════════════════════
-   CREATE CONTACT DIALOG (from chat header)
-   ═══════════════════════════════════════════════════════ */
-
-function CreateContactDialog({
-  open, onClose, phone, pushName, onCreated,
-}: {
-  open: boolean; onClose: () => void; phone: string; pushName: string; onCreated: () => void;
-}) {
-  const [name, setName] = useState(pushName || "");
-  const [email, setEmail] = useState("");
-  const [notes, setNotes] = useState("");
-  const [creating, setCreating] = useState(false);
-
-  const createContact = trpc.crm.contacts.create.useMutation();
-
-  // Reset form when dialog opens
-  useEffect(() => {
-    if (open) {
-      setName(pushName || "");
-      setEmail("");
-      setNotes("");
-    }
-  }, [open, pushName]);
-
-  const formattedPhone = useMemo(() => {
-    const p = phone.replace(/\D/g, "");
-    if (p.startsWith("55") && p.length >= 12) {
-      const ddd = p.substring(2, 4);
-      const num = p.substring(4);
-      if (num.length === 9) return `+55 (${ddd}) ${num.substring(0, 5)}-${num.substring(5)}`;
-      if (num.length === 8) return `+55 (${ddd}) ${num.substring(0, 4)}-${num.substring(4)}`;
-    }
-    return `+${p}`;
-  }, [phone]);
-
-  const handleCreate = async () => {
-    if (!name.trim()) {
-      toast.error("Informe o nome do contato");
-      return;
-    }
-    setCreating(true);
-    try {
-      await createContact.mutateAsync({
-        tenantId: 1,
-        name: name.trim(),
-        phone: phone,
-        email: email.trim() || undefined,
-        source: "whatsapp",
-      });
-      toast.success(`Contato "${name.trim()}" criado com sucesso!`);
-      onCreated();
-    } catch (e) {
-      toast.error("Erro ao criar contato");
-      console.error(e);
-    } finally {
-      setCreating(false);
-    }
-  };
-
-  if (!open) return null;
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
-      <div
-        className="bg-card rounded-xl shadow-xl w-full max-w-md mx-4"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-full bg-emerald-500 flex items-center justify-center">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
-                <circle cx="9" cy="7" r="4"/>
-                <line x1="19" y1="8" x2="19" y2="14"/>
-                <line x1="16" y1="11" x2="22" y2="11"/>
-              </svg>
-            </div>
-            <h3 className="text-[16px] font-semibold text-foreground">Novo Contato</h3>
-          </div>
-          <button onClick={onClose} className="p-1 hover:bg-muted rounded-full">
-            <X className="w-5 h-5 text-muted-foreground" />
-          </button>
-        </div>
-
-        {/* Body */}
-        <div className="px-5 py-4 space-y-4">
-          {/* Phone (read-only) */}
-          <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
-            <Phone className="w-5 h-5 text-emerald-500" />
-            <div>
-              <p className="text-xs text-muted-foreground">Telefone (WhatsApp)</p>
-              <p className="text-sm font-medium text-foreground">{formattedPhone}</p>
-            </div>
-          </div>
-
-          {/* Name */}
-          <div>
-            <label className="text-[13px] text-muted-foreground mb-1 block">Nome *</label>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Nome do contato"
-              className="w-full px-3 py-2 border border-border rounded-lg text-sm text-foreground bg-background focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
-              autoFocus
-            />
-          </div>
-
-          {/* Email */}
-          <div>
-            <label className="text-[13px] text-muted-foreground mb-1 block">Email</label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="email@exemplo.com"
-              className="w-full px-3 py-2 border border-border rounded-lg text-sm text-foreground bg-background focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
-            />
-          </div>
-
-          {/* Notes */}
-          <div>
-            <label className="text-[13px] text-muted-foreground mb-1 block">Observações</label>
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Observações sobre o contato..."
-              rows={2}
-              className="w-full px-3 py-2 border border-border rounded-lg text-sm text-foreground bg-background focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 resize-none"
-            />
-          </div>
-        </div>
-
-        {/* Footer */}
-        <div className="flex items-center justify-end gap-3 px-5 py-4 border-t border-border">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-sm text-muted-foreground hover:bg-muted rounded-lg transition-colors"
-          >
-            Cancelar
-          </button>
-          <button
-            onClick={handleCreate}
-            disabled={creating || !name.trim()}
-            className="px-4 py-2 text-sm text-white bg-emerald-500 hover:bg-emerald-600 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-          >
-            {creating && <Loader2 className="w-4 h-4 animate-spin" />}
-            Criar Contato
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ═══════════════════════════════════════════════════════
-   NEW CHAT PANEL (slide-over on left panel)
+   NEW CHAT PANEL (slide-over)
    ═══════════════════════════════════════════════════════ */
 
 function NewChatPanel({
-  open,
-  onClose,
-  onSelectJid,
-  sessionId,
+  open, onClose, onSelectJid, sessionId,
 }: {
-  open: boolean;
-  onClose: () => void;
-  onSelectJid: (jid: string, name: string) => void;
-  sessionId: string;
+  open: boolean; onClose: () => void; onSelectJid: (jid: string, name: string) => void; sessionId: string;
 }) {
   const [searchTerm, setSearchTerm] = useState("");
   const [phoneInput, setPhoneInput] = useState("");
   const [resolving, setResolving] = useState(false);
   const [resolveError, setResolveError] = useState("");
 
-  const contactsQ = trpc.crm.contacts.list.useQuery(
-    { tenantId: 1, limit: 500 },
-    { enabled: open }
-  );
-
+  const contactsQ = trpc.crm.contacts.list.useQuery({ tenantId: 1, limit: 500 }, { enabled: open });
   const trpcUtils = trpc.useUtils();
 
   const contacts = useMemo(() => {
     const list = (contactsQ.data || []) as Array<{ id: number; name: string; phone?: string | null; email?: string | null; accountName?: string | null }>;
     if (!searchTerm.trim()) return list.filter((c) => c.phone);
     const q = searchTerm.toLowerCase();
-    return list.filter(
-      (c) =>
-        c.phone &&
-        (c.name.toLowerCase().includes(q) ||
-          (c.phone && c.phone.includes(q)) ||
-          (c.accountName && c.accountName.toLowerCase().includes(q)))
-    );
+    return list.filter((c) => c.phone && (c.name.toLowerCase().includes(q) || (c.phone && c.phone.includes(q)) || (c.accountName && c.accountName.toLowerCase().includes(q))));
   }, [contactsQ.data, searchTerm]);
 
   const handleSelectContact = async (contact: { name: string; phone?: string | null }) => {
     if (!contact.phone) return;
-    setResolving(true);
-    setResolveError("");
+    setResolving(true); setResolveError("");
     try {
-      const result = await trpcUtils.whatsapp.resolveJid.fetch({
-        sessionId,
-        phone: contact.phone,
-      });
-      if (result.jid) {
-        onSelectJid(result.jid, contact.name);
-        onClose();
-      } else {
-        setResolveError(`${contact.name} não está no WhatsApp`);
-      }
-    } catch {
-      setResolveError("Erro ao verificar número no WhatsApp");
-    } finally {
-      setResolving(false);
-    }
+      const result = await trpcUtils.whatsapp.resolveJid.fetch({ sessionId, phone: contact.phone });
+      if (result.jid) { onSelectJid(result.jid, contact.name); onClose(); }
+      else setResolveError(`${contact.name} não está no WhatsApp`);
+    } catch { setResolveError("Erro ao verificar número no WhatsApp"); }
+    finally { setResolving(false); }
   };
 
   const handlePhoneSubmit = async () => {
     const cleaned = phoneInput.replace(/\D/g, "");
-    if (cleaned.length < 8) {
-      setResolveError("Digite um número válido");
-      return;
-    }
-    setResolving(true);
-    setResolveError("");
+    if (cleaned.length < 8) { setResolveError("Digite um número válido"); return; }
+    setResolving(true); setResolveError("");
     try {
-      const result = await trpcUtils.whatsapp.resolveJid.fetch({
-        sessionId,
-        phone: cleaned,
-      });
-      if (result.jid) {
-        onSelectJid(result.jid, formatPhoneNumber(result.jid));
-        onClose();
-      } else {
-        setResolveError("Número não encontrado no WhatsApp");
-      }
-    } catch {
-      setResolveError("Erro ao verificar número no WhatsApp");
-    } finally {
-      setResolving(false);
-    }
+      const result = await trpcUtils.whatsapp.resolveJid.fetch({ sessionId, phone: cleaned });
+      if (result.jid) { onSelectJid(result.jid, formatPhoneNumber(result.jid)); onClose(); }
+      else setResolveError("Número não encontrado no WhatsApp");
+    } catch { setResolveError("Erro ao verificar número no WhatsApp"); }
+    finally { setResolving(false); }
   };
 
   if (!open) return null;
 
   return (
-    <div
-      className="absolute inset-0 z-20 flex flex-col bg-card"
-      style={{ animation: "slideInLeft 0.2s ease-out" }}
-    >
+    <div className="absolute inset-0 z-20 flex flex-col bg-wa-panel" style={{ animation: "slideInLeft 0.2s ease-out" }}>
       {/* Header */}
-      <div
-        className="flex items-center gap-4 shrink-0"
-        style={{
-          height: "59px",
-          padding: "10px 16px",
-          backgroundColor: "#008069",
-        }}
-      >
+      <div className="flex items-center gap-4 shrink-0 h-[59px] px-4 bg-wa-panel-header border-b border-wa-divider">
         <button
           onClick={() => { onClose(); setSearchTerm(""); setPhoneInput(""); setResolveError(""); }}
-          className="w-[28px] h-[28px] flex items-center justify-center text-white hover:opacity-80 transition-opacity"
+          className="w-[28px] h-[28px] flex items-center justify-center text-foreground hover:opacity-80 transition-opacity"
         >
-          <ArrowLeft className="w-[22px] h-[22px]" />
+          <ArrowLeft className="w-[20px] h-[20px]" />
         </button>
-        <h2 className="text-[16px] font-medium text-white">Nova conversa</h2>
+        <h2 className="text-[16px] font-medium text-foreground">Nova conversa</h2>
       </div>
 
       {/* Search */}
-      <div className="shrink-0" style={{ padding: "7px 12px", backgroundColor: "#FFFFFF" }}>
-        <div
-          className="flex items-center rounded-lg overflow-hidden"
-          style={{ height: "35px", backgroundColor: "#F0F2F5", padding: "0 8px 0 12px" }}
-        >
-          <Search className="shrink-0" style={{ width: "16px", height: "16px", color: "#54656F" }} />
+      <div className="shrink-0 px-3 py-[7px] bg-wa-panel">
+        <div className="flex items-center rounded-lg overflow-hidden h-[35px] bg-wa-search-bg px-3">
+          <Search className="shrink-0 w-4 h-4 text-muted-foreground" />
           <input
-            type="text"
-            placeholder="Pesquisar contatos"
-            value={searchTerm}
+            type="text" placeholder="Pesquisar contatos" value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="flex-1 bg-transparent border-none outline-none text-[14px] text-foreground placeholder:text-muted-foreground"
-            style={{ paddingLeft: "12px", height: "100%" }}
+            className="flex-1 bg-transparent border-none outline-none text-[14px] text-foreground placeholder:text-muted-foreground pl-3 h-full"
             autoFocus
           />
         </div>
       </div>
 
-      {/* Phone input section */}
-      <div className="shrink-0 px-4 py-3 border-b border-border">
-        <label className="text-[12px] text-muted-foreground uppercase tracking-wide font-medium mb-2 block">
-          Digitar número
-        </label>
+      {/* Phone input */}
+      <div className="shrink-0 px-4 py-3 border-b border-wa-divider">
+        <label className="text-[12px] text-muted-foreground uppercase tracking-wide font-medium mb-2 block">Digitar número</label>
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-1 px-3 py-2 bg-muted rounded-lg text-sm text-muted-foreground shrink-0">
-            <span>🇧🇷</span>
-            <span>+55</span>
+            <span>🇧🇷</span><span>+55</span>
           </div>
           <input
-            type="tel"
-            placeholder="(84) 99999-9999"
-            value={phoneInput}
+            type="tel" placeholder="(84) 99999-9999" value={phoneInput}
             onChange={(e) => { setPhoneInput(e.target.value); setResolveError(""); }}
             onKeyDown={(e) => { if (e.key === "Enter") handlePhoneSubmit(); }}
-            className="flex-1 px-3 py-2 border border-border rounded-lg text-sm text-foreground focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
+            className="flex-1 px-3 py-2 border border-border rounded-lg text-sm text-foreground bg-background focus:outline-none focus:border-wa-tint focus:ring-1 focus:ring-wa-tint/30 transition-colors"
           />
-          <button
-            onClick={handlePhoneSubmit}
-            disabled={resolving || phoneInput.replace(/\D/g, "").length < 8}
-            className="px-3 py-2 bg-emerald-500 text-white rounded-lg text-sm font-medium hover:bg-emerald-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
-          >
-            {resolving ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <MessageCircle className="w-4 h-4" />
-            )}
+          <button onClick={handlePhoneSubmit} disabled={resolving || phoneInput.replace(/\D/g, "").length < 8}
+            className="px-3 py-2 bg-wa-tint text-white rounded-lg text-sm font-medium hover:opacity-90 transition-all disabled:opacity-50 flex items-center gap-1">
+            {resolving ? <Loader2 className="w-4 h-4 animate-spin" /> : <MessageCircle className="w-4 h-4" />}
           </button>
         </div>
-        {resolveError && (
-          <p className="text-[12px] text-red-500 mt-1.5">{resolveError}</p>
-        )}
+        {resolveError && <p className="text-[12px] text-destructive mt-1.5">{resolveError}</p>}
       </div>
 
       {/* Contacts list */}
       <div className="shrink-0 px-4 pt-3 pb-1">
-        <p className="text-[12px] text-emerald-600 dark:text-emerald-400 uppercase tracking-wide font-medium">
-          Contatos do CRM ({contacts.length})
-        </p>
+        <p className="text-[12px] text-wa-tint uppercase tracking-wide font-medium">Contatos do CRM ({contacts.length})</p>
       </div>
-
-      <div className="flex-1 overflow-y-auto" style={{ overscrollBehavior: "contain" }}>
+      <div className="flex-1 overflow-y-auto scrollbar-thin" style={{ overscrollBehavior: "contain" }}>
         {contactsQ.isLoading ? (
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="w-5 h-5 text-emerald-500 animate-spin" />
-          </div>
+          <div className="flex items-center justify-center py-12"><Loader2 className="w-5 h-5 text-wa-tint animate-spin" /></div>
         ) : contacts.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
             <Phone className="w-10 h-10 text-muted-foreground/20 mb-2" />
-            <p className="text-[13px] text-muted-foreground">
-              {searchTerm ? "Nenhum contato encontrado" : "Nenhum contato com telefone cadastrado"}
-            </p>
+            <p className="text-[13px] text-muted-foreground">{searchTerm ? "Nenhum contato encontrado" : "Nenhum contato com telefone cadastrado"}</p>
           </div>
-        ) : (
-          contacts.map((contact) => (
-            <button
-              key={contact.id}
-              onClick={() => handleSelectContact(contact)}
-              disabled={resolving}
-              className="w-full flex items-center gap-3 px-4 py-[10px] hover:bg-muted transition-colors text-left disabled:opacity-60"
-            >
-              <div className="w-[49px] h-[49px] rounded-full bg-muted flex items-center justify-center shrink-0">
-                <svg viewBox="0 0 212 212" width={49} height={49}>
-                  <path fill="#DFE5E7" d="M106 0C47.5 0 0 47.5 0 106s47.5 106 106 106 106-47.5 106-106S164.5 0 106 0z" />
-                  <path fill="#FFF" d="M106 45c-20.7 0-37.5 16.8-37.5 37.5S85.3 120 106 120s37.5-16.8 37.5-37.5S126.7 45 106 45zm0 105c-28.3 0-52.5 14.3-52.5 32v10h105v-10c0-17.7-24.2-32-52.5-32z" />
-                </svg>
-              </div>
-              <div className="flex-1 min-w-0 border-b border-border py-[6px]">
-                <p className="text-[16px] text-foreground truncate">{contact.name}</p>
-                <p className="text-[13px] text-muted-foreground truncate">
-                  {contact.phone || "Sem telefone"}
-                  {contact.accountName ? ` · ${contact.accountName}` : ""}
-                </p>
-              </div>
-            </button>
-          ))
-        )}
+        ) : contacts.map((contact) => (
+          <button
+            key={contact.id} onClick={() => handleSelectContact(contact)} disabled={resolving}
+            className="w-full flex items-center gap-3 px-4 py-[10px] hover:bg-wa-hover transition-colors text-left disabled:opacity-60"
+          >
+            <WaAvatar name={contact.name} size={49} />
+            <div className="flex-1 min-w-0 border-b border-wa-divider py-[6px]">
+              <p className="text-[15px] text-foreground truncate">{contact.name}</p>
+              <p className="text-[13px] text-muted-foreground truncate">
+                {contact.phone || "Sem telefone"}{contact.accountName ? ` · ${contact.accountName}` : ""}
+              </p>
+            </div>
+          </button>
+        ))}
       </div>
 
-      {/* Resolving overlay */}
       {resolving && (
-        <div className="absolute inset-0 z-30 bg-card/70 flex items-center justify-center">
+        <div className="absolute inset-0 z-30 bg-wa-panel/70 backdrop-blur-sm flex items-center justify-center">
           <div className="flex flex-col items-center gap-3">
-            <Loader2 className="w-8 h-8 text-emerald-500 animate-spin" />
+            <Loader2 className="w-8 h-8 text-wa-tint animate-spin" />
             <p className="text-[14px] text-muted-foreground">Verificando no WhatsApp...</p>
           </div>
         </div>
@@ -833,20 +608,19 @@ function NewChatPanel({
 }
 
 /* ═══════════════════════════════════════════════════════
-   EMPTY CHAT STATE (WhatsApp Web default screen)
+   EMPTY CHAT STATE — ENTUR OS branded
    ═══════════════════════════════════════════════════════ */
 
 function EmptyChat() {
   return (
-    <div className="flex-1 flex flex-col items-center justify-center" style={{ backgroundColor: "#F0F2F5" }}>
-      <div className="text-center max-w-[560px] px-8">
-        <div className="mb-[28px]">
-          <svg viewBox="0 0 303 172" width="250" height="148" className="mx-auto opacity-30">
-            <path fill="#25D366" d="M229.565 160.229c32.647-16.166 55.349-51.227 55.349-91.229 0-56.243-45.694-101.937-101.937-101.937S80.04 12.757 80.04 69c0 40.002 22.702 75.063 55.349 91.229L151.5 172l15.612-11.771h62.453z"/>
-            <path fill="#FFF" d="M180.5 84.5c0 16.016-12.984 29-29 29s-29-12.984-29-29 12.984-29 29-29 29 12.984 29 29z"/>
-          </svg>
+    <div className="flex-1 flex flex-col items-center justify-center bg-wa-chat-bg">
+      <div className="text-center max-w-[500px] px-8">
+        <div className="mb-8">
+          <div className="w-[72px] h-[72px] mx-auto rounded-full bg-wa-tint/10 flex items-center justify-center">
+            <MessageSquare className="w-8 h-8 text-wa-tint" />
+          </div>
         </div>
-        <h1 className="text-[32px] font-light text-foreground/70 leading-[38px] mb-[14px]">
+        <h1 className="text-[28px] font-light text-foreground/80 leading-[34px] mb-3">
           ENTUR OS WhatsApp
         </h1>
         <p className="text-[14px] text-muted-foreground leading-[20px]">
@@ -854,9 +628,9 @@ function EmptyChat() {
           <br />
           Selecione uma conversa ao lado para começar.
         </p>
-        <div className="mt-[40px] pt-[20px] border-t border-border">
-          <p className="text-[14px] text-muted-foreground/60 flex items-center justify-center gap-[6px]">
-            <span className="inline-block w-[6px] h-[6px] rounded-full bg-emerald-500" />
+        <div className="mt-10 pt-5 border-t border-wa-divider">
+          <p className="text-[13px] text-muted-foreground/60 flex items-center justify-center gap-2">
+            <Lock className="w-3.5 h-3.5" />
             Criptografia de ponta a ponta
           </p>
         </div>
@@ -871,19 +645,17 @@ function EmptyChat() {
 
 function NoSession() {
   return (
-    <div className="flex h-full items-center justify-center" style={{ backgroundColor: "#F0F2F5" }}>
+    <div className="flex h-full items-center justify-center bg-background">
       <div className="text-center max-w-md px-6">
-        <div className="w-20 h-20 rounded-full bg-emerald-500/10 flex items-center justify-center mx-auto mb-4">
-          <MessageSquare className="w-10 h-10 text-emerald-500" />
+        <div className="w-20 h-20 rounded-full bg-wa-tint/10 flex items-center justify-center mx-auto mb-4">
+          <MessageSquare className="w-10 h-10 text-wa-tint" />
         </div>
         <h2 className="text-xl font-medium text-foreground mb-2">Nenhuma sessão WhatsApp ativa</h2>
         <p className="text-[14px] text-muted-foreground mb-4">
           Conecte uma sessão na página WhatsApp para ver suas conversas aqui.
         </p>
-        <a
-          href="/whatsapp"
-          className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-500 text-white rounded-lg text-sm font-medium hover:bg-emerald-600 transition-colors"
-        >
+        <a href="/whatsapp"
+          className="inline-flex items-center gap-2 px-4 py-2.5 bg-wa-tint text-white rounded-xl text-sm font-medium hover:opacity-90 transition-all">
           <Phone className="w-4 h-4" />
           Ir para WhatsApp
         </a>
@@ -893,7 +665,7 @@ function NoSession() {
 }
 
 /* ═══════════════════════════════════════════════════════
-   MAIN PAGE
+   MAIN INBOX PAGE
    ═══════════════════════════════════════════════════════ */
 
 export default function InboxPage() {
@@ -911,57 +683,50 @@ export default function InboxPage() {
   });
   const prevMessageRef = useRef<typeof lastMessage>(null);
 
-  // Get active WhatsApp session
+  // ─── Data queries ───
   const sessionsQ = trpc.whatsapp.sessions.useQuery();
   const activeSession = useMemo(
     () => (sessionsQ.data || []).find((s: any) => s.liveStatus === "connected"),
     [sessionsQ.data]
   );
 
-  // Get conversations list
   const conversationsQ = trpc.whatsapp.conversations.useQuery(
     { sessionId: activeSession?.sessionId || "" },
     { enabled: !!activeSession?.sessionId, refetchInterval: 8000 }
   );
 
-  // Get CRM contacts to match names
   const contactsQ = trpc.crm.contacts.list.useQuery(
     { tenantId: 1, limit: 500 },
     { enabled: true }
   );
 
-  // Contact JIDs for profile pictures
+  // Profile pictures
   const convJids = useMemo(() => {
     return ((conversationsQ.data || []) as ConvItem[]).map((c) => c.remoteJid);
   }, [conversationsQ.data]);
 
-  // Batch fetch profile pictures
   const profilePicsQ = trpc.whatsapp.profilePictures.useQuery(
     { sessionId: activeSession?.sessionId || "", jids: convJids.slice(0, 50) },
     { enabled: !!activeSession?.sessionId && convJids.length > 0, staleTime: 5 * 60 * 1000 }
   );
 
-  const profilePicMap = useMemo(() => {
-    return (profilePicsQ.data || {}) as Record<string, string | null>;
-  }, [profilePicsQ.data]);
+  const profilePicMap = useMemo(() => (profilePicsQ.data || {}) as Record<string, string | null>, [profilePicsQ.data]);
 
-  // Build pushName map from conversations data
+  // PushName map from conversations
   const pushNameMap = useMemo(() => {
     const map = new Map<string, string>();
     for (const c of (conversationsQ.data || []) as ConvItem[]) {
-      if (c.contactPushName) {
-        map.set(c.remoteJid, c.contactPushName);
-      }
+      if (c.contactPushName) map.set(c.remoteJid, c.contactPushName);
     }
     return map;
   }, [conversationsQ.data]);
 
-  // Mark as read mutation
+  // Mark as read
   const markRead = trpc.whatsapp.markRead.useMutation({
     onSuccess: () => conversationsQ.refetch(),
   });
 
-  // Build contact name map from CRM contacts (phone -> name)
+  // Contact name map (CRM phone → contact info)
   const contactNameMap = useMemo(() => {
     const map = new Map<string, { id: number; name: string; phone: string; email?: string; avatarUrl?: string }>();
     for (const c of (contactsQ.data as any[]) || []) {
@@ -969,11 +734,8 @@ export default function InboxPage() {
         const cleaned = c.phone.replace(/\D/g, "");
         const entry = { id: c.id, name: c.name, phone: c.phone, email: c.email || undefined, avatarUrl: undefined };
         map.set(cleaned, entry);
-        if (cleaned.startsWith("55")) {
-          map.set(cleaned.substring(2), entry);
-        } else {
-          map.set(`55${cleaned}`, entry);
-        }
+        if (cleaned.startsWith("55")) map.set(cleaned.substring(2), entry);
+        else map.set(`55${cleaned}`, entry);
       }
     }
     return map;
@@ -985,32 +747,23 @@ export default function InboxPage() {
   }, [contactNameMap]);
 
   const getDisplayName = useCallback((jid: string) => {
-    // 1. CRM contact name
     const contact = getContactForJid(jid);
     if (contact) return contact.name;
-    // 2. WhatsApp pushName (name set by the contact on their WhatsApp)
     const pushName = pushNameMap.get(jid);
     if (pushName) return pushName;
-    // 3. Formatted phone number
     return formatPhoneNumber(jid);
   }, [getContactForJid, pushNameMap]);
 
-  // Refetch on new messages + play notification sound
+  // Notification sound on new messages
   useEffect(() => {
     if (!lastMessage) return;
     conversationsQ.refetch();
-
-    // Play sound only for incoming messages (not from me)
     const isNew = !prevMessageRef.current ||
       lastMessage.timestamp !== prevMessageRef.current.timestamp ||
       lastMessage.remoteJid !== prevMessageRef.current.remoteJid ||
       lastMessage.content !== prevMessageRef.current.content;
-
     if (isNew && !lastMessage.fromMe && !isMuted) {
-      const isCurrentConv = selectedJid === lastMessage.remoteJid;
-      if (!isCurrentConv) {
-        playNotification();
-      }
+      if (selectedJid !== lastMessage.remoteJid) playNotification();
     }
     prevMessageRef.current = lastMessage;
   }, [lastMessage]);
@@ -1027,11 +780,7 @@ export default function InboxPage() {
   // Filter conversations
   const filteredConvs = useMemo(() => {
     let convs = (conversationsQ.data || []) as ConvItem[];
-
-    if (filter === "unread") {
-      convs = convs.filter((c) => Number(c.unreadCount) > 0);
-    }
-
+    if (filter === "unread") convs = convs.filter((c) => Number(c.unreadCount) > 0);
     if (search) {
       const s = search.toLowerCase();
       convs = convs.filter((c) => {
@@ -1040,11 +789,10 @@ export default function InboxPage() {
         return name.includes(s) || phone.includes(s);
       });
     }
-
     return convs;
   }, [conversationsQ.data, search, filter, getDisplayName]);
 
-  // Selected contact for WhatsAppChat (with profile picture)
+  // Selected contact info
   const selectedContact = useMemo(() => {
     if (!selectedJid) return null;
     const crmContact = getContactForJid(selectedJid);
@@ -1055,13 +803,11 @@ export default function InboxPage() {
     return { id: 0, name: displayName, phone, email: undefined, avatarUrl: pic };
   }, [selectedJid, getContactForJid, profilePicMap, getDisplayName]);
 
-  // Check if selected conversation has a CRM contact
   const hasCrmContact = useMemo(() => {
     if (!selectedJid) return false;
     return !!getContactForJid(selectedJid);
   }, [selectedJid, getContactForJid]);
 
-  // Toggle mute
   const toggleMute = useCallback(() => {
     setIsMuted(prev => {
       const next = !prev;
@@ -1072,31 +818,19 @@ export default function InboxPage() {
 
   // No session state
   if (!activeSession && !sessionsQ.isLoading) {
-    return (
-      <div style={{ height: "calc(100vh - 56px)" }}>
-        <NoSession />
-      </div>
-    );
+    return <div className="h-full"><NoSession /></div>;
   }
 
   return (
-    <div
-      className="flex overflow-hidden"
-      style={{
-        height: "calc(100vh - 56px)",
-        backgroundColor: "#eae6df",
-      }}
-    >
+    <div className="flex h-full overflow-hidden bg-wa-chat-bg">
       {/* ═══ LEFT PANEL: Conversations List ═══ */}
       <div
-        className={`flex flex-col bg-card ${
-          showMobileChat ? "hidden md:flex" : "flex"
-        }`}
+        className={`flex flex-col bg-wa-panel ${showMobileChat ? "hidden md:flex" : "flex"}`}
         style={{
           width: "100%",
-          maxWidth: "440px",
-          minWidth: "340px",
-          borderRight: "1px solid #d1d7db",
+          maxWidth: "420px",
+          minWidth: "320px",
+          borderRight: "1px solid var(--wa-divider)",
           position: "relative",
         }}
       >
@@ -1104,89 +838,64 @@ export default function InboxPage() {
         <NewChatPanel
           open={showNewChat}
           onClose={() => setShowNewChat(false)}
-          onSelectJid={(jid, name) => {
-            handleSelectConv(jid);
-            setShowNewChat(false);
-          }}
+          onSelectJid={(jid) => { handleSelectConv(jid); setShowNewChat(false); }}
           sessionId={activeSession?.sessionId || ""}
         />
+
         {/* ── Header ── */}
-        <div
-          className="flex items-center justify-between shrink-0"
-          style={{
-            height: "59px",
-            padding: "10px 16px",
-            backgroundColor: "#F0F2F5",
-          }}
-        >
+        <div className="flex items-center justify-between shrink-0 h-[59px] px-4 bg-wa-panel-header border-b border-wa-divider">
           <WaAvatar name="Eu" size={40} />
-          <div className="flex items-center gap-[10px]">
+          <div className="flex items-center gap-1">
             <button
               onClick={toggleMute}
-              className="w-[40px] h-[40px] flex items-center justify-center rounded-full hover:bg-muted transition-colors relative group"
+              className="w-[40px] h-[40px] flex items-center justify-center rounded-full hover:bg-wa-hover transition-colors relative group"
               title={isMuted ? "Ativar som de notificação" : "Silenciar notificações"}
             >
-              {isMuted ? (
-                <VolumeX className="w-[22px] h-[22px] text-red-500" />
-              ) : (
-                <Volume2 className="w-[22px] h-[22px] text-muted-foreground" />
-              )}
-              {/* Tooltip */}
-              <span className="absolute -bottom-8 left-1/2 -translate-x-1/2 bg-popover text-white text-[11px] px-2 py-1 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+              {isMuted ? <VolumeX className="w-[20px] h-[20px] text-destructive" /> : <Volume2 className="w-[20px] h-[20px] text-muted-foreground" />}
+              <span className="absolute -bottom-8 left-1/2 -translate-x-1/2 bg-foreground text-background text-[11px] px-2 py-1 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
                 {isMuted ? "Som desativado" : "Som ativado"}
               </span>
             </button>
-            <button
-              onClick={() => setShowNewChat(true)}
-              className="w-[40px] h-[40px] flex items-center justify-center rounded-full hover:bg-muted transition-colors"
-              title="Nova conversa"
-            >
-              <MessageCircle className="w-[22px] h-[22px] text-muted-foreground" />
+            <button onClick={() => setShowNewChat(true)} className="w-[40px] h-[40px] flex items-center justify-center rounded-full hover:bg-wa-hover transition-colors" title="Nova conversa">
+              <MessageCircle className="w-[20px] h-[20px] text-muted-foreground" />
             </button>
-            <button className="w-[40px] h-[40px] flex items-center justify-center rounded-full hover:bg-muted transition-colors">
-              <MoreVertical className="w-[22px] h-[22px] text-muted-foreground" />
+            <button className="w-[40px] h-[40px] flex items-center justify-center rounded-full hover:bg-wa-hover transition-colors">
+              <MoreVertical className="w-[20px] h-[20px] text-muted-foreground" />
             </button>
           </div>
         </div>
 
         {/* ── Search Bar ── */}
-        <div className="shrink-0" style={{ padding: "7px 12px", backgroundColor: "#FFFFFF" }}>
-          <div
-            className="flex items-center rounded-lg overflow-hidden"
-            style={{ height: "35px", backgroundColor: "#F0F2F5", padding: "0 8px 0 12px" }}
-          >
+        <div className="shrink-0 px-3 py-[7px] bg-wa-panel">
+          <div className="flex items-center rounded-lg overflow-hidden h-[35px] bg-wa-search-bg px-3">
             <Search
-              className="shrink-0 transition-all duration-200"
-              style={{ width: "16px", height: "16px", color: searchFocused ? "#25D366" : "#54656F" }}
+              className="shrink-0 transition-colors duration-200"
+              style={{ width: "15px", height: "15px" }}
+              color={searchFocused ? "var(--wa-tint)" : undefined}
             />
             <input
-              type="text"
-              placeholder="Pesquisar"
-              value={search}
+              type="text" placeholder="Pesquisar" value={search}
               onChange={(e) => setSearch(e.target.value)}
               onFocus={() => setSearchFocused(true)}
               onBlur={() => setSearchFocused(false)}
-              className="flex-1 bg-transparent border-none outline-none text-[14px] text-foreground placeholder:text-muted-foreground"
-              style={{ paddingLeft: "12px", height: "100%" }}
+              className="flex-1 bg-transparent border-none outline-none text-[14px] text-foreground placeholder:text-muted-foreground pl-3 h-full"
             />
           </div>
         </div>
 
         {/* ── Filter Tabs ── */}
-        <div className="flex items-center gap-[6px] shrink-0" style={{ padding: "6px 12px" }}>
+        <div className="flex items-center gap-[6px] shrink-0 px-3 py-[6px]">
           {(["all", "unread"] as const).map((f) => {
             const labels: Record<string, string> = { all: "Todas", unread: "Não lidas" };
             const active = filter === f;
             return (
               <button
-                key={f}
-                onClick={() => setFilter(f)}
-                className="rounded-full text-[13px] font-medium transition-colors"
-                style={{
-                  padding: "5px 12px",
-                  backgroundColor: active ? "#E7FCE3" : "#F0F2F5",
-                  color: active ? "#008069" : "#54656F",
-                }}
+                key={f} onClick={() => setFilter(f)}
+                className={`rounded-full text-[13px] font-medium transition-colors px-3 py-[5px] ${
+                  active
+                    ? "bg-wa-tint/15 text-wa-tint"
+                    : "bg-wa-search-bg text-muted-foreground hover:bg-wa-hover"
+                }`}
               >
                 {labels[f]}
               </button>
@@ -1195,14 +904,14 @@ export default function InboxPage() {
         </div>
 
         {/* ── Conversations List ── */}
-        <div className="flex-1 overflow-y-auto" style={{ overscrollBehavior: "contain" }}>
+        <div className="flex-1 overflow-y-auto scrollbar-thin" style={{ overscrollBehavior: "contain" }}>
           {conversationsQ.isLoading || sessionsQ.isLoading ? (
             <div className="flex items-center justify-center py-16">
-              <Loader2 className="w-6 h-6 text-emerald-500 animate-spin" />
+              <Loader2 className="w-6 h-6 text-wa-tint animate-spin" />
             </div>
           ) : filteredConvs.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
-              <MessageSquare className="w-12 h-12 text-muted-foreground/20 mb-3" />
+              <MessageSquare className="w-12 h-12 text-muted-foreground/15 mb-3" />
               <p className="text-[14px] text-muted-foreground">
                 {search ? "Nenhuma conversa encontrada" : filter === "unread" ? "Nenhuma conversa não lida" : "Nenhuma conversa ainda"}
               </p>
@@ -1223,23 +932,17 @@ export default function InboxPage() {
       </div>
 
       {/* ═══ RIGHT PANEL: Chat Area ═══ */}
-      <div
-        className={`flex-1 flex flex-col min-w-0 ${
-          !showMobileChat ? "hidden md:flex" : "flex"
-        }`}
-        style={{ position: "relative" }}
-      >
+      <div className={`flex-1 flex flex-col min-w-0 ${!showMobileChat ? "hidden md:flex" : "flex"}`}>
         {!selectedJid || !activeSession ? (
           <EmptyChat />
         ) : (
-          <div className="flex flex-col h-full w-full" style={{ position: "relative" }}>
-            {/* Mobile back button overlay */}
+          <div className="flex flex-col h-full w-full relative">
+            {/* Mobile back button */}
             <button
               onClick={() => setShowMobileChat(false)}
-              className="md:hidden absolute top-[10px] left-[6px] z-30 p-[6px] rounded-full"
-              style={{ backgroundColor: "rgba(255,255,255,0.85)", boxShadow: "0 1px 3px rgba(0,0,0,0.1)" }}
+              className="md:hidden absolute top-[10px] left-[6px] z-30 p-[6px] rounded-full bg-card/85 shadow-sm backdrop-blur-sm"
             >
-              <ArrowLeft className="w-5 h-5 text-muted-foreground" />
+              <ArrowLeft className="w-5 h-5 text-foreground" />
             </button>
 
             <WhatsAppChat
@@ -1254,9 +957,7 @@ export default function InboxPage() {
         )}
       </div>
 
-      {/* ═══ NEW CHAT PANEL (mobile) ═══ */}
-
-      {/* ═══ CREATE DEAL DIALOG ═══ */}
+      {/* ═══ DIALOGS ═══ */}
       {selectedJid && activeSession && (
         <CreateDealDialog
           open={showCreateDeal}
@@ -1267,18 +968,13 @@ export default function InboxPage() {
           sessionId={activeSession.sessionId}
         />
       )}
-
-      {/* ═══ CREATE CONTACT DIALOG ═══ */}
       {selectedJid && (
         <CreateContactDialog
           open={showCreateContact}
           onClose={() => setShowCreateContact(false)}
           phone={selectedJid.split("@")[0]}
           pushName={selectedContact?.name || ""}
-          onCreated={() => {
-            contactsQ.refetch();
-            setShowCreateContact(false);
-          }}
+          onCreated={() => { contactsQ.refetch(); setShowCreateContact(false); }}
         />
       )}
     </div>

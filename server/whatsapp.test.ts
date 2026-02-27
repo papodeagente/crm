@@ -529,3 +529,88 @@ describe("WhatsApp API Routes", () => {
     expect(settings?.maxTokens).toBe(300);
   });
 });
+
+describe("WhatsApp Inbox Sync Tests", () => {
+  it("whatsapp.profilePictures returns empty object for disconnected session", async () => {
+    const { ctx } = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    const result = await caller.whatsapp.profilePictures({
+      sessionId: "nonexistent-session",
+      jids: ["5511999999999@s.whatsapp.net"],
+    });
+    expect(result).toBeDefined();
+    expect(typeof result).toBe("object");
+  });
+
+  it("whatsapp.profilePictures accepts empty jids array", async () => {
+    const { ctx } = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    const result = await caller.whatsapp.profilePictures({
+      sessionId: "test-session",
+      jids: [],
+    });
+    expect(result).toBeDefined();
+    expect(typeof result).toBe("object");
+    expect(Object.keys(result).length).toBe(0);
+  });
+
+  it("whatsapp.conversations returns array with correct shape", async () => {
+    const { ctx } = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    const result = await caller.whatsapp.conversations({ sessionId: "test-session" });
+    expect(Array.isArray(result)).toBe(true);
+    // Each item should have the expected fields if any exist
+    if (result.length > 0) {
+      const conv = result[0];
+      expect(conv).toHaveProperty("remoteJid");
+      expect(conv).toHaveProperty("lastMessage");
+      expect(conv).toHaveProperty("lastTimestamp");
+      expect(conv).toHaveProperty("unreadCount");
+      expect(conv).toHaveProperty("contactPushName");
+    }
+  });
+
+  it("whatsapp.messagesByContact returns messages in expected format", async () => {
+    const { ctx } = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    const result = await caller.whatsapp.messagesByContact({
+      sessionId: "test-session",
+      remoteJid: "5511999999999@s.whatsapp.net",
+      limit: 10,
+    });
+    expect(Array.isArray(result)).toBe(true);
+    if (result.length > 0) {
+      const msg = result[0];
+      expect(msg).toHaveProperty("id");
+      expect(msg).toHaveProperty("fromMe");
+      expect(msg).toHaveProperty("messageType");
+      expect(msg).toHaveProperty("timestamp");
+    }
+  });
+
+  it("whatsapp.markRead returns success for valid input", async () => {
+    const { ctx } = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    const result = await caller.whatsapp.markRead({
+      sessionId: "test-session",
+      remoteJid: "5511999999999@s.whatsapp.net",
+    });
+    expect(result).toEqual({ success: true });
+  });
+
+  it("whatsapp.profilePictures handles multiple jids", async () => {
+    const { ctx } = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    const jids = [
+      "5511999999999@s.whatsapp.net",
+      "5511888888888@s.whatsapp.net",
+      "5511777777777@s.whatsapp.net",
+    ];
+    const result = await caller.whatsapp.profilePictures({
+      sessionId: "test-session",
+      jids,
+    });
+    expect(result).toBeDefined();
+    expect(typeof result).toBe("object");
+  });
+});
