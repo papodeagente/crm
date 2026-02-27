@@ -798,3 +798,50 @@
 - [x] Testes CRUD de pipelines e stages
 - [x] Testes de automação de transição
 - [x] Testes de funil pós-venda — 173 testes, 8 arquivos, todos passando
+
+## Catálogo de Produtos Turísticos e Relatórios
+
+### Schema
+- [x] Criar tabela product_catalog (id, tenantId, name, categoryId, productType, basePriceCents, costPriceCents, currency, supplier, destination, duration, imageUrl, sku, isActive, detailsJson)
+- [x] Criar tabela product_categories (id, tenantId, name, icon, color, parentId, sortOrder)
+- [x] Expandir deal_products com catalogProductId para referenciar product_catalog
+
+### Backend
+- [x] CRUD de categorias de produtos turísticos
+- [x] CRUD de produtos do catálogo (criar, editar, ativar/desativar, excluir)
+- [x] Endpoint para vincular produto do catálogo a uma negociação (com quantidade, preço customizado, datas)
+- [x] Query de relatórios: produtos mais vendidos (deals won)
+- [x] Query de relatórios: produtos mais perdidos (deals lost)
+- [x] Query de relatórios: produtos mais solicitados (todos os deals)
+- [x] Query de relatórios: receita por produto, por categoria, por período
+- [x] Query de relatórios: ticket médio por produto/categoria
+- [x] Query de relatórios: taxa de conversão por produto
+
+### Frontend - Catálogo
+- [x] Página /settings/products com lista de produtos em grid/tabela
+- [x] Filtros por categoria, status, faixa de preço, destino
+- [x] Modal de criar/editar produto com campos completos
+- [ ] Seletor de produto no DealDetail (tab Produtos) vinculando ao catálogo — futuro
+- [ ] Precificação customizada por negociação (preço base vs preço negociado) — futuro
+
+### Frontend - Relatórios
+- [x] Página /analytics/products com dashboard de métricas
+- [x] Card: Top 10 produtos mais vendidos (barras horizontais)
+- [x] Card: Top 10 produtos mais perdidos (barras horizontais)
+- [x] Card: Top 10 produtos mais solicitados (barras horizontais)
+- [x] Card: Receita por categoria (donut chart)
+- [ ] Card: Evolução de vendas por produto ao longo do tempo (line chart) — futuro
+- [x] Card: Ticket médio por categoria (tabela detalhada)
+- [x] Card: Taxa de conversão por produto (barras com %)
+- [ ] Filtros: período, categoria, destino, fornecedor — futuro
+- [x] Exportação dos dados (CSV)
+
+### Navegação
+- [x] Link na navegação principal (Settings) para Catálogo de Produtos
+- [x] Rota /settings/products no App.tsx
+- [x] Rota /analytics/products no App.tsx
+
+### Testes
+- [x] Testes CRUD de catálogo de produtos
+- [x] Testes de vinculação produto-deal
+- [x] Testes de queries de relatórios

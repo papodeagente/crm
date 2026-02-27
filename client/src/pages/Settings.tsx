@@ -136,6 +136,14 @@ const settingsSections: SettingsSection[] = [
         bgColor: "bg-emerald-500/15",
       },
       {
+        icon: Plane,
+        label: "Catálogo de Produtos",
+        description: "Gerencie produtos turísticos, preços e fornecedores",
+        path: "/settings/products",
+        color: "text-sky-400",
+        bgColor: "bg-sky-500/15",
+      },
+      {
         icon: BookOpen,
         label: "Documentação API",
         description: "Referência técnica e endpoints",

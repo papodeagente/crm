@@ -386,6 +386,49 @@ export const dealParticipants = mysqlTable("deal_participants", {
 }, (t) => [index("dp_tenant_idx").on(t.tenantId)]);
 
 // ════════════════════════════════════════════════════════════
+// PRODUCT CATALOG (Catálogo de Produtos Turísticos)
+// ════════════════════════════════════════════════════════════
+
+export const productCategories = mysqlTable("product_categories", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  name: varchar("name", { length: 128 }).notNull(),
+  icon: varchar("icon", { length: 64 }),
+  color: varchar("color", { length: 32 }),
+  parentId: int("parentId"),
+  sortOrder: int("sortOrder").default(0).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (t) => [
+  index("pc_tenant_idx").on(t.tenantId),
+]);
+
+export const productCatalog = mysqlTable("product_catalog", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  categoryId: int("categoryId"),
+  productType: mysqlEnum("productType", ["flight", "hotel", "tour", "transfer", "insurance", "cruise", "visa", "package", "other"]).default("other").notNull(),
+  basePriceCents: bigint("basePriceCents", { mode: "number" }).default(0).notNull(),
+  costPriceCents: bigint("costPriceCents", { mode: "number" }).default(0),
+  currency: varchar("currency", { length: 3 }).default("BRL"),
+  supplier: varchar("supplier", { length: 255 }),
+  destination: varchar("destination", { length: 255 }),
+  duration: varchar("duration", { length: 128 }),
+  imageUrl: text("imageUrl"),
+  sku: varchar("sku", { length: 64 }),
+  isActive: boolean("isActive").default(true).notNull(),
+  detailsJson: json("detailsJson"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (t) => [
+  index("pcat_tenant_idx").on(t.tenantId),
+  index("pcat_tenant_type_idx").on(t.tenantId, t.productType),
+  index("pcat_tenant_cat_idx").on(t.tenantId, t.categoryId),
+  index("pcat_tenant_active_idx").on(t.tenantId, t.isActive),
+]);
+
+// ════════════════════════════════════════════════════════════
 // DEAL PRODUCTS (Orçamento / Itens do Deal)
 // ════════════════════════════════════════════════════════════
 
@@ -403,11 +446,13 @@ export const dealProducts = mysqlTable("deal_products", {
   supplier: varchar("supplier", { length: 255 }),
   checkIn: timestamp("checkIn"),
   checkOut: timestamp("checkOut"),
+  catalogProductId: int("catalogProductId"),
   notes: text("notes"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 }, (t) => [
   index("dp_prod_tenant_deal_idx").on(t.tenantId, t.dealId),
+  index("dp_prod_catalog_idx").on(t.catalogProductId),
 ]);
 
 // ════════════════════════════════════════════════════════════
@@ -955,6 +1000,10 @@ export const notifications = mysqlTable("notifications", {
 ]);
 
 export type Notification = typeof notifications.$inferSelect;
+export type ProductCategory = typeof productCategories.$inferSelect;
+export type InsertProductCategory = typeof productCategories.$inferInsert;
+export type ProductCatalogItem = typeof productCatalog.$inferSelect;
+export type InsertProductCatalogItem = typeof productCatalog.$inferInsert;
 export type CustomField = typeof customFields.$inferSelect;
 export type InsertCustomField = typeof customFields.$inferInsert;
 export type CustomFieldValue = typeof customFieldValues.$inferSelect;

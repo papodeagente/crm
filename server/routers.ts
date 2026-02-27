@@ -72,6 +72,7 @@ import { adminRouter } from "./routers/adminRouter";
 import { crmRouter } from "./routers/crmRouter";
 import { inboxRouter } from "./routers/inboxRouter";
 import { proposalRouter, portalRouter, managementRouter, insightsRouter, academyRouter, integrationHubRouter } from "./routers/featureRouters";
+import { productCatalogRouter } from "./routers/productCatalogRouter";
 
 export const appRouter = router({
   system: systemRouter,
@@ -525,6 +526,7 @@ export const appRouter = router({
   insights: insightsRouter, // M6: Insights
   academy: academyRouter,   // M7: Academy
   integrationHub: integrationHubRouter, // M8: Integration Hub
+  productCatalog: productCatalogRouter, // M9: Catálogo de Produtos Turísticos
 
   // ─── Contact Profile & Custom Fields ───
   contactProfile: router({

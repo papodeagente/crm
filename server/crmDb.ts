@@ -1,4 +1,4 @@
-import { eq, and, desc, asc, like, sql, inArray } from "drizzle-orm";
+import { eq, and, desc, asc, like, sql, inArray, count, sum } from "drizzle-orm";
 import { getDb } from "./db";
 import {
   tenants, crmUsers, teams, teamMembers, roles, permissions, rolePermissions, userRoles, apiKeys,
@@ -11,6 +11,7 @@ import {
   courses, lessons, enrollments,
   integrations, integrationConnections, integrationCredentials, webhooks, jobs, jobDlq,
   eventLog,
+  productCategories, productCatalog,
 } from "../drizzle/schema";
 
 // ═══════════════════════════════════════
@@ -689,4 +690,217 @@ export async function executePipelineAutomation(tenantId: number, dealId: number
   }
 
   return createdDeals;
+}
+
+// ═══════════════════════════════════════
+// PRODUCT CATEGORIES
+// ═══════════════════════════════════════
+export async function listProductCategories(tenantId: number) {
+  const db = await getDb(); if (!db) return [];
+  return db.select().from(productCategories).where(eq(productCategories.tenantId, tenantId)).orderBy(asc(productCategories.sortOrder), asc(productCategories.name));
+}
+export async function getProductCategoryById(tenantId: number, id: number) {
+  const db = await getDb(); if (!db) return null;
+  const rows = await db.select().from(productCategories).where(and(eq(productCategories.id, id), eq(productCategories.tenantId, tenantId))).limit(1);
+  return rows[0] || null;
+}
+export async function createProductCategory(data: { tenantId: number; name: string; icon?: string; color?: string; parentId?: number; sortOrder?: number }) {
+  const db = await getDb(); if (!db) return null;
+  const [result] = await db.insert(productCategories).values(data).$returningId();
+  return result;
+}
+export async function updateProductCategory(tenantId: number, id: number, data: Partial<{ name: string; icon: string; color: string; parentId: number | null; sortOrder: number }>) {
+  const db = await getDb(); if (!db) return;
+  await db.update(productCategories).set(data).where(and(eq(productCategories.id, id), eq(productCategories.tenantId, tenantId)));
+}
+export async function deleteProductCategory(tenantId: number, id: number) {
+  const db = await getDb(); if (!db) return;
+  await db.delete(productCategories).where(and(eq(productCategories.id, id), eq(productCategories.tenantId, tenantId)));
+}
+
+// ═══════════════════════════════════════
+// PRODUCT CATALOG
+// ═══════════════════════════════════════
+export async function listCatalogProducts(tenantId: number, opts?: { search?: string; productType?: string; categoryId?: number; isActive?: boolean; limit?: number; offset?: number }) {
+  const db = await getDb(); if (!db) return [];
+  const conditions = [eq(productCatalog.tenantId, tenantId)];
+  if (opts?.search) conditions.push(like(productCatalog.name, `%${opts.search}%`));
+  if (opts?.productType) conditions.push(eq(productCatalog.productType, opts.productType as any));
+  if (opts?.categoryId !== undefined) conditions.push(eq(productCatalog.categoryId, opts.categoryId));
+  if (opts?.isActive !== undefined) conditions.push(eq(productCatalog.isActive, opts.isActive));
+  return db.select().from(productCatalog).where(and(...conditions)).orderBy(desc(productCatalog.updatedAt)).limit(opts?.limit || 100).offset(opts?.offset || 0);
+}
+export async function getCatalogProductById(tenantId: number, id: number) {
+  const db = await getDb(); if (!db) return null;
+  const rows = await db.select().from(productCatalog).where(and(eq(productCatalog.id, id), eq(productCatalog.tenantId, tenantId))).limit(1);
+  return rows[0] || null;
+}
+export async function createCatalogProduct(data: {
+  tenantId: number; name: string; description?: string; categoryId?: number;
+  productType?: "flight" | "hotel" | "tour" | "transfer" | "insurance" | "cruise" | "visa" | "package" | "other";
+  basePriceCents?: number; costPriceCents?: number; currency?: string;
+  supplier?: string; destination?: string; duration?: string;
+  imageUrl?: string; sku?: string; isActive?: boolean; detailsJson?: any;
+}) {
+  const db = await getDb(); if (!db) return null;
+  const [result] = await db.insert(productCatalog).values(data).$returningId();
+  return result;
+}
+export async function updateCatalogProduct(tenantId: number, id: number, data: Partial<{
+  name: string; description: string; categoryId: number | null;
+  productType: "flight" | "hotel" | "tour" | "transfer" | "insurance" | "cruise" | "visa" | "package" | "other";
+  basePriceCents: number; costPriceCents: number; currency: string;
+  supplier: string; destination: string; duration: string;
+  imageUrl: string; sku: string; isActive: boolean; detailsJson: any;
+}>) {
+  const db = await getDb(); if (!db) return;
+  await db.update(productCatalog).set(data).where(and(eq(productCatalog.id, id), eq(productCatalog.tenantId, tenantId)));
+}
+export async function deleteCatalogProduct(tenantId: number, id: number) {
+  const db = await getDb(); if (!db) return;
+  await db.delete(productCatalog).where(and(eq(productCatalog.id, id), eq(productCatalog.tenantId, tenantId)));
+}
+export async function countCatalogProducts(tenantId: number, isActive?: boolean) {
+  const db = await getDb(); if (!db) return 0;
+  const conditions = [eq(productCatalog.tenantId, tenantId)];
+  if (isActive !== undefined) conditions.push(eq(productCatalog.isActive, isActive));
+  const [row] = await db.select({ total: count() }).from(productCatalog).where(and(...conditions));
+  return row?.total || 0;
+}
+
+// ═══════════════════════════════════════
+// PRODUCT ANALYTICS
+// ═══════════════════════════════════════
+
+/** Most sold products: products in deals with status='won', grouped by name/category */
+export async function getProductAnalyticsMostSold(tenantId: number, limit = 10) {
+  const db = await getDb(); if (!db) return [];
+  const rows = await db.execute(sql`
+    SELECT dp.name, dp.category, dp.catalogProductId,
+           COUNT(*) as dealCount,
+           SUM(dp.quantity) as totalQuantity,
+           SUM(dp.unitPriceCents * dp.quantity - COALESCE(dp.discountCents, 0)) as totalRevenueCents
+    FROM deal_products dp
+    INNER JOIN deals d ON dp.dealId = d.id AND dp.tenantId = d.tenantId
+    WHERE dp.tenantId = ${tenantId} AND d.status = 'won'
+    GROUP BY dp.name, dp.category, dp.catalogProductId
+    ORDER BY totalQuantity DESC
+    LIMIT ${limit}
+  `);
+  return (rows as any)[0] || [];
+}
+
+/** Most lost products: products in deals with status='lost' */
+export async function getProductAnalyticsMostLost(tenantId: number, limit = 10) {
+  const db = await getDb(); if (!db) return [];
+  const rows = await db.execute(sql`
+    SELECT dp.name, dp.category, dp.catalogProductId,
+           COUNT(*) as dealCount,
+           SUM(dp.quantity) as totalQuantity,
+           SUM(dp.unitPriceCents * dp.quantity - COALESCE(dp.discountCents, 0)) as totalValueCents
+    FROM deal_products dp
+    INNER JOIN deals d ON dp.dealId = d.id AND dp.tenantId = d.tenantId
+    WHERE dp.tenantId = ${tenantId} AND d.status = 'lost'
+    GROUP BY dp.name, dp.category, dp.catalogProductId
+    ORDER BY totalQuantity DESC
+    LIMIT ${limit}
+  `);
+  return (rows as any)[0] || [];
+}
+
+/** Most requested products: all products across all deals regardless of status */
+export async function getProductAnalyticsMostRequested(tenantId: number, limit = 10) {
+  const db = await getDb(); if (!db) return [];
+  const rows = await db.execute(sql`
+    SELECT dp.name, dp.category, dp.catalogProductId,
+           COUNT(*) as dealCount,
+           SUM(dp.quantity) as totalQuantity,
+           SUM(dp.unitPriceCents * dp.quantity - COALESCE(dp.discountCents, 0)) as totalValueCents
+    FROM deal_products dp
+    INNER JOIN deals d ON dp.dealId = d.id AND dp.tenantId = d.tenantId
+    WHERE dp.tenantId = ${tenantId}
+    GROUP BY dp.name, dp.category, dp.catalogProductId
+    ORDER BY totalQuantity DESC
+    LIMIT ${limit}
+  `);
+  return (rows as any)[0] || [];
+}
+
+/** Revenue by product type (category) */
+export async function getProductAnalyticsRevenueByType(tenantId: number) {
+  const db = await getDb(); if (!db) return [];
+  const rows = await db.execute(sql`
+    SELECT dp.category,
+           COUNT(DISTINCT d.id) as dealCount,
+           SUM(dp.quantity) as totalQuantity,
+           SUM(dp.unitPriceCents * dp.quantity - COALESCE(dp.discountCents, 0)) as totalRevenueCents
+    FROM deal_products dp
+    INNER JOIN deals d ON dp.dealId = d.id AND dp.tenantId = d.tenantId
+    WHERE dp.tenantId = ${tenantId} AND d.status = 'won'
+    GROUP BY dp.category
+    ORDER BY totalRevenueCents DESC
+  `);
+  return (rows as any)[0] || [];
+}
+
+/** Conversion rate by product: won vs total deals containing each product */
+export async function getProductAnalyticsConversionRate(tenantId: number, limit = 10) {
+  const db = await getDb(); if (!db) return [];
+  const rows = await db.execute(sql`
+    SELECT dp.name, dp.category, dp.catalogProductId,
+           COUNT(DISTINCT d.id) as totalDeals,
+           SUM(CASE WHEN d.status = 'won' THEN 1 ELSE 0 END) as wonDeals,
+           ROUND(SUM(CASE WHEN d.status = 'won' THEN 1 ELSE 0 END) * 100.0 / COUNT(DISTINCT d.id), 1) as conversionRate
+    FROM deal_products dp
+    INNER JOIN deals d ON dp.dealId = d.id AND dp.tenantId = d.tenantId
+    WHERE dp.tenantId = ${tenantId}
+    GROUP BY dp.name, dp.category, dp.catalogProductId
+    HAVING COUNT(DISTINCT d.id) >= 1
+    ORDER BY conversionRate DESC
+    LIMIT ${limit}
+  `);
+  return (rows as any)[0] || [];
+}
+
+/** Product analytics summary: total products, active, avg price, total revenue */
+export async function getProductAnalyticsSummary(tenantId: number) {
+  const db = await getDb(); if (!db) return { totalProducts: 0, activeProducts: 0, avgPriceCents: 0, totalRevenueCents: 0, totalCostCents: 0 };
+  const [catRow] = await db.select({
+    total: count(),
+    active: sql<number>`SUM(CASE WHEN ${productCatalog.isActive} = true THEN 1 ELSE 0 END)`,
+    avgPrice: sql<number>`COALESCE(AVG(${productCatalog.basePriceCents}), 0)`,
+  }).from(productCatalog).where(eq(productCatalog.tenantId, tenantId));
+
+  const revRows = await db.execute(sql`
+    SELECT COALESCE(SUM(dp.unitPriceCents * dp.quantity - COALESCE(dp.discountCents, 0)), 0) as totalRevenueCents,
+           COALESCE(COUNT(DISTINCT dp.dealId), 0) as dealsWithProducts
+    FROM deal_products dp
+    INNER JOIN deals d ON dp.dealId = d.id AND dp.tenantId = d.tenantId
+    WHERE dp.tenantId = ${tenantId} AND d.status = 'won'
+  `);
+  const rev = ((revRows as any)[0] || [])[0] || {};
+
+  return {
+    totalProducts: catRow?.total || 0,
+    activeProducts: Number(catRow?.active) || 0,
+    avgPriceCents: Math.round(Number(catRow?.avgPrice) || 0),
+    totalRevenueCents: Number(rev.totalRevenueCents) || 0,
+    dealsWithProducts: Number(rev.dealsWithProducts) || 0,
+  };
+}
+
+/** Top destinations by revenue */
+export async function getProductAnalyticsTopDestinations(tenantId: number, limit = 10) {
+  const db = await getDb(); if (!db) return [];
+  const rows = await db.execute(sql`
+    SELECT pc.destination,
+           COUNT(*) as productCount,
+           SUM(pc.basePriceCents) as totalBasePriceCents
+    FROM product_catalog pc
+    WHERE pc.tenantId = ${tenantId} AND pc.isActive = true AND pc.destination IS NOT NULL AND pc.destination != ''
+    GROUP BY pc.destination
+    ORDER BY productCount DESC
+    LIMIT ${limit}
+  `);
+  return (rows as any)[0] || [];
 }
