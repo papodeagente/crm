@@ -124,8 +124,8 @@ const settingsSections: SettingsSection[] = [
         label: "Campos Personalizados",
         description: "Configure campos extras para contatos, negociações e mais",
         path: "/settings/custom-fields",
-        color: "text-teal-400",
-        bgColor: "bg-teal-500/15",
+        color: "text-violet-400",
+        bgColor: "bg-violet-500/15",
       },
       {
         icon: GitBranch,

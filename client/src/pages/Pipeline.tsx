@@ -25,7 +25,7 @@ type ViewMode = "kanban" | "list";
 type SortMode = "created_desc" | "created_asc" | "value_desc" | "value_asc";
 
 const statusColors: Record<string, { bg: string; text: string; dot: string }> = {
-  open: { bg: "bg-teal-50 dark:bg-teal-500/15", text: "text-teal-700 dark:text-teal-300", dot: "bg-teal-500" },
+  open: { bg: "bg-violet-50 dark:bg-violet-500/15", text: "text-violet-700 dark:text-violet-300", dot: "bg-violet-500" },
   won: { bg: "bg-emerald-50 dark:bg-emerald-500/15", text: "text-emerald-700 dark:text-emerald-300", dot: "bg-emerald-500" },
   lost: { bg: "bg-red-50 dark:bg-red-500/15", text: "text-red-700 dark:text-red-300", dot: "bg-red-500" },
 };

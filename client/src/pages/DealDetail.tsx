@@ -876,7 +876,7 @@ function HistoryPanel({ history, notes, dealId, onNoteCreated }: {
     stage_moved: "bg-blue-500/15 text-blue-500",
     field_changed: "bg-yellow-500/15 text-yellow-500",
     status_changed: "bg-purple-500/15 text-purple-500",
-    product_added: "bg-teal-500/15 text-teal-500",
+    product_added: "bg-violet-500/15 text-violet-500",
     product_removed: "bg-red-500/15 text-red-500",
     participant_added: "bg-indigo-500/15 text-indigo-500",
     participant_removed: "bg-red-500/15 text-red-500",

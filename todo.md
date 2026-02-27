@@ -867,3 +867,11 @@
 - [x] Ajustar variáveis de tema claro para melhor contraste (fundo cinza suave, cards brancos)
 - [x] Ajustar variáveis de tema escuro para manter consistência
 - [x] Melhorar contraste de texto (foreground vs background) em ambos os temas
+
+## Correção de Cores — Reverter teal/ciano para padrão ENTUR OS
+
+- [x] Reverter primary color no index.css de teal (195) para roxo/magenta original ENTUR OS
+- [x] Reverter accent color no index.css de teal para padrão original
+- [x] Reverter cores de status no Pipeline.tsx (teal → violet ENTUR OS)
+- [x] Reverter cores de stage bar no DealDetail.tsx (usa primary CSS var)
+- [x] Reverter cores de botões no DealDetail.tsx (usa primary CSS var)
