@@ -17,7 +17,8 @@ import {
   Clock, Copy, DollarSign, Edit2, ExternalLink, FileText, Flag, GripVertical,
   History, Loader2, Mail, MapPin, MessageCircle, MessageSquarePlus, Mic, MoreHorizontal,
   Package, Phone, Plane, Play, Plus, Send, ShoppingBag, ThumbsDown, ThumbsUp,
-  Trash2, User, Users, X, AlertCircle, ClipboardList, Paperclip, Tag
+  Trash2, User, Users, X, AlertCircle, ClipboardList, Paperclip, Tag,
+  Sparkles, BarChart3, TrendingUp, TrendingDown, Star, Target, Lightbulb, RefreshCw, Award
 } from "lucide-react";
 
 const TENANT_ID = 1;
@@ -132,7 +133,7 @@ export default function DealDetail() {
     setSidebarSections((prev) => ({ ...prev, [key]: !prev[key] }));
 
   /* ─── Content tabs ─── */
-  const [activeTab, setActiveTab] = useState<"history" | "tasks" | "products" | "participants" | "whatsapp">("history");
+  const [activeTab, setActiveTab] = useState<"history" | "tasks" | "products" | "participants" | "whatsapp" | "ai-analysis">("history");
 
   /* ─── Status dialogs ─── */
   const [showWonDialog, setShowWonDialog] = useState(false);
@@ -464,6 +465,7 @@ export default function DealDetail() {
               { key: "products" as const, label: "Produtos e Serviços", icon: ShoppingBag, count: (productsQ.data || []).length },
               { key: "participants" as const, label: "Participantes", icon: Users, count: (participantsQ.data || []).length },
               { key: "whatsapp" as const, label: "WhatsApp", icon: MessageCircle, count: waMessagesCountQ.data || 0 },
+              { key: "ai-analysis" as const, label: "Análise IA", icon: Sparkles },
             ].map((tab) => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.key;
@@ -525,6 +527,9 @@ export default function DealDetail() {
             )}
             {activeTab === "whatsapp" && (
               <WhatsAppPanel contact={contact} dealId={dealId} />
+            )}
+            {activeTab === "ai-analysis" && (
+              <AiAnalysisPanel dealId={dealId} contactName={contact?.name || "Contato"} />
             )}
           </div>
         </div>
@@ -1293,6 +1298,277 @@ function ParticipantsPanel({ participants, contacts, dealId, onRefresh }: any) {
 /* ════════════════════════════════════════════════════════════ */
 /* WHATSAPP PANEL                                              */
 /* ════════════════════════════════════════════════════════════ */
+
+/* ═══════════════════════════════════════════════════════════════════
+   AI ANALYSIS PANEL
+   ═══════════════════════════════════════════════════════════════════ */
+
+function ScoreCircle({ score, label, size = "md" }: { score: number; label: string; size?: "sm" | "md" | "lg" }) {
+  const radius = size === "lg" ? 45 : size === "md" ? 32 : 24;
+  const stroke = size === "lg" ? 6 : size === "md" ? 4 : 3;
+  const circumference = 2 * Math.PI * radius;
+  const offset = circumference - (score / 100) * circumference;
+  const svgSize = (radius + stroke) * 2;
+  const color = score >= 80 ? "text-emerald-500" : score >= 60 ? "text-yellow-500" : score >= 40 ? "text-orange-500" : "text-red-500";
+  const bgColor = score >= 80 ? "stroke-emerald-500/15" : score >= 60 ? "stroke-yellow-500/15" : score >= 40 ? "stroke-orange-500/15" : "stroke-red-500/15";
+
+  return (
+    <div className="flex flex-col items-center gap-1.5">
+      <div className="relative" style={{ width: svgSize, height: svgSize }}>
+        <svg width={svgSize} height={svgSize} className="-rotate-90">
+          <circle cx={radius + stroke} cy={radius + stroke} r={radius} fill="none" strokeWidth={stroke} className={bgColor} />
+          <circle cx={radius + stroke} cy={radius + stroke} r={radius} fill="none" strokeWidth={stroke}
+            className={color} style={{ strokeDasharray: circumference, strokeDashoffset: offset, strokeLinecap: "round", transition: "stroke-dashoffset 1s ease" }} />
+        </svg>
+        <div className="absolute inset-0 flex items-center justify-center">
+          <span className={`font-bold ${color} ${size === "lg" ? "text-2xl" : size === "md" ? "text-lg" : "text-sm"}`}>{score}</span>
+        </div>
+      </div>
+      <span className={`text-muted-foreground font-medium text-center ${size === "lg" ? "text-sm" : "text-[11px]"}`}>{label}</span>
+    </div>
+  );
+}
+
+function AiAnalysisPanel({ dealId, contactName }: { dealId: number; contactName: string }) {
+  const [showHistory, setShowHistory] = useState(false);
+
+  const latestQ = trpc.aiAnalysis.getLatest.useQuery({ dealId });
+  const historyQ = trpc.aiAnalysis.getHistory.useQuery({ dealId }, { enabled: showHistory });
+  const analyzeMut = trpc.aiAnalysis.analyze.useMutation({
+    onSuccess: () => {
+      latestQ.refetch();
+      historyQ.refetch();
+      toast.success("Análise concluída!");
+    },
+    onError: (err) => {
+      toast.error(err.message);
+    },
+  });
+
+  const analysis = latestQ.data;
+
+  return (
+    <div className="p-6 space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
+            <Sparkles className="h-5 w-5 text-white" />
+          </div>
+          <div>
+            <h3 className="text-lg font-semibold">Análise de Atendimento por IA</h3>
+            <p className="text-xs text-muted-foreground">Avaliação automática da conversa com {contactName}</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          {analysis && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setShowHistory(!showHistory)}
+              className="text-xs"
+            >
+              <History className="h-3.5 w-3.5 mr-1" />
+              Histórico
+            </Button>
+          )}
+          <Button
+            size="sm"
+            onClick={() => analyzeMut.mutate({ dealId, forceNew: !!analysis })}
+            disabled={analyzeMut.isPending}
+            className="bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white"
+          >
+            {analyzeMut.isPending ? (
+              <><Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> Analisando...</>
+            ) : analysis ? (
+              <><RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Re-analisar</>
+            ) : (
+              <><Sparkles className="h-3.5 w-3.5 mr-1.5" /> Analisar Atendimento</>
+            )}
+          </Button>
+        </div>
+      </div>
+
+      {/* Loading state */}
+      {analyzeMut.isPending && (
+        <div className="flex flex-col items-center justify-center py-16 bg-card rounded-xl border border-border">
+          <div className="relative">
+            <div className="h-16 w-16 rounded-full bg-gradient-to-br from-violet-500/20 to-purple-600/20 flex items-center justify-center animate-pulse">
+              <Sparkles className="h-8 w-8 text-violet-500 animate-spin" style={{ animationDuration: "3s" }} />
+            </div>
+          </div>
+          <p className="text-sm font-medium mt-4">Analisando conversa com IA...</p>
+          <p className="text-xs text-muted-foreground mt-1">Isso pode levar alguns segundos</p>
+        </div>
+      )}
+
+      {/* Empty state */}
+      {!analysis && !analyzeMut.isPending && (
+        <div className="flex flex-col items-center justify-center py-16 bg-card rounded-xl border border-border">
+          <div className="h-16 w-16 rounded-full bg-muted flex items-center justify-center mb-4">
+            <Sparkles className="h-8 w-8 text-muted-foreground" />
+          </div>
+          <p className="text-sm font-medium">Nenhuma análise realizada</p>
+          <p className="text-xs text-muted-foreground mt-1 max-w-sm text-center">
+            Clique em "Analisar Atendimento" para que a IA avalie a conversa do WhatsApp e sugira melhorias
+          </p>
+        </div>
+      )}
+
+      {/* Analysis results */}
+      {analysis && !analyzeMut.isPending && (
+        <div className="space-y-6">
+          {/* Score overview */}
+          <div className="bg-card rounded-xl border border-border p-6">
+            <div className="flex items-center gap-2 mb-6">
+              <Award className="h-4 w-4 text-primary" />
+              <h4 className="text-sm font-semibold">Pontuação Geral</h4>
+              <span className="text-[10px] text-muted-foreground ml-auto">
+                {analysis.messagesAnalyzed} mensagens analisadas · {analysis.createdAt ? new Date(analysis.createdAt).toLocaleString("pt-BR") : ""}
+              </span>
+            </div>
+            <div className="flex items-center justify-center gap-8 flex-wrap">
+              <ScoreCircle score={analysis.overallScore || 0} label="Geral" size="lg" />
+              <div className="flex gap-6 flex-wrap justify-center">
+                <ScoreCircle score={analysis.toneScore || 0} label="Tom e Empatia" />
+                <ScoreCircle score={analysis.responsivenessScore || 0} label="Responsividade" />
+                <ScoreCircle score={analysis.clarityScore || 0} label="Clareza" />
+                <ScoreCircle score={analysis.closingScore || 0} label="Fechamento" />
+              </div>
+            </div>
+            {analysis.responseTimeAvg && (
+              <div className="flex items-center justify-center gap-2 mt-4 text-xs text-muted-foreground">
+                <Clock className="h-3.5 w-3.5" />
+                Tempo médio de resposta: <strong className="text-foreground">{analysis.responseTimeAvg}</strong>
+              </div>
+            )}
+          </div>
+
+          {/* Summary */}
+          {analysis.summary && (
+            <div className="bg-card rounded-xl border border-border p-5">
+              <div className="flex items-center gap-2 mb-3">
+                <BarChart3 className="h-4 w-4 text-primary" />
+                <h4 className="text-sm font-semibold">Resumo</h4>
+              </div>
+              <p className="text-sm text-muted-foreground leading-relaxed">{analysis.summary}</p>
+            </div>
+          )}
+
+          {/* Strengths & Improvements grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Strengths */}
+            {(analysis.strengths as string[] | null)?.length ? (
+              <div className="bg-card rounded-xl border border-border p-5">
+                <div className="flex items-center gap-2 mb-3">
+                  <TrendingUp className="h-4 w-4 text-emerald-500" />
+                  <h4 className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">Pontos Fortes</h4>
+                </div>
+                <ul className="space-y-2">
+                  {(analysis.strengths as string[]).map((s, i) => (
+                    <li key={i} className="flex items-start gap-2 text-sm">
+                      <Star className="h-3.5 w-3.5 text-emerald-500 mt-0.5 shrink-0" />
+                      <span className="text-muted-foreground">{s}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+
+            {/* Improvements */}
+            {(analysis.improvements as string[] | null)?.length ? (
+              <div className="bg-card rounded-xl border border-border p-5">
+                <div className="flex items-center gap-2 mb-3">
+                  <TrendingDown className="h-4 w-4 text-orange-500" />
+                  <h4 className="text-sm font-semibold text-orange-600 dark:text-orange-400">Pontos de Melhoria</h4>
+                </div>
+                <ul className="space-y-2">
+                  {(analysis.improvements as string[]).map((s, i) => (
+                    <li key={i} className="flex items-start gap-2 text-sm">
+                      <AlertCircle className="h-3.5 w-3.5 text-orange-500 mt-0.5 shrink-0" />
+                      <span className="text-muted-foreground">{s}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+          </div>
+
+          {/* Suggestions */}
+          {(analysis.suggestions as string[] | null)?.length ? (
+            <div className="bg-card rounded-xl border border-border p-5">
+              <div className="flex items-center gap-2 mb-3">
+                <Lightbulb className="h-4 w-4 text-yellow-500" />
+                <h4 className="text-sm font-semibold">Sugestões de Melhoria</h4>
+              </div>
+              <div className="grid grid-cols-1 gap-3">
+                {(analysis.suggestions as string[]).map((s, i) => (
+                  <div key={i} className="flex items-start gap-3 p-3 rounded-lg bg-muted/30 border border-border/50">
+                    <div className="h-6 w-6 rounded-full bg-yellow-500/10 flex items-center justify-center shrink-0 mt-0.5">
+                      <span className="text-xs font-bold text-yellow-600 dark:text-yellow-400">{i + 1}</span>
+                    </div>
+                    <p className="text-sm text-muted-foreground">{s}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
+
+          {/* Missed Opportunities */}
+          {(analysis.missedOpportunities as string[] | null)?.length ? (
+            <div className="bg-card rounded-xl border border-border p-5">
+              <div className="flex items-center gap-2 mb-3">
+                <Target className="h-4 w-4 text-red-500" />
+                <h4 className="text-sm font-semibold text-red-600 dark:text-red-400">Oportunidades Perdidas</h4>
+              </div>
+              <ul className="space-y-2">
+                {(analysis.missedOpportunities as string[]).map((s, i) => (
+                  <li key={i} className="flex items-start gap-2 text-sm">
+                    <Target className="h-3.5 w-3.5 text-red-500 mt-0.5 shrink-0" />
+                    <span className="text-muted-foreground">{s}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+        </div>
+      )}
+
+      {/* History panel */}
+      {showHistory && (historyQ.data || []).length > 1 && (
+        <div className="bg-card rounded-xl border border-border p-5">
+          <div className="flex items-center gap-2 mb-3">
+            <History className="h-4 w-4 text-primary" />
+            <h4 className="text-sm font-semibold">Histórico de Análises</h4>
+          </div>
+          <div className="space-y-2">
+            {(historyQ.data || []).map((a: any) => (
+              <div key={a.id} className="flex items-center gap-3 p-3 rounded-lg border border-border/50 hover:bg-muted/30 transition-colors">
+                <ScoreCircle score={a.overallScore || 0} label="" size="sm" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium truncate">{a.summary?.slice(0, 80)}...</p>
+                  <p className="text-[10px] text-muted-foreground">
+                    {a.messagesAnalyzed} msgs · {a.createdAt ? new Date(a.createdAt).toLocaleString("pt-BR") : ""}
+                  </p>
+                </div>
+                <div className="flex gap-2 text-[10px] text-muted-foreground">
+                  <span>Tom: {a.toneScore}</span>
+                  <span>Resp: {a.responsivenessScore}</span>
+                  <span>Clar: {a.clarityScore}</span>
+                  <span>Fech: {a.closingScore}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   WHATSAPP PANEL
+   ═══════════════════════════════════════════════════════════════════ */
 
 function WhatsAppPanel({ contact, dealId }: { contact: any; dealId: number }) {
   const [viewMode, setViewMode] = useState<"history" | "live">("history");

@@ -13,6 +13,7 @@ import {
   eventLog,
   productCategories, productCatalog,
   waMessages, whatsappSessions,
+  aiConversationAnalyses,
 } from "../drizzle/schema";
 
 // ═══════════════════════════════════════
@@ -1039,4 +1040,55 @@ export async function countWhatsAppMessagesByDeal(dealId: number, tenantId: numb
     ));
 
   return result[0]?.total || 0;
+}
+
+// ═══════════════════════════════════════
+// AI CONVERSATION ANALYSIS
+// ═══════════════════════════════════════
+
+export async function getLatestAnalysis(tenantId: number, dealId: number) {
+  const db = await getDb(); if (!db) return null;
+  const rows = await db.select().from(aiConversationAnalyses)
+    .where(and(eq(aiConversationAnalyses.tenantId, tenantId), eq(aiConversationAnalyses.dealId, dealId)))
+    .orderBy(desc(aiConversationAnalyses.createdAt))
+    .limit(1);
+  return rows[0] || null;
+}
+
+export async function getAnalysisHistory(tenantId: number, dealId: number) {
+  const db = await getDb(); if (!db) return [];
+  return db.select().from(aiConversationAnalyses)
+    .where(and(eq(aiConversationAnalyses.tenantId, tenantId), eq(aiConversationAnalyses.dealId, dealId)))
+    .orderBy(desc(aiConversationAnalyses.createdAt))
+    .limit(10);
+}
+
+export async function saveAnalysis(data: {
+  tenantId: number;
+  dealId: number;
+  contactId?: number | null;
+  analyzedBy?: number | null;
+  overallScore?: number | null;
+  toneScore?: number | null;
+  responsivenessScore?: number | null;
+  clarityScore?: number | null;
+  closingScore?: number | null;
+  summary?: string | null;
+  strengths?: string[];
+  improvements?: string[];
+  suggestions?: string[];
+  missedOpportunities?: string[];
+  responseTimeAvg?: string | null;
+  messagesAnalyzed?: number;
+  rawAnalysis?: string | null;
+}) {
+  const db = await getDb(); if (!db) return null;
+  const [result] = await db.insert(aiConversationAnalyses).values({
+    ...data,
+    strengths: data.strengths || [],
+    improvements: data.improvements || [],
+    suggestions: data.suggestions || [],
+    missedOpportunities: data.missedOpportunities || [],
+  }).$returningId();
+  return result;
 }

@@ -1008,3 +1008,36 @@ export type CustomField = typeof customFields.$inferSelect;
 export type InsertCustomField = typeof customFields.$inferInsert;
 export type CustomFieldValue = typeof customFieldValues.$inferSelect;
 export type InsertCustomFieldValue = typeof customFieldValues.$inferInsert;
+
+
+// ════════════════════════════════════════════════════════════
+// AI CONVERSATION ANALYSIS
+// ════════════════════════════════════════════════════════════
+
+export const aiConversationAnalyses = mysqlTable("ai_conversation_analyses", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  dealId: int("dealId").notNull(),
+  contactId: int("contactId"),
+  analyzedBy: int("analyzedBy"), // userId who triggered analysis
+  overallScore: int("overallScore"), // 0-100
+  toneScore: int("toneScore"), // 0-100
+  responsivenessScore: int("responsivenessScore"), // 0-100
+  clarityScore: int("clarityScore"), // 0-100
+  closingScore: int("closingScore"), // 0-100
+  summary: text("summary"),
+  strengths: json("strengths"), // string[]
+  improvements: json("improvements"), // string[]
+  suggestions: json("suggestions"), // string[]
+  missedOpportunities: json("missedOpportunities"), // string[]
+  responseTimeAvg: varchar("responseTimeAvg", { length: 64 }), // e.g. "15 min"
+  messagesAnalyzed: int("messagesAnalyzed").default(0),
+  rawAnalysis: text("rawAnalysis"), // full LLM response for debugging
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (t) => [
+  index("ai_analysis_tenant_idx").on(t.tenantId),
+  index("ai_analysis_deal_idx").on(t.tenantId, t.dealId),
+]);
+export type AiConversationAnalysis = typeof aiConversationAnalyses.$inferSelect;
+export type InsertAiConversationAnalysis = typeof aiConversationAnalyses.$inferInsert;

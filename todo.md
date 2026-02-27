@@ -919,3 +919,27 @@
 - [x] Normalizar phoneToJid no crmDb.ts e whatsappDailyBackup.ts
 - [x] Testes unitários para phoneUtils (27 testes passando)
 - [x] 226 testes passando no total (1 falha pré-existente no backup diário)
+
+## Análise de Atendimento por IA
+
+### Backend
+- [x] Endpoint tRPC para análise de conversa WhatsApp por deal via LLM
+- [x] Prompt estruturado para avaliar: tom, tempo de resposta, clareza, oportunidades perdidas
+- [x] Retorno com nota geral, pontos fortes, pontos de melhoria e sugestões acionáveis
+- [x] Cache de análise de 1h no banco para evitar chamadas repetidas ao LLM (com opção forceNew)
+- [x] Tabela ai_conversation_analyses para armazenar análises
+- [x] Migração SQL aplicada
+
+### Frontend - DealDetail
+- [x] Tab "Análise IA" no DealDetail com ícone Sparkles
+- [x] Botão "Analisar Atendimento" com gradiente violet/purple
+- [x] Score circles animados (geral, tom, responsividade, clareza, fechamento)
+- [x] Cards de pontos fortes (verde), melhorias (laranja), sugestões (amarelo), oportunidades perdidas (vermelho)
+- [x] Histórico de análises anteriores com scores resumidos
+- [x] Estado de loading com animação durante análise
+- [x] Estado vazio quando não há análise
+- [x] Opção de re-analisar (forçar nova análise)
+
+### Testes
+- [x] Testes do endpoint de análise de atendimento (5 testes passando)
+- [x] 231 testes passando no total (1 falha pré-existente no backup diário)
