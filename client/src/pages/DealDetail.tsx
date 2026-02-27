@@ -13,10 +13,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import {
-  ArrowLeft, Building2, Calendar, Check, ChevronDown, ChevronRight, ChevronUp,
+  ArrowLeft, Building2, Calendar, Check, CheckCheck, ChevronDown, ChevronRight, ChevronUp,
   Clock, Copy, DollarSign, Edit2, ExternalLink, FileText, Flag, GripVertical,
-  History, Loader2, Mail, MapPin, MessageCircle, MessageSquarePlus, MoreHorizontal,
-  Package, Phone, Plane, Plus, Send, ShoppingBag, ThumbsDown, ThumbsUp,
+  History, Loader2, Mail, MapPin, MessageCircle, MessageSquarePlus, Mic, MoreHorizontal,
+  Package, Phone, Plane, Play, Plus, Send, ShoppingBag, ThumbsDown, ThumbsUp,
   Trash2, User, Users, X, AlertCircle, ClipboardList, Paperclip, Tag
 } from "lucide-react";
 
@@ -97,6 +97,7 @@ export default function DealDetail() {
   const historyQ = trpc.crm.deals.history.list.useQuery({ tenantId: TENANT_ID, dealId }, { enabled: dealId > 0 });
   const tasksQ = trpc.crm.tasks.list.useQuery({ tenantId: TENANT_ID, entityType: "deal", entityId: dealId }, { enabled: dealId > 0 });
   const notesQ = trpc.crm.notes.list.useQuery({ tenantId: TENANT_ID, entityType: "deal", entityId: dealId }, { enabled: dealId > 0 });
+  const waMessagesCountQ = trpc.crm.dealWhatsApp.count.useQuery({ tenantId: TENANT_ID, dealId }, { enabled: dealId > 0 });
   const contactsQ = trpc.crm.contacts.list.useQuery({ tenantId: TENANT_ID, limit: 200 });
   const accountsQ = trpc.crm.accounts.list.useQuery({ tenantId: TENANT_ID });
   const customFieldsQ = trpc.customFields.list.useQuery({ tenantId: TENANT_ID, entity: "deal" });
@@ -462,7 +463,7 @@ export default function DealDetail() {
               { key: "tasks" as const, label: "Tarefas", icon: ClipboardList, count: (tasksQ.data || []).length },
               { key: "products" as const, label: "Produtos e Serviços", icon: ShoppingBag, count: (productsQ.data || []).length },
               { key: "participants" as const, label: "Participantes", icon: Users, count: (participantsQ.data || []).length },
-              { key: "whatsapp" as const, label: "WhatsApp", icon: MessageCircle },
+              { key: "whatsapp" as const, label: "WhatsApp", icon: MessageCircle, count: waMessagesCountQ.data || 0 },
             ].map((tab) => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.key;
@@ -496,6 +497,7 @@ export default function DealDetail() {
                 history={historyQ.data || []}
                 notes={notesQ.data || []}
                 dealId={dealId}
+                contactName={contact?.name || "Contato"}
                 onNoteCreated={() => { notesQ.refetch(); historyQ.refetch(); }}
               />
             )}
@@ -522,7 +524,7 @@ export default function DealDetail() {
               />
             )}
             {activeTab === "whatsapp" && (
-              <WhatsAppPanel contact={contact} />
+              <WhatsAppPanel contact={contact} dealId={dealId} />
             )}
           </div>
         </div>
@@ -841,8 +843,8 @@ function TaskRow({ task, onUpdate }: { task: any; onUpdate: () => void }) {
 /* HISTORY PANEL                                               */
 /* ════════════════════════════════════════════════════════════ */
 
-function HistoryPanel({ history, notes, dealId, onNoteCreated }: {
-  history: any[]; notes: any[]; dealId: number; onNoteCreated: () => void;
+function HistoryPanel({ history, notes, dealId, contactName, onNoteCreated }: {
+  history: any[]; notes: any[]; dealId: number; contactName: string; onNoteCreated: () => void;
 }) {
   const [newNote, setNewNote] = useState("");
   const createNote = trpc.crm.notes.create.useMutation({
@@ -865,11 +867,18 @@ function HistoryPanel({ history, notes, dealId, onNoteCreated }: {
     return items.sort((a, b) => b.sortDate - a.sortDate);
   }, [history, notes]);
 
+  const [expandedBackups, setExpandedBackups] = useState<Set<number>>(new Set());
+  const toggleBackup = (id: number) => setExpandedBackups(prev => {
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
+  });
+
   const actionIcons: Record<string, typeof History> = {
     created: Plus, stage_moved: ArrowLeft, field_changed: Edit2,
     status_changed: AlertCircle, product_added: Package, product_updated: Edit2,
     product_removed: Trash2, participant_added: Users, participant_removed: Users,
-    note: MessageSquarePlus,
+    note: MessageSquarePlus, whatsapp_backup: MessageCircle,
   };
   const actionColors: Record<string, string> = {
     created: "bg-emerald-500/15 text-emerald-500",
@@ -881,6 +890,7 @@ function HistoryPanel({ history, notes, dealId, onNoteCreated }: {
     participant_added: "bg-indigo-500/15 text-indigo-500",
     participant_removed: "bg-red-500/15 text-red-500",
     note: "bg-primary/15 text-primary",
+    whatsapp_backup: "bg-green-500/15 text-green-600",
   };
 
   return (
@@ -920,6 +930,10 @@ function HistoryPanel({ history, notes, dealId, onNoteCreated }: {
               const Icon = actionIcons[item.action] || History;
               const color = actionColors[item.action] || "bg-muted text-muted-foreground";
               const isNote = item.type === "note";
+              const isWhatsAppBackup = item.action === "whatsapp_backup";
+              const isExpanded = expandedBackups.has(item.id);
+              const meta = item.metadataJson || {};
+              const conversation: string = meta.conversation || "";
 
               return (
                 <div key={item.id} className="relative flex gap-3 pb-5 pl-0">
@@ -930,6 +944,59 @@ function HistoryPanel({ history, notes, dealId, onNoteCreated }: {
                     {isNote ? (
                       <div className="p-3 bg-primary/5 border border-primary/10 rounded-lg">
                         <p className="text-sm whitespace-pre-wrap">{item.description}</p>
+                      </div>
+                    ) : isWhatsAppBackup ? (
+                      <div>
+                        <button
+                          onClick={() => toggleBackup(item.id)}
+                          className="flex items-center gap-2 text-sm hover:text-foreground transition-colors group w-full text-left"
+                        >
+                          <strong className="text-green-600 dark:text-green-400">WhatsApp</strong>
+                          <span>{item.description}</span>
+                          <ChevronDown className={`h-3.5 w-3.5 ml-auto text-muted-foreground transition-transform ${isExpanded ? "rotate-180" : ""}`} />
+                        </button>
+                        {isExpanded && conversation && (
+                          <div className="mt-3 rounded-lg border border-green-500/20 bg-green-500/5 overflow-hidden">
+                            <div className="px-3 py-2 bg-green-600 dark:bg-green-700 text-white text-xs font-medium flex items-center gap-2">
+                              <MessageCircle className="h-3.5 w-3.5" />
+                              Conversa com {meta.contactName || contactName}
+                            </div>
+                            <div className="p-3 max-h-[500px] overflow-y-auto space-y-1">
+                              {conversation.split("\n").map((line: string, i: number) => {
+                                const dateSep = line.match(/^\u2500\u2500 (.+) \u2500\u2500$/);
+                                if (dateSep) {
+                                  return (
+                                    <div key={i} className="flex items-center gap-2 py-2">
+                                      <div className="flex-1 h-px bg-border" />
+                                      <span className="text-[10px] text-muted-foreground font-medium px-2 py-0.5 bg-muted rounded-full">{dateSep[1]}</span>
+                                      <div className="flex-1 h-px bg-border" />
+                                    </div>
+                                  );
+                                }
+                                if (!line.trim()) return null;
+                                const msgMatch = line.match(/^\[(.+?)\] (.+?): (.+)$/);
+                                if (msgMatch) {
+                                  const [, time, sender, text] = msgMatch;
+                                  const isAgent = sender !== (meta.contactName || contactName);
+                                  return (
+                                    <div key={i} className={`flex ${isAgent ? "justify-end" : "justify-start"}`}>
+                                      <div className={`max-w-[80%] rounded-lg px-3 py-1.5 text-sm ${
+                                        isAgent
+                                          ? "bg-green-600 dark:bg-green-700 text-white rounded-br-sm"
+                                          : "bg-muted text-foreground rounded-bl-sm"
+                                      }`}>
+                                        {!isAgent && <p className="text-[10px] font-semibold text-muted-foreground mb-0.5">{sender}</p>}
+                                        <p className="whitespace-pre-wrap break-words">{text}</p>
+                                        <p className={`text-[10px] mt-0.5 text-right ${isAgent ? "text-green-200" : "text-muted-foreground"}`}>{time}</p>
+                                      </div>
+                                    </div>
+                                  );
+                                }
+                                return <p key={i} className="text-xs text-muted-foreground">{line}</p>;
+                              })}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     ) : (
                       <p className="text-sm">
@@ -1227,15 +1294,32 @@ function ParticipantsPanel({ participants, contacts, dealId, onRefresh }: any) {
 /* WHATSAPP PANEL                                              */
 /* ════════════════════════════════════════════════════════════ */
 
-function WhatsAppPanel({ contact }: { contact: any }) {
+function WhatsAppPanel({ contact, dealId }: { contact: any; dealId: number }) {
+  const [viewMode, setViewMode] = useState<"history" | "live">("history");
+  const [loadMoreBefore, setLoadMoreBefore] = useState<number | undefined>(undefined);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Fetch full message history from DB
+  const messagesQ = trpc.crm.dealWhatsApp.messages.useQuery(
+    { tenantId: TENANT_ID, dealId, limit: 200, beforeId: loadMoreBefore },
+    { enabled: dealId > 0 }
+  );
+
+  // Live chat setup
   const sessionsQ = trpc.whatsapp.sessions.useQuery();
   const activeSession = (sessionsQ.data || []).find((s: any) => s.liveStatus === "connected");
-
   const resolveQ = trpc.whatsapp.resolveJid.useQuery(
     { sessionId: activeSession?.sessionId || "", phone: contact?.phone || "" },
     { enabled: !!activeSession?.sessionId && !!contact?.phone }
   );
   const remoteJid = resolveQ.data?.jid || null;
+
+  // Auto-scroll to bottom on load
+  useEffect(() => {
+    if (messagesQ.data?.messages?.length && scrollRef.current && viewMode === "history") {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [messagesQ.data?.messages?.length, viewMode]);
 
   if (!contact) {
     return (
@@ -1257,45 +1341,178 @@ function WhatsAppPanel({ contact }: { contact: any }) {
     );
   }
 
-  if (!activeSession) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full py-16 text-muted-foreground">
-        <MessageCircle className="h-12 w-12 mb-3 opacity-20" />
-        <p className="text-sm font-medium">Nenhuma sessão WhatsApp ativa</p>
-        <p className="text-xs mt-1">Conecte uma sessão na página WhatsApp</p>
-        <Button size="sm" variant="outline" className="mt-3" onClick={() => window.location.href = "/whatsapp"}>
-          Ir para WhatsApp
-        </Button>
-      </div>
-    );
-  }
+  const msgs = messagesQ.data?.messages || [];
+  const sessionMap = messagesQ.data?.sessionMap || {};
 
-  if (resolveQ.isLoading) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full py-16 text-muted-foreground">
-        <Loader2 className="h-8 w-8 mb-3 animate-spin opacity-40" />
-        <p className="text-sm">Verificando número no WhatsApp...</p>
-      </div>
-    );
-  }
-
-  if (!remoteJid) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full py-16 text-muted-foreground">
-        <Phone className="h-12 w-12 mb-3 opacity-20" />
-        <p className="text-sm font-medium">Número não encontrado no WhatsApp</p>
-        <p className="text-xs mt-1">O número {contact.phone} não foi encontrado</p>
-      </div>
-    );
-  }
+  // Group messages by date
+  const groupedByDate = useMemo(() => {
+    const groups: { date: string; messages: typeof msgs }[] = [];
+    let currentDate = "";
+    let currentGroup: typeof msgs = [];
+    for (const msg of msgs) {
+      const d = new Date(msg.timestamp).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
+      if (d !== currentDate) {
+        if (currentGroup.length) groups.push({ date: currentDate, messages: currentGroup });
+        currentDate = d;
+        currentGroup = [msg];
+      } else {
+        currentGroup.push(msg);
+      }
+    }
+    if (currentGroup.length) groups.push({ date: currentDate, messages: currentGroup });
+    return groups;
+  }, [msgs]);
 
   return (
-    <div className="h-[calc(100vh-280px)] relative">
-      <WhatsAppChat
-        contact={contact}
-        sessionId={activeSession.sessionId}
-        remoteJid={remoteJid}
-      />
+    <div className="flex flex-col h-[calc(100vh-280px)]">
+      {/* Tab toggle: History vs Live */}
+      <div className="flex items-center gap-2 px-4 py-2 border-b border-border bg-card/50">
+        <button
+          onClick={() => setViewMode("history")}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+            viewMode === "history" ? "bg-green-600 text-white" : "text-muted-foreground hover:text-foreground hover:bg-muted"
+          }`}
+        >
+          <History className="h-3.5 w-3.5" />
+          Histórico Completo ({msgs.length})
+        </button>
+        <button
+          onClick={() => setViewMode("live")}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+            viewMode === "live" ? "bg-green-600 text-white" : "text-muted-foreground hover:text-foreground hover:bg-muted"
+          }`}
+        >
+          <Send className="h-3.5 w-3.5" />
+          Chat ao Vivo
+        </button>
+        <div className="flex-1" />
+        <span className="text-[10px] text-muted-foreground">Contato: {contact.name} · {contact.phone}</span>
+      </div>
+
+      {viewMode === "history" ? (
+        <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-1 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGRlZnM+PHBhdHRlcm4gaWQ9InAiIHdpZHRoPSI2MCIgaGVpZ2h0PSI2MCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHBhdGggZD0iTTAgMGg2MHY2MEgweiIgZmlsbD0ibm9uZSIvPjxjaXJjbGUgY3g9IjMwIiBjeT0iMzAiIHI9IjEiIGZpbGw9InJnYmEoMCwwLDAsMC4wMykiLz48L3BhdHRlcm4+PC9kZWZzPjxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbGw9InVybCgjcCkiLz48L3N2Zz4=')] bg-repeat">
+          {messagesQ.isLoading ? (
+            <div className="flex flex-col items-center justify-center py-16">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              <p className="text-sm text-muted-foreground mt-3">Carregando histórico de mensagens...</p>
+            </div>
+          ) : msgs.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+              <MessageCircle className="h-12 w-12 mb-3 opacity-20" />
+              <p className="text-sm font-medium">Nenhuma mensagem encontrada</p>
+              <p className="text-xs mt-1">As mensagens do WhatsApp com este contato aparecerão aqui</p>
+            </div>
+          ) : (
+            <>
+              {messagesQ.data?.hasMore && (
+                <div className="flex justify-center mb-4">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="text-xs"
+                    onClick={() => setLoadMoreBefore(msgs[0]?.id)}
+                  >
+                    Carregar mensagens anteriores
+                  </Button>
+                </div>
+              )}
+              {groupedByDate.map((group) => (
+                <div key={group.date}>
+                  <div className="flex items-center gap-2 py-3">
+                    <div className="flex-1 h-px bg-border" />
+                    <span className="text-[10px] text-muted-foreground font-medium px-3 py-1 bg-muted rounded-full shadow-sm">{group.date}</span>
+                    <div className="flex-1 h-px bg-border" />
+                  </div>
+                  {group.messages.map((msg: any) => {
+                    const time = new Date(msg.timestamp).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+                    const senderName = msg.fromMe ? (sessionMap[msg.sessionId] || "Agente") : (msg.pushName || contact.name);
+                    const isMedia = msg.messageType !== "text" && msg.messageType !== "conversation";
+
+                    return (
+                      <div key={msg.id} className={`flex mb-1 ${msg.fromMe ? "justify-end" : "justify-start"}`}>
+                        <div className={`max-w-[75%] rounded-lg px-3 py-2 text-sm shadow-sm ${
+                          msg.fromMe
+                            ? "bg-green-600 dark:bg-green-700 text-white rounded-br-sm"
+                            : "bg-card text-foreground border border-border rounded-bl-sm"
+                        }`}>
+                          {!msg.fromMe && (
+                            <p className="text-[10px] font-semibold mb-0.5 text-muted-foreground">{senderName}</p>
+                          )}
+                          {msg.fromMe && msg.senderAgentId && (
+                            <p className="text-[10px] font-semibold mb-0.5 text-green-200">{senderName}</p>
+                          )}
+                          {isMedia && msg.mediaUrl ? (
+                            <div className="mb-1">
+                              {msg.messageType === "image" ? (
+                                <img src={msg.mediaUrl} alt="" className="rounded max-w-full max-h-48 object-cover" />
+                              ) : msg.messageType === "audio" || msg.isVoiceNote ? (
+                                <div className="flex items-center gap-2">
+                                  <Mic className="h-4 w-4" />
+                                  <span className="text-xs">Áudio {msg.mediaDuration ? `(${Math.ceil(msg.mediaDuration)}s)` : ""}</span>
+                                </div>
+                              ) : msg.messageType === "video" ? (
+                                <div className="flex items-center gap-2">
+                                  <Play className="h-4 w-4" />
+                                  <span className="text-xs">Vídeo</span>
+                                </div>
+                              ) : msg.messageType === "document" ? (
+                                <div className="flex items-center gap-2">
+                                  <FileText className="h-4 w-4" />
+                                  <span className="text-xs">{msg.mediaFileName || "Documento"}</span>
+                                </div>
+                              ) : (
+                                <span className="text-xs italic">[{msg.messageType}]</span>
+                              )}
+                              {msg.content && <p className="whitespace-pre-wrap break-words mt-1">{msg.content}</p>}
+                            </div>
+                          ) : (
+                            <p className="whitespace-pre-wrap break-words">{msg.content || `[${msg.messageType}]`}</p>
+                          )}
+                          <div className={`flex items-center gap-1 mt-0.5 ${msg.fromMe ? "justify-end" : ""}`}>
+                            <span className={`text-[10px] ${msg.fromMe ? "text-green-200" : "text-muted-foreground"}`}>{time}</span>
+                            {msg.fromMe && (
+                              msg.status === "read" ? <CheckCheck className="h-3 w-3 text-blue-300" /> :
+                              msg.status === "delivered" ? <CheckCheck className="h-3 w-3 text-green-200" /> :
+                              msg.status === "sent" ? <Check className="h-3 w-3 text-green-200" /> :
+                              <Clock className="h-3 w-3 text-green-200" />
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
+            </>
+          )}
+        </div>
+      ) : (
+        /* Live chat mode */
+        activeSession && remoteJid ? (
+          <div className="flex-1 relative">
+            <WhatsAppChat
+              contact={contact}
+              sessionId={activeSession.sessionId}
+              remoteJid={remoteJid}
+            />
+          </div>
+        ) : (
+          <div className="flex flex-col items-center justify-center flex-1 text-muted-foreground">
+            <MessageCircle className="h-12 w-12 mb-3 opacity-20" />
+            <p className="text-sm font-medium">
+              {!activeSession ? "Nenhuma sessão WhatsApp ativa" : "Número não encontrado no WhatsApp"}
+            </p>
+            <p className="text-xs mt-1">
+              {!activeSession ? "Conecte uma sessão na página WhatsApp" : `O número ${contact.phone} não foi encontrado`}
+            </p>
+            {!activeSession && (
+              <Button size="sm" variant="outline" className="mt-3" onClick={() => window.location.href = "/whatsapp"}>
+                Ir para WhatsApp
+              </Button>
+            )}
+          </div>
+        )
+      )}
     </div>
   );
 }

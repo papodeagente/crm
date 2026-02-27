@@ -875,3 +875,27 @@
 - [x] Reverter cores de status no Pipeline.tsx (teal → violet ENTUR OS)
 - [x] Reverter cores de stage bar no DealDetail.tsx (usa primary CSS var)
 - [x] Reverter cores de botões no DealDetail.tsx (usa primary CSS var)
+
+## Conversa WhatsApp Completa no Histórico da Negociação
+
+### Backend
+- [x] Endpoint para buscar mensagens WhatsApp completas vinculadas a um deal (via sessão/contato)
+- [x] Incluir todas as mensagens (enviadas e recebidas) com timestamp, remetente, conteúdo
+- [x] Endpoint de contagem de mensagens por deal
+
+### Frontend - DealDetail
+- [x] Nova tab "WhatsApp" no DealDetail com visual de chat completo
+- [x] Balões de mensagem estilo WhatsApp (enviadas à direita, recebidas à esquerda)
+- [x] Timestamps formatados em cada mensagem
+- [x] Indicação de quem enviou (agente vs contato)
+- [x] Scroll automático para últimas mensagens
+- [x] Paginação (carregar mensagens anteriores)
+- [x] Agrupamento de mensagens por data (separadores de dia)
+- [x] Suporte a mídias (imagem, áudio, vídeo, documento) com ícones
+- [x] Status de entrega (enviado, entregue, lido) com check marks
+- [x] Toggle entre Histórico Completo e Chat ao Vivo
+- [x] Contagem de mensagens na tab WhatsApp
+- [x] Renderização expandível de conversas nos itens whatsapp_backup do histórico
+
+### Testes
+- [x] Testes do endpoint dealWhatsApp (6 testes passando)

@@ -531,4 +531,18 @@ export const crmRouter = router({
         return crm.createNote({ ...input, createdByUserId: ctx.user.id });
       }),
   }),
+
+  // ─── WHATSAPP MESSAGES BY DEAL ───
+  dealWhatsApp: router({
+    messages: protectedProcedure
+      .input(z.object({ dealId: z.number(), tenantId: z.number(), limit: z.number().optional(), beforeId: z.number().optional() }))
+      .query(async ({ input }) => {
+        return crm.getWhatsAppMessagesByDeal(input.dealId, input.tenantId, { limit: input.limit, beforeId: input.beforeId });
+      }),
+    count: protectedProcedure
+      .input(z.object({ dealId: z.number(), tenantId: z.number() }))
+      .query(async ({ input }) => {
+        return crm.countWhatsAppMessagesByDeal(input.dealId, input.tenantId);
+      }),
+  }),
 });

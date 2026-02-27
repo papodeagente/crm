@@ -1,4 +1,4 @@
-import { eq, and, desc, asc, like, sql, inArray, count, sum } from "drizzle-orm";
+import { eq, and, desc, asc, like, sql, inArray, count, sum, gte, lt } from "drizzle-orm";
 import { getDb } from "./db";
 import {
   tenants, crmUsers, teams, teamMembers, roles, permissions, rolePermissions, userRoles, apiKeys,
@@ -12,6 +12,7 @@ import {
   integrations, integrationConnections, integrationCredentials, webhooks, jobs, jobDlq,
   eventLog,
   productCategories, productCatalog,
+  waMessages, whatsappSessions,
 } from "../drizzle/schema";
 
 // ═══════════════════════════════════════
@@ -903,4 +904,120 @@ export async function getProductAnalyticsTopDestinations(tenantId: number, limit
     LIMIT ${limit}
   `);
   return (rows as any)[0] || [];
+}
+
+
+// ═══════════════════════════════════════
+// WHATSAPP MESSAGES BY DEAL
+// ═══════════════════════════════════════
+
+/** Convert phone number to WhatsApp JID */
+function phoneToJid(phone: string): string {
+  const digits = phone.replace(/\D/g, "");
+  return `${digits}@s.whatsapp.net`;
+}
+
+/** Get all WhatsApp messages for a deal's contact, across all sessions */
+export async function getWhatsAppMessagesByDeal(dealId: number, tenantId: number, opts?: { limit?: number; beforeId?: number }) {
+  const db = await getDb();
+  if (!db) return { messages: [], contact: null, sessions: [] };
+
+  // 1. Get the deal's contact
+  const dealRows = await db.select({ contactId: deals.contactId }).from(deals)
+    .where(and(eq(deals.id, dealId), eq(deals.tenantId, tenantId))).limit(1);
+  const deal = dealRows[0];
+  if (!deal?.contactId) return { messages: [], contact: null, sessions: [] };
+
+  // 2. Get the contact's phone
+  const contactRows = await db.select({
+    id: contacts.id, name: contacts.name, phone: contacts.phone, email: contacts.email,
+  }).from(contacts).where(eq(contacts.id, deal.contactId)).limit(1);
+  const contact = contactRows[0];
+  if (!contact?.phone) return { messages: [], contact, sessions: [] };
+
+  const jid = phoneToJid(contact.phone);
+
+  // 3. Get all sessions for this tenant
+  const sessions = await db.select({
+    sessionId: whatsappSessions.sessionId,
+    pushName: whatsappSessions.pushName,
+    phoneNumber: whatsappSessions.phoneNumber,
+  }).from(whatsappSessions).where(eq(whatsappSessions.tenantId, tenantId));
+
+  if (!sessions.length) return { messages: [], contact, sessions: [] };
+
+  const sessionIds = sessions.map(s => s.sessionId);
+
+  // 4. Get all messages for this JID across all sessions
+  const conditions = [
+    inArray(waMessages.sessionId, sessionIds),
+    eq(waMessages.remoteJid, jid),
+  ];
+  if (opts?.beforeId) {
+    conditions.push(lt(waMessages.id, opts.beforeId));
+  }
+
+  const limit = opts?.limit || 100;
+  const msgs = await db.select({
+    id: waMessages.id,
+    sessionId: waMessages.sessionId,
+    messageId: waMessages.messageId,
+    remoteJid: waMessages.remoteJid,
+    fromMe: waMessages.fromMe,
+    senderAgentId: waMessages.senderAgentId,
+    pushName: waMessages.pushName,
+    messageType: waMessages.messageType,
+    content: waMessages.content,
+    mediaUrl: waMessages.mediaUrl,
+    mediaMimeType: waMessages.mediaMimeType,
+    mediaFileName: waMessages.mediaFileName,
+    mediaDuration: waMessages.mediaDuration,
+    isVoiceNote: waMessages.isVoiceNote,
+    quotedMessageId: waMessages.quotedMessageId,
+    status: waMessages.status,
+    timestamp: waMessages.timestamp,
+    createdAt: waMessages.createdAt,
+  }).from(waMessages)
+    .where(and(...conditions))
+    .orderBy(desc(waMessages.timestamp))
+    .limit(limit);
+
+  // Build session name map for display
+  const sessionMap = Object.fromEntries(sessions.map(s => [s.sessionId, s.pushName || s.phoneNumber || "Agente"]));
+
+  return {
+    messages: msgs.reverse(), // Return in chronological order
+    contact,
+    sessions: sessions.map(s => ({ sessionId: s.sessionId, name: s.pushName || s.phoneNumber || "Agente" })),
+    sessionMap,
+    hasMore: msgs.length === limit,
+  };
+}
+
+/** Count total WhatsApp messages for a deal */
+export async function countWhatsAppMessagesByDeal(dealId: number, tenantId: number) {
+  const db = await getDb();
+  if (!db) return 0;
+
+  const dealRows = await db.select({ contactId: deals.contactId }).from(deals)
+    .where(and(eq(deals.id, dealId), eq(deals.tenantId, tenantId))).limit(1);
+  const deal = dealRows[0];
+  if (!deal?.contactId) return 0;
+
+  const contactRows = await db.select({ phone: contacts.phone }).from(contacts)
+    .where(eq(contacts.id, deal.contactId)).limit(1);
+  const contact = contactRows[0];
+  if (!contact?.phone) return 0;
+
+  const jid = phoneToJid(contact.phone);
+
+  const sessions = await db.select({ sessionId: whatsappSessions.sessionId })
+    .from(whatsappSessions).where(eq(whatsappSessions.tenantId, tenantId));
+  if (!sessions.length) return 0;
+
+  const sessionIds = sessions.map(s => s.sessionId);
+  const result = await db.select({ total: count() }).from(waMessages)
+    .where(and(inArray(waMessages.sessionId, sessionIds), eq(waMessages.remoteJid, jid)));
+
+  return result[0]?.total || 0;
 }
