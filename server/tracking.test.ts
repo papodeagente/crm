@@ -166,7 +166,52 @@ describe("Domain validation", () => {
   });
 });
 
-// ─── Payload building for processInboundLead ────────────
+// ─── Verify Installation logic ────────────────────────
+
+describe("Verify Installation - HTML scanning logic", () => {
+  function findTokenInHtml(html: string, tokens: string[]): string | null {
+    for (const t of tokens) {
+      if (html.includes(t)) return t;
+    }
+    return null;
+  }
+
+  function detectTrackerPresence(html: string): boolean {
+    return html.includes("/tracker.js") || html.includes("__entur_tracker_loaded");
+  }
+
+  it("should find token in HTML with script tag", () => {
+    const html = `<html><head><script>(function(t,r){var s=document.createElement('script');s.async=true;s.src=r+'/tracker.js?t='+t;document.head.appendChild(s);})('abc123token','https://example.com');</script></head><body></body></html>`;
+    expect(findTokenInHtml(html, ["abc123token"])).toBe("abc123token");
+  });
+
+  it("should return null when token not found", () => {
+    const html = `<html><head></head><body>Hello</body></html>`;
+    expect(findTokenInHtml(html, ["abc123token"])).toBeNull();
+  });
+
+  it("should detect tracker.js reference even with wrong token", () => {
+    const html = `<html><head><script src="https://other.com/tracker.js?t=wrongtoken"></script></head></html>`;
+    expect(detectTrackerPresence(html)).toBe(true);
+  });
+
+  it("should detect __entur_tracker_loaded marker", () => {
+    const html = `<html><head><script>window.__entur_tracker_loaded=true;</script></head></html>`;
+    expect(detectTrackerPresence(html)).toBe(true);
+  });
+
+  it("should not detect tracker in clean HTML", () => {
+    const html = `<html><head><title>My Site</title></head><body><form><input name="email"></form></body></html>`;
+    expect(detectTrackerPresence(html)).toBe(false);
+  });
+
+  it("should match first token from multiple", () => {
+    const html = `<script>token='second_token';</script>`;
+    expect(findTokenInHtml(html, ["first_token", "second_token"])).toBe("second_token");
+  });
+});
+
+// ─── Payload building for processInboundLead ────────────────
 
 describe("Tracking payload construction", () => {
   it("should set source as tracking_script", () => {

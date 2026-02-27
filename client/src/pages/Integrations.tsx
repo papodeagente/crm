@@ -329,11 +329,14 @@ function TrackingScriptTab() {
     onError: (e) => toast.error(e.message),
   });
 
+  const verifyInstallation = trpc.leadCapture.verifyTrackingInstallation.useMutation();
+
   const [showCreate, setShowCreate] = useState(false);
   const [newName, setNewName] = useState("");
   const [newDomains, setNewDomains] = useState("");
   const [copiedId, setCopiedId] = useState<number | null>(null);
   const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [verifyUrl, setVerifyUrl] = useState("");
 
   const baseUrl = window.location.origin;
 
@@ -488,6 +491,126 @@ function TrackingScriptTab() {
           ))}
         </div>
       )}
+
+      {/* Verify Installation */}
+      <Card className="border border-border/40 shadow-none rounded-xl">
+        <div className="p-5 space-y-4">
+          <div className="flex items-start gap-3">
+            <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-sky-500/10 to-cyan-500/10 flex items-center justify-center shrink-0">
+              <Globe className="h-5 w-5 text-sky-600" />
+            </div>
+            <div className="flex-1">
+              <h3 className="text-[14px] font-semibold text-foreground">Verificar Instalação</h3>
+              <p className="text-[12px] text-muted-foreground mt-0.5">
+                Cole a URL do site onde você instalou o código para verificar se o tracking está ativo.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex gap-2">
+            <Input
+              placeholder="https://meusite.com.br"
+              value={verifyUrl}
+              onChange={(e) => setVerifyUrl(e.target.value)}
+              className="text-[13px] flex-1"
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && verifyUrl.trim()) {
+                  let url = verifyUrl.trim();
+                  if (!url.startsWith("http")) url = "https://" + url;
+                  setVerifyUrl(url);
+                  verifyInstallation.mutate({ tenantId: TENANT_ID, url });
+                }
+              }}
+            />
+            <Button
+              size="sm"
+              className="gap-1.5 px-4"
+              disabled={verifyInstallation.isPending || !verifyUrl.trim()}
+              onClick={() => {
+                let url = verifyUrl.trim();
+                if (!url.startsWith("http")) url = "https://" + url;
+                setVerifyUrl(url);
+                verifyInstallation.mutate({ tenantId: TENANT_ID, url });
+              }}
+            >
+              {verifyInstallation.isPending ? (
+                <><RefreshCw className="h-3.5 w-3.5 animate-spin" />Verificando...</>
+              ) : (
+                <><ExternalLink className="h-3.5 w-3.5" />Verificar</>
+              )}
+            </Button>
+          </div>
+
+          {/* Result */}
+          {verifyInstallation.data && (
+            <div className={`rounded-lg p-4 border ${
+              verifyInstallation.data.status === "active"
+                ? "bg-emerald-500/5 border-emerald-500/20"
+                : verifyInstallation.data.status === "wrong_token"
+                ? "bg-amber-500/5 border-amber-500/20"
+                : "bg-red-500/5 border-red-500/20"
+            }`}>
+              <div className="flex items-start gap-3">
+                <div className={`h-8 w-8 rounded-full flex items-center justify-center shrink-0 ${
+                  verifyInstallation.data.status === "active"
+                    ? "bg-emerald-500/10"
+                    : verifyInstallation.data.status === "wrong_token"
+                    ? "bg-amber-500/10"
+                    : "bg-red-500/10"
+                }`}>
+                  {verifyInstallation.data.status === "active" ? (
+                    <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                  ) : verifyInstallation.data.status === "wrong_token" ? (
+                    <AlertCircle className="h-4 w-4 text-amber-600" />
+                  ) : (
+                    <XCircle className="h-4 w-4 text-red-600" />
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className={`text-[13px] font-semibold ${
+                    verifyInstallation.data.status === "active"
+                      ? "text-emerald-600"
+                      : verifyInstallation.data.status === "wrong_token"
+                      ? "text-amber-600"
+                      : "text-red-600"
+                  }`}>
+                    {verifyInstallation.data.status === "active" ? "Script Ativo" 
+                      : verifyInstallation.data.status === "wrong_token" ? "Token Incorreto"
+                      : verifyInstallation.data.status === "not_found" ? "Script Não Encontrado"
+                      : verifyInstallation.data.status === "no_tokens" ? "Nenhum Token"
+                      : verifyInstallation.data.status === "timeout" ? "Timeout"
+                      : verifyInstallation.data.status === "fetch_error" ? "Erro de Acesso"
+                      : "Erro"}
+                  </p>
+                  <p className="text-[12px] text-muted-foreground mt-0.5">
+                    {verifyInstallation.data.message}
+                  </p>
+                  {verifyInstallation.data.details && verifyInstallation.data.status === "active" && (
+                    <div className="flex items-center gap-3 mt-2 text-[11px] text-muted-foreground">
+                      <span className="inline-flex items-center gap-1">
+                        <span className={`h-1.5 w-1.5 rounded-full ${
+                          (verifyInstallation.data.details as any).isActive ? "bg-emerald-500" : "bg-slate-400"
+                        }`} />
+                        Token: {(verifyInstallation.data.details as any).tokenName}
+                      </span>
+                      <span>{(verifyInstallation.data.details as any).totalLeads} lead(s) capturado(s)</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {verifyInstallation.error && (
+            <div className="rounded-lg p-4 border bg-red-500/5 border-red-500/20">
+              <div className="flex items-center gap-2">
+                <XCircle className="h-4 w-4 text-red-600 shrink-0" />
+                <p className="text-[12px] text-red-600">{verifyInstallation.error.message}</p>
+              </div>
+            </div>
+          )}
+        </div>
+      </Card>
 
       {/* Create Token Dialog */}
       <Dialog open={showCreate} onOpenChange={setShowCreate}>

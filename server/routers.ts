@@ -898,6 +898,107 @@ export const appRouter = router({
           .where(and(eq(trackingTokens.id, input.tokenId), eq(trackingTokens.tenantId, input.tenantId)));
         return { success: true };
       }),
+
+    verifyTrackingInstallation: protectedProcedure
+      .input(z.object({
+        tenantId: z.number(),
+        url: z.string().url(),
+      }))
+      .mutation(async ({ input }) => {
+        const db = await getDb();
+        if (!db) throw new Error("Database not available");
+
+        // Get all tokens for this tenant
+        const tenantTokens = await db
+          .select()
+          .from(trackingTokens)
+          .where(eq(trackingTokens.tenantId, input.tenantId));
+
+        if (!tenantTokens.length) {
+          return {
+            installed: false,
+            status: "no_tokens" as const,
+            message: "Nenhum token de tracking criado. Crie um token primeiro.",
+            details: null,
+          };
+        }
+
+        try {
+          // Fetch the page HTML
+          const controller = new AbortController();
+          const timeout = setTimeout(() => controller.abort(), 10000);
+          const res = await fetch(input.url, {
+            signal: controller.signal,
+            headers: {
+              "User-Agent": "ENTUR-OS-Tracker-Verifier/1.0",
+              "Accept": "text/html",
+            },
+            redirect: "follow",
+          });
+          clearTimeout(timeout);
+
+          if (!res.ok) {
+            return {
+              installed: false,
+              status: "fetch_error" as const,
+              message: `N\u00e3o foi poss\u00edvel acessar a p\u00e1gina (HTTP ${res.status}).`,
+              details: { httpStatus: res.status },
+            };
+          }
+
+          const html = await res.text();
+
+          // Check for each token in the HTML
+          for (const t of tenantTokens) {
+            if (html.includes(t.token)) {
+              return {
+                installed: true,
+                status: "active" as const,
+                message: `Script encontrado e ativo! Token "${t.name}" detectado na p\u00e1gina.`,
+                details: {
+                  tokenId: t.id,
+                  tokenName: t.name,
+                  isActive: t.isActive,
+                  totalLeads: t.totalLeads,
+                },
+              };
+            }
+          }
+
+          // Check if there's ANY entur tracker script (maybe wrong token)
+          const hasTrackerRef = html.includes("/tracker.js") || html.includes("__entur_tracker_loaded");
+          if (hasTrackerRef) {
+            return {
+              installed: false,
+              status: "wrong_token" as const,
+              message: "Um script de tracking foi encontrado, mas o token n\u00e3o pertence a esta conta. Verifique se copiou o c\u00f3digo correto.",
+              details: null,
+            };
+          }
+
+          return {
+            installed: false,
+            status: "not_found" as const,
+            message: "Script de tracking n\u00e3o encontrado nesta p\u00e1gina. Verifique se o c\u00f3digo foi inserido no <head> ou <body>.",
+            details: null,
+          };
+        } catch (err: any) {
+          if (err.name === "AbortError") {
+            return {
+              installed: false,
+              status: "timeout" as const,
+              message: "Tempo esgotado ao tentar acessar a p\u00e1gina. Verifique se a URL est\u00e1 correta e acess\u00edvel.",
+              details: null,
+            };
+          }
+          return {
+            installed: false,
+            status: "error" as const,
+            message: `Erro ao verificar: ${err.message || "Falha de conex\u00e3o"}`,
+            details: null,
+          };
+        }
+      }),
   }),
 });
 

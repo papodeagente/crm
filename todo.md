@@ -1137,3 +1137,8 @@
 - [x] Adicionar rota /integrations no App.tsx e link na navegação/configurações
 - [x] Testes unitários para heurística de campos, endpoint /api/collect e token validation
 - [x] Teste ponta a ponta com formulário HTML real
+
+## Validação de Instalação do Tracking Script
+
+- [x] Criar endpoint backend para verificar se o tracking script está instalado em uma URL
+- [x] Criar UI de validação na aba Tracking Script (campo de URL + botão verificar + resultado visual)
