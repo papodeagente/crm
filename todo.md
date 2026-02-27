@@ -699,3 +699,38 @@
 - [x] Testes CRUD de equipes
 - [x] Testes CRUD de regras de distribuição — 139 testes, 8 arquivos, todos passando
 - [ ] Testes de integração autoAssign com regras
+
+## Perfil de Contato Completo + Campos Personalizados
+
+### Schema
+- [x] Criar tabela custom_fields (id, tenantId, entity, name, label, fieldType, options, isRequired, isVisibleOnForm, sortOrder, createdAt)
+- [x] Criar tabela custom_field_values (id, tenantId, fieldId, entityId, value, createdAt, updatedAt)
+- [x] Garantir que contacts e deals já possuem campos necessários para métricas
+
+### Backend
+- [x] Endpoint getContactProfile: dados do contato + métricas (cotações, fechamentos, total comprado, dias desde última compra)
+- [x] Endpoint getContactDeals: listar todas as negociações do contato com status, valor, data
+- [x] Endpoint updateContact: atualizar dados padrão do contato (nome, email, telefone) — já existia no crmRouter
+- [x] CRUD custom_fields: create, list, update, delete, reorder
+- [x] CRUD custom_field_values: get/set valores para um contato específico
+- [x] Endpoint para listar campos personalizados visíveis no formulário
+
+### Frontend - Perfil do Contato
+- [x] Página /contact/:id com layout de perfil completo
+- [x] Painel de métricas: cotações feitas, negociações fechadas, total comprado (R$), dias desde última compra
+- [x] Seção de dados básicos: nome, email, telefone (editável inline)
+- [x] Seção de campos personalizados com valores editáveis
+- [x] Lista de negociações vinculadas com status, valor, data, pipeline
+- [x] Histórico de atividades do contato — incluído via lista de deals com datas
+
+### Frontend - Configuração de Campos Personalizados
+- [x] Página /settings/custom-fields para gerenciar campos
+- [x] Criar campo: nome, tipo (texto, número, data, select, checkbox, textarea, email, telefone, URL, moeda, multiselect)
+- [x] Toggle de visibilidade no formulário de cadastro e no perfil
+- [x] Reordenar campos por setas (up/down)
+- [x] Editar/excluir campos existentes
+
+### Testes
+- [x] Testes de métricas do contato
+- [x] Testes CRUD de campos personalizados
+- [x] Testes de valores de campos personalizados — 154 testes, 8 arquivos, todos passando

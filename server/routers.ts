@@ -52,6 +52,17 @@ import {
   updateDistributionRule,
   deleteDistributionRule,
   toggleDistributionRule,
+  // Contact profile & custom fields
+  getContactMetrics,
+  getContactDeals,
+  listCustomFields,
+  getCustomFieldById,
+  createCustomField,
+  updateCustomField,
+  deleteCustomField,
+  reorderCustomFields,
+  getCustomFieldValues,
+  setCustomFieldValues,
 } from "./db";
 import { storagePut } from "./storage";
 import { nanoid } from "nanoid";
@@ -514,6 +525,99 @@ export const appRouter = router({
   insights: insightsRouter, // M6: Insights
   academy: academyRouter,   // M7: Academy
   integrationHub: integrationHubRouter, // M8: Integration Hub
+
+  // ─── Contact Profile & Custom Fields ───
+  contactProfile: router({
+    getMetrics: protectedProcedure
+      .input(z.object({ tenantId: z.number(), contactId: z.number() }))
+      .query(async ({ input }) => {
+        return getContactMetrics(input.tenantId, input.contactId);
+      }),
+    getDeals: protectedProcedure
+      .input(z.object({ tenantId: z.number(), contactId: z.number() }))
+      .query(async ({ input }) => {
+        return getContactDeals(input.tenantId, input.contactId);
+      }),
+    getCustomFieldValues: protectedProcedure
+      .input(z.object({ tenantId: z.number(), entityType: z.enum(["contact", "deal", "account", "trip"]), entityId: z.number() }))
+      .query(async ({ input }) => {
+        return getCustomFieldValues(input.tenantId, input.entityType, input.entityId);
+      }),
+    setCustomFieldValues: protectedProcedure
+      .input(z.object({
+        tenantId: z.number(),
+        entityType: z.enum(["contact", "deal", "account", "trip"]),
+        entityId: z.number(),
+        values: z.array(z.object({ fieldId: z.number(), value: z.string().nullable() })),
+      }))
+      .mutation(async ({ input }) => {
+        await setCustomFieldValues(input.tenantId, input.entityType, input.entityId, input.values);
+        return { success: true };
+      }),
+  }),
+
+  customFields: router({
+    list: protectedProcedure
+      .input(z.object({ tenantId: z.number(), entity: z.enum(["contact", "deal", "account", "trip"]) }))
+      .query(async ({ input }) => {
+        return listCustomFields(input.tenantId, input.entity);
+      }),
+    get: protectedProcedure
+      .input(z.object({ tenantId: z.number(), id: z.number() }))
+      .query(async ({ input }) => {
+        return getCustomFieldById(input.tenantId, input.id);
+      }),
+    create: protectedProcedure
+      .input(z.object({
+        tenantId: z.number(),
+        entity: z.enum(["contact", "deal", "account", "trip"]),
+        name: z.string().min(1).max(128),
+        label: z.string().min(1).max(255),
+        fieldType: z.enum(["text", "number", "date", "select", "multiselect", "checkbox", "textarea", "email", "phone", "url", "currency"]),
+        optionsJson: z.any().optional(),
+        defaultValue: z.string().optional(),
+        placeholder: z.string().optional(),
+        isRequired: z.boolean().optional(),
+        isVisibleOnForm: z.boolean().optional(),
+        isVisibleOnProfile: z.boolean().optional(),
+        sortOrder: z.number().optional(),
+        groupName: z.string().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        return createCustomField(input);
+      }),
+    update: protectedProcedure
+      .input(z.object({
+        tenantId: z.number(),
+        id: z.number(),
+        label: z.string().optional(),
+        fieldType: z.string().optional(),
+        optionsJson: z.any().optional(),
+        defaultValue: z.string().optional(),
+        placeholder: z.string().optional(),
+        isRequired: z.boolean().optional(),
+        isVisibleOnForm: z.boolean().optional(),
+        isVisibleOnProfile: z.boolean().optional(),
+        sortOrder: z.number().optional(),
+        groupName: z.string().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const { tenantId, id, ...data } = input;
+        return updateCustomField(tenantId, id, data);
+      }),
+    delete: protectedProcedure
+      .input(z.object({ tenantId: z.number(), id: z.number() }))
+      .mutation(async ({ input }) => {
+        await deleteCustomField(input.tenantId, input.id);
+        return { success: true };
+      }),
+    reorder: protectedProcedure
+      .input(z.object({ tenantId: z.number(), entity: z.enum(["contact", "deal", "account", "trip"]), orderedIds: z.array(z.number()) }))
+      .mutation(async ({ input }) => {
+        await reorderCustomFields(input.tenantId, input.entity, input.orderedIds);
+        return { success: true };
+      }),
+  }),
 });
 
 export type AppRouter = typeof appRouter;

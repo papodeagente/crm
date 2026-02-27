@@ -3,7 +3,7 @@ import {
   Settings, Inbox, MessageSquare, Bot,
   FileText, Globe, Plane,
   GraduationCap, Plug, Shield, BookOpen,
-  ChevronRight, Users,
+  ChevronRight, Users, Tag,
 } from "lucide-react";
 
 /* ─── Settings Menu Structure ─── */
@@ -118,6 +118,14 @@ const settingsSections: SettingsSection[] = [
         path: "/settings/agents",
         color: "text-indigo-400",
         bgColor: "bg-indigo-500/15",
+      },
+      {
+        icon: Tag,
+        label: "Campos Personalizados",
+        description: "Configure campos extras para contatos, negociações e mais",
+        path: "/settings/custom-fields",
+        color: "text-teal-400",
+        bgColor: "bg-teal-500/15",
       },
       {
         icon: BookOpen,

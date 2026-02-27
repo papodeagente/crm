@@ -3,8 +3,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Plus, Search, Users, Mail, Phone, MoreHorizontal, Trash2, Edit } from "lucide-react";
+import { Plus, Search, Users, Mail, Phone, MoreHorizontal, Trash2, Edit, Eye } from "lucide-react";
 import { useState } from "react";
+import { Link, useLocation } from "wouter";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 
@@ -121,7 +122,7 @@ export default function Contacts() {
                       <div className="h-8 w-8 rounded-full bg-muted/50 flex items-center justify-center text-[12px] font-semibold text-muted-foreground shrink-0">
                         {c.name?.charAt(0)?.toUpperCase() || "?"}
                       </div>
-                      <span className="font-medium text-foreground">{c.name}</span>
+                      <Link href={`/contact/${c.id}`} className="font-medium text-foreground hover:text-primary transition-colors cursor-pointer">{c.name}</Link>
                     </div>
                   </td>
                   <td className="px-4 py-3 text-muted-foreground">
@@ -143,7 +144,8 @@ export default function Contacts() {
                         <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg text-muted-foreground/50 hover:text-foreground"><MoreHorizontal className="h-4 w-4" /></Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="rounded-lg min-w-[140px]">
-                        <DropdownMenuItem className="text-[13px]" onClick={() => toast("Edição em breve")}><Edit className="mr-2 h-3.5 w-3.5" />Editar</DropdownMenuItem>
+                        <DropdownMenuItem className="text-[13px]" asChild><Link href={`/contact/${c.id}`}><Eye className="mr-2 h-3.5 w-3.5" />Ver Perfil</Link></DropdownMenuItem>
+                        <DropdownMenuItem className="text-[13px]" asChild><Link href={`/contact/${c.id}`}><Edit className="mr-2 h-3.5 w-3.5" />Editar</Link></DropdownMenuItem>
                         <DropdownMenuItem className="text-destructive text-[13px]" onClick={() => deleteContact.mutate({ tenantId: TENANT_ID, id: c.id })}><Trash2 className="mr-2 h-3.5 w-3.5" />Excluir</DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>

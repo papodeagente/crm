@@ -30,6 +30,8 @@ const DealDetail = lazy(() => import("./pages/DealDetail"));
 const SettingsPage = lazy(() => import("./pages/Settings"));
 const AgentManagement = lazy(() => import("./pages/AgentManagement"));
 const NotificationsPage = lazy(() => import("./pages/Notifications"));
+const ContactProfile = lazy(() => import("./pages/ContactProfile"));
+const CustomFieldsSettings = lazy(() => import("./pages/CustomFieldsSettings"));
 
 function PageLoader() {
   return (
@@ -59,6 +61,8 @@ function Router() {
           {/* Settings sub-pages (accessible from Settings hub) */}
           <Route path="/settings" component={SettingsPage} />
           <Route path="/settings/agents" component={AgentManagement} />
+          <Route path="/settings/custom-fields" component={CustomFieldsSettings} />
+          <Route path="/contact/:id" component={ContactProfile} />
           <Route path="/inbox" component={InboxPage} />
           <Route path="/whatsapp" component={WhatsApp} />
           <Route path="/chatbot" component={Chatbot} />

@@ -818,6 +818,46 @@ export const eventLog = mysqlTable("event_log", {
 ]);
 
 // ════════════════════════════════════════════════════════════
+// CUSTOM FIELDS (Campos Personalizados por Tenant)
+// ════════════════════════════════════════════════════════════
+
+export const customFields = mysqlTable("custom_fields", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  entity: mysqlEnum("entity", ["contact", "deal", "account", "trip"]).default("contact").notNull(),
+  name: varchar("name", { length: 128 }).notNull(), // slug/key
+  label: varchar("label", { length: 255 }).notNull(), // display label
+  fieldType: mysqlEnum("fieldType", ["text", "number", "date", "select", "multiselect", "checkbox", "textarea", "email", "phone", "url", "currency"]).default("text").notNull(),
+  optionsJson: json("optionsJson"), // for select/multiselect: ["opt1","opt2",...]
+  defaultValue: text("defaultValue"),
+  placeholder: varchar("placeholder", { length: 255 }),
+  isRequired: boolean("isRequired").default(false).notNull(),
+  isVisibleOnForm: boolean("isVisibleOnForm").default(true).notNull(),
+  isVisibleOnProfile: boolean("isVisibleOnProfile").default(true).notNull(),
+  sortOrder: int("sortOrder").default(0).notNull(),
+  groupName: varchar("groupName", { length: 128 }), // optional grouping
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (t) => [
+  index("cf_tenant_entity_idx").on(t.tenantId, t.entity),
+  index("cf_tenant_sort_idx").on(t.tenantId, t.entity, t.sortOrder),
+]);
+
+export const customFieldValues = mysqlTable("custom_field_values", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  fieldId: int("fieldId").notNull(),
+  entityType: mysqlEnum("entityType", ["contact", "deal", "account", "trip"]).default("contact").notNull(),
+  entityId: int("entityId").notNull(),
+  value: text("value"), // stored as string, parsed by fieldType
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (t) => [
+  index("cfv_tenant_entity_idx").on(t.tenantId, t.entityType, t.entityId),
+  index("cfv_field_idx").on(t.fieldId),
+]);
+
+// ════════════════════════════════════════════════════════════
 // TYPE EXPORTS
 // ════════════════════════════════════════════════════════════
 
@@ -889,3 +929,7 @@ export const notifications = mysqlTable("notifications", {
 ]);
 
 export type Notification = typeof notifications.$inferSelect;
+export type CustomField = typeof customFields.$inferSelect;
+export type InsertCustomField = typeof customFields.$inferInsert;
+export type CustomFieldValue = typeof customFieldValues.$inferSelect;
+export type InsertCustomFieldValue = typeof customFieldValues.$inferInsert;

@@ -1,6 +1,6 @@
 import { eq, desc, and, or, like, lt, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users, whatsappSessions, waMessages as messages, activityLogs, chatbotSettings, chatbotRules, conversationAssignments, crmUsers, teams, teamMembers, distributionRules } from "../drizzle/schema";
+import { InsertUser, users, whatsappSessions, waMessages as messages, activityLogs, chatbotSettings, chatbotRules, conversationAssignments, crmUsers, teams, teamMembers, distributionRules, customFields, customFieldValues } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -1107,4 +1107,200 @@ export async function toggleDistributionRule(id: number, tenantId: number, isAct
   const db = await getDb();
   if (!db) return;
   await db.execute(sql`UPDATE distribution_rules SET isActive = ${isActive} WHERE id = ${id} AND tenantId = ${tenantId}`);
+}
+
+
+// ════════════════════════════════════════════════════════════
+// CONTACT PROFILE & METRICS
+// ════════════════════════════════════════════════════════════
+
+export async function getContactMetrics(tenantId: number, contactId: number) {
+  const db = await getDb();
+  if (!db) return { totalDeals: 0, wonDeals: 0, totalSpentCents: 0, daysSinceLastPurchase: null };
+
+  const rows = (await db.execute(sql`
+    SELECT
+      COUNT(*) as totalDeals,
+      SUM(CASE WHEN status = 'won' THEN 1 ELSE 0 END) as wonDeals,
+      SUM(CASE WHEN status = 'won' THEN COALESCE(valueCents, 0) ELSE 0 END) as totalSpentCents,
+      MAX(CASE WHEN status = 'won' THEN updatedAt ELSE NULL END) as lastPurchaseDate
+    FROM deals
+    WHERE tenantId = ${tenantId} AND contactId = ${contactId}
+  `)) as unknown as any[];
+
+  const row = rows?.[0]?.[0] || {};
+  const lastPurchaseDate = row.lastPurchaseDate ? new Date(row.lastPurchaseDate) : null;
+  const daysSinceLastPurchase = lastPurchaseDate
+    ? Math.floor((Date.now() - lastPurchaseDate.getTime()) / (1000 * 60 * 60 * 24))
+    : null;
+
+  return {
+    totalDeals: Number(row.totalDeals || 0),
+    wonDeals: Number(row.wonDeals || 0),
+    totalSpentCents: Number(row.totalSpentCents || 0),
+    daysSinceLastPurchase,
+  };
+}
+
+export async function getContactDeals(tenantId: number, contactId: number) {
+  const db = await getDb();
+  if (!db) return [];
+
+  const rows = (await db.execute(sql`
+    SELECT
+      d.id, d.title, d.status, d.valueCents, d.currency, d.probability,
+      d.expectedCloseAt, d.createdAt, d.updatedAt, d.lastActivityAt,
+      ps.name as stageName, p.name as pipelineName
+    FROM deals d
+    LEFT JOIN pipeline_stages ps ON ps.id = d.stageId AND ps.tenantId = ${tenantId}
+    LEFT JOIN pipelines p ON p.id = d.pipelineId AND p.tenantId = ${tenantId}
+    WHERE d.tenantId = ${tenantId} AND d.contactId = ${contactId}
+    ORDER BY d.updatedAt DESC
+  `)) as unknown as any[];
+
+  return rows?.[0] || [];
+}
+
+// ════════════════════════════════════════════════════════════
+// CUSTOM FIELDS CRUD
+// ════════════════════════════════════════════════════════════
+
+export async function listCustomFields(tenantId: number, entity: string) {
+  const db = await getDb();
+  if (!db) return [];
+
+  const rows = (await db.execute(sql`
+    SELECT * FROM custom_fields
+    WHERE tenantId = ${tenantId} AND entity = ${entity}
+    ORDER BY sortOrder ASC, id ASC
+  `)) as unknown as any[];
+
+  return rows?.[0] || [];
+}
+
+export async function getCustomFieldById(tenantId: number, id: number) {
+  const db = await getDb();
+  if (!db) return null;
+
+  const rows = (await db.execute(sql`
+    SELECT * FROM custom_fields WHERE tenantId = ${tenantId} AND id = ${id} LIMIT 1
+  `)) as unknown as any[];
+
+  return rows?.[0]?.[0] || null;
+}
+
+export async function createCustomField(data: {
+  tenantId: number; entity: string; name: string; label: string;
+  fieldType: string; optionsJson?: any; defaultValue?: string;
+  placeholder?: string; isRequired?: boolean; isVisibleOnForm?: boolean;
+  isVisibleOnProfile?: boolean; sortOrder?: number; groupName?: string;
+}) {
+  const db = await getDb();
+  if (!db) return null;
+
+  await db.execute(sql`
+    INSERT INTO custom_fields (tenantId, entity, name, label, fieldType, optionsJson, defaultValue, placeholder, isRequired, isVisibleOnForm, isVisibleOnProfile, sortOrder, groupName)
+    VALUES (
+      ${data.tenantId}, ${data.entity}, ${data.name}, ${data.label}, ${data.fieldType},
+      ${data.optionsJson ? JSON.stringify(data.optionsJson) : null},
+      ${data.defaultValue || null}, ${data.placeholder || null},
+      ${data.isRequired ?? false}, ${data.isVisibleOnForm ?? true},
+      ${data.isVisibleOnProfile ?? true}, ${data.sortOrder ?? 0},
+      ${data.groupName || null}
+    )
+  `);
+
+  const rows = (await db.execute(sql`SELECT * FROM custom_fields WHERE tenantId = ${data.tenantId} AND name = ${data.name} AND entity = ${data.entity} ORDER BY id DESC LIMIT 1`)) as unknown as any[];
+  return rows?.[0]?.[0] || null;
+}
+
+export async function updateCustomField(tenantId: number, id: number, data: {
+  label?: string; fieldType?: string; optionsJson?: any; defaultValue?: string;
+  placeholder?: string; isRequired?: boolean; isVisibleOnForm?: boolean;
+  isVisibleOnProfile?: boolean; sortOrder?: number; groupName?: string;
+}) {
+  const db = await getDb();
+  if (!db) return null;
+
+  await db.execute(sql`
+    UPDATE custom_fields SET
+      label = COALESCE(${data.label ?? null}, label),
+      fieldType = COALESCE(${data.fieldType ?? null}, fieldType),
+      optionsJson = ${data.optionsJson !== undefined ? (data.optionsJson ? JSON.stringify(data.optionsJson) : null) : sql`optionsJson`},
+      defaultValue = ${data.defaultValue !== undefined ? data.defaultValue : sql`defaultValue`},
+      placeholder = ${data.placeholder !== undefined ? data.placeholder : sql`placeholder`},
+      isRequired = COALESCE(${data.isRequired !== undefined ? data.isRequired : null}, isRequired),
+      isVisibleOnForm = COALESCE(${data.isVisibleOnForm !== undefined ? data.isVisibleOnForm : null}, isVisibleOnForm),
+      isVisibleOnProfile = COALESCE(${data.isVisibleOnProfile !== undefined ? data.isVisibleOnProfile : null}, isVisibleOnProfile),
+      sortOrder = COALESCE(${data.sortOrder ?? null}, sortOrder),
+      groupName = ${data.groupName !== undefined ? data.groupName : sql`groupName`}
+    WHERE id = ${id} AND tenantId = ${tenantId}
+  `);
+
+  return getCustomFieldById(tenantId, id);
+}
+
+export async function deleteCustomField(tenantId: number, id: number) {
+  const db = await getDb();
+  if (!db) return;
+  // Delete values first, then the field
+  await db.execute(sql`DELETE FROM custom_field_values WHERE fieldId = ${id} AND tenantId = ${tenantId}`);
+  await db.execute(sql`DELETE FROM custom_fields WHERE id = ${id} AND tenantId = ${tenantId}`);
+}
+
+export async function reorderCustomFields(tenantId: number, entity: string, orderedIds: number[]) {
+  const db = await getDb();
+  if (!db) return;
+  for (let i = 0; i < orderedIds.length; i++) {
+    await db.execute(sql`UPDATE custom_fields SET sortOrder = ${i} WHERE id = ${orderedIds[i]} AND tenantId = ${tenantId} AND entity = ${entity}`);
+  }
+}
+
+// ════════════════════════════════════════════════════════════
+// CUSTOM FIELD VALUES
+// ════════════════════════════════════════════════════════════
+
+export async function getCustomFieldValues(tenantId: number, entityType: string, entityId: number) {
+  const db = await getDb();
+  if (!db) return [];
+
+  const rows = (await db.execute(sql`
+    SELECT cfv.*, cf.name as fieldName, cf.label as fieldLabel, cf.fieldType, cf.optionsJson, cf.isRequired, cf.isVisibleOnForm, cf.isVisibleOnProfile, cf.groupName
+    FROM custom_field_values cfv
+    JOIN custom_fields cf ON cf.id = cfv.fieldId AND cf.tenantId = cfv.tenantId
+    WHERE cfv.tenantId = ${tenantId} AND cfv.entityType = ${entityType} AND cfv.entityId = ${entityId}
+    ORDER BY cf.sortOrder ASC
+  `)) as unknown as any[];
+
+  return rows?.[0] || [];
+}
+
+export async function setCustomFieldValue(tenantId: number, fieldId: number, entityType: string, entityId: number, value: string | null) {
+  const db = await getDb();
+  if (!db) return;
+
+  // Upsert: check if exists
+  const existing = (await db.execute(sql`
+    SELECT id FROM custom_field_values
+    WHERE tenantId = ${tenantId} AND fieldId = ${fieldId} AND entityType = ${entityType} AND entityId = ${entityId}
+    LIMIT 1
+  `)) as unknown as any[];
+
+  if (existing?.[0]?.[0]) {
+    await db.execute(sql`
+      UPDATE custom_field_values SET value = ${value}
+      WHERE tenantId = ${tenantId} AND fieldId = ${fieldId} AND entityType = ${entityType} AND entityId = ${entityId}
+    `);
+  } else {
+    await db.execute(sql`
+      INSERT INTO custom_field_values (tenantId, fieldId, entityType, entityId, value)
+      VALUES (${tenantId}, ${fieldId}, ${entityType}, ${entityId}, ${value})
+    `);
+  }
+}
+
+export async function setCustomFieldValues(tenantId: number, entityType: string, entityId: number, values: { fieldId: number; value: string | null }[]) {
+  for (const v of values) {
+    await setCustomFieldValue(tenantId, v.fieldId, entityType, entityId, v.value);
+  }
 }
