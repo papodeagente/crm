@@ -1108,3 +1108,18 @@
 - [x] Investigar todos os testes que criam deals, contacts e outros dados no banco real
 - [x] Reescrever testes para usar mocks ou ser read-only, sem poluir o banco
 - [x] Limpar negociações e dados de teste do banco de produção
+
+## Endpoint Público WordPress Elementor — POST /webhooks/wp-leads
+
+- [x] Criar endpoint Express POST /webhooks/wp-leads (fora do tRPC, stateless)
+- [x] Validação de api_key no body contra env WP_SECRET (401 se inválida)
+- [x] Rate limit 30 req/min por IP
+- [x] Validação de campos obrigatórios (name, email, phone) com HTTP 400
+- [x] Normalização de telefone para E.164
+- [x] Criar/atualizar contato pelo email ou telefone
+- [x] Criar negociação no pipeline padrão (source=wordpress, channel=elementor)
+- [x] Salvar UTMs se existirem
+- [x] Registrar EventLog (type=lead_created, origin=elementor_webhook)
+- [x] Logar tentativas inválidas no EventLog
+- [x] Testes unitários para o endpoint
+- [x] Configurar secret WP_SECRET via webdev_request_secrets

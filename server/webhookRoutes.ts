@@ -1,9 +1,10 @@
 /**
  * Webhook Routes — Express routes for inbound lead capture.
  *
- * POST /webhooks/leads   → Landing Page webhook (Bearer token auth)
- * POST /webhooks/meta    → Meta Lead Ads webhook (X-Hub-Signature-256)
- * GET  /webhooks/meta    → Meta verification challenge
+ * POST /webhooks/leads     → Landing Page webhook (Bearer token auth)
+ * POST /webhooks/meta      → Meta Lead Ads webhook (X-Hub-Signature-256)
+ * GET  /webhooks/meta      → Meta verification challenge
+ * POST /webhooks/wp-leads  → WordPress Elementor webhook (api_key in body)
  */
 
 import { Router, Request, Response } from "express";
@@ -14,8 +15,222 @@ import {
   getMetaConfig,
   type InboundLeadPayload,
 } from "./leadProcessor";
+import { getDb } from "./db";
+import { eventLog } from "../drizzle/schema";
+import { ENV } from "./_core/env";
 
 const router = Router();
+
+// ─── Rate Limiter (in-memory, per IP) ───────────────────
+
+interface RateLimitEntry {
+  count: number;
+  resetAt: number;
+}
+
+const rateLimitStore = new Map<string, RateLimitEntry>();
+const RATE_LIMIT_MAX = 30;       // max requests
+const RATE_LIMIT_WINDOW = 60000; // 1 minute in ms
+
+// Clean up stale entries every 5 minutes
+setInterval(() => {
+  const now = Date.now();
+  const keys = Array.from(rateLimitStore.keys());
+  for (const key of keys) {
+    const entry = rateLimitStore.get(key);
+    if (entry && now > entry.resetAt) {
+      rateLimitStore.delete(key);
+    }
+  }
+}, 5 * 60 * 1000);
+
+function checkRateLimit(ip: string): { allowed: boolean; remaining: number } {
+  const now = Date.now();
+  let entry = rateLimitStore.get(ip);
+
+  if (!entry || now > entry.resetAt) {
+    entry = { count: 1, resetAt: now + RATE_LIMIT_WINDOW };
+    rateLimitStore.set(ip, entry);
+    return { allowed: true, remaining: RATE_LIMIT_MAX - 1 };
+  }
+
+  entry.count++;
+  if (entry.count > RATE_LIMIT_MAX) {
+    return { allowed: false, remaining: 0 };
+  }
+
+  return { allowed: true, remaining: RATE_LIMIT_MAX - entry.count };
+}
+
+// ─── EventLog Helper ────────────────────────────────────
+
+async function logEvent(opts: {
+  tenantId: number;
+  actorType: "user" | "system" | "api" | "webhook";
+  entityType: string;
+  entityId?: number;
+  action: string;
+  metadataJson?: Record<string, any>;
+}) {
+  try {
+    const db = await getDb();
+    if (!db) return;
+    await db.insert(eventLog).values({
+      tenantId: opts.tenantId,
+      actorType: opts.actorType,
+      entityType: opts.entityType,
+      entityId: opts.entityId ?? null,
+      action: opts.action,
+      metadataJson: opts.metadataJson ?? null,
+    });
+  } catch (err) {
+    console.error("[EventLog] Failed to log event:", err);
+  }
+}
+
+// ─── Email Validation ───────────────────────────────────
+
+function isValidEmail(email: string): boolean {
+  // Simple but effective email regex
+  const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return re.test(email.trim().toLowerCase());
+}
+
+// ─── WordPress Elementor Webhook ────────────────────────
+
+router.post("/webhooks/wp-leads", async (req: Request, res: Response) => {
+  const tenantId = 1; // Single-tenant for now
+  const clientIp = req.ip || req.socket.remoteAddress || "unknown";
+
+  try {
+    // 1. Rate limiting
+    const rateCheck = checkRateLimit(clientIp);
+    if (!rateCheck.allowed) {
+      await logEvent({
+        tenantId,
+        actorType: "webhook",
+        entityType: "lead",
+        action: "rate_limited",
+        metadataJson: { ip: clientIp, origin: "elementor_webhook" },
+      });
+      return res.status(429).json({ error: "Rate limit exceeded. Try again later." });
+    }
+
+    // 2. Validate api_key
+    const { api_key } = req.body || {};
+    if (!api_key || typeof api_key !== "string") {
+      await logEvent({
+        tenantId,
+        actorType: "webhook",
+        entityType: "lead",
+        action: "auth_failed",
+        metadataJson: { ip: clientIp, reason: "missing_api_key", origin: "elementor_webhook" },
+      });
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const wpSecret = ENV.wpSecret;
+    if (!wpSecret || api_key !== wpSecret) {
+      await logEvent({
+        tenantId,
+        actorType: "webhook",
+        entityType: "lead",
+        action: "auth_failed",
+        metadataJson: { ip: clientIp, reason: "invalid_api_key", origin: "elementor_webhook" },
+      });
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    // 3. Validate required fields
+    const { name, email, phone, message, utm_source, utm_medium, utm_campaign } = req.body;
+
+    const errors: string[] = [];
+    if (!name || typeof name !== "string" || !name.trim()) {
+      errors.push("name is required");
+    }
+    if (!email || typeof email !== "string" || !email.trim()) {
+      errors.push("email is required");
+    } else if (!isValidEmail(email)) {
+      errors.push("email format is invalid");
+    }
+    if (!phone || typeof phone !== "string" || !phone.trim()) {
+      errors.push("phone is required");
+    }
+
+    if (errors.length > 0) {
+      return res.status(400).json({ error: "Validation failed", details: errors });
+    }
+
+    // 4. Build UTM object if any UTM field is present
+    const utm: InboundLeadPayload["utm"] = {};
+    if (utm_source) utm.source = String(utm_source);
+    if (utm_medium) utm.medium = String(utm_medium);
+    if (utm_campaign) utm.campaign = String(utm_campaign);
+    const hasUtm = Object.keys(utm).length > 0;
+
+    // 5. Build payload for processInboundLead
+    const payload: InboundLeadPayload = {
+      name: name.trim(),
+      email: email.trim(),
+      phone: phone.trim(),
+      message: message ? String(message).trim() : undefined,
+      source: "wordpress",
+      lead_id: undefined, // Elementor doesn't provide a unique lead_id
+      utm: hasUtm ? utm : undefined,
+      meta: {
+        channel: "elementor",
+        ip: clientIp,
+      },
+      raw: req.body,
+    };
+
+    // 6. Process the lead (creates/updates contact + creates deal)
+    const result = await processInboundLead(tenantId, payload);
+
+    if (result.success) {
+      // 7. Log success in EventLog
+      await logEvent({
+        tenantId,
+        actorType: "webhook",
+        entityType: "lead",
+        entityId: result.dealId,
+        action: "lead_created",
+        metadataJson: {
+          origin: "elementor_webhook",
+          dealId: result.dealId,
+          contactId: result.contactId,
+          dedupeKey: result.dedupeKey,
+          isExisting: result.isExisting,
+          source: "wordpress",
+          channel: "elementor",
+        },
+      });
+
+      return res.status(200).json({
+        success: true,
+        message: "Lead criado com sucesso",
+      });
+    } else {
+      // Log failure
+      await logEvent({
+        tenantId,
+        actorType: "webhook",
+        entityType: "lead",
+        action: "lead_failed",
+        metadataJson: {
+          origin: "elementor_webhook",
+          error: result.error,
+          dedupeKey: result.dedupeKey,
+        },
+      });
+
+      return res.status(500).json({ error: "Failed to process lead" });
+    }
+  } catch (error: any) {
+    console.error("[Webhook /wp-leads] Error:", error.message);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
 
 // ─── Landing Page Webhook ────────────────────────────────
 
@@ -240,3 +455,6 @@ router.post("/webhooks/meta", async (req: Request, res: Response) => {
 });
 
 export { router as webhookRouter };
+
+// Export for testing
+export { checkRateLimit, isValidEmail, rateLimitStore };
