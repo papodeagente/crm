@@ -1184,3 +1184,7 @@
 - [x] Criar página de CRUD para Motivos de Perda de Venda (adicionar, editar, excluir)
 - [ ] Integrar fontes/campanhas no formulário de Criar Negociação (substituir inputs fixos)
 - [x] Testes unitários para os novos procedures (35 testes adicionais, 438 total passando)
+
+## Menu Principal — Inbox WhatsApp
+
+- [x] Adicionar link do Inbox no menu principal entre Tarefas e Análises

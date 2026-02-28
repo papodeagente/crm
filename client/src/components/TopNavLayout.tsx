@@ -12,7 +12,7 @@ import { getLoginUrl } from "@/const";
 import {
   Home, Briefcase, Users, CheckSquare, BarChart3,
   Bell, Settings, Search, ChevronRight, LogOut, Menu, X,
-  Loader2, User, Building2, ListTodo, Phone, Mail, Sun, Moon,
+  Loader2, User, Building2, ListTodo, Phone, Mail, Sun, Moon, MessageSquare,
 } from "lucide-react";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -33,6 +33,7 @@ const navItems: NavItem[] = [
   { icon: Briefcase, label: "Negociações", path: "/pipeline", matchPaths: ["/pipeline", "/deal"] },
   { icon: Users, label: "Contatos", path: "/contacts", matchPaths: ["/contacts"] },
   { icon: CheckSquare, label: "Tarefas", path: "/tasks", matchPaths: ["/tasks"] },
+  { icon: MessageSquare, label: "Inbox", path: "/inbox", matchPaths: ["/inbox"] },
   { icon: BarChart3, label: "Análises", path: "/insights", matchPaths: ["/insights", "/goals"] },
 ];
 
@@ -42,6 +43,7 @@ const quickNavPages = [
   { icon: Briefcase, label: "Negociações", path: "/pipeline" },
   { icon: Users, label: "Contatos", path: "/contacts" },
   { icon: CheckSquare, label: "Tarefas", path: "/tasks" },
+  { icon: MessageSquare, label: "Inbox", path: "/inbox" },
   { icon: BarChart3, label: "Análises", path: "/insights" },
   { icon: Bell, label: "Notificações", path: "/notifications" },
   { icon: Settings, label: "Configurações", path: "/settings" },
