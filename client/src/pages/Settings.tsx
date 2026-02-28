@@ -4,153 +4,107 @@ import {
   FileText, Globe, Plane,
   GraduationCap, Plug, Shield, BookOpen,
   ChevronRight, Users, Tag, GitBranch,
+  Megaphone, Target, XCircle, Package,
+  Sparkles, UserPlus, Layers,
 } from "lucide-react";
 
-/* ─── Settings Menu Structure ─── */
-interface SettingsItem {
-  icon: any;
-  label: string;
-  description: string;
-  path: string;
-  color: string;
-  bgColor: string;
-}
-
-interface SettingsSection {
+/* ─── Suggestion Cards (top banners) ─── */
+interface SuggestionCard {
   title: string;
   description: string;
-  items: SettingsItem[];
+  buttonLabel: string;
+  path: string;
+  gradient: string;
+  icon: any;
 }
 
-const settingsSections: SettingsSection[] = [
+const suggestionCards: SuggestionCard[] = [
   {
-    title: "Comunicação",
-    description: "Gerencie seus canais de comunicação com clientes",
-    items: [
-      {
-        icon: Inbox,
-        label: "Inbox",
-        description: "Caixa de entrada unificada de mensagens",
-        path: "/inbox",
-        color: "text-blue-400",
-        bgColor: "bg-blue-500/15",
-      },
-      {
-        icon: MessageSquare,
-        label: "WhatsApp",
-        description: "Conexão e gerenciamento de sessões WhatsApp",
-        path: "/whatsapp",
-        color: "text-emerald-400",
-        bgColor: "bg-emerald-500/15",
-      },
-      {
-        icon: Bot,
-        label: "Chatbot IA",
-        description: "Configurações do assistente inteligente",
-        path: "/chatbot",
-        color: "text-violet-400",
-        bgColor: "bg-violet-500/15",
-      },
+    title: "Convide sua equipe para usar o CRM",
+    description: "Adicione agentes e defina permissões",
+    buttonLabel: "Convidar usuários",
+    path: "/settings/agents",
+    gradient: "from-blue-500/20 to-cyan-500/20",
+    icon: UserPlus,
+  },
+  {
+    title: "Crie campos personalizados de acordo com seu processo",
+    description: "Adapte o CRM ao seu negócio",
+    buttonLabel: "Criar campos personalizados",
+    path: "/settings/custom-fields",
+    gradient: "from-violet-500/20 to-purple-500/20",
+    icon: Layers,
+  },
+  {
+    title: "Configure fontes e campanhas para rastrear leads",
+    description: "Saiba de onde vêm seus clientes",
+    buttonLabel: "Configurar fontes",
+    path: "/settings/sources",
+    gradient: "from-amber-500/20 to-orange-500/20",
+    icon: Sparkles,
+  },
+];
+
+/* ─── Category columns (RD Station style) ─── */
+interface SettingsLink {
+  icon: any;
+  label: string;
+  path: string;
+  badge?: string;
+}
+
+interface SettingsCategory {
+  title: string;
+  links: SettingsLink[];
+}
+
+const settingsCategories: SettingsCategory[] = [
+  {
+    title: "SEU TIME",
+    links: [
+      { icon: Users, label: "Agentes & Equipes", path: "/settings/agents" },
+      { icon: Shield, label: "Administração", path: "/admin" },
     ],
   },
   {
-    title: "Comercial",
-    description: "Ferramentas para gestão comercial e vendas",
-    items: [
-      {
-        icon: FileText,
-        label: "Propostas",
-        description: "Modelos e propostas comerciais",
-        path: "/proposals",
-        color: "text-amber-400",
-        bgColor: "bg-amber-500/15",
-      },
-      {
-        icon: Globe,
-        label: "Portal do Cliente",
-        description: "Portal de acesso para seus clientes",
-        path: "/portal",
-        color: "text-cyan-400",
-        bgColor: "bg-cyan-500/15",
-      },
-      {
-        icon: Plane,
-        label: "Viagens",
-        description: "Gestão de pacotes e roteiros de viagem",
-        path: "/trips",
-        color: "text-sky-400",
-        bgColor: "bg-sky-500/15",
-      },
+    title: "CONFIGURE SEU PROCESSO DE VENDA",
+    links: [
+      { icon: GitBranch, label: "Funis de vendas", path: "/settings/pipelines" },
+      { icon: Tag, label: "Campos personalizados", path: "/settings/custom-fields" },
+      { icon: Bot, label: "Automação de vendas", path: "/chatbot" },
     ],
   },
   {
-    title: "Plataforma",
-    description: "Administração e configurações do sistema",
-    items: [
-      {
-        icon: GraduationCap,
-        label: "Academy",
-        description: "Central de aprendizado e tutoriais",
-        path: "/academy",
-        color: "text-purple-400",
-        bgColor: "bg-purple-500/15",
-      },
-      {
-        icon: Plug,
-        label: "Integrações",
-        description: "Conecte ferramentas e serviços externos",
-        path: "/integrations",
-        color: "text-orange-400",
-        bgColor: "bg-orange-500/15",
-      },
-      {
-        icon: Shield,
-        label: "Administração",
-        description: "Usuários, permissões e segurança",
-        path: "/admin",
-        color: "text-rose-400",
-        bgColor: "bg-rose-500/15",
-      },
-      {
-        icon: Users,
-        label: "Agentes & Equipes",
-        description: "Gerencie agentes, equipes e distribuição de conversas",
-        path: "/settings/agents",
-        color: "text-indigo-400",
-        bgColor: "bg-indigo-500/15",
-      },
-      {
-        icon: Tag,
-        label: "Campos Personalizados",
-        description: "Configure campos extras para contatos, negociações e mais",
-        path: "/settings/custom-fields",
-        color: "text-violet-400",
-        bgColor: "bg-violet-500/15",
-      },
-      {
-        icon: GitBranch,
-        label: "Funis & Etapas",
-        description: "Gerencie funis de vendas, pós-venda e automações de transição",
-        path: "/settings/pipelines",
-        color: "text-emerald-400",
-        bgColor: "bg-emerald-500/15",
-      },
-      {
-        icon: Plane,
-        label: "Catálogo de Produtos",
-        description: "Gerencie produtos turísticos, preços e fornecedores",
-        path: "/settings/products",
-        color: "text-sky-400",
-        bgColor: "bg-sky-500/15",
-      },
-      {
-        icon: BookOpen,
-        label: "Documentação API",
-        description: "Referência técnica e endpoints",
-        path: "/api-docs",
-        color: "text-slate-400",
-        bgColor: "bg-slate-500/15",
-      },
+    title: "COMUNICAÇÃO",
+    links: [
+      { icon: Inbox, label: "Inbox", path: "/inbox" },
+      { icon: MessageSquare, label: "WhatsApp", path: "/whatsapp" },
+      { icon: Bot, label: "Chatbot IA", path: "/chatbot" },
+    ],
+  },
+  {
+    title: "AVANÇADO",
+    links: [
+      { icon: Plug, label: "Integrações", path: "/integrations" },
+      { icon: FileText, label: "Propostas", path: "/proposals" },
+      { icon: Globe, label: "Portal do Cliente", path: "/portal" },
+      { icon: BookOpen, label: "Documentação API", path: "/api-docs" },
+    ],
+  },
+  {
+    title: "AJUSTES DE SUA CONTA",
+    links: [
+      { icon: Megaphone, label: "Fontes e campanhas", path: "/settings/sources" },
+      { icon: Package, label: "Produtos e serviços", path: "/settings/products" },
+      { icon: XCircle, label: "Motivos de perda", path: "/settings/loss-reasons" },
+      { icon: Target, label: "Metas", path: "/goals" },
+    ],
+  },
+  {
+    title: "MÓDULOS",
+    links: [
+      { icon: Plane, label: "Viagens", path: "/trips" },
+      { icon: GraduationCap, label: "Academy", path: "/academy" },
     ],
   },
 ];
@@ -159,7 +113,7 @@ export default function SettingsPage() {
   const [, setLocation] = useLocation();
 
   return (
-    <div className="page-content max-w-4xl mx-auto">
+    <div className="page-content max-w-5xl mx-auto">
       {/* Header */}
       <div className="mb-8">
         <div className="flex items-center gap-3 mb-1">
@@ -175,29 +129,55 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      {/* Sections */}
-      <div className="space-y-8">
-        {settingsSections.map((section) => (
-          <div key={section.title}>
-            <div className="mb-4">
-              <h2 className="text-[15px] font-semibold text-foreground">{section.title}</h2>
-              <p className="text-[13px] text-muted-foreground mt-0.5">{section.description}</p>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {section.items.map((item) => (
+      {/* Suggestion Cards */}
+      <div className="mb-10">
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-4">Sugestões para você</p>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {suggestionCards.map((card) => (
+            <div
+              key={card.path}
+              className={`surface relative overflow-hidden rounded-xl p-5 bg-gradient-to-br ${card.gradient} border border-border/50`}
+            >
+              <div className="relative z-10">
+                <p className="text-[13px] font-medium text-foreground leading-snug mb-1">{card.title}</p>
+                <p className="text-[11px] text-muted-foreground mb-4">{card.description}</p>
                 <button
-                  key={item.path}
-                  onClick={() => setLocation(item.path)}
-                  className="surface flex items-center gap-4 p-4 text-left group hover:scale-[1.01] active:scale-[0.99] transition-all duration-200"
+                  onClick={() => setLocation(card.path)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-foreground text-background text-[12px] font-medium hover:opacity-90 transition-opacity"
                 >
-                  <div className={`h-11 w-11 rounded-xl ${item.bgColor} flex items-center justify-center shrink-0 transition-transform duration-200 group-hover:scale-105`}>
-                    <item.icon className={`h-5 w-5 ${item.color}`} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[14px] font-medium text-foreground">{item.label}</p>
-                    <p className="text-[12px] text-muted-foreground mt-0.5 truncate">{item.description}</p>
-                  </div>
-                  <ChevronRight className="h-4 w-4 text-muted-foreground/40 shrink-0 group-hover:text-muted-foreground transition-colors" />
+                  {card.buttonLabel}
+                </button>
+              </div>
+              <div className="absolute top-3 right-3 opacity-20">
+                <card.icon className="h-12 w-12 text-foreground" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Category Grid (3 columns like RD Station) */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-x-10 gap-y-8">
+        {settingsCategories.map((category) => (
+          <div key={category.title}>
+            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+              {category.title}
+            </p>
+            <div className="space-y-0.5">
+              {category.links.map((link) => (
+                <button
+                  key={link.path + link.label}
+                  onClick={() => setLocation(link.path)}
+                  className="w-full flex items-center gap-2.5 py-2 px-1 -mx-1 rounded-lg text-left group hover:bg-accent/50 transition-colors"
+                >
+                  <span className="text-[14px] text-foreground group-hover:text-primary transition-colors">
+                    {link.label}
+                  </span>
+                  {link.badge && (
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-primary/20 text-primary uppercase">
+                      {link.badge}
+                    </span>
+                  )}
                 </button>
               ))}
             </div>

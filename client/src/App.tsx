@@ -36,6 +36,8 @@ const PipelineSettings = lazy(() => import("./pages/PipelineSettings"));
 const ProductCatalog = lazy(() => import("./pages/ProductCatalog"));
 const ProductReports = lazy(() => import("./pages/ProductReports"));
 const ConversationDebug = lazy(() => import("./pages/ConversationDebug"));
+const SourcesAndCampaigns = lazy(() => import("./pages/SourcesAndCampaigns"));
+const LossReasons = lazy(() => import("./pages/LossReasons"));
 
 function PageLoader() {
   return (
@@ -81,6 +83,8 @@ function Router() {
           <Route path="/admin" component={Admin} />
           <Route path="/api-docs" component={ApiDocs} />
           <Route path="/settings/conversation-debug" component={ConversationDebug} />
+          <Route path="/settings/sources" component={SourcesAndCampaigns} />
+          <Route path="/settings/loss-reasons" component={LossReasons} />
 
           {/* Notifications */}
           <Route path="/notifications" component={NotificationsPage} />

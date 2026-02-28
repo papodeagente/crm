@@ -1170,3 +1170,17 @@
 - [x] Seção Contato: select de contatos existentes + botão "+ Adicionar contato" com formulário inline
 - [x] Adicionar campos Fonte e Campanha ao formulário de criação
 - [x] Testes unitários para os novos procedures e formulário (403 testes passando)
+
+## Reorganizar Página de Configurações (estilo RD Station CRM)
+
+- [x] Analisar estrutura atual da página Settings e routers existentes
+- [x] Criar tabelas lead_sources, campaigns e loss_reasons no schema
+- [x] Migrar banco com as novas tabelas
+- [x] Criar procedures tRPC para CRUD de fontes (lead_sources)
+- [x] Criar procedures tRPC para CRUD de campanhas (campaigns)
+- [x] Criar procedures tRPC para CRUD de motivos de perda (loss_reasons)
+- [x] Redesenhar página de Configurações com cards de sugestões no topo e categorias em colunas
+- [x] Criar página de CRUD para Fontes e Campanhas (adicionar, editar, excluir)
+- [x] Criar página de CRUD para Motivos de Perda de Venda (adicionar, editar, excluir)
+- [ ] Integrar fontes/campanhas no formulário de Criar Negociação (substituir inputs fixos)
+- [x] Testes unitários para os novos procedures (35 testes adicionais, 438 total passando)

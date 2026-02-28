@@ -14,6 +14,7 @@ import {
   productCategories, productCatalog,
   waMessages, whatsappSessions,
   aiConversationAnalyses,
+  leadSources, campaigns, lossReasons,
 } from "../drizzle/schema";
 
 // ═══════════════════════════════════════
@@ -1147,4 +1148,115 @@ export async function saveAnalysis(data: {
     missedOpportunities: data.missedOpportunities || [],
   }).$returningId();
   return result;
+}
+
+// ═══════════════════════════════════════
+// LEAD SOURCES
+// ═══════════════════════════════════════
+export async function listLeadSources(tenantId: number, includeDeleted = false) {
+  const db = await getDb(); if (!db) return [];
+  const conditions = [eq(leadSources.tenantId, tenantId)];
+  if (!includeDeleted) conditions.push(eq(leadSources.isDeleted, false));
+  return db.select().from(leadSources).where(and(...conditions)).orderBy(leadSources.name);
+}
+export async function createLeadSource(data: { tenantId: number; name: string; color?: string }) {
+  const db = await getDb(); if (!db) return null;
+  const [result] = await db.insert(leadSources).values(data).$returningId();
+  return result;
+}
+export async function updateLeadSource(id: number, data: { name?: string; color?: string; isActive?: boolean }) {
+  const db = await getDb(); if (!db) return null;
+  await db.update(leadSources).set(data).where(eq(leadSources.id, id));
+  return { id };
+}
+export async function softDeleteLeadSource(id: number) {
+  const db = await getDb(); if (!db) return null;
+  await db.update(leadSources).set({ isDeleted: true, deletedAt: new Date() }).where(eq(leadSources.id, id));
+  return { id };
+}
+export async function restoreLeadSource(id: number) {
+  const db = await getDb(); if (!db) return null;
+  await db.update(leadSources).set({ isDeleted: false, deletedAt: null }).where(eq(leadSources.id, id));
+  return { id };
+}
+export async function hardDeleteLeadSource(id: number) {
+  const db = await getDb(); if (!db) return null;
+  await db.delete(leadSources).where(eq(leadSources.id, id));
+  return { id };
+}
+
+// ═══════════════════════════════════════
+// CAMPAIGNS
+// ═══════════════════════════════════════
+export async function listCampaigns(tenantId: number, sourceId?: number, includeDeleted = false) {
+  const db = await getDb(); if (!db) return [];
+  const conditions = [eq(campaigns.tenantId, tenantId)];
+  if (!includeDeleted) conditions.push(eq(campaigns.isDeleted, false));
+  if (sourceId) conditions.push(eq(campaigns.sourceId, sourceId));
+  return db.select().from(campaigns).where(and(...conditions)).orderBy(campaigns.name);
+}
+export async function createCampaign(data: { tenantId: number; sourceId?: number; name: string; color?: string }) {
+  const db = await getDb(); if (!db) return null;
+  const [result] = await db.insert(campaigns).values(data).$returningId();
+  return result;
+}
+export async function updateCampaign(id: number, data: { name?: string; color?: string; sourceId?: number | null; isActive?: boolean }) {
+  const db = await getDb(); if (!db) return null;
+  await db.update(campaigns).set(data).where(eq(campaigns.id, id));
+  return { id };
+}
+export async function softDeleteCampaign(id: number) {
+  const db = await getDb(); if (!db) return null;
+  await db.update(campaigns).set({ isDeleted: true, deletedAt: new Date() }).where(eq(campaigns.id, id));
+  return { id };
+}
+export async function restoreCampaign(id: number) {
+  const db = await getDb(); if (!db) return null;
+  await db.update(campaigns).set({ isDeleted: false, deletedAt: null }).where(eq(campaigns.id, id));
+  return { id };
+}
+export async function hardDeleteCampaign(id: number) {
+  const db = await getDb(); if (!db) return null;
+  await db.delete(campaigns).where(eq(campaigns.id, id));
+  return { id };
+}
+
+// ═══════════════════════════════════════
+// LOSS REASONS (Motivos de Perda)
+// ═══════════════════════════════════════
+export async function listLossReasons(tenantId: number, includeDeleted = false) {
+  const db = await getDb(); if (!db) return [];
+  const conditions = [eq(lossReasons.tenantId, tenantId)];
+  if (!includeDeleted) conditions.push(eq(lossReasons.isDeleted, false));
+  return db.select().from(lossReasons).where(and(...conditions)).orderBy(lossReasons.name);
+}
+export async function createLossReason(data: { tenantId: number; name: string; description?: string }) {
+  const db = await getDb(); if (!db) return null;
+  const [result] = await db.insert(lossReasons).values(data).$returningId();
+  return result;
+}
+export async function updateLossReason(id: number, data: { name?: string; description?: string; isActive?: boolean }) {
+  const db = await getDb(); if (!db) return null;
+  await db.update(lossReasons).set(data).where(eq(lossReasons.id, id));
+  return { id };
+}
+export async function softDeleteLossReason(id: number) {
+  const db = await getDb(); if (!db) return null;
+  await db.update(lossReasons).set({ isDeleted: true, deletedAt: new Date() }).where(eq(lossReasons.id, id));
+  return { id };
+}
+export async function restoreLossReason(id: number) {
+  const db = await getDb(); if (!db) return null;
+  await db.update(lossReasons).set({ isDeleted: false, deletedAt: null }).where(eq(lossReasons.id, id));
+  return { id };
+}
+export async function hardDeleteLossReason(id: number) {
+  const db = await getDb(); if (!db) return null;
+  await db.delete(lossReasons).where(eq(lossReasons.id, id));
+  return { id };
+}
+export async function incrementLossReasonUsage(id: number) {
+  const db = await getDb(); if (!db) return null;
+  await db.update(lossReasons).set({ usageCount: sql`${lossReasons.usageCount} + 1` }).where(eq(lossReasons.id, id));
+  return { id };
 }

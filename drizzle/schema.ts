@@ -1196,3 +1196,66 @@ export type LeadEventLog = typeof leadEventLog.$inferSelect;
 export type InsertLeadEventLog = typeof leadEventLog.$inferInsert;
 export type MetaIntegrationConfig = typeof metaIntegrationConfig.$inferSelect;
 export type WebhookConfig = typeof webhookConfig.$inferSelect;
+
+// ════════════════════════════════════════════════════════════
+// LEAD SOURCES & CAMPAIGNS
+// ════════════════════════════════════════════════════════════
+
+export const leadSources = mysqlTable("lead_sources", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull().default(1),
+  name: varchar("name", { length: 255 }).notNull(),
+  color: varchar("color", { length: 7 }).default("#6366f1"),
+  isActive: boolean("isActive").default(true).notNull(),
+  isDeleted: boolean("isDeleted").default(false).notNull(),
+  deletedAt: timestamp("deletedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (t) => [
+  index("ls_tenant_idx").on(t.tenantId),
+  index("ls_tenant_active_idx").on(t.tenantId, t.isActive, t.isDeleted),
+]);
+
+export const campaigns = mysqlTable("campaigns", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull().default(1),
+  sourceId: int("sourceId"), // FK to lead_sources
+  name: varchar("name", { length: 255 }).notNull(),
+  color: varchar("color", { length: 7 }).default("#8b5cf6"),
+  isActive: boolean("isActive").default(true).notNull(),
+  isDeleted: boolean("isDeleted").default(false).notNull(),
+  deletedAt: timestamp("deletedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (t) => [
+  index("camp_tenant_idx").on(t.tenantId),
+  index("camp_source_idx").on(t.sourceId),
+  index("camp_tenant_active_idx").on(t.tenantId, t.isActive, t.isDeleted),
+]);
+
+// ════════════════════════════════════════════════════════════
+// LOSS REASONS (Motivos de Perda de Venda)
+// ════════════════════════════════════════════════════════════
+
+export const lossReasons = mysqlTable("loss_reasons", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull().default(1),
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  isActive: boolean("isActive").default(true).notNull(),
+  isDeleted: boolean("isDeleted").default(false).notNull(),
+  deletedAt: timestamp("deletedAt"),
+  usageCount: int("usageCount").default(0).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (t) => [
+  index("lr_tenant_idx").on(t.tenantId),
+  index("lr_tenant_active_idx").on(t.tenantId, t.isActive, t.isDeleted),
+]);
+
+export type LeadSource = typeof leadSources.$inferSelect;
+export type InsertLeadSource = typeof leadSources.$inferInsert;
+export type Campaign = typeof campaigns.$inferSelect;
+export type InsertCampaign = typeof campaigns.$inferInsert;
+export type LossReason = typeof lossReasons.$inferSelect;
+export type InsertLossReason = typeof lossReasons.$inferInsert;

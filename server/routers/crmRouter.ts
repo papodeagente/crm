@@ -631,4 +631,115 @@ export const crmRouter = router({
         return crm.countWhatsAppMessagesByDeal(input.dealId, input.tenantId);
       }),
   }),
+
+  // ─── LEAD SOURCES ───
+  leadSources: router({
+    list: protectedProcedure
+      .input(z.object({ tenantId: z.number(), includeDeleted: z.boolean().optional() }))
+      .query(async ({ input }) => {
+        return crm.listLeadSources(input.tenantId, input.includeDeleted);
+      }),
+    create: protectedProcedure
+      .input(z.object({ tenantId: z.number(), name: z.string().min(1), color: z.string().optional() }))
+      .mutation(async ({ ctx, input }) => {
+        const result = await crm.createLeadSource(input);
+        await emitEvent({ tenantId: input.tenantId, actorUserId: ctx.user.id, entityType: "lead_source", entityId: result?.id, action: "create" });
+        return result;
+      }),
+    update: protectedProcedure
+      .input(z.object({ id: z.number(), name: z.string().min(1).optional(), color: z.string().optional(), isActive: z.boolean().optional() }))
+      .mutation(async ({ input }) => {
+        const { id, ...data } = input;
+        return crm.updateLeadSource(id, data);
+      }),
+    delete: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        return crm.softDeleteLeadSource(input.id);
+      }),
+    restore: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        return crm.restoreLeadSource(input.id);
+      }),
+    hardDelete: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        return crm.hardDeleteLeadSource(input.id);
+      }),
+  }),
+
+  // ─── CAMPAIGNS ───
+  campaigns: router({
+    list: protectedProcedure
+      .input(z.object({ tenantId: z.number(), sourceId: z.number().optional(), includeDeleted: z.boolean().optional() }))
+      .query(async ({ input }) => {
+        return crm.listCampaigns(input.tenantId, input.sourceId, input.includeDeleted);
+      }),
+    create: protectedProcedure
+      .input(z.object({ tenantId: z.number(), sourceId: z.number().optional(), name: z.string().min(1), color: z.string().optional() }))
+      .mutation(async ({ ctx, input }) => {
+        const result = await crm.createCampaign(input);
+        await emitEvent({ tenantId: input.tenantId, actorUserId: ctx.user.id, entityType: "campaign", entityId: result?.id, action: "create" });
+        return result;
+      }),
+    update: protectedProcedure
+      .input(z.object({ id: z.number(), name: z.string().min(1).optional(), color: z.string().optional(), sourceId: z.number().nullish(), isActive: z.boolean().optional() }))
+      .mutation(async ({ input }) => {
+        const { id, ...data } = input;
+        return crm.updateCampaign(id, data);
+      }),
+    delete: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        return crm.softDeleteCampaign(input.id);
+      }),
+    restore: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        return crm.restoreCampaign(input.id);
+      }),
+    hardDelete: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        return crm.hardDeleteCampaign(input.id);
+      }),
+  }),
+
+  // ─── LOSS REASONS ───
+  lossReasons: router({
+    list: protectedProcedure
+      .input(z.object({ tenantId: z.number(), includeDeleted: z.boolean().optional() }))
+      .query(async ({ input }) => {
+        return crm.listLossReasons(input.tenantId, input.includeDeleted);
+      }),
+    create: protectedProcedure
+      .input(z.object({ tenantId: z.number(), name: z.string().min(1), description: z.string().optional() }))
+      .mutation(async ({ ctx, input }) => {
+        const result = await crm.createLossReason(input);
+        await emitEvent({ tenantId: input.tenantId, actorUserId: ctx.user.id, entityType: "loss_reason", entityId: result?.id, action: "create" });
+        return result;
+      }),
+    update: protectedProcedure
+      .input(z.object({ id: z.number(), name: z.string().min(1).optional(), description: z.string().optional(), isActive: z.boolean().optional() }))
+      .mutation(async ({ input }) => {
+        const { id, ...data } = input;
+        return crm.updateLossReason(id, data);
+      }),
+    delete: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        return crm.softDeleteLossReason(input.id);
+      }),
+    restore: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        return crm.restoreLossReason(input.id);
+      }),
+    hardDelete: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        return crm.hardDeleteLossReason(input.id);
+      }),
+  }),
 });
