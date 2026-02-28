@@ -780,15 +780,10 @@ function DealDrawer({ dealId, onClose, contacts, accounts, stages }: {
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-[12px] font-medium">Valor (R$)</Label>
-                  <Input
-                    type="number"
-                    className="h-10 text-[13px] rounded-xl"
-                    defaultValue={d.valueCents ? (d.valueCents / 100).toFixed(2) : ""}
-                    onBlur={(e) => {
-                      const v = Math.round(parseFloat(e.target.value || "0") * 100);
-                      if (v !== (d.valueCents ?? 0)) updateDeal.mutate({ tenantId: TENANT_ID, id: dealId, valueCents: v });
-                    }}
-                  />
+                  <div className="h-10 flex items-center px-3 text-[13px] rounded-xl bg-muted/50 border border-border text-muted-foreground">
+                    {d.valueCents ? formatCurrency(d.valueCents) : "R$ 0,00"}
+                    <span className="ml-auto text-[10px] text-muted-foreground/60">via Produtos</span>
+                  </div>
                 </div>
               </div>
 
@@ -1186,7 +1181,6 @@ function CreateDealDialog({ open, onOpenChange, pipelineId, stages, contacts, ac
       }
 
       // 3. Create deal
-      const value = valueCents ? Math.round(parseFloat(valueCents.replace(/[^\d,]/g, "").replace(",", ".")) * 100) : undefined;
       const deal = await createDeal.mutateAsync({
         tenantId: TENANT_ID,
         title,
@@ -1194,7 +1188,6 @@ function CreateDealDialog({ open, onOpenChange, pipelineId, stages, contacts, ac
         stageId: Number(stageId),
         contactId: finalContactId,
         accountId: finalAccountId,
-        valueCents: value,
         leadSource: leadSource || undefined,
         channelOrigin: campaign || undefined,
       });

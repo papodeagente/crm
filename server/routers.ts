@@ -87,6 +87,7 @@ import { inboxRouter } from "./routers/inboxRouter";
 import { proposalRouter, portalRouter, managementRouter, insightsRouter, academyRouter, integrationHubRouter } from "./routers/featureRouters";
 import { productCatalogRouter } from "./routers/productCatalogRouter";
 import { aiAnalysisRouter } from "./routers/aiAnalysisRouter";
+import { utmAnalyticsRouter } from "./routers/utmAnalyticsRouter";
 import {
   listLeadEvents,
   countLeadEvents,
@@ -661,6 +662,7 @@ export const appRouter = router({
   integrationHub: integrationHubRouter, // M8: Integration Hub
   productCatalog: productCatalogRouter, // M9: Catálogo de Produtos Turísticos
   aiAnalysis: aiAnalysisRouter, // M10: Análise de Atendimento por IA
+  utmAnalytics: utmAnalyticsRouter, // M11: Dashboard de Rastreamento UTM
 
   // ─── Contact Profile & Custom Fields ───
   contactProfile: router({

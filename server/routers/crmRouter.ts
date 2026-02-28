@@ -247,7 +247,7 @@ export const crmRouter = router({
       .input(z.object({
         tenantId: z.number(), title: z.string().min(1), contactId: z.number().optional(),
         accountId: z.number().optional(),
-        pipelineId: z.number(), stageId: z.number(), valueCents: z.number().optional(),
+        pipelineId: z.number(), stageId: z.number(),
         ownerUserId: z.number().optional(), teamId: z.number().optional(),
         leadSource: z.string().optional(), channelOrigin: z.string().optional(),
       }))
@@ -270,7 +270,7 @@ export const crmRouter = router({
         await createNotification(input.tenantId, {
           type: "deal_created",
           title: `Nova negociação: "${input.title}"`,
-          body: input.valueCents ? `Valor: R$ ${(input.valueCents / 100).toFixed(2)}` : undefined,
+          body: undefined,
           entityType: "deal",
           entityId: String(result?.id),
         });
@@ -281,7 +281,7 @@ export const crmRouter = router({
         tenantId: z.number(), id: z.number(), title: z.string().optional(),
         contactId: z.number().nullable().optional(), accountId: z.number().nullable().optional(),
         stageId: z.number().optional(), status: z.enum(["open", "won", "lost"]).optional(),
-        valueCents: z.number().optional(), probability: z.number().optional(), ownerUserId: z.number().optional(),
+        probability: z.number().optional(), ownerUserId: z.number().optional(),
         expectedCloseAt: z.string().nullable().optional(), channelOrigin: z.string().nullable().optional(),
         leadSource: z.string().nullable().optional(),
       }))
@@ -305,15 +305,7 @@ export const crmRouter = router({
               actorUserId: ctx.user.id, actorName: ctx.user.name || "Sistema",
             });
           }
-          if (data.valueCents !== undefined && data.valueCents !== currentDeal.valueCents) {
-            await crm.createDealHistory({
-              tenantId, dealId: id, action: "field_changed", description: `Valor alterado`,
-              fieldChanged: "valueCents",
-              oldValue: String(currentDeal.valueCents || 0),
-              newValue: String(data.valueCents),
-              actorUserId: ctx.user.id, actorName: ctx.user.name || "Sistema",
-            });
-          }
+          // valueCents agora é calculado automaticamente pela soma dos produtos
           if (data.status && data.status !== currentDeal.status) {
             await crm.createDealHistory({
               tenantId, dealId: id, action: "status_changed", description: `Status alterado para ${data.status}`,
@@ -488,6 +480,8 @@ export const crmRouter = router({
             description: `Produto "${catalogProduct.name}" adicionado ao orçamento (${(unitPrice / 100).toFixed(2)})`,
             actorUserId: ctx.user.id, actorName: ctx.user.name || "Sistema",
           });
+          // Recalcular valor total da negociação
+          await crm.recalcDealValue(input.tenantId, input.dealId);
           return result;
         }),
       update: protectedProcedure
@@ -517,6 +511,8 @@ export const crmRouter = router({
             description: `Produto atualizado no orçamento`,
             actorUserId: ctx.user.id, actorName: ctx.user.name || "Sistema",
           });
+          // Recalcular valor total da negociação
+          await crm.recalcDealValue(tenantId, dealId);
           return { success: true };
         }),
       delete: protectedProcedure
@@ -528,6 +524,8 @@ export const crmRouter = router({
             description: `Produto "${input.productName}" removido do orçamento`,
             actorUserId: ctx.user.id, actorName: ctx.user.name || "Sistema",
           });
+          // Recalcular valor total da negociação
+          await crm.recalcDealValue(input.tenantId, input.dealId);
           return { success: true };
         }),
     }),

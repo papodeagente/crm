@@ -13,8 +13,9 @@ import {
   Send, MessageSquare, CheckCheck, Check, Eye, Clock, AlertTriangle,
   Activity, BarChart3, Zap, ArrowUpRight, ArrowDownRight, RefreshCw,
   Wifi, WifiOff, MessageCircle, Image, Mic, FileText, Video, Sticker,
-  PieChart as PieChartIcon, Inbox
+  PieChart as PieChartIcon, Inbox, Megaphone
 } from "lucide-react";
+import UTMDashboard from "./UTMDashboard";
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip as RechartsTooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend
@@ -784,6 +785,9 @@ export default function Insights() {
           <TabsTrigger value="messages" className="gap-1.5">
             <MessageSquare className="h-4 w-4" /> Mensagens WhatsApp
           </TabsTrigger>
+          <TabsTrigger value="utm" className="gap-1.5">
+            <Megaphone className="h-4 w-4" /> Vendas por UTM
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="crm" className="mt-5">
@@ -792,6 +796,10 @@ export default function Insights() {
 
         <TabsContent value="messages" className="mt-5">
           <MessagesDashboard />
+        </TabsContent>
+
+        <TabsContent value="utm" className="mt-5">
+          <UTMDashboard />
         </TabsContent>
       </Tabs>
     </div>

@@ -440,7 +440,7 @@ function CreateDealDialog({
       }
 
       const deal = await createDeal.mutateAsync({
-        tenantId: 1, title: title.trim(), valueCents: value ? Math.round(parseFloat(value) * 100) : 0,
+        tenantId: 1, title: title.trim(),
         pipelineId: selectedPipelineId, stageId: selectedStageId,
         contactId: contactId || undefined,
       });

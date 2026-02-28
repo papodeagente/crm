@@ -322,6 +322,18 @@ export async function deleteDealProduct(tenantId: number, id: number) {
   await db.delete(dealProducts).where(and(eq(dealProducts.id, id), eq(dealProducts.tenantId, tenantId)));
 }
 
+// Recalcular valueCents do deal com base na soma dos deal_products
+export async function recalcDealValue(tenantId: number, dealId: number) {
+  const db = await getDb(); if (!db) return 0;
+  const [result] = await db.select({
+    total: sql<number>`COALESCE(SUM(${dealProducts.finalPriceCents}), 0)`,
+  }).from(dealProducts).where(and(eq(dealProducts.tenantId, tenantId), eq(dealProducts.dealId, dealId)));
+  const totalCents = Number(result?.total ?? 0);
+  await db.update(deals).set({ valueCents: totalCents, lastActivityAt: new Date() })
+    .where(and(eq(deals.id, dealId), eq(deals.tenantId, tenantId)));
+  return totalCents;
+}
+
 // ═══════════════════════════════════════
 // DEAL HISTORY
 // ═══════════════════════════════════════

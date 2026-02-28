@@ -1293,3 +1293,40 @@
 - [x] Melhorar botões Marcar perda/venda (emerald-600, ícones maiores, font-medium)
 - [x] Melhorar header (botão voltar com borda, melhor espaçamento)
 - [x] Todas as funções e cores existentes mantidas
+
+## Tooltip de Tempo de Permanência nas Etapas do Funil
+
+- [ ] Analisar como o histórico de etapas é armazenado (deal_history)
+- [ ] Calcular tempo de permanência em cada etapa
+- [x] Implementar tooltip nas etapas do funil com tempo formatado (ex: "2 dias", "3h 15min")
+
+## Dashboard de Análise UTM (Rastreamento)
+
+- [x] Analisar schema de deals e campos UTM disponíveis
+- [x] Verificar lógica de status de vendas (won/lost/open) e retroação
+- [x] Criar procedures tRPC para analytics UTM com queries SQL diretas ao banco
+- [x] Métricas: total de deals, vendas ganhas, taxa de conversão, valor total por UTM
+- [x] Filtros: período, utm_source, utm_medium, utm_campaign, utm_term, utm_content
+- [x] Gráficos: barras por fonte, pizza por mídia, tabela detalhada com todas as métricas
+- [x] Garantir que venda desmarcada retroaja corretamente (status open/lost reflete no dashboard)
+- [x] Registrar rota em Análises e adicionar link no menu
+- [x] Criar página de dashboard com design profissional
+
+## Tooltip de Tempo de Permanência nas Etapas
+
+- [x] Calcular tempo de permanência em cada etapa usando deal_history
+- [x] Implementar tooltip nas etapas do funil com tempo formatado
+
+## Valor da Negociação = Soma dos Produtos/Serviços
+
+- [x] Tornar campo de valor da negociação read-only (calculado automaticamente pela soma dos deal_products)
+- [x] Backend: recalcular valueCents do deal ao adicionar/remover/editar produtos
+- [x] Frontend: remover edição direta do valor na sidebar, exibir como "calculado"
+- [x] Frontend: indicação visual de que o valor vem dos produtos
+
+## Atalho para Criar Produto/Categoria na Negociação
+
+- [x] Botão "Criar Novo Produto" dentro do modal de busca de produtos na negociação
+- [x] Dialog inline para criar produto rápido (nome, preço, categoria)
+- [x] Botão "Criar Nova Categoria" dentro do dialog de criação de produto
+- [x] Após criar produto, adicioná-lo automaticamente à negociação

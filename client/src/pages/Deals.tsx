@@ -131,7 +131,7 @@ export default function Deals() {
                   <div><Label className="text-[12px] font-medium">Valor (R$)</Label><Input value={value} onChange={(e) => setValue(e.target.value)} placeholder="5000.00" type="number" className="mt-1.5 h-10 rounded-xl" /></div>
                   <Button className="w-full h-11 rounded-lg text-[14px] font-medium bg-primary hover:bg-primary/90 shadow-sm transition-colors" disabled={!title || createDeal.isPending} onClick={() => {
                     if (!defaultPipeline) { toast.error("Crie um pipeline primeiro na seção Funil."); return; }
-                    createDeal.mutate({ tenantId: TENANT_ID, title, pipelineId: defaultPipeline.id, stageId: 1, valueCents: value ? Math.round(parseFloat(value) * 100) : undefined });
+                    createDeal.mutate({ tenantId: TENANT_ID, title, pipelineId: defaultPipeline.id, stageId: 1 });
                   }}>
                     {createDeal.isPending ? "Criando..." : "Criar Negócio"}
                   </Button>
