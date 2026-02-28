@@ -5,7 +5,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import DateRangeFilter, { useDateFilter, getPresetDates, type DatePreset } from "@/components/DateRangeFilter";
 import { Filter, X, RotateCcw } from "lucide-react";
@@ -177,14 +176,14 @@ export default function DealFiltersPanel({
 
   return (
     <Sheet open={open} onOpenChange={handleOpenChange}>
-      <SheetContent side="right" className="w-[400px] sm:max-w-[400px] p-0 flex flex-col">
+      <SheetContent side="right" className="w-[400px] sm:max-w-[400px] p-0 flex flex-col h-full overflow-hidden !gap-0">
         <SheetHeader className="px-5 pt-5 pb-3 border-b">
           <div className="flex items-center justify-between">
             <SheetTitle className="text-base">Filtros</SheetTitle>
           </div>
         </SheetHeader>
 
-        <ScrollArea className="flex-1 px-5">
+        <div className="flex-1 overflow-y-auto px-5">
           <div className="space-y-5 py-4">
 
             {/* ─── Toggles ─── */}
@@ -386,11 +385,11 @@ export default function DealFiltersPanel({
             </div>
 
             {/* Spacer for footer */}
-            <div className="h-4" />
+            <div className="h-6" />
           </div>
-        </ScrollArea>
+        </div>
 
-        <SheetFooter className="border-t px-5 py-4 flex-row gap-3">
+        <SheetFooter className="border-t px-5 py-4 flex-row gap-3 shrink-0">
           <Button variant="outline" onClick={handleClear} className="flex-1 gap-2 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20">
             <RotateCcw className="h-4 w-4" />
             Limpar filtros

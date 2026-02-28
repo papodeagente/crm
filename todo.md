@@ -1379,3 +1379,9 @@
 - [x] Integrar na lista de Deals
 - [x] Integrar no Dashboard UTM (relatórios)
 - [x] Contador de filtros ativos no botão de filtro
+
+## Bug Fix — DealFiltersPanel Responsividade
+
+- [x] Corrigir botão de confirmação cortado no DealFiltersPanel (não acessível em telas menores)
+- [x] Garantir que os botões Limpar/Aplicar fiquem sempre visíveis (sticky no rodapé)
+- [x] Área de filtros deve ter scroll independente sem cortar o rodapé
