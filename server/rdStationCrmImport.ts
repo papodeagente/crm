@@ -51,6 +51,8 @@ export interface RdDeal {
     title?: string | null;
   }>;
   deal_stage?: { _id: string; name: string; nickname?: string } | null;
+  deal_source?: { _id: string; name: string } | null;
+  campaign?: { _id: string; name: string } | null;
   deal_custom_fields?: Array<{ custom_field_id: string; value: string | null }>;
   deal_products?: Array<{
     _id: string;
@@ -84,7 +86,7 @@ export interface RdOrganization {
 export interface RdProduct {
   _id: string;
   name: string;
-  base_price: number;
+  base_price: string | number;
   description?: string | null;
   visible: boolean;
   created_at: string;
@@ -101,21 +103,27 @@ export interface RdTask {
   deal_id?: string | null;
   contact_id?: string | null;
   user?: { _id: string; name: string } | null;
+  users?: Array<{ _id: string; name: string }>;
   notes?: string | null;
   created_at: string;
-  updated_at: string;
+  updated_at?: string;
 }
 
 export interface RdPipeline {
-  _id: string;
+  id: string;
+  _id?: string;
   name: string;
+  order?: number;
   deal_stages: Array<{
     _id: string;
+    id?: string;
     name: string;
     nickname?: string;
     order: number;
+    objective?: string | null;
+    description?: string | null;
   }>;
-  created_at: string;
+  created_at?: string;
 }
 
 export interface RdSource {
@@ -129,6 +137,7 @@ export interface RdUser {
   name: string;
   email: string;
   role?: string;
+  active?: boolean;
 }
 
 export interface RdCampaign {
@@ -146,7 +155,8 @@ export interface RdLossReason {
 export interface RdCustomField {
   _id: string;
   label: string;
-  field_type?: string;
+  type?: string;
+  for?: string;
   created_at: string;
 }
 
@@ -158,14 +168,37 @@ async function rdFetch<T>(endpoint: string, token: string, params: Record<string
   for (const [k, v] of Object.entries(params)) {
     url.searchParams.set(k, v);
   }
-  const res = await fetch(url.toString(), {
-    headers: { accept: "application/json" },
-  });
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new Error(`RD Station CRM API error ${res.status}: ${body}`);
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 30000); // 30s timeout
+
+  try {
+    const res = await fetch(url.toString(), {
+      headers: { accept: "application/json" },
+      signal: controller.signal,
+    });
+
+    const contentType = res.headers.get("content-type") || "";
+
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      throw new Error(`RD Station CRM API error ${res.status}: ${body.substring(0, 200)}`);
+    }
+
+    // Guard against HTML responses (e.g. error pages, rate limits)
+    if (contentType.includes("text/html")) {
+      throw new Error(`RD Station retornou HTML em vez de JSON para ${endpoint}. Pode ser rate limit ou erro temporário.`);
+    }
+
+    const text = await res.text();
+    try {
+      return JSON.parse(text) as T;
+    } catch {
+      throw new Error(`Resposta inválida do RD Station para ${endpoint}: ${text.substring(0, 100)}`);
+    }
+  } finally {
+    clearTimeout(timeout);
   }
-  return res.json() as Promise<T>;
 }
 
 async function rdFetchAllPaginated<T>(
@@ -194,6 +227,8 @@ async function rdFetchAllPaginated<T>(
     page++;
     // Safety: avoid infinite loops
     if (page > 500) break;
+    // Small delay to avoid rate limiting
+    if (hasMore) await new Promise(r => setTimeout(r, 200));
   }
 
   return all;
@@ -204,7 +239,6 @@ async function rdFetchAllPaginated<T>(
 export async function validateRdCrmToken(token: string): Promise<{ valid: boolean; accountName?: string; userCount?: number; error?: string }> {
   try {
     const data = await rdFetch<any>("/users", token, { limit: "1" });
-    // If we can list users, the token is valid
     const users = data.users || data || [];
     return {
       valid: true,
@@ -228,20 +262,23 @@ export async function fetchRdCrmSummary(token: string): Promise<{
   lossReasons: number;
   customFields: number;
 }> {
-  // Fetch first page of each to get totals
   const [contactsData, dealsData, orgsData, productsData, tasksData, pipelinesData, usersData, campaignsData, sourcesData, lossReasonsData, customFieldsData] = await Promise.all([
     rdFetch<any>("/contacts", token, { limit: "1" }).catch(() => ({ total: 0 })),
     rdFetch<any>("/deals", token, { limit: "1" }).catch(() => ({ total: 0 })),
     rdFetch<any>("/organizations", token, { limit: "1" }).catch(() => ({ total: 0 })),
     rdFetch<any>("/products", token, { limit: "1" }).catch(() => ({ total: 0, products: [] })),
     rdFetch<any>("/tasks", token, { limit: "1" }).catch(() => ({ total: 0 })),
-    rdFetch<any>("/deal_pipelines", token, { limit: "1" }).catch(() => ({ total: 0, deal_pipelines: [] })),
-    rdFetch<any>("/users", token, { limit: "1" }).catch(() => ({ total: 0, users: [] })),
+    rdFetch<any>("/deal_pipelines", token, { limit: "200" }).catch(() => []),
+    rdFetch<any>("/users", token, { limit: "200" }).catch(() => ({ users: [] })),
     rdFetch<any>("/campaigns", token, { limit: "1" }).catch(() => ({ total: 0, campaigns: [] })),
     rdFetch<any>("/deal_sources", token, { limit: "1" }).catch(() => ({ total: 0, deal_sources: [] })),
     rdFetch<any>("/deal_lost_reasons", token, { limit: "1" }).catch(() => ({ total: 0, deal_lost_reasons: [] })),
     rdFetch<any>("/custom_fields", token, { limit: "1" }).catch(() => ({ total: 0, custom_fields: [] })),
   ]);
+
+  // Pipelines returns an array directly, not {total, deal_pipelines}
+  const pipelinesCount = Array.isArray(pipelinesData) ? pipelinesData.length : (pipelinesData.total || (pipelinesData.deal_pipelines || []).length);
+  const usersCount = (usersData.users || usersData || []).length;
 
   return {
     contacts: contactsData.total || 0,
@@ -249,8 +286,8 @@ export async function fetchRdCrmSummary(token: string): Promise<{
     organizations: orgsData.total || 0,
     products: productsData.total || (productsData.products || []).length,
     tasks: tasksData.total || 0,
-    pipelines: pipelinesData.total || (pipelinesData.deal_pipelines || []).length,
-    users: usersData.total || (usersData.users || usersData || []).length,
+    pipelines: pipelinesCount,
+    users: usersCount,
     campaigns: campaignsData.total || (campaignsData.campaigns || []).length,
     sources: sourcesData.total || (sourcesData.deal_sources || []).length,
     lossReasons: lossReasonsData.total || (lossReasonsData.deal_lost_reasons || []).length,
@@ -270,9 +307,8 @@ export async function fetchAllOrganizations(token: string, onProgress?: (fetched
   return rdFetchAllPaginated<RdOrganization>("/organizations", token, "organizations", {}, onProgress);
 }
 
-export async function fetchAllProducts(token: string): Promise<RdProduct[]> {
-  const data = await rdFetch<any>("/products", token, { limit: "200" });
-  return data.products || data || [];
+export async function fetchAllProducts(token: string, onProgress?: (fetched: number, total: number) => void): Promise<RdProduct[]> {
+  return rdFetchAllPaginated<RdProduct>("/products", token, "products", {}, onProgress);
 }
 
 export async function fetchAllTasks(token: string, onProgress?: (fetched: number, total: number) => void): Promise<RdTask[]> {
@@ -280,7 +316,9 @@ export async function fetchAllTasks(token: string, onProgress?: (fetched: number
 }
 
 export async function fetchAllPipelines(token: string): Promise<RdPipeline[]> {
+  // This endpoint returns an array directly, not {deal_pipelines: [...]}
   const data = await rdFetch<any>("/deal_pipelines", token, { limit: "200" });
+  if (Array.isArray(data)) return data;
   return data.deal_pipelines || data || [];
 }
 
@@ -289,22 +327,18 @@ export async function fetchAllUsers(token: string): Promise<RdUser[]> {
   return data.users || data || [];
 }
 
-export async function fetchAllCampaigns(token: string): Promise<RdCampaign[]> {
-  const data = await rdFetch<any>("/campaigns", token, { limit: "200" });
-  return data.campaigns || data || [];
+export async function fetchAllCampaigns(token: string, onProgress?: (fetched: number, total: number) => void): Promise<RdCampaign[]> {
+  return rdFetchAllPaginated<RdCampaign>("/campaigns", token, "campaigns", {}, onProgress);
 }
 
-export async function fetchAllSources(token: string): Promise<RdSource[]> {
-  const data = await rdFetch<any>("/deal_sources", token, { limit: "200" });
-  return data.deal_sources || data || [];
+export async function fetchAllSources(token: string, onProgress?: (fetched: number, total: number) => void): Promise<RdSource[]> {
+  return rdFetchAllPaginated<RdSource>("/deal_sources", token, "deal_sources", {}, onProgress);
 }
 
-export async function fetchAllLossReasons(token: string): Promise<RdLossReason[]> {
-  const data = await rdFetch<any>("/deal_lost_reasons", token, { limit: "200" });
-  return data.deal_lost_reasons || data || [];
+export async function fetchAllLossReasons(token: string, onProgress?: (fetched: number, total: number) => void): Promise<RdLossReason[]> {
+  return rdFetchAllPaginated<RdLossReason>("/deal_lost_reasons", token, "deal_lost_reasons", {}, onProgress);
 }
 
-export async function fetchAllCustomFields(token: string): Promise<RdCustomField[]> {
-  const data = await rdFetch<any>("/custom_fields", token, { limit: "200" });
-  return data.custom_fields || data || [];
+export async function fetchAllCustomFields(token: string, onProgress?: (fetched: number, total: number) => void): Promise<RdCustomField[]> {
+  return rdFetchAllPaginated<RdCustomField>("/custom_fields", token, "custom_fields", {}, onProgress);
 }

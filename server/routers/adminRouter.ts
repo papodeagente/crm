@@ -10,7 +10,7 @@ export const adminRouter = router({
       return crm.listTenants();
     }),
     create: protectedProcedure
-      .input(z.object({ name: z.string().min(1), plan: z.enum(["starter", "business", "enterprise"]).optional() }))
+      .input(z.object({ name: z.string().min(1), plan: z.enum(["free", "pro", "enterprise"]).optional() }))
       .mutation(async ({ input }) => {
         const result = await crm.createTenant(input);
         return result;

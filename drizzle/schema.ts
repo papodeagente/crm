@@ -143,9 +143,15 @@ export const conversationAssignments = mysqlTable("conversation_assignments", {
 export const tenants = mysqlTable("tenants", {
   id: int("id").autoincrement().primaryKey(),
   name: varchar("name", { length: 255 }).notNull(),
-  plan: mysqlEnum("plan", ["starter", "business", "enterprise"]).default("starter").notNull(),
+  slug: varchar("slug", { length: 128 }),
+  plan: mysqlEnum("plan", ["free", "pro", "enterprise"]).default("free").notNull(),
   status: mysqlEnum("status", ["active", "suspended", "cancelled"]).default("active").notNull(),
+  ownerUserId: int("ownerUserId"),
   billingCustomerId: varchar("billingCustomerId", { length: 128 }),
+  hotmartEmail: varchar("hotmartEmail", { length: 320 }),
+  freemiumDays: int("freemiumDays").default(365).notNull(),
+  freemiumExpiresAt: timestamp("freemiumExpiresAt"),
+  logoUrl: text("logoUrl"),
   settingsJson: json("settingsJson"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
@@ -1340,3 +1346,34 @@ export const rdFieldMappings = mysqlTable("rd_field_mappings", {
 ]);
 export type RdFieldMapping = typeof rdFieldMappings.$inferSelect;
 export type InsertRdFieldMapping = typeof rdFieldMappings.$inferInsert;
+
+
+// ════════════════════════════════════════════════════════════
+// SUBSCRIPTIONS & BILLING
+// ════════════════════════════════════════════════════════════
+
+export const subscriptions = mysqlTable("subscriptions", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  plan: mysqlEnum("plan", ["free", "pro", "enterprise"]).default("free").notNull(),
+  status: mysqlEnum("status", ["active", "trialing", "past_due", "cancelled", "expired"]).default("trialing").notNull(),
+  hotmartTransactionId: varchar("hotmartTransactionId", { length: 255 }),
+  hotmartSubscriptionId: varchar("hotmartSubscriptionId", { length: 255 }),
+  hotmartProductId: varchar("hotmartProductId", { length: 255 }),
+  hotmartBuyerEmail: varchar("hotmartBuyerEmail", { length: 320 }),
+  priceInCents: int("priceInCents").default(9700), // R$97,00
+  trialStartedAt: timestamp("trialStartedAt"),
+  trialEndsAt: timestamp("trialEndsAt"),
+  currentPeriodStart: timestamp("currentPeriodStart"),
+  currentPeriodEnd: timestamp("currentPeriodEnd"),
+  cancelledAt: timestamp("cancelledAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (t) => [
+  index("sub_tenant_idx").on(t.tenantId),
+  index("sub_hotmart_idx").on(t.hotmartSubscriptionId),
+  index("sub_status_idx").on(t.status),
+]);
+
+export type Subscription = typeof subscriptions.$inferSelect;
+export type InsertSubscription = typeof subscriptions.$inferInsert;

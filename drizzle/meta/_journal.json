@@ -141,6 +141,13 @@
       "when": 1772305495199,
       "tag": "0019_mute_paper_doll",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "5",
+      "when": 1772311526557,
+      "tag": "0020_striped_living_mummy",
+      "breakpoints": true
     }
   ]
 }

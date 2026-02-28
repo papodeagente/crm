@@ -1437,3 +1437,26 @@
 - [x] Frontend: item no menu Configurações com badge (novo)
 - [x] Frontend: progresso em tempo real da importação
 - [x] Testes unitários para a integração (18 testes, 539 total)
+
+## Correção Importação RD Station CRM
+
+- [x] Corrigir erro "Unexpected token '<'" (API retornando HTML em vez de JSON)
+- [x] Adicionar progresso em tempo real com percentual e contagem (X de Y registros)
+- [x] Garantir importação fiel de funis com mesmas etapas do RD Station
+- [x] Garantir negociações em andamento entrem no funil correto com etapa correta
+- [x] Minimizar impacto da mudança de sistema para o usuário
+- [x] Testar com token real: 645c346a88cd99000fa7b641
+
+## SaaS Multi-Tenant + Landing Page + Planos + Hotmart
+
+- [x] Schema multi-tenant: tabela subscriptions, plans
+- [x] Sistema de login email/senha (registro, login, recuperação de senha)
+- [x] Isolamento multi-tenant em todas as queries (tenantId já existe)
+- [x] Sistema de planos: Freemium (12 meses default, mín 7 dias), Pro (R$97/mês), Enterprise (personalizado)
+- [x] Integração Hotmart via webhook para pagamentos Pro
+- [x] Landing page para agências de viagens com diferenciais do Entur OS
+- [x] Painel admin geral (bruno@entur.com.br) para gerenciar tenants, alterar período freemium
+- [x] Tela de bloqueio quando assinatura expira, com link de pagamento Hotmart
+- [x] Fluxo completo: registro → freemium → expiração → cobrança → bloqueio/desbloqueio
+- [x] Webhook Hotmart para processar pagamentos automaticamente
+- [x] 19 testes unitários para SaaS Auth (558 total)

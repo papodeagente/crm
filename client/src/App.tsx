@@ -42,6 +42,13 @@ const RDStationIntegration = lazy(() => import("./pages/RDStationIntegration"));
 const RDFieldMappings = lazy(() => import("./pages/RDFieldMappings"));
 const RDCrmImport = lazy(() => import("./pages/RDCrmImport"));
 
+// SaaS pages (outside TopNavLayout)
+const SaasLogin = lazy(() => import("./pages/SaasLogin"));
+const SaasRegister = lazy(() => import("./pages/SaasRegister"));
+const Upgrade = lazy(() => import("./pages/Upgrade"));
+const Landing = lazy(() => import("./pages/Landing"));
+const SuperAdmin = lazy(() => import("./pages/SuperAdmin"));
+
 function PageLoader() {
   return (
     <div className="flex items-center justify-center h-64">
@@ -50,56 +57,70 @@ function PageLoader() {
   );
 }
 
-function Router() {
+function AppRouter() {
   return (
-    <TopNavLayout>
-      <Suspense fallback={<PageLoader />}>
-        <Switch>
-          {/* Main nav */}
-          <Route path="/" component={Home} />
-          <Route path="/pipeline" component={Pipeline} />
-          <Route path="/contacts" component={Contacts} />
-          <Route path="/tasks" component={Tasks} />
-          <Route path="/insights" component={Insights} />
-          <Route path="/goals" component={Goals} />
+    <Suspense fallback={<PageLoader />}>
+      <Switch>
+        {/* SaaS public pages (no TopNavLayout) */}
+        <Route path="/landing" component={Landing} />
+        <Route path="/login" component={SaasLogin} />
+        <Route path="/register" component={SaasRegister} />
+        <Route path="/upgrade" component={Upgrade} />
+        <Route path="/super-admin" component={SuperAdmin} />
 
-          {/* Detail pages */}
-          <Route path="/deal/:id" component={DealDetail} />
-          <Route path="/deals" component={Deals} />
+        {/* App pages (with TopNavLayout) */}
+        <Route>
+          <TopNavLayout>
+            <Suspense fallback={<PageLoader />}>
+              <Switch>
+                {/* Main nav */}
+                <Route path="/" component={Home} />
+                <Route path="/pipeline" component={Pipeline} />
+                <Route path="/contacts" component={Contacts} />
+                <Route path="/tasks" component={Tasks} />
+                <Route path="/insights" component={Insights} />
+                <Route path="/goals" component={Goals} />
 
-          {/* Settings sub-pages (accessible from Settings hub) */}
-          <Route path="/settings" component={SettingsPage} />
-          <Route path="/settings/agents" component={AgentManagement} />
-          <Route path="/settings/custom-fields" component={CustomFieldsSettings} />
-          <Route path="/settings/pipelines" component={PipelineSettings} />
-          <Route path="/settings/products" component={ProductCatalog} />
-          <Route path="/analytics/products" component={ProductReports} />
-          <Route path="/contact/:id" component={ContactProfile} />
-          <Route path="/inbox" component={InboxPage} />
-          <Route path="/whatsapp" component={WhatsApp} />
-          <Route path="/chatbot" component={Chatbot} />
-          <Route path="/proposals" component={Proposals} />
-          <Route path="/portal" component={Portal} />
-          <Route path="/trips" component={Trips} />
-          <Route path="/academy" component={Academy} />
-          <Route path="/integrations" component={Integrations} />
-          <Route path="/admin" component={Admin} />
-          <Route path="/api-docs" component={ApiDocs} />
-          <Route path="/settings/conversation-debug" component={ConversationDebug} />
-          <Route path="/settings/sources" component={SourcesAndCampaigns} />
-          <Route path="/settings/loss-reasons" component={LossReasons} />
-          <Route path="/settings/rdstation" component={RDStationIntegration} />
-          <Route path="/settings/rdstation/mappings" component={RDFieldMappings} />
-          <Route path="/settings/import-rd-crm" component={RDCrmImport} />
+                {/* Detail pages */}
+                <Route path="/deal/:id" component={DealDetail} />
+                <Route path="/deals" component={Deals} />
 
-          {/* Notifications */}
-          <Route path="/notifications" component={NotificationsPage} />
+                {/* Settings sub-pages */}
+                <Route path="/settings" component={SettingsPage} />
+                <Route path="/settings/agents" component={AgentManagement} />
+                <Route path="/settings/custom-fields" component={CustomFieldsSettings} />
+                <Route path="/settings/pipelines" component={PipelineSettings} />
+                <Route path="/settings/products" component={ProductCatalog} />
+                <Route path="/analytics/products" component={ProductReports} />
+                <Route path="/contact/:id" component={ContactProfile} />
+                <Route path="/inbox" component={InboxPage} />
+                <Route path="/whatsapp" component={WhatsApp} />
+                <Route path="/chatbot" component={Chatbot} />
+                <Route path="/proposals" component={Proposals} />
+                <Route path="/portal" component={Portal} />
+                <Route path="/trips" component={Trips} />
+                <Route path="/academy" component={Academy} />
+                <Route path="/integrations" component={Integrations} />
+                <Route path="/admin" component={Admin} />
+                <Route path="/api-docs" component={ApiDocs} />
+                <Route path="/settings/conversation-debug" component={ConversationDebug} />
+                <Route path="/settings/sources" component={SourcesAndCampaigns} />
+                <Route path="/settings/loss-reasons" component={LossReasons} />
+                <Route path="/settings/rdstation" component={RDStationIntegration} />
+                <Route path="/settings/rdstation/mappings" component={RDFieldMappings} />
+                <Route path="/settings/import-rd-crm" component={RDCrmImport} />
 
-          <Route path="/404" component={NotFound} />
-          <Route component={NotFound} />
-        </Switch>
-      </Suspense>
-    </TopNavLayout>
+                {/* Notifications */}
+                <Route path="/notifications" component={NotificationsPage} />
+
+                <Route path="/404" component={NotFound} />
+                <Route component={NotFound} />
+              </Switch>
+            </Suspense>
+          </TopNavLayout>
+        </Route>
+      </Switch>
+    </Suspense>
   );
 }
 
@@ -109,7 +130,7 @@ function App() {
       <ThemeProvider defaultTheme="dark" switchable>
         <TooltipProvider>
           <Toaster />
-          <Router />
+          <AppRouter />
         </TooltipProvider>
       </ThemeProvider>
     </ErrorBoundary>

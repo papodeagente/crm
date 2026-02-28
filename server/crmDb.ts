@@ -20,9 +20,11 @@ import {
 // ═══════════════════════════════════════
 // TENANTS
 // ═══════════════════════════════════════
-export async function createTenant(data: { name: string; plan?: "starter" | "business" | "enterprise" }) {
+export async function createTenant(data: { name: string; plan?: "free" | "pro" | "enterprise"; ownerUserId?: number; hotmartEmail?: string; freemiumDays?: number }) {
   const db = await getDb(); if (!db) return null;
-  const [result] = await db.insert(tenants).values({ name: data.name, plan: data.plan || "starter" }).$returningId();
+  const freemiumDays = data.freemiumDays ?? 365;
+  const freemiumExpiresAt = new Date(Date.now() + freemiumDays * 24 * 60 * 60 * 1000);
+  const [result] = await db.insert(tenants).values({ name: data.name, plan: data.plan || "free", ownerUserId: data.ownerUserId, hotmartEmail: data.hotmartEmail, freemiumDays, freemiumExpiresAt }).$returningId();
   return result;
 }
 export async function getTenantById(id: number) {

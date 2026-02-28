@@ -29,6 +29,12 @@ function mockJsonResponse(data: any, status = 200) {
   return {
     ok: status >= 200 && status < 300,
     status,
+    headers: {
+      get: (name: string) => {
+        if (name === "content-type") return "application/json";
+        return null;
+      },
+    },
     json: () => Promise.resolve(data),
     text: () => Promise.resolve(JSON.stringify(data)),
   };

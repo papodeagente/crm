@@ -120,6 +120,10 @@ async function startServer() {
   // Webhook routes for lead capture (Landing Page + Meta Lead Ads)
   app.use(webhookRouter);
 
+  // Hotmart webhook for payment processing
+  const { handleHotmartWebhook } = await import("../hotmartWebhook");
+  app.post("/api/webhooks/hotmart", handleHotmartWebhook);
+
   // OAuth callback under /api/oauth/callback
   registerOAuthRoutes(app);
 

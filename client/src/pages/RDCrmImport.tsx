@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
@@ -54,6 +54,18 @@ const dataCategories = [
   { key: "importLossReasons" as const, icon: XCircle, label: "Motivos de perda", desc: "Razões de perda de negociações", summaryKey: "lossReasons" },
 ];
 
+const categoryLabels: Record<string, string> = {
+  pipelines: "Funis",
+  sources: "Fontes",
+  campaigns: "Campanhas",
+  lossReasons: "Motivos de Perda",
+  products: "Produtos",
+  organizations: "Empresas",
+  contacts: "Contatos",
+  deals: "Negociações",
+  tasks: "Tarefas",
+};
+
 export default function RDCrmImport() {
   const [, setLocation] = useLocation();
   const [step, setStep] = useState<Step>("token");
@@ -61,11 +73,35 @@ export default function RDCrmImport() {
   const [showToken, setShowToken] = useState(false);
   const [config, setConfig] = useState<ImportConfig>(defaultConfig);
   const [summary, setSummary] = useState<Record<string, number> | null>(null);
-  const [importResult, setImportResult] = useState<any>(null);
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const validateMutation = trpc.rdCrmImport.validateToken.useMutation();
   const summaryMutation = trpc.rdCrmImport.fetchSummary.useMutation();
   const importMutation = trpc.rdCrmImport.importAll.useMutation();
+  const progressQuery = trpc.rdCrmImport.getProgress.useQuery(undefined, {
+    enabled: step === "importing",
+    refetchInterval: step === "importing" ? 1500 : false,
+  });
+
+  const progress = progressQuery.data;
+
+  // Watch for import completion via polling
+  useEffect(() => {
+    if (step !== "importing" || !progress) return;
+    if (progress.status === "done") {
+      setStep("done");
+      const totalImported = Object.values(progress.results || {}).reduce((sum, r) => sum + r.imported, 0);
+      const totalErrors = Object.values(progress.results || {}).reduce((sum, r) => sum + r.errors.length, 0);
+      if (totalErrors === 0) {
+        toast.success(`Importação concluída! ${totalImported.toLocaleString("pt-BR")} registros importados.`);
+      } else {
+        toast.warning(`Importação concluída com ${totalErrors} erros. ${totalImported.toLocaleString("pt-BR")} registros importados.`);
+      }
+    } else if (progress.status === "error") {
+      toast.error(`Erro na importação: ${progress.error || "Erro desconhecido"}`);
+      setStep("configure");
+    }
+  }, [progress?.status, step]);
 
   const handleValidateToken = async () => {
     if (!token.trim()) {
@@ -76,7 +112,6 @@ export default function RDCrmImport() {
       const result = await validateMutation.mutateAsync({ token: token.trim() });
       if (result.valid) {
         toast.success("Token válido! Buscando dados...");
-        // Fetch summary
         const summaryData = await summaryMutation.mutateAsync({ token: token.trim() });
         setSummary(summaryData);
         setStep("preview");
@@ -91,20 +126,14 @@ export default function RDCrmImport() {
   const handleStartImport = async () => {
     setStep("importing");
     try {
-      const result = await importMutation.mutateAsync({
+      await importMutation.mutateAsync({
         tenantId: TENANT_ID,
         token: token.trim(),
         ...config,
       });
-      setImportResult(result);
-      setStep("done");
-      if (result.totalErrors === 0) {
-        toast.success(`Importação concluída! ${result.totalImported} registros importados.`);
-      } else {
-        toast.warning(`Importação concluída com ${result.totalErrors} erros. ${result.totalImported} registros importados.`);
-      }
+      // The polling will handle the transition to "done"
     } catch (e: any) {
-      toast.error(`Erro na importação: ${e.message}`);
+      toast.error(`Erro ao iniciar importação: ${e.message}`);
       setStep("configure");
     }
   };
@@ -118,6 +147,27 @@ export default function RDCrmImport() {
   }, [summary, config]);
 
   const isLoading = validateMutation.isPending || summaryMutation.isPending;
+
+  // Calculate overall percentage
+  const overallPercent = useMemo(() => {
+    if (!progress || progress.totalSteps === 0) return 0;
+    const basePercent = (progress.completedSteps / progress.totalSteps) * 100;
+    const categoryPercent = progress.categoryTotal > 0
+      ? (progress.categoryDone / progress.categoryTotal) * (100 / progress.totalSteps)
+      : 0;
+    return Math.min(Math.round(basePercent + categoryPercent), 99);
+  }, [progress]);
+
+  // Total imported so far
+  const totalImportedSoFar = useMemo(() => {
+    if (!progress?.results) return 0;
+    return Object.values(progress.results).reduce((sum, r) => sum + r.imported, 0);
+  }, [progress?.results]);
+
+  const totalErrorsSoFar = useMemo(() => {
+    if (!progress?.results) return 0;
+    return Object.values(progress.results).reduce((sum, r) => sum + r.errors.length, 0);
+  }, [progress?.results]);
 
   return (
     <div className="page-content max-w-3xl mx-auto">
@@ -376,33 +426,104 @@ export default function RDCrmImport() {
         </div>
       )}
 
-      {/* Step 4: Importing */}
+      {/* Step 4: Importing — Real-time progress */}
       {step === "importing" && (
-        <Card className="border-border/50">
-          <CardContent className="py-16 flex flex-col items-center justify-center text-center">
-            <div className="relative mb-6">
-              <div className="h-16 w-16 rounded-2xl bg-primary/10 flex items-center justify-center">
-                <Loader2 className="h-8 w-8 text-primary animate-spin" />
+        <div className="space-y-4">
+          <Card className="border-border/50">
+            <CardContent className="py-10">
+              {/* Main progress */}
+              <div className="flex flex-col items-center text-center mb-8">
+                <div className="relative mb-4">
+                  <div className="h-20 w-20 rounded-2xl bg-primary/10 flex items-center justify-center">
+                    <span className="text-2xl font-bold text-primary">{overallPercent}%</span>
+                  </div>
+                  <div className="absolute -top-1 -right-1 h-6 w-6 rounded-full bg-primary flex items-center justify-center">
+                    <RefreshCw className="h-3.5 w-3.5 text-primary-foreground animate-spin" />
+                  </div>
+                </div>
+                <h3 className="text-lg font-semibold text-foreground mb-1">
+                  {progress?.phase || "Preparando importação..."}
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  {totalImportedSoFar > 0 && (
+                    <span className="text-primary font-medium">{totalImportedSoFar.toLocaleString("pt-BR")} registros importados</span>
+                  )}
+                  {totalErrorsSoFar > 0 && (
+                    <span className="text-red-400 ml-2">· {totalErrorsSoFar} erros</span>
+                  )}
+                  {totalImportedSoFar === 0 && "Iniciando..."}
+                </p>
               </div>
-              <div className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-primary flex items-center justify-center">
-                <RefreshCw className="h-3 w-3 text-primary-foreground animate-spin" />
+
+              {/* Overall progress bar */}
+              <div className="mb-6">
+                <div className="flex items-center justify-between text-xs text-muted-foreground mb-1.5">
+                  <span>Progresso geral</span>
+                  <span>{progress?.completedSteps || 0} de {progress?.totalSteps || 0} etapas</span>
+                </div>
+                <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
+                  <div
+                    className="h-full bg-primary rounded-full transition-all duration-500 ease-out"
+                    style={{ width: `${overallPercent}%` }}
+                  />
+                </div>
               </div>
-            </div>
-            <h3 className="text-lg font-semibold text-foreground mb-2">Importando dados...</h3>
-            <p className="text-sm text-muted-foreground max-w-md">
-              Estamos importando seus dados do RD Station CRM. Isso pode levar alguns minutos dependendo da quantidade de registros. Não feche esta página.
-            </p>
-            <div className="mt-6 flex items-center gap-2">
-              <div className="h-1.5 w-48 rounded-full bg-muted overflow-hidden">
-                <div className="h-full bg-primary rounded-full animate-pulse" style={{ width: "60%" }} />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+
+              {/* Current category progress */}
+              {progress?.currentCategory && progress.categoryTotal > 0 && (
+                <div className="mb-6">
+                  <div className="flex items-center justify-between text-xs text-muted-foreground mb-1.5">
+                    <span className="flex items-center gap-1.5">
+                      <Loader2 className="h-3 w-3 animate-spin text-primary" />
+                      {categoryLabels[progress.currentCategory] || progress.currentCategory}
+                    </span>
+                    <span>{progress.categoryDone.toLocaleString("pt-BR")} de {progress.categoryTotal.toLocaleString("pt-BR")}</span>
+                  </div>
+                  <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+                    <div
+                      className="h-full bg-primary/60 rounded-full transition-all duration-300"
+                      style={{ width: `${Math.round((progress.categoryDone / progress.categoryTotal) * 100)}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Completed categories */}
+              {progress?.results && Object.keys(progress.results).length > 0 && (
+                <div className="space-y-1.5">
+                  <p className="text-xs font-medium text-muted-foreground mb-2">Categorias concluídas</p>
+                  {Object.entries(progress.results).map(([key, value]) => {
+                    const cat = dataCategories.find(c => c.summaryKey === key);
+                    const Icon = cat?.icon || Circle;
+                    return (
+                      <div key={key} className="flex items-center justify-between px-3 py-2 rounded-lg bg-green-500/5 border border-green-500/10">
+                        <div className="flex items-center gap-2">
+                          <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
+                          <Icon className="h-3.5 w-3.5 text-muted-foreground" />
+                          <span className="text-xs font-medium text-foreground">{categoryLabels[key] || key}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-green-500 font-medium">{value.imported.toLocaleString("pt-BR")} importados</span>
+                          {value.errors.length > 0 && (
+                            <span className="text-xs text-red-400">{value.errors.length} erros</span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              <p className="text-[11px] text-muted-foreground text-center mt-6">
+                Não feche esta página. A importação pode levar vários minutos dependendo da quantidade de registros.
+              </p>
+            </CardContent>
+          </Card>
+        </div>
       )}
 
       {/* Step 5: Done */}
-      {step === "done" && importResult && (
+      {step === "done" && progress && (
         <div className="space-y-4">
           <Card className="border-border/50">
             <CardContent className="pt-8 pb-6 flex flex-col items-center text-center">
@@ -411,8 +532,8 @@ export default function RDCrmImport() {
               </div>
               <h3 className="text-lg font-semibold text-foreground mb-1">Importação concluída!</h3>
               <p className="text-sm text-muted-foreground">
-                {importResult.totalImported.toLocaleString("pt-BR")} registros importados
-                {importResult.totalErrors > 0 && ` · ${importResult.totalErrors} erros`}
+                {totalImportedSoFar.toLocaleString("pt-BR")} registros importados
+                {totalErrorsSoFar > 0 && ` · ${totalErrorsSoFar} erros`}
               </p>
             </CardContent>
           </Card>
@@ -423,8 +544,8 @@ export default function RDCrmImport() {
               <CardTitle className="text-base">Detalhes da importação</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
-              {Object.entries(importResult.results as Record<string, { imported: number; skipped: number; errors: string[] }>).map(([key, value]) => {
-                const cat = dataCategories.find(c => c.summaryKey === key || c.key === `import${key.charAt(0).toUpperCase()}${key.slice(1)}`);
+              {progress.results && Object.entries(progress.results).map(([key, value]) => {
+                const cat = dataCategories.find(c => c.summaryKey === key);
                 const Icon = cat?.icon || Circle;
                 return (
                   <div key={key} className="flex items-center justify-between p-3 rounded-xl border border-border/30 bg-card">
@@ -432,11 +553,11 @@ export default function RDCrmImport() {
                       <div className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center">
                         <Icon className="h-4 w-4 text-muted-foreground" />
                       </div>
-                      <span className="text-sm font-medium text-foreground capitalize">{key}</span>
+                      <span className="text-sm font-medium text-foreground">{categoryLabels[key] || key}</span>
                     </div>
                     <div className="flex items-center gap-3">
                       <Badge variant="outline" className="bg-green-500/10 text-green-500 border-green-500/20">
-                        {value.imported} importados
+                        {value.imported.toLocaleString("pt-BR")} importados
                       </Badge>
                       {value.errors.length > 0 && (
                         <Badge variant="outline" className="bg-red-500/10 text-red-500 border-red-500/20">

@@ -89,6 +89,7 @@ import { productCatalogRouter } from "./routers/productCatalogRouter";
 import { aiAnalysisRouter } from "./routers/aiAnalysisRouter";
 import { utmAnalyticsRouter } from "./routers/utmAnalyticsRouter";
 import { rdCrmImportRouter } from "./routers/rdCrmImportRouter";
+import { saasAuthRouter } from "./routers/saasAuthRouter";
 import {
   listLeadEvents,
   countLeadEvents,
@@ -665,6 +666,7 @@ export const appRouter = router({
   aiAnalysis: aiAnalysisRouter, // M10: Análise de Atendimento por IA
   utmAnalytics: utmAnalyticsRouter, // M11: Dashboard de Rastreamento UTM
   rdCrmImport: rdCrmImportRouter, // M12: Importação do RD Station CRM
+  saasAuth: saasAuthRouter, // SaaS Authentication (email/senha)
 
   // ─── Contact Profile & Custom Fields ───
   contactProfile: router({
