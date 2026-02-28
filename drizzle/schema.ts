@@ -372,6 +372,11 @@ export const deals = mysqlTable("deals", {
   visibilityScope: mysqlEnum("visibilityScope", ["personal", "team", "global"]).default("global").notNull(),
   channelOrigin: varchar("channelOrigin", { length: 64 }),
   leadSource: varchar("leadSource", { length: 64 }),
+  utmSource: varchar("utmSource", { length: 255 }),
+  utmMedium: varchar("utmMedium", { length: 255 }),
+  utmCampaign: varchar("utmCampaign", { length: 255 }),
+  utmTerm: varchar("utmTerm", { length: 255 }),
+  utmContent: varchar("utmContent", { length: 255 }),
   utmJson: json("utmJson"),
   metaJson: json("metaJson"),
   rawPayloadJson: json("rawPayloadJson"),
@@ -443,29 +448,32 @@ export const productCatalog = mysqlTable("product_catalog", {
 ]);
 
 // ════════════════════════════════════════════════════════════
-// DEAL PRODUCTS (Orçamento / Itens do Deal)
+// DEAL ITEMS (Itens da Negociação — referência ao Catálogo)
 // ════════════════════════════════════════════════════════════
 
 export const dealProducts = mysqlTable("deal_products", {
   id: int("id").autoincrement().primaryKey(),
   tenantId: int("tenantId").notNull(),
   dealId: int("dealId").notNull(),
-  name: varchar("name", { length: 255 }).notNull(),
-  description: text("description"),
+  productId: int("productId").notNull(),               // FK obrigatória → product_catalog.id
+  name: varchar("name", { length: 255 }).notNull(),     // snapshot do nome no momento da adição
+  description: text("description"),                      // snapshot da descrição
   category: mysqlEnum("category", ["flight", "hotel", "tour", "transfer", "insurance", "cruise", "visa", "other"]).default("other").notNull(),
   quantity: int("quantity").default(1).notNull(),
-  unitPriceCents: bigint("unitPriceCents", { mode: "number" }).default(0).notNull(),
+  unitPriceCents: bigint("unitPriceCents", { mode: "number" }).default(0).notNull(),  // snapshot do preço base
   discountCents: bigint("discountCents", { mode: "number" }).default(0),
+  finalPriceCents: bigint("finalPriceCents", { mode: "number" }).default(0),          // (qty * unit) - discount
   currency: varchar("currency", { length: 3 }).default("BRL"),
   supplier: varchar("supplier", { length: 255 }),
   checkIn: timestamp("checkIn"),
   checkOut: timestamp("checkOut"),
-  catalogProductId: int("catalogProductId"),
+  catalogProductId: int("catalogProductId"),              // mantido para compatibilidade (deprecated)
   notes: text("notes"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 }, (t) => [
   index("dp_prod_tenant_deal_idx").on(t.tenantId, t.dealId),
+  index("dp_prod_product_idx").on(t.productId),
   index("dp_prod_catalog_idx").on(t.catalogProductId),
 ]);
 
@@ -1306,3 +1314,26 @@ export const rdStationWebhookLog = mysqlTable("rd_station_webhook_log", {
 export type RdStationConfig = typeof rdStationConfig.$inferSelect;
 export type InsertRdStationConfig = typeof rdStationConfig.$inferInsert;
 export type RdStationWebhookLog = typeof rdStationWebhookLog.$inferSelect;
+
+
+// ════════════════════════════════════════════════════════════
+// RD STATION FIELD MAPPINGS
+// ════════════════════════════════════════════════════════════
+
+export const rdFieldMappings = mysqlTable("rd_field_mappings", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  rdFieldKey: varchar("rdFieldKey", { length: 255 }).notNull(), // campo do RD Station (ex: "cf_interesse", "company", "job_title")
+  rdFieldLabel: varchar("rdFieldLabel", { length: 255 }).notNull(), // label amigável do campo RD
+  enturFieldType: mysqlEnum("enturFieldType", ["standard", "custom"]).default("custom").notNull(), // tipo: campo padrão ou personalizado
+  enturFieldKey: varchar("enturFieldKey", { length: 255 }), // campo padrão do Entur (ex: "contact.email", "deal.utmSource") ou null se custom
+  enturCustomFieldId: int("enturCustomFieldId"), // FK para custom_fields.id se for campo personalizado
+  isActive: boolean("isActive").default(true).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (t) => [
+  index("rdfm_tenant_idx").on(t.tenantId),
+  index("rdfm_rd_key_idx").on(t.tenantId, t.rdFieldKey),
+]);
+export type RdFieldMapping = typeof rdFieldMappings.$inferSelect;
+export type InsertRdFieldMapping = typeof rdFieldMappings.$inferInsert;

@@ -39,6 +39,7 @@ const ConversationDebug = lazy(() => import("./pages/ConversationDebug"));
 const SourcesAndCampaigns = lazy(() => import("./pages/SourcesAndCampaigns"));
 const LossReasons = lazy(() => import("./pages/LossReasons"));
 const RDStationIntegration = lazy(() => import("./pages/RDStationIntegration"));
+const RDFieldMappings = lazy(() => import("./pages/RDFieldMappings"));
 
 function PageLoader() {
   return (
@@ -87,6 +88,7 @@ function Router() {
           <Route path="/settings/sources" component={SourcesAndCampaigns} />
           <Route path="/settings/loss-reasons" component={LossReasons} />
           <Route path="/settings/rdstation" component={RDStationIntegration} />
+          <Route path="/settings/rdstation/mappings" component={RDFieldMappings} />
 
           {/* Notifications */}
           <Route path="/notifications" component={NotificationsPage} />

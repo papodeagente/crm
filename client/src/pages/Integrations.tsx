@@ -51,7 +51,7 @@ function WebhookConfigTab() {
   const [showToken, setShowToken] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
 
-  const webhookUrl = `${window.location.origin}/webhooks/leads`;
+  const webhookUrl = `${window.location.origin}/api/webhooks/leads`;
 
   const copyToClipboard = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
@@ -176,7 +176,7 @@ function MetaLeadAdsTab() {
   const [copied, setCopied] = useState(false);
 
   const isConnected = config.data?.status === "connected";
-  const metaWebhookUrl = `${window.location.origin}/webhooks/meta`;
+  const metaWebhookUrl = `${window.location.origin}/api/webhooks/meta`;
 
   const handleConnect = () => {
     if (!pageId || !accessToken) {

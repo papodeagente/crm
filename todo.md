@@ -1219,3 +1219,57 @@
 - [x] Desvincular empresa da negociação
 - [x] Procedures tRPC para update de deal, contato e empresa (accounts.update adicionado)
 - [x] Componente EditableSidebarField reutilizável para edição inline
+
+## UTMs, Mapeamento de Campos RD Station e Correção do Webhook
+
+### Diagnóstico e Correção do Webhook RD Station
+- [x] Testar endpoint /webhooks/rdstation com curl para verificar se responde
+- [x] Verificar logs de erro no servidor
+- [x] Corrigir problemas: mover todas as rotas de webhook para /api/webhooks/ (proxy só encaminha /api/)
+
+### Campos UTM Dedicados na Negociação
+- [x] Adicionar campos utm_source, utm_medium, utm_campaign, utm_term, utm_content ao schema de deals
+- [x] Migrar banco com os novos campos + migrar dados existentes do utmJson
+- [ ] Atualizar processamento do webhook RD Station para gravar UTMs nos campos dedicados
+- [ ] Exibir UTMs na sidebar da negociação (seção "Rastreamento")
+- [ ] Permitir edição manual dos campos UTM na sidebar
+
+### Mapeamento de Campos Personalizados RD Station ↔ Entur OS
+- [ ] Criar tabela rd_field_mappings no schema (campo RD → campo Entur OS)
+- [ ] Criar procedures tRPC para CRUD de mapeamentos
+- [ ] Criar página/seção de configuração para mapear campos
+- [ ] Aplicar mapeamentos ao processar webhook do RD Station
+
+### Testes
+- [ ] Testes unitários para novos procedures e processamento de UTMs
+
+## Unificação Catálogo de Produtos e Produtos da Negociação
+
+### Schema e Migração
+- [x] Analisar tabelas existentes (product_catalog, deal_products, product_categories)
+- [x] Reestruturar Product (catálogo) — product_catalog já tem a estrutura ideal
+- [x] Reestruturar DealItem com productId obrigatório (FK) + finalPriceCents (snapshot)
+- [x] Migrar banco (0 registros existentes, sem dados para migrar)
+- [x] Índice dp_prod_product_idx adicionado para integridade
+
+### Backend
+- [x] Procedures tRPC para CRUD de Product (catálogo) — já existiam no productCatalogRouter
+- [x] Procedures tRPC para DealItem (adicionar/editar/remover com productId obrigatório)
+- [x] Validação: impedir DealItem sem product_id válido (TRPCError NOT_FOUND)
+- [x] Validação: impedir inserção de produto desativado (TRPCError BAD_REQUEST)
+- [x] Snapshot de preço: copiar basePriceCents do catálogo ao criar DealItem
+- [x] Recálculo automático de finalPriceCents (qty * unit - discount)
+
+### Frontend- [x] Modal de busca no catálogo ao adicionar produto na negociação (com busca por nome/fornecedor/SKU)
+- [x] Permitir editar preço apenas no DealItem (não no catálogo) via dialog de edição
+- [x] Recálculo automático de total da negociação na UI (finalPriceCents)
+- [x] Exibir badge de referência ao catálogo nos itens (Catálogo #id)gociações existentes
+
+### UTMs e RD Station (pendentes da iteração anterior)
+- [x] Atualizar processamento do webhook para gravar UTMs nos campos dedicados (leadProcessor.ts)
+- [x] Exibir UTMs na sidebar da negociação (seção "Rastreamento" com badge RD Station)
+- [x] Permitir edição manual dos campos UTM (via seção Rastreamento na sidebar)
+- [x] Criar área de mapeamento de campos RD Station ↔ Entur OS (página dedicada com CRUD)
+
+### Testes
+- [x] Testes unitários para Product, DealItem, fieldMappings e RD Station (475 testes passando)

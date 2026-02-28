@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { protectedProcedure, router } from "../_core/trpc";
+import { TRPCError } from "@trpc/server";
 import * as crm from "../crmDb";
 import { emitEvent } from "../middleware/eventLog";
 import { createNotification } from "../db";
@@ -449,22 +450,42 @@ export const crmRouter = router({
         }),
       create: protectedProcedure
         .input(z.object({
-          tenantId: z.number(), dealId: z.number(), name: z.string().min(1),
-          description: z.string().optional(),
-          category: z.enum(["flight", "hotel", "tour", "transfer", "insurance", "cruise", "visa", "other"]).optional(),
-          quantity: z.number().default(1), unitPriceCents: z.number().default(0),
-          discountCents: z.number().optional(), supplier: z.string().optional(),
+          tenantId: z.number(), dealId: z.number(), productId: z.number(),
+          quantity: z.number().default(1),
+          unitPriceCents: z.number().optional(),  // override do preço (se não informado, usa base do catálogo)
+          discountCents: z.number().optional(),
+          supplier: z.string().optional(),
           checkIn: z.string().optional(), checkOut: z.string().optional(), notes: z.string().optional(),
         }))
         .mutation(async ({ ctx, input }) => {
+          // Buscar produto do catálogo para snapshot
+          const catalogProduct = await crm.getCatalogProductById(input.tenantId, input.productId);
+          if (!catalogProduct) throw new TRPCError({ code: "NOT_FOUND", message: "Produto não encontrado no catálogo" });
+          if (!catalogProduct.isActive) throw new TRPCError({ code: "BAD_REQUEST", message: "Produto desativado. Não é possível adicionar a novas negociações." });
+          
+          const unitPrice = input.unitPriceCents ?? catalogProduct.basePriceCents;
+          const discount = input.discountCents || 0;
+          const finalPrice = input.quantity * unitPrice - discount;
+          
           const result = await crm.createDealProduct({
-            ...input,
+            tenantId: input.tenantId,
+            dealId: input.dealId,
+            productId: input.productId,
+            name: catalogProduct.name,
+            description: catalogProduct.description || undefined,
+            category: catalogProduct.productType as any,
+            quantity: input.quantity,
+            unitPriceCents: unitPrice,
+            discountCents: discount,
+            finalPriceCents: finalPrice,
+            supplier: input.supplier || catalogProduct.supplier || undefined,
             checkIn: input.checkIn ? new Date(input.checkIn) : undefined,
             checkOut: input.checkOut ? new Date(input.checkOut) : undefined,
+            notes: input.notes,
           });
           await crm.createDealHistory({
             tenantId: input.tenantId, dealId: input.dealId, action: "product_added",
-            description: `Produto "${input.name}" adicionado ao orçamento`,
+            description: `Produto "${catalogProduct.name}" adicionado ao orçamento (${(unitPrice / 100).toFixed(2)})`,
             actorUserId: ctx.user.id, actorName: ctx.user.name || "Sistema",
           });
           return result;
@@ -472,16 +493,22 @@ export const crmRouter = router({
       update: protectedProcedure
         .input(z.object({
           tenantId: z.number(), id: z.number(), dealId: z.number(),
-          name: z.string().optional(), description: z.string().optional(),
-          category: z.enum(["flight", "hotel", "tour", "transfer", "insurance", "cruise", "visa", "other"]).optional(),
           quantity: z.number().optional(), unitPriceCents: z.number().optional(),
           discountCents: z.number().optional(), supplier: z.string().optional(),
           checkIn: z.string().optional(), checkOut: z.string().optional(), notes: z.string().optional(),
         }))
         .mutation(async ({ ctx, input }) => {
           const { tenantId, id, dealId, checkIn, checkOut, ...data } = input;
+          // Recalcular finalPriceCents se quantidade ou preço mudou
+          const existing = await crm.getDealProduct(tenantId, id);
+          const qty = data.quantity ?? existing?.quantity ?? 1;
+          const unit = data.unitPriceCents ?? existing?.unitPriceCents ?? 0;
+          const disc = data.discountCents ?? existing?.discountCents ?? 0;
+          const finalPrice = qty * unit - disc;
+          
           await crm.updateDealProduct(tenantId, id, {
             ...data,
+            finalPriceCents: finalPrice,
             checkIn: checkIn ? new Date(checkIn) : undefined,
             checkOut: checkOut ? new Date(checkOut) : undefined,
           });

@@ -295,18 +295,27 @@ export async function searchAccounts(tenantId: number, search: string) {
 // ═══════════════════════════════════════
 // DEAL PRODUCTS
 // ═══════════════════════════════════════
-export async function createDealProduct(data: { tenantId: number; dealId: number; name: string; description?: string; category?: "flight" | "hotel" | "tour" | "transfer" | "insurance" | "cruise" | "visa" | "other"; quantity?: number; unitPriceCents?: number; discountCents?: number; supplier?: string; checkIn?: Date; checkOut?: Date; notes?: string }) {
+export async function createDealProduct(data: { tenantId: number; dealId: number; productId: number; name: string; description?: string; category?: "flight" | "hotel" | "tour" | "transfer" | "insurance" | "cruise" | "visa" | "other"; quantity?: number; unitPriceCents?: number; discountCents?: number; finalPriceCents?: number; supplier?: string; checkIn?: Date; checkOut?: Date; notes?: string }) {
   const db = await getDb(); if (!db) return null;
-  const [result] = await db.insert(dealProducts).values(data).$returningId();
+  const qty = data.quantity || 1;
+  const unit = data.unitPriceCents || 0;
+  const discount = data.discountCents || 0;
+  const finalPrice = data.finalPriceCents ?? (qty * unit - discount);
+  const [result] = await db.insert(dealProducts).values({ ...data, finalPriceCents: finalPrice }).$returningId();
   return result;
 }
 export async function listDealProducts(tenantId: number, dealId: number) {
   const db = await getDb(); if (!db) return [];
   return db.select().from(dealProducts).where(and(eq(dealProducts.tenantId, tenantId), eq(dealProducts.dealId, dealId))).orderBy(desc(dealProducts.createdAt));
 }
-export async function updateDealProduct(tenantId: number, id: number, data: Partial<{ name: string; description: string; category: "flight" | "hotel" | "tour" | "transfer" | "insurance" | "cruise" | "visa" | "other"; quantity: number; unitPriceCents: number; discountCents: number; supplier: string; checkIn: Date; checkOut: Date; notes: string }>) {
+export async function updateDealProduct(tenantId: number, id: number, data: Partial<{ name: string; description: string; category: "flight" | "hotel" | "tour" | "transfer" | "insurance" | "cruise" | "visa" | "other"; quantity: number; unitPriceCents: number; discountCents: number; finalPriceCents: number; supplier: string; checkIn: Date; checkOut: Date; notes: string }>) {
   const db = await getDb(); if (!db) return;
   await db.update(dealProducts).set(data).where(and(eq(dealProducts.id, id), eq(dealProducts.tenantId, tenantId)));
+}
+export async function getDealProduct(tenantId: number, id: number) {
+  const db = await getDb(); if (!db) return null;
+  const rows = await db.select().from(dealProducts).where(and(eq(dealProducts.id, id), eq(dealProducts.tenantId, tenantId))).limit(1);
+  return rows[0] || null;
 }
 export async function deleteDealProduct(tenantId: number, id: number) {
   const db = await getDb(); if (!db) return;
@@ -735,9 +744,9 @@ export async function executePipelineAutomation(tenantId: number, dealId: number
       const products = await listDealProducts(tenantId, dealId);
       for (const p of products) {
         await createDealProduct({
-          tenantId, dealId: newDeal.id, name: p.name, description: p.description || undefined,
+          tenantId, dealId: newDeal.id, productId: p.productId, name: p.name, description: p.description || undefined,
           category: p.category as any, quantity: p.quantity, unitPriceCents: p.unitPriceCents,
-          discountCents: p.discountCents || 0,
+          discountCents: p.discountCents || 0, finalPriceCents: p.finalPriceCents || 0,
           supplier: p.supplier || undefined, notes: p.notes || undefined,
         });
       }

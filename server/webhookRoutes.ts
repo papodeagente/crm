@@ -100,7 +100,7 @@ function isValidEmail(email: string): boolean {
 
 // ─── WordPress Elementor Webhook ────────────────────────
 
-router.post("/webhooks/wp-leads", async (req: Request, res: Response) => {
+router.post("/api/webhooks/wp-leads", async (req: Request, res: Response) => {
   const tenantId = 1; // Single-tenant for now
   const clientIp = req.ip || req.socket.remoteAddress || "unknown";
 
@@ -236,7 +236,7 @@ router.post("/webhooks/wp-leads", async (req: Request, res: Response) => {
 
 // ─── Landing Page Webhook ────────────────────────────────
 
-router.post("/webhooks/leads", async (req: Request, res: Response) => {
+router.post("/api/webhooks/leads", async (req: Request, res: Response) => {
   const tenantId = 1; // Single-tenant for now
 
   try {
@@ -294,7 +294,7 @@ router.post("/webhooks/leads", async (req: Request, res: Response) => {
 
 // ─── Meta Lead Ads: Verification Challenge ───────────────
 
-router.get("/webhooks/meta", async (req: Request, res: Response) => {
+router.get("/api/webhooks/meta", async (req: Request, res: Response) => {
   const tenantId = 1;
 
   const mode = req.query["hub.mode"];
@@ -316,7 +316,7 @@ router.get("/webhooks/meta", async (req: Request, res: Response) => {
 
 // ─── Meta Lead Ads: Receive Notifications ────────────────
 
-router.post("/webhooks/meta", async (req: Request, res: Response) => {
+router.post("/api/webhooks/meta", async (req: Request, res: Response) => {
   const tenantId = 1;
 
   try {
@@ -458,7 +458,7 @@ router.post("/webhooks/meta", async (req: Request, res: Response) => {
 
 // ─── Tracking Script: GET /tracker.js ──────────────────
 
-router.get("/tracker.js", async (req: Request, res: Response) => {
+router.get("/api/tracker.js", async (req: Request, res: Response) => {
   const token = req.query.t as string;
   if (!token) {
     return res.status(400).type("text/plain").send("// Missing token parameter");
@@ -667,7 +667,7 @@ router.options("/api/collect", (_req: Request, res: Response) => {
 
 // ─── RD Station Marketing Webhook ───────────────────────
 
-router.post("/webhooks/rdstation", async (req: Request, res: Response) => {
+router.post("/api/webhooks/rdstation", async (req: Request, res: Response) => {
   const tenantId = 1;
   const clientIp = req.ip || req.socket.remoteAddress || "unknown";
 

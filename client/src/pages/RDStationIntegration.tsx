@@ -61,7 +61,7 @@ export default function RDStationIntegration() {
   const getWebhookUrl = () => {
     if (!config?.webhookToken) return "";
     const baseUrl = window.location.origin;
-    return `${baseUrl}/webhooks/rdstation?token=${config.webhookToken}`;
+    return `${baseUrl}/api/webhooks/rdstation?token=${config.webhookToken}`;
   };
 
   const copyToClipboard = async (text: string) => {
@@ -600,6 +600,34 @@ export default function RDStationIntegration() {
                 )}
               </CardContent>
             )}
+          </Card>
+
+          {/* Mapeamento de Campos */}
+          <Card className="border-border/50 bg-gradient-to-br from-orange-500/5 to-transparent">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg bg-orange-500/10 flex items-center justify-center">
+                    <Zap className="h-4 w-4 text-orange-600" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-base">Mapeamento de Campos</CardTitle>
+                    <CardDescription className="text-xs">Vincule campos do RD Station aos campos do Entur OS</CardDescription>
+                  </div>
+                </div>
+                <Button size="sm" onClick={() => setLocation("/settings/rdstation/mappings")}>
+                  Configurar
+                  <ExternalLink className="h-3.5 w-3.5 ml-1" />
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground">
+                Configure quais campos personalizados do RD Station devem ser mapeados para campos do Entur OS.
+                Os UTMs (source, medium, campaign, term, content) já são mapeados automaticamente.
+                Use esta área para mapear campos extras como interesse, orçamento, destino preferido, etc.
+              </p>
+            </CardContent>
           </Card>
 
           {/* FAQ */}

@@ -18,7 +18,7 @@ import {
   History, Loader2, Mail, MapPin, MessageCircle, MessageSquarePlus, Mic, MoreHorizontal,
   Package, Phone, Plane, Play, Plus, Send, ShoppingBag, ThumbsDown, ThumbsUp,
   Trash2, User, Users, X, AlertCircle, ClipboardList, Paperclip, Tag,
-  Sparkles, BarChart3, TrendingUp, TrendingDown, Star, Target, Lightbulb, RefreshCw, Award
+  Sparkles, BarChart3, TrendingUp, TrendingDown, Star, Target, Lightbulb, RefreshCw, Award, Search
 } from "lucide-react";
 
 const TENANT_ID = 1;
@@ -154,7 +154,7 @@ export default function DealDetail() {
 
   /* ─── Sidebar collapsed sections ─── */
   const [sidebarSections, setSidebarSections] = useState({
-    deal: true, contact: true, company: true, responsible: true, custom: false,
+    deal: true, contact: true, company: true, responsible: true, utm: false, custom: false,
   });
   const toggleSection = (key: keyof typeof sidebarSections) =>
     setSidebarSections((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -585,6 +585,47 @@ export default function DealDetail() {
             </SidebarSection>
 
             <SidebarDivider />
+
+            {/* ── Rastreamento (UTMs) ── */}
+            {(deal.utmSource || deal.utmMedium || deal.utmCampaign || deal.utmTerm || deal.utmContent || deal.channelOrigin === "rdstation") && (
+              <>
+                <SidebarSection
+                  title="Rastreamento"
+                  open={sidebarSections.utm}
+                  onToggle={() => toggleSection("utm")}
+                >
+                  <div className="space-y-1">
+                    {deal.utmSource && (
+                      <SidebarField label="Origem (utm_source)" value={deal.utmSource} />
+                    )}
+                    {deal.utmMedium && (
+                      <SidebarField label="Mídia (utm_medium)" value={deal.utmMedium} />
+                    )}
+                    {deal.utmCampaign && (
+                      <SidebarField label="Campanha (utm_campaign)" value={deal.utmCampaign} />
+                    )}
+                    {deal.utmTerm && (
+                      <SidebarField label="Termo (utm_term)" value={deal.utmTerm} />
+                    )}
+                    {deal.utmContent && (
+                      <SidebarField label="Conteúdo (utm_content)" value={deal.utmContent} />
+                    )}
+                    {deal.channelOrigin === "rdstation" && (
+                      <div className="flex items-center gap-1.5 mt-2">
+                        <Badge variant="secondary" className="text-[10px] bg-orange-500/10 text-orange-600 border-orange-200">
+                          RD Station
+                        </Badge>
+                        <span className="text-[10px] text-muted-foreground">Integração ativa</span>
+                      </div>
+                    )}
+                    {!deal.utmSource && !deal.utmMedium && !deal.utmCampaign && !deal.utmTerm && !deal.utmContent && (
+                      <p className="text-xs text-muted-foreground">UTMs não disponíveis para este lead</p>
+                    )}
+                  </div>
+                </SidebarSection>
+                <SidebarDivider />
+              </>
+            )}
 
             {/* ── Campos Personalizados ── */}
             <SidebarSection
@@ -1499,16 +1540,57 @@ function TasksPanel({ tasks, dealId, onRefresh }: { tasks: any[]; dealId: number
 
 function ProductsPanel({ products, dealId, onRefresh }: { products: any[]; dealId: number; onRefresh: () => void }) {
   const [showAdd, setShowAdd] = useState(false);
-  const [form, setForm] = useState({ name: "", category: "other", quantity: 1, unitPriceCents: 0, supplier: "", description: "" });
+  const [editingItem, setEditingItem] = useState<any>(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedProduct, setSelectedProduct] = useState<any>(null);
+  const [addForm, setAddForm] = useState({ quantity: 1, unitPriceCents: 0, discountCents: 0, supplier: "", notes: "" });
+  const [editForm, setEditForm] = useState({ quantity: 1, unitPriceCents: 0, discountCents: 0, supplier: "", notes: "" });
+
+  const catalogQ = trpc.productCatalog.products.list.useQuery(
+    { tenantId: TENANT_ID, isActive: true, limit: 200 },
+    { enabled: showAdd }
+  );
+  const catalogProducts = catalogQ.data || [];
+
+  const filteredCatalog = useMemo(() => {
+    if (!searchTerm.trim()) return catalogProducts;
+    const term = searchTerm.toLowerCase();
+    return catalogProducts.filter((p: any) =>
+      p.name.toLowerCase().includes(term) ||
+      (p.supplier || "").toLowerCase().includes(term) ||
+      (p.sku || "").toLowerCase().includes(term)
+    );
+  }, [catalogProducts, searchTerm]);
 
   const createProduct = trpc.crm.deals.products.create.useMutation({
-    onSuccess: () => { onRefresh(); setShowAdd(false); setForm({ name: "", category: "other", quantity: 1, unitPriceCents: 0, supplier: "", description: "" }); toast.success("Produto adicionado"); },
+    onSuccess: () => {
+      onRefresh(); setShowAdd(false); setSelectedProduct(null); setSearchTerm("");
+      setAddForm({ quantity: 1, unitPriceCents: 0, discountCents: 0, supplier: "", notes: "" });
+      toast.success("Produto adicionado ao orçamento");
+    },
+  });
+  const updateProduct = trpc.crm.deals.products.update.useMutation({
+    onSuccess: () => { onRefresh(); setEditingItem(null); toast.success("Item atualizado"); },
   });
   const deleteProduct = trpc.crm.deals.products.delete.useMutation({
     onSuccess: () => { onRefresh(); toast.success("Produto removido"); },
   });
 
-  const total = products.reduce((sum: number, p: any) => sum + (p.quantity * p.unitPriceCents - (p.discountCents || 0)), 0);
+  const total = products.reduce((sum: number, p: any) => sum + (p.finalPriceCents || (p.quantity * p.unitPriceCents - (p.discountCents || 0))), 0);
+
+  const handleSelectCatalogProduct = (product: any) => {
+    setSelectedProduct(product);
+    setAddForm({
+      quantity: 1,
+      unitPriceCents: product.basePriceCents,
+      discountCents: 0,
+      supplier: product.supplier || "",
+      notes: "",
+    });
+  };
+
+  const addFinalPrice = addForm.quantity * addForm.unitPriceCents - addForm.discountCents;
+  const editFinalPrice = editForm.quantity * editForm.unitPriceCents - editForm.discountCents;
 
   return (
     <div className="p-5 space-y-4">
@@ -1517,8 +1599,8 @@ function ProductsPanel({ products, dealId, onRefresh }: { products: any[]; dealI
           <h3 className="text-sm font-semibold">Produtos e Serviços</h3>
           <p className="text-xs text-muted-foreground mt-0.5">{products.length} itens — Total: {fmt$(total)}</p>
         </div>
-        <Button size="sm" variant="outline" onClick={() => setShowAdd(true)}>
-          <Plus className="h-3.5 w-3.5 mr-1" /> Adicionar
+        <Button size="sm" variant="outline" onClick={() => { setShowAdd(true); setSelectedProduct(null); setSearchTerm(""); }}>
+          <Plus className="h-3.5 w-3.5 mr-1" /> Adicionar do Catálogo
         </Button>
       </div>
 
@@ -1526,12 +1608,13 @@ function ProductsPanel({ products, dealId, onRefresh }: { products: any[]; dealI
         <div className="text-center py-12 text-muted-foreground">
           <ShoppingBag className="h-10 w-10 mx-auto mb-2 opacity-20" />
           <p className="text-sm">Nenhum item no orçamento</p>
+          <p className="text-xs mt-1">Adicione produtos do catálogo</p>
         </div>
       ) : (
         <div className="space-y-2">
           {products.map((p: any) => {
             const Icon = categoryIcons[p.category] || Package;
-            const itemTotal = p.quantity * p.unitPriceCents - (p.discountCents || 0);
+            const itemTotal = p.finalPriceCents || (p.quantity * p.unitPriceCents - (p.discountCents || 0));
             return (
               <div key={p.id} className="flex items-center gap-3 p-3 bg-background border border-border rounded-lg hover:border-primary/30 hover:shadow-sm transition-all group">
                 <div className="w-9 h-9 rounded-lg bg-muted/50 flex items-center justify-center shrink-0">
@@ -1541,14 +1624,27 @@ function ProductsPanel({ products, dealId, onRefresh }: { products: any[]; dealI
                   <div className="flex items-center gap-2">
                     <p className="text-sm font-medium truncate">{p.name}</p>
                     <Badge variant="outline" className="text-[10px] shrink-0">{categoryLabels[p.category] || p.category}</Badge>
+                    {p.productId > 0 && <Badge variant="secondary" className="text-[9px] shrink-0">Catálogo #{p.productId}</Badge>}
                   </div>
                   <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
                     {p.supplier && <span>{p.supplier}</span>}
                     <span>{p.quantity}x {fmt$(p.unitPriceCents)}</span>
-                    {p.discountCents > 0 && <span className="text-emerald-600">-{fmt$(p.discountCents)}</span>}
+                    {(p.discountCents || 0) > 0 && <span className="text-emerald-600">-{fmt$(p.discountCents)}</span>}
                   </div>
                 </div>
                 <p className="text-sm font-semibold shrink-0">{fmt$(itemTotal)}</p>
+                <button
+                  onClick={() => {
+                    setEditingItem(p);
+                    setEditForm({
+                      quantity: p.quantity, unitPriceCents: p.unitPriceCents,
+                      discountCents: p.discountCents || 0, supplier: p.supplier || "", notes: p.notes || "",
+                    });
+                  }}
+                  className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-primary/10 rounded"
+                >
+                  <Edit2 className="h-3.5 w-3.5 text-primary" />
+                </button>
                 <button
                   onClick={() => deleteProduct.mutate({ tenantId: TENANT_ID, id: p.id, dealId, productName: p.name })}
                   className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-red-500/10 rounded"
@@ -1565,43 +1661,166 @@ function ProductsPanel({ products, dealId, onRefresh }: { products: any[]; dealI
         </div>
       )}
 
-      <Dialog open={showAdd} onOpenChange={setShowAdd}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader><DialogTitle>Adicionar Produto</DialogTitle></DialogHeader>
-          <div className="space-y-3">
-            <Input placeholder="Nome do produto" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-            <Select value={form.category} onValueChange={(v) => setForm({ ...form, category: v })}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {Object.entries(categoryLabels).map(([k, v]) => (
-                  <SelectItem key={k} value={k}>{v}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-xs text-muted-foreground">Quantidade</label>
-                <Input type="number" min={1} value={form.quantity} onChange={(e) => setForm({ ...form, quantity: parseInt(e.target.value) || 1 })} />
+      {/* DIALOG: Adicionar Produto do Catálogo */}
+      <Dialog open={showAdd} onOpenChange={(open) => { setShowAdd(open); if (!open) { setSelectedProduct(null); setSearchTerm(""); } }}>
+        <DialogContent className="sm:max-w-lg max-h-[85vh] flex flex-col">
+          <DialogHeader><DialogTitle>{selectedProduct ? "Configurar Item" : "Buscar no Catálogo"}</DialogTitle></DialogHeader>
+
+          {!selectedProduct ? (
+            <div className="flex-1 overflow-hidden flex flex-col gap-3">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Buscar produto por nome, fornecedor ou SKU..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-9"
+                  autoFocus
+                />
               </div>
-              <div>
-                <label className="text-xs text-muted-foreground">Preço unitário (R$)</label>
-                <Input type="number" step="0.01" value={form.unitPriceCents / 100} onChange={(e) => setForm({ ...form, unitPriceCents: Math.round(parseFloat(e.target.value || "0") * 100) })} />
+              <div className="flex-1 overflow-y-auto space-y-1 max-h-[400px] pr-1">
+                {catalogQ.isLoading ? (
+                  <div className="text-center py-8"><Loader2 className="h-5 w-5 animate-spin mx-auto text-muted-foreground" /></div>
+                ) : filteredCatalog.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Package className="h-8 w-8 mx-auto mb-2 opacity-20" />
+                    <p className="text-sm">{searchTerm ? "Nenhum produto encontrado" : "Catálogo vazio"}</p>
+                    <p className="text-xs mt-1">Cadastre produtos no catálogo primeiro</p>
+                  </div>
+                ) : (
+                  filteredCatalog.map((p: any) => {
+                    const Icon = categoryIcons[p.productType] || Package;
+                    return (
+                      <button
+                        key={p.id}
+                        onClick={() => handleSelectCatalogProduct(p)}
+                        className="w-full flex items-center gap-3 p-3 rounded-lg border border-border hover:border-primary/40 hover:bg-primary/5 transition-all text-left"
+                      >
+                        <div className="w-9 h-9 rounded-lg bg-muted/50 flex items-center justify-center shrink-0">
+                          <Icon className="h-4 w-4 text-muted-foreground" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{p.name}</p>
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
+                            <Badge variant="outline" className="text-[10px]">{categoryLabels[p.productType] || p.productType}</Badge>
+                            {p.supplier && <span>{p.supplier}</span>}
+                            {p.sku && <span className="text-muted-foreground/60">SKU: {p.sku}</span>}
+                          </div>
+                        </div>
+                        <p className="text-sm font-semibold shrink-0 text-primary">{fmt$(p.basePriceCents)}</p>
+                      </button>
+                    );
+                  })
+                )}
               </div>
             </div>
-            <Input placeholder="Fornecedor" value={form.supplier} onChange={(e) => setForm({ ...form, supplier: e.target.value })} />
-            <Textarea placeholder="Descrição (opcional)" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className="min-h-[60px]" />
+          ) : (
+            <div className="space-y-4">
+              <div className="flex items-center gap-3 p-3 bg-muted/30 rounded-lg border">
+                <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                  {(() => { const Icon = categoryIcons[selectedProduct.productType] || Package; return <Icon className="h-5 w-5 text-primary" />; })()}
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-semibold">{selectedProduct.name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {categoryLabels[selectedProduct.productType] || selectedProduct.productType}
+                    {selectedProduct.supplier && ` • ${selectedProduct.supplier}`}
+                  </p>
+                </div>
+                <Button variant="ghost" size="sm" onClick={() => setSelectedProduct(null)}>
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground">Quantidade</label>
+                  <Input type="number" min={1} value={addForm.quantity} onChange={(e) => setAddForm({ ...addForm, quantity: parseInt(e.target.value) || 1 })} />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground">Preço unitário (R$)</label>
+                  <Input type="number" step="0.01" value={addForm.unitPriceCents / 100} onChange={(e) => setAddForm({ ...addForm, unitPriceCents: Math.round(parseFloat(e.target.value || "0") * 100) })} />
+                </div>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground">Desconto (R$)</label>
+                <Input type="number" step="0.01" value={addForm.discountCents / 100} onChange={(e) => setAddForm({ ...addForm, discountCents: Math.round(parseFloat(e.target.value || "0") * 100) })} />
+              </div>
+              <Input placeholder="Fornecedor (opcional)" value={addForm.supplier} onChange={(e) => setAddForm({ ...addForm, supplier: e.target.value })} />
+              <Textarea placeholder="Observações (opcional)" value={addForm.notes} onChange={(e) => setAddForm({ ...addForm, notes: e.target.value })} className="min-h-[50px]" />
+
+              <div className="flex items-center justify-between p-3 bg-primary/5 border border-primary/10 rounded-lg">
+                <span className="text-sm font-medium">Subtotal do item</span>
+                <span className="text-lg font-bold text-primary">{fmt$(addFinalPrice)}</span>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            {selectedProduct ? (
+              <>
+                <Button variant="ghost" onClick={() => setSelectedProduct(null)}>Voltar</Button>
+                <Button
+                  disabled={createProduct.isPending}
+                  onClick={() => createProduct.mutate({
+                    tenantId: TENANT_ID, dealId, productId: selectedProduct.id,
+                    quantity: addForm.quantity,
+                    unitPriceCents: addForm.unitPriceCents,
+                    discountCents: addForm.discountCents || undefined,
+                    supplier: addForm.supplier || undefined,
+                    notes: addForm.notes || undefined,
+                  })}
+                >
+                  {createProduct.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Plus className="h-4 w-4 mr-1" />}
+                  Adicionar ao Orçamento
+                </Button>
+              </>
+            ) : (
+              <Button variant="ghost" onClick={() => setShowAdd(false)}>Fechar</Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* DIALOG: Editar Item da Negociação */}
+      <Dialog open={!!editingItem} onOpenChange={(open) => { if (!open) setEditingItem(null); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader><DialogTitle>Editar Item: {editingItem?.name}</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-medium text-muted-foreground">Quantidade</label>
+                <Input type="number" min={1} value={editForm.quantity} onChange={(e) => setEditForm({ ...editForm, quantity: parseInt(e.target.value) || 1 })} />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground">Preço unitário (R$)</label>
+                <Input type="number" step="0.01" value={editForm.unitPriceCents / 100} onChange={(e) => setEditForm({ ...editForm, unitPriceCents: Math.round(parseFloat(e.target.value || "0") * 100) })} />
+              </div>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">Desconto (R$)</label>
+              <Input type="number" step="0.01" value={editForm.discountCents / 100} onChange={(e) => setEditForm({ ...editForm, discountCents: Math.round(parseFloat(e.target.value || "0") * 100) })} />
+            </div>
+            <Input placeholder="Fornecedor" value={editForm.supplier} onChange={(e) => setEditForm({ ...editForm, supplier: e.target.value })} />
+            <Textarea placeholder="Observações" value={editForm.notes} onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })} className="min-h-[50px]" />
+            <div className="flex items-center justify-between p-3 bg-primary/5 border border-primary/10 rounded-lg">
+              <span className="text-sm font-medium">Subtotal</span>
+              <span className="text-lg font-bold text-primary">{fmt$(editFinalPrice)}</span>
+            </div>
           </div>
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setShowAdd(false)}>Cancelar</Button>
+            <Button variant="ghost" onClick={() => setEditingItem(null)}>Cancelar</Button>
             <Button
-              disabled={!form.name.trim()}
-              onClick={() => createProduct.mutate({
-                tenantId: TENANT_ID, dealId, name: form.name, category: form.category as any,
-                quantity: form.quantity, unitPriceCents: form.unitPriceCents, supplier: form.supplier || undefined,
-                description: form.description || undefined,
+              disabled={updateProduct.isPending}
+              onClick={() => updateProduct.mutate({
+                tenantId: TENANT_ID, id: editingItem.id, dealId,
+                quantity: editForm.quantity, unitPriceCents: editForm.unitPriceCents,
+                discountCents: editForm.discountCents, supplier: editForm.supplier || undefined,
+                notes: editForm.notes || undefined,
               })}
             >
-              Adicionar
+              {updateProduct.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
+              Salvar Alterações
             </Button>
           </DialogFooter>
         </DialogContent>

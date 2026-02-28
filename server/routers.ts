@@ -2,6 +2,7 @@ import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
+import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { whatsappManager } from "./whatsapp";
 import {
@@ -98,7 +99,7 @@ import {
 } from "./leadProcessor";
 import { randomBytes } from "crypto";
 import { getDb } from "./db";
-import { trackingTokens, rdStationConfig, rdStationWebhookLog } from "../drizzle/schema";
+import { trackingTokens, rdStationConfig, rdStationWebhookLog, rdFieldMappings, customFields } from "../drizzle/schema";
 import { generateTrackerScript } from "./tracker-script";
 import { eq, and, desc, sql } from "drizzle-orm";
 
@@ -1167,6 +1168,111 @@ export const appRouter = router({
           if (row.status === "duplicate") result.duplicate = count;
         }
         return result;
+      }),
+  }),
+
+  // ── Field Mappings (RD Station ↔ Entur OS) ──
+  fieldMappings: router({
+    list: protectedProcedure
+      .input(z.object({ tenantId: z.number() }))
+      .query(async ({ input }) => {
+        const db = await getDb();
+        if (!db) return [];
+        const mappings = await db.select().from(rdFieldMappings)
+          .where(eq(rdFieldMappings.tenantId, input.tenantId))
+          .orderBy(rdFieldMappings.createdAt);
+        return mappings;
+      }),
+
+    create: protectedProcedure
+      .input(z.object({
+        tenantId: z.number(),
+        rdFieldKey: z.string().min(1),
+        rdFieldLabel: z.string().min(1),
+        enturFieldType: z.enum(["standard", "custom"]),
+        enturFieldKey: z.string().optional(),
+        enturCustomFieldId: z.number().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        const [result] = await db.insert(rdFieldMappings).values({
+          tenantId: input.tenantId,
+          rdFieldKey: input.rdFieldKey,
+          rdFieldLabel: input.rdFieldLabel,
+          enturFieldType: input.enturFieldType,
+          enturFieldKey: input.enturFieldKey || null,
+          enturCustomFieldId: input.enturCustomFieldId || null,
+        }).$returningId();
+        return { id: result!.id };
+      }),
+
+    update: protectedProcedure
+      .input(z.object({
+        id: z.number(),
+        tenantId: z.number(),
+        rdFieldKey: z.string().min(1).optional(),
+        rdFieldLabel: z.string().min(1).optional(),
+        enturFieldType: z.enum(["standard", "custom"]).optional(),
+        enturFieldKey: z.string().nullable().optional(),
+        enturCustomFieldId: z.number().nullable().optional(),
+        isActive: z.boolean().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        const { id, tenantId, ...updates } = input;
+        await db.update(rdFieldMappings).set(updates)
+          .where(and(eq(rdFieldMappings.id, id), eq(rdFieldMappings.tenantId, tenantId)));
+        return { success: true };
+      }),
+
+    delete: protectedProcedure
+      .input(z.object({ id: z.number(), tenantId: z.number() }))
+      .mutation(async ({ input }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        await db.delete(rdFieldMappings)
+          .where(and(eq(rdFieldMappings.id, input.id), eq(rdFieldMappings.tenantId, input.tenantId)));
+        return { success: true };
+      }),
+
+    // Lista campos padrão do Entur OS disponíveis para mapeamento
+    enturStandardFields: protectedProcedure
+      .query(async () => {
+        return [
+          { key: "contact.name", label: "Contato — Nome", entity: "contact" },
+          { key: "contact.email", label: "Contato — Email", entity: "contact" },
+          { key: "contact.phone", label: "Contato — Telefone", entity: "contact" },
+          { key: "account.name", label: "Empresa — Nome", entity: "account" },
+          { key: "deal.title", label: "Negociação — Título", entity: "deal" },
+          { key: "deal.valueCents", label: "Negociação — Valor", entity: "deal" },
+          { key: "deal.utmSource", label: "Negociação — UTM Source", entity: "deal" },
+          { key: "deal.utmMedium", label: "Negociação — UTM Medium", entity: "deal" },
+          { key: "deal.utmCampaign", label: "Negociação — UTM Campaign", entity: "deal" },
+          { key: "deal.utmTerm", label: "Negociação — UTM Term", entity: "deal" },
+          { key: "deal.utmContent", label: "Negociação — UTM Content", entity: "deal" },
+          { key: "deal.channelOrigin", label: "Negociação — Canal de Origem", entity: "deal" },
+          { key: "deal.leadSource", label: "Negociação — Fonte do Lead", entity: "deal" },
+        ];
+      }),
+
+    // Lista campos personalizados do Entur OS disponíveis para mapeamento
+    enturCustomFields: protectedProcedure
+      .input(z.object({ tenantId: z.number() }))
+      .query(async ({ input }) => {
+        const db = await getDb();
+        if (!db) return [];
+        const fields = await db.select().from(customFields)
+          .where(eq(customFields.tenantId, input.tenantId))
+          .orderBy(customFields.entity, customFields.sortOrder);
+        return fields.map(f => ({
+          id: f.id,
+          key: `custom.${f.name}`,
+          label: `${f.entity === "deal" ? "Negociação" : f.entity === "contact" ? "Contato" : "Empresa"} — ${f.label}`,
+          entity: f.entity,
+          fieldType: f.fieldType,
+        }));
       }),
   }),
 });

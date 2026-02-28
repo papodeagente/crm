@@ -211,7 +211,7 @@ describe("RD Station Webhook endpoint logic", () => {
     // The router should have a stack with routes
     const routes = (webhookRouter as any).stack || [];
     const rdRoute = routes.find((r: any) =>
-      r.route?.path === "/webhooks/rdstation"
+      r.route?.path === "/api/webhooks/rdstation"
     );
     expect(rdRoute).toBeDefined();
     expect(rdRoute.route.methods.post).toBe(true);
