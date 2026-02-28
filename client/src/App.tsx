@@ -40,6 +40,7 @@ const SourcesAndCampaigns = lazy(() => import("./pages/SourcesAndCampaigns"));
 const LossReasons = lazy(() => import("./pages/LossReasons"));
 const RDStationIntegration = lazy(() => import("./pages/RDStationIntegration"));
 const RDFieldMappings = lazy(() => import("./pages/RDFieldMappings"));
+const RDCrmImport = lazy(() => import("./pages/RDCrmImport"));
 
 function PageLoader() {
   return (
@@ -89,6 +90,7 @@ function Router() {
           <Route path="/settings/loss-reasons" component={LossReasons} />
           <Route path="/settings/rdstation" component={RDStationIntegration} />
           <Route path="/settings/rdstation/mappings" component={RDFieldMappings} />
+          <Route path="/settings/import-rd-crm" component={RDCrmImport} />
 
           {/* Notifications */}
           <Route path="/notifications" component={NotificationsPage} />

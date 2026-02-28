@@ -88,6 +88,7 @@ import { proposalRouter, portalRouter, managementRouter, insightsRouter, academy
 import { productCatalogRouter } from "./routers/productCatalogRouter";
 import { aiAnalysisRouter } from "./routers/aiAnalysisRouter";
 import { utmAnalyticsRouter } from "./routers/utmAnalyticsRouter";
+import { rdCrmImportRouter } from "./routers/rdCrmImportRouter";
 import {
   listLeadEvents,
   countLeadEvents,
@@ -663,6 +664,7 @@ export const appRouter = router({
   productCatalog: productCatalogRouter, // M9: Catálogo de Produtos Turísticos
   aiAnalysis: aiAnalysisRouter, // M10: Análise de Atendimento por IA
   utmAnalytics: utmAnalyticsRouter, // M11: Dashboard de Rastreamento UTM
+  rdCrmImport: rdCrmImportRouter, // M12: Importação do RD Station CRM
 
   // ─── Contact Profile & Custom Fields ───
   contactProfile: router({

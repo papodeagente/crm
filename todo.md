@@ -1419,3 +1419,21 @@
 
 - [x] Seletor de funil na ponta esquerda, botão Filtros na ponta direita (abaixo de Criar)
 - [x] Selects expandindo proporcionalmente para ocupar todo o espaço disponível
+
+## Integração Importar do RD Station CRM
+
+- [x] Pesquisar API do RD Station CRM (endpoints, autenticação, estrutura)
+- [x] Backend: procedure para validar token da API RD Station
+- [x] Backend: importar contatos do RD Station CRM
+- [x] Backend: importar empresas/organizações do RD Station CRM
+- [x] Backend: importar negociações (deals) do RD Station CRM
+- [x] Backend: importar etapas do pipeline do RD Station CRM
+- [x] Backend: importar produtos do RD Station CRM
+- [x] Backend: importar tarefas/atividades do RD Station CRM
+- [x] Backend: importar fontes de leads do RD Station CRM
+- [x] Backend: importar campanhas do RD Station CRM
+- [x] Backend: importar motivos de perda do RD Station CRM
+- [x] Frontend: página de configuração "Importar do RD Station CRM" com fluxo guiado (5 etapas)
+- [x] Frontend: item no menu Configurações com badge (novo)
+- [x] Frontend: progresso em tempo real da importação
+- [x] Testes unitários para a integração (18 testes, 539 total)

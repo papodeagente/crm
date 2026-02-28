@@ -5,7 +5,7 @@ import {
   GraduationCap, Plug, Shield, BookOpen,
   ChevronRight, Users, Tag, GitBranch,
   Megaphone, Target, XCircle, Package,
-  Sparkles, UserPlus, Layers,
+  Sparkles, UserPlus, Layers, Database,
 } from "lucide-react";
 
 /* ─── Suggestion Cards (top banners) ─── */
@@ -86,7 +86,8 @@ const settingsCategories: SettingsCategory[] = [
     title: "AVANÇADO",
     links: [
       { icon: Plug, label: "Integrações", path: "/integrations" },
-      { icon: Megaphone, label: "RD Station Marketing", path: "/settings/rdstation", badge: "Novo" },
+      { icon: Database, label: "Importar do RD Station CRM", path: "/settings/import-rd-crm", badge: "Novo" },
+      { icon: Megaphone, label: "RD Station Marketing", path: "/settings/rdstation" },
       { icon: FileText, label: "Propostas", path: "/proposals" },
       { icon: Globe, label: "Portal do Cliente", path: "/portal" },
       { icon: BookOpen, label: "Documentação API", path: "/api-docs" },
