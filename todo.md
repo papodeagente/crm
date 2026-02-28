@@ -1204,3 +1204,18 @@
 - [x] Registrar rota /settings/rdstation no App.tsx
 - [x] Adicionar link na página de Configurações (seção Avançado com badge "Novo")
 - [x] Testes unitários para o endpoint webhook e procedures (23 testes adicionais, 461 total passando)
+
+## Edição Completa na Página de Negociação
+
+- [x] Edição inline do nome da negociação (clique para editar)
+- [x] Edição de todos os campos da negociação (valor, previsão de fechamento, fonte) exceto data de criação
+- [x] Criar/adicionar novo contato diretamente da página de negociação
+- [x] Vincular contato existente à negociação
+- [x] Editar informações do contato vinculado (nome, telefone, email)
+- [x] Desvincular contato da negociação
+- [x] Criar/adicionar nova empresa diretamente da página de negociação
+- [x] Vincular empresa existente à negociação
+- [x] Editar nome da empresa vinculada
+- [x] Desvincular empresa da negociação
+- [x] Procedures tRPC para update de deal, contato e empresa (accounts.update adicionado)
+- [x] Componente EditableSidebarField reutilizável para edição inline

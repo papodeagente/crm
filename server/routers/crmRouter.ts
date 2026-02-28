@@ -114,6 +114,16 @@ export const crmRouter = router({
         await emitEvent({ tenantId: input.tenantId, actorUserId: ctx.user.id, entityType: "account", entityId: result?.id, action: "create" });
         return result;
       }),
+    update: protectedProcedure
+      .input(z.object({
+        tenantId: z.number(), id: z.number(), name: z.string().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const { tenantId, id, ...data } = input;
+        await crm.updateAccount(tenantId, id, { ...data, updatedBy: ctx.user.id });
+        await emitEvent({ tenantId, actorUserId: ctx.user.id, entityType: "account", entityId: id, action: "update" });
+        return { success: true };
+      }),
     search: protectedProcedure
       .input(z.object({ tenantId: z.number(), search: z.string() }))
       .query(async ({ input }) => {
@@ -271,12 +281,19 @@ export const crmRouter = router({
         contactId: z.number().nullable().optional(), accountId: z.number().nullable().optional(),
         stageId: z.number().optional(), status: z.enum(["open", "won", "lost"]).optional(),
         valueCents: z.number().optional(), probability: z.number().optional(), ownerUserId: z.number().optional(),
+        expectedCloseAt: z.string().nullable().optional(), channelOrigin: z.string().nullable().optional(),
+        leadSource: z.string().nullable().optional(),
       }))
       .mutation(async ({ ctx, input }) => {
         const { tenantId, id, ...data } = input;
         // Get current deal for history
         const currentDeal = await crm.getDealById(tenantId, id);
-        await crm.updateDeal(tenantId, id, { ...data, updatedBy: ctx.user.id } as any);
+        const { expectedCloseAt, ...restData } = data;
+        const updatePayload: any = { ...restData, updatedBy: ctx.user.id };
+        if (expectedCloseAt !== undefined) {
+          updatePayload.expectedCloseAt = expectedCloseAt ? new Date(expectedCloseAt) : null;
+        }
+        await crm.updateDeal(tenantId, id, updatePayload);
 
         // Log field changes in history
         if (currentDeal) {

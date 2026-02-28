@@ -107,6 +107,9 @@ export default function DealDetail() {
     { enabled: dealId > 0 }
   );
 
+  const leadSourcesQ = trpc.crm.leadSources.list.useQuery({ tenantId: TENANT_ID });
+  const campaignsQ = trpc.crm.campaigns.list.useQuery({ tenantId: TENANT_ID });
+
   /* ─── Mutations ─── */
   const moveStage = trpc.crm.deals.moveStage.useMutation({
     onSuccess: () => { dealQ.refetch(); historyQ.refetch(); toast.success("Etapa alterada"); },
@@ -115,6 +118,30 @@ export default function DealDetail() {
   const updateDeal = trpc.crm.deals.update.useMutation({
     onSuccess: () => { dealQ.refetch(); historyQ.refetch(); toast.success("Atualizado"); },
     onError: () => toast.error("Erro ao atualizar"),
+  });
+  const updateContact = trpc.crm.contacts.update.useMutation({
+    onSuccess: () => { contactQ.refetch(); toast.success("Contato atualizado"); },
+    onError: () => toast.error("Erro ao atualizar contato"),
+  });
+  const createContact = trpc.crm.contacts.create.useMutation({
+    onSuccess: (data) => {
+      if (data?.id) updateDeal.mutate({ tenantId: TENANT_ID, id: dealId, contactId: data.id });
+      contactsQ.refetch();
+      toast.success("Contato criado e vinculado");
+    },
+    onError: () => toast.error("Erro ao criar contato"),
+  });
+  const updateAccount = trpc.crm.accounts.update.useMutation({
+    onSuccess: () => { accountQ.refetch(); toast.success("Empresa atualizada"); },
+    onError: () => toast.error("Erro ao atualizar empresa"),
+  });
+  const createAccount = trpc.crm.accounts.create.useMutation({
+    onSuccess: (data) => {
+      if (data?.id) updateDeal.mutate({ tenantId: TENANT_ID, id: dealId, accountId: data.id });
+      accountsQ.refetch();
+      toast.success("Empresa criada e vinculada");
+    },
+    onError: () => toast.error("Erro ao criar empresa"),
   });
 
   const deal = dealQ.data;
@@ -134,6 +161,22 @@ export default function DealDetail() {
 
   /* ─── Content tabs ─── */
   const [activeTab, setActiveTab] = useState<"history" | "tasks" | "products" | "participants" | "whatsapp" | "ai-analysis">("history");
+
+  /* ─── Edit states ─── */
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [titleDraft, setTitleDraft] = useState("");
+  const [editingDealField, setEditingDealField] = useState<string | null>(null);
+  const [dealFieldDraft, setDealFieldDraft] = useState("");
+  const [showContactDialog, setShowContactDialog] = useState(false);
+  const [showAccountDialog, setShowAccountDialog] = useState(false);
+  const [showEditContactDialog, setShowEditContactDialog] = useState(false);
+  const [showEditAccountDialog, setShowEditAccountDialog] = useState(false);
+  const [contactDraft, setContactDraft] = useState({ name: "", phone: "", email: "" });
+  const [accountDraft, setAccountDraft] = useState({ name: "" });
+  const [contactMode, setContactMode] = useState<"create" | "link">("create");
+  const [accountMode, setAccountMode] = useState<"create" | "link">("create");
+  const [selectedContactId, setSelectedContactId] = useState<number | null>(null);
+  const [selectedAccountId, setSelectedAccountId] = useState<number | null>(null);
 
   /* ─── Status dialogs ─── */
   const [showWonDialog, setShowWonDialog] = useState(false);
@@ -207,7 +250,38 @@ export default function DealDetail() {
               <ArrowLeft className="h-4 w-4 text-muted-foreground" />
             </button>
             <div className="min-w-0">
-              <h1 className="text-lg font-semibold text-foreground truncate">{deal.title}</h1>
+              {editingTitle ? (
+                <div className="flex items-center gap-2">
+                  <Input
+                    value={titleDraft}
+                    onChange={(e) => setTitleDraft(e.target.value)}
+                    className="h-8 text-lg font-semibold w-64"
+                    autoFocus
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && titleDraft.trim()) {
+                        updateDeal.mutate({ tenantId: TENANT_ID, id: deal.id, title: titleDraft.trim() });
+                        setEditingTitle(false);
+                      }
+                      if (e.key === "Escape") setEditingTitle(false);
+                    }}
+                  />
+                  <button onClick={() => { if (titleDraft.trim()) { updateDeal.mutate({ tenantId: TENANT_ID, id: deal.id, title: titleDraft.trim() }); } setEditingTitle(false); }} className="p-1 hover:bg-muted/60 rounded">
+                    <Check className="h-4 w-4 text-primary" />
+                  </button>
+                  <button onClick={() => setEditingTitle(false)} className="p-1 hover:bg-muted/60 rounded">
+                    <X className="h-4 w-4 text-muted-foreground" />
+                  </button>
+                </div>
+              ) : (
+                <h1
+                  className="text-lg font-semibold text-foreground truncate cursor-pointer hover:text-primary transition-colors group/title flex items-center gap-1.5"
+                  onClick={() => { setTitleDraft(deal.title); setEditingTitle(true); }}
+                  title="Clique para editar o nome"
+                >
+                  {deal.title}
+                  <Edit2 className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover/title:opacity-100 transition-opacity" />
+                </h1>
+              )}
               <div className="flex items-center gap-2 mt-0.5">
                 {pipeline && (
                   <Badge variant="outline" className="text-[10px] font-medium uppercase tracking-wider">
@@ -311,13 +385,81 @@ export default function DealDetail() {
               onToggle={() => toggleSection("deal")}
             >
               <div className="space-y-3">
-                <SidebarField label="Nome" value={deal.title} />
-                <SidebarField label="Valor total" value={fmt$(deal.valueCents)} className="text-lg font-semibold" />
+                {/* Nome - editável */}
+                <EditableSidebarField
+                  label="Nome"
+                  value={deal.title}
+                  isEditing={editingDealField === "title"}
+                  onStartEdit={() => { setEditingDealField("title"); setDealFieldDraft(deal.title); }}
+                  draft={dealFieldDraft}
+                  onDraftChange={setDealFieldDraft}
+                  onSave={() => { if (dealFieldDraft.trim()) updateDeal.mutate({ tenantId: TENANT_ID, id: deal.id, title: dealFieldDraft.trim() }); setEditingDealField(null); }}
+                  onCancel={() => setEditingDealField(null)}
+                />
+                {/* Valor - editável */}
+                <EditableSidebarField
+                  label="Valor total"
+                  value={fmt$(deal.valueCents)}
+                  className="text-lg font-semibold"
+                  isEditing={editingDealField === "value"}
+                  onStartEdit={() => { setEditingDealField("value"); setDealFieldDraft(String((deal.valueCents || 0) / 100)); }}
+                  draft={dealFieldDraft}
+                  onDraftChange={setDealFieldDraft}
+                  onSave={() => { updateDeal.mutate({ tenantId: TENANT_ID, id: deal.id, valueCents: Math.round(parseFloat(dealFieldDraft || "0") * 100) }); setEditingDealField(null); }}
+                  onCancel={() => setEditingDealField(null)}
+                  inputType="number"
+                  inputPrefix="R$"
+                />
+                {/* Criada em - não editável */}
                 <SidebarField label="Criada em" value={fmtDateTime(deal.createdAt)} />
-                {deal.expectedCloseAt && (
-                  <SidebarField label="Previsão de fech." value={fmtDate(deal.expectedCloseAt)} />
-                )}
-                <SidebarField label="Fonte" value={deal.channelOrigin || "—"} />
+                {/* Previsão de fechamento - editável */}
+                <EditableSidebarField
+                  label="Previsão de fech."
+                  value={deal.expectedCloseAt ? fmtDate(deal.expectedCloseAt) : "—"}
+                  isEditing={editingDealField === "expectedClose"}
+                  onStartEdit={() => { setEditingDealField("expectedClose"); setDealFieldDraft(deal.expectedCloseAt ? new Date(deal.expectedCloseAt).toISOString().split("T")[0] : ""); }}
+                  draft={dealFieldDraft}
+                  onDraftChange={setDealFieldDraft}
+                  onSave={() => { updateDeal.mutate({ tenantId: TENANT_ID, id: deal.id, expectedCloseAt: dealFieldDraft || null }); setEditingDealField(null); }}
+                  onCancel={() => setEditingDealField(null)}
+                  inputType="date"
+                />
+                {/* Fonte - editável com select */}
+                <div className="flex items-baseline justify-between gap-3 group">
+                  <span className="text-xs text-muted-foreground shrink-0">Fonte</span>
+                  {editingDealField === "source" ? (
+                    <div className="flex items-center gap-1">
+                      <Select
+                        value={dealFieldDraft || "none"}
+                        onValueChange={(v) => {
+                          const val = v === "none" ? null : v;
+                          updateDeal.mutate({ tenantId: TENANT_ID, id: deal.id, channelOrigin: val });
+                          setEditingDealField(null);
+                        }}
+                      >
+                        <SelectTrigger className="h-7 text-xs w-32">
+                          <SelectValue placeholder="Selecione" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">Nenhuma</SelectItem>
+                          {(leadSourcesQ.data || []).filter((s: any) => s.isActive).map((s: any) => (
+                            <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <button onClick={() => setEditingDealField(null)} className="p-0.5"><X className="h-3 w-3 text-muted-foreground" /></button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => { setEditingDealField("source"); setDealFieldDraft(deal.channelOrigin || ""); }}
+                      className="text-sm text-foreground text-right truncate hover:text-primary transition-colors flex items-center gap-1 group-hover:text-primary"
+                    >
+                      {deal.channelOrigin || "—"}
+                      <Edit2 className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </button>
+                  )}
+                </div>
+                {/* Status - não editável (usa botões de venda/perda) */}
                 <SidebarField
                   label="Status"
                   value={deal.status === "open" ? "Aberta" : deal.status === "won" ? "Ganha" : "Perdida"}
@@ -339,10 +481,24 @@ export default function DealDetail() {
                     <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
                       <User className="h-4 w-4 text-primary" />
                     </div>
-                    <div className="min-w-0">
+                    <div className="min-w-0 flex-1">
                       <Link href={`/contact/${contact.id}`} className="text-sm font-medium text-primary hover:underline truncate block">
                         {contact.name}
                       </Link>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => { setShowEditContactDialog(true); setContactDraft({ name: contact.name, phone: contact.phone || "", email: contact.email || "" }); }}
+                        className="p-1 hover:bg-muted/60 rounded" title="Editar contato"
+                      >
+                        <Edit2 className="h-3.5 w-3.5 text-muted-foreground" />
+                      </button>
+                      <button
+                        onClick={() => { updateDeal.mutate({ tenantId: TENANT_ID, id: deal.id, contactId: null }); }}
+                        className="p-1 hover:bg-red-100 dark:hover:bg-red-500/10 rounded" title="Desvincular contato"
+                      >
+                        <X className="h-3.5 w-3.5 text-red-500" />
+                      </button>
                     </div>
                   </div>
                   {contact.phone && (
@@ -351,14 +507,16 @@ export default function DealDetail() {
                   {contact.email && (
                     <ContactInfoRow icon={Mail} value={contact.email} copyable />
                   )}
-                  <button className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors mt-1">
-                    <ChevronDown className="h-3 w-3" />
-                    Informações adicionais
-                  </button>
+                  {contact.lifecycleStage && (
+                    <div className="flex items-center gap-2">
+                      <Tag className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                      <span className="text-xs text-muted-foreground capitalize">{contact.lifecycleStage}</span>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <button
-                  onClick={() => toast.info("Associe um contato na edição da negociação")}
+                  onClick={() => { setShowContactDialog(true); setContactMode("create"); setContactDraft({ name: "", phone: "", email: "" }); setSelectedContactId(null); }}
                   className="flex items-center gap-1.5 text-sm text-primary hover:text-primary/80 transition-colors"
                 >
                   <Plus className="h-3.5 w-3.5" />
@@ -380,15 +538,29 @@ export default function DealDetail() {
                   <div className="w-8 h-8 rounded-lg bg-secondary flex items-center justify-center shrink-0">
                     <Building2 className="h-4 w-4 text-muted-foreground" />
                   </div>
-                  <p className="text-sm font-medium">{account.name}</p>
+                  <p className="text-sm font-medium flex-1">{account.name}</p>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => { setShowEditAccountDialog(true); setAccountDraft({ name: account.name }); }}
+                      className="p-1 hover:bg-muted/60 rounded" title="Editar empresa"
+                    >
+                      <Edit2 className="h-3.5 w-3.5 text-muted-foreground" />
+                    </button>
+                    <button
+                      onClick={() => { updateDeal.mutate({ tenantId: TENANT_ID, id: deal.id, accountId: null }); }}
+                      className="p-1 hover:bg-red-100 dark:hover:bg-red-500/10 rounded" title="Desvincular empresa"
+                    >
+                      <X className="h-3.5 w-3.5 text-red-500" />
+                    </button>
+                  </div>
                 </div>
               ) : (
                 <div>
                   <p className="text-xs text-muted-foreground mb-2">
-                    Não há empresa na negociação, clique no botão abaixo para associar uma empresa
+                    Não há empresa na negociação
                   </p>
                   <button
-                    onClick={() => toast.info("Associe uma empresa na edição da negociação")}
+                    onClick={() => { setShowAccountDialog(true); setAccountMode("create"); setAccountDraft({ name: "" }); setSelectedAccountId(null); }}
                     className="flex items-center gap-1.5 text-sm text-primary hover:text-primary/80 transition-colors"
                   >
                     <Plus className="h-3.5 w-3.5" />
@@ -582,6 +754,210 @@ export default function DealDetail() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* ═══ Dialog: Adicionar Contato ═══ */}
+      <Dialog open={showContactDialog} onOpenChange={setShowContactDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <User className="h-5 w-5 text-primary" />
+              Adicionar Contato
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="flex gap-2">
+              <Button
+                variant={contactMode === "create" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setContactMode("create")}
+              >Criar novo</Button>
+              <Button
+                variant={contactMode === "link" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setContactMode("link")}
+              >Vincular existente</Button>
+            </div>
+            {contactMode === "create" ? (
+              <div className="space-y-3">
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground">Nome *</label>
+                  <Input value={contactDraft.name} onChange={(e) => setContactDraft(d => ({ ...d, name: e.target.value }))} placeholder="Nome do contato" />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground">Telefone</label>
+                  <Input value={contactDraft.phone} onChange={(e) => setContactDraft(d => ({ ...d, phone: e.target.value }))} placeholder="+55 11 99999-9999" />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground">Email</label>
+                  <Input value={contactDraft.email} onChange={(e) => setContactDraft(d => ({ ...d, email: e.target.value }))} placeholder="email@exemplo.com" />
+                </div>
+              </div>
+            ) : (
+              <div>
+                <label className="text-xs font-medium text-muted-foreground">Selecione um contato</label>
+                <Select value={selectedContactId ? String(selectedContactId) : ""} onValueChange={(v) => setSelectedContactId(Number(v))}>
+                  <SelectTrigger><SelectValue placeholder="Buscar contato..." /></SelectTrigger>
+                  <SelectContent>
+                    {(contactsQ.data || []).map((c: any) => (
+                      <SelectItem key={c.id} value={String(c.id)}>{c.name}{c.phone ? ` — ${c.phone}` : ""}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setShowContactDialog(false)}>Cancelar</Button>
+            <Button
+              onClick={() => {
+                if (contactMode === "create") {
+                  if (!contactDraft.name.trim()) { toast.error("Nome é obrigatório"); return; }
+                  createContact.mutate({ tenantId: TENANT_ID, name: contactDraft.name.trim(), phone: contactDraft.phone || undefined, email: contactDraft.email || undefined });
+                } else {
+                  if (!selectedContactId) { toast.error("Selecione um contato"); return; }
+                  updateDeal.mutate({ tenantId: TENANT_ID, id: dealId, contactId: selectedContactId });
+                }
+                setShowContactDialog(false);
+              }}
+              disabled={createContact.isPending}
+            >
+              {contactMode === "create" ? "Criar e vincular" : "Vincular"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ═══ Dialog: Editar Contato ═══ */}
+      <Dialog open={showEditContactDialog} onOpenChange={setShowEditContactDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Edit2 className="h-5 w-5 text-primary" />
+              Editar Contato
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">Nome *</label>
+              <Input value={contactDraft.name} onChange={(e) => setContactDraft(d => ({ ...d, name: e.target.value }))} />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">Telefone</label>
+              <Input value={contactDraft.phone} onChange={(e) => setContactDraft(d => ({ ...d, phone: e.target.value }))} />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">Email</label>
+              <Input value={contactDraft.email} onChange={(e) => setContactDraft(d => ({ ...d, email: e.target.value }))} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setShowEditContactDialog(false)}>Cancelar</Button>
+            <Button
+              onClick={() => {
+                if (!contactDraft.name.trim()) { toast.error("Nome é obrigatório"); return; }
+                const cId = deal?.contactId;
+                if (cId) updateContact.mutate({ tenantId: TENANT_ID, id: cId, name: contactDraft.name.trim(), phone: contactDraft.phone || undefined, email: contactDraft.email || undefined });
+                setShowEditContactDialog(false);
+              }}
+              disabled={updateContact.isPending}
+            >
+              Salvar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ═══ Dialog: Adicionar Empresa ═══ */}
+      <Dialog open={showAccountDialog} onOpenChange={setShowAccountDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Building2 className="h-5 w-5 text-primary" />
+              Adicionar Empresa
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="flex gap-2">
+              <Button
+                variant={accountMode === "create" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setAccountMode("create")}
+              >Criar nova</Button>
+              <Button
+                variant={accountMode === "link" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setAccountMode("link")}
+              >Vincular existente</Button>
+            </div>
+            {accountMode === "create" ? (
+              <div>
+                <label className="text-xs font-medium text-muted-foreground">Nome da empresa *</label>
+                <Input value={accountDraft.name} onChange={(e) => setAccountDraft({ name: e.target.value })} placeholder="Nome da empresa" />
+              </div>
+            ) : (
+              <div>
+                <label className="text-xs font-medium text-muted-foreground">Selecione uma empresa</label>
+                <Select value={selectedAccountId ? String(selectedAccountId) : ""} onValueChange={(v) => setSelectedAccountId(Number(v))}>
+                  <SelectTrigger><SelectValue placeholder="Buscar empresa..." /></SelectTrigger>
+                  <SelectContent>
+                    {(accountsQ.data || []).map((a: any) => (
+                      <SelectItem key={a.id} value={String(a.id)}>{a.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setShowAccountDialog(false)}>Cancelar</Button>
+            <Button
+              onClick={() => {
+                if (accountMode === "create") {
+                  if (!accountDraft.name.trim()) { toast.error("Nome é obrigatório"); return; }
+                  createAccount.mutate({ tenantId: TENANT_ID, name: accountDraft.name.trim() });
+                } else {
+                  if (!selectedAccountId) { toast.error("Selecione uma empresa"); return; }
+                  updateDeal.mutate({ tenantId: TENANT_ID, id: dealId, accountId: selectedAccountId });
+                }
+                setShowAccountDialog(false);
+              }}
+              disabled={createAccount.isPending}
+            >
+              {accountMode === "create" ? "Criar e vincular" : "Vincular"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ═══ Dialog: Editar Empresa ═══ */}
+      <Dialog open={showEditAccountDialog} onOpenChange={setShowEditAccountDialog}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Edit2 className="h-5 w-5 text-primary" />
+              Editar Empresa
+            </DialogTitle>
+          </DialogHeader>
+          <div>
+            <label className="text-xs font-medium text-muted-foreground">Nome da empresa *</label>
+            <Input value={accountDraft.name} onChange={(e) => setAccountDraft({ name: e.target.value })} />
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setShowEditAccountDialog(false)}>Cancelar</Button>
+            <Button
+              onClick={() => {
+                if (!accountDraft.name.trim()) { toast.error("Nome é obrigatório"); return; }
+                const aId = deal?.accountId;
+                if (aId) updateAccount.mutate({ tenantId: TENANT_ID, id: aId, name: accountDraft.name.trim() });
+                setShowEditAccountDialog(false);
+              }}
+              disabled={updateAccount.isPending}
+            >
+              Salvar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -620,6 +996,45 @@ function SidebarField({ label, value, className }: { label: string; value: strin
     <div className="flex items-baseline justify-between gap-3">
       <span className="text-xs text-muted-foreground shrink-0">{label}</span>
       <span className={`text-sm text-foreground text-right truncate ${className || ""}`}>{value}</span>
+    </div>
+  );
+}
+
+function EditableSidebarField({ label, value, className, isEditing, onStartEdit, draft, onDraftChange, onSave, onCancel, inputType, inputPrefix }: {
+  label: string; value: string; className?: string; isEditing: boolean;
+  onStartEdit: () => void; draft: string; onDraftChange: (v: string) => void;
+  onSave: () => void; onCancel: () => void;
+  inputType?: "text" | "number" | "date"; inputPrefix?: string;
+}) {
+  return (
+    <div className="flex items-baseline justify-between gap-3 group">
+      <span className="text-xs text-muted-foreground shrink-0">{label}</span>
+      {isEditing ? (
+        <div className="flex items-center gap-1">
+          {inputPrefix && <span className="text-xs text-muted-foreground">{inputPrefix}</span>}
+          <Input
+            type={inputType || "text"}
+            value={draft}
+            onChange={(e) => onDraftChange(e.target.value)}
+            className="h-7 text-xs w-32"
+            autoFocus
+            onKeyDown={(e) => {
+              if (e.key === "Enter") onSave();
+              if (e.key === "Escape") onCancel();
+            }}
+          />
+          <button onClick={onSave} className="p-0.5 hover:bg-muted/60 rounded"><Check className="h-3 w-3 text-primary" /></button>
+          <button onClick={onCancel} className="p-0.5 hover:bg-muted/60 rounded"><X className="h-3 w-3 text-muted-foreground" /></button>
+        </div>
+      ) : (
+        <button
+          onClick={onStartEdit}
+          className={`text-sm text-foreground text-right truncate hover:text-primary transition-colors flex items-center gap-1 group-hover:text-primary ${className || ""}`}
+        >
+          {value}
+          <Edit2 className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+        </button>
+      )}
     </div>
   );
 }

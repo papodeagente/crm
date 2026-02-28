@@ -247,7 +247,7 @@ export async function listDeletedDeals(tenantId: number, limit = 50) {
   const db = await getDb(); if (!db) return [];
   return db.select().from(deals).where(and(eq(deals.tenantId, tenantId), isNotNull(deals.deletedAt))).orderBy(desc(deals.deletedAt)).limit(limit);
 }
-export async function updateDeal(tenantId: number, id: number, data: Partial<{ title: string; stageId: number; status: "open" | "won" | "lost"; valueCents: number; probability: number; ownerUserId: number; updatedBy: number }>) {
+export async function updateDeal(tenantId: number, id: number, data: Partial<{ title: string; stageId: number; status: "open" | "won" | "lost"; valueCents: number; probability: number; ownerUserId: number; updatedBy: number; contactId: number | null; accountId: number | null; expectedCloseAt: Date | null; channelOrigin: string | null; leadSource: string | null }>) {
   const db = await getDb(); if (!db) return;
   await db.update(deals).set({ ...data, lastActivityAt: new Date() }).where(and(eq(deals.id, id), eq(deals.tenantId, tenantId)));
 }
@@ -282,6 +282,10 @@ export async function createAccount(data: { tenantId: number; name: string; prim
   const db = await getDb(); if (!db) return null;
   const [result] = await db.insert(accounts).values(data).$returningId();
   return result;
+}
+export async function updateAccount(tenantId: number, id: number, data: Partial<{ name: string; primaryContactId: number; ownerUserId: number; updatedBy: number }>) {
+  const db = await getDb(); if (!db) return;
+  await db.update(accounts).set(data).where(and(eq(accounts.id, id), eq(accounts.tenantId, tenantId)));
 }
 export async function searchAccounts(tenantId: number, search: string) {
   const db = await getDb(); if (!db) return [];
