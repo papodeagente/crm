@@ -1159,3 +1159,14 @@
 
 - [x] Investigar por que o tracker inline não envia dados ao /api/collect quando formulário Elementor é submetido (causa: WP Rocket muda type para rocketlazyloadscript, impedindo execução)
 - [x] Corrigir: snippet agora usa bootstrap via document.createElement que contorna WP Rocket/LiteSpeed/Autoptimize
+
+## Reformular Formulário Criar Negociação (com Empresa e Contato inline)
+
+- [x] Criar tabela companies (empresas) se não existir no schema (tabela accounts já existia)
+- [x] Criar procedures tRPC para CRUD de empresas (accounts.create, accounts.search)
+- [x] Adicionar campo accountId ao deal (relacionamento deal → empresa) + leadSource, channelOrigin
+- [x] Reformular formulário "Criar Negociação" com seções: Dados da Negociação, Informações da Empresa, Informações do Contato, Campos Personalizados
+- [x] Seção Empresa: select de empresas existentes + botão "+ Adicionar empresa" com formulário inline
+- [x] Seção Contato: select de contatos existentes + botão "+ Adicionar contato" com formulário inline
+- [x] Adicionar campos Fonte e Campanha ao formulário de criação
+- [x] Testes unitários para os novos procedures e formulário (403 testes passando)

@@ -526,7 +526,7 @@ export default function Pipeline() {
       </AlertDialog>
 
       {/* Dialogs */}
-      <CreateDealDialog open={showCreateDeal} onOpenChange={setShowCreateDeal} pipelineId={activePipeline?.id} stages={stages.data || []} contacts={contacts.data || []} />
+      <CreateDealDialog open={showCreateDeal} onOpenChange={setShowCreateDeal} pipelineId={activePipeline?.id} stages={stages.data || []} contacts={contacts.data || []} accounts={allAccounts.data || []} pipelines={pipelines.data?.filter((p: any) => !p.isArchived) || []} />
       {showCreateTask !== null && <CreateTaskDialog open={true} onOpenChange={() => setShowCreateTask(null)} dealId={showCreateTask} />}
     </div>
   );
@@ -1088,105 +1088,355 @@ function AddParticipantForm({ contacts, existingIds, onAdd }: { contacts: any[];
 }
 
 /* ─── Create Deal Dialog ─── */
-function CreateDealDialog({ open, onOpenChange, pipelineId, stages, contacts }: {
-  open: boolean; onOpenChange: (open: boolean) => void; pipelineId?: number; stages: any[]; contacts: any[];
+const LEAD_SOURCES = [
+  { value: "indicacao", label: "Indicação" },
+  { value: "google", label: "Google" },
+  { value: "instagram", label: "Instagram" },
+  { value: "facebook", label: "Facebook" },
+  { value: "whatsapp", label: "WhatsApp" },
+  { value: "wordpress", label: "Website" },
+  { value: "tracking_script", label: "Tracking Script" },
+  { value: "meta_ads", label: "Meta Ads" },
+  { value: "email_marketing", label: "E-mail Marketing" },
+  { value: "telefone", label: "Telefone" },
+  { value: "evento", label: "Evento" },
+  { value: "outro", label: "Outro" },
+];
+
+function CreateDealDialog({ open, onOpenChange, pipelineId, stages, contacts, accounts, pipelines }: {
+  open: boolean; onOpenChange: (open: boolean) => void; pipelineId?: number; stages: any[]; contacts: any[]; accounts: any[]; pipelines: any[];
 }) {
+  // Deal fields
   const [title, setTitle] = useState("");
-  const [contactId, setContactId] = useState<string>("");
+  const [selectedPipeline, setSelectedPipeline] = useState<string>(String(pipelineId || ""));
   const [stageId, setStageId] = useState<string>("");
   const [valueCents, setValueCents] = useState("");
-  const [destination, setDestination] = useState("");
-  const [travelDates, setTravelDates] = useState("");
-  const [passengers, setPassengers] = useState("");
+  const [leadSource, setLeadSource] = useState<string>("");
+  const [campaign, setCampaign] = useState("");
+
+  // Account (empresa) fields
+  const [accountId, setAccountId] = useState<string>("");
+  const [showNewAccount, setShowNewAccount] = useState(false);
+  const [newAccountName, setNewAccountName] = useState("");
+
+  // Contact fields
+  const [contactId, setContactId] = useState<string>("");
+  const [showNewContact, setShowNewContact] = useState(false);
+  const [newContactName, setNewContactName] = useState("");
+  const [newContactEmail, setNewContactEmail] = useState("");
+  const [newContactPhone, setNewContactPhone] = useState("");
+
+  // Custom fields
+  const [showCustomFields, setShowCustomFields] = useState(false);
+  const [customFieldValues, setCustomFieldValues] = useState<Record<number, string>>({});
 
   const utils = trpc.useUtils();
+
+  // Load custom fields for deals
+  const dealCustomFields = trpc.customFields.list.useQuery({ tenantId: TENANT_ID, entity: "deal" });
+  const visibleFields = (dealCustomFields.data || []).filter((f: any) => f.isVisibleOnForm);
+
+  // Load stages for selected pipeline
+  const pipelineStagesQuery = trpc.crm.pipelines.stages.useQuery(
+    { tenantId: TENANT_ID, pipelineId: Number(selectedPipeline) },
+    { enabled: !!selectedPipeline }
+  );
+  const currentStages = selectedPipeline && Number(selectedPipeline) !== pipelineId
+    ? (pipelineStagesQuery.data || [])
+    : stages;
+
   const createDeal = trpc.crm.deals.create.useMutation({
-    onSuccess: () => { utils.crm.deals.list.invalidate(); onOpenChange(false); resetForm(); toast.success("Negociação criada com sucesso!"); },
+    onSuccess: () => { utils.crm.deals.list.invalidate(); utils.crm.contacts.list.invalidate(); utils.crm.accounts.list.invalidate(); onOpenChange(false); resetForm(); toast.success("Negociação criada com sucesso!"); },
     onError: (err) => toast.error("Erro ao criar: " + err.message),
   });
+  const createContact = trpc.crm.contacts.create.useMutation();
+  const createAccount = trpc.crm.accounts.create.useMutation();
+  const setFieldValues = trpc.contactProfile.setCustomFieldValues.useMutation();
 
-  function resetForm() { setTitle(""); setContactId(""); setStageId(""); setValueCents(""); setDestination(""); setTravelDates(""); setPassengers(""); }
-
-  function handleSubmit() {
-    if (!title || !stageId || !pipelineId) { toast.error("Preencha os campos obrigatórios."); return; }
-    const fullTitle = destination ? `${title} \u2013 ${destination}` : title;
-    const value = valueCents ? Math.round(parseFloat(valueCents.replace(/[^\d,]/g, "").replace(",", ".")) * 100) : undefined;
-    createDeal.mutate({ tenantId: TENANT_ID, title: fullTitle, pipelineId, stageId: Number(stageId), contactId: contactId ? Number(contactId) : undefined, valueCents: value });
+  function resetForm() {
+    setTitle(""); setStageId(""); setValueCents(""); setLeadSource(""); setCampaign("");
+    setAccountId(""); setShowNewAccount(false); setNewAccountName("");
+    setContactId(""); setShowNewContact(false); setNewContactName(""); setNewContactEmail(""); setNewContactPhone("");
+    setShowCustomFields(false); setCustomFieldValues({});
+    setSelectedPipeline(String(pipelineId || ""));
   }
+
+  async function handleSubmit() {
+    if (!title) { toast.error("Informe o título da negociação."); return; }
+    if (!selectedPipeline) { toast.error("Selecione o funil de vendas."); return; }
+    if (!stageId) { toast.error("Selecione a etapa do funil."); return; }
+
+    try {
+      // 1. Create account if needed
+      let finalAccountId = accountId ? Number(accountId) : undefined;
+      if (showNewAccount && newAccountName.trim()) {
+        const acc = await createAccount.mutateAsync({ tenantId: TENANT_ID, name: newAccountName.trim() });
+        if (acc?.id) finalAccountId = acc.id;
+      }
+
+      // 2. Create contact if needed
+      let finalContactId = contactId ? Number(contactId) : undefined;
+      if (showNewContact && newContactName.trim()) {
+        const ct = await createContact.mutateAsync({
+          tenantId: TENANT_ID, name: newContactName.trim(),
+          email: newContactEmail.trim() || undefined,
+          phone: newContactPhone.trim() || undefined,
+        });
+        if (ct?.id) finalContactId = ct.id;
+      }
+
+      // 3. Create deal
+      const value = valueCents ? Math.round(parseFloat(valueCents.replace(/[^\d,]/g, "").replace(",", ".")) * 100) : undefined;
+      const deal = await createDeal.mutateAsync({
+        tenantId: TENANT_ID,
+        title,
+        pipelineId: Number(selectedPipeline),
+        stageId: Number(stageId),
+        contactId: finalContactId,
+        accountId: finalAccountId,
+        valueCents: value,
+        leadSource: leadSource || undefined,
+        channelOrigin: campaign || undefined,
+      });
+
+      // 4. Set custom field values if any
+      const cfEntries = Object.entries(customFieldValues).filter(([, v]) => v.trim());
+      if (deal?.id && cfEntries.length > 0) {
+        await setFieldValues.mutateAsync({
+          tenantId: TENANT_ID,
+          entityType: "deal",
+          entityId: deal.id,
+          values: cfEntries.map(([fid, val]) => ({ fieldId: Number(fid), value: val })),
+        });
+      }
+    } catch {
+      // errors handled by mutation onError
+    }
+  }
+
+  const isSubmitting = createDeal.isPending || createContact.isPending || createAccount.isPending;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[540px] rounded-2xl">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-[580px] max-h-[90vh] rounded-2xl p-0">
+        <DialogHeader className="px-6 pt-6 pb-0">
           <DialogTitle className="flex items-center gap-2.5 text-lg">
             <div className="h-9 w-9 rounded-xl bg-primary/10 flex items-center justify-center">
-              <Plane className="h-4.5 w-4.5 text-primary" />
+              <Plus className="h-4.5 w-4.5 text-primary" />
             </div>
-            Nova Negociação
+            Criar Negociação
           </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-5 pt-3">
-          <div>
-            <Label className="text-[12px] font-medium">Título da negociação *</Label>
-            <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Ex: Pacote Cancún \u2013 Família Silva" className="mt-1.5 h-10 rounded-xl" />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
+        <ScrollArea className="max-h-[calc(90vh-120px)] px-6 pb-6">
+          <div className="space-y-5 pt-4">
+            {/* ─── DADOS DA NEGOCIAÇÃO ─── */}
             <div>
-              <Label className="text-[12px] font-medium">Contato</Label>
-              <Select value={contactId} onValueChange={setContactId}>
-                <SelectTrigger className="mt-1.5 h-10 rounded-xl"><SelectValue placeholder="Selecionar..." /></SelectTrigger>
-                <SelectContent className="rounded-xl">
-                  {contacts.map((c: any) => <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
+              <Label className="text-[12px] font-semibold">Nome da negociação <span className="text-destructive">*</span></Label>
+              <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Digite o nome da negociação" className="mt-1.5 h-10 rounded-xl" />
             </div>
-            <div>
-              <Label className="text-[12px] font-medium">Etapa do funil *</Label>
-              <Select value={stageId} onValueChange={setStageId}>
-                <SelectTrigger className="mt-1.5 h-10 rounded-xl"><SelectValue placeholder="Selecionar..." /></SelectTrigger>
-                <SelectContent className="rounded-xl">
-                  {stages.map((s: any) => <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
 
-          <div className="border border-border/40 rounded-xl p-4 bg-muted/20 space-y-4">
-            <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-[0.1em] flex items-center gap-1.5">
-              <Plane className="h-3.5 w-3.5" /> Dados da Viagem
-            </p>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label className="text-[12px] font-medium">Destino</Label>
-                <Input value={destination} onChange={(e) => setDestination(e.target.value)} placeholder="Ex: Cancún, México" className="mt-1.5 h-10 rounded-xl" />
+                <Label className="text-[12px] font-semibold">Funil de vendas</Label>
+                <Select value={selectedPipeline} onValueChange={(v) => { setSelectedPipeline(v); setStageId(""); }}>
+                  <SelectTrigger className="mt-1.5 h-10 rounded-xl"><SelectValue placeholder="Selecionar" /></SelectTrigger>
+                  <SelectContent className="rounded-xl">
+                    {pipelines.map((p: any) => <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
               </div>
               <div>
-                <Label className="text-[12px] font-medium">Valor do pacote</Label>
-                <Input value={valueCents} onChange={(e) => setValueCents(e.target.value)} placeholder="Ex: 4.997,00" className="mt-1.5 h-10 rounded-xl" />
+                <Label className="text-[12px] font-semibold">Etapa do funil <span className="text-destructive">*</span></Label>
+                <Select value={stageId} onValueChange={setStageId}>
+                  <SelectTrigger className="mt-1.5 h-10 rounded-xl"><SelectValue placeholder="Selecionar" /></SelectTrigger>
+                  <SelectContent className="rounded-xl">
+                    {currentStages.map((s: any) => <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
+
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label className="text-[12px] font-medium">Datas de viagem</Label>
-                <Input value={travelDates} onChange={(e) => setTravelDates(e.target.value)} placeholder="Ex: 15/03 a 22/03/2026" className="mt-1.5 h-10 rounded-xl" />
+                <Label className="text-[12px] font-semibold">Fonte</Label>
+                <Select value={leadSource} onValueChange={setLeadSource}>
+                  <SelectTrigger className="mt-1.5 h-10 rounded-xl"><SelectValue placeholder="Selecionar" /></SelectTrigger>
+                  <SelectContent className="rounded-xl">
+                    {LEAD_SOURCES.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
               </div>
               <div>
-                <Label className="text-[12px] font-medium">Passageiros</Label>
-                <Input value={passengers} onChange={(e) => setPassengers(e.target.value)} placeholder="Ex: 2 adultos, 1 criança" className="mt-1.5 h-10 rounded-xl" />
+                <Label className="text-[12px] font-semibold">Campanha</Label>
+                <Input value={campaign} onChange={(e) => setCampaign(e.target.value)} placeholder="Ex: Black Friday 2026" className="mt-1.5 h-10 rounded-xl" />
               </div>
             </div>
-          </div>
 
-          <Button
-            className="w-full h-11 rounded-lg text-[14px] font-medium shadow-sm bg-primary hover:bg-primary/90 transition-colors text-primary-foreground"
-            onClick={handleSubmit}
-            disabled={createDeal.isPending}
-          >
-            {createDeal.isPending ? "Criando..." : "Criar Negociação"}
-          </Button>
-        </div>
+            <div>
+              <Label className="text-[12px] font-semibold">Valor</Label>
+              <Input value={valueCents} onChange={(e) => setValueCents(e.target.value)} placeholder="Ex: 4.997,00" className="mt-1.5 h-10 rounded-xl" />
+            </div>
+
+            {/* ─── INFORMAÇÕES DA EMPRESA ─── */}
+            <div className="border border-border/40 rounded-xl p-4 bg-muted/20 space-y-3">
+              <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-[0.1em] flex items-center gap-1.5">
+                <Building2 className="h-3.5 w-3.5" /> Informações da Empresa
+              </p>
+
+              {!showNewAccount ? (
+                <>
+                  <div>
+                    <Label className="text-[12px] font-medium">Empresa da negociação</Label>
+                    <Select value={accountId} onValueChange={setAccountId}>
+                      <SelectTrigger className="mt-1.5 h-10 rounded-xl"><SelectValue placeholder="Selecionar" /></SelectTrigger>
+                      <SelectContent className="rounded-xl">
+                        {accounts.map((a: any) => <SelectItem key={a.id} value={String(a.id)}>{a.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <button
+                    type="button"
+                    className="flex items-center gap-1.5 text-[13px] text-primary hover:text-primary/80 font-medium transition-colors"
+                    onClick={() => { setShowNewAccount(true); setAccountId(""); }}
+                  >
+                    <Plus className="h-3.5 w-3.5" /> Adicionar empresa
+                  </button>
+                </>
+              ) : (
+                <>
+                  <div>
+                    <Label className="text-[12px] font-medium">Nome da empresa</Label>
+                    <Input value={newAccountName} onChange={(e) => setNewAccountName(e.target.value)} placeholder="Nome da empresa" className="mt-1.5 h-10 rounded-xl" />
+                  </div>
+                  <button
+                    type="button"
+                    className="flex items-center gap-1.5 text-[13px] text-muted-foreground hover:text-foreground font-medium transition-colors"
+                    onClick={() => { setShowNewAccount(false); setNewAccountName(""); }}
+                  >
+                    <X className="h-3.5 w-3.5" /> Cancelar e selecionar existente
+                  </button>
+                </>
+              )}
+            </div>
+
+            {/* ─── INFORMAÇÕES DO CONTATO ─── */}
+            <div className="border border-border/40 rounded-xl p-4 bg-muted/20 space-y-3">
+              <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-[0.1em] flex items-center gap-1.5">
+                <User className="h-3.5 w-3.5" /> Informações do Contato
+              </p>
+
+              {!showNewContact ? (
+                <>
+                  <div>
+                    <Label className="text-[12px] font-medium">Contato</Label>
+                    <Select value={contactId} onValueChange={setContactId}>
+                      <SelectTrigger className="mt-1.5 h-10 rounded-xl"><SelectValue placeholder="Selecionar" /></SelectTrigger>
+                      <SelectContent className="rounded-xl">
+                        {contacts.map((c: any) => <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <button
+                    type="button"
+                    className="flex items-center gap-1.5 text-[13px] text-primary hover:text-primary/80 font-medium transition-colors"
+                    onClick={() => { setShowNewContact(true); setContactId(""); }}
+                  >
+                    <Plus className="h-3.5 w-3.5" /> Adicionar contato
+                  </button>
+                </>
+              ) : (
+                <>
+                  <div>
+                    <Label className="text-[12px] font-medium">Nome do contato <span className="text-destructive">*</span></Label>
+                    <Input value={newContactName} onChange={(e) => setNewContactName(e.target.value)} placeholder="Nome completo" className="mt-1.5 h-10 rounded-xl" />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label className="text-[12px] font-medium">E-mail</Label>
+                      <Input value={newContactEmail} onChange={(e) => setNewContactEmail(e.target.value)} placeholder="email@exemplo.com" type="email" className="mt-1.5 h-10 rounded-xl" />
+                    </div>
+                    <div>
+                      <Label className="text-[12px] font-medium">Telefone</Label>
+                      <Input value={newContactPhone} onChange={(e) => setNewContactPhone(e.target.value)} placeholder="(84) 99999-0000" type="tel" className="mt-1.5 h-10 rounded-xl" />
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className="flex items-center gap-1.5 text-[13px] text-muted-foreground hover:text-foreground font-medium transition-colors"
+                    onClick={() => { setShowNewContact(false); setNewContactName(""); setNewContactEmail(""); setNewContactPhone(""); }}
+                  >
+                    <X className="h-3.5 w-3.5" /> Cancelar e selecionar existente
+                  </button>
+                </>
+              )}
+            </div>
+
+            {/* ─── CAMPOS PERSONALIZADOS ─── */}
+            {visibleFields.length > 0 && (
+              <div className="border border-border/40 rounded-xl p-4 bg-muted/20 space-y-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-[0.1em] flex items-center gap-1.5">
+                    <RefreshCw className="h-3.5 w-3.5" /> Campos Personalizados
+                  </p>
+                  <button
+                    type="button"
+                    className="text-[12px] text-primary hover:text-primary/80 font-medium"
+                    onClick={() => setShowCustomFields(!showCustomFields)}
+                  >
+                    {showCustomFields ? "Ocultar" : "Mostrar"}
+                  </button>
+                </div>
+                {showCustomFields && visibleFields.map((field: any) => (
+                  <div key={field.id}>
+                    <Label className="text-[12px] font-medium">
+                      {field.label} {field.isRequired && <span className="text-destructive">*</span>}
+                    </Label>
+                    {field.fieldType === "select" ? (
+                      <Select value={customFieldValues[field.id] || ""} onValueChange={(v) => setCustomFieldValues(prev => ({ ...prev, [field.id]: v }))}>
+                        <SelectTrigger className="mt-1.5 h-10 rounded-xl"><SelectValue placeholder={field.placeholder || "Selecionar"} /></SelectTrigger>
+                        <SelectContent className="rounded-xl">
+                          {(field.optionsJson || []).map((opt: string) => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    ) : field.fieldType === "textarea" ? (
+                      <textarea
+                        value={customFieldValues[field.id] || ""}
+                        onChange={(e) => setCustomFieldValues(prev => ({ ...prev, [field.id]: e.target.value }))}
+                        placeholder={field.placeholder || ""}
+                        className="mt-1.5 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm min-h-[80px] resize-y"
+                      />
+                    ) : field.fieldType === "checkbox" ? (
+                      <div className="mt-1.5 flex items-center gap-2">
+                        <Checkbox
+                          checked={customFieldValues[field.id] === "true"}
+                          onCheckedChange={(checked) => setCustomFieldValues(prev => ({ ...prev, [field.id]: String(!!checked) }))}
+                        />
+                        <span className="text-sm">{field.placeholder || "Sim"}</span>
+                      </div>
+                    ) : (
+                      <Input
+                        value={customFieldValues[field.id] || ""}
+                        onChange={(e) => setCustomFieldValues(prev => ({ ...prev, [field.id]: e.target.value }))}
+                        placeholder={field.placeholder || ""}
+                        type={field.fieldType === "number" || field.fieldType === "currency" ? "number" : field.fieldType === "date" ? "date" : field.fieldType === "email" ? "email" : field.fieldType === "url" ? "url" : "text"}
+                        className="mt-1.5 h-10 rounded-xl"
+                      />
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <Button
+              className="w-full h-11 rounded-lg text-[14px] font-medium shadow-sm bg-primary hover:bg-primary/90 transition-colors text-primary-foreground"
+              onClick={handleSubmit}
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? "Criando..." : "Criar Negociação"}
+            </Button>
+          </div>
+        </ScrollArea>
       </DialogContent>
     </Dialog>
   );

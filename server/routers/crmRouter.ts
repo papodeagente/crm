@@ -104,6 +104,21 @@ export const crmRouter = router({
       .query(async ({ input }) => {
         return crm.getAccountById(input.tenantId, input.id);
       }),
+    create: protectedProcedure
+      .input(z.object({
+        tenantId: z.number(), name: z.string().min(1),
+        primaryContactId: z.number().optional(), ownerUserId: z.number().optional(), teamId: z.number().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const result = await crm.createAccount({ ...input, createdBy: ctx.user.id });
+        await emitEvent({ tenantId: input.tenantId, actorUserId: ctx.user.id, entityType: "account", entityId: result?.id, action: "create" });
+        return result;
+      }),
+    search: protectedProcedure
+      .input(z.object({ tenantId: z.number(), search: z.string() }))
+      .query(async ({ input }) => {
+        return crm.searchAccounts(input.tenantId, input.search);
+      }),
   }),
 
   // ─── PIPELINES & STAGES ───
@@ -223,6 +238,7 @@ export const crmRouter = router({
         accountId: z.number().optional(),
         pipelineId: z.number(), stageId: z.number(), valueCents: z.number().optional(),
         ownerUserId: z.number().optional(), teamId: z.number().optional(),
+        leadSource: z.string().optional(), channelOrigin: z.string().optional(),
       }))
       .mutation(async ({ ctx, input }) => {
         const result = await crm.createDeal({ ...input, createdBy: ctx.user.id });

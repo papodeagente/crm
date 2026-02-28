@@ -206,7 +206,7 @@ export async function listStages(tenantId: number, pipelineId: number) {
 // ═══════════════════════════════════════
 // DEALS
 // ═══════════════════════════════════════
-export async function createDeal(data: { tenantId: number; title: string; contactId?: number; pipelineId: number; stageId: number; valueCents?: number; ownerUserId?: number; teamId?: number; createdBy?: number }) {
+export async function createDeal(data: { tenantId: number; title: string; contactId?: number; accountId?: number; pipelineId: number; stageId: number; valueCents?: number; ownerUserId?: number; teamId?: number; createdBy?: number; leadSource?: string; channelOrigin?: string }) {
   const db = await getDb(); if (!db) return null;
   const [result] = await db.insert(deals).values(data).$returningId();
   return result;
@@ -276,6 +276,15 @@ export async function getAccountById(tenantId: number, id: number) {
   const db = await getDb(); if (!db) return null;
   const rows = await db.select().from(accounts).where(and(eq(accounts.id, id), eq(accounts.tenantId, tenantId))).limit(1);
   return rows[0] || null;
+}
+export async function createAccount(data: { tenantId: number; name: string; primaryContactId?: number; ownerUserId?: number; teamId?: number; createdBy?: number }) {
+  const db = await getDb(); if (!db) return null;
+  const [result] = await db.insert(accounts).values(data).$returningId();
+  return result;
+}
+export async function searchAccounts(tenantId: number, search: string) {
+  const db = await getDb(); if (!db) return [];
+  return db.select().from(accounts).where(and(eq(accounts.tenantId, tenantId), like(accounts.name, `%${search}%`))).orderBy(accounts.name).limit(20);
 }
 
 // ═══════════════════════════════════════
