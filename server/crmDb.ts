@@ -239,6 +239,7 @@ export async function listDeals(tenantId: number, opts?: {
   noTasks?: boolean;
   cooling?: boolean; // no activity in last 7 days
   coolingDays?: number;
+  ownerUserId?: number;
 }) {
   const db = await getDb(); if (!db) return [];
   const conditions: any[] = [eq(deals.tenantId, tenantId)];
@@ -275,6 +276,8 @@ export async function listDeals(tenantId: number, opts?: {
   if (opts?.noTasks) {
     conditions.push(sql`${deals.id} NOT IN (SELECT entityId FROM crm_tasks WHERE entityType = 'deal' AND tenantId = ${tenantId} AND status IN ('pending','in_progress'))`);
   }
+  // Owner user filter
+  if (opts?.ownerUserId) conditions.push(eq(deals.ownerUserId, opts.ownerUserId));
   // Cooling filter — no activity in last N days
   if (opts?.cooling) {
     const days = opts.coolingDays || 7;

@@ -16,7 +16,12 @@ import {
   RefreshCw, TrendingUp, Info, ArrowUpDown, Plane, X,
   DollarSign, MapPin, Clock, GripVertical, Building2, User,
   Package, History, Trash2, Pencil, Link2, Unlink, RotateCcw,
+  MoreVertical, Download, AlertTriangle, Flame, CheckCircle2,
+  ChevronLeft, ChevronRight,
 } from "lucide-react";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import DealFiltersPanel, { useDealFilters, DealFilterButton } from "@/components/DealFiltersPanel";
 import { useState, useMemo, useCallback } from "react";
 import { useLocation } from "wouter";
@@ -75,6 +80,10 @@ export default function Pipeline() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [listTab, setListTab] = useState<"active" | "trash">("active");
   const dealFilters = useDealFilters();
+  const [ownerFilter, setOwnerFilter] = useState<number | "all">("all");
+  const [showIndicators, setShowIndicators] = useState(false);
+  const [showTaskCalendar, setShowTaskCalendar] = useState(false);
+  const crmUsers = trpc.admin.users.list.useQuery({ tenantId: TENANT_ID });
 
   const utils = trpc.useUtils();
   const pipelines = trpc.crm.pipelines.list.useQuery({ tenantId: TENANT_ID });
@@ -93,6 +102,7 @@ export default function Pipeline() {
       pipelineId: activePipeline?.id,
       limit: 200,
       ...dealFilters.filters,
+      ...(ownerFilter !== "all" ? { ownerUserId: ownerFilter } : {}),
     },
     { enabled: !!activePipeline }
   );
@@ -217,28 +227,89 @@ export default function Pipeline() {
 
   return (
     <div className="flex flex-col h-[calc(100vh-56px)]">
-      {/* Toolbar */}
-      <div className="border-b border-border bg-card px-5 lg:px-8 py-3.5">
-        <div className="flex items-center gap-2.5 flex-wrap">
+      {/* Toolbar — Linha 1: Toggle view + ações */}
+      <div className="border-b border-border bg-card">
+        <div className="flex items-center gap-2 px-5 lg:px-8 py-2.5">
           {/* View toggle */}
           <div className="flex bg-muted/60 rounded-xl p-1 gap-0.5">
-            <button
-              onClick={() => setViewMode("kanban")}
-              className={`p-2 rounded-lg transition-all duration-200 ${viewMode === "kanban" ? "bg-card text-primary shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
-            >
-              <LayoutGrid className="h-4 w-4" />
-            </button>
-            <button
-              onClick={() => setViewMode("list")}
-              className={`p-2 rounded-lg transition-all duration-200 ${viewMode === "list" ? "bg-card text-primary shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
-            >
-              <List className="h-4 w-4" />
-            </button>
+            <Tooltip><TooltipTrigger asChild>
+              <button
+                onClick={() => setViewMode("kanban")}
+                className={`p-2 rounded-lg transition-all duration-200 ${viewMode === "kanban" ? "bg-card text-primary shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+              >
+                <LayoutGrid className="h-4 w-4" />
+              </button>
+            </TooltipTrigger><TooltipContent side="bottom"><p className="text-xs">Funil</p></TooltipContent></Tooltip>
+            <Tooltip><TooltipTrigger asChild>
+              <button
+                onClick={() => setViewMode("list")}
+                className={`p-2 rounded-lg transition-all duration-200 ${viewMode === "list" ? "bg-card text-primary shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+              >
+                <List className="h-4 w-4" />
+              </button>
+            </TooltipTrigger><TooltipContent side="bottom"><p className="text-xs">Lista</p></TooltipContent></Tooltip>
           </div>
 
+          <div className="flex-1" />
+
+          {/* Indicadores profundos */}
+          <Popover open={showIndicators} onOpenChange={setShowIndicators}>
+            <PopoverTrigger asChild>
+              <Button variant="ghost" size="icon" className={`h-9 w-9 rounded-xl transition-colors ${showIndicators ? 'bg-primary/10 text-primary' : ''}`}>
+                <Tooltip><TooltipTrigger asChild><TrendingUp className="h-4 w-4" /></TooltipTrigger>
+                <TooltipContent side="bottom"><p className="text-xs">Indicadores do Pipeline</p></TooltipContent></Tooltip>
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-[420px] p-0 rounded-2xl shadow-xl border-border/50">
+              <PipelineIndicatorsPanel deals={sortedDeals} tasks={tasks.data || []} stages={stages.data || []} />
+            </PopoverContent>
+          </Popover>
+
+          {/* Calendário de tarefas */}
+          <Popover open={showTaskCalendar} onOpenChange={setShowTaskCalendar}>
+            <PopoverTrigger asChild>
+              <Button variant="ghost" size="icon" className={`h-9 w-9 rounded-xl transition-colors ${showTaskCalendar ? 'bg-primary/10 text-primary' : ''}`}>
+                <Tooltip><TooltipTrigger asChild><CalendarIcon className="h-4 w-4" /></TooltipTrigger>
+                <TooltipContent side="bottom"><p className="text-xs">Calendário de Tarefas</p></TooltipContent></Tooltip>
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-[520px] p-0 rounded-2xl shadow-xl border-border/50">
+              <TaskCalendarPanel tasks={tasks.data || []} deals={sortedDeals} />
+            </PopoverContent>
+          </Popover>
+
+          {/* 3 pontos — ações */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl">
+                <MoreVertical className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-52 rounded-xl">
+              <DropdownMenuItem onClick={() => { toast.info("Exportação em breve!"); }}>
+                <Download className="h-4 w-4 mr-2" /> Exportar dados
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => utils.crm.deals.list.invalidate()}>
+                <RefreshCw className="h-4 w-4 mr-2" /> Atualizar
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          {/* Botão Criar */}
+          <Button
+            onClick={() => setShowCreateDeal(true)}
+            className="h-9 gap-2 px-5 rounded-xl shadow-sm bg-primary hover:bg-primary/90 transition-colors text-[13px] font-medium text-primary-foreground"
+          >
+            <Plus className="h-4 w-4" />
+            Criar
+          </Button>
+        </div>
+
+        {/* Linha 2: Filtros inline — estilo RD Station */}
+        <div className="flex items-center gap-2.5 px-5 lg:px-8 pb-3">
           {/* Pipeline selector */}
           <Select value={String(activePipeline?.id ?? "")} onValueChange={(v) => setSelectedPipelineId(Number(v))}>
-            <SelectTrigger className="w-[200px] h-9 text-[13px] rounded-xl border-border/50 bg-card">
+            <SelectTrigger className="flex-1 min-w-[140px] max-w-[240px] h-10 text-[13px] rounded-xl border-border/50 bg-background">
               <SelectValue placeholder="Selecionar funil" />
             </SelectTrigger>
             <SelectContent className="rounded-xl">
@@ -248,13 +319,27 @@ export default function Pipeline() {
             </SelectContent>
           </Select>
 
+          {/* User filter */}
+          <Select value={String(ownerFilter)} onValueChange={(v) => setOwnerFilter(v === "all" ? "all" : Number(v))}>
+            <SelectTrigger className="flex-1 min-w-[140px] max-w-[240px] h-10 text-[13px] rounded-xl border-border/50 bg-background">
+              <User className="h-3.5 w-3.5 mr-1.5 text-muted-foreground flex-shrink-0" />
+              <SelectValue placeholder="Todas as negociações" />
+            </SelectTrigger>
+            <SelectContent className="rounded-xl">
+              <SelectItem value="all">Todas as negociações</SelectItem>
+              {crmUsers.data?.map((u: any) => (
+                <SelectItem key={u.id} value={String(u.id)}>{u.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
           {/* Status filter */}
           <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-[170px] h-9 text-[13px] rounded-xl border-border/50 bg-card">
+            <SelectTrigger className="flex-1 min-w-[130px] max-w-[200px] h-10 text-[13px] rounded-xl border-border/50 bg-background">
               <SelectValue placeholder="Todos os status" />
             </SelectTrigger>
             <SelectContent className="rounded-xl">
-              <SelectItem value="all">Todos os status</SelectItem>
+              <SelectItem value="all">Em andamento</SelectItem>
               <SelectItem value="open">Em aberto</SelectItem>
               <SelectItem value="won">Ganhos</SelectItem>
               <SelectItem value="lost">Perdidos</SelectItem>
@@ -263,8 +348,8 @@ export default function Pipeline() {
 
           {/* Sort */}
           <Select value={sortMode} onValueChange={(v) => setSortMode(v as SortMode)}>
-            <SelectTrigger className="w-[180px] h-9 text-[13px] rounded-xl border-border/50 bg-card">
-              <ArrowUpDown className="h-3.5 w-3.5 mr-1.5 text-muted-foreground" />
+            <SelectTrigger className="flex-1 min-w-[140px] max-w-[220px] h-10 text-[13px] rounded-xl border-border/50 bg-background">
+              <ArrowUpDown className="h-3.5 w-3.5 mr-1.5 text-muted-foreground flex-shrink-0" />
               <SelectValue />
             </SelectTrigger>
             <SelectContent className="rounded-xl">
@@ -275,25 +360,24 @@ export default function Pipeline() {
             </SelectContent>
           </Select>
 
-          <DealFilterButton activeCount={dealFilters.activeCount} onClick={() => dealFilters.setIsOpen(true)} />
-
-          <div className="flex-1" />
-
-          <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl" onClick={() => utils.crm.deals.list.invalidate()}>
-            <RefreshCw className="h-4 w-4 text-muted-foreground" />
-          </Button>
-
+          {/* Botão Filtros com destaque */}
           <Button
-            onClick={() => setShowCreateDeal(true)}
-            className="h-9 gap-2 px-5 rounded-lg shadow-sm bg-primary hover:bg-primary/90 transition-colors text-[13px] font-medium text-primary-foreground"
+            variant={dealFilters.activeCount > 0 ? "default" : "outline"}
+            onClick={() => dealFilters.setIsOpen(true)}
+            className={`h-10 gap-2 px-5 rounded-xl text-[13px] font-medium flex-shrink-0 transition-all ${
+              dealFilters.activeCount > 0
+                ? "bg-primary text-primary-foreground shadow-sm hover:bg-primary/90"
+                : "border-border/50 hover:bg-muted/60"
+            }`}
           >
-            <Plus className="h-4 w-4" />
-            Criar
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+            Filtros{dealFilters.activeCount > 0 ? ` (${dealFilters.activeCount})` : ""}
           </Button>
         </div>
 
-        <div className="mt-2.5">
-          <span className="text-[13px] font-medium text-muted-foreground">{totalDeals} Negociações</span>
+        {/* Contagem */}
+        <div className="px-5 lg:px-8 pb-2">
+          <span className="text-[12px] font-medium text-muted-foreground">{totalDeals} Negociações · {statusFilter === 'all' ? 'Em andamento' : statusFilter === 'open' ? 'Em aberto' : statusFilter === 'won' ? 'Ganhos' : 'Perdidos'}</span>
         </div>
       </div>
 
@@ -1568,5 +1652,235 @@ function CreateTaskDialog({ open, onOpenChange, dealId }: { open: boolean; onOpe
         </div>
       </DialogContent>
     </Dialog>
+  );
+}
+
+/* ─── Pipeline Indicators Panel ─── */
+function PipelineIndicatorsPanel({ deals, tasks, stages }: { deals: any[]; tasks: any[]; stages: any[] }) {
+  const openDeals = deals.filter((d: any) => d.status === "open");
+  const now = Date.now();
+  const sevenDaysAgo = now - 7 * 24 * 60 * 60 * 1000;
+
+  // Em andamento
+  const inProgress = openDeals.length;
+
+  // Esfriando (sem atividade nos últimos 7 dias)
+  const cooling = openDeals.filter((d: any) => {
+    const lastActivity = d.lastActivityAt ? new Date(d.lastActivityAt).getTime() : new Date(d.createdAt).getTime();
+    return lastActivity < sevenDaysAgo;
+  }).length;
+
+  // Sem tarefas
+  const dealIdsWithTasks = new Set(tasks.filter((t: any) => t.entityType === "deal" && (t.status === "pending" || t.status === "in_progress")).map((t: any) => t.entityId));
+  const noTasks = openDeals.filter((d: any) => !dealIdsWithTasks.has(d.id)).length;
+
+  // Com tarefas atrasadas
+  const overdueTasks = tasks.filter((t: any) => t.entityType === "deal" && (t.status === "pending" || t.status === "in_progress") && t.dueAt && new Date(t.dueAt).getTime() < now);
+  const dealIdsWithOverdue = new Set(overdueTasks.map((t: any) => t.entityId));
+  const withOverdue = openDeals.filter((d: any) => dealIdsWithOverdue.has(d.id)).length;
+
+  // Sem produtos ou serviços (valueCents = 0 ou null)
+  const noProducts = openDeals.filter((d: any) => !d.valueCents || d.valueCents === 0).length;
+
+  const indicators = [
+    { label: "Em andamento", value: inProgress, color: "text-blue-600 dark:text-blue-400", bg: "bg-blue-50 dark:bg-blue-500/10", icon: TrendingUp },
+    { label: "Esfriando", value: cooling, color: "text-amber-600 dark:text-amber-400", bg: "bg-amber-50 dark:bg-amber-500/10", icon: Flame },
+    { label: "Sem tarefas", value: noTasks, color: "text-slate-600 dark:text-slate-400", bg: "bg-slate-50 dark:bg-slate-500/10", icon: CheckCircle2 },
+    { label: "Com tarefas atrasadas", value: withOverdue, color: "text-red-600 dark:text-red-400", bg: "bg-red-50 dark:bg-red-500/10", icon: AlertTriangle },
+    { label: "Sem produtos ou serviços", value: noProducts, color: "text-violet-600 dark:text-violet-400", bg: "bg-violet-50 dark:bg-violet-500/10", icon: Package },
+  ];
+
+  // Per-stage breakdown
+  const stageBreakdown = stages.map((stage: any) => {
+    const stageDeals = openDeals.filter((d: any) => d.stageId === stage.id);
+    const stageCooling = stageDeals.filter((d: any) => {
+      const la = d.lastActivityAt ? new Date(d.lastActivityAt).getTime() : new Date(d.createdAt).getTime();
+      return la < sevenDaysAgo;
+    }).length;
+    const stageNoTasks = stageDeals.filter((d: any) => !dealIdsWithTasks.has(d.id)).length;
+    const stageOverdue = stageDeals.filter((d: any) => dealIdsWithOverdue.has(d.id)).length;
+    return { name: stage.name, total: stageDeals.length, cooling: stageCooling, noTasks: stageNoTasks, overdue: stageOverdue };
+  });
+
+  return (
+    <div className="p-5">
+      <h3 className="text-sm font-semibold text-foreground mb-4">Indicadores do Pipeline</h3>
+      <div className="space-y-2.5">
+        {indicators.map((ind) => (
+          <div key={ind.label} className={`flex items-center justify-between px-3.5 py-2.5 rounded-xl ${ind.bg}`}>
+            <div className="flex items-center gap-2.5">
+              <ind.icon className={`h-4 w-4 ${ind.color}`} />
+              <span className="text-[13px] font-medium text-foreground">{ind.label}</span>
+            </div>
+            <span className={`text-sm font-bold ${ind.color}`}>{ind.value}</span>
+          </div>
+        ))}
+      </div>
+
+      {stageBreakdown.length > 0 && (
+        <>
+          <Separator className="my-4" />
+          <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Por Etapa</h4>
+          <div className="space-y-1.5 max-h-[200px] overflow-y-auto">
+            {stageBreakdown.filter(s => s.total > 0).map((s) => (
+              <div key={s.name} className="flex items-center justify-between text-[12px] px-2 py-1.5 rounded-lg hover:bg-muted/50 transition-colors">
+                <span className="text-foreground font-medium truncate max-w-[140px]">{s.name}</span>
+                <div className="flex items-center gap-3 text-muted-foreground">
+                  <span title="Total">{s.total}</span>
+                  {s.cooling > 0 && <span className="text-amber-500" title="Esfriando">{s.cooling}🔥</span>}
+                  {s.noTasks > 0 && <span className="text-slate-400" title="Sem tarefas">{s.noTasks}📋</span>}
+                  {s.overdue > 0 && <span className="text-red-500" title="Atrasadas">{s.overdue}⚠️</span>}
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+/* ─── Task Calendar Panel ─── */
+function TaskCalendarPanel({ tasks, deals }: { tasks: any[]; deals: any[] }) {
+  const [currentMonth, setCurrentMonth] = useState(() => {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), 1);
+  });
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+
+  const year = currentMonth.getFullYear();
+  const month = currentMonth.getMonth();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const firstDayOfWeek = new Date(year, month, 1).getDay(); // 0=Sun
+
+  const monthNames = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+  const dayNames = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+
+  // Group tasks by date
+  const tasksByDate = useMemo(() => {
+    const map: Record<string, any[]> = {};
+    (tasks || []).forEach((t: any) => {
+      if (!t.dueAt) return;
+      const d = new Date(t.dueAt);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      if (!map[key]) map[key] = [];
+      map[key].push(t);
+    });
+    return map;
+  }, [tasks]);
+
+  const today = new Date();
+  const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+
+  const prevMonth = () => setCurrentMonth(new Date(year, month - 1, 1));
+  const nextMonth = () => setCurrentMonth(new Date(year, month + 1, 1));
+
+  const selectedTasks = selectedDate ? (tasksByDate[selectedDate] || []) : [];
+
+  const getDealTitle = (entityId: number) => {
+    const deal = deals.find((d: any) => d.id === entityId);
+    return deal?.title || `Deal #${entityId}`;
+  };
+
+  return (
+    <div className="p-5">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-sm font-semibold text-foreground">Calendário de Tarefas</h3>
+        <div className="flex items-center gap-1">
+          <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg" onClick={prevMonth}>
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <span className="text-[13px] font-medium text-foreground min-w-[130px] text-center">
+            {monthNames[month]} {year}
+          </span>
+          <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg" onClick={nextMonth}>
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+
+      {/* Day names */}
+      <div className="grid grid-cols-7 gap-0.5 mb-1">
+        {dayNames.map((d) => (
+          <div key={d} className="text-[10px] font-semibold text-muted-foreground text-center py-1">{d}</div>
+        ))}
+      </div>
+
+      {/* Calendar grid */}
+      <div className="grid grid-cols-7 gap-0.5">
+        {Array.from({ length: firstDayOfWeek }).map((_, i) => (
+          <div key={`empty-${i}`} className="h-10" />
+        ))}
+        {Array.from({ length: daysInMonth }).map((_, i) => {
+          const day = i + 1;
+          const dateKey = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+          const dayTasks = tasksByDate[dateKey] || [];
+          const isToday = dateKey === todayKey;
+          const isSelected = dateKey === selectedDate;
+          const hasOverdue = dayTasks.some((t: any) => (t.status === "pending" || t.status === "in_progress") && new Date(t.dueAt).getTime() < Date.now());
+          const hasPending = dayTasks.some((t: any) => t.status === "pending" || t.status === "in_progress");
+
+          return (
+            <button
+              key={day}
+              onClick={() => setSelectedDate(dateKey === selectedDate ? null : dateKey)}
+              className={`h-10 rounded-xl text-[12px] font-medium relative transition-all duration-150 ${
+                isSelected
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : isToday
+                    ? "bg-primary/10 text-primary font-bold"
+                    : "text-foreground hover:bg-muted/60"
+              }`}
+            >
+              {day}
+              {dayTasks.length > 0 && (
+                <span className={`absolute bottom-1 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full ${
+                  isSelected ? "bg-primary-foreground" : hasOverdue ? "bg-red-500" : hasPending ? "bg-primary" : "bg-emerald-500"
+                }`} />
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Selected date tasks */}
+      {selectedDate && (
+        <>
+          <Separator className="my-3" />
+          <div className="space-y-1.5 max-h-[180px] overflow-y-auto">
+            {selectedTasks.length === 0 ? (
+              <p className="text-[12px] text-muted-foreground text-center py-3">Nenhuma tarefa neste dia</p>
+            ) : (
+              selectedTasks.map((t: any) => {
+                const isOverdue = (t.status === "pending" || t.status === "in_progress") && t.dueAt && new Date(t.dueAt).getTime() < Date.now();
+                return (
+                  <div key={t.id} className={`flex items-center gap-2.5 px-3 py-2 rounded-xl text-[12px] ${
+                    isOverdue ? "bg-red-50 dark:bg-red-500/10" : "bg-muted/40"
+                  }`}>
+                    <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                      t.status === "completed" ? "bg-emerald-500" : isOverdue ? "bg-red-500" : "bg-primary"
+                    }`} />
+                    <div className="flex-1 min-w-0">
+                      <p className={`font-medium truncate ${t.status === "completed" ? "line-through text-muted-foreground" : "text-foreground"}`}>
+                        {t.title}
+                      </p>
+                      {t.entityType === "deal" && (
+                        <p className="text-[11px] text-muted-foreground truncate">{getDealTitle(t.entityId)}</p>
+                      )}
+                    </div>
+                    {t.dueAt && (
+                      <span className="text-[11px] text-muted-foreground flex-shrink-0">
+                        {new Date(t.dueAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                      </span>
+                    )}
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </>
+      )}
+    </div>
   );
 }

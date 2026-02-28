@@ -1394,3 +1394,17 @@
 - [x] Salvar motivo de perda no deal (campo loss_reason_id e loss_notes)
 - [x] Backend: query de analytics para motivos de perda (contagem e valor por motivo)
 - [x] Gráfico de motivos de perda no dashboard inicial (Home)
+
+## Redesign Header Pipeline/Negociações (estilo RD Station adaptado Apple)
+
+- [x] Linha 1: Toggle funil/lista à esquerda + botões à direita (indicadores, calendário, 3 pontos, + Criar)
+- [x] Linha 2: Filtros inline (pipeline, usuário CRM, status, ordenação) + botão FILTROS destacado na cor do sistema
+- [x] Filtro de usuário da conta CRM (listar usuários do sistema)
+- [x] Botão indicadores: painel com métricas por etapa (em andamento, esfriando, sem tarefas, tarefas atrasadas, sem produtos)
+- [x] Botão calendário: gestão de tarefas em calendário estilo Apple
+- [x] Menu 3 pontos: exportar dados, atualizar (contextual)
+- [x] Manter padrão visual Apple do sistema (cores, fontes, espaçamentos)
+- [x] Selects flex-1 ocupando todo o espaço disponível (estilo RD Station)
+- [x] Botão Filtros com destaque visual (cor primária quando filtros ativos)
+- [x] Indicadores por etapa com breakdown (esfriando, sem tarefas, atrasadas)
+- [x] 24 testes unitários adicionais para Pipeline Header (521 total)

@@ -260,6 +260,7 @@ export const crmRouter = router({
         noTasks: z.boolean().optional(),
         cooling: z.boolean().optional(),
         coolingDays: z.number().optional(),
+        ownerUserId: z.number().optional(),
       }))
       .query(async ({ input }) => {
         return crm.listDeals(input.tenantId, input);
