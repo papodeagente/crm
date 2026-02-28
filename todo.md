@@ -1408,3 +1408,9 @@
 - [x] Botão Filtros com destaque visual (cor primária quando filtros ativos)
 - [x] Indicadores por etapa com breakdown (esfriando, sem tarefas, atrasadas)
 - [x] 24 testes unitários adicionais para Pipeline Header (521 total)
+
+## Correção Visual Header Pipeline
+
+- [x] Remover retângulo/card de fundo (bg-card) do header do Pipeline
+- [x] Toolbar deve ocupar toda a parte superior sem card separado, fluindo com o fundo
+- [x] Botão Filtros na cor de destaque do sistema (sempre visível)

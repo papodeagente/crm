@@ -228,7 +228,7 @@ export default function Pipeline() {
   return (
     <div className="flex flex-col h-[calc(100vh-56px)]">
       {/* Toolbar — Linha 1: Toggle view + ações */}
-      <div className="border-b border-border bg-card">
+      <div className="border-b border-border/40">
         <div className="flex items-center gap-2 px-5 lg:px-8 py-2.5">
           {/* View toggle */}
           <div className="flex bg-muted/60 rounded-xl p-1 gap-0.5">
@@ -360,15 +360,10 @@ export default function Pipeline() {
             </SelectContent>
           </Select>
 
-          {/* Botão Filtros com destaque */}
+          {/* Botão Filtros — sempre na cor de destaque */}
           <Button
-            variant={dealFilters.activeCount > 0 ? "default" : "outline"}
             onClick={() => dealFilters.setIsOpen(true)}
-            className={`h-10 gap-2 px-5 rounded-xl text-[13px] font-medium flex-shrink-0 transition-all ${
-              dealFilters.activeCount > 0
-                ? "bg-primary text-primary-foreground shadow-sm hover:bg-primary/90"
-                : "border-border/50 hover:bg-muted/60"
-            }`}
+            className="h-10 gap-2 px-5 rounded-xl text-[13px] font-medium flex-shrink-0 transition-all bg-primary text-primary-foreground shadow-sm hover:bg-primary/90"
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
             Filtros{dealFilters.activeCount > 0 ? ` (${dealFilters.activeCount})` : ""}
