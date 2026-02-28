@@ -310,13 +310,24 @@ export const crmRouter = router({
         probability: z.number().optional(), ownerUserId: z.number().optional(),
         expectedCloseAt: z.string().nullable().optional(), channelOrigin: z.string().nullable().optional(),
         leadSource: z.string().nullable().optional(),
+        lossReasonId: z.number().nullable().optional(),
+        lossNotes: z.string().nullable().optional(),
       }))
       .mutation(async ({ ctx, input }) => {
         const { tenantId, id, ...data } = input;
+        // Validate lossReasonId is required when marking as lost
+        if (data.status === "lost" && !data.lossReasonId) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Motivo de perda é obrigatório ao marcar como perdida" });
+        }
         // Get current deal for history
         const currentDeal = await crm.getDealById(tenantId, id);
         const { expectedCloseAt, ...restData } = data;
         const updatePayload: any = { ...restData, updatedBy: ctx.user.id };
+        // Clear loss fields when reopening
+        if (data.status === "open" || data.status === "won") {
+          updatePayload.lossReasonId = null;
+          updatePayload.lossNotes = null;
+        }
         if (expectedCloseAt !== undefined) {
           updatePayload.expectedCloseAt = expectedCloseAt ? new Date(expectedCloseAt) : null;
         }
@@ -333,11 +344,17 @@ export const crmRouter = router({
           }
           // valueCents agora é calculado automaticamente pela soma dos produtos
           if (data.status && data.status !== currentDeal.status) {
+            const lossReasonName = data.lossReasonId ? `(Motivo: #${data.lossReasonId})` : "";
             await crm.createDealHistory({
-              tenantId, dealId: id, action: "status_changed", description: `Status alterado para ${data.status}`,
+              tenantId, dealId: id, action: "status_changed",
+              description: `Status alterado para ${data.status} ${lossReasonName}`.trim(),
               fieldChanged: "status", oldValue: currentDeal.status || "", newValue: data.status,
               actorUserId: ctx.user.id, actorName: ctx.user.name || "Sistema",
             });
+            // Increment loss reason usage count
+            if (data.status === "lost" && data.lossReasonId) {
+              await crm.incrementLossReasonUsage(data.lossReasonId);
+            }
             // Trigger pipeline automations on won/lost
             if (data.status === "won" || data.status === "lost") {
               const triggerEvent = data.status === "won" ? "deal_won" : "deal_lost";

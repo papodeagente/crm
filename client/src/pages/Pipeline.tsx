@@ -627,6 +627,12 @@ function DealDrawer({ dealId, onClose, contacts, accounts, stages }: {
   const participants = trpc.crm.deals.participants.list.useQuery({ tenantId: TENANT_ID, dealId });
   const dealTasks = trpc.crm.tasks.list.useQuery({ tenantId: TENANT_ID, entityType: "deal", entityId: dealId });
   const dealNotes = trpc.crm.notes.list.useQuery({ tenantId: TENANT_ID, entityType: "deal", entityId: dealId });
+  const lossReasonsQ = trpc.crm.lossReasons.list.useQuery({ tenantId: TENANT_ID });
+  const lossReasonsList = (lossReasonsQ.data || []).filter((r: any) => r.isActive && !r.isDeleted);
+  const [showLossDialog, setShowLossDialog] = useState(false);
+  const [lossDialogDealId, setLossDialogDealId] = useState<number | null>(null);
+  const [selectedLossReasonId, setSelectedLossReasonId] = useState<number | null>(null);
+  const [lossNotes, setLossNotes] = useState("");
 
   const updateDeal = trpc.crm.deals.update.useMutation({
     onSuccess: () => {
@@ -780,7 +786,14 @@ function DealDrawer({ dealId, onClose, contacts, accounts, stages }: {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <Label className="text-[12px] font-medium">Status</Label>
-                  <Select value={d.status || "open"} onValueChange={(v) => updateDeal.mutate({ tenantId: TENANT_ID, id: dealId, status: v as any })}>
+                  <Select value={d.status || "open"} onValueChange={(v) => {
+                    if (v === "lost") {
+                      setLossDialogDealId(dealId);
+                      setShowLossDialog(true);
+                    } else {
+                      updateDeal.mutate({ tenantId: TENANT_ID, id: dealId, status: v as any });
+                    }
+                  }}>
                     <SelectTrigger className="h-10 text-[13px] rounded-xl"><SelectValue /></SelectTrigger>
                     <SelectContent className="rounded-xl">
                       <SelectItem value="open">Em aberto</SelectItem>
@@ -969,6 +982,82 @@ function DealDrawer({ dealId, onClose, contacts, accounts, stages }: {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* ── Loss Reason Dialog ── */}
+      <Dialog open={showLossDialog} onOpenChange={(open) => {
+        setShowLossDialog(open);
+        if (!open) { setSelectedLossReasonId(null); setLossNotes(""); setLossDialogDealId(null); }
+      }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <X className="h-5 w-5" />
+              Marcar como perda
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Motivo da perda <span className="text-red-500">*</span></Label>
+              {lossReasonsList.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Nenhum motivo cadastrado. Cadastre motivos em Configurações.</p>
+              ) : (
+                <div className="grid gap-2 max-h-[200px] overflow-y-auto">
+                  {lossReasonsList.map((reason: any) => (
+                    <button
+                      key={reason.id}
+                      type="button"
+                      onClick={() => setSelectedLossReasonId(reason.id)}
+                      className={`flex items-center gap-3 px-3 py-2.5 rounded-lg border text-left transition-all text-sm ${
+                        selectedLossReasonId === reason.id
+                          ? "border-red-500 bg-red-50 dark:bg-red-500/10 ring-1 ring-red-500"
+                          : "border-border hover:border-red-300 hover:bg-muted/50"
+                      }`}
+                    >
+                      <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                        selectedLossReasonId === reason.id ? "border-red-500" : "border-muted-foreground/30"
+                      }`}>
+                        {selectedLossReasonId === reason.id && <div className="w-2 h-2 rounded-full bg-red-500" />}
+                      </div>
+                      <span className="font-medium">{reason.name}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Observações (opcional)</Label>
+              <Input
+                value={lossNotes}
+                onChange={(e) => setLossNotes(e.target.value)}
+                placeholder="Detalhes adicionais..."
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 mt-2">
+            <Button variant="ghost" onClick={() => { setShowLossDialog(false); setSelectedLossReasonId(null); setLossNotes(""); }}>Cancelar</Button>
+            <Button
+              variant="destructive"
+              disabled={!selectedLossReasonId}
+              onClick={() => {
+                if (!selectedLossReasonId || !lossDialogDealId) return;
+                updateDeal.mutate({
+                  tenantId: TENANT_ID,
+                  id: lossDialogDealId,
+                  status: "lost",
+                  lossReasonId: selectedLossReasonId,
+                  lossNotes: lossNotes || null,
+                });
+                setShowLossDialog(false);
+                setSelectedLossReasonId(null);
+                setLossNotes("");
+                setLossDialogDealId(null);
+              }}
+            >
+              Confirmar perda
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

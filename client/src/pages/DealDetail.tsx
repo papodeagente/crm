@@ -6,6 +6,7 @@ import WhatsAppChat from "@/components/WhatsAppChat";
 import { useRoute, useLocation, Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -198,6 +199,11 @@ export default function DealDetail() {
   const [showWonDialog, setShowWonDialog] = useState(false);
   const [showLostDialog, setShowLostDialog] = useState(false);
   const [lostReason, setLostReason] = useState("");
+  const [selectedLossReasonId, setSelectedLossReasonId] = useState<number | null>(null);
+
+  /* ─── Loss Reasons query ─── */
+  const lossReasonsQ = trpc.crm.lossReasons.list.useQuery({ tenantId: TENANT_ID });
+  const lossReasonsList = (lossReasonsQ.data || []).filter((r: any) => r.isActive && !r.isDeleted);
 
   /* ─── Loading / Error states ─── */
   if (!matched || !dealId) {
@@ -244,9 +250,17 @@ export default function DealDetail() {
   };
 
   const handleMarkLost = () => {
-    updateDeal.mutate({ tenantId: TENANT_ID, id: deal.id, status: "lost" });
+    if (!selectedLossReasonId) return;
+    updateDeal.mutate({
+      tenantId: TENANT_ID,
+      id: deal.id,
+      status: "lost",
+      lossReasonId: selectedLossReasonId,
+      lossNotes: lostReason || null,
+    });
     setShowLostDialog(false);
     setLostReason("");
+    setSelectedLossReasonId(null);
   };
 
   const pendingTasks = (tasksQ.data || []).filter((t: any) => t.status === "pending" || t.status === "in_progress");
@@ -897,26 +911,70 @@ export default function DealDetail() {
       </Dialog>
 
       {/* ── Lost Dialog ── */}
-      <Dialog open={showLostDialog} onOpenChange={setShowLostDialog}>
-        <DialogContent className="sm:max-w-sm">
+      <Dialog open={showLostDialog} onOpenChange={(open) => {
+        setShowLostDialog(open);
+        if (!open) { setSelectedLossReasonId(null); setLostReason(""); }
+      }}>
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <ThumbsDown className="h-5 w-5 text-red-500" />
               Marcar como perda
             </DialogTitle>
           </DialogHeader>
-          <p className="text-sm text-muted-foreground mb-2">
-            Motivo da perda (opcional):
-          </p>
-          <Textarea
-            value={lostReason}
-            onChange={(e) => setLostReason(e.target.value)}
-            placeholder="Ex: Cliente escolheu concorrente, preço alto..."
-            className="min-h-[80px]"
-          />
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Motivo da perda <span className="text-red-500">*</span></Label>
+              {lossReasonsList.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Nenhum motivo cadastrado. Cadastre motivos em Configurações &gt; Comercial &gt; Motivos de Perda.</p>
+              ) : (
+                <div className="grid gap-2 max-h-[200px] overflow-y-auto">
+                  {lossReasonsList.map((reason: any) => (
+                    <button
+                      key={reason.id}
+                      type="button"
+                      onClick={() => setSelectedLossReasonId(reason.id)}
+                      className={`flex items-center gap-3 px-3 py-2.5 rounded-lg border text-left transition-all text-sm ${
+                        selectedLossReasonId === reason.id
+                          ? "border-red-500 bg-red-50 dark:bg-red-500/10 text-red-700 dark:text-red-300 ring-1 ring-red-500"
+                          : "border-border hover:border-red-300 hover:bg-muted/50"
+                      }`}
+                    >
+                      <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                        selectedLossReasonId === reason.id ? "border-red-500" : "border-muted-foreground/30"
+                      }`}>
+                        {selectedLossReasonId === reason.id && (
+                          <div className="w-2 h-2 rounded-full bg-red-500" />
+                        )}
+                      </div>
+                      <div>
+                        <span className="font-medium">{reason.name}</span>
+                        {reason.description && (
+                          <p className="text-xs text-muted-foreground mt-0.5">{reason.description}</p>
+                        )}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Observações (opcional)</Label>
+              <Textarea
+                value={lostReason}
+                onChange={(e) => setLostReason(e.target.value)}
+                placeholder="Detalhes adicionais sobre a perda..."
+                className="min-h-[70px]"
+              />
+            </div>
+          </div>
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setShowLostDialog(false)}>Cancelar</Button>
-            <Button variant="destructive" onClick={handleMarkLost}>
+            <Button variant="ghost" onClick={() => { setShowLostDialog(false); setSelectedLossReasonId(null); setLostReason(""); }}>Cancelar</Button>
+            <Button
+              variant="destructive"
+              onClick={handleMarkLost}
+              disabled={!selectedLossReasonId}
+            >
               Confirmar perda
             </Button>
           </DialogFooter>

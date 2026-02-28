@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { protectedProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
-import { deals, dealHistory, leadSources, campaigns, pipelineStages } from "../../drizzle/schema";
+import { deals, dealHistory, leadSources, campaigns, pipelineStages, lossReasons } from "../../drizzle/schema";
 import { eq, and, sql, isNull, gte, lt, isNotNull, desc, asc } from "drizzle-orm";
 
 // ═══════════════════════════════════════════════════════════════
@@ -316,10 +316,58 @@ export const utmAnalyticsRouter = router({
         })),
         total: Number(countResult?.count ?? 0),
       };
+    }),  // ─── Loss Reasons Analytics ──────────────────────────────
+  // Retorna contagem e valor de deals perdidos agrupados por motivo de perda
+  lossReasonsAnalytics: protectedProcedure
+    .input(dateFilterSchema)
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) return [];
+      const conditions = buildDateConditions(input.tenantId, input.dateFrom, input.dateTo, input.pipelineId);
+      conditions.push(eq(deals.status, "lost" as any));
+      conditions.push(isNotNull(deals.lossReasonId));
+
+      const rows = await db.select({
+        lossReasonId: deals.lossReasonId,
+        reasonName: lossReasons.name,
+        count: sql<number>`COUNT(*)`,
+        totalValueCents: sql<number>`COALESCE(SUM(${deals.valueCents}), 0)`,
+      }).from(deals)
+        .leftJoin(lossReasons, eq(deals.lossReasonId, lossReasons.id))
+        .where(and(...conditions))
+        .groupBy(deals.lossReasonId, lossReasons.name)
+        .orderBy(sql`COUNT(*) DESC`);
+
+      // Also get deals lost without a reason (legacy)
+      const legacyConditions = buildDateConditions(input.tenantId, input.dateFrom, input.dateTo, input.pipelineId);
+      legacyConditions.push(eq(deals.status, "lost" as any));
+      legacyConditions.push(isNull(deals.lossReasonId));
+      const [legacyResult] = await db.select({
+        count: sql<number>`COUNT(*)`,
+        totalValueCents: sql<number>`COALESCE(SUM(${deals.valueCents}), 0)`,
+      }).from(deals).where(and(...legacyConditions));
+
+      const results = rows.map(r => ({
+        lossReasonId: Number(r.lossReasonId),
+        reasonName: String(r.reasonName || "Sem motivo"),
+        count: Number(r.count),
+        totalValueCents: Number(r.totalValueCents),
+      }));
+
+      // Add legacy if any
+      if (Number(legacyResult?.count ?? 0) > 0) {
+        results.push({
+          lossReasonId: 0,
+          reasonName: "Sem motivo informado",
+          count: Number(legacyResult.count),
+          totalValueCents: Number(legacyResult.totalValueCents),
+        });
+      }
+
+      return results;
     }),
 
-  // ─── Stage time analytics (for tooltip) ──────────────────
-  // Calcula tempo médio de permanência em cada etapa do pipeline
+  // ─── Stage time analytics (for tooltip) ────────────────────── // Calcula tempo médio de permanência em cada etapa do pipeline
   stageTime: protectedProcedure
     .input(z.object({
       tenantId: z.number().default(1),

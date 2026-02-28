@@ -388,6 +388,8 @@ export const deals = mysqlTable("deals", {
   createdBy: int("createdBy"),
   updatedBy: int("updatedBy"),
   waConversationId: int("waConversationId"),
+  lossReasonId: int("lossReasonId"),
+  lossNotes: text("lossNotes"),
   deletedAt: timestamp("deletedAt"),
 }, (t) => [
   index("deals_tenant_pipeline_idx").on(t.tenantId, t.pipelineId, t.stageId),

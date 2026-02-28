@@ -166,6 +166,7 @@ export default function Home() {
   const pipelineQ = trpc.dashboard.pipelineSummary.useQuery({ tenantId, dateFrom: dateFilter.dates.dateFrom, dateTo: dateFilter.dates.dateTo });
   const activityQ = trpc.dashboard.recentActivity.useQuery({ tenantId, limit: 5, dateFrom: dateFilter.dates.dateFrom, dateTo: dateFilter.dates.dateTo });
   const tasksQ = trpc.dashboard.upcomingTasks.useQuery({ tenantId, limit: 5 });
+  const lossReasonsQ = trpc.utmAnalytics.lossReasonsAnalytics.useQuery({ tenantId, dateFrom: dateFilter.dates.dateFrom, dateTo: dateFilter.dates.dateTo });
 
   const metrics = metricsQ.data;
   const loading = metricsQ.isLoading;
@@ -406,6 +407,61 @@ export default function Home() {
                 <Briefcase className="h-7 w-7 text-muted-foreground/30 mx-auto mb-2" />
                 <p className="text-[13px] text-muted-foreground">Pipeline vazio</p>
                 <p className="text-[11px] text-muted-foreground/60 mt-1">Configure etapas em Configurações</p>
+              </div>
+            )}
+          </div>
+
+          {/* ─── Motivos de Perda ─── */}
+          <div className="surface p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-[14px] font-semibold text-foreground">Motivos de Perda</h2>
+              <Link href="/insights" className="text-[12px] text-primary font-medium hover:underline">
+                Ver mais
+              </Link>
+            </div>
+            {lossReasonsQ.isLoading ? (
+              <div className="space-y-3">
+                {[1,2,3].map(i => <Skeleton key={i} className="h-8 w-full" />)}
+              </div>
+            ) : lossReasonsQ.data && lossReasonsQ.data.length > 0 ? (() => {
+              const maxCount = Math.max(...lossReasonsQ.data.map(r => r.count), 1);
+              const lossColors = [
+                "bg-red-500", "bg-orange-500", "bg-amber-500", "bg-rose-500",
+                "bg-pink-500", "bg-red-400", "bg-orange-400", "bg-amber-400",
+              ];
+              return (
+                <div className="space-y-3.5">
+                  {lossReasonsQ.data.slice(0, 6).map((r, i) => (
+                    <div key={r.lossReasonId}>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-[12.5px] font-medium text-foreground truncate max-w-[60%]">{r.reasonName}</span>
+                        <span className="text-[11px] text-muted-foreground font-medium">
+                          {r.count} neg. · {formatCurrency(r.totalValueCents)}
+                        </span>
+                      </div>
+                      <div className="h-2 rounded-full bg-muted/60 overflow-hidden">
+                        <div
+                          className={`h-full rounded-full ${lossColors[i % lossColors.length]} transition-all duration-700`}
+                          style={{ width: `${Math.max((r.count / maxCount) * 100, 4)}%` }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                  <div className="pt-2 border-t border-border/30">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] text-muted-foreground font-semibold uppercase tracking-wider">Total Perdido</span>
+                      <span className="text-[13px] font-bold text-red-500">
+                        {formatCurrency(lossReasonsQ.data.reduce((sum, r) => sum + r.totalValueCents, 0))}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })() : (
+              <div className="py-6 text-center">
+                <CheckSquare className="h-7 w-7 text-muted-foreground/30 mx-auto mb-2" />
+                <p className="text-[13px] text-muted-foreground">Nenhuma perda registrada</p>
+                <p className="text-[11px] text-muted-foreground/60 mt-1">Negociações perdidas aparecerão aqui</p>
               </div>
             )}
           </div>

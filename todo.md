@@ -1385,3 +1385,12 @@
 - [x] Corrigir botão de confirmação cortado no DealFiltersPanel (não acessível em telas menores)
 - [x] Garantir que os botões Limpar/Aplicar fiquem sempre visíveis (sticky no rodapé)
 - [x] Área de filtros deve ter scroll independente sem cortar o rodapé
+
+## Motivo de Perda Obrigatório + Gráfico no Dashboard
+
+- [x] Ao marcar deal como perdido, exigir seleção de motivo de perda dos motivos cadastrados nas configurações
+- [x] Dialog/modal de motivo de perda ao clicar em "Marcar como Perdida"
+- [x] Backend: validar que lossReasonId é obrigatório ao mudar status para lost
+- [x] Salvar motivo de perda no deal (campo loss_reason_id e loss_notes)
+- [x] Backend: query de analytics para motivos de perda (contagem e valor por motivo)
+- [x] Gráfico de motivos de perda no dashboard inicial (Home)
