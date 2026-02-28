@@ -1354,3 +1354,28 @@
 - [x] Frontend: DateRangeFilter na página Tarefas (Tasks.tsx)
 - [x] KPIs: variação percentual entre período selecionado e período anterior na Home
 - [x] KPIs: variação percentual entre período selecionado e período anterior no CRM Dashboard
+
+## Painel de Filtros Avançados para Negociações
+
+- [x] Criar componente DealFiltersPanel (drawer lateral estilo CRM profissional)
+- [x] Toggle: Ver apenas negociações sem tarefa
+- [x] Toggle: Ver apenas negociações esfriando (sem atividade recente)
+- [x] Filtro: Status da negociação (aberto, ganho, perdido)
+- [x] Filtro: Nome da negociação (busca por texto)
+- [x] Filtro: Qualificação (quente, morno, frio)
+- [x] Filtro: Valor total (de/até)
+- [x] Filtro: Data de criação (com presets)
+- [x] Filtro: Data de último contato (com presets)
+- [x] Filtro: Data da próxima tarefa (com presets)
+- [x] Filtro: Data de fechamento (com presets)
+- [x] Filtro: Data de previsão de fechamento (com presets)
+- [x] Filtro: Empresa (select com empresas do sistema)
+- [x] Filtro: Campanha UTM (select com campanhas do sistema)
+- [x] Filtro: Fonte/Lead Source (select com fontes do sistema)
+- [x] Filtro: Produto ou serviço (select com produtos do catálogo)
+- [x] Botões: Limpar filtros e Aplicar filtros
+- [x] Backend: query avançada de deals com todos os filtros
+- [x] Integrar no Pipeline Kanban
+- [x] Integrar na lista de Deals
+- [x] Integrar no Dashboard UTM (relatórios)
+- [x] Contador de filtros ativos no botão de filtro

@@ -219,14 +219,68 @@ export async function getDealById(tenantId: number, id: number) {
   const rows = await db.select().from(deals).where(and(eq(deals.id, id), eq(deals.tenantId, tenantId))).limit(1);
   return rows[0] || null;
 }
-export async function listDeals(tenantId: number, opts?: { pipelineId?: number; stageId?: number; status?: string; limit?: number; offset?: number; includeDeleted?: boolean; dateFrom?: string; dateTo?: string }) {
+export async function listDeals(tenantId: number, opts?: {
+  pipelineId?: number; stageId?: number; status?: string; limit?: number; offset?: number;
+  includeDeleted?: boolean; dateFrom?: string; dateTo?: string;
+  // Advanced filters
+  titleSearch?: string;
+  accountId?: number;
+  leadSource?: string;
+  utmCampaign?: string;
+  utmSource?: string;
+  utmMedium?: string;
+  productId?: number;
+  valueMin?: number;
+  valueMax?: number;
+  expectedCloseDateFrom?: string;
+  expectedCloseDateTo?: string;
+  lastActivityDateFrom?: string;
+  lastActivityDateTo?: string;
+  noTasks?: boolean;
+  cooling?: boolean; // no activity in last 7 days
+  coolingDays?: number;
+}) {
   const db = await getDb(); if (!db) return [];
   const conditions: any[] = [eq(deals.tenantId, tenantId)];
   if (!opts?.includeDeleted) conditions.push(isNull(deals.deletedAt));
   if (opts?.pipelineId) conditions.push(eq(deals.pipelineId, opts.pipelineId));
   if (opts?.stageId) conditions.push(eq(deals.stageId, opts.stageId));
+  if (opts?.status) conditions.push(eq(deals.status, opts.status as any));
   if (opts?.dateFrom) conditions.push(gte(deals.createdAt, new Date(opts.dateFrom + "T00:00:00")));
   if (opts?.dateTo) conditions.push(lte(deals.createdAt, new Date(opts.dateTo + "T23:59:59")));
+  // Title search
+  if (opts?.titleSearch) conditions.push(like(deals.title, `%${opts.titleSearch}%`));
+  // Account filter
+  if (opts?.accountId) conditions.push(eq(deals.accountId, opts.accountId));
+  // Lead source filter
+  if (opts?.leadSource) conditions.push(eq(deals.leadSource, opts.leadSource));
+  // UTM filters
+  if (opts?.utmCampaign) conditions.push(eq(deals.utmCampaign, opts.utmCampaign));
+  if (opts?.utmSource) conditions.push(eq(deals.utmSource, opts.utmSource));
+  if (opts?.utmMedium) conditions.push(eq(deals.utmMedium, opts.utmMedium));
+  // Value range
+  if (opts?.valueMin !== undefined && opts.valueMin > 0) conditions.push(gte(deals.valueCents, opts.valueMin));
+  if (opts?.valueMax !== undefined && opts.valueMax > 0) conditions.push(lte(deals.valueCents, opts.valueMax));
+  // Expected close date range
+  if (opts?.expectedCloseDateFrom) conditions.push(gte(deals.expectedCloseAt, new Date(opts.expectedCloseDateFrom + "T00:00:00")));
+  if (opts?.expectedCloseDateTo) conditions.push(lte(deals.expectedCloseAt, new Date(opts.expectedCloseDateTo + "T23:59:59")));
+  // Last activity date range
+  if (opts?.lastActivityDateFrom) conditions.push(gte(deals.lastActivityAt, new Date(opts.lastActivityDateFrom + "T00:00:00")));
+  if (opts?.lastActivityDateTo) conditions.push(lte(deals.lastActivityAt, new Date(opts.lastActivityDateTo + "T23:59:59")));
+  // Product filter — deals that contain a specific product
+  if (opts?.productId) {
+    conditions.push(sql`${deals.id} IN (SELECT dealId FROM deal_products WHERE productId = ${opts.productId} AND tenantId = ${tenantId})`);
+  }
+  // No tasks filter
+  if (opts?.noTasks) {
+    conditions.push(sql`${deals.id} NOT IN (SELECT entityId FROM crm_tasks WHERE entityType = 'deal' AND tenantId = ${tenantId} AND status IN ('pending','in_progress'))`);
+  }
+  // Cooling filter — no activity in last N days
+  if (opts?.cooling) {
+    const days = opts.coolingDays || 7;
+    conditions.push(sql`${deals.lastActivityAt} < DATE_SUB(NOW(), INTERVAL ${days} DAY)`);
+    conditions.push(eq(deals.status, "open"));
+  }
   return db.select().from(deals).where(and(...conditions)).orderBy(desc(deals.lastActivityAt)).limit(opts?.limit || 50).offset(opts?.offset || 0);
 }
 export async function bulkSoftDeleteDeals(tenantId: number, ids: number[]) {

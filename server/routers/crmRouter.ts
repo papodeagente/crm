@@ -234,7 +234,33 @@ export const crmRouter = router({
   // ─── DEALS ───
   deals: router({
     list: protectedProcedure
-      .input(z.object({ tenantId: z.number(), pipelineId: z.number().optional(), stageId: z.number().optional(), status: z.string().optional(), limit: z.number().default(200), offset: z.number().default(0), dateFrom: z.string().optional(), dateTo: z.string().optional() }))
+      .input(z.object({
+        tenantId: z.number(),
+        pipelineId: z.number().optional(),
+        stageId: z.number().optional(),
+        status: z.string().optional(),
+        limit: z.number().default(200),
+        offset: z.number().default(0),
+        dateFrom: z.string().optional(),
+        dateTo: z.string().optional(),
+        // Advanced filters
+        titleSearch: z.string().optional(),
+        accountId: z.number().optional(),
+        leadSource: z.string().optional(),
+        utmCampaign: z.string().optional(),
+        utmSource: z.string().optional(),
+        utmMedium: z.string().optional(),
+        productId: z.number().optional(),
+        valueMin: z.number().optional(),
+        valueMax: z.number().optional(),
+        expectedCloseDateFrom: z.string().optional(),
+        expectedCloseDateTo: z.string().optional(),
+        lastActivityDateFrom: z.string().optional(),
+        lastActivityDateTo: z.string().optional(),
+        noTasks: z.boolean().optional(),
+        cooling: z.boolean().optional(),
+        coolingDays: z.number().optional(),
+      }))
       .query(async ({ input }) => {
         return crm.listDeals(input.tenantId, input);
       }),

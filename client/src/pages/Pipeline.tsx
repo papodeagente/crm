@@ -13,10 +13,11 @@ import { Separator } from "@/components/ui/separator";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Plus, LayoutGrid, List, Calendar as CalendarIcon,
-  RefreshCw, TrendingUp, Info, Filter, ArrowUpDown, Plane, X,
+  RefreshCw, TrendingUp, Info, ArrowUpDown, Plane, X,
   DollarSign, MapPin, Clock, GripVertical, Building2, User,
   Package, History, Trash2, Pencil, Link2, Unlink, RotateCcw,
 } from "lucide-react";
+import DealFiltersPanel, { useDealFilters, DealFilterButton } from "@/components/DealFiltersPanel";
 import { useState, useMemo, useCallback } from "react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
@@ -73,6 +74,7 @@ export default function Pipeline() {
   const [selectedDealIds, setSelectedDealIds] = useState<Set<number>>(new Set());
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [listTab, setListTab] = useState<"active" | "trash">("active");
+  const dealFilters = useDealFilters();
 
   const utils = trpc.useUtils();
   const pipelines = trpc.crm.pipelines.list.useQuery({ tenantId: TENANT_ID });
@@ -86,7 +88,12 @@ export default function Pipeline() {
   );
 
   const deals = trpc.crm.deals.list.useQuery(
-    { tenantId: TENANT_ID, pipelineId: activePipeline?.id, limit: 200 },
+    {
+      tenantId: TENANT_ID,
+      pipelineId: activePipeline?.id,
+      limit: 200,
+      ...dealFilters.filters,
+    },
     { enabled: !!activePipeline }
   );
 
@@ -268,10 +275,7 @@ export default function Pipeline() {
             </SelectContent>
           </Select>
 
-          <Button variant="outline" size="sm" className="h-9 gap-1.5 text-[13px] rounded-xl border-border/50">
-            <Filter className="h-3.5 w-3.5" />
-            Filtros (0)
-          </Button>
+          <DealFilterButton activeCount={dealFilters.activeCount} onClick={() => dealFilters.setIsOpen(true)} />
 
           <div className="flex-1" />
 
@@ -528,6 +532,13 @@ export default function Pipeline() {
       {/* Dialogs */}
       <CreateDealDialog open={showCreateDeal} onOpenChange={setShowCreateDeal} pipelineId={activePipeline?.id} stages={stages.data || []} contacts={contacts.data || []} accounts={allAccounts.data || []} pipelines={pipelines.data?.filter((p: any) => !p.isArchived) || []} />
       {showCreateTask !== null && <CreateTaskDialog open={true} onOpenChange={() => setShowCreateTask(null)} dealId={showCreateTask} />}
+      <DealFiltersPanel
+        open={dealFilters.isOpen}
+        onOpenChange={dealFilters.setIsOpen}
+        filters={dealFilters.filters}
+        onApply={(f) => { dealFilters.setFilters(f); }}
+        onClear={dealFilters.clear}
+      />
     </div>
   );
 }

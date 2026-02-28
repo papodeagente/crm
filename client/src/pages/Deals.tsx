@@ -8,6 +8,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Plus, Briefcase, MoreHorizontal, Trash2, TrendingUp, DollarSign, RotateCcw, AlertTriangle, Archive } from "lucide-react";
 import { useState, useMemo } from "react";
 import DateRangeFilter, { useDateFilter } from "@/components/DateRangeFilter";
+import DealFiltersPanel, { useDealFilters, DealFilterButton } from "@/components/DealFiltersPanel";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -32,8 +33,13 @@ export default function Deals() {
   const { user } = useAuth();
   const isAdmin = user?.role === "admin";
   const dateFilter = useDateFilter("all");
+  const dealFilters = useDealFilters();
 
-  const deals = trpc.crm.deals.list.useQuery({ tenantId: TENANT_ID, limit: 200, dateFrom: dateFilter.dates.dateFrom, dateTo: dateFilter.dates.dateTo });
+  const deals = trpc.crm.deals.list.useQuery({
+    tenantId: TENANT_ID, limit: 200,
+    dateFrom: dateFilter.dates.dateFrom, dateTo: dateFilter.dates.dateTo,
+    ...dealFilters.filters,
+  });
   const deletedDeals = trpc.crm.deals.listDeleted.useQuery({ tenantId: TENANT_ID, limit: 100 }, { enabled: showTrash });
   const pipelines = trpc.crm.pipelines.list.useQuery({ tenantId: TENANT_ID });
 
@@ -114,6 +120,7 @@ export default function Deals() {
             onCustomToChange={dateFilter.setCustomTo}
             onReset={dateFilter.reset}
           />
+          <DealFilterButton activeCount={dealFilters.activeCount} onClick={() => dealFilters.setIsOpen(true)} />
           <Button
             variant={showTrash ? "default" : "outline"}
             size="sm"
@@ -348,6 +355,13 @@ export default function Deals() {
           </div>
         </DialogContent>
       </Dialog>
+      <DealFiltersPanel
+        open={dealFilters.isOpen}
+        onOpenChange={dealFilters.setIsOpen}
+        filters={dealFilters.filters}
+        onApply={(f) => { dealFilters.setFilters(f); }}
+        onClear={dealFilters.clear}
+      />
     </div>
   );
 }

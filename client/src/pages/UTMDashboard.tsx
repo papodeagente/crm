@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import DateRangeFilter, { useDateFilter } from "@/components/DateRangeFilter";
+import DealFiltersPanel, { useDealFilters, DealFilterButton } from "@/components/DealFiltersPanel";
 import {
   TrendingUp, DollarSign, Target, Trophy, BarChart3, Filter, ExternalLink,
   ArrowUpRight, ArrowDownRight, Percent, Hash, Eye, ChevronDown, ChevronUp,
@@ -109,13 +110,23 @@ export default function UTMDashboard() {
   const [dealListMedium, setDealListMedium] = useState<string>("");
   const [dealListCampaign, setDealListCampaign] = useState<string>("");
   const [expandedCross, setExpandedCross] = useState(false);
+  const dealFilters = useDealFilters();
 
   const filterInput = useMemo(() => ({
     tenantId: TENANT_ID,
-    dateFrom: dateFilter.dates.dateFrom,
-    dateTo: dateFilter.dates.dateTo,
+    dateFrom: dealFilters.filters.dateFrom || dateFilter.dates.dateFrom,
+    dateTo: dealFilters.filters.dateTo || dateFilter.dates.dateTo,
     pipelineId,
-  }), [dateFilter.dates.dateFrom, dateFilter.dates.dateTo, pipelineId]);
+    utmSource: dealFilters.filters.utmSource,
+    utmMedium: dealFilters.filters.utmMedium,
+    utmCampaign: dealFilters.filters.utmCampaign,
+    leadSource: dealFilters.filters.leadSource,
+    status: dealFilters.filters.status,
+    accountId: dealFilters.filters.accountId,
+    productId: dealFilters.filters.productId,
+    valueMin: dealFilters.filters.valueMin,
+    valueMax: dealFilters.filters.valueMax,
+  }), [dateFilter.dates.dateFrom, dateFilter.dates.dateTo, pipelineId, dealFilters.filters]);
 
   // ─── Queries ───
   const overview = trpc.utmAnalytics.overview.useQuery(filterInput);
@@ -189,6 +200,7 @@ export default function UTMDashboard() {
                 ))}
               </SelectContent>
             </Select>
+            <DealFilterButton activeCount={dealFilters.activeCount} onClick={() => dealFilters.setIsOpen(true)} />
           </div>
         </CardContent>
       </Card>
@@ -583,6 +595,13 @@ export default function UTMDashboard() {
           </Card>
         </>
       )}
+      <DealFiltersPanel
+        open={dealFilters.isOpen}
+        onOpenChange={dealFilters.setIsOpen}
+        filters={dealFilters.filters}
+        onApply={(f) => { dealFilters.setFilters(f); }}
+        onClear={dealFilters.clear}
+      />
     </div>
   );
 }
