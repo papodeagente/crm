@@ -1414,3 +1414,8 @@
 - [x] Remover retângulo/card de fundo (bg-card) do header do Pipeline
 - [x] Toolbar deve ocupar toda a parte superior sem card separado, fluindo com o fundo
 - [x] Botão Filtros na cor de destaque do sistema (sempre visível)
+
+## Ajuste Layout Filtros Pipeline
+
+- [x] Seletor de funil na ponta esquerda, botão Filtros na ponta direita (abaixo de Criar)
+- [x] Selects expandindo proporcionalmente para ocupar todo o espaço disponível

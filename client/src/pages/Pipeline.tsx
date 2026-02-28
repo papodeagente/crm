@@ -305,11 +305,11 @@ export default function Pipeline() {
           </Button>
         </div>
 
-        {/* Linha 2: Filtros inline — estilo RD Station */}
+        {/* Linha 2: Filtros inline — funil na esquerda, Filtros na direita, selects proporcionais */}
         <div className="flex items-center gap-2.5 px-5 lg:px-8 pb-3">
           {/* Pipeline selector */}
           <Select value={String(activePipeline?.id ?? "")} onValueChange={(v) => setSelectedPipelineId(Number(v))}>
-            <SelectTrigger className="flex-1 min-w-[140px] max-w-[240px] h-10 text-[13px] rounded-xl border-border/50 bg-background">
+            <SelectTrigger className="flex-1 h-10 text-[13px] rounded-xl border-border/50 bg-background">
               <SelectValue placeholder="Selecionar funil" />
             </SelectTrigger>
             <SelectContent className="rounded-xl">
@@ -321,7 +321,7 @@ export default function Pipeline() {
 
           {/* User filter */}
           <Select value={String(ownerFilter)} onValueChange={(v) => setOwnerFilter(v === "all" ? "all" : Number(v))}>
-            <SelectTrigger className="flex-1 min-w-[140px] max-w-[240px] h-10 text-[13px] rounded-xl border-border/50 bg-background">
+            <SelectTrigger className="flex-1 h-10 text-[13px] rounded-xl border-border/50 bg-background">
               <User className="h-3.5 w-3.5 mr-1.5 text-muted-foreground flex-shrink-0" />
               <SelectValue placeholder="Todas as negociações" />
             </SelectTrigger>
@@ -335,7 +335,7 @@ export default function Pipeline() {
 
           {/* Status filter */}
           <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="flex-1 min-w-[130px] max-w-[200px] h-10 text-[13px] rounded-xl border-border/50 bg-background">
+            <SelectTrigger className="flex-1 h-10 text-[13px] rounded-xl border-border/50 bg-background">
               <SelectValue placeholder="Todos os status" />
             </SelectTrigger>
             <SelectContent className="rounded-xl">
@@ -348,7 +348,7 @@ export default function Pipeline() {
 
           {/* Sort */}
           <Select value={sortMode} onValueChange={(v) => setSortMode(v as SortMode)}>
-            <SelectTrigger className="flex-1 min-w-[140px] max-w-[220px] h-10 text-[13px] rounded-xl border-border/50 bg-background">
+            <SelectTrigger className="flex-1 h-10 text-[13px] rounded-xl border-border/50 bg-background">
               <ArrowUpDown className="h-3.5 w-3.5 mr-1.5 text-muted-foreground flex-shrink-0" />
               <SelectValue />
             </SelectTrigger>
@@ -360,7 +360,7 @@ export default function Pipeline() {
             </SelectContent>
           </Select>
 
-          {/* Botão Filtros — sempre na cor de destaque */}
+          {/* Botão Filtros — sempre na cor de destaque, ponta direita */}
           <Button
             onClick={() => dealFilters.setIsOpen(true)}
             className="h-10 gap-2 px-5 rounded-xl text-[13px] font-medium flex-shrink-0 transition-all bg-primary text-primary-foreground shadow-sm hover:bg-primary/90"
