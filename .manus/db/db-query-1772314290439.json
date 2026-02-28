@@ -1,0 +1,9 @@
+{
+  "query": "INSERT INTO crm_users (tenantId, name, email, passwordHash, status) VALUES (1, 'Bruno', 'bruno@entur.com.br', '$2b$12$sDhAe8l3.HpAc90xBHS7eeO1f2dDhJxpY4Kf0ua3F8GSHhZSu4NNW', 'active');",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute INSERT INTO crm_users (tenantId, name, email, passwordHash, status) VALUES (1, 'Bruno', 'bruno@entur.com.br', '$2b$12$sDhAe8l3.HpAc90xBHS7eeO1f2dDhJxpY4Kf0ua3F8GSHhZSu4NNW', 'active');",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 362
+}
