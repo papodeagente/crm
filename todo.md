@@ -1460,7 +1460,3 @@
 - [x] Fluxo completo: registro → freemium → expiração → cobrança → bloqueio/desbloqueio
 - [x] Webhook Hotmart para processar pagamentos automaticamente
 - [x] 19 testes unitários para SaaS Auth (558 total)
-
-## Configuração SuperAdmin
-
-- [x] Criar conta bruno@entur.com.br com senha Bruna2016* no sistema SaaS vinculada ao tenant 1
