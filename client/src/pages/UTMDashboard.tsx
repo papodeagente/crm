@@ -3,11 +3,11 @@ import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import DateRangeFilter, { useDateFilter } from "@/components/DateRangeFilter";
 import {
   TrendingUp, DollarSign, Target, Trophy, BarChart3, Filter, ExternalLink,
   ArrowUpRight, ArrowDownRight, Percent, Hash, Eye, ChevronDown, ChevronUp,
@@ -100,8 +100,7 @@ function CustomTooltip({ active, payload, label }: any) {
 // ─── Main UTM Dashboard ───
 export default function UTMDashboard() {
   const [, navigate] = useLocation();
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
+  const dateFilter = useDateFilter("all");
   const [pipelineId, setPipelineId] = useState<number | undefined>(undefined);
   const [dimension, setDimension] = useState<"utmSource" | "utmMedium" | "utmCampaign" | "utmTerm" | "utmContent" | "leadSource" | "channelOrigin">("utmSource");
   const [detailTab, setDetailTab] = useState("chart");
@@ -113,10 +112,10 @@ export default function UTMDashboard() {
 
   const filterInput = useMemo(() => ({
     tenantId: TENANT_ID,
-    dateFrom: dateFrom || undefined,
-    dateTo: dateTo || undefined,
+    dateFrom: dateFilter.dates.dateFrom,
+    dateTo: dateFilter.dates.dateTo,
     pipelineId,
-  }), [dateFrom, dateTo, pipelineId]);
+  }), [dateFilter.dates.dateFrom, dateFilter.dates.dateTo, pipelineId]);
 
   // ─── Queries ───
   const overview = trpc.utmAnalytics.overview.useQuery(filterInput);
@@ -163,41 +162,33 @@ export default function UTMDashboard() {
       {/* ─── Filters ─── */}
       <Card>
         <CardContent className="p-4">
-          <div className="flex flex-wrap items-end gap-3">
-            <div className="space-y-1">
-              <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">De</label>
-              <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="h-8 w-36 text-xs" />
-            </div>
-            <div className="space-y-1">
-              <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Até</label>
-              <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-8 w-36 text-xs" />
-            </div>
-            <div className="space-y-1">
-              <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Pipeline</label>
-              <Select value={pipelineId ? String(pipelineId) : "all"} onValueChange={(v) => setPipelineId(v === "all" ? undefined : Number(v))}>
-                <SelectTrigger className="h-8 w-40 text-xs"><SelectValue placeholder="Todos" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos os pipelines</SelectItem>
-                  {(pipelines.data || []).map((p: any) => (
-                    <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1">
-              <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Dimensão</label>
-              <Select value={dimension} onValueChange={(v: any) => setDimension(v)}>
-                <SelectTrigger className="h-8 w-40 text-xs"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {Object.entries(DIMENSION_LABELS).map(([k, v]) => (
-                    <SelectItem key={k} value={k}>{v}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => { setDateFrom(""); setDateTo(""); setPipelineId(undefined); }}>
-              <RefreshCw className="h-3 w-3 mr-1" /> Limpar
-            </Button>
+          <div className="flex flex-wrap items-center gap-3">
+            <DateRangeFilter
+              preset={dateFilter.preset}
+              onPresetChange={dateFilter.setPreset}
+              customFrom={dateFilter.customFrom}
+              onCustomFromChange={dateFilter.setCustomFrom}
+              customTo={dateFilter.customTo}
+              onCustomToChange={dateFilter.setCustomTo}
+              onReset={() => { dateFilter.reset(); setPipelineId(undefined); }}
+            />
+            <Select value={pipelineId ? String(pipelineId) : "all"} onValueChange={(v) => setPipelineId(v === "all" ? undefined : Number(v))}>
+              <SelectTrigger className="h-8 w-40 text-xs"><SelectValue placeholder="Pipeline" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os pipelines</SelectItem>
+                {(pipelines.data || []).map((p: any) => (
+                  <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={dimension} onValueChange={(v: any) => setDimension(v)}>
+              <SelectTrigger className="h-8 w-40 text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {Object.entries(DIMENSION_LABELS).map(([k, v]) => (
+                  <SelectItem key={k} value={k}>{v}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </CardContent>
       </Card>

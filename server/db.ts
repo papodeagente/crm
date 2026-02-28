@@ -552,7 +552,7 @@ export async function getNextRoundRobinAgent(tenantId: number): Promise<number |
 
 // ─── Dashboard Metrics ───
 
-export async function getDashboardMetrics(tenantId: number) {
+export async function getDashboardMetrics(tenantId: number, dateFrom?: string, dateTo?: string) {
   const db = await getDb();
   if (!db) {
     return {
@@ -568,42 +568,70 @@ export async function getDashboardMetrics(tenantId: number) {
     };
   }
 
+  // If custom date range provided, calculate comparison period of same length
   const now = new Date();
-  const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-  const sixtyDaysAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
+  let periodStart: Date;
+  let periodEnd: Date;
+  let prevStart: Date;
+  let prevEnd: Date;
+
+  if (dateFrom && dateTo) {
+    periodStart = new Date(dateFrom + "T00:00:00");
+    periodEnd = new Date(dateTo + "T23:59:59");
+    const periodMs = periodEnd.getTime() - periodStart.getTime();
+    prevEnd = new Date(periodStart.getTime() - 1);
+    prevStart = new Date(prevEnd.getTime() - periodMs);
+  } else if (dateFrom) {
+    periodStart = new Date(dateFrom + "T00:00:00");
+    periodEnd = now;
+    const periodMs = periodEnd.getTime() - periodStart.getTime();
+    prevEnd = new Date(periodStart.getTime() - 1);
+    prevStart = new Date(prevEnd.getTime() - periodMs);
+  } else {
+    // Default: last 30 days vs previous 30 days
+    periodStart = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    periodEnd = now;
+    prevStart = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
+    prevEnd = new Date(periodStart.getTime() - 1);
+  }
+
+  // For "all time" queries (no date filter), use the original 30-day comparison
+  const hasDateFilter = !!dateFrom || !!dateTo;
+  const dateConditionDeals = hasDateFilter ? sql`AND d_inner.createdAt >= ${periodStart} AND d_inner.createdAt <= ${periodEnd}` : sql``;
+  const dateConditionDealsPrev = hasDateFilter ? sql`AND d_inner.createdAt >= ${prevStart} AND d_inner.createdAt <= ${prevEnd}` : sql``;
 
   const [result] = await db.execute(sql`
     SELECT
-      -- Active deals (status = 'open', not deleted)
-      (SELECT COUNT(*) FROM deals WHERE tenantId = ${tenantId} AND status = 'open' AND deletedAt IS NULL) AS activeDeals,
-      -- Deals created in last 30 days
-      (SELECT COUNT(*) FROM deals WHERE tenantId = ${tenantId} AND status = 'open' AND deletedAt IS NULL AND createdAt >= ${thirtyDaysAgo}) AS dealsLast30,
-      -- Deals created in previous 30 days (30-60 days ago)
-      (SELECT COUNT(*) FROM deals WHERE tenantId = ${tenantId} AND status = 'open' AND deletedAt IS NULL AND createdAt >= ${sixtyDaysAgo} AND createdAt < ${thirtyDaysAgo}) AS dealsPrev30,
+      -- Active deals (status = 'open', not deleted) in period
+      (SELECT COUNT(*) FROM deals d_inner WHERE d_inner.tenantId = ${tenantId} AND d_inner.status = 'open' AND d_inner.deletedAt IS NULL ${dateConditionDeals}) AS activeDeals,
+      -- Deals in current period
+      (SELECT COUNT(*) FROM deals d_inner WHERE d_inner.tenantId = ${tenantId} AND d_inner.status = 'open' AND d_inner.deletedAt IS NULL AND d_inner.createdAt >= ${periodStart} AND d_inner.createdAt <= ${periodEnd}) AS dealsLast30,
+      -- Deals in previous period
+      (SELECT COUNT(*) FROM deals d_inner WHERE d_inner.tenantId = ${tenantId} AND d_inner.status = 'open' AND d_inner.deletedAt IS NULL AND d_inner.createdAt >= ${prevStart} AND d_inner.createdAt <= ${prevEnd}) AS dealsPrev30,
 
-      -- Total contacts (not deleted)
-      (SELECT COUNT(*) FROM contacts WHERE tenantId = ${tenantId} AND deletedAt IS NULL) AS totalContacts,
-      -- Contacts created in last 30 days
-      (SELECT COUNT(*) FROM contacts WHERE tenantId = ${tenantId} AND deletedAt IS NULL AND createdAt >= ${thirtyDaysAgo}) AS contactsLast30,
-      -- Contacts created in previous 30 days
-      (SELECT COUNT(*) FROM contacts WHERE tenantId = ${tenantId} AND deletedAt IS NULL AND createdAt >= ${sixtyDaysAgo} AND createdAt < ${thirtyDaysAgo}) AS contactsPrev30,
+      -- Total contacts in period
+      (SELECT COUNT(*) FROM contacts WHERE tenantId = ${tenantId} AND deletedAt IS NULL ${hasDateFilter ? sql`AND createdAt >= ${periodStart} AND createdAt <= ${periodEnd}` : sql``}) AS totalContacts,
+      -- Contacts in current period
+      (SELECT COUNT(*) FROM contacts WHERE tenantId = ${tenantId} AND deletedAt IS NULL AND createdAt >= ${periodStart} AND createdAt <= ${periodEnd}) AS contactsLast30,
+      -- Contacts in previous period
+      (SELECT COUNT(*) FROM contacts WHERE tenantId = ${tenantId} AND deletedAt IS NULL AND createdAt >= ${prevStart} AND createdAt <= ${prevEnd}) AS contactsPrev30,
 
-      -- Active trips (planning, confirmed, in_progress)
-      (SELECT COUNT(*) FROM trips WHERE tenantId = ${tenantId} AND status IN ('planning', 'confirmed', 'in_progress')) AS activeTrips,
-      -- Trips created in last 30 days
-      (SELECT COUNT(*) FROM trips WHERE tenantId = ${tenantId} AND status IN ('planning', 'confirmed', 'in_progress') AND createdAt >= ${thirtyDaysAgo}) AS tripsLast30,
-      -- Trips created in previous 30 days
-      (SELECT COUNT(*) FROM trips WHERE tenantId = ${tenantId} AND status IN ('planning', 'confirmed', 'in_progress') AND createdAt >= ${sixtyDaysAgo} AND createdAt < ${thirtyDaysAgo}) AS tripsPrev30,
+      -- Active trips in period
+      (SELECT COUNT(*) FROM trips WHERE tenantId = ${tenantId} AND status IN ('planning', 'confirmed', 'in_progress') ${hasDateFilter ? sql`AND createdAt >= ${periodStart} AND createdAt <= ${periodEnd}` : sql``}) AS activeTrips,
+      -- Trips in current period
+      (SELECT COUNT(*) FROM trips WHERE tenantId = ${tenantId} AND status IN ('planning', 'confirmed', 'in_progress') AND createdAt >= ${periodStart} AND createdAt <= ${periodEnd}) AS tripsLast30,
+      -- Trips in previous period
+      (SELECT COUNT(*) FROM trips WHERE tenantId = ${tenantId} AND status IN ('planning', 'confirmed', 'in_progress') AND createdAt >= ${prevStart} AND createdAt <= ${prevEnd}) AS tripsPrev30,
 
-      -- Pending tasks (pending or in_progress)
-      (SELECT COUNT(*) FROM crm_tasks WHERE tenantId = ${tenantId} AND status IN ('pending', 'in_progress')) AS pendingTasks,
-      -- Tasks created in last 30 days
-      (SELECT COUNT(*) FROM crm_tasks WHERE tenantId = ${tenantId} AND status IN ('pending', 'in_progress') AND createdAt >= ${thirtyDaysAgo}) AS tasksLast30,
-      -- Tasks created in previous 30 days
-      (SELECT COUNT(*) FROM crm_tasks WHERE tenantId = ${tenantId} AND status IN ('pending', 'in_progress') AND createdAt >= ${sixtyDaysAgo} AND createdAt < ${thirtyDaysAgo}) AS tasksPrev30,
+      -- Pending tasks in period
+      (SELECT COUNT(*) FROM crm_tasks WHERE tenantId = ${tenantId} AND status IN ('pending', 'in_progress') ${hasDateFilter ? sql`AND createdAt >= ${periodStart} AND createdAt <= ${periodEnd}` : sql``}) AS pendingTasks,
+      -- Tasks in current period
+      (SELECT COUNT(*) FROM crm_tasks WHERE tenantId = ${tenantId} AND status IN ('pending', 'in_progress') AND createdAt >= ${periodStart} AND createdAt <= ${periodEnd}) AS tasksLast30,
+      -- Tasks in previous period
+      (SELECT COUNT(*) FROM crm_tasks WHERE tenantId = ${tenantId} AND status IN ('pending', 'in_progress') AND createdAt >= ${prevStart} AND createdAt <= ${prevEnd}) AS tasksPrev30,
 
-      -- Total deal value (open deals)
-      (SELECT COALESCE(SUM(valueCents), 0) FROM deals WHERE tenantId = ${tenantId} AND status = 'open') AS totalDealValueCents
+      -- Total deal value (open deals) in period
+      (SELECT COALESCE(SUM(valueCents), 0) FROM deals d_inner WHERE d_inner.tenantId = ${tenantId} AND d_inner.status = 'open' ${dateConditionDeals}) AS totalDealValueCents
   `);
 
   const row = (result as any)[0] || {};
@@ -629,9 +657,14 @@ export async function getDashboardMetrics(tenantId: number) {
 
 // ─── Pipeline Summary for Dashboard ───
 
-export async function getPipelineSummary(tenantId: number) {
+export async function getPipelineSummary(tenantId: number, dateFrom?: string, dateTo?: string) {
   const db = await getDb();
   if (!db) return [];
+
+  const hasDateFilter = !!dateFrom || !!dateTo;
+  const dateJoinCondition = hasDateFilter
+    ? sql`${dateFrom ? sql`AND d.createdAt >= ${new Date(dateFrom + "T00:00:00")}` : sql``} ${dateTo ? sql`AND d.createdAt <= ${new Date(dateTo + "T23:59:59")}` : sql``}`
+    : sql``;
 
   const [rows] = await db.execute(sql`
     SELECT
@@ -641,7 +674,7 @@ export async function getPipelineSummary(tenantId: number) {
       COUNT(d.id) AS dealCount,
       COALESCE(SUM(d.valueCents), 0) AS totalValueCents
     FROM pipeline_stages ps
-    LEFT JOIN deals d ON d.stageId = ps.id AND d.tenantId = ${tenantId} AND d.status = 'open' AND d.deletedAt IS NULL
+    LEFT JOIN deals d ON d.stageId = ps.id AND d.tenantId = ${tenantId} AND d.status = 'open' AND d.deletedAt IS NULL ${dateJoinCondition}
     WHERE ps.tenantId = ${tenantId}
     GROUP BY ps.id, ps.name, ps.orderIndex
     ORDER BY ps.orderIndex ASC
@@ -658,15 +691,20 @@ export async function getPipelineSummary(tenantId: number) {
 
 // ─── Recent Activity for Dashboard ───
 
-export async function getRecentActivity(tenantId: number, limit = 8) {
+export async function getRecentActivity(tenantId: number, limit = 8, dateFrom?: string, dateTo?: string) {
   const db = await getDb();
   if (!db) return [];
+
+  const dateConditions = [];
+  if (dateFrom) dateConditions.push(sql`AND createdAt >= ${new Date(dateFrom + "T00:00:00")}`);
+  if (dateTo) dateConditions.push(sql`AND createdAt <= ${new Date(dateTo + "T23:59:59")}`);
+  const dateFilter = dateConditions.length > 0 ? sql.join(dateConditions, sql` `) : sql``;
 
   const [rows] = await db.execute(sql`
     SELECT id, dealId, action, description, fromStageName, toStageName,
            actorName, createdAt
     FROM deal_history
-    WHERE tenantId = ${tenantId}
+    WHERE tenantId = ${tenantId} ${dateFilter}
     ORDER BY createdAt DESC
     LIMIT ${limit}
   `);

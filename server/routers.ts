@@ -450,19 +450,19 @@ export const appRouter = router({
   // ─── Dashboard ───
   dashboard: router({
     metrics: protectedProcedure
-      .input(z.object({ tenantId: z.number() }))
+      .input(z.object({ tenantId: z.number(), dateFrom: z.string().optional(), dateTo: z.string().optional() }))
       .query(async ({ input }) => {
-        return getDashboardMetrics(input.tenantId);
+        return getDashboardMetrics(input.tenantId, input.dateFrom, input.dateTo);
       }),
     pipelineSummary: protectedProcedure
-      .input(z.object({ tenantId: z.number() }))
+      .input(z.object({ tenantId: z.number(), dateFrom: z.string().optional(), dateTo: z.string().optional() }))
       .query(async ({ input }) => {
-        return getPipelineSummary(input.tenantId);
+        return getPipelineSummary(input.tenantId, input.dateFrom, input.dateTo);
       }),
     recentActivity: protectedProcedure
-      .input(z.object({ tenantId: z.number(), limit: z.number().optional() }))
+      .input(z.object({ tenantId: z.number(), limit: z.number().optional(), dateFrom: z.string().optional(), dateTo: z.string().optional() }))
       .query(async ({ input }) => {
-        return getRecentActivity(input.tenantId, input.limit);
+        return getRecentActivity(input.tenantId, input.limit, input.dateFrom, input.dateTo);
       }),
     upcomingTasks: protectedProcedure
       .input(z.object({ tenantId: z.number(), limit: z.number().optional() }))

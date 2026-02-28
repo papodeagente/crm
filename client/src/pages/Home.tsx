@@ -1,6 +1,7 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import { useMemo } from "react";
+import DateRangeFilter, { useDateFilter } from "@/components/DateRangeFilter";
 import {
   Briefcase, Users, Plane, CheckSquare, MessageSquare,
   TrendingUp, ArrowUpRight, ArrowDownRight, Clock, Calendar,
@@ -156,13 +157,14 @@ const stageBarColors = [
 /* ─── Main Dashboard ─── */
 export default function Home() {
   const { user } = useAuth();
+  const dateFilter = useDateFilter("all");
 
   // Use tenantId 1 as default (single-tenant for now)
   const tenantId = 1;
 
-  const metricsQ = trpc.dashboard.metrics.useQuery({ tenantId });
-  const pipelineQ = trpc.dashboard.pipelineSummary.useQuery({ tenantId });
-  const activityQ = trpc.dashboard.recentActivity.useQuery({ tenantId, limit: 5 });
+  const metricsQ = trpc.dashboard.metrics.useQuery({ tenantId, dateFrom: dateFilter.dates.dateFrom, dateTo: dateFilter.dates.dateTo });
+  const pipelineQ = trpc.dashboard.pipelineSummary.useQuery({ tenantId, dateFrom: dateFilter.dates.dateFrom, dateTo: dateFilter.dates.dateTo });
+  const activityQ = trpc.dashboard.recentActivity.useQuery({ tenantId, limit: 5, dateFrom: dateFilter.dates.dateFrom, dateTo: dateFilter.dates.dateTo });
   const tasksQ = trpc.dashboard.upcomingTasks.useQuery({ tenantId, limit: 5 });
 
   const metrics = metricsQ.data;
@@ -202,14 +204,25 @@ export default function Home() {
           </h1>
           <p className="text-[13px] text-muted-foreground mt-1 capitalize">{today}</p>
         </div>
-        <Link href="/pipeline">
-          <Button size="sm" className="h-9 rounded-xl text-[13px] font-medium gap-1.5 shadow-sm" style={{
-            background: "linear-gradient(135deg, oklch(0.55 0.25 270), oklch(0.60 0.25 320), oklch(0.65 0.20 200))"
-          }}>
-            <Plus className="h-3.5 w-3.5" />
-            Nova Negociação
-          </Button>
-        </Link>
+        <div className="flex items-center gap-3">
+          <DateRangeFilter
+            preset={dateFilter.preset}
+            onPresetChange={dateFilter.setPreset}
+            customFrom={dateFilter.customFrom}
+            onCustomFromChange={dateFilter.setCustomFrom}
+            customTo={dateFilter.customTo}
+            onCustomToChange={dateFilter.setCustomTo}
+            onReset={dateFilter.reset}
+          />
+          <Link href="/pipeline">
+            <Button size="sm" className="h-9 rounded-xl text-[13px] font-medium gap-1.5 shadow-sm" style={{
+              background: "linear-gradient(135deg, oklch(0.55 0.25 270), oklch(0.60 0.25 320), oklch(0.65 0.20 200))"
+            }}>
+              <Plus className="h-3.5 w-3.5" />
+              Nova Negociação
+            </Button>
+          </Link>
+        </div>
       </div>
 
       {/* Metrics row */}

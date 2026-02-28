@@ -16,6 +16,7 @@ import {
   PieChart as PieChartIcon, Inbox, Megaphone
 } from "lucide-react";
 import UTMDashboard from "./UTMDashboard";
+import DateRangeFilter, { useDateFilter, getPresetDates } from "@/components/DateRangeFilter";
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip as RechartsTooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend
@@ -86,9 +87,10 @@ function StatusBadge({ status }: { status: string }) {
 
 // ─── CRM Dashboard ───
 function CRMDashboard() {
+  const dateFilter = useDateFilter("all");
   const dashboard = trpc.insights.dashboard.useQuery({ tenantId: TENANT_ID });
-  const homeData = trpc.dashboard.metrics.useQuery({ tenantId: TENANT_ID }, { refetchInterval: 60000 });
-  const pipelineSummary = trpc.dashboard.pipelineSummary.useQuery({ tenantId: TENANT_ID }, { refetchInterval: 60000 });
+  const homeData = trpc.dashboard.metrics.useQuery({ tenantId: TENANT_ID, dateFrom: dateFilter.dates.dateFrom, dateTo: dateFilter.dates.dateTo }, { refetchInterval: 60000 });
+  const pipelineSummary = trpc.dashboard.pipelineSummary.useQuery({ tenantId: TENANT_ID, dateFrom: dateFilter.dates.dateFrom, dateTo: dateFilter.dates.dateTo }, { refetchInterval: 60000 });
   const d = dashboard.data;
   const h = homeData.data;
 
@@ -110,6 +112,19 @@ function CRMDashboard() {
 
   return (
     <div className="space-y-5">
+      {/* Date filter */}
+      <div className="flex items-center gap-3">
+        <DateRangeFilter
+          preset={dateFilter.preset}
+          onPresetChange={dateFilter.setPreset}
+          customFrom={dateFilter.customFrom}
+          onCustomFromChange={dateFilter.setCustomFrom}
+          customTo={dateFilter.customTo}
+          onCustomToChange={dateFilter.setCustomTo}
+          onReset={dateFilter.reset}
+        />
+      </div>
+
       {/* Metric cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {metrics.map((m) => (
@@ -235,7 +250,19 @@ function CRMDashboard() {
 function MessagesDashboard() {
   const { user } = useAuth();
   const { lastMessage, lastStatusUpdate, isConnected } = useSocket();
-  const [periodDays, setPeriodDays] = useState(7);
+  const dateFilter = useDateFilter("last7");
+  const periodDays = useMemo(() => {
+    if (dateFilter.preset === "all") return 365;
+    if (dateFilter.preset === "custom") {
+      if (dateFilter.customFrom && dateFilter.customTo) {
+        const diff = Math.ceil((new Date(dateFilter.customTo).getTime() - new Date(dateFilter.customFrom).getTime()) / (1000 * 60 * 60 * 24));
+        return Math.max(1, diff);
+      }
+      return 30;
+    }
+    const presetMap: Record<string, number> = { last7: 7, last30: 30, last3months: 90, last6months: 180, thisYear: 365, lastYear: 365, lastMonth: 30 };
+    return presetMap[dateFilter.preset] || 30;
+  }, [dateFilter.preset, dateFilter.customFrom, dateFilter.customTo]);
   const [msgTab, setMsgTab] = useState("overview");
   const [liveEvents, setLiveEvents] = useState<Array<{ type: string; data: any; ts: number }>>([]);
 
@@ -369,17 +396,15 @@ function MessagesDashboard() {
           </Select>
         )}
 
-        <Select value={String(periodDays)} onValueChange={(v) => setPeriodDays(Number(v))}>
-          <SelectTrigger className="w-[120px] h-8 text-xs">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="1">Hoje</SelectItem>
-            <SelectItem value="7">7 dias</SelectItem>
-            <SelectItem value="30">30 dias</SelectItem>
-            <SelectItem value="90">90 dias</SelectItem>
-          </SelectContent>
-        </Select>
+        <DateRangeFilter
+          preset={dateFilter.preset}
+          onPresetChange={dateFilter.setPreset}
+          customFrom={dateFilter.customFrom}
+          onCustomFromChange={dateFilter.setCustomFrom}
+          customTo={dateFilter.customTo}
+          onCustomToChange={dateFilter.setCustomTo}
+          onReset={dateFilter.reset}
+        />
 
         <Button variant="outline" size="sm" onClick={handleRefresh} className="h-8 w-8 p-0">
           <RefreshCw className="h-3.5 w-3.5" />

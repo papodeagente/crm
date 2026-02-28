@@ -1330,3 +1330,16 @@
 - [x] Dialog inline para criar produto rápido (nome, preço, categoria)
 - [x] Botão "Criar Nova Categoria" dentro do dialog de criação de produto
 - [x] Após criar produto, adicioná-lo automaticamente à negociação
+
+## Filtro de Datas Global com Presets
+
+- [x] Criar componente reutilizável DateRangeFilter com presets e data personalizada
+- [x] Presets: Últimos 7 dias, Mês passado, Últimos 3 meses, Últimos 6 meses, Esse ano, Ano passado
+- [x] Opção de data personalizada (de/até)
+- [x] Aplicar filtro no Dashboard UTM (Análises)
+- [x] Aplicar filtro no CRM Dashboard (Análises)
+- [x] Aplicar filtro no Mensagens WhatsApp Dashboard (Análises)
+- [x] Aplicar filtro na Home (Dashboard principal)
+- [ ] Aplicar filtro na lista de Negociações — pendente (requer mudança no backend de listagem)
+- [ ] Aplicar filtro na lista de Contatos — pendente (requer mudança no backend de listagem)
+- [ ] Aplicar filtro na lista de Tarefas — pendente (requer mudança no backend de listagem)
