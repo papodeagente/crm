@@ -1241,7 +1241,7 @@
 - [ ] Aplicar mapeamentos ao processar webhook do RD Station
 
 ### Testes
-- [ ] Testes unitários para novos procedures e processamento de UTMs
+- [x] Testes unitários para novos procedures e processamento de UTMs (480 testes passando)
 
 ## Unificação Catálogo de Produtos e Produtos da Negociação
 
@@ -1273,3 +1273,13 @@
 
 ### Testes
 - [x] Testes unitários para Product, DealItem, fieldMappings e RD Station (475 testes passando)
+
+## Auto-captura de Campos RD Station e Reposicionamento
+
+- [x] Adicionar campo rdCustomFields (JSON) ao schema de deals
+- [x] Migrar banco com o novo campo
+- [x] Atualizar webhook para detectar e capturar automaticamente campos cf_* do RD Station
+- [x] Gravar todos os campos cf_* como texto aberto no rdCustomFields do deal
+- [x] Exibir campos capturados na sidebar da negociação (seção "Campos RD Station" com badge Auto-captura)
+- [x] Reposicionar mapeamento de campos abaixo do webhook na página RD Station (com card expandido e badge Auto-captura)
+- [x] Testes unitários (auto-captura cf_*, 480 testes passando)

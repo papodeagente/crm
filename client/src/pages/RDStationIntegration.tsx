@@ -259,6 +259,99 @@ export default function RDStationIntegration() {
             </CardContent>
           </Card>
 
+          {/* ─── Mapeamento de Campos (Auto-captura) ─── */}
+          <Card className="mb-6 border-border/50 bg-gradient-to-br from-orange-500/5 to-transparent">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-500 to-amber-500 flex items-center justify-center">
+                    <Zap className="h-5 w-5 text-white" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-base flex items-center gap-2">
+                      Mapeamento de Campos
+                      <Badge variant="secondary" className="text-[10px] bg-emerald-500/10 text-emerald-600 border-emerald-200">
+                        Auto-captura ativo
+                      </Badge>
+                    </CardTitle>
+                    <CardDescription className="text-xs">
+                      Campos personalizados do RD Station são capturados automaticamente
+                    </CardDescription>
+                  </div>
+                </div>
+                <Button variant="outline" size="sm" onClick={() => setLocation("/settings/rdstation/mappings")}>
+                  Mapeamento avançado
+                  <ExternalLink className="h-3.5 w-3.5 ml-1" />
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="rounded-lg bg-emerald-500/5 border border-emerald-200/30 p-4">
+                <div className="flex items-start gap-3">
+                  <CheckCircle2 className="h-5 w-5 text-emerald-500 shrink-0 mt-0.5" />
+                  <div>
+                    <h4 className="text-sm font-semibold text-foreground mb-1">Zero configuração necessária</h4>
+                    <p className="text-sm text-muted-foreground">
+                      Todos os campos personalizados do RD Station (identificadores que começam com <code className="text-xs bg-muted px-1 py-0.5 rounded">cf_</code>) são capturados automaticamente como texto aberto e exibidos na negociação.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="rounded-lg border border-border/50 p-3">
+                  <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Mapeamento automático (UTMs)</h4>
+                  <ul className="space-y-1.5 text-sm">
+                    <li className="flex items-center gap-2 text-muted-foreground">
+                      <CheckCircle2 className="h-3 w-3 text-blue-500 shrink-0" />
+                      <span><code className="text-xs bg-muted px-1 rounded">utm_source</code> → Origem</span>
+                    </li>
+                    <li className="flex items-center gap-2 text-muted-foreground">
+                      <CheckCircle2 className="h-3 w-3 text-blue-500 shrink-0" />
+                      <span><code className="text-xs bg-muted px-1 rounded">utm_medium</code> → Mídia</span>
+                    </li>
+                    <li className="flex items-center gap-2 text-muted-foreground">
+                      <CheckCircle2 className="h-3 w-3 text-blue-500 shrink-0" />
+                      <span><code className="text-xs bg-muted px-1 rounded">utm_campaign</code> → Campanha</span>
+                    </li>
+                    <li className="flex items-center gap-2 text-muted-foreground">
+                      <CheckCircle2 className="h-3 w-3 text-blue-500 shrink-0" />
+                      <span><code className="text-xs bg-muted px-1 rounded">utm_term</code> → Termo</span>
+                    </li>
+                    <li className="flex items-center gap-2 text-muted-foreground">
+                      <CheckCircle2 className="h-3 w-3 text-blue-500 shrink-0" />
+                      <span><code className="text-xs bg-muted px-1 rounded">utm_content</code> → Conteúdo</span>
+                    </li>
+                  </ul>
+                </div>
+                <div className="rounded-lg border border-border/50 p-3">
+                  <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Auto-captura (campos cf_)</h4>
+                  <ul className="space-y-1.5 text-sm">
+                    <li className="flex items-center gap-2 text-muted-foreground">
+                      <CheckCircle2 className="h-3 w-3 text-orange-500 shrink-0" />
+                      <span>Todos os campos <code className="text-xs bg-muted px-1 rounded">cf_*</code> capturados como texto</span>
+                    </li>
+                    <li className="flex items-center gap-2 text-muted-foreground">
+                      <CheckCircle2 className="h-3 w-3 text-orange-500 shrink-0" />
+                      <span>Exibidos na sidebar da negociação</span>
+                    </li>
+                    <li className="flex items-center gap-2 text-muted-foreground">
+                      <CheckCircle2 className="h-3 w-3 text-orange-500 shrink-0" />
+                      <span>Nenhuma configuração manual necessária</span>
+                    </li>
+                    <li className="flex items-center gap-2 text-muted-foreground">
+                      <CheckCircle2 className="h-3 w-3 text-orange-500 shrink-0" />
+                      <span>Novos campos detectados automaticamente</span>
+                    </li>
+                  </ul>
+                  <p className="text-xs text-muted-foreground mt-2 italic">
+                    Ex: cf_voce_ja_tem_um_grupo, cf_fbc, cf_fbp...
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Manual de Configuração */}
           <Card className="mb-6 border-border/50">
             <CardHeader>
@@ -600,34 +693,6 @@ export default function RDStationIntegration() {
                 )}
               </CardContent>
             )}
-          </Card>
-
-          {/* Mapeamento de Campos */}
-          <Card className="border-border/50 bg-gradient-to-br from-orange-500/5 to-transparent">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-lg bg-orange-500/10 flex items-center justify-center">
-                    <Zap className="h-4 w-4 text-orange-600" />
-                  </div>
-                  <div>
-                    <CardTitle className="text-base">Mapeamento de Campos</CardTitle>
-                    <CardDescription className="text-xs">Vincule campos do RD Station aos campos do Entur OS</CardDescription>
-                  </div>
-                </div>
-                <Button size="sm" onClick={() => setLocation("/settings/rdstation/mappings")}>
-                  Configurar
-                  <ExternalLink className="h-3.5 w-3.5 ml-1" />
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">
-                Configure quais campos personalizados do RD Station devem ser mapeados para campos do Entur OS.
-                Os UTMs (source, medium, campaign, term, content) já são mapeados automaticamente.
-                Use esta área para mapear campos extras como interesse, orçamento, destino preferido, etc.
-              </p>
-            </CardContent>
           </Card>
 
           {/* FAQ */}

@@ -154,7 +154,7 @@ export default function DealDetail() {
 
   /* ─── Sidebar collapsed sections ─── */
   const [sidebarSections, setSidebarSections] = useState({
-    deal: true, contact: true, company: true, responsible: true, utm: false, custom: false,
+    deal: true, contact: true, company: true, responsible: true, utm: false, rdFields: false, custom: false,
   });
   const toggleSection = (key: keyof typeof sidebarSections) =>
     setSidebarSections((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -621,6 +621,43 @@ export default function DealDetail() {
                     {!deal.utmSource && !deal.utmMedium && !deal.utmCampaign && !deal.utmTerm && !deal.utmContent && (
                       <p className="text-xs text-muted-foreground">UTMs não disponíveis para este lead</p>
                     )}
+                  </div>
+                </SidebarSection>
+                <SidebarDivider />
+              </>
+            )}
+
+            {/* ── Campos RD Station (auto-captura) ── */}
+            {deal.rdCustomFields && typeof deal.rdCustomFields === "object" && Object.keys(deal.rdCustomFields as Record<string, string>).length > 0 && (
+              <>
+                <SidebarSection
+                  title="Campos RD Station"
+                  open={sidebarSections.rdFields}
+                  onToggle={() => toggleSection("rdFields")}
+                >
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-1.5 mb-2">
+                      <Badge variant="secondary" className="text-[10px] bg-orange-500/10 text-orange-600 border-orange-200">
+                        Auto-captura
+                      </Badge>
+                      <span className="text-[10px] text-muted-foreground">
+                        {Object.keys(deal.rdCustomFields as Record<string, string>).length} campo(s)
+                      </span>
+                    </div>
+                    {Object.entries(deal.rdCustomFields as Record<string, string>).map(([key, value]) => {
+                      // Format the key: remove cf_ prefix and replace underscores with spaces
+                      const label = key
+                        .replace(/^cf_/, "")
+                        .replace(/_/g, " ")
+                        .replace(/\b\w/g, (c) => c.toUpperCase());
+                      return (
+                        <SidebarField
+                          key={key}
+                          label={label}
+                          value={String(value)}
+                        />
+                      );
+                    })}
                   </div>
                 </SidebarSection>
                 <SidebarDivider />

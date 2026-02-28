@@ -41,6 +41,7 @@ export interface InboundLeadPayload {
     content?: string;
     term?: string;
   };
+  rdCustomFields?: Record<string, string>;
   meta?: Record<string, any>;
   raw?: Record<string, any>;
 }
@@ -327,6 +328,7 @@ export async function processInboundLead(
       utmTerm: payload.utm?.term || undefined,
       utmContent: payload.utm?.content || undefined,
       utmJson: payload.utm ? (payload.utm as any) : undefined,
+      rdCustomFields: payload.rdCustomFields ? (payload.rdCustomFields as any) : undefined,
       metaJson: payload.meta ? (payload.meta as any) : undefined,
       rawPayloadJson: payload.raw ? (payload.raw as any) : (payload as any),
       dedupeKey,

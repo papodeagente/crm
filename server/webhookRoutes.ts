@@ -754,7 +754,35 @@ router.post("/api/webhooks/rdstation", async (req: Request, res: Response) => {
         const directUtmContent = lead.utm_content || utmContent;
         const directUtmTerm = lead.utm_term || utmTerm;
 
-        // 7. Build payload for lead processor
+        // 7. Auto-capture all cf_* custom fields from RD Station
+        const rdCustomFields: Record<string, string> = {};
+        // Capture from custom_fields object (standard RD format)
+        if (lead.custom_fields && typeof lead.custom_fields === "object") {
+          for (const [key, value] of Object.entries(lead.custom_fields)) {
+            if (value !== null && value !== undefined && String(value).trim() !== "") {
+              rdCustomFields[key] = String(value);
+            }
+          }
+        }
+        // Also capture any top-level cf_* fields
+        for (const [key, value] of Object.entries(lead)) {
+          if (key.startsWith("cf_") && value !== null && value !== undefined && String(value).trim() !== "") {
+            rdCustomFields[key] = String(value);
+          }
+        }
+        // Capture from last_conversion content (form fields)
+        const convContent = lastConversion?.content || {};
+        if (typeof convContent === "object") {
+          for (const [key, value] of Object.entries(convContent)) {
+            if (key.startsWith("cf_") && value !== null && value !== undefined && String(value).trim() !== "") {
+              rdCustomFields[key] = String(value);
+            }
+          }
+        }
+
+        const hasCustomFields = Object.keys(rdCustomFields).length > 0;
+
+        // 8. Build payload for lead processor
         const hasUtm = !!(directUtmSource || directUtmMedium || directUtmCampaign || directUtmContent || directUtmTerm);
 
         const payload: InboundLeadPayload = {
@@ -771,6 +799,7 @@ router.post("/api/webhooks/rdstation", async (req: Request, res: Response) => {
             content: directUtmContent || undefined,
             term: directUtmTerm || undefined,
           } : undefined,
+          rdCustomFields: hasCustomFields ? rdCustomFields : undefined,
           meta: {
             channel: "rdstation",
             company,

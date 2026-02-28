@@ -378,6 +378,7 @@ export const deals = mysqlTable("deals", {
   utmTerm: varchar("utmTerm", { length: 255 }),
   utmContent: varchar("utmContent", { length: 255 }),
   utmJson: json("utmJson"),
+  rdCustomFields: json("rdCustomFields").$type<Record<string, string>>(),
   metaJson: json("metaJson"),
   rawPayloadJson: json("rawPayloadJson"),
   dedupeKey: varchar("dedupeKey", { length: 255 }),

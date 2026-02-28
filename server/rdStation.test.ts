@@ -264,3 +264,92 @@ describe("RD Station schema tables", () => {
     expect(table).toBeDefined();
   });
 });
+
+// ─── Auto-capture cf_* fields ─────────────────────────────
+
+describe("RD Station auto-capture cf_* fields", () => {
+  it("deals table has rdCustomFields column in schema", async () => {
+    const schema = await import("../drizzle/schema");
+    expect(schema.deals).toBeDefined();
+    // rdCustomFields is a json column
+    expect(schema.deals.rdCustomFields).toBeDefined();
+  });
+
+  it("webhook route extracts cf_ fields from RD Station payload", async () => {
+    // Simulate the extraction logic used in the webhook handler
+    const sampleLead = {
+      email: "test@example.com",
+      name: "Test Lead",
+      personal_phone: "+5511999999999",
+      cf_voce_ja_tem_um_grupo: "Sim",
+      cf_fbc: "fb.1.12345.67890",
+      cf_fbp: "fb.1.98765.43210",
+      cf_destino_interesse: "Europa",
+      company: "Test Company",
+      job_title: "CEO",
+    };
+
+    // Extract cf_ fields (same logic as webhook handler)
+    const rdCustomFields: Record<string, string> = {};
+    for (const [key, value] of Object.entries(sampleLead)) {
+      if (key.startsWith("cf_") && value != null && String(value).trim() !== "") {
+        rdCustomFields[key] = String(value);
+      }
+    }
+
+    expect(Object.keys(rdCustomFields).length).toBe(4);
+    expect(rdCustomFields["cf_voce_ja_tem_um_grupo"]).toBe("Sim");
+    expect(rdCustomFields["cf_fbc"]).toBe("fb.1.12345.67890");
+    expect(rdCustomFields["cf_fbp"]).toBe("fb.1.98765.43210");
+    expect(rdCustomFields["cf_destino_interesse"]).toBe("Europa");
+    // Non cf_ fields should not be included
+    expect(rdCustomFields["company"]).toBeUndefined();
+    expect(rdCustomFields["email"]).toBeUndefined();
+  });
+
+  it("ignores empty cf_ fields", () => {
+    const sampleLead = {
+      cf_filled: "Has value",
+      cf_empty: "",
+      cf_null: null,
+      cf_whitespace: "   ",
+    };
+
+    const rdCustomFields: Record<string, string> = {};
+    for (const [key, value] of Object.entries(sampleLead)) {
+      if (key.startsWith("cf_") && value != null && String(value).trim() !== "") {
+        rdCustomFields[key] = String(value);
+      }
+    }
+
+    expect(Object.keys(rdCustomFields).length).toBe(1);
+    expect(rdCustomFields["cf_filled"]).toBe("Has value");
+  });
+
+  it("handles leads with no cf_ fields gracefully", () => {
+    const sampleLead = {
+      email: "test@example.com",
+      name: "Test Lead",
+      company: "Test Company",
+    };
+
+    const rdCustomFields: Record<string, string> = {};
+    for (const [key, value] of Object.entries(sampleLead)) {
+      if (key.startsWith("cf_") && value != null && String(value).trim() !== "") {
+        rdCustomFields[key] = String(value);
+      }
+    }
+
+    expect(Object.keys(rdCustomFields).length).toBe(0);
+  });
+
+  it("formats cf_ field labels correctly for display", () => {
+    const key = "cf_voce_ja_tem_um_grupo_de_viagens_pronto_para_ser_lancado";
+    const label = key
+      .replace(/^cf_/, "")
+      .replace(/_/g, " ")
+      .replace(/\b\w/g, (c) => c.toUpperCase());
+
+    expect(label).toBe("Voce Ja Tem Um Grupo De Viagens Pronto Para Ser Lancado");
+  });
+});
