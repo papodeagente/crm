@@ -169,8 +169,8 @@ function CRMDashboard() {
                 <TrendingUp className="h-5 w-5 text-emerald-500" />
               </div>
               <div>
-                <p className="text-[14px] font-semibold">Resumo dos Últimos 30 Dias</p>
-                <p className="text-[12px] text-muted-foreground">Variação em relação ao período anterior</p>
+                <p className="text-[14px] font-semibold">Resumo do Período</p>
+                <p className="text-[12px] text-muted-foreground">Variação em relação ao período anterior equivalente</p>
               </div>
             </div>
             {h ? (
@@ -179,9 +179,10 @@ function CRMDashboard() {
                   <p className="text-xs text-muted-foreground uppercase tracking-wider">Negócios</p>
                   <div className="flex items-baseline gap-1.5 mt-1">
                     <span className="text-xl font-bold">{h.activeDeals}</span>
-                    {h.activeDealsChange > 0 && (
-                      <span className="text-xs text-emerald-500 flex items-center">
-                        <ArrowUpRight className="h-3 w-3" /> +{h.activeDealsChange}
+                    {h.activeDealsChange !== 0 && (
+                      <span className={`text-xs flex items-center ${h.activeDealsChange > 0 ? "text-emerald-500" : "text-red-500"}`}>
+                        {h.activeDealsChange > 0 ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
+                        {h.activeDealsChange > 0 ? "+" : ""}{h.activeDealsChange}%
                       </span>
                     )}
                   </div>
@@ -190,9 +191,10 @@ function CRMDashboard() {
                   <p className="text-xs text-muted-foreground uppercase tracking-wider">Contatos</p>
                   <div className="flex items-baseline gap-1.5 mt-1">
                     <span className="text-xl font-bold">{h.totalContacts}</span>
-                    {h.totalContactsChange > 0 && (
-                      <span className="text-xs text-emerald-500 flex items-center">
-                        <ArrowUpRight className="h-3 w-3" /> +{h.totalContactsChange}
+                    {h.totalContactsChange !== 0 && (
+                      <span className={`text-xs flex items-center ${h.totalContactsChange > 0 ? "text-emerald-500" : "text-red-500"}`}>
+                        {h.totalContactsChange > 0 ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
+                        {h.totalContactsChange > 0 ? "+" : ""}{h.totalContactsChange}%
                       </span>
                     )}
                   </div>
@@ -201,12 +203,24 @@ function CRMDashboard() {
                   <p className="text-xs text-muted-foreground uppercase tracking-wider">Viagens</p>
                   <div className="flex items-baseline gap-1.5 mt-1">
                     <span className="text-xl font-bold">{h.activeTrips}</span>
+                    {h.activeTripsChange !== 0 && (
+                      <span className={`text-xs flex items-center ${h.activeTripsChange > 0 ? "text-emerald-500" : "text-red-500"}`}>
+                        {h.activeTripsChange > 0 ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
+                        {h.activeTripsChange > 0 ? "+" : ""}{h.activeTripsChange}%
+                      </span>
+                    )}
                   </div>
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground uppercase tracking-wider">Tarefas Pendentes</p>
                   <div className="flex items-baseline gap-1.5 mt-1">
                     <span className="text-xl font-bold">{h.pendingTasks}</span>
+                    {h.pendingTasksChange !== 0 && (
+                      <span className={`text-xs flex items-center ${h.pendingTasksChange > 0 ? "text-emerald-500" : "text-red-500"}`}>
+                        {h.pendingTasksChange > 0 ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
+                        {h.pendingTasksChange > 0 ? "+" : ""}{h.pendingTasksChange}%
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>

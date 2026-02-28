@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Plus, Search, Users, Mail, Phone, MoreHorizontal, Trash2, Edit, Eye, RotateCcw, AlertTriangle, Archive } from "lucide-react";
 import { useState } from "react";
+import DateRangeFilter, { useDateFilter } from "@/components/DateRangeFilter";
 import { Link } from "wouter";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
@@ -33,8 +34,9 @@ export default function Contacts() {
   const utils = trpc.useUtils();
   const { user } = useAuth();
   const isAdmin = user?.role === "admin";
+  const dateFilter = useDateFilter("all");
 
-  const contacts = trpc.crm.contacts.list.useQuery({ tenantId: TENANT_ID, search: search || undefined, limit: 100 });
+  const contacts = trpc.crm.contacts.list.useQuery({ tenantId: TENANT_ID, search: search || undefined, limit: 100, dateFrom: dateFilter.dates.dateFrom, dateTo: dateFilter.dates.dateTo });
   const deletedContacts = trpc.crm.contacts.listDeleted.useQuery({ tenantId: TENANT_ID, limit: 100 }, { enabled: showTrash });
 
   const createContact = trpc.crm.contacts.create.useMutation({
@@ -103,6 +105,15 @@ export default function Contacts() {
           <p className="text-[13px] text-muted-foreground/70 mt-0.5">{total} contato{total !== 1 ? "s" : ""}</p>
         </div>
         <div className="flex items-center gap-2">
+          <DateRangeFilter
+            preset={dateFilter.preset}
+            onPresetChange={dateFilter.setPreset}
+            customFrom={dateFilter.customFrom}
+            onCustomFromChange={dateFilter.setCustomFrom}
+            customTo={dateFilter.customTo}
+            onCustomToChange={dateFilter.setCustomTo}
+            onReset={dateFilter.reset}
+          />
           <Button
             variant={showTrash ? "default" : "outline"}
             size="sm"

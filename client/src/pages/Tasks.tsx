@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Plus, ClipboardList, CheckCircle2, Circle, Clock, AlertTriangle } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+import DateRangeFilter, { useDateFilter } from "@/components/DateRangeFilter";
 
 const TENANT_ID = 1;
 
@@ -30,8 +31,9 @@ export default function Tasks() {
   const [priority, setPriority] = useState("medium");
   const [dueAt, setDueAt] = useState("");
   const utils = trpc.useUtils();
+  const dateFilter = useDateFilter("all");
 
-  const tasks = trpc.crm.tasks.list.useQuery({ tenantId: TENANT_ID });
+  const tasks = trpc.crm.tasks.list.useQuery({ tenantId: TENANT_ID, dateFrom: dateFilter.dates.dateFrom, dateTo: dateFilter.dates.dateTo });
   const createTask = trpc.crm.tasks.create.useMutation({
     onSuccess: () => { utils.crm.tasks.list.invalidate(); setOpen(false); setTitle(""); setDueAt(""); toast.success("Tarefa criada!"); },
   });
@@ -52,12 +54,22 @@ export default function Tasks() {
             {pending} pendentes \u2022 {done} concluídas
           </p>
         </div>
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild>
-            <Button className="h-9 gap-2 px-5 rounded-lg bg-primary hover:bg-primary/90 shadow-sm text-[13px] font-medium transition-colors">
-              <Plus className="h-4 w-4" />Nova Tarefa
-            </Button>
-          </DialogTrigger>
+        <div className="flex items-center gap-2">
+          <DateRangeFilter
+            preset={dateFilter.preset}
+            onPresetChange={dateFilter.setPreset}
+            customFrom={dateFilter.customFrom}
+            onCustomFromChange={dateFilter.setCustomFrom}
+            customTo={dateFilter.customTo}
+            onCustomToChange={dateFilter.setCustomTo}
+            onReset={dateFilter.reset}
+          />
+          <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
+              <Button className="h-9 gap-2 px-5 rounded-lg bg-primary hover:bg-primary/90 shadow-sm text-[13px] font-medium transition-colors">
+                <Plus className="h-4 w-4" />Nova Tarefa
+              </Button>
+            </DialogTrigger>
           <DialogContent className="sm:max-w-[440px] rounded-2xl">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2.5 text-lg">
@@ -88,7 +100,8 @@ export default function Tasks() {
               </Button>
             </div>
           </DialogContent>
-        </Dialog>
+          </Dialog>
+        </div>
       </div>
 
       {/* Table */}

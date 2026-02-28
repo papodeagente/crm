@@ -1340,6 +1340,17 @@
 - [x] Aplicar filtro no CRM Dashboard (Análises)
 - [x] Aplicar filtro no Mensagens WhatsApp Dashboard (Análises)
 - [x] Aplicar filtro na Home (Dashboard principal)
-- [ ] Aplicar filtro na lista de Negociações — pendente (requer mudança no backend de listagem)
-- [ ] Aplicar filtro na lista de Contatos — pendente (requer mudança no backend de listagem)
-- [ ] Aplicar filtro na lista de Tarefas — pendente (requer mudança no backend de listagem)
+- [x] Aplicar filtro na lista de Negociações
+- [x] Aplicar filtro na lista de Contatos
+- [x] Aplicar filtro na lista de Tarefas
+
+## Filtro de Data nas Listas + Variação Percentual nos KPIs
+
+- [x] Backend: adicionar dateFrom/dateTo na listagem de deals (crm.deals.list)
+- [x] Backend: adicionar dateFrom/dateTo na listagem de contacts (crm.contacts.list)
+- [x] Backend: adicionar dateFrom/dateTo na listagem de tasks (crm.tasks.list)
+- [x] Frontend: DateRangeFilter na página Negociações (Deals.tsx)
+- [x] Frontend: DateRangeFilter na página Contatos (Contacts.tsx)
+- [x] Frontend: DateRangeFilter na página Tarefas (Tasks.tsx)
+- [x] KPIs: variação percentual entre período selecionado e período anterior na Home
+- [x] KPIs: variação percentual entre período selecionado e período anterior no CRM Dashboard

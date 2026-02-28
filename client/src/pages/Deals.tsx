@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Plus, Briefcase, MoreHorizontal, Trash2, TrendingUp, DollarSign, RotateCcw, AlertTriangle, Archive } from "lucide-react";
 import { useState, useMemo } from "react";
+import DateRangeFilter, { useDateFilter } from "@/components/DateRangeFilter";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -30,8 +31,9 @@ export default function Deals() {
   const utils = trpc.useUtils();
   const { user } = useAuth();
   const isAdmin = user?.role === "admin";
+  const dateFilter = useDateFilter("all");
 
-  const deals = trpc.crm.deals.list.useQuery({ tenantId: TENANT_ID, limit: 200 });
+  const deals = trpc.crm.deals.list.useQuery({ tenantId: TENANT_ID, limit: 200, dateFrom: dateFilter.dates.dateFrom, dateTo: dateFilter.dates.dateTo });
   const deletedDeals = trpc.crm.deals.listDeleted.useQuery({ tenantId: TENANT_ID, limit: 100 }, { enabled: showTrash });
   const pipelines = trpc.crm.pipelines.list.useQuery({ tenantId: TENANT_ID });
 
@@ -103,6 +105,15 @@ export default function Deals() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <DateRangeFilter
+            preset={dateFilter.preset}
+            onPresetChange={dateFilter.setPreset}
+            customFrom={dateFilter.customFrom}
+            onCustomFromChange={dateFilter.setCustomFrom}
+            customTo={dateFilter.customTo}
+            onCustomToChange={dateFilter.setCustomTo}
+            onReset={dateFilter.reset}
+          />
           <Button
             variant={showTrash ? "default" : "outline"}
             size="sm"

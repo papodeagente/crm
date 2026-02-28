@@ -9,7 +9,7 @@ export const crmRouter = router({
   // ─── CONTACTS ───
   contacts: router({
     list: protectedProcedure
-      .input(z.object({ tenantId: z.number(), search: z.string().optional(), stage: z.string().optional(), limit: z.number().default(50), offset: z.number().default(0) }))
+      .input(z.object({ tenantId: z.number(), search: z.string().optional(), stage: z.string().optional(), limit: z.number().default(50), offset: z.number().default(0), dateFrom: z.string().optional(), dateTo: z.string().optional() }))
       .query(async ({ input }) => {
         return crm.listContacts(input.tenantId, input);
       }),
@@ -234,7 +234,7 @@ export const crmRouter = router({
   // ─── DEALS ───
   deals: router({
     list: protectedProcedure
-      .input(z.object({ tenantId: z.number(), pipelineId: z.number().optional(), stageId: z.number().optional(), status: z.string().optional(), limit: z.number().default(200), offset: z.number().default(0) }))
+      .input(z.object({ tenantId: z.number(), pipelineId: z.number().optional(), stageId: z.number().optional(), status: z.string().optional(), limit: z.number().default(200), offset: z.number().default(0), dateFrom: z.string().optional(), dateTo: z.string().optional() }))
       .query(async ({ input }) => {
         return crm.listDeals(input.tenantId, input);
       }),
@@ -606,7 +606,7 @@ export const crmRouter = router({
   // ─── TASKS ───
   tasks: router({
     list: protectedProcedure
-      .input(z.object({ tenantId: z.number(), entityType: z.string().optional(), entityId: z.number().optional(), status: z.string().optional() }))
+      .input(z.object({ tenantId: z.number(), entityType: z.string().optional(), entityId: z.number().optional(), status: z.string().optional(), dateFrom: z.string().optional(), dateTo: z.string().optional() }))
       .query(async ({ input }) => {
         return crm.listTasks(input.tenantId, input);
       }),

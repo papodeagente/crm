@@ -1,4 +1,4 @@
-import { eq, and, desc, asc, like, sql, inArray, count, sum, gte, lt, isNull, isNotNull } from "drizzle-orm";
+import { eq, and, desc, asc, like, sql, inArray, count, sum, gte, lt, lte, isNull, isNotNull } from "drizzle-orm";
 import { getDb } from "./db";
 import {
   tenants, crmUsers, teams, teamMembers, roles, permissions, rolePermissions, userRoles, apiKeys,
@@ -130,11 +130,13 @@ export async function getContactById(tenantId: number, id: number) {
   const rows = await db.select().from(contacts).where(and(eq(contacts.id, id), eq(contacts.tenantId, tenantId))).limit(1);
   return rows[0] || null;
 }
-export async function listContacts(tenantId: number, opts?: { search?: string; stage?: string; limit?: number; offset?: number; includeDeleted?: boolean }) {
+export async function listContacts(tenantId: number, opts?: { search?: string; stage?: string; limit?: number; offset?: number; includeDeleted?: boolean; dateFrom?: string; dateTo?: string }) {
   const db = await getDb(); if (!db) return [];
   const conditions: any[] = [eq(contacts.tenantId, tenantId)];
   if (!opts?.includeDeleted) conditions.push(isNull(contacts.deletedAt));
   if (opts?.search) conditions.push(like(contacts.name, `%${opts.search}%`));
+  if (opts?.dateFrom) conditions.push(gte(contacts.createdAt, new Date(opts.dateFrom + "T00:00:00")));
+  if (opts?.dateTo) conditions.push(lte(contacts.createdAt, new Date(opts.dateTo + "T23:59:59")));
   return db.select().from(contacts).where(and(...conditions)).orderBy(desc(contacts.updatedAt)).limit(opts?.limit || 50).offset(opts?.offset || 0);
 }
 export async function updateContact(tenantId: number, id: number, data: Partial<{ name: string; email: string; phone: string; lifecycleStage: "lead" | "prospect" | "customer" | "churned"; notes: string; ownerUserId: number; updatedBy: number }>) {
@@ -217,12 +219,14 @@ export async function getDealById(tenantId: number, id: number) {
   const rows = await db.select().from(deals).where(and(eq(deals.id, id), eq(deals.tenantId, tenantId))).limit(1);
   return rows[0] || null;
 }
-export async function listDeals(tenantId: number, opts?: { pipelineId?: number; stageId?: number; status?: string; limit?: number; offset?: number; includeDeleted?: boolean }) {
+export async function listDeals(tenantId: number, opts?: { pipelineId?: number; stageId?: number; status?: string; limit?: number; offset?: number; includeDeleted?: boolean; dateFrom?: string; dateTo?: string }) {
   const db = await getDb(); if (!db) return [];
   const conditions: any[] = [eq(deals.tenantId, tenantId)];
   if (!opts?.includeDeleted) conditions.push(isNull(deals.deletedAt));
   if (opts?.pipelineId) conditions.push(eq(deals.pipelineId, opts.pipelineId));
   if (opts?.stageId) conditions.push(eq(deals.stageId, opts.stageId));
+  if (opts?.dateFrom) conditions.push(gte(deals.createdAt, new Date(opts.dateFrom + "T00:00:00")));
+  if (opts?.dateTo) conditions.push(lte(deals.createdAt, new Date(opts.dateTo + "T23:59:59")));
   return db.select().from(deals).where(and(...conditions)).orderBy(desc(deals.lastActivityAt)).limit(opts?.limit || 50).offset(opts?.offset || 0);
 }
 export async function bulkSoftDeleteDeals(tenantId: number, ids: number[]) {
@@ -390,11 +394,13 @@ export async function createTask(data: { tenantId: number; entityType: string; e
   const [result] = await db.insert(tasks).values(data).$returningId();
   return result;
 }
-export async function listTasks(tenantId: number, opts?: { entityType?: string; entityId?: number; status?: string }) {
+export async function listTasks(tenantId: number, opts?: { entityType?: string; entityId?: number; status?: string; dateFrom?: string; dateTo?: string }) {
   const db = await getDb(); if (!db) return [];
-  const conditions = [eq(tasks.tenantId, tenantId)];
+  const conditions: any[] = [eq(tasks.tenantId, tenantId)];
   if (opts?.entityType) conditions.push(eq(tasks.entityType, opts.entityType));
   if (opts?.entityId) conditions.push(eq(tasks.entityId, opts.entityId));
+  if (opts?.dateFrom) conditions.push(gte(tasks.createdAt, new Date(opts.dateFrom + "T00:00:00")));
+  if (opts?.dateTo) conditions.push(lte(tasks.createdAt, new Date(opts.dateTo + "T23:59:59")));
   return db.select().from(tasks).where(and(...conditions)).orderBy(desc(tasks.createdAt));
 }
 export async function updateTask(tenantId: number, id: number, data: Partial<{ title: string; status: "pending" | "in_progress" | "done" | "cancelled"; priority: "low" | "medium" | "high" | "urgent"; dueAt: Date; assignedToUserId: number }>) {
