@@ -86,6 +86,7 @@ const settingsCategories: SettingsCategory[] = [
     title: "AVANÇADO",
     links: [
       { icon: Plug, label: "Integrações", path: "/integrations" },
+      { icon: Megaphone, label: "RD Station Marketing", path: "/settings/rdstation", badge: "Novo" },
       { icon: FileText, label: "Propostas", path: "/proposals" },
       { icon: Globe, label: "Portal do Cliente", path: "/portal" },
       { icon: BookOpen, label: "Documentação API", path: "/api-docs" },

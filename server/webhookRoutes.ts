@@ -16,7 +16,7 @@ import {
   type InboundLeadPayload,
 } from "./leadProcessor";
 import { getDb } from "./db";
-import { eventLog, trackingTokens } from "../drizzle/schema";
+import { eventLog, trackingTokens, rdStationConfig, rdStationWebhookLog } from "../drizzle/schema";
 import { eq, and, sql } from "drizzle-orm";
 import { ENV } from "./_core/env";
 import { generateTrackerScript } from "./tracker-script";
@@ -663,6 +663,204 @@ router.options("/api/collect", (_req: Request, res: Response) => {
     "Access-Control-Max-Age": "86400",
   });
   return res.status(204).send();
+});
+
+// ─── RD Station Marketing Webhook ───────────────────────
+
+router.post("/webhooks/rdstation", async (req: Request, res: Response) => {
+  const tenantId = 1;
+  const clientIp = req.ip || req.socket.remoteAddress || "unknown";
+
+  try {
+    // 1. Rate limiting
+    const rateCheck = checkRateLimit(clientIp);
+    if (!rateCheck.allowed) {
+      return res.status(429).json({ error: "Rate limit exceeded" });
+    }
+
+    // 2. Validate token from query param
+    const token = (req.query.token as string) || "";
+    if (!token) {
+      console.warn("[RD Station Webhook] Missing token");
+      return res.status(401).json({ error: "Missing token parameter" });
+    }
+
+    const db = await getDb();
+    if (!db) {
+      return res.status(500).json({ error: "Service unavailable" });
+    }
+
+    // 3. Validate token against config
+    const configRows = await db
+      .select()
+      .from(rdStationConfig)
+      .where(eq(rdStationConfig.tenantId, tenantId))
+      .limit(1);
+
+    if (configRows.length === 0 || configRows[0]!.webhookToken !== token) {
+      console.warn("[RD Station Webhook] Invalid token");
+      return res.status(403).json({ error: "Invalid token" });
+    }
+
+    const config = configRows[0]!;
+    if (!config.isActive) {
+      return res.status(503).json({ error: "Integration is disabled" });
+    }
+
+    // 4. Parse RD Station payload
+    // RD Station sends: { leads: [ { id, email, name, ... } ] }
+    const body = req.body;
+    const leads = body?.leads;
+
+    if (!leads || !Array.isArray(leads) || leads.length === 0) {
+      console.warn("[RD Station Webhook] Empty or invalid payload");
+      // Log the raw payload for debugging
+      await db.insert(rdStationWebhookLog).values({
+        tenantId,
+        status: "failed",
+        error: "Empty or invalid payload: missing leads array",
+        rawPayload: body as any,
+      });
+      return res.status(400).json({ error: "Invalid payload: expected { leads: [...] }" });
+    }
+
+    const results: Array<{ email?: string; success: boolean; dealId?: number }> = [];
+
+    for (const lead of leads) {
+      try {
+        // 5. Extract lead data
+        const email = lead.email || "";
+        const name = lead.name || "";
+        const phone = lead.personal_phone || lead.mobile_phone || "";
+        const company = lead.company || "";
+        const jobTitle = lead.job_title || "";
+        const rdLeadId = lead.id ? String(lead.id) : undefined;
+
+        // 6. Extract UTM from last_conversion.conversion_origin (most recent)
+        const lastConversion = lead.last_conversion || lead.first_conversion;
+        const conversionOrigin = lastConversion?.conversion_origin || {};
+        const conversionIdentifier = lastConversion?.content?.identificador || lastConversion?.content?.form_name || "";
+
+        const utmSource = conversionOrigin.source || "";
+        const utmMedium = conversionOrigin.medium || "";
+        const utmCampaign = conversionOrigin.campaign || "";
+        const utmContent = conversionOrigin.content || "";
+        const utmTerm = conversionOrigin.term || "";
+
+        // Also check for direct UTM fields (some RD Station versions)
+        const directUtmSource = lead.utm_source || lead.traffic_source || utmSource;
+        const directUtmMedium = lead.utm_medium || lead.traffic_medium || utmMedium;
+        const directUtmCampaign = lead.utm_campaign || lead.traffic_campaign || utmCampaign;
+        const directUtmContent = lead.utm_content || utmContent;
+        const directUtmTerm = lead.utm_term || utmTerm;
+
+        // 7. Build payload for lead processor
+        const hasUtm = !!(directUtmSource || directUtmMedium || directUtmCampaign || directUtmContent || directUtmTerm);
+
+        const payload: InboundLeadPayload = {
+          name: name || company || "Lead RD Station",
+          email,
+          phone,
+          message: conversionIdentifier ? `Conversão: ${conversionIdentifier}` : undefined,
+          source: "rdstation",
+          lead_id: rdLeadId,
+          utm: hasUtm ? {
+            source: directUtmSource || undefined,
+            medium: directUtmMedium || undefined,
+            campaign: directUtmCampaign || undefined,
+            content: directUtmContent || undefined,
+            term: directUtmTerm || undefined,
+          } : undefined,
+          meta: {
+            channel: "rdstation",
+            company,
+            jobTitle,
+            city: lead.city || "",
+            state: lead.state || "",
+            tags: lead.tags || [],
+            leadStage: lead.lead_stage || "",
+            opportunity: lead.opportunity === "true" || lead.opportunity === true,
+            conversionIdentifier,
+            numberConversions: lead.number_conversions,
+            customFields: lead.custom_fields || {},
+          },
+          raw: lead,
+        };
+
+        // 8. Process the lead
+        const result = await processInboundLead(tenantId, payload);
+
+        // 9. Log in rd_station_webhook_log
+        await db.insert(rdStationWebhookLog).values({
+          tenantId,
+          rdLeadId,
+          conversionIdentifier,
+          email,
+          name: name || company || "Lead RD Station",
+          phone,
+          utmSource: directUtmSource || null,
+          utmMedium: directUtmMedium || null,
+          utmCampaign: directUtmCampaign || null,
+          utmContent: directUtmContent || null,
+          utmTerm: directUtmTerm || null,
+          status: result.success ? (result.isExisting ? "duplicate" : "success") : "failed",
+          dealId: result.dealId ?? null,
+          contactId: result.contactId ?? null,
+          error: result.error || null,
+          rawPayload: lead as any,
+        });
+
+        // 10. Update config stats
+        await db
+          .update(rdStationConfig)
+          .set({
+            totalLeadsReceived: sql`${rdStationConfig.totalLeadsReceived} + 1`,
+            lastLeadReceivedAt: new Date(),
+          })
+          .where(eq(rdStationConfig.id, config.id));
+
+        results.push({ email, success: result.success, dealId: result.dealId });
+
+        console.log(`[RD Station Webhook] Lead ${rdLeadId || email}: ${result.success ? "success" : "failed"} → deal #${result.dealId || "N/A"}`);
+      } catch (leadErr: any) {
+        console.error(`[RD Station Webhook] Error processing lead:`, leadErr.message);
+
+        await db.insert(rdStationWebhookLog).values({
+          tenantId,
+          rdLeadId: lead.id ? String(lead.id) : null,
+          email: lead.email || null,
+          name: lead.name || null,
+          status: "failed",
+          error: leadErr.message,
+          rawPayload: lead as any,
+        });
+
+        results.push({ email: lead.email, success: false });
+      }
+    }
+
+    // Log event
+    await logEvent({
+      tenantId,
+      actorType: "webhook",
+      entityType: "lead",
+      action: "rdstation_webhook_received",
+      metadataJson: {
+        leadsCount: leads.length,
+        results,
+        ip: clientIp,
+      },
+    });
+
+    return res.status(200).json({
+      success: true,
+      processed: results.length,
+      results,
+    });
+  } catch (error: any) {
+    console.error("[RD Station Webhook] Error:", error.message);
+    return res.status(500).json({ error: "Internal server error" });
+  }
 });
 
 export { router as webhookRouter };

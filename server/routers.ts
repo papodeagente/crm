@@ -98,9 +98,9 @@ import {
 } from "./leadProcessor";
 import { randomBytes } from "crypto";
 import { getDb } from "./db";
-import { trackingTokens } from "../drizzle/schema";
+import { trackingTokens, rdStationConfig, rdStationWebhookLog } from "../drizzle/schema";
 import { generateTrackerScript } from "./tracker-script";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, sql } from "drizzle-orm";
 
 export const appRouter = router({
   system: systemRouter,
@@ -1026,6 +1026,147 @@ export const appRouter = router({
             details: null,
           };
         }
+      }),
+  }),
+
+  // ─── RD Station Marketing Integration ───
+  rdStation: router({
+    getConfig: protectedProcedure
+      .input(z.object({ tenantId: z.number() }))
+      .query(async ({ input }) => {
+        const db = await getDb();
+        if (!db) return null;
+        const rows = await db
+          .select()
+          .from(rdStationConfig)
+          .where(eq(rdStationConfig.tenantId, input.tenantId))
+          .limit(1);
+        return rows[0] || null;
+      }),
+
+    setupIntegration: protectedProcedure
+      .input(z.object({ tenantId: z.number() }))
+      .mutation(async ({ input }) => {
+        const db = await getDb();
+        if (!db) throw new Error("Database not available");
+
+        // Check if already exists
+        const existing = await db
+          .select()
+          .from(rdStationConfig)
+          .where(eq(rdStationConfig.tenantId, input.tenantId))
+          .limit(1);
+
+        if (existing.length > 0) {
+          return existing[0];
+        }
+
+        // Generate a unique webhook token
+        const token = randomBytes(32).toString("hex");
+        const [result] = await db.insert(rdStationConfig).values({
+          tenantId: input.tenantId,
+          webhookToken: token,
+        }).$returningId();
+
+        const rows = await db
+          .select()
+          .from(rdStationConfig)
+          .where(eq(rdStationConfig.id, result!.id))
+          .limit(1);
+        return rows[0]!;
+      }),
+
+    regenerateToken: protectedProcedure
+      .input(z.object({ tenantId: z.number() }))
+      .mutation(async ({ input }) => {
+        const db = await getDb();
+        if (!db) throw new Error("Database not available");
+
+        const newToken = randomBytes(32).toString("hex");
+        await db
+          .update(rdStationConfig)
+          .set({ webhookToken: newToken })
+          .where(eq(rdStationConfig.tenantId, input.tenantId));
+
+        const rows = await db
+          .select()
+          .from(rdStationConfig)
+          .where(eq(rdStationConfig.tenantId, input.tenantId))
+          .limit(1);
+        return rows[0]!;
+      }),
+
+    toggleActive: protectedProcedure
+      .input(z.object({ tenantId: z.number(), isActive: z.boolean() }))
+      .mutation(async ({ input }) => {
+        const db = await getDb();
+        if (!db) throw new Error("Database not available");
+        await db
+          .update(rdStationConfig)
+          .set({ isActive: input.isActive })
+          .where(eq(rdStationConfig.tenantId, input.tenantId));
+        return { success: true };
+      }),
+
+    getWebhookLogs: protectedProcedure
+      .input(z.object({
+        tenantId: z.number(),
+        status: z.enum(["success", "failed", "duplicate"]).optional(),
+        limit: z.number().default(50),
+        offset: z.number().default(0),
+      }))
+      .query(async ({ input }) => {
+        const db = await getDb();
+        if (!db) return { logs: [], total: 0 };
+
+        const conditions: any[] = [eq(rdStationWebhookLog.tenantId, input.tenantId)];
+        if (input.status) {
+          conditions.push(eq(rdStationWebhookLog.status, input.status));
+        }
+
+        const logs = await db
+          .select()
+          .from(rdStationWebhookLog)
+          .where(and(...conditions))
+          .orderBy(desc(rdStationWebhookLog.createdAt))
+          .limit(input.limit)
+          .offset(input.offset);
+
+        const countResult = await db
+          .select({ count: sql<number>`count(*)` })
+          .from(rdStationWebhookLog)
+          .where(and(...conditions));
+
+        return {
+          logs,
+          total: Number(countResult[0]?.count || 0),
+        };
+      }),
+
+    getStats: protectedProcedure
+      .input(z.object({ tenantId: z.number() }))
+      .query(async ({ input }) => {
+        const db = await getDb();
+        if (!db) return { total: 0, success: 0, failed: 0, duplicate: 0 };
+
+        const stats = await db
+          .select({
+            status: rdStationWebhookLog.status,
+            count: sql<number>`count(*)`,
+          })
+          .from(rdStationWebhookLog)
+          .where(eq(rdStationWebhookLog.tenantId, input.tenantId))
+          .groupBy(rdStationWebhookLog.status);
+
+        const result = { total: 0, success: 0, failed: 0, duplicate: 0 };
+        for (const row of stats) {
+          const count = Number(row.count);
+          result.total += count;
+          if (row.status === "success") result.success = count;
+          if (row.status === "failed") result.failed = count;
+          if (row.status === "duplicate") result.duplicate = count;
+        }
+        return result;
       }),
   }),
 });

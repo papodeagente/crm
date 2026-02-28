@@ -1188,3 +1188,19 @@
 ## Menu Principal — Inbox WhatsApp
 
 - [x] Adicionar link do Inbox no menu principal entre Tarefas e Análises
+
+## Integração RD Station Marketing via Webhook
+
+- [x] Criar tabelas rd_station_config e rd_station_webhook_log no schema
+- [x] UTMs já suportados via utmJson no deals (campo JSON existente)
+- [x] Migrar banco com as novas tabelas
+- [x] Criar endpoint POST /webhooks/rdstation com autenticação por token
+- [x] Processar payload do RD Station: extrair leads, UTMs, criar contato + deal automaticamente
+- [x] Criar procedures tRPC (getConfig, setupIntegration, regenerateToken, toggleActive, getWebhookLogs, getStats)
+- [x] Criar página frontend com manual passo-a-passo simplificado para leigos
+- [x] Exibir cards de estatísticas (total, sucesso, falha, duplicata)
+- [x] Histórico de recebimentos com filtros e tabela
+- [x] FAQ com perguntas frequentes
+- [x] Registrar rota /settings/rdstation no App.tsx
+- [x] Adicionar link na página de Configurações (seção Avançado com badge "Novo")
+- [x] Testes unitários para o endpoint webhook e procedures (23 testes adicionais, 461 total passando)

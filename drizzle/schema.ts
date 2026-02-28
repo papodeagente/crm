@@ -1259,3 +1259,50 @@ export type Campaign = typeof campaigns.$inferSelect;
 export type InsertCampaign = typeof campaigns.$inferInsert;
 export type LossReason = typeof lossReasons.$inferSelect;
 export type InsertLossReason = typeof lossReasons.$inferInsert;
+
+// ════════════════════════════════════════════════════════════
+// RD STATION MARKETING INTEGRATION
+// ════════════════════════════════════════════════════════════
+
+export const rdStationConfig = mysqlTable("rd_station_config", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull().default(1),
+  webhookToken: varchar("webhookToken", { length: 128 }).notNull(),
+  isActive: boolean("isActive").default(true).notNull(),
+  autoCreateDeal: boolean("autoCreateDeal").default(true).notNull(),
+  defaultPipelineId: int("defaultPipelineId"),
+  defaultStageId: int("defaultStageId"),
+  totalLeadsReceived: int("totalLeadsReceived").default(0).notNull(),
+  lastLeadReceivedAt: timestamp("lastLeadReceivedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export const rdStationWebhookLog = mysqlTable("rd_station_webhook_log", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull().default(1),
+  rdLeadId: varchar("rdLeadId", { length: 255 }),
+  conversionIdentifier: varchar("conversionIdentifier", { length: 255 }),
+  email: varchar("email", { length: 320 }),
+  name: varchar("name", { length: 255 }),
+  phone: varchar("phone", { length: 64 }),
+  utmSource: varchar("utmSource", { length: 255 }),
+  utmMedium: varchar("utmMedium", { length: 255 }),
+  utmCampaign: varchar("utmCampaign", { length: 255 }),
+  utmContent: varchar("utmContent", { length: 255 }),
+  utmTerm: varchar("utmTerm", { length: 255 }),
+  status: mysqlEnum("status", ["success", "failed", "duplicate"]).default("success").notNull(),
+  dealId: int("dealId"),
+  contactId: int("contactId"),
+  error: text("error"),
+  rawPayload: json("rawPayload"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (t) => [
+  index("rdlog_tenant_idx").on(t.tenantId),
+  index("rdlog_status_idx").on(t.tenantId, t.status),
+  index("rdlog_created_idx").on(t.tenantId, t.createdAt),
+]);
+
+export type RdStationConfig = typeof rdStationConfig.$inferSelect;
+export type InsertRdStationConfig = typeof rdStationConfig.$inferInsert;
+export type RdStationWebhookLog = typeof rdStationWebhookLog.$inferSelect;
