@@ -241,11 +241,12 @@ export default function DealDetail() {
       {/* TOP HEADER — Title + Pipeline badge + Action buttons    */}
       {/* ════════════════════════════════════════════════════════ */}
       <div className="shrink-0 border-b border-border bg-card">
-        <div className="flex items-center justify-between px-5 py-3">
+        <div className="flex items-center justify-between px-5 py-4">
           <div className="flex items-center gap-3 min-w-0">
             <button
               onClick={() => setLocation("/pipeline")}
-              className="flex items-center justify-center w-8 h-8 rounded-lg hover:bg-muted/60 transition-colors shrink-0"
+              className="flex items-center justify-center w-9 h-9 rounded-lg hover:bg-muted/60 transition-colors shrink-0 border border-border/60"
+              title="Voltar ao pipeline"
             >
               <ArrowLeft className="h-4 w-4 text-muted-foreground" />
             </button>
@@ -310,18 +311,18 @@ export default function DealDetail() {
                 <Button
                   variant="outline"
                   size="sm"
-                  className="border-red-300 text-red-600 hover:bg-red-50 hover:text-red-700 dark:border-red-500/40 dark:text-red-400 dark:hover:bg-red-500/10"
+                  className="border-red-300 text-red-600 hover:bg-red-50 hover:text-red-700 dark:border-red-500/40 dark:text-red-400 dark:hover:bg-red-500/10 gap-1.5 font-medium"
                   onClick={() => setShowLostDialog(true)}
                 >
-                  <ThumbsDown className="h-3.5 w-3.5 mr-1.5" />
+                  <ThumbsDown className="h-4 w-4" />
                   Marcar perda
                 </Button>
                 <Button
                   size="sm"
-                  className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm"
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm gap-1.5 font-medium"
                   onClick={() => setShowWonDialog(true)}
                 >
-                  <ThumbsUp className="h-3.5 w-3.5 mr-1.5" />
+                  <ThumbsUp className="h-4 w-4" />
                   Marcar venda
                 </Button>
               </>
@@ -330,38 +331,92 @@ export default function DealDetail() {
         </div>
 
         {/* ════════════════════════════════════════════════════════ */}
-        {/* STAGE BAR — Clickable pipeline stages                   */}
+        {/* STAGE BAR — Chevron arrow pipeline steps (RD Station style) */}
         {/* ════════════════════════════════════════════════════════ */}
         {stages.length > 0 && deal.status === "open" && (
-          <div className="flex items-stretch px-5 pb-3 gap-0.5 overflow-x-auto">
+          <div className="flex items-stretch px-5 pb-4 overflow-x-auto" style={{ gap: 0 }}>
             {stages.map((stage: any, idx: number) => {
               const isActive = stage.id === deal.stageId;
               const isPast = idx < currentStageIdx;
               const isWon = stage.isWon;
               const isLost = stage.isLost;
+              const isFirst = idx === 0;
+              const isLast = idx === stages.length - 1;
+              const total = stages.length;
 
-              let bgClass = "bg-muted/50 dark:bg-muted/30 text-muted-foreground hover:bg-muted/80";
-              if (isActive) bgClass = "bg-primary text-primary-foreground shadow-sm font-semibold";
-              else if (isPast) bgClass = "bg-primary/30 text-primary dark:bg-primary/20 dark:text-primary";
-              if (isWon) bgClass = isPast || isActive ? "bg-emerald-500 text-white font-semibold" : "bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 dark:text-emerald-400";
-              if (isLost) bgClass = isPast || isActive ? "bg-red-500 text-white font-semibold" : "bg-red-500/10 text-red-600 hover:bg-red-500/20 dark:text-red-400";
+              // Colors
+              let bg = "var(--muted)";
+              let fg = "var(--muted-foreground)";
+              let hoverBg = "oklch(0.90 0.01 250)";
+              if (isActive) { bg = "var(--primary)"; fg = "var(--primary-foreground)"; hoverBg = bg; }
+              else if (isPast) { bg = "oklch(0.82 0.08 290)"; fg = "var(--primary)"; hoverBg = "oklch(0.78 0.10 290)"; }
+              if (isWon && (isPast || isActive)) { bg = "oklch(0.60 0.18 155)"; fg = "#fff"; hoverBg = bg; }
+              else if (isWon) { bg = "oklch(0.92 0.04 155)"; fg = "oklch(0.45 0.15 155)"; hoverBg = "oklch(0.88 0.06 155)"; }
+              if (isLost && (isPast || isActive)) { bg = "oklch(0.58 0.24 25)"; fg = "#fff"; hoverBg = bg; }
+              else if (isLost) { bg = "oklch(0.92 0.04 25)"; fg = "oklch(0.50 0.20 25)"; hoverBg = "oklch(0.88 0.06 25)"; }
+
+              // Next stage bg for arrow color
+              const nextStage = stages[idx + 1];
+              let nextBg = "var(--card)";
+              if (nextStage) {
+                const nextIsActive = nextStage.id === deal.stageId;
+                const nextIsPast = idx + 1 < currentStageIdx;
+                if (nextIsActive) nextBg = "var(--primary)";
+                else if (nextIsPast) nextBg = "oklch(0.82 0.08 290)";
+                else nextBg = "var(--muted)";
+                if (nextStage.isWon && (nextIsPast || nextIsActive)) nextBg = "oklch(0.60 0.18 155)";
+                else if (nextStage.isWon) nextBg = "oklch(0.92 0.04 155)";
+                if (nextStage.isLost && (nextIsPast || nextIsActive)) nextBg = "oklch(0.58 0.24 25)";
+                else if (nextStage.isLost) nextBg = "oklch(0.92 0.04 25)";
+              }
+
+              const arrowW = 14;
+              const h = 44;
 
               return (
                 <button
                   key={stage.id}
                   onClick={() => handleMoveStage(stage)}
                   disabled={moveStage.isPending}
-                  className={`relative flex-1 min-w-0 py-2.5 px-3 text-xs font-medium truncate transition-all
-                    ${idx === 0 ? "rounded-l-lg" : ""} ${idx === stages.length - 1 ? "rounded-r-lg" : ""}
-                    ${bgClass}
+                  className={`relative flex items-center justify-center shrink-0 transition-colors duration-150 group/stage
                     ${!isActive ? "cursor-pointer" : "cursor-default"}
                   `}
+                  style={{
+                    height: h,
+                    paddingLeft: isFirst ? 16 : arrowW + 8,
+                    paddingRight: isLast ? 16 : 8,
+                    flex: `1 1 ${100 / total}%`,
+                    minWidth: 0,
+                    background: bg,
+                    color: fg,
+                    borderRadius: isFirst ? "8px 0 0 8px" : isLast ? "0 8px 8px 0" : "0",
+                    clipPath: isLast
+                      ? undefined
+                      : `polygon(0 0, calc(100% - ${arrowW}px) 0, 100% 50%, calc(100% - ${arrowW}px) 100%, 0 100%${!isFirst ? `, ${arrowW}px 50%` : ""})`,
+                    zIndex: total - idx,
+                  }}
                   title={`${stage.name}${isActive ? ` (${daysInStage(deal.lastActivityAt || deal.createdAt)})` : ""}`}
                 >
-                  <span className="truncate block text-center">
+                  {/* Left arrow notch (cut-in) for non-first items */}
+                  {!isFirst && (
+                    <svg
+                      className="absolute left-0 top-0"
+                      width={arrowW}
+                      height={h}
+                      viewBox={`0 0 ${arrowW} ${h}`}
+                      fill="none"
+                      style={{ display: "block" }}
+                    >
+                      <path
+                        d={`M0,0 L${arrowW},${h / 2} L0,${h}`}
+                        fill="var(--card)"
+                      />
+                    </svg>
+                  )}
+                  <span className="truncate text-xs font-medium text-center leading-tight">
                     {stage.name}
                     {isActive && (
-                      <span className="ml-1 opacity-80">({daysInStage(deal.lastActivityAt || deal.createdAt)})</span>
+                      <span className="ml-1 opacity-75 text-[10px]">({daysInStage(deal.lastActivityAt || deal.createdAt)})</span>
                     )}
                   </span>
                 </button>
@@ -377,7 +432,7 @@ export default function DealDetail() {
       <div className="flex-1 flex overflow-hidden">
         {/* ─── LEFT SIDEBAR ─── */}
         <aside className="w-[380px] shrink-0 border-r border-border bg-card overflow-y-auto hidden lg:block">
-          <div className="p-4 space-y-0">
+          <div className="p-5 space-y-0">
             {/* ── Negociação ── */}
             <SidebarSection
               title="Negociação"
@@ -476,9 +531,9 @@ export default function DealDetail() {
               onToggle={() => toggleSection("contact")}
             >
               {contact ? (
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                <div className="space-y-2.5">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-9 h-9 rounded-full bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center shrink-0 ring-1 ring-primary/10">
                       <User className="h-4 w-4 text-primary" />
                     </div>
                     <div className="min-w-0 flex-1">
@@ -683,16 +738,21 @@ export default function DealDetail() {
         {/* ─── RIGHT CONTENT ─── */}
         <div className="flex-1 flex flex-col overflow-hidden">
           {/* ── Próximas Tarefas (top card) ── */}
-          <div className="shrink-0 border-b border-border bg-card p-4">
+          <div className="shrink-0 border-b border-border bg-card p-5">
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
-                <ClipboardList className="h-4 w-4 text-muted-foreground" />
+              <h3 className="text-[13px] font-semibold text-foreground flex items-center gap-2">
+                <ClipboardList className="h-4 w-4 text-primary/60" />
                 Próximas tarefas
               </h3>
               <CreateTaskButton dealId={dealId} onCreated={() => tasksQ.refetch()} />
             </div>
             {pendingTasks.length === 0 ? (
-              <p className="text-xs text-muted-foreground">Nenhuma tarefa pendente</p>
+              <div className="flex items-center gap-2 py-2">
+                <div className="w-8 h-8 rounded-lg bg-muted/50 flex items-center justify-center">
+                  <Check className="h-4 w-4 text-muted-foreground" />
+                </div>
+                <p className="text-xs text-muted-foreground">Nenhuma tarefa pendente</p>
+              </div>
             ) : (
               <div className="space-y-2">
                 {pendingTasks.slice(0, 3).map((task: any) => (
@@ -708,7 +768,7 @@ export default function DealDetail() {
           </div>
 
           {/* ── Tab bar ── */}
-          <div className="shrink-0 flex items-center gap-0 px-4 border-b border-border bg-card">
+          <div className="shrink-0 flex items-center gap-0 px-4 border-b border-border bg-card overflow-x-auto">
             {[
               { key: "history" as const, label: "Histórico", icon: History },
               { key: "tasks" as const, label: "Tarefas", icon: ClipboardList, count: (tasksQ.data || []).length },
@@ -723,7 +783,7 @@ export default function DealDetail() {
                 <button
                   key={tab.key}
                   onClick={() => setActiveTab(tab.key)}
-                  className={`flex items-center gap-1.5 px-4 py-3 text-sm font-medium transition-colors relative
+                  className={`flex items-center gap-1.5 px-4 py-3 text-[13px] font-medium transition-all relative whitespace-nowrap
                     ${isActive
                       ? "text-primary"
                       : "text-muted-foreground hover:text-foreground"
@@ -732,10 +792,10 @@ export default function DealDetail() {
                   <Icon className="h-3.5 w-3.5" />
                   {tab.label}
                   {tab.count !== undefined && tab.count > 0 && (
-                    <span className="ml-1 text-[10px] bg-muted/60 px-1.5 py-0.5 rounded-full">{tab.count}</span>
+                    <span className="ml-1 text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-full font-semibold">{tab.count}</span>
                   )}
                   {isActive && (
-                    <span className="absolute bottom-0 left-2 right-2 h-0.5 bg-primary rounded-full" />
+                    <span className="absolute bottom-0 left-2 right-2 h-[2.5px] bg-primary rounded-full" />
                   )}
                 </button>
               );
@@ -1053,14 +1113,12 @@ function SidebarSection({ title, open, onToggle, children }: {
         onClick={onToggle}
         className="flex items-center justify-between w-full group"
       >
-        <h3 className="text-sm font-semibold text-foreground">{title}</h3>
-        {open ? (
-          <ChevronUp className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
-        ) : (
+        <h3 className="text-[13px] font-semibold text-foreground tracking-tight">{title}</h3>
+        <div className={`transition-transform duration-200 ${open ? "rotate-180" : "rotate-0"}`}>
           <ChevronDown className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
-        )}
+        </div>
       </button>
-      {open && <div className="mt-3">{children}</div>}
+      {open && <div className="mt-3 animate-in fade-in slide-in-from-top-1 duration-200">{children}</div>}
     </div>
   );
 }
@@ -1071,9 +1129,9 @@ function SidebarDivider() {
 
 function SidebarField({ label, value, className }: { label: string; value: string; className?: string }) {
   return (
-    <div className="flex items-baseline justify-between gap-3">
+    <div className="flex items-baseline justify-between gap-3 py-0.5">
       <span className="text-xs text-muted-foreground shrink-0">{label}</span>
-      <span className={`text-sm text-foreground text-right truncate ${className || ""}`}>{value}</span>
+      <span className={`text-[13px] text-foreground text-right truncate ${className || ""}`}>{value}</span>
     </div>
   );
 }

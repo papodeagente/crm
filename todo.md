@@ -1283,3 +1283,13 @@
 - [x] Exibir campos capturados na sidebar da negociação (seção "Campos RD Station" com badge Auto-captura)
 - [x] Reposicionar mapeamento de campos abaixo do webhook na página RD Station (com card expandido e badge Auto-captura)
 - [x] Testes unitários (auto-captura cf_*, 480 testes passando)
+
+## Melhoria UX/Design da Página de Negociação
+
+- [x] Redesenhar funil de etapas com design de setas (chevron/arrow steps) como RD Station (clip-path + SVG notch)
+- [x] Melhorar espaçamento, tipografia e hierarquia visual da sidebar (13px, animação fade-in, avatar gradiente)
+- [x] Melhorar tab bar (badges primary, indicador 2.5px, overflow-x-auto)
+- [x] Melhorar seção Próximas Tarefas (empty state com ícone, melhor padding)
+- [x] Melhorar botões Marcar perda/venda (emerald-600, ícones maiores, font-medium)
+- [x] Melhorar header (botão voltar com borda, melhor espaçamento)
+- [x] Todas as funções e cores existentes mantidas
