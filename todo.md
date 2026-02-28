@@ -1154,3 +1154,8 @@
 - [x] Investigar o tracker.js carregado no site real e monitorar envio do formulário (causa: ERR_SSL_PROTOCOL_ERROR no domínio manus.space impede carregamento do script externo)
 - [x] Identificar causa raiz e corrigir (snippet agora é inline completo, não depende de /tracker.js externo)
 - [x] Testar e validar a correção (389 testes passando)
+
+## Bug: Leads não chegam ao CRM via tracking script inline no crienatal.com.br
+
+- [x] Investigar por que o tracker inline não envia dados ao /api/collect quando formulário Elementor é submetido (causa: WP Rocket muda type para rocketlazyloadscript, impedindo execução)
+- [x] Corrigir: snippet agora usa bootstrap via document.createElement que contorna WP Rocket/LiteSpeed/Autoptimize

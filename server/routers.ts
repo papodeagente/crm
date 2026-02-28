@@ -917,7 +917,14 @@ export const appRouter = router({
         if (rows.length === 0) throw new Error("Token not found");
         const tokenRow = rows[0]!;
         const script = generateTrackerScript(tokenRow.token, input.collectUrl);
-        return { snippet: `<script>\n${script}\n</script>` };
+        // Use a bootstrap technique that WP Rocket / LiteSpeed / Autoptimize cannot intercept.
+        // The outer <script> is tiny and creates the real script element programmatically.
+        // This bypasses type="rocketlazyloadscript" and similar lazy-load rewrites.
+        const escaped = script.replace(/<\//g, '<\\/');
+        const bootstrap = `<script data-cfasync="false" data-no-optimize="1" data-pagespeed-no-defer>
+(function(){var s=document.createElement('script');s.textContent=${JSON.stringify(escaped)};document.head.appendChild(s);})()
+</script>`;
+        return { snippet: bootstrap };
       }),
 
     verifyTrackingInstallation: protectedProcedure
