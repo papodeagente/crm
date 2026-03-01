@@ -558,14 +558,24 @@ export const tasks = mysqlTable("crm_tasks", {
   entityType: varchar("entityType", { length: 32 }).notNull(),
   entityId: int("entityId").notNull(),
   title: varchar("title", { length: 255 }).notNull(),
+  taskType: varchar("taskType", { length: 32 }).default("task"),
   dueAt: timestamp("dueAt"),
   status: mysqlEnum("status", ["pending", "in_progress", "done", "cancelled"]).default("pending").notNull(),
   priority: mysqlEnum("priority", ["low", "medium", "high", "urgent"]).default("medium").notNull(),
   assignedToUserId: int("assignedToUserId"),
   createdByUserId: int("createdByUserId"),
+  description: text("description"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 }, (t) => [index("tasks_tenant_idx").on(t.tenantId)]);
+
+export const taskAssignees = mysqlTable("task_assignees", {
+  id: int("id").autoincrement().primaryKey(),
+  taskId: int("taskId").notNull(),
+  userId: int("userId").notNull(),
+  tenantId: int("tenantId").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (t) => [index("ta_task_idx").on(t.taskId), index("ta_user_idx").on(t.userId)]);
 
 export const crmNotes = mysqlTable("crm_notes", {
   id: int("id").autoincrement().primaryKey(),
@@ -989,6 +999,7 @@ export type PipelineAutomation = typeof pipelineAutomations.$inferSelect;
 export type Trip = typeof trips.$inferSelect;
 export type TripItem = typeof tripItems.$inferSelect;
 export type Task = typeof tasks.$inferSelect;
+export type TaskAssignee = typeof taskAssignees.$inferSelect;
 export type CrmNote = typeof crmNotes.$inferSelect;
 export type CrmAttachment = typeof crmAttachments.$inferSelect;
 export type Channel = typeof channels.$inferSelect;

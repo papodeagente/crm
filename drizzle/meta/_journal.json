@@ -148,6 +148,13 @@
       "when": 1772311526557,
       "tag": "0020_striped_living_mummy",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "5",
+      "when": 1772326361338,
+      "tag": "0021_graceful_white_tiger",
+      "breakpoints": true
     }
   ]
 }

@@ -650,15 +650,28 @@ export const crmRouter = router({
   // ─── TASKS ───
   tasks: router({
     list: protectedProcedure
-      .input(z.object({ tenantId: z.number(), entityType: z.string().optional(), entityId: z.number().optional(), status: z.string().optional(), dateFrom: z.string().optional(), dateTo: z.string().optional() }))
+      .input(z.object({
+        tenantId: z.number(),
+        entityType: z.string().optional(),
+        entityId: z.number().optional(),
+        status: z.string().optional(),
+        taskType: z.string().optional(),
+        assigneeUserId: z.number().optional(),
+        dateFrom: z.string().optional(),
+        dateTo: z.string().optional(),
+        limit: z.number().optional(),
+        offset: z.number().optional(),
+      }))
       .query(async ({ input }) => {
-        return crm.listTasks(input.tenantId, input);
+        return crm.listTasksEnriched(input.tenantId, input);
       }),
     create: protectedProcedure
       .input(z.object({
         tenantId: z.number(), entityType: z.string(), entityId: z.number(), title: z.string().min(1),
+        taskType: z.string().optional(),
         dueAt: z.string().optional(), assignedToUserId: z.number().optional(),
         priority: z.enum(["low", "medium", "high", "urgent"]).optional(),
+        description: z.string().optional(),
       }))
       .mutation(async ({ ctx, input }) => {
         const result = await crm.createTask({
@@ -681,11 +694,25 @@ export const crmRouter = router({
         tenantId: z.number(), id: z.number(), title: z.string().optional(),
         status: z.enum(["pending", "in_progress", "done", "cancelled"]).optional(),
         priority: z.enum(["low", "medium", "high", "urgent"]).optional(),
+        taskType: z.string().optional(),
         dueAt: z.string().optional(), assignedToUserId: z.number().optional(),
+        description: z.string().optional(),
       }))
       .mutation(async ({ input }) => {
         const { tenantId, id, dueAt, ...data } = input;
         await crm.updateTask(tenantId, id, { ...data, dueAt: dueAt ? new Date(dueAt) : undefined });
+        return { success: true };
+      }),
+    addAssignee: protectedProcedure
+      .input(z.object({ tenantId: z.number(), taskId: z.number(), userId: z.number() }))
+      .mutation(async ({ input }) => {
+        await crm.addTaskAssignee(input.taskId, input.userId, input.tenantId);
+        return { success: true };
+      }),
+    removeAssignee: protectedProcedure
+      .input(z.object({ tenantId: z.number(), taskId: z.number(), userId: z.number() }))
+      .mutation(async ({ input }) => {
+        await crm.removeTaskAssignee(input.taskId, input.userId, input.tenantId);
         return { success: true };
       }),
   }),

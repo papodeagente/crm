@@ -759,6 +759,15 @@ async function runImport(
             }
 
             const dueAt = t.date ? new Date(t.date) : undefined;
+            // Map RD Station task type to Entur OS taskType
+            const rdTypeMap: Record<string, string> = {
+              call: "phone",
+              whatsapp: "whatsapp",
+              email: "email",
+              meeting: "video_call",
+              task: "task",
+            };
+            const taskType = rdTypeMap[t.type] || "task";
             const result = await crm.createTask({
               tenantId,
               entityType,
@@ -766,6 +775,7 @@ async function runImport(
               title: t.subject || "Tarefa importada",
               dueAt: dueAt && !isNaN(dueAt.getTime()) ? dueAt : undefined,
               createdByUserId: userId,
+              taskType,
             });
             if (result) {
               entry.imported++;

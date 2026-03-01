@@ -1473,3 +1473,18 @@
 - [x] Adicionar logging detalhado para diagnóstico de erros de importação
 - [x] Aumentar timeout da API de 30s para 60s
 - [x] Testar importação completa: 14.076 contatos, 13.815 deals, 17.817 tasks
+
+## Redesign Página de Tarefas (estilo RD Station + Google Agenda)
+
+- [x] Schema: tabela task_assignees para múltiplos responsáveis por tarefa
+- [x] Backend: procedure para listar tarefas com filtros (responsável, período, tipo, status)
+- [x] Backend: procedure para atribuir/remover responsáveis de tarefas
+- [x] Frontend: filtros inline (Responsável, Período, Tipo de tarefa, Status)
+- [x] Frontend: visão lista com colunas (Tarefa+ícone tipo, Status, Data/Hora, Responsáveis, Negociação, Valor Total)
+- [x] Frontend: resumo das tarefas da semana (card expansível)
+- [x] Frontend: toggle lista/calendário (mesmo padrão da página de negociações)
+- [x] Frontend: visão calendário estilo Google Agenda (dia, semana, mês)
+- [x] Frontend: ordenação por data e hora na lista
+- [x] Backend: quem cria a tarefa é responsável por padrão, editável para adicionar outros
+- [x] Frontend: badge de status (Completa, Atrasada, Em aberto)
+- [x] Frontend: link para negociação vinculada com nome e valor

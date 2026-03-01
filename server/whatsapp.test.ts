@@ -1133,7 +1133,9 @@ describe("customFields", () => {
     it("should list deal tasks", async () => {
       const caller = appRouter.createCaller(createAuthContext().ctx);
       const result = await caller.crm.tasks.list({ tenantId: 1, entityType: "deal", entityId: 9999 });
-      expect(Array.isArray(result)).toBe(true);
+      expect(result).toHaveProperty("tasks");
+      expect(result).toHaveProperty("total");
+      expect(Array.isArray(result.tasks)).toBe(true);
     });
 
     it("should get custom field values for a deal", async () => {

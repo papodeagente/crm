@@ -114,6 +114,7 @@ export default function DealDetail() {
   const participantsQ = trpc.crm.deals.participants.list.useQuery({ tenantId: TENANT_ID, dealId }, { enabled: dealId > 0 });
   const historyQ = trpc.crm.deals.history.list.useQuery({ tenantId: TENANT_ID, dealId }, { enabled: dealId > 0 });
   const tasksQ = trpc.crm.tasks.list.useQuery({ tenantId: TENANT_ID, entityType: "deal", entityId: dealId }, { enabled: dealId > 0 });
+  const tasksList: any[] = (tasksQ.data as any)?.tasks ?? (Array.isArray(tasksQ.data) ? tasksQ.data : []);
   const notesQ = trpc.crm.notes.list.useQuery({ tenantId: TENANT_ID, entityType: "deal", entityId: dealId }, { enabled: dealId > 0 });
   const stageTimeQ = trpc.utmAnalytics.stageTime.useQuery({ tenantId: TENANT_ID, dealId }, { enabled: dealId > 0 });
   const waMessagesCountQ = trpc.crm.dealWhatsApp.count.useQuery({ tenantId: TENANT_ID, dealId }, { enabled: dealId > 0 });
@@ -264,7 +265,7 @@ export default function DealDetail() {
     setSelectedLossReasonId(null);
   };
 
-  const pendingTasks = (tasksQ.data || []).filter((t: any) => t.status === "pending" || t.status === "in_progress");
+  const pendingTasks = ((tasksQ.data as any)?.tasks || []).filter((t: any) => t.status === "pending" || t.status === "in_progress");
 
   return (
     <div className="h-full flex flex-col bg-background">
@@ -816,7 +817,7 @@ export default function DealDetail() {
           <div className="shrink-0 flex items-center gap-0 px-4 border-b border-border bg-card overflow-x-auto">
             {[
               { key: "history" as const, label: "Histórico", icon: History },
-              { key: "tasks" as const, label: "Tarefas", icon: ClipboardList, count: (tasksQ.data || []).length },
+              { key: "tasks" as const, label: "Tarefas", icon: ClipboardList, count: tasksList.length },
               { key: "products" as const, label: "Produtos e Serviços", icon: ShoppingBag, count: (productsQ.data || []).length },
               { key: "participants" as const, label: "Participantes", icon: Users, count: (participantsQ.data || []).length },
               { key: "whatsapp" as const, label: "WhatsApp", icon: MessageCircle, count: waMessagesCountQ.data || 0 },
@@ -860,7 +861,7 @@ export default function DealDetail() {
             )}
             {activeTab === "tasks" && (
               <TasksPanel
-                tasks={tasksQ.data || []}
+                tasks={tasksList}
                 dealId={dealId}
                 onRefresh={() => tasksQ.refetch()}
               />

@@ -262,7 +262,7 @@ export default function Pipeline() {
               </Button>
             </PopoverTrigger>
             <PopoverContent align="end" className="w-[420px] p-0 rounded-2xl shadow-xl border-border/50">
-              <PipelineIndicatorsPanel deals={sortedDeals} tasks={tasks.data || []} stages={stages.data || []} />
+              <PipelineIndicatorsPanel deals={sortedDeals} tasks={tasks.data?.tasks || []} stages={stages.data || []} />
             </PopoverContent>
           </Popover>
 
@@ -275,7 +275,7 @@ export default function Pipeline() {
               </Button>
             </PopoverTrigger>
             <PopoverContent align="end" className="w-[520px] p-0 rounded-2xl shadow-xl border-border/50">
-              <TaskCalendarPanel tasks={tasks.data || []} deals={sortedDeals} />
+              <TaskCalendarPanel tasks={tasks.data?.tasks || []} deals={sortedDeals} />
             </PopoverContent>
           </Popover>
 
@@ -424,7 +424,7 @@ export default function Pipeline() {
                             key={deal.id}
                             deal={deal}
                             contacts={contacts.data || []}
-                            tasks={(tasks.data || []).filter((t: any) => t.entityId === deal.id)}
+                            tasks={(tasks.data?.tasks || []).filter((t: any) => t.entityId === deal.id)}
                             onCreateTask={() => setShowCreateTask(deal.id)}
                             onOpenDrawer={() => setLocation(`/deal/${deal.id}`)}
                             onDragStart={handleDragStart}
@@ -909,7 +909,7 @@ function DealDrawer({ dealId, onClose, contacts, accounts, stages }: {
 
               <div className="space-y-3">
                 <Label className="text-[11px] font-bold uppercase tracking-[0.1em] text-muted-foreground">Tarefas</Label>
-                {(dealTasks.data || []).map((t: any) => (
+                {(dealTasks.data?.tasks || []).map((t: any) => (
                   <div key={t.id} className={`flex items-center gap-2.5 text-[13px] p-3 rounded-xl border border-border/40 ${t.status === "done" ? "bg-emerald-500/10 line-through text-muted-foreground" : "bg-card"}`}>
                     <Clock className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                     <span className="flex-1 truncate">{t.title}</span>

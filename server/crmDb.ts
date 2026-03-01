@@ -3,7 +3,7 @@ import { getDb } from "./db";
 import {
   tenants, crmUsers, teams, teamMembers, roles, permissions, rolePermissions, userRoles, apiKeys,
   contacts, accounts, deals, dealParticipants, pipelines, pipelineStages, pipelineAutomations, trips, tripItems,
-  tasks, crmNotes, crmAttachments, dealProducts, dealHistory,
+  tasks, taskAssignees, crmNotes, crmAttachments, dealProducts, dealHistory,
   channels, conversations, inboxMessages,
   proposalTemplates, proposals, proposalItems, proposalSignatures,
   portalUsers, portalSessions, portalTickets,
@@ -448,23 +448,117 @@ export async function getTripById(tenantId: number, id: number) {
 // ═══════════════════════════════════════
 // TASKS
 // ═══════════════════════════════════════
-export async function createTask(data: { tenantId: number; entityType: string; entityId: number; title: string; dueAt?: Date; assignedToUserId?: number; createdByUserId?: number; priority?: "low" | "medium" | "high" | "urgent" }) {
+export async function createTask(data: { tenantId: number; entityType: string; entityId: number; title: string; taskType?: string; dueAt?: Date; assignedToUserId?: number; createdByUserId?: number; priority?: "low" | "medium" | "high" | "urgent"; description?: string }) {
   const db = await getDb(); if (!db) return null;
   const [result] = await db.insert(tasks).values(data).$returningId();
+  // Auto-assign creator as default assignee
+  if (result && data.createdByUserId) {
+    await db.insert(taskAssignees).values({ taskId: result.id, userId: data.createdByUserId, tenantId: data.tenantId });
+  }
   return result;
 }
-export async function listTasks(tenantId: number, opts?: { entityType?: string; entityId?: number; status?: string; dateFrom?: string; dateTo?: string }) {
-  const db = await getDb(); if (!db) return [];
+
+export async function listTasks(tenantId: number, opts?: { entityType?: string; entityId?: number; status?: string; taskType?: string; assigneeUserId?: number; dateFrom?: string; dateTo?: string; limit?: number; offset?: number }) {
+  const db = await getDb(); if (!db) return { tasks: [], total: 0 };
   const conditions: any[] = [eq(tasks.tenantId, tenantId)];
   if (opts?.entityType) conditions.push(eq(tasks.entityType, opts.entityType));
   if (opts?.entityId) conditions.push(eq(tasks.entityId, opts.entityId));
-  if (opts?.dateFrom) conditions.push(gte(tasks.createdAt, new Date(opts.dateFrom + "T00:00:00")));
-  if (opts?.dateTo) conditions.push(lte(tasks.createdAt, new Date(opts.dateTo + "T23:59:59")));
-  return db.select().from(tasks).where(and(...conditions)).orderBy(desc(tasks.createdAt));
+  if (opts?.taskType) conditions.push(eq(tasks.taskType, opts.taskType));
+  if (opts?.status === "overdue") {
+    conditions.push(sql`${tasks.status} != 'done' AND ${tasks.status} != 'cancelled' AND ${tasks.dueAt} < NOW()`);
+  } else if (opts?.status === "open") {
+    conditions.push(sql`${tasks.status} != 'done' AND ${tasks.status} != 'cancelled'`);
+  } else if (opts?.status && opts.status !== "all") {
+    conditions.push(eq(tasks.status, opts.status as any));
+  }
+  if (opts?.dateFrom) conditions.push(gte(tasks.dueAt, new Date(opts.dateFrom + "T00:00:00")));
+  if (opts?.dateTo) conditions.push(lte(tasks.dueAt, new Date(opts.dateTo + "T23:59:59")));
+  
+  // If filtering by assignee, join with task_assignees
+  if (opts?.assigneeUserId) {
+    conditions.push(sql`${tasks.id} IN (SELECT taskId FROM task_assignees WHERE userId = ${opts.assigneeUserId})`);
+  }
+  
+  const whereClause = and(...conditions);
+  const [countResult] = await db.select({ count: sql<number>`COUNT(*)` }).from(tasks).where(whereClause);
+  const total = Number(countResult?.count || 0);
+  
+  let query = db.select().from(tasks).where(whereClause).orderBy(desc(tasks.dueAt));
+  if (opts?.limit) query = query.limit(opts.limit) as any;
+  if (opts?.offset) query = query.offset(opts.offset) as any;
+  const taskList = await query;
+  return { tasks: taskList, total };
 }
-export async function updateTask(tenantId: number, id: number, data: Partial<{ title: string; status: "pending" | "in_progress" | "done" | "cancelled"; priority: "low" | "medium" | "high" | "urgent"; dueAt: Date; assignedToUserId: number }>) {
+
+export async function listTasksEnriched(tenantId: number, opts?: { entityType?: string; entityId?: number; status?: string; taskType?: string; assigneeUserId?: number; dateFrom?: string; dateTo?: string; limit?: number; offset?: number }) {
+  const result = await listTasks(tenantId, opts);
+  if (!result.tasks.length) return { tasks: [], total: result.total };
+  
+  const db = await getDb(); if (!db) return result;
+  
+  // Get assignees for all tasks
+  const taskIds = result.tasks.map((t: any) => t.id);
+  const assignees = await db.select().from(taskAssignees).where(and(inArray(taskAssignees.taskId, taskIds), eq(taskAssignees.tenantId, tenantId)));
+  
+  // Get users for assignees
+  const userIds = Array.from(new Set(assignees.map(a => a.userId)));
+  let usersMap: Record<number, any> = {};
+  if (userIds.length > 0) {
+    const users = await db.select().from(crmUsers).where(and(inArray(crmUsers.id, userIds), eq(crmUsers.tenantId, tenantId)));
+    usersMap = Object.fromEntries(users.map(u => [u.id, u]));
+  }
+  
+  // Get linked deals for tasks with entityType=deal
+  const dealIds = Array.from(new Set(result.tasks.filter((t: any) => t.entityType === "deal").map((t: any) => t.entityId)));
+  let dealsMap: Record<number, any> = {};
+  if (dealIds.length > 0) {
+    const dealList = await db.select({ id: deals.id, title: deals.title, valueCents: deals.valueCents, contactId: deals.contactId }).from(deals).where(inArray(deals.id, dealIds));
+    dealsMap = Object.fromEntries(dealList.map(d => [d.id, { ...d, amount: (d.valueCents || 0) / 100 }]));
+  }
+  
+  // Enrich tasks
+  const enriched = result.tasks.map((t: any) => {
+    const taskAssigneeList = assignees.filter(a => a.taskId === t.id).map(a => ({
+      userId: a.userId,
+      name: usersMap[a.userId]?.name || "Desconhecido",
+      avatarUrl: usersMap[a.userId]?.avatarUrl,
+    }));
+    const deal = t.entityType === "deal" ? dealsMap[t.entityId] : null;
+    return {
+      ...t,
+      assignees: taskAssigneeList,
+      deal: deal ? { id: deal.id, title: deal.title, amount: deal.amount } : null,
+    };
+  });
+  
+  return { tasks: enriched, total: result.total };
+}
+
+export async function updateTask(tenantId: number, id: number, data: Partial<{ title: string; status: "pending" | "in_progress" | "done" | "cancelled"; priority: "low" | "medium" | "high" | "urgent"; dueAt: Date; assignedToUserId: number; taskType: string; description: string }>) {
   const db = await getDb(); if (!db) return;
   await db.update(tasks).set(data).where(and(eq(tasks.id, id), eq(tasks.tenantId, tenantId)));
+}
+
+export async function addTaskAssignee(taskId: number, userId: number, tenantId: number) {
+  const db = await getDb(); if (!db) return;
+  // Check if already assigned
+  const existing = await db.select().from(taskAssignees).where(and(eq(taskAssignees.taskId, taskId), eq(taskAssignees.userId, userId)));
+  if (existing.length > 0) return;
+  await db.insert(taskAssignees).values({ taskId, userId, tenantId });
+}
+
+export async function removeTaskAssignee(taskId: number, userId: number, tenantId: number) {
+  const db = await getDb(); if (!db) return;
+  await db.delete(taskAssignees).where(and(eq(taskAssignees.taskId, taskId), eq(taskAssignees.userId, userId), eq(taskAssignees.tenantId, tenantId)));
+}
+
+export async function getTaskAssignees(taskId: number, tenantId: number) {
+  const db = await getDb(); if (!db) return [];
+  const assigneeRows = await db.select().from(taskAssignees).where(and(eq(taskAssignees.taskId, taskId), eq(taskAssignees.tenantId, tenantId)));
+  if (!assigneeRows.length) return [];
+  const userIds = assigneeRows.map(a => a.userId);
+  const users = await db.select().from(crmUsers).where(inArray(crmUsers.id, userIds));
+  return users;
 }
 
 // ═══════════════════════════════════════
