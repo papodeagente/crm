@@ -1675,3 +1675,9 @@
 - [x] Dashboard (Início): gráfico de funil deve puxar apenas dados do funil padrão
 - [x] Dashboard (Início): KPIs de pipeline devem usar apenas o funil padrão
 - [x] Testes para garantir que dashboard filtra pelo funil padrão
+
+## Correção: Gráficos do Dashboard não atualizam em tempo real com funil padrão
+
+- [x] Diagnosticar por que gráficos não refletem dados do funil padrão em tempo real
+- [x] Corrigir queries do dashboard para reagir à mudança de pipelineId
+- [x] Garantir que backend retorna dados filtrados corretamente pelo pipelineId

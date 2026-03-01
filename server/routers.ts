@@ -466,13 +466,15 @@ export const appRouter = router({
   dashboard: router({
     metrics: protectedProcedure
       .input(z.object({ tenantId: z.number(), pipelineId: z.number().optional() }))
-      .query(async ({ input, ctx }) => {
-        return getDashboardMetrics(input.tenantId, ctx.user?.id, input.pipelineId);
+      .query(async ({ input }) => {
+        // Dashboard shows global metrics for the tenant (no owner filter)
+        return getDashboardMetrics(input.tenantId, undefined, input.pipelineId);
       }),
     pipelineSummary: protectedProcedure
       .input(z.object({ tenantId: z.number(), pipelineId: z.number().optional() }))
-      .query(async ({ input, ctx }) => {
-        return getPipelineSummary(input.tenantId, ctx.user?.id, input.pipelineId);
+      .query(async ({ input }) => {
+        // Dashboard shows global pipeline summary for the tenant (no owner filter)
+        return getPipelineSummary(input.tenantId, undefined, input.pipelineId);
       }),
     recentActivity: protectedProcedure
       .input(z.object({ tenantId: z.number(), limit: z.number().optional(), dateFrom: z.string().optional(), dateTo: z.string().optional() }))
