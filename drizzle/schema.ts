@@ -290,6 +290,15 @@ export const contacts = mysqlTable("contacts", {
   visibilityScope: mysqlEnum("visibilityScope", ["personal", "team", "global"]).default("global").notNull(),
   consentStatus: mysqlEnum("consentStatus", ["pending", "granted", "revoked"]).default("pending").notNull(),
   notes: text("notes"),
+  // Strategic classification (9 audiences)
+  stageClassification: varchar("stageClassification", { length: 32 }).default("desconhecido").notNull(),
+  // Referral window tracking
+  referralWindowStart: timestamp("referralWindowStart"),
+  referralCount: int("referralCount").default(0).notNull(),
+  // Purchase tracking
+  lastPurchaseAt: timestamp("lastPurchaseAt"),
+  totalPurchases: int("totalPurchases").default(0).notNull(),
+  totalSpentCents: bigint("totalSpentCents", { mode: "number" }).default(0).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   createdBy: int("createdBy"),
@@ -298,6 +307,7 @@ export const contacts = mysqlTable("contacts", {
 }, (t) => [
   index("contacts_tenant_idx").on(t.tenantId),
   index("contacts_owner_idx").on(t.tenantId, t.ownerUserId),
+  index("contacts_classification_idx").on(t.tenantId, t.stageClassification),
 ]);
 
 export const accounts = mysqlTable("accounts", {

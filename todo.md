@@ -1525,3 +1525,33 @@
 - [x] Tarefa atrasada dentro do card do Kanban com fundo rosa/vermelho (linha da tarefa destacada)
 - [x] Ícone "i" no card com popup "Sobre a Negociação" ao hover (Fonte, Campanha, Empresa, Data de criação, Último contato, Previsão de fechamento, Identificador, botão Abrir Negociação)
 - [x] Unificar status "Em andamento" e "Aberto" no funil — tudo vira "Em andamento"
+
+## Sistema de Classificação Estratégica de Contatos + Pipelines Automáticos
+
+### Schema & Migração
+- [x] Campo contact_stage_classification no schema de contatos (enum: desconhecido, seguidor, lead, oportunidade, cliente_primeira_compra, cliente_ativo, cliente_recorrente, ex_cliente, promotor)
+- [x] Campo referral_window_start nos contatos (timestamp para janela de indicação 90 dias)
+- [x] Campo referral_count nos contatos (número de indicações confirmadas)
+- [x] Campo last_purchase_at nos contatos (data da última compra)
+- [x] Campo total_purchases nos contatos (total de compras)
+- [x] Migração SQL para adicionar os novos campos
+
+### Pipelines Padrão por Tenant
+- [x] Pipeline 1 — Funil de Vendas: Novo atendimento, Primeiro contato, Diagnóstico, Cotação, Apresentação, Acompanhamento, Reserva
+- [x] Pipeline 2 — Funil de Pós-Venda: Novo cliente, Aguardando embarque, 30D para embarque, Pré embarque, Em viagem, Pós viagem, Viagem finalizada
+- [x] Criação automática dos 2 pipelines no onboarding de novo tenant
+
+### Motor de Regras Automatizadas
+- [x] Regra DealMoved: etapas 1-2 → classificar contato como Lead; etapas 3-7 → classificar como Oportunidade
+- [x] Regra DealWon: sem compras anteriores → Cliente Primeira Compra; com compras → Cliente Recorrente
+- [x] Regra DealWon: iniciar janela de indicação 90 dias (Potencial Indicador)
+- [x] Regra DealWon: criar negociação automática no Funil de Pós-Venda (etapa "Novo cliente")
+- [x] Regra DealLost: se nunca comprou → classificar como Não Cliente (Desconhecido)
+- [x] Regra Cliente Ativo: compra dentro de 360 dias (configurável)
+- [x] Regra Ex-Cliente: inativo por 360 dias (configurável)
+- [x] Regra Promotor: indicou pelo menos 1 cliente confirmado
+
+### Badges Visuais nos Cards
+- [x] Badge de classificação estratégica com cor distinta no card da negociação
+- [x] Ícone visual correspondente ao estágio do contato
+- [x] Indicador de "Janela de Indicação Ativa" (se aplicável)

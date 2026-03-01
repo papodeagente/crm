@@ -25,6 +25,13 @@ export async function createTenant(data: { name: string; plan?: "free" | "pro" |
   const freemiumDays = data.freemiumDays ?? 365;
   const freemiumExpiresAt = new Date(Date.now() + freemiumDays * 24 * 60 * 60 * 1000);
   const [result] = await db.insert(tenants).values({ name: data.name, plan: data.plan || "free", ownerUserId: data.ownerUserId, hotmartEmail: data.hotmartEmail, freemiumDays, freemiumExpiresAt }).$returningId();
+  // Auto-create default pipelines for new tenant
+  try {
+    const { createDefaultPipelines } = await import("./classificationEngine");
+    await createDefaultPipelines(result.id);
+  } catch (e) {
+    console.error("[Onboarding] Failed to create default pipelines:", e);
+  }
   return result;
 }
 export async function getTenantById(id: number) {

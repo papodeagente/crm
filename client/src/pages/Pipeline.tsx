@@ -24,6 +24,7 @@ import { HoverCard, HoverCardTrigger, HoverCardContent } from "@/components/ui/h
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import DealFiltersPanel, { useDealFilters, DealFilterButton } from "@/components/DealFiltersPanel";
+import ClassificationBadge from "@/components/ClassificationBadge";
 import { useState, useMemo, useCallback } from "react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
@@ -736,6 +737,15 @@ function DealCard({ deal, contacts, accounts, overdueData, pendingCount, onCreat
       <p className="font-bold text-[13.5px] leading-snug text-foreground cursor-pointer hover:text-primary transition-colors" onClick={onOpenDeal}>
         {deal.title}
       </p>
+
+      {/* Classification badge */}
+      {contact && (
+        <ClassificationBadge
+          classification={contact.stageClassification || "desconhecido"}
+          size="sm"
+          referralWindowActive={!!contact.referralWindowStart && (Date.now() - new Date(contact.referralWindowStart).getTime()) < 90 * 24 * 60 * 60 * 1000}
+        />
+      )}
 
       {/* Date & source */}
       <div className="flex items-center gap-2 text-[11.5px] text-muted-foreground flex-wrap">

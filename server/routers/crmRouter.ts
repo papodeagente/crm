@@ -373,6 +373,21 @@ export const crmRouter = router({
               } catch (e) {
                 console.error("Pipeline automation error:", e);
               }
+              // Classification engine: auto-classify contact on won/lost
+              try {
+                const contactId = currentDeal?.contactId || data.contactId;
+                if (contactId) {
+                  if (data.status === "won") {
+                    const { onDealWon } = await import("../classificationEngine");
+                    await onDealWon(tenantId, id, contactId, currentDeal?.valueCents || 0);
+                  } else {
+                    const { onDealLost } = await import("../classificationEngine");
+                    await onDealLost(tenantId, id, contactId);
+                  }
+                }
+              } catch (e) {
+                console.error("[Classification] Error on deal status change:", e);
+              }
             }
           }
           if (data.contactId !== undefined && data.contactId !== currentDeal.contactId) {
@@ -424,6 +439,16 @@ export const crmRouter = router({
           entityType: "deal",
           entityId: String(input.dealId),
         });
+        // Classification engine: auto-classify contact on stage move
+        try {
+          const deal = await crm.getDealById(input.tenantId, input.dealId);
+          if (deal?.contactId) {
+            const { onDealMoved } = await import("../classificationEngine");
+            await onDealMoved(input.tenantId, input.dealId, input.toStageId, deal.contactId, deal.pipelineId);
+          }
+        } catch (e) {
+          console.error("[Classification] Error on deal moved:", e);
+        }
         return { success: true };
       }),
     count: protectedProcedure
@@ -876,6 +901,44 @@ export const crmRouter = router({
       .input(z.object({ id: z.number() }))
       .mutation(async ({ input }) => {
         return crm.hardDeleteLossReason(input.id);
+      }),
+  }),
+  // ─── CLASSIFICATION ENGINE ───
+  classification: router({
+    getConfig: protectedProcedure
+      .input(z.object({ tenantId: z.number() }))
+      .query(async () => {
+        const { STAGE_CLASSIFICATIONS, CLASSIFICATION_CONFIG } = await import("../classificationEngine");
+        return { classifications: STAGE_CLASSIFICATIONS, config: CLASSIFICATION_CONFIG };
+      }),
+    updateContact: protectedProcedure
+      .input(z.object({ tenantId: z.number(), contactId: z.number(), classification: z.string() }))
+      .mutation(async ({ input }) => {
+        const { updateContactClassification } = await import("../classificationEngine");
+        await updateContactClassification(input.tenantId, input.contactId, input.classification as any);
+        return { success: true };
+      }),
+    confirmReferral: protectedProcedure
+      .input(z.object({ tenantId: z.number(), referrerContactId: z.number() }))
+      .mutation(async ({ input }) => {
+        const { onReferralConfirmed } = await import("../classificationEngine");
+        await onReferralConfirmed(input.tenantId, input.referrerContactId);
+        return { success: true };
+      }),
+    processInactive: protectedProcedure
+      .input(z.object({ tenantId: z.number(), inactivityDays: z.number().default(360) }))
+      .mutation(async ({ input }) => {
+        const { processInactiveClients, processReferralWindows } = await import("../classificationEngine");
+        await processInactiveClients(input.tenantId, input.inactivityDays);
+        await processReferralWindows(input.tenantId);
+        return { success: true };
+      }),
+    seedDefaultPipelines: protectedProcedure
+      .input(z.object({ tenantId: z.number() }))
+      .mutation(async ({ input }) => {
+        const { createDefaultPipelines } = await import("../classificationEngine");
+        const result = await createDefaultPipelines(input.tenantId);
+        return result;
       }),
   }),
 });
