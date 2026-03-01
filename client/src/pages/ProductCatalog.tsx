@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
+import { useTenantId } from "@/hooks/useTenantId";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -483,7 +484,7 @@ function ProductRow({
 export default function ProductCatalogPage() {
   const [, setLocation] = useLocation();
   const { user } = useAuth();
-  const tenantId = 1;
+  const tenantId = useTenantId();
   const utils = trpc.useUtils();
 
   // State

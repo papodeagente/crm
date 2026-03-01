@@ -1488,3 +1488,34 @@
 - [x] Backend: quem cria a tarefa é responsável por padrão, editável para adicionar outros
 - [x] Frontend: badge de status (Completa, Atrasada, Em aberto)
 - [x] Frontend: link para negociação vinculada com nome e valor
+
+## Correção Dashboard - Números por Tenant
+
+- [ ] Dashboard deve mostrar números reais do tenant do usuário logado
+- [ ] Novos usuários/contas devem ver dashboard zerado (sem dados de outros tenants)
+- [ ] Números devem atualizar em tempo real (adicionar/remover dados)
+- [ ] Verificar conta da agência (bruno@boxtour.com.br) mostra dados corretos
+
+## Destaque Tarefas Atrasadas no Kanban
+
+- [x] Cards do Kanban com tarefas atrasadas devem ter borda/destaque vermelho
+- [x] Indicador visual de alerta de atraso visível no card da negociação
+
+## Formulário Completo de Tarefas (Criar/Editar) — Estilo RD Station
+
+- [x] Componente TaskFormDialog reutilizável com campos: empresa, negociação, assunto, descrição, responsável(is), tipo de tarefa, data, horário, "marcar como concluída ao criar"
+- [x] Responsável obrigatório desde a criação da tarefa (multi-select com usuários CRM)
+- [x] Tipo de tarefa obrigatório (WhatsApp, telefone, email, vídeo, tarefa)
+- [x] Data e horário obrigatórios
+- [x] Modo edição: preencher campos com dados existentes da tarefa
+- [x] Integrar TaskFormDialog na página Pipeline (criar/editar tarefa na negociação)
+- [x] Integrar TaskFormDialog na página Tasks (tarefas gerais) com edição
+- [x] Integrar TaskFormDialog no DealDetail (tarefas da negociação) com edição
+- [x] Manter checkbox de conclusão em tarefas atrasadas na lista
+- [x] Ícones de ação na lista de tarefas: editar (lápis), reagendar (relógio), concluir (check)
+- [x] Corrigir erros TypeScript pendentes (DealDetail.tsx formato tasks)
+
+- [x] Popup de ação ao tocar na tarefa no calendário: Finalizar / Editar / Adiar
+- [x] Opções de adiar: 1h, 3h, 1 dia, 2 dias, 7 dias, tempo personalizado
+- [x] Lógica unificada de tarefas em todos os contextos (Pipeline, DealDetail, Tasks, Calendário)
+- [x] Formulário completo na criação dentro da negociação (todos os campos disponíveis)

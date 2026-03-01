@@ -19,6 +19,10 @@ import { useState, useMemo, useCallback } from "react";
 import { toast } from "sonner";
 import { useTenantId } from "@/hooks/useTenantId";
 import { useAuth } from "@/_core/hooks/useAuth";
+import TaskFormDialog from "@/components/TaskFormDialog";
+import TaskActionPopover from "@/components/TaskActionPopover";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Pencil, Check, MoreVertical } from "lucide-react";
 
 // ─── Types & Config ───
 const TASK_TYPES = [
@@ -111,13 +115,9 @@ export default function Tasks() {
   const [page, setPage] = useState(0);
   const PAGE_SIZE = 50;
 
-  // Create dialog
+  // Create/Edit dialog
   const [createOpen, setCreateOpen] = useState(false);
-  const [newTitle, setNewTitle] = useState("");
-  const [newType, setNewType] = useState("task");
-  const [newDueAt, setNewDueAt] = useState("");
-  const [newPriority, setNewPriority] = useState("medium");
-  const [newDescription, setNewDescription] = useState("");
+  const [editTask, setEditTask] = useState<any>(null);
 
   // Summary expanded
   const [summaryOpen, setSummaryOpen] = useState(false);
@@ -147,18 +147,6 @@ export default function Tasks() {
     dateFrom: weekStart.toISOString().split("T")[0],
     dateTo: weekEnd.toISOString().split("T")[0],
     limit: 500,
-  });
-
-  const createTask = trpc.crm.tasks.create.useMutation({
-    onSuccess: () => {
-      utils.crm.tasks.list.invalidate();
-      setCreateOpen(false);
-      setNewTitle("");
-      setNewDueAt("");
-      setNewDescription("");
-      toast.success("Tarefa criada com sucesso!");
-    },
-    onError: () => toast.error("Erro ao criar tarefa"),
   });
 
   const updateTask = trpc.crm.tasks.update.useMutation({
@@ -284,77 +272,25 @@ export default function Tasks() {
           </div>
 
           {/* Create button */}
-          <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-            <DialogTrigger asChild>
-              <Button className="h-9 gap-2 px-5 rounded-lg bg-primary hover:bg-primary/90 shadow-sm text-[13px] font-medium">
-                <Plus className="h-4 w-4" />Criar tarefa
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-[500px] rounded-2xl">
-              <DialogHeader>
-                <DialogTitle className="flex items-center gap-2.5 text-lg">
-                  <div className="h-9 w-9 rounded-xl bg-primary/10 flex items-center justify-center">
-                    <ClipboardList className="h-4 w-4 text-primary" />
-                  </div>
-                  Criar tarefa
-                </DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4 pt-3">
-                <div>
-                  <Label className="text-[12px] font-medium">Título *</Label>
-                  <Input value={newTitle} onChange={(e) => setNewTitle(e.target.value)} placeholder="Ex: Ligar para confirmar reserva" className="mt-1.5 h-10 rounded-xl" />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <Label className="text-[12px] font-medium">Tipo</Label>
-                    <Select value={newType} onValueChange={setNewType}>
-                      <SelectTrigger className="mt-1.5 h-10 rounded-xl"><SelectValue /></SelectTrigger>
-                      <SelectContent className="rounded-xl">
-                        <SelectItem value="task">Tarefa</SelectItem>
-                        <SelectItem value="call">Chamada</SelectItem>
-                        <SelectItem value="whatsapp">WhatsApp</SelectItem>
-                        <SelectItem value="email">E-mail</SelectItem>
-                        <SelectItem value="meeting">Reunião</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label className="text-[12px] font-medium">Prioridade</Label>
-                    <Select value={newPriority} onValueChange={setNewPriority}>
-                      <SelectTrigger className="mt-1.5 h-10 rounded-xl"><SelectValue /></SelectTrigger>
-                      <SelectContent className="rounded-xl">
-                        <SelectItem value="low">Baixa</SelectItem>
-                        <SelectItem value="medium">Média</SelectItem>
-                        <SelectItem value="high">Alta</SelectItem>
-                        <SelectItem value="urgent">Urgente</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <div>
-                  <Label className="text-[12px] font-medium">Data e hora</Label>
-                  <Input type="datetime-local" value={newDueAt} onChange={(e) => setNewDueAt(e.target.value)} className="mt-1.5 h-10 rounded-xl" />
-                </div>
-                <div>
-                  <Label className="text-[12px] font-medium">Descrição</Label>
-                  <Textarea value={newDescription} onChange={(e) => setNewDescription(e.target.value)} placeholder="Detalhes da tarefa..." className="mt-1.5 rounded-xl min-h-[80px]" />
-                </div>
-                <Button
-                  className="w-full h-11 rounded-lg text-[14px] font-medium bg-primary hover:bg-primary/90 shadow-sm"
-                  disabled={!newTitle || createTask.isPending}
-                  onClick={() => createTask.mutate({
-                    tenantId: TENANT_ID, entityType: "general", entityId: 0,
-                    title: newTitle, taskType: newType,
-                    priority: newPriority as any,
-                    dueAt: newDueAt || undefined,
-                    description: newDescription || undefined,
-                  })}
-                >
-                  {createTask.isPending ? "Criando..." : "Criar Tarefa"}
-                </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
+          <Button className="h-9 gap-2 px-5 rounded-lg bg-primary hover:bg-primary/90 shadow-sm text-[13px] font-medium" onClick={() => setCreateOpen(true)}>
+            <Plus className="h-4 w-4" />Criar tarefa
+          </Button>
+          {createOpen && (
+            <TaskFormDialog
+              open={true}
+              onOpenChange={() => setCreateOpen(false)}
+            />
+          )}
+          {editTask && (
+            <TaskFormDialog
+              open={true}
+              onOpenChange={() => setEditTask(null)}
+              dealId={editTask.entityType === "deal" ? editTask.entityId : undefined}
+              dealTitle={editTask.deal?.title}
+              editTask={editTask}
+              editAssigneeIds={editTask.assignees?.map((a: any) => a.userId || a.id) || []}
+            />
+          )}
         </div>
       </div>
 
@@ -495,6 +431,7 @@ export default function Tasks() {
           page={page}
           totalPages={totalPages}
           onPageChange={setPage}
+          onEdit={(t: any) => setEditTask(t)}
         />
       ) : (
         <TaskCalendarView
@@ -513,6 +450,7 @@ export default function Tasks() {
               status: task.status === "done" ? "pending" : "done",
             });
           }}
+          onEdit={(t: any) => setEditTask(t)}
         />
       )}
     </div>
@@ -522,13 +460,14 @@ export default function Tasks() {
 // ─── List View ───
 function TaskListView({
   tasks, total, isLoading, sortField, sortDir, onSort, onToggleStatus,
-  page, totalPages, onPageChange,
+  page, totalPages, onPageChange, onEdit,
 }: {
   tasks: any[]; total: number; isLoading: boolean;
   sortField: string; sortDir: string;
   onSort: (field: "dueAt" | "title") => void;
   onToggleStatus: (task: any) => void;
   page: number; totalPages: number; onPageChange: (p: number) => void;
+  onEdit?: (task: any) => void;
 }) {
   return (
     <Card className="border border-border/40 shadow-none rounded-xl overflow-hidden">
@@ -553,7 +492,7 @@ function TaskListView({
               <th className="text-left p-3 font-semibold text-muted-foreground w-[140px]">RESPONSÁVEIS</th>
               <th className="text-left p-3 font-semibold text-muted-foreground min-w-[180px]">NEGOCIAÇÃO</th>
               <th className="text-right p-3 font-semibold text-muted-foreground w-[130px]">VALOR TOTAL</th>
-              <th className="w-10 p-3"></th>
+              <th className="w-[100px] p-3 text-center font-semibold text-muted-foreground">AÇÕES</th>
             </tr>
           </thead>
           <tbody>
@@ -646,23 +585,44 @@ function TaskListView({
                   <td className="p-3 text-right text-[13px] font-medium text-foreground whitespace-nowrap">
                     {t.deal?.amount ? formatCurrency(t.deal.amount) : "—"}
                   </td>
-                  {/* Info */}
+                  {/* Actions */}
                   <td className="p-3">
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <button className="p-1 rounded-lg hover:bg-muted/40 text-muted-foreground/50 hover:text-muted-foreground transition-colors">
-                          <Info className="h-4 w-4" />
+                    <div className="flex items-center justify-center gap-1">
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            onClick={() => onEdit?.(t)}
+                            className="p-1.5 rounded-lg hover:bg-muted/60 text-muted-foreground hover:text-foreground transition-colors"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent><p className="text-xs">Editar</p></TooltipContent>
+                      </Tooltip>
+                      <TaskActionPopover
+                        task={t}
+                        onEdit={() => onEdit?.(t)}
+                        onComplete={() => onToggleStatus(t)}
+                        onPostpone={() => onToggleStatus(t)}
+                      >
+                        <button className="p-1.5 rounded-lg hover:bg-muted/60 text-muted-foreground hover:text-foreground transition-colors">
+                          <Clock className="h-3.5 w-3.5" />
                         </button>
-                      </TooltipTrigger>
-                      <TooltipContent side="left" className="max-w-[250px]">
-                        <div className="text-xs space-y-1">
-                          <p><strong>Tipo:</strong> {t.taskType || "tarefa"}</p>
-                          <p><strong>Prioridade:</strong> {t.priority || "média"}</p>
-                          {t.description && <p><strong>Descrição:</strong> {t.description}</p>}
-                          <p><strong>Criada em:</strong> {formatDateTime(t.createdAt)}</p>
-                        </div>
-                      </TooltipContent>
-                    </Tooltip>
+                      </TaskActionPopover>
+                      {t.status !== "done" && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button
+                              onClick={() => onToggleStatus(t)}
+                              className="p-1.5 rounded-lg hover:bg-emerald-100 dark:hover:bg-emerald-900/30 text-emerald-600 transition-colors"
+                            >
+                              <Check className="h-3.5 w-3.5" />
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent><p className="text-xs">Concluir</p></TooltipContent>
+                        </Tooltip>
+                      )}
+                    </div>
                   </td>
                 </tr>
               );
@@ -694,7 +654,7 @@ function TaskListView({
 // ─── Calendar View ───
 function TaskCalendarView({
   tasks, isLoading, calendarView, calendarDate, calendarTitle,
-  onViewChange, onNavigate, onToday, onToggleStatus,
+  onViewChange, onNavigate, onToday, onToggleStatus, onEdit,
 }: {
   tasks: any[]; isLoading: boolean;
   calendarView: CalendarView; calendarDate: Date; calendarTitle: string;
@@ -702,6 +662,7 @@ function TaskCalendarView({
   onNavigate: (dir: number) => void;
   onToday: () => void;
   onToggleStatus: (task: any) => void;
+  onEdit?: (task: any) => void;
 }) {
   return (
     <Card className="border border-border/40 shadow-none rounded-xl overflow-hidden">
@@ -737,18 +698,18 @@ function TaskCalendarView({
       {isLoading ? (
         <div className="p-12 text-center text-muted-foreground text-sm">Carregando calendário...</div>
       ) : calendarView === "month" ? (
-        <MonthView tasks={tasks} date={calendarDate} onToggleStatus={onToggleStatus} />
+        <MonthView tasks={tasks} date={calendarDate} onToggleStatus={onToggleStatus} onEdit={onEdit} />
       ) : calendarView === "week" ? (
-        <WeekView tasks={tasks} date={calendarDate} onToggleStatus={onToggleStatus} />
+        <WeekView tasks={tasks} date={calendarDate} onToggleStatus={onToggleStatus} onEdit={onEdit} />
       ) : (
-        <DayView tasks={tasks} date={calendarDate} onToggleStatus={onToggleStatus} />
+        <DayView tasks={tasks} date={calendarDate} onToggleStatus={onToggleStatus} onEdit={onEdit} />
       )}
     </Card>
   );
 }
 
 // ─── Month View ───
-function MonthView({ tasks, date, onToggleStatus }: { tasks: any[]; date: Date; onToggleStatus: (t: any) => void }) {
+function MonthView({ tasks, date, onToggleStatus, onEdit }: { tasks: any[]; date: Date; onToggleStatus: (t: any) => void; onEdit?: (t: any) => void }) {
   const year = date.getFullYear();
   const month = date.getMonth();
   const firstDay = new Date(year, month, 1);
@@ -796,14 +757,20 @@ function MonthView({ tasks, date, onToggleStatus }: { tasks: any[]; date: Date; 
                   const effectiveStatus = getEffectiveStatus(t);
                   const bgColor = effectiveStatus === "done" ? "bg-emerald-100 dark:bg-emerald-900/30" : effectiveStatus === "overdue" ? "bg-red-100 dark:bg-red-900/30" : "bg-blue-100 dark:bg-blue-900/30";
                   return (
-                    <button
+                    <TaskActionPopover
                       key={t.id}
-                      className={`w-full text-left px-1.5 py-0.5 rounded text-[10px] truncate flex items-center gap-1 ${bgColor} hover:opacity-80 transition-opacity`}
-                      onClick={() => onToggleStatus(t)}
+                      task={t}
+                      onEdit={() => onEdit?.(t)}
+                      onComplete={() => onToggleStatus(t)}
+                      onPostpone={() => onToggleStatus(t)}
                     >
-                      <TypeIcon className="h-2.5 w-2.5 flex-shrink-0" />
-                      <span className="truncate">{t.title}</span>
-                    </button>
+                      <button
+                        className={`w-full text-left px-1.5 py-0.5 rounded text-[10px] truncate flex items-center gap-1 ${bgColor} hover:opacity-80 transition-opacity`}
+                      >
+                        <TypeIcon className="h-2.5 w-2.5 flex-shrink-0" />
+                        <span className="truncate">{t.title}</span>
+                      </button>
+                    </TaskActionPopover>
                   );
                 })}
                 {dayTasks.length > 3 && (
@@ -819,7 +786,7 @@ function MonthView({ tasks, date, onToggleStatus }: { tasks: any[]; date: Date; 
 }
 
 // ─── Week View ───
-function WeekView({ tasks, date, onToggleStatus }: { tasks: any[]; date: Date; onToggleStatus: (t: any) => void }) {
+function WeekView({ tasks, date, onToggleStatus, onEdit }: { tasks: any[]; date: Date; onToggleStatus: (t: any) => void; onEdit?: (t: any) => void }) {
   const weekStart = new Date(date);
   weekStart.setDate(date.getDate() - date.getDay());
   const today = new Date();
@@ -877,15 +844,21 @@ function WeekView({ tasks, date, onToggleStatus }: { tasks: any[]; date: Date; o
                     const effectiveStatus = getEffectiveStatus(t);
                     const bgColor = effectiveStatus === "done" ? "bg-emerald-200/70 dark:bg-emerald-800/40 border-emerald-300" : effectiveStatus === "overdue" ? "bg-red-200/70 dark:bg-red-800/40 border-red-300" : "bg-blue-200/70 dark:bg-blue-800/40 border-blue-300";
                     return (
-                      <button
+                      <TaskActionPopover
                         key={t.id}
-                        className={`w-full text-left px-1 py-0.5 rounded text-[10px] truncate flex items-center gap-1 border ${bgColor} hover:opacity-80 transition-opacity mb-0.5`}
-                        onClick={() => onToggleStatus(t)}
-                        title={t.title}
+                        task={t}
+                        onEdit={() => onEdit?.(t)}
+                        onComplete={() => onToggleStatus(t)}
+                        onPostpone={() => onToggleStatus(t)}
                       >
-                        <TypeIcon className="h-2.5 w-2.5 flex-shrink-0" />
-                        <span className="truncate">{t.title}</span>
-                      </button>
+                        <button
+                          className={`w-full text-left px-1 py-0.5 rounded text-[10px] truncate flex items-center gap-1 border ${bgColor} hover:opacity-80 transition-opacity mb-0.5`}
+                          title={t.title}
+                        >
+                          <TypeIcon className="h-2.5 w-2.5 flex-shrink-0" />
+                          <span className="truncate">{t.title}</span>
+                        </button>
+                      </TaskActionPopover>
                     );
                   })}
                 </div>
@@ -899,7 +872,7 @@ function WeekView({ tasks, date, onToggleStatus }: { tasks: any[]; date: Date; o
 }
 
 // ─── Day View ───
-function DayView({ tasks, date, onToggleStatus }: { tasks: any[]; date: Date; onToggleStatus: (t: any) => void }) {
+function DayView({ tasks, date, onToggleStatus, onEdit }: { tasks: any[]; date: Date; onToggleStatus: (t: any) => void; onEdit?: (t: any) => void }) {
   const today = new Date();
   const isToday = date.toDateString() === today.toDateString();
   const hours = Array.from({ length: 18 }, (_, i) => i + 5); // 5:00 - 22:00
@@ -933,33 +906,41 @@ function DayView({ tasks, date, onToggleStatus }: { tasks: any[]; date: Date; on
                   const bgColor = effectiveStatus === "done" ? "bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200" : effectiveStatus === "overdue" ? "bg-red-50 dark:bg-red-900/20 border-red-200" : "bg-blue-50 dark:bg-blue-900/20 border-blue-200";
                   const badge = statusBadge[effectiveStatus] || statusBadge.pending;
                   return (
-                    <div key={t.id} className={`flex items-center gap-3 px-3 py-2 rounded-lg border ${bgColor} hover:shadow-sm transition-shadow`}>
-                      <button onClick={() => onToggleStatus(t)} className="flex-shrink-0">
-                        {t.status === "done" ? <CheckCircle2 className="h-5 w-5 text-emerald-500" /> : <Circle className="h-5 w-5 text-muted-foreground/40" />}
-                      </button>
-                      <TypeIcon className={`h-4 w-4 flex-shrink-0 ${getTaskTypeColor(t.taskType)}`} />
-                      <div className="flex-1 min-w-0">
-                        <p className={`text-[13px] font-medium truncate ${t.status === "done" ? "line-through text-muted-foreground" : ""}`}>{t.title}</p>
-                        {t.deal && <p className="text-[11px] text-primary truncate">{t.deal.title}</p>}
+                    <TaskActionPopover
+                      key={t.id}
+                      task={t}
+                      onEdit={() => onEdit?.(t)}
+                      onComplete={() => onToggleStatus(t)}
+                      onPostpone={() => onToggleStatus(t)}
+                    >
+                      <div className={`flex items-center gap-3 px-3 py-2 rounded-lg border ${bgColor} hover:shadow-sm transition-shadow cursor-pointer`}>
+                        <button onClick={(e) => { e.stopPropagation(); onToggleStatus(t); }} className="flex-shrink-0">
+                          {t.status === "done" ? <CheckCircle2 className="h-5 w-5 text-emerald-500" /> : <Circle className="h-5 w-5 text-muted-foreground/40" />}
+                        </button>
+                        <TypeIcon className={`h-4 w-4 flex-shrink-0 ${getTaskTypeColor(t.taskType)}`} />
+                        <div className="flex-1 min-w-0">
+                          <p className={`text-[13px] font-medium truncate ${t.status === "done" ? "line-through text-muted-foreground" : ""}`}>{t.title}</p>
+                          {t.deal && <p className="text-[11px] text-primary truncate">{t.deal.title}</p>}
+                        </div>
+                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border flex-shrink-0 ${badge.className}`}>
+                          {badge.label}
+                        </span>
+                        <div className="flex items-center -space-x-1 flex-shrink-0">
+                          {(t.assignees || []).slice(0, 2).map((a: any, i: number) => (
+                            a.avatarUrl ? (
+                              <img key={i} src={a.avatarUrl} alt={a.name} className="h-6 w-6 rounded-full border-2 border-card object-cover" />
+                            ) : (
+                              <div key={i} className="h-6 w-6 rounded-full border-2 border-card bg-muted flex items-center justify-center text-[9px] font-bold text-muted-foreground">
+                                {(a.name || "?").substring(0, 2).toUpperCase()}
+                              </div>
+                            )
+                          ))}
+                        </div>
+                        <span className="text-[11px] text-muted-foreground flex-shrink-0">
+                          {new Date(t.dueAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                        </span>
                       </div>
-                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border flex-shrink-0 ${badge.className}`}>
-                        {badge.label}
-                      </span>
-                      <div className="flex items-center -space-x-1 flex-shrink-0">
-                        {(t.assignees || []).slice(0, 2).map((a: any, i: number) => (
-                          a.avatarUrl ? (
-                            <img key={i} src={a.avatarUrl} alt={a.name} className="h-6 w-6 rounded-full border-2 border-card object-cover" />
-                          ) : (
-                            <div key={i} className="h-6 w-6 rounded-full border-2 border-card bg-muted flex items-center justify-center text-[9px] font-bold text-muted-foreground">
-                              {(a.name || "?").substring(0, 2).toUpperCase()}
-                            </div>
-                          )
-                        ))}
-                      </div>
-                      <span className="text-[11px] text-muted-foreground flex-shrink-0">
-                        {new Date(t.dueAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
-                      </span>
-                    </div>
+                    </TaskActionPopover>
                   );
                 })}
               </div>

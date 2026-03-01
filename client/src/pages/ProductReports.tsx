@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
+import { useTenantId } from "@/hooks/useTenantId";
 import { Button } from "@/components/ui/button";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -181,7 +182,7 @@ function ConversionChart({ data }: { data: ConversionRow[] }) {
 export default function ProductReportsPage() {
   const [, setLocation] = useLocation();
   const { user } = useAuth();
-  const tenantId = 1;
+  const tenantId = useTenantId();
 
   // Queries
   const summaryQ = trpc.productCatalog.analytics.summary.useQuery({ tenantId });

@@ -27,7 +27,8 @@ import { useState, useMemo, useCallback } from "react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
 import { useTenantId } from "@/hooks/useTenantId";
-
+import TaskFormDialog, { getTaskTypeIcon, getTaskTypeLabel } from "@/components/TaskFormDialog";
+import TaskActionPopover from "@/components/TaskActionPopover";
 
 type ViewMode = "kanban" | "list";
 type SortMode = "created_desc" | "created_asc" | "value_desc" | "value_asc";
@@ -73,7 +74,7 @@ export default function Pipeline() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [sortMode, setSortMode] = useState<SortMode>("created_desc");
   const [showCreateDeal, setShowCreateDeal] = useState(false);
-  const [showCreateTask, setShowCreateTask] = useState<number | null>(null);
+  const [showTaskForm, setShowTaskForm] = useState<{ dealId?: number; dealTitle?: string; editTask?: any; editAssigneeIds?: number[]; showDealSelector?: boolean } | null>(null);
   const [, setLocation] = useLocation();
   const [draggedDealId, setDraggedDealId] = useState<number | null>(null);
   const [dragOverStageId, setDragOverStageId] = useState<number | null>(null);
@@ -110,7 +111,14 @@ export default function Pipeline() {
 
   const contacts = trpc.crm.contacts.list.useQuery({ tenantId: TENANT_ID, limit: 200 });
   const allAccounts = trpc.crm.accounts.list.useQuery({ tenantId: TENANT_ID });
-  const tasks = trpc.crm.tasks.list.useQuery({ tenantId: TENANT_ID, entityType: "deal" });
+  // Optimized: aggregated overdue/pending counts per deal for Kanban cards
+  const overdueSummary = trpc.crm.tasks.overdueSummary.useQuery({ tenantId: TENANT_ID });
+  const pendingCounts = trpc.crm.tasks.pendingCounts.useQuery({ tenantId: TENANT_ID });
+  // Full tasks for calendar and indicators panels
+  const allTasks = trpc.crm.tasks.list.useQuery(
+    { tenantId: TENANT_ID },
+    { enabled: showIndicators || showTaskCalendar }
+  );
 
   const deletedDeals = trpc.crm.deals.listDeleted.useQuery(
     { tenantId: TENANT_ID },
@@ -262,7 +270,7 @@ export default function Pipeline() {
               </Button>
             </PopoverTrigger>
             <PopoverContent align="end" className="w-[420px] p-0 rounded-2xl shadow-xl border-border/50">
-              <PipelineIndicatorsPanel deals={sortedDeals} tasks={tasks.data?.tasks || []} stages={stages.data || []} />
+              <PipelineIndicatorsPanel deals={sortedDeals} tasks={allTasks.data?.tasks || []} stages={stages.data || []} />
             </PopoverContent>
           </Popover>
 
@@ -275,7 +283,7 @@ export default function Pipeline() {
               </Button>
             </PopoverTrigger>
             <PopoverContent align="end" className="w-[520px] p-0 rounded-2xl shadow-xl border-border/50">
-              <TaskCalendarPanel tasks={tasks.data?.tasks || []} deals={sortedDeals} />
+              <TaskCalendarPanel tasks={allTasks.data?.tasks || []} deals={sortedDeals} onEditTask={(t: any) => setShowTaskForm({ editTask: t, editAssigneeIds: t.assignedToUserId ? [t.assignedToUserId] : [] })} />
             </PopoverContent>
           </Popover>
 
@@ -424,8 +432,9 @@ export default function Pipeline() {
                             key={deal.id}
                             deal={deal}
                             contacts={contacts.data || []}
-                            tasks={(tasks.data?.tasks || []).filter((t: any) => t.entityId === deal.id)}
-                            onCreateTask={() => setShowCreateTask(deal.id)}
+                            overdueCount={(overdueSummary.data as any)?.[deal.id] || 0}
+                            pendingCount={(pendingCounts.data as any)?.[deal.id] || 0}
+                            onCreateTask={() => setShowTaskForm({ dealId: deal.id, dealTitle: deal.title })}
                             onOpenDrawer={() => setLocation(`/deal/${deal.id}`)}
                             onDragStart={handleDragStart}
                             onDragEnd={handleDragEnd}
@@ -611,7 +620,17 @@ export default function Pipeline() {
 
       {/* Dialogs */}
       <CreateDealDialog open={showCreateDeal} onOpenChange={setShowCreateDeal} pipelineId={activePipeline?.id} stages={stages.data || []} contacts={contacts.data || []} accounts={allAccounts.data || []} pipelines={pipelines.data?.filter((p: any) => !p.isArchived) || []} />
-      {showCreateTask !== null && <CreateTaskDialog open={true} onOpenChange={() => setShowCreateTask(null)} dealId={showCreateTask} />}
+      {showTaskForm && (
+        <TaskFormDialog
+          open={true}
+          onOpenChange={() => setShowTaskForm(null)}
+          dealId={showTaskForm.dealId}
+          dealTitle={showTaskForm.dealTitle}
+          editTask={showTaskForm.editTask}
+          editAssigneeIds={showTaskForm.editAssigneeIds}
+          showDealSelector={showTaskForm.showDealSelector}
+        />
+      )}
       <DealFiltersPanel
         open={dealFilters.isOpen}
         onOpenChange={dealFilters.setIsOpen}
@@ -624,21 +643,21 @@ export default function Pipeline() {
 }
 
 /* ─── Deal Card ─── */
-function DealCard({ deal, contacts, tasks, onCreateTask, onOpenDrawer, onDragStart, onDragEnd, isDragging }: {
-  deal: any; contacts: any[]; tasks: any[]; onCreateTask: () => void; onOpenDrawer: () => void;
+function DealCard({ deal, contacts, overdueCount, pendingCount, onCreateTask, onOpenDrawer, onDragStart, onDragEnd, isDragging }: {
+  deal: any; contacts: any[]; overdueCount: number; pendingCount: number; onCreateTask: () => void; onOpenDrawer: () => void;
   onDragStart: (e: React.DragEvent, dealId: number) => void; onDragEnd: (e: React.DragEvent) => void; isDragging: boolean;
 }) {
   const contact = contacts.find((c: any) => c.id === deal.contactId);
   const style = getStatusStyle(deal.status);
-  const pendingTasks = tasks.filter((t: any) => t.status === "pending" || t.status === "in_progress");
-  const nextTask = pendingTasks[0];
+  const hasOverdue = overdueCount > 0;
+  const hasPending = pendingCount > 0;
 
   return (
     <div
       draggable
       onDragStart={(e) => onDragStart(e, deal.id)}
       onDragEnd={onDragEnd}
-      className={`bg-card rounded-xl border border-border/50 p-3.5 shadow-[0_1px_4px_oklch(0_0_0/0.06)] hover:shadow-md transition-all duration-200 cursor-grab active:cursor-grabbing space-y-2.5 ${isDragging ? "opacity-40 scale-95" : ""}`}
+      className={`bg-card rounded-xl border-2 p-3.5 shadow-[0_1px_4px_oklch(0_0_0/0.06)] hover:shadow-md transition-all duration-200 cursor-grab active:cursor-grabbing space-y-2.5 ${isDragging ? "opacity-40 scale-95" : ""} ${hasOverdue ? "border-red-500 bg-red-50/40 dark:bg-red-950/20 ring-1 ring-red-400/30" : "border-border/50"}`}
     >
       {/* Status + actions */}
       <div className="flex items-center justify-between">
@@ -673,17 +692,26 @@ function DealCard({ deal, contacts, tasks, onCreateTask, onOpenDrawer, onDragSta
         )}
       </div>
 
-      {/* Next task */}
-      {nextTask && (
+      {/* Overdue alert */}
+      {hasOverdue && (
+        <div className="flex items-center gap-1.5 text-[11px] bg-red-100 dark:bg-red-950/40 border border-red-300 dark:border-red-800 px-2.5 py-2 rounded-lg">
+          <AlertTriangle className="h-3 w-3 shrink-0 text-red-600 dark:text-red-400" />
+          <span className="truncate flex-1 text-red-700 dark:text-red-300 font-semibold">
+            {overdueCount} tarefa{overdueCount > 1 ? "s" : ""} atrasada{overdueCount > 1 ? "s" : ""}
+          </span>
+        </div>
+      )}
+
+      {/* Pending tasks indicator */}
+      {hasPending && !hasOverdue && (
         <div className="flex items-center gap-1.5 text-[11px] bg-primary/[0.08] dark:bg-primary/[0.12] border border-primary/15 px-2.5 py-2 rounded-lg">
           <Clock className="h-3 w-3 shrink-0 text-primary" />
-          <span className="truncate flex-1 text-foreground font-medium">{nextTask.title}</span>
-          {nextTask.dueAt && <span className="shrink-0 text-muted-foreground text-[10px]">{formatDateTime(nextTask.dueAt)}</span>}
+          <span className="truncate flex-1 text-foreground font-medium">{pendingCount} tarefa{pendingCount > 1 ? "s" : ""} pendente{pendingCount > 1 ? "s" : ""}</span>
         </div>
       )}
 
       {/* Create task */}
-      {!nextTask && (
+      {!hasPending && !hasOverdue && (
         <button
           onClick={(e) => { e.stopPropagation(); onCreateTask(); }}
           className="flex items-center gap-1.5 text-[12px] text-muted-foreground hover:text-primary w-full justify-center py-2 border border-dashed border-border/50 rounded-xl hover:border-primary/40 transition-all duration-200"
@@ -714,6 +742,16 @@ function DealDrawer({ dealId, onClose, contacts, accounts, stages }: {
   const [lossDialogDealId, setLossDialogDealId] = useState<number | null>(null);
   const [selectedLossReasonId, setSelectedLossReasonId] = useState<number | null>(null);
   const [lossNotes, setLossNotes] = useState("");
+  const [showDrawerTaskForm, setShowDrawerTaskForm] = useState<any>(null);
+
+  const updateTaskStatus = trpc.crm.tasks.update.useMutation({
+    onSuccess: () => {
+      utils.crm.tasks.list.invalidate();
+      utils.crm.tasks.overdueSummary.invalidate();
+      utils.crm.tasks.pendingCounts.invalidate();
+      toast.success("Tarefa atualizada!");
+    },
+  });
 
   const updateDeal = trpc.crm.deals.update.useMutation({
     onSuccess: () => {
@@ -908,14 +946,35 @@ function DealDrawer({ dealId, onClose, contacts, accounts, stages }: {
               <Separator className="bg-border/40" />
 
               <div className="space-y-3">
-                <Label className="text-[11px] font-bold uppercase tracking-[0.1em] text-muted-foreground">Tarefas</Label>
-                {(dealTasks.data?.tasks || []).map((t: any) => (
-                  <div key={t.id} className={`flex items-center gap-2.5 text-[13px] p-3 rounded-xl border border-border/40 ${t.status === "done" ? "bg-emerald-500/10 line-through text-muted-foreground" : "bg-card"}`}>
-                    <Clock className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                    <span className="flex-1 truncate">{t.title}</span>
-                    {t.dueAt && <span className="text-[11px] text-muted-foreground shrink-0">{formatDate(t.dueAt)}</span>}
-                  </div>
-                ))}
+                <div className="flex items-center justify-between">
+                  <Label className="text-[11px] font-bold uppercase tracking-[0.1em] text-muted-foreground">Tarefas</Label>
+                  <Button variant="ghost" size="sm" className="h-7 text-[11px] gap-1 text-primary" onClick={() => setShowDrawerTaskForm({ dealId, dealTitle: d.title })}>
+                    <Plus className="h-3 w-3" /> Criar tarefa
+                  </Button>
+                </div>
+                {(dealTasks.data?.tasks || []).map((t: any) => {
+                  const isOverdue = (t.status === "pending" || t.status === "in_progress") && t.dueAt && new Date(t.dueAt).getTime() < Date.now();
+                  return (
+                    <div key={t.id} className={`flex items-center gap-2.5 text-[13px] p-3 rounded-xl border ${t.status === "done" ? "bg-emerald-500/10 border-emerald-200 dark:border-emerald-800" : isOverdue ? "bg-red-50/60 dark:bg-red-950/20 border-red-300 dark:border-red-800" : "bg-card border-border/40"}`}>
+                      <Checkbox
+                        checked={t.status === "done"}
+                        onCheckedChange={(checked) => {
+                          updateTaskStatus.mutate({ tenantId: TENANT_ID, id: t.id, status: checked ? "done" : "pending" });
+                        }}
+                        className="shrink-0"
+                      />
+                      <span className={`flex-1 truncate ${t.status === "done" ? "line-through text-muted-foreground" : ""}`}>{t.title}</span>
+                      {isOverdue && <Badge variant="destructive" className="text-[9px] px-1.5 py-0 h-4 rounded-md shrink-0">ATRASADA</Badge>}
+                      {t.dueAt && <span className="text-[11px] text-muted-foreground shrink-0">{formatDateTime(t.dueAt)}</span>}
+                      <button
+                        onClick={() => setShowDrawerTaskForm({ editTask: t, editAssigneeIds: t.assignedToUserId ? [t.assignedToUserId] : [] })}
+                        className="p-1 hover:bg-muted/60 rounded-lg transition-colors shrink-0"
+                      >
+                        <Pencil className="h-3 w-3 text-muted-foreground" />
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           </TabsContent>
@@ -1139,6 +1198,18 @@ function DealDrawer({ dealId, onClose, contacts, accounts, stages }: {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Task Form Dialog for Drawer */}
+      {showDrawerTaskForm && (
+        <TaskFormDialog
+          open={true}
+          onOpenChange={() => setShowDrawerTaskForm(null)}
+          dealId={showDrawerTaskForm.dealId || dealId}
+          dealTitle={showDrawerTaskForm.dealTitle || d?.title}
+          editTask={showDrawerTaskForm.editTask}
+          editAssigneeIds={showDrawerTaskForm.editAssigneeIds}
+        />
+      )}
     </div>
   );
 }
@@ -1617,42 +1688,7 @@ function CreateDealDialog({ open, onOpenChange, pipelineId, stages, contacts, ac
   );
 }
 
-/* ─── Create Task Dialog ─── */
-function CreateTaskDialog({ open, onOpenChange, dealId }: { open: boolean; onOpenChange: (open: boolean) => void; dealId: number }) {
-  const TENANT_ID = useTenantId();
-  const [title, setTitle] = useState("");
-  const [dueAt, setDueAt] = useState("");
-  const utils = trpc.useUtils();
-
-  const createTask = trpc.crm.tasks.create.useMutation({
-    onSuccess: () => { utils.crm.tasks.list.invalidate(); onOpenChange(false); setTitle(""); setDueAt(""); toast.success("Tarefa criada!"); },
-  });
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[420px] rounded-2xl">
-        <DialogHeader><DialogTitle className="text-lg">Criar Tarefa</DialogTitle></DialogHeader>
-        <div className="space-y-5 pt-3">
-          <div>
-            <Label className="text-[12px] font-medium">Título *</Label>
-            <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Ex: Ligar para confirmar reserva" className="mt-1.5 h-10 rounded-xl" />
-          </div>
-          <div>
-            <Label className="text-[12px] font-medium">Data de vencimento</Label>
-            <Input type="datetime-local" value={dueAt} onChange={(e) => setDueAt(e.target.value)} className="mt-1.5 h-10 rounded-xl" />
-          </div>
-          <Button
-            className="w-full h-11 rounded-lg text-[14px] font-medium shadow-sm bg-primary hover:bg-primary/90 transition-colors text-primary-foreground"
-            disabled={!title || createTask.isPending}
-            onClick={() => createTask.mutate({ tenantId: TENANT_ID, entityType: "deal", entityId: dealId, title, dueAt: dueAt || undefined })}
-          >
-            {createTask.isPending ? "Criando..." : "Criar Tarefa"}
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-}
+/* CreateTaskDialog removed — replaced by TaskFormDialog component */
 
 /* ─── Pipeline Indicators Panel ─── */
 function PipelineIndicatorsPanel({ deals, tasks, stages }: { deals: any[]; tasks: any[]; stages: any[] }) {
@@ -1741,7 +1777,7 @@ function PipelineIndicatorsPanel({ deals, tasks, stages }: { deals: any[]; tasks
 }
 
 /* ─── Task Calendar Panel ─── */
-function TaskCalendarPanel({ tasks, deals }: { tasks: any[]; deals: any[] }) {
+function TaskCalendarPanel({ tasks, deals, onEditTask }: { tasks: any[]; deals: any[]; onEditTask?: (task: any) => void }) {
   const [currentMonth, setCurrentMonth] = useState(() => {
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), 1);
@@ -1855,26 +1891,35 @@ function TaskCalendarPanel({ tasks, deals }: { tasks: any[]; deals: any[] }) {
               selectedTasks.map((t: any) => {
                 const isOverdue = (t.status === "pending" || t.status === "in_progress") && t.dueAt && new Date(t.dueAt).getTime() < Date.now();
                 return (
-                  <div key={t.id} className={`flex items-center gap-2.5 px-3 py-2 rounded-xl text-[12px] ${
-                    isOverdue ? "bg-red-50 dark:bg-red-500/10" : "bg-muted/40"
-                  }`}>
-                    <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
-                      t.status === "completed" ? "bg-emerald-500" : isOverdue ? "bg-red-500" : "bg-primary"
-                    }`} />
-                    <div className="flex-1 min-w-0">
-                      <p className={`font-medium truncate ${t.status === "completed" ? "line-through text-muted-foreground" : "text-foreground"}`}>
-                        {t.title}
-                      </p>
-                      {t.entityType === "deal" && (
-                        <p className="text-[11px] text-muted-foreground truncate">{getDealTitle(t.entityId)}</p>
+                  <TaskActionPopover
+                    key={t.id}
+                    task={t}
+                    onEdit={() => onEditTask?.(t)}
+                    side="left"
+                    align="start"
+                  >
+                    <div className={`flex items-center gap-2.5 px-3 py-2 rounded-xl text-[12px] cursor-pointer hover:ring-1 hover:ring-primary/30 transition-all ${
+                      isOverdue ? "bg-red-50 dark:bg-red-500/10" : "bg-muted/40"
+                    }`}>
+                      <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                        t.status === "done" ? "bg-emerald-500" : isOverdue ? "bg-red-500" : "bg-primary"
+                      }`} />
+                      <div className="flex-1 min-w-0">
+                        <p className={`font-medium truncate ${t.status === "done" ? "line-through text-muted-foreground" : "text-foreground"}`}>
+                          {t.title}
+                        </p>
+                        {t.entityType === "deal" && (
+                          <p className="text-[11px] text-muted-foreground truncate">{getDealTitle(t.entityId)}</p>
+                        )}
+                      </div>
+                      {isOverdue && <Badge variant="destructive" className="text-[9px] px-1.5 py-0 h-4 rounded-md">ATRASADA</Badge>}
+                      {t.dueAt && (
+                        <span className="text-[11px] text-muted-foreground flex-shrink-0">
+                          {new Date(t.dueAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                        </span>
                       )}
                     </div>
-                    {t.dueAt && (
-                      <span className="text-[11px] text-muted-foreground flex-shrink-0">
-                        {new Date(t.dueAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
-                      </span>
-                    )}
-                  </div>
+                  </TaskActionPopover>
                 );
               })
             )}

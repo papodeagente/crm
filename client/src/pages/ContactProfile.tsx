@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { useRoute, Link } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
+import { useTenantId } from "@/hooks/useTenantId";
 import {
   ArrowLeft, Mail, Phone, FileText, Calendar, DollarSign,
   TrendingUp, Clock, ShoppingCart, Award, Edit2, Save, X,
@@ -289,7 +290,7 @@ export default function ContactProfile() {
   const [, params] = useRoute("/contact/:id");
   const contactId = Number(params?.id);
   const { user } = useAuth();
-  const tenantId = 1;
+  const tenantId = useTenantId();
 
   const [isEditing, setIsEditing] = useState(false);
   const [editData, setEditData] = useState<{ name: string; email: string; phone: string; notes: string }>({ name: "", email: "", phone: "", notes: "" });

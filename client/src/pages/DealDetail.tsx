@@ -23,6 +23,10 @@ import {
   Sparkles, BarChart3, TrendingUp, TrendingDown, Star, Target, Lightbulb, RefreshCw, Award, Search
 } from "lucide-react";
 import { useTenantId } from "@/hooks/useTenantId";
+import TaskFormDialog from "@/components/TaskFormDialog";
+import TaskActionPopover from "@/components/TaskActionPopover";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Pencil } from "lucide-react";
 
 
 /* ─── Helpers ─── */
@@ -113,8 +117,20 @@ export default function DealDetail() {
   const productsQ = trpc.crm.deals.products.list.useQuery({ tenantId: TENANT_ID, dealId }, { enabled: dealId > 0 });
   const participantsQ = trpc.crm.deals.participants.list.useQuery({ tenantId: TENANT_ID, dealId }, { enabled: dealId > 0 });
   const historyQ = trpc.crm.deals.history.list.useQuery({ tenantId: TENANT_ID, dealId }, { enabled: dealId > 0 });
-  const tasksQ = trpc.crm.tasks.list.useQuery({ tenantId: TENANT_ID, entityType: "deal", entityId: dealId }, { enabled: dealId > 0 });
-  const tasksList: any[] = (tasksQ.data as any)?.tasks ?? (Array.isArray(tasksQ.data) ? tasksQ.data : []);
+  const tasksRawQ = trpc.crm.tasks.list.useQuery(
+    { tenantId: TENANT_ID, entityType: "deal", entityId: dealId },
+    {
+      enabled: dealId > 0,
+      select: (d: any) => {
+        if (!d) return [] as any[];
+        if (Array.isArray(d)) return d as any[];
+        if (d?.tasks && Array.isArray(d.tasks)) return d.tasks as any[];
+        return [] as any[];
+      },
+    }
+  );
+  const tasksList: any[] = tasksRawQ.data || [];
+  const tasksQ = { ...tasksRawQ, data: tasksList };
   const notesQ = trpc.crm.notes.list.useQuery({ tenantId: TENANT_ID, entityType: "deal", entityId: dealId }, { enabled: dealId > 0 });
   const stageTimeQ = trpc.utmAnalytics.stageTime.useQuery({ tenantId: TENANT_ID, dealId }, { enabled: dealId > 0 });
   const waMessagesCountQ = trpc.crm.dealWhatsApp.count.useQuery({ tenantId: TENANT_ID, dealId }, { enabled: dealId > 0 });
@@ -265,7 +281,7 @@ export default function DealDetail() {
     setSelectedLossReasonId(null);
   };
 
-  const pendingTasks = ((tasksQ.data as any)?.tasks || []).filter((t: any) => t.status === "pending" || t.status === "in_progress");
+  const pendingTasks = tasksList.filter((t: any) => t.status === "pending" || t.status === "in_progress");
 
   return (
     <div className="h-full flex flex-col bg-background">
@@ -863,6 +879,7 @@ export default function DealDetail() {
               <TasksPanel
                 tasks={tasksList}
                 dealId={dealId}
+                dealTitle={deal?.title}
                 onRefresh={() => tasksQ.refetch()}
               />
             )}
@@ -1381,92 +1398,48 @@ function CustomFieldsSidebar({ fields, values, dealId, onRefresh }: any) {
 /* TASK COMPONENTS                                             */
 /* ════════════════════════════════════════════════════════════ */
 
-function CreateTaskButton({ dealId, onCreated }: { dealId: number; onCreated: () => void }) {
-  const TENANT_ID = useTenantId();
+function CreateTaskButton({ dealId, onCreated, dealTitle }: { dealId: number; onCreated: () => void; dealTitle?: string }) {
   const [open, setOpen] = useState(false);
-  const [title, setTitle] = useState("");
-  const [dueAt, setDueAt] = useState("");
-  const [priority, setPriority] = useState("medium");
-
-  const createTask = trpc.crm.tasks.create.useMutation({
-    onSuccess: () => {
-      onCreated();
-      setOpen(false);
-      setTitle("");
-      setDueAt("");
-      setPriority("medium");
-      toast.success("Tarefa criada");
-    },
-  });
 
   return (
     <>
       <Button size="sm" variant="outline" onClick={() => setOpen(true)} className="text-xs">
         <Plus className="h-3 w-3 mr-1" /> Criar tarefa
       </Button>
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="sm:max-w-sm">
-          <DialogHeader><DialogTitle>Nova Tarefa</DialogTitle></DialogHeader>
-          <div className="space-y-3">
-            <Input placeholder="Título da tarefa" value={title} onChange={(e) => setTitle(e.target.value)} autoFocus />
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-xs text-muted-foreground mb-1 block">Prazo</label>
-                <Input type="datetime-local" value={dueAt} onChange={(e) => setDueAt(e.target.value)} className="text-xs" />
-              </div>
-              <div>
-                <label className="text-xs text-muted-foreground mb-1 block">Prioridade</label>
-                <Select value={priority} onValueChange={setPriority}>
-                  <SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="low">Baixa</SelectItem>
-                    <SelectItem value="medium">Média</SelectItem>
-                    <SelectItem value="high">Alta</SelectItem>
-                    <SelectItem value="urgent">Urgente</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setOpen(false)}>Cancelar</Button>
-            <Button
-              disabled={!title.trim()}
-              onClick={() => createTask.mutate({
-                tenantId: TENANT_ID, entityType: "deal", entityId: dealId,
-                title, dueAt: dueAt || undefined, priority: priority as any,
-              })}
-            >
-              Criar
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {open && (
+        <TaskFormDialog
+          open={true}
+          onOpenChange={() => setOpen(false)}
+          dealId={dealId}
+          dealTitle={dealTitle}
+        />
+      )}
     </>
   );
 }
 
-function TaskRow({ task, onUpdate }: { task: any; onUpdate: () => void }) {
+function TaskRow({ task, onUpdate, onEdit }: { task: any; onUpdate: () => void; onEdit?: (task: any) => void }) {
   const TENANT_ID = useTenantId();
   const updateTask = trpc.crm.tasks.update.useMutation({
     onSuccess: () => { onUpdate(); toast.success("Tarefa atualizada"); },
   });
   const pri = priorityConfig[task.priority] || priorityConfig.medium;
   const isOverdue = task.dueAt && new Date(task.dueAt) < new Date() && task.status !== "done";
+  const isDone = task.status === "done";
 
   return (
-    <div className={`flex items-center gap-3 p-2.5 rounded-lg border transition-colors ${
-      isOverdue ? "border-red-500/40 bg-red-500/5 dark:bg-red-500/10" : "border-border bg-background hover:border-primary/30 hover:shadow-sm"
+    <div className={`flex items-center gap-3 p-3 rounded-xl border transition-colors ${
+      isOverdue ? "border-red-500/40 bg-red-500/5 dark:bg-red-500/10" : isDone ? "border-emerald-200 dark:border-emerald-800 bg-emerald-500/5" : "border-border bg-background hover:border-primary/30 hover:shadow-sm"
     }`}>
-      <button
-        onClick={() => updateTask.mutate({ tenantId: TENANT_ID, id: task.id, status: "done" })}
-        className="w-5 h-5 rounded-full border-2 border-muted-foreground/40 hover:border-primary hover:bg-primary/10 flex items-center justify-center shrink-0 transition-colors"
-        title="Marcar como concluída"
-      >
-        {task.status === "done" && <Check className="h-3 w-3 text-primary" />}
-      </button>
+      <Checkbox
+        checked={isDone}
+        onCheckedChange={(checked) => {
+          updateTask.mutate({ tenantId: TENANT_ID, id: task.id, status: checked ? "done" : "pending" });
+        }}
+        className="shrink-0"
+      />
       <div className="flex-1 min-w-0">
-        <p className={`text-sm font-medium truncate ${task.status === "done" ? "line-through text-muted-foreground" : ""}`}>
+        <p className={`text-sm font-medium truncate ${isDone ? "line-through text-muted-foreground" : ""}`}>
           {task.title}
         </p>
         <div className="flex items-center gap-2 mt-0.5">
@@ -1481,9 +1454,35 @@ function TaskRow({ task, onUpdate }: { task: any; onUpdate: () => void }) {
           </span>
         </div>
       </div>
-      <Badge variant="outline" className="text-[10px] shrink-0">
-        {taskStatusLabels[task.status] || task.status}
-      </Badge>
+      {isOverdue && <Badge variant="destructive" className="text-[9px] px-1.5 py-0 h-4 rounded-md shrink-0">ATRASADA</Badge>}
+      <div className="flex items-center gap-1 shrink-0">
+        <button
+          onClick={() => onEdit?.(task)}
+          className="p-1.5 hover:bg-muted/60 rounded-lg transition-colors"
+          title="Editar tarefa"
+        >
+          <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
+        </button>
+        <TaskActionPopover
+          task={task}
+          onEdit={() => onEdit?.(task)}
+          onComplete={onUpdate}
+          onPostpone={onUpdate}
+        >
+          <button className="p-1.5 hover:bg-muted/60 rounded-lg transition-colors" title="Ações">
+            <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+          </button>
+        </TaskActionPopover>
+        {!isDone && (
+          <button
+            onClick={() => updateTask.mutate({ tenantId: TENANT_ID, id: task.id, status: "done" })}
+            className="p-1.5 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 rounded-lg transition-colors"
+            title="Concluir tarefa"
+          >
+            <Check className="h-3.5 w-3.5 text-emerald-600" />
+          </button>
+        )}
+      </div>
     </div>
   );
 }
@@ -1679,10 +1678,8 @@ function HistoryPanel({ history, notes, dealId, contactName, onNoteCreated }: {
 /* TASKS PANEL                                                 */
 /* ════════════════════════════════════════════════════════════ */
 
-function TasksPanel({ tasks, dealId, onRefresh }: { tasks: any[]; dealId: number; onRefresh: () => void }) {
-  const updateTask = trpc.crm.tasks.update.useMutation({
-    onSuccess: () => { onRefresh(); toast.success("Tarefa atualizada"); },
-  });
+function TasksPanel({ tasks, dealId, onRefresh, dealTitle }: { tasks: any[]; dealId: number; onRefresh: () => void; dealTitle?: string }) {
+  const [editTask, setEditTask] = useState<any>(null);
 
   const pending = tasks.filter((t: any) => t.status === "pending" || t.status === "in_progress");
   const done = tasks.filter((t: any) => t.status === "done" || t.status === "cancelled");
@@ -1691,7 +1688,7 @@ function TasksPanel({ tasks, dealId, onRefresh }: { tasks: any[]; dealId: number
     <div className="p-5 space-y-6">
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold">Todas as Tarefas ({tasks.length})</h3>
-        <CreateTaskButton dealId={dealId} onCreated={onRefresh} />
+        <CreateTaskButton dealId={dealId} onCreated={onRefresh} dealTitle={dealTitle} />
       </div>
 
       {tasks.length === 0 ? (
@@ -1705,7 +1702,7 @@ function TasksPanel({ tasks, dealId, onRefresh }: { tasks: any[]; dealId: number
             <div className="space-y-2">
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Pendentes ({pending.length})</p>
               {pending.map((task: any) => (
-                <TaskRow key={task.id} task={task} onUpdate={onRefresh} />
+                <TaskRow key={task.id} task={task} onUpdate={onRefresh} onEdit={(t) => setEditTask(t)} />
               ))}
             </div>
           )}
@@ -1713,11 +1710,22 @@ function TasksPanel({ tasks, dealId, onRefresh }: { tasks: any[]; dealId: number
             <div className="space-y-2">
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Concluídas ({done.length})</p>
               {done.map((task: any) => (
-                <TaskRow key={task.id} task={task} onUpdate={onRefresh} />
+                <TaskRow key={task.id} task={task} onUpdate={onRefresh} onEdit={(t) => setEditTask(t)} />
               ))}
             </div>
           )}
         </>
+      )}
+
+      {editTask && (
+        <TaskFormDialog
+          open={true}
+          onOpenChange={() => setEditTask(null)}
+          dealId={dealId}
+          dealTitle={dealTitle}
+          editTask={editTask}
+          editAssigneeIds={editTask.assignedToUserId ? [editTask.assignedToUserId] : []}
+        />
       )}
     </div>
   );

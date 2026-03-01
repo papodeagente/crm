@@ -672,13 +672,26 @@ export const crmRouter = router({
         dueAt: z.string().optional(), assignedToUserId: z.number().optional(),
         priority: z.enum(["low", "medium", "high", "urgent"]).optional(),
         description: z.string().optional(),
+        markAsDone: z.boolean().optional(),
+        assigneeUserIds: z.array(z.number()).optional(),
       }))
       .mutation(async ({ ctx, input }) => {
+        const { markAsDone, assigneeUserIds, ...taskInput } = input;
         const result = await crm.createTask({
-          ...input,
-          dueAt: input.dueAt ? new Date(input.dueAt) : undefined,
+          ...taskInput,
+          dueAt: taskInput.dueAt ? new Date(taskInput.dueAt) : undefined,
           createdByUserId: ctx.user.id,
         });
+        // Mark as done if requested
+        if (markAsDone && result?.id) {
+          await crm.updateTask(input.tenantId, result.id, { status: "done" });
+        }
+        // Add assignees
+        if (result?.id && assigneeUserIds && assigneeUserIds.length > 0) {
+          for (const userId of assigneeUserIds) {
+            await crm.addTaskAssignee(result.id, userId, input.tenantId);
+          }
+        }
         // In-app notification
         await createNotification(input.tenantId, {
           type: "task_created",
@@ -714,6 +727,16 @@ export const crmRouter = router({
       .mutation(async ({ input }) => {
         await crm.removeTaskAssignee(input.taskId, input.userId, input.tenantId);
         return { success: true };
+      }),
+    overdueSummary: protectedProcedure
+      .input(z.object({ tenantId: z.number(), dealIds: z.array(z.number()).optional() }))
+      .query(async ({ input }) => {
+        return crm.getOverdueTasksByDeal(input.tenantId, input.dealIds);
+      }),
+    pendingCounts: protectedProcedure
+      .input(z.object({ tenantId: z.number() }))
+      .query(async ({ input }) => {
+        return crm.getPendingTaskCountsByDeal(input.tenantId);
       }),
   }),
 

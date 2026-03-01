@@ -561,6 +561,50 @@ export async function getTaskAssignees(taskId: number, tenantId: number) {
   return users;
 }
 
+// Optimized: get overdue task counts grouped by deal ID
+export async function getOverdueTasksByDeal(tenantId: number, dealIds?: number[]) {
+  const db = await getDb(); if (!db) return {};
+  const conditions = [
+    eq(tasks.tenantId, tenantId),
+    eq(tasks.entityType, "deal"),
+    sql`${tasks.status} NOT IN ('done', 'cancelled')`,
+    sql`${tasks.dueAt} IS NOT NULL`,
+    sql`${tasks.dueAt} < NOW()`,
+  ];
+  if (dealIds && dealIds.length > 0) {
+    conditions.push(inArray(tasks.entityId, dealIds));
+  }
+  const rows = await db.select({
+    entityId: tasks.entityId,
+    count: sql<number>`COUNT(*)`,
+    oldestTitle: sql<string>`MIN(${tasks.title})`,
+    oldestDueAt: sql<string>`MIN(${tasks.dueAt})`,
+  }).from(tasks).where(and(...conditions)).groupBy(tasks.entityId);
+  const result: Record<number, { count: number; oldestTitle: string; oldestDueAt: string }> = {};
+  for (const row of rows) {
+    result[row.entityId] = { count: Number(row.count), oldestTitle: row.oldestTitle, oldestDueAt: row.oldestDueAt };
+  }
+  return result;
+}
+
+// Get pending task counts grouped by deal ID (for "no tasks" indicator)
+export async function getPendingTaskCountsByDeal(tenantId: number) {
+  const db = await getDb(); if (!db) return {};
+  const rows = await db.select({
+    entityId: tasks.entityId,
+    count: sql<number>`COUNT(*)`,
+  }).from(tasks).where(and(
+    eq(tasks.tenantId, tenantId),
+    eq(tasks.entityType, "deal"),
+    sql`${tasks.status} NOT IN ('done', 'cancelled')`,
+  )).groupBy(tasks.entityId);
+  const result: Record<number, number> = {};
+  for (const row of rows) {
+    result[row.entityId] = Number(row.count);
+  }
+  return result;
+}
+
 // ═══════════════════════════════════════
 // NOTES
 // ═══════════════════════════════════════

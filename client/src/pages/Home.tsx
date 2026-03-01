@@ -1,6 +1,7 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import { useMemo } from "react";
+import { useTenantId } from "@/hooks/useTenantId";
 import DateRangeFilter, { useDateFilter } from "@/components/DateRangeFilter";
 import {
   Briefcase, Users, Plane, CheckSquare, MessageSquare,
@@ -159,8 +160,7 @@ export default function Home() {
   const { user } = useAuth();
   const dateFilter = useDateFilter("all");
 
-  // Use tenantId 1 as default (single-tenant for now)
-  const tenantId = 1;
+  const tenantId = useTenantId();
 
   const metricsQ = trpc.dashboard.metrics.useQuery({ tenantId, dateFrom: dateFilter.dates.dateFrom, dateTo: dateFilter.dates.dateTo });
   const pipelineQ = trpc.dashboard.pipelineSummary.useQuery({ tenantId, dateFrom: dateFilter.dates.dateFrom, dateTo: dateFilter.dates.dateTo });
