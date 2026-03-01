@@ -1555,3 +1555,37 @@
 - [x] Badge de classificação estratégica com cor distinta no card da negociação
 - [x] Ícone visual correspondente ao estágio do contato
 - [x] Indicador de "Janela de Indicação Ativa" (se aplicável)
+
+## Página de Configuração do Motor de Regras
+
+- [x] Backend: endpoint para ler configurações do motor de regras por tenant
+- [x] Backend: endpoint para salvar configurações do motor de regras por tenant
+- [x] Frontend: página ClassificationSettings com formulário de configuração
+- [x] Campos configuráveis: threshold de inatividade (dias), janela de indicação (dias)
+- [x] Visualização das 9 classificações com explicação de cada regra
+- [x] Registrar rota /settings/classification no App.tsx
+- [x] Link na página de configurações para acessar a nova página
+- [ ] Testes unitários para os endpoints de configuração
+
+## Correções e Melhorias — Onboarding, Pós-Venda, Badge Visual
+
+- [x] Corrigir criação automática dos 2 funis padrão no onboarding de novo tenant
+- [ ] Funil de Pós-Venda NÃO contabiliza dados de vendas (separar métricas)
+- [x] Funil de Pós-Venda é para gerenciar entrega de viagem, não para vender
+- [x] Badge de classificação estratégica mais visual e destacado no card do Kanban
+- [x] Registrar rota /settings/classification no App.tsx
+- [x] Adicionar link para classificação nas configurações
+- [x] Seed dos funis padrão para o tenant existente
+
+## Automação de Tarefas por Etapa do Funil
+
+- [x] Campo dataEmbarque (date) nos deals
+- [x] Campo dataRetorno (date) nos deals
+- [x] Tabela task_automations (regras de automação de tarefas por etapa)
+- [x] Migração SQL para novos campos e tabela
+- [x] Motor de automação: ao mover deal para etapa, criar tarefas automaticamente
+- [x] Regras de prazo: X dias antes/depois do dia atual, data de embarque ou data de retorno
+- [x] Endpoint CRUD para task_automations no crmRouter
+- [x] Página de configuração "Automação de Vendas" com UI para criar/editar regras
+- [x] Integrar automação no moveStage do crmRouter
+- [x] Seed funis padrão para tenants existentes (Aceleradora e Boxtour)

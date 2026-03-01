@@ -119,17 +119,15 @@ export default function DealDetail() {
   const historyQ = trpc.crm.deals.history.list.useQuery({ tenantId: TENANT_ID, dealId }, { enabled: dealId > 0 });
   const tasksRawQ = trpc.crm.tasks.list.useQuery(
     { tenantId: TENANT_ID, entityType: "deal", entityId: dealId },
-    {
-      enabled: dealId > 0,
-      select: (d: any) => {
-        if (!d) return [] as any[];
-        if (Array.isArray(d)) return d as any[];
-        if (d?.tasks && Array.isArray(d.tasks)) return d.tasks as any[];
-        return [] as any[];
-      },
-    }
+    { enabled: dealId > 0 }
   );
-  const tasksList: any[] = tasksRawQ.data || [];
+  const tasksList: any[] = (() => {
+    const d = tasksRawQ.data;
+    if (!d) return [];
+    if (Array.isArray(d)) return d;
+    if (typeof d === 'object' && 'tasks' in d && Array.isArray((d as any).tasks)) return (d as any).tasks;
+    return [];
+  })();
   const tasksQ = { ...tasksRawQ, data: tasksList };
   const notesQ = trpc.crm.notes.list.useQuery({ tenantId: TENANT_ID, entityType: "deal", entityId: dealId }, { enabled: dealId > 0 });
   const stageTimeQ = trpc.utmAnalytics.stageTime.useQuery({ tenantId: TENANT_ID, dealId }, { enabled: dealId > 0 });

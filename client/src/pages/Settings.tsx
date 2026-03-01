@@ -71,7 +71,8 @@ const settingsCategories: SettingsCategory[] = [
     links: [
       { icon: GitBranch, label: "Funis de vendas", path: "/settings/pipelines" },
       { icon: Tag, label: "Campos personalizados", path: "/settings/custom-fields" },
-      { icon: Bot, label: "Automação de vendas", path: "/chatbot" },
+      { icon: Bot, label: "Automação de vendas", path: "/settings/automations", badge: "Novo" },
+      { icon: Target, label: "Classificação estratégica", path: "/settings/classification" },
     ],
   },
   {

@@ -4,6 +4,9 @@ import { TRPCError } from "@trpc/server";
 import * as crm from "../crmDb";
 import { emitEvent } from "../middleware/eventLog";
 import { createNotification } from "../db";
+import { getDb } from "../db";
+import { tenants } from "../../drizzle/schema";
+import { eq } from "drizzle-orm";
 
 export const crmRouter = router({
   // ─── CONTACTS ───
@@ -440,14 +443,28 @@ export const crmRouter = router({
           entityId: String(input.dealId),
         });
         // Classification engine: auto-classify contact on stage move
+        // + Task automation engine: create tasks when deal enters a stage
         try {
           const deal = await crm.getDealById(input.tenantId, input.dealId);
           if (deal?.contactId) {
             const { onDealMoved } = await import("../classificationEngine");
             await onDealMoved(input.tenantId, input.dealId, input.toStageId, deal.contactId, deal.pipelineId);
           }
+          // Execute task automations for the new stage
+          if (deal) {
+            const createdTaskIds = await crm.executeTaskAutomations(
+              input.tenantId,
+              input.dealId,
+              input.toStageId,
+              { ownerUserId: deal.ownerUserId, boardingDate: deal.boardingDate, returnDate: deal.returnDate },
+              ctx.user.id
+            );
+            if (createdTaskIds.length > 0) {
+              console.log(`[TaskAutomation] Created ${createdTaskIds.length} tasks for deal ${input.dealId} at stage ${input.toStageId}`);
+            }
+          }
         } catch (e) {
-          console.error("[Classification] Error on deal moved:", e);
+          console.error("[Classification/TaskAutomation] Error on deal moved:", e);
         }
         return { success: true };
       }),
@@ -911,6 +928,49 @@ export const crmRouter = router({
         const { STAGE_CLASSIFICATIONS, CLASSIFICATION_CONFIG } = await import("../classificationEngine");
         return { classifications: STAGE_CLASSIFICATIONS, config: CLASSIFICATION_CONFIG };
       }),
+    getSettings: protectedProcedure
+      .input(z.object({ tenantId: z.number() }))
+      .query(async ({ input }) => {
+        const db = await getDb();
+        if (!db) return { inactivityDays: 360, referralWindowDays: 90, autoClassifyOnMove: true, autoClassifyOnWon: true, autoClassifyOnLost: true, autoCreatePostSaleDeal: true };
+        const rows = await db.select({ settingsJson: tenants.settingsJson }).from(tenants).where(eq(tenants.id, input.tenantId)).limit(1);
+        const settings = (rows[0]?.settingsJson as any) || {};
+        const cls = settings.classificationEngine || {};
+        return {
+          inactivityDays: cls.inactivityDays ?? 360,
+          referralWindowDays: cls.referralWindowDays ?? 90,
+          autoClassifyOnMove: cls.autoClassifyOnMove ?? true,
+          autoClassifyOnWon: cls.autoClassifyOnWon ?? true,
+          autoClassifyOnLost: cls.autoClassifyOnLost ?? true,
+          autoCreatePostSaleDeal: cls.autoCreatePostSaleDeal ?? true,
+        };
+      }),
+    saveSettings: protectedProcedure
+      .input(z.object({
+        tenantId: z.number(),
+        inactivityDays: z.number().min(30).max(3650),
+        referralWindowDays: z.number().min(7).max(365),
+        autoClassifyOnMove: z.boolean(),
+        autoClassifyOnWon: z.boolean(),
+        autoClassifyOnLost: z.boolean(),
+        autoCreatePostSaleDeal: z.boolean(),
+      }))
+      .mutation(async ({ input }) => {
+        const db = await getDb();
+        if (!db) return { success: false };
+        const rows = await db.select({ settingsJson: tenants.settingsJson }).from(tenants).where(eq(tenants.id, input.tenantId)).limit(1);
+        const currentSettings = (rows[0]?.settingsJson as any) || {};
+        currentSettings.classificationEngine = {
+          inactivityDays: input.inactivityDays,
+          referralWindowDays: input.referralWindowDays,
+          autoClassifyOnMove: input.autoClassifyOnMove,
+          autoClassifyOnWon: input.autoClassifyOnWon,
+          autoClassifyOnLost: input.autoClassifyOnLost,
+          autoCreatePostSaleDeal: input.autoCreatePostSaleDeal,
+        };
+        await db.update(tenants).set({ settingsJson: currentSettings }).where(eq(tenants.id, input.tenantId));
+        return { success: true };
+      }),
     updateContact: protectedProcedure
       .input(z.object({ tenantId: z.number(), contactId: z.number(), classification: z.string() }))
       .mutation(async ({ input }) => {
@@ -939,6 +999,60 @@ export const crmRouter = router({
         const { createDefaultPipelines } = await import("../classificationEngine");
         const result = await createDefaultPipelines(input.tenantId);
         return result;
+      }),
+  }),
+
+  // ─── TASK AUTOMATIONS ───
+  taskAutomations: router({
+    list: protectedProcedure
+      .input(z.object({ tenantId: z.number(), pipelineId: z.number().optional() }))
+      .query(async ({ input }) => {
+        return crm.listTaskAutomations(input.tenantId, input.pipelineId);
+      }),
+    create: protectedProcedure
+      .input(z.object({
+        tenantId: z.number(),
+        pipelineId: z.number(),
+        stageId: z.number(),
+        taskTitle: z.string().min(1),
+        taskDescription: z.string().optional(),
+        taskType: z.enum(["whatsapp", "phone", "email", "video", "task"]).default("task"),
+        deadlineReference: z.enum(["current_date", "boarding_date", "return_date"]).default("current_date"),
+        deadlineOffsetDays: z.number().default(0),
+        deadlineTime: z.string().default("09:00"),
+        assignToOwner: z.boolean().default(true),
+        assignToUserIds: z.array(z.number()).optional(),
+        isActive: z.boolean().default(true),
+        orderIndex: z.number().default(0),
+      }))
+      .mutation(async ({ input }) => {
+        return crm.createTaskAutomation(input);
+      }),
+    update: protectedProcedure
+      .input(z.object({
+        id: z.number(),
+        tenantId: z.number(),
+        taskTitle: z.string().min(1).optional(),
+        taskDescription: z.string().nullable().optional(),
+        taskType: z.enum(["whatsapp", "phone", "email", "video", "task"]).optional(),
+        deadlineReference: z.enum(["current_date", "boarding_date", "return_date"]).optional(),
+        deadlineOffsetDays: z.number().optional(),
+        deadlineTime: z.string().optional(),
+        assignToOwner: z.boolean().optional(),
+        assignToUserIds: z.array(z.number()).nullable().optional(),
+        isActive: z.boolean().optional(),
+        orderIndex: z.number().optional(),
+        stageId: z.number().optional(),
+        pipelineId: z.number().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const { id, tenantId, ...data } = input;
+        return crm.updateTaskAutomation(id, tenantId, data);
+      }),
+    delete: protectedProcedure
+      .input(z.object({ id: z.number(), tenantId: z.number() }))
+      .mutation(async ({ input }) => {
+        return crm.deleteTaskAutomation(input.id, input.tenantId);
       }),
   }),
 });

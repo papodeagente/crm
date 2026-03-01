@@ -41,6 +41,8 @@ const LossReasons = lazy(() => import("./pages/LossReasons"));
 const RDStationIntegration = lazy(() => import("./pages/RDStationIntegration"));
 const RDFieldMappings = lazy(() => import("./pages/RDFieldMappings"));
 const RDCrmImport = lazy(() => import("./pages/RDCrmImport"));
+const TaskAutomationSettings = lazy(() => import("./pages/TaskAutomationSettings"));
+const ClassificationSettings = lazy(() => import("./pages/ClassificationSettings"));
 
 // SaaS pages (outside TopNavLayout)
 const SaasLogin = lazy(() => import("./pages/SaasLogin"));
@@ -109,6 +111,8 @@ function AppRouter() {
                 <Route path="/settings/rdstation" component={RDStationIntegration} />
                 <Route path="/settings/rdstation/mappings" component={RDFieldMappings} />
                 <Route path="/settings/import-rd-crm" component={RDCrmImport} />
+                <Route path="/settings/automations" component={TaskAutomationSettings} />
+                <Route path="/settings/classification" component={ClassificationSettings} />
 
                 {/* Notifications */}
                 <Route path="/notifications" component={NotificationsPage} />

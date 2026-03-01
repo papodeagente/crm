@@ -1,0 +1,31 @@
+{
+  "query": "SELECT CONCAT(p.id, '|', p.tenantId, '|', p.name, '|', p.pipelineType, '|', p.isDefault, '|', (SELECT COUNT(*) FROM pipeline_stages ps WHERE ps.pipelineId = p.id)) as info FROM pipelines p ORDER BY p.tenantId, p.id;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute SELECT CONCAT(p.id, '|', p.tenantId, '|', p.name, '|', p.pipelineType, '|', p.isDefault, '|', (SELECT COUNT(*) FROM pipeline_stages ps WHERE ps.pipelineId = p.id)) as info FROM pipelines p ORDER BY p.tenantId, p.id;",
+  "rows": [
+    {
+      "info": "150037|1|Funil de Vendas 1|sales|0|6"
+    },
+    {
+      "info": "150038|1|Sucesso do Cliente|sales|0|4"
+    },
+    {
+      "info": "150039|1|Funil de Vendas 2|sales|0|3"
+    },
+    {
+      "info": "150040|1|Funil de Patrocínios|sales|0|4"
+    },
+    {
+      "info": "150041|1|Recuperação Workshop|sales|0|4"
+    },
+    {
+      "info": "150042|1|Funil de Vendas Simulação|sales|0|7"
+    },
+    {
+      "info": "150043|1|Funil de Avaliação de Atendimento ENTUR|sales|0|5"
+    }
+  ],
+  "messages": [],
+  "stdout": "info\n150037|1|Funil de Vendas 1|sales|0|6\n150038|1|Sucesso do Cliente|sales|0|4\n150039|1|Funil de Vendas 2|sales|0|3\n150040|1|Funil de Patrocínios|sales|0|4\n150041|1|Recuperação Workshop|sales|0|4\n150042|1|Funil de Vendas Simulação|sales|0|7\n150043|1|Funil de Avaliação de Atendimento ENTUR|sales|0|5\n",
+  "stderr": "",
+  "execution_time_ms": 357
+}

@@ -15,6 +15,7 @@ import {
   waMessages, whatsappSessions,
   aiConversationAnalyses,
   leadSources, campaigns, lossReasons,
+  taskAutomations,
 } from "../drizzle/schema";
 
 // ═══════════════════════════════════════
@@ -1494,4 +1495,162 @@ export async function incrementLossReasonUsage(id: number) {
   const db = await getDb(); if (!db) return null;
   await db.update(lossReasons).set({ usageCount: sql`${lossReasons.usageCount} + 1` }).where(eq(lossReasons.id, id));
   return { id };
+}
+
+
+// ═══════════════════════════════════════
+// TASK AUTOMATIONS — CRUD & Motor de Execução
+// ═══════════════════════════════════════
+
+export async function listTaskAutomations(tenantId: number, pipelineId?: number) {
+  const db = await getDb(); if (!db) return [];
+  const conditions = [eq(taskAutomations.tenantId, tenantId)];
+  if (pipelineId) conditions.push(eq(taskAutomations.pipelineId, pipelineId));
+  return db.select().from(taskAutomations).where(and(...conditions)).orderBy(taskAutomations.stageId, taskAutomations.orderIndex);
+}
+
+export async function listTaskAutomationsByStage(tenantId: number, stageId: number) {
+  const db = await getDb(); if (!db) return [];
+  return db.select().from(taskAutomations)
+    .where(and(
+      eq(taskAutomations.tenantId, tenantId),
+      eq(taskAutomations.stageId, stageId),
+      eq(taskAutomations.isActive, true)
+    ))
+    .orderBy(taskAutomations.orderIndex);
+}
+
+export async function createTaskAutomation(data: {
+  tenantId: number;
+  pipelineId: number;
+  stageId: number;
+  taskTitle: string;
+  taskDescription?: string;
+  taskType?: "whatsapp" | "phone" | "email" | "video" | "task";
+  deadlineReference?: "current_date" | "boarding_date" | "return_date";
+  deadlineOffsetDays?: number;
+  deadlineTime?: string;
+  assignToOwner?: boolean;
+  assignToUserIds?: number[];
+  isActive?: boolean;
+  orderIndex?: number;
+}) {
+  const db = await getDb(); if (!db) return null;
+  const [result] = await db.insert(taskAutomations).values({
+    tenantId: data.tenantId,
+    pipelineId: data.pipelineId,
+    stageId: data.stageId,
+    taskTitle: data.taskTitle,
+    taskDescription: data.taskDescription ?? null,
+    taskType: data.taskType ?? "task",
+    deadlineReference: data.deadlineReference ?? "current_date",
+    deadlineOffsetDays: data.deadlineOffsetDays ?? 0,
+    deadlineTime: data.deadlineTime ?? "09:00",
+    assignToOwner: data.assignToOwner ?? true,
+    assignToUserIds: data.assignToUserIds ?? null,
+    isActive: data.isActive ?? true,
+    orderIndex: data.orderIndex ?? 0,
+  });
+  return { id: result.insertId };
+}
+
+export async function updateTaskAutomation(id: number, tenantId: number, data: Partial<{
+  taskTitle: string;
+  taskDescription: string | null;
+  taskType: "whatsapp" | "phone" | "email" | "video" | "task";
+  deadlineReference: "current_date" | "boarding_date" | "return_date";
+  deadlineOffsetDays: number;
+  deadlineTime: string;
+  assignToOwner: boolean;
+  assignToUserIds: number[] | null;
+  isActive: boolean;
+  orderIndex: number;
+  stageId: number;
+  pipelineId: number;
+}>) {
+  const db = await getDb(); if (!db) return null;
+  await db.update(taskAutomations).set(data).where(and(eq(taskAutomations.id, id), eq(taskAutomations.tenantId, tenantId)));
+  return { id };
+}
+
+export async function deleteTaskAutomation(id: number, tenantId: number) {
+  const db = await getDb(); if (!db) return null;
+  await db.delete(taskAutomations).where(and(eq(taskAutomations.id, id), eq(taskAutomations.tenantId, tenantId)));
+  return { id };
+}
+
+/**
+ * Motor de execução: ao mover deal para uma etapa, cria tarefas automaticamente
+ * baseado nas regras configuradas para aquela etapa.
+ */
+export async function executeTaskAutomations(
+  tenantId: number,
+  dealId: number,
+  stageId: number,
+  deal: { ownerUserId?: number | null; boardingDate?: Date | string | null; returnDate?: Date | string | null },
+  createdByUserId?: number
+) {
+  const db = await getDb(); if (!db) return [];
+  
+  // Buscar automações ativas para esta etapa
+  const automations = await listTaskAutomationsByStage(tenantId, stageId);
+  if (!automations.length) return [];
+  
+  const createdTasks: number[] = [];
+  const now = new Date();
+  
+  for (const auto of automations) {
+    // Calcular a data de prazo
+    let baseDate: Date;
+    
+    if (auto.deadlineReference === "boarding_date" && deal.boardingDate) {
+      baseDate = new Date(deal.boardingDate);
+    } else if (auto.deadlineReference === "return_date" && deal.returnDate) {
+      baseDate = new Date(deal.returnDate);
+    } else {
+      baseDate = new Date(now);
+    }
+    
+    // Aplicar offset em dias
+    const dueDate = new Date(baseDate);
+    dueDate.setDate(dueDate.getDate() + auto.deadlineOffsetDays);
+    
+    // Aplicar horário
+    const [hours, minutes] = (auto.deadlineTime || "09:00").split(":").map(Number);
+    dueDate.setHours(hours || 9, minutes || 0, 0, 0);
+    
+    // Determinar responsáveis
+    let assigneeIds: number[] = [];
+    if (auto.assignToOwner && deal.ownerUserId) {
+      assigneeIds = [deal.ownerUserId];
+    }
+    if (auto.assignToUserIds && auto.assignToUserIds.length > 0) {
+      assigneeIds = Array.from(new Set([...assigneeIds, ...auto.assignToUserIds]));
+    }
+    
+    // Criar a tarefa
+    const [taskResult] = await db.insert(tasks).values({
+      tenantId,
+      entityType: "deal",
+      entityId: dealId,
+      title: auto.taskTitle,
+      description: auto.taskDescription ?? undefined,
+      taskType: auto.taskType,
+      dueAt: dueDate,
+      status: "pending",
+      createdByUserId: createdByUserId ?? undefined,
+    });
+    
+    const taskId = taskResult.insertId;
+    createdTasks.push(taskId);
+    
+    // Atribuir responsáveis
+    if (assigneeIds.length > 0) {
+      await db.insert(taskAssignees).values(
+        assigneeIds.map(uid => ({ tenantId, taskId, userId: uid }))
+      );
+    }
+  }
+  
+  return createdTasks;
 }

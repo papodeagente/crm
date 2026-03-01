@@ -738,11 +738,11 @@ function DealCard({ deal, contacts, accounts, overdueData, pendingCount, onCreat
         {deal.title}
       </p>
 
-      {/* Classification badge */}
+      {/* Classification badge — strip variant for visual impact */}
       {contact && (
         <ClassificationBadge
           classification={contact.stageClassification || "desconhecido"}
-          size="sm"
+          variant="strip"
           referralWindowActive={!!contact.referralWindowStart && (Date.now() - new Date(contact.referralWindowStart).getTime()) < 90 * 24 * 60 * 60 * 1000}
         />
       )}

@@ -406,12 +406,43 @@ export const deals = mysqlTable("deals", {
   waConversationId: int("waConversationId"),
   lossReasonId: int("lossReasonId"),
   lossNotes: text("lossNotes"),
+  boardingDate: timestamp("boardingDate"),
+  returnDate: timestamp("returnDate"),
   deletedAt: timestamp("deletedAt"),
 }, (t) => [
   index("deals_tenant_pipeline_idx").on(t.tenantId, t.pipelineId, t.stageId),
   index("deals_tenant_status_idx").on(t.tenantId, t.status, t.lastActivityAt),
   index("deals_tenant_owner_idx").on(t.tenantId, t.ownerUserId),
   index("idx_deals_wa_conv").on(t.waConversationId),
+]);
+
+// ═══════════════════════════════════════
+// TASK AUTOMATIONS — Regras de criação automática de tarefas por etapa
+// ═══════════════════════════════════════
+export const taskAutomations = mysqlTable("task_automations", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  pipelineId: int("pipelineId").notNull(),
+  stageId: int("stageId").notNull(),
+  taskTitle: varchar("taskTitle", { length: 255 }).notNull(),
+  taskDescription: text("taskDescription"),
+  taskType: mysqlEnum("taskType", ["whatsapp", "phone", "email", "video", "task"]).default("task").notNull(),
+  // Referência de prazo: "current_date", "boarding_date", "return_date"
+  deadlineReference: mysqlEnum("deadlineReference", ["current_date", "boarding_date", "return_date"]).default("current_date").notNull(),
+  // Offset em dias: positivo = depois, negativo = antes
+  deadlineOffsetDays: int("deadlineOffsetDays").default(0).notNull(),
+  // Hora do dia para a tarefa (ex: "09:00")
+  deadlineTime: varchar("deadlineTime", { length: 5 }).default("09:00").notNull(),
+  // Atribuir a quem? null = dono do deal
+  assignToOwner: boolean("assignToOwner").default(true).notNull(),
+  assignToUserIds: json("assignToUserIds").$type<number[]>(),
+  isActive: boolean("isActive").default(true).notNull(),
+  orderIndex: int("orderIndex").default(0).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (t) => [
+  index("task_auto_tenant_pipeline_idx").on(t.tenantId, t.pipelineId),
+  index("task_auto_tenant_stage_idx").on(t.tenantId, t.stageId),
 ]);
 
 export const dealParticipants = mysqlTable("deal_participants", {
