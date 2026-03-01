@@ -1589,3 +1589,23 @@
 - [x] Página de configuração "Automação de Vendas" com UI para criar/editar regras
 - [x] Integrar automação no moveStage do crmRouter
 - [x] Seed funis padrão para tenants existentes (Aceleradora e Boxtour)
+
+## Vincular Produtos/Serviços ao Formulário de Criação de Negociação
+
+- [x] Adicionar seção de produtos/serviços no formulário de criação de negociação
+- [x] Listar produtos cadastrados no sistema para seleção (com busca)
+- [x] Permitir adicionar múltiplos produtos com quantidade e valor unitário
+- [x] Calcular valor total da negociação automaticamente a partir dos produtos selecionados
+- [x] Salvar produtos vinculados (deal_products) ao criar a negociação no backend
+- [x] Atualizar valor total do deal (valueCents) com base nos produtos selecionados
+- [x] Testes unitários para criação de negociação com produtos vinculados
+
+## Data de Embarque e Data de Retorno nas Negociações
+
+- [x] Adicionar colunas departure_date e return_date na tabela deals (schema + migração SQL)
+- [x] Atualizar endpoints create/update deal para aceitar departure_date e return_date
+- [x] Adicionar campos Data de Embarque e Data de Retorno no formulário de criação de negociação
+- [x] Adicionar campos Data de Embarque e Data de Retorno na página de detalhes da negociação (editável)
+- [x] Integrar datas de embarque/retorno no motor de automação de tarefas (calcular prazos com base nessas datas)
+- [x] Atualizar página de configuração de automação para permitir regras baseadas em data de embarque/retorno
+- [x] Testes unitários para criação/edição de deal com datas e automação integrada

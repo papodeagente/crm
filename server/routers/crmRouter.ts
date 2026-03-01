@@ -280,9 +280,23 @@ export const crmRouter = router({
         pipelineId: z.number(), stageId: z.number(),
         ownerUserId: z.number().optional(), teamId: z.number().optional(),
         leadSource: z.string().optional(), channelOrigin: z.string().optional(),
+        boardingDate: z.string().nullable().optional(),
+        returnDate: z.string().nullable().optional(),
+        products: z.array(z.object({
+          productId: z.number(),
+          quantity: z.number().default(1),
+          unitPriceCents: z.number().optional(),
+          discountCents: z.number().optional(),
+        })).optional(),
       }))
       .mutation(async ({ ctx, input }) => {
-        const result = await crm.createDeal({ ...input, createdBy: ctx.user.id });
+        const { products: productItems, boardingDate, returnDate, ...dealInput } = input;
+        const result = await crm.createDeal({
+          ...dealInput,
+          createdBy: ctx.user.id,
+          boardingDate: boardingDate ? new Date(boardingDate) : null,
+          returnDate: returnDate ? new Date(returnDate) : null,
+        });
         // Log creation in deal history
         if (result?.id) {
           await crm.createDealHistory({
@@ -294,6 +308,31 @@ export const crmRouter = router({
             actorUserId: ctx.user.id,
             actorName: ctx.user.name || "Sistema",
           });
+
+          // 5. Add products if provided and recalc value
+          if (productItems && productItems.length > 0) {
+            for (const item of productItems) {
+              const catalogProduct = await crm.getCatalogProductById(input.tenantId, item.productId);
+              if (!catalogProduct || !catalogProduct.isActive) continue;
+              const unitPrice = item.unitPriceCents ?? catalogProduct.basePriceCents;
+              const discount = item.discountCents || 0;
+              const finalPrice = item.quantity * unitPrice - discount;
+              await crm.createDealProduct({
+                tenantId: input.tenantId,
+                dealId: result.id,
+                productId: item.productId,
+                name: catalogProduct.name,
+                description: catalogProduct.description || undefined,
+                category: catalogProduct.productType as any,
+                quantity: item.quantity,
+                unitPriceCents: unitPrice,
+                discountCents: discount,
+                finalPriceCents: finalPrice,
+                supplier: catalogProduct.supplier || undefined,
+              });
+            }
+            await crm.recalcDealValue(input.tenantId, result.id);
+          }
         }
         await emitEvent({ tenantId: input.tenantId, actorUserId: ctx.user.id, entityType: "deal", entityId: result?.id, action: "create" });
         // In-app notification
@@ -316,6 +355,8 @@ export const crmRouter = router({
         leadSource: z.string().nullable().optional(),
         lossReasonId: z.number().nullable().optional(),
         lossNotes: z.string().nullable().optional(),
+        boardingDate: z.string().nullable().optional(),
+        returnDate: z.string().nullable().optional(),
       }))
       .mutation(async ({ ctx, input }) => {
         const { tenantId, id, ...data } = input;
@@ -325,8 +366,14 @@ export const crmRouter = router({
         }
         // Get current deal for history
         const currentDeal = await crm.getDealById(tenantId, id);
-        const { expectedCloseAt, ...restData } = data;
+        const { expectedCloseAt, boardingDate, returnDate, ...restData } = data;
         const updatePayload: any = { ...restData, updatedBy: ctx.user.id };
+        if (boardingDate !== undefined) {
+          updatePayload.boardingDate = boardingDate ? new Date(boardingDate) : null;
+        }
+        if (returnDate !== undefined) {
+          updatePayload.returnDate = returnDate ? new Date(returnDate) : null;
+        }
         // Clear loss fields when reopening
         if (data.status === "open" || data.status === "won") {
           updatePayload.lossReasonId = null;

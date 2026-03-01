@@ -219,7 +219,7 @@ export async function listStages(tenantId: number, pipelineId: number) {
 // ═══════════════════════════════════════
 // DEALS
 // ═══════════════════════════════════════
-export async function createDeal(data: { tenantId: number; title: string; contactId?: number; accountId?: number; pipelineId: number; stageId: number; valueCents?: number; ownerUserId?: number; teamId?: number; createdBy?: number; leadSource?: string; channelOrigin?: string }) {
+export async function createDeal(data: { tenantId: number; title: string; contactId?: number; accountId?: number; pipelineId: number; stageId: number; valueCents?: number; ownerUserId?: number; teamId?: number; createdBy?: number; leadSource?: string; channelOrigin?: string; boardingDate?: Date | null; returnDate?: Date | null }) {
   const db = await getDb(); if (!db) return null;
   const [result] = await db.insert(deals).values(data).$returningId();
   return result;
@@ -318,7 +318,7 @@ export async function listDeletedDeals(tenantId: number, limit = 50) {
   const db = await getDb(); if (!db) return [];
   return db.select().from(deals).where(and(eq(deals.tenantId, tenantId), isNotNull(deals.deletedAt))).orderBy(desc(deals.deletedAt)).limit(limit);
 }
-export async function updateDeal(tenantId: number, id: number, data: Partial<{ title: string; stageId: number; status: "open" | "won" | "lost"; valueCents: number; probability: number; ownerUserId: number; updatedBy: number; contactId: number | null; accountId: number | null; expectedCloseAt: Date | null; channelOrigin: string | null; leadSource: string | null }>) {
+export async function updateDeal(tenantId: number, id: number, data: Partial<{ title: string; stageId: number; status: "open" | "won" | "lost"; valueCents: number; probability: number; ownerUserId: number; updatedBy: number; contactId: number | null; accountId: number | null; expectedCloseAt: Date | null; channelOrigin: string | null; leadSource: string | null; boardingDate: Date | null; returnDate: Date | null; lossReasonId: number | null; lossNotes: string | null }>) {
   const db = await getDb(); if (!db) return;
   await db.update(deals).set({ ...data, lastActivityAt: new Date() }).where(and(eq(deals.id, id), eq(deals.tenantId, tenantId)));
 }

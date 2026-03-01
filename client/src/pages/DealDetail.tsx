@@ -187,7 +187,7 @@ export default function DealDetail() {
 
   /* ─── Sidebar collapsed sections ─── */
   const [sidebarSections, setSidebarSections] = useState({
-    deal: true, contact: true, company: true, responsible: true, utm: false, rdFields: false, custom: false,
+    deal: true, travel: true, contact: true, company: true, responsible: true, utm: false, rdFields: false, custom: false,
   });
   const toggleSection = (key: keyof typeof sidebarSections) =>
     setSidebarSections((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -579,6 +579,46 @@ export default function DealDetail() {
                   label="Status"
                   value={deal.status === "open" ? "Aberta" : deal.status === "won" ? "Ganha" : "Perdida"}
                 />
+              </div>
+            </SidebarSection>
+
+            <SidebarDivider />
+
+            {/* ── Datas da Viagem ── */}
+            <SidebarSection
+              title="Datas da Viagem"
+              open={sidebarSections.travel}
+              onToggle={() => toggleSection("travel")}
+            >
+              <div className="space-y-3">
+                <EditableSidebarField
+                  label="Data de Embarque"
+                  value={deal.boardingDate ? fmtDate(deal.boardingDate) : "—"}
+                  isEditing={editingDealField === "boardingDate"}
+                  onStartEdit={() => { setEditingDealField("boardingDate"); setDealFieldDraft(deal.boardingDate ? new Date(deal.boardingDate).toISOString().split("T")[0] : ""); }}
+                  draft={dealFieldDraft}
+                  onDraftChange={setDealFieldDraft}
+                  onSave={() => { updateDeal.mutate({ tenantId: TENANT_ID, id: deal.id, boardingDate: dealFieldDraft || null }); setEditingDealField(null); }}
+                  onCancel={() => setEditingDealField(null)}
+                  inputType="date"
+                />
+                <EditableSidebarField
+                  label="Data de Retorno"
+                  value={deal.returnDate ? fmtDate(deal.returnDate) : "—"}
+                  isEditing={editingDealField === "returnDate"}
+                  onStartEdit={() => { setEditingDealField("returnDate"); setDealFieldDraft(deal.returnDate ? new Date(deal.returnDate).toISOString().split("T")[0] : ""); }}
+                  draft={dealFieldDraft}
+                  onDraftChange={setDealFieldDraft}
+                  onSave={() => { updateDeal.mutate({ tenantId: TENANT_ID, id: deal.id, returnDate: dealFieldDraft || null }); setEditingDealField(null); }}
+                  onCancel={() => setEditingDealField(null)}
+                  inputType="date"
+                />
+                {deal.boardingDate && deal.returnDate && new Date(deal.returnDate) > new Date(deal.boardingDate) && (
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground bg-muted/40 rounded-lg px-2.5 py-1.5">
+                    <Plane className="h-3 w-3 text-primary/60" />
+                    {Math.ceil((new Date(deal.returnDate).getTime() - new Date(deal.boardingDate).getTime()) / (1000 * 60 * 60 * 24))} dias de viagem
+                  </div>
+                )}
               </div>
             </SidebarSection>
 

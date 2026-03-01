@@ -1438,9 +1438,17 @@ function CreateDealDialog({ open, onOpenChange, pipelineId, stages, contacts, ac
   const [title, setTitle] = useState("");
   const [selectedPipeline, setSelectedPipeline] = useState<string>(String(pipelineId || ""));
   const [stageId, setStageId] = useState<string>("");
-  const [valueCents, setValueCents] = useState("");
   const [leadSource, setLeadSource] = useState<string>("");
   const [campaign, setCampaign] = useState("");
+
+  // Travel dates
+  const [boardingDate, setBoardingDate] = useState("");
+  const [returnDate, setReturnDate] = useState("");
+
+  // Products
+  const [selectedProducts, setSelectedProducts] = useState<Array<{ productId: number; name: string; quantity: number; unitPriceCents: number; productType: string }>>([]);
+  const [productSearch, setProductSearch] = useState("");
+  const [showProductPicker, setShowProductPicker] = useState(false);
 
   // Account (empresa) fields
   const [accountId, setAccountId] = useState<string>("");
@@ -1459,6 +1467,20 @@ function CreateDealDialog({ open, onOpenChange, pipelineId, stages, contacts, ac
   const [customFieldValues, setCustomFieldValues] = useState<Record<number, string>>({});
 
   const utils = trpc.useUtils();
+
+  // Load catalog products
+  const catalogProducts = trpc.productCatalog.products.list.useQuery({ tenantId: TENANT_ID, isActive: true, limit: 500 });
+  const filteredCatalogProducts = useMemo(() => {
+    const all = catalogProducts.data || [];
+    if (!productSearch.trim()) return all;
+    const q = productSearch.toLowerCase();
+    return all.filter((p: any) => p.name.toLowerCase().includes(q) || (p.supplier || "").toLowerCase().includes(q) || (p.destination || "").toLowerCase().includes(q));
+  }, [catalogProducts.data, productSearch]);
+
+  // Calculate total from selected products
+  const totalValueCents = useMemo(() => {
+    return selectedProducts.reduce((sum, p) => sum + (p.quantity * p.unitPriceCents), 0);
+  }, [selectedProducts]);
 
   // Load custom fields for deals
   const dealCustomFields = trpc.customFields.list.useQuery({ tenantId: TENANT_ID, entity: "deal" });
@@ -1482,11 +1504,43 @@ function CreateDealDialog({ open, onOpenChange, pipelineId, stages, contacts, ac
   const setFieldValues = trpc.contactProfile.setCustomFieldValues.useMutation();
 
   function resetForm() {
-    setTitle(""); setStageId(""); setValueCents(""); setLeadSource(""); setCampaign("");
+    setTitle(""); setStageId(""); setLeadSource(""); setCampaign("");
+    setBoardingDate(""); setReturnDate("");
     setAccountId(""); setShowNewAccount(false); setNewAccountName("");
     setContactId(""); setShowNewContact(false); setNewContactName(""); setNewContactEmail(""); setNewContactPhone("");
     setShowCustomFields(false); setCustomFieldValues({});
+    setSelectedProducts([]); setProductSearch(""); setShowProductPicker(false);
     setSelectedPipeline(String(pipelineId || ""));
+  }
+
+  function addProduct(product: any) {
+    const existing = selectedProducts.find(p => p.productId === product.id);
+    if (existing) {
+      setSelectedProducts(prev => prev.map(p => p.productId === product.id ? { ...p, quantity: p.quantity + 1 } : p));
+    } else {
+      setSelectedProducts(prev => [...prev, {
+        productId: product.id,
+        name: product.name,
+        quantity: 1,
+        unitPriceCents: product.basePriceCents || 0,
+        productType: product.productType || "other",
+      }]);
+    }
+    setProductSearch("");
+    setShowProductPicker(false);
+  }
+
+  function removeProduct(productId: number) {
+    setSelectedProducts(prev => prev.filter(p => p.productId !== productId));
+  }
+
+  function updateProductQty(productId: number, qty: number) {
+    if (qty < 1) return;
+    setSelectedProducts(prev => prev.map(p => p.productId === productId ? { ...p, quantity: qty } : p));
+  }
+
+  function updateProductPrice(productId: number, priceCents: number) {
+    setSelectedProducts(prev => prev.map(p => p.productId === productId ? { ...p, unitPriceCents: priceCents } : p));
   }
 
   async function handleSubmit() {
@@ -1513,7 +1567,7 @@ function CreateDealDialog({ open, onOpenChange, pipelineId, stages, contacts, ac
         if (ct?.id) finalContactId = ct.id;
       }
 
-      // 3. Create deal
+      // 3. Create deal with products
       const deal = await createDeal.mutateAsync({
         tenantId: TENANT_ID,
         title,
@@ -1523,6 +1577,13 @@ function CreateDealDialog({ open, onOpenChange, pipelineId, stages, contacts, ac
         accountId: finalAccountId,
         leadSource: leadSource || undefined,
         channelOrigin: campaign || undefined,
+        boardingDate: boardingDate || null,
+        returnDate: returnDate || null,
+        products: selectedProducts.length > 0 ? selectedProducts.map(p => ({
+          productId: p.productId,
+          quantity: p.quantity,
+          unitPriceCents: p.unitPriceCents,
+        })) : undefined,
       });
 
       // 4. Set custom field values if any
@@ -1599,9 +1660,145 @@ function CreateDealDialog({ open, onOpenChange, pipelineId, stages, contacts, ac
               </div>
             </div>
 
-            <div>
-              <Label className="text-[12px] font-semibold">Valor</Label>
-              <Input value={valueCents} onChange={(e) => setValueCents(e.target.value)} placeholder="Ex: 4.997,00" className="mt-1.5 h-10 rounded-xl" />
+            {/* ─── DATAS DA VIAGEM ─── */}
+            <div className="border border-border/40 rounded-xl p-4 bg-muted/20 space-y-3">
+              <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-[0.1em] flex items-center gap-1.5">
+                <Plane className="h-3.5 w-3.5" /> Datas da Viagem
+              </p>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-[12px] font-medium">Data de Embarque</Label>
+                  <Input
+                    type="date"
+                    value={boardingDate}
+                    onChange={(e) => setBoardingDate(e.target.value)}
+                    className="mt-1.5 h-10 rounded-xl"
+                  />
+                </div>
+                <div>
+                  <Label className="text-[12px] font-medium">Data de Retorno</Label>
+                  <Input
+                    type="date"
+                    value={returnDate}
+                    onChange={(e) => setReturnDate(e.target.value)}
+                    className="mt-1.5 h-10 rounded-xl"
+                  />
+                </div>
+              </div>
+              {boardingDate && returnDate && new Date(returnDate) > new Date(boardingDate) && (
+                <p className="text-[11px] text-muted-foreground flex items-center gap-1">
+                  <Clock className="h-3 w-3" />
+                  {Math.ceil((new Date(returnDate).getTime() - new Date(boardingDate).getTime()) / (1000 * 60 * 60 * 24))} dias de viagem
+                </p>
+              )}
+            </div>
+
+            {/* ─── PRODUTOS E SERVIÇOS ─── */}
+            <div className="border border-border/40 rounded-xl p-4 bg-muted/20 space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-[0.1em] flex items-center gap-1.5">
+                  <Package className="h-3.5 w-3.5" /> Produtos e Serviços
+                </p>
+                <button
+                  type="button"
+                  className="flex items-center gap-1 text-[12px] text-primary hover:text-primary/80 font-medium transition-colors"
+                  onClick={() => setShowProductPicker(!showProductPicker)}
+                >
+                  <Plus className="h-3.5 w-3.5" /> Adicionar
+                </button>
+              </div>
+
+              {/* Product picker */}
+              {showProductPicker && (
+                <div className="space-y-2">
+                  <Input
+                    value={productSearch}
+                    onChange={(e) => setProductSearch(e.target.value)}
+                    placeholder="Buscar produto ou serviço..."
+                    className="h-9 rounded-lg text-[13px]"
+                    autoFocus
+                  />
+                  <div className="max-h-[180px] overflow-y-auto rounded-lg border border-border/40 bg-background">
+                    {filteredCatalogProducts.length === 0 ? (
+                      <div className="p-3 text-center text-[12px] text-muted-foreground">
+                        {catalogProducts.isLoading ? "Carregando..." : "Nenhum produto encontrado"}
+                      </div>
+                    ) : (
+                      filteredCatalogProducts.map((p: any) => {
+                        const alreadyAdded = selectedProducts.some(sp => sp.productId === p.id);
+                        return (
+                          <button
+                            key={p.id}
+                            type="button"
+                            disabled={alreadyAdded}
+                            onClick={() => addProduct(p)}
+                            className={`w-full flex items-center justify-between px-3 py-2 text-left hover:bg-muted/50 transition-colors border-b border-border/20 last:border-0 ${alreadyAdded ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}`}
+                          >
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className="text-[14px]">{categoryIcons[p.productType] || '📦'}</span>
+                              <div className="min-w-0">
+                                <p className="text-[13px] font-medium truncate">{p.name}</p>
+                                <p className="text-[11px] text-muted-foreground truncate">
+                                  {p.supplier ? p.supplier : ''}{p.supplier && p.destination ? ' · ' : ''}{p.destination || ''}
+                                </p>
+                              </div>
+                            </div>
+                            <span className="text-[12px] font-medium text-foreground/70 whitespace-nowrap ml-2">
+                              {formatCurrency(p.basePriceCents || 0)}
+                            </span>
+                          </button>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Selected products list */}
+              {selectedProducts.length > 0 && (
+                <div className="space-y-2">
+                  {selectedProducts.map((p) => (
+                    <div key={p.productId} className="flex items-center gap-2 bg-background rounded-lg border border-border/30 px-3 py-2">
+                      <span className="text-[14px]">{categoryIcons[p.productType] || '📦'}</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[13px] font-medium truncate">{p.name}</p>
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button type="button" onClick={() => updateProductQty(p.productId, p.quantity - 1)} className="h-6 w-6 rounded flex items-center justify-center text-muted-foreground hover:bg-muted transition-colors text-[14px]">−</button>
+                        <span className="text-[12px] font-medium w-5 text-center">{p.quantity}</span>
+                        <button type="button" onClick={() => updateProductQty(p.productId, p.quantity + 1)} className="h-6 w-6 rounded flex items-center justify-center text-muted-foreground hover:bg-muted transition-colors text-[14px]">+</button>
+                      </div>
+                      <div className="w-[100px] shrink-0">
+                        <Input
+                          type="text"
+                          value={(p.unitPriceCents / 100).toFixed(2).replace('.', ',')}
+                          onChange={(e) => {
+                            const raw = e.target.value.replace(/[^0-9,]/g, '').replace(',', '.');
+                            const cents = Math.round(parseFloat(raw || '0') * 100);
+                            if (!isNaN(cents)) updateProductPrice(p.productId, cents);
+                          }}
+                          className="h-7 text-[12px] text-right rounded-md px-2"
+                        />
+                      </div>
+                      <button type="button" onClick={() => removeProduct(p.productId)} className="h-6 w-6 rounded flex items-center justify-center text-destructive/60 hover:text-destructive hover:bg-destructive/10 transition-colors">
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  ))}
+
+                  {/* Total */}
+                  <div className="flex items-center justify-between pt-2 border-t border-border/30">
+                    <span className="text-[12px] font-semibold text-muted-foreground uppercase tracking-wide">Valor Total</span>
+                    <span className="text-[15px] font-bold text-primary">{formatCurrency(totalValueCents)}</span>
+                  </div>
+                </div>
+              )}
+
+              {selectedProducts.length === 0 && !showProductPicker && (
+                <p className="text-[12px] text-muted-foreground/60 text-center py-2">
+                  Nenhum produto adicionado. O valor será calculado automaticamente.
+                </p>
+              )}
             </div>
 
             {/* ─── INFORMAÇÕES DA EMPRESA ─── */}
