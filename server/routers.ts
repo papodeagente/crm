@@ -462,14 +462,14 @@ export const appRouter = router({
   // ─── Dashboard ───
   dashboard: router({
     metrics: protectedProcedure
-      .input(z.object({ tenantId: z.number(), dateFrom: z.string().optional(), dateTo: z.string().optional() }))
-      .query(async ({ input }) => {
-        return getDashboardMetrics(input.tenantId, input.dateFrom, input.dateTo);
+      .input(z.object({ tenantId: z.number() }))
+      .query(async ({ input, ctx }) => {
+        return getDashboardMetrics(input.tenantId, ctx.user?.id);
       }),
     pipelineSummary: protectedProcedure
-      .input(z.object({ tenantId: z.number(), dateFrom: z.string().optional(), dateTo: z.string().optional() }))
-      .query(async ({ input }) => {
-        return getPipelineSummary(input.tenantId, input.dateFrom, input.dateTo);
+      .input(z.object({ tenantId: z.number() }))
+      .query(async ({ input, ctx }) => {
+        return getPipelineSummary(input.tenantId, ctx.user?.id);
       }),
     recentActivity: protectedProcedure
       .input(z.object({ tenantId: z.number(), limit: z.number().optional(), dateFrom: z.string().optional(), dateTo: z.string().optional() }))
@@ -478,8 +478,8 @@ export const appRouter = router({
       }),
     upcomingTasks: protectedProcedure
       .input(z.object({ tenantId: z.number(), limit: z.number().optional() }))
-      .query(async ({ input }) => {
-        return getUpcomingTasks(input.tenantId, input.limit);
+      .query(async ({ input, ctx }) => {
+        return getUpcomingTasks(input.tenantId, ctx.user?.id, input.limit);
       }),
   }),
 

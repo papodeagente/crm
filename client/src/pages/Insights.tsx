@@ -90,8 +90,8 @@ function CRMDashboard() {
   const TENANT_ID = useTenantId();
   const dateFilter = useDateFilter("all");
   const dashboard = trpc.insights.dashboard.useQuery({ tenantId: TENANT_ID });
-  const homeData = trpc.dashboard.metrics.useQuery({ tenantId: TENANT_ID, dateFrom: dateFilter.dates.dateFrom, dateTo: dateFilter.dates.dateTo }, { refetchInterval: 60000 });
-  const pipelineSummary = trpc.dashboard.pipelineSummary.useQuery({ tenantId: TENANT_ID, dateFrom: dateFilter.dates.dateFrom, dateTo: dateFilter.dates.dateTo }, { refetchInterval: 60000 });
+  const homeData = trpc.dashboard.metrics.useQuery({ tenantId: TENANT_ID }, { refetchInterval: 60000 });
+  const pipelineSummary = trpc.dashboard.pipelineSummary.useQuery({ tenantId: TENANT_ID }, { refetchInterval: 60000 });
   const d = dashboard.data;
   const h = homeData.data;
 

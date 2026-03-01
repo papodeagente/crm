@@ -67,14 +67,17 @@ describe("Dashboard Endpoints", () => {
     const result = await caller.dashboard.pipelineSummary({ tenantId: 1 });
 
     expect(Array.isArray(result)).toBe(true);
-    // Each stage should have the correct shape
+    // Each stage should have the correct shape including new fields
     if (result.length > 0) {
       const stage = result[0];
       expect(typeof stage.stageId).toBe("number");
       expect(typeof stage.stageName).toBe("string");
+      expect(stage).toHaveProperty("stageColor");
       expect(typeof stage.orderIndex).toBe("number");
       expect(typeof stage.dealCount).toBe("number");
       expect(typeof stage.totalValueCents).toBe("number");
+      expect(typeof stage.isWon).toBe("boolean");
+      expect(typeof stage.isLost).toBe("boolean");
     }
   });
 
@@ -112,7 +115,7 @@ describe("Dashboard Endpoints", () => {
     expect(result.length).toBeLessThanOrEqual(2);
   });
 
-  it("dashboard.upcomingTasks returns array of tasks", async () => {
+  it("dashboard.upcomingTasks returns array of tasks with isOverdue and taskType", async () => {
     const { ctx } = createAuthContext();
     const caller = appRouter.createCaller(ctx);
     const result = await caller.dashboard.upcomingTasks({ tenantId: 1 });
@@ -125,6 +128,9 @@ describe("Dashboard Endpoints", () => {
       expect(typeof task.priority).toBe("string");
       expect(["low", "medium", "high", "urgent"]).toContain(task.priority);
       expect(typeof task.status).toBe("string");
+      expect(["pending", "in_progress"]).toContain(task.status);
+      expect(typeof task.isOverdue).toBe("boolean");
+      expect(typeof task.taskType).toBe("string");
     }
   });
 

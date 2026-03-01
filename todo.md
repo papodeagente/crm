@@ -1609,3 +1609,17 @@
 - [x] Integrar datas de embarque/retorno no motor de automação de tarefas (calcular prazos com base nessas datas)
 - [x] Atualizar página de configuração de automação para permitir regras baseadas em data de embarque/retorno
 - [x] Testes unitários para criação/edição de deal com datas e automação integrada
+
+## Reformulação do Dashboard Início - Sincronização em Tempo Real
+
+- [x] KPI Negociações Ativas: contar apenas negociações em andamento do usuário logado
+- [x] KPI Contatos: contatos únicos na carteira do usuário, com % de aumento do último mês
+- [x] KPI Viagens em Andamento: deals no funil pós-venda exceto etapa "viagem finalizada"
+- [x] Foco do Dia: tarefas abertas/atrasadas do dia, ordenadas por execução, sem finalizadas
+- [x] Gráfico de Funil Visual: apenas funil de vendas, com cores das etapas, inspirado na imagem
+- [x] Cada etapa do funil com cor configurada representada no gráfico
+- [x] Percentual de conversão entre etapas no gráfico
+- [x] Sincronização em tempo real de todas as informações do dashboard (refetchInterval)
+- [x] Backend: endpoint dedicado para KPIs do dashboard com dados filtrados por usuário
+- [x] Backend: endpoint para dados do funil de vendas com contagem por etapa
+- [x] Testes unitários para os novos endpoints
