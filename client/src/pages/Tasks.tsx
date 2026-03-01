@@ -36,7 +36,7 @@ const TASK_TYPES = [
 
 const STATUS_OPTIONS = [
   { value: "all", label: "Todos os status" },
-  { value: "open", label: "Em aberto" },
+  { value: "open", label: "Em andamento" },
   { value: "done", label: "Concluída" },
   { value: "overdue", label: "Atrasada" },
 ];
@@ -395,7 +395,7 @@ export default function Tasks() {
           <div className="px-3.5 pb-3.5 grid grid-cols-3 gap-3">
             <div className="bg-blue-50 dark:bg-blue-950/30 rounded-xl p-3 text-center">
               <p className="text-2xl font-bold text-blue-600">{summaryPending}</p>
-              <p className="text-[11px] text-blue-600/70 font-medium mt-0.5">Em aberto</p>
+              <p className="text-[11px] text-blue-600/70 font-medium mt-0.5">Em andamento</p>
             </div>
             <div className="bg-red-50 dark:bg-red-950/30 rounded-xl p-3 text-center">
               <p className="text-2xl font-bold text-red-600">{summaryOverdue}</p>

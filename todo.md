@@ -1519,3 +1519,9 @@
 - [x] Opções de adiar: 1h, 3h, 1 dia, 2 dias, 7 dias, tempo personalizado
 - [x] Lógica unificada de tarefas em todos os contextos (Pipeline, DealDetail, Tasks, Calendário)
 - [x] Formulário completo na criação dentro da negociação (todos os campos disponíveis)
+
+## Kanban Cards — Destaque Tarefas Atrasadas + Popup Info + Unificar Status
+
+- [x] Tarefa atrasada dentro do card do Kanban com fundo rosa/vermelho (linha da tarefa destacada)
+- [x] Ícone "i" no card com popup "Sobre a Negociação" ao hover (Fonte, Campanha, Empresa, Data de criação, Último contato, Previsão de fechamento, Identificador, botão Abrir Negociação)
+- [x] Unificar status "Em andamento" e "Aberto" no funil — tudo vira "Em andamento"

@@ -20,6 +20,7 @@ import {
   ChevronLeft, ChevronRight,
 } from "lucide-react";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
+import { HoverCard, HoverCardTrigger, HoverCardContent } from "@/components/ui/hover-card";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import DealFiltersPanel, { useDealFilters, DealFilterButton } from "@/components/DealFiltersPanel";
@@ -348,8 +349,8 @@ export default function Pipeline() {
               <SelectValue placeholder="Todos os status" />
             </SelectTrigger>
             <SelectContent className="rounded-xl">
-              <SelectItem value="all">Em andamento</SelectItem>
-              <SelectItem value="open">Em aberto</SelectItem>
+              <SelectItem value="all">Todos</SelectItem>
+              <SelectItem value="open">Em andamento</SelectItem>
               <SelectItem value="won">Ganhos</SelectItem>
               <SelectItem value="lost">Perdidos</SelectItem>
             </SelectContent>
@@ -381,7 +382,7 @@ export default function Pipeline() {
 
         {/* Contagem */}
         <div className="px-5 lg:px-8 pb-2">
-          <span className="text-[12px] font-medium text-muted-foreground">{totalDeals} Negociações · {statusFilter === 'all' ? 'Em andamento' : statusFilter === 'open' ? 'Em aberto' : statusFilter === 'won' ? 'Ganhos' : 'Perdidos'}</span>
+          <span className="text-[12px] font-medium text-muted-foreground">{totalDeals} Negociações · {statusFilter === 'all' ? 'Todos' : statusFilter === 'open' ? 'Em andamento' : statusFilter === 'won' ? 'Ganhos' : 'Perdidos'}</span>
         </div>
       </div>
 
@@ -432,10 +433,11 @@ export default function Pipeline() {
                             key={deal.id}
                             deal={deal}
                             contacts={contacts.data || []}
-                            overdueCount={(overdueSummary.data as any)?.[deal.id] || 0}
+                            accounts={allAccounts.data || []}
+                            overdueData={(overdueSummary.data as any)?.[deal.id] || null}
                             pendingCount={(pendingCounts.data as any)?.[deal.id] || 0}
                             onCreateTask={() => setShowTaskForm({ dealId: deal.id, dealTitle: deal.title })}
-                            onOpenDrawer={() => setLocation(`/deal/${deal.id}`)}
+                            onOpenDeal={() => setLocation(`/deal/${deal.id}`)}
                             onDragStart={handleDragStart}
                             onDragEnd={handleDragEnd}
                             isDragging={draggedDealId === deal.id}
@@ -529,7 +531,7 @@ export default function Pipeline() {
                         <td className="p-3.5" onClick={() => setLocation(`/deal/${deal.id}`)}>
                           <span className={`inline-flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded-full ${style.bg} ${style.text}`}>
                             <span className={`h-1.5 w-1.5 rounded-full ${style.dot}`} />
-                            {deal.status === "open" ? "Em aberto" : deal.status === "won" ? "Ganho" : "Perdido"}
+                            {deal.status === "open" ? "Em andamento" : deal.status === "won" ? "Ganho" : "Perdido"}
                           </span>
                         </td>
                         <td className="p-3.5 text-right font-semibold" onClick={() => setLocation(`/deal/${deal.id}`)}>{deal.valueCents ? formatCurrency(deal.valueCents) : "—"}</td>
@@ -576,7 +578,7 @@ export default function Pipeline() {
                         <td className="p-3.5">
                           <span className={`inline-flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded-full ${style.bg} ${style.text}`}>
                             <span className={`h-1.5 w-1.5 rounded-full ${style.dot}`} />
-                            {deal.status === "open" ? "Em aberto" : deal.status === "won" ? "Ganho" : "Perdido"}
+                            {deal.status === "open" ? "Em andamento" : deal.status === "won" ? "Ganho" : "Perdido"}
                           </span>
                         </td>
                         <td className="p-3.5 text-right font-semibold text-muted-foreground">{deal.valueCents ? formatCurrency(deal.valueCents) : "—"}</td>
@@ -643,62 +645,130 @@ export default function Pipeline() {
 }
 
 /* ─── Deal Card ─── */
-function DealCard({ deal, contacts, overdueCount, pendingCount, onCreateTask, onOpenDrawer, onDragStart, onDragEnd, isDragging }: {
-  deal: any; contacts: any[]; overdueCount: number; pendingCount: number; onCreateTask: () => void; onOpenDrawer: () => void;
+function DealCard({ deal, contacts, accounts, overdueData, pendingCount, onCreateTask, onOpenDeal, onDragStart, onDragEnd, isDragging }: {
+  deal: any; contacts: any[]; accounts: any[]; overdueData: { count: number; oldestTitle: string; oldestDueAt: string } | null; pendingCount: number; onCreateTask: () => void; onOpenDeal: () => void;
   onDragStart: (e: React.DragEvent, dealId: number) => void; onDragEnd: (e: React.DragEvent) => void; isDragging: boolean;
 }) {
   const contact = contacts.find((c: any) => c.id === deal.contactId);
+  const account = accounts.find((a: any) => a.id === deal.accountId);
   const style = getStatusStyle(deal.status);
-  const hasOverdue = overdueCount > 0;
+  const hasOverdue = !!overdueData && overdueData.count > 0;
   const hasPending = pendingCount > 0;
+
+  // Build the overdue task type icon from title heuristic
+  const overdueTaskIcon = hasOverdue ? (() => {
+    const title = (overdueData.oldestTitle || "").toLowerCase();
+    if (title.includes("whatsapp") || title.includes("primeiro contato")) return "whatsapp";
+    if (title.includes("telefone") || title.includes("ligar")) return "phone";
+    if (title.includes("email") || title.includes("e-mail")) return "email";
+    if (title.includes("vídeo") || title.includes("video")) return "video_call";
+    return "task";
+  })() : "task";
+  const OverdueIcon = getTaskTypeIcon(overdueTaskIcon);
 
   return (
     <div
       draggable
       onDragStart={(e) => onDragStart(e, deal.id)}
       onDragEnd={onDragEnd}
-      className={`bg-card rounded-xl border-2 p-3.5 shadow-[0_1px_4px_oklch(0_0_0/0.06)] hover:shadow-md transition-all duration-200 cursor-grab active:cursor-grabbing space-y-2.5 ${isDragging ? "opacity-40 scale-95" : ""} ${hasOverdue ? "border-red-500 bg-red-50/40 dark:bg-red-950/20 ring-1 ring-red-400/30" : "border-border/50"}`}
+      className={`bg-card rounded-xl border p-3.5 shadow-[0_1px_4px_oklch(0_0_0/0.06)] hover:shadow-md transition-all duration-200 cursor-grab active:cursor-grabbing space-y-2.5 ${isDragging ? "opacity-40 scale-95" : "border-border/50"}`}
     >
-      {/* Status + actions */}
+      {/* Status + info icon */}
       <div className="flex items-center justify-between">
         <span className={`inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-md ${style.bg} ${style.text}`}>
           <span className={`h-1.5 w-1.5 rounded-full ${style.dot}`} />
           {deal.status === "open" ? "Em andamento" : deal.status === "won" ? "Ganha" : "Perdida"}
         </span>
-        <button className="p-1 hover:bg-muted/60 rounded-lg transition-colors" onClick={(e) => { e.stopPropagation(); onOpenDrawer(); }}>
-          <Info className="h-3.5 w-3.5 text-muted-foreground" />
-        </button>
+        <HoverCard openDelay={200} closeDelay={100}>
+          <HoverCardTrigger asChild>
+            <button className="p-1 hover:bg-primary/10 rounded-full transition-colors" onClick={(e) => e.stopPropagation()}>
+              <Info className="h-4 w-4 text-primary" />
+            </button>
+          </HoverCardTrigger>
+          <HoverCardContent side="right" align="start" className="w-[320px] p-0 z-[100]">
+            <div className="p-4 space-y-0.5">
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="font-bold text-sm">Sobre a Negociação</h4>
+              </div>
+              <Separator className="mb-3" />
+              <p className="text-[10px] font-bold text-primary uppercase tracking-wider mb-2">DADOS GERAIS</p>
+              <div className="space-y-3 text-[12.5px]">
+                <div>
+                  <p className="text-muted-foreground text-[11px]">Fonte</p>
+                  <p className="font-semibold">{deal.leadSource || deal.channelOrigin || "Desconhecido"}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground text-[11px]">Campanha</p>
+                  <p className="font-semibold">{deal.utmCampaign || "Não preenchido"}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground text-[11px]">Empresa</p>
+                  <p className="font-semibold">{account?.name || "Não vinculada"}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground text-[11px]">Data de criação</p>
+                  <p className="font-semibold">{deal.createdAt ? formatDateTime(deal.createdAt) : "Não preenchido"}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground text-[11px]">Último contato</p>
+                  <p className="font-semibold">{deal.lastActivityAt ? formatDateTime(deal.lastActivityAt) : "Não preenchido"}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground text-[11px]">Previsão de fechamento</p>
+                  <p className="font-semibold">{deal.expectedCloseAt ? formatDate(deal.expectedCloseAt) : "Não preenchido"}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground text-[11px]">Identificador</p>
+                  <p className="font-semibold">#{deal.id}</p>
+                </div>
+              </div>
+            </div>
+            <div className="border-t p-3">
+              <Button size="sm" className="w-full" onClick={onOpenDeal}>
+                Abrir Negociação
+              </Button>
+            </div>
+          </HoverCardContent>
+        </HoverCard>
       </div>
 
       {/* Title */}
-      <p className="font-bold text-[13.5px] leading-snug text-foreground cursor-pointer hover:text-primary transition-colors" onClick={onOpenDrawer}>
+      <p className="font-bold text-[13.5px] leading-snug text-foreground cursor-pointer hover:text-primary transition-colors" onClick={onOpenDeal}>
         {deal.title}
       </p>
 
-      {/* Contact */}
-      {contact && <p className="text-[12px] text-muted-foreground truncate">{contact.name}</p>}
-
-      {/* Date & value */}
-      <div className="flex items-center gap-3 text-[12px] text-muted-foreground flex-wrap">
+      {/* Date & source */}
+      <div className="flex items-center gap-2 text-[11.5px] text-muted-foreground flex-wrap">
         <span className="flex items-center gap-1">
           <CalendarIcon className="h-3 w-3" />
           {formatDate(deal.createdAt)}
         </span>
-        {deal.valueCents > 0 && (
-          <span className="flex items-center gap-1 font-bold text-foreground">
-            <DollarSign className="h-3 w-3 text-primary" />
-            {formatCurrency(deal.valueCents)}
+        {deal.utmCampaign && (
+          <span className="flex items-center gap-1 truncate max-w-[120px]" title={deal.utmCampaign}>
+            <TrendingUp className="h-3 w-3 shrink-0" />
+            {deal.utmCampaign.length > 20 ? deal.utmCampaign.slice(0, 18) + "..." : deal.utmCampaign}
           </span>
         )}
       </div>
 
-      {/* Overdue alert */}
+      {/* Overdue task — pink/rose background row */}
       {hasOverdue && (
-        <div className="flex items-center gap-1.5 text-[11px] bg-red-100 dark:bg-red-950/40 border border-red-300 dark:border-red-800 px-2.5 py-2 rounded-lg">
-          <AlertTriangle className="h-3 w-3 shrink-0 text-red-600 dark:text-red-400" />
-          <span className="truncate flex-1 text-red-700 dark:text-red-300 font-semibold">
-            {overdueCount} tarefa{overdueCount > 1 ? "s" : ""} atrasada{overdueCount > 1 ? "s" : ""}
+        <div className="bg-pink-200 dark:bg-pink-900/50 rounded-lg px-2.5 py-2 flex items-center gap-2 text-[11.5px]">
+          <OverdueIcon className="h-3.5 w-3.5 shrink-0 text-pink-800 dark:text-pink-200" />
+          <span className="font-semibold text-pink-900 dark:text-pink-100 truncate flex-1">
+            {overdueData.oldestTitle}
           </span>
+          <span className="text-pink-700 dark:text-pink-300 whitespace-nowrap text-[10.5px]">
+            {formatDateTime(overdueData.oldestDueAt)}
+          </span>
+        </div>
+      )}
+
+      {/* Extra overdue count if more than 1 */}
+      {hasOverdue && overdueData.count > 1 && (
+        <div className="flex items-center gap-1.5 text-[10.5px] text-red-600 dark:text-red-400 pl-1">
+          <AlertTriangle className="h-3 w-3" />
+          <span>+{overdueData.count - 1} tarefa{overdueData.count - 1 > 1 ? "s" : ""} atrasada{overdueData.count - 1 > 1 ? "s" : ""}</span>
         </div>
       )}
 
@@ -825,7 +895,7 @@ function DealDrawer({ dealId, onClose, contacts, accounts, stages }: {
               <div className="flex items-center gap-2 mb-2">
                 <span className={`inline-flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded-full ${style.bg} ${style.text}`}>
                   <span className={`h-1.5 w-1.5 rounded-full ${style.dot}`} />
-                  {d.status === "open" ? "Em aberto" : d.status === "won" ? "Ganha" : "Perdida"}
+                  {d.status === "open" ? "Em andamento" : d.status === "won" ? "Ganha" : "Perdida"}
                 </span>
                 <Badge variant="secondary" className="text-[11px] rounded-lg">{stage?.name || "—"}</Badge>
               </div>
@@ -915,7 +985,7 @@ function DealDrawer({ dealId, onClose, contacts, accounts, stages }: {
                   }}>
                     <SelectTrigger className="h-10 text-[13px] rounded-xl"><SelectValue /></SelectTrigger>
                     <SelectContent className="rounded-xl">
-                      <SelectItem value="open">Em aberto</SelectItem>
+                      <SelectItem value="open">Em andamento</SelectItem>
                       <SelectItem value="won">Ganho</SelectItem>
                       <SelectItem value="lost">Perdido</SelectItem>
                     </SelectContent>

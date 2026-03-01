@@ -93,7 +93,7 @@ function statusLabel(status: string) {
   switch (status) {
     case "won": return "Ganho";
     case "lost": return "Perdido";
-    case "open": return "Aberto";
+    case "open": return "Em andamento";
     default: return status;
   }
 }

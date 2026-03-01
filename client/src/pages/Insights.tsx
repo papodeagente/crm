@@ -97,7 +97,7 @@ function CRMDashboard() {
 
   const metrics = [
     { label: "Contatos", value: d?.totalContacts ?? 0, icon: Users, bg: "bg-blue-50 dark:bg-blue-500/10", iconColor: "text-blue-600 dark:text-blue-400" },
-    { label: "Negócios Abertos", value: d?.openDeals ?? 0, icon: Briefcase, bg: "bg-amber-50 dark:bg-amber-500/10", iconColor: "text-amber-600 dark:text-amber-400" },
+    { label: "Em andamento", value: d?.openDeals ?? 0, icon: Briefcase, bg: "bg-amber-50 dark:bg-amber-500/10", iconColor: "text-amber-600 dark:text-amber-400" },
     { label: "Negócios Ganhos", value: d?.wonDeals ?? 0, icon: Trophy, bg: "bg-emerald-50 dark:bg-emerald-500/10", iconColor: "text-emerald-600 dark:text-emerald-400" },
     { label: "Conversas Abertas", value: d?.openConversations ?? 0, icon: Inbox, bg: "bg-violet-50 dark:bg-violet-500/10", iconColor: "text-violet-600 dark:text-violet-400" },
   ];
