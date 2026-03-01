@@ -795,9 +795,17 @@ function DealCard({ deal, contacts, accounts, overdueData, pendingCount, onCreat
       </div>
 
       {/* Row 2: Deal title (bold, clickable) */}
-      <p className="font-bold text-[13px] leading-snug text-foreground cursor-pointer hover:text-primary transition-colors mb-1.5" onClick={onOpenDeal}>
+      <p className="font-bold text-[13px] leading-snug text-foreground cursor-pointer hover:text-primary transition-colors" onClick={onOpenDeal}>
         {deal.title}
       </p>
+
+      {/* Row 2b: Contact name */}
+      {contact && (
+        <p className="text-[11.5px] text-muted-foreground truncate mb-1.5">
+          <User className="inline h-3 w-3 mr-1 -mt-0.5" />
+          {contact.name || "Sem nome"}
+        </p>
+      )}
 
       {/* Row 3: Value + Date on same line */}
       <div className="flex items-center gap-3 text-[11px] text-muted-foreground mb-2">

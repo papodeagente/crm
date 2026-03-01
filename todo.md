@@ -1665,3 +1665,6 @@
 - [x] Redesenhar DealCard: classificação do cliente mais discreta (badge pequeno)
 - [x] Redesenhar DealCard: ícone de informação permanece como está
 - [x] Layout inspirado na referência visual do CRM (compacto, limpo)
+
+## Nome do Contato no DealCard
+- [x] Exibir nome do contato abaixo do título da negociação no card do Kanban
