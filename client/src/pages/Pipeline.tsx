@@ -235,6 +235,20 @@ export default function Pipeline() {
     setDragOverStageId(null);
   }, []);
 
+  // Safety: also clear drag state on any mouseup/pointerup to prevent stuck opacity
+  useEffect(() => {
+    const clearDrag = () => {
+      setDraggedDealId(null);
+      setDragOverStageId(null);
+    };
+    document.addEventListener("drop", clearDrag);
+    document.addEventListener("dragend", clearDrag);
+    return () => {
+      document.removeEventListener("drop", clearDrag);
+      document.removeEventListener("dragend", clearDrag);
+    };
+  }, []);
+
   const handleDragOver = useCallback((e: React.DragEvent, stageId: number) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = "move";
@@ -252,6 +266,7 @@ export default function Pipeline() {
     if (!deal || deal.stageId === toStageId) return;
     const fromStage = stages.data.find((s: any) => s.id === deal.stageId);
     const toStage = stages.data.find((s: any) => s.id === toStageId);
+    setDraggedDealId(null);
     moveStage.mutate({
       tenantId: TENANT_ID, dealId, fromStageId: deal.stageId, toStageId,
       fromStageName: fromStage?.name || "Desconhecida", toStageName: toStage?.name || "Desconhecida",
@@ -718,11 +733,11 @@ function DealCard({ deal, contacts, accounts, overdueData, pendingCount, onCreat
       draggable
       onDragStart={(e) => onDragStart(e, deal.id)}
       onDragEnd={onDragEnd}
-      className={`bg-card rounded-xl border p-3.5 shadow-[0_1px_4px_oklch(0_0_0/0.06)] hover:shadow-md transition-all duration-200 cursor-grab active:cursor-grabbing space-y-2.5 ${isDragging ? "opacity-60 scale-[0.97] ring-2 ring-primary/40 border-primary/30" : "border-border/50"}`}
+      className={`bg-card rounded-xl border p-3 shadow-[0_1px_3px_oklch(0_0_0/0.05)] hover:shadow-md transition-all duration-150 cursor-grab active:cursor-grabbing ${isDragging ? "ring-2 ring-primary/40 border-primary/30 scale-[0.98]" : "border-border/50"}`}
     >
-      {/* Status + info icon */}
-      <div className="flex items-center justify-between">
-        <span className={`inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-md ${style.bg} ${style.text}`}>
+      {/* Row 1: Status badge + info icon */}
+      <div className="flex items-center justify-between mb-2">
+        <span className={`inline-flex items-center gap-1.5 text-[10.5px] font-semibold px-2 py-0.5 rounded-md ${style.bg} ${style.text}`}>
           <span className={`h-1.5 w-1.5 rounded-full ${style.dot}`} />
           {deal.status === "open" ? "Em andamento" : deal.status === "won" ? "Ganha" : "Perdida"}
         </span>
@@ -779,72 +794,71 @@ function DealCard({ deal, contacts, accounts, overdueData, pendingCount, onCreat
         </HoverCard>
       </div>
 
-      {/* Title */}
-      <p className="font-bold text-[13.5px] leading-snug text-foreground cursor-pointer hover:text-primary transition-colors" onClick={onOpenDeal}>
+      {/* Row 2: Deal title (bold, clickable) */}
+      <p className="font-bold text-[13px] leading-snug text-foreground cursor-pointer hover:text-primary transition-colors mb-1.5" onClick={onOpenDeal}>
         {deal.title}
       </p>
 
-      {/* Classification badge — strip variant for visual impact */}
-      {contact && (
-        <ClassificationBadge
-          classification={contact.stageClassification || "desconhecido"}
-          variant="strip"
-          referralWindowActive={!!contact.referralWindowStart && (Date.now() - new Date(contact.referralWindowStart).getTime()) < 90 * 24 * 60 * 60 * 1000}
-        />
-      )}
-
-      {/* Date & source */}
-      <div className="flex items-center gap-2 text-[11.5px] text-muted-foreground flex-wrap">
+      {/* Row 3: Value + Date on same line */}
+      <div className="flex items-center gap-3 text-[11px] text-muted-foreground mb-2">
+        {deal.valueCents > 0 && (
+          <span className="flex items-center gap-1 font-semibold text-foreground">
+            <DollarSign className="h-3 w-3 text-emerald-500" />
+            {formatCurrency(deal.valueCents)}
+          </span>
+        )}
         <span className="flex items-center gap-1">
           <CalendarIcon className="h-3 w-3" />
           {formatDate(deal.createdAt)}
         </span>
-        {deal.utmCampaign && (
-          <span className="flex items-center gap-1 truncate max-w-[120px]" title={deal.utmCampaign}>
-            <TrendingUp className="h-3 w-3 shrink-0" />
-            {deal.utmCampaign.length > 20 ? deal.utmCampaign.slice(0, 18) + "..." : deal.utmCampaign}
-          </span>
-        )}
       </div>
 
-      {/* Overdue task — pink/rose background row */}
-      {hasOverdue && (
-        <div className="bg-pink-200 dark:bg-pink-900/50 rounded-lg px-2.5 py-2 flex items-center gap-2 text-[11.5px]">
-          <OverdueIcon className="h-3.5 w-3.5 shrink-0 text-pink-800 dark:text-pink-200" />
-          <span className="font-semibold text-pink-900 dark:text-pink-100 truncate flex-1">
+      {/* Row 4: Task section — overdue (pink), pending (subtle), or create */}
+      {hasOverdue ? (
+        <div className="bg-pink-100 dark:bg-pink-900/40 rounded-lg px-2.5 py-1.5 flex items-center gap-2 text-[11px]">
+          <OverdueIcon className="h-3.5 w-3.5 shrink-0 text-pink-700 dark:text-pink-300" />
+          <span className="font-medium text-pink-800 dark:text-pink-200 truncate flex-1">
             {overdueData.oldestTitle}
           </span>
-          <span className="text-pink-700 dark:text-pink-300 whitespace-nowrap text-[10.5px]">
+          <span className="text-pink-600 dark:text-pink-400 whitespace-nowrap text-[10px]">
             {formatDateTime(overdueData.oldestDueAt)}
           </span>
         </div>
-      )}
-
-      {/* Extra overdue count if more than 1 */}
-      {hasOverdue && overdueData.count > 1 && (
-        <div className="flex items-center gap-1.5 text-[10.5px] text-red-600 dark:text-red-400 pl-1">
-          <AlertTriangle className="h-3 w-3" />
-          <span>+{overdueData.count - 1} tarefa{overdueData.count - 1 > 1 ? "s" : ""} atrasada{overdueData.count - 1 > 1 ? "s" : ""}</span>
-        </div>
-      )}
-
-      {/* Pending tasks indicator */}
-      {hasPending && !hasOverdue && (
-        <div className="flex items-center gap-1.5 text-[11px] bg-primary/[0.08] dark:bg-primary/[0.12] border border-primary/15 px-2.5 py-2 rounded-lg">
+      ) : hasPending ? (
+        <div className="flex items-center gap-1.5 text-[11px] bg-muted/60 dark:bg-muted/30 px-2.5 py-1.5 rounded-lg">
           <Clock className="h-3 w-3 shrink-0 text-primary" />
-          <span className="truncate flex-1 text-foreground font-medium">{pendingCount} tarefa{pendingCount > 1 ? "s" : ""} pendente{pendingCount > 1 ? "s" : ""}</span>
+          <span className="truncate flex-1 text-muted-foreground font-medium">{pendingCount} tarefa{pendingCount > 1 ? "s" : ""} pendente{pendingCount > 1 ? "s" : ""}</span>
         </div>
-      )}
-
-      {/* Create task */}
-      {!hasPending && !hasOverdue && (
+      ) : (
         <button
           onClick={(e) => { e.stopPropagation(); onCreateTask(); }}
-          className="flex items-center gap-1.5 text-[12px] text-muted-foreground hover:text-primary w-full justify-center py-2 border border-dashed border-border/50 rounded-xl hover:border-primary/40 transition-all duration-200"
+          className="flex items-center gap-1.5 text-[11px] text-muted-foreground/70 hover:text-primary w-full justify-center py-1.5 border border-dashed border-border/40 rounded-lg hover:border-primary/40 transition-all duration-150"
         >
           <Plus className="h-3 w-3" />
           Criar Tarefa
         </button>
+      )}
+
+      {/* Extra overdue count */}
+      {hasOverdue && overdueData.count > 1 && (
+        <div className="flex items-center gap-1 text-[10px] text-red-500 dark:text-red-400 mt-1 pl-0.5">
+          <AlertTriangle className="h-2.5 w-2.5" />
+          <span>+{overdueData.count - 1} atrasada{overdueData.count - 1 > 1 ? "s" : ""}</span>
+        </div>
+      )}
+
+      {/* Row 5: Classification badge — discrete, small */}
+      {contact && contact.stageClassification && contact.stageClassification !== "desconhecido" && (
+        <div className="mt-1 pt-1.5 border-t border-border/30">
+          <ClassificationBadge
+            classification={contact.stageClassification}
+            variant="badge"
+            size="sm"
+            showIcon={true}
+            showLabel={true}
+            referralWindowActive={!!contact.referralWindowStart && (Date.now() - new Date(contact.referralWindowStart).getTime()) < 90 * 24 * 60 * 60 * 1000}
+          />
+        </div>
       )}
     </div>
   );

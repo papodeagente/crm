@@ -1655,3 +1655,13 @@
 - [x] Atualizar formatações de data no backend (process.env.TZ = America/Sao_Paulo)
 - [x] Garantir que novas datas criadas usem referência UTC-3
 - [x] Testes unitários para formatação de datas com timezone (606 passando)
+
+## Correção Card Kanban + Novo Layout
+- [x] Corrigir bug: card fica apagado/opaco após mover no Kanban (persistente até refresh)
+- [x] Redesenhar DealCard: nome da negociação em destaque
+- [x] Redesenhar DealCard: data de criação com ícone de calendário
+- [x] Redesenhar DealCard: tarefa pendente com ícone
+- [x] Redesenhar DealCard: valor da negociação com ícone
+- [x] Redesenhar DealCard: classificação do cliente mais discreta (badge pequeno)
+- [x] Redesenhar DealCard: ícone de informação permanece como está
+- [x] Layout inspirado na referência visual do CRM (compacto, limpo)
