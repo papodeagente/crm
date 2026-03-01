@@ -12,7 +12,7 @@ import { getLoginUrl } from "@/const";
 import {
   Home, Briefcase, Users, CheckSquare, BarChart3,
   Bell, Settings, Search, ChevronRight, LogOut, Menu, X,
-  Loader2, User, Building2, ListTodo, Phone, Mail, Sun, Moon, MessageSquare,
+  Loader2, User, Building2, ListTodo, Phone, Mail, Sun, Moon, MessageSquare, Shield,
 } from "lucide-react";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -29,7 +29,7 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  { icon: Home, label: "Início", path: "/", matchPaths: ["/"] },
+  { icon: Home, label: "Início", path: "/dashboard", matchPaths: ["/dashboard"] },
   { icon: Briefcase, label: "Negociações", path: "/pipeline", matchPaths: ["/pipeline", "/deal"] },
   { icon: Users, label: "Contatos", path: "/contacts", matchPaths: ["/contacts"] },
   { icon: CheckSquare, label: "Tarefas", path: "/tasks", matchPaths: ["/tasks"] },
@@ -39,7 +39,7 @@ const navItems: NavItem[] = [
 
 /* ─── Quick Nav Pages ─── */
 const quickNavPages = [
-  { icon: Home, label: "Início", path: "/" },
+  { icon: Home, label: "Início", path: "/dashboard" },
   { icon: Briefcase, label: "Negociações", path: "/pipeline" },
   { icon: Users, label: "Contatos", path: "/contacts" },
   { icon: CheckSquare, label: "Tarefas", path: "/tasks" },
@@ -375,13 +375,17 @@ function TopBar({ onSearchOpen, mobileMenuOpen, onToggleMobile }: {
     { tenantId: 1 },
     { refetchInterval: 30000 }
   );
+  const saasMe = trpc.saasAuth.me.useQuery(undefined, {
+    retry: false,
+    refetchOnWindowFocus: false,
+  }).data;
 
   return (
     <>
       <header className="shrink-0 glass z-50 sticky top-0 border-b border-border">
         <div className="flex items-center h-[56px] px-4 lg:px-6 gap-2">
           {/* Logo */}
-          <Link href="/" className="flex items-center gap-2.5 shrink-0 mr-2">
+          <Link href="/dashboard" className="flex items-center gap-2.5 shrink-0 mr-2">
             <img
               src="https://files.manuscdn.com/user_upload_by_module/session_file/310519663249817763/XXuAsdiNIcgnwwra.png"
               alt="ENTUR OS"
@@ -393,8 +397,8 @@ function TopBar({ onSearchOpen, mobileMenuOpen, onToggleMobile }: {
           {/* Desktop Nav */}
           <nav className="hidden md:flex items-center gap-0.5 ml-2">
             {navItems.map((item) => {
-              const isActive = item.path === "/"
-                ? location === "/"
+              const isActive = item.path === "/dashboard"
+                ? location === "/dashboard"
                 : (item.matchPaths || [item.path]).some((p) => location.startsWith(p));
               return (
                 <Link
@@ -486,6 +490,12 @@ function TopBar({ onSearchOpen, mobileMenuOpen, onToggleMobile }: {
                   <Settings className="h-3.5 w-3.5 text-muted-foreground" />
                   Configurações
                 </DropdownMenuItem>
+                {saasMe?.isSuperAdmin && (
+                  <DropdownMenuItem onClick={() => setLocation("/super-admin")} className="cursor-pointer rounded-lg px-3 py-2 text-[13px] gap-2.5">
+                    <Shield className="h-3.5 w-3.5 text-purple-400" />
+                    Super Admin
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuItem onClick={(e) => { e.preventDefault(); themeCtx.toggleTheme?.(); }} className="cursor-pointer rounded-lg px-3 py-2 text-[13px] gap-2.5">
                   {themeCtx.theme === "dark" ? <Sun className="h-3.5 w-3.5 text-amber-500" /> : <Moon className="h-3.5 w-3.5 text-indigo-500" />}
                   {themeCtx.theme === "dark" ? "Tema Claro" : "Tema Escuro"}
@@ -516,8 +526,8 @@ function TopBar({ onSearchOpen, mobileMenuOpen, onToggleMobile }: {
         <div className="md:hidden fixed inset-x-0 top-[56px] z-40 bg-card/95 backdrop-blur-xl border-b border-border shadow-lg animate-in slide-in-from-top-2 duration-200">
           <nav className="flex flex-col p-3 gap-1">
             {navItems.map((item) => {
-              const isActive = item.path === "/"
-                ? location === "/"
+              const isActive = item.path === "/dashboard"
+                ? location === "/dashboard"
                 : (item.matchPaths || [item.path]).some((p) => location.startsWith(p));
               return (
                 <Link

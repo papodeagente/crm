@@ -64,11 +64,10 @@ function AppRouter() {
     <Suspense fallback={<PageLoader />}>
       <Switch>
         {/* SaaS public pages (no TopNavLayout) */}
-        <Route path="/landing" component={Landing} />
+        <Route path="/" component={Landing} />
         <Route path="/login" component={SaasLogin} />
         <Route path="/register" component={SaasRegister} />
         <Route path="/upgrade" component={Upgrade} />
-        <Route path="/super-admin" component={SuperAdmin} />
 
         {/* App pages (with TopNavLayout) */}
         <Route>
@@ -76,7 +75,7 @@ function AppRouter() {
             <Suspense fallback={<PageLoader />}>
               <Switch>
                 {/* Main nav */}
-                <Route path="/" component={Home} />
+                <Route path="/dashboard" component={Home} />
                 <Route path="/pipeline" component={Pipeline} />
                 <Route path="/contacts" component={Contacts} />
                 <Route path="/tasks" component={Tasks} />
@@ -113,6 +112,9 @@ function AppRouter() {
                 <Route path="/settings/import-rd-crm" component={RDCrmImport} />
                 <Route path="/settings/automations" component={TaskAutomationSettings} />
                 <Route path="/settings/classification" component={ClassificationSettings} />
+
+                {/* Super Admin */}
+                <Route path="/super-admin" component={SuperAdmin} />
 
                 {/* Notifications */}
                 <Route path="/notifications" component={NotificationsPage} />

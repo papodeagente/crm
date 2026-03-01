@@ -11,7 +11,8 @@ import { useLocation } from "wouter";
 import { toast } from "sonner";
 import {
   Shield, Users, Building2, Calendar, CreditCard, Search,
-  Plane, ArrowLeft, Loader2, Edit, Ban, CheckCircle, Clock
+  Plane, ArrowLeft, Loader2, Edit, Ban, CheckCircle, Clock,
+  ChevronDown, ChevronRight, User, Mail, Phone, UserCheck, UserX
 } from "lucide-react";
 
 export default function SuperAdmin() {
@@ -26,6 +27,7 @@ export default function SuperAdmin() {
   const [freemiumDays, setFreemiumDays] = useState("365");
   const [selectedPlan, setSelectedPlan] = useState<"free" | "pro" | "enterprise">("free");
   const [selectedStatus, setSelectedStatus] = useState<"active" | "suspended" | "cancelled">("active");
+  const [expandedTenant, setExpandedTenant] = useState<number | null>(null);
 
   const updateFreemiumMutation = trpc.saasAuth.adminUpdateFreemium.useMutation({
     onSuccess: () => {
@@ -33,7 +35,7 @@ export default function SuperAdmin() {
       tenantsQuery.refetch();
       setEditDialog(null);
     },
-    onError: (err) => toast.error(err.message),
+    onError: (err: any) => toast.error(err.message),
   });
 
   const updatePlanMutation = trpc.saasAuth.adminUpdatePlan.useMutation({
@@ -42,7 +44,7 @@ export default function SuperAdmin() {
       tenantsQuery.refetch();
       setEditDialog(null);
     },
-    onError: (err) => toast.error(err.message),
+    onError: (err: any) => toast.error(err.message),
   });
 
   const toggleStatusMutation = trpc.saasAuth.adminToggleTenantStatus.useMutation({
@@ -51,27 +53,34 @@ export default function SuperAdmin() {
       tenantsQuery.refetch();
       setEditDialog(null);
     },
-    onError: (err) => toast.error(err.message),
+    onError: (err: any) => toast.error(err.message),
+  });
+
+  const updateUserStatusMutation = trpc.saasAuth.adminUpdateUserStatus.useMutation({
+    onSuccess: () => {
+      toast.success("Status do usuário atualizado!");
+    },
+    onError: (err: any) => toast.error(err.message),
   });
 
   // Auth check
   if (meQuery.isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-purple-600" />
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
       </div>
     );
   }
 
   if (!meQuery.data?.isSuperAdmin) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Card className="max-w-md">
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Card className="max-w-md border-border">
           <CardContent className="p-8 text-center">
             <Shield className="w-12 h-12 text-red-500 mx-auto mb-4" />
-            <h2 className="text-xl font-bold mb-2">Acesso Restrito</h2>
-            <p className="text-slate-500 mb-4">Esta área é exclusiva para administradores do sistema.</p>
-            <Button onClick={() => navigate("/login")}>Fazer login</Button>
+            <h2 className="text-xl font-bold mb-2 text-foreground">Acesso Restrito</h2>
+            <p className="text-muted-foreground mb-4">Esta área é exclusiva para administradores do sistema.</p>
+            <Button onClick={() => navigate("/dashboard")}>Voltar ao Dashboard</Button>
           </CardContent>
         </Card>
       </div>
@@ -85,18 +94,27 @@ export default function SuperAdmin() {
 
   const planBadge = (plan: string) => {
     switch (plan) {
-      case "pro": return <Badge className="bg-purple-100 text-purple-700 hover:bg-purple-100">Pro</Badge>;
-      case "enterprise": return <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100">Enterprise</Badge>;
+      case "pro": return <Badge className="bg-purple-500/20 text-purple-400 border-purple-500/30 hover:bg-purple-500/20">Pro</Badge>;
+      case "enterprise": return <Badge className="bg-blue-500/20 text-blue-400 border-blue-500/30 hover:bg-blue-500/20">Enterprise</Badge>;
       default: return <Badge variant="secondary">Free</Badge>;
     }
   };
 
   const statusBadge = (status: string) => {
     switch (status) {
-      case "active": return <Badge className="bg-green-100 text-green-700 hover:bg-green-100">Ativo</Badge>;
-      case "suspended": return <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100">Suspenso</Badge>;
-      case "cancelled": return <Badge className="bg-red-100 text-red-700 hover:bg-red-100">Cancelado</Badge>;
+      case "active": return <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20">Ativo</Badge>;
+      case "suspended": return <Badge className="bg-amber-500/20 text-amber-400 border-amber-500/30 hover:bg-amber-500/20">Suspenso</Badge>;
+      case "cancelled": return <Badge className="bg-red-500/20 text-red-400 border-red-500/30 hover:bg-red-500/20">Cancelado</Badge>;
       default: return <Badge variant="secondary">{status}</Badge>;
+    }
+  };
+
+  const userStatusBadge = (status: string) => {
+    switch (status) {
+      case "active": return <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 text-xs hover:bg-emerald-500/20">Ativo</Badge>;
+      case "inactive": return <Badge className="bg-red-500/20 text-red-400 border-red-500/30 text-xs hover:bg-red-500/20">Inativo</Badge>;
+      case "invited": return <Badge className="bg-blue-500/20 text-blue-400 border-blue-500/30 text-xs hover:bg-blue-500/20">Convidado</Badge>;
+      default: return <Badge variant="secondary" className="text-xs">{status}</Badge>;
     }
   };
 
@@ -107,23 +125,25 @@ export default function SuperAdmin() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-purple-50/30">
+    <div className="min-h-screen bg-background text-foreground">
       {/* Header */}
-      <div className="bg-white border-b border-slate-200 sticky top-0 z-40">
+      <div className="border-b border-border sticky top-0 z-40 bg-card/95 backdrop-blur-xl">
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <button onClick={() => navigate("/")} className="text-slate-400 hover:text-slate-600">
+            <button onClick={() => navigate("/dashboard")} className="text-muted-foreground hover:text-foreground transition-colors">
               <ArrowLeft className="w-5 h-5" />
             </button>
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-gradient-to-br from-purple-600 to-purple-700 rounded-lg flex items-center justify-center">
-                <Plane className="w-4 h-4 text-white" />
-              </div>
+              <img
+                src="https://files.manuscdn.com/user_upload_by_module/session_file/310519663249817763/XXuAsdiNIcgnwwra.png"
+                alt="ENTUR OS"
+                className="h-8 w-8 rounded-lg"
+              />
               <span className="font-bold text-lg">Super Admin</span>
             </div>
           </div>
-          <div className="flex items-center gap-2 text-sm text-slate-500">
-            <Shield className="w-4 h-4" />
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Shield className="w-4 h-4 text-purple-400" />
             {meQuery.data?.email}
           </div>
         </div>
@@ -133,19 +153,19 @@ export default function SuperAdmin() {
         {/* Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
           {[
-            { icon: <Building2 className="w-5 h-5" />, label: "Total de Tenants", value: filteredTenants.length },
-            { icon: <Users className="w-5 h-5" />, label: "Total de Usuários", value: filteredTenants.reduce((acc: number, t: any) => acc + t.userCount, 0) },
-            { icon: <CheckCircle className="w-5 h-5" />, label: "Ativos", value: filteredTenants.filter((t: any) => t.status === "active").length },
-            { icon: <CreditCard className="w-5 h-5" />, label: "Plano Pro", value: filteredTenants.filter((t: any) => t.plan === "pro").length },
+            { icon: <Building2 className="w-5 h-5" />, label: "Total de Agências", value: filteredTenants.length, color: "text-purple-400 bg-purple-500/10" },
+            { icon: <Users className="w-5 h-5" />, label: "Total de Usuários", value: filteredTenants.reduce((acc: number, t: any) => acc + t.userCount, 0), color: "text-blue-400 bg-blue-500/10" },
+            { icon: <CheckCircle className="w-5 h-5" />, label: "Agências Ativas", value: filteredTenants.filter((t: any) => t.status === "active").length, color: "text-emerald-400 bg-emerald-500/10" },
+            { icon: <CreditCard className="w-5 h-5" />, label: "Plano Pro", value: filteredTenants.filter((t: any) => t.plan === "pro").length, color: "text-amber-400 bg-amber-500/10" },
           ].map((stat, i) => (
-            <Card key={i} className="bg-white">
+            <Card key={i} className="border-border bg-card">
               <CardContent className="p-4 flex items-center gap-3">
-                <div className="w-10 h-10 bg-purple-50 rounded-lg flex items-center justify-center text-purple-600">
+                <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${stat.color}`}>
                   {stat.icon}
                 </div>
                 <div>
-                  <p className="text-2xl font-bold">{stat.value}</p>
-                  <p className="text-xs text-slate-500">{stat.label}</p>
+                  <p className="text-2xl font-bold text-foreground">{stat.value}</p>
+                  <p className="text-xs text-muted-foreground">{stat.label}</p>
                 </div>
               </CardContent>
             </Card>
@@ -155,26 +175,30 @@ export default function SuperAdmin() {
         {/* Search */}
         <div className="flex items-center gap-4 mb-6">
           <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
               placeholder="Buscar por nome ou email..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="pl-10 bg-white"
+              className="pl-10"
             />
           </div>
         </div>
 
-        {/* Tenants table */}
-        <Card className="bg-white">
+        {/* Tenants list */}
+        <Card className="border-border bg-card">
           <CardHeader className="pb-3">
-            <CardTitle className="text-lg">Tenants ({filteredTenants.length})</CardTitle>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Building2 className="w-5 h-5 text-purple-400" />
+              Agências ({filteredTenants.length})
+            </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-slate-100 text-slate-500">
+                  <tr className="border-b border-border text-muted-foreground">
+                    <th className="text-left p-4 font-medium w-8"></th>
                     <th className="text-left p-4 font-medium">Agência</th>
                     <th className="text-left p-4 font-medium">Email</th>
                     <th className="text-left p-4 font-medium">Plano</th>
@@ -188,72 +212,104 @@ export default function SuperAdmin() {
                 <tbody>
                   {filteredTenants.map((tenant: any) => {
                     const daysLeft = getDaysLeft(tenant.freemiumExpiresAt);
+                    const isExpanded = expandedTenant === tenant.id;
                     return (
-                      <tr key={tenant.id} className="border-b border-slate-50 hover:bg-slate-50/50">
-                        <td className="p-4 font-medium">{tenant.name}</td>
-                        <td className="p-4 text-slate-500">{tenant.hotmartEmail || "—"}</td>
-                        <td className="p-4">{planBadge(tenant.plan)}</td>
-                        <td className="p-4">{statusBadge(tenant.status)}</td>
-                        <td className="p-4">
-                          {tenant.plan === "free" && daysLeft !== null ? (
-                            <span className={`text-sm font-medium ${daysLeft <= 30 ? "text-amber-600" : "text-green-600"}`}>
-                              {daysLeft > 0 ? `${daysLeft} dias` : "Expirado"}
-                            </span>
-                          ) : (
-                            <span className="text-slate-400">—</span>
-                          )}
-                        </td>
-                        <td className="p-4 text-slate-500">{tenant.userCount}</td>
-                        <td className="p-4 text-slate-500">
-                          {new Date(tenant.createdAt).toLocaleDateString("pt-BR")}
-                        </td>
-                        <td className="p-4 text-right">
-                          <div className="flex items-center justify-end gap-1">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-8 w-8 p-0"
-                              title="Alterar período freemium"
-                              onClick={() => {
-                                setFreemiumDays(String(tenant.freemiumDays || 365));
-                                setEditDialog({ tenantId: tenant.id, type: "freemium" });
-                              }}
-                            >
-                              <Clock className="w-4 h-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-8 w-8 p-0"
-                              title="Alterar plano"
-                              onClick={() => {
-                                setSelectedPlan(tenant.plan);
-                                setEditDialog({ tenantId: tenant.id, type: "plan" });
-                              }}
-                            >
-                              <Edit className="w-4 h-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-8 w-8 p-0"
-                              title="Alterar status"
-                              onClick={() => {
-                                setSelectedStatus(tenant.status);
-                                setEditDialog({ tenantId: tenant.id, type: "status" });
-                              }}
-                            >
-                              <Ban className="w-4 h-4" />
-                            </Button>
-                          </div>
-                        </td>
-                      </tr>
+                      <>
+                        <tr key={tenant.id} className={`border-b border-border/50 hover:bg-accent/30 transition-colors cursor-pointer ${isExpanded ? "bg-accent/20" : ""}`}>
+                          <td className="p-4" onClick={() => setExpandedTenant(isExpanded ? null : tenant.id)}>
+                            {isExpanded ? (
+                              <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                            ) : (
+                              <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                            )}
+                          </td>
+                          <td className="p-4 font-medium text-foreground" onClick={() => setExpandedTenant(isExpanded ? null : tenant.id)}>
+                            <div className="flex items-center gap-2">
+                              <div className="w-8 h-8 bg-purple-500/10 rounded-lg flex items-center justify-center text-purple-400 text-xs font-bold">
+                                {tenant.name.charAt(0).toUpperCase()}
+                              </div>
+                              {tenant.name}
+                            </div>
+                          </td>
+                          <td className="p-4 text-muted-foreground">{tenant.hotmartEmail || "—"}</td>
+                          <td className="p-4">{planBadge(tenant.plan)}</td>
+                          <td className="p-4">{statusBadge(tenant.status)}</td>
+                          <td className="p-4">
+                            {tenant.plan === "free" && daysLeft !== null ? (
+                              <span className={`text-sm font-medium ${daysLeft <= 30 ? "text-amber-400" : "text-emerald-400"}`}>
+                                {daysLeft > 0 ? `${daysLeft} dias` : "Expirado"}
+                              </span>
+                            ) : (
+                              <span className="text-muted-foreground">—</span>
+                            )}
+                          </td>
+                          <td className="p-4 text-muted-foreground">{tenant.userCount}</td>
+                          <td className="p-4 text-muted-foreground">
+                            {new Date(tenant.createdAt).toLocaleDateString("pt-BR")}
+                          </td>
+                          <td className="p-4 text-right">
+                            <div className="flex items-center justify-end gap-1">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
+                                title="Alterar período freemium"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setFreemiumDays(String(tenant.freemiumDays || 365));
+                                  setEditDialog({ tenantId: tenant.id, type: "freemium" });
+                                }}
+                              >
+                                <Clock className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
+                                title="Alterar plano"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedPlan(tenant.plan);
+                                  setEditDialog({ tenantId: tenant.id, type: "plan" });
+                                }}
+                              >
+                                <Edit className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
+                                title="Alterar status"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedStatus(tenant.status);
+                                  setEditDialog({ tenantId: tenant.id, type: "status" });
+                                }}
+                              >
+                                <Ban className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                        {isExpanded && (
+                          <tr key={`${tenant.id}-users`}>
+                            <td colSpan={9} className="p-0">
+                              <TenantUsersPanel
+                                tenantId={tenant.id}
+                                tenantName={tenant.name}
+                                userStatusBadge={userStatusBadge}
+                                updateUserStatusMutation={updateUserStatusMutation}
+                              />
+                            </td>
+                          </tr>
+                        )}
+                      </>
                     );
                   })}
                   {filteredTenants.length === 0 && (
                     <tr>
-                      <td colSpan={8} className="p-8 text-center text-slate-400">
-                        Nenhum tenant encontrado
+                      <td colSpan={9} className="p-8 text-center text-muted-foreground">
+                        Nenhuma agência encontrada
                       </td>
                     </tr>
                   )}
@@ -286,7 +342,7 @@ export default function SuperAdmin() {
                   onChange={(e) => setFreemiumDays(e.target.value)}
                   placeholder="365"
                 />
-                <p className="text-xs text-slate-500">Mínimo: 7 dias. O período será recalculado a partir de hoje.</p>
+                <p className="text-xs text-muted-foreground">Mínimo: 7 dias. O período será recalculado a partir de hoje.</p>
               </div>
             </div>
           )}
@@ -351,6 +407,124 @@ export default function SuperAdmin() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+/* ─── Tenant Users Panel (expandable row) ─── */
+function TenantUsersPanel({
+  tenantId,
+  tenantName,
+  userStatusBadge,
+  updateUserStatusMutation,
+}: {
+  tenantId: number;
+  tenantName: string;
+  userStatusBadge: (status: string) => React.ReactNode;
+  updateUserStatusMutation: any;
+}) {
+  const usersQuery = trpc.saasAuth.adminListTenantUsers.useQuery(
+    { tenantId },
+    { enabled: true }
+  );
+
+  if (usersQuery.isLoading) {
+    return (
+      <div className="bg-accent/10 border-t border-border p-6 flex items-center justify-center">
+        <Loader2 className="w-5 h-5 animate-spin text-muted-foreground mr-2" />
+        <span className="text-sm text-muted-foreground">Carregando usuários...</span>
+      </div>
+    );
+  }
+
+  const users = usersQuery.data || [];
+
+  return (
+    <div className="bg-accent/10 border-t border-border">
+      <div className="px-6 py-3 border-b border-border/50">
+        <h4 className="text-sm font-semibold text-foreground flex items-center gap-2">
+          <Users className="w-4 h-4 text-purple-400" />
+          Usuários de {tenantName} ({users.length})
+        </h4>
+      </div>
+      {users.length === 0 ? (
+        <div className="p-6 text-center text-muted-foreground text-sm">
+          Nenhum usuário cadastrado nesta agência
+        </div>
+      ) : (
+        <div className="divide-y divide-border/30">
+          {users.map((user: any) => (
+            <div key={user.id} className="px-6 py-3 flex items-center gap-4 hover:bg-accent/20 transition-colors">
+              <div className="w-9 h-9 bg-purple-500/10 rounded-full flex items-center justify-center text-purple-400 text-sm font-bold shrink-0">
+                {user.name?.charAt(0)?.toUpperCase() || "?"}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="font-medium text-foreground text-sm truncate">{user.name}</span>
+                  {userStatusBadge(user.status)}
+                </div>
+                <div className="flex items-center gap-4 text-xs text-muted-foreground mt-0.5">
+                  <span className="flex items-center gap-1">
+                    <Mail className="w-3 h-3" />
+                    {user.email}
+                  </span>
+                  {user.phone && (
+                    <span className="flex items-center gap-1">
+                      <Phone className="w-3 h-3" />
+                      {user.phone}
+                    </span>
+                  )}
+                  <span className="flex items-center gap-1">
+                    <Calendar className="w-3 h-3" />
+                    Criado em {new Date(user.createdAt).toLocaleDateString("pt-BR")}
+                  </span>
+                  {user.lastLoginAt && (
+                    <span className="flex items-center gap-1">
+                      <Clock className="w-3 h-3" />
+                      Último login: {new Date(user.lastLoginAt).toLocaleDateString("pt-BR")}
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div className="flex items-center gap-1 shrink-0">
+                {user.status === "active" ? (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 text-xs text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                    onClick={() => {
+                      updateUserStatusMutation.mutate(
+                        { userId: user.id, status: "inactive" as const },
+                        { onSuccess: () => usersQuery.refetch() }
+                      );
+                    }}
+                    disabled={updateUserStatusMutation.isPending}
+                  >
+                    <UserX className="w-3.5 h-3.5 mr-1" />
+                    Desativar
+                  </Button>
+                ) : (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 text-xs text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10"
+                    onClick={() => {
+                      updateUserStatusMutation.mutate(
+                        { userId: user.id, status: "active" as const },
+                        { onSuccess: () => usersQuery.refetch() }
+                      );
+                    }}
+                    disabled={updateUserStatusMutation.isPending}
+                  >
+                    <UserCheck className="w-3.5 h-3.5 mr-1" />
+                    Ativar
+                  </Button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

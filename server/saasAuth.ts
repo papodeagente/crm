@@ -353,3 +353,40 @@ export async function updateTenantPlan(tenantId: number, plan: "free" | "pro" | 
 
   return { tenantId, plan };
 }
+
+
+// ═══════════════════════════════════════
+// LIST USERS BY TENANT (SUPERADMIN)
+// ═══════════════════════════════════════
+
+export async function listTenantUsersAdmin(tenantId: number) {
+  const db = await getDb();
+  if (!db) return [];
+
+  const users = await db
+    .select({
+      id: crmUsers.id,
+      name: crmUsers.name,
+      email: crmUsers.email,
+      phone: crmUsers.phone,
+      status: crmUsers.status,
+      lastLoginAt: crmUsers.lastLoginAt,
+      createdAt: crmUsers.createdAt,
+    })
+    .from(crmUsers)
+    .where(eq(crmUsers.tenantId, tenantId));
+
+  return users;
+}
+
+// ═══════════════════════════════════════
+// UPDATE USER STATUS (SUPERADMIN)
+// ═══════════════════════════════════════
+
+export async function updateUserStatusAdmin(userId: number, status: "active" | "inactive") {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.update(crmUsers).set({ status }).where(eq(crmUsers.id, userId));
+  return { userId, status };
+}

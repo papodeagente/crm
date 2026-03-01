@@ -166,7 +166,7 @@ export default function Upgrade() {
         {!isExpired && (
           <div className="text-center mt-6">
             <button
-              onClick={() => navigate("/")}
+              onClick={() => navigate("/dashboard")}
               className="text-sm text-slate-500 hover:text-slate-700 hover:underline"
             >
               Voltar para o dashboard

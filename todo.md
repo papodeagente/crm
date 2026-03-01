@@ -1623,3 +1623,16 @@
 - [x] Backend: endpoint dedicado para KPIs do dashboard com dados filtrados por usuário
 - [x] Backend: endpoint para dados do funil de vendas com contagem por etapa
 - [x] Testes unitários para os novos endpoints
+
+## Landing Page Pública + Fluxo de Login + Painel Super Admin
+
+- [x] Landing page pública dark no estilo Entur OS como página inicial (/)
+- [x] Branding: logo, cores, tipografia do Entur OS na landing
+- [x] Botão de Login na landing que redireciona para autenticação
+- [x] Roteamento: / = landing pública, /dashboard = sistema autenticado
+- [x] Backend: endpoints Super Admin para listar/gerenciar tenants (agências)
+- [x] Backend: endpoints Super Admin para listar/gerenciar usuários por tenant
+- [x] Frontend: Painel Super Admin com lista de agências e seus usuários
+- [x] Acesso ao Super Admin via menu do usuário (dropdown no nome, abaixo de Configurações)
+- [x] Apenas isSuperAdmin pode acessar o painel Super Admin
+- [x] Testes unitários para endpoints Super Admin

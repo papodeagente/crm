@@ -11,6 +11,8 @@ import {
   listAllTenantsAdmin,
   updateFreemiumPeriod,
   updateTenantPlan,
+  listTenantUsersAdmin,
+  updateUserStatusAdmin,
   SAAS_COOKIE,
   SESSION_DURATION_MS,
 } from "../saasAuth";
@@ -181,6 +183,35 @@ export const saasAuthRouter = router({
         throw new TRPCError({ code: "FORBIDDEN", message: "Acesso negado" });
       }
       return updateTenantPlan(input.tenantId, input.plan);
+    }),
+
+  // List users for a tenant (superadmin only)
+  adminListTenantUsers: publicProcedure
+    .input(z.object({ tenantId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      const cookies = parseCookies(ctx.req.headers.cookie);
+      const token = cookies.get(SAAS_COOKIE);
+      const session = await verifySaasSession(token);
+      if (!session || !isSuperAdmin(session.email)) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Acesso negado" });
+      }
+      return listTenantUsersAdmin(input.tenantId);
+    }),
+
+  // Update user status (superadmin only)
+  adminUpdateUserStatus: publicProcedure
+    .input(z.object({
+      userId: z.number(),
+      status: z.enum(["active", "inactive"]),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const cookies = parseCookies(ctx.req.headers.cookie);
+      const token = cookies.get(SAAS_COOKIE);
+      const session = await verifySaasSession(token);
+      if (!session || !isSuperAdmin(session.email)) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Acesso negado" });
+      }
+      return updateUserStatusAdmin(input.userId, input.status);
     }),
 
   // Suspend/Activate tenant (superadmin only)

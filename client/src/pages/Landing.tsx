@@ -7,6 +7,8 @@ import {
   PieChart, Target, Calendar, FileText, Bot
 } from "lucide-react";
 
+const LOGO_URL = "https://files.manuscdn.com/user_upload_by_module/session_file/310519663249817763/XXuAsdiNIcgnwwra.png";
+
 export default function Landing() {
   const [, navigate] = useLocation();
 
@@ -14,32 +16,44 @@ export default function Landing() {
     {
       icon: <Target className="w-6 h-6" />,
       title: "Pipeline de Vendas Inteligente",
-      description: "Gerencie suas negociações com funis personalizáveis, automações e indicadores em tempo real. Visualize cada etapa da venda.",
+      description: "Gerencie suas negociações com funis personalizáveis, automações e indicadores em tempo real.",
+      gradient: "from-purple-500/20 to-violet-500/20",
+      iconColor: "text-purple-400",
     },
     {
       icon: <MessageSquare className="w-6 h-6" />,
       title: "WhatsApp Integrado com IA",
-      description: "Atenda seus clientes direto pelo WhatsApp com chatbot inteligente, respostas automáticas e histórico completo de conversas.",
+      description: "Atenda seus clientes direto pelo WhatsApp com chatbot inteligente e histórico completo.",
+      gradient: "from-emerald-500/20 to-teal-500/20",
+      iconColor: "text-emerald-400",
     },
     {
       icon: <Users className="w-6 h-6" />,
       title: "Gestão de Contatos 360°",
-      description: "Perfil completo do cliente com histórico de compras, cotações, viagens e campos personalizáveis para cada agência.",
+      description: "Perfil completo do cliente com histórico de compras, cotações e campos personalizáveis.",
+      gradient: "from-blue-500/20 to-cyan-500/20",
+      iconColor: "text-blue-400",
     },
     {
       icon: <FileText className="w-6 h-6" />,
       title: "Propostas e Contratos Digitais",
       description: "Crie propostas profissionais com assinatura digital. Envie cotações e feche vendas mais rápido.",
+      gradient: "from-amber-500/20 to-orange-500/20",
+      iconColor: "text-amber-400",
     },
     {
       icon: <PieChart className="w-6 h-6" />,
       title: "Relatórios e Análises",
-      description: "Dashboards com métricas de vendas, performance da equipe, análise de fontes e campanhas de marketing.",
+      description: "Dashboards com métricas de vendas, performance da equipe e análise de fontes.",
+      gradient: "from-rose-500/20 to-pink-500/20",
+      iconColor: "text-rose-400",
     },
     {
       icon: <Bot className="w-6 h-6" />,
       title: "Automações Inteligentes",
-      description: "Automatize tarefas repetitivas, distribua leads, envie follow-ups e mova negociações entre funis automaticamente.",
+      description: "Automatize tarefas repetitivas, distribua leads e envie follow-ups automaticamente.",
+      gradient: "from-indigo-500/20 to-purple-500/20",
+      iconColor: "text-indigo-400",
     },
   ];
 
@@ -74,27 +88,31 @@ export default function Landing() {
   ];
 
   return (
-    <div className="min-h-screen bg-white text-slate-900">
+    <div className="min-h-screen bg-[#0a0a0f] text-white">
       {/* Navigation */}
-      <nav className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-lg border-b border-slate-100">
+      <nav className="fixed top-0 left-0 right-0 z-50 bg-[#0a0a0f]/80 backdrop-blur-xl border-b border-white/[0.06]">
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-gradient-to-br from-purple-600 to-purple-700 rounded-lg flex items-center justify-center">
-              <Plane className="w-4 h-4 text-white" />
-            </div>
-            <span className="text-xl font-bold">Entur OS</span>
+          <div className="flex items-center gap-2.5">
+            <img src={LOGO_URL} alt="Entur OS" className="h-8 w-8 rounded-lg" />
+            <span className="text-lg font-bold bg-gradient-to-r from-purple-400 via-violet-400 to-fuchsia-400 bg-clip-text text-transparent">
+              ENTUR OS
+            </span>
           </div>
-          <div className="hidden md:flex items-center gap-8 text-sm text-slate-600">
-            <a href="#features" className="hover:text-slate-900 transition-colors">Recursos</a>
-            <a href="#pricing" className="hover:text-slate-900 transition-colors">Preços</a>
-            <a href="#testimonials" className="hover:text-slate-900 transition-colors">Depoimentos</a>
+          <div className="hidden md:flex items-center gap-8 text-sm text-white/50">
+            <a href="#features" className="hover:text-white transition-colors">Recursos</a>
+            <a href="#pricing" className="hover:text-white transition-colors">Preços</a>
+            <a href="#testimonials" className="hover:text-white transition-colors">Depoimentos</a>
           </div>
           <div className="flex items-center gap-3">
-            <Button variant="ghost" className="text-sm" onClick={() => navigate("/login")}>
+            <Button
+              variant="ghost"
+              className="text-sm text-white/70 hover:text-white hover:bg-white/10"
+              onClick={() => navigate("/login")}
+            >
               Entrar
             </Button>
             <Button
-              className="text-sm bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white shadow-lg shadow-purple-200/50"
+              className="text-sm bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-500 hover:to-violet-500 text-white border-0 shadow-lg shadow-purple-500/25"
               onClick={() => navigate("/register")}
             >
               Começar grátis
@@ -104,31 +122,41 @@ export default function Landing() {
       </nav>
 
       {/* Hero */}
-      <section className="pt-32 pb-20 px-6 relative overflow-hidden">
+      <section className="pt-32 pb-24 px-6 relative overflow-hidden">
+        {/* Background effects */}
         <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute top-20 right-0 w-[600px] h-[600px] bg-purple-50 rounded-full blur-3xl opacity-60" />
-          <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-blue-50 rounded-full blur-3xl opacity-40" />
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[600px] bg-gradient-to-b from-purple-600/15 via-violet-600/10 to-transparent rounded-full blur-3xl" />
+          <div className="absolute top-40 right-0 w-[400px] h-[400px] bg-blue-600/8 rounded-full blur-3xl" />
+          <div className="absolute bottom-0 left-0 w-[300px] h-[300px] bg-fuchsia-600/8 rounded-full blur-3xl" />
+          {/* Grid pattern */}
+          <div className="absolute inset-0 opacity-[0.03]" style={{
+            backgroundImage: "linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)",
+            backgroundSize: "60px 60px"
+          }} />
         </div>
+
         <div className="max-w-7xl mx-auto relative z-10">
-          <div className="max-w-3xl">
-            <div className="inline-flex items-center gap-2 bg-purple-50 text-purple-700 px-4 py-1.5 rounded-full text-sm font-medium mb-6 border border-purple-100">
+          <div className="max-w-3xl mx-auto text-center">
+            <div className="inline-flex items-center gap-2 bg-white/[0.06] text-purple-300 px-4 py-1.5 rounded-full text-sm font-medium mb-8 border border-white/[0.08]">
               <Sparkles className="w-4 h-4" />
               CRM inteligente para agências de viagens
             </div>
-            <h1 className="text-5xl md:text-6xl font-bold leading-tight mb-6 tracking-tight">
-              Venda mais viagens com{" "}
-              <span className="bg-gradient-to-r from-purple-600 to-purple-800 bg-clip-text text-transparent">
+            <h1 className="text-5xl md:text-7xl font-bold leading-[1.1] mb-6 tracking-tight">
+              Venda mais viagens{" "}
+              <br className="hidden md:block" />
+              com{" "}
+              <span className="bg-gradient-to-r from-purple-400 via-violet-400 to-fuchsia-400 bg-clip-text text-transparent">
                 inteligência
               </span>
             </h1>
-            <p className="text-xl text-slate-500 mb-8 max-w-2xl leading-relaxed">
+            <p className="text-lg md:text-xl text-white/50 mb-10 max-w-2xl mx-auto leading-relaxed">
               O Entur OS é o CRM completo feito para agências de viagens. Pipeline de vendas,
               WhatsApp integrado, automações e IA — tudo em uma plataforma.
             </p>
-            <div className="flex flex-col sm:flex-row gap-4">
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Button
                 size="lg"
-                className="h-13 px-8 text-base bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white shadow-xl shadow-purple-200/50"
+                className="h-14 px-8 text-base bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-500 hover:to-violet-500 text-white border-0 shadow-xl shadow-purple-500/25"
                 onClick={() => navigate("/register")}
               >
                 Começar grátis por 12 meses <ArrowRight className="w-5 h-5 ml-2" />
@@ -136,7 +164,7 @@ export default function Landing() {
               <Button
                 size="lg"
                 variant="outline"
-                className="h-13 px-8 text-base border-slate-300"
+                className="h-14 px-8 text-base border-white/10 text-white/80 hover:bg-white/5 hover:text-white bg-transparent"
                 onClick={() => {
                   document.getElementById("features")?.scrollIntoView({ behavior: "smooth" });
                 }}
@@ -144,7 +172,7 @@ export default function Landing() {
                 Ver recursos
               </Button>
             </div>
-            <p className="text-sm text-slate-400 mt-4">
+            <p className="text-sm text-white/30 mt-5">
               Sem cartão de crédito. Cancele quando quiser.
             </p>
           </div>
@@ -152,7 +180,7 @@ export default function Landing() {
       </section>
 
       {/* Stats bar */}
-      <section className="py-12 bg-slate-50 border-y border-slate-100">
+      <section className="py-12 border-y border-white/[0.06] bg-white/[0.02]">
         <div className="max-w-7xl mx-auto px-6 grid grid-cols-2 md:grid-cols-4 gap-8">
           {[
             { value: "500+", label: "Agências ativas" },
@@ -161,34 +189,34 @@ export default function Landing() {
             { value: "4.9/5", label: "Satisfação dos clientes" },
           ].map((stat, i) => (
             <div key={i} className="text-center">
-              <p className="text-3xl font-bold text-slate-900">{stat.value}</p>
-              <p className="text-sm text-slate-500 mt-1">{stat.label}</p>
+              <p className="text-3xl font-bold text-white">{stat.value}</p>
+              <p className="text-sm text-white/40 mt-1">{stat.label}</p>
             </div>
           ))}
         </div>
       </section>
 
       {/* Features */}
-      <section id="features" className="py-20 px-6">
+      <section id="features" className="py-24 px-6">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-bold mb-4">
               Tudo que sua agência precisa em um só lugar
             </h2>
-            <p className="text-lg text-slate-500 max-w-2xl mx-auto">
+            <p className="text-lg text-white/40 max-w-2xl mx-auto">
               Do primeiro contato à viagem realizada, o Entur OS acompanha cada etapa
               da jornada do seu cliente.
             </p>
           </div>
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
             {features.map((feature, i) => (
-              <Card key={i} className="border-slate-100 hover:border-purple-200 transition-colors group bg-white">
+              <Card key={i} className="bg-white/[0.03] border-white/[0.06] hover:border-white/[0.12] transition-all duration-300 group hover:bg-white/[0.05]">
                 <CardContent className="p-6">
-                  <div className="w-12 h-12 bg-purple-50 rounded-xl flex items-center justify-center text-purple-600 mb-4 group-hover:bg-purple-100 transition-colors">
+                  <div className={`w-12 h-12 bg-gradient-to-br ${feature.gradient} rounded-xl flex items-center justify-center ${feature.iconColor} mb-4 group-hover:scale-110 transition-transform duration-300`}>
                     {feature.icon}
                   </div>
-                  <h3 className="text-lg font-semibold mb-2">{feature.title}</h3>
-                  <p className="text-sm text-slate-500 leading-relaxed">{feature.description}</p>
+                  <h3 className="text-lg font-semibold mb-2 text-white">{feature.title}</h3>
+                  <p className="text-sm text-white/40 leading-relaxed">{feature.description}</p>
                 </CardContent>
               </Card>
             ))}
@@ -197,23 +225,24 @@ export default function Landing() {
       </section>
 
       {/* Differentials */}
-      <section className="py-20 px-6 bg-gradient-to-br from-purple-600 to-purple-800 text-white">
-        <div className="max-w-7xl mx-auto">
+      <section className="py-24 px-6 relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-b from-purple-600/10 via-violet-600/5 to-transparent pointer-events-none" />
+        <div className="max-w-7xl mx-auto relative z-10">
           <div className="text-center mb-12">
             <h2 className="text-3xl md:text-4xl font-bold mb-4">
               Por que agências escolhem o Entur OS
             </h2>
-            <p className="text-lg text-purple-200 max-w-2xl mx-auto">
+            <p className="text-lg text-white/40 max-w-2xl mx-auto">
               Não somos um CRM genérico. Somos especialistas no mercado de turismo.
             </p>
           </div>
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
             {differentials.map((diff, i) => (
-              <div key={i} className="flex items-center gap-4 bg-white/10 backdrop-blur-sm rounded-xl p-5 border border-white/10">
-                <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center flex-shrink-0">
+              <div key={i} className="flex items-center gap-4 bg-white/[0.04] backdrop-blur-sm rounded-xl p-5 border border-white/[0.08] hover:border-purple-500/30 transition-colors">
+                <div className="w-10 h-10 bg-purple-500/15 rounded-lg flex items-center justify-center flex-shrink-0 text-purple-400">
                   {diff.icon}
                 </div>
-                <span className="text-sm font-medium">{diff.text}</span>
+                <span className="text-sm font-medium text-white/80">{diff.text}</span>
               </div>
             ))}
           </div>
@@ -221,29 +250,29 @@ export default function Landing() {
       </section>
 
       {/* Pricing */}
-      <section id="pricing" className="py-20 px-6">
+      <section id="pricing" className="py-24 px-6">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-bold mb-4">Planos simples e transparentes</h2>
-            <p className="text-lg text-slate-500">Comece grátis, escale quando precisar</p>
+            <p className="text-lg text-white/40">Comece grátis, escale quando precisar</p>
           </div>
           <div className="grid md:grid-cols-2 gap-8 max-w-3xl mx-auto">
             {/* Pro */}
-            <Card className="border-2 border-purple-200 shadow-xl relative overflow-hidden bg-white">
-              <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-purple-500 to-purple-700" />
+            <Card className="bg-white/[0.04] border-purple-500/30 shadow-xl shadow-purple-500/10 relative overflow-hidden">
+              <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-purple-500 to-violet-500" />
               <CardContent className="p-8">
                 <div className="flex items-center gap-2 mb-4">
-                  <Zap className="w-5 h-5 text-purple-600" />
-                  <span className="font-semibold text-lg">Pro</span>
-                  <span className="ml-auto bg-purple-100 text-purple-700 text-xs font-medium px-2.5 py-1 rounded-full">
+                  <Zap className="w-5 h-5 text-purple-400" />
+                  <span className="font-semibold text-lg text-white">Pro</span>
+                  <span className="ml-auto bg-purple-500/20 text-purple-300 text-xs font-medium px-2.5 py-1 rounded-full border border-purple-500/20">
                     Mais popular
                   </span>
                 </div>
                 <div className="flex items-baseline gap-1 mb-1">
-                  <span className="text-5xl font-bold">R$97</span>
-                  <span className="text-slate-500">/mês</span>
+                  <span className="text-4xl font-bold text-white">R$97</span>
+                  <span className="text-white/40">/mês</span>
                 </div>
-                <p className="text-sm text-green-600 font-medium mb-6">
+                <p className="text-sm text-emerald-400 font-medium mb-6">
                   Com 12 meses de avaliação grátis
                 </p>
                 <div className="space-y-3 mb-8">
@@ -258,13 +287,13 @@ export default function Landing() {
                     "Suporte por email",
                   ].map((f, i) => (
                     <div key={i} className="flex items-center gap-2.5">
-                      <Check className="w-4 h-4 text-purple-600 flex-shrink-0" />
-                      <span className="text-sm text-slate-700">{f}</span>
+                      <Check className="w-4 h-4 text-purple-400 flex-shrink-0" />
+                      <span className="text-sm text-white/60">{f}</span>
                     </div>
                   ))}
                 </div>
                 <Button
-                  className="w-full h-12 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white font-medium shadow-lg shadow-purple-200/50"
+                  className="w-full h-12 bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-500 hover:to-violet-500 text-white font-medium shadow-lg shadow-purple-500/25 border-0"
                   onClick={() => navigate("/register")}
                 >
                   Começar grátis <ArrowRight className="w-4 h-4 ml-2" />
@@ -273,16 +302,16 @@ export default function Landing() {
             </Card>
 
             {/* Enterprise */}
-            <Card className="border border-slate-200 bg-white">
+            <Card className="bg-white/[0.03] border-white/[0.08]">
               <CardContent className="p-8">
                 <div className="flex items-center gap-2 mb-4">
-                  <BarChart3 className="w-5 h-5 text-slate-600" />
-                  <span className="font-semibold text-lg">Enterprise</span>
+                  <BarChart3 className="w-5 h-5 text-white/50" />
+                  <span className="font-semibold text-lg text-white">Enterprise</span>
                 </div>
                 <div className="flex items-baseline gap-1 mb-1">
-                  <span className="text-4xl font-bold">Personalizado</span>
+                  <span className="text-4xl font-bold text-white">Personalizado</span>
                 </div>
-                <p className="text-sm text-slate-500 mb-6">
+                <p className="text-sm text-white/40 mb-6">
                   Para redes e grandes operações
                 </p>
                 <div className="space-y-3 mb-8">
@@ -297,14 +326,14 @@ export default function Landing() {
                     "Treinamento da equipe",
                   ].map((f, i) => (
                     <div key={i} className="flex items-center gap-2.5">
-                      <Check className="w-4 h-4 text-slate-500 flex-shrink-0" />
-                      <span className="text-sm text-slate-700">{f}</span>
+                      <Check className="w-4 h-4 text-white/30 flex-shrink-0" />
+                      <span className="text-sm text-white/60">{f}</span>
                     </div>
                   ))}
                 </div>
                 <Button
                   variant="outline"
-                  className="w-full h-12 border-slate-300 font-medium"
+                  className="w-full h-12 border-white/10 text-white/80 hover:bg-white/5 font-medium bg-transparent"
                   onClick={() => window.open("https://wa.me/5511999999999?text=Olá! Gostaria de saber mais sobre o plano Enterprise do Entur OS.", "_blank")}
                 >
                   Falar com vendas <ChevronRight className="w-4 h-4 ml-2" />
@@ -316,25 +345,25 @@ export default function Landing() {
       </section>
 
       {/* Testimonials */}
-      <section id="testimonials" className="py-20 px-6 bg-slate-50">
+      <section id="testimonials" className="py-24 px-6 bg-white/[0.02]">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-bold mb-4">O que nossos clientes dizem</h2>
-            <p className="text-lg text-slate-500">Agências que transformaram suas vendas com o Entur OS</p>
+            <p className="text-lg text-white/40">Agências que transformaram suas vendas com o Entur OS</p>
           </div>
           <div className="grid md:grid-cols-3 gap-6">
             {testimonials.map((t, i) => (
-              <Card key={i} className="border-slate-100 bg-white">
+              <Card key={i} className="bg-white/[0.03] border-white/[0.06]">
                 <CardContent className="p-6">
                   <div className="flex gap-1 mb-4">
                     {Array.from({ length: t.rating }).map((_, j) => (
                       <Star key={j} className="w-4 h-4 fill-amber-400 text-amber-400" />
                     ))}
                   </div>
-                  <p className="text-sm text-slate-600 mb-4 leading-relaxed italic">"{t.text}"</p>
+                  <p className="text-sm text-white/50 mb-4 leading-relaxed italic">"{t.text}"</p>
                   <div>
-                    <p className="font-medium text-sm text-slate-900">{t.name}</p>
-                    <p className="text-xs text-slate-500">{t.role}</p>
+                    <p className="font-medium text-sm text-white">{t.name}</p>
+                    <p className="text-xs text-white/30">{t.role}</p>
                   </div>
                 </CardContent>
               </Card>
@@ -344,17 +373,18 @@ export default function Landing() {
       </section>
 
       {/* CTA */}
-      <section className="py-20 px-6">
-        <div className="max-w-3xl mx-auto text-center">
+      <section className="py-24 px-6 relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-t from-purple-600/10 via-transparent to-transparent pointer-events-none" />
+        <div className="max-w-3xl mx-auto text-center relative z-10">
           <h2 className="text-3xl md:text-4xl font-bold mb-4">
             Pronto para vender mais viagens?
           </h2>
-          <p className="text-lg text-slate-500 mb-8">
+          <p className="text-lg text-white/40 mb-8">
             Comece agora com 12 meses grátis. Sem cartão de crédito, sem compromisso.
           </p>
           <Button
             size="lg"
-            className="h-14 px-10 text-base bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white shadow-xl shadow-purple-200/50"
+            className="h-14 px-10 text-base bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-500 hover:to-violet-500 text-white shadow-xl shadow-purple-500/25 border-0"
             onClick={() => navigate("/register")}
           >
             Criar minha conta grátis <ArrowRight className="w-5 h-5 ml-2" />
@@ -363,21 +393,21 @@ export default function Landing() {
       </section>
 
       {/* Footer */}
-      <footer className="py-12 px-6 bg-slate-900 text-slate-400">
+      <footer className="py-12 px-6 border-t border-white/[0.06] bg-[#06060a]">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg flex items-center justify-center">
-              <Plane className="w-3.5 h-3.5 text-white" />
-            </div>
-            <span className="font-semibold text-white">Entur OS</span>
+          <div className="flex items-center gap-2.5">
+            <img src={LOGO_URL} alt="Entur OS" className="h-7 w-7 rounded-lg" />
+            <span className="font-bold bg-gradient-to-r from-purple-400 to-violet-400 bg-clip-text text-transparent">
+              ENTUR OS
+            </span>
           </div>
-          <p className="text-sm">
+          <p className="text-sm text-white/30">
             &copy; {new Date().getFullYear()} Entur OS. Todos os direitos reservados.
           </p>
-          <div className="flex gap-6 text-sm">
-            <a href="#" className="hover:text-white transition-colors">Termos</a>
-            <a href="#" className="hover:text-white transition-colors">Privacidade</a>
-            <a href="#" className="hover:text-white transition-colors">Suporte</a>
+          <div className="flex gap-6 text-sm text-white/30">
+            <a href="#" className="hover:text-white/60 transition-colors">Termos</a>
+            <a href="#" className="hover:text-white/60 transition-colors">Privacidade</a>
+            <a href="#" className="hover:text-white/60 transition-colors">Suporte</a>
           </div>
         </div>
       </footer>

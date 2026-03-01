@@ -17,7 +17,7 @@ export default function SaasLogin() {
   const loginMutation = trpc.saasAuth.login.useMutation({
     onSuccess: () => {
       toast.success("Login realizado com sucesso!");
-      window.location.href = "/";
+      window.location.href = "/dashboard";
     },
     onError: (error) => {
       if (error.message === "SUBSCRIPTION_EXPIRED") {
