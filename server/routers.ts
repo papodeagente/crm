@@ -76,6 +76,9 @@ import {
   getMessageTypeDistribution,
   getTopContactsByVolume,
   getResponseTimeMetrics,
+  getUserPreference,
+  setUserPreference,
+  getAllUserPreferences,
 } from "./db";
 import { storagePut } from "./storage";
 import { nanoid } from "nanoid";
@@ -480,6 +483,27 @@ export const appRouter = router({
       .input(z.object({ tenantId: z.number(), limit: z.number().optional() }))
       .query(async ({ input, ctx }) => {
         return getUpcomingTasks(input.tenantId, ctx.user?.id, input.limit);
+      }),
+  }),
+
+  // ─── User Preferences ───
+  preferences: router({
+    get: protectedProcedure
+      .input(z.object({ tenantId: z.number(), key: z.string() }))
+      .query(async ({ input, ctx }) => {
+        const val = await getUserPreference(ctx.user!.id, input.tenantId, input.key);
+        return { key: input.key, value: val };
+      }),
+    set: protectedProcedure
+      .input(z.object({ tenantId: z.number(), key: z.string(), value: z.string() }))
+      .mutation(async ({ input, ctx }) => {
+        await setUserPreference(ctx.user!.id, input.tenantId, input.key, input.value);
+        return { success: true };
+      }),
+    getAll: protectedProcedure
+      .input(z.object({ tenantId: z.number() }))
+      .query(async ({ input, ctx }) => {
+        return getAllUserPreferences(ctx.user!.id, input.tenantId);
       }),
   }),
 

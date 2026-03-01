@@ -1636,3 +1636,14 @@
 - [x] Acesso ao Super Admin via menu do usuário (dropdown no nome, abaixo de Configurações)
 - [x] Apenas isSuperAdmin pode acessar o painel Super Admin
 - [x] Testes unitários para endpoints Super Admin
+
+## Funil Padrão + Filtro Em Atendimento + Bug Card Apagado
+
+- [x] Backend: endpoint para salvar/ler funil padrão por usuário (user preferences)
+- [x] Frontend: opção de marcar funil como padrão nas configurações ou no seletor de pipeline
+- [x] Ao abrir /pipeline, carregar automaticamente o funil padrão do usuário
+- [x] Filtro "Em atendimento" como padrão ao abrir a página de negociações
+- [x] Otimizar carregamento do Kanban (performance)
+- [x] Corrigir bug: card fica apagado/opaco após mover no Kanban (drag-and-drop)
+- [x] Card deve ficar totalmente visível e pronto para próximo passo após mover
+- [x] Testes unitários para funil padrão e preferências do usuário

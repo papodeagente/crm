@@ -1,6 +1,6 @@
 import { eq, desc, and, or, like, lt, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users, whatsappSessions, waMessages as messages, activityLogs, chatbotSettings, chatbotRules, conversationAssignments, crmUsers, teams, teamMembers, distributionRules, customFields, customFieldValues, waConversations } from "../drizzle/schema";
+import { InsertUser, users, whatsappSessions, waMessages as messages, activityLogs, chatbotSettings, chatbotRules, conversationAssignments, crmUsers, teams, teamMembers, distributionRules, customFields, customFieldValues, waConversations, userPreferences } from "../drizzle/schema";
 import { ENV } from './_core/env';
 import { normalizeJid } from "./phoneUtils";
 
@@ -1765,4 +1765,55 @@ export async function getResponseTimeMetrics(sessionId: string, periodDays: numb
   `);
   const rows = (result as any)[0] || [];
   return rows[0] || null;
+}
+
+
+// ═══ USER PREFERENCES ═══
+
+export async function getUserPreference(userId: number, tenantId: number, prefKey: string): Promise<string | null> {
+  const db = await getDb();
+  if (!db) return null;
+  const rows = await db.select().from(userPreferences)
+    .where(and(
+      eq(userPreferences.userId, userId),
+      eq(userPreferences.tenantId, tenantId),
+      eq(userPreferences.prefKey, prefKey),
+    ))
+    .limit(1);
+  return rows[0]?.prefValue ?? null;
+}
+
+export async function setUserPreference(userId: number, tenantId: number, prefKey: string, prefValue: string): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  // Upsert: try update first, then insert
+  const existing = await db.select({ id: userPreferences.id }).from(userPreferences)
+    .where(and(
+      eq(userPreferences.userId, userId),
+      eq(userPreferences.tenantId, tenantId),
+      eq(userPreferences.prefKey, prefKey),
+    ))
+    .limit(1);
+  if (existing.length > 0) {
+    await db.update(userPreferences)
+      .set({ prefValue })
+      .where(eq(userPreferences.id, existing[0].id));
+  } else {
+    await db.insert(userPreferences).values({ userId, tenantId, prefKey, prefValue });
+  }
+}
+
+export async function getAllUserPreferences(userId: number, tenantId: number): Promise<Record<string, string>> {
+  const db = await getDb();
+  if (!db) return {};
+  const rows = await db.select().from(userPreferences)
+    .where(and(
+      eq(userPreferences.userId, userId),
+      eq(userPreferences.tenantId, tenantId),
+    ));
+  const result: Record<string, string> = {};
+  for (const row of rows) {
+    if (row.prefValue !== null) result[row.prefKey] = row.prefValue;
+  }
+  return result;
 }

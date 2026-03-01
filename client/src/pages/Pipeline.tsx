@@ -17,7 +17,7 @@ import {
   DollarSign, MapPin, Clock, GripVertical, Building2, User,
   Package, History, Trash2, Pencil, Link2, Unlink, RotateCcw,
   MoreVertical, Download, AlertTriangle, Flame, CheckCircle2,
-  ChevronLeft, ChevronRight,
+  ChevronLeft, ChevronRight, Star,
 } from "lucide-react";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { HoverCard, HoverCardTrigger, HoverCardContent } from "@/components/ui/hover-card";
@@ -25,7 +25,7 @@ import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import DealFiltersPanel, { useDealFilters, DealFilterButton } from "@/components/DealFiltersPanel";
 import ClassificationBadge from "@/components/ClassificationBadge";
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
 import { useTenantId } from "@/hooks/useTenantId";
@@ -73,7 +73,8 @@ export default function Pipeline() {
   const TENANT_ID = useTenantId();
   const [viewMode, setViewMode] = useState<ViewMode>("kanban");
   const [selectedPipelineId, setSelectedPipelineId] = useState<number | null>(null);
-  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<string>("open");
+  const [pipelineInitialized, setPipelineInitialized] = useState(false);
   const [sortMode, setSortMode] = useState<SortMode>("created_desc");
   const [showCreateDeal, setShowCreateDeal] = useState(false);
   const [showTaskForm, setShowTaskForm] = useState<{ dealId?: number; dealTitle?: string; editTask?: any; editAssigneeIds?: number[]; showDealSelector?: boolean } | null>(null);
@@ -91,6 +92,37 @@ export default function Pipeline() {
 
   const utils = trpc.useUtils();
   const pipelines = trpc.crm.pipelines.list.useQuery({ tenantId: TENANT_ID });
+
+  // Load user's default pipeline preference
+  const defaultPipelinePref = trpc.preferences.get.useQuery(
+    { tenantId: TENANT_ID, key: "default_pipeline_id" },
+    { enabled: !!TENANT_ID }
+  );
+  const setDefaultPipelineMut = trpc.preferences.set.useMutation({
+    onSuccess: () => {
+      utils.preferences.get.invalidate({ tenantId: TENANT_ID, key: "default_pipeline_id" });
+      toast.success("Funil padrão salvo!");
+    },
+  });
+
+  // Auto-select default pipeline on load
+  useEffect(() => {
+    if (pipelineInitialized || !pipelines.data?.length) return;
+    const prefVal = defaultPipelinePref.data?.value;
+    if (prefVal) {
+      const prefId = Number(prefVal);
+      const exists = pipelines.data.find((p: any) => p.id === prefId && !p.isArchived);
+      if (exists) {
+        setSelectedPipelineId(prefId);
+        setPipelineInitialized(true);
+        return;
+      }
+    }
+    // Fallback: first sales pipeline or first pipeline
+    const salesPipeline = pipelines.data.find((p: any) => p.pipelineType === "sales" && !p.isArchived);
+    setSelectedPipelineId(salesPipeline?.id ?? pipelines.data[0]?.id ?? null);
+    setPipelineInitialized(true);
+  }, [pipelines.data, defaultPipelinePref.data, pipelineInitialized]);
   const activePipeline = selectedPipelineId
     ? pipelines.data?.find((p: any) => p.id === selectedPipelineId)
     : pipelines.data?.[0];
@@ -203,13 +235,11 @@ export default function Pipeline() {
     setDraggedDealId(dealId);
     e.dataTransfer.effectAllowed = "move";
     e.dataTransfer.setData("text/plain", String(dealId));
-    setTimeout(() => { (e.currentTarget as HTMLElement).style.opacity = "0.4"; }, 0);
   }, []);
 
-  const handleDragEnd = useCallback((e: React.DragEvent) => {
+  const handleDragEnd = useCallback((_e: React.DragEvent) => {
     setDraggedDealId(null);
     setDragOverStageId(null);
-    if (e.currentTarget instanceof HTMLElement) e.currentTarget.style.opacity = "1";
   }, []);
 
   const handleDragOver = useCallback((e: React.DragEvent, stageId: number) => {
@@ -319,16 +349,39 @@ export default function Pipeline() {
         {/* Linha 2: Filtros inline — funil na esquerda, Filtros na direita, selects proporcionais */}
         <div className="flex items-center gap-2.5 px-5 lg:px-8 pb-3">
           {/* Pipeline selector */}
-          <Select value={String(activePipeline?.id ?? "")} onValueChange={(v) => setSelectedPipelineId(Number(v))}>
-            <SelectTrigger className="flex-1 h-10 text-[13px] rounded-xl border-border/50 bg-background">
-              <SelectValue placeholder="Selecionar funil" />
-            </SelectTrigger>
-            <SelectContent className="rounded-xl">
-              {pipelines.data?.filter((p: any) => !p.isArchived).map((p: any) => (
-                <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="flex items-center gap-1.5 flex-1">
+            <Select value={String(activePipeline?.id ?? "")} onValueChange={(v) => setSelectedPipelineId(Number(v))}>
+              <SelectTrigger className="flex-1 h-10 text-[13px] rounded-xl border-border/50 bg-background">
+                <SelectValue placeholder="Selecionar funil" />
+              </SelectTrigger>
+              <SelectContent className="rounded-xl">
+                {pipelines.data?.filter((p: any) => !p.isArchived).map((p: any) => (
+                  <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => {
+                    if (activePipeline) {
+                      setDefaultPipelineMut.mutate({ tenantId: TENANT_ID, key: "default_pipeline_id", value: String(activePipeline.id) });
+                    }
+                  }}
+                  className={`p-2 rounded-lg transition-all duration-200 flex-shrink-0 ${
+                    defaultPipelinePref.data?.value === String(activePipeline?.id)
+                      ? "text-yellow-500 hover:text-yellow-400"
+                      : "text-muted-foreground hover:text-yellow-500"
+                  }`}
+                >
+                  <Star className={`h-4 w-4 ${defaultPipelinePref.data?.value === String(activePipeline?.id) ? "fill-current" : ""}`} />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                <p className="text-xs">{defaultPipelinePref.data?.value === String(activePipeline?.id) ? "Funil padrão" : "Definir como funil padrão"}</p>
+              </TooltipContent>
+            </Tooltip>
+          </div>
 
           {/* User filter */}
           <Select value={String(ownerFilter)} onValueChange={(v) => setOwnerFilter(v === "all" ? "all" : Number(v))}>
@@ -672,7 +725,7 @@ function DealCard({ deal, contacts, accounts, overdueData, pendingCount, onCreat
       draggable
       onDragStart={(e) => onDragStart(e, deal.id)}
       onDragEnd={onDragEnd}
-      className={`bg-card rounded-xl border p-3.5 shadow-[0_1px_4px_oklch(0_0_0/0.06)] hover:shadow-md transition-all duration-200 cursor-grab active:cursor-grabbing space-y-2.5 ${isDragging ? "opacity-40 scale-95" : "border-border/50"}`}
+      className={`bg-card rounded-xl border p-3.5 shadow-[0_1px_4px_oklch(0_0_0/0.06)] hover:shadow-md transition-all duration-200 cursor-grab active:cursor-grabbing space-y-2.5 ${isDragging ? "opacity-60 scale-[0.97] ring-2 ring-primary/40 border-primary/30" : "border-border/50"}`}
     >
       {/* Status + info icon */}
       <div className="flex items-center justify-between">

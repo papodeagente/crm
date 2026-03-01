@@ -1429,3 +1429,23 @@ export const subscriptions = mysqlTable("subscriptions", {
 
 export type Subscription = typeof subscriptions.$inferSelect;
 export type InsertSubscription = typeof subscriptions.$inferInsert;
+
+
+// ════════════════════════════════════════════════════════════
+// USER PREFERENCES
+// ════════════════════════════════════════════════════════════
+
+export const userPreferences = mysqlTable("user_preferences", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  tenantId: int("tenantId").notNull(),
+  prefKey: varchar("prefKey", { length: 128 }).notNull(),
+  prefValue: text("prefValue"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (t) => [
+  index("up_user_tenant_idx").on(t.userId, t.tenantId),
+  index("up_user_key_idx").on(t.userId, t.tenantId, t.prefKey),
+]);
+export type UserPreference = typeof userPreferences.$inferSelect;
+export type InsertUserPreference = typeof userPreferences.$inferInsert;
