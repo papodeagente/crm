@@ -12,10 +12,11 @@ import {
   Megaphone, Zap, Shield, Clock, ChevronDown, ChevronUp,
   FileText, Eye, EyeOff, XCircle, Loader2,
 } from "lucide-react";
+import { useTenantId } from "@/hooks/useTenantId";
 
-const TENANT_ID = 1;
 
 export default function RDStationIntegration() {
+  const TENANT_ID = useTenantId();
   const [, setLocation] = useLocation();
   const [copied, setCopied] = useState(false);
   const [showToken, setShowToken] = useState(false);

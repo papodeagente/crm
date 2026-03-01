@@ -12,8 +12,8 @@ import DealFiltersPanel, { useDealFilters, DealFilterButton } from "@/components
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { useAuth } from "@/_core/hooks/useAuth";
+import { useTenantId } from "@/hooks/useTenantId";
 
-const TENANT_ID = 1;
 
 const statusStyles: Record<string, { bg: string; text: string; dot: string; label: string }> = {
   open: { bg: "bg-blue-50", text: "text-blue-700", dot: "bg-blue-500", label: "Aberto" },
@@ -22,6 +22,7 @@ const statusStyles: Record<string, { bg: string; text: string; dot: string; labe
 };
 
 export default function Deals() {
+  const TENANT_ID = useTenantId();
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [value, setValue] = useState("");

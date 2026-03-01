@@ -1460,3 +1460,16 @@
 - [x] Fluxo completo: registro → freemium → expiração → cobrança → bloqueio/desbloqueio
 - [x] Webhook Hotmart para processar pagamentos automaticamente
 - [x] 19 testes unitários para SaaS Auth (558 total)
+
+## Correção Importação RD Station CRM v2 — Paginação e Dados
+
+- [x] Corrigir limite de 10.000 registros da API RD Station (page*limit <= 10000)
+- [x] Implementar busca em duas janelas (default + asc) com deduplicação para contatos
+- [x] Implementar busca de deals por pipeline (cada pipeline < 10.000 deals)
+- [x] Implementar busca de tasks por tipo (call, email, meeting, task, whatsapp)
+- [x] Garantir contatos importados com nome, email e telefone corretos
+- [x] Garantir negociações vinculadas aos contatos e contas corretas
+- [x] Garantir tarefas vinculadas às negociações corretas (mapa rdIdMap.deals)
+- [x] Adicionar logging detalhado para diagnóstico de erros de importação
+- [x] Aumentar timeout da API de 30s para 60s
+- [x] Testar importação completa: 14.076 contatos, 13.815 deals, 17.817 tasks

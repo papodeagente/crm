@@ -109,10 +109,20 @@ import { eq, and, desc, sql } from "drizzle-orm";
 export const appRouter = router({
   system: systemRouter,
   auth: router({
-    me: publicProcedure.query((opts) => opts.ctx.user),
+    me: publicProcedure.query((opts) => {
+      if (opts.ctx.saasUser && opts.ctx.user) {
+        return {
+          ...opts.ctx.user,
+          tenantId: opts.ctx.saasUser.tenantId,
+          saasEmail: opts.ctx.saasUser.email,
+        };
+      }
+      return opts.ctx.user;
+    }),
     logout: publicProcedure.mutation(({ ctx }) => {
       const cookieOptions = getSessionCookieOptions(ctx.req);
       ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
+      ctx.res.clearCookie("entur_saas_session", { ...cookieOptions, maxAge: -1 });
       return { success: true } as const;
     }),
   }),

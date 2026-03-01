@@ -9,8 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import DateRangeFilter, { useDateFilter, getPresetDates, type DatePreset } from "@/components/DateRangeFilter";
 import { Filter, X, RotateCcw } from "lucide-react";
 import { trpc } from "@/lib/trpc";
+import { useTenantId } from "@/hooks/useTenantId";
 
-const TENANT_ID = 1;
 
 // ─── Types ───
 export interface DealFilters {
@@ -138,6 +138,7 @@ export default function DealFiltersPanel({
   onApply: (filters: DealFilters) => void;
   onClear: () => void;
 }) {
+  const TENANT_ID = useTenantId();
   // Local state for editing before applying
   const [local, setLocal] = useState<DealFilters>(filters);
 

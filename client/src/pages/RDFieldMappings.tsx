@@ -11,8 +11,8 @@ import {
   ArrowLeft, ArrowRight, Plus, Trash2, Edit2, Loader2, Link2, Unlink,
   Settings, Zap, AlertCircle, CheckCircle2, HelpCircle, RefreshCw,
 } from "lucide-react";
+import { useTenantId } from "@/hooks/useTenantId";
 
-const TENANT_ID = 1;
 
 /* ── Campos comuns do RD Station para sugestão ── */
 const RD_COMMON_FIELDS = [
@@ -42,6 +42,7 @@ const RD_COMMON_FIELDS = [
 ];
 
 export default function RDFieldMappings() {
+  const TENANT_ID = useTenantId();
   const [showAdd, setShowAdd] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
 

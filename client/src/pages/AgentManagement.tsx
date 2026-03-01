@@ -55,8 +55,8 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { useLocation } from "wouter";
+import { useTenantId } from "@/hooks/useTenantId";
 
-const TENANT_ID = 1;
 
 // ─── Types ───
 type Tab = "agents" | "teams" | "rules";
@@ -149,6 +149,7 @@ function AgentAvatar({ name, avatarUrl, size = 40 }: { name: string; avatarUrl?:
 // ════════════════════════════════════════════════════════════
 
 function AgentsTab() {
+  const TENANT_ID = useTenantId();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const utils = trpc.useUtils();
@@ -336,6 +337,7 @@ function AgentsTab() {
 // ════════════════════════════════════════════════════════════
 
 function TeamsTab() {
+  const TENANT_ID = useTenantId();
   const [showCreate, setShowCreate] = useState(false);
   const [editTeam, setEditTeam] = useState<TeamData | null>(null);
   const [selectedTeamId, setSelectedTeamId] = useState<number | null>(null);
@@ -675,6 +677,7 @@ function TeamsTab() {
 // ════════════════════════════════════════════════════════════
 
 function DistributionTab() {
+  const TENANT_ID = useTenantId();
   const [showCreate, setShowCreate] = useState(false);
   const [editRule, setEditRule] = useState<Rule | null>(null);
   const [newRule, setNewRule] = useState({
@@ -992,6 +995,7 @@ function DistributionTab() {
 // ════════════════════════════════════════════════════════════
 
 export default function AgentManagement() {
+  const TENANT_ID = useTenantId();
   const [tab, setTab] = useState<Tab>("agents");
   const [, setLocation] = useLocation();
 

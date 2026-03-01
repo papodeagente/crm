@@ -2,10 +2,16 @@
  * RD Station CRM Import Router
  * Handles importing data from RD Station CRM into Entur OS
  * Uses in-memory progress tracking with polling for real-time updates
+ *
+ * Key fixes:
+ * - Contacts are imported first with full data (name, email, phone)
+ * - A lookup map by email+name is built so deals can find their contacts
+ * - Organizations are imported as accounts (not contacts)
+ * - Deals are linked to correct pipeline/stage via deal_stage._id mapping
+ * - Organizations in deals are linked as accountId
  */
 import { z } from "zod";
 import { protectedProcedure, router } from "../_core/trpc";
-import { TRPCError } from "@trpc/server";
 import * as rdCrm from "../rdStationCrmImport";
 import * as crm from "../crmDb";
 import { getDb } from "../db";
@@ -56,17 +62,6 @@ function updateProgress(userId: number, update: Partial<ImportProgress>) {
   if (current) {
     Object.assign(current, update);
   }
-}
-
-// ─── Build stage-to-pipeline map from RD Station pipelines ───
-function buildStageToPipelineMap(rdPipelines: rdCrm.RdPipeline[]): Map<string, string> {
-  const map = new Map<string, string>();
-  for (const p of rdPipelines) {
-    for (const s of p.deal_stages || []) {
-      map.set(s._id, p.id || p._id || "");
-    }
-  }
-  return map;
 }
 
 export const rdCrmImportRouter = router({
@@ -165,16 +160,26 @@ async function runImport(
   }
 
   const results: Record<string, { imported: number; skipped: number; errors: string[] }> = {};
-  const rdIdMap: Record<string, Record<string, number>> = {
-    contacts: {},
-    organizations: {},
-    pipelines: {},
-    stages: {},
-    products: {},
-    sources: {},
-    campaigns: {},
-    lossReasons: {},
+
+  // Maps from RD Station _id → Entur OS id
+  const rdIdMap = {
+    contacts: new Map<string, number>(),       // rd _id → entur contact id
+    organizations: new Map<string, number>(),   // rd _id → entur account id
+    pipelines: new Map<string, number>(),       // rd pipeline id → entur pipeline id
+    stages: new Map<string, number>(),          // rd stage _id → entur stage id
+    products: new Map<string, number>(),        // rd _id → entur product id
+    deals: new Map<string, number>(),           // rd deal _id → entur deal id
+    sources: new Map<string, number>(),
+    campaigns: new Map<string, number>(),
+    lossReasons: new Map<string, number>(),
   };
+
+  // Secondary lookup: email → entur contact id (for deal→contact matching)
+  const contactByEmail = new Map<string, number>();
+  // name → entur contact id (fallback when no email)
+  const contactByName = new Map<string, number>();
+  // org rd _id → entur account id
+  const orgByRdId = new Map<string, number>();
 
   let stepIndex = 0;
 
@@ -207,9 +212,10 @@ async function runImport(
         for (let i = 0; i < rdPipelines.length; i++) {
           const rdPipeline = rdPipelines[i];
           try {
+            const pipelineRdId = rdPipeline.id || rdPipeline._id || "";
             const result = await crm.createPipeline({ tenantId, name: rdPipeline.name });
             if (result) {
-              rdIdMap.pipelines[rdPipeline.id || rdPipeline._id || ""] = result.id;
+              rdIdMap.pipelines.set(pipelineRdId, result.id);
               entry.imported++;
               // Import stages for this pipeline
               if (rdPipeline.deal_stages) {
@@ -222,7 +228,7 @@ async function runImport(
                       orderIndex: stage.order || 0,
                     });
                     if (stageResult) {
-                      rdIdMap.stages[stage._id] = stageResult.id;
+                      rdIdMap.stages.set(stage._id, stageResult.id);
                     }
                   } catch (e: any) {
                     entry.errors.push(`Etapa ${stage.name}: ${e.message}`);
@@ -259,7 +265,7 @@ async function runImport(
           try {
             const result = await crm.createLeadSource({ tenantId, name: src.name });
             if (result) {
-              rdIdMap.sources[src._id] = result.id;
+              rdIdMap.sources.set(src._id, result.id);
               entry.imported++;
             }
           } catch (e: any) {
@@ -291,7 +297,7 @@ async function runImport(
           try {
             const result = await crm.createCampaign({ tenantId, name: camp.name });
             if (result) {
-              rdIdMap.campaigns[camp._id] = result.id;
+              rdIdMap.campaigns.set(camp._id, result.id);
               entry.imported++;
             }
           } catch (e: any) {
@@ -310,7 +316,7 @@ async function runImport(
       advanceStep("lossReasons", "Motivos de Perda");
       const entry = { imported: 0, skipped: 0, errors: [] as string[] };
       try {
-        updateProgress(userId, { phase: "Buscando motivos de perda do RD Station..." });
+        updateProgress(userId, { phase: "Buscando motivos de perda..." });
         const rdReasons = await rdCrm.fetchAllLossReasons(token, (fetched, total) => {
           setCategoryProgress(fetched, total);
         });
@@ -322,7 +328,7 @@ async function runImport(
           try {
             const result = await crm.createLossReason({ tenantId, name: reason.name });
             if (result) {
-              rdIdMap.lossReasons[reason._id] = result.id;
+              rdIdMap.lossReasons.set(reason._id, result.id);
               entry.imported++;
             }
           } catch (e: any) {
@@ -362,7 +368,7 @@ async function runImport(
               isActive: prod.visible !== false,
             });
             if (result) {
-              rdIdMap.products[prod._id] = result.id;
+              rdIdMap.products.set(prod._id, result.id);
               entry.imported++;
             }
           } catch (e: any) {
@@ -376,7 +382,7 @@ async function runImport(
       results.products = entry;
     }
 
-    // ─── 6. Import Organizations ───
+    // ─── 6. Import Organizations as Accounts ───
     if (input.importOrganizations) {
       advanceStep("organizations", "Empresas");
       const entry = { imported: 0, skipped: 0, errors: [] as string[] };
@@ -386,21 +392,21 @@ async function runImport(
           setCategoryProgress(fetched, total);
           updateProgress(userId, { phase: `Buscando empresas... ${fetched}/${total}` });
         });
-        updateProgress(userId, { phase: "Importando empresas..." });
+        updateProgress(userId, { phase: "Importando empresas como contas..." });
         setCategoryProgress(0, rdOrgs.length);
 
         for (let i = 0; i < rdOrgs.length; i++) {
           const org = rdOrgs[i];
           try {
-            const result = await crm.createContact({
+            // Create as account (not contact)
+            const result = await crm.createAccount({
               tenantId,
               name: org.name,
-              type: "company",
-              source: "rd_station_crm",
               createdBy: userId,
             });
             if (result) {
-              rdIdMap.organizations[org._id] = result.id;
+              rdIdMap.organizations.set(org._id, result.id);
+              orgByRdId.set(org._id, result.id);
               entry.imported++;
             }
           } catch (e: any) {
@@ -414,27 +420,32 @@ async function runImport(
       results.organizations = entry;
     }
 
-    // ─── 7. Import Contacts ───
+    // ─── 7. Import Contacts (with full data: name, email, phone) ───
     if (input.importContacts) {
       advanceStep("contacts", "Contatos");
       const entry = { imported: 0, skipped: 0, errors: [] as string[] };
       try {
+        console.log("[RD Import] Starting contacts fetch...");
         updateProgress(userId, { phase: "Buscando contatos do RD Station..." });
         const rdContacts = await rdCrm.fetchAllContacts(token, (fetched, total) => {
           setCategoryProgress(fetched, total);
           updateProgress(userId, { phase: `Buscando contatos... ${fetched}/${total}` });
         });
+        console.log(`[RD Import] Fetched ${rdContacts.length} contacts. Starting import...`);
         updateProgress(userId, { phase: "Importando contatos..." });
         setCategoryProgress(0, rdContacts.length);
 
         for (let i = 0; i < rdContacts.length; i++) {
           const c = rdContacts[i];
           try {
+            // Extract email and phone from arrays
             const email = c.emails?.[0]?.email || undefined;
             const phone = c.phones?.[0]?.phone || undefined;
+            const contactName = (c.name || "").trim() || email || phone || "Sem nome";
+
             const result = await crm.createContact({
               tenantId,
-              name: c.name || email || phone || "Sem nome",
+              name: contactName,
               type: "person",
               email,
               phone,
@@ -442,8 +453,18 @@ async function runImport(
               createdBy: userId,
             });
             if (result) {
-              rdIdMap.contacts[c._id] = result.id;
+              // Map by RD _id
+              rdIdMap.contacts.set(c._id, result.id);
+              // Map by email for deal matching (contacts in deals don't have _id)
+              if (email) {
+                contactByEmail.set(email.toLowerCase().trim(), result.id);
+              }
+              // Map by name for fallback matching
+              if (contactName && contactName !== "Sem nome") {
+                contactByName.set(contactName.toLowerCase().trim(), result.id);
+              }
               entry.imported++;
+
               // Add notes if present
               if (c.notes) {
                 try {
@@ -456,27 +477,41 @@ async function runImport(
                   });
                 } catch {}
               }
+            } else {
+              if (i < 5) console.log(`[RD Import] createContact returned null for contact ${i}: ${contactName}`);
             }
           } catch (e: any) {
-            entry.errors.push(`Contato ${c.name}: ${e.message}`);
+            if (entry.errors.length < 10) entry.errors.push(`Contato ${c.name}: ${e.message}`);
+            if (entry.errors.length <= 3) console.error(`[RD Import] Contact error ${i}:`, e.message);
           }
-          if (i % 50 === 0) setCategoryProgress(i + 1, rdContacts.length);
+          if (i % 100 === 0) {
+            setCategoryProgress(i + 1, rdContacts.length);
+            if (i % 1000 === 0) console.log(`[RD Import] Contacts progress: ${i}/${rdContacts.length}, imported: ${entry.imported}`);
+          }
         }
         setCategoryProgress(rdContacts.length, rdContacts.length);
+        console.log(`[RD Import] Contacts done: ${entry.imported} imported, ${entry.errors.length} errors`);
       } catch (e: any) {
+        console.error("[RD Import] CONTACTS OUTER ERROR:", e.message, e.stack);
         entry.errors.push(`Buscar contatos: ${e.message}`);
       }
       results.contacts = entry;
     }
 
-    // ─── 8. Import Deals (by pipeline for correct association) ───
+    // ─── 8. Import Deals (with correct pipeline/stage/contact/account linking) ───
     if (input.importDeals) {
       advanceStep("deals", "Negociações");
       const entry = { imported: 0, skipped: 0, errors: [] as string[] };
       try {
-        // First, fetch pipelines to build stage→pipeline map
+        // Build stage→pipeline map from RD Station data
         const rdPipelines = await rdCrm.fetchAllPipelines(token);
-        const stageToPipelineRd = buildStageToPipelineMap(rdPipelines);
+        const stageToPipelineRd = new Map<string, string>();
+        for (const p of rdPipelines) {
+          const pId = p.id || p._id || "";
+          for (const s of p.deal_stages || []) {
+            stageToPipelineRd.set(s._id, pId);
+          }
+        }
 
         // Get fallback pipeline/stage
         const existingPipelines = await crm.listPipelines(tenantId);
@@ -496,11 +531,13 @@ async function runImport(
         }
 
         // Fetch all deals
+        console.log("[RD Import] Starting deals fetch...");
         updateProgress(userId, { phase: "Buscando negociações do RD Station..." });
         const rdDeals = await rdCrm.fetchAllDeals(token, (fetched, total) => {
           setCategoryProgress(fetched, total);
           updateProgress(userId, { phase: `Buscando negociações... ${fetched}/${total}` });
         });
+        console.log(`[RD Import] Fetched ${rdDeals.length} deals. Starting import...`);
 
         updateProgress(userId, { phase: "Importando negociações..." });
         setCategoryProgress(0, rdDeals.length);
@@ -508,43 +545,95 @@ async function runImport(
         for (let i = 0; i < rdDeals.length; i++) {
           const d = rdDeals[i];
           try {
-            // Resolve stage and pipeline
+            // ── Resolve pipeline and stage ──
             let stageId = fallbackStageId!;
             let pipelineId = fallbackPipelineId!;
 
             if (d.deal_stage?._id) {
-              // Find the mapped stage
-              const mappedStageId = rdIdMap.stages[d.deal_stage._id];
+              const mappedStageId = rdIdMap.stages.get(d.deal_stage._id);
               if (mappedStageId) {
                 stageId = mappedStageId;
-                // Find which pipeline this stage belongs to via RD data
+                // Find which pipeline this stage belongs to
                 const rdPipelineId = stageToPipelineRd.get(d.deal_stage._id);
-                if (rdPipelineId && rdIdMap.pipelines[rdPipelineId]) {
-                  pipelineId = rdIdMap.pipelines[rdPipelineId];
+                if (rdPipelineId) {
+                  const mappedPipelineId = rdIdMap.pipelines.get(rdPipelineId);
+                  if (mappedPipelineId) {
+                    pipelineId = mappedPipelineId;
+                  }
                 }
               }
             }
 
-            // Resolve contact
+            // ── Resolve contact (by email or name from deal's inline contacts) ──
             let contactId: number | undefined;
-            if (d.contacts?.[0]) {
+            if (d.contacts?.length) {
               const firstContact = d.contacts[0];
-              if (firstContact._id && rdIdMap.contacts[firstContact._id]) {
-                contactId = rdIdMap.contacts[firstContact._id];
+              const dealContactEmail = firstContact.emails?.[0]?.email;
+              const dealContactName = (firstContact.name || "").trim();
+
+              // Try by email first (most reliable)
+              if (dealContactEmail) {
+                contactId = contactByEmail.get(dealContactEmail.toLowerCase().trim());
+              }
+              // Fallback: try by name
+              if (!contactId && dealContactName) {
+                contactId = contactByName.get(dealContactName.toLowerCase().trim());
+              }
+              // Last resort: create the contact on the fly
+              if (!contactId && (dealContactName || dealContactEmail)) {
+                try {
+                  const phone = firstContact.phones?.[0]?.phone || undefined;
+                  const newContact = await crm.createContact({
+                    tenantId,
+                    name: dealContactName || dealContactEmail || "Sem nome",
+                    type: "person",
+                    email: dealContactEmail || undefined,
+                    phone,
+                    source: "rd_station_crm",
+                    createdBy: userId,
+                  });
+                  if (newContact) {
+                    contactId = newContact.id;
+                    if (dealContactEmail) contactByEmail.set(dealContactEmail.toLowerCase().trim(), newContact.id);
+                    if (dealContactName) contactByName.set(dealContactName.toLowerCase().trim(), newContact.id);
+                  }
+                } catch {}
               }
             }
 
-            // Determine status
+            // ── Resolve organization as account ──
+            let accountId: number | undefined;
+            if (d.organization?._id) {
+              accountId = orgByRdId.get(d.organization._id);
+              // If not found (maybe organizations import was skipped), create it
+              if (!accountId && d.organization.name) {
+                try {
+                  const newAccount = await crm.createAccount({
+                    tenantId,
+                    name: d.organization.name,
+                    createdBy: userId,
+                  });
+                  if (newAccount) {
+                    accountId = newAccount.id;
+                    orgByRdId.set(d.organization._id, newAccount.id);
+                  }
+                } catch {}
+              }
+            }
+
+            // ── Determine status ──
             let status: "open" | "won" | "lost" = "open";
             if (d.win === true) status = "won";
             else if (d.win === false) status = "lost";
 
             const valueCents = Math.round((d.amount_total || 0) * 100);
 
+            // ── Create the deal ──
             const result = await crm.createDeal({
               tenantId,
               title: d.name || "Negociação importada",
               contactId,
+              accountId,
               pipelineId,
               stageId,
               valueCents,
@@ -554,6 +643,9 @@ async function runImport(
 
             if (result) {
               entry.imported++;
+              // Store mapping for task linking
+              rdIdMap.deals.set(d._id, result.id);
+
               // Update status if won/lost
               if (status !== "open") {
                 try {
@@ -567,7 +659,7 @@ async function runImport(
               if (d.deal_products?.length) {
                 for (const dp of d.deal_products) {
                   try {
-                    let finalProductId = dp.product_id ? (rdIdMap.products[dp.product_id] || 0) : 0;
+                    let finalProductId = dp.product_id ? (rdIdMap.products.get(dp.product_id) || 0) : 0;
                     if (!finalProductId && dp.name) {
                       const newProd = await crm.createCatalogProduct({
                         tenantId,
@@ -577,7 +669,7 @@ async function runImport(
                       });
                       if (newProd) {
                         finalProductId = newProd.id;
-                        if (dp.product_id) rdIdMap.products[dp.product_id] = newProd.id;
+                        if (dp.product_id) rdIdMap.products.set(dp.product_id, newProd.id);
                       }
                     }
                     if (finalProductId) {
@@ -609,45 +701,68 @@ async function runImport(
               } catch {}
             }
           } catch (e: any) {
-            entry.errors.push(`Negociação ${d.name}: ${e.message}`);
+            if (entry.errors.length < 10) entry.errors.push(`Negociação ${d.name}: ${e.message}`);
+            if (entry.errors.length <= 3) console.error(`[RD Import] Deal error ${i}:`, e.message);
           }
-          if (i % 20 === 0) setCategoryProgress(i + 1, rdDeals.length);
+          if (i % 20 === 0) {
+            setCategoryProgress(i + 1, rdDeals.length);
+            if (i % 500 === 0) console.log(`[RD Import] Deals progress: ${i}/${rdDeals.length}, imported: ${entry.imported}`);
+          }
         }
         setCategoryProgress(rdDeals.length, rdDeals.length);
+        console.log(`[RD Import] Deals done: ${entry.imported} imported, ${entry.errors.length} errors`);
       } catch (e: any) {
+        console.error("[RD Import] DEALS OUTER ERROR:", e.message, e.stack);
         entry.errors.push(`Buscar negociações: ${e.message}`);
       }
       results.deals = entry;
     }
 
-    // ─── 9. Import Tasks ───
+    // ─── 9. Import Tasks (linked to deals and contacts) ───
     if (input.importTasks) {
       advanceStep("tasks", "Tarefas");
       const entry = { imported: 0, skipped: 0, errors: [] as string[] };
       try {
+        console.log("[RD Import] Starting tasks fetch...");
         updateProgress(userId, { phase: "Buscando tarefas do RD Station..." });
         const rdTasks = await rdCrm.fetchAllTasks(token, (fetched, total) => {
           setCategoryProgress(fetched, total);
           updateProgress(userId, { phase: `Buscando tarefas... ${fetched}/${total}` });
         });
+        console.log(`[RD Import] Fetched ${rdTasks.length} tasks. Starting import...`);
         updateProgress(userId, { phase: "Importando tarefas..." });
         setCategoryProgress(0, rdTasks.length);
 
         for (let i = 0; i < rdTasks.length; i++) {
           const t = rdTasks[i];
           try {
+            // Try to link to a deal or contact
             let entityType = "deal";
             let entityId = 0;
-            if (t.contact_id && rdIdMap.contacts[t.contact_id]) {
+
+            // First try to link to a deal
+            if (t.deal_id && rdIdMap.deals.has(t.deal_id)) {
+              entityType = "deal";
+              entityId = rdIdMap.deals.get(t.deal_id)!;
+            }
+            // If no deal found, try contact
+            if (!entityId && t.contact_id && rdIdMap.contacts.has(t.contact_id)) {
               entityType = "contact";
-              entityId = rdIdMap.contacts[t.contact_id];
+              entityId = rdIdMap.contacts.get(t.contact_id)!;
+            }
+
+            // Skip tasks that can't be linked to anything
+            if (!entityId) {
+              entry.skipped++;
+              if (i % 50 === 0) setCategoryProgress(i + 1, rdTasks.length);
+              continue;
             }
 
             const dueAt = t.date ? new Date(t.date) : undefined;
             const result = await crm.createTask({
               tenantId,
               entityType,
-              entityId: entityId || 1,
+              entityId,
               title: t.subject || "Tarefa importada",
               dueAt: dueAt && !isNaN(dueAt.getTime()) ? dueAt : undefined,
               createdByUserId: userId,
@@ -668,7 +783,9 @@ async function runImport(
           if (i % 50 === 0) setCategoryProgress(i + 1, rdTasks.length);
         }
         setCategoryProgress(rdTasks.length, rdTasks.length);
+        console.log(`[RD Import] Tasks done: ${entry.imported} imported, ${entry.skipped} skipped, ${entry.errors.length} errors`);
       } catch (e: any) {
+        console.error("[RD Import] TASKS OUTER ERROR:", e.message, e.stack);
         entry.errors.push(`Buscar tarefas: ${e.message}`);
       }
       results.tasks = entry;

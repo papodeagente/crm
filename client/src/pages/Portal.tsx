@@ -3,8 +3,8 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Plus, Ticket } from "lucide-react";
 import { toast } from "sonner";
+import { useTenantId } from "@/hooks/useTenantId";
 
-const TENANT_ID = 1;
 
 const priorityStyles: Record<string, { bg: string; text: string; dot: string; label: string }> = {
   low: { bg: "bg-slate-50", text: "text-slate-600", dot: "bg-slate-400", label: "Baixa" },
@@ -21,6 +21,7 @@ const ticketStatusStyles: Record<string, { bg: string; text: string; dot: string
 };
 
 export default function Portal() {
+  const TENANT_ID = useTenantId();
   const tickets = trpc.portal.tickets.list.useQuery({ tenantId: TENANT_ID });
 
   return (

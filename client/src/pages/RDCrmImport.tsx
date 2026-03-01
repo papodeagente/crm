@@ -13,8 +13,8 @@ import {
   Target, Key, Eye, EyeOff, ShieldCheck, Download,
   BarChart3, Zap, RefreshCw,
 } from "lucide-react";
+import { useTenantId } from "@/hooks/useTenantId";
 
-const TENANT_ID = 1;
 
 type Step = "token" | "preview" | "configure" | "importing" | "done";
 
@@ -67,6 +67,7 @@ const categoryLabels: Record<string, string> = {
 };
 
 export default function RDCrmImport() {
+  const TENANT_ID = useTenantId();
   const [, setLocation] = useLocation();
   const [step, setStep] = useState<Step>("token");
   const [token, setToken] = useState("");

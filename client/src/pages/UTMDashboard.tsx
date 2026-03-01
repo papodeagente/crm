@@ -20,8 +20,8 @@ import {
   AreaChart, Area, ComposedChart, Line
 } from "recharts";
 import { useLocation } from "wouter";
+import { useTenantId } from "@/hooks/useTenantId";
 
-const TENANT_ID = 1;
 
 // ─── Helpers ───
 function formatCurrency(cents: number): string {
@@ -100,6 +100,7 @@ function CustomTooltip({ active, payload, label }: any) {
 
 // ─── Main UTM Dashboard ───
 export default function UTMDashboard() {
+  const TENANT_ID = useTenantId();
   const [, navigate] = useLocation();
   const dateFilter = useDateFilter("all");
   const [pipelineId, setPipelineId] = useState<number | undefined>(undefined);

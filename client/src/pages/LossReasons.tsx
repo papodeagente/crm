@@ -19,10 +19,11 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { useTenantId } from "@/hooks/useTenantId";
 
-const TENANT_ID = 1;
 
 export default function LossReasons() {
+  const TENANT_ID = useTenantId();
   const [, setLocation] = useLocation();
   const [showDeleted, setShowDeleted] = useState(false);
 

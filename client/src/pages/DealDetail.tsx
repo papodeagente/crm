@@ -22,8 +22,8 @@ import {
   Trash2, User, Users, X, AlertCircle, ClipboardList, Paperclip, Tag,
   Sparkles, BarChart3, TrendingUp, TrendingDown, Star, Target, Lightbulb, RefreshCw, Award, Search
 } from "lucide-react";
+import { useTenantId } from "@/hooks/useTenantId";
 
-const TENANT_ID = 1;
 
 /* ─── Helpers ─── */
 const categoryLabels: Record<string, string> = {
@@ -89,6 +89,7 @@ function formatDurationMs(ms: number): string {
 /* MAIN PAGE                                                   */
 /* ════════════════════════════════════════════════════════════ */
 export default function DealDetail() {
+  const TENANT_ID = useTenantId();
   const { user } = useAuth();
   const [, setLocation] = useLocation();
   const [matched, params] = useRoute("/deal/:id");
@@ -1296,6 +1297,7 @@ function ContactInfoRow({ icon: Icon, value, copyable, whatsapp }: {
 
 /* ─── Custom Fields Sidebar ─── */
 function CustomFieldsSidebar({ fields, values, dealId, onRefresh }: any) {
+  const TENANT_ID = useTenantId();
   const setValues = trpc.contactProfile.setCustomFieldValues.useMutation({
     onSuccess: () => { onRefresh(); toast.success("Campo atualizado"); },
   });
@@ -1379,6 +1381,7 @@ function CustomFieldsSidebar({ fields, values, dealId, onRefresh }: any) {
 /* ════════════════════════════════════════════════════════════ */
 
 function CreateTaskButton({ dealId, onCreated }: { dealId: number; onCreated: () => void }) {
+  const TENANT_ID = useTenantId();
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [dueAt, setDueAt] = useState("");
@@ -1443,6 +1446,7 @@ function CreateTaskButton({ dealId, onCreated }: { dealId: number; onCreated: ()
 }
 
 function TaskRow({ task, onUpdate }: { task: any; onUpdate: () => void }) {
+  const TENANT_ID = useTenantId();
   const updateTask = trpc.crm.tasks.update.useMutation({
     onSuccess: () => { onUpdate(); toast.success("Tarefa atualizada"); },
   });
@@ -1490,6 +1494,7 @@ function TaskRow({ task, onUpdate }: { task: any; onUpdate: () => void }) {
 function HistoryPanel({ history, notes, dealId, contactName, onNoteCreated }: {
   history: any[]; notes: any[]; dealId: number; contactName: string; onNoteCreated: () => void;
 }) {
+  const TENANT_ID = useTenantId();
   const [newNote, setNewNote] = useState("");
   const createNote = trpc.crm.notes.create.useMutation({
     onSuccess: () => { onNoteCreated(); setNewNote(""); toast.success("Anotação criada"); },
@@ -1722,6 +1727,7 @@ function TasksPanel({ tasks, dealId, onRefresh }: { tasks: any[]; dealId: number
 /* ════════════════════════════════════════════════════════════ */
 
 function ProductsPanel({ products, dealId, onRefresh }: { products: any[]; dealId: number; onRefresh: () => void }) {
+  const TENANT_ID = useTenantId();
   const [showAdd, setShowAdd] = useState(false);
   const [editingItem, setEditingItem] = useState<any>(null);
   const [searchTerm, setSearchTerm] = useState("");
@@ -2121,6 +2127,7 @@ function ProductsPanel({ products, dealId, onRefresh }: { products: any[]; dealI
 /* ════════════════════════════════════════════════════════════ */
 
 function ParticipantsPanel({ participants, contacts, dealId, onRefresh }: any) {
+  const TENANT_ID = useTenantId();
   const [showAdd, setShowAdd] = useState(false);
   const [selectedContact, setSelectedContact] = useState("");
   const [selectedRole, setSelectedRole] = useState("traveler");
@@ -2492,6 +2499,7 @@ function AiAnalysisPanel({ dealId, contactName }: { dealId: number; contactName:
    ═══════════════════════════════════════════════════════════════════ */
 
 function WhatsAppPanel({ contact, dealId }: { contact: any; dealId: number }) {
+  const TENANT_ID = useTenantId();
   const [viewMode, setViewMode] = useState<"history" | "live">("history");
   const [loadMoreBefore, setLoadMoreBefore] = useState<number | undefined>(undefined);
   const scrollRef = useRef<HTMLDivElement>(null);

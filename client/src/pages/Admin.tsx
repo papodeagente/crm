@@ -8,8 +8,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Shield, Plus, Users, Building2, Key, Activity } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+import { useTenantId } from "@/hooks/useTenantId";
 
-const TENANT_ID = 1;
 
 const actionColors: Record<string, { bg: string; text: string }> = {
   create: { bg: "bg-emerald-50", text: "text-emerald-700" },
@@ -19,6 +19,7 @@ const actionColors: Record<string, { bg: string; text: string }> = {
 };
 
 export default function Admin() {
+  const TENANT_ID = useTenantId();
   const [openUser, setOpenUser] = useState(false);
   const [userName, setUserName] = useState("");
   const [userEmail, setUserEmail] = useState("");

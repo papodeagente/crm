@@ -2,8 +2,8 @@ import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Bell, MessageSquare, ArrowRightLeft, UserPlus, ClipboardList, Briefcase, Check, CheckCheck } from "lucide-react";
 import { useLocation } from "wouter";
+import { useTenantId } from "@/hooks/useTenantId";
 
-const TENANT_ID = 1;
 
 const typeConfig: Record<string, { icon: any; bg: string; iconBg: string; iconColor: string; label: string; route?: (entityId: string) => string }> = {
   whatsapp_message: {
@@ -61,6 +61,7 @@ function timeAgo(ts: number): string {
 }
 
 export default function NotificationsPage() {
+  const TENANT_ID = useTenantId();
   const [, navigate] = useLocation();
   const utils = trpc.useUtils();
 

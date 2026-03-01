@@ -26,8 +26,8 @@ import DealFiltersPanel, { useDealFilters, DealFilterButton } from "@/components
 import { useState, useMemo, useCallback } from "react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
+import { useTenantId } from "@/hooks/useTenantId";
 
-const TENANT_ID = 1;
 
 type ViewMode = "kanban" | "list";
 type SortMode = "created_desc" | "created_asc" | "value_desc" | "value_asc";
@@ -67,6 +67,7 @@ function formatDateTime(date: string | Date | null | undefined) {
 }
 
 export default function Pipeline() {
+  const TENANT_ID = useTenantId();
   const [viewMode, setViewMode] = useState<ViewMode>("kanban");
   const [selectedPipelineId, setSelectedPipelineId] = useState<number | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -699,6 +700,7 @@ function DealCard({ deal, contacts, tasks, onCreateTask, onOpenDrawer, onDragSta
 function DealDrawer({ dealId, onClose, contacts, accounts, stages }: {
   dealId: number; onClose: () => void; contacts: any[]; accounts: any[]; stages: any[];
 }) {
+  const TENANT_ID = useTenantId();
   const utils = trpc.useUtils();
   const deal = trpc.crm.deals.get.useQuery({ tenantId: TENANT_ID, id: dealId });
   const products = trpc.crm.deals.products.list.useQuery({ tenantId: TENANT_ID, dealId });
@@ -1280,6 +1282,7 @@ const LEAD_SOURCES = [
 function CreateDealDialog({ open, onOpenChange, pipelineId, stages, contacts, accounts, pipelines }: {
   open: boolean; onOpenChange: (open: boolean) => void; pipelineId?: number; stages: any[]; contacts: any[]; accounts: any[]; pipelines: any[];
 }) {
+  const TENANT_ID = useTenantId();
   // Deal fields
   const [title, setTitle] = useState("");
   const [selectedPipeline, setSelectedPipeline] = useState<string>(String(pipelineId || ""));
@@ -1616,6 +1619,7 @@ function CreateDealDialog({ open, onOpenChange, pipelineId, stages, contacts, ac
 
 /* ─── Create Task Dialog ─── */
 function CreateTaskDialog({ open, onOpenChange, dealId }: { open: boolean; onOpenChange: (open: boolean) => void; dealId: number }) {
+  const TENANT_ID = useTenantId();
   const [title, setTitle] = useState("");
   const [dueAt, setDueAt] = useState("");
   const utils = trpc.useUtils();
@@ -1652,6 +1656,7 @@ function CreateTaskDialog({ open, onOpenChange, dealId }: { open: boolean; onOpe
 
 /* ─── Pipeline Indicators Panel ─── */
 function PipelineIndicatorsPanel({ deals, tasks, stages }: { deals: any[]; tasks: any[]; stages: any[] }) {
+  const TENANT_ID = useTenantId();
   const openDeals = deals.filter((d: any) => d.status === "open");
   const now = Date.now();
   const sevenDaysAgo = now - 7 * 24 * 60 * 60 * 1000;

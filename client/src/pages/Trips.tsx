@@ -9,8 +9,8 @@ import { Plus, Plane, MapPin, Calendar, User, DollarSign, ArrowRight, ChevronRig
 import { useState, useMemo } from "react";
 import { toast } from "sonner";
 import { useLocation, Link } from "wouter";
+import { useTenantId } from "@/hooks/useTenantId";
 
-const TENANT_ID = 1;
 
 /* ─── Types ─── */
 interface StageData {
@@ -34,6 +34,7 @@ function formatDate(d: string | null) {
 }
 
 export default function Trips() {
+  const TENANT_ID = useTenantId();
   const [, setLocation] = useLocation();
 
   // Find the post_sale pipeline

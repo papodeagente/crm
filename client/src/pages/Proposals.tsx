@@ -3,8 +3,8 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { FileText, Plus, Eye, Send as SendIcon, CheckCircle, XCircle, Clock } from "lucide-react";
 import { toast } from "sonner";
+import { useTenantId } from "@/hooks/useTenantId";
 
-const TENANT_ID = 1;
 
 const statusStyles: Record<string, { bg: string; text: string; dot: string; label: string; icon: any }> = {
   draft: { bg: "bg-slate-50", text: "text-slate-600", dot: "bg-slate-400", label: "Rascunho", icon: Clock },
@@ -16,6 +16,7 @@ const statusStyles: Record<string, { bg: string; text: string; dot: string; labe
 };
 
 export default function Proposals() {
+  const TENANT_ID = useTenantId();
   const proposals = trpc.proposals.list.useQuery({ tenantId: TENANT_ID });
 
   return (

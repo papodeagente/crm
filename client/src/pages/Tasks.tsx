@@ -9,8 +9,8 @@ import { Plus, ClipboardList, CheckCircle2, Circle, Clock, AlertTriangle } from 
 import { useState } from "react";
 import { toast } from "sonner";
 import DateRangeFilter, { useDateFilter } from "@/components/DateRangeFilter";
+import { useTenantId } from "@/hooks/useTenantId";
 
-const TENANT_ID = 1;
 
 const priorityStyles: Record<string, { bg: string; text: string; dot: string; label: string }> = {
   low: { bg: "bg-slate-50", text: "text-slate-600", dot: "bg-slate-400", label: "Baixa" },
@@ -26,6 +26,7 @@ const statusConfig: Record<string, { icon: any; color: string; label: string }> 
 };
 
 export default function Tasks() {
+  const TENANT_ID = useTenantId();
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [priority, setPriority] = useState("medium");

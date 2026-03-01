@@ -18,8 +18,8 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
+import { useTenantId } from "@/hooks/useTenantId";
 
-const TENANT_ID = 1;
 
 function StatusBadge({ status }: { status: string }) {
   const map: Record<string, { icon: any; color: string; label: string }> = {
@@ -40,6 +40,7 @@ function StatusBadge({ status }: { status: string }) {
 // ─── Webhook Config Tab ──────────────────────────────────
 
 function WebhookConfigTab() {
+  const TENANT_ID = useTenantId();
   const config = trpc.leadCapture.getWebhookConfig.useQuery({ tenantId: TENANT_ID });
   const generateToken = trpc.leadCapture.generateWebhookToken.useMutation({
     onSuccess: () => {
@@ -153,6 +154,7 @@ Content-Type: application/json
 // ─── Meta Lead Ads Tab ───────────────────────────────────
 
 function MetaLeadAdsTab() {
+  const TENANT_ID = useTenantId();
   const config = trpc.leadCapture.getMetaConfig.useQuery({ tenantId: TENANT_ID });
   const connectMeta = trpc.leadCapture.connectMeta.useMutation({
     onSuccess: () => {
@@ -315,6 +317,7 @@ function MetaLeadAdsTab() {
 }// ─── Tracking Script Tab ──────────────────────────────────────
 
 function TrackingScriptTab() {
+  const TENANT_ID = useTenantId();
   const tokens = trpc.leadCapture.listTrackingTokens.useQuery({ tenantId: TENANT_ID });
   const createToken = trpc.leadCapture.createTrackingToken.useMutation({
     onSuccess: () => { tokens.refetch(); toast.success("Token criado!"); setShowCreate(false); setNewName(""); setNewDomains(""); },
@@ -702,6 +705,7 @@ function TrackingScriptTab() {
 // ─── Event Logs Tab ──────────────────────────────────────────
 
 function EventLogsTab() { const [sourceFilter, setSourceFilter] = useState<string>("all");
+  const TENANT_ID = useTenantId();
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [page, setPage] = useState(0);
   const LIMIT = 20;
@@ -856,6 +860,7 @@ function EventLogsTab() { const [sourceFilter, setSourceFilter] = useState<strin
 // ─── Main Integrations Page ──────────────────────────────
 
 export default function Integrations() {
+  const TENANT_ID = useTenantId();
   const integrations = trpc.integrationHub.integrations.list.useQuery({ tenantId: TENANT_ID });
 
   return (

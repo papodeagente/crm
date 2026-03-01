@@ -68,6 +68,7 @@ export interface RdDeal {
   }>;
   markup?: string;
   markup_created?: string;
+  organization?: { _id: string; id?: string; name: string; address?: string | null } | null;
 }
 
 export interface RdOrganization {
@@ -170,7 +171,7 @@ async function rdFetch<T>(endpoint: string, token: string, params: Record<string
   }
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 30000); // 30s timeout
+  const timeout = setTimeout(() => controller.abort(), 60000); // 60s timeout
 
   try {
     const res = await fetch(url.toString(), {
@@ -201,35 +202,70 @@ async function rdFetch<T>(endpoint: string, token: string, params: Record<string
   }
 }
 
-async function rdFetchAllPaginated<T>(
+async function rdFetchAllPaginated<T extends { _id?: string }>(
   endpoint: string,
   token: string,
   listKey: string,
   extraParams: Record<string, string> = {},
   onProgress?: (fetched: number, total: number) => void,
 ): Promise<T[]> {
-  const all: T[] = [];
-  let page = 1;
-  let hasMore = true;
-  let total = 0;
+  const LIMIT = 200;
+  const MAX_PAGE = 50; // page * limit must be <= 10000
 
-  while (hasMore) {
-    const data = await rdFetch<any>(endpoint, token, {
-      ...extraParams,
-      page: String(page),
-      limit: "200",
-    });
-    const items = data[listKey] || [];
-    all.push(...items);
-    total = data.total || all.length;
-    hasMore = data.has_more === true;
-    if (onProgress) onProgress(all.length, total);
-    page++;
-    // Safety: avoid infinite loops
-    if (page > 500) break;
-    // Small delay to avoid rate limiting
-    if (hasMore) await new Promise(r => setTimeout(r, 200));
+  // Helper: fetch one window of up to 10000 records
+  async function fetchWindow(windowParams: Record<string, string>): Promise<T[]> {
+    const items: T[] = [];
+    let page = 1;
+    let hasMore = true;
+
+    while (hasMore && page <= MAX_PAGE) {
+      const data = await rdFetch<any>(endpoint, token, {
+        ...extraParams,
+        ...windowParams,
+        page: String(page),
+        limit: String(LIMIT),
+      });
+      const batch = data[listKey] || [];
+      items.push(...batch);
+      const total = data.total || items.length;
+      hasMore = data.has_more === true;
+      if (onProgress) onProgress(items.length, total);
+      page++;
+      if (hasMore && page <= MAX_PAGE) await new Promise(r => setTimeout(r, 100));
+    }
+    return items;
   }
+
+  // First pass: default order (newest first)
+  const firstBatch = await fetchWindow({});
+  const total = firstBatch.length;
+
+  // If we got all records (< 10000), return immediately
+  // Check: did we hit the 10000 limit?
+  if (firstBatch.length < MAX_PAGE * LIMIT) {
+    return firstBatch;
+  }
+
+  console.log(`[RD Paginate] ${endpoint}: Got ${firstBatch.length} in first window, fetching reverse window...`);
+
+  // Second pass: reverse order (oldest first) to get the remaining records
+  const secondBatch = await fetchWindow({ order: "created_at", sort: "asc" });
+
+  console.log(`[RD Paginate] ${endpoint}: Got ${secondBatch.length} in second window. Deduplicating...`);
+
+  // Deduplicate by _id
+  const seen = new Set<string>();
+  const all: T[] = [];
+  for (const item of [...firstBatch, ...secondBatch]) {
+    const id = (item as any)._id || (item as any).id || "";
+    if (id && !seen.has(id)) {
+      seen.add(id);
+      all.push(item);
+    }
+  }
+
+  console.log(`[RD Paginate] ${endpoint}: After dedup: ${all.length} unique records (from ${firstBatch.length} + ${secondBatch.length})`);
+  if (onProgress) onProgress(all.length, all.length);
 
   return all;
 }
@@ -300,7 +336,37 @@ export async function fetchAllContacts(token: string, onProgress?: (fetched: num
 }
 
 export async function fetchAllDeals(token: string, onProgress?: (fetched: number, total: number) => void): Promise<RdDeal[]> {
-  return rdFetchAllPaginated<RdDeal>("/deals", token, "deals", {}, onProgress);
+  // Fetch deals per pipeline to avoid the 10,000 record limit
+  // First, get all pipeline IDs
+  const pipelines = await fetchAllPipelines(token);
+  const pipelineIds = pipelines.map(p => p._id || p.id).filter(Boolean);
+
+  console.log(`[RD Deals] Fetching deals from ${pipelineIds.length} pipelines...`);
+
+  const allDeals: RdDeal[] = [];
+  const seen = new Set<string>();
+  let totalEstimate = 0;
+
+  for (const pid of pipelineIds) {
+    console.log(`[RD Deals] Fetching pipeline ${pid}...`);
+    const pipelineDeals = await rdFetchAllPaginated<RdDeal>("/deals", token, "deals", { deal_pipeline_id: pid }, (fetched, total) => {
+      if (onProgress) onProgress(allDeals.length + fetched, totalEstimate || total);
+    });
+
+    for (const deal of pipelineDeals) {
+      const id = deal._id || deal.id;
+      if (id && !seen.has(id)) {
+        seen.add(id);
+        allDeals.push(deal);
+      }
+    }
+    console.log(`[RD Deals] Pipeline ${pid}: ${pipelineDeals.length} deals, total unique so far: ${allDeals.length}`);
+    totalEstimate = allDeals.length; // Update estimate
+  }
+
+  console.log(`[RD Deals] Total unique deals: ${allDeals.length}`);
+  if (onProgress) onProgress(allDeals.length, allDeals.length);
+  return allDeals;
 }
 
 export async function fetchAllOrganizations(token: string, onProgress?: (fetched: number, total: number) => void): Promise<RdOrganization[]> {
@@ -312,7 +378,35 @@ export async function fetchAllProducts(token: string, onProgress?: (fetched: num
 }
 
 export async function fetchAllTasks(token: string, onProgress?: (fetched: number, total: number) => void): Promise<RdTask[]> {
-  return rdFetchAllPaginated<RdTask>("/tasks", token, "tasks", {}, onProgress);
+  // Fetch tasks by type to avoid the 10,000 record limit
+  const taskTypes = ["call", "email", "meeting", "task", "whatsapp"];
+
+  console.log(`[RD Tasks] Fetching tasks by type...`);
+
+  const allTasks: RdTask[] = [];
+  const seen = new Set<string>();
+  let totalEstimate = 0;
+
+  for (const type of taskTypes) {
+    console.log(`[RD Tasks] Fetching type '${type}'...`);
+    const typeTasks = await rdFetchAllPaginated<RdTask>("/tasks", token, "tasks", { type }, (fetched, total) => {
+      if (onProgress) onProgress(allTasks.length + fetched, totalEstimate || total);
+    });
+
+    for (const task of typeTasks) {
+      const id = task._id;
+      if (id && !seen.has(id)) {
+        seen.add(id);
+        allTasks.push(task);
+      }
+    }
+    console.log(`[RD Tasks] Type '${type}': ${typeTasks.length} tasks, total unique so far: ${allTasks.length}`);
+    totalEstimate = allTasks.length;
+  }
+
+  console.log(`[RD Tasks] Total unique tasks: ${allTasks.length}`);
+  if (onProgress) onProgress(allTasks.length, allTasks.length);
+  return allTasks;
 }
 
 export async function fetchAllPipelines(token: string): Promise<RdPipeline[]> {

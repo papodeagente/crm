@@ -21,8 +21,8 @@ import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip as RechartsTooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend
 } from "recharts";
+import { useTenantId } from "@/hooks/useTenantId";
 
-const TENANT_ID = 1;
 
 // ─── Status helpers ───
 const STATUS_CONFIG: Record<string, { label: string; color: string; icon: React.ReactNode; bgClass: string }> = {
@@ -87,6 +87,7 @@ function StatusBadge({ status }: { status: string }) {
 
 // ─── CRM Dashboard ───
 function CRMDashboard() {
+  const TENANT_ID = useTenantId();
   const dateFilter = useDateFilter("all");
   const dashboard = trpc.insights.dashboard.useQuery({ tenantId: TENANT_ID });
   const homeData = trpc.dashboard.metrics.useQuery({ tenantId: TENANT_ID, dateFrom: dateFilter.dates.dateFrom, dateTo: dateFilter.dates.dateTo }, { refetchInterval: 60000 });
@@ -805,6 +806,7 @@ function MessagesDashboard() {
 
 // ─── Main Page ───
 export default function Insights() {
+  const TENANT_ID = useTenantId();
   const [mainTab, setMainTab] = useState("crm");
 
   return (

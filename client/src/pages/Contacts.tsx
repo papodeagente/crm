@@ -11,8 +11,8 @@ import { Link } from "wouter";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { useAuth } from "@/_core/hooks/useAuth";
+import { useTenantId } from "@/hooks/useTenantId";
 
-const TENANT_ID = 1;
 
 const stageConfig: Record<string, { dot: string; label: string }> = {
   lead: { dot: "bg-blue-500", label: "Lead" },
@@ -22,6 +22,7 @@ const stageConfig: Record<string, { dot: string; label: string }> = {
 };
 
 export default function Contacts() {
+  const TENANT_ID = useTenantId();
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");

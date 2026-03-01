@@ -3,10 +3,11 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Target, Plus, Calendar } from "lucide-react";
 import { toast } from "sonner";
+import { useTenantId } from "@/hooks/useTenantId";
 
-const TENANT_ID = 1;
 
 export default function Goals() {
+  const TENANT_ID = useTenantId();
   const goals = trpc.management.goals.list.useQuery({ tenantId: TENANT_ID });
 
   return (
