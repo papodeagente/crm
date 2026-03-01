@@ -27,6 +27,7 @@ import TaskFormDialog from "@/components/TaskFormDialog";
 import TaskActionPopover from "@/components/TaskActionPopover";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Pencil } from "lucide-react";
+import { formatDate, formatTime, formatDateTime, SYSTEM_TIMEZONE, SYSTEM_LOCALE, formatFullDateTime} from "../../../shared/dateUtils";
 
 
 /* ─── Helpers ─── */
@@ -57,15 +58,15 @@ function fmt$(cents: number | null | undefined): string {
 }
 function fmtDate(d: string | Date | null | undefined): string {
   if (!d) return "—";
-  return new Date(d).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
+  return formatDate(d) || "—";
 }
 function fmtTime(d: string | Date | null | undefined): string {
   if (!d) return "";
-  return new Date(d).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+  return formatTime(d);
 }
 function fmtDateTime(d: string | Date | null | undefined): string {
   if (!d) return "—";
-  return `${fmtDate(d)} ${fmtTime(d)}`;
+  return formatDateTime(d) || "—";
 }
 function daysInStage(d: string | Date | null | undefined): string {
   if (!d) return "";
@@ -475,7 +476,7 @@ export default function DealDetail() {
                           return (
                             <>
                               <p className="flex items-center gap-1"><Clock className="h-3 w-3" /> Tempo: {formatDurationMs(stageTimeData.durationMs)}</p>
-                              {stageTimeData.enteredAt && <p className="text-muted-foreground">Entrou em: {new Date(stageTimeData.enteredAt).toLocaleDateString("pt-BR")}</p>}
+                              {stageTimeData.enteredAt && <p className="text-muted-foreground">Entrou em: {formatDate(stageTimeData.enteredAt)}</p>}
                             </>
                           );
                         }
@@ -2399,7 +2400,7 @@ function AiAnalysisPanel({ dealId, contactName }: { dealId: number; contactName:
               <Award className="h-4 w-4 text-primary" />
               <h4 className="text-sm font-semibold">Pontuação Geral</h4>
               <span className="text-[10px] text-muted-foreground ml-auto">
-                {analysis.messagesAnalyzed} mensagens analisadas · {analysis.createdAt ? new Date(analysis.createdAt).toLocaleString("pt-BR") : ""}
+                {analysis.messagesAnalyzed} mensagens analisadas · {analysis.createdAt ? formatFullDateTime(analysis.createdAt) : ""}
               </span>
             </div>
             <div className="flex items-center justify-center gap-8 flex-wrap">
@@ -2523,7 +2524,7 @@ function AiAnalysisPanel({ dealId, contactName }: { dealId: number; contactName:
                 <div className="flex-1 min-w-0">
                   <p className="text-xs font-medium truncate">{a.summary?.slice(0, 80)}...</p>
                   <p className="text-[10px] text-muted-foreground">
-                    {a.messagesAnalyzed} msgs · {a.createdAt ? new Date(a.createdAt).toLocaleString("pt-BR") : ""}
+                    {a.messagesAnalyzed} msgs · {a.createdAt ? formatFullDateTime(a.createdAt) : ""}
                   </p>
                 </div>
                 <div className="flex gap-2 text-[10px] text-muted-foreground">
@@ -2602,7 +2603,7 @@ function WhatsAppPanel({ contact, dealId }: { contact: any; dealId: number }) {
     let currentDate = "";
     let currentGroup: typeof msgs = [];
     for (const msg of msgs) {
-      const d = new Date(msg.timestamp).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
+      const d = formatDate(msg.timestamp);
       if (d !== currentDate) {
         if (currentGroup.length) groups.push({ date: currentDate, messages: currentGroup });
         currentDate = d;
@@ -2676,7 +2677,7 @@ function WhatsAppPanel({ contact, dealId }: { contact: any; dealId: number }) {
                     <div className="flex-1 h-px bg-border" />
                   </div>
                   {group.messages.map((msg: any) => {
-                    const time = new Date(msg.timestamp).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+                    const time = formatTime(msg.timestamp);
                     const senderName = msg.fromMe ? (sessionMap[msg.sessionId] || "Agente") : (msg.pushName || contact.name);
                     const isMedia = msg.messageType !== "text" && msg.messageType !== "conversation";
 

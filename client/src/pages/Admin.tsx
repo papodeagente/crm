@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Shield, Plus, Users, Building2, Key, Activity } from "lucide-react";
+import { formatDate, formatFullDateTime } from "../../../shared/dateUtils";
 import { useState } from "react";
 import { toast } from "sonner";
 import { useTenantId } from "@/hooks/useTenantId";
@@ -109,7 +110,7 @@ export default function Admin() {
                           <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />{u.status || "Ativo"}
                         </span>
                       </td>
-                      <td className="p-3.5 text-muted-foreground">{u.createdAt ? new Date(u.createdAt).toLocaleDateString("pt-BR") : "—"}</td>
+                      <td className="p-3.5 text-muted-foreground">{u.createdAt ? formatDate(u.createdAt) : "—"}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -163,7 +164,7 @@ export default function Admin() {
                           <span className="font-semibold">{t.name}</span>
                         </div>
                       </td>
-                      <td className="p-3.5 text-muted-foreground">{t.createdAt ? new Date(t.createdAt).toLocaleDateString("pt-BR") : "—"}</td>
+                      <td className="p-3.5 text-muted-foreground">{t.createdAt ? formatDate(t.createdAt) : "—"}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -232,7 +233,7 @@ export default function Admin() {
                         <td className="p-3.5"><span className={`inline-flex text-[11px] font-medium px-2.5 py-1 rounded-full ${ac.bg} ${ac.text}`}>{e.action}</span></td>
                         <td className="p-3.5">{e.entityType} <span className="text-muted-foreground">#{e.entityId}</span></td>
                         <td className="p-3.5 text-muted-foreground">User #{e.actorUserId}</td>
-                        <td className="p-3.5 text-muted-foreground">{e.createdAt ? new Date(e.createdAt).toLocaleString("pt-BR") : "—"}</td>
+                        <td className="p-3.5 text-muted-foreground">{e.createdAt ? formatFullDateTime(e.createdAt) : "—"}</td>
                       </tr>
                     );
                   })}

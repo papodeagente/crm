@@ -12,6 +12,7 @@ import {
   Megaphone, Zap, Shield, Clock, ChevronDown, ChevronUp,
   FileText, Eye, EyeOff, XCircle, Loader2,
 } from "lucide-react";
+import { formatFullDateTime } from "../../../shared/dateUtils";
 import { useTenantId } from "@/hooks/useTenantId";
 
 
@@ -253,7 +254,7 @@ export default function RDStationIntegration() {
                 {config.lastLeadReceivedAt && (
                   <span className="text-xs text-muted-foreground flex items-center gap-1">
                     <Clock className="h-3 w-3" />
-                    Último lead: {new Date(config.lastLeadReceivedAt).toLocaleString("pt-BR")}
+                    Último lead: {formatFullDateTime(config.lastLeadReceivedAt)}
                   </span>
                 )}
               </div>
@@ -679,7 +680,7 @@ export default function RDStationIntegration() {
                             <td className="py-2 px-2 text-muted-foreground text-xs">{log.utmSource || "—"}</td>
                             <td className="py-2 px-2 text-muted-foreground text-xs">{log.utmCampaign || "—"}</td>
                             <td className="py-2 px-2 text-muted-foreground text-xs">
-                              {log.createdAt ? new Date(log.createdAt).toLocaleString("pt-BR") : "—"}
+                              {log.createdAt ? formatFullDateTime(log.createdAt) : "—"}
                             </td>
                           </tr>
                         ))}

@@ -14,6 +14,7 @@ import {
   ArrowUpRight, ArrowDownRight, RefreshCw, Wifi, WifiOff,
   MessageCircle, Image, Mic, FileText, Video, Sticker
 } from "lucide-react";
+import { formatTime as fmtTime, formatTimeWithSeconds as fmtTimeWS, SYSTEM_TIMEZONE, SYSTEM_LOCALE } from "../../../shared/dateUtils";
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip as RechartsTooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend
@@ -288,8 +289,8 @@ export default function MessageMonitoring() {
   const volumeChartData = useMemo(() => {
     return (volumeOverTime.data || []).map((row: any) => ({
       time: periodDays <= 2
-        ? new Date(row.timeBucket).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })
-        : new Date(row.timeBucket + "T00:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }),
+        ? fmtTime(row.timeBucket)
+        : new Date(row.timeBucket + "T00:00:00").toLocaleDateString(SYSTEM_LOCALE, { day: "2-digit", month: "2-digit", timeZone: SYSTEM_TIMEZONE }),
       enviadas: Number(row.sent) || 0,
       recebidas: Number(row.received) || 0,
     }));
@@ -524,7 +525,7 @@ export default function MessageMonitoring() {
                         </>
                       )}
                       <span className="shrink-0 text-[11px] text-muted-foreground">
-                        {new Date(evt.ts).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+                        {fmtTimeWS(evt.ts)}
                       </span>
                     </div>
                   ))}

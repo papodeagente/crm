@@ -22,6 +22,7 @@ import {
   Tooltip as RechartsTooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend
 } from "recharts";
 import { useTenantId } from "@/hooks/useTenantId";
+import { formatTime as formatTimeOfDay, formatTimeWithSeconds, SYSTEM_TIMEZONE, SYSTEM_LOCALE } from "../../../shared/dateUtils";
 
 
 // ─── Status helpers ───
@@ -52,7 +53,7 @@ function formatNumber(n: number): string {
   return String(n);
 }
 
-function formatTime(seconds: number | null): string {
+function formatDuration(seconds: number | null): string {
   if (!seconds || seconds <= 0) return "—";
   if (seconds < 60) return `${Math.round(seconds)}s`;
   if (seconds < 3600) return `${Math.round(seconds / 60)}min`;
@@ -353,8 +354,8 @@ function MessagesDashboard() {
   const volumeChartData = useMemo(() => {
     return (volumeOverTime.data || []).map((row: any) => ({
       time: periodDays <= 2
-        ? new Date(row.timeBucket).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })
-        : new Date(row.timeBucket + "T00:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }),
+        ? formatTimeOfDay(row.timeBucket)
+        : new Date(row.timeBucket + "T00:00:00").toLocaleDateString(SYSTEM_LOCALE, { day: "2-digit", month: "2-digit", timeZone: SYSTEM_TIMEZONE }),
       enviadas: Number(row.sent) || 0,
       recebidas: Number(row.received) || 0,
     }));
@@ -468,7 +469,7 @@ function MessagesDashboard() {
             <div className="flex items-start justify-between">
               <div className="space-y-1">
                 <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Tempo de Resposta</p>
-                <p className="text-2xl font-bold tracking-tight">{formatTime(responseTime.data?.avgResponseTimeSec)}</p>
+                <p className="text-2xl font-bold tracking-tight">{formatDuration(responseTime.data?.avgResponseTimeSec)}</p>
                 <p className="text-xs text-muted-foreground">Média</p>
               </div>
               <div className="rounded-lg bg-amber-500/10 p-2.5 text-amber-500"><Clock className="h-5 w-5" /></div>
@@ -587,7 +588,7 @@ function MessagesDashboard() {
                         </>
                       )}
                       <span className="shrink-0 text-[11px] text-muted-foreground">
-                        {new Date(evt.ts).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+                        {formatTimeWithSeconds(evt.ts)}
                       </span>
                     </div>
                   ))}
@@ -700,19 +701,19 @@ function MessagesDashboard() {
               {responseTime.data ? (
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div className="rounded-lg bg-muted/30 p-4 text-center">
-                    <p className="text-2xl font-bold">{formatTime(responseTime.data.avgResponseTimeSec)}</p>
+                    <p className="text-2xl font-bold">{formatDuration(responseTime.data.avgResponseTimeSec)}</p>
                     <p className="text-xs text-muted-foreground mt-1">Média</p>
                   </div>
                   <div className="rounded-lg bg-muted/30 p-4 text-center">
-                    <p className="text-2xl font-bold">{formatTime(responseTime.data.medianResponseTimeSec)}</p>
+                    <p className="text-2xl font-bold">{formatDuration(responseTime.data.medianResponseTimeSec)}</p>
                     <p className="text-xs text-muted-foreground mt-1">Mediana</p>
                   </div>
                   <div className="rounded-lg bg-muted/30 p-4 text-center">
-                    <p className="text-2xl font-bold">{formatTime(responseTime.data.minResponseTimeSec)}</p>
+                    <p className="text-2xl font-bold">{formatDuration(responseTime.data.minResponseTimeSec)}</p>
                     <p className="text-xs text-muted-foreground mt-1">Mais Rápido</p>
                   </div>
                   <div className="rounded-lg bg-muted/30 p-4 text-center">
-                    <p className="text-2xl font-bold">{formatTime(responseTime.data.maxResponseTimeSec)}</p>
+                    <p className="text-2xl font-bold">{formatDuration(responseTime.data.maxResponseTimeSec)}</p>
                     <p className="text-xs text-muted-foreground mt-1">Mais Lento</p>
                   </div>
                 </div>

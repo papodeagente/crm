@@ -8,6 +8,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Plus, Briefcase, MoreHorizontal, Trash2, TrendingUp, DollarSign, RotateCcw, AlertTriangle, Archive } from "lucide-react";
 import { useState, useMemo } from "react";
 import DateRangeFilter, { useDateFilter } from "@/components/DateRangeFilter";
+import { formatDate } from "../../../shared/dateUtils";
 import DealFiltersPanel, { useDealFilters, DealFilterButton } from "@/components/DealFiltersPanel";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
@@ -273,8 +274,8 @@ export default function Deals() {
                     </td>
                     <td className="p-3.5 text-muted-foreground">
                       {showTrash
-                        ? (d.deletedAt ? new Date(d.deletedAt).toLocaleDateString("pt-BR") : "—")
-                        : (d.createdAt ? new Date(d.createdAt).toLocaleDateString("pt-BR") : "—")
+                        ? (d.deletedAt ? formatDate(d.deletedAt) : "—")
+                        : (d.createdAt ? formatDate(d.createdAt) : "—")
                       }
                     </td>
                     <td className="p-3.5">

@@ -9,6 +9,7 @@ import {
   ChevronRight, Building2, Tag, User, MoreHorizontal, Plus,
   CheckCircle2, XCircle, AlertCircle, Loader2
 } from "lucide-react";
+import { formatDateShort as fmtDateShort } from "../../../shared/dateUtils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -77,7 +78,7 @@ function formatCurrency(cents: number, currency = "BRL") {
 
 function formatDate(d: string | null) {
   if (!d) return "—";
-  return new Date(d).toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" });
+  return new Date(d).toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric", timeZone: "America/Sao_Paulo" });
 }
 
 function statusColor(status: string) {

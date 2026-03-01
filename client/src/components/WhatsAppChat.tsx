@@ -9,6 +9,8 @@ import {
   UserPlus, Briefcase, Users
 } from "lucide-react";
 
+import { formatTime, SYSTEM_TIMEZONE, SYSTEM_LOCALE } from "../../../shared/dateUtils";
+
 /* ─── Types ─── */
 interface Message {
   id: number;
@@ -135,7 +137,7 @@ AudioPlayer.displayName = "AudioPlayer";
 /* ─── Message Bubble ─── */
 const MessageBubble = memo(({ msg, isFirst, isLast }: { msg: Message; isFirst: boolean; isLast: boolean }) => {
   const fromMe = msg.fromMe;
-  const time = new Date(msg.timestamp || msg.createdAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+  const time = formatTime(msg.timestamp || msg.createdAt);
 
   const isImage = msg.messageType === "imageMessage" || msg.messageType === "image" || msg.mediaMimeType?.startsWith("image/");
   const isVideo = msg.messageType === "videoMessage" || msg.messageType === "video" || msg.mediaMimeType?.startsWith("video/");
@@ -488,7 +490,7 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
       const today = new Date();
       const yesterday = new Date(today);
       yesterday.setDate(yesterday.getDate() - 1);
-      let label = d.toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" });
+      let label = d.toLocaleDateString(SYSTEM_LOCALE, { day: "2-digit", month: "long", year: "numeric", timeZone: SYSTEM_TIMEZONE });
       if (d.toDateString() === today.toDateString()) label = "Hoje";
       else if (d.toDateString() === yesterday.toDateString()) label = "Ontem";
       if (label !== currentDate) {

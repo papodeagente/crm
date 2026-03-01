@@ -14,6 +14,7 @@ import {
   Bell, Settings, Search, ChevronRight, LogOut, Menu, X,
   Loader2, User, Building2, ListTodo, Phone, Mail, Sun, Moon, MessageSquare, Shield,
 } from "lucide-react";
+import { formatDateShort } from "../../../shared/dateUtils";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useTheme } from "@/contexts/ThemeContext";
 import { Link, useLocation } from "wouter";
@@ -134,7 +135,7 @@ function SearchPalette({ open, onClose }: { open: boolean; onClose: () => void }
       tasks.forEach(t => items.push({
         type: "task",
         label: t.title,
-        sublabel: t.priority.charAt(0).toUpperCase() + t.priority.slice(1) + (t.dueAt ? " · " + new Date(t.dueAt).toLocaleDateString("pt-BR", { day: "numeric", month: "short" }) : ""),
+        sublabel: t.priority.charAt(0).toUpperCase() + t.priority.slice(1) + (t.dueAt ? " · " + formatDateShort(t.dueAt) : ""),
         path: t.entityType === "deal" ? `/deals/${t.entityId}` : "/tasks",
         icon: ListTodo,
         iconColor: priorityColors[t.priority] || "text-muted-foreground",

@@ -11,6 +11,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
 import FunnelChart from "@/components/FunnelChart";
+import { formatTime, formatDateShort, SYSTEM_TIMEZONE, SYSTEM_LOCALE } from "../../../shared/dateUtils";
 
 /* ─── Polling interval for real-time sync (15 seconds) ─── */
 const REFETCH_INTERVAL = 15_000;
@@ -71,10 +72,10 @@ function FocusTaskItem({ task }: { task: any }) {
     const d = new Date(task.dueAt);
     const now = new Date();
     const isToday = d.toDateString() === now.toDateString();
-    const time = d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+    const time = formatTime(d);
     if (isOverdue) return `Atrasada`;
     if (isToday) return time;
-    return d.toLocaleDateString("pt-BR", { day: "numeric", month: "short" });
+    return formatDateShort(d);
   })();
 
   return (
@@ -160,10 +161,11 @@ export default function Home() {
     return "Boa noite";
   })();
 
-  const today = new Date().toLocaleDateString("pt-BR", {
+  const today = new Date().toLocaleDateString(SYSTEM_LOCALE, {
     weekday: "long",
     day: "numeric",
     month: "long",
+    timeZone: SYSTEM_TIMEZONE,
   });
 
   return (

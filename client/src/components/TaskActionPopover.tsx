@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useTenantId } from "@/hooks/useTenantId";
+import { formatDate, formatTime } from "../../../shared/dateUtils";
 
 const postponeOptions = [
   { label: "1 hora", hours: 1 },
@@ -78,7 +79,7 @@ export default function TaskActionPopover({
       id: task.id,
       dueAt: newDue.toISOString(),
     });
-    toast.success(`Tarefa adiada para ${newDue.toLocaleDateString("pt-BR")} ${newDue.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`);
+    toast.success(`Tarefa adiada para ${formatDate(newDue)} ${formatTime(newDue)}`);
     setOpen(false);
     setShowPostpone(false);
     onPostpone?.();
@@ -95,7 +96,7 @@ export default function TaskActionPopover({
       id: task.id,
       dueAt: newDue.toISOString(),
     });
-    toast.success(`Tarefa adiada para ${newDue.toLocaleDateString("pt-BR")} ${newDue.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`);
+    toast.success(`Tarefa adiada para ${formatDate(newDue)} ${formatTime(newDue)}`);
     setOpen(false);
     setShowPostpone(false);
     setShowCustom(false);
@@ -134,7 +135,7 @@ export default function TaskActionPopover({
               <p className="text-[13px] font-semibold text-foreground truncate">{task.title}</p>
               {task.dueAt && (
                 <p className="text-[11px] text-muted-foreground mt-0.5">
-                  Prazo: {new Date(task.dueAt).toLocaleDateString("pt-BR")} {new Date(task.dueAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                  Prazo: {formatDate(task.dueAt)} {formatTime(task.dueAt)}
                 </p>
               )}
             </div>

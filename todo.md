@@ -1647,3 +1647,11 @@
 - [x] Corrigir bug: card fica apagado/opaco após mover no Kanban (drag-and-drop)
 - [x] Card deve ficar totalmente visível e pronto para próximo passo após mover
 - [x] Testes unitários para funil padrão e preferências do usuário
+
+## Configuração de Timezone UTC-3
+
+- [x] Criar utilitário centralizado de formatação de datas com timezone America/Sao_Paulo
+- [x] Atualizar todas as formatações de data no frontend para usar UTC-3
+- [x] Atualizar formatações de data no backend (process.env.TZ = America/Sao_Paulo)
+- [x] Garantir que novas datas criadas usem referência UTC-3
+- [x] Testes unitários para formatação de datas com timezone (606 passando)

@@ -7,6 +7,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Plus, Search, Users, Mail, Phone, MoreHorizontal, Trash2, Edit, Eye, RotateCcw, AlertTriangle, Archive } from "lucide-react";
 import { useState } from "react";
 import DateRangeFilter, { useDateFilter } from "@/components/DateRangeFilter";
+import { formatDate } from "../../../shared/dateUtils";
 import { Link } from "wouter";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
@@ -280,8 +281,8 @@ export default function Contacts() {
                   </td>
                   <td className="px-4 py-3 text-muted-foreground text-[12px]">
                     {showTrash
-                      ? (c.deletedAt ? new Date(c.deletedAt).toLocaleDateString("pt-BR") : "—")
-                      : (c.createdAt ? new Date(c.createdAt).toLocaleDateString("pt-BR") : "—")
+                      ? (c.deletedAt ? formatDate(c.deletedAt) : "—")
+                      : (c.createdAt ? formatDate(c.createdAt) : "—")
                     }
                   </td>
                   <td className="px-4 py-3">

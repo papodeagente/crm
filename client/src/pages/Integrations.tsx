@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
 import { useTenantId } from "@/hooks/useTenantId";
+import { formatDateTimeShort } from "../../../shared/dateUtils";
 
 
 function StatusBadge({ status }: { status: string }) {
@@ -451,7 +452,7 @@ function TrackingScriptTab() {
                     </div>
                     <div className="flex items-center gap-3 mt-1 text-[11px] text-muted-foreground">
                       <span>{t.totalLeads} lead(s) capturado(s)</span>
-                      {t.lastSeenAt && <span>· Último acesso: {new Date(t.lastSeenAt).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</span>}
+                      {t.lastSeenAt && <span>· Último acesso: {formatDateTimeShort(t.lastSeenAt)}</span>}
                       {t.allowedDomains && (t.allowedDomains as string[]).length > 0 && (
                         <span>· Domínios: {(t.allowedDomains as string[]).join(", ")}</span>
                       )}
@@ -816,7 +817,7 @@ function EventLogsTab() { const [sourceFilter, setSourceFilter] = useState<strin
                     )}
                   </td>
                   <td className="p-3.5 text-muted-foreground text-[12px]">
-                    {e.createdAt ? new Date(e.createdAt).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : "—"}
+                    {e.createdAt ? formatDateTimeShort(e.createdAt) : "—"}
                   </td>
                   <td className="p-3.5">
                     {e.status === "failed" && (

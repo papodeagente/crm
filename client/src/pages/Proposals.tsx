@@ -2,6 +2,7 @@ import { trpc } from "@/lib/trpc";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { FileText, Plus, Eye, Send as SendIcon, CheckCircle, XCircle, Clock } from "lucide-react";
+import { formatDate } from "../../../shared/dateUtils";
 import { toast } from "sonner";
 import { useTenantId } from "@/hooks/useTenantId";
 
@@ -73,7 +74,7 @@ export default function Proposals() {
                         {ss.label}
                       </span>
                     </td>
-                    <td className="p-3.5 text-muted-foreground">{p.createdAt ? new Date(p.createdAt).toLocaleDateString("pt-BR") : "—"}</td>
+                    <td className="p-3.5 text-muted-foreground">{p.createdAt ? formatDate(p.createdAt) : "—"}</td>
                   </tr>
                 );
               })}

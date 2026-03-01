@@ -5,9 +5,10 @@ import { trpc } from "@/lib/trpc";
 import { useSocket } from "@/hooks/useSocket";
 import { MessageSquare, ArrowUpRight, ArrowDownLeft, Image, FileAudio, FileText } from "lucide-react";
 import { useState, useEffect } from "react";
+import { formatDateTimeCompact } from "../../../shared/dateUtils";
 
 function formatTimestamp(ts: string | Date) {
-  return new Date(ts).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" });
+  return formatDateTimeCompact(ts);
 }
 
 function formatJid(jid: string) {

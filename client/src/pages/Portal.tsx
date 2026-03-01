@@ -2,6 +2,7 @@ import { trpc } from "@/lib/trpc";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Plus, Ticket } from "lucide-react";
+import { formatDate } from "../../../shared/dateUtils";
 import { toast } from "sonner";
 import { useTenantId } from "@/hooks/useTenantId";
 
@@ -82,7 +83,7 @@ export default function Portal() {
                         <span className={`h-1.5 w-1.5 rounded-full ${ts.dot}`} />{ts.label}
                       </span>
                     </td>
-                    <td className="p-3.5 text-muted-foreground">{t.createdAt ? new Date(t.createdAt).toLocaleDateString("pt-BR") : "—"}</td>
+                    <td className="p-3.5 text-muted-foreground">{t.createdAt ? formatDate(t.createdAt) : "—"}</td>
                   </tr>
                 );
               })}

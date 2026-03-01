@@ -1,6 +1,7 @@
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Bell, MessageSquare, ArrowRightLeft, UserPlus, ClipboardList, Briefcase, Check, CheckCheck } from "lucide-react";
+import { formatDate } from "../../../shared/dateUtils";
 import { useLocation } from "wouter";
 import { useTenantId } from "@/hooks/useTenantId";
 
@@ -57,7 +58,7 @@ function timeAgo(ts: number): string {
   if (hours < 24) return `há ${hours}h`;
   const days = Math.floor(hours / 24);
   if (days < 7) return `há ${days}d`;
-  return new Date(ts).toLocaleDateString("pt-BR");
+  return formatDate(ts);
 }
 
 export default function NotificationsPage() {

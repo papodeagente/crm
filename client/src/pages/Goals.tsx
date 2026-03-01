@@ -2,6 +2,7 @@ import { trpc } from "@/lib/trpc";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Target, Plus, Calendar } from "lucide-react";
+import { formatDate } from "../../../shared/dateUtils";
 import { toast } from "sonner";
 import { useTenantId } from "@/hooks/useTenantId";
 
@@ -51,7 +52,7 @@ export default function Goals() {
                         <p className="text-[13px] font-semibold">{g.metricKey}</p>
                         <p className="text-[11px] text-muted-foreground flex items-center gap-1">
                           <Calendar className="h-3 w-3" />
-                          {g.periodStart ? new Date(g.periodStart).toLocaleDateString("pt-BR") : "—"} — {g.periodEnd ? new Date(g.periodEnd).toLocaleDateString("pt-BR") : "—"}
+                          {g.periodStart ? formatDate(g.periodStart) : "—"} — {g.periodEnd ? formatDate(g.periodEnd) : "—"}
                         </p>
                       </div>
                     </div>

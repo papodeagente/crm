@@ -10,6 +10,7 @@ import { useState, useMemo } from "react";
 import { toast } from "sonner";
 import { useLocation, Link } from "wouter";
 import { useTenantId } from "@/hooks/useTenantId";
+import { formatDateShort } from "../../../shared/dateUtils";
 
 
 /* ─── Types ─── */
@@ -30,7 +31,7 @@ function formatCurrency(cents: number | null) {
 
 function formatDate(d: string | null) {
   if (!d) return "—";
-  return new Date(d).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
+  return formatDateShort(d) || "—";
 }
 
 export default function Trips() {

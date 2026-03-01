@@ -4,9 +4,11 @@ import { Card } from "@/components/ui/card";
 import { trpc } from "@/lib/trpc";
 import { Activity, Wifi, WifiOff, QrCode, MessageSquare, Bot, AlertTriangle } from "lucide-react";
 import { useState } from "react";
+import { formatDateTimeShort, formatTimeWithSeconds, SYSTEM_TIMEZONE, SYSTEM_LOCALE } from "../../../shared/dateUtils";
 
 function formatTimestamp(ts: string | Date) {
-  return new Date(ts).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  const d = new Date(ts);
+  return d.toLocaleString(SYSTEM_LOCALE, { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit", timeZone: SYSTEM_TIMEZONE });
 }
 
 const eventConfig: Record<string, { icon: any; bg: string; color: string; label: string }> = {

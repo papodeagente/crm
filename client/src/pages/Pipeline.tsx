@@ -31,6 +31,7 @@ import { toast } from "sonner";
 import { useTenantId } from "@/hooks/useTenantId";
 import TaskFormDialog, { getTaskTypeIcon, getTaskTypeLabel } from "@/components/TaskFormDialog";
 import TaskActionPopover from "@/components/TaskActionPopover";
+import { formatDate, formatDateTime, formatTime } from "../../../shared/dateUtils";
 
 type ViewMode = "kanban" | "list";
 type SortMode = "created_desc" | "created_asc" | "value_desc" | "value_asc";
@@ -59,15 +60,7 @@ function formatCurrency(cents: number) {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(cents / 100);
 }
 
-function formatDate(date: string | Date | null | undefined) {
-  if (!date) return "";
-  return new Date(date).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
-}
-
-function formatDateTime(date: string | Date | null | undefined) {
-  if (!date) return "";
-  return new Date(date).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
-}
+// formatDate and formatDateTime imported from shared/dateUtils (UTC-3)
 
 export default function Pipeline() {
   const TENANT_ID = useTenantId();
@@ -2245,7 +2238,7 @@ function TaskCalendarPanel({ tasks, deals, onEditTask }: { tasks: any[]; deals: 
                       {isOverdue && <Badge variant="destructive" className="text-[9px] px-1.5 py-0 h-4 rounded-md">ATRASADA</Badge>}
                       {t.dueAt && (
                         <span className="text-[11px] text-muted-foreground flex-shrink-0">
-                          {new Date(t.dueAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                          {formatTime(t.dueAt)}
                         </span>
                       )}
                     </div>

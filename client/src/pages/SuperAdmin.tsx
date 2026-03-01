@@ -14,6 +14,7 @@ import {
   Plane, ArrowLeft, Loader2, Edit, Ban, CheckCircle, Clock,
   ChevronDown, ChevronRight, User, Mail, Phone, UserCheck, UserX
 } from "lucide-react";
+import { formatDate } from "../../../shared/dateUtils";
 
 export default function SuperAdmin() {
   const [, navigate] = useLocation();
@@ -245,7 +246,7 @@ export default function SuperAdmin() {
                           </td>
                           <td className="p-4 text-muted-foreground">{tenant.userCount}</td>
                           <td className="p-4 text-muted-foreground">
-                            {new Date(tenant.createdAt).toLocaleDateString("pt-BR")}
+                            {formatDate(tenant.createdAt)}
                           </td>
                           <td className="p-4 text-right">
                             <div className="flex items-center justify-end gap-1">
@@ -476,12 +477,12 @@ function TenantUsersPanel({
                   )}
                   <span className="flex items-center gap-1">
                     <Calendar className="w-3 h-3" />
-                    Criado em {new Date(user.createdAt).toLocaleDateString("pt-BR")}
+                    Criado em {formatDate(user.createdAt)}
                   </span>
                   {user.lastLoginAt && (
                     <span className="flex items-center gap-1">
                       <Clock className="w-3 h-3" />
-                      Último login: {new Date(user.lastLoginAt).toLocaleDateString("pt-BR")}
+                      Último login: {formatDate(user.lastLoginAt)}
                     </span>
                   )}
                 </div>

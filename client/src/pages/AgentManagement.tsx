@@ -47,6 +47,7 @@ import {
   ArrowUpDown,
   MessageSquare,
 } from "lucide-react";
+import { formatDateShort } from "../../../shared/dateUtils";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -295,7 +296,7 @@ function AgentsTab() {
                     {agent.lastLoginAt && (
                       <div className="text-center">
                         <p className="text-[12px] text-muted-foreground">
-                          {new Date(agent.lastLoginAt).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}
+                          {formatDateShort(agent.lastLoginAt)}
                         </p>
                         <p className="text-[10px] text-muted-foreground/60">Último login</p>
                       </div>

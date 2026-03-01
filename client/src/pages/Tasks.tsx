@@ -23,6 +23,7 @@ import TaskFormDialog from "@/components/TaskFormDialog";
 import TaskActionPopover from "@/components/TaskActionPopover";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Pencil, Check, MoreVertical } from "lucide-react";
+import { formatDate, formatTime, formatDateLong, formatDateShort, formatMonthYear, formatDateRange, SYSTEM_TIMEZONE, SYSTEM_LOCALE } from "../../../shared/dateUtils";
 
 // ─── Types & Config ───
 const TASK_TYPES = [
@@ -78,9 +79,7 @@ function getEffectiveStatus(task: any): string {
 
 function formatDateTime(dateStr: string | null | undefined) {
   if (!dateStr) return "—";
-  const d = new Date(dateStr);
-  return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" }) +
-    " às " + d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+  return formatDate(dateStr) + " às " + formatTime(dateStr);
 }
 
 function formatCurrency(amount: number | null | undefined) {
@@ -211,15 +210,15 @@ export default function Tasks() {
   const calendarTitle = useMemo(() => {
     const d = calendarDate;
     if (calendarView === "day") {
-      return d.toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+      return formatDateLong(d);
     } else if (calendarView === "week") {
       const start = new Date(d);
       start.setDate(d.getDate() - d.getDay());
       const end = new Date(start);
       end.setDate(start.getDate() + 6);
-      return `${start.toLocaleDateString("pt-BR", { day: "numeric", month: "short" })} — ${end.toLocaleDateString("pt-BR", { day: "numeric", month: "short", year: "numeric" })}`;
+      return formatDateRange(start, end);
     }
-    return d.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+    return formatMonthYear(d);
   }, [calendarDate, calendarView]);
 
   // Calendar tasks query (broader date range for calendar)
@@ -937,7 +936,7 @@ function DayView({ tasks, date, onToggleStatus, onEdit }: { tasks: any[]; date: 
                           ))}
                         </div>
                         <span className="text-[11px] text-muted-foreground flex-shrink-0">
-                          {new Date(t.dueAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                          {formatTime(t.dueAt)}
                         </span>
                       </div>
                     </TaskActionPopover>

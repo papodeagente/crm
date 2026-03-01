@@ -1,3 +1,6 @@
+// Set system timezone to America/Sao_Paulo (UTC-3) before anything else
+process.env.TZ = "America/Sao_Paulo";
+
 import "dotenv/config";
 import express from "express";
 import { createServer } from "http";

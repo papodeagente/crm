@@ -9,6 +9,7 @@ import {
   UserPlus, Lock, Users, UserCheck, UserX, ArrowRightLeft,
   CircleDot, ChevronDown, WifiOff
 } from "lucide-react";
+import { formatTime } from "../../../shared/dateUtils";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
 
@@ -54,7 +55,7 @@ const playNotification = createNotificationSound();
    HELPERS
    ═══════════════════════════════════════════════════════ */
 
-function formatTime(date: string | Date | null | undefined): string {
+function formatConversationTime(date: string | Date | null | undefined): string {
   if (!date) return "";
   const d = new Date(date);
   if (isNaN(d.getTime())) return "";
@@ -62,10 +63,10 @@ function formatTime(date: string | Date | null | undefined): string {
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const msgDay = new Date(d.getFullYear(), d.getMonth(), d.getDate());
   const diffDays = Math.round((today.getTime() - msgDay.getTime()) / 86400000);
-  if (diffDays === 0) return d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+  if (diffDays === 0) return formatTime(d);
   if (diffDays === 1) return "Ontem";
-  if (diffDays < 7) return d.toLocaleDateString("pt-BR", { weekday: "short" });
-  return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit" });
+  if (diffDays < 7) return d.toLocaleDateString("pt-BR", { weekday: "short", timeZone: "America/Sao_Paulo" });
+  return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit", timeZone: "America/Sao_Paulo" });
 }
 
 function formatPhoneNumber(jid: string): string {
@@ -214,7 +215,7 @@ const ConversationItem = memo(({
   const fromMe = conv.lastFromMe === true || conv.lastFromMe === 1;
   const unread = Number(conv.unreadCount) || 0;
   const preview = getMessagePreview(conv.lastMessage, conv.lastMessageType);
-  const time = formatTime(conv.lastTimestamp);
+  const time = formatConversationTime(conv.lastTimestamp);
 
   return (
     <div

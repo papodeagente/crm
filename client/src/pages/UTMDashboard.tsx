@@ -14,6 +14,7 @@ import {
   ArrowUpRight, ArrowDownRight, Percent, Hash, Eye, ChevronDown, ChevronUp,
   Calendar, RefreshCw, Info, Loader2, Download, Search
 } from "lucide-react";
+import { formatDate } from "../../../shared/dateUtils";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip as RechartsTooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend,
@@ -566,7 +567,7 @@ export default function UTMDashboard() {
                           <TableCell>{deal.utmMedium || "—"}</TableCell>
                           <TableCell className="max-w-[120px] truncate">{deal.utmCampaign || "—"}</TableCell>
                           <TableCell>{deal.leadSource || deal.channelOrigin || "—"}</TableCell>
-                          <TableCell className="text-muted-foreground">{new Date(deal.createdAt).toLocaleDateString("pt-BR")}</TableCell>
+                          <TableCell className="text-muted-foreground">{formatDate(deal.createdAt)}</TableCell>
                         </TableRow>
                       ))
                     )}

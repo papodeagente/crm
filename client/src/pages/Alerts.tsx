@@ -1,6 +1,7 @@
 import { trpc } from "@/lib/trpc";
 import { Card } from "@/components/ui/card";
 import { Bell, AlertTriangle, Info, CheckCircle2 } from "lucide-react";
+import { formatFullDateTime } from "../../../shared/dateUtils";
 import { useTenantId } from "@/hooks/useTenantId";
 
 
@@ -50,7 +51,7 @@ export default function Alerts() {
                       <span className={`inline-flex items-center text-[10px] font-medium px-2 py-0.5 rounded-full ${cfg.iconBg} ${cfg.iconColor}`}>{cfg.label}</span>
                     </div>
                     <p className="text-[13px] text-muted-foreground mt-1.5">{a.description || "Sem detalhes"}</p>
-                    <p className="text-[11px] text-muted-foreground/60 mt-2">{a.createdAt ? new Date(a.createdAt).toLocaleString("pt-BR") : "—"}</p>
+                    <p className="text-[11px] text-muted-foreground/60 mt-2">{a.createdAt ? formatFullDateTime(a.createdAt) : "—"}</p>
                   </div>
                 </div>
               </Card>

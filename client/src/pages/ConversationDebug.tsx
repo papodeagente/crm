@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { toast } from "sonner";
 import { ArrowLeft, RefreshCw, Database, Merge, Search, Shield, Phone, MessageSquare, Users } from "lucide-react";
+import { formatFullDateTime } from "../../../shared/dateUtils";
 import { useLocation } from "wouter";
 
 export default function ConversationDebug() {
@@ -312,10 +313,10 @@ export default function ConversationDebug() {
                       </Badge>
                     </td>
                     <td className="p-2 text-xs text-muted-foreground">
-                      {i.firstSeenAt ? new Date(i.firstSeenAt).toLocaleString() : "—"}
+                      {i.firstSeenAt ? formatFullDateTime(i.firstSeenAt) : "—"}
                     </td>
                     <td className="p-2 text-xs text-muted-foreground">
-                      {i.lastSeenAt ? new Date(i.lastSeenAt).toLocaleString() : "—"}
+                      {i.lastSeenAt ? formatFullDateTime(i.lastSeenAt) : "—"}
                     </td>
                   </tr>
                 ))}
