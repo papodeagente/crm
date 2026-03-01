@@ -465,14 +465,14 @@ export const appRouter = router({
   // ─── Dashboard ───
   dashboard: router({
     metrics: protectedProcedure
-      .input(z.object({ tenantId: z.number() }))
+      .input(z.object({ tenantId: z.number(), pipelineId: z.number().optional() }))
       .query(async ({ input, ctx }) => {
-        return getDashboardMetrics(input.tenantId, ctx.user?.id);
+        return getDashboardMetrics(input.tenantId, ctx.user?.id, input.pipelineId);
       }),
     pipelineSummary: protectedProcedure
-      .input(z.object({ tenantId: z.number() }))
+      .input(z.object({ tenantId: z.number(), pipelineId: z.number().optional() }))
       .query(async ({ input, ctx }) => {
-        return getPipelineSummary(input.tenantId, ctx.user?.id);
+        return getPipelineSummary(input.tenantId, ctx.user?.id, input.pipelineId);
       }),
     recentActivity: protectedProcedure
       .input(z.object({ tenantId: z.number(), limit: z.number().optional(), dateFrom: z.string().optional(), dateTo: z.string().optional() }))

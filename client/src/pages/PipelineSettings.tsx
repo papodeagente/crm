@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -16,7 +16,7 @@ import {
 import {
   ArrowLeft, Plus, Pencil, Trash2, ChevronUp, ChevronDown,
   GitBranch, Zap, GripVertical, AlertTriangle, Archive,
-  Play, Pause, Copy, ArrowRight, Loader2,
+  Play, Pause, Copy, ArrowRight, Loader2, Star,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -117,6 +117,13 @@ export default function PipelineSettings() {
   );
   const sourceStages = (sourceStagesQ.data || []) as unknown as StageData[];
 
+  // User default pipeline preference
+  const defaultPipelinePref = trpc.preferences.get.useQuery(
+    { tenantId, key: "default_pipeline_id" },
+    { enabled: !!tenantId }
+  );
+  const defaultPipelineId = defaultPipelinePref.data?.value ? Number(defaultPipelinePref.data.value) : null;
+
   // Mutations
   const utils = trpc.useUtils();
   const createPipeline = trpc.crm.pipelines.create.useMutation({
@@ -153,6 +160,12 @@ export default function PipelineSettings() {
   });
   const deleteAutomation = trpc.crm.pipelineAutomations.delete.useMutation({
     onSuccess: () => { utils.crm.pipelineAutomations.list.invalidate(); toast.success("Automação excluída"); },
+  });
+  const setDefaultPipelineMut = trpc.preferences.set.useMutation({
+    onSuccess: () => {
+      utils.preferences.get.invalidate({ tenantId, key: "default_pipeline_id" });
+      toast.success("Funil padrão definido!");
+    },
   });
 
   // Auto-select first pipeline
@@ -289,38 +302,53 @@ export default function PipelineSettings() {
                 <Plus className="h-3.5 w-3.5" />
               </Button>
             </div>
-            {activePipelines.map(p => (
-              <button
-                key={p.id}
-                onClick={() => setSelectedPipelineId(p.id)}
-                className={`w-full text-left p-3 rounded-xl transition-all group ${
-                  selectedPipelineId === p.id
-                    ? "bg-primary/10 border border-primary/20"
-                    : "surface hover:bg-accent/50"
-                }`}
-              >
-                <div className="flex items-center gap-2.5">
-                  <div className="h-3 w-3 rounded-full shrink-0" style={{ backgroundColor: p.color || "#10b981" }} />
-                  <span className="text-[13px] font-medium text-foreground truncate">{p.name}</span>
-                </div>
-                <div className="flex items-center gap-2 mt-1.5 ml-5">
-                  <span className={`text-[11px] px-1.5 py-0.5 rounded-md ${PIPELINE_TYPES[p.pipelineType]?.color || "bg-muted text-muted-foreground"}`}>
-                    {PIPELINE_TYPES[p.pipelineType]?.label || p.pipelineType}
-                  </span>
-                  {p.isDefault ? <span className="text-[11px] text-primary">Padrão</span> : null}
-                </div>
-                <div className="flex gap-1 mt-2 ml-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button onClick={(e) => { e.stopPropagation(); openEditPipeline(p); }} className="h-6 w-6 rounded flex items-center justify-center hover:bg-accent">
-                    <Pencil className="h-3 w-3 text-muted-foreground" />
-                  </button>
-                  {!p.isDefault && (
+            {activePipelines.map(p => {
+              const isDefault = defaultPipelineId === p.id;
+              return (
+                <button
+                  key={p.id}
+                  onClick={() => setSelectedPipelineId(p.id)}
+                  className={`w-full text-left p-3 rounded-xl transition-all group ${
+                    selectedPipelineId === p.id
+                      ? "bg-primary/10 border border-primary/20"
+                      : "surface hover:bg-accent/50"
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5">
+                    <div className="h-3 w-3 rounded-full shrink-0" style={{ backgroundColor: p.color || "#10b981" }} />
+                    <span className="text-[13px] font-medium text-foreground truncate flex-1">{p.name}</span>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setDefaultPipelineMut.mutate({ tenantId, key: "default_pipeline_id", value: String(p.id) });
+                      }}
+                      className={`h-6 w-6 rounded-full flex items-center justify-center shrink-0 transition-all ${
+                        isDefault
+                          ? "text-amber-400"
+                          : "text-muted-foreground/30 hover:text-amber-400 opacity-0 group-hover:opacity-100"
+                      }`}
+                      title={isDefault ? "Funil padrão" : "Definir como funil padrão"}
+                    >
+                      <Star className={`h-3.5 w-3.5 ${isDefault ? "fill-amber-400" : ""}`} />
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-2 mt-1.5 ml-5">
+                    <span className={`text-[11px] px-1.5 py-0.5 rounded-md ${PIPELINE_TYPES[p.pipelineType]?.color || "bg-muted text-muted-foreground"}`}>
+                      {PIPELINE_TYPES[p.pipelineType]?.label || p.pipelineType}
+                    </span>
+                    {isDefault && <span className="text-[10px] text-amber-500 font-semibold">Padrão</span>}
+                  </div>
+                  <div className="flex gap-1 mt-2 ml-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button onClick={(e) => { e.stopPropagation(); openEditPipeline(p); }} className="h-6 w-6 rounded flex items-center justify-center hover:bg-accent">
+                      <Pencil className="h-3 w-3 text-muted-foreground" />
+                    </button>
                     <button onClick={(e) => { e.stopPropagation(); deletePipeline.mutate({ tenantId, id: p.id }); }} className="h-6 w-6 rounded flex items-center justify-center hover:bg-destructive/10">
                       <Archive className="h-3 w-3 text-muted-foreground" />
                     </button>
-                  )}
-                </div>
-              </button>
-            ))}
+                  </div>
+                </button>
+              );
+            })}
             {activePipelines.length === 0 && (
               <div className="text-center py-8">
                 <p className="text-[13px] text-muted-foreground">Nenhum funil criado</p>

@@ -132,13 +132,28 @@ export default function Home() {
   const { user } = useAuth();
   const tenantId = useTenantId();
 
-  // All queries with refetchInterval for real-time sync
+  // Load user's default pipeline preference
+  const defaultPipelinePref = trpc.preferences.get.useQuery(
+    { tenantId, key: "default_pipeline_id" },
+    { enabled: !!tenantId }
+  );
+  const defaultPipelineId = defaultPipelinePref.data?.value ? Number(defaultPipelinePref.data.value) : undefined;
+
+  // Load pipeline name for display
+  const pipelinesQ = trpc.crm.pipelines.list.useQuery({ tenantId });
+  const defaultPipelineName = useMemo(() => {
+    if (!defaultPipelineId || !pipelinesQ.data) return "Funil de Vendas";
+    const p = (pipelinesQ.data as any[]).find((p: any) => p.id === defaultPipelineId);
+    return p?.name || "Funil de Vendas";
+  }, [defaultPipelineId, pipelinesQ.data]);
+
+  // All queries with refetchInterval for real-time sync — filtered by default pipeline
   const metricsQ = trpc.dashboard.metrics.useQuery(
-    { tenantId },
+    { tenantId, pipelineId: defaultPipelineId },
     { refetchInterval: REFETCH_INTERVAL }
   );
   const pipelineQ = trpc.dashboard.pipelineSummary.useQuery(
-    { tenantId },
+    { tenantId, pipelineId: defaultPipelineId },
     { refetchInterval: REFETCH_INTERVAL }
   );
   const tasksQ = trpc.dashboard.upcomingTasks.useQuery(
@@ -284,14 +299,14 @@ export default function Home() {
             )}
           </div>
 
-          {/* Funnel Chart — Sales Pipeline Only */}
+          {/* Funnel Chart — Default Pipeline */}
           <div className="surface p-5">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <div className="h-6 w-6 rounded-lg bg-purple-500/15 flex items-center justify-center">
                   <TrendingUp className="h-3.5 w-3.5 text-purple-400" />
                 </div>
-                <h2 className="text-[14px] font-semibold text-foreground">Funil de Vendas</h2>
+                <h2 className="text-[14px] font-semibold text-foreground">{defaultPipelineName}</h2>
               </div>
               <Link href="/pipeline" className="text-[12px] text-primary font-medium hover:underline">
                 Abrir Pipeline
@@ -328,7 +343,7 @@ export default function Home() {
                   <TrendingUp className="h-3.5 w-3.5 text-emerald-400" />
                 </div>
                 <span className="text-[11.5px] font-semibold text-muted-foreground uppercase tracking-wider">
-                  Valor Total em Pipeline
+                  Valor Total — {defaultPipelineName}
                 </span>
               </div>
               <span className="text-[24px] font-bold tracking-tight text-foreground">
@@ -340,7 +355,7 @@ export default function Home() {
           {/* Pipeline stages as list (complementary to funnel) */}
           {pipelineQ.data && pipelineQ.data.length > 0 && (
             <div className="surface p-5">
-              <h2 className="text-[14px] font-semibold text-foreground mb-4">Etapas do Funil</h2>
+              <h2 className="text-[14px] font-semibold text-foreground mb-4">Etapas — {defaultPipelineName}</h2>
               <div className="space-y-3">
                 {pipelineQ.data.map((s: any) => (
                   <div key={s.stageId} className="flex items-center gap-3">

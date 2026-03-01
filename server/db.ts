@@ -552,7 +552,7 @@ export async function getNextRoundRobinAgent(tenantId: number): Promise<number |
 
 // ─── Dashboard Metrics ───
 
-export async function getDashboardMetrics(tenantId: number, userId?: number) {
+export async function getDashboardMetrics(tenantId: number, userId?: number, pipelineId?: number) {
   const db = await getDb();
   if (!db) {
     return {
@@ -576,22 +576,29 @@ export async function getDashboardMetrics(tenantId: number, userId?: number) {
   const ownerFilter = userId ? sql`AND d_inner.ownerUserId = ${userId}` : sql``;
   const contactOwnerFilter = userId ? sql`AND ownerUserId = ${userId}` : sql``;
   const taskAssigneeFilter = userId ? sql`AND assignedToUserId = ${userId}` : sql``;
+  // Pipeline filter: if pipelineId provided, filter by specific pipeline; otherwise by type 'sales'
+  const pipelineFilter = pipelineId
+    ? sql`AND d_inner.pipelineId = ${pipelineId}`
+    : sql``;
+  const pipelineJoin = pipelineId
+    ? sql`JOIN pipelines p ON p.id = d_inner.pipelineId`
+    : sql`JOIN pipelines p ON p.id = d_inner.pipelineId AND p.pipelineType = 'sales'`;
 
   const [result] = await db.execute(sql`
     SELECT
-      -- Active deals (status = 'open', not deleted) for this user - ONLY sales pipeline
+      -- Active deals (status = 'open', not deleted) for this user
       (SELECT COUNT(*) FROM deals d_inner
-        JOIN pipelines p ON p.id = d_inner.pipelineId AND p.pipelineType = 'sales'
-        WHERE d_inner.tenantId = ${tenantId} AND d_inner.status = 'open' AND d_inner.deletedAt IS NULL ${ownerFilter}) AS activeDeals,
+        ${pipelineJoin}
+        WHERE d_inner.tenantId = ${tenantId} AND d_inner.status = 'open' AND d_inner.deletedAt IS NULL ${pipelineFilter} ${ownerFilter}) AS activeDeals,
       -- Deals created last 30 days
       (SELECT COUNT(*) FROM deals d_inner
-        JOIN pipelines p ON p.id = d_inner.pipelineId AND p.pipelineType = 'sales'
-        WHERE d_inner.tenantId = ${tenantId} AND d_inner.status = 'open' AND d_inner.deletedAt IS NULL ${ownerFilter}
+        ${pipelineJoin}
+        WHERE d_inner.tenantId = ${tenantId} AND d_inner.status = 'open' AND d_inner.deletedAt IS NULL ${pipelineFilter} ${ownerFilter}
         AND d_inner.createdAt >= ${thirtyDaysAgo}) AS dealsLast30,
       -- Deals created previous 30 days
       (SELECT COUNT(*) FROM deals d_inner
-        JOIN pipelines p ON p.id = d_inner.pipelineId AND p.pipelineType = 'sales'
-        WHERE d_inner.tenantId = ${tenantId} AND d_inner.status = 'open' AND d_inner.deletedAt IS NULL ${ownerFilter}
+        ${pipelineJoin}
+        WHERE d_inner.tenantId = ${tenantId} AND d_inner.status = 'open' AND d_inner.deletedAt IS NULL ${pipelineFilter} ${ownerFilter}
         AND d_inner.createdAt >= ${sixtyDaysAgo} AND d_inner.createdAt < ${thirtyDaysAgo}) AS dealsPrev30,
 
       -- Total unique contacts in user's portfolio
@@ -642,10 +649,10 @@ export async function getDashboardMetrics(tenantId: number, userId?: number) {
       (SELECT COUNT(*) FROM crm_tasks WHERE tenantId = ${tenantId} AND status IN ('pending', 'in_progress') ${taskAssigneeFilter}
         AND createdAt >= ${sixtyDaysAgo} AND createdAt < ${thirtyDaysAgo}) AS tasksPrev30,
 
-      -- Total deal value (open deals, sales pipeline only) for user
+      -- Total deal value (open deals) for user
       (SELECT COALESCE(SUM(d_inner.valueCents), 0) FROM deals d_inner
-        JOIN pipelines p ON p.id = d_inner.pipelineId AND p.pipelineType = 'sales'
-        WHERE d_inner.tenantId = ${tenantId} AND d_inner.status = 'open' AND d_inner.deletedAt IS NULL ${ownerFilter}) AS totalDealValueCents
+        ${pipelineJoin}
+        WHERE d_inner.tenantId = ${tenantId} AND d_inner.status = 'open' AND d_inner.deletedAt IS NULL ${pipelineFilter} ${ownerFilter}) AS totalDealValueCents
   `);
 
   const row = (result as any)[0] || {};
@@ -670,13 +677,16 @@ export async function getDashboardMetrics(tenantId: number, userId?: number) {
 
 // ─── Pipeline Summary for Dashboard ───
 
-export async function getPipelineSummary(tenantId: number, userId?: number) {
+export async function getPipelineSummary(tenantId: number, userId?: number, pipelineId?: number) {
   const db = await getDb();
   if (!db) return [];
 
   const ownerFilter = userId ? sql`AND d.ownerUserId = ${userId}` : sql``;
+  // If pipelineId provided, filter by specific pipeline; otherwise by type 'sales'
+  const pipelineCondition = pipelineId
+    ? sql`AND p.id = ${pipelineId}`
+    : sql`AND p.pipelineType = 'sales'`;
 
-  // Only sales pipelines
   const [rows] = await db.execute(sql`
     SELECT
       ps.id AS stageId,
@@ -688,7 +698,7 @@ export async function getPipelineSummary(tenantId: number, userId?: number) {
       COUNT(d.id) AS dealCount,
       COALESCE(SUM(d.valueCents), 0) AS totalValueCents
     FROM pipeline_stages ps
-    JOIN pipelines p ON p.id = ps.pipelineId AND p.pipelineType = 'sales'
+    JOIN pipelines p ON p.id = ps.pipelineId ${pipelineCondition}
     LEFT JOIN deals d ON d.stageId = ps.id AND d.tenantId = ${tenantId} AND d.status = 'open' AND d.deletedAt IS NULL ${ownerFilter}
     WHERE ps.tenantId = ${tenantId}
     GROUP BY ps.id, ps.name, ps.color, ps.orderIndex, ps.isWon, ps.isLost

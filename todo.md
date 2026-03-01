@@ -1668,3 +1668,10 @@
 
 ## Nome do Contato no DealCard
 - [x] Exibir nome do contato abaixo do título da negociação no card do Kanban
+
+## Funil Padrão em Settings + Dashboard Filtrado
+
+- [x] Página /settings/pipelines: opção de definir um funil como principal/padrão
+- [x] Dashboard (Início): gráfico de funil deve puxar apenas dados do funil padrão
+- [x] Dashboard (Início): KPIs de pipeline devem usar apenas o funil padrão
+- [x] Testes para garantir que dashboard filtra pelo funil padrão
