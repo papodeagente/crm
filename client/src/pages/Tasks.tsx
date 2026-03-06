@@ -104,7 +104,7 @@ export default function Tasks() {
   // Filters
   const [assigneeFilter, setAssigneeFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("open");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [sortField, setSortField] = useState<"dueAt" | "title">("dueAt");

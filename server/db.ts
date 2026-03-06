@@ -552,7 +552,7 @@ export async function getNextRoundRobinAgent(tenantId: number): Promise<number |
 
 // ─── Dashboard Metrics ───
 
-export async function getDashboardMetrics(tenantId: number, userId?: number, pipelineId?: number) {
+export async function getDashboardMetrics(tenantId: number, userId?: number, pipelineId?: number, dealStatus?: string) {
   const db = await getDb();
   if (!db) {
     return {
@@ -583,22 +583,30 @@ export async function getDashboardMetrics(tenantId: number, userId?: number, pip
   const pipelineJoin = pipelineId
     ? sql`JOIN pipelines p ON p.id = d_inner.pipelineId`
     : sql`JOIN pipelines p ON p.id = d_inner.pipelineId AND p.pipelineType = 'sales'`;
+  // Deal status filter: 'open' (em andamento), 'won' (ganho), 'lost' (perdido), or undefined/all
+  const statusFilter = dealStatus === 'won'
+    ? sql`AND d_inner.status = 'won'`
+    : dealStatus === 'lost'
+      ? sql`AND d_inner.status = 'lost'`
+      : dealStatus === 'all'
+        ? sql`AND d_inner.deletedAt IS NULL`
+        : sql`AND d_inner.status = 'open'`;
 
   const [result] = await db.execute(sql`
     SELECT
-      -- Active deals (status = 'open', not deleted) for this user
+      -- Deals filtered by status
       (SELECT COUNT(*) FROM deals d_inner
         ${pipelineJoin}
-        WHERE d_inner.tenantId = ${tenantId} AND d_inner.status = 'open' AND d_inner.deletedAt IS NULL ${pipelineFilter} ${ownerFilter}) AS activeDeals,
+        WHERE d_inner.tenantId = ${tenantId} AND d_inner.deletedAt IS NULL ${statusFilter} ${pipelineFilter} ${ownerFilter}) AS activeDeals,
       -- Deals created last 30 days
       (SELECT COUNT(*) FROM deals d_inner
         ${pipelineJoin}
-        WHERE d_inner.tenantId = ${tenantId} AND d_inner.status = 'open' AND d_inner.deletedAt IS NULL ${pipelineFilter} ${ownerFilter}
+        WHERE d_inner.tenantId = ${tenantId} AND d_inner.deletedAt IS NULL ${statusFilter} ${pipelineFilter} ${ownerFilter}
         AND d_inner.createdAt >= ${thirtyDaysAgo}) AS dealsLast30,
       -- Deals created previous 30 days
       (SELECT COUNT(*) FROM deals d_inner
         ${pipelineJoin}
-        WHERE d_inner.tenantId = ${tenantId} AND d_inner.status = 'open' AND d_inner.deletedAt IS NULL ${pipelineFilter} ${ownerFilter}
+        WHERE d_inner.tenantId = ${tenantId} AND d_inner.deletedAt IS NULL ${statusFilter} ${pipelineFilter} ${ownerFilter}
         AND d_inner.createdAt >= ${sixtyDaysAgo} AND d_inner.createdAt < ${thirtyDaysAgo}) AS dealsPrev30,
 
       -- Total unique contacts in user's portfolio
@@ -649,10 +657,10 @@ export async function getDashboardMetrics(tenantId: number, userId?: number, pip
       (SELECT COUNT(*) FROM crm_tasks WHERE tenantId = ${tenantId} AND status IN ('pending', 'in_progress') ${taskAssigneeFilter}
         AND createdAt >= ${sixtyDaysAgo} AND createdAt < ${thirtyDaysAgo}) AS tasksPrev30,
 
-      -- Total deal value (open deals) for user
+      -- Total deal value filtered by status
       (SELECT COALESCE(SUM(d_inner.valueCents), 0) FROM deals d_inner
         ${pipelineJoin}
-        WHERE d_inner.tenantId = ${tenantId} AND d_inner.status = 'open' AND d_inner.deletedAt IS NULL ${pipelineFilter} ${ownerFilter}) AS totalDealValueCents
+        WHERE d_inner.tenantId = ${tenantId} AND d_inner.deletedAt IS NULL ${statusFilter} ${pipelineFilter} ${ownerFilter}) AS totalDealValueCents
   `);
 
   const row = (result as any)[0] || {};
@@ -677,7 +685,7 @@ export async function getDashboardMetrics(tenantId: number, userId?: number, pip
 
 // ─── Pipeline Summary for Dashboard ───
 
-export async function getPipelineSummary(tenantId: number, userId?: number, pipelineId?: number) {
+export async function getPipelineSummary(tenantId: number, userId?: number, pipelineId?: number, dealStatus?: string) {
   const db = await getDb();
   if (!db) return [];
 
@@ -686,6 +694,14 @@ export async function getPipelineSummary(tenantId: number, userId?: number, pipe
   const pipelineCondition = pipelineId
     ? sql`AND p.id = ${pipelineId}`
     : sql`AND p.pipelineType = 'sales'`;
+  // Deal status filter for pipeline summary
+  const statusFilter = dealStatus === 'won'
+    ? sql`AND d.status = 'won'`
+    : dealStatus === 'lost'
+      ? sql`AND d.status = 'lost'`
+      : dealStatus === 'all'
+        ? sql`AND d.deletedAt IS NULL`
+        : sql`AND d.status = 'open'`;
 
   const [rows] = await db.execute(sql`
     SELECT
@@ -699,7 +715,7 @@ export async function getPipelineSummary(tenantId: number, userId?: number, pipe
       COALESCE(SUM(d.valueCents), 0) AS totalValueCents
     FROM pipeline_stages ps
     JOIN pipelines p ON p.id = ps.pipelineId ${pipelineCondition}
-    LEFT JOIN deals d ON d.stageId = ps.id AND d.tenantId = ${tenantId} AND d.status = 'open' AND d.deletedAt IS NULL ${ownerFilter}
+    LEFT JOIN deals d ON d.stageId = ps.id AND d.tenantId = ${tenantId} AND d.deletedAt IS NULL ${statusFilter} ${ownerFilter}
     WHERE ps.tenantId = ${tenantId}
     GROUP BY ps.id, ps.name, ps.color, ps.orderIndex, ps.isWon, ps.isLost
     ORDER BY ps.orderIndex ASC

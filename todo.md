@@ -1681,3 +1681,12 @@
 - [x] Diagnosticar por que gráficos não refletem dados do funil padrão em tempo real
 - [x] Corrigir queries do dashboard para reagir à mudança de pipelineId
 - [x] Garantir que backend retorna dados filtrados corretamente pelo pipelineId
+
+## Filtro de Status no Dashboard + Padrão CRM
+- [x] Adicionar filtro de status no Dashboard (Em andamento, Ganho, Perdido, Todos)
+- [x] Backend: getDashboardMetrics aceitar parâmetro de status
+- [x] Backend: getPipelineSummary aceitar parâmetro de status
+- [x] Frontend: botões/tabs de filtro de status no Dashboard
+- [x] Padrão: todos os filtros do CRM começam em "Em andamento"
+- [x] Aplicar padrão "Em andamento" na página Pipeline/Kanban (já estava 'open')
+- [x] Aplicar padrão "Em andamento" na página de Tarefas (alterado de 'all' para 'open')

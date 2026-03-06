@@ -1,6 +1,6 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
-import { useMemo } from "react";
+import { useState, useMemo } from "react";
 import { useTenantId } from "@/hooks/useTenantId";
 import {
   Briefcase, Users, Plane, CheckSquare, MessageSquare,
@@ -132,6 +132,9 @@ export default function Home() {
   const { user } = useAuth();
   const tenantId = useTenantId();
 
+  // Deal status filter — default is 'open' (Em andamento)
+  const [dealStatus, setDealStatus] = useState<'open' | 'won' | 'lost' | 'all'>('open');
+
   // Load user's default pipeline preference
   const defaultPipelinePref = trpc.preferences.get.useQuery(
     { tenantId, key: "default_pipeline_id" },
@@ -147,13 +150,13 @@ export default function Home() {
     return p?.name || "Funil de Vendas";
   }, [defaultPipelineId, pipelinesQ.data]);
 
-  // All queries with refetchInterval for real-time sync — filtered by default pipeline
+  // All queries with refetchInterval for real-time sync — filtered by default pipeline + status
   const metricsQ = trpc.dashboard.metrics.useQuery(
-    { tenantId, pipelineId: defaultPipelineId },
+    { tenantId, pipelineId: defaultPipelineId, dealStatus },
     { refetchInterval: REFETCH_INTERVAL }
   );
   const pipelineQ = trpc.dashboard.pipelineSummary.useQuery(
-    { tenantId, pipelineId: defaultPipelineId },
+    { tenantId, pipelineId: defaultPipelineId, dealStatus },
     { refetchInterval: REFETCH_INTERVAL }
   );
   const tasksQ = trpc.dashboard.upcomingTasks.useQuery(
@@ -210,10 +213,32 @@ export default function Home() {
         </div>
       </div>
 
+      {/* Status filter tabs */}
+      <div className="flex items-center gap-1.5 mb-6 p-1 rounded-xl bg-muted/40 w-fit">
+        {([
+          { value: 'open' as const, label: 'Em andamento' },
+          { value: 'won' as const, label: 'Ganho' },
+          { value: 'lost' as const, label: 'Perdido' },
+          { value: 'all' as const, label: 'Todos' },
+        ]).map((opt) => (
+          <button
+            key={opt.value}
+            onClick={() => setDealStatus(opt.value)}
+            className={`px-4 py-1.5 rounded-lg text-[12px] font-medium transition-all duration-200 ${
+              dealStatus === opt.value
+                ? 'bg-background text-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            {opt.label}
+          </button>
+        ))}
+      </div>
+
       {/* Metrics row */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         <MetricCard
-          label="Negociações Ativas"
+          label={dealStatus === 'won' ? 'Negociações Ganhas' : dealStatus === 'lost' ? 'Negociações Perdidas' : dealStatus === 'all' ? 'Total de Negociações' : 'Negociações Ativas'}
           value={String(metrics?.activeDeals ?? 0)}
           change={dealsChange.text}
           changeType={dealsChange.type}
