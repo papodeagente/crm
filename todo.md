@@ -1690,3 +1690,11 @@
 - [x] Padrão: todos os filtros do CRM começam em "Em andamento"
 - [x] Aplicar padrão "Em andamento" na página Pipeline/Kanban (já estava 'open')
 - [x] Aplicar padrão "Em andamento" na página de Tarefas (alterado de 'all' para 'open')
+
+## Funis Pré-Determinados + Automação Padrão
+- [x] Criar funil "Funil de Vendas" com 7 etapas ao registrar novo tenant
+- [x] Criar funil "Funil de Pós-Venda" com 7 etapas ao registrar novo tenant
+- [x] Etapas do Funil de Vendas: Novo atendimento, Atendimento iniciado, Diagnóstico, Cotação, Apresentação, Acompanhamento, Reserva
+- [x] Etapas do Funil de Pós-Venda: Nova venda, Aguardando embarque, 30D para embarque, Pré viagem, Em viagem, Pós viagem, Viagem finalizada
+- [x] Automação padrão: ao marcar "ganho" no funil de vendas, criar card no pós-venda etapa 1
+- [x] Definir funil de vendas como padrão do tenant

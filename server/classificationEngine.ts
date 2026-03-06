@@ -4,7 +4,7 @@
  * 9 Públicos Estratégicos:
  * - desconhecido: Contato sem interação significativa
  * - seguidor: Contato que acompanha mas não entrou no funil
- * - lead: Entrou no funil, etapas 1-2 (Novo atendimento, Primeiro contato)
+ * - lead: Entrou no funil, etapas 1-2 (Novo atendimento, Atendimento iniciado)
  * - oportunidade: Avançou para etapas 3-7 (Diagnóstico → Reserva)
  * - cliente_primeira_compra: Primeira venda ganha
  * - cliente_ativo: Possui compra e está dentro do ciclo operacional (360 dias)
@@ -45,7 +45,7 @@ const REFERRAL_WINDOW_DAYS = 90;
 // ═══════════════════════════════════════
 export const SALES_PIPELINE_STAGES = [
   { name: "Novo atendimento", orderIndex: 0, probabilityDefault: 5, color: "#3b82f6" },
-  { name: "Primeiro contato", orderIndex: 1, probabilityDefault: 10, color: "#06b6d4" },
+  { name: "Atendimento iniciado", orderIndex: 1, probabilityDefault: 10, color: "#06b6d4" },
   { name: "Diagnóstico", orderIndex: 2, probabilityDefault: 25, color: "#8b5cf6" },
   { name: "Cotação", orderIndex: 3, probabilityDefault: 40, color: "#f59e0b" },
   { name: "Apresentação", orderIndex: 4, probabilityDefault: 60, color: "#f97316" },
@@ -54,10 +54,10 @@ export const SALES_PIPELINE_STAGES = [
 ];
 
 export const POST_SALE_PIPELINE_STAGES = [
-  { name: "Novo cliente", orderIndex: 0, probabilityDefault: 100, color: "#3b82f6" },
+  { name: "Nova venda", orderIndex: 0, probabilityDefault: 100, color: "#3b82f6" },
   { name: "Aguardando embarque", orderIndex: 1, probabilityDefault: 100, color: "#06b6d4" },
   { name: "30D para embarque", orderIndex: 2, probabilityDefault: 100, color: "#8b5cf6" },
-  { name: "Pré embarque", orderIndex: 3, probabilityDefault: 100, color: "#f59e0b" },
+  { name: "Pré viagem", orderIndex: 3, probabilityDefault: 100, color: "#f59e0b" },
   { name: "Em viagem", orderIndex: 4, probabilityDefault: 100, color: "#22c55e" },
   { name: "Pós viagem", orderIndex: 5, probabilityDefault: 100, color: "#f97316" },
   { name: "Viagem finalizada", orderIndex: 6, probabilityDefault: 100, color: "#10b981" },
@@ -118,14 +118,14 @@ export async function createDefaultPipelines(tenantId: number): Promise<{ salesP
     postSaleStageIds.push(stageResult.id);
   }
 
-  // Create automation: DealWon in Sales → Create deal in Post-Sale (stage "Novo cliente")
+  // Create automation: DealWon in Sales → Create deal in Post-Sale (stage "Nova venda")
   await db.insert(pipelineAutomations).values({
     tenantId,
     name: "Venda Ganha → Pós-Venda",
     sourcePipelineId: salesPipeline.id,
     triggerEvent: "deal_won",
     targetPipelineId: postSalePipeline.id,
-    targetStageId: postSaleStageIds[0], // "Novo cliente"
+    targetStageId: postSaleStageIds[0], // "Nova venda"
     copyProducts: true,
     copyParticipants: true,
     copyCustomFields: true,
@@ -235,7 +235,7 @@ export async function getContactClassificationData(tenantId: number, contactId: 
 
 /**
  * Handle DealMoved event — classify contact as Lead or Oportunidade
- * Stages 0-1 (Novo atendimento, Primeiro contato) → Lead
+ * Stages 0-1 (Novo atendimento, Atendimento iniciado) → Lead
  * Stages 2-6 (Diagnóstico → Reserva) → Oportunidade
  */
 export async function onDealMoved(tenantId: number, dealId: number, toStageId: number, contactId: number | null, pipelineId: number) {

@@ -62,7 +62,7 @@ const CLASSIFICATION_RULES = [
     color: "#3b82f6",
     bgClass: "bg-blue-500/10 border-blue-500/20",
     textClass: "text-blue-400",
-    description: "Entrou no funil de vendas nas etapas iniciais (Novo atendimento ou Primeiro contato).",
+    description: "Entrou no funil de vendas nas etapas iniciais (Novo atendimento ou Atendimento iniciado).",
     rule: "Automático: etapas 1-2 do Funil de Vendas",
   },
   {
@@ -432,7 +432,7 @@ export default function ClassificationSettings() {
             <div className="space-y-2">
               {[
                 { name: "Novo atendimento", cls: "Lead", color: "#3b82f6" },
-                { name: "Primeiro contato", cls: "Lead", color: "#06b6d4" },
+                { name: "Atendimento iniciado", cls: "Lead", color: "#06b6d4" },
                 { name: "Diagnóstico", cls: "Oportunidade", color: "#8b5cf6" },
                 { name: "Cotação", cls: "Oportunidade", color: "#f59e0b" },
                 { name: "Apresentação", cls: "Oportunidade", color: "#f97316" },
@@ -468,10 +468,10 @@ export default function ClassificationSettings() {
           <CardContent>
             <div className="space-y-2">
               {[
-                { name: "Novo cliente", color: "#3b82f6" },
+                { name: "Nova venda", color: "#3b82f6" },
                 { name: "Aguardando embarque", color: "#06b6d4" },
                 { name: "30D para embarque", color: "#8b5cf6" },
-                { name: "Pré embarque", color: "#f59e0b" },
+                { name: "Pré viagem", color: "#f59e0b" },
                 { name: "Em viagem", color: "#22c55e" },
                 { name: "Pós viagem", color: "#f97316" },
                 { name: "Viagem finalizada", color: "#10b981" },

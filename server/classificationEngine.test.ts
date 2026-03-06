@@ -32,7 +32,7 @@ describe("Classification Engine Constants", () => {
   it("should have correct sales pipeline stages", () => {
     expect(SALES_PIPELINE_STAGES).toHaveLength(7);
     expect(SALES_PIPELINE_STAGES[0].name).toBe("Novo atendimento");
-    expect(SALES_PIPELINE_STAGES[1].name).toBe("Primeiro contato");
+    expect(SALES_PIPELINE_STAGES[1].name).toBe("Atendimento iniciado");
     expect(SALES_PIPELINE_STAGES[2].name).toBe("Diagnóstico");
     expect(SALES_PIPELINE_STAGES[3].name).toBe("Cotação");
     expect(SALES_PIPELINE_STAGES[4].name).toBe("Apresentação");
@@ -42,17 +42,17 @@ describe("Classification Engine Constants", () => {
 
   it("should have correct post-sale pipeline stages", () => {
     expect(POST_SALE_PIPELINE_STAGES).toHaveLength(7);
-    expect(POST_SALE_PIPELINE_STAGES[0].name).toBe("Novo cliente");
+    expect(POST_SALE_PIPELINE_STAGES[0].name).toBe("Nova venda");
     expect(POST_SALE_PIPELINE_STAGES[1].name).toBe("Aguardando embarque");
     expect(POST_SALE_PIPELINE_STAGES[2].name).toBe("30D para embarque");
-    expect(POST_SALE_PIPELINE_STAGES[3].name).toBe("Pré embarque");
+    expect(POST_SALE_PIPELINE_STAGES[3].name).toBe("Pré viagem");
     expect(POST_SALE_PIPELINE_STAGES[4].name).toBe("Em viagem");
     expect(POST_SALE_PIPELINE_STAGES[5].name).toBe("Pós viagem");
     expect(POST_SALE_PIPELINE_STAGES[6].name).toBe("Viagem finalizada");
   });
 
   it("should classify stages 1-2 as lead and 3-7 as oportunidade", () => {
-    // Stages 0-1 (Novo atendimento, Primeiro contato) → Lead
+    // Stages 0-1 (Novo atendimento, Atendimento iniciado) → Lead
     expect(SALES_PIPELINE_STAGES[0].orderIndex).toBe(0);
     expect(SALES_PIPELINE_STAGES[1].orderIndex).toBe(1);
     // Stages 2-6 (Diagnóstico to Reserva) → Oportunidade
