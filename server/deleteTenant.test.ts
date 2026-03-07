@@ -132,6 +132,25 @@ describe("deleteTenantCompletely", () => {
     expect(routerSource).toContain("tenant.name.toLowerCase() !== input.confirmName.toLowerCase()");
   });
 
+  it("should prevent deleting the super admin's tenant", async () => {
+    const fs = await import("fs");
+    const source = fs.readFileSync("./server/saasAuth.ts", "utf-8");
+    
+    // Verify the function checks for super admin email before deletion
+    expect(source).toContain("Não é possível excluir o tenant do super administrador");
+    // Verify it queries crm_users for the super admin email
+    expect(source).toContain("SUPERADMIN_EMAIL");
+  });
+
+  it("should prevent deleting own tenant in the router", async () => {
+    const fs = await import("fs");
+    const routerSource = fs.readFileSync("./server/routers/saasAuthRouter.ts", "utf-8");
+    
+    // Verify the router checks if tenantId matches the session's tenantId
+    expect(routerSource).toContain("input.tenantId === session.tenantId");
+    expect(routerSource).toContain("Não é possível excluir seu próprio tenant");
+  });
+
   it("should only allow superadmin access", async () => {
     const fs = await import("fs");
     const routerSource = fs.readFileSync("./server/routers/saasAuthRouter.ts", "utf-8");

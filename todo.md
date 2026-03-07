@@ -1858,3 +1858,16 @@
 - [x] Testes unitários para lógica de detecção de novos contatos (15 testes passando)
 - [x] Testes unitários para geração de mensagens de notificação
 - [x] Teste visual no browser (botão Verificar Alertas funcional, mutation retorna corretamente)
+
+## Bug: Senha do Admin Master Resetada ao Alterar Sistema
+- [x] Identificar causa: tenant e usuário foram excluídos durante teste de deleteTenantCompletely (não era bug de código, mas falta de proteção)
+- [x] Recriar tenant Entur (id: 150002) com plano enterprise e status active
+- [x] Recriar usuário Bruno (id: 150001) com email bruno@entur.com.br e senha Bruna2016*
+- [x] Criar pipelines padrão (Funil de Vendas + Funil de Pós-Venda) com 14 etapas e automação
+- [x] Criar subscription enterprise para o tenant
+- [x] Testar login no browser com sucesso
+
+## Proteção contra Exclusão do Super Admin
+- [x] Adicionar verificação em deleteTenantCompletely: bloqueia exclusão se tenant contém super admin
+- [x] Adicionar verificação no router: bloqueia exclusão do próprio tenant do super admin
+- [x] 12 testes unitários passando em deleteTenant.test.ts (incluindo 2 novos testes de proteção)

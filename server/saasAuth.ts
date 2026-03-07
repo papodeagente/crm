@@ -570,6 +570,17 @@ export async function deleteTenantCompletely(tenantId: number): Promise<{
   // Safety: never delete tenant 0 or negative
   if (tenantId <= 0) throw new Error("Invalid tenant ID");
 
+  // Safety: never delete the tenant that contains the super admin user
+  const superAdminUsers = await db.select().from(crmUsers)
+    .where(and(
+      eq(crmUsers.tenantId, tenantId),
+      eq(crmUsers.email, SUPERADMIN_EMAIL)
+    ))
+    .limit(1);
+  if (superAdminUsers.length > 0) {
+    throw new Error("Não é possível excluir o tenant do super administrador");
+  }
+
   const deletedTables: string[] = [];
   const errors: string[] = [];
 
