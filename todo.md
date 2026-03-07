@@ -1698,3 +1698,8 @@
 - [x] Etapas do Funil de Pós-Venda: Nova venda, Aguardando embarque, 30D para embarque, Pré viagem, Em viagem, Pós viagem, Viagem finalizada
 - [x] Automação padrão: ao marcar "ganho" no funil de vendas, criar card no pós-venda etapa 1
 - [x] Definir funil de vendas como padrão do tenant
+
+## Bug: Funis padrão não criados ao registrar conta nova
+- [x] Investigar se createDefaultPipelines é chamado no fluxo de criação de tenant/conta
+- [x] Corrigir para garantir que funis padrão são criados automaticamente (adicionado ao registerTenantAndUser)
+- [x] Testar criando uma conta nova e verificar os funis (tenant 120003 criado com sucesso)

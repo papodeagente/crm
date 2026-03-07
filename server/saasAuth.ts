@@ -120,6 +120,14 @@ export async function registerTenantAndUser(data: {
   // Update tenant owner
   await db.update(tenants).set({ ownerUserId: userResult.id }).where(eq(tenants.id, tenantId));
 
+  // Auto-create default pipelines for new tenant
+  try {
+    const { createDefaultPipelines } = await import("./classificationEngine");
+    await createDefaultPipelines(tenantId);
+  } catch (e) {
+    console.error("[Onboarding] Failed to create default pipelines for tenant", tenantId, e);
+  }
+
   // Create subscription (trialing/freemium)
   await db.insert(subscriptions).values({
     tenantId,
