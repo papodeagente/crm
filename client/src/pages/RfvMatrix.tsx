@@ -21,8 +21,53 @@ import {
   ShieldAlert, UserCheck, MessageSquare, ExternalLink,
   BarChart3, FileSpreadsheet, XCircle, Send, X,
   CheckSquare, Square, Loader2, Ban, CheckCircle2,
-  AlertCircle, SkipForward,
+  AlertCircle, SkipForward, Filter, Clock, Heart,
+  Award, Plane, UserX,
 } from "lucide-react";
+
+// ─── Smart Filter Config ───
+const smartFilterConfig: Record<string, { label: string; description: string; icon: React.ReactNode; color: string; bg: string; border: string }> = {
+  potencial_ex_cliente: {
+    label: "Potencial Ex-Cliente",
+    description: "250–350 dias sem comprar",
+    icon: <Clock className="w-4 h-4" />,
+    color: "text-orange-600",
+    bg: "bg-orange-50 dark:bg-orange-950/30",
+    border: "border-orange-300 dark:border-orange-700",
+  },
+  potencial_indicador: {
+    label: "Potencial Indicador",
+    description: "Compra nos últimos 30 dias",
+    icon: <Heart className="w-4 h-4" />,
+    color: "text-emerald-600",
+    bg: "bg-emerald-50 dark:bg-emerald-950/30",
+    border: "border-emerald-300 dark:border-emerald-700",
+  },
+  potencial_indicador_pos_viagem: {
+    label: "Pós Viagem",
+    description: "30 dias após retorno",
+    icon: <Plane className="w-4 h-4" />,
+    color: "text-sky-600",
+    bg: "bg-sky-50 dark:bg-sky-950/30",
+    border: "border-sky-300 dark:border-sky-700",
+  },
+  potencial_indicador_fiel: {
+    label: "Indicador Fiel",
+    description: "Mais de 1 compra",
+    icon: <Award className="w-4 h-4" />,
+    color: "text-purple-600",
+    bg: "bg-purple-50 dark:bg-purple-950/30",
+    border: "border-purple-300 dark:border-purple-700",
+  },
+  abordagem_nao_cliente: {
+    label: "Abordagem Não Cliente",
+    description: "Venda perdida em 90 dias",
+    icon: <UserX className="w-4 h-4" />,
+    color: "text-red-600",
+    bg: "bg-red-50 dark:bg-red-950/30",
+    border: "border-red-300 dark:border-red-700",
+  },
+};
 
 // ─── Audience Config ───
 const audienceConfig: Record<string, { label: string; color: string; bg: string; icon: React.ReactNode }> = {
@@ -88,6 +133,7 @@ export default function RfvMatrix() {
   // ─── State ───
   const [search, setSearch] = useState("");
   const [audienceFilter, setAudienceFilter] = useState("all");
+  const [smartFilter, setSmartFilter] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState("updatedAt");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [page, setPage] = useState(1);
@@ -127,9 +173,11 @@ export default function RfvMatrix() {
     pageSize: 50,
     search: debouncedSearch || undefined,
     audienceType: audienceFilter !== "all" ? audienceFilter : undefined,
+    smartFilter: smartFilter || undefined,
     sortBy,
     sortDir,
   }, { enabled: !!tenantId });
+  const smartCounts = trpc.rfv.smartFilterCounts.useQuery({ tenantId }, { enabled: !!tenantId });
   const alerta = trpc.rfv.alertaDinheiroParado.useQuery({ tenantId }, { enabled: !!tenantId });
   const activeSession = trpc.rfv.activeSession.useQuery({ tenantId }, { enabled: !!tenantId });
 
@@ -440,6 +488,56 @@ export default function RfvMatrix() {
               </CardContent>
             </Card>
           )}
+
+          {/* ─── Smart Filters ─── */}
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <Filter className="w-4 h-4 text-muted-foreground" />
+                <span className="text-sm font-medium">Filtros Inteligentes</span>
+                {smartFilter && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 px-2 text-xs ml-auto"
+                    onClick={() => { setSmartFilter(null); setPage(1); }}
+                  >
+                    <X className="w-3 h-3 mr-1" />
+                    Limpar filtro
+                  </Button>
+                )}
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+                {Object.entries(smartFilterConfig).map(([key, cfg]) => {
+                  const count = smartCounts.data?.[key as keyof typeof smartCounts.data] ?? 0;
+                  const isActive = smartFilter === key;
+                  return (
+                    <button
+                      key={key}
+                      onClick={() => {
+                        setSmartFilter(isActive ? null : key);
+                        setPage(1);
+                        // Clear audience filter when using smart filter
+                        if (!isActive) setAudienceFilter("all");
+                      }}
+                      className={`flex flex-col items-start gap-1 p-3 rounded-lg border text-left transition-all ${
+                        isActive
+                          ? `${cfg.bg} ${cfg.border} ring-2 ring-offset-1 ring-current ${cfg.color}`
+                          : `border-border hover:${cfg.bg} hover:${cfg.border}`
+                      }`}
+                    >
+                      <div className={`flex items-center gap-1.5 ${isActive ? cfg.color : "text-muted-foreground"}`}>
+                        {cfg.icon}
+                        <span className="text-xs font-semibold">{cfg.label}</span>
+                      </div>
+                      <span className="text-lg font-bold">{count}</span>
+                      <span className="text-[10px] text-muted-foreground leading-tight">{cfg.description}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
 
           {/* ─── Alerta Dinheiro Parado ─── */}
           {a && a.totalContatos > 0 && (

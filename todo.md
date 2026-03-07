@@ -1809,3 +1809,28 @@
 - [x] Relatório de envio: sucesso, falha, sem telefone
 - [x] Escrever testes unitários para o endpoint de envio em massa (15 testes passando)
 - [x] Testar visualmente no browser (modal, seleção, variáveis, pré-visualização)
+
+## Filtros Inteligentes na Matriz RFV
+### Filtros por Regra de Negócio
+- [x] Potencial Ex Cliente: rScore BETWEEN 250-350 e fScore > 0
+- [x] Potencial Indicador: lastPurchaseAt >= 30 dias atrás
+- [x] Potencial Indicador Pós Viagem: JOIN com deals.returnDate, 30 dias após retorno
+- [x] Potencial Indicador Fiel: fScore > 1 (mais de 1 compra)
+- [x] Abordagem Não Cliente: JOIN com deals perdidos nos últimos 90 dias
+
+### Filtros por Público
+- [x] Filtro visual clicável para cada público na Matriz RFV (dropdown + badges de distribuição)
+
+### Backend
+- [x] Queries SQL com regras de data/compra para cada filtro inteligente (getSmartFilterCounts)
+- [x] Endpoint tRPC para listar contatos por filtro inteligente (smartFilter param no list)
+- [x] Contagem de contatos por filtro para exibição nos badges (smartFilterCounts endpoint)
+
+### Frontend
+- [x] Seção de filtros inteligentes com 5 cards coloridos e contagem
+- [x] Integração com listagem existente (paginação, busca, ordenação mantidos)
+- [x] Ícones e cores distintas para cada filtro (Clock/orange, Heart/green, Plane/sky, Award/purple, UserX/red)
+
+### Testes
+- [x] Testes unitários para as regras de cada filtro (20 testes passando)
+- [x] Teste visual no browser (5 filtros renderizados corretamente, dados vazios pois deals foram limpos)

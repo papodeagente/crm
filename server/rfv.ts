@@ -3,8 +3,42 @@
  * Classificação automática de contatos em 9 públicos comerciais
  */
 import { getDb } from "./db";
-import { rfvContacts, contactActionLogs, type RfvContact, type NewRfvContact } from "../drizzle/schema";
-import { eq, and, sql, desc, asc, like, isNull, or, lte, gte, between } from "drizzle-orm";
+import { rfvContacts, contactActionLogs, deals, type RfvContact, type NewRfvContact } from "../drizzle/schema";
+import { eq, and, sql, desc, asc, like, isNull, or, lte, gte, between, inArray, gt, not } from "drizzle-orm";
+
+// ─── Smart Filter Types ───
+export const SMART_FILTERS = [
+  "potencial_ex_cliente",
+  "potencial_indicador",
+  "potencial_indicador_pos_viagem",
+  "potencial_indicador_fiel",
+  "abordagem_nao_cliente",
+] as const;
+
+export type SmartFilter = typeof SMART_FILTERS[number];
+
+export const SMART_FILTER_CONFIG: Record<SmartFilter, { label: string; description: string }> = {
+  potencial_ex_cliente: {
+    label: "Potencial Ex-Cliente",
+    description: "250 a 350 dias sem comprar",
+  },
+  potencial_indicador: {
+    label: "Potencial Indicador",
+    description: "Compra nos últimos 30 dias",
+  },
+  potencial_indicador_pos_viagem: {
+    label: "Pós Viagem",
+    description: "30 dias após retorno da viagem",
+  },
+  potencial_indicador_fiel: {
+    label: "Indicador Fiel",
+    description: "Mais de 1 compra realizada",
+  },
+  abordagem_nao_cliente: {
+    label: "Abordagem Não Cliente",
+    description: "Venda perdida nos últimos 90 dias",
+  },
+};
 
 // ─── Audience Types ───
 export const AUDIENCE_TYPES = [
@@ -127,6 +161,7 @@ export async function getRfvContacts(tenantId: number, params: {
   pageSize?: number;
   search?: string;
   audienceType?: string;
+  smartFilter?: string;
   sortBy?: string;
   sortDir?: "asc" | "desc";
 }) {
@@ -137,7 +172,15 @@ export async function getRfvContacts(tenantId: number, params: {
   const pageSize = params.pageSize || 50;
   const offset = (page - 1) * pageSize;
 
-  const conditions = [
+  // For smart filters that need JOINs, we use raw SQL subqueries
+  const smartFilter = params.smartFilter as SmartFilter | undefined;
+  let smartFilterContactIds: number[] | null = null;
+
+  if (smartFilter) {
+    smartFilterContactIds = await getSmartFilterContactIds(db, tenantId, smartFilter);
+  }
+
+  const conditions: any[] = [
     eq(rfvContacts.tenantId, tenantId),
     isNull(rfvContacts.deletedAt),
   ];
@@ -148,6 +191,15 @@ export async function getRfvContacts(tenantId: number, params: {
 
   if (params.audienceType && params.audienceType !== "all") {
     conditions.push(eq(rfvContacts.audienceType, params.audienceType));
+  }
+
+  // Apply smart filter
+  if (smartFilterContactIds !== null) {
+    if (smartFilterContactIds.length === 0) {
+      // No matches — return empty
+      return { contacts: [], total: 0, page, pageSize, totalPages: 0 };
+    }
+    conditions.push(inArray(rfvContacts.id, smartFilterContactIds));
   }
 
   // Sort
@@ -180,6 +232,148 @@ export async function getRfvContacts(tenantId: number, params: {
     page,
     pageSize,
     totalPages: Math.ceil((countResult[0]?.count || 0) / pageSize),
+  };
+}
+
+// ─── Smart Filter Logic ───
+
+async function getSmartFilterContactIds(db: any, tenantId: number, filter: SmartFilter): Promise<number[]> {
+  const now = new Date();
+
+  switch (filter) {
+    case "potencial_ex_cliente": {
+      // 250-350 dias sem comprar (rScore entre 250 e 350, com pelo menos 1 compra)
+      const rows = await db.select({ id: rfvContacts.id })
+        .from(rfvContacts)
+        .where(and(
+          eq(rfvContacts.tenantId, tenantId),
+          isNull(rfvContacts.deletedAt),
+          gte(rfvContacts.rScore, 250),
+          lte(rfvContacts.rScore, 350),
+          gt(rfvContacts.fScore, 0),
+        ));
+      return rows.map((r: any) => r.id);
+    }
+
+    case "potencial_indicador": {
+      // Compra nos últimos 30 dias
+      const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      const rows = await db.select({ id: rfvContacts.id })
+        .from(rfvContacts)
+        .where(and(
+          eq(rfvContacts.tenantId, tenantId),
+          isNull(rfvContacts.deletedAt),
+          gt(rfvContacts.fScore, 0),
+          gte(rfvContacts.lastPurchaseAt, thirtyDaysAgo),
+        ));
+      return rows.map((r: any) => r.id);
+    }
+
+    case "potencial_indicador_pos_viagem": {
+      // 30 dias após a data de retorno da viagem (returnDate no deal)
+      // Busca contatos cujo deal tem returnDate entre 25-35 dias atrás (janela de ~30 dias)
+      const windowStart = new Date(now.getTime() - 35 * 24 * 60 * 60 * 1000);
+      const windowEnd = new Date(now.getTime() - 25 * 24 * 60 * 60 * 1000);
+
+      const dealRows = await db.execute(sql`
+        SELECT DISTINCT rc.id
+        FROM rfv_contacts rc
+        INNER JOIN contacts c ON c.id = rc.contactId AND c.tenantId = ${tenantId}
+        INNER JOIN deals d ON d.contactId = c.id AND d.tenantId = ${tenantId} AND d.deletedAt IS NULL
+        WHERE rc.tenantId = ${tenantId}
+          AND rc.deletedAt IS NULL
+          AND d.status = 'won'
+          AND d.returnDate IS NOT NULL
+          AND d.returnDate BETWEEN ${windowStart} AND ${windowEnd}
+      `);
+      const resultRows = (dealRows as unknown as any[][])[0] || [];
+      return resultRows.map((r: any) => r.id);
+    }
+
+    case "potencial_indicador_fiel": {
+      // Mais de 1 compra realizada (fScore > 1)
+      const rows = await db.select({ id: rfvContacts.id })
+        .from(rfvContacts)
+        .where(and(
+          eq(rfvContacts.tenantId, tenantId),
+          isNull(rfvContacts.deletedAt),
+          gt(rfvContacts.fScore, 1),
+        ));
+      return rows.map((r: any) => r.id);
+    }
+
+    case "abordagem_nao_cliente": {
+      // Venda perdida nos últimos 90 dias
+      const ninetyDaysAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+
+      const dealRows = await db.execute(sql`
+        SELECT DISTINCT rc.id
+        FROM rfv_contacts rc
+        INNER JOIN contacts c ON c.id = rc.contactId AND c.tenantId = ${tenantId}
+        INNER JOIN deals d ON d.contactId = c.id AND d.tenantId = ${tenantId} AND d.deletedAt IS NULL
+        WHERE rc.tenantId = ${tenantId}
+          AND rc.deletedAt IS NULL
+          AND d.status = 'lost'
+          AND d.updatedAt >= ${ninetyDaysAgo}
+      `);
+      const resultRows = (dealRows as unknown as any[][])[0] || [];
+      return resultRows.map((r: any) => r.id);
+    }
+
+    default:
+      return [];
+  }
+}
+
+// ─── Smart Filter Counts ───
+export async function getSmartFilterCounts(tenantId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const now = new Date();
+  const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+  const ninetyDaysAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+  const windowStart = new Date(now.getTime() - 35 * 24 * 60 * 60 * 1000);
+  const windowEnd = new Date(now.getTime() - 25 * 24 * 60 * 60 * 1000);
+
+  const baseWhere = `rc.tenantId = ${tenantId} AND rc.deletedAt IS NULL`;
+
+  const result = await db.execute(sql`
+    SELECT
+      (
+        SELECT COUNT(*) FROM rfv_contacts rc
+        WHERE ${sql.raw(baseWhere)} AND rc.rScore BETWEEN 250 AND 350 AND rc.fScore > 0
+      ) AS potencial_ex_cliente,
+      (
+        SELECT COUNT(*) FROM rfv_contacts rc
+        WHERE ${sql.raw(baseWhere)} AND rc.fScore > 0 AND rc.lastPurchaseAt >= ${thirtyDaysAgo}
+      ) AS potencial_indicador,
+      (
+        SELECT COUNT(DISTINCT rc.id) FROM rfv_contacts rc
+        INNER JOIN contacts c ON c.id = rc.contactId AND c.tenantId = ${tenantId}
+        INNER JOIN deals d ON d.contactId = c.id AND d.tenantId = ${tenantId} AND d.deletedAt IS NULL
+        WHERE ${sql.raw(baseWhere)} AND d.status = 'won' AND d.returnDate IS NOT NULL
+          AND d.returnDate BETWEEN ${windowStart} AND ${windowEnd}
+      ) AS potencial_indicador_pos_viagem,
+      (
+        SELECT COUNT(*) FROM rfv_contacts rc
+        WHERE ${sql.raw(baseWhere)} AND rc.fScore > 1
+      ) AS potencial_indicador_fiel,
+      (
+        SELECT COUNT(DISTINCT rc.id) FROM rfv_contacts rc
+        INNER JOIN contacts c ON c.id = rc.contactId AND c.tenantId = ${tenantId}
+        INNER JOIN deals d ON d.contactId = c.id AND d.tenantId = ${tenantId} AND d.deletedAt IS NULL
+        WHERE ${sql.raw(baseWhere)} AND d.status = 'lost' AND d.updatedAt >= ${ninetyDaysAgo}
+      ) AS abordagem_nao_cliente
+  `);
+
+  const row = (result as unknown as any[][])[0]?.[0] || {};
+  return {
+    potencial_ex_cliente: Number(row.potencial_ex_cliente || 0),
+    potencial_indicador: Number(row.potencial_indicador || 0),
+    potencial_indicador_pos_viagem: Number(row.potencial_indicador_pos_viagem || 0),
+    potencial_indicador_fiel: Number(row.potencial_indicador_fiel || 0),
+    abordagem_nao_cliente: Number(row.abordagem_nao_cliente || 0),
   };
 }
 

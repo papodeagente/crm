@@ -11,7 +11,10 @@ import {
   recalculateRfvFromDeals,
   importCsvAndRecalculate,
   resetAgencyRfvData,
+  getSmartFilterCounts,
   AUDIENCE_TYPES,
+  SMART_FILTERS,
+  SMART_FILTER_CONFIG,
 } from "../rfv";
 import {
   startBulkSend,
@@ -36,6 +39,7 @@ export const rfvRouter = router({
       pageSize: z.number().optional().default(50),
       search: z.string().optional(),
       audienceType: z.string().optional(),
+      smartFilter: z.string().optional(),
       sortBy: z.string().optional(),
       sortDir: z.enum(["asc", "desc"]).optional().default("desc"),
     }))
@@ -45,9 +49,23 @@ export const rfvRouter = router({
         pageSize: input.pageSize,
         search: input.search,
         audienceType: input.audienceType,
+        smartFilter: input.smartFilter,
         sortBy: input.sortBy,
         sortDir: input.sortDir,
       });
+    }),
+
+  // ─── Smart Filter Counts ───
+  smartFilterCounts: protectedProcedure
+    .input(z.object({ tenantId: z.number() }))
+    .query(async ({ input }) => {
+      return getSmartFilterCounts(input.tenantId);
+    }),
+
+  // ─── Smart Filter Config ───
+  smartFilterConfig: protectedProcedure
+    .query(() => {
+      return { filters: SMART_FILTERS, config: SMART_FILTER_CONFIG };
     }),
 
   // ─── Alerta Dinheiro Parado ───
