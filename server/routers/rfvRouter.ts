@@ -22,6 +22,10 @@ import {
   cancelBulkSend,
   getActiveSessionForTenant,
 } from "../bulkMessage";
+import {
+  runRfvNotificationCheck,
+  getRfvFilterSnapshots,
+} from "../rfvNotifications";
 
 export const rfvRouter = router({
   // ─── Dashboard KPIs ───
@@ -140,5 +144,19 @@ export const rfvRouter = router({
     .input(z.object({ tenantId: z.number() }))
     .query(async ({ input }) => {
       return getActiveSessionForTenant(input.tenantId);
+    }),
+
+  // ─── Run RFV Notification Check (manual trigger) ───
+  checkNotifications: protectedProcedure
+    .input(z.object({ tenantId: z.number() }))
+    .mutation(async ({ input }) => {
+      return runRfvNotificationCheck(input.tenantId);
+    }),
+
+  // ─── Get Filter Snapshots ───
+  filterSnapshots: protectedProcedure
+    .input(z.object({ tenantId: z.number() }))
+    .query(async ({ input }) => {
+      return getRfvFilterSnapshots(input.tenantId);
     }),
 });

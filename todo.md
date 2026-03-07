@@ -1834,3 +1834,27 @@
 ### Testes
 - [x] Testes unitários para as regras de cada filtro (20 testes passando)
 - [x] Teste visual no browser (5 filtros renderizados corretamente, dados vazios pois deals foram limpos)
+
+## Sistema de Notificações RFV
+
+### Schema e Backend
+- [x] Reutilizar sistema de notificações existente (tabela notifications com tipo rfv_filter_alert)
+- [x] Criar tabela rfv_filter_snapshots para rastrear contagens anteriores dos filtros
+- [x] Implementar lógica de detecção de novos contatos comparando snapshots (checkTenantRfvFilters)
+- [x] Implementar job periódico a cada 6 horas (rfvNotificationScheduler)
+- [x] Endpoint tRPC: checkNotifications (verificação manual)
+- [x] Endpoint tRPC: filterSnapshots (estado atual dos snapshots)
+- [x] Reutilizar endpoints existentes: notifications.list, markRead, unreadCount
+- [x] Corrigir query tenants: usar status='active' em vez de isActive
+
+### Frontend
+- [x] Botão "Verificar Alertas" no header da página RFV
+- [x] Tipo rfv_filter_alert na página de Notificações com ícone TrendingUp laranja
+- [x] Cada notificação mostra: filtro, quantidade de novos contatos, descrição
+- [x] Clique na notificação redireciona para /rfv?filter={filterKey}
+- [x] Badge de notificações não lidas no sino da TopNav (sistema existente)
+
+### Testes
+- [x] Testes unitários para lógica de detecção de novos contatos (15 testes passando)
+- [x] Testes unitários para geração de mensagens de notificação
+- [x] Teste visual no browser (botão Verificar Alertas funcional, mutation retorna corretamente)

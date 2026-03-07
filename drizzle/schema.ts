@@ -1611,3 +1611,24 @@ export const contactActionLogs = mysqlTable("contact_action_logs", {
 ]);
 
 export type ContactActionLog = typeof contactActionLogs.$inferSelect;
+
+
+// ════════════════════════════════════════════════════════════
+// RFV FILTER SNAPSHOTS (for notification change detection)
+// ════════════════════════════════════════════════════════════
+
+export const rfvFilterSnapshots = mysqlTable("rfv_filter_snapshots", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  filterKey: varchar("filterKey", { length: 64 }).notNull(), // e.g. potencial_ex_cliente
+  previousCount: int("previousCount").default(0).notNull(),
+  currentCount: int("currentCount").default(0).notNull(),
+  lastCheckedAt: timestamp("lastCheckedAt").defaultNow().notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (t) => [
+  index("rfv_snap_tenant_idx").on(t.tenantId),
+  index("rfv_snap_tenant_filter_idx").on(t.tenantId, t.filterKey),
+]);
+
+export type RfvFilterSnapshot = typeof rfvFilterSnapshots.$inferSelect;
+export type NewRfvFilterSnapshot = typeof rfvFilterSnapshots.$inferInsert;

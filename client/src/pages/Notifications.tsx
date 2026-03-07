@@ -1,6 +1,6 @@
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
-import { Bell, MessageSquare, ArrowRightLeft, UserPlus, ClipboardList, Briefcase, Check, CheckCheck } from "lucide-react";
+import { Bell, MessageSquare, ArrowRightLeft, UserPlus, ClipboardList, Briefcase, Check, CheckCheck, TrendingUp } from "lucide-react";
 import { formatDate } from "../../../shared/dateUtils";
 import { useLocation } from "wouter";
 import { useTenantId } from "@/hooks/useTenantId";
@@ -46,6 +46,14 @@ const typeConfig: Record<string, { icon: any; bg: string; iconBg: string; iconCo
     iconColor: "text-amber-400",
     label: "Tarefa",
     route: () => "/tasks",
+  },
+  rfv_filter_alert: {
+    icon: TrendingUp,
+    bg: "border-l-4 border-l-orange-500",
+    iconBg: "bg-orange-500/15",
+    iconColor: "text-orange-400",
+    label: "Matriz RFV",
+    route: (filterKey) => `/rfv?filter=${filterKey}`,
   },
 };
 

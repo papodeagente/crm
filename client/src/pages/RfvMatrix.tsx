@@ -22,7 +22,7 @@ import {
   BarChart3, FileSpreadsheet, XCircle, Send, X,
   CheckSquare, Square, Loader2, Ban, CheckCircle2,
   AlertCircle, SkipForward, Filter, Clock, Heart,
-  Award, Plane, UserX,
+  Award, Plane, UserX, Bell,
 } from "lucide-react";
 
 // ─── Smart Filter Config ───
@@ -199,6 +199,19 @@ export default function RfvMatrix() {
     onSuccess: (data) => {
       toast.success(`RFV recalculado: ${data.processed} contatos processados`);
       utils.rfv.invalidate();
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
+  const checkNotifications = trpc.rfv.checkNotifications.useMutation({
+    onSuccess: (data) => {
+      if (data.notificationsCreated > 0) {
+        toast.success(`${data.notificationsCreated} notificação(ões) criada(s) para ${data.changes.length} filtro(s) com novos contatos`);
+        utils.notifications.invalidate();
+      } else {
+        toast.info("Nenhuma alteração detectada nos filtros RFV");
+      }
+      utils.rfv.filterSnapshots.invalidate();
     },
     onError: (err) => toast.error(err.message),
   });
@@ -380,6 +393,23 @@ export default function RfvMatrix() {
               <Upload className="w-4 h-4 mr-1.5" />
               Importar CSV
             </Button>
+
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => checkNotifications.mutate({ tenantId })}
+                    disabled={checkNotifications.isPending}
+                  >
+                    <Bell className={`w-4 h-4 mr-1.5 ${checkNotifications.isPending ? "animate-pulse" : ""}`} />
+                    Verificar Alertas
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Verificar novos contatos nos filtros e gerar notificações</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
 
             <Button
               variant="outline"

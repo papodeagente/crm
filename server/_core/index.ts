@@ -161,6 +161,9 @@ async function startServer() {
 
     // Start date-based automation scheduler
     import("../dateAutomationScheduler").then(m => m.startDateAutomationScheduler());
+
+    // Start RFV notification scheduler
+    import("../rfvNotificationScheduler").then(m => m.startRfvNotificationScheduler());
   });
 }
 
