@@ -1,21 +1,27 @@
-import { useState, useRef, useMemo, useCallback } from "react";
+import { useState, useRef, useMemo, useCallback, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 import { useTenantId } from "@/hooks/useTenantId";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Separator } from "@/components/ui/separator";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Progress } from "@/components/ui/progress";
+import { Label } from "@/components/ui/label";
 import {
   Users, DollarSign, Target, TrendingUp, Search,
   Upload, RefreshCw, Trash2, AlertTriangle, Phone,
   ArrowUpDown, ChevronLeft, ChevronRight, Star,
   ShieldAlert, UserCheck, MessageSquare, ExternalLink,
-  BarChart3, FileSpreadsheet, XCircle,
+  BarChart3, FileSpreadsheet, XCircle, Send, X,
+  CheckSquare, Square, Loader2, Ban, CheckCircle2,
+  AlertCircle, SkipForward,
 } from "lucide-react";
 
 // ─── Audience Config ───
@@ -65,6 +71,16 @@ const sortOptions = [
   { value: "atendimentos", label: "Atendimentos" },
 ];
 
+// ─── Template variables ───
+const templateVars = [
+  { var: "{nome}", desc: "Nome completo" },
+  { var: "{primeiro_nome}", desc: "Primeiro nome" },
+  { var: "{email}", desc: "Email" },
+  { var: "{telefone}", desc: "Telefone" },
+  { var: "{publico}", desc: "Público RFV" },
+  { var: "{valor}", desc: "Valor total (R$)" },
+];
+
 export default function RfvMatrix() {
   const tenantId = useTenantId();
   const utils = trpc.useUtils();
@@ -79,6 +95,17 @@ export default function RfvMatrix() {
   const [resetDialogOpen, setResetDialogOpen] = useState(false);
   const [resetConfirm, setResetConfirm] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // ─── Selection State ───
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [selectAllPages, setSelectAllPages] = useState(false);
+
+  // ─── Bulk Send State ───
+  const [bulkDialogOpen, setBulkDialogOpen] = useState(false);
+  const [messageTemplate, setMessageTemplate] = useState("");
+  const [delaySeconds, setDelaySeconds] = useState(3);
+  const [progressDialogOpen, setProgressDialogOpen] = useState(false);
+  const [pollingEnabled, setPollingEnabled] = useState(false);
 
   // Debounced search
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -104,6 +131,20 @@ export default function RfvMatrix() {
     sortDir,
   }, { enabled: !!tenantId });
   const alerta = trpc.rfv.alertaDinheiroParado.useQuery({ tenantId }, { enabled: !!tenantId });
+  const activeSession = trpc.rfv.activeSession.useQuery({ tenantId }, { enabled: !!tenantId });
+
+  // ─── Bulk Send Progress Polling ───
+  const bulkProgress = trpc.rfv.bulkSendProgress.useQuery(
+    { tenantId },
+    { enabled: pollingEnabled && !!tenantId, refetchInterval: pollingEnabled ? 1500 : false },
+  );
+
+  // Stop polling when completed
+  useEffect(() => {
+    if (bulkProgress.data && bulkProgress.data.status !== "running") {
+      setPollingEnabled(false);
+    }
+  }, [bulkProgress.data]);
 
   // ─── Mutations ───
   const recalculate = trpc.rfv.recalculate.useMutation({
@@ -133,6 +174,24 @@ export default function RfvMatrix() {
     onError: (err) => toast.error(err.message),
   });
 
+  const bulkSend = trpc.rfv.bulkSend.useMutation({
+    onSuccess: () => {
+      setBulkDialogOpen(false);
+      setProgressDialogOpen(true);
+      setPollingEnabled(true);
+      toast.info("Envio em massa iniciado!");
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
+  const cancelBulk = trpc.rfv.cancelBulkSend.useMutation({
+    onSuccess: () => {
+      toast.info("Envio em massa cancelado");
+      setPollingEnabled(false);
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
   // ─── CSV File handler ───
   const handleCsvUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -148,9 +207,90 @@ export default function RfvMatrix() {
     e.target.value = "";
   };
 
+  // ─── Selection helpers ───
+  const currentPageIds = useMemo(() => {
+    return (contacts.data?.contacts || []).map((c) => c.id);
+  }, [contacts.data]);
+
+  const allPageSelected = useMemo(() => {
+    if (currentPageIds.length === 0) return false;
+    return currentPageIds.every((id) => selectedIds.has(id));
+  }, [currentPageIds, selectedIds]);
+
+  const someSelected = selectedIds.size > 0;
+
+  const toggleContact = useCallback((id: number) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+    setSelectAllPages(false);
+  }, []);
+
+  const togglePageAll = useCallback(() => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (allPageSelected) {
+        currentPageIds.forEach((id) => next.delete(id));
+      } else {
+        currentPageIds.forEach((id) => next.add(id));
+      }
+      return next;
+    });
+    setSelectAllPages(false);
+  }, [allPageSelected, currentPageIds]);
+
+  const clearSelection = useCallback(() => {
+    setSelectedIds(new Set());
+    setSelectAllPages(false);
+  }, []);
+
+  // ─── Bulk send handler ───
+  const handleBulkSend = () => {
+    if (!activeSession.data?.sessionId) {
+      toast.error("Nenhuma sessão WhatsApp conectada. Conecte-se primeiro.");
+      return;
+    }
+    if (!messageTemplate.trim()) {
+      toast.error("Digite uma mensagem para enviar.");
+      return;
+    }
+    const ids = Array.from(selectedIds);
+    bulkSend.mutate({
+      tenantId,
+      contactIds: ids,
+      messageTemplate: messageTemplate.trim(),
+      sessionId: activeSession.data.sessionId,
+      delayMs: delaySeconds * 1000,
+    });
+  };
+
+  // ─── Insert variable into template ───
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const insertVariable = (varName: string) => {
+    const ta = textareaRef.current;
+    if (!ta) {
+      setMessageTemplate((prev) => prev + varName);
+      return;
+    }
+    const start = ta.selectionStart;
+    const end = ta.selectionEnd;
+    const before = messageTemplate.substring(0, start);
+    const after = messageTemplate.substring(end);
+    setMessageTemplate(before + varName + after);
+    setTimeout(() => {
+      ta.focus();
+      ta.selectionStart = ta.selectionEnd = start + varName.length;
+    }, 0);
+  };
+
   const d = dashboard.data;
   const a = alerta.data;
   const c = contacts.data;
+  const bp = bulkProgress.data;
+  const sessionConnected = activeSession.data?.status === "connected";
 
   return (
     <div className="flex flex-col h-full min-h-0 bg-background">
@@ -254,15 +394,15 @@ export default function RfvMatrix() {
               </CardContent>
             </Card>
 
-            <Card className="border-l-4 border-l-purple-500">
+            <Card className="border-l-4 border-l-sky-500">
               <CardContent className="p-4">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Conversão Média</p>
                     <p className="text-2xl font-bold mt-1">{d ? `${d.conversaoMedia.toFixed(1)}%` : "—"}</p>
                   </div>
-                  <div className="p-2.5 rounded-xl bg-purple-500/10">
-                    <TrendingUp className="w-5 h-5 text-purple-500" />
+                  <div className="p-2.5 rounded-xl bg-sky-500/10">
+                    <TrendingUp className="w-5 h-5 text-sky-500" />
                   </div>
                 </div>
               </CardContent>
@@ -270,32 +410,29 @@ export default function RfvMatrix() {
           </div>
 
           {/* ─── Audience Distribution ─── */}
-          {d && d.audienceDistribution.length > 0 && (
+          {d && d.audienceDistribution && d.audienceDistribution.length > 0 && (
             <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium">Distribuição por Público</CardTitle>
-              </CardHeader>
-              <CardContent>
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <Users className="w-4 h-4 text-muted-foreground" />
+                  <span className="text-sm font-medium">Distribuição por Público</span>
+                </div>
                 <div className="flex flex-wrap gap-2">
                   {d.audienceDistribution.map((item) => {
-                    const config = audienceConfig[item.audienceType] || audienceConfig.desconhecido;
+                    const ac = audienceConfig[item.audienceType] || audienceConfig.desconhecido;
                     return (
                       <button
                         key={item.audienceType}
-                        onClick={() => {
-                          setAudienceFilter(audienceFilter === item.audienceType ? "all" : item.audienceType);
-                          setPage(1);
-                        }}
-                        className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-all text-sm ${
+                        onClick={() => { setAudienceFilter(audienceFilter === item.audienceType ? "all" : item.audienceType); setPage(1); }}
+                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all cursor-pointer border ${
                           audienceFilter === item.audienceType
-                            ? "border-primary bg-primary/5 ring-1 ring-primary/20"
-                            : "border-border hover:border-primary/30"
-                        }`}
+                            ? "ring-2 ring-primary border-primary"
+                            : "border-transparent hover:border-border"
+                        } ${ac.bg} ${ac.color}`}
                       >
-                        <span className={config.color}>{config.icon}</span>
-                        <span className="font-medium">{config.label}</span>
-                        <Badge variant="secondary" className="text-xs">{item.count}</Badge>
-                        <span className="text-xs text-muted-foreground">{formatCurrency(item.totalValue)}</span>
+                        {ac.icon}
+                        {ac.label}
+                        <span className="ml-1 font-bold">{item.count}</span>
                       </button>
                     );
                   })}
@@ -306,25 +443,24 @@ export default function RfvMatrix() {
 
           {/* ─── Alerta Dinheiro Parado ─── */}
           {a && a.totalContatos > 0 && (
-            <Card className="border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-950/30">
+            <Card className="border-l-4 border-l-red-500 bg-red-50/50 dark:bg-red-950/20">
               <CardContent className="p-4">
                 <div className="flex items-start gap-3">
-                  <div className="p-2 rounded-lg bg-amber-100 dark:bg-amber-900">
-                    <AlertTriangle className="w-5 h-5 text-amber-600" />
+                  <div className="p-2 rounded-lg bg-red-100 dark:bg-red-900/50">
+                    <AlertTriangle className="w-5 h-5 text-red-600" />
                   </div>
                   <div className="flex-1">
-                    <h3 className="font-semibold text-amber-800 dark:text-amber-200">Dinheiro Parado</h3>
-                    <p className="text-sm text-amber-700 dark:text-amber-300 mt-0.5">
-                      <strong>{a.totalContatos}</strong> contatos sem ação há mais de 7 dias com valor potencial de{" "}
-                      <strong>{formatCurrency(a.valorPotencial)}</strong>
+                    <h3 className="font-semibold text-red-700 dark:text-red-400">Dinheiro Parado</h3>
+                    <p className="text-sm text-red-600/80 dark:text-red-400/80 mt-0.5">
+                      <strong>{a.totalContatos}</strong> contatos sem ação há 7+ dias — valor potencial de <strong>{formatCurrency(a.valorPotencial)}</strong>
                     </p>
-                    <div className="flex flex-wrap gap-2 mt-2">
+                    <div className="flex flex-wrap gap-1.5 mt-2">
                       {a.distribuicao.map((item) => {
-                        const config = audienceConfig[item.audienceType] || audienceConfig.desconhecido;
+                        const ac = audienceConfig[item.audienceType] || audienceConfig.desconhecido;
                         return (
-                          <span key={item.audienceType} className={`inline-flex items-center gap-1 text-xs px-2 py-1 rounded ${config.bg} ${config.color}`}>
-                            {config.label}: {item.count} ({formatCurrency(item.valorPotencial)})
-                          </span>
+                          <Badge key={item.audienceType} variant="outline" className={`text-[10px] ${ac.color}`}>
+                            {ac.label}: {item.count}
+                          </Badge>
                         );
                       })}
                     </div>
@@ -382,6 +518,25 @@ export default function RfvMatrix() {
             </Button>
           </div>
 
+          {/* ─── Select All Header ─── */}
+          {c && c.contacts.length > 0 && (
+            <div className="flex items-center gap-3 px-1">
+              <Checkbox
+                checked={allPageSelected}
+                onCheckedChange={togglePageAll}
+                id="select-all"
+              />
+              <label htmlFor="select-all" className="text-sm text-muted-foreground cursor-pointer">
+                {allPageSelected ? "Desmarcar todos desta página" : "Selecionar todos desta página"}
+              </label>
+              {someSelected && (
+                <span className="text-sm font-medium text-primary">
+                  {selectedIds.size} selecionado{selectedIds.size !== 1 ? "s" : ""}
+                </span>
+              )}
+            </div>
+          )}
+
           {/* ─── Contact List ─── */}
           {contacts.isLoading ? (
             <div className="space-y-3">
@@ -396,11 +551,26 @@ export default function RfvMatrix() {
                 const flag = contact.rfvFlag !== "none" ? flagConfig[contact.rfvFlag] : null;
                 const conv = conversionBadge(Number(contact.taxaConversao));
                 const waLink = normalizePhoneForWa(contact.phone);
+                const isSelected = selectedIds.has(contact.id);
 
                 return (
-                  <Card key={contact.id} className="hover:shadow-md transition-shadow">
+                  <Card
+                    key={contact.id}
+                    className={`hover:shadow-md transition-all cursor-pointer ${
+                      isSelected ? "ring-2 ring-primary bg-primary/5" : ""
+                    }`}
+                    onClick={() => toggleContact(contact.id)}
+                  >
                     <CardContent className="p-4">
                       <div className="flex items-center gap-4">
+                        {/* Checkbox */}
+                        <Checkbox
+                          checked={isSelected}
+                          onCheckedChange={() => toggleContact(contact.id)}
+                          onClick={(e) => e.stopPropagation()}
+                          className="shrink-0"
+                        />
+
                         {/* Avatar / Audience icon */}
                         <div className={`shrink-0 w-10 h-10 rounded-full flex items-center justify-center ${ac.bg}`}>
                           <span className={ac.color}>{ac.icon}</span>
@@ -469,6 +639,7 @@ export default function RfvMatrix() {
                                   target="_blank"
                                   rel="noopener noreferrer"
                                   className="shrink-0 p-2 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950 transition-colors"
+                                  onClick={(e) => e.stopPropagation()}
                                 >
                                   <Phone className="w-4 h-4 text-emerald-600" />
                                 </a>
@@ -536,6 +707,240 @@ export default function RfvMatrix() {
           )}
         </div>
       </div>
+
+      {/* ─── Floating Action Bar ─── */}
+      {someSelected && (
+        <div className="shrink-0 border-t bg-card px-6 py-3 shadow-lg">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <CheckSquare className="w-5 h-5 text-primary" />
+              <span className="text-sm font-medium">
+                {selectedIds.size} contato{selectedIds.size !== 1 ? "s" : ""} selecionado{selectedIds.size !== 1 ? "s" : ""}
+              </span>
+              <Button variant="ghost" size="sm" onClick={clearSelection}>
+                <X className="w-3.5 h-3.5 mr-1" />
+                Limpar
+              </Button>
+            </div>
+            <div className="flex items-center gap-2">
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      size="sm"
+                      onClick={() => setBulkDialogOpen(true)}
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                    >
+                      <Send className="w-4 h-4 mr-1.5" />
+                      Enviar WhatsApp
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    {sessionConnected
+                      ? `Enviar mensagem para ${selectedIds.size} contato(s)`
+                      : "Conecte o WhatsApp primeiro"}
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Bulk Send Compose Dialog ─── */}
+      <Dialog open={bulkDialogOpen} onOpenChange={setBulkDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Send className="w-5 h-5 text-emerald-600" />
+              Envio em Massa — WhatsApp
+            </DialogTitle>
+            <DialogDescription>
+              Envie uma mensagem personalizada para {selectedIds.size} contato{selectedIds.size !== 1 ? "s" : ""} selecionado{selectedIds.size !== 1 ? "s" : ""}.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            {/* WhatsApp session status */}
+            <div className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm ${
+              sessionConnected
+                ? "bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400"
+                : "bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-400"
+            }`}>
+              <div className={`w-2 h-2 rounded-full ${sessionConnected ? "bg-emerald-500" : "bg-red-500"}`} />
+              {sessionConnected ? "WhatsApp conectado" : "WhatsApp desconectado"}
+            </div>
+
+            {/* Message template */}
+            <div className="space-y-2">
+              <Label>Mensagem</Label>
+              <Textarea
+                ref={textareaRef}
+                value={messageTemplate}
+                onChange={(e) => setMessageTemplate(e.target.value)}
+                placeholder="Olá {primeiro_nome}, tudo bem? ..."
+                rows={5}
+                className="resize-none"
+              />
+              <div className="flex flex-wrap gap-1.5">
+                {templateVars.map((tv) => (
+                  <button
+                    key={tv.var}
+                    onClick={() => insertVariable(tv.var)}
+                    className="inline-flex items-center px-2 py-0.5 rounded text-xs bg-muted hover:bg-muted/80 text-muted-foreground transition-colors"
+                    title={tv.desc}
+                  >
+                    {tv.var}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Delay setting */}
+            <div className="flex items-center gap-3">
+              <Label className="shrink-0">Intervalo entre mensagens:</Label>
+              <Select value={String(delaySeconds)} onValueChange={(v) => setDelaySeconds(Number(v))}>
+                <SelectTrigger className="w-[120px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="2">2 segundos</SelectItem>
+                  <SelectItem value="3">3 segundos</SelectItem>
+                  <SelectItem value="5">5 segundos</SelectItem>
+                  <SelectItem value="10">10 segundos</SelectItem>
+                  <SelectItem value="15">15 segundos</SelectItem>
+                  <SelectItem value="30">30 segundos</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Preview */}
+            {messageTemplate.trim() && (
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Pré-visualização:</Label>
+                <div className="rounded-lg bg-emerald-50 dark:bg-emerald-950/30 p-3 text-sm whitespace-pre-wrap">
+                  {messageTemplate
+                    .replace(/\{nome\}/gi, "João da Silva")
+                    .replace(/\{primeiro_nome\}/gi, "João")
+                    .replace(/\{email\}/gi, "joao@email.com")
+                    .replace(/\{telefone\}/gi, "(11) 99999-0000")
+                    .replace(/\{publico\}/gi, "oportunidade")
+                    .replace(/\{valor\}/gi, "R$ 1.500,00")}
+                </div>
+              </div>
+            )}
+
+            {/* Estimated time */}
+            <div className="text-xs text-muted-foreground">
+              Tempo estimado: ~{Math.ceil((selectedIds.size * delaySeconds) / 60)} minuto{Math.ceil((selectedIds.size * delaySeconds) / 60) !== 1 ? "s" : ""}
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBulkDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleBulkSend}
+              disabled={!messageTemplate.trim() || !sessionConnected || bulkSend.isPending}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white"
+            >
+              {bulkSend.isPending ? (
+                <><Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> Iniciando...</>
+              ) : (
+                <><Send className="w-4 h-4 mr-1.5" /> Enviar para {selectedIds.size} contatos</>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── Bulk Send Progress Dialog ─── */}
+      <Dialog open={progressDialogOpen} onOpenChange={(open) => {
+        if (!open && bp?.status !== "running") {
+          setProgressDialogOpen(false);
+          clearSelection();
+        }
+      }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {bp?.status === "running" ? (
+                <><Loader2 className="w-5 h-5 animate-spin text-emerald-600" /> Enviando mensagens...</>
+              ) : bp?.status === "cancelled" ? (
+                <><Ban className="w-5 h-5 text-amber-600" /> Envio cancelado</>
+              ) : (
+                <><CheckCircle2 className="w-5 h-5 text-emerald-600" /> Envio concluído</>
+              )}
+            </DialogTitle>
+          </DialogHeader>
+
+          {bp && (
+            <div className="space-y-4">
+              {/* Progress bar */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Progresso</span>
+                  <span className="font-medium">{bp.processed} / {bp.total}</span>
+                </div>
+                <Progress value={bp.total > 0 ? (bp.processed / bp.total) * 100 : 0} className="h-2" />
+              </div>
+
+              {/* Stats */}
+              <div className="grid grid-cols-3 gap-3">
+                <div className="rounded-lg bg-emerald-50 dark:bg-emerald-950/30 p-3 text-center">
+                  <CheckCircle2 className="w-5 h-5 mx-auto text-emerald-600" />
+                  <p className="text-lg font-bold mt-1 text-emerald-700 dark:text-emerald-400">{bp.sent}</p>
+                  <p className="text-xs text-muted-foreground">Enviados</p>
+                </div>
+                <div className="rounded-lg bg-red-50 dark:bg-red-950/30 p-3 text-center">
+                  <AlertCircle className="w-5 h-5 mx-auto text-red-600" />
+                  <p className="text-lg font-bold mt-1 text-red-700 dark:text-red-400">{bp.failed}</p>
+                  <p className="text-xs text-muted-foreground">Falhas</p>
+                </div>
+                <div className="rounded-lg bg-amber-50 dark:bg-amber-950/30 p-3 text-center">
+                  <SkipForward className="w-5 h-5 mx-auto text-amber-600" />
+                  <p className="text-lg font-bold mt-1 text-amber-700 dark:text-amber-400">{bp.skipped}</p>
+                  <p className="text-xs text-muted-foreground">Sem telefone</p>
+                </div>
+              </div>
+
+              {/* Recent results */}
+              {bp.results.length > 0 && (
+                <div className="space-y-1.5 max-h-40 overflow-y-auto">
+                  <Label className="text-xs text-muted-foreground">Últimos resultados:</Label>
+                  {bp.results.slice(-10).reverse().map((r, i) => (
+                    <div key={i} className="flex items-center gap-2 text-xs px-2 py-1 rounded bg-muted/50">
+                      {r.status === "sent" && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />}
+                      {r.status === "failed" && <AlertCircle className="w-3.5 h-3.5 text-red-500 shrink-0" />}
+                      {r.status === "skipped" && <SkipForward className="w-3.5 h-3.5 text-amber-500 shrink-0" />}
+                      <span className="truncate flex-1">{r.name}</span>
+                      {r.error && <span className="text-muted-foreground truncate max-w-[150px]">{r.error}</span>}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          <DialogFooter>
+            {bp?.status === "running" ? (
+              <Button
+                variant="destructive"
+                onClick={() => cancelBulk.mutate({ tenantId })}
+                disabled={cancelBulk.isPending}
+              >
+                <Ban className="w-4 h-4 mr-1.5" />
+                Cancelar Envio
+              </Button>
+            ) : (
+              <Button onClick={() => { setProgressDialogOpen(false); clearSelection(); }}>
+                Fechar
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* ─── CSV Import Dialog ─── */}
       <Dialog open={csvDialogOpen} onOpenChange={setCsvDialogOpen}>

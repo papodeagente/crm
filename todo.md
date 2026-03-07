@@ -1797,3 +1797,15 @@
 - [x] Testes unitários para cálculos RFV e classificação (39 testes passando)
 - [x] Testes unitários para endpoints tRPC
 - [x] Teste visual no browser (2119 contatos carregados com sucesso)
+
+## Ações em Massa — Envio de Mensagens Template WhatsApp
+- [x] Analisar código existente de envio de mensagens e templates WhatsApp
+- [x] Criar endpoint backend para envio em massa com fila e rate-limit (delay configurável 2-30s)
+- [x] Implementar seleção múltipla de contatos na Matriz RFV (checkbox individual + selecionar todos)
+- [x] Barra de ações flutuante com contagem de selecionados e botão "Enviar WhatsApp"
+- [x] Modal de composição: campo de texto com 6 variáveis dinâmicas ({nome}, {primeiro_nome}, {email}, {telefone}, {publico}, {valor})
+- [x] Pré-visualização da mensagem com dados de exemplo
+- [x] Barra de progresso em tempo real durante o envio em massa
+- [x] Relatório de envio: sucesso, falha, sem telefone
+- [x] Escrever testes unitários para o endpoint de envio em massa (15 testes passando)
+- [x] Testar visualmente no browser (modal, seleção, variáveis, pré-visualização)

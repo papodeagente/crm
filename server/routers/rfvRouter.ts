@@ -13,6 +13,12 @@ import {
   resetAgencyRfvData,
   AUDIENCE_TYPES,
 } from "../rfv";
+import {
+  startBulkSend,
+  getBulkSendProgress,
+  cancelBulkSend,
+  getActiveSessionForTenant,
+} from "../bulkMessage";
 
 export const rfvRouter = router({
   // ─── Dashboard KPIs ───
@@ -80,5 +86,41 @@ export const rfvRouter = router({
   audienceTypes: protectedProcedure
     .query(() => {
       return AUDIENCE_TYPES;
+    }),
+
+  // ─── Bulk Send WhatsApp Messages ───
+  bulkSend: protectedProcedure
+    .input(z.object({
+      tenantId: z.number(),
+      contactIds: z.array(z.number()).min(1).max(5000),
+      messageTemplate: z.string().min(1).max(4096),
+      sessionId: z.string().min(1),
+      delayMs: z.number().min(1000).max(30000).optional(),
+    }))
+    .mutation(async ({ input }) => {
+      return startBulkSend(input);
+    }),
+
+  // ─── Get Bulk Send Progress ───
+  bulkSendProgress: protectedProcedure
+    .input(z.object({ tenantId: z.number() }))
+    .query(async ({ input }) => {
+      return getBulkSendProgress(input.tenantId);
+    }),
+
+  // ─── Cancel Bulk Send ───
+  cancelBulkSend: protectedProcedure
+    .input(z.object({ tenantId: z.number() }))
+    .mutation(async ({ input }) => {
+      const cancelled = cancelBulkSend(input.tenantId);
+      if (!cancelled) throw new TRPCError({ code: "NOT_FOUND", message: "Nenhum envio em andamento" });
+      return { cancelled: true };
+    }),
+
+  // ─── Get Active WhatsApp Session for Tenant ───
+  activeSession: protectedProcedure
+    .input(z.object({ tenantId: z.number() }))
+    .query(async ({ input }) => {
+      return getActiveSessionForTenant(input.tenantId);
     }),
 });
