@@ -382,6 +382,28 @@ export const appRouter = router({
         const { url } = await storagePut(fileKey, fileBuffer, input.contentType);
         return { url, fileKey };
       }),
+    // WA Contacts map (LID ↔ Phone resolution)
+    waContactsMap: protectedProcedure
+      .input(z.object({ sessionId: z.string() }))
+      .query(async ({ input }) => {
+        const db = await getDb();
+        if (!db) return {};
+        const { waContacts } = await import("../drizzle/schema");
+        const rows = await db.select().from(waContacts)
+          .where(eq(waContacts.sessionId, input.sessionId))
+          .limit(5000);
+        // Build a map: jid -> { phoneNumber, pushName, savedName, verifiedName }
+        const map: Record<string, { phoneNumber: string | null; pushName: string | null; savedName: string | null; verifiedName: string | null }> = {};
+        for (const r of rows) {
+          map[r.jid] = {
+            phoneNumber: r.phoneNumber,
+            pushName: r.pushName,
+            savedName: r.savedName,
+            verifiedName: r.verifiedName,
+          };
+        }
+        return map;
+      }),
     // Manual trigger for daily backup
     triggerDailyBackup: protectedProcedure
       .mutation(async () => {

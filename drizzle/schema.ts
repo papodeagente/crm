@@ -1501,3 +1501,26 @@ export const dateAutomations = mysqlTable("date_automations", {
 ]);
 export type DateAutomation = typeof dateAutomations.$inferSelect;
 export type InsertDateAutomation = typeof dateAutomations.$inferInsert;
+
+
+// ════════════════════════════════════════════════════════════
+// WA CONTACTS (LID ↔ Phone mapping from Baileys contacts.upsert)
+// ════════════════════════════════════════════════════════════
+
+export const waContacts = mysqlTable("wa_contacts", {
+  id: int("id").autoincrement().primaryKey(),
+  sessionId: varchar("sessionId", { length: 100 }).notNull(),
+  jid: varchar("jid", { length: 100 }).notNull(),           // Primary JID (could be @s.whatsapp.net or @lid)
+  lid: varchar("lid", { length: 100 }),                       // LID format (@lid)
+  phoneNumber: varchar("phoneNumber", { length: 100 }),       // Phone number (@s.whatsapp.net)
+  pushName: varchar("pushName", { length: 255 }),             // Contact's self-set name
+  savedName: varchar("savedName", { length: 255 }),           // Name saved in phone contacts
+  verifiedName: varchar("verifiedName", { length: 255 }),     // Business verified name
+  profilePictureUrl: text("profilePictureUrl"),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (t) => [
+  index("wac_session_jid_idx").on(t.sessionId, t.jid),
+  index("wac_session_lid_idx").on(t.sessionId, t.lid),
+  index("wac_session_phone_idx").on(t.sessionId, t.phoneNumber),
+]);
+export type WaContact = typeof waContacts.$inferSelect;

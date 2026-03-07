@@ -1723,3 +1723,9 @@
 - [x] Frontend: lista de automações ativas com toggle de ativar/desativar
 - [ ] Criar automações padrão de pós-venda ao registrar novo tenant (pendente)
 - [x] Testes para validar a lógica de movimentação automática
+
+## Correções WhatsApp API
+- [x] Bug: Área de chat na negociação não responsiva e some ao rolar a tela (fixar posição)
+- [x] Bug: Status de mensagens não sincroniza enviada/recebida/lida com WhatsApp (adicionado lastStatusUpdate ao WhatsAppChat)
+- [x] Bug: Inbox não sincronizado como WhatsApp Web (adicionado waContactsMap para resolver LIDs)
+- [x] Bug: Contatos não salvos aparecem com números aleatórios (LID JIDs resolvidos via wa_contacts table + Baileys contacts.upsert)

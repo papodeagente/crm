@@ -71,7 +71,11 @@ function formatConversationTime(date: string | Date | null | undefined): string 
 
 function formatPhoneNumber(jid: string): string {
   if (!jid) return "Desconhecido";
+  // LID JIDs don't contain phone numbers - show friendly label
+  if (jid.endsWith("@lid")) return "Contato WhatsApp";
   const phone = jid.split("@")[0];
+  // Skip non-numeric strings (corrupted JIDs)
+  if (!/^\d+$/.test(phone)) return "Contato WhatsApp";
   if (phone.startsWith("55") && phone.length >= 12) {
     const ddd = phone.substring(2, 4);
     const num = phone.substring(4);
@@ -787,6 +791,13 @@ export default function InboxPage() {
 
   const profilePicMap = useMemo(() => (profilePicsQ.data || {}) as Record<string, string | null>, [profilePicsQ.data]);
 
+  // WA Contacts map (LID ↔ Phone resolution from Baileys contacts sync)
+  const waContactsMapQ = trpc.whatsapp.waContactsMap.useQuery(
+    { sessionId: activeSession?.sessionId || "" },
+    { enabled: !!activeSession?.sessionId, staleTime: 60 * 1000 }
+  );
+  const waContactsMap = useMemo(() => (waContactsMapQ.data || {}) as Record<string, { phoneNumber: string | null; pushName: string | null; savedName: string | null; verifiedName: string | null }>, [waContactsMapQ.data]);
+
   // PushName map from conversations
   const pushNameMap = useMemo(() => {
     const map = new Map<string, string>();
@@ -818,16 +829,42 @@ export default function InboxPage() {
 
   const getContactForJid = useCallback((jid: string) => {
     const phone = jid.split("@")[0];
-    return contactNameMap.get(phone) || null;
-  }, [contactNameMap]);
+    const directMatch = contactNameMap.get(phone);
+    if (directMatch) return directMatch;
+    // For LID JIDs, resolve via waContactsMap to get the real phone number
+    if (jid.endsWith("@lid")) {
+      const waContact = waContactsMap[jid];
+      if (waContact?.phoneNumber) {
+        const resolvedPhone = waContact.phoneNumber.split("@")[0];
+        return contactNameMap.get(resolvedPhone) || null;
+      }
+    }
+    return null;
+  }, [contactNameMap, waContactsMap]);
 
   const getDisplayName = useCallback((jid: string) => {
+    // 1. CRM contact match (direct or via LID resolution)
     const contact = getContactForJid(jid);
     if (contact) return contact.name;
+    // 2. WA Contacts map (savedName > verifiedName > pushName from Baileys sync)
+    const waContact = waContactsMap[jid];
+    if (waContact) {
+      if (waContact.savedName) return waContact.savedName;
+      if (waContact.verifiedName) return waContact.verifiedName;
+      if (waContact.pushName) return waContact.pushName;
+      // If we have a phone number, format it nicely
+      if (waContact.phoneNumber) return formatPhoneNumber(waContact.phoneNumber);
+    }
+    // 3. PushName from conversation data
     const pushName = pushNameMap.get(jid);
     if (pushName) return pushName;
+    // 4. For LID JIDs, try to show a resolved phone number instead of the LID
+    if (jid.endsWith("@lid")) {
+      return "Contato WhatsApp";
+    }
+    // 5. Format the phone number from the JID
     return formatPhoneNumber(jid);
-  }, [getContactForJid, pushNameMap]);
+  }, [getContactForJid, pushNameMap, waContactsMap]);
 
   // Notification sound on new messages
   useEffect(() => {

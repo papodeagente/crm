@@ -341,12 +341,13 @@ function VoiceRecorder({ onSend, onCancel }: { onSend: (blob: Blob, duration: nu
 
 export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDeal, onCreateContact, hasCrmContact, assignment, agents, onAssign, onStatusChange }: WhatsAppChatProps) {
   const [showAgentDropdown, setShowAgentDropdown] = useState(false);
-  const { lastMessage } = useSocket();
+  const { lastMessage, lastStatusUpdate } = useSocket();
   const [messageText, setMessageText] = useState("");
   const [showAttach, setShowAttach] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [showScrollBtn, setShowScrollBtn] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  const [localStatusUpdates, setLocalStatusUpdates] = useState<Record<string, string>>({});
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -385,6 +386,21 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
   useEffect(() => {
     if (lastMessage && lastMessage.remoteJid === remoteJid) messagesQ.refetch();
   }, [lastMessage, remoteJid]);
+
+  // Update message status in real-time via socket
+  useEffect(() => {
+    if (lastStatusUpdate && lastStatusUpdate.messageId) {
+      setLocalStatusUpdates(prev => ({
+        ...prev,
+        [lastStatusUpdate.messageId]: lastStatusUpdate.status,
+      }));
+    }
+  }, [lastStatusUpdate]);
+
+  // Clear local status updates when messages are refetched from server
+  useEffect(() => {
+    if (messagesQ.data) setLocalStatusUpdates({});
+  }, [messagesQ.dataUpdatedAt]);
 
   useEffect(() => {
     const container = scrollContainerRef.current;
@@ -662,7 +678,11 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
                   const next = mi < group.messages.length - 1 ? group.messages[mi + 1] : null;
                   const isFirst = !prev || prev.fromMe !== msg.fromMe;
                   const isLast = !next || next.fromMe !== msg.fromMe;
-                  return <MessageBubble key={msg.id} msg={msg} isFirst={isFirst} isLast={isLast} />;
+                  // Apply real-time status updates from socket
+                  const updatedMsg = msg.messageId && localStatusUpdates[msg.messageId]
+                    ? { ...msg, status: localStatusUpdates[msg.messageId] }
+                    : msg;
+                  return <MessageBubble key={msg.id} msg={updatedMsg} isFirst={isFirst} isLast={isLast} />;
                 })}
               </div>
             ))

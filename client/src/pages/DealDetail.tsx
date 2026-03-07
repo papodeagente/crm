@@ -904,7 +904,7 @@ export default function DealDetail() {
           </div>
 
           {/* ── Tab content ── */}
-          <div className="flex-1 overflow-y-auto">
+          <div className={`flex-1 ${activeTab === "whatsapp" ? "overflow-hidden flex flex-col" : "overflow-y-auto"}`}>
             {activeTab === "history" && (
               <HistoryPanel
                 history={historyQ.data || []}
@@ -2617,7 +2617,7 @@ function WhatsAppPanel({ contact, dealId }: { contact: any; dealId: number }) {
   }, [msgs]);
 
   return (
-    <div className="flex flex-col h-[calc(100vh-280px)]">
+    <div className="flex flex-col h-full min-h-0">
       {/* Tab toggle: History vs Live */}
       <div className="flex items-center gap-2 px-4 py-2 border-b border-border bg-card/50">
         <button

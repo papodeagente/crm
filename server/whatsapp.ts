@@ -494,6 +494,118 @@ class WhatsAppManager extends EventEmitter {
       }
     });
 
+    // ─── Contacts sync (LID ↔ Phone mapping) ───
+    sock.ev.on("contacts.upsert" as any, async (contacts: any[]) => {
+      try {
+        const db = await getDb();
+        if (!db) return;
+        const { waContacts } = await import("../drizzle/schema");
+        for (const contact of contacts) {
+          if (!contact.id) continue;
+          // Skip group JIDs
+          if (contact.id.includes("@g.us")) continue;
+          
+          const jid = contact.id;
+          const lid = contact.lid || null;
+          const phoneNumber = contact.phoneNumber || null;
+          const pushName = contact.notify || null;
+          const savedName = contact.name || null;
+          const verifiedName = contact.verifiedName || null;
+
+          // Upsert: check if exists by sessionId+jid
+          const existing = await db.select({ id: waContacts.id }).from(waContacts)
+            .where(and(eq(waContacts.sessionId, sessionId), eq(waContacts.jid, jid)))
+            .limit(1);
+          
+          if (existing.length > 0) {
+            await db.update(waContacts).set({
+              lid: lid || undefined,
+              phoneNumber: phoneNumber || undefined,
+              pushName: pushName || undefined,
+              savedName: savedName || undefined,
+              verifiedName: verifiedName || undefined,
+            }).where(eq(waContacts.id, existing[0].id));
+          } else {
+            await db.insert(waContacts).values({
+              sessionId,
+              jid,
+              lid,
+              phoneNumber,
+              pushName,
+              savedName,
+              verifiedName,
+            });
+          }
+
+          // Also insert reverse mapping if LID is present
+          if (lid && lid !== jid) {
+            const existingLid = await db.select({ id: waContacts.id }).from(waContacts)
+              .where(and(eq(waContacts.sessionId, sessionId), eq(waContacts.jid, lid)))
+              .limit(1);
+            if (existingLid.length > 0) {
+              await db.update(waContacts).set({
+                phoneNumber: phoneNumber || jid.includes("@s.whatsapp.net") ? jid : undefined,
+                pushName: pushName || undefined,
+                savedName: savedName || undefined,
+                verifiedName: verifiedName || undefined,
+              }).where(eq(waContacts.id, existingLid[0].id));
+            } else {
+              await db.insert(waContacts).values({
+                sessionId,
+                jid: lid,
+                lid: lid,
+                phoneNumber: phoneNumber || (jid.includes("@s.whatsapp.net") ? jid : null),
+                pushName,
+                savedName,
+                verifiedName,
+              });
+            }
+          }
+        }
+      } catch (e) {
+        console.error("[WA Contacts] Error syncing contacts:", e);
+      }
+    });
+
+    // Also handle contacts.update for incremental updates
+    sock.ev.on("contacts.update" as any, async (contacts: any[]) => {
+      try {
+        const db = await getDb();
+        if (!db) return;
+        const { waContacts } = await import("../drizzle/schema");
+        for (const contact of contacts) {
+          if (!contact.id) continue;
+          if (contact.id.includes("@g.us")) continue;
+          const existing = await db.select({ id: waContacts.id }).from(waContacts)
+            .where(and(eq(waContacts.sessionId, sessionId), eq(waContacts.jid, contact.id)))
+            .limit(1);
+          if (existing.length > 0) {
+            const updates: any = {};
+            if (contact.notify) updates.pushName = contact.notify;
+            if (contact.name) updates.savedName = contact.name;
+            if (contact.verifiedName) updates.verifiedName = contact.verifiedName;
+            if (contact.lid) updates.lid = contact.lid;
+            if (contact.phoneNumber) updates.phoneNumber = contact.phoneNumber;
+            if (Object.keys(updates).length > 0) {
+              await db.update(waContacts).set(updates).where(eq(waContacts.id, existing[0].id));
+            }
+          } else {
+            await db.insert(waContacts).values({
+              sessionId,
+              jid: contact.id,
+              lid: contact.lid || null,
+              phoneNumber: contact.phoneNumber || null,
+              pushName: contact.notify || null,
+              savedName: contact.name || null,
+              verifiedName: contact.verifiedName || null,
+            });
+          }
+        }
+      } catch (e) {
+        console.error("[WA Contacts] Error updating contacts:", e);
+      }
+    });
+
     return sessionState;
   }
 
