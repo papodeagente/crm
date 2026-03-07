@@ -13,6 +13,7 @@ import {
   updateTenantPlan,
   listTenantUsersAdmin,
   updateUserStatusAdmin,
+  deleteTenantCompletely,
   SAAS_COOKIE,
   SESSION_DURATION_MS,
 } from "../saasAuth";
@@ -273,6 +274,39 @@ export const saasAuthRouter = router({
         throw new TRPCError({ code: "FORBIDDEN", message: "Acesso negado" });
       }
       return updateUserStatusAdmin(input.userId, input.status);
+    }),
+
+  // Delete tenant completely (superadmin only)
+  adminDeleteTenant: publicProcedure
+    .input(z.object({
+      tenantId: z.number().min(1),
+      confirmName: z.string().min(1, "Confirme o nome da agência"),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const cookies = parseCookies(ctx.req.headers.cookie);
+      const token = cookies.get(SAAS_COOKIE);
+      const session = await verifySaasSession(token);
+      if (!session || !isSuperAdmin(session.email)) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Acesso negado" });
+      }
+      // Verify tenant exists and name matches
+      const { getDb } = await import("../db");
+      const { tenants } = await import("../../drizzle/schema");
+      const { eq } = await import("drizzle-orm");
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [tenant] = await db.select().from(tenants).where(eq(tenants.id, input.tenantId)).limit(1);
+      if (!tenant) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Agência não encontrada" });
+      }
+      if (tenant.name.toLowerCase() !== input.confirmName.toLowerCase()) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Nome da agência não confere. Exclusão cancelada." });
+      }
+      const result = await deleteTenantCompletely(input.tenantId);
+      if (!result.success) {
+        console.error(`[SuperAdmin] Tenant ${input.tenantId} deletion had errors:`, result.errors);
+      }
+      return result;
     }),
 
   // Suspend/Activate tenant (superadmin only)

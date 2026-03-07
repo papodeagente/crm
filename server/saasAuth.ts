@@ -1,6 +1,6 @@
 import bcrypt from "bcryptjs";
 import { SignJWT, jwtVerify } from "jose";
-import { eq, and } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import { crmUsers, tenants, subscriptions, passwordResetTokens } from "../drizzle/schema";
 import { getDb } from "./db";
 
@@ -544,5 +544,249 @@ export async function inviteUserToTenant(data: {
     success: true,
     userId: userResult.id,
     emailSent: true,
+  };
+}
+
+
+// ═══════════════════════════════════════
+// DELETE TENANT COMPLETELY (SUPERADMIN)
+// ═══════════════════════════════════════
+
+/**
+ * Deletes a tenant and ALL associated data from the database.
+ * This is a hard-delete that removes everything so the account
+ * can be recreated from scratch without any leftover data.
+ *
+ * Tables are deleted in reverse dependency order to avoid FK violations.
+ */
+export async function deleteTenantCompletely(tenantId: number): Promise<{
+  success: boolean;
+  deletedTables: string[];
+  errors: string[];
+}> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  // Safety: never delete tenant 0 or negative
+  if (tenantId <= 0) throw new Error("Invalid tenant ID");
+
+  const deletedTables: string[] = [];
+  const errors: string[] = [];
+
+  // First, get all session IDs for this tenant (needed for non-tenant tables)
+  let sessionIds: string[] = [];
+  try {
+    const sessions = await db.execute(
+      sql`SELECT sessionId FROM whatsapp_sessions WHERE tenantId = ${tenantId}`
+    );
+    sessionIds = ((sessions as unknown as any[][])[0] || []).map((r: any) => r.sessionId);
+  } catch (e: any) {
+    errors.push(`whatsapp_sessions lookup: ${e.message}`);
+  }
+
+  // Get all user IDs for this tenant
+  let userIds: number[] = [];
+  try {
+    const users = await db.execute(
+      sql`SELECT id FROM crm_users WHERE tenantId = ${tenantId}`
+    );
+    userIds = ((users as unknown as any[][])[0] || []).map((r: any) => r.id);
+  } catch (e: any) {
+    errors.push(`crm_users lookup: ${e.message}`);
+  }
+
+  // ─── Phase 1: Delete tables with tenantId (leaf tables first) ───
+  // Order matters: delete child/leaf tables before parent tables
+
+  const tenantTables = [
+    // Leaf tables (no other table references these)
+    "ai_conversation_analyses",
+    "wa_audit_log",
+    "wa_identities",
+    "wa_conversations",
+    "lead_event_log",
+    "tracking_tokens",
+    "rd_station_webhook_log",
+    "rd_field_mappings",
+    "rd_station_config",
+    "meta_integration_config",
+    "portal_sessions",
+    "portal_tickets",
+    "portal_users",
+    "performance_snapshots",
+    "metrics_daily",
+    "alerts",
+    "event_log",
+    "job_dlq",
+    "jobs",
+    "webhook_config",
+    "webhooks",
+    "notifications",
+    "user_preferences",
+
+    // Custom fields
+    "custom_field_values",
+    "custom_fields",
+
+    // CRM attachments, notes, tasks
+    "task_assignees",
+    "crm_attachments",
+    "crm_notes",
+    "crm_tasks",
+
+    // Deals child tables
+    "deal_history",
+    "deal_products",
+    "deal_participants",
+    "proposal_items",
+    "proposal_signatures",
+    "proposals",
+    "proposal_templates",
+
+    // Trip items before trips
+    "trip_items",
+    "trips",
+
+    // Deals before pipelines
+    "task_automations",
+    "date_automations",
+    "deals",
+
+    // Pipeline child tables
+    "pipeline_automations",
+    "pipeline_stages",
+    "pipelines",
+
+    // Products
+    "product_catalog",
+    "product_categories",
+
+    // Contacts & accounts
+    "contacts",
+    "accounts",
+
+    // Inbox/messaging
+    "inbox_messages",
+    "conversations",
+    "channels",
+
+    // Conversation assignments
+    "conversation_assignments",
+
+    // Teams & distribution
+    "team_members",
+    "distribution_rules",
+    "teams",
+
+    // Roles & permissions
+    "role_permissions",
+    "user_roles",
+    "crm_roles",
+    "api_keys",
+
+    // Integrations
+    "integration_connections",
+    "integration_credentials",
+    "integrations",
+
+    // Subscriptions
+    "subscriptions",
+
+    // Courses / LMS
+    "enrollments",
+    "lessons",
+    "courses",
+
+    // Goals
+    "goals",
+
+    // Loss reasons
+    "loss_reasons",
+
+    // Lead sources & campaigns
+    "campaigns",
+    "lead_sources",
+  ];
+
+  for (const table of tenantTables) {
+    try {
+      await db.execute(sql`DELETE FROM ${sql.identifier(table)} WHERE tenantId = ${tenantId}`);
+      deletedTables.push(table);
+    } catch (e: any) {
+      errors.push(`${table}: ${e.message}`);
+    }
+  }
+
+  // ─── Phase 2: Delete non-tenant tables linked by sessionId ───
+  if (sessionIds.length > 0) {
+    const sessionLinkedTables = [
+      "chatbot_rules",
+      "chatbot_settings",
+      "wa_contacts",
+      "activity_logs",
+    ];
+
+    for (const table of sessionLinkedTables) {
+      try {
+        for (const sid of sessionIds) {
+          await db.execute(sql`DELETE FROM ${sql.identifier(table)} WHERE sessionId = ${sid}`);
+        }
+        deletedTables.push(table);
+      } catch (e: any) {
+        errors.push(`${table}: ${e.message}`);
+      }
+    }
+
+    // Delete messages linked by sessionId
+    try {
+      for (const sid of sessionIds) {
+        await db.execute(sql`DELETE FROM messages WHERE sessionId = ${sid}`);
+      }
+      deletedTables.push("messages");
+    } catch (e: any) {
+      errors.push(`messages: ${e.message}`);
+    }
+  }
+
+  // ─── Phase 3: Delete whatsapp_sessions for this tenant ───
+  try {
+    await db.execute(sql`DELETE FROM whatsapp_sessions WHERE tenantId = ${tenantId}`);
+    deletedTables.push("whatsapp_sessions");
+  } catch (e: any) {
+    errors.push(`whatsapp_sessions: ${e.message}`);
+  }
+
+  // ─── Phase 4: Delete password_reset_tokens for tenant users ───
+  if (userIds.length > 0) {
+    try {
+      for (const uid of userIds) {
+        await db.execute(sql`DELETE FROM password_reset_tokens WHERE userId = ${uid}`);
+      }
+      deletedTables.push("password_reset_tokens");
+    } catch (e: any) {
+      errors.push(`password_reset_tokens: ${e.message}`);
+    }
+  }
+
+  // ─── Phase 5: Delete crm_users for this tenant ───
+  try {
+    await db.execute(sql`DELETE FROM crm_users WHERE tenantId = ${tenantId}`);
+    deletedTables.push("crm_users");
+  } catch (e: any) {
+    errors.push(`crm_users: ${e.message}`);
+  }
+
+  // ─── Phase 6: Delete the tenant itself ───
+  try {
+    await db.execute(sql`DELETE FROM tenants WHERE id = ${tenantId}`);
+    deletedTables.push("tenants");
+  } catch (e: any) {
+    errors.push(`tenants: ${e.message}`);
+  }
+
+  return {
+    success: errors.length === 0,
+    deletedTables,
+    errors,
   };
 }

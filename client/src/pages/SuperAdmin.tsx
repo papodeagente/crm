@@ -12,8 +12,10 @@ import { toast } from "sonner";
 import {
   Shield, Users, Building2, Calendar, CreditCard, Search,
   Plane, ArrowLeft, Loader2, Edit, Ban, CheckCircle, Clock,
-  ChevronDown, ChevronRight, User, Mail, Phone, UserCheck, UserX
+  ChevronDown, ChevronRight, User, Mail, Phone, UserCheck, UserX,
+  Trash2, AlertTriangle
 } from "lucide-react";
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "@/components/ui/alert-dialog";
 import { formatDate } from "../../../shared/dateUtils";
 
 export default function SuperAdmin() {
@@ -25,6 +27,9 @@ export default function SuperAdmin() {
 
   const [search, setSearch] = useState("");
   const [editDialog, setEditDialog] = useState<{ tenantId: number; type: "freemium" | "plan" | "status" } | null>(null);
+  const [deleteDialog, setDeleteDialog] = useState<{ tenantId: number; tenantName: string } | null>(null);
+  const [deleteConfirmName, setDeleteConfirmName] = useState("");
+  const [deleteStep, setDeleteStep] = useState<1 | 2>(1);
   const [freemiumDays, setFreemiumDays] = useState("365");
   const [selectedPlan, setSelectedPlan] = useState<"free" | "pro" | "enterprise">("free");
   const [selectedStatus, setSelectedStatus] = useState<"active" | "suspended" | "cancelled">("active");
@@ -60,6 +65,22 @@ export default function SuperAdmin() {
   const updateUserStatusMutation = trpc.saasAuth.adminUpdateUserStatus.useMutation({
     onSuccess: () => {
       toast.success("Status do usuário atualizado!");
+    },
+    onError: (err: any) => toast.error(err.message),
+  });
+
+  const deleteTenantMutation = trpc.saasAuth.adminDeleteTenant.useMutation({
+    onSuccess: (data) => {
+      if (data.success) {
+        toast.success(`Agência excluída com sucesso! ${data.deletedTables.length} tabelas limpas.`);
+      } else {
+        toast.warning(`Agência excluída com ${data.errors.length} erros. Verifique o console.`);
+        console.warn("[Delete Tenant] Errors:", data.errors);
+      }
+      tenantsQuery.refetch();
+      setDeleteDialog(null);
+      setDeleteConfirmName("");
+      setDeleteStep(1);
     },
     onError: (err: any) => toast.error(err.message),
   });
@@ -289,6 +310,20 @@ export default function SuperAdmin() {
                               >
                                 <Ban className="w-4 h-4" />
                               </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 w-8 p-0 text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                                title="Excluir agência permanentemente"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setDeleteDialog({ tenantId: tenant.id, tenantName: tenant.name });
+                                  setDeleteConfirmName("");
+                                  setDeleteStep(1);
+                                }}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
                             </div>
                           </td>
                         </tr>
@@ -408,6 +443,94 @@ export default function SuperAdmin() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {/* Delete Tenant Dialog */}
+      <AlertDialog open={!!deleteDialog} onOpenChange={(open) => { if (!open) { setDeleteDialog(null); setDeleteConfirmName(""); setDeleteStep(1); } }}>
+        <AlertDialogContent className="sm:max-w-lg">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-red-500">
+              <AlertTriangle className="w-5 h-5" />
+              Excluir Agência Permanentemente
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                {deleteStep === 1 && (
+                  <>
+                    <p className="text-sm text-muted-foreground">
+                      Você está prestes a excluir <strong className="text-foreground">{deleteDialog?.tenantName}</strong> e <strong className="text-red-400">TODOS os dados associados</strong>.
+                    </p>
+                    <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3 text-sm text-red-400">
+                      <p className="font-semibold mb-1">Esta ação irá excluir permanentemente:</p>
+                      <ul className="list-disc list-inside space-y-0.5 text-xs">
+                        <li>Todos os contatos, negociações e pipelines</li>
+                        <li>Todas as mensagens e conversas do WhatsApp</li>
+                        <li>Todas as automações e configurações</li>
+                        <li>Todos os usuários e permissões</li>
+                        <li>Todos os produtos, propostas e tarefas</li>
+                        <li>Todas as integrações e webhooks</li>
+                        <li>A própria conta da agência</li>
+                      </ul>
+                    </div>
+                    <p className="text-sm text-muted-foreground font-medium">
+                      Esta ação é <strong className="text-red-400">irreversível</strong>. Se a agência for recriada, começará completamente do zero.
+                    </p>
+                  </>
+                )}
+                {deleteStep === 2 && (
+                  <>
+                    <p className="text-sm text-muted-foreground">
+                      Para confirmar, digite o nome exato da agência:
+                    </p>
+                    <div className="bg-accent/50 rounded-lg p-3 text-center">
+                      <code className="text-foreground font-bold text-lg">{deleteDialog?.tenantName}</code>
+                    </div>
+                    <Input
+                      placeholder="Digite o nome da agência para confirmar"
+                      value={deleteConfirmName}
+                      onChange={(e) => setDeleteConfirmName(e.target.value)}
+                      className="border-red-500/30 focus:border-red-500"
+                      autoFocus
+                    />
+                  </>
+                )}
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => { setDeleteDialog(null); setDeleteConfirmName(""); setDeleteStep(1); }}>
+              Cancelar
+            </AlertDialogCancel>
+            {deleteStep === 1 ? (
+              <Button
+                variant="destructive"
+                onClick={() => setDeleteStep(2)}
+              >
+                Continuar
+              </Button>
+            ) : (
+              <Button
+                variant="destructive"
+                disabled={
+                  deleteConfirmName.toLowerCase() !== deleteDialog?.tenantName.toLowerCase() ||
+                  deleteTenantMutation.isPending
+                }
+                onClick={() => {
+                  if (!deleteDialog) return;
+                  deleteTenantMutation.mutate({
+                    tenantId: deleteDialog.tenantId,
+                    confirmName: deleteConfirmName,
+                  });
+                }}
+              >
+                {deleteTenantMutation.isPending ? (
+                  <><Loader2 className="w-4 h-4 animate-spin mr-2" /> Excluindo...</>
+                ) : (
+                  <><Trash2 className="w-4 h-4 mr-2" /> Excluir Permanentemente</>
+                )}
+              </Button>
+            )}
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

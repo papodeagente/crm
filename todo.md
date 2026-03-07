@@ -1741,3 +1741,12 @@
 - [x] Manter botões "Chat ao vivo" e "Histórico da conversa" sempre visíveis (sticky)
 - [x] Corrigir rolagem da conversa ao vivo dentro da negociação
 - [x] Garantir responsividade do painel de chat
+
+## Super Admin: Exclusão Completa de Contas (Tenants)
+- [x] Mapear todas as tabelas do banco vinculadas a tenant_id (71 tabelas com tenantId + 10 vinculadas por sessionId)
+- [x] Criar endpoint backend protegido (super admin only) para deletar tenant e todos os dados
+- [x] Implementar exclusão em cascata respeitando ordem de dependências (FKs) - 6 fases
+- [x] Adicionar botão de exclusão na interface do super admin com confirmação dupla (nome da agência)
+- [x] Escrever testes unitários para o endpoint de exclusão (10 testes passando)
+- [x] Testar visualmente no browser a exclusão de conta (testado com agência Teste Funis Co)
+- [x] Corrigir tabela activity_logs (usa sessionId, não tenantId)
