@@ -93,6 +93,7 @@ import { aiAnalysisRouter } from "./routers/aiAnalysisRouter";
 import { utmAnalyticsRouter } from "./routers/utmAnalyticsRouter";
 import { rdCrmImportRouter } from "./routers/rdCrmImportRouter";
 import { saasAuthRouter } from "./routers/saasAuthRouter";
+import { rfvRouter } from "./routers/rfvRouter";
 import {
   listLeadEvents,
   countLeadEvents,
@@ -732,6 +733,7 @@ export const appRouter = router({
   utmAnalytics: utmAnalyticsRouter, // M11: Dashboard de Rastreamento UTM
   rdCrmImport: rdCrmImportRouter, // M12: Importação do RD Station CRM
   saasAuth: saasAuthRouter, // SaaS Authentication (email/senha)
+  rfv: rfvRouter, // M13: Matriz RFV — Classificação Automática de Contatos
 
   // ─── Contact Profile & Custom Fields ───
   contactProfile: router({

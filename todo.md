@@ -1750,3 +1750,50 @@
 - [x] Escrever testes unitários para o endpoint de exclusão (10 testes passando)
 - [x] Testar visualmente no browser a exclusão de conta (testado com agência Teste Funis Co)
 - [x] Corrigir tabela activity_logs (usa sessionId, não tenantId)
+
+## Matriz RFV — Classificação Automática de Contatos
+
+### Schema & Banco de Dados
+- [x] Criar tabela rfv_contacts com campos RFV, audience_type, flags, scores
+- [x] Criar tabela contact_action_logs para histórico de ações
+- [x] Executar migrações SQL
+
+### Backend — Cálculos e Classificação
+- [x] Implementar lógica de cálculo RFV (R, F, V scores)
+- [x] Implementar regras de classificação em 9 públicos (ordem obrigatória)
+- [x] Implementar flags visuais (Potencial Indicador, Risco Ex Cliente, Abordagem Não Cliente)
+- [x] Endpoint tRPC: listar contatos RFV com paginação, busca, filtros e ordenação
+- [x] Endpoint tRPC: dashboard KPIs (Total Contatos, Receita Total, Oportunidades, Conversão Média)
+- [x] Endpoint tRPC: alerta dinheiro parado (contatos sem ação há 7+ dias)
+- [x] Endpoint tRPC: recalcular RFV para todos os contatos de um tenant (batch insert otimizado)
+- [x] Endpoint tRPC: reset agency data (deletar contatos por lotes)
+
+### Frontend — Dashboard e Listagem
+- [x] Página RFV com dashboard de KPIs no topo (2119 contatos, R$ 519.712,30)
+- [x] Listagem paginada (50 por página) com busca por nome
+- [x] Filtro por audience_type (clicável nos badges de distribuição)
+- [x] Ordenação por valor, compras, recência, conversão, atendimentos
+- [x] Badge de conversão (alta >= 50%, média >= 20%, baixa < 20%)
+- [x] Link WhatsApp normalizado (55 + telefone)
+- [x] Flags visuais nos cards/linhas dos contatos
+
+### Importação CSV
+- [x] Upload e parsing de CSV
+- [x] Mapeamento de colunas (Nome, Email, Telefone, Valor, Estado, Data fechamento, Data criação)
+- [x] Normalização de estados (em andamento/aberto/open, perdido/perdida/lost, vendido/ganho/won)
+- [x] Agrupamento por pessoa (dedupe por phone > email > nome)
+- [x] Upsert (buscar existente por email/phone/nome, update ou insert)
+- [x] Recálculo RFV após importação
+
+### Alerta Dinheiro Parado
+- [x] Condição: last_action_date >= 7 dias
+- [x] Mostrar quantidade contatos, valor potencial, distribuição por público
+
+### Navegação
+- [x] Adicionar item "RFV" no menu principal entre Inbox e Análises
+- [x] Registrar rota /rfv no App.tsx
+
+### Testes
+- [x] Testes unitários para cálculos RFV e classificação (39 testes passando)
+- [x] Testes unitários para endpoints tRPC
+- [x] Teste visual no browser (2119 contatos carregados com sucesso)

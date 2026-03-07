@@ -1,0 +1,22 @@
+{
+  "query": "SELECT status, COUNT(*) as cnt FROM deals WHERE tenantId = 1 GROUP BY status;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute SELECT status, COUNT(*) as cnt FROM deals WHERE tenantId = 1 GROUP BY status;",
+  "rows": [
+    {
+      "status": "open",
+      "cnt": "2016"
+    },
+    {
+      "status": "won",
+      "cnt": "1623"
+    },
+    {
+      "status": "lost",
+      "cnt": "10178"
+    }
+  ],
+  "messages": [],
+  "stdout": "status\tcnt\nopen\t2016\nwon\t1623\nlost\t10178\n",
+  "stderr": "",
+  "execution_time_ms": 355
+}

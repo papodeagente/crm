@@ -1,0 +1,25 @@
+{
+  "query": "SELECT status, COUNT(*) as cnt, SUM(valueCents) as total_value FROM deals WHERE tenantId = 1 GROUP BY status;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute SELECT status, COUNT(*) as cnt, SUM(valueCents) as total_value FROM deals WHERE tenantId = 1 GROUP BY status;",
+  "rows": [
+    {
+      "status": "open",
+      "cnt": "2016",
+      "total_value": "29649900"
+    },
+    {
+      "status": "lost",
+      "cnt": "10178",
+      "total_value": "715587594"
+    },
+    {
+      "status": "won",
+      "cnt": "1623",
+      "total_value": "421069094"
+    }
+  ],
+  "messages": [],
+  "stdout": "status\tcnt\ttotal_value\nopen\t2016\t29649900\nlost\t10178\t715587594\nwon\t1623\t421069094\n",
+  "stderr": "",
+  "execution_time_ms": 373
+}

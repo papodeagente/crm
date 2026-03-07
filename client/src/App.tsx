@@ -44,6 +44,7 @@ const RDCrmImport = lazy(() => import("./pages/RDCrmImport"));
 const TaskAutomationSettings = lazy(() => import("./pages/TaskAutomationSettings"));
 const ClassificationSettings = lazy(() => import("./pages/ClassificationSettings"));
 const DateAutomationSettings = lazy(() => import("./pages/DateAutomationSettings"));
+const RfvMatrix = lazy(() => import("./pages/RfvMatrix"));
 
 // SaaS pages (outside TopNavLayout)
 const SaasLogin = lazy(() => import("./pages/SaasLogin"));
@@ -100,6 +101,7 @@ function AppRouter() {
                 <Route path="/analytics/products" component={ProductReports} />
                 <Route path="/contact/:id" component={ContactProfile} />
                 <Route path="/inbox" component={InboxPage} />
+                <Route path="/rfv" component={RfvMatrix} />
                 <Route path="/whatsapp" component={WhatsApp} />
                 <Route path="/chatbot" component={Chatbot} />
                 <Route path="/proposals" component={Proposals} />

@@ -1524,3 +1524,90 @@ export const waContacts = mysqlTable("wa_contacts", {
   index("wac_session_phone_idx").on(t.sessionId, t.phoneNumber),
 ]);
 export type WaContact = typeof waContacts.$inferSelect;
+
+
+// ═══════════════════════════════════════
+// MATRIZ RFV — Classificação Automática de Contatos
+// ═══════════════════════════════════════
+
+export const rfvAudienceEnum = mysqlEnum("audience_type", [
+  "desconhecido",
+  "seguidor",
+  "lead",
+  "oportunidade",
+  "nao_cliente",
+  "cliente_primeira_compra",
+  "cliente_recorrente",
+  "ex_cliente",
+  "indicado",
+]);
+
+export const rfvFlagEnum = mysqlEnum("rfv_flag", [
+  "none",
+  "potencial_indicador",
+  "risco_ex_cliente",
+  "abordagem_nao_cliente",
+]);
+
+export const rfvContacts = mysqlTable("rfv_contacts", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  
+  // Dados do contato
+  name: varchar("name", { length: 255 }).notNull(),
+  email: varchar("email", { length: 320 }),
+  phone: varchar("phone", { length: 32 }),
+  
+  // Scores RFV
+  vScore: bigint("vScore", { mode: "number" }).default(0).notNull(), // valor total comprado em centavos
+  fScore: int("fScore").default(0).notNull(), // quantidade de compras
+  rScore: int("rScore").default(9999).notNull(), // dias desde última compra
+  
+  // Classificação
+  audienceType: varchar("audienceType", { length: 32 }).default("desconhecido").notNull(),
+  rfvFlag: varchar("rfvFlag", { length: 32 }).default("none").notNull(),
+  
+  // Métricas
+  totalAtendimentos: int("totalAtendimentos").default(0).notNull(),
+  totalVendasGanhas: int("totalVendasGanhas").default(0).notNull(),
+  totalVendasPerdidas: int("totalVendasPerdidas").default(0).notNull(),
+  taxaConversao: decimal("taxaConversao", { precision: 5, scale: 2 }).default("0").notNull(),
+  
+  // Datas
+  lastActionDate: timestamp("lastActionDate"),
+  lastPurchaseAt: timestamp("lastPurchaseAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  
+  // Referências
+  contactId: int("contactId"), // link para contacts table (opcional)
+  createdBy: int("createdBy"),
+  
+  // Soft delete
+  deletedAt: timestamp("deletedAt"),
+}, (t) => [
+  index("rfv_tenant_idx").on(t.tenantId),
+  index("rfv_tenant_audience_idx").on(t.tenantId, t.audienceType),
+  index("rfv_tenant_email_idx").on(t.tenantId, t.email),
+  index("rfv_tenant_phone_idx").on(t.tenantId, t.phone),
+  index("rfv_tenant_flag_idx").on(t.tenantId, t.rfvFlag),
+]);
+
+export type RfvContact = typeof rfvContacts.$inferSelect;
+export type NewRfvContact = typeof rfvContacts.$inferInsert;
+
+export const contactActionLogs = mysqlTable("contact_action_logs", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  rfvContactId: int("rfvContactId").notNull(),
+  actionType: varchar("actionType", { length: 64 }).notNull(), // "import", "recalc", "manual_edit", "csv_import"
+  description: text("description"),
+  metadata: json("metadata"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  createdBy: int("createdBy"),
+}, (t) => [
+  index("cal_tenant_idx").on(t.tenantId),
+  index("cal_rfv_contact_idx").on(t.rfvContactId),
+]);
+
+export type ContactActionLog = typeof contactActionLogs.$inferSelect;
