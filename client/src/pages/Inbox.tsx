@@ -800,10 +800,11 @@ export default function InboxPage() {
 
   // Sync contacts mutation
   const syncContactsMut = trpc.whatsapp.syncContacts.useMutation({
-    onSuccess: (data) => {
+    onSuccess: (data: any) => {
       waContactsMapQ.refetch();
       conversationsQ.refetch();
-      toast.success(`Contatos sincronizados: ${data.synced}/${data.total}`);
+      const resolvedMsg = data.resolved > 0 ? ` (${data.resolved} LIDs resolvidos)` : "";
+      toast.success(`Contatos sincronizados: ${data.synced}/${data.total}${resolvedMsg}`);
     },
     onError: (e) => toast.error(e.message || "Erro ao sincronizar contatos"),
   });

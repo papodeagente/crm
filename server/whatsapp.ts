@@ -1174,7 +1174,7 @@ class WhatsAppManager extends EventEmitter {
   }
 
   /** Force sync contacts: fetch all unique JIDs from messages and resolve them via onWhatsApp + store */
-  async syncContacts(sessionId: string): Promise<{ synced: number; total: number }> {
+  async syncContacts(sessionId: string): Promise<{ synced: number; total: number; resolved: number }> {
     const session = this.sessions.get(sessionId);
     if (!session?.socket || session.status !== "connected") {
       throw new Error("WhatsApp não está conectado");
@@ -1197,29 +1197,19 @@ class WhatsAppManager extends EventEmitter {
       .filter((j): j is string => !!j && !j.includes("@g.us") && !j.includes("@broadcast"));
 
     let synced = 0;
+    let resolved = 0;
     const batchSize = 20;
 
+    // Phase 1: Sync all JIDs from messages into wa_contacts
     for (let i = 0; i < jids.length; i += batchSize) {
       const batch = jids.slice(i, i + batchSize);
       for (const jid of batch) {
         try {
           const phone = jid.split("@")[0];
-          // Use onWhatsApp to verify and get canonical JID
-          let resolvedJid = jid;
           let phoneNumber: string | null = null;
 
           if (jid.endsWith("@s.whatsapp.net")) {
             phoneNumber = phone;
-          } else if (jid.endsWith("@lid")) {
-            // For LID JIDs, try to find the phone via onWhatsApp is not possible
-            // But we can check if we already have a mapping
-            const existingMapping = await db.select().from(waContacts)
-              .where(and(eq(waContacts.sessionId, sessionId), eq(waContacts.jid, jid)))
-              .limit(1);
-            if (existingMapping.length > 0 && existingMapping[0].phoneNumber) {
-              synced++;
-              continue; // Already resolved
-            }
           }
 
           // Try to get push name from the latest message
@@ -1236,14 +1226,14 @@ class WhatsAppManager extends EventEmitter {
           const pushName = latestMsg[0]?.pushName || null;
 
           // Upsert into wa_contacts
-          const existing = await db.select({ id: waContacts.id }).from(waContacts)
+          const existing = await db.select({ id: waContacts.id, phoneNumber: waContacts.phoneNumber }).from(waContacts)
             .where(and(eq(waContacts.sessionId, sessionId), eq(waContacts.jid, jid)))
             .limit(1);
 
           if (existing.length > 0) {
             const updates: any = {};
             if (pushName) updates.pushName = pushName;
-            if (phoneNumber) updates.phoneNumber = phoneNumber;
+            if (phoneNumber && !existing[0].phoneNumber) updates.phoneNumber = phoneNumber;
             if (Object.keys(updates).length > 0) {
               await db.update(waContacts).set(updates).where(eq(waContacts.id, existing[0].id));
             }
@@ -1265,7 +1255,71 @@ class WhatsAppManager extends EventEmitter {
       await new Promise(r => setTimeout(r, 100));
     }
 
-    return { synced, total: jids.length };
+    // Phase 2: Cross-reference LID JIDs with phone JIDs
+    // For each LID without a phoneNumber, check if there's a phone JID with the same pushName
+    try {
+      const unresolvedLids = await db.select().from(waContacts)
+        .where(and(
+          eq(waContacts.sessionId, sessionId),
+          sql`${waContacts.jid} LIKE '%@lid'`,
+          sql`(${waContacts.phoneNumber} IS NULL OR ${waContacts.phoneNumber} = '')`
+        ));
+
+      for (const lidContact of unresolvedLids) {
+        if (!lidContact.pushName) continue;
+        // Try to find a phone JID with the same pushName
+        const phoneMatch = await db.select().from(waContacts)
+          .where(and(
+            eq(waContacts.sessionId, sessionId),
+            eq(waContacts.pushName, lidContact.pushName),
+            sql`${waContacts.jid} LIKE '%@s.whatsapp.net'`,
+            isNotNull(waContacts.phoneNumber)
+          ))
+          .limit(1);
+
+        if (phoneMatch.length > 0 && phoneMatch[0].phoneNumber) {
+          // Update the LID contact with the phone number
+          await db.update(waContacts).set({
+            phoneNumber: phoneMatch[0].phoneNumber,
+          }).where(eq(waContacts.id, lidContact.id));
+
+          // Also update the phone contact with the LID
+          await db.update(waContacts).set({
+            lid: lidContact.jid,
+          }).where(eq(waContacts.id, phoneMatch[0].id));
+
+          resolved++;
+        }
+      }
+    } catch (e) {
+      console.error("[SyncContacts] Error cross-referencing LIDs:", e);
+    }
+
+    // Phase 3: Try to fetch profile pictures for contacts without one
+    try {
+      const contactsWithoutPic = await db.select({ id: waContacts.id, jid: waContacts.jid }).from(waContacts)
+        .where(and(
+          eq(waContacts.sessionId, sessionId),
+          sql`(${waContacts.profilePictureUrl} IS NULL OR ${waContacts.profilePictureUrl} = '')`,
+          sql`${waContacts.jid} LIKE '%@s.whatsapp.net'`
+        ))
+        .limit(50); // Limit to avoid too many API calls
+
+      for (const contact of contactsWithoutPic) {
+        try {
+          const url = await session.socket!.profilePictureUrl(contact.jid, "image");
+          if (url) {
+            await db.update(waContacts).set({ profilePictureUrl: url }).where(eq(waContacts.id, contact.id));
+          }
+        } catch {
+          // Profile picture not available (privacy settings)
+        }
+      }
+    } catch (e) {
+      console.error("[SyncContacts] Error fetching profile pictures:", e);
+    }
+
+    return { synced, total: jids.length, resolved };
   }
 }
 

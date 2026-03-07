@@ -1731,8 +1731,11 @@
 - [x] Bug: Contatos não salvos aparecem com números aleatórios (LID JIDs resolvidos via wa_contacts table + Baileys contacts.upsert)
 
 ## Botão Sincronizar Contatos WhatsApp
-- [ ] Criar endpoint backend para forçar sincronização de contatos do WhatsApp
-- [ ] Adicionar botão no Inbox para disparar a sincronização manualmente
+- [x] Criar endpoint backend para forçar sincronização de contatos do WhatsApp
+- [x] Adicionar botão no Inbox para disparar a sincronização manualmente
+- [x] Escrever testes unitários para o endpoint syncContacts (10 testes passando)
+- [x] Testar visualmente no browser a sincronização de contatos
+- [x] Garantir que contatos sincronizados resolvam LID JIDs corretamente (cross-reference por pushName)
 
 ## Correção: Rolagem e Responsividade do Chat na Negociação
 - [x] Manter botões "Chat ao vivo" e "Histórico da conversa" sempre visíveis (sticky)
