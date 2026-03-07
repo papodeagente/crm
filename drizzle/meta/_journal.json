@@ -169,6 +169,13 @@
       "when": 1772844340188,
       "tag": "0023_freezing_vance_astro",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "5",
+      "when": 1772882570864,
+      "tag": "0024_jazzy_squadron_sinister",
+      "breakpoints": true
     }
   ]
 }

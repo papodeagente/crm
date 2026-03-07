@@ -1,4 +1,4 @@
-import { eq, and, desc, asc, like, sql, inArray, count, sum, gte, lt, lte, isNull, isNotNull } from "drizzle-orm";
+import { eq, and, desc, asc, like, sql, inArray, count, sum, gte, lt, lte, ne, isNull, isNotNull } from "drizzle-orm";
 import { getDb } from "./db";
 import {
   tenants, crmUsers, teams, teamMembers, roles, permissions, rolePermissions, userRoles, apiKeys,
@@ -16,6 +16,7 @@ import {
   aiConversationAnalyses,
   leadSources, campaigns, lossReasons,
   taskAutomations,
+  dateAutomations,
 } from "../drizzle/schema";
 
 // ═══════════════════════════════════════
@@ -1653,4 +1654,144 @@ export async function executeTaskAutomations(
   }
   
   return createdTasks;
+}
+
+
+// ═══════════════════════════════════════
+// DATE-BASED AUTOMATIONS
+// ═══════════════════════════════════════
+export async function createDateAutomation(data: {
+  tenantId: number; name: string; description?: string; pipelineId: number;
+  dateField: "boardingDate" | "returnDate" | "expectedCloseAt" | "createdAt";
+  condition: "days_before" | "days_after" | "on_date"; offsetDays: number;
+  sourceStageId?: number; targetStageId: number; dealStatusFilter?: "open" | "won" | "lost";
+  isActive?: boolean;
+}) {
+  const db = await getDb(); if (!db) return null;
+  const [result] = await db.insert(dateAutomations).values(data as any).$returningId();
+  return result;
+}
+
+export async function listDateAutomations(tenantId: number, pipelineId?: number) {
+  const db = await getDb(); if (!db) return [];
+  const conditions = [eq(dateAutomations.tenantId, tenantId)];
+  if (pipelineId) conditions.push(eq(dateAutomations.pipelineId, pipelineId));
+  return db.select().from(dateAutomations).where(and(...conditions)).orderBy(desc(dateAutomations.createdAt));
+}
+
+export async function getDateAutomation(tenantId: number, id: number) {
+  const db = await getDb(); if (!db) return null;
+  const rows = await db.select().from(dateAutomations).where(and(eq(dateAutomations.tenantId, tenantId), eq(dateAutomations.id, id))).limit(1);
+  return rows[0] || null;
+}
+
+export async function updateDateAutomation(tenantId: number, id: number, data: {
+  name?: string; description?: string; dateField?: string; condition?: string;
+  offsetDays?: number; sourceStageId?: number | null; targetStageId?: number;
+  dealStatusFilter?: string | null; isActive?: boolean;
+}) {
+  const db = await getDb(); if (!db) return;
+  await db.update(dateAutomations).set(data as any).where(and(eq(dateAutomations.tenantId, tenantId), eq(dateAutomations.id, id)));
+}
+
+export async function deleteDateAutomation(tenantId: number, id: number) {
+  const db = await getDb(); if (!db) return;
+  await db.delete(dateAutomations).where(and(eq(dateAutomations.tenantId, tenantId), eq(dateAutomations.id, id)));
+}
+
+export async function getAllActiveDateAutomations() {
+  const db = await getDb(); if (!db) return [];
+  return db.select().from(dateAutomations).where(eq(dateAutomations.isActive, true));
+}
+
+export async function updateDateAutomationLastRun(id: number) {
+  const db = await getDb(); if (!db) return;
+  await db.update(dateAutomations).set({ lastRunAt: new Date() }).where(eq(dateAutomations.id, id));
+}
+
+/**
+ * Execute a single date automation: find matching deals and move them to the target stage
+ */
+export async function executeDateAutomation(auto: {
+  id: number; tenantId: number; pipelineId: number;
+  dateField: "boardingDate" | "returnDate" | "expectedCloseAt" | "createdAt";
+  condition: "days_before" | "days_after" | "on_date"; offsetDays: number;
+  sourceStageId: number | null; targetStageId: number; dealStatusFilter: string | null;
+}) {
+  const db = await getDb(); if (!db) return { moved: 0 };
+
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+  // Build the date column reference
+  const dateCol = auto.dateField === "boardingDate" ? deals.boardingDate
+    : auto.dateField === "returnDate" ? deals.returnDate
+    : auto.dateField === "expectedCloseAt" ? deals.expectedCloseAt
+    : deals.createdAt;
+
+  // Build conditions
+  const conditions: any[] = [
+    eq(deals.tenantId, auto.tenantId),
+    eq(deals.pipelineId, auto.pipelineId),
+    isNotNull(dateCol),
+    ne(deals.stageId, auto.targetStageId),
+    isNull(deals.deletedAt),
+  ];
+
+  if (auto.dealStatusFilter) {
+    conditions.push(eq(deals.status, auto.dealStatusFilter as any));
+  }
+  if (auto.sourceStageId) {
+    conditions.push(eq(deals.stageId, auto.sourceStageId));
+  }
+
+  // Date condition logic:
+  // "days_before": move when today >= (dateField - offsetDays)
+  // "days_after": move when today >= (dateField + offsetDays)
+  // "on_date": move when today == dateField
+  if (auto.condition === "days_before") {
+    const targetDate = new Date(today);
+    targetDate.setDate(targetDate.getDate() + auto.offsetDays);
+    conditions.push(lte(dateCol, targetDate));
+  } else if (auto.condition === "days_after") {
+    const targetDate = new Date(today);
+    targetDate.setDate(targetDate.getDate() - auto.offsetDays);
+    conditions.push(lte(dateCol, targetDate));
+  } else {
+    // on_date
+    const endOfDay = new Date(today);
+    endOfDay.setDate(endOfDay.getDate() + 1);
+    conditions.push(gte(dateCol, today));
+    conditions.push(lte(dateCol, endOfDay));
+  }
+
+  const matchingDeals = await db.select({ id: deals.id, stageId: deals.stageId })
+    .from(deals)
+    .where(and(...conditions));
+
+  if (matchingDeals.length === 0) return { moved: 0 };
+
+  const dealIds = matchingDeals.map(d => d.id);
+  await db.update(deals)
+    .set({ stageId: auto.targetStageId, updatedAt: new Date() })
+    .where(inArray(deals.id, dealIds));
+
+  // Log the moves in deal_history
+  for (const deal of matchingDeals) {
+    await db.insert(dealHistory).values({
+      tenantId: auto.tenantId,
+      dealId: deal.id,
+      action: "stage_change",
+      description: `Automação por data: movido da etapa ${deal.stageId} para ${auto.targetStageId}`,
+      fromStageId: deal.stageId,
+      toStageId: auto.targetStageId,
+      fieldChanged: "stageId",
+      oldValue: String(deal.stageId),
+      newValue: String(auto.targetStageId),
+      actorName: "Automação por data",
+      metadataJson: { automationId: auto.id },
+    });
+  }
+
+  return { moved: matchingDeals.length };
 }

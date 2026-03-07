@@ -5,7 +5,7 @@ import {
   GraduationCap, Plug, Shield, BookOpen,
   ChevronRight, Users, Tag, GitBranch,
   Megaphone, Target, XCircle, Package,
-  Sparkles, UserPlus, Layers, Database,
+  Sparkles, UserPlus, Layers, Database, CalendarClock,
 } from "lucide-react";
 
 /* ─── Suggestion Cards (top banners) ─── */
@@ -72,6 +72,7 @@ const settingsCategories: SettingsCategory[] = [
       { icon: GitBranch, label: "Funis de vendas", path: "/settings/pipelines" },
       { icon: Tag, label: "Campos personalizados", path: "/settings/custom-fields" },
       { icon: Bot, label: "Automação de vendas", path: "/settings/automations", badge: "Novo" },
+      { icon: CalendarClock, label: "Automações por data", path: "/settings/date-automations", badge: "Novo" },
       { icon: Target, label: "Classificação estratégica", path: "/settings/classification" },
     ],
   },

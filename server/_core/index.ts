@@ -158,6 +158,9 @@ async function startServer() {
 
     // Start daily WhatsApp backup scheduler
     startDailyBackupScheduler();
+
+    // Start date-based automation scheduler
+    import("../dateAutomationScheduler").then(m => m.startDateAutomationScheduler());
   });
 }
 

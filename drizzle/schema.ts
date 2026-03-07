@@ -1467,3 +1467,37 @@ export const passwordResetTokens = mysqlTable("password_reset_tokens", {
 ]);
 export type PasswordResetToken = typeof passwordResetTokens.$inferSelect;
 export type InsertPasswordResetToken = typeof passwordResetTokens.$inferInsert;
+
+
+// ════════════════════════════════════════════════════════════
+// DATE-BASED AUTOMATIONS — Regras de movimentação automática por data
+// ════════════════════════════════════════════════════════════
+
+export const dateAutomations = mysqlTable("date_automations", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  pipelineId: int("pipelineId").notNull(),
+  // Campo de data de referência no deal
+  dateField: mysqlEnum("dateField", ["boardingDate", "returnDate", "expectedCloseAt", "createdAt"]).notNull(),
+  // Condição: "days_before" = N dias antes da data, "days_after" = N dias depois, "on_date" = no dia exato
+  condition: mysqlEnum("condition", ["days_before", "days_after", "on_date"]).notNull(),
+  // Número de dias (0 para "on_date")
+  offsetDays: int("offsetDays").default(0).notNull(),
+  // Etapa de origem (opcional: se null, aplica a qualquer etapa do pipeline)
+  sourceStageId: int("sourceStageId"),
+  // Etapa de destino
+  targetStageId: int("targetStageId").notNull(),
+  // Apenas mover deals com status específico (null = qualquer status)
+  dealStatusFilter: mysqlEnum("dealStatusFilter", ["open", "won", "lost"]).default("open"),
+  isActive: boolean("isActive").default(true).notNull(),
+  lastRunAt: timestamp("lastRunAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (t) => [
+  index("da_tenant_idx").on(t.tenantId),
+  index("da_tenant_pipeline_idx").on(t.tenantId, t.pipelineId),
+]);
+export type DateAutomation = typeof dateAutomations.$inferSelect;
+export type InsertDateAutomation = typeof dateAutomations.$inferInsert;

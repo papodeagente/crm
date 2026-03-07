@@ -1712,3 +1712,14 @@
 - [x] Frontend: link "Esqueci minha senha" no formulário de login
 - [x] Frontend: página de solicitar reset de senha
 - [x] Frontend: página de redefinir senha com token
+
+## Automações de Etapas por Data (Configuráveis)
+- [x] Criar tabela date_automations no schema (regras configuráveis por tenant/pipeline)
+- [x] Backend: CRUD de automações por data (criar, listar, atualizar, excluir)
+- [x] Backend: scheduler/cron que verifica a cada hora e move cards conforme regras
+- [x] Lógica: mover card para etapa X quando campo de data estiver a N dias (antes/depois)
+- [x] Frontend: página de configuração de automações por data em /settings/date-automations
+- [x] Frontend: formulário para criar/editar regras (selecionar pipeline, campo de data, condição, etapa destino)
+- [x] Frontend: lista de automações ativas com toggle de ativar/desativar
+- [ ] Criar automações padrão de pós-venda ao registrar novo tenant (pendente)
+- [x] Testes para validar a lógica de movimentação automática

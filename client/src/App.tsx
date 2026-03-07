@@ -43,6 +43,7 @@ const RDFieldMappings = lazy(() => import("./pages/RDFieldMappings"));
 const RDCrmImport = lazy(() => import("./pages/RDCrmImport"));
 const TaskAutomationSettings = lazy(() => import("./pages/TaskAutomationSettings"));
 const ClassificationSettings = lazy(() => import("./pages/ClassificationSettings"));
+const DateAutomationSettings = lazy(() => import("./pages/DateAutomationSettings"));
 
 // SaaS pages (outside TopNavLayout)
 const SaasLogin = lazy(() => import("./pages/SaasLogin"));
@@ -115,6 +116,7 @@ function AppRouter() {
                 <Route path="/settings/rdstation/mappings" component={RDFieldMappings} />
                 <Route path="/settings/import-rd-crm" component={RDCrmImport} />
                 <Route path="/settings/automations" component={TaskAutomationSettings} />
+                <Route path="/settings/date-automations" component={DateAutomationSettings} />
                 <Route path="/settings/classification" component={ClassificationSettings} />
 
                 {/* Super Admin */}

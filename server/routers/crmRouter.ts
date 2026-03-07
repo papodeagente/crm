@@ -1102,4 +1102,55 @@ export const crmRouter = router({
         return crm.deleteTaskAutomation(input.id, input.tenantId);
       }),
   }),
+
+  // ─── DATE-BASED AUTOMATIONS ───
+  dateAutomations: router({
+    list: protectedProcedure
+      .input(z.object({ tenantId: z.number(), pipelineId: z.number().optional() }))
+      .query(async ({ input }) => {
+        return crm.listDateAutomations(input.tenantId, input.pipelineId);
+      }),
+    create: protectedProcedure
+      .input(z.object({
+        tenantId: z.number(), name: z.string().min(1), description: z.string().optional(),
+        pipelineId: z.number(),
+        dateField: z.enum(["boardingDate", "returnDate", "expectedCloseAt", "createdAt"]),
+        condition: z.enum(["days_before", "days_after", "on_date"]),
+        offsetDays: z.number().min(0).default(0),
+        sourceStageId: z.number().optional(),
+        targetStageId: z.number(),
+        dealStatusFilter: z.enum(["open", "won", "lost"]).optional(),
+        isActive: z.boolean().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        return crm.createDateAutomation(input);
+      }),
+    update: protectedProcedure
+      .input(z.object({
+        tenantId: z.number(), id: z.number(),
+        name: z.string().optional(), description: z.string().optional(),
+        dateField: z.enum(["boardingDate", "returnDate", "expectedCloseAt", "createdAt"]).optional(),
+        condition: z.enum(["days_before", "days_after", "on_date"]).optional(),
+        offsetDays: z.number().min(0).optional(),
+        sourceStageId: z.number().nullable().optional(),
+        targetStageId: z.number().optional(),
+        dealStatusFilter: z.enum(["open", "won", "lost"]).nullable().optional(),
+        isActive: z.boolean().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const { tenantId, id, ...data } = input;
+        return crm.updateDateAutomation(tenantId, id, data);
+      }),
+    delete: protectedProcedure
+      .input(z.object({ tenantId: z.number(), id: z.number() }))
+      .mutation(async ({ input }) => {
+        return crm.deleteDateAutomation(input.tenantId, input.id);
+      }),
+    runNow: protectedProcedure
+      .input(z.object({ tenantId: z.number() }))
+      .mutation(async ({ input }) => {
+        const { runDateAutomationsForTenant } = await import("../dateAutomationScheduler");
+        return runDateAutomationsForTenant(input.tenantId);
+      }),
+  }),
 });
