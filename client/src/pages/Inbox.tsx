@@ -7,7 +7,7 @@ import {
   Check, CheckCheck, Clock, Phone, Loader2,
   MessageCircle, Briefcase, Plus, X, Volume2, VolumeX,
   UserPlus, Lock, Users, UserCheck, UserX, ArrowRightLeft,
-  CircleDot, ChevronDown, WifiOff
+  CircleDot, ChevronDown, WifiOff, RefreshCw
 } from "lucide-react";
 import { formatTime } from "../../../shared/dateUtils";
 import { toast } from "sonner";
@@ -798,6 +798,16 @@ export default function InboxPage() {
   );
   const waContactsMap = useMemo(() => (waContactsMapQ.data || {}) as Record<string, { phoneNumber: string | null; pushName: string | null; savedName: string | null; verifiedName: string | null }>, [waContactsMapQ.data]);
 
+  // Sync contacts mutation
+  const syncContactsMut = trpc.whatsapp.syncContacts.useMutation({
+    onSuccess: (data) => {
+      waContactsMapQ.refetch();
+      conversationsQ.refetch();
+      toast.success(`Contatos sincronizados: ${data.synced}/${data.total}`);
+    },
+    onError: (e) => toast.error(e.message || "Erro ao sincronizar contatos"),
+  });
+
   // PushName map from conversations
   const pushNameMap = useMemo(() => {
     const map = new Map<string, string>();
@@ -1017,6 +1027,20 @@ export default function InboxPage() {
               {isMuted ? <VolumeX className="w-[20px] h-[20px] text-destructive" /> : <Volume2 className="w-[20px] h-[20px] text-muted-foreground" />}
               <span className="absolute -bottom-8 left-1/2 -translate-x-1/2 bg-foreground text-background text-[11px] px-2 py-1 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
                 {isMuted ? "Som desativado" : "Som ativado"}
+              </span>
+            </button>
+            <button
+              onClick={() => {
+                if (!activeSession?.sessionId) { toast.error("Nenhuma sessão ativa"); return; }
+                syncContactsMut.mutate({ sessionId: activeSession.sessionId });
+              }}
+              disabled={syncContactsMut.isPending}
+              className="w-[40px] h-[40px] flex items-center justify-center rounded-full hover:bg-wa-hover transition-colors relative group"
+              title="Sincronizar contatos"
+            >
+              <RefreshCw className={`w-[20px] h-[20px] text-muted-foreground ${syncContactsMut.isPending ? "animate-spin" : ""}`} />
+              <span className="absolute -bottom-8 left-1/2 -translate-x-1/2 bg-foreground text-background text-[11px] px-2 py-1 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+                {syncContactsMut.isPending ? "Sincronizando..." : "Sincronizar contatos"}
               </span>
             </button>
             <button onClick={() => setShowNewChat(true)} className="w-[40px] h-[40px] flex items-center justify-center rounded-full hover:bg-wa-hover transition-colors" title="Nova conversa">

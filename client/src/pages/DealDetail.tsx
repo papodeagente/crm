@@ -2619,7 +2619,7 @@ function WhatsAppPanel({ contact, dealId }: { contact: any; dealId: number }) {
   return (
     <div className="flex flex-col h-full min-h-0">
       {/* Tab toggle: History vs Live */}
-      <div className="flex items-center gap-2 px-4 py-2 border-b border-border bg-card/50">
+      <div className="shrink-0 flex items-center gap-2 px-4 py-2 border-b border-border bg-card/50 sticky top-0 z-10">
         <button
           onClick={() => setViewMode("history")}
           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
@@ -2742,7 +2742,7 @@ function WhatsAppPanel({ contact, dealId }: { contact: any; dealId: number }) {
       ) : (
         /* Live chat mode */
         activeSession && remoteJid ? (
-          <div className="flex-1 relative">
+          <div className="flex-1 min-h-0 relative">
             <WhatsAppChat
               contact={contact}
               sessionId={activeSession.sessionId}

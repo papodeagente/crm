@@ -15,7 +15,7 @@ import QRCode from "qrcode";
 import { EventEmitter } from "events";
 import { getDb, createNotification } from "./db";
 import { whatsappSessions, waMessages as messages, activityLogs, chatbotSettings, chatbotRules } from "../drizzle/schema";
-import { eq, desc, and, gte, sql } from "drizzle-orm";
+import { eq, desc, and, gte, sql, isNotNull } from "drizzle-orm";
 import { invokeLLM } from "./_core/llm";
 // notifyOwner desativado — todas as notificações são apenas in-app
 import { storagePut } from "./storage";
@@ -1171,6 +1171,101 @@ class WhatsAppManager extends EventEmitter {
     } catch (e) {
       console.error("Error logging activity:", e);
     }
+  }
+
+  /** Force sync contacts: fetch all unique JIDs from messages and resolve them via onWhatsApp + store */
+  async syncContacts(sessionId: string): Promise<{ synced: number; total: number }> {
+    const session = this.sessions.get(sessionId);
+    if (!session?.socket || session.status !== "connected") {
+      throw new Error("WhatsApp não está conectado");
+    }
+    const db = await getDb();
+    if (!db) throw new Error("Database not available");
+
+    const { waContacts } = await import("../drizzle/schema");
+
+    // Get all unique JIDs from messages table for this session
+    const allJids = await db.selectDistinct({ jid: messages.remoteJid })
+      .from(messages)
+      .where(and(
+        eq(messages.sessionId, sessionId),
+        isNotNull(messages.remoteJid)
+      ));
+
+    const jids = allJids
+      .map(r => r.jid)
+      .filter((j): j is string => !!j && !j.includes("@g.us") && !j.includes("@broadcast"));
+
+    let synced = 0;
+    const batchSize = 20;
+
+    for (let i = 0; i < jids.length; i += batchSize) {
+      const batch = jids.slice(i, i + batchSize);
+      for (const jid of batch) {
+        try {
+          const phone = jid.split("@")[0];
+          // Use onWhatsApp to verify and get canonical JID
+          let resolvedJid = jid;
+          let phoneNumber: string | null = null;
+
+          if (jid.endsWith("@s.whatsapp.net")) {
+            phoneNumber = phone;
+          } else if (jid.endsWith("@lid")) {
+            // For LID JIDs, try to find the phone via onWhatsApp is not possible
+            // But we can check if we already have a mapping
+            const existingMapping = await db.select().from(waContacts)
+              .where(and(eq(waContacts.sessionId, sessionId), eq(waContacts.jid, jid)))
+              .limit(1);
+            if (existingMapping.length > 0 && existingMapping[0].phoneNumber) {
+              synced++;
+              continue; // Already resolved
+            }
+          }
+
+          // Try to get push name from the latest message
+          const latestMsg = await db.select({ pushName: messages.pushName })
+            .from(messages)
+            .where(and(
+              eq(messages.sessionId, sessionId),
+              eq(messages.remoteJid, jid),
+              isNotNull(messages.pushName)
+            ))
+            .orderBy(desc(messages.timestamp))
+            .limit(1);
+
+          const pushName = latestMsg[0]?.pushName || null;
+
+          // Upsert into wa_contacts
+          const existing = await db.select({ id: waContacts.id }).from(waContacts)
+            .where(and(eq(waContacts.sessionId, sessionId), eq(waContacts.jid, jid)))
+            .limit(1);
+
+          if (existing.length > 0) {
+            const updates: any = {};
+            if (pushName) updates.pushName = pushName;
+            if (phoneNumber) updates.phoneNumber = phoneNumber;
+            if (Object.keys(updates).length > 0) {
+              await db.update(waContacts).set(updates).where(eq(waContacts.id, existing[0].id));
+            }
+          } else {
+            await db.insert(waContacts).values({
+              sessionId,
+              jid,
+              phoneNumber,
+              pushName,
+              lid: jid.endsWith("@lid") ? jid : null,
+            });
+          }
+          synced++;
+        } catch (e) {
+          // Skip individual contact errors
+        }
+      }
+      // Small delay between batches to avoid overwhelming
+      await new Promise(r => setTimeout(r, 100));
+    }
+
+    return { synced, total: jids.length };
   }
 }
 

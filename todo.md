@@ -1729,3 +1729,12 @@
 - [x] Bug: Status de mensagens não sincroniza enviada/recebida/lida com WhatsApp (adicionado lastStatusUpdate ao WhatsAppChat)
 - [x] Bug: Inbox não sincronizado como WhatsApp Web (adicionado waContactsMap para resolver LIDs)
 - [x] Bug: Contatos não salvos aparecem com números aleatórios (LID JIDs resolvidos via wa_contacts table + Baileys contacts.upsert)
+
+## Botão Sincronizar Contatos WhatsApp
+- [ ] Criar endpoint backend para forçar sincronização de contatos do WhatsApp
+- [ ] Adicionar botão no Inbox para disparar a sincronização manualmente
+
+## Correção: Rolagem e Responsividade do Chat na Negociação
+- [x] Manter botões "Chat ao vivo" e "Histórico da conversa" sempre visíveis (sticky)
+- [x] Corrigir rolagem da conversa ao vivo dentro da negociação
+- [x] Garantir responsividade do painel de chat
