@@ -1,7 +1,7 @@
 import bcrypt from "bcryptjs";
 import { SignJWT, jwtVerify } from "jose";
 import { eq, and } from "drizzle-orm";
-import { crmUsers, tenants, subscriptions } from "../drizzle/schema";
+import { crmUsers, tenants, subscriptions, passwordResetTokens } from "../drizzle/schema";
 import { getDb } from "./db";
 
 const JWT_SECRET_KEY = () => new TextEncoder().encode(process.env.JWT_SECRET ?? "saas-secret");
@@ -397,4 +397,152 @@ export async function updateUserStatusAdmin(userId: number, status: "active" | "
 
   await db.update(crmUsers).set({ status }).where(eq(crmUsers.id, userId));
   return { userId, status };
+}
+
+// ═══════════════════════════════════════
+// PASSWORD RESET
+// ═══════════════════════════════════════
+
+import { randomBytes } from "crypto";
+import { sendPasswordResetEmail, sendInviteEmail } from "./emailService";
+
+const RESET_TOKEN_EXPIRY_MINUTES = 60;
+
+export async function requestPasswordReset(email: string, origin: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  // Find user by email
+  const users = await db.select().from(crmUsers).where(eq(crmUsers.email, email)).limit(1);
+  if (users.length === 0) {
+    // Don't reveal if email exists
+    return;
+  }
+
+  const user = users[0];
+
+  // Generate token
+  const token = randomBytes(32).toString("hex");
+  const expiresAt = new Date(Date.now() + RESET_TOKEN_EXPIRY_MINUTES * 60 * 1000);
+
+  // Save token
+  await db.insert(passwordResetTokens).values({
+    userId: user.id,
+    token,
+    expiresAt,
+  });
+
+  // Send email
+  const resetUrl = `${origin}/reset-password?token=${token}`;
+  await sendPasswordResetEmail({
+    to: user.email,
+    userName: user.name,
+    resetUrl,
+    expiresInMinutes: RESET_TOKEN_EXPIRY_MINUTES,
+  });
+}
+
+export async function resetPasswordWithToken(token: string, newPassword: string): Promise<{ success: boolean; error?: string }> {
+  const db = await getDb();
+  if (!db) return { success: false, error: "Database not available" };
+
+  // Find token
+  const tokens = await db.select().from(passwordResetTokens)
+    .where(eq(passwordResetTokens.token, token))
+    .limit(1);
+
+  if (tokens.length === 0) {
+    return { success: false, error: "Token inválido" };
+  }
+
+  const resetToken = tokens[0];
+
+  // Check if already used
+  if (resetToken.usedAt) {
+    return { success: false, error: "Este link já foi utilizado" };
+  }
+
+  // Check expiration
+  if (new Date() > resetToken.expiresAt) {
+    return { success: false, error: "Link expirado. Solicite um novo." };
+  }
+
+  // Hash new password
+  const passwordHash = await hashPassword(newPassword);
+
+  // Update password
+  await db.update(crmUsers).set({ passwordHash }).where(eq(crmUsers.id, resetToken.userId));
+
+  // Mark token as used
+  await db.update(passwordResetTokens).set({ usedAt: new Date() }).where(eq(passwordResetTokens.id, resetToken.id));
+
+  return { success: true };
+}
+
+// ═══════════════════════════════════════
+// INVITE USER TO TENANT
+// ═══════════════════════════════════════
+
+function generateTempPassword(): string {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
+  let result = "";
+  for (let i = 0; i < 8; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return result;
+}
+
+export async function inviteUserToTenant(data: {
+  tenantId: number;
+  name: string;
+  email: string;
+  phone?: string;
+  inviterName: string;
+  origin: string;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  // Check if email already exists in this tenant
+  const existing = await db.select().from(crmUsers)
+    .where(and(eq(crmUsers.tenantId, data.tenantId), eq(crmUsers.email, data.email)))
+    .limit(1);
+
+  if (existing.length > 0) {
+    throw new Error("EMAIL_EXISTS_IN_TENANT");
+  }
+
+  // Generate temp password
+  const tempPassword = generateTempPassword();
+  const passwordHash = await hashPassword(tempPassword);
+
+  // Create user with status "invited"
+  const [userResult] = await db.insert(crmUsers).values({
+    tenantId: data.tenantId,
+    name: data.name,
+    email: data.email,
+    phone: data.phone || null,
+    passwordHash,
+    status: "invited",
+  }).$returningId();
+
+  // Get tenant name
+  const tenantRows = await db.select().from(tenants).where(eq(tenants.id, data.tenantId)).limit(1);
+  const companyName = tenantRows[0]?.name || "sua empresa";
+
+  // Send invite email
+  const loginUrl = `${data.origin}/login`;
+  await sendInviteEmail({
+    to: data.email,
+    inviterName: data.inviterName,
+    companyName,
+    tempPassword,
+    loginUrl,
+  });
+
+  return {
+    success: true,
+    userId: userResult.id,
+    emailSent: true,
+  };
 }

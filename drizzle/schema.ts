@@ -1449,3 +1449,21 @@ export const userPreferences = mysqlTable("user_preferences", {
 ]);
 export type UserPreference = typeof userPreferences.$inferSelect;
 export type InsertUserPreference = typeof userPreferences.$inferInsert;
+
+// ═══════════════════════════════════════
+// PASSWORD RESET TOKENS
+// ═══════════════════════════════════════
+
+export const passwordResetTokens = mysqlTable("password_reset_tokens", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  token: varchar("token", { length: 128 }).notNull(),
+  expiresAt: timestamp("expiresAt").notNull(),
+  usedAt: timestamp("usedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (t) => [
+  index("prt_token_idx").on(t.token),
+  index("prt_user_idx").on(t.userId),
+]);
+export type PasswordResetToken = typeof passwordResetTokens.$inferSelect;
+export type InsertPasswordResetToken = typeof passwordResetTokens.$inferInsert;

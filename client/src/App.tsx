@@ -50,6 +50,8 @@ const SaasRegister = lazy(() => import("./pages/SaasRegister"));
 const Upgrade = lazy(() => import("./pages/Upgrade"));
 const Landing = lazy(() => import("./pages/Landing"));
 const SuperAdmin = lazy(() => import("./pages/SuperAdmin"));
+const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
+const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 
 function PageLoader() {
   return (
@@ -68,6 +70,8 @@ function AppRouter() {
         <Route path="/login" component={SaasLogin} />
         <Route path="/register" component={SaasRegister} />
         <Route path="/upgrade" component={Upgrade} />
+        <Route path="/forgot-password" component={ForgotPassword} />
+        <Route path="/reset-password" component={ResetPassword} />
 
         {/* App pages (with TopNavLayout) */}
         <Route>

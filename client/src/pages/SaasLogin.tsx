@@ -96,6 +96,16 @@ export default function SaasLogin() {
                 </div>
               </div>
 
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => navigate("/forgot-password")}
+                  className="text-xs text-purple-600 hover:text-purple-700 hover:underline"
+                >
+                  Esqueci minha senha
+                </button>
+              </div>
+
               <Button
                 type="submit"
                 className="w-full h-11 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white font-medium shadow-lg shadow-purple-200/50"

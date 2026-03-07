@@ -1703,3 +1703,12 @@
 - [x] Investigar se createDefaultPipelines é chamado no fluxo de criação de tenant/conta
 - [x] Corrigir para garantir que funis padrão são criados automaticamente (adicionado ao registerTenantAndUser)
 - [x] Testar criando uma conta nova e verificar os funis (tenant 120003 criado com sucesso)
+
+## E-mail de Convite + Recuperação de Senha
+- [x] Enviar e-mail ao criar convite de novo usuário com link de acesso
+- [x] Implementar fluxo de recuperação de senha (esqueci minha senha)
+- [x] Backend: endpoint para solicitar reset de senha (gerar token + enviar e-mail)
+- [x] Backend: endpoint para redefinir senha com token válido
+- [x] Frontend: link "Esqueci minha senha" no formulário de login
+- [x] Frontend: página de solicitar reset de senha
+- [x] Frontend: página de redefinir senha com token

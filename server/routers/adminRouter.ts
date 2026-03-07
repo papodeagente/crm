@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { protectedProcedure, router } from "../_core/trpc";
+import { TRPCError } from "@trpc/server";
 import * as crm from "../crmDb";
 import { emitEvent } from "../middleware/eventLog";
 
@@ -30,11 +31,30 @@ export const adminRouter = router({
         return crm.listCrmUsers(input.tenantId);
       }),
     create: protectedProcedure
-      .input(z.object({ tenantId: z.number(), name: z.string().min(1), email: z.string().email(), phone: z.string().optional() }))
+      .input(z.object({ tenantId: z.number(), name: z.string().min(1), email: z.string().email(), phone: z.string().optional(), origin: z.string().optional() }))
       .mutation(async ({ ctx, input }) => {
-        const result = await crm.createCrmUser({ ...input, createdBy: ctx.user.id });
-        await emitEvent({ tenantId: input.tenantId, actorUserId: ctx.user.id, entityType: "crm_user", entityId: result?.id, action: "create" });
-        return result;
+        // Use inviteUserToTenant to create user + send invite email
+        try {
+          const { inviteUserToTenant } = await import("../saasAuth");
+          const result = await inviteUserToTenant({
+            tenantId: input.tenantId,
+            name: input.name,
+            email: input.email,
+            phone: input.phone,
+            inviterName: ctx.user.name || "Administrador",
+            origin: input.origin || "https://crm.acelerador.tur.br",
+          });
+          await emitEvent({ tenantId: input.tenantId, actorUserId: ctx.user.id, entityType: "crm_user", entityId: result?.userId, action: "create" });
+          return { id: result.userId };
+        } catch (error: any) {
+          if (error.message === "EMAIL_EXISTS_IN_TENANT") {
+            throw new TRPCError({ code: "CONFLICT", message: "Este email j\u00e1 est\u00e1 cadastrado neste tenant" });
+          }
+          // Fallback: create without email if email service fails
+          const result = await crm.createCrmUser({ ...input, createdBy: ctx.user.id });
+          await emitEvent({ tenantId: input.tenantId, actorUserId: ctx.user.id, entityType: "crm_user", entityId: result?.id, action: "create" });
+          return result;
+        }
       }),
     get: protectedProcedure
       .input(z.object({ tenantId: z.number(), id: z.number() }))

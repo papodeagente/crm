@@ -131,6 +131,67 @@ export const saasAuthRouter = router({
     return { success: true };
   }),
 
+  // ─── REQUEST PASSWORD RESET ───
+  requestPasswordReset: publicProcedure
+    .input(z.object({
+      email: z.string().email("Email inválido"),
+      origin: z.string(),
+    }))
+    .mutation(async ({ input }) => {
+      try {
+        const { requestPasswordReset } = await import("../saasAuth");
+        await requestPasswordReset(input.email, input.origin);
+      } catch (e) {
+        // Always return success to prevent email enumeration
+        console.error("[PasswordReset] Error:", e);
+      }
+      return { success: true, message: "Se o email existir, você receberá um link de redefinição." };
+    }),
+
+  // ─── RESET PASSWORD ───
+  resetPassword: publicProcedure
+    .input(z.object({
+      token: z.string().min(1),
+      newPassword: z.string().min(6, "Senha deve ter pelo menos 6 caracteres"),
+    }))
+    .mutation(async ({ input }) => {
+      const { resetPasswordWithToken } = await import("../saasAuth");
+      const result = await resetPasswordWithToken(input.token, input.newPassword);
+      if (!result.success) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: result.error || "Token inválido ou expirado" });
+      }
+      return { success: true };
+    }),
+
+  // ─── INVITE USER (send email) ───
+  inviteUser: publicProcedure
+    .input(z.object({
+      tenantId: z.number(),
+      name: z.string().min(1),
+      email: z.string().email(),
+      phone: z.string().optional(),
+      origin: z.string(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      // Verify caller is authenticated
+      const cookies = parseCookies(ctx.req.headers.cookie);
+      const token = cookies.get(SAAS_COOKIE);
+      const session = await verifySaasSession(token);
+      if (!session) {
+        throw new TRPCError({ code: "UNAUTHORIZED", message: "Não autenticado" });
+      }
+      const { inviteUserToTenant } = await import("../saasAuth");
+      const result = await inviteUserToTenant({
+        tenantId: input.tenantId,
+        name: input.name,
+        email: input.email,
+        phone: input.phone,
+        inviterName: session.name,
+        origin: input.origin,
+      });
+      return result;
+    }),
+
   // ─── CHECK ACCESS ───
   checkAccess: publicProcedure
     .input(z.object({ tenantId: z.number() }))

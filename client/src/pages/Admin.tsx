@@ -73,7 +73,7 @@ export default function Admin() {
                 <div className="space-y-4 pt-3">
                   <div><Label className="text-[12px] font-medium">Nome *</Label><Input value={userName} onChange={(e) => setUserName(e.target.value)} placeholder="Nome completo" className="mt-1.5 h-10 rounded-xl" /></div>
                   <div><Label className="text-[12px] font-medium">Email *</Label><Input value={userEmail} onChange={(e) => setUserEmail(e.target.value)} placeholder="email@exemplo.com" type="email" className="mt-1.5 h-10 rounded-xl" /></div>
-                  <Button className="w-full h-11 rounded-lg text-[14px] font-medium bg-primary hover:bg-primary/90 shadow-sm transition-colors" disabled={!userName || !userEmail || createUser.isPending} onClick={() => createUser.mutate({ tenantId: TENANT_ID, name: userName, email: userEmail })}>
+                  <Button className="w-full h-11 rounded-lg text-[14px] font-medium bg-primary hover:bg-primary/90 shadow-sm transition-colors" disabled={!userName || !userEmail || createUser.isPending} onClick={() => createUser.mutate({ tenantId: TENANT_ID, name: userName, email: userEmail, origin: window.location.origin })}>
                     {createUser.isPending ? "Criando..." : "Criar Usuário"}
                   </Button>
                 </div>
