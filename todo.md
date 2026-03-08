@@ -1871,3 +1871,37 @@
 - [x] Adicionar verificação em deleteTenantCompletely: bloqueia exclusão se tenant contém super admin
 - [x] Adicionar verificação no router: bloqueia exclusão do próprio tenant do super admin
 - [x] 12 testes unitários passando em deleteTenant.test.ts (incluindo 2 novos testes de proteção)
+
+## Reconstrução Completa da Landing Page — CRM Acelerador de Agências
+
+### Seções 1-4
+- [x] Hero Section: 2 colunas, headline sobre perda de vendas, mockup CRM, CTAs, prova social 8000 agentes
+- [x] Diagnóstico Interativo (Quiz): 5 checkboxes, resultado dinâmico, CTA
+- [x] Seção do Inimigo: desorganização comercial como vilão invisível
+- [x] Seção de Revelação: padrão dos 8000 agentes, falta de processo
+
+### Seções 5-8
+- [x] Introdução da Solução: CRM Acelerador + mockup grande
+- [x] Como Funciona: 3 cards (visualizar negociações, follow-up, transformar atendimentos)
+- [x] Calculadora de Dinheiro Perdido: inputs + cálculo + valor estimado perdido
+- [x] Mapa de Vazamento de Vendas: funil interativo com perdas entre etapas
+
+### Seções 9-12
+- [x] Benchmark Agência vs Mercado: gráfico de barras comparativo
+- [x] Simulador de Crescimento 12 meses: gráfico linha dupla com/sem CRM
+- [x] Relatório Automático: formulário lead capture (nome, email, WhatsApp)
+- [x] Modo Auditoria (Score 0-100): 5 perguntas, gauge/velocímetro, classificação
+
+### Seções 13-16
+- [x] Prova Social: 3 depoimentos com foto, nome, cidade, resultado
+- [x] Diferencial: turismo-específico (planejamento, família, datas, emoção)
+- [x] Demonstração: seção com vídeo placeholder
+- [x] CTA Final: "Pare de perder vendas silenciosas"
+
+### Elementos de Conversão
+- [x] CTA a cada 2 seções (SectionCTA entre cada 2 seções)
+- [x] Sticky CTA mobile (StickyCTA component)
+- [x] Scroll animations suaves (FadeIn + motion/react)
+- [x] Cards com microinterações (hover effects, gradients)
+- [x] Layout escaneável mobile-first (responsive design)
+- [x] Design inspirado em Stripe/Linear/Apple (dark theme, tipografia grande, gradientes)
