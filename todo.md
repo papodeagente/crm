@@ -1912,3 +1912,12 @@
 - [x] Conectar resultado com texto sobre Matriz RFV do ENTUR OS
 - [x] CTA final do simulador: "Quero recuperar essas vendas"
 - [x] Substituir todas as referências "CRM Acelerador" / "CRM ACELERADOR" por "ENTUR OS"
+
+## Remoção de Módulos da LP
+- [x] Remover Diagnóstico rápido da sua agência (DiagnosticQuiz)
+- [x] Remover Calculadora de Dinheiro Perdido (MoneyCalculator)
+- [x] Remover Mapa de Vazamento de Vendas (FunnelMap)
+- [x] Remover Benchmark Agência vs Mercado (BenchmarkSection)
+- [x] Remover Simulador de Crescimento 12 meses (GrowthSimulator)
+- [x] Remover Auditoria Comercial (AuditScore)
+- [x] Remover CTAs intermediários associados aos módulos removidos
