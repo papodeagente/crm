@@ -1930,3 +1930,7 @@
 - [x] Enterprise: popup com formulário para solicitar atendimento
 - [x] Substituir FinalCTA pela seção de planos
 - [x] Atualizar CTAs da LP para apontar para a seção de planos
+
+## Layout Escuro nas Páginas de Login e Cadastro
+- [x] Ajustar página de Login para fundo preto (#0a0a12) igual à LP
+- [x] Ajustar página de Cadastro para fundo preto (#0a0a12) igual à LP

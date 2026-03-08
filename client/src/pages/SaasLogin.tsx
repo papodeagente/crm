@@ -3,7 +3,6 @@ import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useLocation } from "wouter";
 import { Loader2, Eye, EyeOff, Plane } from "lucide-react";
 import { toast } from "sonner";
@@ -34,110 +33,111 @@ export default function SaasLogin() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-purple-50/30 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-[#0a0a12] flex items-center justify-center p-4 relative overflow-hidden">
       {/* Background decoration */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-purple-100/40 rounded-full blur-3xl" />
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-blue-100/40 rounded-full blur-3xl" />
+        <div className="absolute -top-40 -right-40 w-96 h-96 bg-purple-600/10 rounded-full blur-3xl" />
+        <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-purple-800/10 rounded-full blur-3xl" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-purple-500/5 rounded-full blur-3xl" />
       </div>
 
       <div className="w-full max-w-md relative z-10">
         {/* Logo */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center gap-2 mb-2">
-            <div className="w-10 h-10 bg-gradient-to-br from-purple-600 to-purple-700 rounded-xl flex items-center justify-center shadow-lg shadow-purple-200">
+            <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-purple-700 rounded-xl flex items-center justify-center shadow-lg shadow-purple-500/20">
               <Plane className="w-5 h-5 text-white" />
             </div>
-            <span className="text-2xl font-bold text-slate-900">Entur OS</span>
+            <span className="text-2xl font-bold text-white">ENTUR OS</span>
           </div>
-          <p className="text-sm text-slate-500">CRM inteligente para agências de viagens</p>
+          <p className="text-sm text-gray-400">Sistema operacional para agências de viagens</p>
         </div>
 
-        <Card className="border-0 shadow-xl shadow-slate-200/50 bg-white/80 backdrop-blur-sm">
-          <CardHeader className="space-y-1 pb-4">
-            <CardTitle className="text-xl font-semibold text-center">Entrar na sua conta</CardTitle>
-            <CardDescription className="text-center">
+        {/* Card */}
+        <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-8">
+          <div className="text-center mb-6">
+            <h1 className="text-xl font-semibold text-white">Entrar na sua conta</h1>
+            <p className="text-sm text-gray-400 mt-1">
               Digite seu email e senha para acessar
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="email" className="text-sm font-medium text-slate-700">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="seu@email.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  className="h-11 bg-slate-50/50 border-slate-200 focus:border-purple-400 focus:ring-purple-400/20"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="password" className="text-sm font-medium text-slate-700">Senha</Label>
-                <div className="relative">
-                  <Input
-                    id="password"
-                    type={showPassword ? "text" : "password"}
-                    placeholder="••••••••"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                    className="h-11 bg-slate-50/50 border-slate-200 focus:border-purple-400 focus:ring-purple-400/20 pr-10"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                  >
-                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
-              </div>
+            </p>
+          </div>
 
-              <div className="flex justify-end">
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="email" className="text-sm font-medium text-gray-300">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="seu@email.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                className="h-11 bg-white/5 border-white/10 text-white placeholder:text-gray-500 focus:border-purple-500 focus:ring-purple-500/20"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="password" className="text-sm font-medium text-gray-300">Senha</Label>
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  className="h-11 bg-white/5 border-white/10 text-white placeholder:text-gray-500 focus:border-purple-500 focus:ring-purple-500/20 pr-10"
+                />
                 <button
                   type="button"
-                  onClick={() => navigate("/forgot-password")}
-                  className="text-xs text-purple-600 hover:text-purple-700 hover:underline"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 transition-colors"
                 >
-                  Esqueci minha senha
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
-
-              <Button
-                type="submit"
-                className="w-full h-11 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white font-medium shadow-lg shadow-purple-200/50"
-                disabled={loginMutation.isPending}
-              >
-                {loginMutation.isPending ? (
-                  <><Loader2 className="w-4 h-4 animate-spin mr-2" /> Entrando...</>
-                ) : (
-                  "Entrar"
-                )}
-              </Button>
-            </form>
-
-            <div className="mt-6 text-center">
-              <p className="text-sm text-slate-500">
-                Não tem uma conta?{" "}
-                <button
-                  onClick={() => navigate("/register")}
-                  className="text-purple-600 hover:text-purple-700 font-medium hover:underline"
-                >
-                  Criar conta grátis
-                </button>
-              </p>
             </div>
-          </CardContent>
-        </Card>
 
-        <p className="text-center text-xs text-slate-400 mt-6">
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={() => navigate("/forgot-password")}
+                className="text-xs text-purple-400 hover:text-purple-300 hover:underline transition-colors"
+              >
+                Esqueci minha senha
+              </button>
+            </div>
+
+            <Button
+              type="submit"
+              className="w-full h-11 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-500 hover:to-purple-600 text-white font-medium shadow-lg shadow-purple-500/20 transition-all"
+              disabled={loginMutation.isPending}
+            >
+              {loginMutation.isPending ? (
+                <><Loader2 className="w-4 h-4 animate-spin mr-2" /> Entrando...</>
+              ) : (
+                "Entrar"
+              )}
+            </Button>
+          </form>
+
+          <div className="mt-6 text-center">
+            <p className="text-sm text-gray-400">
+              Não tem uma conta?{" "}
+              <button
+                onClick={() => navigate("/register")}
+                className="text-purple-400 hover:text-purple-300 font-medium hover:underline transition-colors"
+              >
+                Criar conta grátis
+              </button>
+            </p>
+          </div>
+        </div>
+
+        <p className="text-center text-xs text-gray-600 mt-6">
           Ao entrar, você concorda com nossos{" "}
-          <a href="#" className="underline hover:text-slate-600">Termos de Uso</a>{" "}
+          <a href="#" className="underline hover:text-gray-400 transition-colors">Termos de Uso</a>{" "}
           e{" "}
-          <a href="#" className="underline hover:text-slate-600">Política de Privacidade</a>
+          <a href="#" className="underline hover:text-gray-400 transition-colors">Política de Privacidade</a>
         </p>
       </div>
     </div>
