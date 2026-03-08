@@ -17,6 +17,7 @@ import { DemoSection } from "@/components/landing/DemoSection";
 import { FinalCTA } from "@/components/landing/FinalCTA";
 import { SectionCTA } from "@/components/landing/SectionCTA";
 import { StickyCTA } from "@/components/landing/StickyCTA";
+import { SalesSimulator } from "@/components/landing/SalesSimulator";
 
 export default function Landing() {
   const [, navigate] = useLocation();
@@ -38,6 +39,9 @@ export default function Landing() {
       {/* 1. Hero */}
       <HeroSection onCTA={scrollToReport} onDemo={scrollToDemo} />
 
+      {/* Simulador simples */}
+      <SalesSimulator onCTA={scrollToReport} />
+
       {/* 2. Diagnóstico Interativo (Quiz) */}
       <DiagnosticQuiz onCTA={scrollToReport} />
 
@@ -51,7 +55,7 @@ export default function Landing() {
       <RevelationSection />
 
       {/* CTA between sections */}
-      <SectionCTA text="Quero ver como funciona o CRM" onClick={scrollToReport} />
+      <SectionCTA text="Quero ver como funciona o ENTUR OS" onClick={scrollToReport} />
 
       {/* 5. Introdução da Solução */}
       <SolutionSection />
@@ -96,7 +100,7 @@ export default function Landing() {
       <DifferentiatorSection />
 
       {/* CTA between sections */}
-      <SectionCTA text="Quero um CRM feito para turismo" onClick={scrollToReport} variant="secondary" />
+      <SectionCTA text="Quero um sistema feito para turismo" onClick={scrollToReport} variant="secondary" />
 
       {/* 15. Demonstração */}
       <DemoSection />

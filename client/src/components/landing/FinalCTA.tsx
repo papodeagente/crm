@@ -33,7 +33,7 @@ export function FinalCTA({ onCTA }: FinalCTAProps) {
               className="h-16 px-12 text-lg bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white border-0 shadow-2xl shadow-violet-500/25 transition-all duration-300 hover:shadow-violet-500/35 hover:scale-[1.03]"
               onClick={onCTA}
             >
-              Quero acessar o CRM <ArrowRight className="w-5 h-5 ml-2" />
+              Quero acessar o ENTUR OS <ArrowRight className="w-5 h-5 ml-2" />
             </Button>
             <p className="text-sm text-white/25 mt-5">
               Sem cartão de crédito. Comece a organizar suas vendas agora.
@@ -46,9 +46,9 @@ export function FinalCTA({ onCTA }: FinalCTAProps) {
       <footer className="py-10 px-5 sm:px-8 border-t border-white/[0.05] bg-[#06060a]">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2.5">
-            <img src={LOGO_URL} alt="CRM Acelerador" className="h-7 w-7 rounded-lg" />
+            <img src={LOGO_URL} alt="ENTUR OS" className="h-7 w-7 rounded-lg" />
             <span className="font-bold bg-gradient-to-r from-violet-400 to-purple-400 bg-clip-text text-transparent text-sm">
-              CRM ACELERADOR
+              ENTUR OS
             </span>
           </div>
           <p className="text-xs text-white/20">

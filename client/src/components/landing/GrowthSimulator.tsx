@@ -74,7 +74,7 @@ export function GrowthSimulator({ onCTA }: GrowthSimulatorProps) {
               Como sua agência pode crescer com processo comercial estruturado
             </h2>
             <p className="text-lg text-white/40">
-              Simule o impacto de um CRM nos próximos 12 meses
+              Simule o impacto do ENTUR OS nos próximos 12 meses
             </p>
           </div>
         </FadeIn>
@@ -165,7 +165,7 @@ export function GrowthSimulator({ onCTA }: GrowthSimulatorProps) {
                           <Line
                             type="monotone"
                             dataKey="semCRM"
-                            name="Sem CRM"
+                            name="Sem ENTUR OS"
                             stroke="#ef4444"
                             strokeWidth={2}
                             dot={false}
@@ -174,7 +174,7 @@ export function GrowthSimulator({ onCTA }: GrowthSimulatorProps) {
                           <Line
                             type="monotone"
                             dataKey="comCRM"
-                            name="Com CRM"
+                            name="Com ENTUR OS"
                             stroke="#10b981"
                             strokeWidth={3}
                             dot={false}
@@ -190,7 +190,7 @@ export function GrowthSimulator({ onCTA }: GrowthSimulatorProps) {
                         <p className="text-xl font-bold text-white/60">{formatCurrency(result.totalWithout)}</p>
                       </div>
                       <div className="bg-emerald-500/[0.06] border border-emerald-500/15 rounded-xl p-4 text-center">
-                        <p className="text-xs text-emerald-300/70 uppercase tracking-wider mb-1">Faturamento com CRM</p>
+                        <p className="text-xs text-emerald-300/70 uppercase tracking-wider mb-1">Faturamento com ENTUR OS</p>
                         <p className="text-xl font-bold text-emerald-400">{formatCurrency(result.totalWith)}</p>
                       </div>
                       <div className="bg-violet-500/[0.06] border border-violet-500/15 rounded-xl p-4 text-center">

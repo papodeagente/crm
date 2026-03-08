@@ -26,7 +26,7 @@ export function BenchmarkSection({ onCTA }: BenchmarkSectionProps) {
     if (parsedRate <= 0) return null;
     if (parsedRate <= 10) return { label: "Abaixo do mercado", color: "text-red-400", message: "Sua agência está convertendo abaixo da média. Com processo estruturado, você pode triplicar essa taxa." };
     if (parsedRate <= 18) return { label: "Na média do mercado", color: "text-amber-400", message: "Sua agência está na média, mas há espaço significativo para crescimento com processos melhores." };
-    return { label: "Acima da média", color: "text-emerald-400", message: "Boa performance! Um CRM pode ajudar a manter e escalar esses resultados." };
+    return { label: "Acima da média", color: "text-emerald-400", message: "Boa performance! O ENTUR OS pode ajudar a manter e escalar esses resultados." };
   }, [parsedRate]);
 
   return (

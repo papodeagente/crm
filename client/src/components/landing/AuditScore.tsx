@@ -5,7 +5,7 @@ import { Shield, ArrowRight } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
 const AUDIT_QUESTIONS = [
-  { question: "Você usa CRM para organizar negociações?", weight: 25 },
+  { question: "Você usa um sistema para organizar negociações?", weight: 25 },
   { question: "Você faz follow-up estruturado?", weight: 25 },
   { question: "Você acompanha todas as propostas enviadas?", weight: 20 },
   { question: "Você mede taxa de conversão da agência?", weight: 15 },
@@ -15,8 +15,8 @@ const AUDIT_QUESTIONS = [
 const CLASSIFICATIONS = [
   { min: 0, max: 30, label: "Agência desorganizada", color: "text-red-400", bgColor: "bg-red-500", description: "Sua agência precisa urgentemente de um processo comercial estruturado." },
   { min: 31, max: 60, label: "Processo comercial inconsistente", color: "text-amber-400", bgColor: "bg-amber-500", description: "Você tem alguns processos, mas falta consistência e acompanhamento." },
-  { min: 61, max: 80, label: "Processo estruturado", color: "text-blue-400", bgColor: "bg-blue-500", description: "Boa base! Um CRM pode potencializar seus resultados." },
-  { min: 81, max: 100, label: "Alta maturidade comercial", color: "text-emerald-400", bgColor: "bg-emerald-500", description: "Excelente! Um CRM ajudará a escalar e manter essa performance." },
+  { min: 61, max: 80, label: "Processo estruturado", color: "text-blue-400", bgColor: "bg-blue-500", description: "Boa base! O ENTUR OS pode potencializar seus resultados." },
+  { min: 81, max: 100, label: "Alta maturidade comercial", color: "text-emerald-400", bgColor: "bg-emerald-500", description: "Excelente! O ENTUR OS ajudará a escalar e manter essa performance." },
 ];
 
 interface AuditScoreProps {

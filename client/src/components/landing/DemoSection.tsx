@@ -14,7 +14,7 @@ export function DemoSection() {
         <FadeIn>
           <div className="text-center mb-10">
             <h2 className="text-3xl sm:text-4xl font-bold text-white mb-3 tracking-tight">
-              Veja o CRM funcionando na prática
+              Veja o ENTUR OS funcionando na prática
             </h2>
             <p className="text-lg text-white/40">
               Assista uma demonstração rápida e veja como organizar suas vendas
@@ -30,7 +30,7 @@ export function DemoSection() {
                 <div className="w-3 h-3 rounded-full bg-red-500/60" />
                 <div className="w-3 h-3 rounded-full bg-yellow-500/60" />
                 <div className="w-3 h-3 rounded-full bg-green-500/60" />
-                <span className="ml-4 text-xs text-white/25 font-mono">Demonstração do CRM Acelerador</span>
+                <span className="ml-4 text-xs text-white/25 font-mono">Demonstração do ENTUR OS</span>
               </div>
               <div className="relative">
                 <img

@@ -18,11 +18,10 @@ export function SolutionSection() {
               A solução
             </div>
             <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white mb-4 tracking-tight">
-              CRM do Acelerador de Agências
+              ENTUR OS
             </h2>
             <p className="text-lg text-white/45 max-w-2xl mx-auto leading-relaxed">
-              Um sistema criado especificamente para organizar as vendas de agências de viagens.
-              Do primeiro contato à viagem realizada.
+              O sistema operacional que organiza vendas, WhatsApp, pós-venda e inteligência comercial da sua agência em um só lugar.
             </p>
           </div>
         </FadeIn>
@@ -35,11 +34,11 @@ export function SolutionSection() {
                 <div className="w-3 h-3 rounded-full bg-red-500/60" />
                 <div className="w-3 h-3 rounded-full bg-yellow-500/60" />
                 <div className="w-3 h-3 rounded-full bg-green-500/60" />
-                <span className="ml-4 text-xs text-white/25 font-mono">crm.acelerador.tur.br/pipeline</span>
+                <span className="ml-4 text-xs text-white/25 font-mono">entur.os/pipeline</span>
               </div>
               <img
                 src={MOCKUP_URL}
-                alt="CRM Acelerador - Pipeline de Vendas"
+                alt="ENTUR OS - Pipeline de Vendas"
                 className="w-full"
                 loading="lazy"
               />

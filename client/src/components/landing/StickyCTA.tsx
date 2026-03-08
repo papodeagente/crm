@@ -25,7 +25,7 @@ export function StickyCTA({ onClick }: StickyCTAProps) {
         className="w-full h-12 bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white font-semibold text-sm border-0 shadow-lg shadow-violet-500/25"
         onClick={onClick}
       >
-        Quero ver como funciona <ArrowRight className="w-4 h-4 ml-1.5" />
+        Quero recuperar minhas vendas <ArrowRight className="w-4 h-4 ml-1.5" />
       </Button>
     </div>
   );

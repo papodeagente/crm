@@ -1905,3 +1905,10 @@
 - [x] Cards com microinterações (hover effects, gradients)
 - [x] Layout escaneável mobile-first (responsive design)
 - [x] Design inspirado em Stripe/Linear/Apple (dark theme, tipografia grande, gradientes)
+
+## Adaptação LP — ENTUR OS (alterações mínimas)
+- [x] Ajustar headline do Hero para novo texto
+- [x] Inserir simulador simples abaixo do Hero (1 input + 1 botão + resultado dinâmico)
+- [x] Conectar resultado com texto sobre Matriz RFV do ENTUR OS
+- [x] CTA final do simulador: "Quero recuperar essas vendas"
+- [x] Substituir todas as referências "CRM Acelerador" / "CRM ACELERADOR" por "ENTUR OS"

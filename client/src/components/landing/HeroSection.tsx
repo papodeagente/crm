@@ -33,7 +33,7 @@ export function HeroSection({ onCTA, onDemo }: HeroSectionProps) {
           <div className="flex items-center gap-2.5">
             <img src={LOGO_URL} alt="Entur OS" className="h-8 w-8 rounded-lg" />
             <span className="text-lg font-bold bg-gradient-to-r from-violet-300 via-purple-300 to-fuchsia-300 bg-clip-text text-transparent tracking-tight">
-              CRM ACELERADOR
+              ENTUR OS
             </span>
           </div>
           <div className="hidden md:flex items-center gap-3">
@@ -48,7 +48,7 @@ export function HeroSection({ onCTA, onDemo }: HeroSectionProps) {
               className="text-sm bg-white/10 hover:bg-white/15 text-white border border-white/10 backdrop-blur-sm"
               onClick={onCTA}
             >
-              Acessar CRM
+              Acessar ENTUR OS
             </Button>
           </div>
         </div>
@@ -65,20 +65,20 @@ export function HeroSection({ onCTA, onDemo }: HeroSectionProps) {
           >
             <div className="inline-flex items-center gap-2 bg-violet-500/10 text-violet-300 px-4 py-1.5 rounded-full text-sm font-medium mb-6 border border-violet-500/15">
               <span className="w-1.5 h-1.5 bg-violet-400 rounded-full animate-pulse" />
-              CRM para agências de viagens
+              Sistema operacional para agências de viagens
             </div>
 
             <h1 className="text-4xl sm:text-5xl lg:text-[3.5rem] font-bold leading-[1.1] mb-6 tracking-tight text-white">
-              Agências de viagens perdem até{" "}
+              A maioria das agências{" "}
               <span className="bg-gradient-to-r from-violet-400 via-purple-400 to-fuchsia-400 bg-clip-text text-transparent">
-                40% das vendas
+                perde vendas todos os dias.
               </span>{" "}
-              porque não acompanham o cliente depois do orçamento.
+              E nem percebe.
             </h1>
 
             <p className="text-lg text-white/45 mb-8 leading-relaxed max-w-xl">
-              Clientes pedem proposta, dizem que vão pensar e desaparecem.
-              O problema não é preço. <span className="text-white/70 font-medium">É falta de acompanhamento.</span>
+              Clientes pedem orçamento, dizem que vão pensar e simplesmente desaparecem.
+              O problema não é preço. <span className="text-white/70 font-medium">É que a agência não consegue acompanhar todas as negociações.</span>
             </p>
 
             <div className="flex flex-col sm:flex-row gap-3 mb-8">
@@ -87,7 +87,7 @@ export function HeroSection({ onCTA, onDemo }: HeroSectionProps) {
                 className="h-14 px-8 text-base bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white border-0 shadow-xl shadow-violet-500/20 transition-all duration-300 hover:shadow-violet-500/30 hover:scale-[1.02]"
                 onClick={onCTA}
               >
-                Quero ver como funciona o CRM <ArrowRight className="w-5 h-5 ml-2" />
+                Quero ver como funciona <ArrowRight className="w-5 h-5 ml-2" />
               </Button>
               <Button
                 size="lg"
@@ -138,11 +138,11 @@ export function HeroSection({ onCTA, onDemo }: HeroSectionProps) {
                   <div className="w-2.5 h-2.5 rounded-full bg-red-500/60" />
                   <div className="w-2.5 h-2.5 rounded-full bg-yellow-500/60" />
                   <div className="w-2.5 h-2.5 rounded-full bg-green-500/60" />
-                  <span className="ml-3 text-[10px] text-white/25 font-mono">crm.acelerador.tur.br</span>
+                  <span className="ml-3 text-[10px] text-white/25 font-mono">entur.os</span>
                 </div>
                 <img
                   src={MOCKUP_URL}
-                  alt="CRM Acelerador - Dashboard"
+                  alt="ENTUR OS - Dashboard"
                   className="w-full"
                   loading="eager"
                 />
