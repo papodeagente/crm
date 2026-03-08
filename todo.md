@@ -1934,3 +1934,11 @@
 ## Layout Escuro nas Páginas de Login e Cadastro
 - [x] Ajustar página de Login para fundo preto (#0a0a12) igual à LP
 - [x] Ajustar página de Cadastro para fundo preto (#0a0a12) igual à LP
+
+## Recurso: Negociações Esfriando (Cooling Deals)
+- [x] Adicionar campos cooling_enabled e cooling_days na tabela pipeline_stages
+- [x] Criar procedure para atualizar configuração de cooling por etapa
+- [x] Retornar info de cooling nas queries de deals/pipeline
+- [x] Criar UI de configuração nas settings do funil (toggle + input dias por etapa)
+- [x] Implementar destaque visual amarelo nos cards do pipeline para deals esfriando
+- [x] Testar configuração e destaque visual

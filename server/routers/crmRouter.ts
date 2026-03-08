@@ -174,7 +174,7 @@ export const crmRouter = router({
         return crm.createStage(input);
       }),
     updateStage: protectedProcedure
-      .input(z.object({ tenantId: z.number(), id: z.number(), name: z.string().optional(), color: z.string().optional(), orderIndex: z.number().optional(), probabilityDefault: z.number().optional(), isWon: z.boolean().optional(), isLost: z.boolean().optional() }))
+      .input(z.object({ tenantId: z.number(), id: z.number(), name: z.string().optional(), color: z.string().optional(), orderIndex: z.number().optional(), probabilityDefault: z.number().optional(), isWon: z.boolean().optional(), isLost: z.boolean().optional(), coolingEnabled: z.boolean().optional(), coolingDays: z.number().optional() }))
       .mutation(async ({ input }) => {
         const { tenantId, id, ...data } = input;
         return crm.updateStage(tenantId, id, data);

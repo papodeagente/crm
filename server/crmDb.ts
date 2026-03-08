@@ -867,7 +867,7 @@ export async function getPipelineById(tenantId: number, id: number) {
 // ═══════════════════════════════════════
 // STAGES — CRUD Completo
 // ═══════════════════════════════════════
-export async function updateStage(tenantId: number, id: number, data: { name?: string; color?: string; orderIndex?: number; probabilityDefault?: number; isWon?: boolean; isLost?: boolean }) {
+export async function updateStage(tenantId: number, id: number, data: { name?: string; color?: string; orderIndex?: number; probabilityDefault?: number; isWon?: boolean; isLost?: boolean; coolingEnabled?: boolean; coolingDays?: number }) {
   const db = await getDb(); if (!db) return null;
   await db.update(pipelineStages).set(data as any).where(and(eq(pipelineStages.tenantId, tenantId), eq(pipelineStages.id, id)));
   return { success: true };

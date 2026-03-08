@@ -17,7 +17,7 @@ import {
   DollarSign, MapPin, Clock, GripVertical, Building2, User,
   Package, History, Trash2, Pencil, Link2, Unlink, RotateCcw,
   MoreVertical, Download, AlertTriangle, Flame, CheckCircle2,
-  ChevronLeft, ChevronRight, Star,
+  ChevronLeft, ChevronRight, Star, Thermometer,
 } from "lucide-react";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { HoverCard, HoverCardTrigger, HoverCardContent } from "@/components/ui/hover-card";
@@ -463,6 +463,7 @@ export default function Pipeline() {
                 const stageDeals = sortedDeals.filter((d: any) => d.stageId === stage.id);
                 const stageValue = stageDeals.reduce((sum: number, d: any) => sum + (d.valueCents || 0), 0);
                 const isDragOver = dragOverStageId === stage.id;
+                const coolingMs = stage.coolingEnabled && stage.coolingDays ? (stage.coolingDays as number) * 86400000 : 0;
 
                 return (
                   <div
@@ -490,7 +491,12 @@ export default function Pipeline() {
                         : "bg-muted/30 dark:bg-card/30 border-border/40"
                     }`}>
                       <div className="p-2.5 space-y-2.5 min-h-[200px]">
-                        {stageDeals.map((deal: any) => (
+                        {stageDeals.map((deal: any) => {
+                          const dealCooling = coolingMs > 0 && deal.status === "open" ? (() => {
+                            const lastAct = deal.lastActivityAt ? new Date(deal.lastActivityAt).getTime() : new Date(deal.createdAt).getTime();
+                            return (Date.now() - lastAct) > coolingMs;
+                          })() : false;
+                          return (
                           <DealCard
                             key={deal.id}
                             deal={deal}
@@ -503,8 +509,9 @@ export default function Pipeline() {
                             onDragStart={handleDragStart}
                             onDragEnd={handleDragEnd}
                             isDragging={draggedDealId === deal.id}
-                          />
-                        ))}
+                            isCooling={dealCooling}
+                          />)
+                        })}
                         {stageDeals.length === 0 && (
                           <div className="flex items-center justify-center h-24 text-[12px] text-muted-foreground/60">
                             Arraste negociações aqui
@@ -707,9 +714,9 @@ export default function Pipeline() {
 }
 
 /* ─── Deal Card ─── */
-function DealCard({ deal, contacts, accounts, overdueData, pendingCount, onCreateTask, onOpenDeal, onDragStart, onDragEnd, isDragging }: {
+function DealCard({ deal, contacts, accounts, overdueData, pendingCount, onCreateTask, onOpenDeal, onDragStart, onDragEnd, isDragging, isCooling }: {
   deal: any; contacts: any[]; accounts: any[]; overdueData: { count: number; oldestTitle: string; oldestDueAt: string } | null; pendingCount: number; onCreateTask: () => void; onOpenDeal: () => void;
-  onDragStart: (e: React.DragEvent, dealId: number) => void; onDragEnd: (e: React.DragEvent) => void; isDragging: boolean;
+  onDragStart: (e: React.DragEvent, dealId: number) => void; onDragEnd: (e: React.DragEvent) => void; isDragging: boolean; isCooling?: boolean;
 }) {
   const contact = contacts.find((c: any) => c.id === deal.contactId);
   const account = accounts.find((a: any) => a.id === deal.accountId);
@@ -733,14 +740,22 @@ function DealCard({ deal, contacts, accounts, overdueData, pendingCount, onCreat
       draggable
       onDragStart={(e) => onDragStart(e, deal.id)}
       onDragEnd={onDragEnd}
-      className={`bg-card rounded-xl border p-3 shadow-[0_1px_3px_oklch(0_0_0/0.05)] hover:shadow-md transition-all duration-150 cursor-grab active:cursor-grabbing ${isDragging ? "ring-2 ring-primary/40 border-primary/30 scale-[0.98]" : "border-border/50"}`}
+      className={`rounded-xl border p-3 shadow-[0_1px_3px_oklch(0_0_0/0.05)] hover:shadow-md transition-all duration-150 cursor-grab active:cursor-grabbing ${isCooling ? "bg-amber-50 dark:bg-amber-950/30 border-amber-300 dark:border-amber-700/60 ring-1 ring-amber-200 dark:ring-amber-800/40" : "bg-card border-border/50"} ${isDragging ? "ring-2 ring-primary/40 border-primary/30 scale-[0.98]" : ""}`}
     >
       {/* Row 1: Status badge + info icon */}
       <div className="flex items-center justify-between mb-2">
-        <span className={`inline-flex items-center gap-1.5 text-[10.5px] font-semibold px-2 py-0.5 rounded-md ${style.bg} ${style.text}`}>
-          <span className={`h-1.5 w-1.5 rounded-full ${style.dot}`} />
-          {deal.status === "open" ? "Em andamento" : deal.status === "won" ? "Ganha" : "Perdida"}
-        </span>
+        <div className="flex items-center gap-1.5">
+          <span className={`inline-flex items-center gap-1.5 text-[10.5px] font-semibold px-2 py-0.5 rounded-md ${style.bg} ${style.text}`}>
+            <span className={`h-1.5 w-1.5 rounded-full ${style.dot}`} />
+            {deal.status === "open" ? "Em andamento" : deal.status === "won" ? "Ganha" : "Perdida"}
+          </span>
+          {isCooling && (
+            <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300">
+              <Thermometer className="h-3 w-3" />
+              Esfriando
+            </span>
+          )}
+        </div>
         <HoverCard openDelay={200} closeDelay={100}>
           <HoverCardTrigger asChild>
             <button className="p-1 hover:bg-primary/10 rounded-full transition-colors" onClick={(e) => e.stopPropagation()}>

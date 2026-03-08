@@ -16,7 +16,7 @@ import {
 import {
   ArrowLeft, Plus, Pencil, Trash2, ChevronUp, ChevronDown,
   GitBranch, Zap, GripVertical, AlertTriangle, Archive,
-  Play, Pause, Copy, ArrowRight, Loader2, Star,
+  Play, Pause, Copy, ArrowRight, Loader2, Star, Thermometer,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -29,7 +29,9 @@ interface PipelineData {
 interface StageData {
   id: number; tenantId: number; pipelineId: number; name: string;
   color: string | null; orderIndex: number; probabilityDefault: number | null;
-  isWon: number | boolean; isLost: number | boolean; createdAt: string;
+  isWon: number | boolean; isLost: number | boolean;
+  coolingEnabled: number | boolean; coolingDays: number | null;
+  createdAt: string;
 }
 interface AutomationData {
   id: number; tenantId: number; name: string; sourcePipelineId: number;
@@ -408,30 +410,62 @@ export default function PipelineSettings() {
                 {/* Stage list */}
                 <div className="space-y-1.5">
                   {sortedStages.map((s, i) => (
-                    <div key={s.id} className="surface flex items-center gap-3 p-3 group">
-                      <GripVertical className="h-4 w-4 text-muted-foreground/30 shrink-0" />
-                      <div className="h-4 w-4 rounded-full shrink-0" style={{ backgroundColor: s.color || STAGE_COLORS[i % STAGE_COLORS.length] }} />
-                      <div className="flex-1 min-w-0">
-                        <span className="text-[13px] font-medium text-foreground">{s.name}</span>
-                        <div className="flex gap-2 mt-0.5">
-                          <span className="text-[11px] text-muted-foreground">Prob: {s.probabilityDefault || 0}%</span>
-                          {s.isWon ? <span className="text-[11px] text-emerald-400 font-medium">Etapa de Ganho</span> : null}
-                          {s.isLost ? <span className="text-[11px] text-red-400 font-medium">Etapa de Perda</span> : null}
+                    <div key={s.id} className="surface p-3 group">
+                      <div className="flex items-center gap-3">
+                        <GripVertical className="h-4 w-4 text-muted-foreground/30 shrink-0" />
+                        <div className="h-4 w-4 rounded-full shrink-0" style={{ backgroundColor: s.color || STAGE_COLORS[i % STAGE_COLORS.length] }} />
+                        <div className="flex-1 min-w-0">
+                          <span className="text-[13px] font-medium text-foreground">{s.name}</span>
+                          <div className="flex gap-2 mt-0.5">
+                            <span className="text-[11px] text-muted-foreground">Prob: {s.probabilityDefault || 0}%</span>
+                            {s.isWon ? <span className="text-[11px] text-emerald-400 font-medium">Etapa de Ganho</span> : null}
+                            {s.isLost ? <span className="text-[11px] text-red-400 font-medium">Etapa de Perda</span> : null}
+                            {!!s.coolingEnabled && <span className="text-[11px] text-amber-400 font-medium">Esfriando: {s.coolingDays || 3} dias</span>}
+                          </div>
+                        </div>
+                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button disabled={i === 0} onClick={() => moveStage(s.id, "up")} className="h-7 w-7 rounded flex items-center justify-center hover:bg-accent disabled:opacity-30">
+                            <ChevronUp className="h-3.5 w-3.5 text-muted-foreground" />
+                          </button>
+                          <button disabled={i === sortedStages.length - 1} onClick={() => moveStage(s.id, "down")} className="h-7 w-7 rounded flex items-center justify-center hover:bg-accent disabled:opacity-30">
+                            <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                          </button>
+                          <button onClick={() => openEditStage(s)} className="h-7 w-7 rounded flex items-center justify-center hover:bg-accent">
+                            <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
+                          </button>
+                          <button onClick={() => deleteStage.mutate({ tenantId, id: s.id })} className="h-7 w-7 rounded flex items-center justify-center hover:bg-destructive/10">
+                            <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
+                          </button>
                         </div>
                       </div>
-                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button disabled={i === 0} onClick={() => moveStage(s.id, "up")} className="h-7 w-7 rounded flex items-center justify-center hover:bg-accent disabled:opacity-30">
-                          <ChevronUp className="h-3.5 w-3.5 text-muted-foreground" />
-                        </button>
-                        <button disabled={i === sortedStages.length - 1} onClick={() => moveStage(s.id, "down")} className="h-7 w-7 rounded flex items-center justify-center hover:bg-accent disabled:opacity-30">
-                          <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
-                        </button>
-                        <button onClick={() => openEditStage(s)} className="h-7 w-7 rounded flex items-center justify-center hover:bg-accent">
-                          <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
-                        </button>
-                        <button onClick={() => deleteStage.mutate({ tenantId, id: s.id })} className="h-7 w-7 rounded flex items-center justify-center hover:bg-destructive/10">
-                          <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
-                        </button>
+                      {/* Cooling config inline */}
+                      <div className="mt-2 pt-2 border-t border-border/30 flex items-center gap-3">
+                        <Thermometer className="h-3.5 w-3.5 text-amber-500 shrink-0 ml-8" />
+                        <span className="text-[11px] text-muted-foreground whitespace-nowrap">Destacar negociações esfriando na etapa</span>
+                        <Switch
+                          checked={!!s.coolingEnabled}
+                          onCheckedChange={(checked) => {
+                            updateStage.mutate({ tenantId, id: s.id, coolingEnabled: checked, coolingDays: s.coolingDays || 3 });
+                          }}
+                          className="scale-75"
+                        />
+                        {!!s.coolingEnabled && (
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[11px] text-muted-foreground">após</span>
+                            <Input
+                              type="number"
+                              min={1}
+                              max={90}
+                              value={s.coolingDays || 3}
+                              onChange={(e) => {
+                                const days = parseInt(e.target.value) || 1;
+                                updateStage.mutate({ tenantId, id: s.id, coolingDays: Math.max(1, Math.min(90, days)) });
+                              }}
+                              className="h-6 w-14 text-[11px] text-center px-1"
+                            />
+                            <span className="text-[11px] text-muted-foreground">dias</span>
+                          </div>
+                        )}
                       </div>
                     </div>
                   ))}

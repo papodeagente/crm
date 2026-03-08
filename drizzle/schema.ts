@@ -367,6 +367,8 @@ export const pipelineStages = mysqlTable("pipeline_stages", {
   probabilityDefault: int("probabilityDefault").default(0),
   isWon: boolean("isWon").default(false).notNull(),
   isLost: boolean("isLost").default(false).notNull(),
+  coolingEnabled: boolean("coolingEnabled").default(false).notNull(),
+  coolingDays: int("coolingDays").default(3),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 }, (t) => [index("ps_tenant_pipeline_idx").on(t.tenantId, t.pipelineId)]);
 
