@@ -1921,3 +1921,12 @@
 - [x] Remover Simulador de Crescimento 12 meses (GrowthSimulator)
 - [x] Remover Auditoria Comercial (AuditScore)
 - [x] Remover CTAs intermediários associados aos módulos removidos
+
+## Seção de Planos + Remoção do Formulário de Diagnóstico
+- [x] Remover ReportForm (formulário de diagnóstico) da LP
+- [x] Criar seção de Planos com 3 tiers: Basic (R$67), Pro (R$97), Enterprise (sob consulta)
+- [x] Basic: tudo do Pro menos automações, 1 usuário
+- [x] Pro: inclui automações, até 4 usuários, +R$97 por usuário adicional
+- [x] Enterprise: popup com formulário para solicitar atendimento
+- [x] Substituir FinalCTA pela seção de planos
+- [x] Atualizar CTAs da LP para apontar para a seção de planos

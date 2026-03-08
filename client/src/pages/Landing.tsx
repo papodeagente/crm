@@ -4,11 +4,10 @@ import { EnemySection } from "@/components/landing/EnemySection";
 import { RevelationSection } from "@/components/landing/RevelationSection";
 import { SolutionSection } from "@/components/landing/SolutionSection";
 import { HowItWorks } from "@/components/landing/HowItWorks";
-import { ReportForm } from "@/components/landing/ReportForm";
 import { SocialProof } from "@/components/landing/SocialProof";
 import { DifferentiatorSection } from "@/components/landing/DifferentiatorSection";
 import { DemoSection } from "@/components/landing/DemoSection";
-import { FinalCTA } from "@/components/landing/FinalCTA";
+import { PricingSection } from "@/components/landing/PricingSection";
 import { SectionCTA } from "@/components/landing/SectionCTA";
 import { StickyCTA } from "@/components/landing/StickyCTA";
 import { SalesSimulator } from "@/components/landing/SalesSimulator";
@@ -16,8 +15,8 @@ import { SalesSimulator } from "@/components/landing/SalesSimulator";
 export default function Landing() {
   const [, navigate] = useLocation();
 
-  const scrollToReport = () => {
-    document.getElementById("report-form")?.scrollIntoView({ behavior: "smooth" });
+  const scrollToPlanos = () => {
+    document.getElementById("planos")?.scrollIntoView({ behavior: "smooth" });
   };
 
   const goToRegister = () => {
@@ -31,13 +30,13 @@ export default function Landing() {
   return (
     <div className="min-h-screen bg-[#0a0a12] text-white overflow-x-hidden">
       {/* 1. Hero */}
-      <HeroSection onCTA={scrollToReport} onDemo={scrollToDemo} />
+      <HeroSection onCTA={scrollToPlanos} onDemo={scrollToDemo} />
 
       {/* Simulador simples */}
-      <SalesSimulator onCTA={scrollToReport} />
+      <SalesSimulator onCTA={scrollToPlanos} />
 
       {/* CTA between sections */}
-      <SectionCTA text="Quero organizar minhas vendas" onClick={scrollToReport} variant="secondary" />
+      <SectionCTA text="Quero organizar minhas vendas" onClick={scrollToPlanos} variant="secondary" />
 
       {/* 2. Seção do Inimigo */}
       <EnemySection />
@@ -46,7 +45,7 @@ export default function Landing() {
       <RevelationSection />
 
       {/* CTA between sections */}
-      <SectionCTA text="Quero ver como funciona o ENTUR OS" onClick={scrollToReport} />
+      <SectionCTA text="Quero ver como funciona o ENTUR OS" onClick={scrollToPlanos} />
 
       {/* 4. Introdução da Solução */}
       <SolutionSection />
@@ -55,31 +54,25 @@ export default function Landing() {
       <HowItWorks />
 
       {/* CTA between sections */}
-      <SectionCTA text="Quero estruturar meu processo comercial" onClick={scrollToReport} variant="secondary" />
+      <SectionCTA text="Quero estruturar meu processo comercial" onClick={scrollToPlanos} variant="secondary" />
 
-      {/* 6. Relatório Automático (Lead Capture) */}
-      <ReportForm />
-
-      {/* CTA between sections */}
-      <SectionCTA text="Quero melhorar minha agência" onClick={scrollToReport} />
-
-      {/* 7. Prova Social */}
+      {/* 6. Prova Social */}
       <SocialProof />
 
-      {/* 8. Diferencial */}
+      {/* 7. Diferencial */}
       <DifferentiatorSection />
 
       {/* CTA between sections */}
-      <SectionCTA text="Quero um sistema feito para turismo" onClick={scrollToReport} variant="secondary" />
+      <SectionCTA text="Quero um sistema feito para turismo" onClick={scrollToPlanos} />
 
-      {/* 9. Demonstração */}
+      {/* 8. Demonstração */}
       <DemoSection />
 
-      {/* 10. CTA Final */}
-      <FinalCTA onCTA={goToRegister} />
+      {/* 9. Planos e Preços */}
+      <PricingSection onSelectPlan={goToRegister} />
 
       {/* Sticky CTA Mobile */}
-      <StickyCTA onClick={scrollToReport} />
+      <StickyCTA onClick={scrollToPlanos} />
     </div>
   );
 }
