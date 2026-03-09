@@ -25,6 +25,7 @@ import {
 import { useTenantId } from "@/hooks/useTenantId";
 import TaskFormDialog from "@/components/TaskFormDialog";
 import TaskActionPopover from "@/components/TaskActionPopover";
+import SaleCelebration from "@/components/SaleCelebration";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Pencil } from "lucide-react";
 import { formatDate, formatTime, formatDateTime, SYSTEM_TIMEZONE, SYSTEM_LOCALE, formatFullDateTime} from "../../../shared/dateUtils";
@@ -214,6 +215,7 @@ export default function DealDetail() {
 
   /* ─── Status dialogs ─── */
   const [showWonDialog, setShowWonDialog] = useState(false);
+  const [showCelebration, setShowCelebration] = useState(false);
   const [showLostDialog, setShowLostDialog] = useState(false);
   const [lostReason, setLostReason] = useState("");
   const [selectedLossReasonId, setSelectedLossReasonId] = useState<number | null>(null);
@@ -262,7 +264,12 @@ export default function DealDetail() {
   };
 
   const handleMarkWon = () => {
-    updateDeal.mutate({ tenantId: TENANT_ID, id: deal.id, status: "won" });
+    updateDeal.mutate({ tenantId: TENANT_ID, id: deal.id, status: "won" }, {
+      onSuccess: () => {
+        dealQ.refetch(); historyQ.refetch();
+        setShowCelebration(true);
+      },
+    });
     setShowWonDialog(false);
   };
 
@@ -967,6 +974,14 @@ export default function DealDetail() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* ── Sale Celebration ── */}
+      <SaleCelebration
+        open={showCelebration}
+        onClose={() => setShowCelebration(false)}
+        dealTitle={deal.title}
+        dealValue={deal.valueCents ? new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(deal.valueCents / 100) : undefined}
+      />
 
       {/* ── Lost Dialog ── */}
       <Dialog open={showLostDialog} onOpenChange={(open) => {

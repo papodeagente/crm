@@ -24,6 +24,7 @@ import { HoverCard, HoverCardTrigger, HoverCardContent } from "@/components/ui/h
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import DealFiltersPanel, { useDealFilters, DealFilterButton } from "@/components/DealFiltersPanel";
+import SaleCelebration from "@/components/SaleCelebration";
 import ClassificationBadge from "@/components/ClassificationBadge";
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { useLocation } from "wouter";
@@ -80,7 +81,18 @@ export default function Pipeline() {
   const dealFilters = useDealFilters();
   const [ownerFilter, setOwnerFilter] = useState<number | "all">("all");
   const [showIndicators, setShowIndicators] = useState(false);
+  const [celebration, setCelebration] = useState<{ open: boolean; title?: string; value?: string }>({ open: false });
   const [showTaskCalendar, setShowTaskCalendar] = useState(false);
+
+  // Listen for sale celebration events from DealDrawer
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      setCelebration({ open: true, title: detail?.title, value: detail?.value });
+    };
+    window.addEventListener("sale-celebration", handler);
+    return () => window.removeEventListener("sale-celebration", handler);
+  }, []);
   const crmUsers = trpc.admin.users.list.useQuery({ tenantId: TENANT_ID });
 
   const utils = trpc.useUtils();
@@ -690,6 +702,12 @@ export default function Pipeline() {
       </AlertDialog>
 
       {/* Dialogs */}
+      <SaleCelebration
+        open={celebration.open}
+        onClose={() => setCelebration({ open: false })}
+        dealTitle={celebration.title}
+        dealValue={celebration.value}
+      />
       <CreateDealDialog open={showCreateDeal} onOpenChange={setShowCreateDeal} pipelineId={activePipeline?.id} stages={stages.data || []} contacts={contacts.data || []} accounts={allAccounts.data || []} pipelines={pipelines.data?.filter((p: any) => !p.isArchived) || []} />
       {showTaskForm && (
         <TaskFormDialog
@@ -1072,6 +1090,17 @@ function DealDrawer({ dealId, onClose, contacts, accounts, stages }: {
                     if (v === "lost") {
                       setLossDialogDealId(dealId);
                       setShowLossDialog(true);
+                    } else if (v === "won") {
+                      updateDeal.mutate({ tenantId: TENANT_ID, id: dealId, status: "won" }, {
+                        onSuccess: () => {
+                          utils.crm.deals.get.invalidate({ tenantId: TENANT_ID, id: dealId });
+                          utils.crm.deals.list.invalidate();
+                          // Trigger celebration in parent via custom event
+                          window.dispatchEvent(new CustomEvent("sale-celebration", {
+                            detail: { title: d.title, value: d.valueCents ? new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(d.valueCents / 100) : undefined }
+                          }));
+                        },
+                      });
                     } else {
                       updateDeal.mutate({ tenantId: TENANT_ID, id: dealId, status: v as any });
                     }

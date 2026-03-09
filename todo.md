@@ -1942,3 +1942,12 @@
 - [x] Criar UI de configuração nas settings do funil (toggle + input dias por etapa)
 - [x] Implementar destaque visual amarelo nos cards do pipeline para deals esfriando
 - [x] Testar configuração e destaque visual
+
+## Celebração de Venda (Yabba-Dabba-Doo)
+- [x] Encontrar o ponto de marcação de venda no pipeline (status "won")
+- [x] Baixar áudio "Yabba-Dabba-Doo" estilo Flintstones
+- [x] Upload do áudio para CDN
+- [x] Criar componente SaleCelebration com popup, confetes canvas e áudio
+- [x] Integrar ao DealDetail.tsx (handleMarkWon)
+- [x] Integrar ao Pipeline.tsx DealDrawer (status change para won via custom event)
+- [x] Testar celebração no browser — popup YABBA-DABBA-DOO aparece com confetes e áudio ao confirmar venda
