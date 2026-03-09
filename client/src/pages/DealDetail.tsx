@@ -287,6 +287,19 @@ export default function DealDetail() {
     setSelectedLossReasonId(null);
   };
 
+  const handleReopen = () => {
+    updateDeal.mutate(
+      { tenantId: TENANT_ID, id: deal.id, status: "open", lossReasonId: null, lossNotes: null },
+      {
+        onSuccess: () => {
+          dealQ.refetch();
+          historyQ.refetch();
+          toast.success("Negociação reaberta com sucesso!");
+        },
+      }
+    );
+  };
+
   const pendingTasks = tasksList.filter((t: any) => t.status === "pending" || t.status === "in_progress");
 
   return (
@@ -380,6 +393,18 @@ export default function DealDetail() {
                   Marcar venda
                 </Button>
               </>
+            )}
+            {deal.status !== "open" && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="border-blue-300 text-blue-600 hover:bg-blue-50 hover:text-blue-700 dark:border-blue-500/40 dark:text-blue-400 dark:hover:bg-blue-500/10 gap-1.5 font-medium"
+                onClick={handleReopen}
+                disabled={updateDeal.isPending}
+              >
+                <RefreshCw className={`h-4 w-4 ${updateDeal.isPending ? "animate-spin" : ""}`} />
+                Reabrir negociação
+              </Button>
             )}
           </div>
         </div>

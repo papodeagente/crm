@@ -1960,3 +1960,8 @@
 - [x] Tratar eventos de desconexão: loggedOut (limpa sessão), badSession (limpa auth), banned (403), max retries (notificação)
 - [x] Adicionar alerta/disclaimer de API não oficial: no dialog de conexão + banner permanente na aba Sessões
 - [x] Testar estabilidade da conexão — alerta visível na aba Sessões + no dialog de conexão
+
+## Reverter Negociação Ganha/Perdida para Em Andamento
+- [x] Adicionar botão "Reabrir negociação" quando deal status é won ou lost
+- [x] Implementar lógica de reverter status para open (backend já suportava, limpa lossReasonId/lossNotes)
+- [x] Testar reversão de venda ganha — deal voltou para "Aberta" com pipeline visível e histórico registrado (won → open)
