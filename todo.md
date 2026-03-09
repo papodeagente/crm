@@ -1951,3 +1951,12 @@
 - [x] Integrar ao DealDetail.tsx (handleMarkWon)
 - [x] Integrar ao Pipeline.tsx DealDrawer (status change para won via custom event)
 - [x] Testar celebração no browser — popup YABBA-DABBA-DOO aparece com confetes e áudio ao confirmar venda
+
+## Estabilidade WhatsApp + Alerta API Não Oficial
+- [x] Analisar motor Baileys: identificar causas de desconexão rápida
+- [x] Implementar reconnect automático com backoff exponencial (15 tentativas, 3s-2min)
+- [x] Melhorar config do socket: keepAlive 25s, connectTimeout 30s, queryTimeout 2min
+- [x] Adicionar heartbeat/keepalive otimizado (keepAliveIntervalMs: 25000)
+- [x] Tratar eventos de desconexão: loggedOut (limpa sessão), badSession (limpa auth), banned (403), max retries (notificação)
+- [x] Adicionar alerta/disclaimer de API não oficial: no dialog de conexão + banner permanente na aba Sessões
+- [x] Testar estabilidade da conexão — alerta visível na aba Sessões + no dialog de conexão

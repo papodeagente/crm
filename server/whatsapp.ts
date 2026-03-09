@@ -38,6 +38,10 @@ class WhatsAppManager extends EventEmitter {
   private sessions: Map<string, WhatsAppState> = new Map();
   private authDir = path.join(process.cwd(), "auth_sessions");
   private reconnectTimers: Map<string, NodeJS.Timeout> = new Map();
+  private reconnectAttempts: Map<string, number> = new Map();
+  private static readonly MAX_RECONNECT_ATTEMPTS = 15;
+  private static readonly BASE_RECONNECT_DELAY = 3000; // 3s
+  private static readonly MAX_RECONNECT_DELAY = 120000; // 2min
 
   constructor() {
     super();
@@ -86,6 +90,14 @@ class WhatsAppManager extends EventEmitter {
       },
       logger,
       generateHighQualityLinkPreview: true,
+      // Estabilidade: manter conexão ativa
+      keepAliveIntervalMs: 25000, // Ping a cada 25s (padrão 30s)
+      connectTimeoutMs: 30000, // Timeout de conexão 30s
+      defaultQueryTimeoutMs: 120000, // Timeout de queries 2min
+      retryRequestDelayMs: 500, // Delay entre retries de requests
+      markOnlineOnConnect: false, // Não marcar online automaticamente (reduz detecção)
+      syncFullHistory: false, // Não sincronizar histórico completo (reduz carga)
+      emitOwnEvents: true,
     });
 
     sessionState.socket = sock;
@@ -112,40 +124,78 @@ class WhatsAppManager extends EventEmitter {
         sessionState.qrDataUrl = null;
 
         const statusCode = (lastDisconnect?.error as Boom)?.output?.statusCode;
-        const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
+        const shouldReconnect = statusCode !== DisconnectReason.loggedOut
+          && statusCode !== DisconnectReason.badSession
+          && statusCode !== 403; // Banned
 
-        this.emit("status", { sessionId, status: "disconnected", statusCode });
-        await this.logActivity(sessionId, "disconnected", `Desconectado. Código: ${statusCode}`);
+        const attempts = this.reconnectAttempts.get(sessionId) || 0;
+
+        this.emit("status", { sessionId, status: "disconnected", statusCode, reconnectAttempt: attempts });
+        await this.logActivity(sessionId, "disconnected", `Desconectado. Código: ${statusCode}. Tentativa: ${attempts}/${WhatsAppManager.MAX_RECONNECT_ATTEMPTS}`);
         await this.updateSessionDb(sessionId, userId, "disconnected");
 
-        // notifyOwner desativado — notificações apenas in-app
+        // Notificação in-app
         try {
           await createNotification(1, {
             type: "whatsapp_disconnected",
             title: "WhatsApp Desconectado",
-            body: `Sessão "${sessionId}" desconectada. Código: ${statusCode}. ${shouldReconnect ? "Tentando reconectar..." : "Sessão encerrada."}`,
+            body: `Sessão "${sessionId}" desconectada. Código: ${statusCode}. ${shouldReconnect ? `Reconectando (tentativa ${attempts + 1}/${WhatsAppManager.MAX_RECONNECT_ATTEMPTS})...` : "Sessão encerrada."}`,
             entityType: "session",
             entityId: sessionId,
           });
         } catch (e) { console.error("Error creating disconnect notification:", e); }
 
-        if (shouldReconnect) {
+        if (shouldReconnect && attempts < WhatsAppManager.MAX_RECONNECT_ATTEMPTS) {
+          // Backoff exponencial com jitter: min 3s, max 2min
+          const baseDelay = WhatsAppManager.BASE_RECONNECT_DELAY * Math.pow(1.5, attempts);
+          const jitter = Math.random() * 2000; // 0-2s de jitter
+          const delay = Math.min(baseDelay + jitter, WhatsAppManager.MAX_RECONNECT_DELAY);
+          
+          console.log(`[WhatsApp] Reconectando sessão ${sessionId} em ${Math.round(delay / 1000)}s (tentativa ${attempts + 1}/${WhatsAppManager.MAX_RECONNECT_ATTEMPTS})`);
+          
+          this.reconnectAttempts.set(sessionId, attempts + 1);
           const timer = setTimeout(() => {
             this.connect(sessionId, userId);
-          }, 5000);
+          }, delay);
           this.reconnectTimers.set(sessionId, timer);
-        } else {
+        } else if (statusCode === DisconnectReason.loggedOut || statusCode === 403) {
+          // Logout ou banimento: limpar sessão completamente
+          console.log(`[WhatsApp] Sessão ${sessionId} encerrada definitivamente (código: ${statusCode})`);
+          this.reconnectAttempts.delete(sessionId);
           this.sessions.delete(sessionId);
-          // Clean auth files on logout
           if (fs.existsSync(sessionDir)) {
             fs.rmSync(sessionDir, { recursive: true, force: true });
           }
+        } else if (statusCode === DisconnectReason.badSession) {
+          // Sessão corrompida: limpar e permitir nova conexão
+          console.log(`[WhatsApp] Sessão ${sessionId} corrompida. Limpando auth para nova conexão.`);
+          this.reconnectAttempts.delete(sessionId);
+          this.sessions.delete(sessionId);
+          if (fs.existsSync(sessionDir)) {
+            fs.rmSync(sessionDir, { recursive: true, force: true });
+          }
+        } else {
+          // Max tentativas atingido
+          console.log(`[WhatsApp] Sessão ${sessionId}: máximo de tentativas de reconexão atingido (${WhatsAppManager.MAX_RECONNECT_ATTEMPTS})`);
+          this.reconnectAttempts.delete(sessionId);
+          try {
+            await createNotification(1, {
+              type: "whatsapp_disconnected",
+              title: "WhatsApp - Reconexão Falhou",
+              body: `Sessão "${sessionId}" não conseguiu reconectar após ${WhatsAppManager.MAX_RECONNECT_ATTEMPTS} tentativas. Reconecte manualmente.`,
+              entityType: "session",
+              entityId: sessionId,
+            });
+          } catch (e) { console.error("Error creating max retry notification:", e); }
         }
       } else if (connection === "open") {
         sessionState.status = "connected";
         sessionState.qrCode = null;
         sessionState.qrDataUrl = null;
         sessionState.user = sock.user;
+
+        // Reset reconnect counter on successful connection
+        this.reconnectAttempts.delete(sessionId);
 
         this.emit("status", { sessionId, status: "connected", user: sock.user });
         await this.logActivity(sessionId, "connected", `Conectado como ${sock.user?.name || sock.user?.id}`);
@@ -620,6 +670,7 @@ class WhatsAppManager extends EventEmitter {
       clearTimeout(timer);
       this.reconnectTimers.delete(sessionId);
     }
+    this.reconnectAttempts.delete(sessionId);
     this.sessions.delete(sessionId);
     await this.logActivity(sessionId, "manual_disconnect", "Sessão desconectada manualmente");
   }

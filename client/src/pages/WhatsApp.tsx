@@ -7,7 +7,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Smartphone, Plus, Send, Wifi, WifiOff, QrCode, MessageSquare } from "lucide-react";
+import { Smartphone, Plus, Send, Wifi, WifiOff, QrCode, MessageSquare, AlertTriangle, ShieldAlert } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { useSocket } from "@/hooks/useSocket";
@@ -44,6 +45,8 @@ export default function WhatsApp() {
 
   const connectedSessions = sessions.data?.filter((s: any) => s.liveStatus === "connected") || [];
 
+  const [showDisclaimer, setShowDisclaimer] = useState(false);
+
   return (
     <div className="p-5 lg:px-8 space-y-5">
       {/* Header */}
@@ -66,8 +69,22 @@ export default function WhatsApp() {
               </DialogTitle>
             </DialogHeader>
             <div className="space-y-4 pt-3">
+              {/* Disclaimer API Não Oficial */}
+              <div className="rounded-xl border border-amber-200 bg-amber-50 p-3.5">
+                <div className="flex gap-2.5">
+                  <ShieldAlert className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-[13px] font-semibold text-amber-800">API Não Oficial do WhatsApp</p>
+                    <p className="text-[12px] text-amber-700 mt-1 leading-relaxed">
+                      Esta integração utiliza uma <strong>API não oficial</strong> do WhatsApp. 
+                      Eventuais bloqueios ou restrições ao número conectado podem ocorrer por parte do WhatsApp/Meta. 
+                      <strong>O ENTUR OS não se responsabiliza por bloqueios</strong> decorrentes do uso desta funcionalidade.
+                    </p>
+                  </div>
+                </div>
+              </div>
               <div><Label className="text-[12px] font-medium">Nome da Sessão *</Label><Input value={sessionName} onChange={(e) => setSessionName(e.target.value)} placeholder="Ex: principal" className="mt-1.5 h-10 rounded-xl" /></div>
-              <Button className="w-full h-11 rounded-xl text-[14px] font-semibold shadow-sm bg-emerald-600 hover:bg-emerald-700 text-white transition-colors" disabled={!sessionName || connect.isPending} onClick={() => { connect.mutate({ sessionId: sessionName }); setSelectedSession(sessionName); }}>
+              <Button className="w-full h-11 rounded-xl text-[14px] font-semibold shadow-sm bg-emerald-600 hover:bg-emerald-700 text-white transition-colors" disabled={!sessionName || connect.isPending} onClick={() => { connect.mutate({ sessionId: sessionName }); setSelectedSession(sessionName); setShowDisclaimer(true); }}>
                 {connect.isPending ? "Conectando..." : "Conectar"}
               </Button>
             </div>
@@ -82,6 +99,16 @@ export default function WhatsApp() {
         </TabsList>
 
         <TabsContent value="sessions" className="space-y-4">
+          {/* Alerta permanente de API não oficial */}
+          <div className="rounded-xl border border-amber-200/60 bg-amber-50/50 p-3.5">
+            <div className="flex gap-2.5 items-start">
+              <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
+              <p className="text-[12px] text-amber-700 leading-relaxed">
+                <strong>Aviso:</strong> O WhatsApp integrado ao ENTUR OS utiliza uma API não oficial. Eventuais bloqueios ou restrições impostos pelo WhatsApp/Meta não são de responsabilidade do ENTUR OS. Use com moderação para evitar detecção.
+              </p>
+            </div>
+          </div>
+
           {/* QR Code */}
           {qrCode && (
             <Card className="border border-border/40 shadow-none rounded-xl overflow-hidden">
