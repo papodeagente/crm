@@ -225,6 +225,13 @@
       "when": 1773146536095,
       "tag": "0031_yellow_speedball",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "5",
+      "when": 1773149188631,
+      "tag": "0032_fuzzy_the_twelve",
+      "breakpoints": true
     }
   ]
 }

@@ -2103,3 +2103,42 @@
 
 ### Testes
 - [x] 21 testes unitários passando (profile.test.ts)
+
+## Fluxo Completo Google Calendar OAuth2 + Sincronização
+### Backend — Autenticação via MCP (substituiu OAuth2 direto)
+- [x] Integração via MCP google-calendar (autenticação automática)
+- [x] Verificação de conectividade com Google Calendar via MCP
+- [x] Salvar registro de conexão na tabela google_calendar_tokens
+- [x] Endpoint para desconectar (desativar conexão)
+
+### Backend — Google Calendar API (via MCP)
+- [x] Helper para criar evento no Google Calendar a partir de uma task (createCalendarEvent)
+- [x] Helper para atualizar evento existente (updateCalendarEvent)
+- [x] Helper para deletar evento (deleteCalendarEvent)
+- [x] Helper para listar/buscar eventos do calendário (searchCalendarEvents)
+- [x] Helper para obter evento específico (getCalendarEvent)
+- [x] Conversão automática task → evento com prioridade, descrição CRM, lembretes
+
+### Backend — Sincronização Task ↔ Evento
+- [x] Ao criar task com data, criar evento no Google Calendar automaticamente (fire-and-forget)
+- [x] Ao editar task, atualizar evento correspondente no Google Calendar
+- [x] Ao completar/cancelar task, marcar evento com emoji de status
+- [x] Armazenar googleEventId e googleCalendarSynced na task para rastreamento
+- [x] Procedure para sync manual individual (syncTaskToCalendar)
+- [x] Procedure para sync em massa (syncAllTasksToCalendar)
+- [x] Procedure para remover task do calendário (removeTaskFromCalendar)
+- [x] Procedure para importar eventos do calendário como tasks (importCalendarEventsAsTasks)
+
+### Frontend — Perfil
+- [x] Botão "Conectar Google Calendar" com verificação MCP
+- [x] Exibir status da conexão (conectado/desconectado com mensagem)
+- [x] Botão "Desconectar" para revogar acesso
+- [x] Botão "Sincronizar Tarefas Pendentes" para forçar sync em massa
+- [x] Resultado da sincronização exibido com contadores
+- [x] Seção "Como funciona" explicando a sincronização automática
+
+### Testes
+- [x] 36 testes para Google Calendar (MCP helper, conversão task→evento, sync logic, procedures)
+- [x] Testes para criação, atualização, deleção de eventos via MCP
+- [x] Testes para bulk sync e verificação de disponibilidade
+- [x] Testes para auto-sync hooks no CRM router

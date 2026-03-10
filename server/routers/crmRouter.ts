@@ -792,6 +792,38 @@ export const crmRouter = router({
             await crm.addTaskAssignee(result.id, userId, input.tenantId);
           }
         }
+        // Auto-sync to Google Calendar (fire-and-forget)
+        if (result?.id && taskInput.dueAt) {
+          import("../googleCalendarSync").then(async ({ syncTaskToCalendar }) => {
+            try {
+              const syncResult = await syncTaskToCalendar({
+                id: result.id!,
+                title: input.title,
+                description: input.description,
+                dueAt: taskInput.dueAt,
+                priority: input.priority,
+                status: markAsDone ? "done" : "pending",
+                entityType: input.entityType,
+                entityId: input.entityId,
+              });
+              if (syncResult.synced && syncResult.eventId) {
+                const { getDb } = await import("../db");
+                const { tasks } = await import("../../drizzle/schema");
+                const { eq } = await import("drizzle-orm");
+                const db = await getDb();
+                if (db) {
+                  await db.update(tasks).set({
+                    googleEventId: syncResult.eventId,
+                    googleCalendarSynced: true,
+                  }).where(eq(tasks.id, result.id!));
+                }
+                console.log(`[GCal AutoSync] Task ${result.id} synced, eventId: ${syncResult.eventId}`);
+              }
+            } catch (e) {
+              console.error(`[GCal AutoSync] Failed for task ${result?.id}:`, e);
+            }
+          });
+        }
         // In-app notification
         await createNotification(input.tenantId, {
           type: "task_created",
@@ -814,6 +846,46 @@ export const crmRouter = router({
       .mutation(async ({ input }) => {
         const { tenantId, id, dueAt, ...data } = input;
         await crm.updateTask(tenantId, id, { ...data, dueAt: dueAt ? new Date(dueAt) : undefined });
+
+        // Auto-sync to Google Calendar (fire-and-forget)
+        import("../googleCalendarSync").then(async (gcSync) => {
+          try {
+            const { getDb } = await import("../db");
+            const { tasks } = await import("../../drizzle/schema");
+            const { eq, and } = await import("drizzle-orm");
+            const db = await getDb();
+            if (!db) return;
+            const [task] = await db.select().from(tasks)
+              .where(and(eq(tasks.id, id), eq(tasks.tenantId, tenantId)))
+              .limit(1);
+            if (!task) return;
+
+            // If task is done/cancelled, mark in calendar
+            if (input.status === "done" || input.status === "cancelled") {
+              await gcSync.markTaskCompletedInCalendar({
+                id: task.id,
+                title: task.title,
+                googleEventId: task.googleEventId,
+                status: input.status,
+              });
+            } else if (task.googleEventId) {
+              // Update existing event
+              await gcSync.syncTaskToCalendar(task);
+            } else if (task.dueAt) {
+              // Create new event for task that now has a due date
+              const result = await gcSync.syncTaskToCalendar(task);
+              if (result.synced && result.eventId) {
+                await db.update(tasks).set({
+                  googleEventId: result.eventId,
+                  googleCalendarSynced: true,
+                }).where(eq(tasks.id, id));
+              }
+            }
+          } catch (e) {
+            console.error(`[GCal AutoSync] Failed for task update ${id}:`, e);
+          }
+        });
+
         return { success: true };
       }),
     addAssignee: protectedProcedure

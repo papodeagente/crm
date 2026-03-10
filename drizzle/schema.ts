@@ -609,6 +609,8 @@ export const tasks = mysqlTable("crm_tasks", {
   assignedToUserId: int("assignedToUserId"),
   createdByUserId: int("createdByUserId"),
   description: text("description"),
+  googleEventId: varchar("googleEventId", { length: 512 }),
+  googleCalendarSynced: boolean("googleCalendarSynced").default(false),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 }, (t) => [index("tasks_tenant_idx").on(t.tenantId)]);

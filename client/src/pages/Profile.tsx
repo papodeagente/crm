@@ -23,6 +23,12 @@ import {
   EyeOff,
   ExternalLink,
   Unlink,
+  RefreshCw,
+  CloudUpload,
+  CloudDownload,
+  CalendarCheck,
+  CalendarX,
+  Zap,
 } from "lucide-react";
 
 export default function Profile() {
@@ -123,10 +129,10 @@ export default function Profile() {
   // ─── Google Calendar ───
   const connectGCal = trpc.profile.connectGoogleCalendar.useMutation({
     onSuccess: () => {
-      toast.success("Google Calendar conectado.");
+      toast.success("Google Calendar conectado com sucesso!");
       refetch();
     },
-    onError: (err) => toast.error(`Erro: ${err.message}`),
+    onError: (err) => toast.error(`Erro ao conectar: ${err.message}`),
   });
 
   const disconnectGCal = trpc.profile.disconnectGoogleCalendar.useMutation({
@@ -137,18 +143,21 @@ export default function Profile() {
     onError: (err) => toast.error(`Erro: ${err.message}`),
   });
 
+  const syncAllTasks = trpc.profile.syncAllTasksToCalendar.useMutation({
+    onSuccess: (data) => {
+      toast.success(data.message);
+      refetch();
+    },
+    onError: (err) => toast.error(`Erro ao sincronizar: ${err.message}`),
+  });
+
   const handleConnectGoogleCalendar = useCallback(() => {
-    // Google OAuth2 flow — redirect to Google consent screen
-    const clientId = (window as any).__GOOGLE_CALENDAR_CLIENT_ID;
-    if (!clientId) {
-      toast.error("O Google Calendar Client ID não está configurado. Entre em contato com o administrador.");
-      return;
-    }
-    const redirectUri = `${window.location.origin}/api/google-calendar/callback`;
-    const scope = "https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/calendar.events";
-    const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scope)}&access_type=offline&prompt=consent`;
-    window.location.href = url;
-  }, [toast]);
+    connectGCal.mutate({});
+  }, [connectGCal]);
+
+  const handleSyncAllTasks = useCallback(() => {
+    syncAllTasks.mutate();
+  }, [syncAllTasks]);
 
   // ─── Loading ───
   if (isLoading) {
@@ -289,7 +298,7 @@ export default function Profile() {
             {isEditingProfile ? (
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="edit-name">Nome completo</Label>
+                  <Label htmlFor="edit-name">Nome</Label>
                   <Input
                     id="edit-name"
                     value={editName}
@@ -303,21 +312,13 @@ export default function Profile() {
                     id="edit-phone"
                     value={editPhone}
                     onChange={(e) => setEditPhone(e.target.value)}
-                    placeholder="(00) 00000-0000"
+                    placeholder="(11) 99999-9999"
                   />
-                </div>
-                <div className="space-y-2">
-                  <Label>Email</Label>
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 rounded-md px-3 py-2">
-                    <Mail className="h-4 w-4" />
-                    {profile.email}
-                    <Badge variant="outline" className="ml-auto text-xs">Não editável</Badge>
-                  </div>
                 </div>
                 <div className="flex gap-2 pt-2">
                   <Button
-                    onClick={() => updateProfile.mutate({ name: editName, phone: editPhone || undefined })}
-                    disabled={updateProfile.isPending || editName.length < 2}
+                    onClick={() => updateProfile.mutate({ name: editName, phone: editPhone })}
+                    disabled={updateProfile.isPending || !editName.trim()}
                     size="sm"
                   >
                     {updateProfile.isPending ? (
@@ -333,34 +334,38 @@ export default function Profile() {
                 </div>
               </div>
             ) : (
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-3">
+                <div className="flex items-center gap-3">
+                  <User className="h-4 w-4 text-muted-foreground" />
                   <div>
-                    <p className="text-xs text-muted-foreground mb-1">Nome</p>
+                    <p className="text-sm text-muted-foreground">Nome</p>
                     <p className="font-medium">{profile.name}</p>
                   </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <Mail className="h-4 w-4 text-muted-foreground" />
                   <div>
-                    <p className="text-xs text-muted-foreground mb-1">Email</p>
-                    <p className="font-medium flex items-center gap-1.5">
-                      <Mail className="h-3.5 w-3.5 text-muted-foreground" />
-                      {profile.email}
-                    </p>
+                    <p className="text-sm text-muted-foreground">E-mail</p>
+                    <p className="font-medium">{profile.email}</p>
                   </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground mb-1">Telefone</p>
-                    <p className="font-medium">{profile.phone || "Não informado"}</p>
+                </div>
+                {profile.phone && (
+                  <div className="flex items-center gap-3">
+                    <Shield className="h-4 w-4 text-muted-foreground" />
+                    <div>
+                      <p className="text-sm text-muted-foreground">Telefone</p>
+                      <p className="font-medium">{profile.phone}</p>
+                    </div>
                   </div>
+                )}
+                <div className="flex items-center gap-3">
+                  <Shield className="h-4 w-4 text-muted-foreground" />
                   <div>
-                    <p className="text-xs text-muted-foreground mb-1">Permissão</p>
-                    <Badge variant={profile.role === "admin" ? "default" : "secondary"} className="text-xs">
-                      <Shield className="h-3 w-3 mr-1" />
+                    <p className="text-sm text-muted-foreground">Função</p>
+                    <Badge variant={profile.role === "admin" ? "default" : "secondary"}>
                       {profile.role === "admin" ? "Administrador" : "Usuário"}
                     </Badge>
                   </div>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground mb-1">Membro desde</p>
-                  <p className="text-sm">{profile.createdAt ? new Date(profile.createdAt).toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" }) : "—"}</p>
                 </div>
               </div>
             )}
@@ -374,9 +379,9 @@ export default function Profile() {
               <div>
                 <CardTitle className="flex items-center gap-2 text-lg">
                   <Lock className="h-5 w-5 text-primary" />
-                  Senha de Acesso
+                  Segurança
                 </CardTitle>
-                <CardDescription>Altere sua senha de login</CardDescription>
+                <CardDescription>Gerencie sua senha de acesso</CardDescription>
               </div>
               {!showPasswordForm && (
                 <Button variant="outline" size="sm" onClick={() => setShowPasswordForm(true)}>
@@ -478,20 +483,24 @@ export default function Profile() {
               Google Calendar
             </CardTitle>
             <CardDescription>
-              Conecte sua conta do Google para sincronizar eventos e compromissos com o CRM
+              Sincronize suas tarefas do CRM com o Google Calendar automaticamente
             </CardDescription>
           </CardHeader>
           <CardContent>
             {profile.googleCalendar.connected ? (
-              <div className="space-y-4">
-                <div className="flex items-center gap-3 p-3 bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-lg">
-                  <div className="h-10 w-10 rounded-full bg-green-100 dark:bg-green-900 flex items-center justify-center">
-                    <Check className="h-5 w-5 text-green-600 dark:text-green-400" />
+              <div className="space-y-5">
+                {/* Connected Status */}
+                <div className="flex items-center gap-3 p-4 bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-lg">
+                  <div className="h-10 w-10 rounded-full bg-green-100 dark:bg-green-900 flex items-center justify-center shrink-0">
+                    <CalendarCheck className="h-5 w-5 text-green-600 dark:text-green-400" />
                   </div>
-                  <div className="flex-1">
-                    <p className="font-medium text-green-800 dark:text-green-200">Conectado</p>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-green-800 dark:text-green-200">Google Calendar Conectado</p>
+                    <p className="text-sm text-green-600 dark:text-green-400">
+                      {profile.googleCalendar.message}
+                    </p>
                     {profile.googleCalendar.email && (
-                      <p className="text-sm text-green-600 dark:text-green-400">{profile.googleCalendar.email}</p>
+                      <p className="text-xs text-green-500 dark:text-green-500 mt-0.5">{profile.googleCalendar.email}</p>
                     )}
                   </div>
                   <Button
@@ -499,7 +508,7 @@ export default function Profile() {
                     size="sm"
                     onClick={() => disconnectGCal.mutate()}
                     disabled={disconnectGCal.isPending}
-                    className="text-destructive hover:text-destructive"
+                    className="text-destructive hover:text-destructive shrink-0"
                   >
                     {disconnectGCal.isPending ? (
                       <Loader2 className="h-4 w-4 animate-spin mr-2" />
@@ -509,30 +518,115 @@ export default function Profile() {
                     Desconectar
                   </Button>
                 </div>
+
+                {/* Sync Actions */}
+                <div className="space-y-3">
+                  <h4 className="text-sm font-medium text-foreground">Sincronização</h4>
+
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <Button
+                      variant="outline"
+                      onClick={handleSyncAllTasks}
+                      disabled={syncAllTasks.isPending}
+                      className="flex-1"
+                    >
+                      {syncAllTasks.isPending ? (
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      ) : (
+                        <CloudUpload className="h-4 w-4 mr-2" />
+                      )}
+                      Sincronizar Tarefas Pendentes
+                    </Button>
+                  </div>
+
+                  {syncAllTasks.data && (
+                    <div className="p-3 bg-muted/50 rounded-lg text-sm">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Zap className="h-4 w-4 text-primary" />
+                        <span className="font-medium">Resultado da sincronização</span>
+                      </div>
+                      <p className="text-muted-foreground">{syncAllTasks.data.message}</p>
+                      {syncAllTasks.data.synced > 0 && (
+                        <p className="text-xs text-green-600 mt-1">
+                          {syncAllTasks.data.synced} tarefa(s) enviada(s) para o Google Calendar
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* How it works */}
+                <div className="space-y-2 pt-2">
+                  <h4 className="text-sm font-medium text-foreground">Como funciona</h4>
+                  <div className="grid gap-2 text-sm text-muted-foreground">
+                    <div className="flex items-start gap-2">
+                      <CalendarCheck className="h-4 w-4 mt-0.5 text-green-500 shrink-0" />
+                      <span>Tarefas com data de vencimento são automaticamente criadas como eventos no Google Calendar</span>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <RefreshCw className="h-4 w-4 mt-0.5 text-blue-500 shrink-0" />
+                      <span>Ao editar uma tarefa, o evento correspondente é atualizado automaticamente</span>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <CalendarX className="h-4 w-4 mt-0.5 text-orange-500 shrink-0" />
+                      <span>Ao concluir ou cancelar uma tarefa, o evento é marcado no calendário</span>
+                    </div>
+                  </div>
+                </div>
+
                 {profile.googleCalendar.connectedAt && (
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-xs text-muted-foreground pt-2">
                     Conectado em {new Date(profile.googleCalendar.connectedAt).toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" })}
                   </p>
                 )}
               </div>
             ) : (
               <div className="space-y-4">
-                <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
-                  <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center">
-                    <Calendar className="h-5 w-5 text-muted-foreground" />
+                {/* MCP Available but not connected */}
+                {profile.googleCalendar.mcpAvailable ? (
+                  <>
+                    <div className="flex items-center gap-3 p-4 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg">
+                      <div className="h-10 w-10 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
+                        <Calendar className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="font-medium text-blue-800 dark:text-blue-200">Pronto para conectar</p>
+                        <p className="text-sm text-blue-600 dark:text-blue-400">
+                          O Google Calendar está disponível e pronto para sincronização
+                        </p>
+                      </div>
+                    </div>
+                    <Button
+                      onClick={handleConnectGoogleCalendar}
+                      disabled={connectGCal.isPending}
+                      className="w-full sm:w-auto"
+                    >
+                      {connectGCal.isPending ? (
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      ) : (
+                        <ExternalLink className="h-4 w-4 mr-2" />
+                      )}
+                      Conectar Google Calendar
+                    </Button>
+                  </>
+                ) : (
+                  <div className="flex items-center gap-3 p-4 bg-muted/50 rounded-lg">
+                    <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center">
+                      <Calendar className="h-5 w-5 text-muted-foreground" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-medium">Não disponível</p>
+                      <p className="text-sm text-muted-foreground">
+                        A integração com o Google Calendar não está configurada no momento.
+                        Verifique as configurações do sistema.
+                      </p>
+                    </div>
                   </div>
-                  <div className="flex-1">
-                    <p className="font-medium">Não conectado</p>
-                    <p className="text-sm text-muted-foreground">Conecte para ver seus compromissos no CRM</p>
-                  </div>
-                </div>
-                <Button onClick={handleConnectGoogleCalendar} className="w-full sm:w-auto">
-                  <ExternalLink className="h-4 w-4 mr-2" />
-                  Conectar Google Calendar
-                </Button>
+                )}
+
                 <p className="text-xs text-muted-foreground">
-                  Ao conectar, você autoriza o acesso somente leitura aos seus eventos do Google Calendar.
-                  Você pode desconectar a qualquer momento.
+                  Ao conectar, suas tarefas com data de vencimento serão sincronizadas automaticamente
+                  com o Google Calendar. Você pode desconectar a qualquer momento.
                 </p>
               </div>
             )}
