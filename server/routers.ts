@@ -94,6 +94,7 @@ import { aiAnalysisRouter } from "./routers/aiAnalysisRouter";
 import { utmAnalyticsRouter } from "./routers/utmAnalyticsRouter";
 import { rdCrmImportRouter } from "./routers/rdCrmImportRouter";
 import { saasAuthRouter } from "./routers/saasAuthRouter";
+import { inviteUserToTenant } from "./saasAuth";
 import { rfvRouter } from "./routers/rfvRouter";
 import { profileRouter } from "./routers/profileRouter";
 import {
@@ -679,7 +680,7 @@ export const appRouter = router({
           throw new TRPCError({ code: "FORBIDDEN", message: "Apenas administradores podem convidar agentes" });
         }
         try {
-          const { inviteUserToTenant } = await import("../saasAuth");
+          // inviteUserToTenant imported statically at top of file
           const result = await inviteUserToTenant({
             tenantId: input.tenantId,
             name: input.name,

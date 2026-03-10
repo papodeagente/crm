@@ -3,6 +3,7 @@ import { protectedProcedure, router } from "../_core/trpc";
 import { TRPCError } from "@trpc/server";
 import * as crm from "../crmDb";
 import { emitEvent } from "../middleware/eventLog";
+import { inviteUserToTenant } from "../saasAuth";
 
 export const adminRouter = router({
   // ─── TENANTS ───
@@ -39,7 +40,7 @@ export const adminRouter = router({
         }
         // Use inviteUserToTenant to create user + send invite email
         try {
-          const { inviteUserToTenant } = await import("../saasAuth");
+          // inviteUserToTenant imported statically at top of file
           const result = await inviteUserToTenant({
             tenantId: input.tenantId,
             name: input.name,

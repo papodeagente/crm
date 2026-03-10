@@ -16,6 +16,9 @@ import {
   deleteTenantCompletely,
   SAAS_COOKIE,
   SESSION_DURATION_MS,
+  requestPasswordReset,
+  resetPasswordWithToken,
+  inviteUserToTenant,
 } from "../saasAuth";
 import { getSessionCookieOptions } from "../_core/cookies";
 
@@ -156,7 +159,7 @@ export const saasAuthRouter = router({
     }))
     .mutation(async ({ input }) => {
       try {
-        const { requestPasswordReset } = await import("../saasAuth");
+        // requestPasswordReset imported statically at top
         await requestPasswordReset(input.email, input.origin);
       } catch (e) {
         // Always return success to prevent email enumeration
@@ -172,7 +175,7 @@ export const saasAuthRouter = router({
       newPassword: z.string().min(6, "Senha deve ter pelo menos 6 caracteres"),
     }))
     .mutation(async ({ input }) => {
-      const { resetPasswordWithToken } = await import("../saasAuth");
+      // resetPasswordWithToken imported statically at top
       const result = await resetPasswordWithToken(input.token, input.newPassword);
       if (!result.success) {
         throw new TRPCError({ code: "BAD_REQUEST", message: result.error || "Token inválido ou expirado" });
@@ -201,7 +204,7 @@ export const saasAuthRouter = router({
       if (session.role !== "admin" && !isSuperAdmin(session.email)) {
         throw new TRPCError({ code: "FORBIDDEN", message: "Apenas administradores podem convidar usuários" });
       }
-      const { inviteUserToTenant } = await import("../saasAuth");
+      // inviteUserToTenant imported statically at top
       const result = await inviteUserToTenant({
         tenantId: input.tenantId,
         name: input.name,

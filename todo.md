@@ -2181,3 +2181,6 @@
 - [x] Combinar funcionalidades de UsersTab (criar usuário, alterar permissão) na AgentsTab (já existiam no AgentsTab via inviteAgent e updateRole)
 - [x] Remover aba "Usuários" e UsersTab component (removido ~210 linhas)
 - [x] Manter apenas 3 abas: Agentes, Equipes, Distribuição
+
+## Bug Fix — Cannot find module saasAuth
+- [x] Corrigir erro "Cannot find module '/usr/src/app/saasAuth'" ao adicionar usuário em produção (convertido 5 dynamic imports para static imports em adminRouter, saasAuthRouter e routers.ts)
