@@ -31,8 +31,12 @@ export const adminRouter = router({
         return crm.listCrmUsers(input.tenantId);
       }),
     create: protectedProcedure
-      .input(z.object({ tenantId: z.number(), name: z.string().min(1), email: z.string().email(), phone: z.string().optional(), origin: z.string().optional() }))
+      .input(z.object({ tenantId: z.number(), name: z.string().min(1), email: z.string().email(), phone: z.string().optional(), role: z.enum(["admin", "user"]).default("user"), origin: z.string().optional() }))
       .mutation(async ({ ctx, input }) => {
+        // Only admins can create users
+        if (ctx.saasUser?.role !== "admin") {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Apenas administradores podem adicionar usuários" });
+        }
         // Use inviteUserToTenant to create user + send invite email
         try {
           const { inviteUserToTenant } = await import("../saasAuth");
@@ -41,6 +45,7 @@ export const adminRouter = router({
             name: input.name,
             email: input.email,
             phone: input.phone,
+            role: input.role,
             inviterName: ctx.user.name || "Administrador",
             origin: input.origin || "https://crm.acelerador.tur.br",
           });
@@ -48,7 +53,7 @@ export const adminRouter = router({
           return { id: result.userId };
         } catch (error: any) {
           if (error.message === "EMAIL_EXISTS_IN_TENANT") {
-            throw new TRPCError({ code: "CONFLICT", message: "Este email j\u00e1 est\u00e1 cadastrado neste tenant" });
+            throw new TRPCError({ code: "CONFLICT", message: "Este email já está cadastrado neste tenant" });
           }
           // Fallback: create without email if email service fails
           const result = await crm.createCrmUser({ ...input, createdBy: ctx.user.id });
@@ -62,10 +67,25 @@ export const adminRouter = router({
         return crm.getCrmUserById(input.tenantId, input.id);
       }),
     update: protectedProcedure
-      .input(z.object({ tenantId: z.number(), id: z.number(), name: z.string().optional(), email: z.string().email().optional(), phone: z.string().optional(), status: z.enum(["active", "inactive", "invited"]).optional() }))
+      .input(z.object({ tenantId: z.number(), id: z.number(), name: z.string().optional(), email: z.string().email().optional(), phone: z.string().optional(), role: z.enum(["admin", "user"]).optional(), status: z.enum(["active", "inactive", "invited"]).optional() }))
       .mutation(async ({ ctx, input }) => {
-        const { tenantId, id, ...data } = input;
+        // Only admins can update users
+        if (ctx.saasUser?.role !== "admin") {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Apenas administradores podem editar usuários" });
+        }
+        const { tenantId, id, role, ...data } = input;
+        // Update user fields
         await crm.updateCrmUser(tenantId, id, { ...data, updatedBy: ctx.user.id });
+        // Update role if provided (via direct SQL since crmDb may not support it)
+        if (role) {
+          const { getDb } = await import("../db");
+          const { crmUsers } = await import("../../drizzle/schema");
+          const { eq, and } = await import("drizzle-orm");
+          const db = await getDb();
+          if (db) {
+            await db.update(crmUsers).set({ role }).where(and(eq(crmUsers.id, id), eq(crmUsers.tenantId, tenantId)));
+          }
+        }
         await emitEvent({ tenantId, actorUserId: ctx.user.id, entityType: "crm_user", entityId: id, action: "update" });
         return { success: true };
       }),

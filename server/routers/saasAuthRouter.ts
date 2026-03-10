@@ -171,15 +171,19 @@ export const saasAuthRouter = router({
       name: z.string().min(1),
       email: z.string().email(),
       phone: z.string().optional(),
+      role: z.enum(["admin", "user"]).default("user"),
       origin: z.string(),
     }))
     .mutation(async ({ ctx, input }) => {
-      // Verify caller is authenticated
+      // Verify caller is authenticated and is admin
       const cookies = parseCookies(ctx.req.headers.cookie);
       const token = cookies.get(SAAS_COOKIE);
       const session = await verifySaasSession(token);
       if (!session) {
         throw new TRPCError({ code: "UNAUTHORIZED", message: "Não autenticado" });
+      }
+      if (session.role !== "admin" && !isSuperAdmin(session.email)) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Apenas administradores podem convidar usuários" });
       }
       const { inviteUserToTenant } = await import("../saasAuth");
       const result = await inviteUserToTenant({
@@ -187,6 +191,7 @@ export const saasAuthRouter = router({
         name: input.name,
         email: input.email,
         phone: input.phone,
+        role: input.role,
         inviterName: session.name,
         origin: input.origin,
       });

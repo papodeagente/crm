@@ -1,0 +1,1 @@
+ALTER TABLE `crm_users` ADD `crm_user_role` enum('admin','user') DEFAULT 'user' NOT NULL;

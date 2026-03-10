@@ -141,13 +141,14 @@ export async function getContactById(tenantId: number, id: number) {
   const rows = await db.select().from(contacts).where(and(eq(contacts.id, id), eq(contacts.tenantId, tenantId))).limit(1);
   return rows[0] || null;
 }
-export async function listContacts(tenantId: number, opts?: { search?: string; stage?: string; limit?: number; offset?: number; includeDeleted?: boolean; dateFrom?: string; dateTo?: string }) {
+export async function listContacts(tenantId: number, opts?: { search?: string; stage?: string; limit?: number; offset?: number; includeDeleted?: boolean; dateFrom?: string; dateTo?: string; ownerUserId?: number }) {
   const db = await getDb(); if (!db) return [];
   const conditions: any[] = [eq(contacts.tenantId, tenantId)];
   if (!opts?.includeDeleted) conditions.push(isNull(contacts.deletedAt));
   if (opts?.search) conditions.push(like(contacts.name, `%${opts.search}%`));
   if (opts?.dateFrom) conditions.push(gte(contacts.createdAt, new Date(opts.dateFrom + "T00:00:00")));
   if (opts?.dateTo) conditions.push(lte(contacts.createdAt, new Date(opts.dateTo + "T23:59:59")));
+  if (opts?.ownerUserId) conditions.push(eq(contacts.ownerUserId, opts.ownerUserId));
   return db.select().from(contacts).where(and(...conditions)).orderBy(desc(contacts.updatedAt)).limit(opts?.limit || 50).offset(opts?.offset || 0);
 }
 export async function updateContact(tenantId: number, id: number, data: Partial<{ name: string; email: string; phone: string; lifecycleStage: "lead" | "prospect" | "customer" | "churned"; notes: string; ownerUserId: number; updatedBy: number }>) {
@@ -341,9 +342,11 @@ export async function sumDealValue(tenantId: number, status?: string) {
 // ═══════════════════════════════════════
 // ACCOUNTS
 // ═══════════════════════════════════════
-export async function listAccounts(tenantId: number) {
+export async function listAccounts(tenantId: number, opts?: { ownerUserId?: number }) {
   const db = await getDb(); if (!db) return [];
-  return db.select().from(accounts).where(eq(accounts.tenantId, tenantId)).orderBy(desc(accounts.createdAt));
+  const conditions: any[] = [eq(accounts.tenantId, tenantId)];
+  if (opts?.ownerUserId) conditions.push(eq(accounts.ownerUserId, opts.ownerUserId));
+  return db.select().from(accounts).where(and(...conditions)).orderBy(desc(accounts.createdAt));
 }
 export async function getAccountById(tenantId: number, id: number) {
   const db = await getDb(); if (!db) return null;
@@ -467,7 +470,7 @@ export async function createTask(data: { tenantId: number; entityType: string; e
   return result;
 }
 
-export async function listTasks(tenantId: number, opts?: { entityType?: string; entityId?: number; status?: string; taskType?: string; assigneeUserId?: number; dateFrom?: string; dateTo?: string; limit?: number; offset?: number }) {
+export async function listTasks(tenantId: number, opts?: { entityType?: string; entityId?: number; status?: string; taskType?: string; assigneeUserId?: number; dateFrom?: string; dateTo?: string; limit?: number; offset?: number; createdByUserId?: number }) {
   const db = await getDb(); if (!db) return { tasks: [], total: 0 };
   const conditions: any[] = [eq(tasks.tenantId, tenantId)];
   if (opts?.entityType) conditions.push(eq(tasks.entityType, opts.entityType));
@@ -487,6 +490,10 @@ export async function listTasks(tenantId: number, opts?: { entityType?: string; 
   if (opts?.assigneeUserId) {
     conditions.push(sql`${tasks.id} IN (SELECT taskId FROM task_assignees WHERE userId = ${opts.assigneeUserId})`);
   }
+  // If filtering by creator (for non-admin users: see own tasks + tasks assigned to them)
+  if (opts?.createdByUserId) {
+    conditions.push(sql`(${tasks.createdByUserId} = ${opts.createdByUserId} OR ${tasks.assignedToUserId} = ${opts.createdByUserId} OR ${tasks.id} IN (SELECT taskId FROM task_assignees WHERE userId = ${opts.createdByUserId}))`);
+  }
   
   const whereClause = and(...conditions);
   const [countResult] = await db.select({ count: sql<number>`COUNT(*)` }).from(tasks).where(whereClause);
@@ -499,7 +506,7 @@ export async function listTasks(tenantId: number, opts?: { entityType?: string; 
   return { tasks: taskList, total };
 }
 
-export async function listTasksEnriched(tenantId: number, opts?: { entityType?: string; entityId?: number; status?: string; taskType?: string; assigneeUserId?: number; dateFrom?: string; dateTo?: string; limit?: number; offset?: number }) {
+export async function listTasksEnriched(tenantId: number, opts?: { entityType?: string; entityId?: number; status?: string; taskType?: string; assigneeUserId?: number; dateFrom?: string; dateTo?: string; limit?: number; offset?: number; createdByUserId?: number }) {
   const result = await listTasks(tenantId, opts);
   if (!result.tasks.length) return { tasks: [], total: result.total };
   

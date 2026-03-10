@@ -672,8 +672,34 @@ export const appRouter = router({
         userId: z.number(),
         status: z.enum(["active", "inactive", "invited"]),
       }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ ctx, input }) => {
+        // Only admins can update agent status
+        if (ctx.saasUser?.role !== "admin") {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Apenas administradores podem alterar status de agentes" });
+        }
         await updateAgentStatus(input.tenantId, input.userId, input.status);
+        return { success: true };
+      }),
+    updateAgentRole: protectedProcedure
+      .input(z.object({
+        tenantId: z.number(),
+        userId: z.number(),
+        role: z.enum(["admin", "user"]),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        // Only admins can change roles
+        if (ctx.saasUser?.role !== "admin") {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Apenas administradores podem alterar permissões" });
+        }
+        // Cannot change own role
+        if (ctx.saasUser?.userId === input.userId) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Você não pode alterar sua própria permissão" });
+        }
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        const { crmUsers: crmUsersTable } = await import("../drizzle/schema");
+        const { eq: eqOp, and: andOp } = await import("drizzle-orm");
+        await db.update(crmUsersTable).set({ role: input.role }).where(andOp(eqOp(crmUsersTable.id, input.userId), eqOp(crmUsersTable.tenantId, input.tenantId)));
         return { success: true };
       }),
     // ── Distribution Rules ──

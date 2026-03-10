@@ -69,6 +69,7 @@ interface Agent {
   phone: string | null;
   avatarUrl: string | null;
   status: string;
+  role: string;
   lastLoginAt: number | null;
   createdAt: number;
   openAssignments: number;
@@ -155,6 +156,12 @@ function AgentsTab() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const utils = trpc.useUtils();
 
+  // Current user info to check if admin
+  const saasMe = trpc.saasAuth.me.useQuery(undefined, { retry: false, refetchOnWindowFocus: false });
+  const currentUserRole = saasMe.data?.role || "user";
+  const currentUserId = saasMe.data?.userId;
+  const isCurrentAdmin = currentUserRole === "admin";
+
   const { data: agents = [], isLoading } = trpc.teamManagement.listAgents.useQuery({ tenantId: TENANT_ID });
 
   const updateStatus = trpc.teamManagement.updateAgentStatus.useMutation({
@@ -162,7 +169,15 @@ function AgentsTab() {
       utils.teamManagement.listAgents.invalidate();
       toast.success("Status do agente atualizado");
     },
-    onError: () => toast.error("Erro ao atualizar status"),
+    onError: (err) => toast.error(err.message || "Erro ao atualizar status"),
+  });
+
+  const updateRole = trpc.teamManagement.updateAgentRole.useMutation({
+    onSuccess: () => {
+      utils.teamManagement.listAgents.invalidate();
+      toast.success("Permissão atualizada com sucesso");
+    },
+    onError: (err) => toast.error(err.message || "Erro ao atualizar permissão"),
   });
 
   const filtered = useMemo(() => {
@@ -183,6 +198,11 @@ function AgentsTab() {
     inactive: (agents as Agent[]).filter(a => a.status === "inactive").length,
     invited: (agents as Agent[]).filter(a => a.status === "invited").length,
   }), [agents]);
+
+  const roleLabels: Record<string, { label: string; color: string; bg: string }> = {
+    admin: { label: "Administrador", color: "text-amber-500", bg: "bg-amber-500/10 border-amber-500/30" },
+    user: { label: "Usuário", color: "text-blue-400", bg: "bg-blue-500/10 border-blue-500/30" },
+  };
 
   return (
     <div className="space-y-6">
@@ -255,6 +275,8 @@ function AgentsTab() {
         <div className="space-y-2">
           {filtered.map(agent => {
             const st = statusLabels[agent.status] || statusLabels.inactive;
+            const rl = roleLabels[agent.role] || roleLabels.user;
+            const isSelf = agent.id === currentUserId;
             return (
               <div key={agent.id} className="surface p-4 hover:bg-accent/5 transition-colors">
                 <div className="flex items-center gap-4">
@@ -266,9 +288,15 @@ function AgentsTab() {
 
                   {/* Info */}
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <p className="text-[14px] font-semibold text-foreground truncate">{agent.name}</p>
+                      {isSelf && <Badge variant="outline" className="text-[10px] px-1.5 py-0 shrink-0 border-emerald-500/30 text-emerald-500">Você</Badge>}
                       <Badge variant="outline" className="text-[10px] px-1.5 py-0 shrink-0">{st.label}</Badge>
+                      {agent.role === "admin" && (
+                        <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full font-medium border border-amber-500/30 bg-amber-500/10 text-amber-500">
+                          <Crown className="h-3 w-3" /> Admin
+                        </span>
+                      )}
                     </div>
                     <p className="text-[12px] text-muted-foreground truncate">{agent.email}</p>
                     {agent.teams.length > 0 && (
@@ -303,26 +331,45 @@ function AgentsTab() {
                     )}
                   </div>
 
-                  {/* Actions */}
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      {agent.status !== "active" && (
-                        <DropdownMenuItem onClick={() => updateStatus.mutate({ tenantId: TENANT_ID, userId: agent.id, status: "active" })}>
-                          <UserCheck className="h-4 w-4 mr-2" /> Ativar
-                        </DropdownMenuItem>
-                      )}
-                      {agent.status === "active" && (
-                        <DropdownMenuItem onClick={() => updateStatus.mutate({ tenantId: TENANT_ID, userId: agent.id, status: "inactive" })}>
-                          <UserX className="h-4 w-4 mr-2" /> Desativar
-                        </DropdownMenuItem>
-                      )}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                  {/* Actions - only for admins */}
+                  {isCurrentAdmin && (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        {/* Role management */}
+                        {!isSelf && (
+                          <>
+                            {agent.role !== "admin" && (
+                              <DropdownMenuItem onClick={() => updateRole.mutate({ tenantId: TENANT_ID, userId: agent.id, role: "admin" })}>
+                                <Crown className="h-4 w-4 mr-2 text-amber-500" /> Tornar Administrador
+                              </DropdownMenuItem>
+                            )}
+                            {agent.role === "admin" && (
+                              <DropdownMenuItem onClick={() => updateRole.mutate({ tenantId: TENANT_ID, userId: agent.id, role: "user" })}>
+                                <Shield className="h-4 w-4 mr-2" /> Tornar Usuário
+                              </DropdownMenuItem>
+                            )}
+                            <DropdownMenuSeparator />
+                          </>
+                        )}
+                        {/* Status management */}
+                        {agent.status !== "active" && (
+                          <DropdownMenuItem onClick={() => updateStatus.mutate({ tenantId: TENANT_ID, userId: agent.id, status: "active" })}>
+                            <UserCheck className="h-4 w-4 mr-2" /> Ativar
+                          </DropdownMenuItem>
+                        )}
+                        {agent.status === "active" && !isSelf && (
+                          <DropdownMenuItem onClick={() => updateStatus.mutate({ tenantId: TENANT_ID, userId: agent.id, status: "inactive" })}>
+                            <UserX className="h-4 w-4 mr-2" /> Desativar
+                          </DropdownMenuItem>
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
                 </div>
               </div>
             );

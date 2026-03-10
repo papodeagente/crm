@@ -13,8 +13,11 @@ export const crmRouter = router({
   contacts: router({
     list: protectedProcedure
       .input(z.object({ tenantId: z.number(), search: z.string().optional(), stage: z.string().optional(), limit: z.number().default(50), offset: z.number().default(0), dateFrom: z.string().optional(), dateTo: z.string().optional() }))
-      .query(async ({ input }) => {
-        return crm.listContacts(input.tenantId, input);
+      .query(async ({ ctx, input }) => {
+        // Non-admin users only see their own contacts
+        const isAdmin = ctx.saasUser?.role === "admin";
+        const ownerUserId = isAdmin ? undefined : ctx.saasUser?.userId;
+        return crm.listContacts(input.tenantId, { ...input, ownerUserId });
       }),
     get: protectedProcedure
       .input(z.object({ tenantId: z.number(), id: z.number() }))
@@ -100,8 +103,10 @@ export const crmRouter = router({
   accounts: router({
     list: protectedProcedure
       .input(z.object({ tenantId: z.number() }))
-      .query(async ({ input }) => {
-        return crm.listAccounts(input.tenantId);
+      .query(async ({ ctx, input }) => {
+        const isAdmin = ctx.saasUser?.role === "admin";
+        const ownerUserId = isAdmin ? undefined : ctx.saasUser?.userId;
+        return crm.listAccounts(input.tenantId, { ownerUserId });
       }),
     get: protectedProcedure
       .input(z.object({ tenantId: z.number(), id: z.number() }))
@@ -265,8 +270,11 @@ export const crmRouter = router({
         coolingDays: z.number().optional(),
         ownerUserId: z.number().optional(),
       }))
-      .query(async ({ input }) => {
-        return crm.listDeals(input.tenantId, input);
+      .query(async ({ ctx, input }) => {
+        // Non-admin users only see their own deals (unless they explicitly filter by another owner)
+        const isAdmin = ctx.saasUser?.role === "admin";
+        const ownerFilter = isAdmin ? input.ownerUserId : (input.ownerUserId || ctx.saasUser?.userId);
+        return crm.listDeals(input.tenantId, { ...input, ownerUserId: ownerFilter });
       }),
     get: protectedProcedure
       .input(z.object({ tenantId: z.number(), id: z.number() }))
@@ -751,8 +759,11 @@ export const crmRouter = router({
         limit: z.number().optional(),
         offset: z.number().optional(),
       }))
-      .query(async ({ input }) => {
-        return crm.listTasksEnriched(input.tenantId, input);
+      .query(async ({ ctx, input }) => {
+        // Non-admin users only see tasks they created or are assigned to
+        const isAdmin = ctx.saasUser?.role === "admin";
+        const createdByUserId = isAdmin ? undefined : ctx.saasUser?.userId;
+        return crm.listTasksEnriched(input.tenantId, { ...input, createdByUserId });
       }),
     create: protectedProcedure
       .input(z.object({

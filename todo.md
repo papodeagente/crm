@@ -2026,3 +2026,43 @@
 ### Testes
 - [x] 19 testes unitários passando (campaigns.test.ts)
 - [x] Testes para interpolateTemplate, listCampaigns, getCampaignDetail, getCampaignMessages, getActiveSessionForTenant
+
+## Controle de Acesso Multi-Usuário por Tenant (CONCLUÍDO)
+
+### Schema & Banco de Dados
+- [x] Adicionar campo `role` (admin/user) na tabela `crm_users` — migração 0030_nappy_xorn.sql
+- [x] Verificar que deals, contacts, accounts, tasks já têm campos ownerUserId/createdByUserId
+- [x] Tabelas teams e team_members já existiam no schema
+
+### Backend — Autenticação
+- [x] `loginWithEmail` usa role do DB ao invés de apenas checar ownerUserId
+- [x] `registerTenantAndUser` define primeiro usuário como admin automaticamente
+- [x] `inviteUserToTenant` aceita parâmetro `role` (admin/user)
+- [x] JWT inclui campo `role` no payload
+- [x] `verifySaasSession` retorna `role` do token
+
+### Backend — Gerenciamento de Usuários
+- [x] `admin.users.list` — listar usuários do tenant (retorna role)
+- [x] `admin.users.create` — convidar novo usuário com guard admin-only e parâmetro `role`
+- [x] `teamManagement.updateAgentRole` — alterar permissão (admin/user) com guard admin-only
+- [x] `getAgentsWithTeams` retorna campo `role` de cada agente
+- [x] Equipes já gerenciadas via admin.teams (criar/editar/remover)
+
+### Backend — Filtro de Dados por Role
+- [x] Contacts: `listContacts` filtra por `ownerUserId` para não-admins
+- [x] Accounts: `listAccounts` filtra por `ownerUserId` para não-admins
+- [x] Deals: `listDeals` filtra por `ownerUserId` para não-admins
+- [x] Tasks: `listTasks` filtra por `createdByUserId` para não-admins
+- [x] crmRouter: contacts.list, accounts.list, deals.list, tasks.list passam userId quando role !== admin
+
+### Frontend — Painel de Gerenciamento
+- [x] Página Admin: seletor de permissão (admin/user) ao criar usuário
+- [x] Página Admin: coluna "Permissão" com badges Admin/Usuário na tabela
+- [x] Página Admin: guard de acesso restrito para não-admins (tela "Acesso Restrito")
+- [x] Página Agentes: badge "Admin" e "Você" em cada agente
+- [x] Página Agentes: menu de ações admin-only (Tornar Admin, Tornar Usuário, Ativar, Desativar)
+- [x] Página Agentes: proteção contra auto-desativação e auto-rebaixamento
+- [x] Página Settings: link "Administração" oculto para não-admins, badge "Admin" para admins
+
+### Testes
+- [x] 29 testes unitários passando (roleAccess.test.ts)

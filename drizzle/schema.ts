@@ -168,6 +168,7 @@ export const crmUsers = mysqlTable("crm_users", {
   email: varchar("email", { length: 320 }).notNull(),
   phone: varchar("phone", { length: 32 }),
   passwordHash: varchar("passwordHash", { length: 512 }),
+  role: mysqlEnum("crm_user_role", ["admin", "user"]).default("user").notNull(),
   status: mysqlEnum("status", ["active", "inactive", "invited"]).default("invited").notNull(),
   avatarUrl: text("avatarUrl"),
   lastLoginAt: timestamp("lastLoginAt"),

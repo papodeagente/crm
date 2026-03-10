@@ -5,12 +5,12 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Shield, Plus, Users, Building2, Key, Activity } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Shield, Plus, Users, Building2, Key, Activity, Crown, Lock } from "lucide-react";
 import { formatDate, formatFullDateTime } from "../../../shared/dateUtils";
 import { useState } from "react";
 import { toast } from "sonner";
 import { useTenantId } from "@/hooks/useTenantId";
-
 
 const actionColors: Record<string, { bg: string; text: string }> = {
   create: { bg: "bg-emerald-50", text: "text-emerald-700" },
@@ -24,9 +24,15 @@ export default function Admin() {
   const [openUser, setOpenUser] = useState(false);
   const [userName, setUserName] = useState("");
   const [userEmail, setUserEmail] = useState("");
+  const [userRole, setUserRole] = useState<"admin" | "user">("user");
   const [openTeam, setOpenTeam] = useState(false);
   const [teamName, setTeamName] = useState("");
   const utils = trpc.useUtils();
+
+  // Check current user role
+  const saasMe = trpc.saasAuth.me.useQuery(undefined, { retry: false, refetchOnWindowFocus: false });
+  const currentUserRole = saasMe.data?.role || "user";
+  const isCurrentAdmin = currentUserRole === "admin";
 
   const users = trpc.admin.users.list.useQuery({ tenantId: TENANT_ID });
   const teams = trpc.admin.teams.list.useQuery({ tenantId: TENANT_ID });
@@ -34,11 +40,37 @@ export default function Admin() {
   const eventLog = trpc.admin.eventLog.list.useQuery({ tenantId: TENANT_ID, limit: 50 });
 
   const createUser = trpc.admin.users.create.useMutation({
-    onSuccess: () => { utils.admin.users.list.invalidate(); setOpenUser(false); setUserName(""); setUserEmail(""); toast.success("Usuário criado!"); },
+    onSuccess: () => {
+      utils.admin.users.list.invalidate();
+      setOpenUser(false);
+      setUserName("");
+      setUserEmail("");
+      setUserRole("user");
+      toast.success("Usuário criado!");
+    },
+    onError: (err) => toast.error(err.message || "Erro ao criar usuário"),
   });
   const createTeam = trpc.admin.teams.create.useMutation({
     onSuccess: () => { utils.admin.teams.list.invalidate(); setOpenTeam(false); setTeamName(""); toast.success("Equipe criada!"); },
   });
+
+  // Non-admin users see a restricted view
+  if (!isCurrentAdmin && !saasMe.isLoading) {
+    return (
+      <div className="p-5 lg:px-8 flex items-center justify-center min-h-[60vh]">
+        <div className="text-center space-y-4">
+          <div className="h-16 w-16 rounded-2xl bg-amber-500/10 flex items-center justify-center mx-auto">
+            <Lock className="h-8 w-8 text-amber-500" />
+          </div>
+          <h2 className="text-xl font-bold text-foreground">Acesso Restrito</h2>
+          <p className="text-muted-foreground text-sm max-w-md">
+            Esta página é exclusiva para administradores do tenant. 
+            Entre em contato com o administrador da sua conta para obter acesso.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-5 lg:px-8 space-y-5">
@@ -71,9 +103,43 @@ export default function Admin() {
                   </DialogTitle>
                 </DialogHeader>
                 <div className="space-y-4 pt-3">
-                  <div><Label className="text-[12px] font-medium">Nome *</Label><Input value={userName} onChange={(e) => setUserName(e.target.value)} placeholder="Nome completo" className="mt-1.5 h-10 rounded-xl" /></div>
-                  <div><Label className="text-[12px] font-medium">Email *</Label><Input value={userEmail} onChange={(e) => setUserEmail(e.target.value)} placeholder="email@exemplo.com" type="email" className="mt-1.5 h-10 rounded-xl" /></div>
-                  <Button className="w-full h-11 rounded-lg text-[14px] font-medium bg-primary hover:bg-primary/90 shadow-sm transition-colors" disabled={!userName || !userEmail || createUser.isPending} onClick={() => createUser.mutate({ tenantId: TENANT_ID, name: userName, email: userEmail, origin: window.location.origin })}>
+                  <div>
+                    <Label className="text-[12px] font-medium">Nome *</Label>
+                    <Input value={userName} onChange={(e) => setUserName(e.target.value)} placeholder="Nome completo" className="mt-1.5 h-10 rounded-xl" />
+                  </div>
+                  <div>
+                    <Label className="text-[12px] font-medium">Email *</Label>
+                    <Input value={userEmail} onChange={(e) => setUserEmail(e.target.value)} placeholder="email@exemplo.com" type="email" className="mt-1.5 h-10 rounded-xl" />
+                  </div>
+                  <div>
+                    <Label className="text-[12px] font-medium">Permissão *</Label>
+                    <Select value={userRole} onValueChange={(v) => setUserRole(v as "admin" | "user")}>
+                      <SelectTrigger className="mt-1.5 h-10 rounded-xl">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="user">
+                          <div className="flex items-center gap-2">
+                            <Shield className="h-3.5 w-3.5 text-blue-500" />
+                            <span>Usuário</span>
+                            <span className="text-[10px] text-muted-foreground ml-1">— Vê apenas seus próprios dados</span>
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="admin">
+                          <div className="flex items-center gap-2">
+                            <Crown className="h-3.5 w-3.5 text-amber-500" />
+                            <span>Administrador</span>
+                            <span className="text-[10px] text-muted-foreground ml-1">— Acesso total ao tenant</span>
+                          </div>
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Button
+                    className="w-full h-11 rounded-lg text-[14px] font-medium bg-primary hover:bg-primary/90 shadow-sm transition-colors"
+                    disabled={!userName || !userEmail || createUser.isPending}
+                    onClick={() => createUser.mutate({ tenantId: TENANT_ID, name: userName, email: userEmail, role: userRole, origin: window.location.origin })}
+                  >
                     {createUser.isPending ? "Criando..." : "Criar Usuário"}
                   </Button>
                 </div>
@@ -86,13 +152,14 @@ export default function Admin() {
                 <thead><tr className="border-b border-border/30 bg-muted/20">
                   <th className="text-left p-3.5 font-semibold text-muted-foreground">Nome</th>
                   <th className="text-left p-3.5 font-semibold text-muted-foreground">Email</th>
+                  <th className="text-left p-3.5 font-semibold text-muted-foreground">Permissão</th>
                   <th className="text-left p-3.5 font-semibold text-muted-foreground">Status</th>
                   <th className="text-left p-3.5 font-semibold text-muted-foreground">Criado em</th>
                 </tr></thead>
                 <tbody>
-                  {users.isLoading ? <tr><td colSpan={4} className="p-12 text-center text-muted-foreground text-sm">Carregando...</td></tr>
+                  {users.isLoading ? <tr><td colSpan={5} className="p-12 text-center text-muted-foreground text-sm">Carregando...</td></tr>
                   : !users.data?.length ? (
-                    <tr><td colSpan={4} className="p-12 text-center text-muted-foreground">
+                    <tr><td colSpan={5} className="p-12 text-center text-muted-foreground">
                       <Users className="h-10 w-10 mx-auto mb-3 text-muted-foreground/30" />
                       <p className="text-sm">Nenhum usuário CRM cadastrado.</p>
                     </td></tr>
@@ -106,8 +173,28 @@ export default function Admin() {
                       </td>
                       <td className="p-3.5 text-muted-foreground">{u.email}</td>
                       <td className="p-3.5">
-                        <span className="inline-flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700">
-                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />{u.status || "Ativo"}
+                        {u.role === "admin" ? (
+                          <span className="inline-flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-600 border border-amber-500/20">
+                            <Crown className="h-3 w-3" /> Administrador
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded-full bg-blue-500/10 text-blue-600 border border-blue-500/20">
+                            <Shield className="h-3 w-3" /> Usuário
+                          </span>
+                        )}
+                      </td>
+                      <td className="p-3.5">
+                        <span className={`inline-flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded-full ${
+                          u.status === "active" ? "bg-emerald-50 text-emerald-700" :
+                          u.status === "invited" ? "bg-amber-50 text-amber-700" :
+                          "bg-zinc-100 text-zinc-600"
+                        }`}>
+                          <span className={`h-1.5 w-1.5 rounded-full ${
+                            u.status === "active" ? "bg-emerald-500" :
+                            u.status === "invited" ? "bg-amber-500" :
+                            "bg-zinc-400"
+                          }`} />
+                          {u.status === "active" ? "Ativo" : u.status === "invited" ? "Convidado" : u.status === "inactive" ? "Inativo" : u.status || "Ativo"}
                         </span>
                       </td>
                       <td className="p-3.5 text-muted-foreground">{u.createdAt ? formatDate(u.createdAt) : "—"}</td>

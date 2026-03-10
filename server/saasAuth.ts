@@ -114,6 +114,7 @@ export async function registerTenantAndUser(data: {
     email: data.email,
     phone: data.phone || null,
     passwordHash,
+    role: "admin",
     status: "active",
   }).$returningId();
 
@@ -198,9 +199,9 @@ export async function loginWithEmail(email: string, password: string) {
   // Update last login
   await db.update(crmUsers).set({ lastLoginAt: new Date() }).where(eq(crmUsers.id, user.id));
 
-  // Determine role (check if user is the owner or has admin role)
+  // Determine role: owner is always admin, otherwise use DB role
   const isOwner = tenant.ownerUserId === user.id;
-  const role = isOwner ? "admin" : "user";
+  const role = isOwner ? "admin" : (user.role || "user");
 
   return {
     userId: user.id,
@@ -497,6 +498,7 @@ export async function inviteUserToTenant(data: {
   name: string;
   email: string;
   phone?: string;
+  role?: "admin" | "user";
   inviterName: string;
   origin: string;
 }) {
@@ -523,6 +525,7 @@ export async function inviteUserToTenant(data: {
     email: data.email,
     phone: data.phone || null,
     passwordHash,
+    role: data.role || "user",
     status: "invited",
   }).$returningId();
 
