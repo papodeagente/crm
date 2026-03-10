@@ -1977,3 +1977,11 @@
 - [x] Tratar gracefully: network drops (428/408/503/515 = reconexão imediata), server restarts (auto-restore), fatal (401/403 = cleanup)
 - [x] Otimizar config: keepAlive 30s, queryTimeout DISABLED, connectTimeout 45s, Desktop browser, markOnline false
 - [x] Testar compilação e estabilidade (41 testes passando)
+
+## Bug Fix: RFV Envio em Massa mostra "WhatsApp desconectado"
+- [x] Investigar como o componente de envio em massa verifica o status do WhatsApp
+- [x] Corrigir a lógica de detecção de status para funcionar corretamente com sessões conectadas
+- [x] Implementar auto-reconnect quando DB diz "connected" mas memória não tem sessão
+- [x] Adicionar estado "reconectando" com spinner no dialog
+- [x] Adicionar polling automático (3s) enquanto dialog está aberto e sessão não conectada
+- [x] Testar que o dialog mostra "conectado" quando há sessão ativa

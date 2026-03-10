@@ -223,7 +223,14 @@ async function processBulkSend(
 }
 
 /**
- * Get active session for a tenant
+ * Get active session for a tenant.
+ * 
+ * Uses a two-layer check:
+ * 1. In-memory session (whatsappManager) — the live connection state
+ * 2. Database record — persisted state that survives server restarts
+ * 
+ * If the DB says "connected" but the in-memory session is missing or disconnected,
+ * this triggers an automatic reconnect attempt in the background.
  */
 export async function getActiveSessionForTenant(tenantId: number): Promise<{ sessionId: string; status: string } | null> {
   const db = await getDb();
@@ -234,7 +241,9 @@ export async function getActiveSessionForTenant(tenantId: number): Promise<{ ses
     .from(whatsappSessions)
     .where(eq(whatsappSessions.tenantId, tenantId));
 
-  // Find the first connected session
+  if (sessions.length === 0) return null;
+
+  // Find the first connected session (in-memory takes priority)
   for (const s of sessions) {
     const live = whatsappManager.getSession(s.sessionId);
     if (live && live.status === "connected") {
@@ -242,11 +251,35 @@ export async function getActiveSessionForTenant(tenantId: number): Promise<{ ses
     }
   }
 
-  // Return first session even if disconnected
-  if (sessions.length > 0) {
-    const live = whatsappManager.getSession(sessions[0].sessionId);
-    return { sessionId: sessions[0].sessionId, status: live?.status || "disconnected" };
+  // Check if any session is currently connecting (in-memory)
+  for (const s of sessions) {
+    const live = whatsappManager.getSession(s.sessionId);
+    if (live && live.status === "connecting") {
+      return { sessionId: s.sessionId, status: "connecting" };
+    }
   }
 
-  return null;
+  // No live connected session found.
+  // Check if DB says "connected" — if so, trigger auto-reconnect in background
+  // and return the DB status so the UI knows a session exists.
+  for (const s of sessions) {
+    if (s.status === "connected") {
+      // Session was connected before server restart but not yet restored.
+      // Trigger reconnect in background (non-blocking).
+      const live = whatsappManager.getSession(s.sessionId);
+      if (!live) {
+        console.log(`[ActiveSession] DB says connected but no in-memory session for ${s.sessionId}. Triggering reconnect...`);
+        whatsappManager.connect(s.sessionId, s.userId).catch(e => {
+          console.error(`[ActiveSession] Auto-reconnect failed for ${s.sessionId}:`, e);
+        });
+        // Return "connecting" so the UI shows a reconnecting state
+        return { sessionId: s.sessionId, status: "connecting" };
+      }
+    }
+  }
+
+  // Return first session with its actual status
+  const firstSession = sessions[0];
+  const live = whatsappManager.getSession(firstSession.sessionId);
+  return { sessionId: firstSession.sessionId, status: live?.status || firstSession.status || "disconnected" };
 }

@@ -179,7 +179,19 @@ export default function RfvMatrix() {
   }, { enabled: !!tenantId });
   const smartCounts = trpc.rfv.smartFilterCounts.useQuery({ tenantId }, { enabled: !!tenantId });
   const alerta = trpc.rfv.alertaDinheiroParado.useQuery({ tenantId }, { enabled: !!tenantId });
-  const activeSession = trpc.rfv.activeSession.useQuery({ tenantId }, { enabled: !!tenantId });
+  const activeSession = trpc.rfv.activeSession.useQuery(
+    { tenantId },
+    {
+      enabled: !!tenantId,
+      // Poll every 3s while dialog is open and session is not yet connected
+      refetchInterval: (query) => {
+        if (!bulkDialogOpen) return false;
+        const d = query.state?.data;
+        if (d?.status === "connected") return false;
+        return 3000;
+      },
+    },
+  );
 
   // ─── Bulk Send Progress Polling ───
   const bulkProgress = trpc.rfv.bulkSendProgress.useQuery(
@@ -352,6 +364,15 @@ export default function RfvMatrix() {
   const c = contacts.data;
   const bp = bulkProgress.data;
   const sessionConnected = activeSession.data?.status === "connected";
+  const sessionConnecting = activeSession.data?.status === "connecting";
+  const sessionExists = !!activeSession.data?.sessionId;
+
+  // Refetch session status when dialog opens
+  useEffect(() => {
+    if (bulkDialogOpen) {
+      activeSession.refetch();
+    }
+  }, [bulkDialogOpen]);
 
   return (
     <div className="flex flex-col h-full min-h-0 bg-background">
@@ -893,10 +914,20 @@ export default function RfvMatrix() {
             <div className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm ${
               sessionConnected
                 ? "bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400"
-                : "bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-400"
+                : sessionConnecting
+                  ? "bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400"
+                  : "bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-400"
             }`}>
-              <div className={`w-2 h-2 rounded-full ${sessionConnected ? "bg-emerald-500" : "bg-red-500"}`} />
-              {sessionConnected ? "WhatsApp conectado" : "WhatsApp desconectado"}
+              {sessionConnecting ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <div className={`w-2 h-2 rounded-full ${sessionConnected ? "bg-emerald-500" : "bg-red-500"}`} />
+              )}
+              {sessionConnected
+                ? "WhatsApp conectado"
+                : sessionConnecting
+                  ? "WhatsApp reconectando..."
+                  : "WhatsApp desconectado"}
             </div>
 
             {/* Message template */}
@@ -970,7 +1001,7 @@ export default function RfvMatrix() {
             </Button>
             <Button
               onClick={handleBulkSend}
-              disabled={!messageTemplate.trim() || !sessionConnected || bulkSend.isPending}
+              disabled={!messageTemplate.trim() || !sessionConnected || sessionConnecting || bulkSend.isPending}
               className="bg-emerald-600 hover:bg-emerald-700 text-white"
             >
               {bulkSend.isPending ? (
