@@ -1,5 +1,5 @@
 import { useAuth } from "@/_core/hooks/useAuth";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -473,6 +473,7 @@ function TopBar({ onSearchOpen, mobileMenuOpen, onToggleMobile }: {
               <DropdownMenuTrigger asChild>
                 <button className="flex items-center gap-2 rounded-xl px-1.5 py-1 hover:bg-accent transition-all duration-150">
                   <Avatar className="h-8 w-8">
+                    {saasMe?.avatarUrl && <AvatarImage src={saasMe.avatarUrl} alt={user?.name || ""} />}
                     <AvatarFallback className="text-[12px] font-semibold text-white" style={{
                       background: "linear-gradient(135deg, oklch(0.55 0.25 270), oklch(0.60 0.25 320), oklch(0.65 0.20 200))"
                     }}>
@@ -489,6 +490,10 @@ function TopBar({ onSearchOpen, mobileMenuOpen, onToggleMobile }: {
                   <p className="text-[13px] font-semibold text-foreground">{user?.name || "Usuário"}</p>
                   <p className="text-[11px] text-muted-foreground truncate mt-0.5">{user?.email || ""}</p>
                 </div>
+                <DropdownMenuItem onClick={() => setLocation("/profile")} className="cursor-pointer rounded-lg px-3 py-2 text-[13px] gap-2.5">
+                  <User className="h-3.5 w-3.5 text-muted-foreground" />
+                  Meu Perfil
+                </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setLocation("/settings")} className="cursor-pointer rounded-lg px-3 py-2 text-[13px] gap-2.5">
                   <Settings className="h-3.5 w-3.5 text-muted-foreground" />
                   Configurações

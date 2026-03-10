@@ -2073,3 +2073,33 @@
 - [x] Garantir que o backend updateAgentRole e admin.users.update funcionam corretamente
 - [x] Feedback visual ao alterar permissão (toast de sucesso, spinner de loading)
 - [x] Proteção: admin não pode rebaixar a si mesmo (badge estático "Você")
+
+## Perfil do Usuário e Integração Google Calendar (CONCLUÍDO)
+
+### Foto de Perfil
+- [x] Endpoint de upload de avatar (S3 storage via storagePut)
+- [x] Procedure para atualizar avatarUrl no crmUsers
+- [x] Procedure para remover avatar (removeAvatar)
+- [x] UI de upload com preview e botão de remover
+- [x] Avatar exibido no TopNavLayout (dropdown do usuário) com fallback para iniciais
+- [x] saasAuth.me retorna avatarUrl do DB
+
+### Página de Perfil (/profile)
+- [x] Criar página /profile com dados do usuário (nome, email, telefone, permissão, data)
+- [x] Editar nome e telefone do usuário
+- [x] Alterar senha (senha atual + nova senha + confirmação com toggle de visibilidade)
+- [x] Registrar rota no App.tsx
+- [x] Link "Meu Perfil" no dropdown do usuário (TopNav)
+
+### Integração Google Calendar (opcional por usuário)
+- [x] Tabela google_calendar_tokens no schema (migração 0031)
+- [x] Armazenar tokens OAuth do Google Calendar por usuário no DB
+- [x] Botão conectar/desconectar Google Calendar no perfil
+- [x] Exibir status da conexão (conectado com email / desconectado)
+
+### Backend (profileRouter)
+- [x] getProfile, updateProfile, changePassword, uploadAvatar, removeAvatar
+- [x] connectGoogleCalendar, disconnectGoogleCalendar
+
+### Testes
+- [x] 21 testes unitários passando (profile.test.ts)

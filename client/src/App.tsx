@@ -46,6 +46,7 @@ const ClassificationSettings = lazy(() => import("./pages/ClassificationSettings
 const DateAutomationSettings = lazy(() => import("./pages/DateAutomationSettings"));
 const RfvMatrix = lazy(() => import("./pages/RfvMatrix"));
 const Campaigns = lazy(() => import("./pages/Campaigns"));
+const Profile = lazy(() => import("./pages/Profile"));
 const CampaignDetail = lazy(() => import("./pages/CampaignDetail"));
 
 // SaaS pages (outside TopNavLayout)
@@ -95,6 +96,7 @@ function AppRouter() {
                 <Route path="/deals" component={Deals} />
 
                 {/* Settings sub-pages */}
+                <Route path="/profile" component={Profile} />
                 <Route path="/settings" component={SettingsPage} />
                 <Route path="/settings/agents" component={AgentManagement} />
                 <Route path="/settings/custom-fields" component={CustomFieldsSettings} />

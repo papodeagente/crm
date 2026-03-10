@@ -95,6 +95,7 @@ import { utmAnalyticsRouter } from "./routers/utmAnalyticsRouter";
 import { rdCrmImportRouter } from "./routers/rdCrmImportRouter";
 import { saasAuthRouter } from "./routers/saasAuthRouter";
 import { rfvRouter } from "./routers/rfvRouter";
+import { profileRouter } from "./routers/profileRouter";
 import {
   listLeadEvents,
   countLeadEvents,
@@ -769,6 +770,7 @@ export const appRouter = router({
   rdCrmImport: rdCrmImportRouter, // M12: Importação do RD Station CRM
   saasAuth: saasAuthRouter, // SaaS Authentication (email/senha)
   rfv: rfvRouter, // M13: Matriz RFV — Classificação Automática de Contatos
+  profile: profileRouter, // Perfil do usuário (avatar, nome, senha, Google Calendar)
 
   // ─── Contact Profile & Custom Fields ───
   contactProfile: router({

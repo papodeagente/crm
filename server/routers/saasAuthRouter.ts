@@ -118,8 +118,24 @@ export const saasAuthRouter = router({
     // Check tenant access
     const access = await checkTenantAccess(session.tenantId);
 
+    // Fetch avatarUrl from DB (not stored in JWT)
+    let avatarUrl: string | null = null;
+    try {
+      const { getDb } = await import("../db");
+      const { crmUsers } = await import("../../drizzle/schema");
+      const { eq } = await import("drizzle-orm");
+      const db = await getDb();
+      if (db) {
+        const [user] = await db.select({ avatarUrl: crmUsers.avatarUrl }).from(crmUsers).where(eq(crmUsers.id, session.userId)).limit(1);
+        if (user) avatarUrl = user.avatarUrl;
+      }
+    } catch (e) {
+      // Silently ignore — avatarUrl is optional
+    }
+
     return {
       ...session,
+      avatarUrl,
       isSuperAdmin: isSuperAdmin(session.email),
       access,
     };

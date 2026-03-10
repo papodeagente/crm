@@ -1695,3 +1695,29 @@ export const bulkCampaignMessages = mysqlTable("bulk_campaign_messages", {
 
 export type BulkCampaignMessage = typeof bulkCampaignMessages.$inferSelect;
 export type NewBulkCampaignMessage = typeof bulkCampaignMessages.$inferInsert;
+
+
+// ════════════════════════════════════════════════════════════
+// GOOGLE CALENDAR INTEGRATION (per user)
+// ════════════════════════════════════════════════════════════
+
+export const googleCalendarTokens = mysqlTable("google_calendar_tokens", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  tenantId: int("tenantId").notNull(),
+  accessToken: text("accessToken").notNull(),
+  refreshToken: text("refreshToken"),
+  tokenType: varchar("tokenType", { length: 32 }).default("Bearer"),
+  expiresAt: timestamp("expiresAt"),
+  scope: text("scope"),
+  calendarEmail: varchar("calendarEmail", { length: 320 }),
+  isActive: boolean("isActive").default(true).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (t) => [
+  index("gct_user_tenant_idx").on(t.userId, t.tenantId),
+  index("gct_tenant_idx").on(t.tenantId),
+]);
+
+export type GoogleCalendarToken = typeof googleCalendarTokens.$inferSelect;
+export type InsertGoogleCalendarToken = typeof googleCalendarTokens.$inferInsert;
