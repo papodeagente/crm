@@ -1118,7 +1118,7 @@ export async function getAgentsWithTeams(tenantId: number) {
   const db = await getDb();
   if (!db) return [];
   const [rows] = await db.execute(sql`
-    SELECT cu.id, cu.name, cu.email, cu.phone, cu.avatarUrl, cu.status, cu.role, cu.lastLoginAt, cu.createdAt,
+    SELECT cu.id, cu.name, cu.email, cu.phone, cu.avatarUrl, cu.status, cu.crm_user_role, cu.lastLoginAt, cu.createdAt,
       (SELECT GROUP_CONCAT(CONCAT(t.id, ':', t.name, ':', COALESCE(t.color, '#6366f1')) SEPARATOR '|')
        FROM team_members tm JOIN teams t ON t.id = tm.teamId
        WHERE tm.userId = cu.id AND tm.tenantId = ${tenantId}
@@ -1137,7 +1137,7 @@ export async function getAgentsWithTeams(tenantId: number) {
     phone: r.phone ? String(r.phone) : null,
     avatarUrl: r.avatarUrl ? String(r.avatarUrl) : null,
     status: String(r.status),
-    role: String(r.role || "user"),
+    role: String(r.crm_user_role || "user"),
     lastLoginAt: r.lastLoginAt ? new Date(r.lastLoginAt).getTime() : null,
     createdAt: new Date(r.createdAt).getTime(),
     openAssignments: Number(r.openAssignments) || 0,

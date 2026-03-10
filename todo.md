@@ -2184,3 +2184,7 @@
 
 ## Bug Fix — Cannot find module saasAuth
 - [x] Corrigir erro "Cannot find module '/usr/src/app/saasAuth'" ao adicionar usuário em produção (convertido 5 dynamic imports para static imports em adminRouter, saasAuthRouter e routers.ts)
+
+## Bug Fix — Usuário adicionado não aparece na lista de agentes
+- [x] Investigar por que marcio.dias@boxtour.com.br não aparece na lista após ser adicionado ao tenant Boxtour (query usava cu.role mas coluna real é crm_user_role)
+- [x] Corrigir o problema de listagem (getAgentsWithTeams em db.ts corrigido para usar cu.crm_user_role)
