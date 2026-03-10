@@ -35,7 +35,7 @@ const navItems: NavItem[] = [
   { icon: Users, label: "Contatos", path: "/contacts", matchPaths: ["/contacts"] },
   { icon: CheckSquare, label: "Tarefas", path: "/tasks", matchPaths: ["/tasks"] },
   { icon: MessageSquare, label: "Inbox", path: "/inbox", matchPaths: ["/inbox"] },
-  { icon: TrendingUp, label: "RFV", path: "/rfv", matchPaths: ["/rfv"] },
+  { icon: TrendingUp, label: "RFV", path: "/rfv", matchPaths: ["/rfv", "/campaigns"] },
   { icon: BarChart3, label: "Análises", path: "/insights", matchPaths: ["/insights", "/goals"] },
 ];
 

@@ -1,26 +1,32 @@
 /**
  * Bulk WhatsApp Messaging — Send template messages to multiple RFV contacts
- * with rate-limiting, progress tracking, and variable substitution.
+ * with rate-limiting, progress tracking, variable substitution,
+ * and full campaign registry with per-message status tracking.
  */
 import { getDb } from "./db";
-import { rfvContacts, whatsappSessions } from "../drizzle/schema";
-import { eq, and, inArray } from "drizzle-orm";
+import { rfvContacts, whatsappSessions, bulkCampaigns, bulkCampaignMessages } from "../drizzle/schema";
+import { eq, and, inArray, desc, sql, count } from "drizzle-orm";
 import { whatsappManager } from "./whatsapp";
 
 // ─── Types ───
 export interface BulkSendRequest {
   tenantId: number;
+  userId: number;
+  userName?: string;
   contactIds: number[];
   messageTemplate: string;
   sessionId: string;
-  delayMs?: number; // delay between messages (default 3000ms)
+  delayMs?: number;
+  campaignName?: string;
+  source?: string;
+  audienceFilter?: string;
 }
 
 export interface BulkSendResult {
   total: number;
   sent: number;
   failed: number;
-  skipped: number; // no phone number
+  skipped: number;
   results: {
     contactId: number;
     name: string;
@@ -33,6 +39,7 @@ export interface BulkSendResult {
 // ─── In-memory progress tracking ───
 interface BulkJobProgress {
   tenantId: number;
+  campaignId: number;
   total: number;
   processed: number;
   sent: number;
@@ -70,7 +77,7 @@ export function cancelBulkSend(tenantId: number): boolean {
 
 /**
  * Replace template variables with contact data.
- * Supported variables: {nome}, {email}, {telefone}, {publico}, {valor}
+ * Supported variables: {nome}, {primeiro_nome}, {email}, {telefone}, {publico}, {valor}
  */
 export function interpolateTemplate(template: string, contact: {
   name: string;
@@ -103,10 +110,10 @@ function phoneToJid(phone: string): string | null {
 
 /**
  * Send bulk WhatsApp messages to selected RFV contacts.
- * Runs asynchronously with progress tracking.
+ * Creates a campaign record and tracks each message individually.
  */
-export async function startBulkSend(request: BulkSendRequest): Promise<{ jobId: string }> {
-  const { tenantId, contactIds, messageTemplate, sessionId, delayMs = 3000 } = request;
+export async function startBulkSend(request: BulkSendRequest): Promise<{ jobId: string; campaignId: number }> {
+  const { tenantId, userId, userName, contactIds, messageTemplate, sessionId, delayMs = 3000, source = "rfv", audienceFilter } = request;
   const key = jobKey(tenantId);
 
   // Check if there's already a running job
@@ -137,9 +144,50 @@ export async function startBulkSend(request: BulkSendRequest): Promise<{ jobId: 
     throw new Error("Nenhum contato encontrado com os IDs fornecidos.");
   }
 
+  // Generate campaign name if not provided
+  const campaignName = request.campaignName || `Campanha ${new Date().toLocaleDateString("pt-BR")} ${new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`;
+
+  // Create campaign record in DB
+  const [campaignResult] = await db.insert(bulkCampaigns).values({
+    tenantId,
+    userId,
+    userName: userName || null,
+    name: campaignName,
+    messageTemplate,
+    source,
+    audienceFilter: audienceFilter || null,
+    sessionId,
+    intervalMs: delayMs,
+    totalContacts: contacts.length,
+    sentCount: 0,
+    failedCount: 0,
+    skippedCount: 0,
+    status: "running",
+  });
+
+  const campaignId = campaignResult.insertId;
+
+  // Pre-create all message records as "pending"
+  const messageRecords = contacts.map((contact) => ({
+    campaignId,
+    tenantId,
+    contactId: contact.id,
+    contactName: contact.name,
+    contactPhone: contact.phone || null,
+    messageContent: null as string | null,
+    status: "pending" as const,
+  }));
+
+  // Insert in batches of 100 to avoid query size limits
+  for (let i = 0; i < messageRecords.length; i += 100) {
+    const batch = messageRecords.slice(i, i + 100);
+    await db.insert(bulkCampaignMessages).values(batch);
+  }
+
   // Initialize job progress
   const job: BulkJobProgress = {
     tenantId,
+    campaignId,
     total: contacts.length,
     processed: 0,
     sent: 0,
@@ -152,28 +200,61 @@ export async function startBulkSend(request: BulkSendRequest): Promise<{ jobId: 
   activeJobs.set(key, job);
 
   // Run async (don't await — fire and forget)
-  processBulkSend(key, job, contacts, messageTemplate, sessionId, delayMs).catch((err) => {
+  processBulkSend(key, job, campaignId, contacts, messageTemplate, sessionId, delayMs).catch((err) => {
     console.error("[BulkSend] Fatal error:", err);
     job.status = "completed";
+    // Mark campaign as failed
+    getDb().then(db2 => {
+      if (db2) {
+        db2.update(bulkCampaigns)
+          .set({ status: "failed", completedAt: new Date() })
+          .where(eq(bulkCampaigns.id, campaignId))
+          .catch(console.error);
+      }
+    });
   });
 
-  return { jobId: key };
+  return { jobId: key, campaignId };
 }
 
 async function processBulkSend(
   key: string,
   job: BulkJobProgress,
+  campaignId: number,
   contacts: any[],
   messageTemplate: string,
   sessionId: string,
   delayMs: number,
 ) {
+  const db = await getDb();
+  if (!db) return;
+
+  // Fetch the campaign message records to get their IDs
+  const campaignMessages = await db
+    .select({ id: bulkCampaignMessages.id, contactId: bulkCampaignMessages.contactId })
+    .from(bulkCampaignMessages)
+    .where(eq(bulkCampaignMessages.campaignId, campaignId));
+
+  // Build a map: contactId → campaignMessageId
+  const msgIdMap = new Map<number, number>();
+  for (const m of campaignMessages) {
+    if (m.contactId) msgIdMap.set(m.contactId, m.id);
+  }
+
   for (const contact of contacts) {
     // Check if cancelled
     if (job.status === "cancelled") {
+      // Mark remaining messages as skipped
+      await db.update(bulkCampaignMessages)
+        .set({ status: "skipped", errorMessage: "Campanha cancelada" })
+        .where(and(
+          eq(bulkCampaignMessages.campaignId, campaignId),
+          eq(bulkCampaignMessages.status, "pending"),
+        ));
       break;
     }
 
+    const msgId = msgIdMap.get(contact.id);
     const result: BulkSendResult["results"][0] = {
       contactId: contact.id,
       name: contact.name,
@@ -185,22 +266,62 @@ async function processBulkSend(
       result.status = "skipped";
       result.error = "Sem telefone";
       job.skipped++;
+      if (msgId) {
+        await db.update(bulkCampaignMessages)
+          .set({ status: "skipped", errorMessage: "Sem telefone" })
+          .where(eq(bulkCampaignMessages.id, msgId));
+      }
     } else {
       const jid = phoneToJid(contact.phone);
       if (!jid) {
         result.status = "skipped";
         result.error = "Telefone inválido";
         job.skipped++;
+        if (msgId) {
+          await db.update(bulkCampaignMessages)
+            .set({ status: "skipped", errorMessage: "Telefone inválido" })
+            .where(eq(bulkCampaignMessages.id, msgId));
+        }
       } else {
+        // Mark as sending
+        if (msgId) {
+          await db.update(bulkCampaignMessages)
+            .set({ status: "sending" })
+            .where(eq(bulkCampaignMessages.id, msgId));
+        }
+
         try {
           const message = interpolateTemplate(messageTemplate, contact);
-          await whatsappManager.sendTextMessage(sessionId, jid, message);
+          const sendResult = await whatsappManager.sendTextMessage(sessionId, jid, message);
+          const waMessageId = sendResult?.key?.id || null;
+          
           result.status = "sent";
           job.sent++;
+
+          if (msgId) {
+            await db.update(bulkCampaignMessages)
+              .set({
+                status: "sent",
+                messageContent: message,
+                sentAt: new Date(),
+                waMessageId,
+              })
+              .where(eq(bulkCampaignMessages.id, msgId));
+          }
         } catch (err: any) {
           result.status = "failed";
           result.error = err.message || "Erro desconhecido";
           job.failed++;
+
+          if (msgId) {
+            await db.update(bulkCampaignMessages)
+              .set({
+                status: "failed",
+                messageContent: interpolateTemplate(messageTemplate, contact),
+                errorMessage: err.message || "Erro desconhecido",
+              })
+              .where(eq(bulkCampaignMessages.id, msgId));
+          }
         }
       }
     }
@@ -208,29 +329,157 @@ async function processBulkSend(
     job.results.push(result);
     job.processed++;
 
+    // Update campaign counters every message
+    await db.update(bulkCampaigns)
+      .set({
+        sentCount: job.sent,
+        failedCount: job.failed,
+        skippedCount: job.skipped,
+      })
+      .where(eq(bulkCampaigns.id, campaignId));
+
     // Rate-limit delay between messages (skip for last message)
     if (job.status === "running" && job.processed < job.total) {
       await new Promise((resolve) => setTimeout(resolve, delayMs));
     }
   }
 
-  job.status = job.status === "cancelled" ? "cancelled" : "completed";
+  // Finalize campaign
+  const finalStatus = job.status === "cancelled" ? "cancelled" : "completed";
+  job.status = finalStatus === "cancelled" ? "cancelled" : "completed";
 
-  // Clean up job after 5 minutes
+  await db.update(bulkCampaigns)
+    .set({
+      status: finalStatus,
+      sentCount: job.sent,
+      failedCount: job.failed,
+      skippedCount: job.skipped,
+      completedAt: new Date(),
+    })
+    .where(eq(bulkCampaigns.id, campaignId));
+
+  console.log(`[BulkSend] Campaign ${campaignId} ${finalStatus}: ${job.sent} sent, ${job.failed} failed, ${job.skipped} skipped out of ${job.total}`);
+
+  // Clean up in-memory job after 5 minutes
   setTimeout(() => {
     activeJobs.delete(key);
   }, 5 * 60 * 1000);
 }
 
+// ─── Campaign Query Functions ───
+
+/**
+ * List campaigns for a tenant with pagination
+ */
+export async function listCampaigns(tenantId: number, opts: {
+  page?: number;
+  pageSize?: number;
+  status?: string;
+} = {}): Promise<{ campaigns: any[]; total: number }> {
+  const db = await getDb();
+  if (!db) return { campaigns: [], total: 0 };
+
+  const page = opts.page || 1;
+  const pageSize = opts.pageSize || 20;
+  const offset = (page - 1) * pageSize;
+
+  const conditions = [eq(bulkCampaigns.tenantId, tenantId)];
+  if (opts.status) {
+    conditions.push(eq(bulkCampaigns.status, opts.status as any));
+  }
+
+  const [campaigns, totalResult] = await Promise.all([
+    db.select()
+      .from(bulkCampaigns)
+      .where(and(...conditions))
+      .orderBy(desc(bulkCampaigns.createdAt))
+      .limit(pageSize)
+      .offset(offset),
+    db.select({ total: count() })
+      .from(bulkCampaigns)
+      .where(and(...conditions)),
+  ]);
+
+  return {
+    campaigns,
+    total: Number(totalResult[0]?.total || 0),
+  };
+}
+
+/**
+ * Get a single campaign with summary stats
+ */
+export async function getCampaignDetail(campaignId: number, tenantId: number) {
+  const db = await getDb();
+  if (!db) return null;
+
+  const [campaign] = await db.select()
+    .from(bulkCampaigns)
+    .where(and(eq(bulkCampaigns.id, campaignId), eq(bulkCampaigns.tenantId, tenantId)));
+
+  if (!campaign) return null;
+
+  // Get status breakdown
+  const statusCounts = await db
+    .select({
+      status: bulkCampaignMessages.status,
+      count: count(),
+    })
+    .from(bulkCampaignMessages)
+    .where(eq(bulkCampaignMessages.campaignId, campaignId))
+    .groupBy(bulkCampaignMessages.status);
+
+  const breakdown: Record<string, number> = {};
+  for (const row of statusCounts) {
+    breakdown[row.status] = Number(row.count);
+  }
+
+  return { ...campaign, breakdown };
+}
+
+/**
+ * Get messages for a campaign with pagination
+ */
+export async function getCampaignMessages(campaignId: number, tenantId: number, opts: {
+  page?: number;
+  pageSize?: number;
+  status?: string;
+} = {}): Promise<{ messages: any[]; total: number }> {
+  const db = await getDb();
+  if (!db) return { messages: [], total: 0 };
+
+  const page = opts.page || 1;
+  const pageSize = opts.pageSize || 50;
+  const offset = (page - 1) * pageSize;
+
+  const conditions = [
+    eq(bulkCampaignMessages.campaignId, campaignId),
+    eq(bulkCampaignMessages.tenantId, tenantId),
+  ];
+  if (opts.status) {
+    conditions.push(eq(bulkCampaignMessages.status, opts.status as any));
+  }
+
+  const [messages, totalResult] = await Promise.all([
+    db.select()
+      .from(bulkCampaignMessages)
+      .where(and(...conditions))
+      .orderBy(bulkCampaignMessages.id)
+      .limit(pageSize)
+      .offset(offset),
+    db.select({ total: count() })
+      .from(bulkCampaignMessages)
+      .where(and(...conditions)),
+  ]);
+
+  return {
+    messages,
+    total: Number(totalResult[0]?.total || 0),
+  };
+}
+
 /**
  * Get active session for a tenant.
- * 
- * Uses a two-layer check:
- * 1. In-memory session (whatsappManager) — the live connection state
- * 2. Database record — persisted state that survives server restarts
- * 
- * If the DB says "connected" but the in-memory session is missing or disconnected,
- * this triggers an automatic reconnect attempt in the background.
  */
 export async function getActiveSessionForTenant(tenantId: number): Promise<{ sessionId: string; status: string } | null> {
   const db = await getDb();
@@ -261,18 +510,14 @@ export async function getActiveSessionForTenant(tenantId: number): Promise<{ ses
 
   // No live connected session found.
   // Check if DB says "connected" — if so, trigger auto-reconnect in background
-  // and return the DB status so the UI knows a session exists.
   for (const s of sessions) {
     if (s.status === "connected") {
-      // Session was connected before server restart but not yet restored.
-      // Trigger reconnect in background (non-blocking).
       const live = whatsappManager.getSession(s.sessionId);
       if (!live) {
         console.log(`[ActiveSession] DB says connected but no in-memory session for ${s.sessionId}. Triggering reconnect (tenant: ${s.tenantId})...`);
-        whatsappManager.connect(s.sessionId, s.userId, s.tenantId).catch(e => {
+        whatsappManager.connect(s.sessionId, s.userId, s.tenantId).catch((e: any) => {
           console.error(`[ActiveSession] Auto-reconnect failed for ${s.sessionId}:`, e);
         });
-        // Return "connecting" so the UI shows a reconnecting state
         return { sessionId: s.sessionId, status: "connecting" };
       }
     }

@@ -1997,3 +1997,32 @@
 - [x] Atualizar registro existente no DB para tenantId correto
 - [x] Escrever 10 testes unitários para validar a correção (rfvActiveSession.test.ts)
 - [x] Todos os testes passando (774 de 777, 3 falhas pré-existentes)
+
+## Registro de Campanhas de Envio em Massa (CONCLUÍDO)
+
+### Schema & Banco de Dados
+- [x] Criar tabela bulk_campaigns (id, tenantId, userId, name, message_template, total_contacts, sent_count, failed_count, skipped_count, status, source, session_id, interval_ms, audience_filter, created_at, started_at, completed_at)
+- [x] Criar tabela bulk_campaign_messages (id, campaignId, tenantId, contactId, contact_name, contact_phone, contact_email, status, message_sent, wa_message_id, error_message, sent_at, delivered_at, read_at)
+- [x] Gerar e aplicar migrações SQL (0029_minor_nightmare.sql)
+
+### Backend
+- [x] DB helpers: createCampaign, updateCampaignStatus, createCampaignMessage, updateMessageStatus, updateCampaignCounters
+- [x] Integrar criação de campanha no fluxo de startBulkSend existente
+- [x] Atualizar status de cada mensagem em tempo real (pending → sending → sent / failed / skipped)
+- [x] tRPC procedures: rfv.campaigns, rfv.campaignDetail, rfv.campaignMessages
+- [x] Atualizar contadores da campanha (sentCount, failedCount, skippedCount) automaticamente
+- [x] userId registrado em cada campanha para rastreabilidade
+
+### Frontend
+- [x] Página /campaigns: lista de campanhas com tabela (nome, data, total, enviados, falhas, status)
+- [x] Página /campaigns/:id: detalhe da campanha com breakdown de status e tabela de mensagens individuais
+- [x] Indicadores visuais: badges de status coloridos, barra de progresso, cards de estatísticas
+- [x] Filtros por status nas mensagens individuais
+- [x] Auto-refresh (3s) quando campanha está em andamento
+- [x] Rotas registradas no App.tsx
+- [x] Botão "Campanhas" na página RFV
+- [x] matchPaths no TopNavLayout para highlight do RFV em /campaigns
+
+### Testes
+- [x] 19 testes unitários passando (campaigns.test.ts)
+- [x] Testes para interpolateTemplate, listCampaigns, getCampaignDetail, getCampaignMessages, getActiveSessionForTenant

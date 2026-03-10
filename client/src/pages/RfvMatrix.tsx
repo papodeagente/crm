@@ -1,6 +1,7 @@
 import { useState, useRef, useMemo, useCallback, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 import { useTenantId } from "@/hooks/useTenantId";
+import { useLocation } from "wouter";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -128,6 +129,7 @@ const templateVars = [
 
 export default function RfvMatrix() {
   const tenantId = useTenantId();
+  const [, setLocation] = useLocation();
   const utils = trpc.useUtils();
 
   // ─── State ───
@@ -413,6 +415,15 @@ export default function RfvMatrix() {
             >
               <Upload className="w-4 h-4 mr-1.5" />
               Importar CSV
+            </Button>
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setLocation("/campaigns")}
+            >
+              <MessageSquare className="w-4 h-4 mr-1.5" />
+              Campanhas
             </Button>
 
             <TooltipProvider>

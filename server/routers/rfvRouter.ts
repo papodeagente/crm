@@ -1,5 +1,5 @@
 /**
- * RFV Router — tRPC endpoints for Matriz RFV
+ * RFV Router — tRPC endpoints for Matriz RFV + Campaign Registry
  */
 import { z } from "zod";
 import { protectedProcedure, router } from "../_core/trpc";
@@ -21,6 +21,9 @@ import {
   getBulkSendProgress,
   cancelBulkSend,
   getActiveSessionForTenant,
+  listCampaigns,
+  getCampaignDetail,
+  getCampaignMessages,
 } from "../bulkMessage";
 import {
   runRfvNotificationCheck,
@@ -118,9 +121,16 @@ export const rfvRouter = router({
       messageTemplate: z.string().min(1).max(4096),
       sessionId: z.string().min(1),
       delayMs: z.number().min(1000).max(30000).optional(),
+      campaignName: z.string().max(255).optional(),
+      audienceFilter: z.string().max(128).optional(),
     }))
-    .mutation(async ({ input }) => {
-      return startBulkSend(input);
+    .mutation(async ({ input, ctx }) => {
+      return startBulkSend({
+        ...input,
+        userId: ctx.user.id,
+        userName: ctx.user.name || undefined,
+        source: "rfv",
+      });
     }),
 
   // ─── Get Bulk Send Progress ───
@@ -158,5 +168,54 @@ export const rfvRouter = router({
     .input(z.object({ tenantId: z.number() }))
     .query(async ({ input }) => {
       return getRfvFilterSnapshots(input.tenantId);
+    }),
+
+  // ═══════════════════════════════════════════════════════
+  // CAMPAIGN REGISTRY
+  // ═══════════════════════════════════════════════════════
+
+  // ─── List Campaigns ───
+  campaigns: protectedProcedure
+    .input(z.object({
+      tenantId: z.number(),
+      page: z.number().optional().default(1),
+      pageSize: z.number().optional().default(20),
+      status: z.string().optional(),
+    }))
+    .query(async ({ input }) => {
+      return listCampaigns(input.tenantId, {
+        page: input.page,
+        pageSize: input.pageSize,
+        status: input.status,
+      });
+    }),
+
+  // ─── Campaign Detail ───
+  campaignDetail: protectedProcedure
+    .input(z.object({
+      campaignId: z.number(),
+      tenantId: z.number(),
+    }))
+    .query(async ({ input }) => {
+      const detail = await getCampaignDetail(input.campaignId, input.tenantId);
+      if (!detail) throw new TRPCError({ code: "NOT_FOUND", message: "Campanha não encontrada" });
+      return detail;
+    }),
+
+  // ─── Campaign Messages ───
+  campaignMessages: protectedProcedure
+    .input(z.object({
+      campaignId: z.number(),
+      tenantId: z.number(),
+      page: z.number().optional().default(1),
+      pageSize: z.number().optional().default(50),
+      status: z.string().optional(),
+    }))
+    .query(async ({ input }) => {
+      return getCampaignMessages(input.campaignId, input.tenantId, {
+        page: input.page,
+        pageSize: input.pageSize,
+        status: input.status,
+      });
     }),
 });

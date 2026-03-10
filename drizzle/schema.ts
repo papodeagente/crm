@@ -1634,3 +1634,63 @@ export const rfvFilterSnapshots = mysqlTable("rfv_filter_snapshots", {
 
 export type RfvFilterSnapshot = typeof rfvFilterSnapshots.$inferSelect;
 export type NewRfvFilterSnapshot = typeof rfvFilterSnapshots.$inferInsert;
+
+
+// ════════════════════════════════════════════════════════════
+// BULK CAMPAIGNS (WhatsApp mass messaging registry)
+// ════════════════════════════════════════════════════════════
+
+export const bulkCampaigns = mysqlTable("bulk_campaigns", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  userId: int("userId").notNull(),
+  userName: varchar("userName", { length: 255 }),
+  name: varchar("name", { length: 255 }).notNull(),
+  messageTemplate: text("messageTemplate").notNull(),
+  source: varchar("source", { length: 64 }).default("rfv").notNull(), // rfv, contacts, manual
+  audienceFilter: varchar("audienceFilter", { length: 128 }), // which filter was active
+  sessionId: varchar("sessionId", { length: 128 }).notNull(),
+  intervalMs: int("intervalMs").default(3000).notNull(),
+  totalContacts: int("totalContacts").default(0).notNull(),
+  sentCount: int("sentCount").default(0).notNull(),
+  failedCount: int("failedCount").default(0).notNull(),
+  skippedCount: int("skippedCount").default(0).notNull(),
+  deliveredCount: int("deliveredCount").default(0).notNull(),
+  readCount: int("readCount").default(0).notNull(),
+  status: mysqlEnum("status", ["running", "completed", "cancelled", "failed"]).default("running").notNull(),
+  startedAt: timestamp("startedAt").defaultNow().notNull(),
+  completedAt: timestamp("completedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (t) => [
+  index("bc_tenant_idx").on(t.tenantId),
+  index("bc_tenant_status_idx").on(t.tenantId, t.status),
+  index("bc_tenant_created_idx").on(t.tenantId, t.createdAt),
+]);
+
+export type BulkCampaign = typeof bulkCampaigns.$inferSelect;
+export type NewBulkCampaign = typeof bulkCampaigns.$inferInsert;
+
+export const bulkCampaignMessages = mysqlTable("bulk_campaign_messages", {
+  id: int("id").autoincrement().primaryKey(),
+  campaignId: int("campaignId").notNull(),
+  tenantId: int("tenantId").notNull(),
+  contactId: int("contactId"),
+  contactName: varchar("contactName", { length: 255 }).notNull(),
+  contactPhone: varchar("contactPhone", { length: 32 }),
+  messageContent: text("messageContent"), // the actual interpolated message sent
+  status: mysqlEnum("status", ["pending", "sending", "sent", "delivered", "read", "failed", "skipped"]).default("pending").notNull(),
+  errorMessage: text("errorMessage"),
+  sentAt: timestamp("sentAt"),
+  deliveredAt: timestamp("deliveredAt"),
+  readAt: timestamp("readAt"),
+  waMessageId: varchar("waMessageId", { length: 256 }), // WhatsApp message ID for tracking delivery/read
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (t) => [
+  index("bcm_campaign_idx").on(t.campaignId),
+  index("bcm_tenant_idx").on(t.tenantId),
+  index("bcm_campaign_status_idx").on(t.campaignId, t.status),
+  index("bcm_wa_msg_idx").on(t.waMessageId),
+]);
+
+export type BulkCampaignMessage = typeof bulkCampaignMessages.$inferSelect;
+export type NewBulkCampaignMessage = typeof bulkCampaignMessages.$inferInsert;
