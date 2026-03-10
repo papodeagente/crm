@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { trpc } from "@/lib/trpc";
 import { useTenantId } from "@/hooks/useTenantId";
 import { useLocation } from "wouter";
+import { AdminOnlyGuard } from "@/components/AdminOnlyGuard";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -207,11 +208,12 @@ export default function DateAutomationSettings() {
   if (!tenantId) return null;
 
   return (
+    <AdminOnlyGuard pageTitle="Automações por data">
     <div className="min-h-screen bg-background">
       <div className="max-w-5xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="flex items-center gap-3 mb-2">
-          <Button variant="ghost" size="icon" onClick={() => setLocation("/settings")}>
+          <Button variant="ghost" size="icon" onClick={() => setLocation("/settings")} style={{ pointerEvents: "auto" }}>
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
@@ -537,5 +539,6 @@ export default function DateAutomationSettings() {
         </DialogContent>
       </Dialog>
     </div>
+    </AdminOnlyGuard>
   );
 }

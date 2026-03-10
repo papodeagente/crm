@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 import { useTenantId } from "@/hooks/useTenantId";
 import { useLocation } from "wouter";
+import { AdminOnlyGuard } from "@/components/AdminOnlyGuard";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -206,11 +207,12 @@ export default function ClassificationSettings() {
   }
 
   return (
+    <AdminOnlyGuard pageTitle="Classificação estratégica">
     <div className="container max-w-5xl py-8 space-y-8">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate("/settings")} className="rounded-xl">
+          <Button variant="ghost" size="icon" onClick={() => navigate("/settings")} className="rounded-xl" style={{ pointerEvents: "auto" }}>
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
@@ -486,5 +488,6 @@ export default function ClassificationSettings() {
         </Card>
       </div>
     </div>
+    </AdminOnlyGuard>
   );
 }

@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { trpc } from "@/lib/trpc";
 import { useTenantId } from "@/hooks/useTenantId";
+import { AdminOnlyGuard } from "@/components/AdminOnlyGuard";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -207,10 +208,11 @@ export default function TaskAutomationSettings() {
   }
 
   return (
+    <AdminOnlyGuard pageTitle="Automação de vendas">
     <div className="page-content max-w-5xl mx-auto">
       {/* Header */}
       <div className="flex items-center gap-3 mb-6">
-        <Button variant="ghost" size="icon" onClick={() => setLocation("/settings")} className="shrink-0">
+        <Button variant="ghost" size="icon" onClick={() => setLocation("/settings")} className="shrink-0" style={{ pointerEvents: "auto" }}>
           <ArrowLeft className="h-5 w-5" />
         </Button>
         <div className="flex items-center gap-3">
@@ -501,5 +503,6 @@ export default function TaskAutomationSettings() {
         </DialogContent>
       </Dialog>
     </div>
+    </AdminOnlyGuard>
   );
 }

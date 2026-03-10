@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { Link } from "wouter";
 import { trpc } from "@/lib/trpc";
+import { AdminOnlyGuard } from "@/components/AdminOnlyGuard";
 import {
   ArrowLeft, Plus, Edit2, Trash2, GripVertical, Eye, EyeOff,
   ChevronDown, ChevronUp, Save, X, Tag, Settings2, Type,
@@ -344,10 +345,11 @@ export default function CustomFieldsSettings() {
   }
 
   return (
+    <AdminOnlyGuard pageTitle="Campos personalizados">
     <div className="container max-w-4xl py-6 space-y-6">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <Link href="/settings">
+        <Link href="/settings" style={{ pointerEvents: "auto" }}>
           <Button variant="ghost" size="icon" className="rounded-full">
             <ArrowLeft className="h-5 w-5" />
           </Button>
@@ -549,5 +551,6 @@ export default function CustomFieldsSettings() {
         </DialogContent>
       </Dialog>
     </div>
+    </AdminOnlyGuard>
   );
 }

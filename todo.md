@@ -2154,3 +2154,20 @@
 - [x] Mover gestão de usuários de "Administração" para "Agentes e Equipes" (inviteAgent procedure + dialog na AgentsTab)
 - [x] Verificar funcionamento do WhatsApp para tenants e novos usuários (corrigido createNotification hardcoded tenantId=1)
 - [x] Testes para as correções acima (13 testes em inviteActivation.test.ts)
+
+## Restrições Admin-Only + RD Station por Tenant
+
+### Admin-Only com mensagem informativa
+- [x] Agentes & Equipes — AdminOnlyGuard com banner + pointer-events:none
+- [x] Administração — AdminOnlyGuard com banner + pointer-events:none
+- [x] Funis de vendas — AdminOnlyGuard com banner + pointer-events:none
+- [x] Campos personalizados — AdminOnlyGuard com banner + pointer-events:none
+- [x] Automação de vendas — AdminOnlyGuard com banner + pointer-events:none
+- [x] Automações por data — AdminOnlyGuard com banner + pointer-events:none
+- [x] Classificação estratégica (RFV) — AdminOnlyGuard com banner + pointer-events:none
+- [x] Badge "Admin" com ícone de cadeado na página de Configurações para todas as 7 páginas
+- [x] Páginas admin agora visíveis para todos (antes /admin era oculto para não-admins)
+- [x] Testes: 14 testes em adminGuard.test.ts
+
+### RD Station CRM Import por Tenant
+- [x] Individualizar importação do RD Station CRM por tenant (usa ctx.saasUser.tenantId da sessão autenticada)

@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
+import { AdminOnlyGuard } from "@/components/AdminOnlyGuard";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -261,10 +262,11 @@ export default function PipelineSettings() {
   const selectedPipeline = activePipelines.find(p => p.id === selectedPipelineId);
 
   return (
+    <AdminOnlyGuard pageTitle="Funis de vendas">
     <div className="page-content max-w-6xl mx-auto">
       {/* Header */}
       <div className="flex items-center gap-3 mb-6">
-        <button onClick={() => setLocation("/settings")} className="h-9 w-9 rounded-xl flex items-center justify-center hover:bg-accent transition-colors">
+        <button onClick={() => setLocation("/settings")} className="h-9 w-9 rounded-xl flex items-center justify-center hover:bg-accent transition-colors" style={{ pointerEvents: "auto" }}>
           <ArrowLeft className="h-4 w-4 text-muted-foreground" />
         </button>
         <div className="h-10 w-10 rounded-xl flex items-center justify-center" style={{
@@ -783,5 +785,6 @@ export default function PipelineSettings() {
         </DialogContent>
       </Dialog>
     </div>
+    </AdminOnlyGuard>
   );
 }

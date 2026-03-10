@@ -101,7 +101,9 @@ export const rdCrmImportRouter = router({
       importLossReasons: z.boolean().default(true),
     }))
     .mutation(async ({ ctx, input }) => {
-      const { tenantId, token } = input;
+      // Use tenantId from authenticated session when available, fallback to input
+      const tenantId = (ctx as any).saasUser?.tenantId ?? input.tenantId;
+      const { token } = input;
       const userId = ctx.user.id;
       const userName = ctx.user.name || "Sistema";
 

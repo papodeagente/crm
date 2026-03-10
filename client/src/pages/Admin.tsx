@@ -1,6 +1,7 @@
 import { trpc } from "@/lib/trpc";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { AdminOnlyGuard } from "@/components/AdminOnlyGuard";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
@@ -98,6 +99,7 @@ export default function Admin() {
   }
 
   return (
+    <AdminOnlyGuard pageTitle="Administração">
     <div className="p-5 lg:px-8 space-y-5">
       {/* Header */}
       <div>
@@ -397,5 +399,6 @@ export default function Admin() {
         </TabsContent>
       </Tabs>
     </div>
+    </AdminOnlyGuard>
   );
 }

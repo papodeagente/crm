@@ -6,7 +6,7 @@ import {
   ChevronRight, Users, Tag, GitBranch,
   Megaphone, Target, XCircle, Package,
   Sparkles, UserPlus, Layers, Database, CalendarClock,
-  Lock, Crown,
+  Lock, Crown, ShieldAlert,
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 
@@ -167,11 +167,7 @@ export default function SettingsPage() {
       {/* Category Grid (3 columns like RD Station) */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-x-10 gap-y-8">
         {settingsCategories.map((category) => {
-          // Filter out admin-only links for non-admin users
-          const visibleLinks = category.links.filter((link) => {
-            if (link.path === "/admin" && !isAdmin) return false;
-            return true;
-          });
+          const visibleLinks = category.links;
           if (visibleLinks.length === 0) return null;
           return (
             <div key={category.title}>
@@ -193,9 +189,9 @@ export default function SettingsPage() {
                         {link.badge}
                       </span>
                     )}
-                    {link.path === "/admin" && (
-                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-600 uppercase">
-                        Admin
+                    {(link.path === "/admin" || link.path === "/settings/agents" || link.path === "/settings/pipelines" || link.path === "/settings/custom-fields" || link.path === "/settings/automations" || link.path === "/settings/date-automations" || link.path === "/settings/classification") && (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-600 uppercase">
+                        <Lock className="h-2.5 w-2.5" /> Admin
                       </span>
                     )}
                   </button>

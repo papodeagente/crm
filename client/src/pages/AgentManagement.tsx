@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { trpc } from "@/lib/trpc";
-
+import { AdminOnlyGuard } from "@/components/AdminOnlyGuard";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -1176,11 +1176,12 @@ export default function AgentManagement() {
   ];
 
   return (
+    <AdminOnlyGuard pageTitle="Agentes & Equipes">
     <div className="page-content max-w-4xl mx-auto">
       {/* Header */}
       <div className="mb-6">
         <div className="flex items-center gap-2 mb-4">
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setLocation("/settings")}>
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setLocation("/settings")} style={{ pointerEvents: "auto" }}>
             <ChevronLeft className="h-4 w-4" />
           </Button>
           <div className="flex items-center gap-3">
@@ -1223,5 +1224,6 @@ export default function AgentManagement() {
       {tab === "teams" && <TeamsTab />}
       {tab === "rules" && <DistributionTab />}
     </div>
+    </AdminOnlyGuard>
   );
 }
