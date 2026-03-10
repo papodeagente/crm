@@ -2176,3 +2176,8 @@
 - [x] Mover aba "Usuários" de Administração para Agentes & Equipes (nova UsersTab com CRUD completo)
 - [x] Mover aba "Equipes" de Administração para Agentes & Equipes (já existia TeamsTab)
 - [x] Remover abas movidas da página Administração (Admin.tsx agora só tem Perfis e Auditoria)
+
+## Unificar abas Agentes e Usuários
+- [x] Combinar funcionalidades de UsersTab (criar usuário, alterar permissão) na AgentsTab (já existiam no AgentsTab via inviteAgent e updateRole)
+- [x] Remover aba "Usuários" e UsersTab component (removido ~210 linhas)
+- [x] Manter apenas 3 abas: Agentes, Equipes, Distribuição
