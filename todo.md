@@ -1965,3 +1965,15 @@
 - [x] Adicionar botão "Reabrir negociação" quando deal status é won ou lost
 - [x] Implementar lógica de reverter status para open (backend já suportava, limpa lossReasonId/lossNotes)
 - [x] Testar reversão de venda ganha — deal voltou para "Aberta" com pipeline visível e histórico registrado (won → open)
+
+## Reestruturação WhatsApp — Conexão Persistente (dias)
+- [x] Analisar código completo do whatsapp.ts e identificar causas de desconexão
+- [x] Persistir auth state no banco de dados (não apenas em memória/arquivo)
+- [x] Implementar heartbeat robusto com health check periódico (5min) verificando WebSocket readyState
+- [x] Reconnect inteligente com backoff exponencial infinito (1.5x, 3s-5min, jitter) — NUNCA desiste
+- [x] Evitar reconexões desnecessárias (tratar connection.update parcial corretamente)
+- [x] Implementar session recovery sem perder auth credentials (auto-restore no startup do servidor)
+- [x] Adicionar logging detalhado de eventos de conexão para diagnóstico (uptime, health checks)
+- [x] Tratar gracefully: network drops (428/408/503/515 = reconexão imediata), server restarts (auto-restore), fatal (401/403 = cleanup)
+- [x] Otimizar config: keepAlive 30s, queryTimeout DISABLED, connectTimeout 45s, Desktop browser, markOnline false
+- [x] Testar compilação e estabilidade (41 testes passando)

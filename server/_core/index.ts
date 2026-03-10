@@ -164,6 +164,15 @@ async function startServer() {
 
     // Start RFV notification scheduler
     import("../rfvNotificationScheduler").then(m => m.startRfvNotificationScheduler());
+
+    // Auto-restore WhatsApp sessions that were connected before server restart
+    // Delayed by 10s to let the server fully initialize first
+    setTimeout(() => {
+      console.log("[WA AutoRestore] Starting auto-restore of WhatsApp sessions...");
+      whatsappManager.autoRestoreSessions().catch(e => {
+        console.error("[WA AutoRestore] Error:", e);
+      });
+    }, 10_000);
   });
 }
 
