@@ -65,7 +65,7 @@ const settingsCategories: SettingsCategory[] = [
     title: "SEU TIME",
     links: [
       { icon: Users, label: "Agentes & Equipes", path: "/settings/agents" },
-      { icon: Shield, label: "Administração", path: "/admin" },
+      { icon: Shield, label: "Administração", path: "/admin", badge: "Perfis & Auditoria" },
     ],
   },
   {

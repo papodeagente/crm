@@ -46,8 +46,11 @@ import {
   Star,
   ArrowUpDown,
   MessageSquare,
+  Building2,
+  Loader2,
+  Lock,
 } from "lucide-react";
-import { formatDateShort } from "../../../shared/dateUtils";
+import { formatDateShort, formatDate } from "../../../shared/dateUtils";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -60,7 +63,7 @@ import { useTenantId } from "@/hooks/useTenantId";
 
 
 // ─── Types ───
-type Tab = "agents" | "teams" | "rules";
+type Tab = "agents" | "teams" | "rules" | "users";
 
 interface Agent {
   id: number;
@@ -1161,6 +1164,220 @@ function DistributionTab() {
 }
 
 // ════════════════════════════════════════════════════════════
+// USUÁRIOS TAB (moved from Admin)
+// ════════════════════════════════════════════════════════════
+
+function UsersTab() {
+  const TENANT_ID = useTenantId();
+  const utils = trpc.useUtils();
+
+  const saasMe = trpc.saasAuth.me.useQuery(undefined, { retry: false, refetchOnWindowFocus: false });
+  const currentUserRole = saasMe.data?.role || "user";
+  const currentUserId = saasMe.data?.userId;
+  const isCurrentAdmin = currentUserRole === "admin";
+
+  const users = trpc.admin.users.list.useQuery({ tenantId: TENANT_ID });
+
+  const [openUser, setOpenUser] = useState(false);
+  const [userName, setUserName] = useState("");
+  const [userEmail, setUserEmail] = useState("");
+  const [userRole, setUserRole] = useState<"admin" | "user">("user");
+  const [updatingRoleFor, setUpdatingRoleFor] = useState<number | null>(null);
+
+  const createUser = trpc.admin.users.create.useMutation({
+    onSuccess: () => {
+      utils.admin.users.list.invalidate();
+      setOpenUser(false);
+      setUserName("");
+      setUserEmail("");
+      setUserRole("user");
+      toast.success("Usuário criado!");
+    },
+    onError: (err) => toast.error(err.message || "Erro ao criar usuário"),
+  });
+
+  const updateUser = trpc.admin.users.update.useMutation({
+    onSuccess: (_data, variables) => {
+      utils.admin.users.list.invalidate();
+      setUpdatingRoleFor(null);
+      const newRole = variables.role === "admin" ? "Administrador" : "Usuário";
+      toast.success(`Permissão alterada para ${newRole}`);
+    },
+    onError: (err) => {
+      setUpdatingRoleFor(null);
+      toast.error(err.message || "Erro ao alterar permissão");
+    },
+  });
+
+  function handleRoleChange(userId: number, newRole: "admin" | "user") {
+    if (userId === currentUserId) {
+      toast.error("Você não pode alterar sua própria permissão");
+      return;
+    }
+    setUpdatingRoleFor(userId);
+    updateUser.mutate({ tenantId: TENANT_ID, id: userId, role: newRole });
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex justify-end">
+        <Dialog open={openUser} onOpenChange={setOpenUser}>
+          <Button className="h-9 gap-2 px-5 rounded-lg bg-primary hover:bg-primary/90 shadow-sm text-[13px] font-medium transition-colors" onClick={() => setOpenUser(true)}>
+            <Plus className="h-4 w-4" />Novo Usuário
+          </Button>
+          <DialogContent className="sm:max-w-[440px] rounded-2xl">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2.5 text-lg">
+                <div className="h-9 w-9 rounded-xl bg-primary/10 flex items-center justify-center"><Users className="h-4 w-4 text-primary" /></div>
+                Novo Usuário
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 pt-3">
+              <div>
+                <label className="text-[12px] font-medium">Nome *</label>
+                <Input value={userName} onChange={(e) => setUserName(e.target.value)} placeholder="Nome completo" className="mt-1.5 h-10 rounded-xl" />
+              </div>
+              <div>
+                <label className="text-[12px] font-medium">Email *</label>
+                <Input value={userEmail} onChange={(e) => setUserEmail(e.target.value)} placeholder="email@exemplo.com" type="email" className="mt-1.5 h-10 rounded-xl" />
+              </div>
+              <div>
+                <label className="text-[12px] font-medium">Permissão *</label>
+                <Select value={userRole} onValueChange={(v) => setUserRole(v as "admin" | "user")}>
+                  <SelectTrigger className="mt-1.5 h-10 rounded-xl">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="user">
+                      <div className="flex items-center gap-2">
+                        <Shield className="h-3.5 w-3.5 text-blue-500" />
+                        <span>Usuário</span>
+                        <span className="text-[10px] text-muted-foreground ml-1">— Vê apenas seus próprios dados</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="admin">
+                      <div className="flex items-center gap-2">
+                        <Crown className="h-3.5 w-3.5 text-amber-500" />
+                        <span>Administrador</span>
+                        <span className="text-[10px] text-muted-foreground ml-1">— Acesso total ao tenant</span>
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button
+                className="w-full h-11 rounded-lg text-[14px] font-medium bg-primary hover:bg-primary/90 shadow-sm transition-colors"
+                disabled={!userName || !userEmail || createUser.isPending}
+                onClick={() => createUser.mutate({ tenantId: TENANT_ID, name: userName, email: userEmail, role: userRole, origin: window.location.origin })}
+              >
+                {createUser.isPending ? "Criando..." : "Criar Usuário"}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      </div>
+
+      <div className="border border-border/40 shadow-none rounded-xl overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-[13px]">
+            <thead><tr className="border-b border-border/30 bg-muted/20">
+              <th className="text-left p-3.5 font-semibold text-muted-foreground">Nome</th>
+              <th className="text-left p-3.5 font-semibold text-muted-foreground">Email</th>
+              <th className="text-left p-3.5 font-semibold text-muted-foreground">Permissão</th>
+              <th className="text-left p-3.5 font-semibold text-muted-foreground">Status</th>
+              <th className="text-left p-3.5 font-semibold text-muted-foreground">Criado em</th>
+            </tr></thead>
+            <tbody>
+              {users.isLoading ? <tr><td colSpan={5} className="p-12 text-center text-muted-foreground text-sm">Carregando...</td></tr>
+              : !users.data?.length ? (
+                <tr><td colSpan={5} className="p-12 text-center text-muted-foreground">
+                  <Users className="h-10 w-10 mx-auto mb-3 text-muted-foreground/30" />
+                  <p className="text-sm">Nenhum usuário CRM cadastrado.</p>
+                </td></tr>
+              ) : users.data.map((u: any) => {
+                const isSelf = u.id === currentUserId;
+                const isUpdating = updatingRoleFor === u.id;
+                return (
+                  <tr key={u.id} className="border-b border-border/20 hover:bg-muted/20 transition-colors">
+                    <td className="p-3.5">
+                      <div className="flex items-center gap-2.5">
+                        <div className="h-8 w-8 rounded-full bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center text-[11px] font-bold text-primary">{(u.name || "?")[0]?.toUpperCase()}</div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold">{u.name}</span>
+                          {isSelf && (
+                            <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-primary/10 text-primary">Você</span>
+                          )}
+                        </div>
+                      </div>
+                    </td>
+                    <td className="p-3.5 text-muted-foreground">{u.email}</td>
+                    <td className="p-3.5">
+                      {isSelf ? (
+                        u.role === "admin" ? (
+                          <span className="inline-flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-600 border border-amber-500/20">
+                            <Crown className="h-3 w-3" /> Administrador
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded-full bg-blue-500/10 text-blue-600 border border-blue-500/20">
+                            <Shield className="h-3 w-3" /> Usuário
+                          </span>
+                        )
+                      ) : isUpdating ? (
+                        <span className="inline-flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded-full bg-muted text-muted-foreground">
+                          <Loader2 className="h-3 w-3 animate-spin" /> Alterando...
+                        </span>
+                      ) : (
+                        <Select
+                          value={u.role || "user"}
+                          onValueChange={(newRole) => handleRoleChange(u.id, newRole as "admin" | "user")}
+                        >
+                          <SelectTrigger className="h-8 w-[180px] rounded-lg border-border/40 text-[12px] font-medium bg-transparent hover:bg-muted/30 transition-colors [&>span]:flex [&>span]:items-center [&>span]:gap-1.5">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="admin">
+                              <div className="flex items-center gap-2">
+                                <Crown className="h-3.5 w-3.5 text-amber-500" />
+                                <span className="font-medium">Administrador</span>
+                              </div>
+                            </SelectItem>
+                            <SelectItem value="user">
+                              <div className="flex items-center gap-2">
+                                <Shield className="h-3.5 w-3.5 text-blue-500" />
+                                <span className="font-medium">Usuário</span>
+                              </div>
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                      )}
+                    </td>
+                    <td className="p-3.5">
+                      <span className={`inline-flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded-full ${
+                        u.status === "active" ? "bg-emerald-50 text-emerald-700" :
+                        u.status === "invited" ? "bg-amber-50 text-amber-700" :
+                        "bg-zinc-100 text-zinc-600"
+                      }`}>
+                        <span className={`h-1.5 w-1.5 rounded-full ${
+                          u.status === "active" ? "bg-emerald-500" :
+                          u.status === "invited" ? "bg-amber-500" :
+                          "bg-zinc-400"
+                        }`} />
+                        {u.status === "active" ? "Ativo" : u.status === "invited" ? "Convidado" : u.status === "inactive" ? "Inativo" : u.status || "Ativo"}
+                      </span>
+                    </td>
+                    <td className="p-3.5 text-muted-foreground">{u.createdAt ? formatDate(u.createdAt) : "—"}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════
 // MAIN PAGE
 // ════════════════════════════════════════════════════════════
 
@@ -1171,6 +1388,7 @@ export default function AgentManagement() {
 
   const tabs: { id: Tab; label: string; icon: any }[] = [
     { id: "agents", label: "Agentes", icon: Users },
+    { id: "users", label: "Usuários", icon: UserPlus },
     { id: "teams", label: "Equipes", icon: Shield },
     { id: "rules", label: "Distribuição", icon: Shuffle },
   ];
@@ -1221,6 +1439,7 @@ export default function AgentManagement() {
 
       {/* Tab Content */}
       {tab === "agents" && <AgentsTab />}
+      {tab === "users" && <UsersTab />}
       {tab === "teams" && <TeamsTab />}
       {tab === "rules" && <DistributionTab />}
     </div>

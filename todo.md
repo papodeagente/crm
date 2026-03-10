@@ -2171,3 +2171,8 @@
 
 ### RD Station CRM Import por Tenant
 - [x] Individualizar importação do RD Station CRM por tenant (usa ctx.saasUser.tenantId da sessão autenticada)
+
+## Mover Usuários e Equipes para Agentes & Equipes
+- [x] Mover aba "Usuários" de Administração para Agentes & Equipes (nova UsersTab com CRUD completo)
+- [x] Mover aba "Equipes" de Administração para Agentes & Equipes (já existia TeamsTab)
+- [x] Remover abas movidas da página Administração (Admin.tsx agora só tem Perfis e Auditoria)
