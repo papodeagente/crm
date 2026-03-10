@@ -593,7 +593,7 @@ class WhatsAppManager extends EventEmitter {
         // ─── Conversation Identity Resolver ───
         let waConversationId: number | undefined;
         try {
-          const resolved = await resolveInbound(1, sessionId, remoteJid, msg.pushName || null);
+          const resolved = await resolveInbound(resolvedTenantId, sessionId, remoteJid, msg.pushName || null);
           waConversationId = resolved.conversationId;
         } catch (e) {
           console.error("[ConvResolver] Error resolving inbound:", e);
@@ -1061,7 +1061,8 @@ class WhatsAppManager extends EventEmitter {
     // ─── Resolve outbound conversation ───
     let waConversationId: number | undefined;
     try {
-      const resolved = await resolveOutbound(1, sessionId, formattedJid);
+      const sState = this.sessions.get(sessionId);
+      const resolved = await resolveOutbound(sState?.tenantId ?? 0, sessionId, formattedJid);
       waConversationId = resolved.conversationId;
     } catch (e) {
       console.error("[ConvResolver] Error resolving outbound:", e);
@@ -1129,7 +1130,8 @@ class WhatsAppManager extends EventEmitter {
     // ─── Resolve outbound conversation ───
     let waConversationId: number | undefined;
     try {
-      const resolved = await resolveOutbound(1, sessionId, formattedJid);
+      const sState = this.sessions.get(sessionId);
+      const resolved = await resolveOutbound(sState?.tenantId ?? 0, sessionId, formattedJid);
       waConversationId = resolved.conversationId;
     } catch (e) {
       console.error("[ConvResolver] Error resolving outbound media:", e);

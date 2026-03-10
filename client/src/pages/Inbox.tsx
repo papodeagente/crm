@@ -12,6 +12,7 @@ import {
 import { formatTime } from "../../../shared/dateUtils";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
+import { useTenantId } from "@/hooks/useTenantId";
 
 /* ═══════════════════════════════════════════════════════
    NOTIFICATION SOUND (Web Audio API — WhatsApp style)
@@ -279,6 +280,7 @@ function CreateContactDialog({
 }: {
   open: boolean; onClose: () => void; phone: string; pushName: string; onCreated: () => void;
 }) {
+  const tenantId = useTenantId();
   const [name, setName] = useState(pushName || "");
   const [email, setEmail] = useState("");
   const [notes, setNotes] = useState("");
@@ -303,7 +305,7 @@ function CreateContactDialog({
       const cleaned = phone.replace(/\D/g, "");
       const formatted = cleaned.startsWith("55") ? `+${cleaned}` : `+55${cleaned}`;
       await createContact.mutateAsync({
-        tenantId: 1,
+        tenantId,
         name: name.trim(),
         phone: formatted,
         email: email.trim() || undefined,
@@ -395,16 +397,17 @@ function CreateDealDialog({
 }: {
   open: boolean; onClose: () => void; contactName: string; contactPhone: string; contactJid: string; sessionId: string;
 }) {
+  const tenantId = useTenantId();
   const [, navigate] = useLocation();
   const [title, setTitle] = useState(`Negociação - ${contactName}`);
   const [value, setValue] = useState("");
 
-  const pipelinesQ = trpc.crm.pipelines.list.useQuery({ tenantId: 1 });
+  const pipelinesQ = trpc.crm.pipelines.list.useQuery({ tenantId });
   const pipelines = (pipelinesQ.data || []) as any[];
   const [selectedPipelineId, setSelectedPipelineId] = useState<number | null>(null);
 
   const stagesQ = trpc.crm.pipelines.stages.useQuery(
-    { tenantId: 1, pipelineId: selectedPipelineId! },
+    { tenantId, pipelineId: selectedPipelineId! },
     { enabled: !!selectedPipelineId }
   );
   const stages = (stagesQ.data || []) as any[];
@@ -424,7 +427,7 @@ function CreateDealDialog({
 
   const createDeal = trpc.crm.deals.create.useMutation();
   const createContact = trpc.crm.contacts.create.useMutation();
-  const contactsQ = trpc.crm.contacts.list.useQuery({ tenantId: 1, limit: 500 });
+  const contactsQ = trpc.crm.contacts.list.useQuery({ tenantId, limit: 500 });
 
   const handleCreate = async () => {
     if (!title.trim() || !selectedPipelineId || !selectedStageId) return;
@@ -439,13 +442,13 @@ function CreateDealDialog({
 
       if (!contactId) {
         const newContact = await createContact.mutateAsync({
-          tenantId: 1, name: contactName, phone: formatted,
+          tenantId, name: contactName, phone: formatted,
         });
         contactId = (newContact as any).id;
       }
 
       const deal = await createDeal.mutateAsync({
-        tenantId: 1, title: title.trim(),
+        tenantId, title: title.trim(),
         pipelineId: selectedPipelineId, stageId: selectedStageId,
         contactId: contactId || undefined,
       });
@@ -529,7 +532,8 @@ function NewChatPanel({
   const [resolving, setResolving] = useState(false);
   const [resolveError, setResolveError] = useState("");
 
-  const contactsQ = trpc.crm.contacts.list.useQuery({ tenantId: 1, limit: 500 }, { enabled: open });
+  const tenantId = useTenantId();
+  const contactsQ = trpc.crm.contacts.list.useQuery({ tenantId, limit: 500 }, { enabled: open });
   const trpcUtils = trpc.useUtils();
 
   const contacts = useMemo(() => {
@@ -722,6 +726,7 @@ function NoSession() {
 type AgentFilter = "all" | "unread" | "mine" | "unassigned";
 
 export default function InboxPage() {
+  const tenantId = useTenantId();
   const { lastMessage } = useSocket();
   const [selectedJid, setSelectedJid] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -757,12 +762,12 @@ export default function InboxPage() {
 
   // Multi-agent: use the new conversationsMultiAgent endpoint
   const conversationsQ = trpc.whatsapp.conversationsMultiAgent.useQuery(
-    { sessionId: activeSession?.sessionId || "", tenantId: 1 },
+    { sessionId: activeSession?.sessionId || "", tenantId },
     { enabled: !!activeSession?.sessionId, refetchInterval: isConnected ? 8000 : 30000 }
   );
 
   // Agents list for assignment
-  const agentsQ = trpc.whatsapp.agents.useQuery({ tenantId: 1 });
+  const agentsQ = trpc.whatsapp.agents.useQuery({ tenantId });
   const agents = useMemo(() => (agentsQ.data || []) as Array<{ id: number; name: string; email: string; avatarUrl?: string | null; status: string }>, [agentsQ.data]);
 
   // Assignment mutations
@@ -775,7 +780,7 @@ export default function InboxPage() {
   });
 
   const contactsQ = trpc.crm.contacts.list.useQuery(
-    { tenantId: 1, limit: 500 },
+    { tenantId, limit: 500 },
     { enabled: true }
   );
 
@@ -935,7 +940,7 @@ export default function InboxPage() {
   const handleAssign = useCallback((agentId: number | null) => {
     if (!selectedJid || !activeSession?.sessionId) return;
     assignMutation.mutate({
-      tenantId: 1,
+      tenantId,
       sessionId: activeSession.sessionId,
       remoteJid: selectedJid,
       assignedUserId: agentId,
@@ -946,7 +951,7 @@ export default function InboxPage() {
   const handleStatusChange = useCallback((status: "open" | "pending" | "resolved" | "closed") => {
     if (!selectedJid || !activeSession?.sessionId) return;
     updateStatusMutation.mutate({
-      tenantId: 1,
+      tenantId,
       sessionId: activeSession.sessionId,
       remoteJid: selectedJid,
       status,

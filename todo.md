@@ -2188,3 +2188,13 @@
 ## Bug Fix — Usuário adicionado não aparece na lista de agentes
 - [x] Investigar por que marcio.dias@boxtour.com.br não aparece na lista após ser adicionado ao tenant Boxtour (query usava cu.role mas coluna real é crm_user_role)
 - [x] Corrigir o problema de listagem (getAgentsWithTeams em db.ts corrigido para usar cu.crm_user_role)
+
+## Bug Fix — Respostas de clientes não aparecem no WhatsApp do tenant
+- [x] Investigar por que as respostas dos clientes não são exibidas nas instâncias de WhatsApp dos tenants
+- [x] Verificar fluxo de recebimento de mensagens (incoming messages) e armazenamento por tenant
+- [x] Corrigir o problema mantendo estabilidade total:
+  - Backend whatsapp.ts: resolveInbound/resolveOutbound/createNotification usavam tenantId=1 hardcoded, agora usam resolvedTenantId da sessão
+  - Frontend Inbox.tsx: 11 ocorrências de tenantId:1 substituídas por useTenantId()
+  - Frontend TopNavLayout.tsx: 2 ocorrências corrigidas (busca global + notificações)
+  - Frontend ConversationDebug.tsx: 3 ocorrências corrigidas
+  - Backend whatsapp.ts: 2 resolveOutbound com fallback ||1 corrigidos para ??0

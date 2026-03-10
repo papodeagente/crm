@@ -20,6 +20,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { Link, useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from "./DashboardLayoutSkeleton";
 import { trpc } from "@/lib/trpc";
+import { useTenantId } from "@/hooks/useTenantId";
 
 /* ─── Top Nav Items ─── */
 interface NavItem {
@@ -69,6 +70,7 @@ function SearchPalette({ open, onClose }: { open: boolean; onClose: () => void }
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [, setLocation] = useLocation();
   const [selectedIdx, setSelectedIdx] = useState(0);
+  const tenantId = useTenantId();
 
   // Debounce 300ms
   useEffect(() => {
@@ -78,7 +80,7 @@ function SearchPalette({ open, onClose }: { open: boolean; onClose: () => void }
 
   // tRPC search query
   const searchQ = trpc.search.global.useQuery(
-    { tenantId: 1, query: debouncedQuery, limit: 5 },
+    { tenantId, query: debouncedQuery, limit: 5 },
     { enabled: open && debouncedQuery.length >= 1 }
   );
 
@@ -374,8 +376,9 @@ function TopBar({ onSearchOpen, mobileMenuOpen, onToggleMobile }: {
   const { user, logout } = useAuth();
   const [location, setLocation] = useLocation();
   const themeCtx = useTheme();
+  const tenantId = useTenantId();
   const unreadCount = trpc.notifications.unreadCount.useQuery(
-    { tenantId: 1 },
+    { tenantId },
     { refetchInterval: 30000 }
   );
   const saasMe = trpc.saasAuth.me.useQuery(undefined, {
