@@ -2148,3 +2148,9 @@
 - [x] Identificar e corrigir o problema de importação de leads convertidos (tenantId hardcoded como 1, agora resolvido pelo token)
 - [x] Verificar rota, parsing do payload, e criação de contato no CRM
 - [x] Testes unitários para o webhook (32 testes passando, incluindo 4 novos para resolução de tenant por token)
+
+## Correções Pontuais — Convite, Agentes e WhatsApp
+- [x] Marcar usuário como ativo na lista ao aceitar convite do tenant (saasAuth.ts: status invited→active no login)
+- [x] Mover gestão de usuários de "Administração" para "Agentes e Equipes" (inviteAgent procedure + dialog na AgentsTab)
+- [x] Verificar funcionamento do WhatsApp para tenants e novos usuários (corrigido createNotification hardcoded tenantId=1)
+- [x] Testes para as correções acima (13 testes em inviteActivation.test.ts)

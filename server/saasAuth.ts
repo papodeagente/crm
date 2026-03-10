@@ -196,8 +196,12 @@ export async function loginWithEmail(email: string, password: string) {
     }
   }
 
-  // Update last login
-  await db.update(crmUsers).set({ lastLoginAt: new Date() }).where(eq(crmUsers.id, user.id));
+  // Update last login — and activate invited users on first login
+  const updateFields: Record<string, any> = { lastLoginAt: new Date() };
+  if (user.status === "invited") {
+    updateFields.status = "active";
+  }
+  await db.update(crmUsers).set(updateFields).where(eq(crmUsers.id, user.id));
 
   // Determine role: owner is always admin, otherwise use DB role
   const isOwner = tenant.ownerUserId === user.id;

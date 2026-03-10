@@ -154,6 +154,11 @@ function AgentsTab() {
   const TENANT_ID = useTenantId();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [showInvite, setShowInvite] = useState(false);
+  const [inviteName, setInviteName] = useState("");
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [invitePhone, setInvitePhone] = useState("");
+  const [inviteRole, setInviteRole] = useState<"admin" | "user">("user");
   const utils = trpc.useUtils();
 
   // Current user info to check if admin
@@ -178,6 +183,19 @@ function AgentsTab() {
       toast.success("Permissão atualizada com sucesso");
     },
     onError: (err) => toast.error(err.message || "Erro ao atualizar permissão"),
+  });
+
+  const inviteAgent = trpc.teamManagement.inviteAgent.useMutation({
+    onSuccess: () => {
+      utils.teamManagement.listAgents.invalidate();
+      setShowInvite(false);
+      setInviteName("");
+      setInviteEmail("");
+      setInvitePhone("");
+      setInviteRole("user");
+      toast.success("Convite enviado com sucesso! O agente receberá um email com as credenciais.");
+    },
+    onError: (err) => toast.error(err.message || "Erro ao convidar agente"),
   });
 
   const filtered = useMemo(() => {
@@ -226,8 +244,17 @@ function AgentsTab() {
         ))}
       </div>
 
-      {/* Filters */}
+      {/* Invite Button + Filters */}
       <div className="flex flex-col sm:flex-row gap-3">
+        {isCurrentAdmin && (
+          <Button
+            onClick={() => setShowInvite(true)}
+            className="gap-2 shrink-0"
+          >
+            <UserPlus className="h-4 w-4" />
+            Convidar Agente
+          </Button>
+        )}
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
@@ -250,6 +277,73 @@ function AgentsTab() {
         </Select>
       </div>
 
+      {/* Invite Agent Dialog */}
+      <Dialog open={showInvite} onOpenChange={setShowInvite}>
+        <DialogContent className="sm:max-w-[440px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2.5 text-lg">
+              <div className="h-9 w-9 rounded-xl bg-primary/10 flex items-center justify-center"><UserPlus className="h-4 w-4 text-primary" /></div>
+              Convidar Agente
+            </DialogTitle>
+            <DialogDescription>O agente receberá um email com login e senha temporária.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div>
+              <label className="text-[12px] font-medium text-foreground">Nome *</label>
+              <Input value={inviteName} onChange={e => setInviteName(e.target.value)} placeholder="Nome completo" className="mt-1.5" />
+            </div>
+            <div>
+              <label className="text-[12px] font-medium text-foreground">Email *</label>
+              <Input value={inviteEmail} onChange={e => setInviteEmail(e.target.value)} placeholder="email@exemplo.com" type="email" className="mt-1.5" />
+            </div>
+            <div>
+              <label className="text-[12px] font-medium text-foreground">Telefone</label>
+              <Input value={invitePhone} onChange={e => setInvitePhone(e.target.value)} placeholder="(11) 99999-9999" className="mt-1.5" />
+            </div>
+            <div>
+              <label className="text-[12px] font-medium text-foreground">Permissão *</label>
+              <Select value={inviteRole} onValueChange={v => setInviteRole(v as "admin" | "user")}>
+                <SelectTrigger className="mt-1.5">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="user">
+                    <div className="flex items-center gap-2">
+                      <Shield className="h-3.5 w-3.5 text-blue-500" />
+                      <span>Usuário</span>
+                      <span className="text-[10px] text-muted-foreground ml-1">— Vê apenas seus dados</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="admin">
+                    <div className="flex items-center gap-2">
+                      <Crown className="h-3.5 w-3.5 text-amber-500" />
+                      <span>Administrador</span>
+                      <span className="text-[10px] text-muted-foreground ml-1">— Acesso total</span>
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowInvite(false)}>Cancelar</Button>
+            <Button
+              disabled={!inviteName.trim() || !inviteEmail.trim() || inviteAgent.isPending}
+              onClick={() => inviteAgent.mutate({
+                tenantId: TENANT_ID,
+                name: inviteName,
+                email: inviteEmail,
+                phone: invitePhone || undefined,
+                role: inviteRole,
+                origin: window.location.origin,
+              })}
+            >
+              {inviteAgent.isPending ? "Enviando..." : "Enviar Convite"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Agent List */}
       {isLoading ? (
         <div className="space-y-3">
@@ -269,7 +363,7 @@ function AgentsTab() {
         <div className="surface p-12 text-center">
           <Users className="h-12 w-12 text-muted-foreground/30 mx-auto mb-3" />
           <p className="text-muted-foreground">Nenhum agente encontrado</p>
-          <p className="text-xs text-muted-foreground/60 mt-1">Cadastre agentes na seção Administração do CRM</p>
+          <p className="text-xs text-muted-foreground/60 mt-1">{isCurrentAdmin ? "Clique em \"Convidar Agente\" para adicionar membros" : "Solicite ao administrador para adicionar agentes"}</p>
         </div>
       ) : (
         <div className="space-y-2">

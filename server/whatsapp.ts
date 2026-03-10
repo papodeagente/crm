@@ -332,14 +332,14 @@ class WhatsAppManager extends EventEmitter {
           if (fs.existsSync(sessionDir)) {
             fs.rmSync(sessionDir, { recursive: true, force: true });
           }
-          // Notify user
-          try {
-            await createNotification(1, {
-              type: "whatsapp_disconnected",
-              title: "WhatsApp Desconectado Permanentemente",
-              body: `Sessão "${sessionId}" foi ${statusCode === 401 ? "deslogada" : "banida"}. Reconecte manualmente com novo QR Code.`,
-              entityType: "session",
-              entityId: sessionId,
+           // Notify user
+           try {
+             await createNotification(resolvedTenantId, {
+               type: "whatsapp_disconnected",
+               title: "WhatsApp Desconectado Permanentemente",
+               body: `Sessão "${sessionId}" foi ${statusCode === 401 ? "deslogada" : "banida"}. Reconecte manualmente com novo QR Code.`,
+               entityType: "session",
+               entityId: sessionId,
             });
           } catch (e) { console.error("Error creating fatal notification:", e); }
           return;
@@ -353,13 +353,13 @@ class WhatsAppManager extends EventEmitter {
           if (fs.existsSync(sessionDir)) {
             fs.rmSync(sessionDir, { recursive: true, force: true });
           }
-          try {
-            await createNotification(1, {
-              type: "whatsapp_disconnected",
-              title: "WhatsApp — Sessão Corrompida",
-              body: `Sessão "${sessionId}" teve dados corrompidos. Reconecte com novo QR Code.`,
-              entityType: "session",
-              entityId: sessionId,
+           try {
+             await createNotification(resolvedTenantId, {
+               type: "whatsapp_disconnected",
+               title: "WhatsApp — Sessão Corrompida",
+               body: `Sessão "${sessionId}" teve dados corrompidos. Reconecte com novo QR Code.`,
+               entityType: "session",
+               entityId: sessionId,
             });
           } catch (e) { console.error("Error creating bad session notification:", e); }
           return;
@@ -371,13 +371,13 @@ class WhatsAppManager extends EventEmitter {
 
         // Notify on first disconnect and every 10 attempts
         if (attempts === 0 || attempts % 10 === 0) {
-          try {
-            await createNotification(1, {
-              type: "whatsapp_disconnected",
-              title: "WhatsApp Reconectando",
-              body: `Sessão "${sessionId}" desconectada (código: ${statusCode}). Reconectando automaticamente (tentativa ${attempts + 1})...`,
-              entityType: "session",
-              entityId: sessionId,
+           try {
+             await createNotification(resolvedTenantId, {
+               type: "whatsapp_disconnected",
+               title: "WhatsApp Reconectando",
+               body: `Sessão "${sessionId}" desconectada (código: ${statusCode}). Reconectando automaticamente (tentativa ${attempts + 1})...`,
+               entityType: "session",
+               entityId: sessionId,
             });
           } catch (e) { console.error("Error creating reconnect notification:", e); }
         }
@@ -405,7 +405,7 @@ class WhatsAppManager extends EventEmitter {
 
         // notifyOwner desativado — notificações apenas in-app
         try {
-          await createNotification(1, {
+          await createNotification(resolvedTenantId, {
             type: "whatsapp_connected",
             title: "WhatsApp Conectado",
             body: `Sessão "${sessionId}" conectada como ${sock.user?.name || sock.user?.id}.`,
@@ -675,8 +675,9 @@ class WhatsAppManager extends EventEmitter {
         // Notificação apenas in-app (notifyOwner/email desativado)
         if (!fromMe && content) {
           const senderName = msg.pushName || remoteJid.replace("@s.whatsapp.net", "");
+          const msgTenantId = this.sessions.get(sessionId)?.tenantId || resolvedTenantId || 1;
           try {
-            await createNotification(1, {
+            await createNotification(msgTenantId, {
               type: "whatsapp_message",
               title: `Nova mensagem de ${senderName}`,
               body: content.substring(0, 300),

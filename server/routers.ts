@@ -664,6 +664,39 @@ export const appRouter = router({
         return { success: true };
       }),
     // ── Agents ──
+    inviteAgent: protectedProcedure
+      .input(z.object({
+        tenantId: z.number(),
+        name: z.string().min(1),
+        email: z.string().email(),
+        phone: z.string().optional(),
+        role: z.enum(["admin", "user"]).default("user"),
+        origin: z.string().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        // Only admins can invite agents
+        if (ctx.saasUser?.role !== "admin") {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Apenas administradores podem convidar agentes" });
+        }
+        try {
+          const { inviteUserToTenant } = await import("../saasAuth");
+          const result = await inviteUserToTenant({
+            tenantId: input.tenantId,
+            name: input.name,
+            email: input.email,
+            phone: input.phone,
+            role: input.role,
+            inviterName: ctx.user.name || "Administrador",
+            origin: input.origin || "https://crm.acelerador.tur.br",
+          });
+          return { success: true, userId: result.userId, emailSent: result.emailSent };
+        } catch (e: any) {
+          if (e.message === "EMAIL_EXISTS_IN_TENANT") {
+            throw new TRPCError({ code: "CONFLICT", message: "Este email já está cadastrado neste tenant" });
+          }
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: e.message || "Erro ao convidar agente" });
+        }
+      }),
     listAgents: protectedProcedure
       .input(z.object({ tenantId: z.number().default(1) }))
       .query(async ({ input }) => getAgentsWithTeams(input.tenantId)),
