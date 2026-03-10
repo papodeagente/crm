@@ -1163,7 +1163,7 @@ function DistributionTab() {
 }
 
 // (UsersTab removed - unified into AgentsTab)
-// The functionality is now part of AgentsTab above.
+// All user management functionality is now part of AgentsTab above.
 
 
 
