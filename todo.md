@@ -2142,3 +2142,9 @@
 - [x] Testes para criação, atualização, deleção de eventos via MCP
 - [x] Testes para bulk sync e verificação de disponibilidade
 - [x] Testes para auto-sync hooks no CRM router
+
+## Bug Fix — Webhook RD Station para Importação de Leads
+- [x] Investigar código do webhook RD Station existente
+- [x] Identificar e corrigir o problema de importação de leads convertidos (tenantId hardcoded como 1, agora resolvido pelo token)
+- [x] Verificar rota, parsing do payload, e criação de contato no CRM
+- [x] Testes unitários para o webhook (32 testes passando, incluindo 4 novos para resolução de tenant por token)

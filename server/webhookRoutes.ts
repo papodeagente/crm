@@ -668,7 +668,6 @@ router.options("/api/collect", (_req: Request, res: Response) => {
 // ─── RD Station Marketing Webhook ───────────────────────
 
 router.post("/api/webhooks/rdstation", async (req: Request, res: Response) => {
-  const tenantId = 1;
   const clientIp = req.ip || req.socket.remoteAddress || "unknown";
 
   try {
@@ -690,22 +689,23 @@ router.post("/api/webhooks/rdstation", async (req: Request, res: Response) => {
       return res.status(500).json({ error: "Service unavailable" });
     }
 
-    // 3. Validate token against config
-    const configRows = await db
+    // 3. Validate token against ALL configs (resolve tenantId from token)
+    // Previously hardcoded tenantId=1 which caused "Nenhum pipeline encontrado" errors
+    // because pipelines exist on different tenantIds. Now we look up by token directly.
+    const allConfigs = await db
       .select()
       .from(rdStationConfig)
-      .where(eq(rdStationConfig.tenantId, tenantId))
-      .limit(1);
+      .where(eq(rdStationConfig.isActive, true));
 
-    if (configRows.length === 0 || configRows[0]!.webhookToken !== token) {
+    const config = allConfigs.find(c => c.webhookToken === token);
+    if (!config) {
       console.warn("[RD Station Webhook] Invalid token");
       return res.status(403).json({ error: "Invalid token" });
     }
 
-    const config = configRows[0]!;
-    if (!config.isActive) {
-      return res.status(503).json({ error: "Integration is disabled" });
-    }
+    // Use the tenantId from the matched config
+    const tenantId = config.tenantId;
+    console.log(`[RD Station Webhook] Token matched → tenantId=${tenantId}, configId=${config.id}`);
 
     // 4. Parse RD Station payload
     // RD Station sends: { leads: [ { id, email, name, ... } ] }

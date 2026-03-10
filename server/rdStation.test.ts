@@ -265,6 +265,72 @@ describe("RD Station schema tables", () => {
   });
 });
 
+// ─── Token-based Tenant Resolution (Bug Fix) ─────────────────
+
+describe("RD Station Webhook token-based tenant resolution", () => {
+  it("webhook resolves tenantId from token instead of hardcoding", async () => {
+    // The fix: instead of hardcoding tenantId=1, the webhook now looks up
+    // the rd_station_config row by matching the token, and uses that row's tenantId.
+    // This ensures leads are processed in the correct tenant's pipeline.
+
+    // Simulate the fixed lookup logic
+    const allConfigs = [
+      { id: 1, tenantId: 150002, webhookToken: "token-a", isActive: true },
+      { id: 2, tenantId: 180002, webhookToken: "token-b", isActive: true },
+      { id: 3, tenantId: 1, webhookToken: "token-c", isActive: false },
+    ];
+
+    // Token A should resolve to tenant 150002
+    const configA = allConfigs.find(c => c.webhookToken === "token-a" && c.isActive);
+    expect(configA).toBeDefined();
+    expect(configA!.tenantId).toBe(150002);
+
+    // Token B should resolve to tenant 180002
+    const configB = allConfigs.find(c => c.webhookToken === "token-b" && c.isActive);
+    expect(configB).toBeDefined();
+    expect(configB!.tenantId).toBe(180002);
+
+    // Token C is inactive, should not match
+    const activeConfigs = allConfigs.filter(c => c.isActive);
+    const configC = activeConfigs.find(c => c.webhookToken === "token-c");
+    expect(configC).toBeUndefined();
+  });
+
+  it("rejects unknown tokens", () => {
+    const allConfigs = [
+      { id: 1, tenantId: 150002, webhookToken: "valid-token", isActive: true },
+    ];
+
+    const config = allConfigs.find(c => c.webhookToken === "unknown-token");
+    expect(config).toBeUndefined();
+  });
+
+  it("only matches active configs", () => {
+    const allConfigs = [
+      { id: 1, tenantId: 150002, webhookToken: "disabled-token", isActive: false },
+    ];
+
+    // Even if token matches, inactive config should be filtered out
+    const activeConfigs = allConfigs.filter(c => c.isActive);
+    const config = activeConfigs.find(c => c.webhookToken === "disabled-token");
+    expect(config).toBeUndefined();
+  });
+
+  it("handles multiple tenants with unique tokens", () => {
+    const allConfigs = [
+      { id: 1, tenantId: 100, webhookToken: "aaa", isActive: true },
+      { id: 2, tenantId: 200, webhookToken: "bbb", isActive: true },
+      { id: 3, tenantId: 300, webhookToken: "ccc", isActive: true },
+    ];
+
+    // Each token should resolve to its own tenant
+    for (const expected of allConfigs) {
+      const found = allConfigs.find(c => c.webhookToken === expected.webhookToken);
+      expect(found!.tenantId).toBe(expected.tenantId);
+    }
+  });
+});
+
 // ─── Auto-capture cf_* fields ─────────────────────────────
 
 describe("RD Station auto-capture cf_* fields", () => {

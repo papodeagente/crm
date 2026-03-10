@@ -1,0 +1,49 @@
+{
+  "query": "SELECT * FROM rd_station_config LIMIT 5;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute SELECT * FROM rd_station_config LIMIT 5;",
+  "rows": [
+    {
+      "id": "30001",
+      "tenantId": "150002",
+      "webhookToken": "e5477a5f59fcd9153d6daff1b996a4e2ce2d4b47a65c48f0222b11e6b89c9d45",
+      "isActive": "1",
+      "autoCreateDeal": "1",
+      "defaultPipelineId": "NULL",
+      "defaultStageId": "NULL",
+      "totalLeadsReceived": "0",
+      "lastLeadReceivedAt": "NULL",
+      "createdAt": "2026-03-08 12:33:12",
+      "updatedAt": "2026-03-08 12:33:12"
+    },
+    {
+      "id": "60001",
+      "tenantId": "1",
+      "webhookToken": "529694ed20692b2e7f07d7aeef033a1bf5e38f06ff37c0639ceead8c26ad4bab",
+      "isActive": "1",
+      "autoCreateDeal": "1",
+      "defaultPipelineId": "NULL",
+      "defaultStageId": "NULL",
+      "totalLeadsReceived": "0",
+      "lastLeadReceivedAt": "NULL",
+      "createdAt": "2026-03-10 00:36:42",
+      "updatedAt": "2026-03-10 11:18:05"
+    },
+    {
+      "id": "90001",
+      "tenantId": "180002",
+      "webhookToken": "ae2005c9603ad521d30de5843a235d7b383b2eb4510f065e859b67784a1dd13a",
+      "isActive": "1",
+      "autoCreateDeal": "1",
+      "defaultPipelineId": "NULL",
+      "defaultStageId": "NULL",
+      "totalLeadsReceived": "0",
+      "lastLeadReceivedAt": "NULL",
+      "createdAt": "2026-03-10 14:03:10",
+      "updatedAt": "2026-03-10 14:05:06"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\ttenantId\twebhookToken\tisActive\tautoCreateDeal\tdefaultPipelineId\tdefaultStageId\ttotalLeadsReceived\tlastLeadReceivedAt\tcreatedAt\tupdatedAt\n30001\t150002\te5477a5f59fcd9153d6daff1b996a4e2ce2d4b47a65c48f0222b11e6b89c9d45\t1\t1\tNULL\tNULL\t0\tNULL\t2026-03-08 12:33:12\t2026-03-08 12:33:12\n60001\t1\t529694ed20692b2e7f07d7aeef033a1bf5e38f06ff37c0639ceead8c26ad4bab\t1\t1\tNULL\tNULL\t0\tNULL\t2026-03-10 00:36:42\t2026-03-10 11:18:05\n90001\t180002\tae2005c9603ad521d30de5843a235d7b383b2eb4510f065e859b67784a1dd13a\t1\t1\tNULL\tNULL\t0\tNULL\t2026-03-10 14:03:10\t2026-03-10 14:05:06\n",
+  "stderr": "",
+  "execution_time_ms": 446
+}
