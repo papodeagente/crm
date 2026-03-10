@@ -268,8 +268,8 @@ export async function getActiveSessionForTenant(tenantId: number): Promise<{ ses
       // Trigger reconnect in background (non-blocking).
       const live = whatsappManager.getSession(s.sessionId);
       if (!live) {
-        console.log(`[ActiveSession] DB says connected but no in-memory session for ${s.sessionId}. Triggering reconnect...`);
-        whatsappManager.connect(s.sessionId, s.userId).catch(e => {
+        console.log(`[ActiveSession] DB says connected but no in-memory session for ${s.sessionId}. Triggering reconnect (tenant: ${s.tenantId})...`);
+        whatsappManager.connect(s.sessionId, s.userId, s.tenantId).catch(e => {
           console.error(`[ActiveSession] Auto-reconnect failed for ${s.sessionId}:`, e);
         });
         // Return "connecting" so the UI shows a reconnecting state

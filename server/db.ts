@@ -95,6 +95,12 @@ export async function getSessionsByUser(userId: number) {
   return db.select().from(whatsappSessions).where(eq(whatsappSessions.userId, userId));
 }
 
+export async function getSessionsByTenant(tenantId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(whatsappSessions).where(eq(whatsappSessions.tenantId, tenantId));
+}
+
 export async function getSessionBySessionId(sessionId: string) {
   const db = await getDb();
   if (!db) return null;

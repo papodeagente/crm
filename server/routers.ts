@@ -7,6 +7,7 @@ import { z } from "zod";
 import { whatsappManager } from "./whatsapp";
 import {
   getSessionsByUser,
+  getSessionsByTenant,
   getMessages,
   getMessagesByContact,
   getLogs,
@@ -136,7 +137,9 @@ export const appRouter = router({
     connect: protectedProcedure
       .input(z.object({ sessionId: z.string().min(1).max(64) }))
       .mutation(async ({ ctx, input }) => {
-        const state = await whatsappManager.connect(input.sessionId, ctx.user.id);
+        // Pass tenantId so the session is correctly associated with the tenant
+        const tenantId = ctx.saasUser?.tenantId;
+        const state = await whatsappManager.connect(input.sessionId, ctx.user.id, tenantId);
         return { sessionId: state.sessionId, status: state.status, qrDataUrl: state.qrDataUrl, user: state.user };
       }),
     disconnect: protectedProcedure
@@ -152,13 +155,19 @@ export const appRouter = router({
         return { status: session?.status || "disconnected", qrDataUrl: session?.qrDataUrl || null, user: session?.user || null };
       }),
     sessions: protectedProcedure.query(async ({ ctx }) => {
-      const dbSessions = await getSessionsByUser(ctx.user.id);
+      // For SaaS users, find sessions by tenantId (shared across the tenant)
+      // For Manus OAuth users, find by userId
+      const tenantId = ctx.saasUser?.tenantId;
+      let dbSessions;
+      if (tenantId) {
+        dbSessions = await getSessionsByTenant(tenantId);
+      } else {
+        dbSessions = await getSessionsByUser(ctx.user.id);
+      }
       return dbSessions.map((s) => {
         const live = whatsappManager.getSession(s.sessionId);
-        // Only use the live in-memory status — do NOT fall back to DB status
-        // If the session is not in memory (e.g. after server restart), show as disconnected
-        // so the user knows they need to reconnect
-        const liveStatus = live?.status || "disconnected";
+        // Use live in-memory status if available, otherwise use DB status
+        const liveStatus = live?.status || s.status || "disconnected";
         return { ...s, liveStatus, qrDataUrl: live?.qrDataUrl || null, user: live?.user || null };
       });
     }),

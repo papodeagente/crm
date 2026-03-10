@@ -1985,3 +1985,15 @@
 - [x] Adicionar estado "reconectando" com spinner no dialog
 - [x] Adicionar polling automático (3s) enquanto dialog está aberto e sessão não conectada
 - [x] Testar que o dialog mostra "conectado" quando há sessão ativa
+
+## Bug Fix DEFINITIVO: RFV Envio em Massa — WhatsApp sempre desconectado (RESOLVIDO)
+- [x] Rastrear fluxo completo: DB → getActiveSessionForTenant → tRPC → frontend
+- [x] Causa raiz: tenantId mismatch (sessão salva com tenantId=1, query buscava tenantId=150002)
+- [x] Corrigir connect() para aceitar e salvar tenantId correto
+- [x] Corrigir updateSessionDb para persistir tenantId
+- [x] Corrigir autoRestoreSessions para NÃO marcar como disconnected quando auth files não existem
+- [x] Criar getSessionsByTenant() em db.ts
+- [x] Corrigir sessions procedure em routers.ts para buscar por tenantId para SaaS users
+- [x] Atualizar registro existente no DB para tenantId correto
+- [x] Escrever 10 testes unitários para validar a correção (rfvActiveSession.test.ts)
+- [x] Todos os testes passando (774 de 777, 3 falhas pré-existentes)

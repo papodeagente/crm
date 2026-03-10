@@ -189,7 +189,7 @@ describe("WhatsApp Stability Engine", () => {
         fs.readFileSync("/home/ubuntu/whatsapp-automation-app/server/whatsapp.ts", "utf-8")
       );
       expect(source).toContain("No auth files for");
-      expect(source).toContain("marking as disconnected");
+      expect(source).toContain("skipping (DB status preserved");
     });
 
     it("should stagger reconnections with 3s delay between sessions", async () => {

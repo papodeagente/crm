@@ -34,6 +34,7 @@ export interface WhatsAppState {
   user: any;
   sessionId: string;
   userId: number;
+  tenantId: number;
   /** Timestamp of last successful connection */
   lastConnectedAt: number | null;
   /** Timestamp of last health check ping */
@@ -100,16 +101,15 @@ class WhatsAppManager extends EventEmitter {
         // Check if auth files exist for this session
         const sessionDir = path.join(this.authDir, session.sessionId);
         if (!fs.existsSync(sessionDir)) {
-          console.log(`[WA AutoRestore] No auth files for ${session.sessionId}, marking as disconnected`);
-          await db.update(whatsappSessions)
-            .set({ status: "disconnected" })
-            .where(eq(whatsappSessions.sessionId, session.sessionId));
+          console.log(`[WA AutoRestore] No auth files for ${session.sessionId}, skipping (DB status preserved for production)`);
+          // Do NOT mark as disconnected here — in production the auth files exist.
+          // The getActiveSessionForTenant will handle reconnection when needed.
           continue;
         }
 
-        console.log(`[WA AutoRestore] Restoring session ${session.sessionId} (user: ${session.userId})`);
+        console.log(`[WA AutoRestore] Restoring session ${session.sessionId} (user: ${session.userId}, tenant: ${session.tenantId})`);
         try {
-          await this.connect(session.sessionId, session.userId);
+          await this.connect(session.sessionId, session.userId, session.tenantId);
         } catch (e) {
           console.error(`[WA AutoRestore] Failed to restore ${session.sessionId}:`, e);
         }
@@ -210,7 +210,7 @@ class WhatsAppManager extends EventEmitter {
     this.reconnectTimers.set(sessionId, timer);
   }
 
-  async connect(sessionId: string, userId: number): Promise<WhatsAppState> {
+  async connect(sessionId: string, userId: number, tenantId?: number): Promise<WhatsAppState> {
     const existing = this.sessions.get(sessionId);
     if (existing?.status === "connected") {
       return existing;
@@ -219,6 +219,20 @@ class WhatsAppManager extends EventEmitter {
     // If already connecting, don't create a duplicate
     if (existing?.status === "connecting" && existing.socket) {
       return existing;
+    }
+
+    // Resolve tenantId: use provided value, or look up from DB, or default to 1
+    let resolvedTenantId = tenantId || 1;
+    if (!tenantId) {
+      try {
+        const db = await getDb();
+        if (db) {
+          const existingSession = await db.select().from(whatsappSessions).where(eq(whatsappSessions.sessionId, sessionId)).limit(1);
+          if (existingSession.length && existingSession[0].tenantId) {
+            resolvedTenantId = existingSession[0].tenantId;
+          }
+        }
+      } catch (e) { /* ignore */ }
     }
 
     const sessionDir = path.join(this.authDir, sessionId);
@@ -237,6 +251,7 @@ class WhatsAppManager extends EventEmitter {
       user: null,
       sessionId,
       userId,
+      tenantId: resolvedTenantId,
       lastConnectedAt: null,
       lastHealthCheck: null,
     };
@@ -1377,6 +1392,10 @@ class WhatsAppManager extends EventEmitter {
       const db = await getDb();
       if (!db) return;
 
+      // Get tenantId from the in-memory session state
+      const sessionState = this.sessions.get(sessionId);
+      const tenantId = sessionState?.tenantId || 1;
+
       const existing = await db.select().from(whatsappSessions).where(eq(whatsappSessions.sessionId, sessionId)).limit(1);
 
       if (existing.length) {
@@ -1384,6 +1403,7 @@ class WhatsAppManager extends EventEmitter {
           .update(whatsappSessions)
           .set({
             status: status as any,
+            tenantId,
             phoneNumber: user?.id?.split(":")[0] || existing[0].phoneNumber,
             pushName: user?.name || existing[0].pushName,
           })
@@ -1392,6 +1412,7 @@ class WhatsAppManager extends EventEmitter {
         await db.insert(whatsappSessions).values({
           sessionId,
           userId,
+          tenantId,
           status: status as any,
           phoneNumber: user?.id?.split(":")[0] || null,
           pushName: user?.name || null,
