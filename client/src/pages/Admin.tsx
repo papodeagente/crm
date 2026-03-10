@@ -6,7 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Shield, Plus, Users, Building2, Key, Activity, Crown, Lock } from "lucide-react";
+import { Shield, Plus, Users, Building2, Key, Activity, Crown, Lock, Loader2 } from "lucide-react";
 import { formatDate, formatFullDateTime } from "../../../shared/dateUtils";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -27,11 +27,13 @@ export default function Admin() {
   const [userRole, setUserRole] = useState<"admin" | "user">("user");
   const [openTeam, setOpenTeam] = useState(false);
   const [teamName, setTeamName] = useState("");
+  const [updatingRoleFor, setUpdatingRoleFor] = useState<number | null>(null);
   const utils = trpc.useUtils();
 
   // Check current user role
   const saasMe = trpc.saasAuth.me.useQuery(undefined, { retry: false, refetchOnWindowFocus: false });
   const currentUserRole = saasMe.data?.role || "user";
+  const currentUserId = saasMe.data?.userId;
   const isCurrentAdmin = currentUserRole === "admin";
 
   const users = trpc.admin.users.list.useQuery({ tenantId: TENANT_ID });
@@ -50,9 +52,32 @@ export default function Admin() {
     },
     onError: (err) => toast.error(err.message || "Erro ao criar usuário"),
   });
+
+  const updateUser = trpc.admin.users.update.useMutation({
+    onSuccess: (_data, variables) => {
+      utils.admin.users.list.invalidate();
+      setUpdatingRoleFor(null);
+      const newRole = variables.role === "admin" ? "Administrador" : "Usuário";
+      toast.success(`Permissão alterada para ${newRole}`);
+    },
+    onError: (err) => {
+      setUpdatingRoleFor(null);
+      toast.error(err.message || "Erro ao alterar permissão");
+    },
+  });
+
   const createTeam = trpc.admin.teams.create.useMutation({
     onSuccess: () => { utils.admin.teams.list.invalidate(); setOpenTeam(false); setTeamName(""); toast.success("Equipe criada!"); },
   });
+
+  function handleRoleChange(userId: number, newRole: "admin" | "user") {
+    if (userId === currentUserId) {
+      toast.error("Você não pode alterar sua própria permissão");
+      return;
+    }
+    setUpdatingRoleFor(userId);
+    updateUser.mutate({ tenantId: TENANT_ID, id: userId, role: newRole });
+  }
 
   // Non-admin users see a restricted view
   if (!isCurrentAdmin && !saasMe.isLoading) {
@@ -163,43 +188,84 @@ export default function Admin() {
                       <Users className="h-10 w-10 mx-auto mb-3 text-muted-foreground/30" />
                       <p className="text-sm">Nenhum usuário CRM cadastrado.</p>
                     </td></tr>
-                  ) : users.data.map((u: any) => (
-                    <tr key={u.id} className="border-b border-border/20 hover:bg-muted/20 transition-colors">
-                      <td className="p-3.5">
-                        <div className="flex items-center gap-2.5">
-                          <div className="h-8 w-8 rounded-full bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center text-[11px] font-bold text-primary">{(u.name || "?")[0]?.toUpperCase()}</div>
-                          <span className="font-semibold">{u.name}</span>
-                        </div>
-                      </td>
-                      <td className="p-3.5 text-muted-foreground">{u.email}</td>
-                      <td className="p-3.5">
-                        {u.role === "admin" ? (
-                          <span className="inline-flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-600 border border-amber-500/20">
-                            <Crown className="h-3 w-3" /> Administrador
+                  ) : users.data.map((u: any) => {
+                    const isSelf = u.id === currentUserId;
+                    const isUpdating = updatingRoleFor === u.id;
+                    return (
+                      <tr key={u.id} className="border-b border-border/20 hover:bg-muted/20 transition-colors">
+                        <td className="p-3.5">
+                          <div className="flex items-center gap-2.5">
+                            <div className="h-8 w-8 rounded-full bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center text-[11px] font-bold text-primary">{(u.name || "?")[0]?.toUpperCase()}</div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-semibold">{u.name}</span>
+                              {isSelf && (
+                                <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-primary/10 text-primary">Você</span>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="p-3.5 text-muted-foreground">{u.email}</td>
+                        <td className="p-3.5">
+                          {isSelf ? (
+                            /* Current user cannot change their own role - show static badge */
+                            u.role === "admin" ? (
+                              <span className="inline-flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-600 border border-amber-500/20">
+                                <Crown className="h-3 w-3" /> Administrador
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded-full bg-blue-500/10 text-blue-600 border border-blue-500/20">
+                                <Shield className="h-3 w-3" /> Usuário
+                              </span>
+                            )
+                          ) : isUpdating ? (
+                            /* Show loading spinner while updating */
+                            <span className="inline-flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded-full bg-muted text-muted-foreground">
+                              <Loader2 className="h-3 w-3 animate-spin" /> Alterando...
+                            </span>
+                          ) : (
+                            /* Editable role selector for other users */
+                            <Select
+                              value={u.role || "user"}
+                              onValueChange={(newRole) => handleRoleChange(u.id, newRole as "admin" | "user")}
+                            >
+                              <SelectTrigger className="h-8 w-[180px] rounded-lg border-border/40 text-[12px] font-medium bg-transparent hover:bg-muted/30 transition-colors [&>span]:flex [&>span]:items-center [&>span]:gap-1.5">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="admin">
+                                  <div className="flex items-center gap-2">
+                                    <Crown className="h-3.5 w-3.5 text-amber-500" />
+                                    <span className="font-medium">Administrador</span>
+                                  </div>
+                                </SelectItem>
+                                <SelectItem value="user">
+                                  <div className="flex items-center gap-2">
+                                    <Shield className="h-3.5 w-3.5 text-blue-500" />
+                                    <span className="font-medium">Usuário</span>
+                                  </div>
+                                </SelectItem>
+                              </SelectContent>
+                            </Select>
+                          )}
+                        </td>
+                        <td className="p-3.5">
+                          <span className={`inline-flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded-full ${
+                            u.status === "active" ? "bg-emerald-50 text-emerald-700" :
+                            u.status === "invited" ? "bg-amber-50 text-amber-700" :
+                            "bg-zinc-100 text-zinc-600"
+                          }`}>
+                            <span className={`h-1.5 w-1.5 rounded-full ${
+                              u.status === "active" ? "bg-emerald-500" :
+                              u.status === "invited" ? "bg-amber-500" :
+                              "bg-zinc-400"
+                            }`} />
+                            {u.status === "active" ? "Ativo" : u.status === "invited" ? "Convidado" : u.status === "inactive" ? "Inativo" : u.status || "Ativo"}
                           </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded-full bg-blue-500/10 text-blue-600 border border-blue-500/20">
-                            <Shield className="h-3 w-3" /> Usuário
-                          </span>
-                        )}
-                      </td>
-                      <td className="p-3.5">
-                        <span className={`inline-flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded-full ${
-                          u.status === "active" ? "bg-emerald-50 text-emerald-700" :
-                          u.status === "invited" ? "bg-amber-50 text-amber-700" :
-                          "bg-zinc-100 text-zinc-600"
-                        }`}>
-                          <span className={`h-1.5 w-1.5 rounded-full ${
-                            u.status === "active" ? "bg-emerald-500" :
-                            u.status === "invited" ? "bg-amber-500" :
-                            "bg-zinc-400"
-                          }`} />
-                          {u.status === "active" ? "Ativo" : u.status === "invited" ? "Convidado" : u.status === "inactive" ? "Inativo" : u.status || "Ativo"}
-                        </span>
-                      </td>
-                      <td className="p-3.5 text-muted-foreground">{u.createdAt ? formatDate(u.createdAt) : "—"}</td>
-                    </tr>
-                  ))}
+                        </td>
+                        <td className="p-3.5 text-muted-foreground">{u.createdAt ? formatDate(u.createdAt) : "—"}</td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

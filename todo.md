@@ -2066,3 +2066,10 @@
 
 ### Testes
 - [x] 29 testes unitários passando (roleAccess.test.ts)
+
+## Editar Permissão de Usuários no Tenant (CONCLUÍDO)
+- [x] Permitir editar role (admin/user) diretamente na tabela de usuários da página Admin (Select inline)
+- [x] Permitir editar role na página de Agentes & Equipes (Select inline + dropdown menu)
+- [x] Garantir que o backend updateAgentRole e admin.users.update funcionam corretamente
+- [x] Feedback visual ao alterar permissão (toast de sucesso, spinner de loading)
+- [x] Proteção: admin não pode rebaixar a si mesmo (badge estático "Você")

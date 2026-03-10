@@ -292,9 +292,37 @@ function AgentsTab() {
                       <p className="text-[14px] font-semibold text-foreground truncate">{agent.name}</p>
                       {isSelf && <Badge variant="outline" className="text-[10px] px-1.5 py-0 shrink-0 border-emerald-500/30 text-emerald-500">Você</Badge>}
                       <Badge variant="outline" className="text-[10px] px-1.5 py-0 shrink-0">{st.label}</Badge>
-                      {agent.role === "admin" && (
+                      {/* Inline role selector for admins editing other users */}
+                      {isCurrentAdmin && !isSelf ? (
+                        <Select
+                          value={agent.role || "user"}
+                          onValueChange={(newRole) => updateRole.mutate({ tenantId: TENANT_ID, userId: agent.id, role: newRole as "admin" | "user" })}
+                        >
+                          <SelectTrigger className="h-6 w-[140px] rounded-full text-[10px] font-medium border-border/40 bg-transparent hover:bg-muted/30 transition-colors px-2 py-0 gap-1 [&>svg]:h-3 [&>svg]:w-3 [&>span]:flex [&>span]:items-center [&>span]:gap-1">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="admin">
+                              <div className="flex items-center gap-1.5">
+                                <Crown className="h-3 w-3 text-amber-500" />
+                                <span className="font-medium">Administrador</span>
+                              </div>
+                            </SelectItem>
+                            <SelectItem value="user">
+                              <div className="flex items-center gap-1.5">
+                                <Shield className="h-3 w-3 text-blue-500" />
+                                <span className="font-medium">Usuário</span>
+                              </div>
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                      ) : agent.role === "admin" ? (
                         <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full font-medium border border-amber-500/30 bg-amber-500/10 text-amber-500">
                           <Crown className="h-3 w-3" /> Admin
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full font-medium border border-blue-500/30 bg-blue-500/10 text-blue-500">
+                          <Shield className="h-3 w-3" /> Usuário
                         </span>
                       )}
                     </div>
