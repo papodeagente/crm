@@ -15,7 +15,7 @@ import fs from "fs";
 import QRCode from "qrcode";
 import { EventEmitter } from "events";
 import { getDb, createNotification } from "./db";
-import { whatsappSessions, waMessages as messages, activityLogs, chatbotSettings, chatbotRules } from "../drizzle/schema";
+import { whatsappSessions, waMessages as messages, activityLogs, chatbotSettings, chatbotRules, waContacts } from "../drizzle/schema";
 import { eq, desc, and, gte, sql, isNotNull } from "drizzle-orm";
 import { invokeLLM } from "./_core/llm";
 // notifyOwner desativado — todas as notificações são apenas in-app
@@ -30,7 +30,7 @@ export interface WhatsAppState {
   socket: WASocket | null;
   qrCode: string | null;
   qrDataUrl: string | null;
-  status: "connecting" | "connected" | "disconnected";
+  status: "connecting" | "connected" | "disconnected" | "reconnecting";
   user: any;
   sessionId: string;
   userId: number;
@@ -39,6 +39,10 @@ export interface WhatsAppState {
   lastConnectedAt: number | null;
   /** Timestamp of last health check ping */
   lastHealthCheck: number | null;
+  /** Number of messages processed since last connect */
+  messagesProcessed: number;
+  /** Number of DB write errors since last connect */
+  dbWriteErrors: number;
 }
 
 // ─── STABILITY CONSTANTS ───
@@ -54,12 +58,73 @@ const IMMEDIATE_RECONNECT_CODES = new Set([428, 408, 503, 515]); // connectionCl
 const FATAL_CODES = new Set([401, 403]); // loggedOut, banned — stop reconnecting
 const AUTO_RESTORE_DELAY_MS = 10_000;       // 10s delay before auto-restoring sessions on startup
 
+// ─── DB WRITE QUEUE: Fire-and-forget for non-critical DB operations ───
+type DbWriteTask = () => Promise<void>;
+class DbWriteQueue {
+  private queue: DbWriteTask[] = [];
+  private processing = false;
+  private errorCount = 0;
+  private readonly MAX_QUEUE_SIZE = 500;
+  private readonly BATCH_DELAY_MS = 50;
+
+  enqueue(task: DbWriteTask): void {
+    if (this.queue.length >= this.MAX_QUEUE_SIZE) {
+      // Drop oldest task to prevent memory leak
+      this.queue.shift();
+      this.errorCount++;
+    }
+    this.queue.push(task);
+    if (!this.processing) this.process();
+  }
+
+  private async process(): Promise<void> {
+    this.processing = true;
+    while (this.queue.length > 0) {
+      const task = this.queue.shift()!;
+      try {
+        await task();
+      } catch (e) {
+        this.errorCount++;
+        console.error("[DbWriteQueue] Task failed:", (e as Error).message);
+      }
+      // Small delay between writes to avoid overwhelming DB
+      if (this.queue.length > 0) {
+        await new Promise(r => setTimeout(r, this.BATCH_DELAY_MS));
+      }
+    }
+    this.processing = false;
+  }
+
+  getStats(): { pending: number; errors: number } {
+    return { pending: this.queue.length, errors: this.errorCount };
+  }
+
+  /** Wait for all queued tasks to complete */
+  async drain(): Promise<void> {
+    // If nothing is processing and queue is empty, return immediately
+    if (!this.processing && this.queue.length === 0) return;
+    // Poll until queue is drained
+    return new Promise((resolve) => {
+      const check = () => {
+        if (!this.processing && this.queue.length === 0) {
+          resolve();
+        } else {
+          setTimeout(check, 100);
+        }
+      };
+      check();
+    });
+  }
+}
+
 class WhatsAppManager extends EventEmitter {
   private sessions: Map<string, WhatsAppState> = new Map();
   private authDir = path.join(process.cwd(), "auth_sessions");
   private reconnectTimers: Map<string, NodeJS.Timeout> = new Map();
   private reconnectAttempts: Map<string, number> = new Map();
   private healthCheckTimers: Map<string, NodeJS.Timeout> = new Map();
+  private connectLocks: Set<string> = new Set(); // Mutex for connect()
+  private dbQueue = new DbWriteQueue();
   private isShuttingDown = false;
 
   constructor() {
@@ -216,13 +281,33 @@ class WhatsAppManager extends EventEmitter {
       return existing;
     }
 
-    // If already connecting, don't create a duplicate
-    if (existing?.status === "connecting" && existing.socket) {
+    // If already connecting or reconnecting, don't create a duplicate
+    if ((existing?.status === "connecting" || existing?.status === "reconnecting") && existing.socket) {
       return existing;
     }
 
-    // Resolve tenantId: use provided value, or look up from DB, or default to 1
-    let resolvedTenantId = tenantId || 1;
+    // ─── CONNECTION MUTEX: Prevent duplicate socket creation ───
+    if (this.connectLocks.has(sessionId)) {
+      console.log(`[WA] Session ${sessionId}: connect() already in progress, skipping duplicate call`);
+      if (existing) return existing;
+      // Wait briefly for the lock to release
+      await new Promise(r => setTimeout(r, 2000));
+      const afterWait = this.sessions.get(sessionId);
+      if (afterWait) return afterWait;
+      throw new Error(`Session ${sessionId} is being created by another call`);
+    }
+    this.connectLocks.add(sessionId);
+    try {
+      return await this._doConnect(sessionId, userId, tenantId);
+    } finally {
+      this.connectLocks.delete(sessionId);
+    }
+  }
+
+  private async _doConnect(sessionId: string, userId: number, tenantId?: number): Promise<WhatsAppState> {
+
+    // Resolve tenantId: use provided value, or look up from DB
+    let resolvedTenantId = tenantId ?? 0;
     if (!tenantId) {
       try {
         const db = await getDb();
@@ -254,6 +339,8 @@ class WhatsAppManager extends EventEmitter {
       tenantId: resolvedTenantId,
       lastConnectedAt: null,
       lastHealthCheck: null,
+      messagesProcessed: 0,
+      dbWriteErrors: 0,
     };
     this.sessions.set(sessionId, sessionState);
 
@@ -366,6 +453,8 @@ class WhatsAppManager extends EventEmitter {
         }
 
         // ─── RECONNECTABLE: Schedule reconnect (NEVER give up) ───
+        sessionState.status = "reconnecting";
+        this.emit("status", { sessionId, status: "reconnecting", statusCode });
         const isImmediate = IMMEDIATE_RECONNECT_CODES.has(statusCode!);
         const attempts = this.reconnectAttempts.get(sessionId) || 0;
 
@@ -535,56 +624,54 @@ class WhatsAppManager extends EventEmitter {
         } else if (msg.message.imageMessage) {
           content = msg.message.imageMessage.caption || "";
           mediaMimeType = msg.message.imageMessage.mimetype || "image/jpeg";
-          // Download and upload image to S3
-          try {
-            const buffer = await downloadMediaMessage(msg, "buffer", {}, { logger, reuploadRequest: sock.updateMediaMessage });
-            const ext = (mediaMimeType || "image/jpeg").split("/")[1] || "jpg";
-            const key = `whatsapp-media/${nanoid()}.${ext}`;
-            const { url } = await storagePut(key, buffer as Buffer, mediaMimeType || "image/jpeg");
-            mediaUrl = url;
-          } catch (e) { console.error("Error downloading image:", e); }
         } else if (msg.message.videoMessage) {
           content = msg.message.videoMessage.caption || "";
           mediaMimeType = msg.message.videoMessage.mimetype || "video/mp4";
           mediaDuration = msg.message.videoMessage.seconds || undefined;
-          try {
-            const buffer = await downloadMediaMessage(msg, "buffer", {}, { logger, reuploadRequest: sock.updateMediaMessage });
-            const ext = (mediaMimeType || "video/mp4").split("/")[1] || "mp4";
-            const key = `whatsapp-media/${nanoid()}.${ext}`;
-            const { url } = await storagePut(key, buffer as Buffer, mediaMimeType || "video/mp4");
-            mediaUrl = url;
-          } catch (e) { console.error("Error downloading video:", e); }
         } else if (msg.message.documentMessage) {
           mediaFileName = msg.message.documentMessage.fileName || "document";
           mediaMimeType = msg.message.documentMessage.mimetype || "application/octet-stream";
           content = msg.message.documentMessage.caption || `[Documento: ${mediaFileName}]`;
-          try {
-            const buffer = await downloadMediaMessage(msg, "buffer", {}, { logger, reuploadRequest: sock.updateMediaMessage });
-            const key = `whatsapp-media/${nanoid()}-${mediaFileName}`;
-            const { url } = await storagePut(key, buffer as Buffer, mediaMimeType);
-            mediaUrl = url;
-          } catch (e) { console.error("Error downloading document:", e); }
         } else if (msg.message.audioMessage) {
           mediaMimeType = msg.message.audioMessage.mimetype || "audio/ogg";
           mediaDuration = msg.message.audioMessage.seconds || undefined;
           isVoiceNote = msg.message.audioMessage.ptt || false;
           content = isVoiceNote ? "[Áudio]" : "[Áudio]";
-          try {
-            const buffer = await downloadMediaMessage(msg, "buffer", {}, { logger, reuploadRequest: sock.updateMediaMessage });
-            const ext = isVoiceNote ? "ogg" : ((mediaMimeType || "audio/ogg").split("/")[1] || "ogg");
-            const key = `whatsapp-media/${nanoid()}.${ext}`;
-            const { url } = await storagePut(key, buffer as Buffer, mediaMimeType);
-            mediaUrl = url;
-          } catch (e) { console.error("Error downloading audio:", e); }
         } else if (msg.message.stickerMessage) {
           content = "[Sticker]";
           mediaMimeType = "image/webp";
-          try {
-            const buffer = await downloadMediaMessage(msg, "buffer", {}, { logger, reuploadRequest: sock.updateMediaMessage });
-            const key = `whatsapp-media/${nanoid()}.webp`;
-            const { url } = await storagePut(key, buffer as Buffer, "image/webp");
-            mediaUrl = url;
-          } catch (e) { console.error("Error downloading sticker:", e); }
+        }
+
+        // ─── ASYNC MEDIA DOWNLOAD: Don't block message processing ───
+        // Media is downloaded in the background and the DB row is updated later.
+        const hasMedia = !!(msg.message.imageMessage || msg.message.videoMessage || msg.message.documentMessage || msg.message.audioMessage || msg.message.stickerMessage);
+        const capturedMsgId = msg.key.id;
+        const capturedMimeType = mediaMimeType;
+        const capturedFileName = mediaFileName;
+        if (hasMedia && capturedMsgId) {
+          // Fire-and-forget: download media in background via dbQueue
+          this.dbQueue.enqueue(async () => {
+            try {
+              const buffer = await downloadMediaMessage(msg, "buffer", {}, { logger, reuploadRequest: sock.updateMediaMessage });
+              let ext = "bin";
+              if (msg.message.stickerMessage) ext = "webp";
+              else if (capturedMimeType) ext = capturedMimeType.split("/")[1]?.split(";")[0] || "bin";
+              const key = capturedFileName
+                ? `whatsapp-media/${nanoid()}-${capturedFileName}`
+                : `whatsapp-media/${nanoid()}.${ext}`;
+              const contentType = msg.message.stickerMessage ? "image/webp" : (capturedMimeType || "application/octet-stream");
+              const { url: uploadedUrl } = await storagePut(key, buffer as Buffer, contentType);
+              // Update the already-saved message row with the media URL
+              const db = await getDb();
+              if (db) {
+                await db.update(messages)
+                  .set({ mediaUrl: uploadedUrl })
+                  .where(and(eq(messages.messageId, capturedMsgId), eq(messages.sessionId, sessionId)));
+              }
+            } catch (e) {
+              console.error(`[WA] Async media download failed for ${capturedMsgId}:`, (e as Error).message);
+            }
+          });
         }
 
         // Determine initial status for sent messages
@@ -665,6 +752,9 @@ class WhatsAppManager extends EventEmitter {
           }
         }
 
+        // Increment messages processed counter
+        sessionState.messagesProcessed++;
+
         this.emit("message", { sessionId, message: msg, content, fromMe, remoteJid, messageType, mediaUrl, mediaMimeType, mediaFileName, mediaDuration, isVoiceNote, status: initialStatus });
 
         // Chatbot auto-reply
@@ -675,7 +765,7 @@ class WhatsAppManager extends EventEmitter {
         // Notificação apenas in-app (notifyOwner/email desativado)
         if (!fromMe && content) {
           const senderName = msg.pushName || remoteJid.replace("@s.whatsapp.net", "");
-          const msgTenantId = this.sessions.get(sessionId)?.tenantId || resolvedTenantId || 1;
+          const msgTenantId = this.sessions.get(sessionId)?.tenantId ?? resolvedTenantId ?? 0;
           try {
             await createNotification(msgTenantId, {
               type: "whatsapp_message",
@@ -689,36 +779,34 @@ class WhatsAppManager extends EventEmitter {
       }
     });
 
-    // ─── Message Receipt Updates (delivered / read) ───
+    // ─── Message Receipt Updates (delivered / read) — queued for stability ───
     sock.ev.on("message-receipt.update", async (updates: any[]) => {
       for (const update of updates) {
         const msgId = update.key.id;
         const receiptType = update.receipt?.receiptTimestamp ? "delivered" : "sent";
         let newStatus = receiptType;
 
-        // readTimestamp indicates the message was read
         if (update.receipt?.readTimestamp) {
           newStatus = "read";
         } else if ((update as any).receipt?.receiptTimestamp) {
           newStatus = "delivered";
         }
 
-        try {
+        // Queue DB write — status updates are non-critical
+        this.dbQueue.enqueue(async () => {
           const db = await getDb();
           if (db && msgId) {
             await db.update(messages)
               .set({ status: newStatus })
               .where(eq(messages.messageId, msgId));
           }
-        } catch (e) {
-          console.error("Error updating message status:", e);
-        }
+        });
 
         this.emit("message:status", { sessionId, messageId: msgId, status: newStatus });
       }
     });
 
-    // ─── Message Update (status changes from Baileys) ───
+    // ─── Message Update (status changes from Baileys) — queued for stability ───
     sock.ev.on("messages.update", async (updates: any[]) => {
       for (const update of updates) {
         const msgId = update.key.id;
@@ -731,28 +819,26 @@ class WhatsAppManager extends EventEmitter {
         const newStatus = statusMap[(update.update as any)?.status] || null;
 
         if (newStatus && msgId) {
-          try {
+          // Queue DB write — status updates are non-critical
+          this.dbQueue.enqueue(async () => {
             const db = await getDb();
             if (db) {
               await db.update(messages)
                 .set({ status: newStatus })
                 .where(eq(messages.messageId, msgId));
             }
-          } catch (e) {
-            console.error("Error updating message status:", e);
-          }
+          });
 
           this.emit("message:status", { sessionId, messageId: msgId, status: newStatus });
         }
       }
     });
 
-    // ─── Contacts sync (LID ↔ Phone mapping) ───
+    // ─── Contacts sync (LID ↔ Phone mapping) — queued for stability ───
     sock.ev.on("contacts.upsert" as any, async (contacts: any[]) => {
-      try {
+      this.dbQueue.enqueue(async () => {
         const db = await getDb();
         if (!db) return;
-        const { waContacts } = await import("../drizzle/schema");
         for (const contact of contacts) {
           if (!contact.id) continue;
           // Skip group JIDs
@@ -815,17 +901,14 @@ class WhatsAppManager extends EventEmitter {
             }
           }
         }
-      } catch (e) {
-        console.error("[WA Contacts] Error syncing contacts:", e);
-      }
+      });
     });
 
-    // Also handle contacts.update for incremental updates
+    // Also handle contacts.update for incremental updates — queued for stability
     sock.ev.on("contacts.update" as any, async (contacts: any[]) => {
-      try {
+      this.dbQueue.enqueue(async () => {
         const db = await getDb();
         if (!db) return;
-        const { waContacts } = await import("../drizzle/schema");
         for (const contact of contacts) {
           if (!contact.id) continue;
           if (contact.id.includes("@g.us")) continue;
@@ -854,9 +937,7 @@ class WhatsAppManager extends EventEmitter {
             });
           }
         }
-      } catch (e) {
-        console.error("[WA Contacts] Error updating contacts:", e);
-      }
+      });
     });
 
     return sessionState;
@@ -1319,18 +1400,47 @@ class WhatsAppManager extends EventEmitter {
       const rawContent = response.choices?.[0]?.message?.content;
       const replyText = typeof rawContent === 'string' ? rawContent : null;
       if (replyText) {
-        await sock.sendMessage(remoteJid, { text: replyText });
+        const chatbotResult = await sock.sendMessage(remoteJid, { text: replyText });
+
+        // Resolve outbound conversation for chatbot reply
+        let chatbotConvId: number | undefined;
+        try {
+          const sState = this.sessions.get(sessionId);
+          const resolved = await resolveOutbound(sState?.tenantId ?? 0, sessionId, remoteJid);
+          chatbotConvId = resolved.conversationId;
+        } catch (e) {
+          console.error("[ConvResolver] Error resolving chatbot outbound:", e);
+        }
 
         await db.insert(messages).values({
           sessionId,
+          messageId: chatbotResult?.key?.id || undefined,
           remoteJid,
           fromMe: true,
           messageType: "text",
           content: replyText,
+          waConversationId: chatbotConvId || undefined,
           status: "sent",
         });
 
-        await this.logActivity(sessionId, "chatbot_reply", `Chatbot respondeu para ${remoteJid}`);
+        // Update conversation last message
+        if (chatbotConvId) {
+          try {
+            await updateConversationLastMessage(chatbotConvId, {
+              content: replyText,
+              messageType: "text",
+              fromMe: true,
+              status: "sent",
+              timestamp: new Date(),
+            });
+          } catch (e) {
+            console.error("[ConvResolver] Error updating chatbot last message:", e);
+          }
+        }
+
+        this.dbQueue.enqueue(async () => {
+          await this.logActivity(sessionId, "chatbot_reply", `Chatbot respondeu para ${remoteJid}`);
+        });
       }
     } catch (e) {
       console.error("Chatbot error:", e);
@@ -1397,7 +1507,7 @@ class WhatsAppManager extends EventEmitter {
 
       // Get tenantId from the in-memory session state
       const sessionState = this.sessions.get(sessionId);
-      const tenantId = sessionState?.tenantId || 1;
+      const tenantId = sessionState?.tenantId ?? 0;
 
       const existing = await db.select().from(whatsappSessions).where(eq(whatsappSessions.sessionId, sessionId)).limit(1);
 
@@ -1445,7 +1555,7 @@ class WhatsAppManager extends EventEmitter {
     const db = await getDb();
     if (!db) throw new Error("Database not available");
 
-    const { waContacts } = await import("../drizzle/schema");
+    // waContacts already imported at top level
 
     // Get all unique JIDs from messages table for this session
     const allJids = await db.selectDistinct({ jid: messages.remoteJid })
@@ -1597,14 +1707,23 @@ class WhatsAppManager extends EventEmitter {
     };
   }
 
-  /** Graceful shutdown: stop all health checks and reconnect timers */
-  shutdown(): void {
+  /** Graceful shutdown: stop all health checks, reconnect timers, and drain DB queue */
+  async shutdown(): Promise<void> {
     this.isShuttingDown = true;
     this.healthCheckTimers.forEach((timer) => clearInterval(timer));
     this.healthCheckTimers.clear();
     this.reconnectTimers.forEach((timer) => clearTimeout(timer));
     this.reconnectTimers.clear();
-    console.log("[WA] Shutdown complete — all timers cleared");
+    // Drain the DB write queue (wait up to 10s)
+    try {
+      await Promise.race([
+        this.dbQueue.drain(),
+        new Promise(r => setTimeout(r, 10000)),
+      ]);
+    } catch (e) {
+      console.error("[WA] Error draining DB queue during shutdown:", e);
+    }
+    console.log(`[WA] Shutdown complete — all timers cleared, DB queue drained`);
   }
 }
 

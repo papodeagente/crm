@@ -137,11 +137,9 @@ describe("WhatsApp Notifications — Dynamic tenantId", () => {
       "utf-8"
     );
     // The connect method should look up tenantId from DB
-    const connectIdx = whatsappContent.indexOf("async connect(sessionId");
-    const connectSection = whatsappContent.substring(connectIdx, connectIdx + 500);
-    expect(connectSection).toContain("resolvedTenantId");
-    // The connect method looks up from DB when tenantId is not provided
-    expect(connectSection).toContain("resolvedTenantId = tenantId || 1");
+    // The _doConnect method resolves tenantId from DB when not provided
+    expect(whatsappContent).toContain("resolvedTenantId = tenantId ?? 0");
+    expect(whatsappContent).toContain("resolvedTenantId");
   });
 });
 

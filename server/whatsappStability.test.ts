@@ -296,7 +296,7 @@ describe("WhatsApp Stability Engine", () => {
       const source = await import("fs").then(fs => 
         fs.readFileSync("/home/ubuntu/whatsapp-automation-app/server/whatsapp.ts", "utf-8")
       );
-      expect(source).toContain("shutdown(): void");
+      expect(source).toContain("shutdown(): Promise<void>");
       expect(source).toContain("isShuttingDown = true");
       expect(source).toContain("healthCheckTimers.forEach");
       expect(source).toContain("reconnectTimers.forEach");
@@ -316,7 +316,7 @@ describe("WhatsApp Stability Engine", () => {
       const source = await import("fs").then(fs => 
         fs.readFileSync("/home/ubuntu/whatsapp-automation-app/server/whatsapp.ts", "utf-8")
       );
-      expect(source).toContain('existing?.status === "connecting" && existing.socket');
+      expect(source).toContain('existing?.status === "connecting" || existing?.status === "reconnecting") && existing.socket');
     });
 
     it("should return existing session when already connected", async () => {

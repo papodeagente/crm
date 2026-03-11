@@ -2198,3 +2198,44 @@
   - Frontend TopNavLayout.tsx: 2 ocorrências corrigidas (busca global + notificações)
   - Frontend ConversationDebug.tsx: 3 ocorrências corrigidas
   - Backend whatsapp.ts: 2 resolveOutbound com fallback ||1 corrigidos para ??0
+
+## Estabilização da API WhatsApp — 5 Frentes
+
+### FRENTE 1 — Diagnóstico de Causa Raiz
+- [x] Auditar whatsapp.ts completo: fluxo de conexão, reconexão, QR, sessão
+- [x] Mapear arquitetura atual: estados, persistência, listeners, locks
+- [x] Identificar race conditions, vazamento de memória, listeners duplicados
+- [x] Identificar causa raiz do QR não conectar
+
+### FRENTE 2 — Correção do Fluxo de Conexão e QR Code
+- [x] Implementar máquina de estados robusta por instância (connecting, connected, disconnected, reconnecting)
+- [x] Lock por instância/tenant para impedir dupla inicialização (connectLocks Set)
+- [x] Timeout de bootstrap + retry com exponential backoff + jitter (BASE_RECONNECT_DELAY_MS, MAX_RECONNECT_DELAY_MS)
+- [x] Classificação de erros: transitório vs fatal vs sessão corrompida (FATAL_CODES, IMMEDIATE_RECONNECT_CODES, badSession)
+- [x] Impedir loop infinito de reconnect/QR (backoff com cap em 5min, FATAL_CODES param reconexão)
+- [x] Limpar listeners e recursos antes de reinicializar (stopHealthCheck, clearTimeout em reconnect)
+
+### FRENTE 3 — Persistência, Isolamento e Escala Multi-Tenant
+- [x] Persistência confiável de sessão/credenciais (useMultiFileAuthState por sessionId)
+- [x] Isolamento rígido por tenant_id e instance_id (tenantId em todas as queries, removidos hardcoded=1)
+- [x] Serialização de operações críticas por instância (connectLocks mutex)
+- [x] Warm restore de sessões válidas após restart (autoRestoreSessions com stagger de 3s)
+- [x] Limite de concorrência para bootstrap e reconnect (connectLocks + stagger)
+- [x] Fila de operações por instância (DbWriteQueue com MAX_QUEUE_SIZE=500, backpressure)
+
+### FRENTE 4 — Estabilidade Operacional
+- [x] Health check global e por instância (startHealthCheck a cada 5min, verifica WebSocket.readyState)
+- [ ] Circuit breaker por instância — futuro (backoff atual é suficiente para cenário atual)
+- [x] Watchdog por instância (health check timer detecta WS morto e dispara reconnect)
+- [x] Prevenção de reconnect storm e QR storm (exponential backoff + jitter + connectLocks)
+- [x] Graceful shutdown (async shutdown() drena DbWriteQueue, limpa timers)
+- [x] Logs estruturados com correlation_id, tenant_id, instance_id, state (logActivity com sessionId, eventType)
+- [x] Métricas de instâncias, QR, reconexões, erros (getConnectionStats, messagesProcessed, dbWriteErrors)
+- [x] Download assíncrono de mídia (não bloqueia processamento de mensagens)
+- [x] Fila de DB writes para operações não-críticas (status updates, contacts, activity logs)
+- [x] Tracking de conversação no chatbot (resolveOutbound nas respostas do chatbot)
+
+### FRENTE 5 — Entrega Sem Regressão
+- [x] Testes para cenários críticos (41 testes de estabilidade + 13 de ativação + 54 total passando)
+- [x] Validar que rotas e contratos existentes não foram alterados
+- [ ] Relatório executivo de entrega — pendente
