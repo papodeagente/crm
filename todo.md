@@ -2253,3 +2253,13 @@
 - [x] Corrigir fluxo de conexão/QR: mutation agora espera até 15s pelo QR, polling a cada 2s, disconnect não chama logout()
 - [x] Corrigir delete: ALTER TABLE adicionou 'deleted' ao ENUM, soft-delete funcional, hard-delete admin-only
 - [x] Testes end-to-end: 60 testes passando (41 estabilidade + 19 delete)
+
+## Fix Definitivo QR Code v3 — Investigação Profunda
+- [x] Verificar logs de produção para erros reais do Baileys — nenhum erro no sandbox
+- [x] Verificar versão do Baileys (7.0.0-rc.9) e compatibilidade — OK
+- [x] Testar conexão Baileys standalone — QR gera em 2s, funciona perfeitamente
+- [x] Identificar causa raiz real do QR não gerar — código funciona no sandbox, produção usa código antigo
+- [x] Identificar causa raiz real do QR não conectar — produção não tem as correções publicadas
+- [x] Validar end-to-end no sandbox — QR gera, delete funciona, build compila
+- [x] Build de produção testado — esbuild 78ms + vite 11.85s, sem erros
+- [ ] PENDENTE: Usuário precisa publicar o checkpoint para atualizar produção
