@@ -29,7 +29,7 @@ describe("WhatsApp Delete Session", () => {
     });
 
     it("should support soft-delete (move to trash)", () => {
-      expect(source).toContain("status: \"deleted\" as any");
+      expect(source).toContain('status: "deleted"');
     });
 
     it("should support hard-delete (remove from DB)", () => {
@@ -107,11 +107,19 @@ describe("WhatsApp Delete Session", () => {
       expect(disconnectBody).toContain("updateSessionDb");
     });
 
-    it("should call socket.end() during disconnect", () => {
+    it("should NOT call logout() during disconnect (preserves auth)", () => {
       const disconnectStart = source.indexOf("async disconnect(sessionId: string)");
       const deleteStart = source.indexOf("async deleteSession(sessionId: string");
       const disconnectBody = source.substring(disconnectStart, deleteStart);
+      // disconnect should NOT call logout() — that invalidates credentials
+      expect(disconnectBody).not.toContain("await session.socket.logout()");
       expect(disconnectBody).toContain("session.socket.end(undefined)");
+    });
+
+    it("should call logout() during deleteSession (intentional cleanup)", () => {
+      const deleteStart = source.indexOf("async deleteSession(sessionId: string");
+      const deleteBody = source.substring(deleteStart, deleteStart + 2000);
+      expect(deleteBody).toContain("await session.socket.logout()");
     });
   });
 });

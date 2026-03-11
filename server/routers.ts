@@ -142,7 +142,37 @@ export const appRouter = router({
         // Pass tenantId so the session is correctly associated with the tenant
         const tenantId = ctx.saasUser?.tenantId;
         const state = await whatsappManager.connect(input.sessionId, ctx.user.id, tenantId);
-        return { sessionId: state.sessionId, status: state.status, qrDataUrl: state.qrDataUrl, user: state.user };
+        
+        // If already connected, return immediately
+        if (state.status === "connected") {
+          return { sessionId: state.sessionId, status: state.status, qrDataUrl: null, user: state.user };
+        }
+        
+        // Wait up to 15 seconds for QR code to be generated
+        // This makes the UX much better — the mutation returns WITH the QR code
+        const startWait = Date.now();
+        const MAX_WAIT_MS = 15_000;
+        while (Date.now() - startWait < MAX_WAIT_MS) {
+          const current = whatsappManager.getSession(input.sessionId);
+          if (!current) break; // Session was deleted/failed
+          if (current.qrDataUrl) {
+            return { sessionId: current.sessionId, status: current.status, qrDataUrl: current.qrDataUrl, user: current.user };
+          }
+          if (current.status === "connected") {
+            return { sessionId: current.sessionId, status: current.status, qrDataUrl: null, user: current.user };
+          }
+          // Wait 500ms before checking again
+          await new Promise(r => setTimeout(r, 500));
+        }
+        
+        // Return whatever state we have after waiting
+        const finalState = whatsappManager.getSession(input.sessionId);
+        return {
+          sessionId: input.sessionId,
+          status: finalState?.status || state.status,
+          qrDataUrl: finalState?.qrDataUrl || null,
+          user: finalState?.user || null,
+        };
       }),
     disconnect: protectedProcedure
       .input(z.object({ sessionId: z.string() }))

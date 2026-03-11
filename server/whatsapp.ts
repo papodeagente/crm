@@ -962,35 +962,50 @@ class WhatsAppManager extends EventEmitter {
   }
 
   async disconnect(sessionId: string): Promise<void> {
+    console.log(`[WA] Disconnecting session ${sessionId}`);
     const session = this.sessions.get(sessionId);
     this.stopHealthCheck(sessionId);
-    if (session?.socket) {
-      try {
-        await session.socket.logout();
-      } catch (e) {
-        console.error(`[WA] Error during logout for ${sessionId}:`, e);
-      }
-      try {
-        session.socket.end(undefined);
-      } catch (e) { /* ignore */ }
-      session.socket = null;
-    }
+
+    // Clear reconnect timers FIRST to prevent auto-reconnect
     const timer = this.reconnectTimers.get(sessionId);
     if (timer) {
       clearTimeout(timer);
       this.reconnectTimers.delete(sessionId);
     }
     this.reconnectAttempts.delete(sessionId);
-    this.sessions.delete(sessionId);
+
+    if (session?.socket) {
+      // IMPORTANT: Do NOT call socket.logout() here!
+      // logout() invalidates the session on WhatsApp's servers,
+      // which means the user would need to scan QR again.
+      // We only want to close the local connection, preserving auth files
+      // so the user can reconnect later without scanning QR again.
+      try {
+        session.socket.end(undefined);
+      } catch (e) {
+        console.error(`[WA] Error during end() for ${sessionId}:`, e);
+      }
+      session.socket = null;
+    }
+
+    if (session) {
+      session.status = "disconnected";
+      session.qrCode = null;
+      session.qrDataUrl = null;
+    }
+    // Keep session in memory map with disconnected status (don't delete)
+    // so the UI can still show it and the user can reconnect
+    this.emit("status", { sessionId, status: "disconnected", reason: "manual" });
     await this.logActivity(sessionId, "manual_disconnect", "Sessão desconectada manualmente");
     await this.updateSessionDb(sessionId, session?.userId || 0, "disconnected");
+    console.log(`[WA] Session ${sessionId} disconnected successfully`);
   }
 
   /**
    * Delete a WhatsApp session completely:
    * 1. Disconnect socket if active
    * 2. Clean auth files from disk
-   * 3. Mark as deleted in DB (soft-delete)
+   * 3. Soft-delete: mark as 'deleted' in DB / Hard-delete: remove from DB
    */
   async deleteSession(sessionId: string, hardDelete: boolean = false): Promise<void> {
     console.log(`[WA] Deleting session ${sessionId} (hardDelete: ${hardDelete})`);
@@ -1004,29 +1019,37 @@ class WhatsAppManager extends EventEmitter {
     }
     this.reconnectAttempts.delete(sessionId);
 
-    // 2. Close socket if active
+    // 2. Close socket if active — use logout() here since we're deleting
     const session = this.sessions.get(sessionId);
     if (session?.socket) {
       try {
+        // logout() invalidates the session on WhatsApp's servers
+        // This is intentional for delete — we want a clean break
         await session.socket.logout();
       } catch (e) {
-        console.error(`[WA] Error during logout for ${sessionId}:`, e);
+        // Ignore logout errors — session may already be disconnected
+        console.log(`[WA] Logout during delete for ${sessionId}: ${(e as Error).message}`);
       }
       try {
         session.socket.end(undefined);
       } catch (e) { /* ignore */ }
       session.socket = null;
     }
+    // Remove from in-memory map
     this.sessions.delete(sessionId);
 
     // 3. Clean auth files from disk
     const sessionDir = path.join(this.authDir, sessionId);
-    if (fs.existsSync(sessionDir)) {
-      fs.rmSync(sessionDir, { recursive: true, force: true });
-      console.log(`[WA] Auth files deleted for ${sessionId}`);
+    try {
+      if (fs.existsSync(sessionDir)) {
+        fs.rmSync(sessionDir, { recursive: true, force: true });
+        console.log(`[WA] Auth files deleted for ${sessionId}`);
+      }
+    } catch (e) {
+      console.error(`[WA] Error deleting auth files for ${sessionId}:`, e);
     }
 
-    // 4. Update DB
+    // 4. Update DB — this is the critical step
     try {
       const db = await getDb();
       if (db) {
@@ -1035,18 +1058,24 @@ class WhatsAppManager extends EventEmitter {
           await db.delete(whatsappSessions).where(eq(whatsappSessions.sessionId, sessionId));
           console.log(`[WA] Session ${sessionId} hard-deleted from DB`);
         } else {
-          // Soft delete: mark as deleted
+          // Soft delete: mark as 'deleted' in the enum
           await db.update(whatsappSessions)
-            .set({ status: "deleted" as any })
+            .set({ status: "deleted" })
             .where(eq(whatsappSessions.sessionId, sessionId));
           console.log(`[WA] Session ${sessionId} soft-deleted in DB`);
         }
+      } else {
+        console.error(`[WA] Cannot delete session ${sessionId}: database not available`);
       }
     } catch (e) {
       console.error(`[WA] Error updating DB during delete for ${sessionId}:`, e);
+      // If DB update fails, throw so the frontend knows
+      throw new Error(`Erro ao excluir sessão do banco de dados: ${(e as Error).message}`);
     }
 
+    this.emit("status", { sessionId, status: "deleted", reason: hardDelete ? "hard_delete" : "soft_delete" });
     await this.logActivity(sessionId, hardDelete ? "hard_delete" : "soft_delete", `Sessão ${hardDelete ? "excluída permanentemente" : "movida para lixeira"}`);
+    console.log(`[WA] Session ${sessionId} deleted successfully`);
   }
 
   /**

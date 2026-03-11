@@ -232,6 +232,13 @@
       "when": 1773149188631,
       "tag": "0032_fuzzy_the_twelve",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "5",
+      "when": 1773254005496,
+      "tag": "0033_nasty_red_hulk",
+      "breakpoints": true
     }
   ]
 }

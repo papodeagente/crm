@@ -2246,3 +2246,10 @@
 - [x] Backend: endpoint para deletar instância (limpar sessão, auth files, DB records)
 - [x] Frontend: botão de deletar instância na interface com confirmação
 - [x] Testes para nova funcionalidade de exclusão (72 testes passando)
+
+## Fix Definitivo QR Code + Delete Instance (v2)
+- [x] Root cause: QR code demora para gerar e quando gera não conecta — ENUM do DB não tinha 'deleted', connect mutation retornava antes do QR
+- [x] Root cause: Delete instance não funciona — campo status era ENUM sem 'deleted', MySQL rejeitava silenciosamente
+- [x] Corrigir fluxo de conexão/QR: mutation agora espera até 15s pelo QR, polling a cada 2s, disconnect não chama logout()
+- [x] Corrigir delete: ALTER TABLE adicionou 'deleted' ao ENUM, soft-delete funcional, hard-delete admin-only
+- [x] Testes end-to-end: 60 testes passando (41 estabilidade + 19 delete)

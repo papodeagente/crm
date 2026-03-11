@@ -21,7 +21,7 @@ export const whatsappSessions = mysqlTable("whatsapp_sessions", {
   sessionId: varchar("sessionId", { length: 128 }).notNull().unique(),
   userId: int("userId").notNull(),
   tenantId: int("tenantId").default(1).notNull(),
-  status: mysqlEnum("status", ["connecting", "connected", "disconnected"]).default("disconnected").notNull(),
+  status: mysqlEnum("status", ["connecting", "connected", "disconnected", "deleted"]).default("disconnected").notNull(),
   phoneNumber: varchar("phoneNumber", { length: 32 }),
   pushName: varchar("pushName", { length: 128 }),
   platform: varchar("platform", { length: 64 }),
