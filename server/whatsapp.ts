@@ -151,9 +151,9 @@ class WhatsAppManager extends EventEmitter {
         return;
       }
 
-      // Find all sessions that were "connected" before server restart
+      // Find all sessions that were "connected" before server restart (exclude deleted)
       const connectedSessions = await db.select().from(whatsappSessions)
-        .where(eq(whatsappSessions.status, "connected"));
+        .where(and(eq(whatsappSessions.status, "connected"), sql`${whatsappSessions.status} != 'deleted'`));
 
       if (connectedSessions.length === 0) {
         console.log("[WA AutoRestore] No sessions to restore");
@@ -365,23 +365,27 @@ class WhatsAppManager extends EventEmitter {
 
     sessionState.socket = sock;
 
+    // Track QR generation count to detect scan failures
+    let qrGenerationCount = 0;
+    const MAX_QR_GENERATIONS = 5; // After 5 QR codes without scan, something is wrong
+
     // ─── CONNECTION EVENT HANDLER ───
     sock.ev.on("connection.update", async (update) => {
       const { connection, lastDisconnect, qr, isNewLogin, receivedPendingNotifications } = update;
 
-      // Handle partial updates (important for stability)
-      if (!connection && !qr) {
-        // This is a partial update event — log but don't change state
-        if (receivedPendingNotifications) {
-          console.log(`[WA] Session ${sessionId}: received pending notifications`);
-        }
-        if (isNewLogin) {
-          console.log(`[WA] Session ${sessionId}: new login detected`);
-        }
-        return;
+      // Handle partial updates — log but don't block the flow
+      // IMPORTANT: Do NOT return early here. Partial updates are informational
+      // and the connection/qr fields may still be set in the same event.
+      if (receivedPendingNotifications) {
+        console.log(`[WA] Session ${sessionId}: received pending notifications`);
+      }
+      if (isNewLogin) {
+        console.log(`[WA] Session ${sessionId}: new login detected`);
       }
 
       if (qr) {
+        qrGenerationCount++;
+        console.log(`[WA] Session ${sessionId}: QR code generated (#${qrGenerationCount})`);
         sessionState.qrCode = qr;
         sessionState.status = "connecting";
         try {
@@ -390,8 +394,22 @@ class WhatsAppManager extends EventEmitter {
           console.error("QR generation error:", e);
         }
         this.emit("qr", { sessionId, qr, qrDataUrl: sessionState.qrDataUrl });
-        await this.logActivity(sessionId, "qr_generated", "Novo QR Code gerado");
+        await this.logActivity(sessionId, "qr_generated", `QR Code #${qrGenerationCount} gerado`);
         await this.updateSessionDb(sessionId, userId, "connecting");
+
+        // If too many QR codes generated without connection, warn user
+        if (qrGenerationCount >= MAX_QR_GENERATIONS) {
+          console.warn(`[WA] Session ${sessionId}: ${qrGenerationCount} QR codes generated without scan. Consider restarting.`);
+          try {
+            await createNotification(resolvedTenantId, {
+              type: "whatsapp_warning",
+              title: "QR Code não escaneado",
+              body: `Sessão "${sessionId}" gerou ${qrGenerationCount} QR Codes sem conexão. Tente deletar e recriar a sessão.`,
+              entityType: "session",
+              entityId: sessionId,
+            });
+          } catch (e) { /* ignore */ }
+        }
       }
 
       if (connection === "close") {
@@ -952,6 +970,9 @@ class WhatsAppManager extends EventEmitter {
       } catch (e) {
         console.error(`[WA] Error during logout for ${sessionId}:`, e);
       }
+      try {
+        session.socket.end(undefined);
+      } catch (e) { /* ignore */ }
       session.socket = null;
     }
     const timer = this.reconnectTimers.get(sessionId);
@@ -962,6 +983,70 @@ class WhatsAppManager extends EventEmitter {
     this.reconnectAttempts.delete(sessionId);
     this.sessions.delete(sessionId);
     await this.logActivity(sessionId, "manual_disconnect", "Sessão desconectada manualmente");
+    await this.updateSessionDb(sessionId, session?.userId || 0, "disconnected");
+  }
+
+  /**
+   * Delete a WhatsApp session completely:
+   * 1. Disconnect socket if active
+   * 2. Clean auth files from disk
+   * 3. Mark as deleted in DB (soft-delete)
+   */
+  async deleteSession(sessionId: string, hardDelete: boolean = false): Promise<void> {
+    console.log(`[WA] Deleting session ${sessionId} (hardDelete: ${hardDelete})`);
+
+    // 1. Stop health check and reconnect timers
+    this.stopHealthCheck(sessionId);
+    const timer = this.reconnectTimers.get(sessionId);
+    if (timer) {
+      clearTimeout(timer);
+      this.reconnectTimers.delete(sessionId);
+    }
+    this.reconnectAttempts.delete(sessionId);
+
+    // 2. Close socket if active
+    const session = this.sessions.get(sessionId);
+    if (session?.socket) {
+      try {
+        await session.socket.logout();
+      } catch (e) {
+        console.error(`[WA] Error during logout for ${sessionId}:`, e);
+      }
+      try {
+        session.socket.end(undefined);
+      } catch (e) { /* ignore */ }
+      session.socket = null;
+    }
+    this.sessions.delete(sessionId);
+
+    // 3. Clean auth files from disk
+    const sessionDir = path.join(this.authDir, sessionId);
+    if (fs.existsSync(sessionDir)) {
+      fs.rmSync(sessionDir, { recursive: true, force: true });
+      console.log(`[WA] Auth files deleted for ${sessionId}`);
+    }
+
+    // 4. Update DB
+    try {
+      const db = await getDb();
+      if (db) {
+        if (hardDelete) {
+          // Hard delete: remove from DB entirely
+          await db.delete(whatsappSessions).where(eq(whatsappSessions.sessionId, sessionId));
+          console.log(`[WA] Session ${sessionId} hard-deleted from DB`);
+        } else {
+          // Soft delete: mark as deleted
+          await db.update(whatsappSessions)
+            .set({ status: "deleted" as any })
+            .where(eq(whatsappSessions.sessionId, sessionId));
+          console.log(`[WA] Session ${sessionId} soft-deleted in DB`);
+        }
+      }
+    } catch (e) {
+      console.error(`[WA] Error updating DB during delete for ${sessionId}:`, e);
+    }
+
+    await this.logActivity(sessionId, hardDelete ? "hard_delete" : "soft_delete", `Sessão ${hardDelete ? "excluída permanentemente" : "movida para lixeira"}`);
   }
 
   /**

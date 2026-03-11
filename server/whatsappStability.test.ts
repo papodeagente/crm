@@ -284,7 +284,7 @@ describe("WhatsApp Stability Engine", () => {
       const source = await import("fs").then(fs => 
         fs.readFileSync("/home/ubuntu/whatsapp-automation-app/server/whatsapp.ts", "utf-8")
       );
-      expect(source).toContain("This is a partial update event");
+      expect(source).toContain("Do NOT return early here. Partial updates are informational");
       expect(source).toContain("receivedPendingNotifications");
       expect(source).toContain("isNewLogin");
     });

@@ -92,13 +92,17 @@ export async function getUserByOpenId(openId: string) {
 export async function getSessionsByUser(userId: number) {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(whatsappSessions).where(eq(whatsappSessions.userId, userId));
+  return db.select().from(whatsappSessions).where(
+    and(eq(whatsappSessions.userId, userId), sql`${whatsappSessions.status} != 'deleted'`)
+  );
 }
 
 export async function getSessionsByTenant(tenantId: number) {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(whatsappSessions).where(eq(whatsappSessions.tenantId, tenantId));
+  return db.select().from(whatsappSessions).where(
+    and(eq(whatsappSessions.tenantId, tenantId), sql`${whatsappSessions.status} != 'deleted'`)
+  );
 }
 
 export async function getSessionBySessionId(sessionId: string) {

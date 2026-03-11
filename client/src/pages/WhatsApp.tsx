@@ -5,10 +5,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Smartphone, Plus, Send, Wifi, WifiOff, QrCode, MessageSquare, AlertTriangle, ShieldAlert } from "lucide-react";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Smartphone, Plus, Send, Wifi, WifiOff, QrCode, MessageSquare, AlertTriangle, ShieldAlert, Trash2, MoreVertical } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { useSocket } from "@/hooks/useSocket";
@@ -20,32 +20,78 @@ export default function WhatsApp() {
   const [message, setMessage] = useState("");
   const [selectedSession, setSelectedSession] = useState("");
   const [qrCode, setQrCode] = useState<string | null>(null);
+  const [qrSessionId, setQrSessionId] = useState<string | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const utils = trpc.useUtils();
   const { qrData, waStatus } = useSocket();
 
   const sessions = trpc.whatsapp.sessions.useQuery(undefined, { refetchInterval: 5000 });
   const connect = trpc.whatsapp.connect.useMutation({
-    onSuccess: (data) => { if (data.qrDataUrl) setQrCode(data.qrDataUrl); utils.whatsapp.sessions.invalidate(); toast.success("Sessão iniciada! Escaneie o QR Code."); },
+    onSuccess: (data) => {
+      if (data.qrDataUrl) {
+        setQrCode(data.qrDataUrl);
+        setQrSessionId(data.sessionId);
+      }
+      utils.whatsapp.sessions.invalidate();
+      toast.success("Sessão iniciada! Escaneie o QR Code.");
+    },
+    onError: (err) => toast.error(err.message),
   });
   const disconnect = trpc.whatsapp.disconnect.useMutation({
     onSuccess: () => { utils.whatsapp.sessions.invalidate(); toast.success("Sessão desconectada."); },
+  });
+  const deleteSession = trpc.whatsapp.deleteSession.useMutation({
+    onSuccess: () => {
+      utils.whatsapp.sessions.invalidate();
+      toast.success("Sessão excluída com sucesso.");
+      setDeleteConfirm(null);
+    },
+    onError: (err) => toast.error(err.message),
   });
   const sendMsg = trpc.whatsapp.sendMessage.useMutation({
     onSuccess: () => { setMessage(""); toast.success("Mensagem enviada!"); },
     onError: (err) => toast.error(err.message),
   });
 
+  // Update QR code from WebSocket events
   useEffect(() => {
-    if (qrData && qrData.sessionId === selectedSession) setQrCode(qrData.qrDataUrl);
-  }, [qrData, selectedSession]);
+    if (qrData) {
+      setQrCode(qrData.qrDataUrl);
+      setQrSessionId(qrData.sessionId);
+    }
+  }, [qrData]);
 
+  // Clear QR code when session connects
   useEffect(() => {
-    if (waStatus) utils.whatsapp.sessions.invalidate();
+    if (waStatus) {
+      utils.whatsapp.sessions.invalidate();
+      if (waStatus.status === "connected" && waStatus.sessionId === qrSessionId) {
+        setQrCode(null);
+        setQrSessionId(null);
+      }
+    }
   }, [waStatus]);
 
-  const connectedSessions = sessions.data?.filter((s: any) => s.liveStatus === "connected") || [];
+  // Also poll QR code from the status endpoint as fallback
+  const statusQuery = trpc.whatsapp.status.useQuery(
+    { sessionId: qrSessionId || "" },
+    {
+      enabled: !!qrSessionId && !qrCode,
+      refetchInterval: 3000,
+    }
+  );
 
-  const [showDisclaimer, setShowDisclaimer] = useState(false);
+  useEffect(() => {
+    if (statusQuery.data?.qrDataUrl && !qrCode) {
+      setQrCode(statusQuery.data.qrDataUrl);
+    }
+    if (statusQuery.data?.status === "connected") {
+      setQrCode(null);
+      setQrSessionId(null);
+    }
+  }, [statusQuery.data]);
+
+  const connectedSessions = sessions.data?.filter((s: any) => s.liveStatus === "connected") || [];
 
   return (
     <div className="p-5 lg:px-8 space-y-5">
@@ -84,7 +130,7 @@ export default function WhatsApp() {
                 </div>
               </div>
               <div><Label className="text-[12px] font-medium">Nome da Sessão *</Label><Input value={sessionName} onChange={(e) => setSessionName(e.target.value)} placeholder="Ex: principal" className="mt-1.5 h-10 rounded-xl" /></div>
-              <Button className="w-full h-11 rounded-xl text-[14px] font-semibold shadow-sm bg-emerald-600 hover:bg-emerald-700 text-white transition-colors" disabled={!sessionName || connect.isPending} onClick={() => { connect.mutate({ sessionId: sessionName }); setSelectedSession(sessionName); setShowDisclaimer(true); }}>
+              <Button className="w-full h-11 rounded-xl text-[14px] font-semibold shadow-sm bg-emerald-600 hover:bg-emerald-700 text-white transition-colors" disabled={!sessionName || connect.isPending} onClick={() => { connect.mutate({ sessionId: sessionName }); setSelectedSession(sessionName); setQrSessionId(sessionName); setOpenConnect(false); }}>
                 {connect.isPending ? "Conectando..." : "Conectar"}
               </Button>
             </div>
@@ -115,11 +161,17 @@ export default function WhatsApp() {
               <div className="p-5">
                 <div className="flex items-center gap-2.5 mb-4">
                   <div className="h-8 w-8 rounded-xl bg-emerald-50 flex items-center justify-center"><QrCode className="h-4 w-4 text-emerald-600" /></div>
-                  <p className="text-[14px] font-semibold">QR Code — Escaneie com seu WhatsApp</p>
+                  <div>
+                    <p className="text-[14px] font-semibold">QR Code — Escaneie com seu WhatsApp</p>
+                    {qrSessionId && <p className="text-[11px] text-muted-foreground">Sessão: {qrSessionId}</p>}
+                  </div>
                 </div>
                 <div className="flex justify-center">
                   <img src={qrCode} alt="QR Code" className="max-w-[260px] rounded-2xl shadow-sm" />
                 </div>
+                <p className="text-[11px] text-muted-foreground text-center mt-3">
+                  Abra o WhatsApp no celular &gt; Menu &gt; Aparelhos Conectados &gt; Conectar Aparelho
+                </p>
               </div>
             </Card>
           )}
@@ -149,22 +201,49 @@ export default function WhatsApp() {
                         {s.user && <p className="text-[11px] text-muted-foreground">{s.user.name || s.user.id}</p>}
                       </div>
                     </div>
-                    <span className={`inline-flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded-full ${
-                      s.liveStatus === "connected" ? "bg-emerald-50 text-emerald-700" : "bg-slate-50 text-slate-600"
-                    }`}>
-                      <span className={`h-1.5 w-1.5 rounded-full ${s.liveStatus === "connected" ? "bg-emerald-500 animate-pulse" : "bg-slate-400"}`} />
-                      {s.liveStatus === "connected" ? "Conectado" : "Desconectado"}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className={`inline-flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded-full ${
+                        s.liveStatus === "connected" ? "bg-emerald-50 text-emerald-700" :
+                        s.liveStatus === "connecting" ? "bg-amber-50 text-amber-700" :
+                        "bg-slate-50 text-slate-600"
+                      }`}>
+                        <span className={`h-1.5 w-1.5 rounded-full ${
+                          s.liveStatus === "connected" ? "bg-emerald-500 animate-pulse" :
+                          s.liveStatus === "connecting" ? "bg-amber-500 animate-pulse" :
+                          "bg-slate-400"
+                        }`} />
+                        {s.liveStatus === "connected" ? "Conectado" : s.liveStatus === "connecting" ? "Conectando..." : "Desconectado"}
+                      </span>
+                      {/* Dropdown menu with delete option */}
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0 rounded-lg">
+                            <MoreVertical className="h-4 w-4 text-muted-foreground" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="rounded-xl">
+                          <DropdownMenuItem
+                            className="text-red-600 focus:text-red-600 focus:bg-red-50 rounded-lg text-[12px] gap-2"
+                            onClick={() => setDeleteConfirm(s.sessionId)}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                            Excluir Sessão
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
                   </div>
-                  {s.liveStatus === "connected" ? (
-                    <Button variant="outline" size="sm" className="w-full h-9 rounded-xl text-[12px] border-red-200 text-red-600 hover:bg-red-50" onClick={() => disconnect.mutate({ sessionId: s.sessionId })}>
-                      <WifiOff className="h-3.5 w-3.5 mr-1.5" />Desconectar
-                    </Button>
-                  ) : (
-                    <Button size="sm" className="w-full h-9 rounded-xl text-[12px] bg-gradient-to-r from-emerald-600 to-emerald-500 text-white hover:opacity-90" onClick={() => { connect.mutate({ sessionId: s.sessionId }); setSelectedSession(s.sessionId); }}>
-                      <Wifi className="h-3.5 w-3.5 mr-1.5" />Reconectar
-                    </Button>
-                  )}
+                  <div className="flex gap-2">
+                    {s.liveStatus === "connected" ? (
+                      <Button variant="outline" size="sm" className="flex-1 h-9 rounded-xl text-[12px] border-red-200 text-red-600 hover:bg-red-50" onClick={() => disconnect.mutate({ sessionId: s.sessionId })}>
+                        <WifiOff className="h-3.5 w-3.5 mr-1.5" />Desconectar
+                      </Button>
+                    ) : (
+                      <Button size="sm" className="flex-1 h-9 rounded-xl text-[12px] bg-gradient-to-r from-emerald-600 to-emerald-500 text-white hover:opacity-90" onClick={() => { connect.mutate({ sessionId: s.sessionId }); setSelectedSession(s.sessionId); setQrSessionId(s.sessionId); }}>
+                        <Wifi className="h-3.5 w-3.5 mr-1.5" />Reconectar
+                      </Button>
+                    )}
+                  </div>
                 </div>
               </Card>
             ))}
@@ -202,6 +281,39 @@ export default function WhatsApp() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={!!deleteConfirm} onOpenChange={(open) => !open && setDeleteConfirm(null)}>
+        <DialogContent className="sm:max-w-[400px] rounded-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2.5 text-lg">
+              <div className="h-9 w-9 rounded-xl bg-red-50 flex items-center justify-center"><Trash2 className="h-4 w-4 text-red-600" /></div>
+              Excluir Sessão
+            </DialogTitle>
+            <DialogDescription className="text-[13px] text-muted-foreground pt-2">
+              Tem certeza que deseja excluir a sessão <strong className="text-foreground">"{deleteConfirm}"</strong>? 
+              A sessão será desconectada e movida para a lixeira. Os dados de autenticação serão removidos e será necessário escanear o QR Code novamente caso queira reconectar.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" className="rounded-xl" onClick={() => setDeleteConfirm(null)}>
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              className="rounded-xl"
+              disabled={deleteSession.isPending}
+              onClick={() => {
+                if (deleteConfirm) {
+                  deleteSession.mutate({ sessionId: deleteConfirm });
+                }
+              }}
+            >
+              {deleteSession.isPending ? "Excluindo..." : "Excluir"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

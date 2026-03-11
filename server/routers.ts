@@ -150,6 +150,25 @@ export const appRouter = router({
         await whatsappManager.disconnect(input.sessionId);
         return { success: true };
       }),
+    // Soft-delete: move session to trash (any user can do this)
+    deleteSession: protectedProcedure
+      .input(z.object({ sessionId: z.string() }))
+      .mutation(async ({ input }) => {
+        await whatsappManager.deleteSession(input.sessionId, false);
+        return { success: true };
+      }),
+    // Hard-delete: permanently remove session (admin only)
+    hardDeleteSession: protectedProcedure
+      .input(z.object({ sessionId: z.string() }))
+      .mutation(async ({ ctx, input }) => {
+        // Only admins can hard-delete
+        const role = ctx.saasUser?.crmUserRole || ctx.saasUser?.role;
+        if (role !== "admin") {
+          throw new Error("Apenas administradores podem excluir permanentemente uma sess\u00e3o.");
+        }
+        await whatsappManager.deleteSession(input.sessionId, true);
+        return { success: true };
+      }),
     status: protectedProcedure
       .input(z.object({ sessionId: z.string() }))
       .query(({ input }) => {

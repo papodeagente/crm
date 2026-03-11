@@ -2239,3 +2239,10 @@
 - [x] Testes para cenários críticos (41 testes de estabilidade + 13 de ativação + 54 total passando)
 - [x] Validar que rotas e contratos existentes não foram alterados
 - [ ] Relatório executivo de entrega — pendente
+
+## Fix QR Code + Delete Instance
+- [x] Investigar e corrigir QR Code que não gera ou não conecta
+- [x] Implementar exclusão de instância WhatsApp (soft-delete → lixeira, hard-delete apenas admin)
+- [x] Backend: endpoint para deletar instância (limpar sessão, auth files, DB records)
+- [x] Frontend: botão de deletar instância na interface com confirmação
+- [x] Testes para nova funcionalidade de exclusão (72 testes passando)
