@@ -164,7 +164,7 @@ function AgentsTab() {
   const utils = trpc.useUtils();
 
   // Current user info to check if admin
-  const saasMe = trpc.saasAuth.me.useQuery(undefined, { retry: false, refetchOnWindowFocus: false });
+  const saasMe = trpc.saasAuth.me.useQuery(undefined, { retry: 1, refetchOnWindowFocus: false, refetchOnMount: false, staleTime: 5 * 60 * 1000 });
   const currentUserRole = saasMe.data?.role || "user";
   const currentUserId = saasMe.data?.userId;
   const isCurrentAdmin = currentUserRole === "admin";

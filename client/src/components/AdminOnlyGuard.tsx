@@ -16,7 +16,7 @@ interface AdminOnlyGuardProps {
 }
 
 export function AdminOnlyGuard({ children, pageTitle }: AdminOnlyGuardProps) {
-  const saasMe = trpc.saasAuth.me.useQuery(undefined, { retry: false, refetchOnWindowFocus: false });
+  const saasMe = trpc.saasAuth.me.useQuery(undefined, { retry: 1, refetchOnWindowFocus: false, refetchOnMount: false, staleTime: 5 * 60 * 1000 });
   const isAdmin = saasMe.data?.role === "admin";
 
   // While loading, show children normally (avoids flash)
@@ -62,7 +62,7 @@ export function AdminOnlyGuard({ children, pageTitle }: AdminOnlyGuardProps) {
  * Can be used inside pages for conditional rendering without the full guard.
  */
 export function useIsAdmin() {
-  const saasMe = trpc.saasAuth.me.useQuery(undefined, { retry: false, refetchOnWindowFocus: false });
+  const saasMe = trpc.saasAuth.me.useQuery(undefined, { retry: 1, refetchOnWindowFocus: false, refetchOnMount: false, staleTime: 5 * 60 * 1000 });
   return {
     isAdmin: saasMe.data?.role === "admin",
     isLoading: saasMe.isLoading,

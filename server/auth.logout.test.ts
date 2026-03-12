@@ -29,6 +29,7 @@ function createAuthContext(): { ctx: TrpcContext; clearedCookies: CookieCall[] }
     user,
     req: {
       protocol: "https",
+      hostname: "test.manus.computer",
       headers: {},
     } as TrpcContext["req"],
     res: {

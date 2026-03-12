@@ -1363,8 +1363,11 @@ class WhatsAppEvolutionManager extends EventEmitter {
       }
 
       // Resolve conversation
+      // Only pass pushName when message is FROM the contact (fromMe=false)
+      // When fromMe=true, pushName is the sender's (our) name, not the contact's
       try {
-        const resolved = await resolveInbound(session.tenantId, session.sessionId, remoteJid, pushName);
+        const contactPushName = fromMe ? null : pushName;
+        const resolved = await resolveInbound(session.tenantId, session.sessionId, remoteJid, contactPushName);
         if (resolved) {
           await updateConversationLastMessage(resolved.conversationId, {
             content: content || "",

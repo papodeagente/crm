@@ -117,7 +117,7 @@ const settingsCategories: SettingsCategory[] = [
 
 export default function SettingsPage() {
   const [, setLocation] = useLocation();
-  const saasMe = trpc.saasAuth.me.useQuery(undefined, { retry: false, refetchOnWindowFocus: false });
+  const saasMe = trpc.saasAuth.me.useQuery(undefined, { retry: 1, refetchOnWindowFocus: false, refetchOnMount: false, staleTime: 5 * 60 * 1000 });
   const isAdmin = saasMe.data?.role === "admin";
 
   return (

@@ -2489,3 +2489,7 @@
 - [x] Ticket médio e origens de leads na taxa de conversão
 - [x] Resolução de tenantId para owner via Manus OAuth (busca CRM user)
 - [x] Redesign funil de vendas no dashboard: funil SVG real com trapézios que diminuem, gradientes, efeito de brilho, hover com glow, e resumo total abaixo
+
+## Correções (Mar 13 - v18)
+- [x] BUG: Sessão não persiste — FIX: Cookie sameSite alterado de 'none' para 'lax' em domínios próprios (mais compatível com navegadores modernos); staleTime aumentado para 10min no useAuth para evitar refetches desnecessários; null safety adicionado ao cookies.ts
+- [x] BUG: Nome errado no contato 555189238810 — FIX: resolveInbound agora recebe pushName=null quando fromMe=true (whatsapp.ts e whatsappEvolution.ts); corrigidos 2 contatos CRM com nomes errados (546353: Fernando alves -> CP, 540036: Fernando alves -> Fernando Alves 7D)

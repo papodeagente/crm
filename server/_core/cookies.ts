@@ -4,6 +4,7 @@ const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
 
 function isIpAddress(host: string) {
   // Basic IPv4 check and IPv6 presence detection.
+  if (!host) return false;
   if (/^\d{1,3}(\.\d{1,3}){3}$/.test(host)) return true;
   return host.includes(":");
 }
@@ -24,25 +25,20 @@ function isSecureRequest(req: Request) {
 export function getSessionCookieOptions(
   req: Request
 ): Pick<CookieOptions, "domain" | "httpOnly" | "path" | "sameSite" | "secure"> {
-  // const hostname = req.hostname;
-  // const shouldSetDomain =
-  //   hostname &&
-  //   !LOCAL_HOSTS.has(hostname) &&
-  //   !isIpAddress(hostname) &&
-  //   hostname !== "127.0.0.1" &&
-  //   hostname !== "::1";
+  const hostname = req.hostname || "";
+  const isLocal = LOCAL_HOSTS.has(hostname) || isIpAddress(hostname);
+  const isSecure = isSecureRequest(req);
 
-  // const domain =
-  //   shouldSetDomain && !hostname.startsWith(".")
-  //     ? `.${hostname}`
-  //     : shouldSetDomain
-  //       ? hostname
-  //       : undefined;
+  // Use 'lax' for same-site requests (custom domains, production)
+  // This is more compatible with modern browsers that block 'none' cookies
+  // Only use 'none' for cross-origin scenarios (e.g., manus.computer dev preview)
+  const isManusDev = hostname.includes('manus.computer') || hostname.includes('manus.space');
+  const sameSite: CookieOptions["sameSite"] = isManusDev ? "none" : "lax";
 
   return {
     httpOnly: true,
     path: "/",
-    sameSite: "none",
-    secure: isSecureRequest(req),
+    sameSite,
+    secure: isManusDev ? true : isSecure,
   };
 }

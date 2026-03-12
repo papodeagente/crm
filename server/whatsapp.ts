@@ -753,7 +753,10 @@ class WhatsAppManager extends EventEmitter {
         // ─── Conversation Identity Resolver ───
         let waConversationId: number | undefined;
         try {
-          const resolved = await resolveInbound(resolvedTenantId, sessionId, remoteJid, msg.pushName || null);
+          // Only use pushName for contact name when message is FROM the contact (fromMe=false)
+          // When fromMe=true, pushName is the sender's (our) name, not the contact's name
+          const contactPushName = fromMe ? null : (msg.pushName || null);
+          const resolved = await resolveInbound(resolvedTenantId, sessionId, remoteJid, contactPushName);
           waConversationId = resolved.conversationId;
         } catch (e) {
           console.error("[ConvResolver] Error resolving inbound:", e);
