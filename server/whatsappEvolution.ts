@@ -1275,9 +1275,11 @@ class WhatsAppEvolutionManager extends EventEmitter {
       // Extract media info from the message payload
       const mediaInfo = this.extractMediaInfo(data);
 
-      // If message has media but no URL, download from Evolution API and upload to S3
+      // If message has media but no permanent S3 URL, download from Evolution API and upload to S3
+      // WhatsApp CDN URLs (mmg.whatsapp.net) are temporary and expire, so always download to S3
       const hasMediaType = ["imageMessage", "videoMessage", "audioMessage", "documentMessage", "stickerMessage", "pttMessage"].includes(messageType);
-      if (hasMediaType && !mediaInfo.mediaUrl && messageId) {
+      const hasPermanentUrl = mediaInfo.mediaUrl && !mediaInfo.mediaUrl.includes('whatsapp.net/');
+      if (hasMediaType && !hasPermanentUrl && messageId) {
         try {
           const base64Data = await evo.getBase64FromMediaMessage(session.instanceName, messageId, {
             remoteJid,
@@ -2107,6 +2109,9 @@ class WhatsAppEvolutionManager extends EventEmitter {
               // Extract media info from synced messages
               const syncMediaInfo = this.extractMediaInfo(msg);
 
+              // Don't store temporary WhatsApp CDN URLs - they expire
+              const permanentMediaUrl = syncMediaInfo.mediaUrl && !syncMediaInfo.mediaUrl.includes('whatsapp.net/') ? syncMediaInfo.mediaUrl : null;
+
               insertBatch.push({
                 sessionId: session.sessionId,
                 tenantId: session.tenantId,
@@ -2118,7 +2123,7 @@ class WhatsAppEvolutionManager extends EventEmitter {
                 pushName: pushName || null,
                 status: msgStatus,
                 timestamp,
-                mediaUrl: syncMediaInfo.mediaUrl || null,
+                mediaUrl: permanentMediaUrl,
                 mediaMimeType: syncMediaInfo.mediaMimeType || null,
                 mediaFileName: syncMediaInfo.mediaFileName || null,
                 mediaDuration: syncMediaInfo.mediaDuration || null,
@@ -2130,6 +2135,7 @@ class WhatsAppEvolutionManager extends EventEmitter {
             }
 
             // After inserting, try to download media for messages that need it
+            // Also download for messages with temporary WhatsApp CDN URLs
             const mediaMessages = insertBatch.filter(m => {
               const mediaTypes = ['imageMessage', 'videoMessage', 'audioMessage', 'documentMessage', 'stickerMessage', 'pttMessage'];
               return mediaTypes.includes(m.messageType) && !m.mediaUrl && m.messageId;
@@ -2332,6 +2338,9 @@ class WhatsAppEvolutionManager extends EventEmitter {
               // Extract media info from synced messages
               const deepMediaInfo = this.extractMediaInfo(msg);
 
+              // Don't store temporary WhatsApp CDN URLs - they expire
+              const permanentDeepMediaUrl = deepMediaInfo.mediaUrl && !deepMediaInfo.mediaUrl.includes('whatsapp.net/') ? deepMediaInfo.mediaUrl : null;
+
               insertBatch.push({
                 sessionId: session.sessionId,
                 tenantId: session.tenantId,
@@ -2343,7 +2352,7 @@ class WhatsAppEvolutionManager extends EventEmitter {
                 pushName: pushName || null,
                 status: msgStatus,
                 timestamp,
-                mediaUrl: deepMediaInfo.mediaUrl || null,
+                mediaUrl: permanentDeepMediaUrl,
                 mediaMimeType: deepMediaInfo.mediaMimeType || null,
                 mediaFileName: deepMediaInfo.mediaFileName || null,
                 mediaDuration: deepMediaInfo.mediaDuration || null,

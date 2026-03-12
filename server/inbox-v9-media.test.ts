@@ -64,8 +64,8 @@ describe("Inbox v9 - Media Download Fixes", () => {
       expect(evoManagerCode).toContain("this.extractMediaInfo(msg)");
     });
 
-    it("should include mediaUrl in sync insertBatch", () => {
-      expect(evoManagerCode).toContain("mediaUrl: syncMediaInfo.mediaUrl || null");
+    it("should include mediaUrl in sync insertBatch (filtering temporary WhatsApp URLs)", () => {
+      expect(evoManagerCode).toContain("mediaUrl: permanentMediaUrl");
     });
 
     it("should include mediaMimeType in sync insertBatch", () => {

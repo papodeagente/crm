@@ -549,7 +549,8 @@ const MessageBubble = memo(({
   const isPtv = msg.messageType === "ptvMessage"; // Video message (round video)
   // Detect media by messageType (not just mediaUrl), since most messages have mediaUrl=null
   const isMediaType = isImage || isVideo || isAudio || isDocument || isSticker;
-  const hasMediaUrl = !!msg.mediaUrl;
+  // WhatsApp CDN URLs (mmg.whatsapp.net) are temporary and expire — treat them as not having a valid URL
+  const hasMediaUrl = !!msg.mediaUrl && !msg.mediaUrl.includes('whatsapp.net/');
   const hasMedia = hasMediaUrl || isMediaType;
 
   const bubbleBase = fromMe
