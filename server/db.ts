@@ -1,4 +1,4 @@
-import { eq, desc, and, or, like, lt, sql } from "drizzle-orm";
+import { eq, desc, and, or, like, lt, gt, isNotNull, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import { InsertUser, users, whatsappSessions, waMessages as messages, activityLogs, chatbotSettings, chatbotRules, conversationAssignments, crmUsers, teams, teamMembers, distributionRules, customFields, customFieldValues, waConversations, userPreferences } from "../drizzle/schema";
 import { ENV } from './_core/env';
@@ -1851,6 +1851,31 @@ export async function getAllUserPreferences(userId: number, tenantId: number): P
   const result: Record<string, string> = {};
   for (const row of rows) {
     if (row.prefValue !== null) result[row.prefKey] = row.prefValue;
+  }
+  return result;
+}
+
+/**
+ * Get total unread WhatsApp message counts grouped by contactId.
+ * Used by Pipeline to show badges on deal cards.
+ */
+export async function getWhatsAppUnreadByContact(tenantId: number): Promise<Record<number, number>> {
+  const db = await getDb();
+  if (!db) return {};
+  const rows = await db.select({
+    contactId: waConversations.contactId,
+    totalUnread: sql<number>`SUM(${waConversations.unreadCount})`.as("totalUnread"),
+  })
+    .from(waConversations)
+    .where(and(
+      eq(waConversations.tenantId, tenantId),
+      isNotNull(waConversations.contactId),
+      gt(waConversations.unreadCount, 0),
+    ))
+    .groupBy(waConversations.contactId);
+  const result: Record<number, number> = {};
+  for (const row of rows) {
+    if (row.contactId) result[row.contactId] = Number(row.totalUnread) || 0;
   }
   return result;
 }

@@ -12,7 +12,7 @@ import {
   integrations, integrationConnections, integrationCredentials, webhooks, jobs, jobDlq,
   eventLog,
   productCategories, productCatalog,
-  waMessages, whatsappSessions,
+  waMessages, whatsappSessions, waConversations,
   aiConversationAnalyses,
   leadSources, campaigns, lossReasons,
   taskAutomations,
@@ -1801,4 +1801,31 @@ export async function executeDateAutomation(auto: {
   }
 
   return { moved: matchingDeals.length };
+}
+
+// ═══════════════════════════════════════
+// WHATSAPP UNREAD COUNTS BY CONTACT
+// ═══════════════════════════════════════
+/**
+ * Get total unread WhatsApp message counts grouped by contactId.
+ * Used by Pipeline to show badges on deal cards.
+ */
+export async function getWhatsAppUnreadByContact(tenantId: number): Promise<Record<number, number>> {
+  const db = await getDb();
+  if (!db) return {};
+  const rows = await db.select({
+    contactId: waConversations.contactId,
+    totalUnread: sql<number>`SUM(${waConversations.unreadCount})`.as("totalUnread"),
+  })
+    .from(waConversations)
+    .where(and(
+      eq(waConversations.tenantId, tenantId),
+      isNotNull(waConversations.contactId),
+    ))
+    .groupBy(waConversations.contactId);
+  const result: Record<number, number> = {};
+  for (const row of rows) {
+    if (row.contactId && Number(row.totalUnread) > 0) result[row.contactId] = Number(row.totalUnread);
+  }
+  return result;
 }

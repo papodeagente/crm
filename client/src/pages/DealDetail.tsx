@@ -2591,13 +2591,23 @@ function WhatsAppPanel({ contact, dealId }: { contact: any; dealId: number }) {
   const [viewMode, setViewMode] = useState<"history" | "live">("history");
   const [loadMoreBefore, setLoadMoreBefore] = useState<number | undefined>(undefined);
   const scrollRef = useRef<HTMLDivElement>(null);
-
-  // Fetch full message history from DB
+  const { lastMessage } = useSocket();
+  const utils = trpc.useUtils();
+  // Fetch full message history from DB with periodic polling
   const messagesQ = trpc.crm.dealWhatsApp.messages.useQuery(
     { tenantId: TENANT_ID, dealId, limit: 200, beforeId: loadMoreBefore },
-    { enabled: dealId > 0 }
+    { enabled: dealId > 0, refetchInterval: 10000 }
   );
-
+  // Real-time message updates via WebSocket
+  const prevMsgRef = useRef<typeof lastMessage>(null);
+  useEffect(() => {
+    if (!lastMessage) return;
+    if (prevMsgRef.current?.timestamp === lastMessage.timestamp && prevMsgRef.current?.content === lastMessage.content) return;
+    prevMsgRef.current = lastMessage;
+    messagesQ.refetch();
+    utils.crm.dealWhatsApp.count.invalidate();
+    utils.notifications.unreadCount.invalidate();
+  }, [lastMessage]);
   // Live chat setup
   const sessionsQ = trpc.whatsapp.sessions.useQuery();
   const activeSession = (sessionsQ.data || []).find((s: any) => s.liveStatus === "connected");

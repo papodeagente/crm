@@ -635,8 +635,31 @@ class WhatsAppManager extends EventEmitter {
     });
 
     sock.ev.on("messages.upsert", async ({ messages: msgs, type }: { messages: any[]; type: string }) => {
+      console.log(`[WA] messages.upsert fired: ${msgs.length} message(s), type=${type}, session=${sessionId}`);
       for (const msg of msgs) {
-        if (!msg.message) continue;
+        if (!msg.message) {
+          console.log(`[WA] Skipping message without .message property, key=${JSON.stringify(msg.key)}`);
+          continue;
+        }
+
+        // ─── Unwrap viewOnceMessage / viewOnceMessageV2 containers ───
+        // WhatsApp wraps view-once messages in a container; the real content is inside
+        let actualMessage = msg.message;
+        if (msg.message.viewOnceMessage?.message) {
+          actualMessage = msg.message.viewOnceMessage.message;
+          console.log(`[WA] Unwrapped viewOnceMessage`);
+        } else if (msg.message.viewOnceMessageV2?.message) {
+          actualMessage = msg.message.viewOnceMessageV2.message;
+          console.log(`[WA] Unwrapped viewOnceMessageV2`);
+        } else if (msg.message.ephemeralMessage?.message) {
+          actualMessage = msg.message.ephemeralMessage.message;
+          console.log(`[WA] Unwrapped ephemeralMessage`);
+        } else if (msg.message.documentWithCaptionMessage?.message) {
+          actualMessage = msg.message.documentWithCaptionMessage.message;
+          console.log(`[WA] Unwrapped documentWithCaptionMessage`);
+        }
+        // Replace msg.message reference for downstream processing
+        msg.message = actualMessage;
 
         const rawRemoteJid = msg.key.remoteJid || "";
         // Skip group messages — CRM only handles individual contacts
@@ -652,7 +675,12 @@ class WhatsAppManager extends EventEmitter {
         const upsertKeys = Object.keys(msg.message);
         const upsertRealType = upsertKeys.find(k => !SKIP_MESSAGE_TYPES.has(k) && k !== "messageContextInfo") || upsertKeys[0] || "unknown";
         // Skip entirely internal protocol messages (no user-visible content)
-        if (SKIP_MESSAGE_TYPES.has(upsertRealType)) continue;
+        if (SKIP_MESSAGE_TYPES.has(upsertRealType)) {
+          console.log(`[WA] Skipping internal message type: ${upsertRealType}, keys=${upsertKeys.join(",")}`);
+          continue;
+        }
+        
+        console.log(`[WA] Processing message: type=${upsertRealType}, fromMe=${fromMe}, jid=${remoteJid}, msgId=${msg.key.id}`);
         
         const messageType = upsertRealType;
         let content = "";
@@ -799,6 +827,7 @@ class WhatsAppManager extends EventEmitter {
 
         // Increment messages processed counter
         sessionState.messagesProcessed++;
+        console.log(`[WA] Message processed: fromMe=${fromMe}, type=${messageType}, content=${content.substring(0, 50)}, jid=${remoteJid}`);
 
         this.emit("message", { sessionId, message: msg, content, fromMe, remoteJid, messageType, mediaUrl, mediaMimeType, mediaFileName, mediaDuration, isVoiceNote, status: initialStatus });
 

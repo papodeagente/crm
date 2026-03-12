@@ -2279,3 +2279,14 @@
 - [x] Correção: handler especial para 515 que cria novo socket IMEDIATAMENTE sem delay/backoff
 - [x] Pairing Code adicionado como alternativa ao QR
 - [ ] Publicar e validar com usuário
+
+## Fix Recebimento de Mensagens + Notificação CRM
+- [x] Investigar por que mensagens recebidas não aparecem — handler está correto, problema era falta de real-time no frontend
+- [x] Adicionar logs detalhados no messages.upsert handler para diagnóstico em produção
+- [x] Adicionar unwrapping de viewOnceMessage/viewOnceMessageV2/ephemeralMessage
+- [x] DealDetail WhatsAppPanel: refetch automático via useSocket + polling 10s
+- [x] Pipeline DealCard: badge verde pulsante com contagem de mensagens WhatsApp não lidas
+- [x] Endpoint unreadByContact no crmRouter para buscar contagens por contato
+- [x] Pipeline: useSocket para refetch automático quando mensagem chega
+- [x] 60 testes passando
+- [ ] Publicar e validar com usuário em produção

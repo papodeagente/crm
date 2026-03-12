@@ -33,6 +33,8 @@ import { useTenantId } from "@/hooks/useTenantId";
 import TaskFormDialog, { getTaskTypeIcon, getTaskTypeLabel } from "@/components/TaskFormDialog";
 import TaskActionPopover from "@/components/TaskActionPopover";
 import { formatDate, formatDateTime, formatTime } from "../../../shared/dateUtils";
+import { useSocket } from "@/hooks/useSocket";
+import { MessageCircle } from "lucide-react";
 
 type ViewMode = "kanban" | "list";
 type SortMode = "created_desc" | "created_asc" | "value_desc" | "value_asc";
@@ -153,6 +155,18 @@ export default function Pipeline() {
   // Optimized: aggregated overdue/pending counts per deal for Kanban cards
   const overdueSummary = trpc.crm.tasks.overdueSummary.useQuery({ tenantId: TENANT_ID });
   const pendingCounts = trpc.crm.tasks.pendingCounts.useQuery({ tenantId: TENANT_ID });
+  // WhatsApp unread counts per contact (for deal card badges)
+  const waUnread = trpc.crm.dealWhatsApp.unreadByContact.useQuery(
+    { tenantId: TENANT_ID },
+    { refetchInterval: 30000 }
+  );
+  // Real-time: refetch unread counts when a new WhatsApp message arrives
+  const { lastMessage: wsLastMessage } = useSocket();
+  useEffect(() => {
+    if (wsLastMessage) {
+      waUnread.refetch();
+    }
+  }, [wsLastMessage]);
   // Full tasks for calendar and indicators panels
   const allTasks = trpc.crm.tasks.list.useQuery(
     { tenantId: TENANT_ID },
@@ -516,6 +530,7 @@ export default function Pipeline() {
                             accounts={allAccounts.data || []}
                             overdueData={(overdueSummary.data as any)?.[deal.id] || null}
                             pendingCount={(pendingCounts.data as any)?.[deal.id] || 0}
+                            waUnreadCount={deal.contactId ? ((waUnread.data as any)?.[deal.contactId] || 0) : 0}
                             onCreateTask={() => setShowTaskForm({ dealId: deal.id, dealTitle: deal.title })}
                             onOpenDeal={() => setLocation(`/deal/${deal.id}`)}
                             onDragStart={handleDragStart}
@@ -732,8 +747,8 @@ export default function Pipeline() {
 }
 
 /* ─── Deal Card ─── */
-function DealCard({ deal, contacts, accounts, overdueData, pendingCount, onCreateTask, onOpenDeal, onDragStart, onDragEnd, isDragging, isCooling }: {
-  deal: any; contacts: any[]; accounts: any[]; overdueData: { count: number; oldestTitle: string; oldestDueAt: string } | null; pendingCount: number; onCreateTask: () => void; onOpenDeal: () => void;
+function DealCard({ deal, contacts, accounts, overdueData, pendingCount, waUnreadCount, onCreateTask, onOpenDeal, onDragStart, onDragEnd, isDragging, isCooling }: {
+  deal: any; contacts: any[]; accounts: any[]; overdueData: { count: number; oldestTitle: string; oldestDueAt: string } | null; pendingCount: number; waUnreadCount?: number; onCreateTask: () => void; onOpenDeal: () => void;
   onDragStart: (e: React.DragEvent, dealId: number) => void; onDragEnd: (e: React.DragEvent) => void; isDragging: boolean; isCooling?: boolean;
 }) {
   const contact = contacts.find((c: any) => c.id === deal.contactId);
@@ -771,6 +786,12 @@ function DealCard({ deal, contacts, accounts, overdueData, pendingCount, onCreat
             <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300">
               <Thermometer className="h-3 w-3" />
               Esfriando
+            </span>
+          )}
+          {(waUnreadCount ?? 0) > 0 && (
+            <span className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300 animate-pulse">
+              <MessageCircle className="h-3 w-3" />
+              {waUnreadCount}
             </span>
           )}
         </div>

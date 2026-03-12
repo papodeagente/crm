@@ -938,6 +938,11 @@ export const crmRouter = router({
       .query(async ({ input }) => {
         return crm.countWhatsAppMessagesByDeal(input.dealId, input.tenantId);
       }),
+    unreadByContact: protectedProcedure
+      .input(z.object({ tenantId: z.number() }))
+      .query(async ({ input }) => {
+        return crm.getWhatsAppUnreadByContact(input.tenantId);
+      }),
   }),
 
   // ─── LEAD SOURCES ───
