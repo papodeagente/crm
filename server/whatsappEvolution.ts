@@ -584,13 +584,12 @@ class WhatsAppEvolutionManager extends EventEmitter {
         return true;
       });
 
-      // For incremental sync, only process NEW chats (not already in DB)
-      const chatsToProcess = isFirstSync
-        ? individualChats
-        : individualChats.filter(c => !existingJidSet.has(c.remoteJid));
+      // For incremental sync, process ALL chats (new + existing with newer messages)
+      const chatsToProcess = individualChats;
 
-      if (!isFirstSync && chatsToProcess.length === 0) {
-        console.log(`[EvoWA Sync] No new chats to sync (${individualChats.length} individual, all already in DB)`);
+      if (!isFirstSync) {
+        const newChatsCount = individualChats.filter(c => !existingJidSet.has(c.remoteJid)).length;
+        console.log(`[EvoWA Sync] Processing ${individualChats.length} individual chats (${newChatsCount} new, ${individualChats.length - newChatsCount} existing to update)`);
       }
 
       for (const chat of chatsToProcess) {
@@ -708,6 +707,12 @@ class WhatsAppEvolutionManager extends EventEmitter {
       // ─── SYNC CONTACTS TO wa_contacts TABLE ───
       // This populates the wa_contacts table which the Inbox uses for name resolution
       await this.syncContactsFromEvolution(session);
+
+      // ─── DEEP SYNC: Fetch ALL messages for each conversation ───
+      // This runs in background and fetches full message history from Evolution API
+      this.deepSyncMessages(session, individualChats).catch(e =>
+        console.error("[EvoWA DeepSync] Background error:", e)
+      );
 
     } catch (error) {
       console.error("[EvoWA Sync] Error:", error);
@@ -860,6 +865,36 @@ class WhatsAppEvolutionManager extends EventEmitter {
         status: fromMe ? "sent" : "received",
         timestamp: new Date(timestamp),
       });
+
+      // Update wa_contacts with pushName if it's a real name (not a phone number)
+      if (pushName && !fromMe) {
+        const cleanedPush = pushName.replace(/[\s\-\(\)\+]/g, '');
+        const isRealName = !/^\d+$/.test(cleanedPush) && pushName !== 'Voc\u00ea' && pushName !== 'You';
+        if (isRealName) {
+          try {
+            // Upsert wa_contacts with the real pushName
+            await db.insert(waContacts).values({
+              sessionId: session.sessionId,
+              jid: remoteJid,
+              phoneNumber: remoteJid.endsWith('@s.whatsapp.net') ? remoteJid : null,
+              pushName,
+              savedName: null,
+              verifiedName: null,
+              profilePictureUrl: null,
+            }).onDuplicateKeyUpdate({
+              set: { pushName: sql`${pushName}` },
+            }).catch(() => {
+              // Fallback: just update
+              return db.update(waContacts)
+                .set({ pushName })
+                .where(and(
+                  eq(waContacts.sessionId, session.sessionId),
+                  eq(waContacts.jid, remoteJid)
+                )).catch(() => {});
+            });
+          } catch {}
+        }
+      }
 
       // Resolve conversation
       try {
@@ -1182,6 +1217,243 @@ class WhatsAppEvolutionManager extends EventEmitter {
     } catch (e) {
       console.error("[EvoWA AutoRestore] Error:", e);
     }
+  }
+
+  // ─── DEEP SYNC MESSAGES ───
+  // Fetches ALL messages for each conversation from Evolution API using pagination.
+  // Deduplicates by messageId. Extracts pushName from messages for name resolution.
+  // Runs in background after initial conversation sync.
+
+  private deepSyncInProgress = new Set<string>();
+
+  private async deepSyncMessages(
+    session: EvolutionSessionState,
+    chats: any[]
+  ): Promise<void> {
+    if (this.deepSyncInProgress.has(session.sessionId)) {
+      console.log(`[EvoWA DeepSync] Already in progress for ${session.sessionId}, skipping`);
+      return;
+    }
+    this.deepSyncInProgress.add(session.sessionId);
+
+    try {
+      const db = await getDb();
+      if (!db) return;
+
+      console.log(`[EvoWA DeepSync] Starting deep message sync for ${session.instanceName} (${chats.length} chats)`);
+
+      // Get existing messageIds for this session to avoid duplicates
+      const existingMsgIds = new Set<string>();
+      const existingRows = await db.execute(
+        sql`SELECT messageId FROM messages WHERE sessionId = ${session.sessionId} AND messageId IS NOT NULL`
+      );
+      const rows = (existingRows as any)[0] || [];
+      for (const r of rows) {
+        if (r.messageId) existingMsgIds.add(r.messageId);
+      }
+      console.log(`[EvoWA DeepSync] ${existingMsgIds.size} existing messages in DB`);
+
+      const isRealName = (name: string | null | undefined): name is string => {
+        if (!name || name.trim() === '') return false;
+        if (name === 'Voc\u00ea' || name === 'You') return false;
+        const cleaned = name.replace(/[\s\-\(\)\+]/g, '');
+        if (/^\d+$/.test(cleaned)) return false;
+        return true;
+      };
+
+      const discoveredNames = new Map<string, string>();
+      let totalInserted = 0;
+      let totalSkipped = 0;
+      let chatsProcessed = 0;
+
+      // Sort chats by most recent activity first
+      const sortedChats = [...chats].sort((a, b) => {
+        const tsA = a.lastMessage?.messageTimestamp || 0;
+        const tsB = b.lastMessage?.messageTimestamp || 0;
+        return Number(tsB) - Number(tsA);
+      });
+
+      for (const chat of sortedChats) {
+        const remoteJid = chat.remoteJid;
+        if (!remoteJid) continue;
+
+        try {
+          let page = 1;
+          let hasMore = true;
+
+          while (hasMore) {
+            const messages = await evo.findMessages(session.instanceName, remoteJid, {
+              limit: 50,
+              page,
+            });
+
+            if (!messages || messages.length === 0) {
+              hasMore = false;
+              break;
+            }
+
+            const insertBatch: any[] = [];
+
+            for (const msg of messages) {
+              const msgId = msg.key?.id;
+              if (!msgId) continue;
+
+              if (existingMsgIds.has(msgId)) {
+                totalSkipped++;
+                continue;
+              }
+
+              const fromMe = msg.key?.fromMe || false;
+              const messageType = msg.messageType || 'conversation';
+              const timestamp = msg.messageTimestamp
+                ? new Date(Number(msg.messageTimestamp) * 1000)
+                : new Date();
+              const pushName = msg.pushName || null;
+
+              const msgContent = msg.message;
+              let content = '';
+              if (msgContent) {
+                content = msgContent.conversation
+                  || msgContent.extendedTextMessage?.text
+                  || (msgContent.imageMessage?.caption ? `[Imagem] ${msgContent.imageMessage.caption}` : '')
+                  || (msgContent.imageMessage ? '[Imagem]' : '')
+                  || (msgContent.videoMessage?.caption ? `[V\u00eddeo] ${msgContent.videoMessage.caption}` : '')
+                  || (msgContent.videoMessage ? '[V\u00eddeo]' : '')
+                  || (msgContent.audioMessage ? '[\u00c1udio]' : '')
+                  || (msgContent.documentMessage ? `[Documento] ${msgContent.documentMessage.fileName || ''}` : '')
+                  || (msgContent.stickerMessage ? '[Sticker]' : '')
+                  || (msgContent.contactMessage ? `[Contato] ${msgContent.contactMessage.displayName || ''}` : '')
+                  || (msgContent.locationMessage ? '[Localiza\u00e7\u00e3o]' : '')
+                  || '';
+              }
+
+              if (!fromMe && isRealName(pushName) && !discoveredNames.has(remoteJid)) {
+                discoveredNames.set(remoteJid, pushName!);
+              }
+
+              insertBatch.push({
+                sessionId: session.sessionId,
+                tenantId: session.tenantId,
+                messageId: msgId,
+                remoteJid,
+                fromMe,
+                messageType,
+                content: content || null,
+                pushName: pushName || null,
+                status: fromMe ? 'sent' : 'received',
+                timestamp,
+              });
+
+              existingMsgIds.add(msgId);
+            }
+
+            if (insertBatch.length > 0) {
+              try {
+                for (let i = 0; i < insertBatch.length; i += 20) {
+                  const subBatch = insertBatch.slice(i, i + 20);
+                  await db.insert(waMessages).values(subBatch).catch(async () => {
+                    for (const item of subBatch) {
+                      await db.insert(waMessages).values(item).catch(() => {});
+                    }
+                  });
+                }
+                totalInserted += insertBatch.length;
+              } catch (e: any) {
+                console.warn(`[EvoWA DeepSync] Batch insert error for ${remoteJid}:`, e.message);
+              }
+            }
+
+            page++;
+            if (page > 200) hasMore = false;
+            await new Promise(resolve => setTimeout(resolve, 100));
+          }
+
+          chatsProcessed++;
+          if (chatsProcessed % 50 === 0) {
+            console.log(`[EvoWA DeepSync] Progress: ${chatsProcessed}/${sortedChats.length} chats, ${totalInserted} new messages`);
+          }
+          await new Promise(resolve => setTimeout(resolve, 50));
+        } catch (e: any) {
+          console.warn(`[EvoWA DeepSync] Error syncing ${remoteJid}:`, e.message);
+        }
+      }
+
+      console.log(`[EvoWA DeepSync] Complete: ${chatsProcessed} chats processed, ${totalInserted} new messages inserted, ${totalSkipped} skipped`);
+
+      // Update conversation names from discovered pushNames
+      if (discoveredNames.size > 0) {
+        try {
+          const allConvs = await db.execute(
+            sql`SELECT id, remoteJid, contactPushName FROM wa_conversations WHERE sessionId = ${session.sessionId}`
+          );
+          const convRows = (allConvs as any)[0] || [];
+          let namesUpdated = 0;
+
+          for (const row of convRows) {
+            const name = discoveredNames.get(row.remoteJid);
+            if (name && isRealName(name) && !isRealName(row.contactPushName)) {
+              await db.execute(
+                sql`UPDATE wa_conversations SET contactPushName = ${name} WHERE id = ${row.id}`
+              ).catch(() => {});
+              namesUpdated++;
+            }
+          }
+
+          if (namesUpdated > 0) {
+            console.log(`[EvoWA DeepSync] Updated ${namesUpdated} conversation names from message pushNames`);
+          }
+          console.log(`[EvoWA DeepSync] Discovered ${discoveredNames.size} unique pushNames from messages`);
+        } catch (e: any) {
+          console.warn(`[EvoWA DeepSync] Error updating names:`, e.message);
+        }
+      }
+
+      // Update wa_contacts with pushNames from messages
+      if (discoveredNames.size > 0) {
+        try {
+          let contactsUpdated = 0;
+          for (const [jid, name] of Array.from(discoveredNames)) {
+            await db.execute(
+              sql`UPDATE wa_contacts SET pushName = ${name} WHERE sessionId = ${session.sessionId} AND jid = ${jid} AND (pushName IS NULL OR pushName = '')`
+            ).catch(() => null);
+            contactsUpdated++;
+          }
+          if (contactsUpdated > 0) {
+            console.log(`[EvoWA DeepSync] Updated ${contactsUpdated} wa_contacts with pushNames from messages`);
+          }
+        } catch (e: any) {
+          console.warn(`[EvoWA DeepSync] Error updating wa_contacts:`, e.message);
+        }
+      }
+
+    } finally {
+      this.deepSyncInProgress.delete(session.sessionId);
+    }
+  }
+
+  // ─── PUBLIC: Manual deep sync trigger ───
+
+  async triggerDeepSync(sessionId: string): Promise<{ status: string; chats?: number }> {
+    const session = this.sessions.get(sessionId);
+    if (!session || session.status !== 'connected') {
+      return { status: 'not_connected' };
+    }
+    if (this.deepSyncInProgress.has(sessionId)) {
+      return { status: 'already_in_progress' };
+    }
+
+    const chats = await evo.findChats(session.instanceName);
+    const individualChats = chats.filter(chat => {
+      const jid = chat.remoteJid;
+      if (!jid) return false;
+      return !jid.endsWith('@g.us') && jid !== 'status@broadcast' && !jid.endsWith('@lid') && !jid.endsWith('@newsletter');
+    });
+
+    this.deepSyncMessages(session, individualChats).catch(e =>
+      console.error('[EvoWA DeepSync] Error:', e)
+    );
+
+    return { status: 'started', chats: individualChats.length };
   }
 
   // ─── SHUTDOWN ───

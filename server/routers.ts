@@ -479,6 +479,13 @@ export const appRouter = router({
         const result = await whatsappManager.syncContacts(input.sessionId);
         return result;
       }),
+    // Trigger deep sync of all messages from Evolution API
+    triggerDeepSync: protectedProcedure
+      .input(z.object({ sessionId: z.string() }))
+      .mutation(async ({ input }) => {
+        const result = await whatsappManager.triggerDeepSync(input.sessionId);
+        return result;
+      }),
     // Manual trigger for daily backup
     triggerDailyBackup: protectedProcedure
       .mutation(async () => {

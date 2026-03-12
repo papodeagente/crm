@@ -313,7 +313,14 @@ export async function resolveConversation(
 
     // Atualizar pushName, contactId e remoteJid (raw) se fornecidos
     const updateData: any = {};
-    if (pushName) updateData.contactPushName = pushName;
+    // Only update contactPushName if it's a real name (not just a phone number)
+    if (pushName) {
+      const cleanedPush = pushName.replace(/[\s\-\(\)\+]/g, '');
+      const isRealName = !/^\d+$/.test(cleanedPush) && pushName !== 'Você' && pushName !== 'You';
+      if (isRealName) {
+        updateData.contactPushName = pushName;
+      }
+    }
     if (contactId) updateData.contactId = contactId;
     // Always update remoteJid with the RAW JID from WhatsApp
     // This ensures replies go to the correct JID

@@ -2325,8 +2325,8 @@
 - [x] BUG: Sistema não reconhece que instância está conectada na Evolution API. Inbox mostra "não conectado" mesmo com sessão ativa. Reconectar tenta gerar QR novamente.
 - [x] BUG: Inbox vazio — conversas não estão sendo sincronizadas da Evolution API para o banco de dados após conexão
 - [x] Inbox deve exibir o nome dos contatos do WhatsApp (pushName) em vez de apenas o número de telefone
-- [ ] BUG: Nomes dos contatos não aparecem no Inbox após reconexão do WhatsApp
-- [ ] BUG: Sincronização incompleta — nem todas as conversas são sincronizadas após reconexão
+- [x] BUG: Nomes dos contatos não aparecem no Inbox após reconexão do WhatsApp
+- [x] BUG: Sincronização incompleta — nem todas as conversas são sincronizadas após reconexão
 
 ## Sync de Contatos via Evolution API
 - [x] Implementar syncContactsFromEvolution que busca contatos da Evolution API e insere/atualiza na tabela wa_contacts
@@ -2337,3 +2337,16 @@
 - [x] Resolver 1869 contatos da Evolution API para a tabela wa_contacts
 - [x] 166 conversas com nomes reais resolvidos via wa_contacts
 - [x] Atualizar testes unitários de syncContacts (11 testes passando)
+
+## Correções de Sync - Nomes e Mensagens Completas
+- [x] Deep sync de mensagens: busca TODAS as mensagens de cada conversa via findMessages API com paginação
+- [x] Endpoint triggerDeepSync para forçar deep sync manualmente
+- [x] Deep sync roda automaticamente após syncConversationsBackground
+- [x] Total de mensagens: 9172 (antes era 1240 com apenas 1 mensagem por conversa)
+- [x] Sync incremental agora processa TODAS as conversas (não apenas novas) para atualizar última mensagem
+- [x] Corrigir resolveConversation: só atualizar contactPushName se for nome real (não número de telefone)
+- [x] Webhook handleIncomingMessage: atualizar wa_contacts com pushName real ao receber mensagem
+- [x] Descoberta: Evolution API retorna pushName como número de telefone nas mensagens históricas (não nome real)
+- [x] Descoberta: Evolution API retorna mensagens duplicadas (4x por mensagem - status updates)
+- [x] Nomes reais disponíveis: 163 conversas via wa_contacts (1708 contatos com nomes reais de 1729 total)
+- [x] 398 conversas sem nome: contatos não salvos na agenda do WhatsApp (comportamento esperado)
