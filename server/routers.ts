@@ -139,9 +139,11 @@ export const appRouter = router({
     connect: protectedProcedure
       .input(z.object({ sessionId: z.string().min(1).max(64) }))
       .mutation(async ({ ctx, input }) => {
-        // Pass tenantId so the session is correctly associated with the tenant
+        // Use CRM user ID (saasUser.id) for Evolution API instance naming
+        // Each CRM user gets their own WhatsApp instance
         const tenantId = ctx.saasUser?.tenantId;
-        const state = await whatsappManager.connect(input.sessionId, ctx.user.id, tenantId);
+        const userId = ctx.saasUser?.id || ctx.user.id;
+        const state = await whatsappManager.connect(input.sessionId, userId, tenantId);
         
         // If already connected, return immediately
         if (state.status === "connected") {

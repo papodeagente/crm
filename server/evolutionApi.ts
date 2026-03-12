@@ -195,17 +195,33 @@ export async function connectInstance(instanceName: string): Promise<QrCodeResul
  * Verifica o estado da conexão de uma instância.
  */
 export async function getConnectionState(instanceName: string): Promise<ConnectionState> {
-  return evoFetch<ConnectionState>(`/instance/connectionState/${instanceName}`);
+  try {
+    return await evoFetch<ConnectionState>(`/instance/connectionState/${instanceName}`);
+  } catch (e: any) {
+    // 404 means instance doesn't exist — return "close" state
+    if (e.message?.includes("not found") || e.message?.includes("not exist") || e.message?.includes("Not Found") || e.message?.includes("404")) {
+      return { instance: { instanceName, state: "close" } };
+    }
+    throw e;
+  }
 }
 
 /**
  * Busca detalhes de uma instância específica.
  */
 export async function fetchInstance(instanceName: string): Promise<EvolutionInstance | null> {
-  const instances = await evoFetch<EvolutionInstance[]>(
-    `/instance/fetchInstances?instanceName=${encodeURIComponent(instanceName)}`
-  );
-  return instances.length > 0 ? instances[0] : null;
+  try {
+    const instances = await evoFetch<EvolutionInstance[]>(
+      `/instance/fetchInstances?instanceName=${encodeURIComponent(instanceName)}`
+    );
+    return instances.length > 0 ? instances[0] : null;
+  } catch (e: any) {
+    // 404 means instance doesn't exist — return null instead of throwing
+    if (e.message?.includes("not found") || e.message?.includes("Not Found") || e.message?.includes("404")) {
+      return null;
+    }
+    throw e;
+  }
 }
 
 /**

@@ -2310,3 +2310,4 @@
 - [x] BUG: Inbox mostra conversas de outros usuários mesmo sem sessão WhatsApp conectada
 - [x] Inbox deve filtrar sessões/conversas pelo userId do usuário logado
 - [x] Inbox deve mostrar tela "Conecte seu WhatsApp" quando o usuário não tem sessão ativa
+- [x] BUG: Erro ao conectar WhatsApp - instância não existe na Evolution API. Fluxo connect deve criar instância automaticamente.
