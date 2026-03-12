@@ -2350,3 +2350,6 @@
 - [x] Descoberta: Evolution API retorna mensagens duplicadas (4x por mensagem - status updates)
 - [x] Nomes reais disponíveis: 163 conversas via wa_contacts (1708 contatos com nomes reais de 1729 total)
 - [x] 398 conversas sem nome: contatos não salvos na agenda do WhatsApp (comportamento esperado)
+
+## Correção de Ordenação no Inbox
+- [x] BUG: Ordem das mensagens no Inbox está errada — corrigido: queries agora ordenam por timestamp (data real da mensagem) em vez de createdAt (data de inserção no banco)

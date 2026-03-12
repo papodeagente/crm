@@ -120,7 +120,7 @@ export async function getMessages(sessionId: string, limit = 50, offset = 0) {
     .select()
     .from(messages)
     .where(eq(messages.sessionId, sessionId))
-    .orderBy(desc(messages.createdAt))
+    .orderBy(desc(messages.timestamp))
     .limit(limit)
     .offset(offset);
 }
@@ -145,7 +145,7 @@ export async function getMessagesByContact(sessionId: string, remoteJid: string,
     .select()
     .from(messages)
     .where(and(...conditions))
-    .orderBy(desc(messages.createdAt))
+    .orderBy(desc(messages.timestamp))
     .limit(limit);
 }
 
@@ -1562,7 +1562,7 @@ export async function getMessagesByConversationId(
     .select()
     .from(messages)
     .where(and(...conditions))
-    .orderBy(desc(messages.createdAt))
+    .orderBy(desc(messages.timestamp))
     .limit(limit);
 }
 
