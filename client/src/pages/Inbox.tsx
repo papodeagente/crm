@@ -173,7 +173,7 @@ interface ConvItem {
   lastStatus: string | null;
   contactPushName: string | null;
   unreadCount: number | string;
-  totalMessages: number | string;
+  totalMessages?: number | string;
   // Multi-agent fields
   assignedUserId?: number | null;
   assignedTeamId?: number | null;
@@ -182,6 +182,11 @@ interface ConvItem {
   assignedAgentName?: string | null;
   assignedAgentAvatar?: string | null;
   lastSenderAgentId?: number | null;
+  // Fields from wa_conversations
+  conversationId?: number;
+  contactName?: string | null;
+  contactEmail?: string | null;
+  contactPhone?: string | null;
 }
 
 const AgentBadge = memo(({ name, avatarUrl }: { name?: string | null; avatarUrl?: string | null }) => {
@@ -760,8 +765,8 @@ export default function InboxPage() {
     [sessionsQ.data]
   );
 
-  // Multi-agent: use the new conversationsMultiAgent endpoint
-  const conversationsQ = trpc.whatsapp.conversationsMultiAgent.useQuery(
+  // Use wa_conversations table (canonical, with correct names and ordering)
+  const conversationsQ = trpc.whatsapp.waConversations.useQuery(
     { sessionId: activeSession?.sessionId || "", tenantId },
     { enabled: !!activeSession?.sessionId, refetchInterval: isConnected ? 8000 : 30000 }
   );
@@ -864,27 +869,28 @@ export default function InboxPage() {
     return !/^\d+$/.test(cleaned);
   }, []);
 
-  const getDisplayName = useCallback((jid: string) => {
+  const getDisplayName = useCallback((jid: string, conv?: ConvItem) => {
     // 1. CRM contact match (direct or via LID resolution)
     const contact = getContactForJid(jid);
     if (contact) return contact.name;
-    // 2. WA Contacts map (savedName > verifiedName > pushName from Baileys sync)
+    // 2. contactName from wa_conversations JOIN with contacts table
+    if (conv?.contactName && isRealName(conv.contactName)) return conv.contactName;
+    // 3. WA Contacts map (savedName > verifiedName > pushName)
     const waContact = waContactsMap[jid];
     if (waContact) {
       if (isRealName(waContact.savedName)) return waContact.savedName!;
       if (isRealName(waContact.verifiedName)) return waContact.verifiedName!;
       if (isRealName(waContact.pushName)) return waContact.pushName!;
     }
-    // 3. PushName from conversation data (only if it's a real name, not a phone number)
+    // 4. PushName from conversation data (contactPushName in wa_conversations)
     const pushName = pushNameMap.get(jid);
     if (isRealName(pushName)) return pushName!;
-    // 4. For LID JIDs, try to show a resolved phone number instead of the LID
+    // 5. For LID JIDs, try to show a resolved phone number instead of the LID
     if (jid.endsWith("@lid")) {
-      // Try to get phone number from waContactsMap
       if (waContact?.phoneNumber) return formatPhoneNumber(waContact.phoneNumber);
       return "Contato WhatsApp";
     }
-    // 5. Format the phone number from the JID
+    // 6. Format the phone number from the JID
     return formatPhoneNumber(jid);
   }, [getContactForJid, pushNameMap, waContactsMap, isRealName]);
 
@@ -922,7 +928,7 @@ export default function InboxPage() {
     if (search) {
       const s = search.toLowerCase();
       convs = convs.filter((c) => {
-        const name = getDisplayName(c.remoteJid).toLowerCase();
+        const name = getDisplayName(c.remoteJid, c).toLowerCase();
         const phone = c.remoteJid.split("@")[0];
         return name.includes(s) || phone.includes(s);
       });
@@ -969,11 +975,12 @@ export default function InboxPage() {
     if (!selectedJid) return null;
     const crmContact = getContactForJid(selectedJid);
     const pic = profilePicMap[selectedJid] || undefined;
-    const displayName = getDisplayName(selectedJid);
+    const selectedConv = (conversationsQ.data as ConvItem[] || []).find(c => c.remoteJid === selectedJid);
+    const displayName = getDisplayName(selectedJid, selectedConv);
     if (crmContact) return { ...crmContact, avatarUrl: pic };
     const phone = selectedJid.split("@")[0];
     return { id: 0, name: displayName, phone, email: undefined, avatarUrl: pic };
-  }, [selectedJid, getContactForJid, profilePicMap, getDisplayName]);
+  }, [selectedJid, getContactForJid, profilePicMap, getDisplayName, conversationsQ.data]);
 
   const hasCrmContact = useMemo(() => {
     if (!selectedJid) return false;
@@ -1128,7 +1135,7 @@ export default function InboxPage() {
                 key={conv.remoteJid}
                 conv={conv}
                 isActive={selectedJid === conv.remoteJid}
-                contactName={getDisplayName(conv.remoteJid)}
+                contactName={getDisplayName(conv.remoteJid, conv)}
                 pictureUrl={profilePicMap[conv.remoteJid]}
                 onClick={() => handleSelectConv(conv.remoteJid)}
               />

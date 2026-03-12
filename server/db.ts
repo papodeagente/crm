@@ -327,6 +327,16 @@ export async function markConversationRead(sessionId: string, remoteJid: string)
         eq(messages.fromMe, false)
       ));
   }
+  // Also update unreadCount in wa_conversations
+  const { waConversations } = await import("../drizzle/schema");
+  for (const jid of jidVariants) {
+    await db.update(waConversations)
+      .set({ unreadCount: 0 })
+      .where(and(
+        eq(waConversations.sessionId, sessionId),
+        eq(waConversations.remoteJid, jid)
+      ));
+  }
 }
 
 

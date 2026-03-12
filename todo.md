@@ -2358,3 +2358,8 @@
 - [x] BUG: Nomes de contatos ainda mostram números de telefone em vez de nomes reais — corrigido: getDisplayName agora filtra pushNames numéricos, waContactsMap busca de todas as sessões. 374 conversas sem nome são contatos não salvos na agenda do WhatsApp (limitação da API)
 - [x] BUG: Mensagens de hoje não foram sincronizadas — investigado: DB tem 388 mensagens de hoje, Evolution API retorna duplicatas de status (4x por mensagem). Mensagens estão completas. QuickSync implementado para buscar mensagens recentes automaticamente
 - [x] BUG: Desconectar e reconectar WhatsApp não dispara sincronização — corrigido: polling periódico (5 min) verifica status das sessões e dispara sync automático ao detectar reconexão
+
+## Correções Urgentes Inbox (Mar 12 - v2)
+- [x] BUG: Ordem das conversas errada — CAUSA RAIZ: Inbox usava endpoint conversationsMultiAgent (tabela messages) que ordena por MAX(id) e tem pushNames numéricos. Corrigido: trocado para waConversations (tabela wa_conversations) que tem lastMessageAt correto e nomes reais
+- [x] BUG: Nomes de contatos ainda mostram números de telefone — CAUSA RAIZ: conversationsMultiAgent buscava pushName da tabela messages (que só tem números). Corrigido: waConversations usa contactPushName da tabela wa_conversations (nomes reais como Sara Monte, Viviane Assis, Ana Paula Gutierres)
+- [x] markConversationRead agora também zera unreadCount na tabela wa_conversations
