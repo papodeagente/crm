@@ -34,20 +34,20 @@ function createAuthContext(): { ctx: TrpcContext } {
 describe("WhatsApp Sync Contacts", () => {
   // ─── syncContacts mutation ───
 
-  it("syncContacts throws when session is not connected", async () => {
+  it("syncContacts returns zero counts for any session (Evolution API)", async () => {
     const { ctx } = createAuthContext();
     const caller = appRouter.createCaller(ctx);
-    await expect(
-      caller.whatsapp.syncContacts({ sessionId: "nonexistent-session" })
-    ).rejects.toThrow("WhatsApp não está conectado");
+    // Evolution API manages contacts internally, syncContacts is a no-op
+    const result = await caller.whatsapp.syncContacts({ sessionId: "nonexistent-session" });
+    expect(result).toEqual({ synced: 0, total: 0, resolved: 0 });
   });
 
-  it("syncContacts input validation requires sessionId", async () => {
+  it("syncContacts accepts any sessionId (Evolution API)", async () => {
     const { ctx } = createAuthContext();
     const caller = appRouter.createCaller(ctx);
-    await expect(
-      caller.whatsapp.syncContacts({ sessionId: "" })
-    ).rejects.toThrow();
+    const result = await caller.whatsapp.syncContacts({ sessionId: "test" });
+    expect(result).toBeDefined();
+    expect(result.synced).toBe(0);
   });
 
   // ─── waContactsMap query ───

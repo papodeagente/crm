@@ -2290,3 +2290,18 @@
 - [x] Pipeline: useSocket para refetch automático quando mensagem chega
 - [x] 60 testes passando
 - [ ] Publicar e validar com usuário em produção
+- [ ] BUG: Inbox mostra conversas de outros tenants — Fernando (Boxtour) vê conversas da Entur. Filtrar por tenantId.
+
+## Migração WhatsApp: Baileys → Evolution API v2
+- [x] Pesquisar documentação Evolution API v2 (endpoints, webhooks, instâncias)
+- [x] Configurar secrets (EVOLUTION_API_URL, EVOLUTION_API_KEY)
+- [x] Criar módulo evolutionApi.ts com client HTTP para Evolution API
+- [x] Refatorar backend: criar/deletar instâncias via Evolution API
+- [x] Refatorar backend: gerar QR Code via Evolution API
+- [x] Refatorar backend: envio de mensagens via Evolution API
+- [x] Criar webhook endpoint para receber eventos da Evolution API (mensagens, status)
+- [x] Refatorar frontend: adaptar conexão/QR para Evolution API
+- [x] Refatorar frontend: adaptar Inbox para Evolution API
+- [x] Manter notificações e badges funcionando
+- [x] Testes e validação
+- [ ] Publicar e testar em produção

@@ -4,7 +4,7 @@ import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { whatsappManager } from "./whatsapp";
+import { whatsappManager } from "./whatsappEvolution";
 import {
   getSessionsByUser,
   getSessionsByTenant,
@@ -192,7 +192,7 @@ export const appRouter = router({
       .input(z.object({ sessionId: z.string() }))
       .mutation(async ({ ctx, input }) => {
         // Only admins can hard-delete
-        const role = ctx.saasUser?.crmUserRole || ctx.saasUser?.role;
+        const role = (ctx.saasUser as any)?.crmUserRole || ctx.saasUser?.role;
         if (role !== "admin") {
           throw new Error("Apenas administradores podem excluir permanentemente uma sess\u00e3o.");
         }
@@ -209,28 +209,9 @@ export const appRouter = router({
     requestPairingCode: protectedProcedure
       .input(z.object({ sessionId: z.string(), phoneNumber: z.string().min(8).max(20) }))
       .mutation(async ({ ctx, input }) => {
-        const tenantId = ctx.saasUser?.tenantId;
-        // Ensure session is connecting (has a socket)
-        let session = whatsappManager.getSession(input.sessionId);
-        if (!session?.socket) {
-          // Start connection first
-          await whatsappManager.connect(input.sessionId, ctx.user.id, tenantId);
-          // Wait for socket to be ready
-          await new Promise(r => setTimeout(r, 2000));
-          session = whatsappManager.getSession(input.sessionId);
-        }
-        if (!session?.socket) {
-          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Não foi possível criar o socket. Tente novamente." });
-        }
-        // Clean phone number: remove +, spaces, dashes, parentheses
-        const cleanPhone = input.phoneNumber.replace(/[^\d]/g, "");
-        try {
-          const code = await session.socket.requestPairingCode(cleanPhone);
-          return { code, phoneNumber: cleanPhone };
-        } catch (e: any) {
-          console.error(`[WA] Pairing code request failed for ${input.sessionId}:`, e);
-          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Falha ao solicitar código de pareamento: ${e.message}` });
-        }
+        // Evolution API does not support pairing codes directly.
+        // Connection is done via QR code only.
+        throw new TRPCError({ code: "BAD_REQUEST", message: "A conexão via código de pareamento não está disponível com a Evolution API. Use o QR Code para conectar." });
       }),
     sessions: protectedProcedure.query(async ({ ctx }) => {
       // For SaaS users, find sessions by tenantId (shared across the tenant)

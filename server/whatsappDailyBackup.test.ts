@@ -77,15 +77,15 @@ describe("WhatsApp Daily Backup - Module Functions", () => {
 });
 
 describe("WhatsApp Message Deduplication", () => {
-  it("sendMessage endpoint returns messageId", async () => {
+  it("sendMessage endpoint returns error for non-existent session", async () => {
     const { ctx } = createAuthContext();
     const caller = appRouter.createCaller(ctx);
-    // This will fail because no session is connected, but we verify the endpoint exists
+    // This will fail because no session exists in Evolution API
     try {
       await caller.whatsapp.sendMessage({ sessionId: "test", number: "5511999999999", message: "test" });
     } catch (e: any) {
-      // Expected to fail with "Sessão não conectada"
-      expect(e.message).toContain("Sessão não conectada");
+      // Expected to fail with session not found error (Evolution API)
+      expect(e.message).toContain("Sessão");
     }
   });
 

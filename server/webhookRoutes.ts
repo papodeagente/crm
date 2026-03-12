@@ -892,6 +892,37 @@ router.post("/api/webhooks/rdstation", async (req: Request, res: Response) => {
   }
 });
 
+// ─── Evolution API Webhook ─────────────────────────────
+// Receives events from Evolution API (messages, connection updates, QR codes)
+
+router.post("/api/webhooks/evolution", async (req: Request, res: Response) => {
+  try {
+    const body = req.body;
+    if (!body || !body.event) {
+      return res.status(400).json({ error: "Invalid webhook payload" });
+    }
+
+    // Import the Evolution WhatsApp manager
+    const { whatsappManager } = await import("./whatsappEvolution");
+
+    // Route the event to the manager
+    await whatsappManager.handleWebhookEvent({
+      event: body.event,
+      instance: body.instance,
+      data: body.data,
+      destination: body.destination,
+      date_time: body.date_time,
+      server_url: body.server_url,
+      apikey: body.apikey,
+    });
+
+    return res.status(200).json({ received: true });
+  } catch (error: any) {
+    console.error("[Webhook /evolution] Error:", error.message);
+    return res.status(200).json({ received: true, error: error.message });
+  }
+});
+
 export { router as webhookRouter };
 
 // Export for testing

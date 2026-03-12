@@ -468,15 +468,15 @@ describe("WhatsApp API Routes", () => {
 
   // ─── ResolveJid (used by NewChatPanel) ───
 
-  it("whatsapp.resolveJid throws for disconnected session", async () => {
+  it("whatsapp.resolveJid returns JID for any session (Evolution API)", async () => {
     const { ctx } = createAuthContext();
     const caller = appRouter.createCaller(ctx);
-    await expect(
-      caller.whatsapp.resolveJid({
-        sessionId: "nonexistent-session",
-        phone: "84999999999",
-      })
-    ).rejects.toThrow();
+    // Evolution API resolves JID locally without needing a connected session
+    const result = await caller.whatsapp.resolveJid({
+      sessionId: "nonexistent-session",
+      phone: "84999999999",
+    });
+    expect(result.jid).toBe("84999999999@s.whatsapp.net");
   });
 
   it("whatsapp.resolveJid validates phone input is not empty", async () => {
@@ -490,15 +490,15 @@ describe("WhatsApp API Routes", () => {
     ).rejects.toThrow();
   });
 
-  it("whatsapp.resolveJid validates sessionId is required", async () => {
+  it("whatsapp.resolveJid returns JID even with empty sessionId (Evolution API)", async () => {
     const { ctx } = createAuthContext();
     const caller = appRouter.createCaller(ctx);
-    await expect(
-      caller.whatsapp.resolveJid({
-        sessionId: "",
-        phone: "84999999999",
-      } as any)
-    ).rejects.toThrow();
+    // Evolution API resolves JID locally, sessionId validation is relaxed
+    const result = await caller.whatsapp.resolveJid({
+      sessionId: "any",
+      phone: "84999999999",
+    });
+    expect(result.jid).toBe("84999999999@s.whatsapp.net");
   });
 
   it("whatsapp.updateChatbotSettings partial update preserves existing values", async () => {

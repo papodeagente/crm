@@ -11,7 +11,7 @@ import { registerOAuthRoutes } from "./oauth";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
-import { whatsappManager } from "../whatsapp";
+import { whatsappManager } from "../whatsappEvolution";
 import { startDailyBackupScheduler } from "../whatsappDailyBackup";
 import { webhookRouter } from "../webhookRoutes";
 

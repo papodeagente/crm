@@ -151,6 +151,11 @@ describe("RD Station CRM Import - fetchAllContacts", () => {
 
 describe("RD Station CRM Import - fetchAllDeals", () => {
   it("fetches deals with all fields", async () => {
+    // First mock: fetchAllPipelines call
+    mockFetch.mockResolvedValueOnce(mockJsonResponse([
+      { _id: "p1", id: "p1", name: "Pipeline 1" },
+    ]));
+    // Second mock: fetchAllDeals for pipeline p1
     mockFetch.mockResolvedValueOnce(mockJsonResponse({
       deals: [
         {
@@ -220,6 +225,8 @@ describe("RD Station CRM Import - fetchAllProducts", () => {
 
 describe("RD Station CRM Import - fetchAllTasks", () => {
   it("fetches tasks with pagination", async () => {
+    // fetchAllTasks fetches by 5 types: call, email, meeting, task, whatsapp
+    // Mock: call type returns 1 task
     mockFetch.mockResolvedValueOnce(mockJsonResponse({
       tasks: [
         { _id: "t1", subject: "Ligar para cliente", type: "call", date: "2024-03-01", done: false, created_at: "2024-01-01", updated_at: "2024-01-01" },
@@ -227,6 +234,14 @@ describe("RD Station CRM Import - fetchAllTasks", () => {
       has_more: false,
       total: 1,
     }));
+    // Mock: email type returns empty
+    mockFetch.mockResolvedValueOnce(mockJsonResponse({ tasks: [], has_more: false, total: 0 }));
+    // Mock: meeting type returns empty
+    mockFetch.mockResolvedValueOnce(mockJsonResponse({ tasks: [], has_more: false, total: 0 }));
+    // Mock: task type returns empty
+    mockFetch.mockResolvedValueOnce(mockJsonResponse({ tasks: [], has_more: false, total: 0 }));
+    // Mock: whatsapp type returns empty
+    mockFetch.mockResolvedValueOnce(mockJsonResponse({ tasks: [], has_more: false, total: 0 }));
 
     const tasks = await fetchAllTasks("valid-token");
     expect(tasks).toHaveLength(1);
