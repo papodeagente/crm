@@ -1330,13 +1330,39 @@ class WhatsAppEvolutionManager extends EventEmitter {
       const db = await getDb();
       if (!db) return;
 
+      // Status mapping for both numeric and string formats
+      const numericStatusMap: Record<number, string> = {
+        0: "error", 1: "pending", 2: "sent", 3: "delivered", 4: "read", 5: "played",
+      };
+      const stringStatusMap: Record<string, string> = {
+        "ERROR": "error", "PENDING": "pending", "SENT": "sent",
+        "SERVER_ACK": "sent", "DELIVERY_ACK": "delivered", "DELIVERED": "delivered",
+        "READ": "read", "PLAYED": "played", "DELETED": "deleted",
+      };
+
       for (const update of updates) {
-        const messageId = update?.key?.id;
-        const statusMap: Record<number, string> = {
-          0: "error", 1: "pending", 2: "sent", 3: "delivered", 4: "read", 5: "played",
-        };
-        const newStatus = statusMap[update?.update?.status] || update?.update?.status;
-        if (!messageId || !newStatus) continue;
+        // Support both Evolution API formats:
+        // Format A (Baileys/internal): { key: { id, remoteJid, fromMe }, update: { status: number } }
+        // Format B (Evolution v2 webhook): { keyId, remoteJid, fromMe, status: string, messageId }
+        const messageId = update?.key?.id || update?.keyId || update?.messageId;
+        const remoteJid = update?.key?.remoteJid || update?.remoteJid;
+        const fromMe = update?.key?.fromMe ?? update?.fromMe;
+
+        // Resolve status from either format
+        let newStatus: string | undefined;
+        const rawStatus = update?.update?.status ?? update?.status;
+        if (typeof rawStatus === "number") {
+          newStatus = numericStatusMap[rawStatus];
+        } else if (typeof rawStatus === "string") {
+          newStatus = stringStatusMap[rawStatus.toUpperCase()] || rawStatus.toLowerCase();
+        }
+
+        if (!messageId || !newStatus) {
+          console.log(`[EvoWA] Skipping status update - no messageId or status:`, JSON.stringify(update)?.substring(0, 200));
+          continue;
+        }
+
+        console.log(`[EvoWA] Status update: ${messageId} -> ${newStatus} (jid: ${remoteJid}, fromMe: ${fromMe})`);
 
         await db.update(waMessages)
           .set({ status: newStatus })
@@ -1346,20 +1372,14 @@ class WhatsAppEvolutionManager extends EventEmitter {
           ));
 
         // Also update lastStatus in wa_conversations if this is the last message
-        const remoteJid = update?.key?.remoteJid;
-        if (remoteJid) {
-          // Update wa_conversations lastStatus for this conversation
-          // Only update if the message is fromMe (status ticks are only for sent messages)
-          const fromMe = update?.key?.fromMe;
-          if (fromMe) {
-            await db.update(waConversations)
-              .set({ lastStatus: newStatus })
-              .where(and(
-                eq(waConversations.sessionId, session.sessionId),
-                eq(waConversations.remoteJid, remoteJid),
-                eq(waConversations.lastFromMe, true)
-              ));
-          }
+        if (remoteJid && fromMe) {
+          await db.update(waConversations)
+            .set({ lastStatus: newStatus })
+            .where(and(
+              eq(waConversations.sessionId, session.sessionId),
+              eq(waConversations.remoteJid, remoteJid),
+              eq(waConversations.lastFromMe, true)
+            ));
         }
 
         this.emit("message:status", {

@@ -174,7 +174,7 @@ export async function createInstance(
       qrcode: true,
       webhook: {
         url: webhookUrl,
-        byEvents: true,
+        byEvents: false,
         base64: false,
         events: [
           "MESSAGES_UPSERT",
@@ -182,6 +182,8 @@ export async function createInstance(
           "CONNECTION_UPDATE",
           "QRCODE_UPDATED",
           "SEND_MESSAGE",
+          "MESSAGES_DELETE",
+          "CONTACTS_UPSERT",
         ],
       },
       settings: {

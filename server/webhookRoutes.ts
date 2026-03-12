@@ -895,12 +895,16 @@ router.post("/api/webhooks/rdstation", async (req: Request, res: Response) => {
 // ─── Evolution API Webhook ─────────────────────────────
 // Receives events from Evolution API (messages, connection updates, QR codes)
 
-router.post("/api/webhooks/evolution", async (req: Request, res: Response) => {
+// Handler shared by both routes
+async function handleEvolutionWebhook(req: Request, res: Response) {
   try {
     const body = req.body;
     if (!body || !body.event) {
+      console.warn("[Webhook /evolution] Invalid payload:", JSON.stringify(body)?.substring(0, 200));
       return res.status(400).json({ error: "Invalid webhook payload" });
     }
+
+    console.log(`[Webhook /evolution] Event: ${body.event} | Instance: ${body.instance} | Path: ${req.path}`);
 
     // Import the Evolution WhatsApp manager
     const { whatsappManager } = await import("./whatsappEvolution");
@@ -921,7 +925,18 @@ router.post("/api/webhooks/evolution", async (req: Request, res: Response) => {
     console.error("[Webhook /evolution] Error:", error.message);
     return res.status(200).json({ received: true, error: error.message });
   }
-});
+}
+
+// Base route (webhookByEvents: false)
+router.post("/api/webhooks/evolution", handleEvolutionWebhook);
+
+// Wildcard route for webhookByEvents: true
+// Evolution API appends event name as path suffix, e.g.:
+//   /api/webhooks/evolution/messages-upsert
+//   /api/webhooks/evolution/messages-update
+//   /api/webhooks/evolution/connection-update
+//   /api/webhooks/evolution/send-message
+router.post("/api/webhooks/evolution/:eventType", handleEvolutionWebhook);
 
 export { router as webhookRouter };
 

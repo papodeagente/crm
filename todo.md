@@ -2422,3 +2422,9 @@
 - [x] BUG: Não mostra ticks de status — handleMessageStatusUpdate agora atualiza lastStatus na wa_conversations + StatusTick/MessageStatus já implementados
 - [x] BUG: Mensagens de áudio não visualizadas — extractMediaInfo + getBase64FromMediaMessage + upload S3 para novas msgs; MediaLoader para msgs antigas
 - [x] FEAT: Enviar áudio pelo microfone — VoiceRecorder com MediaRecorder API + upload S3 + sendMedia ptt:true (já implementado)
+
+## Correções Inbox (Mar 12 - v6)
+- [x] BUG: Mensagem enviada demora a aparecer — Implementado atualização otimista (addOptimisticMessage) que mostra a mensagem instantaneamente
+- [x] BUG: Áudios antigos não aparecem — MediaLoader com auto-load para áudios + getMediaUrl endpoint que baixa via getBase64FromMediaMessage e salva no S3
+- [x] BUG: Ticks de status não funcionam — handleMessageStatusUpdate corrigido para suportar AMBOS os formatos (v2 flat com string status + Baileys nested com numérico); webhook wildcard para webhookByEvents:true; createInstance atualizado com MESSAGES_UPDATE habilitado
+- [x] BUG: Mensagem em branco — Filtro de HIDDEN_TYPES (protocolMessage, reactionMessage, senderKeyDistribution, interactiveMessage, buttonsResponseMessage, etc) adicionado antes da renderização

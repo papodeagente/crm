@@ -885,14 +885,45 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
     { enabled: !!sessionId && !!remoteJid, refetchInterval: 8000 }
   );
 
+  const utils = trpc.useUtils();
+
+  // Optimistic update helper: add message to cache immediately
+  const addOptimisticMessage = useCallback((text: string, quotedId?: string | null) => {
+    const queryKey = { sessionId, remoteJid, limit: 100 };
+    const optimistic: Message = {
+      id: -Date.now(), // negative ID to avoid collision
+      sessionId,
+      messageId: `opt_${Date.now()}`,
+      remoteJid,
+      fromMe: true,
+      messageType: "conversation",
+      content: text,
+      status: "pending",
+      timestamp: new Date().toISOString(),
+      createdAt: new Date().toISOString(),
+      quotedMessageId: quotedId || null,
+    };
+    utils.whatsapp.messagesByContact.setData(queryKey, (old: any) => {
+      if (!old) return [optimistic];
+      return [optimistic, ...old];
+    });
+    // Scroll to bottom
+    setTimeout(() => {
+      const el = document.querySelector('[data-chat-scroll]');
+      if (el) el.scrollTop = el.scrollHeight;
+    }, 50);
+  }, [sessionId, remoteJid, utils]);
+
   const sendMessage = trpc.whatsapp.sendMessage.useMutation({
+    onMutate: (vars) => addOptimisticMessage(vars.message),
     onSuccess: () => messagesQ.refetch(),
-    onError: () => toast.error("Erro ao enviar mensagem"),
+    onError: () => { messagesQ.refetch(); toast.error("Erro ao enviar mensagem"); },
   });
 
   const sendTextWithQuote = trpc.whatsapp.sendTextWithQuote.useMutation({
+    onMutate: (vars) => addOptimisticMessage(vars.message, vars.quotedMessageId),
     onSuccess: () => { messagesQ.refetch(); setReplyTarget(null); },
-    onError: () => toast.error("Erro ao enviar resposta"),
+    onError: () => { messagesQ.refetch(); toast.error("Erro ao enviar resposta"); },
   });
 
   const uploadMedia = trpc.whatsapp.uploadMedia.useMutation();
@@ -1184,9 +1215,17 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
     sendPollMut.mutate({ sessionId, number, name, values, selectableCount });
   }, [sessionId, contact]);
 
+  // Filter out protocol/system messages that should not render as chat bubbles
+  const HIDDEN_MSG_TYPES = new Set([
+    "protocolMessage", "senderKeyDistributionMessage", "messageContextInfo",
+    "ephemeralMessage", "reactionMessage", "associatedChildMessage",
+    "placeholderMessage", "albumMessage",
+  ]);
+
   // Group messages by date
   const groupedMessages = useMemo(() => {
-    const msgs = [...(messagesQ.data || [])].reverse();
+    const msgs = [...(messagesQ.data || [])].reverse()
+      .filter(m => !HIDDEN_MSG_TYPES.has(m.messageType));
     const groups: { date: string; messages: Message[] }[] = [];
     let currentDate = "";
     for (const msg of msgs) {
@@ -1343,7 +1382,7 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
       </div>
 
       {/* ─── Messages Area ─── */}
-      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto relative scrollbar-thin bg-wa-chat-bg" style={{ scrollBehavior: "smooth" }}>
+      <div ref={scrollContainerRef} data-chat-scroll className="flex-1 overflow-y-auto relative scrollbar-thin bg-wa-chat-bg" style={{ scrollBehavior: "smooth" }}>
         {/* WhatsApp doodle pattern */}
         <div className="absolute inset-0 opacity-[0.04] pointer-events-none" style={{
           backgroundImage: `url("data:image/svg+xml,%3Csvg width='300' height='300' xmlns='http://www.w3.org/2000/svg'%3E%3Cdefs%3E%3Cpattern id='p' width='60' height='60' patternUnits='userSpaceOnUse'%3E%3Cpath d='M30 10 L35 20 L25 20Z M10 40 L15 50 L5 50Z M50 35 L55 45 L45 45Z' fill='%23888' opacity='0.3'/%3E%3Ccircle cx='45' cy='15' r='3' fill='%23888' opacity='0.2'/%3E%3Ccircle cx='15' cy='30' r='2' fill='%23888' opacity='0.2'/%3E%3C/pattern%3E%3C/defs%3E%3Crect width='300' height='300' fill='url(%23p)'/%3E%3C/svg%3E")`,
