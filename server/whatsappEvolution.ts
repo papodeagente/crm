@@ -342,13 +342,53 @@ class WhatsAppEvolutionManager extends EventEmitter {
   // - isFirstSync=true: sincroniza TODOS os chats e suas últimas mensagens
   // - isFirstSync=false: sincroniza apenas chats com mensagens mais recentes que as do banco
 
+  /**
+   * Public method to trigger sync for a user's session.
+   * Called from tRPC endpoint.
+   */
+  async syncUserConversations(sessionId: string): Promise<{ synced: number; skipped: number }> {
+    const session = this.sessions.get(sessionId);
+    if (!session) {
+      // Try to load from DB
+      const db = await getDb();
+      if (!db) throw new Error("Database not available");
+      const rows = await db.select().from(whatsappSessions).where(eq(whatsappSessions.sessionId, sessionId)).limit(1);
+      if (rows.length === 0) throw new Error("Session not found");
+      const row = rows[0];
+      const instanceName = evo.getInstanceName(row.tenantId, row.userId);
+      const inst = await evo.fetchInstance(instanceName);
+      if (!inst || inst.connectionStatus !== "open") throw new Error("WhatsApp not connected");
+      const state: EvolutionSessionState = {
+        instanceName,
+        sessionId: row.sessionId,
+        userId: row.userId,
+        tenantId: row.tenantId,
+        status: "connected",
+        qrCode: null,
+        qrDataUrl: null,
+        user: inst.ownerJid ? { id: inst.ownerJid, name: inst.profileName || "" } : null,
+        lastConnectedAt: Date.now(),
+      };
+      this.sessions.set(sessionId, state);
+      this.instanceToSession.set(instanceName, sessionId);
+      await this.syncConversationsBackground(state, true);
+      return { synced: 0, skipped: 0 }; // Counts are logged internally
+    }
+    if (session.status !== "connected") throw new Error("WhatsApp not connected");
+    await this.syncConversationsBackground(session, false);
+    return { synced: 0, skipped: 0 };
+  }
+
   private async syncConversationsBackground(session: EvolutionSessionState, isFirstSync: boolean): Promise<void> {
     try {
       console.log(`[EvoWA Sync] Starting ${isFirstSync ? "FULL" : "incremental"} sync for ${session.instanceName}`);
       
-      // Fetch all chats from Evolution API
+      // Fetch all chats from Evolution API (includes lastMessage data)
       const chats = await evo.findChats(session.instanceName);
       console.log(`[EvoWA Sync] Found ${chats.length} chats on Evolution API`);
+
+      const db = await getDb();
+      if (!db) return;
 
       let synced = 0;
       let skipped = 0;
@@ -358,8 +398,8 @@ class WhatsAppEvolutionManager extends EventEmitter {
           const remoteJid = chat.remoteJid;
           if (!remoteJid) continue;
 
-          // Skip groups and broadcast
-          if (remoteJid.endsWith("@g.us") || remoteJid === "status@broadcast" || remoteJid.endsWith("@lid")) {
+          // Skip groups, broadcast, and LID contacts
+          if (remoteJid.endsWith("@g.us") || remoteJid === "status@broadcast" || remoteJid.endsWith("@lid") || remoteJid.endsWith("@newsletter")) {
             skipped++;
             continue;
           }
@@ -370,100 +410,72 @@ class WhatsAppEvolutionManager extends EventEmitter {
           const resolved = await resolveInbound(session.tenantId, session.sessionId, remoteJid, pushName);
           if (!resolved) continue;
 
-          // Check if we need to sync messages for this chat
-          const db = await getDb();
-          if (!db) continue;
-
-          // Get the latest message timestamp we have for this conversation
-          const latestMsg = await db.select({ timestamp: waMessages.timestamp })
-            .from(waMessages)
-            .where(and(
-              eq(waMessages.sessionId, session.sessionId),
-              eq(waMessages.remoteJid, remoteJid)
-            ))
-            .orderBy(desc(waMessages.timestamp))
-            .limit(1);
-
-          const lastSyncedTimestamp = latestMsg.length > 0 ? latestMsg[0].timestamp : null;
-
-          // If not first sync and we already have messages, check if Evolution has newer ones
-          if (!isFirstSync && lastSyncedTimestamp) {
-            const lastMessageAt = chat.lastMessage?.messageTimestamp
-              ? new Date(Number(chat.lastMessage.messageTimestamp) * 1000)
-              : null;
-
-            if (lastMessageAt && lastMessageAt <= lastSyncedTimestamp) {
-              skipped++;
-              continue; // No new messages
-            }
-          }
-
-          // Fetch messages from Evolution API for this chat
-          const messages = await evo.findMessages(session.instanceName, remoteJid, {
-            limit: isFirstSync ? 50 : 20, // More messages on first sync
-          });
-
-          let newMsgCount = 0;
-          for (const msg of messages) {
-            const key = msg?.key;
-            if (!key?.id) continue;
-
-            const messageId = key.id;
-            const fromMe = key.fromMe || false;
-            const messageType = msg.messageType || "conversation";
-            const msgTimestamp = msg.messageTimestamp ? new Date(Number(msg.messageTimestamp) * 1000) : new Date();
-
-            // Skip if we already have this message
-            if (lastSyncedTimestamp && msgTimestamp <= lastSyncedTimestamp && !isFirstSync) continue;
-
-            // Check for duplicate by messageId
-            const existing = await db.select({ id: waMessages.id })
-              .from(waMessages)
-              .where(and(
-                eq(waMessages.sessionId, session.sessionId),
-                eq(waMessages.messageId, messageId)
-              ))
-              .limit(1);
-
-            if (existing.length > 0) continue;
-
-            const content = this.extractMessageContent(msg);
-
-            await db.insert(waMessages).values({
-              sessionId: session.sessionId,
-              tenantId: session.tenantId,
-              messageId,
-              remoteJid,
-              fromMe,
-              messageType,
-              content: content || null,
-              pushName: msg.pushName || null,
-              status: fromMe ? "sent" : "received",
-              timestamp: msgTimestamp,
-            });
-            newMsgCount++;
-          }
-
-          // Update conversation with last message info
-          if (messages.length > 0) {
-            const lastMsg = messages[0]; // Most recent
-            const lastContent = this.extractMessageContent(lastMsg);
-            const lastTimestamp = lastMsg.messageTimestamp
+          // Use lastMessage from findChats response (no need for separate findMessages call)
+          const lastMsg = chat.lastMessage;
+          if (lastMsg) {
+            const msgKey = lastMsg.key;
+            const messageId = msgKey?.id;
+            const fromMe = msgKey?.fromMe || false;
+            const messageType = lastMsg.messageType || "conversation";
+            const msgTimestamp = lastMsg.messageTimestamp
               ? new Date(Number(lastMsg.messageTimestamp) * 1000)
-              : new Date();
+              : chat.updatedAt ? new Date(chat.updatedAt) : new Date();
 
+            // Extract content from lastMessage
+            let content = "";
+            if (lastMsg.message) {
+              content = lastMsg.message.conversation
+                || lastMsg.message.extendedTextMessage?.text
+                || lastMsg.message.imageMessage?.caption
+                || lastMsg.message.videoMessage?.caption
+                || lastMsg.message.documentMessage?.fileName
+                || (lastMsg.message.audioMessage ? "\uD83C\uDFA4 \u00C1udio" : "")
+                || (lastMsg.message.stickerMessage ? "\uD83D\uDCCE Sticker" : "")
+                || (lastMsg.message.contactMessage ? "\uD83D\uDC64 Contato" : "")
+                || (lastMsg.message.locationMessage ? "\uD83D\uDCCD Localiza\u00E7\u00E3o" : "")
+                || "";
+            }
+
+            // Insert message if we have a messageId and it doesn't exist yet
+            if (messageId) {
+              const existing = await db.select({ id: waMessages.id })
+                .from(waMessages)
+                .where(and(
+                  eq(waMessages.sessionId, session.sessionId),
+                  eq(waMessages.messageId, messageId)
+                ))
+                .limit(1);
+
+              if (existing.length === 0) {
+                await db.insert(waMessages).values({
+                  sessionId: session.sessionId,
+                  tenantId: session.tenantId,
+                  messageId,
+                  remoteJid,
+                  fromMe,
+                  messageType,
+                  content: content || null,
+                  pushName: lastMsg.pushName || pushName || null,
+                  status: fromMe ? "sent" : "received",
+                  timestamp: msgTimestamp,
+                });
+              }
+            }
+
+            // Update conversation with last message info
             await updateConversationLastMessage(resolved.conversationId, {
-              content: lastContent || "",
-              fromMe: lastMsg.key?.fromMe || false,
-              timestamp: lastTimestamp,
+              content: content || "",
+              fromMe,
+              timestamp: msgTimestamp,
               incrementUnread: false,
             });
-          }
 
-          if (newMsgCount > 0) synced++;
+            synced++;
+          } else {
+            skipped++;
+          }
         } catch (e: any) {
-          // Skip individual chat errors
-          console.warn(`[EvoWA Sync] Error syncing chat:`, e.message);
+          console.warn(`[EvoWA Sync] Error syncing chat ${chat.remoteJid}:`, e.message);
         }
       }
 
@@ -916,15 +928,18 @@ class WhatsAppEvolutionManager extends EventEmitter {
               lastConnectedAt: inst.connectionStatus === "open" ? Date.now() : null,
             };
 
-            this.sessions.set(row.sessionId, state);
+              this.sessions.set(row.sessionId, state);
             this.instanceToSession.set(instanceName, row.sessionId);
-
             const dbStatus = inst.connectionStatus === "open" ? "connected" : "disconnected";
             await db.update(whatsappSessions)
               .set({ status: dbStatus })
               .where(eq(whatsappSessions.sessionId, row.sessionId));
-
             console.log(`[EvoWA AutoRestore] ${row.sessionId} -> ${instanceName} -> ${dbStatus}`);
+
+            // Sync conversations in background for connected sessions
+            if (dbStatus === "connected") {
+              this.syncConversationsBackground(state, false);
+            }
           } else {
             await db.update(whatsappSessions)
               .set({ status: "disconnected" })

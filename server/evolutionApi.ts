@@ -363,7 +363,11 @@ export async function findMessages(
         page: opts?.page || 1,
       },
     });
-    return Array.isArray(result) ? result : result?.messages || [];
+    // Evolution API v2 returns { messages: { total, pages, currentPage, records: [...] } }
+    if (Array.isArray(result)) return result;
+    if (result?.messages?.records && Array.isArray(result.messages.records)) return result.messages.records;
+    if (Array.isArray(result?.messages)) return result.messages;
+    return [];
   } catch {
     return [];
   }
