@@ -54,7 +54,7 @@ const RETRY_REQUEST_DELAY_MS = 500;         // 500ms between request retries
 const HEALTH_CHECK_INTERVAL_MS = 5 * 60_000; // 5 minutes — periodic health check
 const BASE_RECONNECT_DELAY_MS = 3_000;      // 3s initial backoff
 const MAX_RECONNECT_DELAY_MS = 5 * 60_000;  // 5 minutes max backoff (was 2min)
-const IMMEDIATE_RECONNECT_CODES = new Set([428, 408, 503, 515]); // connectionClosed, timedOut, unavailable, restartRequired
+const IMMEDIATE_RECONNECT_CODES = new Set([428, 408, 503]); // connectionClosed, timedOut, unavailable (515 restartRequired handled separately)
 const FATAL_CODES = new Set([401, 403]); // loggedOut, banned — stop reconnecting
 const AUTO_RESTORE_DELAY_MS = 10_000;       // 10s delay before auto-restoring sessions on startup
 
@@ -413,15 +413,42 @@ class WhatsAppManager extends EventEmitter {
       }
 
       if (connection === "close") {
-        sessionState.status = "disconnected";
-        sessionState.qrCode = null;
-        sessionState.qrDataUrl = null;
         this.stopHealthCheck(sessionId);
 
         const statusCode = (lastDisconnect?.error as Boom)?.output?.statusCode;
         const errorMessage = (lastDisconnect?.error as Boom)?.message || "unknown";
 
         console.log(`[WA] Session ${sessionId}: connection closed (code: ${statusCode}, msg: ${errorMessage})`);
+
+        // ─── CRITICAL: restartRequired (515) after QR scan ───
+        // Per Baileys docs: "After scanning the code, WhatsApp will forcibly disconnect you,
+        // forcing a reconnect such that we can present the authentication credentials."
+        // The old socket is USELESS — we must create a brand new one IMMEDIATELY.
+        if (statusCode === DisconnectReason.restartRequired) {
+          console.log(`[WA] Session ${sessionId}: restartRequired (515) — creating new socket IMMEDIATELY (post-QR-scan handshake)`);
+          sessionState.status = "connecting";
+          sessionState.qrCode = null;
+          sessionState.qrDataUrl = null;
+          // Kill the old socket reference
+          sessionState.socket = null;
+          this.emit("status", { sessionId, status: "connecting", statusCode });
+          // Reset reconnect counter — this is not a failure, it's the normal post-scan flow
+          this.reconnectAttempts.delete(sessionId);
+          // Create new socket immediately (no delay, no backoff)
+          // We must NOT go through connect() because it has a mutex that would block us.
+          // Instead, call _doConnect directly after clearing the lock.
+          this.connectLocks.delete(sessionId);
+          this._doConnect(sessionId, userId, resolvedTenantId).catch(e => {
+            console.error(`[WA] Session ${sessionId}: restartRequired reconnect failed:`, e);
+            sessionState.status = "disconnected";
+            this.emit("status", { sessionId, status: "disconnected" });
+          });
+          return;
+        }
+
+        sessionState.status = "disconnected";
+        sessionState.qrCode = null;
+        sessionState.qrDataUrl = null;
 
         this.emit("status", { sessionId, status: "disconnected", statusCode });
         await this.logActivity(sessionId, "disconnected", `Desconectado. Código: ${statusCode}. Erro: ${errorMessage}`);

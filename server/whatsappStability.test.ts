@@ -84,7 +84,7 @@ describe("WhatsApp Stability Engine", () => {
       const source = await import("fs").then(fs => 
         fs.readFileSync("/home/ubuntu/whatsapp-automation-app/server/whatsapp.ts", "utf-8")
       );
-      expect(source).toContain("IMMEDIATE_RECONNECT_CODES = new Set([428, 408, 503, 515])");
+      expect(source).toContain("IMMEDIATE_RECONNECT_CODES = new Set([428, 408, 503])");
     });
 
     it("should have max reconnect delay of 5 minutes (not 2 minutes)", async () => {

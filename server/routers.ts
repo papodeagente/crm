@@ -205,6 +205,33 @@ export const appRouter = router({
         const session = whatsappManager.getSession(input.sessionId);
         return { status: session?.status || "disconnected", qrDataUrl: session?.qrDataUrl || null, user: session?.user || null };
       }),
+    // Request pairing code as alternative to QR code
+    requestPairingCode: protectedProcedure
+      .input(z.object({ sessionId: z.string(), phoneNumber: z.string().min(8).max(20) }))
+      .mutation(async ({ ctx, input }) => {
+        const tenantId = ctx.saasUser?.tenantId;
+        // Ensure session is connecting (has a socket)
+        let session = whatsappManager.getSession(input.sessionId);
+        if (!session?.socket) {
+          // Start connection first
+          await whatsappManager.connect(input.sessionId, ctx.user.id, tenantId);
+          // Wait for socket to be ready
+          await new Promise(r => setTimeout(r, 2000));
+          session = whatsappManager.getSession(input.sessionId);
+        }
+        if (!session?.socket) {
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Não foi possível criar o socket. Tente novamente." });
+        }
+        // Clean phone number: remove +, spaces, dashes, parentheses
+        const cleanPhone = input.phoneNumber.replace(/[^\d]/g, "");
+        try {
+          const code = await session.socket.requestPairingCode(cleanPhone);
+          return { code, phoneNumber: cleanPhone };
+        } catch (e: any) {
+          console.error(`[WA] Pairing code request failed for ${input.sessionId}:`, e);
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Falha ao solicitar código de pareamento: ${e.message}` });
+        }
+      }),
     sessions: protectedProcedure.query(async ({ ctx }) => {
       // For SaaS users, find sessions by tenantId (shared across the tenant)
       // For Manus OAuth users, find by userId

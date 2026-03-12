@@ -2263,3 +2263,19 @@
 - [x] Validar end-to-end no sandbox — QR gera, delete funciona, build compila
 - [x] Build de produção testado — esbuild 78ms + vite 11.85s, sem erros
 - [ ] PENDENTE: Usuário precisa publicar o checkpoint para atualizar produção
+
+## Fix QR Code Conexão v4 — CRÍTICO
+- [x] QR Code gera mas NÃO conecta após escanear — causa: código 515 (restartRequired) tratado com delay
+- [x] Testar no browser e capturar logs — Baileys standalone gera QR em 2s, funciona perfeitamente
+- [x] Causa raiz: após scan, WhatsApp desconecta com 515 e o handler antigo usava delay de 2s + mutex
+- [x] Correção: handler especial para 515 que cria novo socket IMEDIATAMENTE via _doConnect direto
+- [x] Pairing Code adicionado como alternativa ao QR (mais confiável em servidores remotos)
+- [x] 60 testes passando
+
+## Fix QR Code Produção v5 — QR gera mas scan não conecta (produção publicada)
+- [x] Logs detalhados em CADA evento de connection.update — já existem
+- [x] Investigar versão do Baileys — v7.0.0-rc.9 funciona perfeitamente (testado standalone)
+- [x] Causa raiz: código 515 (restartRequired) era tratado com delay via IMMEDIATE_RECONNECT_CODES
+- [x] Correção: handler especial para 515 que cria novo socket IMEDIATAMENTE sem delay/backoff
+- [x] Pairing Code adicionado como alternativa ao QR
+- [ ] Publicar e validar com usuário

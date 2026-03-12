@@ -7,11 +7,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Smartphone, Plus, Send, Wifi, WifiOff, QrCode, MessageSquare, AlertTriangle, ShieldAlert, Trash2, MoreVertical, Loader2, RefreshCw } from "lucide-react";
+import { Smartphone, Plus, Send, Wifi, WifiOff, QrCode, MessageSquare, AlertTriangle, ShieldAlert, Trash2, MoreVertical, Loader2, RefreshCw, Phone, Hash } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { toast } from "sonner";
 import { useSocket } from "@/hooks/useSocket";
+
+type ConnectMethod = "qr" | "pairing";
 
 export default function WhatsApp() {
   const [sessionName, setSessionName] = useState("");
@@ -23,6 +25,12 @@ export default function WhatsApp() {
   const [qrSessionId, setQrSessionId] = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [isWaitingQr, setIsWaitingQr] = useState(false);
+  // Pairing code state
+  const [connectMethod, setConnectMethod] = useState<ConnectMethod>("qr");
+  const [pairingPhone, setPairingPhone] = useState("");
+  const [pairingCode, setPairingCode] = useState<string | null>(null);
+  const [isPairingLoading, setIsPairingLoading] = useState(false);
+
   const utils = trpc.useUtils();
   const { qrData, waStatus } = useSocket();
 
@@ -55,6 +63,23 @@ export default function WhatsApp() {
     },
   });
 
+  const requestPairingCode = trpc.whatsapp.requestPairingCode.useMutation({
+    onMutate: () => {
+      setIsPairingLoading(true);
+      setPairingCode(null);
+    },
+    onSuccess: (data) => {
+      setIsPairingLoading(false);
+      setPairingCode(data.code);
+      setQrSessionId(data.phoneNumber); // Use phone as session tracking
+      toast.success("Código de pareamento gerado! Digite no seu WhatsApp.");
+    },
+    onError: (err) => {
+      setIsPairingLoading(false);
+      toast.error(`Erro ao gerar código: ${err.message}`);
+    },
+  });
+
   const disconnect = trpc.whatsapp.disconnect.useMutation({
     onSuccess: () => {
       utils.whatsapp.sessions.invalidate();
@@ -72,6 +97,7 @@ export default function WhatsApp() {
       if (qrSessionId === deleteConfirm) {
         setQrCode(null);
         setQrSessionId(null);
+        setPairingCode(null);
       }
     },
     onError: (err) => {
@@ -101,36 +127,34 @@ export default function WhatsApp() {
       if (waStatus.status === "connected" && waStatus.sessionId === qrSessionId) {
         setQrCode(null);
         setQrSessionId(null);
+        setPairingCode(null);
         toast.success("WhatsApp conectado com sucesso!");
       }
       if (waStatus.status === "deleted" && waStatus.sessionId) {
-        // Session was deleted server-side, refresh list
         utils.whatsapp.sessions.invalidate();
       }
     }
   }, [waStatus]);
 
   // Poll QR code from the status endpoint as fallback (when WebSocket doesn't deliver)
-  // This runs when we have a sessionId but no QR code yet
   const statusQuery = trpc.whatsapp.status.useQuery(
     { sessionId: qrSessionId || "" },
     {
-      enabled: !!qrSessionId,
-      refetchInterval: 2000, // Poll every 2s for faster QR delivery
+      enabled: !!qrSessionId && connectMethod === "qr",
+      refetchInterval: 2000,
     }
   );
 
   useEffect(() => {
     if (!statusQuery.data) return;
-    // Update QR code from polling
     if (statusQuery.data.qrDataUrl) {
       setQrCode(statusQuery.data.qrDataUrl);
       setIsWaitingQr(false);
     }
-    // Clear QR when connected
     if (statusQuery.data.status === "connected") {
       setQrCode(null);
       setQrSessionId(null);
+      setPairingCode(null);
       setIsWaitingQr(false);
       utils.whatsapp.sessions.invalidate();
     }
@@ -143,14 +167,19 @@ export default function WhatsApp() {
     if (session?.liveStatus === "connected") {
       setQrCode(null);
       setQrSessionId(null);
+      setPairingCode(null);
       setIsWaitingQr(false);
     }
   }, [sessions.data, qrSessionId]);
 
-  const connectedSessions = sessions.data?.filter((s: any) => s.liveStatus === "connected") || [];
+  const connectedSessions = useMemo(() =>
+    sessions.data?.filter((s: any) => s.liveStatus === "connected") || [],
+    [sessions.data]
+  );
 
   const handleConnect = useCallback((sessionId: string) => {
     setQrCode(null);
+    setPairingCode(null);
     setQrSessionId(sessionId);
     setSelectedSession(sessionId);
     connect.mutate({ sessionId });
@@ -159,9 +188,31 @@ export default function WhatsApp() {
   const handleNewSession = useCallback(() => {
     if (!sessionName.trim()) return;
     setOpenConnect(false);
-    handleConnect(sessionName.trim());
+    if (connectMethod === "pairing") {
+      // For pairing code: first start the connection, then request pairing code
+      const sid = sessionName.trim();
+      setQrSessionId(sid);
+      connect.mutate({ sessionId: sid }, {
+        onSuccess: () => {
+          // After socket is created, request pairing code
+          if (pairingPhone.trim()) {
+            requestPairingCode.mutate({ sessionId: sid, phoneNumber: pairingPhone.trim() });
+          }
+        }
+      });
+    } else {
+      handleConnect(sessionName.trim());
+    }
     setSessionName("");
-  }, [sessionName, handleConnect]);
+  }, [sessionName, handleConnect, connectMethod, pairingPhone, connect, requestPairingCode]);
+
+  const handlePairingCodeRequest = useCallback((sessionId: string) => {
+    if (!pairingPhone.trim()) {
+      toast.error("Digite o número do telefone para gerar o código de pareamento.");
+      return;
+    }
+    requestPairingCode.mutate({ sessionId, phoneNumber: pairingPhone.trim() });
+  }, [pairingPhone, requestPairingCode]);
 
   return (
     <div className="p-5 lg:px-8 space-y-5">
@@ -177,7 +228,7 @@ export default function WhatsApp() {
               <Plus className="h-4 w-4" />Nova Sessão
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-[440px] rounded-2xl">
+          <DialogContent className="sm:max-w-[480px] rounded-2xl">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2.5 text-lg">
                 <div className="h-9 w-9 rounded-xl bg-emerald-50 flex items-center justify-center"><Smartphone className="h-4 w-4 text-emerald-600" /></div>
@@ -199,11 +250,72 @@ export default function WhatsApp() {
                   </div>
                 </div>
               </div>
-              <div><Label className="text-[12px] font-medium">Nome da Sessão *</Label><Input value={sessionName} onChange={(e) => setSessionName(e.target.value)} placeholder="Ex: principal" className="mt-1.5 h-10 rounded-xl" onKeyDown={(e) => { if (e.key === "Enter") handleNewSession(); }} /></div>
-              <Button className="w-full h-11 rounded-xl text-[14px] font-semibold shadow-sm bg-emerald-600 hover:bg-emerald-700 text-white transition-colors" disabled={!sessionName.trim() || connect.isPending || isWaitingQr} onClick={handleNewSession}>
-                {connect.isPending || isWaitingQr ? (
-                  <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Gerando QR Code...</>
-                ) : "Conectar"}
+
+              <div>
+                <Label className="text-[12px] font-medium">Nome da Sessão *</Label>
+                <Input value={sessionName} onChange={(e) => setSessionName(e.target.value)} placeholder="Ex: principal" className="mt-1.5 h-10 rounded-xl" onKeyDown={(e) => { if (e.key === "Enter" && connectMethod === "qr") handleNewSession(); }} />
+              </div>
+
+              {/* Connection method selector */}
+              <div>
+                <Label className="text-[12px] font-medium mb-2 block">Método de Conexão</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    className={`flex items-center gap-2 p-3 rounded-xl border-2 transition-all text-left ${
+                      connectMethod === "qr"
+                        ? "border-emerald-500 bg-emerald-50"
+                        : "border-border/40 hover:border-border"
+                    }`}
+                    onClick={() => setConnectMethod("qr")}
+                  >
+                    <QrCode className={`h-5 w-5 ${connectMethod === "qr" ? "text-emerald-600" : "text-muted-foreground"}`} />
+                    <div>
+                      <p className={`text-[13px] font-semibold ${connectMethod === "qr" ? "text-emerald-800" : "text-foreground"}`}>QR Code</p>
+                      <p className="text-[11px] text-muted-foreground">Escaneie com a câmera</p>
+                    </div>
+                  </button>
+                  <button
+                    type="button"
+                    className={`flex items-center gap-2 p-3 rounded-xl border-2 transition-all text-left ${
+                      connectMethod === "pairing"
+                        ? "border-emerald-500 bg-emerald-50"
+                        : "border-border/40 hover:border-border"
+                    }`}
+                    onClick={() => setConnectMethod("pairing")}
+                  >
+                    <Hash className={`h-5 w-5 ${connectMethod === "pairing" ? "text-emerald-600" : "text-muted-foreground"}`} />
+                    <div>
+                      <p className={`text-[13px] font-semibold ${connectMethod === "pairing" ? "text-emerald-800" : "text-foreground"}`}>Código</p>
+                      <p className="text-[11px] text-muted-foreground">Digite o código no celular</p>
+                    </div>
+                  </button>
+                </div>
+              </div>
+
+              {/* Pairing code: phone number input */}
+              {connectMethod === "pairing" && (
+                <div>
+                  <Label className="text-[12px] font-medium">Número do WhatsApp (com código do país) *</Label>
+                  <Input
+                    value={pairingPhone}
+                    onChange={(e) => setPairingPhone(e.target.value)}
+                    placeholder="5511999999999"
+                    className="mt-1.5 h-10 rounded-xl"
+                    onKeyDown={(e) => { if (e.key === "Enter") handleNewSession(); }}
+                  />
+                  <p className="text-[11px] text-muted-foreground mt-1">Formato: código do país + DDD + número (sem espaços ou símbolos)</p>
+                </div>
+              )}
+
+              <Button
+                className="w-full h-11 rounded-xl text-[14px] font-semibold shadow-sm bg-emerald-600 hover:bg-emerald-700 text-white transition-colors"
+                disabled={!sessionName.trim() || connect.isPending || isWaitingQr || isPairingLoading || (connectMethod === "pairing" && !pairingPhone.trim())}
+                onClick={handleNewSession}
+              >
+                {connect.isPending || isWaitingQr || isPairingLoading ? (
+                  <><Loader2 className="h-4 w-4 mr-2 animate-spin" />{connectMethod === "pairing" ? "Gerando Código..." : "Gerando QR Code..."}</>
+                ) : connectMethod === "pairing" ? "Gerar Código de Pareamento" : "Conectar via QR Code"}
               </Button>
             </div>
           </DialogContent>
@@ -228,23 +340,76 @@ export default function WhatsApp() {
           </div>
 
           {/* Loading state while waiting for QR */}
-          {isWaitingQr && !qrCode && (
+          {isWaitingQr && !qrCode && !pairingCode && (
             <Card className="border border-emerald-200/60 bg-emerald-50/30 shadow-none rounded-xl overflow-hidden">
               <div className="p-8 flex flex-col items-center gap-3">
                 <Loader2 className="h-8 w-8 text-emerald-600 animate-spin" />
-                <p className="text-[14px] font-medium text-emerald-800">Gerando QR Code...</p>
+                <p className="text-[14px] font-medium text-emerald-800">
+                  {connectMethod === "pairing" ? "Gerando código de pareamento..." : "Gerando QR Code..."}
+                </p>
                 <p className="text-[12px] text-emerald-600">Aguarde, isso pode levar até 15 segundos.</p>
               </div>
             </Card>
           )}
 
-          {/* QR Code display */}
-          {qrCode && (
+          {/* Pairing Code display */}
+          {pairingCode && (
             <Card className="border-2 border-emerald-200 bg-white shadow-sm rounded-xl overflow-hidden">
               <div className="p-5">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2.5">
-                    <div className="h-8 w-8 rounded-xl bg-emerald-50 flex items-center justify-center"><QrCode className="h-4 w-4 text-emerald-600" /></div>
+                    <div className="h-9 w-9 rounded-xl bg-emerald-50 flex items-center justify-center">
+                      <Hash className="h-4 w-4 text-emerald-600" />
+                    </div>
+                    <div>
+                      <p className="text-[14px] font-semibold">Código de Pareamento</p>
+                      {qrSessionId && <p className="text-[11px] text-muted-foreground">Sessão: {qrSessionId}</p>}
+                    </div>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 text-[11px] text-muted-foreground gap-1"
+                    onClick={() => { setPairingCode(null); setQrSessionId(null); }}
+                  >
+                    Fechar
+                  </Button>
+                </div>
+                <div className="flex justify-center py-6">
+                  <div className="bg-emerald-50 px-8 py-5 rounded-2xl border border-emerald-200">
+                    <p className="text-4xl font-mono font-bold text-emerald-800 tracking-[0.3em] text-center select-all">
+                      {pairingCode}
+                    </p>
+                  </div>
+                </div>
+                <div className="text-center mt-4 space-y-2">
+                  <p className="text-[13px] font-medium text-foreground">
+                    Digite este código no seu WhatsApp:
+                  </p>
+                  <ol className="text-[12px] text-muted-foreground space-y-1 text-left max-w-xs mx-auto">
+                    <li>1. Abra o WhatsApp no celular</li>
+                    <li>2. Vá em <strong>Configurações</strong> &rarr; <strong>Aparelhos Conectados</strong></li>
+                    <li>3. Toque em <strong>Conectar Aparelho</strong></li>
+                    <li>4. Toque em <strong>"Conectar com número de telefone"</strong></li>
+                    <li>5. Digite o código acima</li>
+                  </ol>
+                  <p className="text-[11px] text-amber-600 mt-3">
+                    O código expira em 60 segundos. Se expirar, gere um novo.
+                  </p>
+                </div>
+              </div>
+            </Card>
+          )}
+
+          {/* QR Code display */}
+          {qrCode && !pairingCode && (
+            <Card className="border-2 border-emerald-200 bg-white shadow-sm rounded-xl overflow-hidden">
+              <div className="p-5">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2.5">
+                    <div className="h-9 w-9 rounded-xl bg-emerald-50 flex items-center justify-center">
+                      <QrCode className="h-4 w-4 text-emerald-600" />
+                    </div>
                     <div>
                       <p className="text-[14px] font-semibold">Escaneie o QR Code</p>
                       {qrSessionId && <p className="text-[11px] text-muted-foreground">Sessão: {qrSessionId}</p>}
@@ -269,7 +434,7 @@ export default function WhatsApp() {
                     Abra o WhatsApp no celular &rarr; Menu &rarr; <strong>Aparelhos Conectados</strong> &rarr; <strong>Conectar Aparelho</strong>
                   </p>
                   <p className="text-[11px] text-muted-foreground/70">
-                    O QR Code atualiza automaticamente. Se não conectar, tente excluir e criar uma nova sessão.
+                    O QR Code atualiza automaticamente. Se não conectar, tente o método <strong>Código de Pareamento</strong>.
                   </p>
                 </div>
               </div>
