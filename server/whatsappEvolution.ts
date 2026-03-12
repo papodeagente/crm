@@ -68,7 +68,24 @@ class WhatsAppEvolutionManager extends EventEmitter {
     // Try to fetch from Evolution API directly
     try {
       const inst = await evo.fetchInstance(sessionId);
-      if (!inst) return cached; // Not found on Evolution API, return whatever we have
+      if (!inst) {
+        // Instance doesn't exist on Evolution API — mark as disconnected in DB
+        // This handles legacy/phantom sessions that were never cleaned up
+        const db = await getDb();
+        if (db) {
+          await db.update(whatsappSessions)
+            .set({ status: "disconnected" })
+            .where(and(
+              eq(whatsappSessions.sessionId, sessionId),
+              sql`${whatsappSessions.status} != 'deleted'`
+            ));
+        }
+        if (cached) {
+          cached.status = "disconnected";
+          return cached;
+        }
+        return undefined;
+      }
 
       const state: EvolutionSessionState = {
         instanceName: sessionId,
@@ -124,6 +141,30 @@ class WhatsAppEvolutionManager extends EventEmitter {
     const existing = this.sessions.get(sessionId);
     if (existing?.status === "connected") {
       return existing;
+    }
+
+    // Clean up legacy sessions for this user/tenant that don't match the canonical name
+    try {
+      const db = await getDb();
+      if (db) {
+        const legacySessions = await db.select()
+          .from(whatsappSessions)
+          .where(and(
+            eq(whatsappSessions.userId, userId),
+            eq(whatsappSessions.tenantId, tenantId),
+            sql`${whatsappSessions.sessionId} != ${sessionId}`,
+            sql`${whatsappSessions.status} != 'deleted'`
+          ));
+        for (const legacy of legacySessions) {
+          console.log(`[EvoWA] Cleaning up legacy session: ${legacy.sessionId} (user ${userId}, tenant ${tenantId})`);
+          await db.update(whatsappSessions)
+            .set({ status: "deleted" })
+            .where(eq(whatsappSessions.sessionId, legacy.sessionId));
+          this.sessions.delete(legacy.sessionId);
+        }
+      }
+    } catch (e) {
+      console.warn("[EvoWA] Error cleaning legacy sessions:", e);
     }
 
     // Create initial state
@@ -295,6 +336,200 @@ class WhatsAppEvolutionManager extends EventEmitter {
       fileName,
       mimetype: opts?.mimetype,
     });
+  }
+
+  // ─── REACTIONS & INTERACTIONS ───
+
+  async sendReaction(sessionId: string, key: { remoteJid: string; fromMe: boolean; id: string }, reaction: string): Promise<any> {
+    const session = this.sessions.get(sessionId);
+    if (!session) throw new Error(`Sessão não encontrada.`);
+    if (session.status !== "connected") throw new Error(`WhatsApp não está conectado.`);
+    return evo.sendReaction(session.instanceName, key, reaction);
+  }
+
+  async sendSticker(sessionId: string, jid: string, stickerUrl: string): Promise<any> {
+    const session = this.sessions.get(sessionId);
+    if (!session) throw new Error(`Sessão não encontrada.`);
+    if (session.status !== "connected") throw new Error(`WhatsApp não está conectado.`);
+    const number = this.jidToNumber(jid);
+    return evo.sendSticker(session.instanceName, number, stickerUrl);
+  }
+
+  async sendLocation(sessionId: string, jid: string, latitude: number, longitude: number, name: string, address: string): Promise<any> {
+    const session = this.sessions.get(sessionId);
+    if (!session) throw new Error(`Sessão não encontrada.`);
+    if (session.status !== "connected") throw new Error(`WhatsApp não está conectado.`);
+    const number = this.jidToNumber(jid);
+    return evo.sendLocation(session.instanceName, number, latitude, longitude, name, address);
+  }
+
+  async sendContact(sessionId: string, jid: string, contacts: Array<{ fullName: string; wuid?: string; phoneNumber: string }>): Promise<any> {
+    const session = this.sessions.get(sessionId);
+    if (!session) throw new Error(`Sessão não encontrada.`);
+    if (session.status !== "connected") throw new Error(`WhatsApp não está conectado.`);
+    const number = this.jidToNumber(jid);
+    return evo.sendContact(session.instanceName, number, contacts);
+  }
+
+  async sendPoll(sessionId: string, jid: string, name: string, values: string[], selectableCount: number = 1): Promise<any> {
+    const session = this.sessions.get(sessionId);
+    if (!session) throw new Error(`Sessão não encontrada.`);
+    if (session.status !== "connected") throw new Error(`WhatsApp não está conectado.`);
+    const number = this.jidToNumber(jid);
+    return evo.sendPoll(session.instanceName, number, name, values, selectableCount);
+  }
+
+  async sendTextWithQuote(sessionId: string, jid: string, text: string, quotedMessageId: string, quotedText: string): Promise<any> {
+    const session = this.sessions.get(sessionId);
+    if (!session) throw new Error(`Sessão não encontrada.`);
+    if (session.status !== "connected") throw new Error(`WhatsApp não está conectado.`);
+    const number = this.jidToNumber(jid);
+    return evo.sendTextWithQuote(session.instanceName, number, text, {
+      key: { id: quotedMessageId },
+      message: { conversation: quotedText },
+    });
+  }
+
+  async deleteMessage(sessionId: string, remoteJid: string, messageId: string, fromMe: boolean): Promise<any> {
+    const session = this.sessions.get(sessionId);
+    if (!session) throw new Error(`Sessão não encontrada.`);
+    if (session.status !== "connected") throw new Error(`WhatsApp não está conectado.`);
+    return evo.deleteMessageForEveryone(session.instanceName, remoteJid, messageId, fromMe);
+  }
+
+  async editMessage(sessionId: string, jid: string, messageId: string, newText: string): Promise<any> {
+    const session = this.sessions.get(sessionId);
+    if (!session) throw new Error(`Sessão não encontrada.`);
+    if (session.status !== "connected") throw new Error(`WhatsApp não está conectado.`);
+    const number = this.jidToNumber(jid);
+    return evo.updateMessage(session.instanceName, number, messageId, newText);
+  }
+
+  async sendPresenceUpdate(sessionId: string, jid: string, presence: "composing" | "recording" | "paused"): Promise<void> {
+    const session = this.sessions.get(sessionId);
+    if (!session || session.status !== "connected") return;
+    const number = this.jidToNumber(jid);
+    await evo.sendPresence(session.instanceName, number, presence);
+  }
+
+  async archiveChat(sessionId: string, remoteJid: string, archive: boolean): Promise<void> {
+    const session = this.sessions.get(sessionId);
+    if (!session) throw new Error(`Sessão não encontrada.`);
+    if (session.status !== "connected") throw new Error(`WhatsApp não está conectado.`);
+    await evo.archiveChat(session.instanceName, remoteJid, archive);
+  }
+
+  async blockContact(sessionId: string, jid: string, block: boolean): Promise<void> {
+    const session = this.sessions.get(sessionId);
+    if (!session) throw new Error(`Sessão não encontrada.`);
+    if (session.status !== "connected") throw new Error(`WhatsApp não está conectado.`);
+    const number = this.jidToNumber(jid);
+    await evo.updateBlockStatus(session.instanceName, number, block ? "block" : "unblock");
+  }
+
+  async checkIsWhatsApp(sessionId: string, numbers: string[]): Promise<Array<{ exists: boolean; jid: string; number: string }>> {
+    const session = this.sessions.get(sessionId);
+    if (!session) throw new Error(`Sessão não encontrada.`);
+    if (session.status !== "connected") throw new Error(`WhatsApp não está conectado.`);
+    return evo.checkIsWhatsApp(session.instanceName, numbers);
+  }
+
+  async markAsUnread(sessionId: string, remoteJid: string, messageId: string): Promise<void> {
+    const session = this.sessions.get(sessionId);
+    if (!session) throw new Error(`Sessão não encontrada.`);
+    if (session.status !== "connected") throw new Error(`WhatsApp não está conectado.`);
+    await evo.markMessageAsUnread(session.instanceName, remoteJid, messageId);
+  }
+
+  async fetchContactProfile(sessionId: string, jid: string): Promise<any> {
+    const session = this.sessions.get(sessionId);
+    if (!session) return null;
+    const number = this.jidToNumber(jid);
+    return evo.fetchProfile(session.instanceName, number);
+  }
+
+  async fetchContactBusinessProfile(sessionId: string, jid: string): Promise<any> {
+    const session = this.sessions.get(sessionId);
+    if (!session) return null;
+    const number = this.jidToNumber(jid);
+    return evo.fetchBusinessProfile(session.instanceName, number);
+  }
+
+  // ─── GROUPS ───
+
+  async listGroups(sessionId: string): Promise<any[]> {
+    const session = this.sessions.get(sessionId);
+    if (!session) throw new Error(`Sessão não encontrada.`);
+    if (session.status !== "connected") throw new Error(`WhatsApp não está conectado.`);
+    return evo.fetchAllGroups(session.instanceName);
+  }
+
+  async createGroup(sessionId: string, subject: string, participants: string[], description?: string): Promise<any> {
+    const session = this.sessions.get(sessionId);
+    if (!session) throw new Error(`Sessão não encontrada.`);
+    if (session.status !== "connected") throw new Error(`WhatsApp não está conectado.`);
+    return evo.createGroup(session.instanceName, subject, participants, description);
+  }
+
+  async getGroupInfo(sessionId: string, groupJid: string): Promise<any> {
+    const session = this.sessions.get(sessionId);
+    if (!session) return null;
+    return evo.findGroupByJid(session.instanceName, groupJid);
+  }
+
+  async getGroupMembers(sessionId: string, groupJid: string): Promise<any[]> {
+    const session = this.sessions.get(sessionId);
+    if (!session) return [];
+    return evo.findGroupMembers(session.instanceName, groupJid);
+  }
+
+  async updateGroupMembers(sessionId: string, groupJid: string, action: "add" | "remove" | "promote" | "demote", participants: string[]): Promise<any> {
+    const session = this.sessions.get(sessionId);
+    if (!session) throw new Error(`Sessão não encontrada.`);
+    if (session.status !== "connected") throw new Error(`WhatsApp não está conectado.`);
+    return evo.updateGroupMembers(session.instanceName, groupJid, action, participants);
+  }
+
+  async updateGroupSubject(sessionId: string, groupJid: string, subject: string): Promise<any> {
+    const session = this.sessions.get(sessionId);
+    if (!session) throw new Error(`Sessão não encontrada.`);
+    return evo.updateGroupSubject(session.instanceName, groupJid, subject);
+  }
+
+  async updateGroupDescription(sessionId: string, groupJid: string, description: string): Promise<any> {
+    const session = this.sessions.get(sessionId);
+    if (!session) throw new Error(`Sessão não encontrada.`);
+    return evo.updateGroupDescription(session.instanceName, groupJid, description);
+  }
+
+  async getGroupInviteCode(sessionId: string, groupJid: string): Promise<string | null> {
+    const session = this.sessions.get(sessionId);
+    if (!session) return null;
+    return evo.fetchInviteCode(session.instanceName, groupJid);
+  }
+
+  async revokeGroupInviteCode(sessionId: string, groupJid: string): Promise<string | null> {
+    const session = this.sessions.get(sessionId);
+    if (!session) return null;
+    return evo.revokeInviteCode(session.instanceName, groupJid);
+  }
+
+  async updateGroupSetting(sessionId: string, groupJid: string, action: "announcement" | "not_announcement" | "locked" | "unlocked"): Promise<any> {
+    const session = this.sessions.get(sessionId);
+    if (!session) throw new Error(`Sessão não encontrada.`);
+    return evo.updateGroupSetting(session.instanceName, groupJid, action);
+  }
+
+  async toggleEphemeral(sessionId: string, groupJid: string, expiration: number): Promise<any> {
+    const session = this.sessions.get(sessionId);
+    if (!session) throw new Error(`Sessão não encontrada.`);
+    return evo.toggleEphemeral(session.instanceName, groupJid, expiration);
+  }
+
+  async leaveGroup(sessionId: string, groupJid: string): Promise<any> {
+    const session = this.sessions.get(sessionId);
+    if (!session) throw new Error(`Sessão não encontrada.`);
+    return evo.leaveGroup(session.instanceName, groupJid);
   }
 
   // ─── PROFILE PICTURES ───
@@ -838,6 +1073,18 @@ class WhatsAppEvolutionManager extends EventEmitter {
           await this.handleOutgoingMessage(session, payload.data);
         }
         break;
+
+      case "messages.delete":
+        if (session) {
+          await this.handleMessageDelete(session, payload.data);
+        }
+        break;
+
+      case "contacts.upsert":
+        if (session) {
+          await this.handleContactsUpsert(session, payload.data);
+        }
+        break;
     }
   }
 
@@ -853,7 +1100,7 @@ class WhatsAppEvolutionManager extends EventEmitter {
       if (key.remoteJid.endsWith("@lid")) return; // Skip LID
 
       const messageType = data?.messageType || "conversation";
-      const skipTypes = ["protocolMessage", "senderKeyDistributionMessage", "messageContextInfo", "reactionMessage", "ephemeralMessage"];
+      const skipTypes = ["protocolMessage", "senderKeyDistributionMessage", "messageContextInfo", "ephemeralMessage"];
       if (skipTypes.includes(messageType)) return;
 
       const fromMe = key.fromMe || false;
@@ -1053,6 +1300,90 @@ class WhatsAppEvolutionManager extends EventEmitter {
     }
   }
 
+  // ─── DELETE HANDLER ───
+
+  private async handleMessageDelete(session: EvolutionSessionState, data: any): Promise<void> {
+    try {
+      const key = data?.key || data;
+      const messageId = key?.id;
+      if (!messageId) return;
+
+      const db = await getDb();
+      if (!db) return;
+
+      // Mark message as deleted in DB
+      await db.update(waMessages)
+        .set({ content: "[Mensagem apagada]", messageType: "protocolMessage" })
+        .where(and(
+          eq(waMessages.sessionId, session.sessionId),
+          eq(waMessages.messageId, messageId)
+        ));
+
+      this.emit("message:deleted", {
+        sessionId: session.sessionId,
+        messageId,
+        remoteJid: key?.remoteJid,
+      });
+    } catch (error) {
+      console.error("[EvoWA] Error handling message delete:", error);
+    }
+  }
+
+  // ─── CONTACTS UPSERT HANDLER ───
+
+  private async handleContactsUpsert(session: EvolutionSessionState, data: any): Promise<void> {
+    try {
+      const contacts = Array.isArray(data) ? data : [data];
+      const db = await getDb();
+      if (!db) return;
+
+      for (const contact of contacts) {
+        const jid = contact?.id || contact?.jid;
+        if (!jid || jid.endsWith("@g.us") || jid === "status@broadcast") continue;
+
+        const pushName = contact?.pushName || contact?.notify || "";
+        const savedName = contact?.name || contact?.verifiedName || "";
+        const profilePicUrl = contact?.imgUrl || contact?.profilePictureUrl || null;
+
+        if (!pushName && !savedName) continue;
+
+        try {
+          await db.insert(waContacts).values({
+            sessionId: session.sessionId,
+            jid,
+            phoneNumber: jid.endsWith("@s.whatsapp.net") ? jid : null,
+            pushName: pushName || null,
+            savedName: savedName || null,
+            verifiedName: null,
+            profilePictureUrl: profilePicUrl,
+          }).onDuplicateKeyUpdate({
+            set: {
+              ...(pushName ? { pushName: sql`${pushName}` } : {}),
+              ...(savedName ? { savedName: sql`${savedName}` } : {}),
+              ...(profilePicUrl ? { profilePictureUrl: sql`${profilePicUrl}` } : {}),
+            },
+          });
+        } catch {
+          // Fallback: update
+          const updateFields: Record<string, any> = {};
+          if (pushName) updateFields.pushName = pushName;
+          if (savedName) updateFields.savedName = savedName;
+          if (profilePicUrl) updateFields.profilePictureUrl = profilePicUrl;
+          if (Object.keys(updateFields).length > 0) {
+            await db.update(waContacts)
+              .set(updateFields)
+              .where(and(
+                eq(waContacts.sessionId, session.sessionId),
+                eq(waContacts.jid, jid)
+              )).catch(() => {});
+          }
+        }
+      }
+    } catch (error) {
+      console.error("[EvoWA] Error handling contacts upsert:", error);
+    }
+  }
+
   // ─── CONTENT EXTRACTION ───
 
   private extractMessageContent(data: any): string {
@@ -1195,14 +1526,66 @@ class WhatsAppEvolutionManager extends EventEmitter {
 
       console.log(`[EvoWA AutoRestore] Found ${rows.length} sessions to check`);
 
+      // Group sessions by user+tenant to detect duplicates
+      const sessionsByUserTenant = new Map<string, typeof rows>();
       for (const row of rows) {
+        const key = `${row.tenantId}-${row.userId}`;
+        if (!sessionsByUserTenant.has(key)) sessionsByUserTenant.set(key, []);
+        sessionsByUserTenant.get(key)!.push(row);
+      }
+
+      // For each user+tenant group, keep only the canonical session
+      for (const [key, group] of Array.from(sessionsByUserTenant.entries())) {
+        const [tenantIdStr, userIdStr] = key.split("-");
+        const canonicalName = evo.getInstanceName(parseInt(tenantIdStr), parseInt(userIdStr));
+
+        // If there are multiple sessions, mark non-canonical ones as deleted
+        if (group.length > 1) {
+          for (const row of group) {
+            if (row.sessionId !== canonicalName) {
+              // Check if this legacy session actually exists on Evolution
+              try {
+                const legacyInst = await evo.fetchInstance(row.sessionId);
+                if (!legacyInst) {
+                  // Doesn't exist on Evolution — safe to delete
+                  await db.update(whatsappSessions)
+                    .set({ status: "deleted" })
+                    .where(eq(whatsappSessions.sessionId, row.sessionId));
+                  console.log(`[EvoWA AutoRestore] Cleaned up legacy session: ${row.sessionId} (not on Evolution)`);
+                  continue;
+                }
+              } catch {
+                // If we can't check, mark as disconnected
+                await db.update(whatsappSessions)
+                  .set({ status: "disconnected" })
+                  .where(eq(whatsappSessions.sessionId, row.sessionId));
+                continue;
+              }
+            }
+          }
+        }
+      }
+
+      // Now restore only non-deleted sessions
+      const activeRows = await db.select()
+        .from(whatsappSessions)
+        .where(sql`${whatsappSessions.status} != 'deleted'`);
+
+      for (const row of activeRows) {
         const instanceName = evo.getInstanceName(row.tenantId, row.userId);
+        // For legacy sessions where sessionId != instanceName, try the sessionId first
+        const nameToCheck = row.sessionId === instanceName ? instanceName : row.sessionId;
 
         try {
-          const inst = await evo.fetchInstance(instanceName);
+          let inst = await evo.fetchInstance(nameToCheck);
+          // If legacy name not found, try canonical name
+          if (!inst && nameToCheck !== instanceName) {
+            inst = await evo.fetchInstance(instanceName);
+          }
+
           if (inst) {
             const state: EvolutionSessionState = {
-              instanceName,
+              instanceName: nameToCheck,
               sessionId: row.sessionId,
               userId: row.userId,
               tenantId: row.tenantId,
@@ -1217,26 +1600,28 @@ class WhatsAppEvolutionManager extends EventEmitter {
               lastConnectedAt: inst.connectionStatus === "open" ? Date.now() : null,
             };
 
-              this.sessions.set(row.sessionId, state);
-            this.instanceToSession.set(instanceName, row.sessionId);
+            this.sessions.set(row.sessionId, state);
+            this.instanceToSession.set(nameToCheck, row.sessionId);
             const dbStatus = inst.connectionStatus === "open" ? "connected" : "disconnected";
             await db.update(whatsappSessions)
               .set({ status: dbStatus })
               .where(eq(whatsappSessions.sessionId, row.sessionId));
-            console.log(`[EvoWA AutoRestore] ${row.sessionId} -> ${instanceName} -> ${dbStatus}`);
+            console.log(`[EvoWA AutoRestore] ${row.sessionId} -> ${nameToCheck} -> ${dbStatus}`);
 
             // Sync conversations in background for connected sessions
             if (dbStatus === "connected") {
               this.syncConversationsBackground(state, false);
             }
           } else {
+            // Instance not found on Evolution — mark as deleted (not just disconnected)
+            // because there's nothing to reconnect to
             await db.update(whatsappSessions)
               .set({ status: "disconnected" })
               .where(eq(whatsappSessions.sessionId, row.sessionId));
             console.log(`[EvoWA AutoRestore] ${row.sessionId} -> instance not found, marked disconnected`);
           }
         } catch (e: any) {
-          console.warn(`[EvoWA AutoRestore] Error checking ${instanceName}:`, e.message);
+          console.warn(`[EvoWA AutoRestore] Error checking ${nameToCheck}:`, e.message);
         }
       }
     } catch (e) {

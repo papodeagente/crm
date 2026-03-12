@@ -215,19 +215,40 @@ export const appRouter = router({
       // Each user has their own WhatsApp instance (Evolution API)
       // Filter by the CRM userId (saasUser.id) so users only see their own sessions
       const saasUserId = ctx.saasUser?.userId;
+      const tenantId = ctx.saasUser?.tenantId || 0;
       let dbSessions;
       if (saasUserId) {
         dbSessions = await getSessionsByUser(saasUserId);
       } else {
         dbSessions = await getSessionsByUser(ctx.user.id);
       }
+
+      // Determine the canonical session name for this user
+      const userId = saasUserId || ctx.user.id;
+      const canonicalName = `crm-${tenantId}-${userId}`;
+
       // Check live status from Evolution API for each session
       const results = await Promise.all(dbSessions.map(async (s) => {
         const live = await whatsappManager.getSessionLive(s.sessionId);
         const liveStatus = live?.status || s.status || "disconnected";
         return { ...s, liveStatus, qrDataUrl: live?.qrDataUrl || null, user: live?.user || null };
       }));
-      return results;
+
+      // Filter out phantom sessions: if a session is not the canonical name
+      // AND its liveStatus is disconnected, remove it from results
+      const filtered = results.filter(s => {
+        if (s.sessionId === canonicalName) return true; // Always keep canonical
+        if (s.liveStatus === "connected") return true; // Keep any connected session
+        return false; // Remove disconnected legacy sessions
+      });
+
+      // If no sessions remain but we had some, return the canonical one if it exists
+      if (filtered.length === 0 && results.length > 0) {
+        const canonical = results.find(s => s.sessionId === canonicalName);
+        if (canonical) return [canonical];
+      }
+
+      return filtered.length > 0 ? filtered : results;
     }),
     // Resolve a phone number to the actual WhatsApp JID
     resolveJid: protectedProcedure
@@ -248,6 +269,136 @@ export const appRouter = router({
         const result = await whatsappManager.sendMediaMessage(input.sessionId, input.number, input.mediaUrl, input.mediaType, input.caption, input.fileName, { ptt: input.ptt, mimetype: input.mimetype, duration: input.duration });
         return { success: true, messageId: result?.key?.id };
       }),
+    // ─── REACTIONS & INTERACTIONS ───
+    sendReaction: protectedProcedure
+      .input(z.object({
+        sessionId: z.string(),
+        key: z.object({ remoteJid: z.string(), fromMe: z.boolean(), id: z.string() }),
+        reaction: z.string(), // emoji or empty string to remove
+      }))
+      .mutation(async ({ input }) => {
+        const result = await whatsappManager.sendReaction(input.sessionId, input.key, input.reaction);
+        return { success: true, messageId: result?.key?.id };
+      }),
+    sendSticker: protectedProcedure
+      .input(z.object({ sessionId: z.string(), number: z.string().min(1), stickerUrl: z.string().url() }))
+      .mutation(async ({ input }) => {
+        const result = await whatsappManager.sendSticker(input.sessionId, input.number, input.stickerUrl);
+        return { success: true, messageId: result?.key?.id };
+      }),
+    sendLocation: protectedProcedure
+      .input(z.object({
+        sessionId: z.string(),
+        number: z.string().min(1),
+        latitude: z.number(),
+        longitude: z.number(),
+        name: z.string(),
+        address: z.string(),
+      }))
+      .mutation(async ({ input }) => {
+        const result = await whatsappManager.sendLocation(input.sessionId, input.number, input.latitude, input.longitude, input.name, input.address);
+        return { success: true, messageId: result?.key?.id };
+      }),
+    sendContact: protectedProcedure
+      .input(z.object({
+        sessionId: z.string(),
+        number: z.string().min(1),
+        contacts: z.array(z.object({ fullName: z.string(), wuid: z.string().optional(), phoneNumber: z.string() })),
+      }))
+      .mutation(async ({ input }) => {
+        const result = await whatsappManager.sendContact(input.sessionId, input.number, input.contacts);
+        return { success: true, messageId: result?.key?.id };
+      }),
+    sendPoll: protectedProcedure
+      .input(z.object({
+        sessionId: z.string(),
+        number: z.string().min(1),
+        name: z.string().min(1),
+        values: z.array(z.string().min(1)).min(2).max(12),
+        selectableCount: z.number().min(1).default(1),
+      }))
+      .mutation(async ({ input }) => {
+        const result = await whatsappManager.sendPoll(input.sessionId, input.number, input.name, input.values, input.selectableCount);
+        return { success: true, messageId: result?.key?.id };
+      }),
+    sendTextWithQuote: protectedProcedure
+      .input(z.object({
+        sessionId: z.string(),
+        number: z.string().min(1),
+        message: z.string().min(1),
+        quotedMessageId: z.string(),
+        quotedText: z.string(),
+      }))
+      .mutation(async ({ input }) => {
+        const result = await whatsappManager.sendTextWithQuote(input.sessionId, input.number, input.message, input.quotedMessageId, input.quotedText);
+        return { success: true, messageId: result?.key?.id };
+      }),
+    deleteMessage: protectedProcedure
+      .input(z.object({
+        sessionId: z.string(),
+        remoteJid: z.string(),
+        messageId: z.string(),
+        fromMe: z.boolean(),
+      }))
+      .mutation(async ({ input }) => {
+        await whatsappManager.deleteMessage(input.sessionId, input.remoteJid, input.messageId, input.fromMe);
+        return { success: true };
+      }),
+    editMessage: protectedProcedure
+      .input(z.object({
+        sessionId: z.string(),
+        number: z.string().min(1),
+        messageId: z.string(),
+        newText: z.string().min(1),
+      }))
+      .mutation(async ({ input }) => {
+        const result = await whatsappManager.editMessage(input.sessionId, input.number, input.messageId, input.newText);
+        return { success: true, messageId: result?.key?.id };
+      }),
+    sendPresence: protectedProcedure
+      .input(z.object({
+        sessionId: z.string(),
+        number: z.string().min(1),
+        presence: z.enum(["composing", "recording", "paused"]),
+      }))
+      .mutation(async ({ input }) => {
+        await whatsappManager.sendPresenceUpdate(input.sessionId, input.number, input.presence);
+        return { success: true };
+      }),
+    archiveChat: protectedProcedure
+      .input(z.object({ sessionId: z.string(), remoteJid: z.string(), archive: z.boolean() }))
+      .mutation(async ({ input }) => {
+        await whatsappManager.archiveChat(input.sessionId, input.remoteJid, input.archive);
+        return { success: true };
+      }),
+    blockContact: protectedProcedure
+      .input(z.object({ sessionId: z.string(), number: z.string().min(1), block: z.boolean() }))
+      .mutation(async ({ input }) => {
+        await whatsappManager.blockContact(input.sessionId, input.number, input.block);
+        return { success: true };
+      }),
+    checkIsWhatsApp: protectedProcedure
+      .input(z.object({ sessionId: z.string(), numbers: z.array(z.string().min(1)) }))
+      .mutation(async ({ input }) => {
+        return whatsappManager.checkIsWhatsApp(input.sessionId, input.numbers);
+      }),
+    markAsUnread: protectedProcedure
+      .input(z.object({ sessionId: z.string(), remoteJid: z.string(), messageId: z.string() }))
+      .mutation(async ({ input }) => {
+        await whatsappManager.markAsUnread(input.sessionId, input.remoteJid, input.messageId);
+        return { success: true };
+      }),
+    fetchContactProfile: protectedProcedure
+      .input(z.object({ sessionId: z.string(), jid: z.string() }))
+      .query(async ({ input }) => {
+        return whatsappManager.fetchContactProfile(input.sessionId, input.jid);
+      }),
+    fetchBusinessProfile: protectedProcedure
+      .input(z.object({ sessionId: z.string(), jid: z.string() }))
+      .query(async ({ input }) => {
+        return whatsappManager.fetchContactBusinessProfile(input.sessionId, input.jid);
+      }),
+    // ─── EXISTING QUERIES ───
     messages: protectedProcedure
       .input(z.object({ sessionId: z.string(), limit: z.number().min(1).max(200).default(50), offset: z.number().min(0).default(0) }))
       .query(async ({ input }) => getMessages(input.sessionId, input.limit, input.offset)),

@@ -14,8 +14,23 @@
  * - POST   /message/sendText/{name}    — Envia texto
  * - POST   /message/sendMedia/{name}   — Envia mídia
  * - POST   /message/sendAudio/{name}   — Envia áudio
+ * - POST   /message/sendSticker/{name} — Envia sticker
+ * - POST   /message/sendLocation/{name}— Envia localização
+ * - POST   /message/sendContact/{name} — Envia contato
+ * - POST   /message/sendPoll/{name}    — Envia enquete
+ * - POST   /message/sendReaction/{name}— Envia reação
+ * - POST   /message/sendList/{name}    — Envia lista
+ * - POST   /message/sendButtons/{name} — Envia botões
+ * - DEL    /chat/deleteMessageForEveryone/{name} — Apaga msg
+ * - POST   /chat/updateMessage/{name}  — Edita msg
+ * - POST   /chat/sendPresence/{name}   — Presença
+ * - POST   /chat/archiveChat/{name}    — Arquivar
+ * - POST   /chat/updateBlockStatus/{name} — Bloquear
+ * - POST   /chat/checkIsWhatsApp/{name}— Verificar número
  * - GET    /chat/findMessages/{name}   — Busca mensagens
  * - PUT    /instance/restart/{name}    — Reinicia instância
+ * - POST   /group/create/{name}        — Criar grupo
+ * - GET    /group/fetchAllGroups/{name} — Listar grupos
  */
 
 import { ENV } from "./_core/env";
@@ -412,15 +427,489 @@ export async function markMessageAsRead(
 }
 
 // ════════════════════════════════════════════════════════════
+// REACTIONS & INTERACTIONS
+// ════════════════════════════════════════════════════════════
+
+/**
+ * Envia reação (emoji) em uma mensagem.
+ * Para remover reação, envie reaction como string vazia.
+ */
+export async function sendReaction(
+  instanceName: string,
+  key: { remoteJid: string; fromMe: boolean; id: string },
+  reaction: string
+): Promise<SendMessageResult> {
+  return evoFetch<SendMessageResult>(`/message/sendReaction/${instanceName}`, {
+    method: "POST",
+    body: { key, reaction },
+  });
+}
+
+/**
+ * Envia sticker/figurinha.
+ */
+export async function sendSticker(
+  instanceName: string,
+  number: string,
+  stickerUrl: string
+): Promise<SendMessageResult> {
+  return evoFetch<SendMessageResult>(`/message/sendSticker/${instanceName}`, {
+    method: "POST",
+    body: { number, sticker: stickerUrl },
+  });
+}
+
+/**
+ * Envia localização.
+ */
+export async function sendLocation(
+  instanceName: string,
+  number: string,
+  latitude: number,
+  longitude: number,
+  name: string,
+  address: string
+): Promise<SendMessageResult> {
+  return evoFetch<SendMessageResult>(`/message/sendLocation/${instanceName}`, {
+    method: "POST",
+    body: { number, name, address, latitude, longitude },
+  });
+}
+
+/**
+ * Envia contato (vCard).
+ */
+export async function sendContact(
+  instanceName: string,
+  number: string,
+  contact: Array<{ fullName: string; wuid?: string; phoneNumber: string }>
+): Promise<SendMessageResult> {
+  return evoFetch<SendMessageResult>(`/message/sendContact/${instanceName}`, {
+    method: "POST",
+    body: { number, contact },
+  });
+}
+
+/**
+ * Envia enquete/votação.
+ */
+export async function sendPoll(
+  instanceName: string,
+  number: string,
+  name: string,
+  values: string[],
+  selectableCount: number = 1
+): Promise<SendMessageResult> {
+  return evoFetch<SendMessageResult>(`/message/sendPoll/${instanceName}`, {
+    method: "POST",
+    body: { number, name, selectableCount, values },
+  });
+}
+
+/**
+ * Envia lista interativa.
+ */
+export async function sendList(
+  instanceName: string,
+  number: string,
+  title: string,
+  description: string,
+  buttonText: string,
+  footerText: string,
+  sections: Array<{ title: string; rows: Array<{ title: string; description?: string; rowId: string }> }>
+): Promise<SendMessageResult> {
+  return evoFetch<SendMessageResult>(`/message/sendList/${instanceName}`, {
+    method: "POST",
+    body: { number, title, description, buttonText, footerText, sections },
+  });
+}
+
+/**
+ * Envia botões interativos.
+ */
+export async function sendButtons(
+  instanceName: string,
+  number: string,
+  title: string,
+  description: string,
+  footer: string,
+  buttons: Array<{ buttonId: string; buttonText: { displayText: string } }>
+): Promise<SendMessageResult> {
+  return evoFetch<SendMessageResult>(`/message/sendButtons/${instanceName}`, {
+    method: "POST",
+    body: { number, title, description, footer, buttons },
+  });
+}
+
+/**
+ * Envia texto com quoted message (reply).
+ */
+export async function sendTextWithQuote(
+  instanceName: string,
+  number: string,
+  text: string,
+  quoted: { key: { id: string }; message: { conversation: string } }
+): Promise<SendMessageResult> {
+  return evoFetch<SendMessageResult>(`/message/sendText/${instanceName}`, {
+    method: "POST",
+    body: { number, text, quoted },
+  });
+}
+
+// ════════════════════════════════════════════════════════════
+// CHAT CONTROLLER
+// ════════════════════════════════════════════════════════════
+
+/**
+ * Apaga mensagem para todos.
+ */
+export async function deleteMessageForEveryone(
+  instanceName: string,
+  remoteJid: string,
+  messageId: string,
+  fromMe: boolean
+): Promise<any> {
+  return evoFetch(`/chat/deleteMessageForEveryone/${instanceName}`, {
+    method: "DELETE",
+    body: { id: messageId, remoteJid, fromMe },
+  });
+}
+
+/**
+ * Edita mensagem enviada.
+ */
+export async function updateMessage(
+  instanceName: string,
+  number: string,
+  messageId: string,
+  text: string
+): Promise<SendMessageResult> {
+  return evoFetch<SendMessageResult>(`/chat/updateMessage/${instanceName}`, {
+    method: "POST",
+    body: { number, key: { id: messageId }, text },
+  });
+}
+
+/**
+ * Envia indicador de presença (digitando, gravando, online, offline).
+ */
+export async function sendPresence(
+  instanceName: string,
+  number: string,
+  presence: "composing" | "recording" | "available" | "unavailable" | "paused"
+): Promise<void> {
+  try {
+    await evoFetch(`/chat/sendPresence/${instanceName}`, {
+      method: "POST",
+      body: { number, presence },
+    });
+  } catch (e) {
+    console.warn("[EvolutionAPI] sendPresence failed:", e);
+  }
+}
+
+/**
+ * Arquiva/desarquiva uma conversa.
+ */
+export async function archiveChat(
+  instanceName: string,
+  remoteJid: string,
+  archive: boolean
+): Promise<void> {
+  try {
+    await evoFetch(`/chat/archiveChat/${instanceName}`, {
+      method: "POST",
+      body: { lastMessage: { key: { remoteJid } }, archive },
+    });
+  } catch (e) {
+    console.warn("[EvolutionAPI] archiveChat failed:", e);
+  }
+}
+
+/**
+ * Bloqueia/desbloqueia um contato.
+ */
+export async function updateBlockStatus(
+  instanceName: string,
+  number: string,
+  status: "block" | "unblock"
+): Promise<void> {
+  try {
+    await evoFetch(`/chat/updateBlockStatus/${instanceName}`, {
+      method: "POST",
+      body: { number, status },
+    });
+  } catch (e) {
+    console.warn("[EvolutionAPI] updateBlockStatus failed:", e);
+  }
+}
+
+/**
+ * Verifica se um número tem WhatsApp.
+ */
+export async function checkIsWhatsApp(
+  instanceName: string,
+  numbers: string[]
+): Promise<Array<{ exists: boolean; jid: string; number: string }>> {
+  try {
+    const result = await evoFetch<any>(`/chat/checkIsWhatsApp/${instanceName}`, {
+      method: "POST",
+      body: { numbers },
+    });
+    return Array.isArray(result) ? result : [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Marca mensagens como não lidas.
+ */
+export async function markMessageAsUnread(
+  instanceName: string,
+  remoteJid: string,
+  messageId: string
+): Promise<void> {
+  try {
+    await evoFetch(`/chat/markMessageAsUnread/${instanceName}`, {
+      method: "POST",
+      body: { readMessages: [{ remoteJid, id: messageId }] },
+    });
+  } catch (e) {
+    console.warn("[EvolutionAPI] markMessageAsUnread failed:", e);
+  }
+}
+
+// ════════════════════════════════════════════════════════════
+// PROFILE
+// ════════════════════════════════════════════════════════════
+
+/**
+ * Busca perfil completo de um contato.
+ */
+export async function fetchProfile(
+  instanceName: string,
+  number: string
+): Promise<any> {
+  try {
+    return await evoFetch(`/chat/fetchProfile/${instanceName}`, {
+      method: "POST",
+      body: { number },
+    });
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Busca perfil comercial (WhatsApp Business).
+ */
+export async function fetchBusinessProfile(
+  instanceName: string,
+  number: string
+): Promise<any> {
+  try {
+    return await evoFetch(`/chat/fetchBusinessProfile/${instanceName}`, {
+      method: "POST",
+      body: { number },
+    });
+  } catch {
+    return null;
+  }
+}
+
+// ════════════════════════════════════════════════════════════
+// GROUPS
+// ════════════════════════════════════════════════════════════
+
+/**
+ * Cria um grupo.
+ */
+export async function createGroup(
+  instanceName: string,
+  subject: string,
+  participants: string[],
+  description?: string
+): Promise<any> {
+  return evoFetch(`/group/create/${instanceName}`, {
+    method: "POST",
+    body: { subject, participants, description },
+  });
+}
+
+/**
+ * Lista todos os grupos.
+ */
+export async function fetchAllGroups(
+  instanceName: string
+): Promise<any[]> {
+  try {
+    const result = await evoFetch<any>(`/group/fetchAllGroups/${instanceName}?getParticipants=false`);
+    return Array.isArray(result) ? result : [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Busca informações de um grupo por JID.
+ */
+export async function findGroupByJid(
+  instanceName: string,
+  groupJid: string
+): Promise<any> {
+  try {
+    return await evoFetch(`/group/findGroupInfos/${instanceName}?groupJid=${encodeURIComponent(groupJid)}`);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Busca membros de um grupo.
+ */
+export async function findGroupMembers(
+  instanceName: string,
+  groupJid: string
+): Promise<any[]> {
+  try {
+    const result = await evoFetch<any>(`/group/findGroupMembers/${instanceName}?groupJid=${encodeURIComponent(groupJid)}`);
+    return Array.isArray(result) ? result : [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Adiciona ou remove membros de um grupo.
+ */
+export async function updateGroupMembers(
+  instanceName: string,
+  groupJid: string,
+  action: "add" | "remove" | "promote" | "demote",
+  participants: string[]
+): Promise<any> {
+  return evoFetch(`/group/updateGroupMembers/${instanceName}`, {
+    method: "POST",
+    body: { groupJid, action, participants },
+  });
+}
+
+/**
+ * Atualiza nome do grupo.
+ */
+export async function updateGroupSubject(
+  instanceName: string,
+  groupJid: string,
+  subject: string
+): Promise<any> {
+  return evoFetch(`/group/updateGroupSubject/${instanceName}`, {
+    method: "POST",
+    body: { groupJid, subject },
+  });
+}
+
+/**
+ * Atualiza descrição do grupo.
+ */
+export async function updateGroupDescription(
+  instanceName: string,
+  groupJid: string,
+  description: string
+): Promise<any> {
+  return evoFetch(`/group/updateGroupDescription/${instanceName}`, {
+    method: "POST",
+    body: { groupJid, description },
+  });
+}
+
+/**
+ * Busca código de convite do grupo.
+ */
+export async function fetchInviteCode(
+  instanceName: string,
+  groupJid: string
+): Promise<string | null> {
+  try {
+    const result = await evoFetch<any>(`/group/fetchInviteCode/${instanceName}?groupJid=${encodeURIComponent(groupJid)}`);
+    return result?.inviteCode || result?.code || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Revoga código de convite do grupo.
+ */
+export async function revokeInviteCode(
+  instanceName: string,
+  groupJid: string
+): Promise<string | null> {
+  try {
+    const result = await evoFetch<any>(`/group/revokeInviteCode/${instanceName}`, {
+      method: "POST",
+      body: { groupJid },
+    });
+    return result?.inviteCode || result?.code || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Atualiza configurações do grupo.
+ */
+export async function updateGroupSetting(
+  instanceName: string,
+  groupJid: string,
+  action: "announcement" | "not_announcement" | "locked" | "unlocked"
+): Promise<any> {
+  return evoFetch(`/group/updateGroupSetting/${instanceName}`, {
+    method: "POST",
+    body: { groupJid, action },
+  });
+}
+
+/**
+ * Ativa/desativa mensagens temporárias no grupo.
+ */
+export async function toggleEphemeral(
+  instanceName: string,
+  groupJid: string,
+  expiration: number // 0 = off, 86400 = 24h, 604800 = 7d, 7776000 = 90d
+): Promise<any> {
+  return evoFetch(`/group/toggleEphemeral/${instanceName}`, {
+    method: "POST",
+    body: { groupJid, expiration },
+  });
+}
+
+/**
+ * Sai de um grupo.
+ */
+export async function leaveGroup(
+  instanceName: string,
+  groupJid: string
+): Promise<any> {
+  return evoFetch(`/group/leaveGroup/${instanceName}`, {
+    method: "DELETE",
+    body: { groupJid },
+  });
+}
+
+// ════════════════════════════════════════════════════════════
 // WEBHOOK EVENT TYPES
 // ════════════════════════════════════════════════════════════
 
 export type WebhookEventType =
   | "messages.upsert"
   | "messages.update"
+  | "messages.delete"
   | "connection.update"
   | "qrcode.updated"
-  | "send.message";
+  | "send.message"
+  | "contacts.upsert"
+  | "groups.update";
 
 export interface WebhookPayload {
   event: WebhookEventType;

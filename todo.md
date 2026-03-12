@@ -2363,3 +2363,56 @@
 - [x] BUG: Ordem das conversas errada — CAUSA RAIZ: Inbox usava endpoint conversationsMultiAgent (tabela messages) que ordena por MAX(id) e tem pushNames numéricos. Corrigido: trocado para waConversations (tabela wa_conversations) que tem lastMessageAt correto e nomes reais
 - [x] BUG: Nomes de contatos ainda mostram números de telefone — CAUSA RAIZ: conversationsMultiAgent buscava pushName da tabela messages (que só tem números). Corrigido: waConversations usa contactPushName da tabela wa_conversations (nomes reais como Sara Monte, Viviane Assis, Ana Paula Gutierres)
 - [x] markConversationRead agora também zera unreadCount na tabela wa_conversations
+
+## Funcionalidades WhatsApp Web via Evolution API (Mar 12 - v3)
+
+### Envio de Mensagens
+- [x] Enviar Sticker/Figurinha (sendSticker)
+- [x] Enviar Localização (sendLocation)
+- [x] Enviar Contato/vCard (sendContact)
+- [x] Enviar Enquete/Votação (sendPoll)
+- [x] Enviar Lista interativa (sendList)
+- [x] Enviar Botões interativos (sendButtons)
+
+### Reações e Interações
+- [x] Reagir com emoji em mensagem (sendReaction)
+- [x] Responder/Citar mensagem (quoted/reply)
+- [x] Apagar mensagem para todos (deleteMessageForEveryone)
+- [x] Editar mensagem enviada (updateMessage)
+- [x] Encaminhar mensagem
+
+### Indicadores de Presença
+- [x] Mostrar "digitando..." ao digitar (sendPresence composing)
+- [x] Mostrar "gravando áudio..." ao gravar (sendPresence recording)
+
+### Gerenciamento de Conversas
+- [x] Marcar como não lido (markMessageAsUnread)
+- [x] Arquivar conversa (archiveChat)
+- [x] Bloquear contato (updateBlockStatus)
+- [x] Verificar se número tem WhatsApp (checkIsWhatsApp)
+
+### Interface do Chat (Frontend)
+- [x] Emoji Picker (seletor visual de emojis)
+- [x] Menu de contexto na mensagem (responder, reagir, apagar, editar, encaminhar)
+- [x] Formatação de texto (negrito, itálico, riscado, monospace)
+- [x] Notificação sonora de nova mensagem
+- [x] Pré-visualização de mídia antes de enviar
+
+### Webhooks/Eventos Adicionais
+- [x] Processar mensagem deletada (messages.delete)
+- [x] Processar reação em mensagem (reactionMessage - removido do skipTypes)
+- [x] Processar atualização de contatos (contacts.upsert)
+
+### Grupos (adiado - não implementar por hora)
+
+### Perfil
+- [x] Ver perfil completo do contato (fetchProfile)
+- [x] Ver perfil comercial (fetchBusinessProfile)
+
+## Bug Crítico: Primeira Conexão WhatsApp (Mar 12 - v4)
+- [x] BUG: Usuário Bruno (crm-210002-210001) conectado no Evolution mas não no sistema — CAUSA RAIZ: sessão legada "Boxtour" marcada como connected no banco mas inexistente na Evolution API, bloqueando a sessão canônica crm-210002-210001
+- [x] BUG: Fluxo de primeira conexão não é à prova de falhas — Corrigido: getSessionLive agora marca sessões fantasma como disconnected; connectUser limpa sessões legadas automaticamente; sessions endpoint filtra sessões fantasma
+- [x] Investigar estado da sessão no banco vs Evolution API
+- [x] Corrigir auto-restore para detectar sessões conectadas no Evolution mas desconectadas no sistema
+- [x] Garantir que o frontend reflita o estado real da conexão
+- [x] Tornar o fluxo de primeira conexão robusto e sem falhas

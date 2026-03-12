@@ -6,8 +6,11 @@ import {
   Check, CheckCheck, Clock, Download, File, Image as ImageIcon,
   Mic, MicOff, Paperclip, Pause, Phone, Play, Search, Send, Smile,
   Video, X, Camera, FileText, ArrowDown, Volume2, Loader2, ChevronDown,
-  UserPlus, Briefcase, Users
+  UserPlus, Briefcase, Users, Reply, Trash2, Pencil, Forward, MapPin,
+  Contact, BarChart3, Copy, Ban
 } from "lucide-react";
+import Picker from "@emoji-mart/react";
+import data from "@emoji-mart/data";
 
 import { formatTime, SYSTEM_TIMEZONE, SYSTEM_LOCALE } from "../../../shared/dateUtils";
 
@@ -28,6 +31,7 @@ interface Message {
   status?: string | null;
   timestamp: string | Date;
   createdAt: string | Date;
+  quotedMessageId?: string | null;
 }
 
 interface AssignmentInfo {
@@ -45,6 +49,12 @@ interface AgentInfo {
   status: string;
 }
 
+interface ReplyTarget {
+  messageId: string;
+  content: string;
+  fromMe: boolean;
+}
+
 export interface WhatsAppChatProps {
   contact: { id: number; name: string; phone: string; email?: string; avatarUrl?: string } | null;
   sessionId: string;
@@ -57,6 +67,53 @@ export interface WhatsAppChatProps {
   agents?: AgentInfo[];
   onAssign?: (agentId: number | null) => void;
   onStatusChange?: (status: "open" | "pending" | "resolved" | "closed") => void;
+}
+
+/* ─── WhatsApp Text Formatting ─── */
+function formatWhatsAppText(text: string): React.ReactNode {
+  // Process WhatsApp formatting: *bold*, _italic_, ~strikethrough~, ```monospace```
+  const parts: React.ReactNode[] = [];
+  let remaining = text;
+  let key = 0;
+
+  const patterns = [
+    { regex: /\*([^*]+)\*/, tag: "b" },
+    { regex: /_([^_]+)_/, tag: "i" },
+    { regex: /~([^~]+)~/, tag: "s" },
+    { regex: /```([^`]+)```/, tag: "code" },
+  ];
+
+  while (remaining.length > 0) {
+    let earliest = -1;
+    let earliestPattern: typeof patterns[0] | null = null;
+    let earliestMatch: RegExpExecArray | null = null;
+
+    for (const p of patterns) {
+      const m = p.regex.exec(remaining);
+      if (m && (earliest === -1 || m.index < earliest)) {
+        earliest = m.index;
+        earliestPattern = p;
+        earliestMatch = m;
+      }
+    }
+
+    if (!earliestMatch || !earliestPattern) {
+      parts.push(remaining);
+      break;
+    }
+
+    if (earliest > 0) parts.push(remaining.substring(0, earliest));
+
+    const inner = earliestMatch[1];
+    if (earliestPattern.tag === "b") parts.push(<strong key={key++}>{inner}</strong>);
+    else if (earliestPattern.tag === "i") parts.push(<em key={key++}>{inner}</em>);
+    else if (earliestPattern.tag === "s") parts.push(<s key={key++}>{inner}</s>);
+    else if (earliestPattern.tag === "code") parts.push(<code key={key++} className="bg-foreground/10 px-1 py-0.5 rounded text-[13px] font-mono">{inner}</code>);
+
+    remaining = remaining.substring(earliest + earliestMatch[0].length);
+  }
+
+  return parts.length === 1 && typeof parts[0] === "string" ? parts[0] : <>{parts}</>;
 }
 
 /* ─── Status Ticks ─── */
@@ -134,8 +191,121 @@ const AudioPlayer = memo(({ src, duration, isVoice }: { src: string; duration?: 
 });
 AudioPlayer.displayName = "AudioPlayer";
 
+/* ─── Reaction Picker (Quick Emojis) ─── */
+function QuickReactionPicker({ onSelect }: { onSelect: (emoji: string) => void }) {
+  const quickEmojis = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
+  return (
+    <div className="flex items-center gap-1 bg-card rounded-full shadow-xl border border-border px-2 py-1.5 animate-in fade-in zoom-in-95 duration-150">
+      {quickEmojis.map((e) => (
+        <button key={e} onClick={() => onSelect(e)} className="w-8 h-8 flex items-center justify-center hover:bg-muted rounded-full transition-colors text-lg">
+          {e}
+        </button>
+      ))}
+      <button onClick={() => onSelect("__picker__")} className="w-8 h-8 flex items-center justify-center hover:bg-muted rounded-full transition-colors">
+        <Smile className="w-4 h-4 text-muted-foreground" />
+      </button>
+    </div>
+  );
+}
+
+/* ─── Message Context Menu ─── */
+function MessageContextMenu({
+  msg, onReply, onReact, onDelete, onEdit, onForward, onCopy, onClose
+}: {
+  msg: Message;
+  onReply: () => void;
+  onReact: (emoji: string) => void;
+  onDelete: () => void;
+  onEdit: () => void;
+  onForward: () => void;
+  onCopy: () => void;
+  onClose: () => void;
+}) {
+  const [showReactionPicker, setShowReactionPicker] = useState(false);
+  const [showFullPicker, setShowFullPicker] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) onClose();
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [onClose]);
+
+  const handleReaction = (emoji: string) => {
+    if (emoji === "__picker__") {
+      setShowFullPicker(true);
+      setShowReactionPicker(false);
+      return;
+    }
+    onReact(emoji);
+  };
+
+  const isTextMessage = msg.messageType === "conversation" || msg.messageType === "extendedTextMessage" || msg.messageType === "text";
+
+  return (
+    <div ref={menuRef} className={`absolute ${msg.fromMe ? "right-0" : "left-0"} top-0 z-50 flex flex-col items-end gap-1`}>
+      {/* Quick reactions */}
+      {showReactionPicker && !showFullPicker && (
+        <QuickReactionPicker onSelect={handleReaction} />
+      )}
+
+      {/* Full emoji picker */}
+      {showFullPicker && (
+        <div className="absolute bottom-full mb-2 z-50">
+          <Picker data={data} onEmojiSelect={(e: any) => { onReact(e.native); }} theme="light" previewPosition="none" skinTonePosition="none" locale="pt" />
+        </div>
+      )}
+
+      {/* Context menu */}
+      <div className="bg-card rounded-xl shadow-xl border border-border overflow-hidden min-w-[180px] animate-in fade-in slide-in-from-top-1 duration-150">
+        <button onClick={() => { setShowReactionPicker(!showReactionPicker); setShowFullPicker(false); }}
+          className="flex items-center gap-3 w-full px-3 py-2 hover:bg-muted transition-colors text-left text-sm">
+          <Smile className="w-4 h-4 text-muted-foreground" /> Reagir
+        </button>
+        <button onClick={onReply}
+          className="flex items-center gap-3 w-full px-3 py-2 hover:bg-muted transition-colors text-left text-sm">
+          <Reply className="w-4 h-4 text-muted-foreground" /> Responder
+        </button>
+        <button onClick={onForward}
+          className="flex items-center gap-3 w-full px-3 py-2 hover:bg-muted transition-colors text-left text-sm">
+          <Forward className="w-4 h-4 text-muted-foreground" /> Encaminhar
+        </button>
+        {isTextMessage && msg.content && (
+          <button onClick={onCopy}
+            className="flex items-center gap-3 w-full px-3 py-2 hover:bg-muted transition-colors text-left text-sm">
+            <Copy className="w-4 h-4 text-muted-foreground" /> Copiar
+          </button>
+        )}
+        {msg.fromMe && isTextMessage && (
+          <button onClick={onEdit}
+            className="flex items-center gap-3 w-full px-3 py-2 hover:bg-muted transition-colors text-left text-sm">
+            <Pencil className="w-4 h-4 text-muted-foreground" /> Editar
+          </button>
+        )}
+        <button onClick={onDelete}
+          className="flex items-center gap-3 w-full px-3 py-2 hover:bg-muted transition-colors text-left text-sm text-destructive">
+          <Trash2 className="w-4 h-4" /> Apagar
+        </button>
+      </div>
+    </div>
+  );
+}
+
 /* ─── Message Bubble ─── */
-const MessageBubble = memo(({ msg, isFirst, isLast }: { msg: Message; isFirst: boolean; isLast: boolean }) => {
+const MessageBubble = memo(({
+  msg, isFirst, isLast, allMessages,
+  onReply, onReact, onDelete, onEdit, onForward
+}: {
+  msg: Message; isFirst: boolean; isLast: boolean; allMessages: Message[];
+  onReply: (target: ReplyTarget) => void;
+  onReact: (key: { remoteJid: string; fromMe: boolean; id: string }, emoji: string) => void;
+  onDelete: (remoteJid: string, messageId: string, fromMe: boolean) => void;
+  onEdit: (messageId: string, currentText: string) => void;
+  onForward: (msg: Message) => void;
+}) => {
+  const [showMenu, setShowMenu] = useState(false);
   const fromMe = msg.fromMe;
   const time = formatTime(msg.timestamp || msg.createdAt);
 
@@ -144,6 +314,9 @@ const MessageBubble = memo(({ msg, isFirst, isLast }: { msg: Message; isFirst: b
   const isAudio = msg.messageType === "audioMessage" || msg.messageType === "audio" || msg.mediaMimeType?.startsWith("audio/");
   const isDocument = msg.messageType === "documentMessage" || msg.messageType === "document";
   const isSticker = msg.messageType === "stickerMessage";
+  const isLocation = msg.messageType === "locationMessage";
+  const isContact = msg.messageType === "contactMessage" || msg.messageType === "contactsArrayMessage";
+  const isPoll = msg.messageType === "pollCreationMessage";
   const hasMedia = !!msg.mediaUrl;
 
   const bubbleBase = fromMe
@@ -154,7 +327,64 @@ const MessageBubble = memo(({ msg, isFirst, isLast }: { msg: Message; isFirst: b
     ? `rounded-[7.5px] ${isFirst ? "rounded-tr-none" : ""}`
     : `rounded-[7.5px] ${isFirst ? "rounded-tl-none" : ""}`;
 
+  // Find quoted message
+  const quotedMsg = msg.quotedMessageId
+    ? allMessages.find(m => m.messageId === msg.quotedMessageId)
+    : null;
+
+  const renderQuotedMessage = () => {
+    if (!quotedMsg) return null;
+    const quotedContent = quotedMsg.content || (quotedMsg.mediaUrl ? "[Mídia]" : "");
+    return (
+      <div className="bg-foreground/5 border-l-4 border-wa-tint rounded-md px-2.5 py-1.5 mb-1 -mx-0.5 cursor-pointer hover:bg-foreground/8 transition-colors">
+        <p className="text-[11px] font-semibold text-wa-tint">{quotedMsg.fromMe ? "Você" : "Contato"}</p>
+        <p className="text-[12px] text-muted-foreground truncate max-w-[250px]">{quotedContent}</p>
+      </div>
+    );
+  };
+
   const renderMedia = () => {
+    if (isLocation && msg.content) {
+      // Parse location from content
+      try {
+        const loc = JSON.parse(msg.content);
+        return (
+          <div className="relative -mx-1 -mt-0.5 mb-1 overflow-hidden rounded-md">
+            <a href={`https://maps.google.com/?q=${loc.latitude},${loc.longitude}`} target="_blank" rel="noopener noreferrer"
+              className="block bg-muted p-3 hover:bg-muted/80 transition-colors">
+              <MapPin className="w-5 h-5 text-destructive mb-1" />
+              <p className="text-sm font-medium">{loc.name || "Localização"}</p>
+              {loc.address && <p className="text-xs text-muted-foreground">{loc.address}</p>}
+            </a>
+          </div>
+        );
+      } catch { /* not JSON location */ }
+    }
+
+    if (isContact && msg.content) {
+      return (
+        <div className="flex items-center gap-2 p-2 -mx-0.5 rounded-md bg-foreground/5 mb-1">
+          <Contact className="w-8 h-8 text-wa-tint" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium">{msg.content}</p>
+            <p className="text-[11px] text-muted-foreground">Contato</p>
+          </div>
+        </div>
+      );
+    }
+
+    if (isPoll && msg.content) {
+      return (
+        <div className="p-2 -mx-0.5 rounded-md bg-foreground/5 mb-1">
+          <div className="flex items-center gap-2 mb-1">
+            <BarChart3 className="w-4 h-4 text-wa-tint" />
+            <p className="text-sm font-medium">Enquete</p>
+          </div>
+          <p className="text-[13px]">{msg.content}</p>
+        </div>
+      );
+    }
+
     if (!hasMedia) return null;
 
     if (isImage && msg.mediaUrl) {
@@ -194,35 +424,81 @@ const MessageBubble = memo(({ msg, isFirst, isLast }: { msg: Message; isFirst: b
     return null;
   };
 
-  const textContent = msg.content && !msg.content.startsWith("[") ? msg.content : (isImage || isVideo || isAudio || isDocument || isSticker) ? null : msg.content;
+  const textContent = msg.content && !msg.content.startsWith("[") && !isLocation && !isContact && !isPoll
+    ? msg.content
+    : (isImage || isVideo || isAudio || isDocument || isSticker || isLocation || isContact || isPoll) ? null : msg.content;
 
   return (
-    <div className={`flex ${fromMe ? "justify-end" : "justify-start"} px-[63px] mb-[2px] ${isFirst ? "mt-[12px]" : ""}`}>
-      <div className={`relative max-w-[65%] px-[9px] pt-[6px] pb-[8px] shadow-sm ${bubbleBase} ${bubbleRadius}`} style={{ minWidth: "80px" }}>
-        {/* Tail SVG */}
-        {isFirst && (
-          <div className={`absolute top-0 w-[8px] h-[13px] ${fromMe ? "-right-[8px]" : "-left-[8px]"}`}>
-            <svg viewBox="0 0 8 13" width="8" height="13">
-              {fromMe ? (
-                <path className="fill-wa-bubble-out" d="M5.188 1H0v11.193l6.467-8.625C7.526 2.156 6.958 1 5.188 1z" />
-              ) : (
-                <path className="fill-wa-bubble-in" d="M2.812 1H8v11.193L1.533 3.568C.474 2.156 1.042 1 2.812 1z" />
-              )}
-            </svg>
-          </div>
+    <div className={`group flex ${fromMe ? "justify-end" : "justify-start"} px-[63px] mb-[2px] ${isFirst ? "mt-[12px]" : ""}`}>
+      <div className="relative max-w-[65%]">
+        {/* Hover action button */}
+        <button
+          onClick={() => setShowMenu(!showMenu)}
+          className={`absolute top-1 ${fromMe ? "left-0 -translate-x-full -ml-1" : "right-0 translate-x-full ml-1"} w-7 h-7 rounded-full bg-card/80 shadow border border-border flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10 hover:bg-card`}
+        >
+          <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />
+        </button>
+
+        {/* Context menu */}
+        {showMenu && msg.messageId && (
+          <MessageContextMenu
+            msg={msg}
+            onReply={() => {
+              onReply({ messageId: msg.messageId!, content: msg.content || "[Mídia]", fromMe: msg.fromMe });
+              setShowMenu(false);
+            }}
+            onReact={(emoji) => {
+              onReact({ remoteJid: msg.remoteJid, fromMe: msg.fromMe, id: msg.messageId! }, emoji);
+              setShowMenu(false);
+            }}
+            onDelete={() => {
+              onDelete(msg.remoteJid, msg.messageId!, msg.fromMe);
+              setShowMenu(false);
+            }}
+            onEdit={() => {
+              onEdit(msg.messageId!, msg.content || "");
+              setShowMenu(false);
+            }}
+            onForward={() => {
+              onForward(msg);
+              setShowMenu(false);
+            }}
+            onCopy={() => {
+              if (msg.content) navigator.clipboard.writeText(msg.content);
+              toast.success("Copiado");
+              setShowMenu(false);
+            }}
+            onClose={() => setShowMenu(false)}
+          />
         )}
 
-        {renderMedia()}
+        <div className={`relative px-[9px] pt-[6px] pb-[8px] shadow-sm ${bubbleBase} ${bubbleRadius}`} style={{ minWidth: "80px" }}>
+          {/* Tail SVG */}
+          {isFirst && (
+            <div className={`absolute top-0 w-[8px] h-[13px] ${fromMe ? "-right-[8px]" : "-left-[8px]"}`}>
+              <svg viewBox="0 0 8 13" width="8" height="13">
+                {fromMe ? (
+                  <path className="fill-wa-bubble-out" d="M5.188 1H0v11.193l6.467-8.625C7.526 2.156 6.958 1 5.188 1z" />
+                ) : (
+                  <path className="fill-wa-bubble-in" d="M2.812 1H8v11.193L1.533 3.568C.474 2.156 1.042 1 2.812 1z" />
+                )}
+              </svg>
+            </div>
+          )}
 
-        {textContent && (
-          <span className="text-[14.2px] leading-[19px] whitespace-pre-wrap break-words">{textContent}</span>
-        )}
+          {renderQuotedMessage()}
+          {renderMedia()}
 
-        {/* Time + Status */}
-        <span className="float-right ml-2 mt-[3px] flex items-center gap-0.5 relative -bottom-0.5">
-          <span className="text-[11px] text-muted-foreground/70 leading-none tabular-nums">{time}</span>
-          <MessageStatus status={msg.status} isFromMe={fromMe} />
-        </span>
+          {textContent && (
+            <span className="text-[14.2px] leading-[19px] whitespace-pre-wrap break-words">{formatWhatsAppText(textContent)}</span>
+          )}
+
+          {/* Time + Status */}
+          <span className="float-right ml-2 mt-[3px] flex items-center gap-0.5 relative -bottom-0.5">
+            <span className="text-[11px] text-muted-foreground/70 leading-none tabular-nums">{time}</span>
+            <MessageStatus status={msg.status} isFromMe={fromMe} />
+          </span>
+        </div>
       </div>
     </div>
   );
@@ -245,6 +521,9 @@ function AttachMenu({ onSelect, onClose }: { onSelect: (type: string) => void; o
     { type: "image", icon: ImageIcon, label: "Fotos e Vídeos", color: "oklch(0.60 0.20 320)" },
     { type: "camera", icon: Camera, label: "Câmera", color: "oklch(0.55 0.20 350)" },
     { type: "document", icon: FileText, label: "Documento", color: "oklch(0.50 0.20 280)" },
+    { type: "location", icon: MapPin, label: "Localização", color: "oklch(0.55 0.18 145)" },
+    { type: "contact", icon: Contact, label: "Contato", color: "oklch(0.55 0.15 250)" },
+    { type: "poll", icon: BarChart3, label: "Enquete", color: "oklch(0.55 0.18 60)" },
   ];
 
   return (
@@ -335,6 +614,146 @@ function VoiceRecorder({ onSend, onCancel }: { onSend: (blob: Blob, duration: nu
   );
 }
 
+/* ─── Location Modal ─── */
+function LocationModal({ onSend, onClose }: { onSend: (lat: number, lng: number, name: string, address: string) => void; onClose: () => void }) {
+  const [name, setName] = useState("");
+  const [address, setAddress] = useState("");
+  const [lat, setLat] = useState("");
+  const [lng, setLng] = useState("");
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={onClose}>
+      <div className="bg-card rounded-xl shadow-2xl border border-border w-[400px] max-w-[90vw] p-5" onClick={e => e.stopPropagation()}>
+        <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+          <MapPin className="w-5 h-5 text-wa-tint" /> Enviar Localização
+        </h3>
+        <div className="space-y-3">
+          <input type="text" placeholder="Nome do local" value={name} onChange={e => setName(e.target.value)}
+            className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:border-wa-tint" />
+          <input type="text" placeholder="Endereço" value={address} onChange={e => setAddress(e.target.value)}
+            className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:border-wa-tint" />
+          <div className="flex gap-2">
+            <input type="text" placeholder="Latitude" value={lat} onChange={e => setLat(e.target.value)}
+              className="flex-1 px-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:border-wa-tint" />
+            <input type="text" placeholder="Longitude" value={lng} onChange={e => setLng(e.target.value)}
+              className="flex-1 px-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:border-wa-tint" />
+          </div>
+        </div>
+        <div className="flex justify-end gap-2 mt-4">
+          <button onClick={onClose} className="px-4 py-2 text-sm rounded-lg hover:bg-muted transition-colors">Cancelar</button>
+          <button onClick={() => { if (lat && lng && name) { onSend(parseFloat(lat), parseFloat(lng), name, address); onClose(); } else toast.error("Preencha latitude, longitude e nome"); }}
+            className="px-4 py-2 text-sm bg-wa-tint text-white rounded-lg hover:opacity-90 transition-colors">Enviar</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─── Contact Modal ─── */
+function ContactModal({ onSend, onClose }: { onSend: (contacts: Array<{ fullName: string; phoneNumber: string }>) => void; onClose: () => void }) {
+  const [fullName, setFullName] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={onClose}>
+      <div className="bg-card rounded-xl shadow-2xl border border-border w-[400px] max-w-[90vw] p-5" onClick={e => e.stopPropagation()}>
+        <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+          <Contact className="w-5 h-5 text-wa-tint" /> Enviar Contato
+        </h3>
+        <div className="space-y-3">
+          <input type="text" placeholder="Nome completo" value={fullName} onChange={e => setFullName(e.target.value)}
+            className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:border-wa-tint" />
+          <input type="text" placeholder="Número de telefone (ex: 5511999999999)" value={phoneNumber} onChange={e => setPhoneNumber(e.target.value)}
+            className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:border-wa-tint" />
+        </div>
+        <div className="flex justify-end gap-2 mt-4">
+          <button onClick={onClose} className="px-4 py-2 text-sm rounded-lg hover:bg-muted transition-colors">Cancelar</button>
+          <button onClick={() => { if (fullName && phoneNumber) { onSend([{ fullName, phoneNumber }]); onClose(); } else toast.error("Preencha nome e telefone"); }}
+            className="px-4 py-2 text-sm bg-wa-tint text-white rounded-lg hover:opacity-90 transition-colors">Enviar</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─── Poll Modal ─── */
+function PollModal({ onSend, onClose }: { onSend: (name: string, values: string[], selectableCount: number) => void; onClose: () => void }) {
+  const [question, setQuestion] = useState("");
+  const [options, setOptions] = useState(["", ""]);
+  const [multiSelect, setMultiSelect] = useState(false);
+
+  const addOption = () => { if (options.length < 12) setOptions([...options, ""]); };
+  const updateOption = (i: number, v: string) => { const o = [...options]; o[i] = v; setOptions(o); };
+  const removeOption = (i: number) => { if (options.length > 2) setOptions(options.filter((_, idx) => idx !== i)); };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={onClose}>
+      <div className="bg-card rounded-xl shadow-2xl border border-border w-[420px] max-w-[90vw] p-5" onClick={e => e.stopPropagation()}>
+        <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+          <BarChart3 className="w-5 h-5 text-wa-tint" /> Criar Enquete
+        </h3>
+        <div className="space-y-3">
+          <input type="text" placeholder="Pergunta da enquete" value={question} onChange={e => setQuestion(e.target.value)}
+            className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:border-wa-tint" />
+          <div className="space-y-2">
+            {options.map((opt, i) => (
+              <div key={i} className="flex items-center gap-2">
+                <input type="text" placeholder={`Opção ${i + 1}`} value={opt} onChange={e => updateOption(i, e.target.value)}
+                  className="flex-1 px-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:border-wa-tint" />
+                {options.length > 2 && (
+                  <button onClick={() => removeOption(i)} className="p-1 hover:bg-muted rounded transition-colors">
+                    <X className="w-4 h-4 text-muted-foreground" />
+                  </button>
+                )}
+              </div>
+            ))}
+            {options.length < 12 && (
+              <button onClick={addOption} className="text-sm text-wa-tint hover:underline">+ Adicionar opção</button>
+            )}
+          </div>
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={multiSelect} onChange={e => setMultiSelect(e.target.checked)} className="rounded" />
+            Permitir múltiplas respostas
+          </label>
+        </div>
+        <div className="flex justify-end gap-2 mt-4">
+          <button onClick={onClose} className="px-4 py-2 text-sm rounded-lg hover:bg-muted transition-colors">Cancelar</button>
+          <button onClick={() => {
+            const validOpts = options.filter(o => o.trim());
+            if (question.trim() && validOpts.length >= 2) {
+              onSend(question.trim(), validOpts, multiSelect ? validOpts.length : 1);
+              onClose();
+            } else toast.error("Preencha a pergunta e pelo menos 2 opções");
+          }}
+            className="px-4 py-2 text-sm bg-wa-tint text-white rounded-lg hover:opacity-90 transition-colors">Criar</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─── Edit Message Modal ─── */
+function EditMessageModal({ currentText, onSave, onClose }: { currentText: string; onSave: (newText: string) => void; onClose: () => void }) {
+  const [text, setText] = useState(currentText);
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={onClose}>
+      <div className="bg-card rounded-xl shadow-2xl border border-border w-[400px] max-w-[90vw] p-5" onClick={e => e.stopPropagation()}>
+        <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+          <Pencil className="w-5 h-5 text-wa-tint" /> Editar Mensagem
+        </h3>
+        <textarea value={text} onChange={e => setText(e.target.value)} rows={4}
+          className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:border-wa-tint resize-none" />
+        <div className="flex justify-end gap-2 mt-4">
+          <button onClick={onClose} className="px-4 py-2 text-sm rounded-lg hover:bg-muted transition-colors">Cancelar</button>
+          <button onClick={() => { if (text.trim()) { onSave(text.trim()); onClose(); } }}
+            className="px-4 py-2 text-sm bg-wa-tint text-white rounded-lg hover:opacity-90 transition-colors">Salvar</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ═══════════════════════════════════════════════════════
    MAIN CHAT COMPONENT
    ═══════════════════════════════════════════════════════ */
@@ -348,11 +767,19 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
   const [showScrollBtn, setShowScrollBtn] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [localStatusUpdates, setLocalStatusUpdates] = useState<Record<string, string>>({});
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [replyTarget, setReplyTarget] = useState<ReplyTarget | null>(null);
+  const [showLocationModal, setShowLocationModal] = useState(false);
+  const [showContactModal, setShowContactModal] = useState(false);
+  const [showPollModal, setShowPollModal] = useState(false);
+  const [editTarget, setEditTarget] = useState<{ messageId: string; text: string } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const docInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const presenceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const emojiPickerRef = useRef<HTMLDivElement>(null);
 
   // Queries
   const messagesQ = trpc.whatsapp.messagesByContact.useQuery(
@@ -365,11 +792,92 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
     onError: () => toast.error("Erro ao enviar mensagem"),
   });
 
+  const sendTextWithQuote = trpc.whatsapp.sendTextWithQuote.useMutation({
+    onSuccess: () => { messagesQ.refetch(); setReplyTarget(null); },
+    onError: () => toast.error("Erro ao enviar resposta"),
+  });
+
   const uploadMedia = trpc.whatsapp.uploadMedia.useMutation();
   const sendMedia = trpc.whatsapp.sendMedia.useMutation({
     onSuccess: () => messagesQ.refetch(),
     onError: () => toast.error("Erro ao enviar mídia"),
   });
+
+  const sendReaction = trpc.whatsapp.sendReaction.useMutation({
+    onSuccess: () => toast.success("Reação enviada"),
+    onError: () => toast.error("Erro ao enviar reação"),
+  });
+
+  const deleteMessage = trpc.whatsapp.deleteMessage.useMutation({
+    onSuccess: () => { messagesQ.refetch(); toast.success("Mensagem apagada"); },
+    onError: () => toast.error("Erro ao apagar mensagem"),
+  });
+
+  const editMessage = trpc.whatsapp.editMessage.useMutation({
+    onSuccess: () => { messagesQ.refetch(); toast.success("Mensagem editada"); },
+    onError: () => toast.error("Erro ao editar mensagem"),
+  });
+
+  const sendPresenceMut = trpc.whatsapp.sendPresence.useMutation();
+
+  const sendLocationMut = trpc.whatsapp.sendLocation.useMutation({
+    onSuccess: () => { messagesQ.refetch(); toast.success("Localização enviada"); },
+    onError: () => toast.error("Erro ao enviar localização"),
+  });
+
+  const sendContactMut = trpc.whatsapp.sendContact.useMutation({
+    onSuccess: () => { messagesQ.refetch(); toast.success("Contato enviado"); },
+    onError: () => toast.error("Erro ao enviar contato"),
+  });
+
+  const sendPollMut = trpc.whatsapp.sendPoll.useMutation({
+    onSuccess: () => { messagesQ.refetch(); toast.success("Enquete enviada"); },
+    onError: () => toast.error("Erro ao enviar enquete"),
+  });
+
+  // ─── Notification sound ───
+  const notificationAudioRef = useRef<HTMLAudioElement | null>(null);
+  useEffect(() => {
+    notificationAudioRef.current = new Audio("data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgkKuunWI2M1qIo6CWYDg1WIWdmpOBPDhXhZqXkYA+OFeFmZaQgD84V4WZlpCAPzhXhZmWkIA/OFeFmZaQgD84V4WZlpCAPzhX");
+  }, []);
+
+  // ─── Sound on new message ───
+  const prevMsgCountRef = useRef(0);
+  useEffect(() => {
+    if (!messagesQ.data) return;
+    const currentCount = messagesQ.data.length;
+    if (prevMsgCountRef.current > 0 && currentCount > prevMsgCountRef.current) {
+      const lastMsg = messagesQ.data[0]; // newest first
+      if (lastMsg && !lastMsg.fromMe) {
+        notificationAudioRef.current?.play().catch(() => {});
+      }
+    }
+    prevMsgCountRef.current = currentCount;
+  }, [messagesQ.data?.length]);
+
+  // ─── Presence: send "composing" while typing ───
+  const sendPresenceComposing = useCallback(() => {
+    const number = contact?.phone?.replace(/\D/g, "") || "";
+    if (!number || !sessionId) return;
+    sendPresenceMut.mutate({ sessionId, number, presence: "composing" });
+  }, [sessionId, contact]);
+
+  const sendPresencePaused = useCallback(() => {
+    const number = contact?.phone?.replace(/\D/g, "") || "";
+    if (!number || !sessionId) return;
+    sendPresenceMut.mutate({ sessionId, number, presence: "paused" });
+  }, [sessionId, contact]);
+
+  // Close emoji picker on outside click
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (emojiPickerRef.current && !emojiPickerRef.current.contains(e.target as Node)) {
+        setShowEmojiPicker(false);
+      }
+    };
+    if (showEmojiPicker) document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [showEmojiPicker]);
 
   // Scroll
   const scrollToBottom = useCallback((smooth = true) => {
@@ -419,15 +927,28 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
     }
   }, [messagesQ.data?.length]);
 
-  // Send text
+  // Send text (with or without reply)
   const handleSend = useCallback(() => {
     if (!messageText.trim() || isSending) return;
     const number = contact?.phone?.replace(/\D/g, "") || "";
     if (!number) return;
-    sendMessage.mutate({ sessionId, number, message: messageText.trim() });
+
+    if (replyTarget) {
+      sendTextWithQuote.mutate({
+        sessionId, number,
+        message: messageText.trim(),
+        quotedMessageId: replyTarget.messageId,
+        quotedText: replyTarget.content,
+      });
+    } else {
+      sendMessage.mutate({ sessionId, number, message: messageText.trim() });
+    }
     setMessageText("");
+    setReplyTarget(null);
     if (textareaRef.current) textareaRef.current.style.height = "42px";
-  }, [messageText, sessionId, contact, isSending]);
+    // Send paused presence
+    sendPresencePaused();
+  }, [messageText, sessionId, contact, isSending, replyTarget]);
 
   // File uploads
   const handleFileSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -487,6 +1008,9 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
   const handleAttachSelect = useCallback((type: string) => {
     if (type === "image" || type === "camera") fileInputRef.current?.click();
     else if (type === "document") docInputRef.current?.click();
+    else if (type === "location") setShowLocationModal(true);
+    else if (type === "contact") setShowContactModal(true);
+    else if (type === "poll") setShowPollModal(true);
   }, []);
 
   const handleTextareaChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -494,7 +1018,73 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
     const el = e.target;
     el.style.height = "42px";
     el.style.height = Math.min(el.scrollHeight, 140) + "px";
+
+    // Send composing presence (debounced)
+    if (presenceTimerRef.current) clearTimeout(presenceTimerRef.current);
+    sendPresenceComposing();
+    presenceTimerRef.current = setTimeout(() => sendPresencePaused(), 3000);
+  }, [sendPresenceComposing, sendPresencePaused]);
+
+  // Emoji select
+  const handleEmojiSelect = useCallback((emoji: any) => {
+    setMessageText(prev => prev + emoji.native);
+    setShowEmojiPicker(false);
+    textareaRef.current?.focus();
   }, []);
+
+  // Reaction handler
+  const handleReact = useCallback((key: { remoteJid: string; fromMe: boolean; id: string }, emoji: string) => {
+    sendReaction.mutate({ sessionId, key, reaction: emoji });
+  }, [sessionId]);
+
+  // Delete handler
+  const handleDelete = useCallback((rJid: string, messageId: string, fromMe: boolean) => {
+    if (confirm("Apagar esta mensagem para todos?")) {
+      deleteMessage.mutate({ sessionId, remoteJid: rJid, messageId, fromMe });
+    }
+  }, [sessionId]);
+
+  // Edit handler
+  const handleEditStart = useCallback((messageId: string, currentText: string) => {
+    setEditTarget({ messageId, text: currentText });
+  }, []);
+
+  const handleEditSave = useCallback((newText: string) => {
+    if (!editTarget) return;
+    const number = contact?.phone?.replace(/\D/g, "") || "";
+    if (!number) return;
+    editMessage.mutate({ sessionId, number, messageId: editTarget.messageId, newText });
+    setEditTarget(null);
+  }, [editTarget, sessionId, contact]);
+
+  // Forward handler
+  const handleForward = useCallback((msg: Message) => {
+    // Copy content to clipboard and show toast
+    const content = msg.content || msg.mediaUrl || "";
+    navigator.clipboard.writeText(content);
+    toast.success("Conteúdo copiado. Cole em outra conversa para encaminhar.");
+  }, []);
+
+  // Location send
+  const handleLocationSend = useCallback((lat: number, lng: number, name: string, address: string) => {
+    const number = contact?.phone?.replace(/\D/g, "") || "";
+    if (!number) return;
+    sendLocationMut.mutate({ sessionId, number, latitude: lat, longitude: lng, name, address });
+  }, [sessionId, contact]);
+
+  // Contact send
+  const handleContactSend = useCallback((contacts: Array<{ fullName: string; phoneNumber: string }>) => {
+    const number = contact?.phone?.replace(/\D/g, "") || "";
+    if (!number) return;
+    sendContactMut.mutate({ sessionId, number, contacts });
+  }, [sessionId, contact]);
+
+  // Poll send
+  const handlePollSend = useCallback((name: string, values: string[], selectableCount: number) => {
+    const number = contact?.phone?.replace(/\D/g, "") || "";
+    if (!number) return;
+    sendPollMut.mutate({ sessionId, number, name, values, selectableCount });
+  }, [sessionId, contact]);
 
   // Group messages by date
   const groupedMessages = useMemo(() => {
@@ -516,6 +1106,11 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
       groups[groups.length - 1].messages.push(msg);
     }
     return groups;
+  }, [messagesQ.data]);
+
+  // Flat messages for quote lookup
+  const allMessages = useMemo(() => {
+    return [...(messagesQ.data || [])].reverse();
   }, [messagesQ.data]);
 
   return (
@@ -682,7 +1277,20 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
                   const updatedMsg = msg.messageId && localStatusUpdates[msg.messageId]
                     ? { ...msg, status: localStatusUpdates[msg.messageId] }
                     : msg;
-                  return <MessageBubble key={msg.id} msg={updatedMsg} isFirst={isFirst} isLast={isLast} />;
+                  return (
+                    <MessageBubble
+                      key={msg.id}
+                      msg={updatedMsg}
+                      isFirst={isFirst}
+                      isLast={isLast}
+                      allMessages={allMessages}
+                      onReply={setReplyTarget}
+                      onReact={handleReact}
+                      onDelete={handleDelete}
+                      onEdit={handleEditStart}
+                      onForward={handleForward}
+                    />
+                  );
                 })}
               </div>
             ))
@@ -699,15 +1307,39 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
         )}
       </div>
 
+      {/* ─── Reply Preview ─── */}
+      {replyTarget && (
+        <div className="bg-wa-panel-header border-t border-wa-divider px-4 py-2 flex items-center gap-3 z-10 shrink-0">
+          <div className="flex-1 bg-foreground/5 border-l-4 border-wa-tint rounded-md px-3 py-2">
+            <p className="text-[11px] font-semibold text-wa-tint">{replyTarget.fromMe ? "Você" : contact?.name || "Contato"}</p>
+            <p className="text-[12px] text-muted-foreground truncate">{replyTarget.content}</p>
+          </div>
+          <button onClick={() => setReplyTarget(null)} className="p-1 hover:bg-muted rounded-full transition-colors">
+            <X className="w-4 h-4 text-muted-foreground" />
+          </button>
+        </div>
+      )}
+
       {/* ─── Input Area ─── */}
       <div className="bg-wa-panel-header border-t border-wa-divider px-3 py-[5px] z-10 shrink-0">
         {isRecording ? (
           <VoiceRecorder onSend={handleVoiceSend} onCancel={() => setIsRecording(false)} />
         ) : (
           <div className="flex items-end gap-1.5">
-            <button className="w-[42px] h-[42px] flex items-center justify-center hover:bg-wa-hover rounded-full transition-colors shrink-0 self-end">
-              <Smile className="w-[24px] h-[24px] text-muted-foreground" />
-            </button>
+            {/* Emoji picker */}
+            <div className="relative shrink-0 self-end" ref={emojiPickerRef}>
+              <button onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                className={`w-[42px] h-[42px] flex items-center justify-center rounded-full transition-colors ${showEmojiPicker ? "bg-wa-hover" : "hover:bg-wa-hover"}`}>
+                <Smile className="w-[24px] h-[24px] text-muted-foreground" />
+              </button>
+              {showEmojiPicker && (
+                <div className="absolute bottom-full left-0 mb-2 z-50">
+                  <Picker data={data} onEmojiSelect={handleEmojiSelect} theme="light" previewPosition="none" skinTonePosition="none" locale="pt" />
+                </div>
+              )}
+            </div>
+
+            {/* Attach menu */}
             <div className="relative shrink-0 self-end">
               <button onClick={() => setShowAttach(!showAttach)}
                 className={`w-[42px] h-[42px] flex items-center justify-center rounded-full transition-colors ${showAttach ? "bg-wa-hover" : "hover:bg-wa-hover"}`}>
@@ -715,6 +1347,8 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
               </button>
               {showAttach && <AttachMenu onSelect={handleAttachSelect} onClose={() => setShowAttach(false)} />}
             </div>
+
+            {/* Text input */}
             <div className="flex-1 relative">
               <textarea
                 ref={textareaRef} value={messageText} onChange={handleTextareaChange}
@@ -724,13 +1358,15 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
                 onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
               />
             </div>
+
+            {/* Send / Mic button */}
             {messageText.trim() ? (
-              <button onClick={handleSend} disabled={sendMessage.isPending || isSending}
+              <button onClick={handleSend} disabled={sendMessage.isPending || sendTextWithQuote.isPending || isSending}
                 className="w-[42px] h-[42px] flex items-center justify-center bg-wa-tint hover:opacity-90 rounded-full transition-all shrink-0 self-end disabled:opacity-50">
-                {sendMessage.isPending || isSending ? <Loader2 className="w-5 h-5 text-white animate-spin" /> : <Send className="w-[20px] h-[20px] text-white" />}
+                {sendMessage.isPending || sendTextWithQuote.isPending || isSending ? <Loader2 className="w-5 h-5 text-white animate-spin" /> : <Send className="w-[20px] h-[20px] text-white" />}
               </button>
             ) : (
-              <button onClick={() => setIsRecording(true)}
+              <button onClick={() => { setIsRecording(true); sendPresenceMut.mutate({ sessionId, number: contact?.phone?.replace(/\D/g, "") || "", presence: "recording" }); }}
                 className="w-[42px] h-[42px] flex items-center justify-center hover:bg-wa-hover rounded-full transition-colors shrink-0 self-end">
                 <Mic className="w-[24px] h-[24px] text-muted-foreground" />
               </button>
@@ -742,6 +1378,12 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
       {/* Hidden file inputs */}
       <input ref={fileInputRef} type="file" accept="image/*,video/*" multiple className="hidden" onChange={handleFileSelect} />
       <input ref={docInputRef} type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip,.rar" multiple className="hidden" onChange={handleDocSelect} />
+
+      {/* Modals */}
+      {showLocationModal && <LocationModal onSend={handleLocationSend} onClose={() => setShowLocationModal(false)} />}
+      {showContactModal && <ContactModal onSend={handleContactSend} onClose={() => setShowContactModal(false)} />}
+      {showPollModal && <PollModal onSend={handlePollSend} onClose={() => setShowPollModal(false)} />}
+      {editTarget && <EditMessageModal currentText={editTarget.text} onSave={handleEditSave} onClose={() => setEditTarget(null)} />}
 
       {/* Sending overlay */}
       {isSending && (
