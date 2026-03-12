@@ -80,6 +80,11 @@ import {
   getUserPreference,
   setUserPreference,
   getAllUserPreferences,
+  getDashboardWhatsAppMetrics,
+  getDashboardDealsTimeline,
+  getDashboardConversionRates,
+  getDashboardFunnelData,
+  getDashboardAllPipelines,
 } from "./db";
 import { storagePut } from "./storage";
 import { nanoid } from "nanoid";
@@ -116,13 +121,33 @@ import { eq, and, desc, sql } from "drizzle-orm";
 export const appRouter = router({
   system: systemRouter,
   auth: router({
-    me: publicProcedure.query((opts) => {
+    me: publicProcedure.query(async (opts) => {
       if (opts.ctx.saasUser && opts.ctx.user) {
         return {
           ...opts.ctx.user,
           tenantId: opts.ctx.saasUser.tenantId,
           saasEmail: opts.ctx.saasUser.email,
         };
+      }
+      // For Manus OAuth users (owner), try to find their CRM user to get tenantId
+      if (opts.ctx.user && !opts.ctx.saasUser) {
+        try {
+          const db = await getDb();
+          if (db && opts.ctx.user.email) {
+            const [crmUser] = await db.execute(
+              sql`SELECT id, tenantId FROM crm_users WHERE email = ${opts.ctx.user.email} LIMIT 1`
+            );
+            const row = (crmUser as unknown as any[])[0];
+            if (row?.tenantId) {
+              return {
+                ...opts.ctx.user,
+                tenantId: Number(row.tenantId),
+              };
+            }
+          }
+        } catch (e) {
+          // Fallback to user without tenantId
+        }
       }
       return opts.ctx.user;
     }),
@@ -796,6 +821,31 @@ export const appRouter = router({
       .input(z.object({ tenantId: z.number(), limit: z.number().optional() }))
       .query(async ({ input, ctx }) => {
         return getUpcomingTasks(input.tenantId, ctx.user?.id, input.limit);
+      }),
+    whatsappMetrics: protectedProcedure
+      .input(z.object({ tenantId: z.number() }))
+      .query(async ({ input }) => {
+        return getDashboardWhatsAppMetrics(input.tenantId);
+      }),
+    dealsTimeline: protectedProcedure
+      .input(z.object({ tenantId: z.number(), days: z.number().optional() }))
+      .query(async ({ input }) => {
+        return getDashboardDealsTimeline(input.tenantId, input.days);
+      }),
+    conversionRates: protectedProcedure
+      .input(z.object({ tenantId: z.number() }))
+      .query(async ({ input }) => {
+        return getDashboardConversionRates(input.tenantId);
+      }),
+    funnelData: protectedProcedure
+      .input(z.object({ tenantId: z.number(), pipelineId: z.number().optional() }))
+      .query(async ({ input }) => {
+        return getDashboardFunnelData(input.tenantId, input.pipelineId);
+      }),
+    allPipelines: protectedProcedure
+      .input(z.object({ tenantId: z.number() }))
+      .query(async ({ input }) => {
+        return getDashboardAllPipelines(input.tenantId);
       }),
   }),
 

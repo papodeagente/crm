@@ -2473,3 +2473,18 @@
 ## Correções Inbox (Mar 13 - v15)
 - [x] BUG: Contato com nome salvo no WhatsApp aparece como número (+5511993839734) na lista de conversas e no header do chat — FIX: getDisplayName agora verifica se o nome CRM é real (não apenas número) antes de usá-lo; selectedContact usa displayName em vez do nome CRM bruto; resolveContact atualiza nome CRM quando pushName real está disponível; 294 contatos CRM atualizados com nomes reais do WhatsApp (212 via wa_conversations + 82 via messages)
 - [x] BUG: Imagem recebida de contato aparece quebrada (ícone "🖼Imagem") — FIX: URLs temporárias do WhatsApp (mmg.whatsapp.net) agora são filtradas em 5 pontos: 1) Frontend trata como sem URL e usa MediaLoader; 2) Backend getMediaUrl re-baixa para S3; 3) handleIncomingMessage baixa para S3 mesmo com URL do WA; 4) quickSync não salva URLs temporárias; 5) deepSync não salva URLs temporárias
+
+## Dashboard Redesign (Mar 13 - v17)
+- [x] Redesign Home dashboard com tema escuro moderno inspirado nas referências
+- [x] KPI cards: negociações ativas, contatos, viagens, tarefas pendentes, WhatsApp
+- [x] Funil de vendas visual estiloso com barras coloridas e dados reais dos pipelines
+- [x] Gráfico de mensagens WhatsApp por dia (área chart com gradientes)
+- [x] Taxa de conversão com donut chart animado (ganhas/perdidas/em aberto)
+- [x] Métricas de atendimento WhatsApp: enviadas/recebidas/conversas/não lidas
+- [x] Foco do Dia: tarefas do dia e atrasadas
+- [x] Etapas do Pipeline: barras de progresso com cores por etapa
+- [x] Ações Rápidas: Nova Negociação, Novo Contato, Enviar Mensagem, Criar Proposta
+- [x] Backend: 5 novas procedures tRPC (whatsappMetrics, funnelData, conversionRates, allPipelines, dashboardTasks)
+- [x] Filtro por status de negociação (em andamento/ganho/perdido/todos)
+- [x] Ticket médio e origens de leads na taxa de conversão
+- [x] Resolução de tenantId para owner via Manus OAuth (busca CRM user)

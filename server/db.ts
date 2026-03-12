@@ -1893,3 +1893,200 @@ export async function getWhatsAppUnreadByContact(tenantId: number): Promise<Reco
   }
   return result;
 }
+
+
+// ─── Enhanced Dashboard v2 ───
+
+export async function getDashboardWhatsAppMetrics(tenantId: number) {
+  const db = await getDb();
+  if (!db) return {
+    totalMessages: 0, sentMessages: 0, receivedMessages: 0,
+    totalConversations: 0, unreadConversations: 0,
+    messagesByDay: [] as { date: string; sent: number; received: number }[],
+    avgResponseTimeMinutes: 0,
+  };
+
+  const now = new Date();
+  const fourteenDaysAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
+
+  const [totalResult] = await db.execute(sql`
+    SELECT
+      COUNT(*) as totalMessages,
+      SUM(CASE WHEN fromMe = 1 THEN 1 ELSE 0 END) as sentMessages,
+      SUM(CASE WHEN fromMe = 0 THEN 1 ELSE 0 END) as receivedMessages
+    FROM ${messages}
+    WHERE tenantId = ${tenantId}
+  `);
+
+  const [convResult] = await db.execute(sql`
+    SELECT
+      COUNT(*) as totalConversations,
+      SUM(CASE WHEN unreadCount > 0 THEN 1 ELSE 0 END) as unreadConversations
+    FROM ${waConversations}
+    WHERE tenantId = ${tenantId}
+  `);
+
+  const [msgsByDay] = await db.execute(sql`
+    SELECT
+      DATE(timestamp) as dt,
+      SUM(CASE WHEN fromMe = 1 THEN 1 ELSE 0 END) as sent,
+      SUM(CASE WHEN fromMe = 0 THEN 1 ELSE 0 END) as received
+    FROM ${messages}
+    WHERE tenantId = ${tenantId} AND timestamp >= ${fourteenDaysAgo}
+    GROUP BY DATE(timestamp)
+    ORDER BY dt ASC
+  `);
+
+  const totals = (totalResult as unknown as any[])[0] || {};
+  const convTotals = (convResult as unknown as any[])[0] || {};
+
+  return {
+    totalMessages: Number(totals.totalMessages) || 0,
+    sentMessages: Number(totals.sentMessages) || 0,
+    receivedMessages: Number(totals.receivedMessages) || 0,
+    totalConversations: Number(convTotals.totalConversations) || 0,
+    unreadConversations: Number(convTotals.unreadConversations) || 0,
+    messagesByDay: (msgsByDay as unknown as any[]).map((r: any) => ({
+      date: new Date(r.dt).toISOString().split("T")[0],
+      sent: Number(r.sent) || 0,
+      received: Number(r.received) || 0,
+    })),
+    avgResponseTimeMinutes: 0,
+  };
+}
+
+export async function getDashboardDealsTimeline(tenantId: number, days = 30) {
+  const db = await getDb();
+  if (!db) return [];
+
+  const startDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+
+  const [rows] = await db.execute(sql`
+    SELECT
+      DATE(createdAt) as dt,
+      COUNT(*) as newDeals,
+      SUM(CASE WHEN status = 'won' THEN 1 ELSE 0 END) as wonDeals,
+      SUM(CASE WHEN status = 'lost' THEN 1 ELSE 0 END) as lostDeals,
+      COALESCE(SUM(valueCents), 0) as totalValueCents,
+      COALESCE(SUM(CASE WHEN status = 'won' THEN valueCents ELSE 0 END), 0) as wonValueCents
+    FROM deals
+    WHERE tenantId = ${tenantId} AND deletedAt IS NULL AND createdAt >= ${startDate}
+    GROUP BY DATE(createdAt)
+    ORDER BY dt ASC
+  `);
+
+  return (rows as unknown as any[]).map((r: any) => ({
+    date: new Date(r.dt).toISOString().split("T")[0],
+    newDeals: Number(r.newDeals) || 0,
+    wonDeals: Number(r.wonDeals) || 0,
+    lostDeals: Number(r.lostDeals) || 0,
+    totalValueCents: Number(r.totalValueCents) || 0,
+    wonValueCents: Number(r.wonValueCents) || 0,
+  }));
+}
+
+export async function getDashboardConversionRates(tenantId: number) {
+  const db = await getDb();
+  if (!db) return { totalDeals: 0, wonDeals: 0, lostDeals: 0, openDeals: 0, conversionRate: 0, avgDealValueCents: 0, topLeadSources: [] as { source: string; count: number }[] };
+
+  const [statusResult] = await db.execute(sql`
+    SELECT
+      COUNT(*) as totalDeals,
+      SUM(CASE WHEN status = 'won' THEN 1 ELSE 0 END) as wonDeals,
+      SUM(CASE WHEN status = 'lost' THEN 1 ELSE 0 END) as lostDeals,
+      SUM(CASE WHEN status = 'open' THEN 1 ELSE 0 END) as openDeals,
+      COALESCE(AVG(CASE WHEN status = 'won' THEN valueCents END), 0) as avgWonValueCents,
+      COALESCE(AVG(valueCents), 0) as avgDealValueCents
+    FROM deals
+    WHERE tenantId = ${tenantId} AND deletedAt IS NULL
+  `);
+
+  const [leadSources] = await db.execute(sql`
+    SELECT
+      COALESCE(leadSource, 'direto') as source,
+      COUNT(*) as cnt
+    FROM deals
+    WHERE tenantId = ${tenantId} AND deletedAt IS NULL
+    GROUP BY leadSource
+    ORDER BY cnt DESC
+    LIMIT 5
+  `);
+
+  const row = (statusResult as unknown as any[])[0] || {};
+  const total = Number(row.totalDeals) || 0;
+  const won = Number(row.wonDeals) || 0;
+  const closed = won + (Number(row.lostDeals) || 0);
+
+  return {
+    totalDeals: total,
+    wonDeals: won,
+    lostDeals: Number(row.lostDeals) || 0,
+    openDeals: Number(row.openDeals) || 0,
+    conversionRate: closed > 0 ? Math.round((won / closed) * 100) : 0,
+    avgDealValueCents: Math.round(Number(row.avgDealValueCents) || 0),
+    topLeadSources: (leadSources as unknown as any[]).map((r: any) => ({
+      source: String(r.source),
+      count: Number(r.cnt) || 0,
+    })),
+  };
+}
+
+export async function getDashboardFunnelData(tenantId: number, pipelineId?: number) {
+  const db = await getDb();
+  if (!db) return { pipelineName: "", stages: [] as any[] };
+
+  // Get the pipeline
+  const pipelineFilter = pipelineId
+    ? sql`AND p.id = ${pipelineId}`
+    : sql``;
+
+  const [pipelineRows] = await db.execute(sql`
+    SELECT p.id, p.name FROM pipelines p
+    WHERE p.tenantId = ${tenantId} ${pipelineFilter}
+    ORDER BY p.id ASC
+    LIMIT 1
+  `);
+
+  const pipeline = (pipelineRows as unknown as any[])[0];
+  if (!pipeline) return { pipelineName: "", stages: [] };
+
+  const [stageRows] = await db.execute(sql`
+    SELECT
+      ps.id, ps.name, ps.color, ps.orderIndex, ps.isWon, ps.isLost,
+      COUNT(d.id) as dealCount,
+      COALESCE(SUM(d.valueCents), 0) as totalValueCents
+    FROM pipeline_stages ps
+    LEFT JOIN deals d ON d.stageId = ps.id AND d.tenantId = ${tenantId} AND d.deletedAt IS NULL AND d.status = 'open'
+    WHERE ps.pipelineId = ${pipeline.id} AND ps.tenantId = ${tenantId}
+    GROUP BY ps.id, ps.name, ps.color, ps.orderIndex, ps.isWon, ps.isLost
+    ORDER BY ps.orderIndex ASC
+  `);
+
+  return {
+    pipelineName: String(pipeline.name),
+    stages: (stageRows as unknown as any[]).map((r: any) => ({
+      id: Number(r.id),
+      name: String(r.name),
+      color: r.color ? String(r.color) : null,
+      orderIndex: Number(r.orderIndex),
+      isWon: Boolean(Number(r.isWon)),
+      isLost: Boolean(Number(r.isLost)),
+      dealCount: Number(r.dealCount) || 0,
+      totalValueCents: Number(r.totalValueCents) || 0,
+    })),
+  };
+}
+
+export async function getDashboardAllPipelines(tenantId: number) {
+  const db = await getDb();
+  if (!db) return [];
+
+  const [rows] = await db.execute(sql`
+    SELECT id, name FROM pipelines WHERE tenantId = ${tenantId} ORDER BY id ASC
+  `);
+
+  return (rows as unknown as any[]).map((r: any) => ({
+    id: Number(r.id),
+    name: String(r.name),
+  }));
+}
