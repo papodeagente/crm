@@ -208,23 +208,29 @@ function MediaLoader({ sessionId, messageId, messageType, mediaDuration, isVoice
   const isDocument = messageType === "documentMessage";
   const isSticker = messageType === "stickerMessage";
 
+  const [unavailable, setUnavailable] = useState(false);
+
   const handleLoad = useCallback(async () => {
-    if (loading || mediaUrl) return;
+    if (loading || mediaUrl || unavailable) return;
     setLoading(true);
     setError(false);
     try {
       const result = await getMediaUrlMut.mutateAsync({ sessionId, messageId });
-      setMediaUrl(result.url);
+      if (result.unavailable || !result.url) {
+        setUnavailable(true);
+      } else {
+        setMediaUrl(result.url);
+      }
     } catch {
       setError(true);
     } finally {
       setLoading(false);
     }
-  }, [sessionId, messageId, loading, mediaUrl]);
+  }, [sessionId, messageId, loading, mediaUrl, unavailable]);
 
   // Auto-load for images, stickers, and audio messages
   useEffect(() => {
-    if ((isAudio || isImage || isSticker || isVideo) && !mediaUrl && !loading && !error) {
+    if ((isAudio || isImage || isSticker || isVideo) && !mediaUrl && !loading && !error && !unavailable) {
       handleLoad();
     }
   }, [isAudio, isImage, isSticker, isVideo]);
@@ -263,11 +269,28 @@ function MediaLoader({ sessionId, messageId, messageType, mediaDuration, isVoice
     );
   }
 
+  if (unavailable) {
+    return (
+      <div className="flex items-center gap-2 p-2 -mx-0.5 rounded-md bg-foreground/5 mb-1 min-w-[160px]">
+        {isAudio ? <Mic className="w-4 h-4 text-muted-foreground/60" /> :
+         isImage ? <ImageIcon className="w-4 h-4 text-muted-foreground/60" /> :
+         isVideo ? <Play className="w-4 h-4 text-muted-foreground/60" /> :
+         isDocument ? <FileText className="w-4 h-4 text-muted-foreground/60" /> :
+         <Download className="w-4 h-4 text-muted-foreground/60" />}
+        <span className="text-xs text-muted-foreground/60 italic">
+          {isAudio ? `Áudio${mediaDuration ? ` (${Math.floor(mediaDuration / 60)}:${(mediaDuration % 60).toString().padStart(2, "0")})` : ""}` :
+           isImage ? "Imagem" : isVideo ? "Vídeo" : isDocument ? (mediaFileName || "Documento") : "Mídia"}
+          {" "}— expirado
+        </span>
+      </div>
+    );
+  }
+
   if (error) {
     return (
       <button onClick={handleLoad} className="flex items-center gap-2 p-2 -mx-0.5 rounded-md bg-foreground/5 hover:bg-foreground/10 transition-colors mb-1 min-w-[200px]">
         <Download className="w-5 h-5 text-muted-foreground" />
-        <span className="text-xs text-muted-foreground">Mídia indisponível. Toque para tentar novamente.</span>
+        <span className="text-xs text-muted-foreground">Erro ao carregar. Toque para tentar novamente.</span>
       </button>
     );
   }

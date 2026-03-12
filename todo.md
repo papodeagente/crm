@@ -2439,3 +2439,6 @@
 - [x] FIX: textContent agora extrai captions de imagens/vídeos em vez de esconder tudo ("[Imagem] Sunset" → "Sunset")
 - [x] FIX: Adicionados mais tipos ao HIDDEN_MSG_TYPES (groupInviteMessage, lottieStickerMessage, pollUpdateMessage, etc)
 - [x] FIX: pttMessage e ptvMessage reconhecidos como tipos de mídia válidos
+
+## Correções Inbox (Mar 12 - v8)
+- [x] BUG: Erro "Media not available" no MediaLoader — CAUSA RAIZ: Evolution API retorna erro para mídias antigas (expiradas no servidor). FIX: getMediaUrl agora retorna {unavailable:true} em vez de lançar erro; marca no DB (mediaMimeType='__unavailable__') para não tentar novamente; frontend mostra placeholder elegante "[tipo] — expirado" em vez de erro

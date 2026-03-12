@@ -608,18 +608,28 @@ export const appRouter = router({
         const { getBase64FromMediaMessage } = await import("./evolutionApi");
         const db = await getDb();
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
-        // Find the message to get its session's instanceName
         const { waMessages } = await import("../drizzle/schema");
         const [msg] = await db.select().from(waMessages)
           .where(and(eq(waMessages.sessionId, input.sessionId), eq(waMessages.messageId, input.messageId)))
           .limit(1);
         if (!msg) throw new TRPCError({ code: "NOT_FOUND", message: "Message not found" });
-        if (msg.mediaUrl) return { url: msg.mediaUrl, mimetype: msg.mediaMimeType };
+        // Already has media URL cached
+        if (msg.mediaUrl) return { url: msg.mediaUrl, mimetype: msg.mediaMimeType, unavailable: false };
+        // Already marked as unavailable - don't retry
+        if (msg.mediaUrl === null && msg.mediaMimeType === "__unavailable__") {
+          return { url: null, mimetype: null, unavailable: true };
+        }
         // Download from Evolution API - resolve the instanceName from the session
         const session = whatsappManager.getSession(input.sessionId);
         const instanceName = session?.instanceName || input.sessionId;
         const base64Data = await getBase64FromMediaMessage(instanceName, input.messageId);
-        if (!base64Data?.base64) throw new TRPCError({ code: "NOT_FOUND", message: "Media not available" });
+        if (!base64Data?.base64) {
+          // Mark as unavailable in DB so we don't keep retrying
+          await db.update(waMessages)
+            .set({ mediaMimeType: "__unavailable__" })
+            .where(eq(waMessages.id, msg.id));
+          return { url: null, mimetype: null, unavailable: true };
+        }
         // Upload to S3
         const ext = (base64Data.mimetype || "bin").split("/")[1]?.split(";")[0] || "bin";
         const fileKey = `whatsapp-media/${input.sessionId}/${nanoid()}.${ext}`;
@@ -629,7 +639,7 @@ export const appRouter = router({
         await db.update(waMessages)
           .set({ mediaUrl: url, mediaMimeType: base64Data.mimetype || null, mediaFileName: base64Data.fileName || null })
           .where(eq(waMessages.id, msg.id));
-        return { url, mimetype: base64Data.mimetype };
+        return { url, mimetype: base64Data.mimetype, unavailable: false };
       }),
     // WA Contacts map (LID ↔ Phone resolution)
     waContactsMap: protectedProcedure
