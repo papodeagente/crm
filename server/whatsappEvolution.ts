@@ -922,6 +922,16 @@ class WhatsAppEvolutionManager extends EventEmitter {
                 .limit(1);
 
               if (existing.length === 0) {
+                // Resolve status from Evolution API message data
+                let msgStatus = fromMe ? 'sent' : 'received';
+                const rawSt = lastMsg.status;
+                if (fromMe && typeof rawSt === 'number') {
+                  const stMap: Record<number, string> = { 0: 'error', 1: 'pending', 2: 'sent', 3: 'delivered', 4: 'read', 5: 'played' };
+                  msgStatus = stMap[rawSt] || 'sent';
+                } else if (fromMe && typeof rawSt === 'string') {
+                  const strMap: Record<string, string> = { 'ERROR': 'error', 'PENDING': 'pending', 'SENT': 'sent', 'SERVER_ACK': 'sent', 'DELIVERY_ACK': 'delivered', 'DELIVERED': 'delivered', 'READ': 'read', 'PLAYED': 'played' };
+                  msgStatus = strMap[rawSt.toUpperCase()] || rawSt.toLowerCase();
+                }
                 await db.insert(waMessages).values({
                   sessionId: session.sessionId,
                   tenantId: session.tenantId,
@@ -931,7 +941,7 @@ class WhatsAppEvolutionManager extends EventEmitter {
                   messageType,
                   content: content || null,
                   pushName: lastMsg.pushName || pushName || null,
-                  status: fromMe ? "sent" : "received",
+                  status: msgStatus,
                   timestamp: msgTimestamp,
                 });
               }
@@ -1912,6 +1922,21 @@ class WhatsAppEvolutionManager extends EventEmitter {
                 discoveredNames.set(remoteJid, pushName!);
               }
 
+              // Resolve status from Evolution API message data
+              let msgStatus = fromMe ? 'sent' : 'received';
+              const rawStatus = msg.status;
+              if (fromMe && typeof rawStatus === 'number') {
+                const statusMap: Record<number, string> = { 0: 'error', 1: 'pending', 2: 'sent', 3: 'delivered', 4: 'read', 5: 'played' };
+                msgStatus = statusMap[rawStatus] || 'sent';
+              } else if (fromMe && typeof rawStatus === 'string') {
+                const strMap: Record<string, string> = {
+                  'ERROR': 'error', 'PENDING': 'pending', 'SENT': 'sent',
+                  'SERVER_ACK': 'sent', 'DELIVERY_ACK': 'delivered', 'DELIVERED': 'delivered',
+                  'READ': 'read', 'PLAYED': 'played',
+                };
+                msgStatus = strMap[rawStatus.toUpperCase()] || rawStatus.toLowerCase();
+              }
+
               insertBatch.push({
                 sessionId: session.sessionId,
                 tenantId: session.tenantId,
@@ -1921,7 +1946,7 @@ class WhatsAppEvolutionManager extends EventEmitter {
                 messageType,
                 content: content || null,
                 pushName: pushName || null,
-                status: fromMe ? 'sent' : 'received',
+                status: msgStatus,
                 timestamp,
               });
 
@@ -2102,6 +2127,21 @@ class WhatsAppEvolutionManager extends EventEmitter {
                 discoveredNames.set(remoteJid, pushName!);
               }
 
+              // Resolve status from Evolution API message data
+              let msgStatus = fromMe ? 'sent' : 'received';
+              const rawStatus = msg.status;
+              if (fromMe && typeof rawStatus === 'number') {
+                const statusMap: Record<number, string> = { 0: 'error', 1: 'pending', 2: 'sent', 3: 'delivered', 4: 'read', 5: 'played' };
+                msgStatus = statusMap[rawStatus] || 'sent';
+              } else if (fromMe && typeof rawStatus === 'string') {
+                const strMap: Record<string, string> = {
+                  'ERROR': 'error', 'PENDING': 'pending', 'SENT': 'sent',
+                  'SERVER_ACK': 'sent', 'DELIVERY_ACK': 'delivered', 'DELIVERED': 'delivered',
+                  'READ': 'read', 'PLAYED': 'played',
+                };
+                msgStatus = strMap[rawStatus.toUpperCase()] || rawStatus.toLowerCase();
+              }
+
               insertBatch.push({
                 sessionId: session.sessionId,
                 tenantId: session.tenantId,
@@ -2111,7 +2151,7 @@ class WhatsAppEvolutionManager extends EventEmitter {
                 messageType,
                 content: content || null,
                 pushName: pushName || null,
-                status: fromMe ? 'sent' : 'received',
+                status: msgStatus,
                 timestamp,
               });
 

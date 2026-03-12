@@ -2428,3 +2428,14 @@
 - [x] BUG: Áudios antigos não aparecem — MediaLoader com auto-load para áudios + getMediaUrl endpoint que baixa via getBase64FromMediaMessage e salva no S3
 - [x] BUG: Ticks de status não funcionam — handleMessageStatusUpdate corrigido para suportar AMBOS os formatos (v2 flat com string status + Baileys nested com numérico); webhook wildcard para webhookByEvents:true; createInstance atualizado com MESSAGES_UPDATE habilitado
 - [x] BUG: Mensagem em branco — Filtro de HIDDEN_TYPES (protocolMessage, reactionMessage, senderKeyDistribution, interactiveMessage, buttonsResponseMessage, etc) adicionado antes da renderização
+
+## Correções Inbox (Mar 12 - v7) — Tornar 100% funcional
+- [x] BUG: Áudio mostra "🎤 Áudio" em texto — CAUSA RAIZ: hasMedia=!!msg.mediaUrl era sempre false (99% das msgs têm mediaUrl=null). Corrigido: hasMedia agora detecta por messageType (isMediaType) + MediaLoader auto-carrega áudio/imagem/vídeo/sticker via getMediaUrl
+- [x] BUG: Imagens recebidas não aparecem — CAUSA RAIZ: mesma que áudio. Corrigido: MediaLoader agora auto-carrega imagens, vídeos e stickers automaticamente (não apenas áudio)
+- [x] BUG: Mensagem fantasma/bolha vazia — CAUSA RAIZ: mensagens de tipo templateMessage, interactiveMessage, buttonsResponseMessage etc tinham content "[Template]" que era filtrado mas a bolha ainda renderizava. Corrigido: filtro inteligente no groupedMessages que esconde mensagens sem conteúdo real (regex /^\[\w+\]$/) e mantém apenas tipos de mídia e tipos especiais
+- [x] Garantir que TODA mídia (áudio, imagem, vídeo, documento, sticker, ptvMessage) seja renderizada corretamente
+- [x] BUG: Ticks de status sempre "sent" — CAUSA RAIZ: deepSync e syncConversationsBackground salvavam status=fromMe?'sent':'received' sem ler o status real da Evolution API. Corrigido: agora lê msg.status (numérico ou string) e mapeia para sent/delivered/read/played
+- [x] FIX: getMediaUrl mutation usava sessionId como instanceName — Corrigido para resolver instanceName via whatsappManager.getSession()
+- [x] FIX: textContent agora extrai captions de imagens/vídeos em vez de esconder tudo ("[Imagem] Sunset" → "Sunset")
+- [x] FIX: Adicionados mais tipos ao HIDDEN_MSG_TYPES (groupInviteMessage, lottieStickerMessage, pollUpdateMessage, etc)
+- [x] FIX: pttMessage e ptvMessage reconhecidos como tipos de mídia válidos

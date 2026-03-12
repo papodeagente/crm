@@ -222,12 +222,12 @@ function MediaLoader({ sessionId, messageId, messageType, mediaDuration, isVoice
     }
   }, [sessionId, messageId, loading, mediaUrl]);
 
-  // Auto-load for audio messages
+  // Auto-load for images, stickers, and audio messages
   useEffect(() => {
-    if (isAudio && !mediaUrl && !loading && !error) {
+    if ((isAudio || isImage || isSticker || isVideo) && !mediaUrl && !loading && !error) {
       handleLoad();
     }
-  }, [isAudio]);
+  }, [isAudio, isImage, isSticker, isVideo]);
 
   if (mediaUrl) {
     if (isAudio) return <AudioPlayer src={mediaUrl} duration={mediaDuration} isVoice={isVoiceNote || false} />;
@@ -403,14 +403,18 @@ const MessageBubble = memo(({
   const time = formatTime(msg.timestamp || msg.createdAt);
 
   const isImage = msg.messageType === "imageMessage" || msg.messageType === "image" || msg.mediaMimeType?.startsWith("image/");
-  const isVideo = msg.messageType === "videoMessage" || msg.messageType === "video" || msg.mediaMimeType?.startsWith("video/");
-  const isAudio = msg.messageType === "audioMessage" || msg.messageType === "audio" || msg.mediaMimeType?.startsWith("audio/");
+  const isVideo = msg.messageType === "videoMessage" || msg.messageType === "video" || msg.messageType === "ptvMessage" || msg.mediaMimeType?.startsWith("video/");
+  const isAudio = msg.messageType === "audioMessage" || msg.messageType === "pttMessage" || msg.messageType === "audio" || msg.mediaMimeType?.startsWith("audio/");
   const isDocument = msg.messageType === "documentMessage" || msg.messageType === "document";
   const isSticker = msg.messageType === "stickerMessage";
   const isLocation = msg.messageType === "locationMessage";
   const isContact = msg.messageType === "contactMessage" || msg.messageType === "contactsArrayMessage";
-  const isPoll = msg.messageType === "pollCreationMessage";
-  const hasMedia = !!msg.mediaUrl;
+  const isPoll = msg.messageType === "pollCreationMessage" || msg.messageType === "pollCreationMessageV3";
+  const isPtv = msg.messageType === "ptvMessage"; // Video message (round video)
+  // Detect media by messageType (not just mediaUrl), since most messages have mediaUrl=null
+  const isMediaType = isImage || isVideo || isAudio || isDocument || isSticker;
+  const hasMediaUrl = !!msg.mediaUrl;
+  const hasMedia = hasMediaUrl || isMediaType;
 
   const bubbleBase = fromMe
     ? "bg-wa-bubble-out text-foreground"
@@ -480,51 +484,66 @@ const MessageBubble = memo(({
 
     if (!hasMedia) return null;
 
-    if (isImage && msg.mediaUrl) {
-      return (
-        <div className="relative -mx-1 -mt-0.5 mb-1 overflow-hidden rounded-md">
-          <img src={msg.mediaUrl} alt="Imagem" className="max-w-[300px] w-full h-auto object-cover cursor-pointer hover:opacity-95 transition-opacity" loading="lazy" onClick={() => window.open(msg.mediaUrl!, "_blank")} />
-        </div>
-      );
-    }
-    if (isVideo && msg.mediaUrl) {
-      return (
-        <div className="relative -mx-1 -mt-0.5 mb-1 overflow-hidden rounded-md">
-          <video src={msg.mediaUrl} controls className="max-w-[300px] w-full h-auto rounded-md" preload="metadata" />
-        </div>
-      );
-    }
-    if (isAudio && msg.mediaUrl) {
-      return <AudioPlayer src={msg.mediaUrl} duration={msg.mediaDuration} isVoice={msg.isVoiceNote || false} />;
-    }
-    if (isDocument && msg.mediaUrl) {
-      return (
-        <a href={msg.mediaUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 p-2 -mx-0.5 rounded-md bg-foreground/5 hover:bg-foreground/10 transition-colors mb-1">
-          <div className="w-10 h-10 rounded-lg bg-primary flex items-center justify-center shrink-0">
-            <FileText className="w-5 h-5 text-white" />
+    // If we have a mediaUrl, render the media directly
+    if (hasMediaUrl) {
+      if (isImage && msg.mediaUrl) {
+        return (
+          <div className="relative -mx-1 -mt-0.5 mb-1 overflow-hidden rounded-md">
+            <img src={msg.mediaUrl} alt="Imagem" className="max-w-[300px] w-full h-auto object-cover cursor-pointer hover:opacity-95 transition-opacity" loading="lazy" onClick={() => window.open(msg.mediaUrl!, "_blank")} />
           </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium truncate">{msg.mediaFileName || "Documento"}</p>
-            <p className="text-[11px] text-muted-foreground">{msg.mediaMimeType || "Arquivo"}</p>
+        );
+      }
+      if (isVideo && msg.mediaUrl) {
+        return (
+          <div className="relative -mx-1 -mt-0.5 mb-1 overflow-hidden rounded-md">
+            <video src={msg.mediaUrl} controls className="max-w-[300px] w-full h-auto rounded-md" preload="metadata" />
           </div>
-          <Download className="w-4 h-4 text-muted-foreground shrink-0" />
-        </a>
-      );
+        );
+      }
+      if (isAudio && msg.mediaUrl) {
+        return <AudioPlayer src={msg.mediaUrl} duration={msg.mediaDuration} isVoice={msg.isVoiceNote || false} />;
+      }
+      if (isDocument && msg.mediaUrl) {
+        return (
+          <a href={msg.mediaUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 p-2 -mx-0.5 rounded-md bg-foreground/5 hover:bg-foreground/10 transition-colors mb-1">
+            <div className="w-10 h-10 rounded-lg bg-primary flex items-center justify-center shrink-0">
+              <FileText className="w-5 h-5 text-white" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium truncate">{msg.mediaFileName || "Documento"}</p>
+              <p className="text-[11px] text-muted-foreground">{msg.mediaMimeType || "Arquivo"}</p>
+            </div>
+            <Download className="w-4 h-4 text-muted-foreground shrink-0" />
+          </a>
+        );
+      }
+      if (isSticker && msg.mediaUrl) {
+        return <img src={msg.mediaUrl} alt="Sticker" className="w-32 h-32 object-contain" loading="lazy" />;
+      }
     }
-    if (isSticker && msg.mediaUrl) {
-      return <img src={msg.mediaUrl} alt="Sticker" className="w-32 h-32 object-contain" loading="lazy" />;
-    }
-    // Fallback: media message without URL - offer to download on demand
-    if (hasMedia && !msg.mediaUrl && msg.messageId) {
+
+    // No mediaUrl but it's a media type message - use MediaLoader to download on demand
+    if (isMediaType && !hasMediaUrl && msg.messageId) {
       return <MediaLoader sessionId={msg.sessionId} messageId={msg.messageId} messageType={msg.messageType}
         mediaDuration={msg.mediaDuration} isVoiceNote={msg.isVoiceNote} mediaFileName={msg.mediaFileName} mediaMimeType={msg.mediaMimeType} />;
     }
     return null;
   };
 
-  const textContent = msg.content && !msg.content.startsWith("[") && !isLocation && !isContact && !isPoll
-    ? msg.content
-    : (isImage || isVideo || isAudio || isDocument || isSticker || isLocation || isContact || isPoll) ? null : msg.content;
+  // Show text content: hide placeholder text like "[Imagem]", "[Áudio]" for media messages
+  // But show captions for images/videos (e.g. "[Imagem] Beautiful sunset" -> "Beautiful sunset")
+  const textContent = (() => {
+    if (!msg.content) return null;
+    if (isLocation || isContact || isPoll) return null; // These have their own rendering
+    if (isMediaType || isPtv) {
+      // Strip placeholder prefixes like "[Imagem] ", "[Vídeo] ", etc.
+      const stripped = msg.content
+        .replace(/^\[(Imagem|Vídeo|Áudio|Documento|Sticker)\]\s*/i, "")
+        .trim();
+      return stripped || null; // Return caption if exists, null otherwise
+    }
+    return msg.content;
+  })();
 
   return (
     <div className={`group flex ${fromMe ? "justify-end" : "justify-start"} px-[63px] mb-[2px] ${isFirst ? "mt-[12px]" : ""}`}>
@@ -1219,13 +1238,39 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
   const HIDDEN_MSG_TYPES = new Set([
     "protocolMessage", "senderKeyDistributionMessage", "messageContextInfo",
     "ephemeralMessage", "reactionMessage", "associatedChildMessage",
-    "placeholderMessage", "albumMessage",
+    "placeholderMessage", "albumMessage", "peerDataOperationRequestResponseMessage",
+    "botInvokeMessage", "newsletterAdminInviteMessage", "encReactionMessage",
+    "keepInChatMessage", "pinInChatMessage", "pollUpdateMessage",
+    "groupInviteMessage", "lottieStickerMessage",
   ]);
 
   // Group messages by date
   const groupedMessages = useMemo(() => {
+    // Known media types that will render via MediaLoader even without content
+    const MEDIA_TYPES = new Set([
+      "imageMessage", "videoMessage", "audioMessage", "pttMessage",
+      "documentMessage", "stickerMessage", "ptvMessage",
+    ]);
+    // Types that have their own special rendering
+    const SPECIAL_TYPES = new Set([
+      "locationMessage", "contactMessage", "contactsArrayMessage",
+      "pollCreationMessage", "pollCreationMessageV3",
+    ]);
     const msgs = [...(messagesQ.data || [])].reverse()
-      .filter(m => !HIDDEN_MSG_TYPES.has(m.messageType));
+      .filter(m => {
+        // Always hide protocol/system messages
+        if (HIDDEN_MSG_TYPES.has(m.messageType)) return false;
+        // Media types are always shown (MediaLoader handles missing URLs)
+        if (MEDIA_TYPES.has(m.messageType)) return true;
+        // Special types with their own rendering
+        if (SPECIAL_TYPES.has(m.messageType)) return true;
+        // For other types: hide if content is empty or just a placeholder like "[Template]"
+        const content = m.content?.trim();
+        if (!content) return false;
+        // Hide messages that are just type placeholders with no real content
+        if (/^\[\w+\]$/.test(content)) return false;
+        return true;
+      });
     const groups: { date: string; messages: Message[] }[] = [];
     let currentDate = "";
     for (const msg of msgs) {

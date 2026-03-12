@@ -615,8 +615,10 @@ export const appRouter = router({
           .limit(1);
         if (!msg) throw new TRPCError({ code: "NOT_FOUND", message: "Message not found" });
         if (msg.mediaUrl) return { url: msg.mediaUrl, mimetype: msg.mediaMimeType };
-        // Download from Evolution API
-        const base64Data = await getBase64FromMediaMessage(input.sessionId, input.messageId);
+        // Download from Evolution API - resolve the instanceName from the session
+        const session = whatsappManager.getSession(input.sessionId);
+        const instanceName = session?.instanceName || input.sessionId;
+        const base64Data = await getBase64FromMediaMessage(instanceName, input.messageId);
         if (!base64Data?.base64) throw new TRPCError({ code: "NOT_FOUND", message: "Media not available" });
         // Upload to S3
         const ext = (base64Data.mimetype || "bin").split("/")[1]?.split(";")[0] || "bin";
