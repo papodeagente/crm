@@ -67,6 +67,7 @@ export interface WhatsAppChatProps {
   agents?: AgentInfo[];
   onAssign?: (agentId: number | null) => void;
   onStatusChange?: (status: "open" | "pending" | "resolved" | "closed") => void;
+  myAvatarUrl?: string;
 }
 
 /* ─── WhatsApp Text Formatting ─── */
@@ -345,7 +346,7 @@ function MediaLoader({ sessionId, messageId, messageType, mediaDuration, isVoice
   }, [isAudio, isImage, isSticker, isVideo]);
 
   if (mediaUrl) {
-    if (isAudio) return <AudioPlayer src={mediaUrl} duration={mediaDuration} isVoice={isVoiceNote || false} fromMe={fromMe} avatarUrl={fromMe ? undefined : avatarUrl} />;
+    if (isAudio) return <AudioPlayer src={mediaUrl} duration={mediaDuration} isVoice={isVoiceNote || false} fromMe={fromMe} avatarUrl={avatarUrl} />;
     if (isImage) return (
       <div className="relative -mx-1 -mt-0.5 mb-1 overflow-hidden rounded-md">
         <img src={mediaUrl} alt="Imagem" className="max-w-[300px] w-full h-auto object-cover cursor-pointer hover:opacity-95 transition-opacity rounded-lg" loading="lazy" onClick={() => onImageClick?.(mediaUrl)} />
@@ -521,7 +522,7 @@ function MessageContextMenu({
 /* ─── Message Bubble ─── */
 const MessageBubble = memo(({
   msg, isFirst, isLast, allMessages,
-  onReply, onReact, onDelete, onEdit, onForward, contactAvatarUrl, onImageClick
+  onReply, onReact, onDelete, onEdit, onForward, contactAvatarUrl, myAvatarUrl, onImageClick
 }: {
   msg: Message; isFirst: boolean; isLast: boolean; allMessages: Message[];
   onReply: (target: ReplyTarget) => void;
@@ -530,6 +531,7 @@ const MessageBubble = memo(({
   onEdit: (messageId: string, currentText: string) => void;
   onForward: (msg: Message) => void;
   contactAvatarUrl?: string;
+  myAvatarUrl?: string;
   onImageClick?: (url: string) => void;
 }) => {
   const [showMenu, setShowMenu] = useState(false);
@@ -635,7 +637,7 @@ const MessageBubble = memo(({
         );
       }
       if (isAudio && msg.mediaUrl) {
-        return <AudioPlayer src={msg.mediaUrl} duration={msg.mediaDuration} isVoice={msg.isVoiceNote || false} fromMe={fromMe} avatarUrl={fromMe ? undefined : contactAvatarUrl} />;
+        return <AudioPlayer src={msg.mediaUrl} duration={msg.mediaDuration} isVoice={msg.isVoiceNote || false} fromMe={fromMe} avatarUrl={fromMe ? myAvatarUrl : contactAvatarUrl} />;
       }
       if (isDocument && msg.mediaUrl) {
         return (
@@ -660,7 +662,7 @@ const MessageBubble = memo(({
     if (isMediaType && !hasMediaUrl && msg.messageId) {
       return <MediaLoader sessionId={msg.sessionId} messageId={msg.messageId} messageType={msg.messageType}
         mediaDuration={msg.mediaDuration} isVoiceNote={msg.isVoiceNote} mediaFileName={msg.mediaFileName} mediaMimeType={msg.mediaMimeType}
-        fromMe={fromMe} avatarUrl={contactAvatarUrl} onImageClick={onImageClick} />;
+        fromMe={fromMe} avatarUrl={fromMe ? myAvatarUrl : contactAvatarUrl} onImageClick={onImageClick} />;
     }
     return null;
   };
@@ -1014,7 +1016,7 @@ function EditMessageModal({ currentText, onSave, onClose }: { currentText: strin
    MAIN CHAT COMPONENT
    ═══════════════════════════════════════════════════════ */
 
-export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDeal, onCreateContact, hasCrmContact, assignment, agents, onAssign, onStatusChange }: WhatsAppChatProps) {
+export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDeal, onCreateContact, hasCrmContact, assignment, agents, onAssign, onStatusChange, myAvatarUrl }: WhatsAppChatProps) {
   const [showAgentDropdown, setShowAgentDropdown] = useState(false);
   const { lastMessage, lastStatusUpdate } = useSocket();
   const [messageText, setMessageText] = useState("");
@@ -1660,6 +1662,7 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
                       onEdit={handleEditStart}
                       onForward={handleForward}
                       contactAvatarUrl={contact?.avatarUrl}
+                      myAvatarUrl={myAvatarUrl}
                       onImageClick={setLightboxUrl}
                     />
                   );

@@ -2797,6 +2797,7 @@ function WhatsAppPanel({ contact, dealId }: { contact: any; dealId: number }) {
               contact={contact}
               sessionId={activeSession.sessionId}
               remoteJid={remoteJid}
+              myAvatarUrl={activeSession.user?.imgUrl}
             />
           </div>
         ) : (

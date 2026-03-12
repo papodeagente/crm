@@ -2462,3 +2462,6 @@
 - [x] BUG: Ticks de status — Código correto (webhook messages.update → DB → socket.io → frontend). Funciona em produção com webhooks
 - [x] FEAT: Lightbox para imagens — Overlay fullscreen com backdrop blur, botão fechar (X), botão download, fecha ao clicar fora ou Escape
 - [x] MELHORIA: Player de áudio redesenhado — Avatar 52px com foto real ou gradiente, seek dot, waveform 28 barras, botão velocidade com estado visual, animações hover/active
+
+## Correção Player Áudio fromMe (Mar 12 - v13)
+- [x] BUG: Player de áudio enviado (fromMe) mostra ícone mic em vez da foto — FIX: Adicionado myAvatarUrl prop (vindo de activeSession.user.imgUrl) que é passado para AudioPlayer quando fromMe=true. Corrigido em 3 locais: renderMedia, MediaLoader e MessageBubble. Também corrigido no DealDetail.tsx

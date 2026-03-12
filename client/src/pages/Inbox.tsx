@@ -1171,6 +1171,7 @@ export default function InboxPage() {
               agents={agents}
               onAssign={handleAssign}
               onStatusChange={handleStatusChange}
+              myAvatarUrl={activeSession.user?.imgUrl}
             />
           </div>
         )}
