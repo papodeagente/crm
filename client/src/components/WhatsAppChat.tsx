@@ -149,13 +149,12 @@ const AudioPlayer = memo(({ src, duration, isVoice, fromMe, avatarUrl }: {
   src: string; duration?: number | null; isVoice?: boolean; fromMe?: boolean; avatarUrl?: string | null;
 }) => {
   const audioRef = useRef<HTMLAudioElement>(null);
-  const waveformRef = useRef<HTMLDivElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [totalDuration, setTotalDuration] = useState(duration || 0);
   const [playbackRate, setPlaybackRate] = useState(1);
 
-  const barCount = 48;
+  const barCount = 28;
   const [bars] = useState(() => generateWaveformBars(barCount, Math.round((duration || 10) * 137)));
 
   useEffect(() => {
@@ -207,77 +206,91 @@ const AudioPlayer = memo(({ src, duration, isVoice, fromMe, avatarUrl }: {
   };
 
   const progress = totalDuration > 0 ? currentTime / totalDuration : 0;
-  const tintColor = fromMe ? "#53bdeb" : "#00a884";
+  const accentColor = fromMe ? "#53bdeb" : "#00a884";
+  const unplayedColor = fromMe ? "rgba(83,189,235,0.3)" : "rgba(0,168,132,0.25)";
 
   return (
-    <div className="flex items-center gap-2 min-w-[240px] max-w-[320px] py-0.5">
+    <div className="flex items-center gap-2.5 min-w-[250px] max-w-[340px] py-1">
       <audio ref={audioRef} src={src} preload="metadata" />
 
-      {/* Avatar / Mic icon */}
+      {/* Avatar - always show photo if available, like WhatsApp Web */}
       <div className="relative shrink-0">
         {avatarUrl ? (
-          <img src={avatarUrl} alt="" className="w-[46px] h-[46px] rounded-full object-cover" />
+          <img src={avatarUrl} alt="" className="w-[52px] h-[52px] rounded-full object-cover shadow-sm" />
         ) : (
-          <div className="w-[46px] h-[46px] rounded-full flex items-center justify-center" style={{ backgroundColor: fromMe ? "#53bdeb22" : "#00a88422" }}>
-            <Mic className="w-5 h-5" style={{ color: tintColor }} />
+          <div className="w-[52px] h-[52px] rounded-full flex items-center justify-center bg-gradient-to-br shadow-sm"
+            style={{ background: fromMe ? "linear-gradient(135deg, #53bdeb 0%, #3a9fd4 100%)" : "linear-gradient(135deg, #25d366 0%, #00a884 100%)" }}>
+            <Mic className="w-6 h-6 text-white" />
           </div>
         )}
-        {/* Small mic badge for voice notes */}
+        {/* Mic badge for voice notes */}
         {isVoice && (
-          <div className="absolute -bottom-0.5 -right-0.5 w-[18px] h-[18px] rounded-full flex items-center justify-center" style={{ backgroundColor: tintColor }}>
-            <Mic className="w-[10px] h-[10px] text-white" />
+          <div className="absolute -bottom-0.5 -right-0.5 w-[20px] h-[20px] rounded-full flex items-center justify-center shadow-sm"
+            style={{ backgroundColor: accentColor }}>
+            <Mic className="w-[11px] h-[11px] text-white" />
           </div>
         )}
       </div>
 
-      <div className="flex-1 flex flex-col gap-1">
-        {/* Play button + Waveform */}
-        <div className="flex items-center gap-1.5">
+      <div className="flex-1 flex flex-col gap-0.5 min-w-0">
+        {/* Play button + Waveform row */}
+        <div className="flex items-center gap-2">
           <button onClick={togglePlay}
-            className="w-[32px] h-[32px] rounded-full flex items-center justify-center shrink-0 transition-colors hover:opacity-80"
-            style={{ color: tintColor }}>
+            className="w-[34px] h-[34px] rounded-full flex items-center justify-center shrink-0 transition-all hover:scale-105 active:scale-95"
+            style={{ color: accentColor }}>
             {isPlaying
-              ? <Pause className="w-[18px] h-[18px]" fill="currentColor" />
-              : <Play className="w-[18px] h-[18px] ml-0.5" fill="currentColor" />
+              ? <Pause className="w-[20px] h-[20px]" fill="currentColor" />
+              : <Play className="w-[20px] h-[20px] ml-0.5" fill="currentColor" />
             }
           </button>
 
-          {/* Waveform */}
-          <div ref={waveformRef} className="flex-1 flex items-center gap-[1.5px] h-[28px] cursor-pointer" onClick={handleSeek}>
-            {bars.map((h, i) => {
-              const barProgress = i / barCount;
-              const isPlayed = barProgress <= progress;
-              return (
-                <div
-                  key={i}
-                  className="rounded-full transition-colors duration-75"
-                  style={{
-                    width: "2.5px",
-                    height: `${Math.max(3, h * 26)}px`,
-                    backgroundColor: isPlayed ? tintColor : (fromMe ? "rgba(83,189,235,0.35)" : "rgba(0,168,132,0.3)"),
-                  }}
-                />
-              );
-            })}
+          {/* Waveform with seek dot */}
+          <div className="flex-1 relative cursor-pointer" onClick={handleSeek}>
+            <div className="flex items-center gap-[2px] h-[32px]">
+              {bars.map((h, i) => {
+                const barProgress = i / barCount;
+                const isPlayed = barProgress <= progress;
+                return (
+                  <div
+                    key={i}
+                    className="rounded-full transition-colors duration-100 flex-1"
+                    style={{
+                      minWidth: "3px",
+                      maxWidth: "4px",
+                      height: `${Math.max(4, h * 30)}px`,
+                      backgroundColor: isPlayed ? accentColor : unplayedColor,
+                    }}
+                  />
+                );
+              })}
+            </div>
+            {/* Seek dot */}
+            <div
+              className="absolute top-1/2 -translate-y-1/2 w-[12px] h-[12px] rounded-full shadow-md transition-all duration-75"
+              style={{
+                left: `calc(${progress * 100}% - 6px)`,
+                backgroundColor: accentColor,
+              }}
+            />
           </div>
         </div>
 
-        {/* Duration + Speed */}
-        <div className="flex items-center gap-2 pl-[36px] -mt-0.5">
-          <span className="text-[11px] tabular-nums" style={{ color: fromMe ? "rgba(0,0,0,0.45)" : "rgba(0,0,0,0.45)" }}>
+        {/* Duration + Speed control */}
+        <div className="flex items-center justify-between pl-[42px] pr-1">
+          <span className="text-[11px] tabular-nums text-muted-foreground/70">
             {isPlaying ? formatDur(currentTime) : formatDur(totalDuration || 0)}
           </span>
-          {isPlaying && playbackRate !== 1 && (
-            <span className="text-[10px] font-medium px-1 rounded" style={{ color: tintColor }}>
-              {playbackRate}x
-            </span>
-          )}
-          {isPlaying && (
-            <button onClick={cycleSpeed} className="text-[10px] font-bold px-1.5 py-0.5 rounded-full border transition-colors hover:opacity-80"
-              style={{ borderColor: tintColor, color: tintColor }}>
-              {playbackRate}x
-            </button>
-          )}
+          <button
+            onClick={cycleSpeed}
+            className="text-[11px] font-semibold px-1.5 py-0.5 rounded-full transition-all hover:scale-105"
+            style={{
+              color: playbackRate !== 1 ? "white" : accentColor,
+              backgroundColor: playbackRate !== 1 ? accentColor : "transparent",
+              border: `1.5px solid ${accentColor}`,
+            }}
+          >
+            {playbackRate}x
+          </button>
         </div>
       </div>
     </div>
@@ -286,11 +299,12 @@ const AudioPlayer = memo(({ src, duration, isVoice, fromMe, avatarUrl }: {
 AudioPlayer.displayName = "AudioPlayer";
 
 /* ─── Media Loader (download on demand) ─── */
-function MediaLoader({ sessionId, messageId, messageType, mediaDuration, isVoiceNote, mediaFileName, mediaMimeType, fromMe, avatarUrl }: {
+function MediaLoader({ sessionId, messageId, messageType, mediaDuration, isVoiceNote, mediaFileName, mediaMimeType, fromMe, avatarUrl, onImageClick }: {
   sessionId: string; messageId: string; messageType: string;
   mediaDuration?: number | null; isVoiceNote?: boolean | null;
   mediaFileName?: string | null; mediaMimeType?: string | null;
   fromMe?: boolean; avatarUrl?: string | null;
+  onImageClick?: (url: string) => void;
 }) {
   const [mediaUrl, setMediaUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -334,7 +348,7 @@ function MediaLoader({ sessionId, messageId, messageType, mediaDuration, isVoice
     if (isAudio) return <AudioPlayer src={mediaUrl} duration={mediaDuration} isVoice={isVoiceNote || false} fromMe={fromMe} avatarUrl={fromMe ? undefined : avatarUrl} />;
     if (isImage) return (
       <div className="relative -mx-1 -mt-0.5 mb-1 overflow-hidden rounded-md">
-        <img src={mediaUrl} alt="Imagem" className="max-w-[300px] w-full h-auto object-cover cursor-pointer hover:opacity-95 transition-opacity" loading="lazy" onClick={() => window.open(mediaUrl, "_blank")} />
+        <img src={mediaUrl} alt="Imagem" className="max-w-[300px] w-full h-auto object-cover cursor-pointer hover:opacity-95 transition-opacity rounded-lg" loading="lazy" onClick={() => onImageClick?.(mediaUrl)} />
       </div>
     );
     if (isVideo) return (
@@ -507,7 +521,7 @@ function MessageContextMenu({
 /* ─── Message Bubble ─── */
 const MessageBubble = memo(({
   msg, isFirst, isLast, allMessages,
-  onReply, onReact, onDelete, onEdit, onForward, contactAvatarUrl
+  onReply, onReact, onDelete, onEdit, onForward, contactAvatarUrl, onImageClick
 }: {
   msg: Message; isFirst: boolean; isLast: boolean; allMessages: Message[];
   onReply: (target: ReplyTarget) => void;
@@ -516,6 +530,7 @@ const MessageBubble = memo(({
   onEdit: (messageId: string, currentText: string) => void;
   onForward: (msg: Message) => void;
   contactAvatarUrl?: string;
+  onImageClick?: (url: string) => void;
 }) => {
   const [showMenu, setShowMenu] = useState(false);
   const fromMe = msg.fromMe;
@@ -608,7 +623,7 @@ const MessageBubble = memo(({
       if (isImage && msg.mediaUrl) {
         return (
           <div className="relative -mx-1 -mt-0.5 mb-1 overflow-hidden rounded-md">
-            <img src={msg.mediaUrl} alt="Imagem" className="max-w-[300px] w-full h-auto object-cover cursor-pointer hover:opacity-95 transition-opacity" loading="lazy" onClick={() => window.open(msg.mediaUrl!, "_blank")} />
+            <img src={msg.mediaUrl} alt="Imagem" className="max-w-[300px] w-full h-auto object-cover cursor-pointer hover:opacity-95 transition-opacity rounded-lg" loading="lazy" onClick={() => onImageClick?.(msg.mediaUrl!)} />
           </div>
         );
       }
@@ -645,7 +660,7 @@ const MessageBubble = memo(({
     if (isMediaType && !hasMediaUrl && msg.messageId) {
       return <MediaLoader sessionId={msg.sessionId} messageId={msg.messageId} messageType={msg.messageType}
         mediaDuration={msg.mediaDuration} isVoiceNote={msg.isVoiceNote} mediaFileName={msg.mediaFileName} mediaMimeType={msg.mediaMimeType}
-        fromMe={fromMe} avatarUrl={contactAvatarUrl} />;
+        fromMe={fromMe} avatarUrl={contactAvatarUrl} onImageClick={onImageClick} />;
     }
     return null;
   };
@@ -1014,6 +1029,7 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
   const [showContactModal, setShowContactModal] = useState(false);
   const [showPollModal, setShowPollModal] = useState(false);
   const [editTarget, setEditTarget] = useState<{ messageId: string; text: string } | null>(null);
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -1058,21 +1074,65 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
     }, 50);
   }, [sessionId, remoteJid, utils]);
 
+  // Delayed refetch: wait a bit for the DB insert to complete before refetching
+  const delayedRefetch = useCallback(() => {
+    setTimeout(() => messagesQ.refetch(), 400);
+  }, [messagesQ]);
+
   const sendMessage = trpc.whatsapp.sendMessage.useMutation({
     onMutate: (vars) => addOptimisticMessage(vars.message),
-    onSuccess: () => messagesQ.refetch(),
-    onError: () => { messagesQ.refetch(); toast.error("Erro ao enviar mensagem"); },
+    onSuccess: (result) => {
+      // Update optimistic message with real messageId so it merges with server data
+      if (result.messageId) {
+        const queryKey = { sessionId, remoteJid, limit: 100 };
+        utils.whatsapp.messagesByContact.setData(queryKey, (old: any) => {
+          if (!old) return old;
+          return old.map((m: any) =>
+            m.messageId?.startsWith("opt_") ? { ...m, messageId: result.messageId, status: "sent" } : m
+          );
+        });
+      }
+      delayedRefetch();
+    },
+    onError: () => {
+      // Remove optimistic message on error
+      const queryKey = { sessionId, remoteJid, limit: 100 };
+      utils.whatsapp.messagesByContact.setData(queryKey, (old: any) => {
+        if (!old) return old;
+        return old.filter((m: any) => !m.messageId?.startsWith("opt_"));
+      });
+      toast.error("Erro ao enviar mensagem");
+    },
   });
 
   const sendTextWithQuote = trpc.whatsapp.sendTextWithQuote.useMutation({
     onMutate: (vars) => addOptimisticMessage(vars.message, vars.quotedMessageId),
-    onSuccess: () => { messagesQ.refetch(); setReplyTarget(null); },
-    onError: () => { messagesQ.refetch(); toast.error("Erro ao enviar resposta"); },
+    onSuccess: (result) => {
+      if (result.messageId) {
+        const queryKey = { sessionId, remoteJid, limit: 100 };
+        utils.whatsapp.messagesByContact.setData(queryKey, (old: any) => {
+          if (!old) return old;
+          return old.map((m: any) =>
+            m.messageId?.startsWith("opt_") ? { ...m, messageId: result.messageId, status: "sent" } : m
+          );
+        });
+      }
+      delayedRefetch();
+      setReplyTarget(null);
+    },
+    onError: () => {
+      const queryKey = { sessionId, remoteJid, limit: 100 };
+      utils.whatsapp.messagesByContact.setData(queryKey, (old: any) => {
+        if (!old) return old;
+        return old.filter((m: any) => !m.messageId?.startsWith("opt_"));
+      });
+      toast.error("Erro ao enviar resposta");
+    },
   });
 
   const uploadMedia = trpc.whatsapp.uploadMedia.useMutation();
   const sendMedia = trpc.whatsapp.sendMedia.useMutation({
-    onSuccess: () => messagesQ.refetch(),
+    onSuccess: () => delayedRefetch(),
     onError: () => toast.error("Erro ao enviar mídia"),
   });
 
@@ -1600,6 +1660,7 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
                       onEdit={handleEditStart}
                       onForward={handleForward}
                       contactAvatarUrl={contact?.avatarUrl}
+                      onImageClick={setLightboxUrl}
                     />
                   );
                 })}
@@ -1703,6 +1764,37 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
             <Loader2 className="w-5 h-5 animate-spin text-wa-tint" />
             <span className="text-sm text-foreground">Enviando...</span>
           </div>
+        </div>
+      )}
+      {/* ─── Image Lightbox ─── */}
+      {lightboxUrl && (
+        <div
+          className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/90 backdrop-blur-sm cursor-zoom-out"
+          onClick={() => setLightboxUrl(null)}
+          onKeyDown={(e) => { if (e.key === "Escape") setLightboxUrl(null); }}
+          tabIndex={0}
+          role="dialog"
+          aria-label="Visualizar imagem"
+        >
+          <button
+            onClick={(e) => { e.stopPropagation(); setLightboxUrl(null); }}
+            className="absolute top-4 right-4 p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors z-10"
+          >
+            <X className="w-6 h-6 text-white" />
+          </button>
+          <button
+            onClick={(e) => { e.stopPropagation(); window.open(lightboxUrl, '_blank'); }}
+            className="absolute top-4 right-16 p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors z-10"
+            title="Abrir em nova aba"
+          >
+            <Download className="w-6 h-6 text-white" />
+          </button>
+          <img
+            src={lightboxUrl}
+            alt="Imagem ampliada"
+            className="max-w-[90vw] max-h-[90vh] object-contain rounded-lg shadow-2xl animate-in fade-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          />
         </div>
       )}
     </div>

@@ -8,7 +8,37 @@ import App from "./App";
 import { getLoginUrl } from "./const";
 import "./index.css";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: (failureCount, error) => {
+        // Retry on rate limit / network errors up to 3 times
+        if (error instanceof TRPCClientError) {
+          const msg = error.message || "";
+          if (msg.includes("Rate exceeded") || msg.includes("Unexpected token") || msg.includes("fetch failed")) {
+            return failureCount < 3;
+          }
+          // Don't retry auth errors
+          if (msg === UNAUTHED_ERR_MSG) return false;
+        }
+        return failureCount < 2;
+      },
+      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10000),
+    },
+    mutations: {
+      retry: (failureCount, error) => {
+        if (error instanceof TRPCClientError) {
+          const msg = error.message || "";
+          if (msg.includes("Rate exceeded") || msg.includes("Unexpected token") || msg.includes("fetch failed")) {
+            return failureCount < 3;
+          }
+        }
+        return false;
+      },
+      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10000),
+    },
+  },
+});
 
 const redirectToLoginIfUnauthorized = (error: unknown) => {
   if (!(error instanceof TRPCClientError)) return;
@@ -42,11 +72,36 @@ const trpcClient = trpc.createClient({
     httpBatchLink({
       url: "/api/trpc",
       transformer: superjson,
-      fetch(input, init) {
-        return globalThis.fetch(input, {
-          ...(init ?? {}),
-          credentials: "include",
-        });
+      async fetch(input, init) {
+        const maxRetries = 3;
+        let lastError: Error | null = null;
+        for (let attempt = 0; attempt <= maxRetries; attempt++) {
+          try {
+            const response = await globalThis.fetch(input, {
+              ...(init ?? {}),
+              credentials: "include",
+            });
+            // Check if response is actually JSON (rate limit returns plain text)
+            const contentType = response.headers.get("content-type") || "";
+            if (!response.ok && !contentType.includes("application/json")) {
+              const text = await response.text();
+              if (text.includes("Rate exceeded") && attempt < maxRetries) {
+                await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
+                continue;
+              }
+              throw new Error(text || `HTTP ${response.status}`);
+            }
+            return response;
+          } catch (err: any) {
+            lastError = err;
+            if (attempt < maxRetries && (err.message?.includes("Rate exceeded") || err.message?.includes("fetch failed"))) {
+              await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
+              continue;
+            }
+            throw err;
+          }
+        }
+        throw lastError || new Error("Max retries exceeded");
       },
     }),
   ],

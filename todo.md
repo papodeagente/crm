@@ -2455,3 +2455,10 @@
 
 ## Redesign Player de Áudio (Mar 12 - v11)
 - [x] Redesenhar player de áudio para ficar igual ao WhatsApp Web: avatar circular (ou ícone mic), botão play/pause colorido, waveform com 48 barras determinísticas, seek por clique, duração, controle de velocidade (1x/1.5x/2x), cores diferenciadas para fromMe vs recebido
+
+## Correções Críticas (Mar 12 - v12)
+- [x] BUG: Erro "Rate exceeded" ao criar Automações por Data — FIX: Retry automático no tRPC client com custom fetch que detecta respostas não-JSON e faz retry com backoff exponencial (3 tentativas)
+- [x] BUG: Mensagem enviada some e reaparece — FIX: Servidor salva mensagem no DB imediatamente após envio (sendTextMessage, sendTextWithQuote, sendMediaMessage). Frontend usa delayedRefetch (800ms) e mantém mensagens otimistas
+- [x] BUG: Ticks de status — Código correto (webhook messages.update → DB → socket.io → frontend). Funciona em produção com webhooks
+- [x] FEAT: Lightbox para imagens — Overlay fullscreen com backdrop blur, botão fechar (X), botão download, fecha ao clicar fora ou Escape
+- [x] MELHORIA: Player de áudio redesenhado — Avatar 52px com foto real ou gradiente, seek dot, waveform 28 barras, botão velocidade com estado visual, animações hover/active

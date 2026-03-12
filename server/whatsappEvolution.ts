@@ -311,7 +311,32 @@ class WhatsAppEvolutionManager extends EventEmitter {
     if (session.status !== "connected") throw new Error(`WhatsApp não está conectado. Reconecte seu WhatsApp.`);
 
     const number = this.jidToNumber(jid);
-    return evo.sendText(session.instanceName, number, text);
+    const result = await evo.sendText(session.instanceName, number, text);
+
+    // Save sent message to DB immediately so frontend refetch finds it
+    if (result?.key?.id) {
+      try {
+        const db = await getDb();
+        if (db) {
+          const remoteJid = result.key.remoteJid || `${number}@s.whatsapp.net`;
+          await db.insert(waMessages).values({
+            sessionId: session.sessionId,
+            tenantId: session.tenantId,
+            messageId: result.key.id,
+            remoteJid,
+            fromMe: true,
+            messageType: "conversation",
+            content: text,
+            status: "sent",
+            timestamp: new Date(result.messageTimestamp ? result.messageTimestamp * 1000 : Date.now()),
+          }).catch(() => { /* duplicate from webhook, ignore */ });
+        }
+      } catch (e) {
+        console.error("[SendText] Failed to save sent message to DB:", e);
+      }
+    }
+
+    return result;
   }
 
   async sendMediaMessage(
@@ -329,15 +354,47 @@ class WhatsAppEvolutionManager extends EventEmitter {
 
     const number = this.jidToNumber(jid);
 
+    let result: any;
     if (mediaType === "audio" && opts?.ptt) {
-      return evo.sendAudio(session.instanceName, number, mediaUrl);
+      result = await evo.sendAudio(session.instanceName, number, mediaUrl);
+    } else {
+      result = await evo.sendMedia(session.instanceName, number, mediaUrl, mediaType, {
+        caption,
+        fileName,
+        mimetype: opts?.mimetype,
+      });
     }
 
-    return evo.sendMedia(session.instanceName, number, mediaUrl, mediaType, {
-      caption,
-      fileName,
-      mimetype: opts?.mimetype,
-    });
+    // Save sent media message to DB immediately
+    if (result?.key?.id) {
+      try {
+        const db = await getDb();
+        if (db) {
+          const remoteJid = result.key.remoteJid || `${number}@s.whatsapp.net`;
+          const typeMap: Record<string, string> = { image: "imageMessage", audio: "audioMessage", video: "videoMessage", document: "documentMessage" };
+          await db.insert(waMessages).values({
+            sessionId: session.sessionId,
+            tenantId: session.tenantId,
+            messageId: result.key.id,
+            remoteJid,
+            fromMe: true,
+            messageType: (mediaType === "audio" && opts?.ptt) ? "pttMessage" : (typeMap[mediaType] || "documentMessage"),
+            content: caption || null,
+            mediaUrl,
+            mediaMimeType: opts?.mimetype || null,
+            mediaFileName: fileName || null,
+            mediaDuration: opts?.duration || null,
+            isVoiceNote: !!(mediaType === "audio" && opts?.ptt),
+            status: "sent",
+            timestamp: new Date(result.messageTimestamp ? result.messageTimestamp * 1000 : Date.now()),
+          }).catch(() => { /* duplicate from webhook, ignore */ });
+        }
+      } catch (e) {
+        console.error("[SendMedia] Failed to save sent message to DB:", e);
+      }
+    }
+
+    return result;
   }
 
   // ─── REACTIONS & INTERACTIONS ───
@@ -386,10 +443,36 @@ class WhatsAppEvolutionManager extends EventEmitter {
     if (!session) throw new Error(`Sessão não encontrada.`);
     if (session.status !== "connected") throw new Error(`WhatsApp não está conectado.`);
     const number = this.jidToNumber(jid);
-    return evo.sendTextWithQuote(session.instanceName, number, text, {
+    const result = await evo.sendTextWithQuote(session.instanceName, number, text, {
       key: { id: quotedMessageId },
       message: { conversation: quotedText },
     });
+
+    // Save sent message to DB immediately
+    if (result?.key?.id) {
+      try {
+        const db = await getDb();
+        if (db) {
+          const remoteJid = result.key.remoteJid || `${number}@s.whatsapp.net`;
+          await db.insert(waMessages).values({
+            sessionId: session.sessionId,
+            tenantId: session.tenantId,
+            messageId: result.key.id,
+            remoteJid,
+            fromMe: true,
+            messageType: "extendedTextMessage",
+            content: text,
+            status: "sent",
+            timestamp: new Date(result.messageTimestamp ? result.messageTimestamp * 1000 : Date.now()),
+            quotedMessageId,
+          }).catch(() => { /* duplicate from webhook, ignore */ });
+        }
+      } catch (e) {
+        console.error("[SendTextWithQuote] Failed to save sent message to DB:", e);
+      }
+    }
+
+    return result;
   }
 
   async deleteMessage(sessionId: string, remoteJid: string, messageId: string, fromMe: boolean): Promise<any> {
