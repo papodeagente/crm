@@ -129,12 +129,34 @@ const MessageStatus = memo(({ status, isFromMe }: { status: string | null | unde
 });
 MessageStatus.displayName = "MessageStatus";
 
-/* ─── Audio Player ─── */
-const AudioPlayer = memo(({ src, duration, isVoice }: { src: string; duration?: number | null; isVoice?: boolean }) => {
+/* ─── Waveform bars generator (deterministic from duration) ─── */
+function generateWaveformBars(count: number, seed: number = 42): number[] {
+  const bars: number[] = [];
+  let s = seed;
+  for (let i = 0; i < count; i++) {
+    s = (s * 16807 + 0) % 2147483647;
+    const normalized = (s % 100) / 100;
+    // Create a natural-looking waveform with peaks in the middle
+    const position = i / count;
+    const envelope = Math.sin(position * Math.PI) * 0.6 + 0.4;
+    bars.push(Math.max(0.12, normalized * envelope));
+  }
+  return bars;
+}
+
+/* ─── Audio Player (WhatsApp Web style) ─── */
+const AudioPlayer = memo(({ src, duration, isVoice, fromMe, avatarUrl }: {
+  src: string; duration?: number | null; isVoice?: boolean; fromMe?: boolean; avatarUrl?: string | null;
+}) => {
   const audioRef = useRef<HTMLAudioElement>(null);
+  const waveformRef = useRef<HTMLDivElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [totalDuration, setTotalDuration] = useState(duration || 0);
+  const [playbackRate, setPlaybackRate] = useState(1);
+
+  const barCount = 48;
+  const [bars] = useState(() => generateWaveformBars(barCount, Math.round((duration || 10) * 137)));
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -155,9 +177,28 @@ const AudioPlayer = memo(({ src, duration, isVoice }: { src: string; duration?: 
   const togglePlay = useCallback(() => {
     const audio = audioRef.current;
     if (!audio) return;
-    if (isPlaying) audio.pause(); else audio.play();
+    if (isPlaying) { audio.pause(); } else { audio.playbackRate = playbackRate; audio.play(); }
     setIsPlaying(!isPlaying);
-  }, [isPlaying]);
+  }, [isPlaying, playbackRate]);
+
+  const cycleSpeed = useCallback(() => {
+    const speeds = [1, 1.5, 2];
+    const nextIdx = (speeds.indexOf(playbackRate) + 1) % speeds.length;
+    const newRate = speeds[nextIdx];
+    setPlaybackRate(newRate);
+    if (audioRef.current) audioRef.current.playbackRate = newRate;
+  }, [playbackRate]);
+
+  const handleSeek = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const pct = Math.max(0, Math.min(1, x / rect.width));
+    const audio = audioRef.current;
+    if (audio && totalDuration > 0) {
+      audio.currentTime = pct * totalDuration;
+      setCurrentTime(audio.currentTime);
+    }
+  }, [totalDuration]);
 
   const formatDur = (s: number) => {
     const m = Math.floor(s / 60);
@@ -165,37 +206,91 @@ const AudioPlayer = memo(({ src, duration, isVoice }: { src: string; duration?: 
     return `${m}:${sec.toString().padStart(2, "0")}`;
   };
 
-  const progress = totalDuration > 0 ? (currentTime / totalDuration) * 100 : 0;
+  const progress = totalDuration > 0 ? currentTime / totalDuration : 0;
+  const tintColor = fromMe ? "#53bdeb" : "#00a884";
 
   return (
-    <div className="flex items-center gap-2 min-w-[200px]">
+    <div className="flex items-center gap-2 min-w-[240px] max-w-[320px] py-0.5">
       <audio ref={audioRef} src={src} preload="metadata" />
-      <button onClick={togglePlay} className="w-8 h-8 rounded-full bg-foreground/10 flex items-center justify-center shrink-0 hover:bg-foreground/15 transition-colors">
-        {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 ml-0.5" />}
-      </button>
-      <div className="flex-1 flex flex-col gap-0.5">
-        <div className="relative h-[5px] bg-foreground/10 rounded-full overflow-hidden">
-          <div className="absolute left-0 top-0 h-full bg-current rounded-full transition-all duration-100" style={{ width: `${progress}%` }} />
-        </div>
-        <span className="text-[10px] opacity-60 tabular-nums">
-          {isPlaying ? formatDur(currentTime) : formatDur(totalDuration || 0)}
-        </span>
+
+      {/* Avatar / Mic icon */}
+      <div className="relative shrink-0">
+        {avatarUrl ? (
+          <img src={avatarUrl} alt="" className="w-[46px] h-[46px] rounded-full object-cover" />
+        ) : (
+          <div className="w-[46px] h-[46px] rounded-full flex items-center justify-center" style={{ backgroundColor: fromMe ? "#53bdeb22" : "#00a88422" }}>
+            <Mic className="w-5 h-5" style={{ color: tintColor }} />
+          </div>
+        )}
+        {/* Small mic badge for voice notes */}
+        {isVoice && (
+          <div className="absolute -bottom-0.5 -right-0.5 w-[18px] h-[18px] rounded-full flex items-center justify-center" style={{ backgroundColor: tintColor }}>
+            <Mic className="w-[10px] h-[10px] text-white" />
+          </div>
+        )}
       </div>
-      {isVoice && (
-        <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center shrink-0">
-          <Mic className="w-4 h-4 text-muted-foreground" />
+
+      <div className="flex-1 flex flex-col gap-1">
+        {/* Play button + Waveform */}
+        <div className="flex items-center gap-1.5">
+          <button onClick={togglePlay}
+            className="w-[32px] h-[32px] rounded-full flex items-center justify-center shrink-0 transition-colors hover:opacity-80"
+            style={{ color: tintColor }}>
+            {isPlaying
+              ? <Pause className="w-[18px] h-[18px]" fill="currentColor" />
+              : <Play className="w-[18px] h-[18px] ml-0.5" fill="currentColor" />
+            }
+          </button>
+
+          {/* Waveform */}
+          <div ref={waveformRef} className="flex-1 flex items-center gap-[1.5px] h-[28px] cursor-pointer" onClick={handleSeek}>
+            {bars.map((h, i) => {
+              const barProgress = i / barCount;
+              const isPlayed = barProgress <= progress;
+              return (
+                <div
+                  key={i}
+                  className="rounded-full transition-colors duration-75"
+                  style={{
+                    width: "2.5px",
+                    height: `${Math.max(3, h * 26)}px`,
+                    backgroundColor: isPlayed ? tintColor : (fromMe ? "rgba(83,189,235,0.35)" : "rgba(0,168,132,0.3)"),
+                  }}
+                />
+              );
+            })}
+          </div>
         </div>
-      )}
+
+        {/* Duration + Speed */}
+        <div className="flex items-center gap-2 pl-[36px] -mt-0.5">
+          <span className="text-[11px] tabular-nums" style={{ color: fromMe ? "rgba(0,0,0,0.45)" : "rgba(0,0,0,0.45)" }}>
+            {isPlaying ? formatDur(currentTime) : formatDur(totalDuration || 0)}
+          </span>
+          {isPlaying && playbackRate !== 1 && (
+            <span className="text-[10px] font-medium px-1 rounded" style={{ color: tintColor }}>
+              {playbackRate}x
+            </span>
+          )}
+          {isPlaying && (
+            <button onClick={cycleSpeed} className="text-[10px] font-bold px-1.5 py-0.5 rounded-full border transition-colors hover:opacity-80"
+              style={{ borderColor: tintColor, color: tintColor }}>
+              {playbackRate}x
+            </button>
+          )}
+        </div>
+      </div>
     </div>
   );
 });
 AudioPlayer.displayName = "AudioPlayer";
 
 /* ─── Media Loader (download on demand) ─── */
-function MediaLoader({ sessionId, messageId, messageType, mediaDuration, isVoiceNote, mediaFileName, mediaMimeType }: {
+function MediaLoader({ sessionId, messageId, messageType, mediaDuration, isVoiceNote, mediaFileName, mediaMimeType, fromMe, avatarUrl }: {
   sessionId: string; messageId: string; messageType: string;
   mediaDuration?: number | null; isVoiceNote?: boolean | null;
   mediaFileName?: string | null; mediaMimeType?: string | null;
+  fromMe?: boolean; avatarUrl?: string | null;
 }) {
   const [mediaUrl, setMediaUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -236,7 +331,7 @@ function MediaLoader({ sessionId, messageId, messageType, mediaDuration, isVoice
   }, [isAudio, isImage, isSticker, isVideo]);
 
   if (mediaUrl) {
-    if (isAudio) return <AudioPlayer src={mediaUrl} duration={mediaDuration} isVoice={isVoiceNote || false} />;
+    if (isAudio) return <AudioPlayer src={mediaUrl} duration={mediaDuration} isVoice={isVoiceNote || false} fromMe={fromMe} avatarUrl={fromMe ? undefined : avatarUrl} />;
     if (isImage) return (
       <div className="relative -mx-1 -mt-0.5 mb-1 overflow-hidden rounded-md">
         <img src={mediaUrl} alt="Imagem" className="max-w-[300px] w-full h-auto object-cover cursor-pointer hover:opacity-95 transition-opacity" loading="lazy" onClick={() => window.open(mediaUrl, "_blank")} />
@@ -412,7 +507,7 @@ function MessageContextMenu({
 /* ─── Message Bubble ─── */
 const MessageBubble = memo(({
   msg, isFirst, isLast, allMessages,
-  onReply, onReact, onDelete, onEdit, onForward
+  onReply, onReact, onDelete, onEdit, onForward, contactAvatarUrl
 }: {
   msg: Message; isFirst: boolean; isLast: boolean; allMessages: Message[];
   onReply: (target: ReplyTarget) => void;
@@ -420,6 +515,7 @@ const MessageBubble = memo(({
   onDelete: (remoteJid: string, messageId: string, fromMe: boolean) => void;
   onEdit: (messageId: string, currentText: string) => void;
   onForward: (msg: Message) => void;
+  contactAvatarUrl?: string;
 }) => {
   const [showMenu, setShowMenu] = useState(false);
   const fromMe = msg.fromMe;
@@ -524,7 +620,7 @@ const MessageBubble = memo(({
         );
       }
       if (isAudio && msg.mediaUrl) {
-        return <AudioPlayer src={msg.mediaUrl} duration={msg.mediaDuration} isVoice={msg.isVoiceNote || false} />;
+        return <AudioPlayer src={msg.mediaUrl} duration={msg.mediaDuration} isVoice={msg.isVoiceNote || false} fromMe={fromMe} avatarUrl={fromMe ? undefined : contactAvatarUrl} />;
       }
       if (isDocument && msg.mediaUrl) {
         return (
@@ -548,7 +644,8 @@ const MessageBubble = memo(({
     // No mediaUrl but it's a media type message - use MediaLoader to download on demand
     if (isMediaType && !hasMediaUrl && msg.messageId) {
       return <MediaLoader sessionId={msg.sessionId} messageId={msg.messageId} messageType={msg.messageType}
-        mediaDuration={msg.mediaDuration} isVoiceNote={msg.isVoiceNote} mediaFileName={msg.mediaFileName} mediaMimeType={msg.mediaMimeType} />;
+        mediaDuration={msg.mediaDuration} isVoiceNote={msg.isVoiceNote} mediaFileName={msg.mediaFileName} mediaMimeType={msg.mediaMimeType}
+        fromMe={fromMe} avatarUrl={contactAvatarUrl} />;
     }
     return null;
   };
@@ -1502,6 +1599,7 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
                       onDelete={handleDelete}
                       onEdit={handleEditStart}
                       onForward={handleForward}
+                      contactAvatarUrl={contact?.avatarUrl}
                     />
                   );
                 })}

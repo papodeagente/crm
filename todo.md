@@ -2452,3 +2452,6 @@
 - [x] Botão de emojis: fechar ao clicar fora do picker — useEffect com click-outside handler
 - [x] Botão de funções/anexos: fechar ao clicar fora do menu — adicionado attachMenuRef + click-outside handler
 - [x] Melhorar visual do emoji picker e menu de funções — animação slideUpFade, backdrop-blur, hover scale, cores melhoradas, botões com feedback visual (cor muda ao ativar), mutuamente exclusivos (abrir um fecha o outro)
+
+## Redesign Player de Áudio (Mar 12 - v11)
+- [x] Redesenhar player de áudio para ficar igual ao WhatsApp Web: avatar circular (ou ícone mic), botão play/pause colorido, waveform com 48 barras determinísticas, seek por clique, duração, controle de velocidade (1x/1.5x/2x), cores diferenciadas para fromMe vs recebido
