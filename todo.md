@@ -2324,3 +2324,4 @@
 - [x] Frontend simplificado: apenas botão "Conectar WhatsApp" (sem nome de sessão)
 - [x] BUG: Sistema não reconhece que instância está conectada na Evolution API. Inbox mostra "não conectado" mesmo com sessão ativa. Reconectar tenta gerar QR novamente.
 - [x] BUG: Inbox vazio — conversas não estão sendo sincronizadas da Evolution API para o banco de dados após conexão
+- [x] Inbox deve exibir o nome dos contatos do WhatsApp (pushName) em vez de apenas o número de telefone

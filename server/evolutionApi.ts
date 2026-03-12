@@ -347,8 +347,23 @@ export async function findChats(
 }
 
 /**
- * Busca mensagens de um chat.
+ * Busca contatos da instância (com pushName, profilePicUrl).
  */
+export async function findContacts(
+  instanceName: string
+): Promise<{ remoteJid: string; pushName: string | null; profilePicUrl: string | null }[]> {
+  try {
+    const result = await evoFetch<any>(`/chat/findContacts/${instanceName}`, {
+      method: "POST",
+      body: {},
+      timeout: 60000,
+    });
+    return Array.isArray(result) ? result : [];
+  } catch {
+    return [];
+  }
+}
+
 export async function findMessages(
   instanceName: string,
   remoteJid: string,

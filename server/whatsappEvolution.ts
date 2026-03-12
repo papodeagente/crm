@@ -383,34 +383,66 @@ class WhatsAppEvolutionManager extends EventEmitter {
     try {
       console.log(`[EvoWA Sync] Starting ${isFirstSync ? "FULL" : "incremental"} sync for ${session.instanceName}`);
       
-      // Fetch all chats from Evolution API (includes lastMessage data)
-      const chats = await evo.findChats(session.instanceName);
-      console.log(`[EvoWA Sync] Found ${chats.length} chats on Evolution API`);
+      // Fetch all chats and contacts from Evolution API
+      const [chats, contacts] = await Promise.all([
+        evo.findChats(session.instanceName),
+        evo.findContacts(session.instanceName),
+      ]);
+      console.log(`[EvoWA Sync] Found ${chats.length} chats, ${contacts.length} contacts on Evolution API`);
+
+      // Build a map of remoteJid -> pushName from contacts
+      const contactNameMap = new Map<string, string>();
+      for (const contact of contacts) {
+        if (contact.remoteJid && contact.pushName) {
+          contactNameMap.set(contact.remoteJid, contact.pushName);
+        }
+      }
 
       const db = await getDb();
       if (!db) return;
 
+      // Pre-load existing conversations for this session to avoid individual DB lookups
+      const existingConvs = await db.select({ remoteJid: waConversations.remoteJid, id: waConversations.id })
+        .from(waConversations)
+        .where(eq(waConversations.sessionId, session.sessionId));
+      const existingJidSet = new Set(existingConvs.map(c => c.remoteJid));
+      console.log(`[EvoWA Sync] ${existingJidSet.size} conversations already in DB`);
+
       let synced = 0;
       let skipped = 0;
+      let newChats = 0;
 
-      for (const chat of chats) {
+      // Filter to only individual chats (not groups/broadcasts)
+      const individualChats = chats.filter(chat => {
+        const jid = chat.remoteJid;
+        if (!jid) return false;
+        if (jid.endsWith("@g.us") || jid === "status@broadcast" || jid.endsWith("@lid") || jid.endsWith("@newsletter")) {
+          skipped++;
+          return false;
+        }
+        return true;
+      });
+
+      // For incremental sync, only process NEW chats (not already in DB)
+      const chatsToProcess = isFirstSync
+        ? individualChats
+        : individualChats.filter(c => !existingJidSet.has(c.remoteJid));
+
+      if (!isFirstSync && chatsToProcess.length === 0) {
+        console.log(`[EvoWA Sync] No new chats to sync (${individualChats.length} individual, all already in DB)`);
+      }
+
+      for (const chat of chatsToProcess) {
         try {
           const remoteJid = chat.remoteJid;
-          if (!remoteJid) continue;
-
-          // Skip groups, broadcast, and LID contacts
-          if (remoteJid.endsWith("@g.us") || remoteJid === "status@broadcast" || remoteJid.endsWith("@lid") || remoteJid.endsWith("@newsletter")) {
-            skipped++;
-            continue;
-          }
-
-          const pushName = chat.pushName || null;
+          const pushName = contactNameMap.get(remoteJid) || chat.pushName || null;
 
           // Resolve conversation in our DB (creates if not exists)
           const resolved = await resolveInbound(session.tenantId, session.sessionId, remoteJid, pushName);
           if (!resolved) continue;
+          if (resolved.isNew) newChats++;
 
-          // Use lastMessage from findChats response (no need for separate findMessages call)
+          // Use lastMessage from findChats response
           const lastMsg = chat.lastMessage;
           if (lastMsg) {
             const msgKey = lastMsg.key;
@@ -421,7 +453,6 @@ class WhatsAppEvolutionManager extends EventEmitter {
               ? new Date(Number(lastMsg.messageTimestamp) * 1000)
               : chat.updatedAt ? new Date(chat.updatedAt) : new Date();
 
-            // Extract content from lastMessage
             let content = "";
             if (lastMsg.message) {
               content = lastMsg.message.conversation
@@ -436,7 +467,6 @@ class WhatsAppEvolutionManager extends EventEmitter {
                 || "";
             }
 
-            // Insert message if we have a messageId and it doesn't exist yet
             if (messageId) {
               const existing = await db.select({ id: waMessages.id })
                 .from(waMessages)
@@ -462,7 +492,6 @@ class WhatsAppEvolutionManager extends EventEmitter {
               }
             }
 
-            // Update conversation with last message info
             await updateConversationLastMessage(resolved.conversationId, {
               content: content || "",
               fromMe,
@@ -479,7 +508,40 @@ class WhatsAppEvolutionManager extends EventEmitter {
         }
       }
 
-      console.log(`[EvoWA Sync] Done: ${synced} chats synced, ${skipped} skipped`);
+      console.log(`[EvoWA Sync] Done: ${synced} synced, ${newChats} new, ${skipped} skipped`);
+
+      // Batch update contactPushName for all conversations missing names
+      if (contactNameMap.size > 0) {
+        try {
+          // Get all conversations without pushName for this session
+          const convsMissingName = await db.execute(
+            sql`SELECT id, remoteJid FROM wa_conversations WHERE sessionId = ${session.sessionId} AND (contactPushName IS NULL OR contactPushName = '')`
+          );
+          const rows = (convsMissingName as any)[0] || [];
+          if (rows.length > 0) {
+            let updated = 0;
+            // Process in batches of 50 to avoid overwhelming the DB
+            for (let i = 0; i < rows.length; i += 50) {
+              const batch = rows.slice(i, i + 50);
+              const updates: Promise<any>[] = [];
+              for (const row of batch) {
+                const name = contactNameMap.get(row.remoteJid);
+                if (name) {
+                  updates.push(
+                    db.execute(sql`UPDATE wa_conversations SET contactPushName = ${name} WHERE id = ${row.id}`)
+                      .then(() => { updated++; })
+                      .catch(() => {})
+                  );
+                }
+              }
+              await Promise.all(updates);
+            }
+            if (updated > 0) console.log(`[EvoWA Sync] Updated ${updated} conversation names from contacts`);
+          }
+        } catch (e: any) {
+          console.warn(`[EvoWA Sync] Error updating contact names:`, e.message);
+        }
+      }
     } catch (error) {
       console.error("[EvoWA Sync] Error:", error);
     }
