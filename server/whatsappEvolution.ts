@@ -330,6 +330,19 @@ class WhatsAppEvolutionManager extends EventEmitter {
             status: "sent",
             timestamp: new Date(result.messageTimestamp ? result.messageTimestamp * 1000 : Date.now()),
           }).catch(() => { /* duplicate from webhook, ignore */ });
+
+          // Update wa_conversations with the latest message
+          try {
+            const resolved = await resolveInbound(session.tenantId, session.sessionId, remoteJid);
+            if (resolved) {
+              await updateConversationLastMessage(resolved.conversationId, {
+                content: text,
+                fromMe: true,
+                timestamp: new Date(result.messageTimestamp ? result.messageTimestamp * 1000 : Date.now()),
+                incrementUnread: false,
+              });
+            }
+          } catch {}
         }
       } catch (e) {
         console.error("[SendText] Failed to save sent message to DB:", e);
@@ -388,6 +401,19 @@ class WhatsAppEvolutionManager extends EventEmitter {
             status: "sent",
             timestamp: new Date(result.messageTimestamp ? result.messageTimestamp * 1000 : Date.now()),
           }).catch(() => { /* duplicate from webhook, ignore */ });
+
+          // Update wa_conversations with the latest message
+          try {
+            const resolved = await resolveInbound(session.tenantId, session.sessionId, remoteJid);
+            if (resolved) {
+              await updateConversationLastMessage(resolved.conversationId, {
+                content: caption || `[Áudio]`,
+                fromMe: true,
+                timestamp: new Date(result.messageTimestamp ? result.messageTimestamp * 1000 : Date.now()),
+                incrementUnread: false,
+              });
+            }
+          } catch {}
         }
       } catch (e) {
         console.error("[SendMedia] Failed to save sent message to DB:", e);
@@ -466,6 +492,19 @@ class WhatsAppEvolutionManager extends EventEmitter {
             timestamp: new Date(result.messageTimestamp ? result.messageTimestamp * 1000 : Date.now()),
             quotedMessageId,
           }).catch(() => { /* duplicate from webhook, ignore */ });
+
+          // Update wa_conversations with the latest message
+          try {
+            const resolved = await resolveInbound(session.tenantId, session.sessionId, remoteJid);
+            if (resolved) {
+              await updateConversationLastMessage(resolved.conversationId, {
+                content: text,
+                fromMe: true,
+                timestamp: new Date(result.messageTimestamp ? result.messageTimestamp * 1000 : Date.now()),
+                incrementUnread: false,
+              });
+            }
+          } catch {}
         }
       } catch (e) {
         console.error("[SendTextWithQuote] Failed to save sent message to DB:", e);

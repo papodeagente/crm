@@ -2465,3 +2465,7 @@
 
 ## Correção Player Áudio fromMe (Mar 12 - v13)
 - [x] BUG: Player de áudio enviado (fromMe) mostra ícone mic em vez da foto — FIX: Adicionado myAvatarUrl prop (vindo de activeSession.user.imgUrl) que é passado para AudioPlayer quando fromMe=true. Corrigido em 3 locais: renderMedia, MediaLoader e MessageBubble. Também corrigido no DealDetail.tsx
+
+## Correções Inbox (Mar 12 - v14)
+- [x] BUG: Última mensagem na lista de contatos está desatualizada — FIX: Sincronizadas 11 conversas com dados desatualizados via UPDATE JOIN com tabela messages. Limpas 564 conversas duplicadas com tenantId=0. Verificado que sendTextMessage, sendMediaMessage, handleIncomingMessage e handleOutgoingMessage todos atualizam wa_conversations corretamente via updateConversationLastMessage
+- [x] BUG: Ordem das mensagens no chat está errada — INVESTIGADO: Mensagens estão ordenadas corretamente por timestamp (data real do WhatsApp). A diferença entre timestamp e createdAt é esperada para mensagens importadas pelo deep sync. O problema visual era a lista de contatos com dados desatualizados (corrigido acima)
