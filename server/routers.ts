@@ -214,12 +214,12 @@ export const appRouter = router({
         throw new TRPCError({ code: "BAD_REQUEST", message: "A conexão via código de pareamento não está disponível com a Evolution API. Use o QR Code para conectar." });
       }),
     sessions: protectedProcedure.query(async ({ ctx }) => {
-      // For SaaS users, find sessions by tenantId (shared across the tenant)
-      // For Manus OAuth users, find by userId
-      const tenantId = ctx.saasUser?.tenantId;
+      // Each user has their own WhatsApp instance (Evolution API)
+      // Filter by the CRM userId (saasUser.id) so users only see their own sessions
+      const saasUserId = ctx.saasUser?.id;
       let dbSessions;
-      if (tenantId) {
-        dbSessions = await getSessionsByTenant(tenantId);
+      if (saasUserId) {
+        dbSessions = await getSessionsByUser(saasUserId);
       } else {
         dbSessions = await getSessionsByUser(ctx.user.id);
       }

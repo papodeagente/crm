@@ -2305,3 +2305,8 @@
 - [x] Manter notificações e badges funcionando
 - [x] Testes e validação
 - [ ] Publicar e testar em produção
+
+## Correção Inbox - Isolamento por Usuário
+- [x] BUG: Inbox mostra conversas de outros usuários mesmo sem sessão WhatsApp conectada
+- [x] Inbox deve filtrar sessões/conversas pelo userId do usuário logado
+- [x] Inbox deve mostrar tela "Conecte seu WhatsApp" quando o usuário não tem sessão ativa
