@@ -113,31 +113,142 @@ function CustomTooltip({ active, payload, label, formatter }: any) {
   );
 }
 
-/* ─── Funnel Stage Bar ─── */
-function FunnelStageBar({ stage, maxCount, index, total }: { stage: any; maxCount: number; index: number; total: number }) {
-  const widthPct = maxCount > 0 ? Math.max((stage.dealCount / maxCount) * 100, 8) : 8;
-  const color = stage.color || `hsl(${260 + index * 20}, 70%, ${60 - index * 3}%)`;
+/* ─── Visual Sales Funnel (SVG trapezoid shape) ─── */
+const FUNNEL_COLORS = [
+  "#8b5cf6", "#a78bfa", "#7c3aed", "#6d28d9", "#5b21b6",
+  "#c084fc", "#9333ea", "#7e22ce", "#6b21a8", "#581c87",
+];
+
+function VisualFunnel({ stages }: { stages: any[] }) {
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+  const totalCount = stages.reduce((s, st) => s + st.dealCount, 0) || 1;
+  const svgWidth = 500;
+  const svgHeight = stages.length * 56 + 20;
+  const topPadding = 10;
+  const stageHeight = 50;
+  const stageGap = 6;
+  const maxWidth = svgWidth - 40;
+  const minWidth = 60;
+
+  // Each stage gets a width proportional to its position (funnel narrows)
+  const stageWidths = stages.map((_, i) => {
+    const ratio = 1 - (i / Math.max(stages.length - 1, 1)) * 0.75;
+    return minWidth + (maxWidth - minWidth) * ratio;
+  });
 
   return (
-    <div className="flex items-center gap-3 group">
-      <div className="w-[100px] shrink-0 text-right">
-        <span className="text-[11px] font-medium text-muted-foreground group-hover:text-foreground transition-colors truncate block">
-          {stage.name}
-        </span>
-      </div>
-      <div className="flex-1 h-9 rounded-lg overflow-hidden bg-muted/30 relative">
-        <div
-          className="h-full rounded-lg flex items-center px-3 transition-all duration-700 ease-out relative overflow-hidden"
-          style={{ width: `${widthPct}%`, backgroundColor: color }}
-        >
-          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent" />
-          <span className="text-[11px] font-bold text-white drop-shadow-sm whitespace-nowrap relative z-10">
-            {stage.dealCount}
-          </span>
+    <div className="relative">
+      <svg
+        viewBox={`0 0 ${svgWidth} ${svgHeight}`}
+        className="w-full"
+        style={{ maxHeight: Math.min(svgHeight, 400) }}
+      >
+        <defs>
+          {stages.map((stage, i) => {
+            const color = stage.color || FUNNEL_COLORS[i % FUNNEL_COLORS.length];
+            return (
+              <linearGradient key={`grad-${i}`} id={`funnel-grad-${i}`} x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stopColor={color} stopOpacity={0.85} />
+                <stop offset="50%" stopColor={color} stopOpacity={1} />
+                <stop offset="100%" stopColor={color} stopOpacity={0.85} />
+              </linearGradient>
+            );
+          })}
+          <filter id="funnel-glow">
+            <feGaussianBlur stdDeviation="4" result="blur" />
+            <feMerge>
+              <feMergeNode in="blur" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+        </defs>
+
+        {stages.map((stage, i) => {
+          const y = topPadding + i * (stageHeight + stageGap);
+          const currentWidth = stageWidths[i];
+          const nextWidth = i < stages.length - 1 ? stageWidths[i + 1] : currentWidth * 0.7;
+          const cx = svgWidth / 2;
+          const isHovered = hoveredIndex === i;
+          const color = stage.color || FUNNEL_COLORS[i % FUNNEL_COLORS.length];
+
+          // Trapezoid points: top-left, top-right, bottom-right, bottom-left
+          const topLeft = cx - currentWidth / 2;
+          const topRight = cx + currentWidth / 2;
+          const bottomLeft = cx - nextWidth / 2;
+          const bottomRight = cx + nextWidth / 2;
+
+          const points = `${topLeft},${y} ${topRight},${y} ${bottomRight},${y + stageHeight} ${bottomLeft},${y + stageHeight}`;
+
+          return (
+            <g
+              key={stage.id || i}
+              onMouseEnter={() => setHoveredIndex(i)}
+              onMouseLeave={() => setHoveredIndex(null)}
+              className="cursor-pointer"
+              style={{ transition: "transform 0.2s" }}
+            >
+              {/* Shadow/glow on hover */}
+              {isHovered && (
+                <polygon
+                  points={points}
+                  fill={color}
+                  opacity={0.3}
+                  filter="url(#funnel-glow)"
+                />
+              )}
+              {/* Main trapezoid */}
+              <polygon
+                points={points}
+                fill={`url(#funnel-grad-${i})`}
+                stroke={isHovered ? "rgba(255,255,255,0.3)" : "rgba(255,255,255,0.08)"}
+                strokeWidth={isHovered ? 1.5 : 0.5}
+                style={{
+                  transition: "all 0.3s ease",
+                  transform: isHovered ? "scale(1.02)" : "scale(1)",
+                  transformOrigin: `${cx}px ${y + stageHeight / 2}px`,
+                }}
+              />
+              {/* Shine effect */}
+              <polygon
+                points={`${topLeft + 2},${y + 1} ${topRight - 2},${y + 1} ${topRight - 4},${y + 6} ${topLeft + 4},${y + 6}`}
+                fill="rgba(255,255,255,0.12)"
+              />
+              {/* Stage name */}
+              <text
+                x={cx}
+                y={y + stageHeight / 2 - 6}
+                textAnchor="middle"
+                className="fill-white text-[11px] font-semibold"
+                style={{ textShadow: "0 1px 3px rgba(0,0,0,0.5)" }}
+              >
+                {stage.name}
+              </text>
+              {/* Count + Value */}
+              <text
+                x={cx}
+                y={y + stageHeight / 2 + 10}
+                textAnchor="middle"
+                className="fill-white/80 text-[10px] font-medium"
+              >
+                {stage.dealCount} neg. · {formatCurrency(stage.totalValueCents)}
+              </text>
+            </g>
+          );
+        })}
+      </svg>
+
+      {/* Total summary below funnel */}
+      <div className="flex items-center justify-center gap-6 mt-3 pt-3 border-t border-border/30">
+        <div className="text-center">
+          <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">Total</span>
+          <p className="text-[14px] font-bold text-foreground">{totalCount} neg.</p>
         </div>
-      </div>
-      <div className="w-[90px] shrink-0">
-        <span className="text-[11px] font-semibold text-foreground">{formatCurrency(stage.totalValueCents)}</span>
+        <div className="text-center">
+          <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">Valor</span>
+          <p className="text-[14px] font-bold text-foreground">
+            {formatCurrency(stages.reduce((s, st) => s + st.totalValueCents, 0))}
+          </p>
+        </div>
       </div>
     </div>
   );
@@ -314,12 +425,6 @@ export default function Home() {
       Recebidas: d.received,
     }));
   }, [waMetrics]);
-
-  // Funnel max count
-  const funnelMaxCount = useMemo(() => {
-    if (!funnel?.stages) return 1;
-    return Math.max(...funnel.stages.map(s => s.dealCount), 1);
-  }, [funnel]);
 
   const greeting = (() => {
     const hour = new Date().getHours();
@@ -578,17 +683,7 @@ export default function Home() {
                 {[1, 2, 3, 4, 5].map(i => <Skeleton key={i} className="h-9 w-full" />)}
               </div>
             ) : funnel && funnel.stages.length > 0 ? (
-              <div className="space-y-2">
-                {funnel.stages.map((stage, i) => (
-                  <FunnelStageBar
-                    key={stage.id}
-                    stage={stage}
-                    maxCount={funnelMaxCount}
-                    index={i}
-                    total={funnel.stages.length}
-                  />
-                ))}
-              </div>
+              <VisualFunnel stages={funnel.stages} />
             ) : (
               <div className="py-12 text-center text-muted-foreground text-sm">
                 Nenhuma etapa configurada

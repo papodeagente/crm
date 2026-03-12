@@ -2488,3 +2488,4 @@
 - [x] Filtro por status de negociação (em andamento/ganho/perdido/todos)
 - [x] Ticket médio e origens de leads na taxa de conversão
 - [x] Resolução de tenantId para owner via Manus OAuth (busca CRM user)
+- [x] Redesign funil de vendas no dashboard: funil SVG real com trapézios que diminuem, gradientes, efeito de brilho, hover com glow, e resumo total abaixo
