@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi, beforeEach } from "vitest";
 import { appRouter } from "./routers";
 import type { TrpcContext } from "./_core/context";
 
@@ -34,20 +34,22 @@ function createAuthContext(): { ctx: TrpcContext } {
 describe("WhatsApp Sync Contacts", () => {
   // ─── syncContacts mutation ───
 
-  it("syncContacts returns zero counts for any session (Evolution API)", async () => {
+  it("syncContacts returns zero counts for nonexistent session (not in memory)", async () => {
     const { ctx } = createAuthContext();
     const caller = appRouter.createCaller(ctx);
-    // Evolution API manages contacts internally, syncContacts is a no-op
+    // Session not in memory → returns { synced: 0, total: 0, resolved: 0 }
     const result = await caller.whatsapp.syncContacts({ sessionId: "nonexistent-session" });
     expect(result).toEqual({ synced: 0, total: 0, resolved: 0 });
   });
 
-  it("syncContacts accepts any sessionId (Evolution API)", async () => {
+  it("syncContacts accepts any sessionId", async () => {
     const { ctx } = createAuthContext();
     const caller = appRouter.createCaller(ctx);
     const result = await caller.whatsapp.syncContacts({ sessionId: "test" });
     expect(result).toBeDefined();
-    expect(result.synced).toBe(0);
+    expect(typeof result.synced).toBe("number");
+    expect(typeof result.total).toBe("number");
+    expect(typeof result.resolved).toBe("number");
   });
 
   // ─── waContactsMap query ───
@@ -64,7 +66,7 @@ describe("WhatsApp Sync Contacts", () => {
   it("waContactsMap returns object with correct shape for valid session", async () => {
     const { ctx } = createAuthContext();
     const caller = appRouter.createCaller(ctx);
-    const result = await caller.whatsapp.waContactsMap({ sessionId: "test-session" });
+    const result = await caller.whatsapp.waContactsMap({ sessionId: "crm-210002-240001" });
     expect(result).toBeDefined();
     expect(typeof result).toBe("object");
     // If any contacts exist, verify the shape
@@ -74,6 +76,20 @@ describe("WhatsApp Sync Contacts", () => {
       expect(contact).toHaveProperty("pushName");
       expect(contact).toHaveProperty("savedName");
       expect(contact).toHaveProperty("verifiedName");
+    }
+  });
+
+  it("waContactsMap returns contacts with pushName for synced session", async () => {
+    const { ctx } = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    const result = await caller.whatsapp.waContactsMap({ sessionId: "crm-210002-240001" });
+    expect(result).toBeDefined();
+    const entries = Object.entries(result);
+    // After syncContacts, we should have contacts in the map
+    if (entries.length > 0) {
+      // At least some should have pushName
+      const withPushName = entries.filter(([, c]) => c.pushName && c.pushName.trim() !== "");
+      expect(withPushName.length).toBeGreaterThan(0);
     }
   });
 

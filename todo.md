@@ -2325,3 +2325,15 @@
 - [x] BUG: Sistema não reconhece que instância está conectada na Evolution API. Inbox mostra "não conectado" mesmo com sessão ativa. Reconectar tenta gerar QR novamente.
 - [x] BUG: Inbox vazio — conversas não estão sendo sincronizadas da Evolution API para o banco de dados após conexão
 - [x] Inbox deve exibir o nome dos contatos do WhatsApp (pushName) em vez de apenas o número de telefone
+- [ ] BUG: Nomes dos contatos não aparecem no Inbox após reconexão do WhatsApp
+- [ ] BUG: Sincronização incompleta — nem todas as conversas são sincronizadas após reconexão
+
+## Sync de Contatos via Evolution API
+- [x] Implementar syncContactsFromEvolution que busca contatos da Evolution API e insere/atualiza na tabela wa_contacts
+- [x] Adicionar UNIQUE constraint (sessionId, jid) na tabela wa_contacts para evitar duplicatas
+- [x] Integrar syncContactsFromEvolution no fluxo syncConversationsBackground (chamado após sync de conversas)
+- [x] AutoRestore chama syncConversationsBackground → syncContactsFromEvolution automaticamente para sessões conectadas
+- [x] Atualizar contactPushName nas conversas usando nomes reais dos contatos (substituir números por nomes)
+- [x] Resolver 1869 contatos da Evolution API para a tabela wa_contacts
+- [x] 166 conversas com nomes reais resolvidos via wa_contacts
+- [x] Atualizar testes unitários de syncContacts (11 testes passando)

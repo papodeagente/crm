@@ -1,0 +1,50 @@
+{
+  "query": "SELECT jid, pushName FROM wa_contacts WHERE sessionId = 'crm-210002-240001' AND pushName IS NOT NULL AND pushName != '' LIMIT 10",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute SELECT jid, pushName FROM wa_contacts WHERE sessionId = 'crm-210002-240001' AND pushName IS NOT NULL AND pushName != '' LIMIT 10",
+  "rows": [
+    {
+      "jid": "120363296675015574@g.us",
+      "pushName": "EQUIPE BOX TOUR"
+    },
+    {
+      "jid": "120363282446394142@g.us",
+      "pushName": "#31 ↗️ VENDE-C"
+    },
+    {
+      "jid": "120363197609525306@g.us",
+      "pushName": "COMUNIDADE - DUARTE TRAVELS"
+    },
+    {
+      "jid": "120363235516112768@g.us",
+      "pushName": "Gestão Aceleradora "
+    },
+    {
+      "jid": "120363152180625370@g.us",
+      "pushName": "Travel Tech Hub"
+    },
+    {
+      "jid": "120363309369446914@g.us",
+      "pushName": "Trippers Club | Aceleradora"
+    },
+    {
+      "jid": "120363269390316873@g.us",
+      "pushName": "ENTUR - CONTABILIDADE"
+    },
+    {
+      "jid": "120363317483248461@g.us",
+      "pushName": "Linkka - Seguro Viagem - Entur"
+    },
+    {
+      "jid": "120363236046736994@g.us",
+      "pushName": "Entur & Linkka "
+    },
+    {
+      "jid": "120363320593742600@g.us",
+      "pushName": "56005 -ENTUR - Arrisca"
+    }
+  ],
+  "messages": [],
+  "stdout": "jid\tpushName\n120363296675015574@g.us\tEQUIPE BOX TOUR\n120363282446394142@g.us\t#31 ↗️ VENDE-C\n120363197609525306@g.us\tCOMUNIDADE - DUARTE TRAVELS\n120363235516112768@g.us\tGestão Aceleradora \n120363152180625370@g.us\tTravel Tech Hub\n120363309369446914@g.us\tTrippers Club | Aceleradora\n120363269390316873@g.us\tENTUR - CONTABILIDADE\n120363317483248461@g.us\tLinkka - Seguro Viagem - Entur\n120363236046736994@g.us\tEntur & Linkka \n120363320593742600@g.us\t56005 -ENTUR - Arrisca\n",
+  "stderr": "",
+  "execution_time_ms": 350
+}

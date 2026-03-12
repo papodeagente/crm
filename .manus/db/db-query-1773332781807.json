@@ -1,0 +1,14 @@
+{
+  "query": "SELECT COUNT(*) as total, SUM(CASE WHEN pushName IS NOT NULL AND pushName != '' THEN 1 ELSE 0 END) as with_name FROM wa_contacts WHERE sessionId = 'crm-210002-240001'",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute SELECT COUNT(*) as total, SUM(CASE WHEN pushName IS NOT NULL AND pushName != '' THEN 1 ELSE 0 END) as with_name FROM wa_contacts WHERE sessionId = 'crm-210002-240001'",
+  "rows": [
+    {
+      "total": "1868",
+      "with_name": "1863"
+    }
+  ],
+  "messages": [],
+  "stdout": "total\twith_name\n1868\t1863\n",
+  "stderr": "",
+  "execution_time_ms": 381
+}

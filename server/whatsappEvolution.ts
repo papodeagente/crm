@@ -14,7 +14,7 @@
 
 import { EventEmitter } from "events";
 import { getDb } from "./db";
-import { whatsappSessions, waMessages, waConversations } from "../drizzle/schema";
+import { whatsappSessions, waMessages, waConversations, waContacts } from "../drizzle/schema";
 import { eq, and, sql, desc } from "drizzle-orm";
 import * as evo from "./evolutionApi";
 import { resolveInbound, updateConversationLastMessage } from "./conversationResolver";
@@ -334,7 +334,145 @@ class WhatsAppEvolutionManager extends EventEmitter {
   // ─── SYNC CONTACTS (interface compatibility) ───
 
   async syncContacts(sessionId: string): Promise<{ synced: number; total: number; resolved: number }> {
-    return { synced: 0, total: 0, resolved: 0 };
+    const session = this.sessions.get(sessionId);
+    if (!session || session.status !== "connected") {
+      return { synced: 0, total: 0, resolved: 0 };
+    }
+    return this.syncContactsFromEvolution(session);
+  }
+
+  /**
+   * Fetch contacts from Evolution API and upsert into wa_contacts table.
+   * Called during sync and on connect.
+   */
+  private async syncContactsFromEvolution(session: EvolutionSessionState): Promise<{ synced: number; total: number; resolved: number }> {
+    try {
+      const db = await getDb();
+      if (!db) return { synced: 0, total: 0, resolved: 0 };
+
+      const contacts = await evo.findContacts(session.instanceName);
+      console.log(`[EvoWA Contacts] Fetched ${contacts.length} contacts from Evolution API`);
+
+      if (contacts.length === 0) return { synced: 0, total: 0, resolved: 0 };
+
+      // Get existing contacts for this session
+      const existing = await db.select({ jid: waContacts.jid })
+        .from(waContacts)
+        .where(eq(waContacts.sessionId, session.sessionId));
+      const existingJids = new Set(existing.map(c => c.jid));
+
+      let synced = 0;
+      // Process in batches of 100
+      for (let i = 0; i < contacts.length; i += 100) {
+        const batch = contacts.slice(i, i + 100);
+        const inserts: any[] = [];
+        const updates: Promise<any>[] = [];
+
+        for (const c of batch) {
+          if (!c.remoteJid) continue;
+          const pushName = c.pushName || null;
+          const profilePictureUrl = c.profilePicUrl || null;
+
+          if (existingJids.has(c.remoteJid)) {
+            // Update existing contact if pushName changed
+            if (pushName) {
+              updates.push(
+                db.update(waContacts)
+                  .set({ pushName, profilePictureUrl })
+                  .where(and(
+                    eq(waContacts.sessionId, session.sessionId),
+                    eq(waContacts.jid, c.remoteJid)
+                  ))
+                  .then(() => { synced++; })
+                  .catch(() => {})
+              );
+            }
+          } else {
+            // Insert new contact
+            inserts.push({
+              sessionId: session.sessionId,
+              jid: c.remoteJid,
+              phoneNumber: c.remoteJid.endsWith('@s.whatsapp.net') ? c.remoteJid : null,
+              pushName,
+              savedName: null,
+              verifiedName: null,
+              profilePictureUrl,
+            });
+            synced++;
+          }
+        }
+
+        if (inserts.length > 0) {
+          await db.insert(waContacts).values(inserts).onDuplicateKeyUpdate({
+            set: { pushName: sql`VALUES(pushName)` },
+          }).catch(() => {
+            // Fallback: insert one by one
+            return Promise.all(inserts.map(ins =>
+              db.insert(waContacts).values(ins).catch(() => {})
+            ));
+          });
+        }
+        await Promise.all(updates);
+      }
+
+      console.log(`[EvoWA Contacts] Synced ${synced} contacts to DB (total: ${contacts.length})`);
+
+      // Also update contactPushName in wa_conversations for conversations that have a matching contact
+      // This ensures the conversation list shows real names instead of phone numbers
+      try {
+        const isRealName = (name: string | null | undefined): name is string => {
+          if (!name || name.trim() === '') return false;
+          if (name === 'Você' || name === 'You') return false;
+          const cleaned = name.replace(/[\s\-\(\)\+]/g, '');
+          if (/^\d+$/.test(cleaned)) return false;
+          return true;
+        };
+
+        // Build a map of jid -> real pushName from contacts
+        const contactNameMap = new Map<string, string>();
+        for (const c of contacts) {
+          if (c.remoteJid && isRealName(c.pushName)) {
+            contactNameMap.set(c.remoteJid, c.pushName!);
+          }
+        }
+
+        // Get conversations missing real names
+        const convsMissingName = await db.execute(
+          sql`SELECT id, remoteJid, contactPushName FROM wa_conversations WHERE sessionId = ${session.sessionId}`
+        );
+        const convRows = (convsMissingName as any)[0] || [];
+        let resolved = 0;
+
+        for (let i = 0; i < convRows.length; i += 50) {
+          const batch = convRows.slice(i, i + 50);
+          const updates: Promise<any>[] = [];
+          for (const row of batch) {
+            const currentName = row.contactPushName;
+            const newName = contactNameMap.get(row.remoteJid);
+            // Update if: no name, or current name is just a phone number
+            if (newName && (!isRealName(currentName))) {
+              updates.push(
+                db.execute(sql`UPDATE wa_conversations SET contactPushName = ${newName} WHERE id = ${row.id}`)
+                  .then(() => { resolved++; })
+                  .catch(() => {})
+              );
+            }
+          }
+          await Promise.all(updates);
+        }
+
+        if (resolved > 0) {
+          console.log(`[EvoWA Contacts] Updated ${resolved} conversation names from contacts`);
+        }
+      } catch (e: any) {
+        console.warn(`[EvoWA Contacts] Error updating conversation names:`, e.message);
+      }
+
+      return { synced, total: contacts.length, resolved: 0 };
+    } catch (error: any) {
+      console.error("[EvoWA Contacts] Error syncing contacts:", error.message);
+      return { synced: 0, total: 0, resolved: 0 };
+    }
   }
 
   // ─── SYNC CONVERSATIONS ───
@@ -390,11 +528,34 @@ class WhatsAppEvolutionManager extends EventEmitter {
       ]);
       console.log(`[EvoWA Sync] Found ${chats.length} chats, ${contacts.length} contacts on Evolution API`);
 
-      // Build a map of remoteJid -> pushName from contacts
+      // Build a UNIFIED name map from multiple sources:
+      // Priority: contacts.pushName > chat.name > lastMessage.pushName
       const contactNameMap = new Map<string, string>();
+      
+      // 1) From contacts (highest priority - these are the contact names)
       for (const contact of contacts) {
-        if (contact.remoteJid && contact.pushName) {
+        if (contact.remoteJid && contact.pushName && contact.pushName.trim() !== '') {
           contactNameMap.set(contact.remoteJid, contact.pushName);
+        }
+      }
+      
+      // Helper: check if a string is a real name (not a phone number or "Você")
+      const isRealName = (name: string | null | undefined): name is string => {
+        if (!name || name.trim() === '') return false;
+        if (name === 'Você' || name === 'You') return false;
+        // If it's only digits (with optional +, spaces, dashes), it's a phone number
+        const cleaned = name.replace(/[\s\-\(\)\+]/g, '');
+        if (/^\d+$/.test(cleaned)) return false;
+        return true;
+      };
+
+      // 2) From chats - use chat.name (saved contact name in WhatsApp) and lastMessage.pushName
+      for (const chat of chats) {
+        if (chat.remoteJid && !contactNameMap.has(chat.remoteJid)) {
+          const name = chat.name || chat.pushName || (chat.lastMessage?.pushName);
+          if (isRealName(name)) {
+            contactNameMap.set(chat.remoteJid, name);
+          }
         }
       }
 
@@ -435,7 +596,8 @@ class WhatsAppEvolutionManager extends EventEmitter {
       for (const chat of chatsToProcess) {
         try {
           const remoteJid = chat.remoteJid;
-          const pushName = contactNameMap.get(remoteJid) || chat.pushName || null;
+          const candidateName = contactNameMap.get(remoteJid) || chat.name || chat.pushName || chat.lastMessage?.pushName || null;
+          const pushName = isRealName(candidateName) ? candidateName : null;
 
           // Resolve conversation in our DB (creates if not exists)
           const resolved = await resolveInbound(session.tenantId, session.sessionId, remoteJid, pushName);
@@ -526,7 +688,7 @@ class WhatsAppEvolutionManager extends EventEmitter {
               const updates: Promise<any>[] = [];
               for (const row of batch) {
                 const name = contactNameMap.get(row.remoteJid);
-                if (name) {
+                if (name && isRealName(name)) {
                   updates.push(
                     db.execute(sql`UPDATE wa_conversations SET contactPushName = ${name} WHERE id = ${row.id}`)
                       .then(() => { updated++; })
@@ -542,6 +704,11 @@ class WhatsAppEvolutionManager extends EventEmitter {
           console.warn(`[EvoWA Sync] Error updating contact names:`, e.message);
         }
       }
+
+      // ─── SYNC CONTACTS TO wa_contacts TABLE ───
+      // This populates the wa_contacts table which the Inbox uses for name resolution
+      await this.syncContactsFromEvolution(session);
+
     } catch (error) {
       console.error("[EvoWA Sync] Error:", error);
     }

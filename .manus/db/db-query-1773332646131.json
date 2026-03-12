@@ -1,0 +1,28 @@
+{
+  "query": "SELECT COUNT(*) as total FROM wa_contacts; SELECT sessionId, jid, COUNT(*) as cnt FROM wa_contacts GROUP BY sessionId, jid HAVING cnt > 1 LIMIT 5;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute SELECT COUNT(*) as total FROM wa_contacts; SELECT sessionId, jid, COUNT(*) as cnt FROM wa_contacts GROUP BY sessionId, jid HAVING cnt > 1 LIMIT 5;",
+  "rows": [
+    {
+      "total": "7740"
+    },
+    {
+      "total": "sessionId\tjid\tcnt"
+    },
+    {
+      "total": "Boxtour\t105940351217679@lid\t2"
+    },
+    {
+      "total": "Boxtour\t152282679234701@lid\t2"
+    },
+    {
+      "total": "Boxtour\t28441457999999@lid\t2"
+    },
+    {
+      "total": "Boxtour\t93265332289755@lid\t2"
+    }
+  ],
+  "messages": [],
+  "stdout": "total\n7740\nsessionId\tjid\tcnt\nBoxtour\t105940351217679@lid\t2\nBoxtour\t152282679234701@lid\t2\nBoxtour\t28441457999999@lid\t2\nBoxtour\t93265332289755@lid\t2\n",
+  "stderr": "",
+  "execution_time_ms": 432
+}
