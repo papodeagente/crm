@@ -1,0 +1,9 @@
+{
+  "query": "UPDATE wa_conversations c\nJOIN wa_contacts wc ON c.remoteJid = wc.jid AND c.sessionId = wc.sessionId\nSET c.contactPushName = COALESCE(wc.savedName, wc.verifiedName, wc.pushName)\nWHERE (c.contactPushName IS NULL OR c.contactPushName = '' OR c.contactPushName REGEXP '^[0-9+\\\\-\\\\s\\\\(\\\\)]+$')\nAND (wc.savedName IS NOT NULL AND wc.savedName != '' AND wc.savedName NOT REGEXP '^[0-9+\\\\-\\\\s\\\\(\\\\)]+$')",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute UPDATE wa_conversations c\nJOIN wa_contacts wc ON c.remoteJid = wc.jid AND c.sessionId = wc.sessionId\nSET c.contactPushName = COALESCE(wc.savedName, wc.verifiedName, wc.pushName)\nWHERE (c.contactPushName IS NULL OR c.contactPushName = '' OR c.contactPushName REGEXP '^[0-9+\\\\-\\\\s\\\\(\\\\)]+$')\nAND (wc.savedName IS NOT NULL AND wc.savedName != '' AND wc.savedName NOT REGEXP '^[0-9+\\\\-\\\\s\\\\(\\\\)]+$')",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 171
+}

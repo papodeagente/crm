@@ -858,6 +858,12 @@ export default function InboxPage() {
     return null;
   }, [contactNameMap, waContactsMap]);
 
+  const isRealName = useCallback((name: string | null | undefined): boolean => {
+    if (!name || !name.trim()) return false;
+    const cleaned = name.replace(/[\s\-\(\)\+]/g, "");
+    return !/^\d+$/.test(cleaned);
+  }, []);
+
   const getDisplayName = useCallback((jid: string) => {
     // 1. CRM contact match (direct or via LID resolution)
     const contact = getContactForJid(jid);
@@ -865,22 +871,22 @@ export default function InboxPage() {
     // 2. WA Contacts map (savedName > verifiedName > pushName from Baileys sync)
     const waContact = waContactsMap[jid];
     if (waContact) {
-      if (waContact.savedName) return waContact.savedName;
-      if (waContact.verifiedName) return waContact.verifiedName;
-      if (waContact.pushName) return waContact.pushName;
-      // If we have a phone number, format it nicely
-      if (waContact.phoneNumber) return formatPhoneNumber(waContact.phoneNumber);
+      if (isRealName(waContact.savedName)) return waContact.savedName!;
+      if (isRealName(waContact.verifiedName)) return waContact.verifiedName!;
+      if (isRealName(waContact.pushName)) return waContact.pushName!;
     }
-    // 3. PushName from conversation data
+    // 3. PushName from conversation data (only if it's a real name, not a phone number)
     const pushName = pushNameMap.get(jid);
-    if (pushName) return pushName;
+    if (isRealName(pushName)) return pushName!;
     // 4. For LID JIDs, try to show a resolved phone number instead of the LID
     if (jid.endsWith("@lid")) {
+      // Try to get phone number from waContactsMap
+      if (waContact?.phoneNumber) return formatPhoneNumber(waContact.phoneNumber);
       return "Contato WhatsApp";
     }
     // 5. Format the phone number from the JID
     return formatPhoneNumber(jid);
-  }, [getContactForJid, pushNameMap, waContactsMap]);
+  }, [getContactForJid, pushNameMap, waContactsMap, isRealName]);
 
   // Notification sound on new messages
   useEffect(() => {

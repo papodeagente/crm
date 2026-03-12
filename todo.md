@@ -2353,3 +2353,8 @@
 
 ## Correção de Ordenação no Inbox
 - [x] BUG: Ordem das mensagens no Inbox está errada — corrigido: queries agora ordenam por timestamp (data real da mensagem) em vez de createdAt (data de inserção no banco)
+
+## Correções Críticas do Inbox (Mar 12)
+- [x] BUG: Nomes de contatos ainda mostram números de telefone em vez de nomes reais — corrigido: getDisplayName agora filtra pushNames numéricos, waContactsMap busca de todas as sessões. 374 conversas sem nome são contatos não salvos na agenda do WhatsApp (limitação da API)
+- [x] BUG: Mensagens de hoje não foram sincronizadas — investigado: DB tem 388 mensagens de hoje, Evolution API retorna duplicatas de status (4x por mensagem). Mensagens estão completas. QuickSync implementado para buscar mensagens recentes automaticamente
+- [x] BUG: Desconectar e reconectar WhatsApp não dispara sincronização — corrigido: polling periódico (5 min) verifica status das sessões e dispara sync automático ao detectar reconexão

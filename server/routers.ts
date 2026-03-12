@@ -457,18 +457,29 @@ export const appRouter = router({
         const db = await getDb();
         if (!db) return {};
         const { waContacts } = await import("../drizzle/schema");
+        // Search contacts from ALL sessions to maximize name coverage
+        // (contacts from old sessions like 'Whatsapp' have savedName data)
         const rows = await db.select().from(waContacts)
-          .where(eq(waContacts.sessionId, input.sessionId))
-          .limit(5000);
+          .where(sql`${waContacts.jid} LIKE '%@s.whatsapp.net'`);
         // Build a map: jid -> { phoneNumber, pushName, savedName, verifiedName }
+        // Merge duplicates: keep the best data from each record
         const map: Record<string, { phoneNumber: string | null; pushName: string | null; savedName: string | null; verifiedName: string | null }> = {};
         for (const r of rows) {
-          map[r.jid] = {
-            phoneNumber: r.phoneNumber,
-            pushName: r.pushName,
-            savedName: r.savedName,
-            verifiedName: r.verifiedName,
-          };
+          const existing = map[r.jid];
+          if (!existing) {
+            map[r.jid] = {
+              phoneNumber: r.phoneNumber,
+              pushName: r.pushName,
+              savedName: r.savedName,
+              verifiedName: r.verifiedName,
+            };
+          } else {
+            // Merge: prefer non-null values
+            if (r.savedName && !existing.savedName) existing.savedName = r.savedName;
+            if (r.verifiedName && !existing.verifiedName) existing.verifiedName = r.verifiedName;
+            if (r.pushName && !existing.pushName) existing.pushName = r.pushName;
+            if (r.phoneNumber && !existing.phoneNumber) existing.phoneNumber = r.phoneNumber;
+          }
         }
         return map;
       }),

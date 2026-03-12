@@ -172,6 +172,9 @@ async function startServer() {
       whatsappManager.autoRestoreSessions().catch(e => {
         console.error("[WA AutoRestore] Error:", e);
       });
+      // Start periodic polling to detect reconnections and sync new messages
+      // Fallback for when webhooks don't arrive
+      whatsappManager.startPeriodicSync(5 * 60 * 1000); // Every 5 minutes
     }, 10_000);
   });
 }

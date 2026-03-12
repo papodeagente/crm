@@ -428,12 +428,32 @@ class WhatsAppEvolutionManager extends EventEmitter {
           return true;
         };
 
-        // Build a map of jid -> real pushName from contacts
+        // Build a map of jid -> best name from contacts
+        // Use API data (pushName) + DB data (savedName, verifiedName) for best coverage
         const contactNameMap = new Map<string, string>();
+        
+        // First, get names from API contacts
         for (const c of contacts) {
-          if (c.remoteJid && isRealName(c.pushName)) {
+          if (!c.remoteJid) continue;
+          if (isRealName(c.pushName)) {
             contactNameMap.set(c.remoteJid, c.pushName!);
           }
+        }
+        
+        // Then, enrich with saved/verified names from DB (these override pushName)
+        try {
+          const dbContacts = await db.execute(
+            sql`SELECT jid, pushName, savedName, verifiedName FROM wa_contacts WHERE jid LIKE '%@s.whatsapp.net'`
+          );
+          const dbRows = (dbContacts as any)[0] || [];
+          for (const r of dbRows) {
+            const bestName = r.savedName || r.verifiedName || r.pushName;
+            if (isRealName(bestName)) {
+              contactNameMap.set(r.jid, bestName);
+            }
+          }
+        } catch (e: any) {
+          console.warn(`[EvoWA Contacts] Error reading DB contacts:`, e.message);
         }
 
         // Get conversations missing real names
@@ -671,28 +691,32 @@ class WhatsAppEvolutionManager extends EventEmitter {
 
       console.log(`[EvoWA Sync] Done: ${synced} synced, ${newChats} new, ${skipped} skipped`);
 
-      // Batch update contactPushName for all conversations missing names
+      // Batch update contactPushName for all conversations that are missing names OR have phone numbers as names
       if (contactNameMap.size > 0) {
         try {
-          // Get all conversations without pushName for this session
-          const convsMissingName = await db.execute(
-            sql`SELECT id, remoteJid FROM wa_conversations WHERE sessionId = ${session.sessionId} AND (contactPushName IS NULL OR contactPushName = '')`
+          // Get ALL conversations for this session (not just those without names)
+          // We also want to replace phone-number-as-name with real names
+          const allConvs = await db.execute(
+            sql`SELECT id, remoteJid, contactPushName FROM wa_conversations WHERE sessionId = ${session.sessionId}`
           );
-          const rows = (convsMissingName as any)[0] || [];
-          if (rows.length > 0) {
+          const convRows = (allConvs as any)[0] || [];
+          if (convRows.length > 0) {
             let updated = 0;
-            // Process in batches of 50 to avoid overwhelming the DB
-            for (let i = 0; i < rows.length; i += 50) {
-              const batch = rows.slice(i, i + 50);
+            for (let i = 0; i < convRows.length; i += 50) {
+              const batch = convRows.slice(i, i + 50);
               const updates: Promise<any>[] = [];
               for (const row of batch) {
-                const name = contactNameMap.get(row.remoteJid);
-                if (name && isRealName(name)) {
-                  updates.push(
-                    db.execute(sql`UPDATE wa_conversations SET contactPushName = ${name} WHERE id = ${row.id}`)
-                      .then(() => { updated++; })
-                      .catch(() => {})
-                  );
+                const newName = contactNameMap.get(row.remoteJid);
+                if (newName && isRealName(newName)) {
+                  // Update if: no name, empty name, or current name is a phone number
+                  const currentName = row.contactPushName;
+                  if (!isRealName(currentName) || currentName !== newName) {
+                    updates.push(
+                      db.execute(sql`UPDATE wa_conversations SET contactPushName = ${newName} WHERE id = ${row.id}`)
+                        .then(() => { updated++; })
+                        .catch(() => {})
+                    );
+                  }
                 }
               }
               await Promise.all(updates);
@@ -708,10 +732,11 @@ class WhatsAppEvolutionManager extends EventEmitter {
       // This populates the wa_contacts table which the Inbox uses for name resolution
       await this.syncContactsFromEvolution(session);
 
-      // ─── DEEP SYNC: Fetch ALL messages for each conversation ───
-      // This runs in background and fetches full message history from Evolution API
-      this.deepSyncMessages(session, individualChats).catch(e =>
-        console.error("[EvoWA DeepSync] Background error:", e)
+      // ─── QUICK SYNC: Fetch recent messages for active conversations ───
+      // Instead of deep sync (which takes too long), fetch the last 3 pages of messages
+      // for each conversation to catch up on recent activity
+      this.quickSyncRecentMessages(session, individualChats).catch(e =>
+        console.error("[EvoWA QuickSync] Background error:", e)
       );
 
     } catch (error) {
@@ -1219,6 +1244,191 @@ class WhatsAppEvolutionManager extends EventEmitter {
     }
   }
 
+  // ─── QUICK SYNC RECENT MESSAGES ───
+  // Fetches only the last 3 pages (~150 messages) per conversation.
+  // Much faster than deep sync — designed to catch up on recent activity.
+  // Runs automatically after each conversation sync.
+
+  private quickSyncInProgress = new Set<string>();
+
+  private async quickSyncRecentMessages(
+    session: EvolutionSessionState,
+    chats: any[]
+  ): Promise<void> {
+    if (this.quickSyncInProgress.has(session.sessionId)) {
+      console.log(`[EvoWA QuickSync] Already in progress for ${session.sessionId}, skipping`);
+      return;
+    }
+    this.quickSyncInProgress.add(session.sessionId);
+
+    try {
+      const db = await getDb();
+      if (!db) return;
+
+      console.log(`[EvoWA QuickSync] Starting quick sync for ${session.instanceName} (${chats.length} chats)`);
+
+      // Get existing messageIds for this session to avoid duplicates
+      const existingMsgIds = new Set<string>();
+      const existingRows = await db.execute(
+        sql`SELECT messageId FROM messages WHERE sessionId = ${session.sessionId} AND messageId IS NOT NULL`
+      );
+      const rows = (existingRows as any)[0] || [];
+      for (const r of rows) {
+        if (r.messageId) existingMsgIds.add(r.messageId);
+      }
+
+      const isRealName = (name: string | null | undefined): name is string => {
+        if (!name || name.trim() === '') return false;
+        if (name === 'Voc\u00ea' || name === 'You') return false;
+        const cleaned = name.replace(/[\s\-\(\)\+]/g, '');
+        if (/^\d+$/.test(cleaned)) return false;
+        return true;
+      };
+
+      const discoveredNames = new Map<string, string>();
+      let totalInserted = 0;
+      let totalSkipped = 0;
+      let chatsProcessed = 0;
+
+      // Sort chats by most recent activity first
+      const sortedChats = [...chats].sort((a: any, b: any) => {
+        const tsA = a.lastMessage?.messageTimestamp || 0;
+        const tsB = b.lastMessage?.messageTimestamp || 0;
+        return Number(tsB) - Number(tsA);
+      });
+
+      for (const chat of sortedChats) {
+        const remoteJid = chat.remoteJid;
+        if (!remoteJid) continue;
+
+        try {
+          // Only fetch 3 pages (up to 150 messages) per conversation
+          const maxPages = 3;
+          for (let page = 1; page <= maxPages; page++) {
+            const messages = await evo.findMessages(session.instanceName, remoteJid, {
+              limit: 50,
+              page,
+            });
+
+            if (!messages || messages.length === 0) break;
+
+            const insertBatch: any[] = [];
+
+            for (const msg of messages) {
+              const msgId = msg.key?.id;
+              if (!msgId) continue;
+
+              if (existingMsgIds.has(msgId)) {
+                totalSkipped++;
+                continue;
+              }
+
+              const fromMe = msg.key?.fromMe || false;
+              const messageType = msg.messageType || 'conversation';
+              const timestamp = msg.messageTimestamp
+                ? new Date(Number(msg.messageTimestamp) * 1000)
+                : new Date();
+              const pushName = msg.pushName || null;
+
+              const msgContent = msg.message;
+              let content = '';
+              if (msgContent) {
+                content = msgContent.conversation
+                  || msgContent.extendedTextMessage?.text
+                  || (msgContent.imageMessage?.caption ? `[Imagem] ${msgContent.imageMessage.caption}` : '')
+                  || (msgContent.imageMessage ? '[Imagem]' : '')
+                  || (msgContent.videoMessage?.caption ? `[V\u00eddeo] ${msgContent.videoMessage.caption}` : '')
+                  || (msgContent.videoMessage ? '[V\u00eddeo]' : '')
+                  || (msgContent.audioMessage ? '[\u00c1udio]' : '')
+                  || (msgContent.documentMessage ? `[Documento] ${msgContent.documentMessage.fileName || ''}` : '')
+                  || (msgContent.stickerMessage ? '[Sticker]' : '')
+                  || (msgContent.contactMessage ? `[Contato] ${msgContent.contactMessage.displayName || ''}` : '')
+                  || (msgContent.locationMessage ? '[Localiza\u00e7\u00e3o]' : '')
+                  || '';
+              }
+
+              if (!fromMe && isRealName(pushName) && !discoveredNames.has(remoteJid)) {
+                discoveredNames.set(remoteJid, pushName!);
+              }
+
+              insertBatch.push({
+                sessionId: session.sessionId,
+                tenantId: session.tenantId,
+                messageId: msgId,
+                remoteJid,
+                fromMe,
+                messageType,
+                content: content || null,
+                pushName: pushName || null,
+                status: fromMe ? 'sent' : 'received',
+                timestamp,
+              });
+
+              existingMsgIds.add(msgId);
+            }
+
+            if (insertBatch.length > 0) {
+              try {
+                for (let i = 0; i < insertBatch.length; i += 20) {
+                  const subBatch = insertBatch.slice(i, i + 20);
+                  await db.insert(waMessages).values(subBatch).catch(async () => {
+                    for (const item of subBatch) {
+                      await db.insert(waMessages).values(item).catch(() => {});
+                    }
+                  });
+                }
+                totalInserted += insertBatch.length;
+              } catch (e: any) {
+                console.warn(`[EvoWA QuickSync] Batch insert error for ${remoteJid}:`, e.message);
+              }
+            }
+
+            await new Promise(resolve => setTimeout(resolve, 50));
+          }
+
+          chatsProcessed++;
+          if (chatsProcessed % 100 === 0) {
+            console.log(`[EvoWA QuickSync] Progress: ${chatsProcessed}/${sortedChats.length} chats, ${totalInserted} new messages`);
+          }
+          await new Promise(resolve => setTimeout(resolve, 30));
+        } catch (e: any) {
+          console.warn(`[EvoWA QuickSync] Error syncing ${remoteJid}:`, e.message);
+        }
+      }
+
+      console.log(`[EvoWA QuickSync] Complete: ${chatsProcessed} chats, ${totalInserted} new messages, ${totalSkipped} skipped`);
+
+      // Update conversation names from discovered pushNames
+      if (discoveredNames.size > 0) {
+        try {
+          const allConvs = await db.execute(
+            sql`SELECT id, remoteJid, contactPushName FROM wa_conversations WHERE sessionId = ${session.sessionId}`
+          );
+          const convRows = (allConvs as any)[0] || [];
+          let namesUpdated = 0;
+
+          for (const row of convRows) {
+            const name = discoveredNames.get(row.remoteJid);
+            if (name && isRealName(name) && !isRealName(row.contactPushName)) {
+              await db.execute(
+                sql`UPDATE wa_conversations SET contactPushName = ${name} WHERE id = ${row.id}`
+              ).catch(() => {});
+              namesUpdated++;
+            }
+          }
+
+          if (namesUpdated > 0) {
+            console.log(`[EvoWA QuickSync] Updated ${namesUpdated} conversation names from message pushNames`);
+          }
+        } catch (e: any) {
+          console.warn(`[EvoWA QuickSync] Error updating names:`, e.message);
+        }
+      }
+    } finally {
+      this.quickSyncInProgress.delete(session.sessionId);
+    }
+  }
+
   // ─── DEEP SYNC MESSAGES ───
   // Fetches ALL messages for each conversation from Evolution API using pagination.
   // Deduplicates by messageId. Extracts pushName from messages for name resolution.
@@ -1456,10 +1666,100 @@ class WhatsAppEvolutionManager extends EventEmitter {
     return { status: 'started', chats: individualChats.length };
   }
 
+  // ─── PERIODIC SYNC POLLING ───
+  // Polls Evolution API every 5 minutes to detect reconnections and sync new messages
+  // This is a fallback for when webhooks don't arrive (e.g., after disconnect/reconnect)
+
+  private pollingInterval: ReturnType<typeof setInterval> | null = null;
+  private lastSyncTimestamps = new Map<string, number>();
+
+  startPeriodicSync(intervalMs = 5 * 60 * 1000): void {
+    if (this.pollingInterval) return;
+    console.log(`[EvoWA Polling] Starting periodic sync every ${intervalMs / 1000}s`);
+    this.pollingInterval = setInterval(() => {
+      this.periodicSyncCheck().catch(e => console.error('[EvoWA Polling] Error:', e));
+    }, intervalMs);
+  }
+
+  private async periodicSyncCheck(): Promise<void> {
+    const db = await getDb();
+    if (!db) return;
+
+    const rows = await db.select()
+      .from(whatsappSessions)
+      .where(sql`${whatsappSessions.status} != 'deleted'`);
+
+    for (const row of rows) {
+      const instanceName = evo.getInstanceName(row.tenantId, row.userId);
+      try {
+        const inst = await evo.fetchInstance(instanceName);
+        if (!inst) continue;
+
+        const session = this.sessions.get(row.sessionId);
+        const wasDisconnected = row.status !== 'connected' || !session || session.status !== 'connected';
+        const isNowConnected = inst.connectionStatus === 'open';
+
+        if (isNowConnected) {
+          // Ensure session is in memory
+          const state: EvolutionSessionState = session || {
+            instanceName,
+            sessionId: row.sessionId,
+            userId: row.userId,
+            tenantId: row.tenantId,
+            status: 'connected',
+            qrCode: null,
+            qrDataUrl: null,
+            user: inst.ownerJid ? {
+              id: inst.ownerJid,
+              name: inst.profileName || '',
+              imgUrl: inst.profilePicUrl || undefined,
+            } : null,
+            lastConnectedAt: Date.now(),
+          };
+          state.status = 'connected';
+          this.sessions.set(row.sessionId, state);
+          this.instanceToSession.set(instanceName, row.sessionId);
+
+          if (wasDisconnected) {
+            console.log(`[EvoWA Polling] Detected reconnection for ${row.sessionId}, triggering full sync`);
+            await db.update(whatsappSessions)
+              .set({ status: 'connected' })
+              .where(eq(whatsappSessions.sessionId, row.sessionId));
+            this.emit('status', { sessionId: row.sessionId, status: 'connected', user: state.user });
+            this.syncConversationsBackground(state, false);
+          } else {
+            // Already connected — sync recent messages periodically
+            const lastSync = this.lastSyncTimestamps.get(row.sessionId) || 0;
+            const now = Date.now();
+            if (now - lastSync > 4 * 60 * 1000) { // At least 4 min since last sync
+              console.log(`[EvoWA Polling] Periodic sync for ${row.sessionId}`);
+              this.syncConversationsBackground(state, false);
+              this.lastSyncTimestamps.set(row.sessionId, now);
+            }
+          }
+        } else if (row.status === 'connected') {
+          // Was connected, now disconnected
+          console.log(`[EvoWA Polling] Detected disconnection for ${row.sessionId}`);
+          await db.update(whatsappSessions)
+            .set({ status: 'disconnected' })
+            .where(eq(whatsappSessions.sessionId, row.sessionId));
+          if (session) session.status = 'disconnected';
+          this.emit('status', { sessionId: row.sessionId, status: 'disconnected' });
+        }
+      } catch (e: any) {
+        console.warn(`[EvoWA Polling] Error checking ${instanceName}:`, e.message);
+      }
+    }
+  }
+
   // ─── SHUTDOWN ───
 
   async shutdown(): Promise<void> {
     console.log("[EvoWA] Shutting down...");
+    if (this.pollingInterval) {
+      clearInterval(this.pollingInterval);
+      this.pollingInterval = null;
+    }
     this.sessions.clear();
     this.instanceToSession.clear();
     this.removeAllListeners();
