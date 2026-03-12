@@ -191,6 +191,99 @@ const AudioPlayer = memo(({ src, duration, isVoice }: { src: string; duration?: 
 });
 AudioPlayer.displayName = "AudioPlayer";
 
+/* ─── Media Loader (download on demand) ─── */
+function MediaLoader({ sessionId, messageId, messageType, mediaDuration, isVoiceNote, mediaFileName, mediaMimeType }: {
+  sessionId: string; messageId: string; messageType: string;
+  mediaDuration?: number | null; isVoiceNote?: boolean | null;
+  mediaFileName?: string | null; mediaMimeType?: string | null;
+}) {
+  const [mediaUrl, setMediaUrl] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(false);
+  const getMediaUrlMut = trpc.whatsapp.getMediaUrl.useMutation();
+
+  const isAudio = ["audioMessage", "pttMessage"].includes(messageType);
+  const isImage = messageType === "imageMessage";
+  const isVideo = messageType === "videoMessage";
+  const isDocument = messageType === "documentMessage";
+  const isSticker = messageType === "stickerMessage";
+
+  const handleLoad = useCallback(async () => {
+    if (loading || mediaUrl) return;
+    setLoading(true);
+    setError(false);
+    try {
+      const result = await getMediaUrlMut.mutateAsync({ sessionId, messageId });
+      setMediaUrl(result.url);
+    } catch {
+      setError(true);
+    } finally {
+      setLoading(false);
+    }
+  }, [sessionId, messageId, loading, mediaUrl]);
+
+  // Auto-load for audio messages
+  useEffect(() => {
+    if (isAudio && !mediaUrl && !loading && !error) {
+      handleLoad();
+    }
+  }, [isAudio]);
+
+  if (mediaUrl) {
+    if (isAudio) return <AudioPlayer src={mediaUrl} duration={mediaDuration} isVoice={isVoiceNote || false} />;
+    if (isImage) return (
+      <div className="relative -mx-1 -mt-0.5 mb-1 overflow-hidden rounded-md">
+        <img src={mediaUrl} alt="Imagem" className="max-w-[300px] w-full h-auto object-cover cursor-pointer hover:opacity-95 transition-opacity" loading="lazy" onClick={() => window.open(mediaUrl, "_blank")} />
+      </div>
+    );
+    if (isVideo) return (
+      <div className="relative -mx-1 -mt-0.5 mb-1 overflow-hidden rounded-md">
+        <video src={mediaUrl} controls className="max-w-[300px] w-full h-auto rounded-md" preload="metadata" />
+      </div>
+    );
+    if (isDocument) return (
+      <a href={mediaUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 p-2 -mx-0.5 rounded-md bg-foreground/5 hover:bg-foreground/10 transition-colors mb-1">
+        <div className="w-10 h-10 rounded-lg bg-primary flex items-center justify-center shrink-0"><FileText className="w-5 h-5 text-white" /></div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium truncate">{mediaFileName || "Documento"}</p>
+          <p className="text-[11px] text-muted-foreground">{mediaMimeType || "Arquivo"}</p>
+        </div>
+        <Download className="w-4 h-4 text-muted-foreground shrink-0" />
+      </a>
+    );
+    if (isSticker) return <img src={mediaUrl} alt="Sticker" className="w-32 h-32 object-contain" loading="lazy" />;
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center gap-2 p-2 -mx-0.5 rounded-md bg-foreground/5 mb-1 min-w-[200px]">
+        <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+        <span className="text-xs text-muted-foreground">Carregando mídia...</span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <button onClick={handleLoad} className="flex items-center gap-2 p-2 -mx-0.5 rounded-md bg-foreground/5 hover:bg-foreground/10 transition-colors mb-1 min-w-[200px]">
+        <Download className="w-5 h-5 text-muted-foreground" />
+        <span className="text-xs text-muted-foreground">Mídia indisponível. Toque para tentar novamente.</span>
+      </button>
+    );
+  }
+
+  return (
+    <button onClick={handleLoad} className="flex items-center gap-2 p-2 -mx-0.5 rounded-md bg-foreground/5 hover:bg-foreground/10 transition-colors mb-1 min-w-[200px]">
+      <Download className="w-5 h-5 text-wa-tint" />
+      <span className="text-xs text-muted-foreground">
+        {isAudio ? `🎤 Áudio${mediaDuration ? ` (${Math.floor(mediaDuration / 60)}:${(mediaDuration % 60).toString().padStart(2, "0")})` : ""}` :
+         isImage ? "🖼️ Imagem" : isVideo ? "🎥 Vídeo" : isDocument ? `📄 ${mediaFileName || "Documento"}` : "📎 Mídia"}
+        {" "}— Toque para carregar
+      </span>
+    </button>
+  );
+}
+
 /* ─── Reaction Picker (Quick Emojis) ─── */
 function QuickReactionPicker({ onSelect }: { onSelect: (emoji: string) => void }) {
   const quickEmojis = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
@@ -420,6 +513,11 @@ const MessageBubble = memo(({
     }
     if (isSticker && msg.mediaUrl) {
       return <img src={msg.mediaUrl} alt="Sticker" className="w-32 h-32 object-contain" loading="lazy" />;
+    }
+    // Fallback: media message without URL - offer to download on demand
+    if (hasMedia && !msg.mediaUrl && msg.messageId) {
+      return <MediaLoader sessionId={msg.sessionId} messageId={msg.messageId} messageType={msg.messageType}
+        mediaDuration={msg.mediaDuration} isVoiceNote={msg.isVoiceNote} mediaFileName={msg.mediaFileName} mediaMimeType={msg.mediaMimeType} />;
     }
     return null;
   };

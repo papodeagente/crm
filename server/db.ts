@@ -1486,6 +1486,8 @@ export async function getWaConversationsList(
     assignedTeamId?: number;
     status?: string;
     unassignedOnly?: boolean;
+    limit?: number;
+    offset?: number;
   }
 ) {
   const db = await getDb();
@@ -1543,6 +1545,8 @@ export async function getWaConversationsList(
     AND wc.lastMessageAt IS NOT NULL
     ${sql.raw(assignmentFilter)}
     ORDER BY wc.lastMessageAt DESC
+    LIMIT ${filter?.limit ?? 100}
+    OFFSET ${filter?.offset ?? 0}
   `);
 
   const rows = (result as any)[0] || [];

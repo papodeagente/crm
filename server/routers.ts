@@ -601,6 +601,34 @@ export const appRouter = router({
         const { url } = await storagePut(fileKey, fileBuffer, input.contentType);
         return { url, fileKey };
       }),
+    // Download media from Evolution API for messages that don't have mediaUrl yet
+    getMediaUrl: protectedProcedure
+      .input(z.object({ sessionId: z.string(), messageId: z.string() }))
+      .mutation(async ({ input }) => {
+        const { getBase64FromMediaMessage } = await import("./evolutionApi");
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+        // Find the message to get its session's instanceName
+        const { waMessages } = await import("../drizzle/schema");
+        const [msg] = await db.select().from(waMessages)
+          .where(and(eq(waMessages.sessionId, input.sessionId), eq(waMessages.messageId, input.messageId)))
+          .limit(1);
+        if (!msg) throw new TRPCError({ code: "NOT_FOUND", message: "Message not found" });
+        if (msg.mediaUrl) return { url: msg.mediaUrl, mimetype: msg.mediaMimeType };
+        // Download from Evolution API
+        const base64Data = await getBase64FromMediaMessage(input.sessionId, input.messageId);
+        if (!base64Data?.base64) throw new TRPCError({ code: "NOT_FOUND", message: "Media not available" });
+        // Upload to S3
+        const ext = (base64Data.mimetype || "bin").split("/")[1]?.split(";")[0] || "bin";
+        const fileKey = `whatsapp-media/${input.sessionId}/${nanoid()}.${ext}`;
+        const buffer = Buffer.from(base64Data.base64, "base64");
+        const { url } = await storagePut(fileKey, buffer, base64Data.mimetype || "application/octet-stream");
+        // Update the message in DB
+        await db.update(waMessages)
+          .set({ mediaUrl: url, mediaMimeType: base64Data.mimetype || null, mediaFileName: base64Data.fileName || null })
+          .where(eq(waMessages.id, msg.id));
+        return { url, mimetype: base64Data.mimetype };
+      }),
     // WA Contacts map (LID ↔ Phone resolution)
     waContactsMap: protectedProcedure
       .input(z.object({ sessionId: z.string() }))

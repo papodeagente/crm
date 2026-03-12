@@ -768,11 +768,11 @@ export default function InboxPage() {
   // Use wa_conversations table (canonical, with correct names and ordering)
   const conversationsQ = trpc.whatsapp.waConversations.useQuery(
     { sessionId: activeSession?.sessionId || "", tenantId },
-    { enabled: !!activeSession?.sessionId, refetchInterval: isConnected ? 8000 : 30000 }
+    { enabled: !!activeSession?.sessionId, refetchInterval: isConnected ? 15000 : 60000, staleTime: 10000 }
   );
 
   // Agents list for assignment
-  const agentsQ = trpc.whatsapp.agents.useQuery({ tenantId });
+  const agentsQ = trpc.whatsapp.agents.useQuery({ tenantId }, { staleTime: 5 * 60 * 1000 });
   const agents = useMemo(() => (agentsQ.data || []) as Array<{ id: number; name: string; email: string; avatarUrl?: string | null; status: string }>, [agentsQ.data]);
 
   // Assignment mutations
@@ -786,7 +786,7 @@ export default function InboxPage() {
 
   const contactsQ = trpc.crm.contacts.list.useQuery(
     { tenantId, limit: 500 },
-    { enabled: true }
+    { enabled: true, staleTime: 5 * 60 * 1000 }
   );
 
   // Profile pictures
@@ -794,9 +794,11 @@ export default function InboxPage() {
     return ((conversationsQ.data || []) as ConvItem[]).map((c) => c.remoteJid);
   }, [conversationsQ.data]);
 
+  // Only fetch profile pics for visible conversations (top 30) and with long staleTime
+  const visibleJids = useMemo(() => convJids.slice(0, 30), [convJids]);
   const profilePicsQ = trpc.whatsapp.profilePictures.useQuery(
-    { sessionId: activeSession?.sessionId || "", jids: convJids.slice(0, 50) },
-    { enabled: !!activeSession?.sessionId && convJids.length > 0, staleTime: 5 * 60 * 1000 }
+    { sessionId: activeSession?.sessionId || "", jids: visibleJids },
+    { enabled: !!activeSession?.sessionId && visibleJids.length > 0, staleTime: 30 * 60 * 1000, refetchInterval: false }
   );
 
   const profilePicMap = useMemo(() => (profilePicsQ.data || {}) as Record<string, string | null>, [profilePicsQ.data]);
@@ -804,7 +806,7 @@ export default function InboxPage() {
   // WA Contacts map (LID ↔ Phone resolution from Baileys contacts sync)
   const waContactsMapQ = trpc.whatsapp.waContactsMap.useQuery(
     { sessionId: activeSession?.sessionId || "" },
-    { enabled: !!activeSession?.sessionId, staleTime: 60 * 1000 }
+    { enabled: !!activeSession?.sessionId, staleTime: 10 * 60 * 1000, refetchInterval: false }
   );
   const waContactsMap = useMemo(() => (waContactsMapQ.data || {}) as Record<string, { phoneNumber: string | null; pushName: string | null; savedName: string | null; verifiedName: string | null }>, [waContactsMapQ.data]);
 

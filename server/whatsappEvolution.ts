@@ -18,6 +18,8 @@ import { whatsappSessions, waMessages, waConversations, waContacts } from "../dr
 import { eq, and, sql, desc } from "drizzle-orm";
 import * as evo from "./evolutionApi";
 import { resolveInbound, updateConversationLastMessage } from "./conversationResolver";
+import { storagePut } from "./storage";
+import { nanoid } from "nanoid";
 import { createNotification } from "./db";
 
 // ════════════════════════════════════════════════════════════
@@ -541,21 +543,48 @@ class WhatsAppEvolutionManager extends EventEmitter {
     return evo.getProfilePicture(session.instanceName, number);
   }
 
+  // In-memory profile picture cache: jid -> { url, fetchedAt }
+  private profilePicCache = new Map<string, { url: string | null; fetchedAt: number }>();
+  private static PROFILE_PIC_TTL = 30 * 60 * 1000; // 30 minutes
+
   async getProfilePictures(sessionId: string, jids: string[]): Promise<Record<string, string | null>> {
     const session = this.sessions.get(sessionId);
     if (!session) return {};
 
     const result: Record<string, string | null> = {};
-    const batchSize = 5;
-    for (let i = 0; i < jids.length; i += batchSize) {
-      const batch = jids.slice(i, i + batchSize);
-      const promises = batch.map(async (jid) => {
-        const number = this.jidToNumber(jid);
-        const url = await evo.getProfilePicture(session.instanceName, number);
-        result[jid] = url;
-      });
-      await Promise.allSettled(promises);
+    const now = Date.now();
+    const uncachedJids: string[] = [];
+
+    // Check cache first
+    for (const jid of jids) {
+      const cached = this.profilePicCache.get(jid);
+      if (cached && (now - cached.fetchedAt) < WhatsAppEvolutionManager.PROFILE_PIC_TTL) {
+        result[jid] = cached.url;
+      } else {
+        uncachedJids.push(jid);
+      }
     }
+
+    // Only fetch uncached JIDs from Evolution API
+    if (uncachedJids.length > 0) {
+      const batchSize = 5;
+      for (let i = 0; i < uncachedJids.length; i += batchSize) {
+        const batch = uncachedJids.slice(i, i + batchSize);
+        const promises = batch.map(async (jid) => {
+          try {
+            const number = this.jidToNumber(jid);
+            const url = await evo.getProfilePicture(session.instanceName, number);
+            result[jid] = url;
+            this.profilePicCache.set(jid, { url, fetchedAt: now });
+          } catch {
+            result[jid] = null;
+            this.profilePicCache.set(jid, { url: null, fetchedAt: now });
+          }
+        });
+        await Promise.allSettled(promises);
+      }
+    }
+
     return result;
   }
 
@@ -1111,6 +1140,28 @@ class WhatsAppEvolutionManager extends EventEmitter {
 
       const content = this.extractMessageContent(data);
 
+      // Extract media info from the message payload
+      const mediaInfo = this.extractMediaInfo(data);
+
+      // If message has media but no URL, download from Evolution API and upload to S3
+      const hasMediaType = ["imageMessage", "videoMessage", "audioMessage", "documentMessage", "stickerMessage", "pttMessage"].includes(messageType);
+      if (hasMediaType && !mediaInfo.mediaUrl && messageId) {
+        try {
+          const base64Data = await evo.getBase64FromMediaMessage(session.instanceName, messageId);
+          if (base64Data?.base64) {
+            const ext = this.mimeToExt(base64Data.mimetype || mediaInfo.mediaMimeType || "application/octet-stream");
+            const fileKey = `whatsapp-media/${session.sessionId}/${nanoid()}.${ext}`;
+            const buffer = Buffer.from(base64Data.base64, "base64");
+            const { url } = await storagePut(fileKey, buffer, base64Data.mimetype || mediaInfo.mediaMimeType || "application/octet-stream");
+            mediaInfo.mediaUrl = url;
+            if (base64Data.mimetype) mediaInfo.mediaMimeType = base64Data.mimetype;
+            if (base64Data.fileName) mediaInfo.mediaFileName = base64Data.fileName;
+          }
+        } catch (e: any) {
+          console.error(`[EvoWA] Failed to download media for ${messageId}:`, e.message);
+        }
+      }
+
       const db = await getDb();
       if (!db) return;
 
@@ -1136,6 +1187,12 @@ class WhatsAppEvolutionManager extends EventEmitter {
         pushName: pushName || null,
         status: fromMe ? "sent" : "received",
         timestamp: new Date(timestamp),
+        mediaUrl: mediaInfo.mediaUrl || null,
+        mediaMimeType: mediaInfo.mediaMimeType || null,
+        mediaFileName: mediaInfo.mediaFileName || null,
+        mediaDuration: mediaInfo.mediaDuration || null,
+        isVoiceNote: mediaInfo.isVoiceNote || false,
+        quotedMessageId: mediaInfo.quotedMessageId || null,
       });
 
       // Update wa_contacts with pushName if it's a real name (not a phone number)
@@ -1288,10 +1345,28 @@ class WhatsAppEvolutionManager extends EventEmitter {
             eq(waMessages.messageId, messageId)
           ));
 
+        // Also update lastStatus in wa_conversations if this is the last message
+        const remoteJid = update?.key?.remoteJid;
+        if (remoteJid) {
+          // Update wa_conversations lastStatus for this conversation
+          // Only update if the message is fromMe (status ticks are only for sent messages)
+          const fromMe = update?.key?.fromMe;
+          if (fromMe) {
+            await db.update(waConversations)
+              .set({ lastStatus: newStatus })
+              .where(and(
+                eq(waConversations.sessionId, session.sessionId),
+                eq(waConversations.remoteJid, remoteJid),
+                eq(waConversations.lastFromMe, true)
+              ));
+          }
+        }
+
         this.emit("message:status", {
           sessionId: session.sessionId,
           messageId,
           status: newStatus,
+          remoteJid: remoteJid || null,
           timestamp: Date.now(),
         });
       }
@@ -1384,6 +1459,74 @@ class WhatsAppEvolutionManager extends EventEmitter {
     }
   }
 
+  // ─── MEDIA EXTRACTION ───
+
+  private extractMediaInfo(data: any): {
+    mediaUrl: string | null;
+    mediaMimeType: string | null;
+    mediaFileName: string | null;
+    mediaDuration: number | null;
+    isVoiceNote: boolean;
+    quotedMessageId: string | null;
+  } {
+    const msg = data?.message;
+    const result = {
+      mediaUrl: null as string | null,
+      mediaMimeType: null as string | null,
+      mediaFileName: null as string | null,
+      mediaDuration: null as number | null,
+      isVoiceNote: false,
+      quotedMessageId: null as string | null,
+    };
+
+    if (!msg) return result;
+
+    // Extract media URL from Evolution API payload
+    // Evolution API v2 provides media URL in the message object or in data.media
+    const mediaTypes = [
+      { key: "imageMessage", mimeDefault: "image/jpeg" },
+      { key: "videoMessage", mimeDefault: "video/mp4" },
+      { key: "audioMessage", mimeDefault: "audio/ogg" },
+      { key: "documentMessage", mimeDefault: "application/octet-stream" },
+      { key: "stickerMessage", mimeDefault: "image/webp" },
+    ];
+
+    for (const { key, mimeDefault } of mediaTypes) {
+      const mediaMsg = msg[key];
+      if (mediaMsg) {
+        // Evolution API v2 provides media URL in multiple places
+        result.mediaUrl = mediaMsg.url || mediaMsg.directPath || data?.media?.url || null;
+        result.mediaMimeType = mediaMsg.mimetype || mediaMsg.mimeType || mimeDefault;
+        result.mediaFileName = mediaMsg.fileName || mediaMsg.title || null;
+        if (mediaMsg.seconds || mediaMsg.duration) {
+          result.mediaDuration = mediaMsg.seconds || mediaMsg.duration || null;
+        }
+        if (key === "audioMessage") {
+          result.isVoiceNote = mediaMsg.ptt === true;
+        }
+        break;
+      }
+    }
+
+    // Also check for media URL at the top level (Evolution API sometimes puts it there)
+    if (!result.mediaUrl && data?.media?.url) {
+      result.mediaUrl = data.media.url;
+    }
+
+    // Extract quoted message ID from contextInfo
+    const contextInfo = msg.extendedTextMessage?.contextInfo
+      || msg.imageMessage?.contextInfo
+      || msg.videoMessage?.contextInfo
+      || msg.audioMessage?.contextInfo
+      || msg.documentMessage?.contextInfo
+      || msg.stickerMessage?.contextInfo;
+    if (contextInfo?.stanzaId) {
+      result.quotedMessageId = contextInfo.stanzaId;
+    }
+
+    return result;
+  }
+
   // ─── CONTENT EXTRACTION ───
 
   private extractMessageContent(data: any): string {
@@ -1411,6 +1554,19 @@ class WhatsAppEvolutionManager extends EventEmitter {
   }
 
   // ─── HELPERS ───
+
+  private mimeToExt(mime: string): string {
+    const map: Record<string, string> = {
+      "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/gif": "gif",
+      "video/mp4": "mp4", "video/3gpp": "3gp",
+      "audio/ogg": "ogg", "audio/ogg; codecs=opus": "ogg", "audio/mpeg": "mp3", "audio/mp4": "m4a", "audio/aac": "aac",
+      "application/pdf": "pdf", "application/msword": "doc",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
+      "application/vnd.ms-excel": "xls",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "xlsx",
+    };
+    return map[mime] || mime.split("/")[1]?.split(";")[0] || "bin";
+  }
 
   private jidToNumber(jid: string): string {
     return jid.replace(/@.*$/, "").replace(/[^\d]/g, "");

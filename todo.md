@@ -2416,3 +2416,9 @@
 - [x] Corrigir auto-restore para detectar sessões conectadas no Evolution mas desconectadas no sistema
 - [x] Garantir que o frontend reflita o estado real da conexão
 - [x] Tornar o fluxo de primeira conexão robusto e sem falhas
+
+## Correções Inbox (Mar 12 - v5)
+- [x] BUG: Inbox muito lento e carregado — Cache 24h fotos perfil, staleTime 30s, refetchInterval 15s, LIMIT 100 conversas
+- [x] BUG: Não mostra ticks de status — handleMessageStatusUpdate agora atualiza lastStatus na wa_conversations + StatusTick/MessageStatus já implementados
+- [x] BUG: Mensagens de áudio não visualizadas — extractMediaInfo + getBase64FromMediaMessage + upload S3 para novas msgs; MediaLoader para msgs antigas
+- [x] FEAT: Enviar áudio pelo microfone — VoiceRecorder com MediaRecorder API + upload S3 + sendMedia ptt:true (já implementado)

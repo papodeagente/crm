@@ -601,7 +601,7 @@ export async function sendPresence(
   try {
     await evoFetch(`/chat/sendPresence/${instanceName}`, {
       method: "POST",
-      body: { number, presence },
+      body: { number, presence, delay: 1200 },
     });
   } catch (e) {
     console.warn("[EvolutionAPI] sendPresence failed:", e);
@@ -919,6 +919,36 @@ export interface WebhookPayload {
   date_time?: string;
   server_url?: string;
   apikey?: string;
+}
+
+// ════════════════════════════════════════════════════════════
+// MEDIA DOWNLOAD
+// ════════════════════════════════════════════════════════════
+/**
+ * Obtém a mídia de uma mensagem como base64.
+ * Evolution API v2: POST /chat/getBase64FromMediaMessage/{instance}
+ */
+export async function getBase64FromMediaMessage(
+  instance: string,
+  messageId: string,
+  convertToMp4?: boolean,
+): Promise<{ base64: string; mimetype: string; fileName?: string } | null> {
+  try {
+    const data = await evoFetch<any>(
+      `/chat/getBase64FromMediaMessage/${instance}`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          message: { key: { id: messageId } },
+          convertToMp4: convertToMp4 || false,
+        }),
+      }
+    );
+    return data || null;
+  } catch (e: any) {
+    console.error(`[EvoAPI] getBase64FromMediaMessage error for ${instance}:`, e.message);
+    return null;
+  }
 }
 
 // ════════════════════════════════════════════════════════════
