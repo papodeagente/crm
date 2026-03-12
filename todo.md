@@ -2447,3 +2447,8 @@
 - [x] BUG: Mídias de HOJE aparecem como "expirado" — CAUSA RAIZ DUPLA: 1) getBase64FromMediaMessage só enviava messageId sem remoteJid/fromMe (Evolution API retornava "Message not found"); 2) Double JSON.stringify no body (evoFetch já faz stringify, função fazia de novo). FIX: Agora passa key completa {id, remoteJid, fromMe} e body como objeto
 - [x] FEAT: Download automático de mídia no webhook — webhook já baixava, mas também corrigido para passar key completa. Sync (quickSync + deepSync) agora também extrai mediaInfo e baixa mídia em background via downloadMediaBatch
 - [x] Limpar marcações __unavailable__ incorretas no banco — 23 registros limpos
+
+## Melhorias UX Inbox (Mar 12 - v10)
+- [x] Botão de emojis: fechar ao clicar fora do picker — useEffect com click-outside handler
+- [x] Botão de funções/anexos: fechar ao clicar fora do menu — adicionado attachMenuRef + click-outside handler
+- [x] Melhorar visual do emoji picker e menu de funções — animação slideUpFade, backdrop-blur, hover scale, cores melhoradas, botões com feedback visual (cor muda ao ativar), mutuamente exclusivos (abrir um fecha o outro)

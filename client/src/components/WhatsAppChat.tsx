@@ -658,25 +658,29 @@ DateSeparator.displayName = "DateSeparator";
 /* ─── Attach Menu ─── */
 function AttachMenu({ onSelect, onClose }: { onSelect: (type: string) => void; onClose: () => void }) {
   const items = [
-    { type: "image", icon: ImageIcon, label: "Fotos e Vídeos", color: "oklch(0.60 0.20 320)" },
-    { type: "camera", icon: Camera, label: "Câmera", color: "oklch(0.55 0.20 350)" },
-    { type: "document", icon: FileText, label: "Documento", color: "oklch(0.50 0.20 280)" },
-    { type: "location", icon: MapPin, label: "Localização", color: "oklch(0.55 0.18 145)" },
-    { type: "contact", icon: Contact, label: "Contato", color: "oklch(0.55 0.15 250)" },
-    { type: "poll", icon: BarChart3, label: "Enquete", color: "oklch(0.55 0.18 60)" },
+    { type: "image", icon: ImageIcon, label: "Fotos e V\u00eddeos", color: "#7C3AED" },
+    { type: "camera", icon: Camera, label: "C\u00e2mera", color: "#EC4899" },
+    { type: "document", icon: FileText, label: "Documento", color: "#6366F1" },
+    { type: "location", icon: MapPin, label: "Localiza\u00e7\u00e3o", color: "#10B981" },
+    { type: "contact", icon: Contact, label: "Contato", color: "#3B82F6" },
+    { type: "poll", icon: BarChart3, label: "Enquete", color: "#F59E0B" },
   ];
 
   return (
-    <div className="absolute bottom-full left-0 mb-2 bg-card rounded-xl shadow-xl border border-border overflow-hidden z-50 animate-in slide-in-from-bottom-2 duration-150">
-      {items.map((item) => (
-        <button key={item.type} onClick={() => { onSelect(item.type); onClose(); }}
-          className="flex items-center gap-3 w-full px-4 py-2.5 hover:bg-muted transition-colors text-left">
-          <div className="w-9 h-9 rounded-full flex items-center justify-center" style={{ backgroundColor: item.color }}>
-            <item.icon className="w-[18px] h-[18px] text-white" />
-          </div>
-          <span className="text-[14px] text-foreground/80">{item.label}</span>
-        </button>
-      ))}
+    <div className="absolute bottom-full left-0 mb-2 bg-card/95 backdrop-blur-sm rounded-xl shadow-2xl border border-border/50 overflow-hidden z-50 min-w-[200px]"
+      style={{ animation: "slideUpFade 0.15s ease-out" }}>
+      <div className="py-1.5">
+        {items.map((item, i) => (
+          <button key={item.type} onClick={() => { onSelect(item.type); onClose(); }}
+            className="flex items-center gap-3 w-full px-3.5 py-2 hover:bg-muted/60 transition-all text-left group"
+            style={{ animationDelay: `${i * 30}ms` }}>
+            <div className="w-9 h-9 rounded-full flex items-center justify-center shrink-0 transition-transform group-hover:scale-110" style={{ backgroundColor: item.color }}>
+              <item.icon className="w-[17px] h-[17px] text-white" />
+            </div>
+            <span className="text-[13.5px] font-medium text-foreground/80 group-hover:text-foreground transition-colors">{item.label}</span>
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
@@ -920,6 +924,7 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const presenceTimerRef = useRef<NodeJS.Timeout | null>(null);
   const emojiPickerRef = useRef<HTMLDivElement>(null);
+  const attachMenuRef = useRef<HTMLDivElement>(null);
 
   // Queries
   const messagesQ = trpc.whatsapp.messagesByContact.useQuery(
@@ -1039,16 +1044,19 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
     sendPresenceMut.mutate({ sessionId, number, presence: "paused" });
   }, [sessionId, contact]);
 
-  // Close emoji picker on outside click
+  // Close emoji picker and attach menu on outside click
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
-      if (emojiPickerRef.current && !emojiPickerRef.current.contains(e.target as Node)) {
+      if (showEmojiPicker && emojiPickerRef.current && !emojiPickerRef.current.contains(e.target as Node)) {
         setShowEmojiPicker(false);
       }
+      if (showAttach && attachMenuRef.current && !attachMenuRef.current.contains(e.target as Node)) {
+        setShowAttach(false);
+      }
     };
-    if (showEmojiPicker) document.addEventListener("mousedown", handleClick);
+    if (showEmojiPicker || showAttach) document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
-  }, [showEmojiPicker]);
+  }, [showEmojiPicker, showAttach]);
 
   // Scroll
   const scrollToBottom = useCallback((smooth = true) => {
@@ -1533,22 +1541,22 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
           <div className="flex items-end gap-1.5">
             {/* Emoji picker */}
             <div className="relative shrink-0 self-end" ref={emojiPickerRef}>
-              <button onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                className={`w-[42px] h-[42px] flex items-center justify-center rounded-full transition-colors ${showEmojiPicker ? "bg-wa-hover" : "hover:bg-wa-hover"}`}>
-                <Smile className="w-[24px] h-[24px] text-muted-foreground" />
+              <button onClick={() => { setShowEmojiPicker(!showEmojiPicker); if (!showEmojiPicker) setShowAttach(false); }}
+                className={`w-[42px] h-[42px] flex items-center justify-center rounded-full transition-all duration-200 ${showEmojiPicker ? "bg-wa-tint/15 text-wa-tint" : "hover:bg-wa-hover text-muted-foreground"}`}>
+                <Smile className="w-[22px] h-[22px]" />
               </button>
               {showEmojiPicker && (
-                <div className="absolute bottom-full left-0 mb-2 z-50">
-                  <Picker data={data} onEmojiSelect={handleEmojiSelect} theme="light" previewPosition="none" skinTonePosition="none" locale="pt" />
+                <div className="absolute bottom-full left-0 mb-2 z-50 rounded-xl overflow-hidden shadow-xl border border-border/50">
+                  <Picker data={data} onEmojiSelect={handleEmojiSelect} theme="light" previewPosition="none" skinTonePosition="none" locale="pt" perLine={8} />
                 </div>
               )}
             </div>
 
             {/* Attach menu */}
-            <div className="relative shrink-0 self-end">
-              <button onClick={() => setShowAttach(!showAttach)}
-                className={`w-[42px] h-[42px] flex items-center justify-center rounded-full transition-colors ${showAttach ? "bg-wa-hover" : "hover:bg-wa-hover"}`}>
-                <Paperclip className="w-[24px] h-[24px] text-muted-foreground rotate-45" />
+            <div className="relative shrink-0 self-end" ref={attachMenuRef}>
+              <button onClick={() => { setShowAttach(!showAttach); if (!showAttach) setShowEmojiPicker(false); }}
+                className={`w-[42px] h-[42px] flex items-center justify-center rounded-full transition-all duration-200 ${showAttach ? "bg-wa-tint/15 text-wa-tint" : "hover:bg-wa-hover text-muted-foreground"}`}>
+                <Paperclip className={`w-[22px] h-[22px] transition-transform duration-200 ${showAttach ? "rotate-[135deg]" : "rotate-45"}`} />
               </button>
               {showAttach && <AttachMenu onSelect={handleAttachSelect} onClose={() => setShowAttach(false)} />}
             </div>
