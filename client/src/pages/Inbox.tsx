@@ -872,9 +872,9 @@ export default function InboxPage() {
   }, []);
 
   const getDisplayName = useCallback((jid: string, conv?: ConvItem) => {
-    // 1. CRM contact match (direct or via LID resolution)
+    // 1. CRM contact match — only use if the name is a real name (not just a phone number)
     const contact = getContactForJid(jid);
-    if (contact) return contact.name;
+    if (contact && isRealName(contact.name)) return contact.name;
     // 2. contactName from wa_conversations JOIN with contacts table
     if (conv?.contactName && isRealName(conv.contactName)) return conv.contactName;
     // 3. WA Contacts map (savedName > verifiedName > pushName)
@@ -887,12 +887,14 @@ export default function InboxPage() {
     // 4. PushName from conversation data (contactPushName in wa_conversations)
     const pushName = pushNameMap.get(jid);
     if (isRealName(pushName)) return pushName!;
-    // 5. For LID JIDs, try to show a resolved phone number instead of the LID
+    // 5. CRM contact name as fallback (even if it's a phone number, it's still better than raw JID)
+    if (contact) return contact.name;
+    // 6. For LID JIDs, try to show a resolved phone number instead of the LID
     if (jid.endsWith("@lid")) {
       if (waContact?.phoneNumber) return formatPhoneNumber(waContact.phoneNumber);
       return "Contato WhatsApp";
     }
-    // 6. Format the phone number from the JID
+    // 7. Format the phone number from the JID
     return formatPhoneNumber(jid);
   }, [getContactForJid, pushNameMap, waContactsMap, isRealName]);
 
@@ -979,8 +981,8 @@ export default function InboxPage() {
     const pic = profilePicMap[selectedJid] || undefined;
     const selectedConv = (conversationsQ.data as ConvItem[] || []).find(c => c.remoteJid === selectedJid);
     const displayName = getDisplayName(selectedJid, selectedConv);
-    if (crmContact) return { ...crmContact, avatarUrl: pic };
     const phone = selectedJid.split("@")[0];
+    if (crmContact) return { ...crmContact, name: displayName, avatarUrl: pic };
     return { id: 0, name: displayName, phone, email: undefined, avatarUrl: pic };
   }, [selectedJid, getContactForJid, profilePicMap, getDisplayName, conversationsQ.data]);
 

@@ -149,11 +149,25 @@ export async function resolveContact(
     .limit(1);
 
   if (existing.length > 0) {
-    // Atualizar nome se fornecido e contato não tinha nome
+    // Update contact name if a real name is provided and current name is just a phone number
     if (name) {
-      await db.update(contacts)
-        .set({ updatedAt: new Date() })
-        .where(eq(contacts.id, existing[0].id));
+      const cleanedName = name.replace(/[\s\-\(\)\+]/g, '');
+      const isRealName = !/^\d+$/.test(cleanedName) && name !== 'Voc\u00ea' && name !== 'You';
+      if (isRealName) {
+        // Check if current name is just a phone number
+        const currentContact = await db.select({ name: contacts.name })
+          .from(contacts)
+          .where(eq(contacts.id, existing[0].id))
+          .limit(1);
+        const currentName = currentContact[0]?.name || '';
+        const currentCleaned = currentName.replace(/[\s\-\(\)\+]/g, '');
+        const currentIsPhone = /^\d+$/.test(currentCleaned) || !currentName;
+        if (currentIsPhone) {
+          await db.update(contacts)
+            .set({ name, updatedAt: new Date() })
+            .where(eq(contacts.id, existing[0].id));
+        }
+      }
     }
     return { contactId: existing[0].id, isNew: false };
   }

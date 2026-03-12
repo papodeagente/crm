@@ -2469,3 +2469,6 @@
 ## Correções Inbox (Mar 12 - v14)
 - [x] BUG: Última mensagem na lista de contatos está desatualizada — FIX: Sincronizadas 11 conversas com dados desatualizados via UPDATE JOIN com tabela messages. Limpas 564 conversas duplicadas com tenantId=0. Verificado que sendTextMessage, sendMediaMessage, handleIncomingMessage e handleOutgoingMessage todos atualizam wa_conversations corretamente via updateConversationLastMessage
 - [x] BUG: Ordem das mensagens no chat está errada — INVESTIGADO: Mensagens estão ordenadas corretamente por timestamp (data real do WhatsApp). A diferença entre timestamp e createdAt é esperada para mensagens importadas pelo deep sync. O problema visual era a lista de contatos com dados desatualizados (corrigido acima)
+
+## Correções Inbox (Mar 13 - v15)
+- [x] BUG: Contato com nome salvo no WhatsApp aparece como número (+5511993839734) na lista de conversas e no header do chat — FIX: getDisplayName agora verifica se o nome CRM é real (não apenas número) antes de usá-lo; selectedContact usa displayName em vez do nome CRM bruto; resolveContact atualiza nome CRM quando pushName real está disponível; 294 contatos CRM atualizados com nomes reais do WhatsApp (212 via wa_conversations + 82 via messages)
