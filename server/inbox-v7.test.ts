@@ -131,9 +131,11 @@ describe("Inbox v7 - getMediaUrl instanceName resolution", () => {
     expect(routerCode).toContain("session?.instanceName || input.sessionId");
   });
 
-  it("should pass instanceName (not sessionId) to getBase64FromMediaMessage", () => {
+  it("should pass instanceName, messageId, remoteJid and fromMe to getBase64FromMediaMessage", () => {
     const routerCode = fs.readFileSync("server/routers.ts", "utf-8");
-    // Should pass instanceName to the API call
-    expect(routerCode).toContain("getBase64FromMediaMessage(instanceName, input.messageId)");
+    // Should pass instanceName + full key to the API call
+    expect(routerCode).toContain("getBase64FromMediaMessage(instanceName, input.messageId");
+    expect(routerCode).toContain("remoteJid: msg.remoteJid");
+    expect(routerCode).toContain("fromMe: msg.fromMe");
   });
 });

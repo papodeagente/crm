@@ -1157,7 +1157,10 @@ class WhatsAppEvolutionManager extends EventEmitter {
       const hasMediaType = ["imageMessage", "videoMessage", "audioMessage", "documentMessage", "stickerMessage", "pttMessage"].includes(messageType);
       if (hasMediaType && !mediaInfo.mediaUrl && messageId) {
         try {
-          const base64Data = await evo.getBase64FromMediaMessage(session.instanceName, messageId);
+          const base64Data = await evo.getBase64FromMediaMessage(session.instanceName, messageId, {
+            remoteJid,
+            fromMe,
+          });
           if (base64Data?.base64) {
             const ext = this.mimeToExt(base64Data.mimetype || mediaInfo.mediaMimeType || "application/octet-stream");
             const fileKey = `whatsapp-media/${session.sessionId}/${nanoid()}.${ext}`;
@@ -1603,6 +1606,48 @@ class WhatsAppEvolutionManager extends EventEmitter {
   }
 
   /**
+   * Download media for a batch of messages in background.
+   * Used by sync to download media after messages are inserted.
+   */
+  private async downloadMediaBatch(
+    session: EvolutionSessionState,
+    messages: Array<{ messageId: string; remoteJid: string; fromMe: boolean; messageType: string; mediaMimeType?: string | null }>
+  ): Promise<void> {
+    const db = await getDb();
+    if (!db) return;
+
+    for (const msg of messages) {
+      try {
+        const base64Data = await evo.getBase64FromMediaMessage(session.instanceName, msg.messageId, {
+          remoteJid: msg.remoteJid,
+          fromMe: msg.fromMe,
+        });
+        if (base64Data?.base64) {
+          const ext = this.mimeToExt(base64Data.mimetype || msg.mediaMimeType || "application/octet-stream");
+          const fileKey = `whatsapp-media/${session.sessionId}/${nanoid()}.${ext}`;
+          const buffer = Buffer.from(base64Data.base64, "base64");
+          const { url } = await storagePut(fileKey, buffer, base64Data.mimetype || msg.mediaMimeType || "application/octet-stream");
+          // Update the message in DB with the S3 URL
+          await db.update(waMessages)
+            .set({
+              mediaUrl: url,
+              mediaMimeType: base64Data.mimetype || msg.mediaMimeType || null,
+              mediaFileName: base64Data.fileName || null,
+            })
+            .where(and(
+              eq(waMessages.sessionId, session.sessionId),
+              eq(waMessages.messageId, msg.messageId)
+            ));
+        }
+      } catch (e: any) {
+        // Silently skip - media may not be available for older messages
+      }
+      // Small delay between downloads to avoid overwhelming the API
+      await new Promise(resolve => setTimeout(resolve, 200));
+    }
+  }
+
+  /**
    * Get the session for a specific user (by tenantId + userId).
    * Returns undefined if user has no session.
    */
@@ -1937,6 +1982,9 @@ class WhatsAppEvolutionManager extends EventEmitter {
                 msgStatus = strMap[rawStatus.toUpperCase()] || rawStatus.toLowerCase();
               }
 
+              // Extract media info from synced messages
+              const syncMediaInfo = this.extractMediaInfo(msg);
+
               insertBatch.push({
                 sessionId: session.sessionId,
                 tenantId: session.tenantId,
@@ -1948,10 +1996,22 @@ class WhatsAppEvolutionManager extends EventEmitter {
                 pushName: pushName || null,
                 status: msgStatus,
                 timestamp,
+                mediaUrl: syncMediaInfo.mediaUrl || null,
+                mediaMimeType: syncMediaInfo.mediaMimeType || null,
+                mediaFileName: syncMediaInfo.mediaFileName || null,
+                mediaDuration: syncMediaInfo.mediaDuration || null,
+                isVoiceNote: syncMediaInfo.isVoiceNote || false,
+                quotedMessageId: syncMediaInfo.quotedMessageId || null,
               });
 
               existingMsgIds.add(msgId);
             }
+
+            // After inserting, try to download media for messages that need it
+            const mediaMessages = insertBatch.filter(m => {
+              const mediaTypes = ['imageMessage', 'videoMessage', 'audioMessage', 'documentMessage', 'stickerMessage', 'pttMessage'];
+              return mediaTypes.includes(m.messageType) && !m.mediaUrl && m.messageId;
+            });
 
             if (insertBatch.length > 0) {
               try {
@@ -1967,6 +2027,11 @@ class WhatsAppEvolutionManager extends EventEmitter {
               } catch (e: any) {
                 console.warn(`[EvoWA QuickSync] Batch insert error for ${remoteJid}:`, e.message);
               }
+            }
+
+            // Download media in background (don't block sync)
+            if (mediaMessages.length > 0) {
+              this.downloadMediaBatch(session, mediaMessages).catch(() => {});
             }
 
             await new Promise(resolve => setTimeout(resolve, 50));
@@ -2142,6 +2207,9 @@ class WhatsAppEvolutionManager extends EventEmitter {
                 msgStatus = strMap[rawStatus.toUpperCase()] || rawStatus.toLowerCase();
               }
 
+              // Extract media info from synced messages
+              const deepMediaInfo = this.extractMediaInfo(msg);
+
               insertBatch.push({
                 sessionId: session.sessionId,
                 tenantId: session.tenantId,
@@ -2153,10 +2221,22 @@ class WhatsAppEvolutionManager extends EventEmitter {
                 pushName: pushName || null,
                 status: msgStatus,
                 timestamp,
+                mediaUrl: deepMediaInfo.mediaUrl || null,
+                mediaMimeType: deepMediaInfo.mediaMimeType || null,
+                mediaFileName: deepMediaInfo.mediaFileName || null,
+                mediaDuration: deepMediaInfo.mediaDuration || null,
+                isVoiceNote: deepMediaInfo.isVoiceNote || false,
+                quotedMessageId: deepMediaInfo.quotedMessageId || null,
               });
 
               existingMsgIds.add(msgId);
             }
+
+            // Collect media messages that need downloading
+            const deepMediaMessages = insertBatch.filter(m => {
+              const mediaTypes = ['imageMessage', 'videoMessage', 'audioMessage', 'documentMessage', 'stickerMessage', 'pttMessage'];
+              return mediaTypes.includes(m.messageType) && !m.mediaUrl && m.messageId;
+            });
 
             if (insertBatch.length > 0) {
               try {
@@ -2172,6 +2252,11 @@ class WhatsAppEvolutionManager extends EventEmitter {
               } catch (e: any) {
                 console.warn(`[EvoWA DeepSync] Batch insert error for ${remoteJid}:`, e.message);
               }
+            }
+
+            // Download media in background (don't block sync)
+            if (deepMediaMessages.length > 0) {
+              this.downloadMediaBatch(session, deepMediaMessages).catch(() => {});
             }
 
             page++;

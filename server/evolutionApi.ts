@@ -933,17 +933,22 @@ export interface WebhookPayload {
 export async function getBase64FromMediaMessage(
   instance: string,
   messageId: string,
-  convertToMp4?: boolean,
+  options?: { remoteJid?: string; fromMe?: boolean; convertToMp4?: boolean },
 ): Promise<{ base64: string; mimetype: string; fileName?: string } | null> {
   try {
+    // Evolution API requires the full message key (id + remoteJid + fromMe) to find the message
+    const key: Record<string, any> = { id: messageId };
+    if (options?.remoteJid) key.remoteJid = options.remoteJid;
+    if (options?.fromMe !== undefined) key.fromMe = options.fromMe;
+
     const data = await evoFetch<any>(
       `/chat/getBase64FromMediaMessage/${instance}`,
       {
         method: "POST",
-        body: JSON.stringify({
-          message: { key: { id: messageId } },
-          convertToMp4: convertToMp4 || false,
-        }),
+        body: {
+          message: { key },
+          convertToMp4: options?.convertToMp4 || false,
+        },
       }
     );
     return data || null;

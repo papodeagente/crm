@@ -622,7 +622,10 @@ export const appRouter = router({
         // Download from Evolution API - resolve the instanceName from the session
         const session = whatsappManager.getSession(input.sessionId);
         const instanceName = session?.instanceName || input.sessionId;
-        const base64Data = await getBase64FromMediaMessage(instanceName, input.messageId);
+        const base64Data = await getBase64FromMediaMessage(instanceName, input.messageId, {
+          remoteJid: msg.remoteJid,
+          fromMe: msg.fromMe,
+        });
         if (!base64Data?.base64) {
           // Mark as unavailable in DB so we don't keep retrying
           await db.update(waMessages)

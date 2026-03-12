@@ -2442,3 +2442,8 @@
 
 ## Correções Inbox (Mar 12 - v8)
 - [x] BUG: Erro "Media not available" no MediaLoader — CAUSA RAIZ: Evolution API retorna erro para mídias antigas (expiradas no servidor). FIX: getMediaUrl agora retorna {unavailable:true} em vez de lançar erro; marca no DB (mediaMimeType='__unavailable__') para não tentar novamente; frontend mostra placeholder elegante "[tipo] — expirado" em vez de erro
+
+## Correções Inbox (Mar 12 - v9) — Mídia deve funcionar
+- [x] BUG: Mídias de HOJE aparecem como "expirado" — CAUSA RAIZ DUPLA: 1) getBase64FromMediaMessage só enviava messageId sem remoteJid/fromMe (Evolution API retornava "Message not found"); 2) Double JSON.stringify no body (evoFetch já faz stringify, função fazia de novo). FIX: Agora passa key completa {id, remoteJid, fromMe} e body como objeto
+- [x] FEAT: Download automático de mídia no webhook — webhook já baixava, mas também corrigido para passar key completa. Sync (quickSync + deepSync) agora também extrai mediaInfo e baixa mídia em background via downloadMediaBatch
+- [x] Limpar marcações __unavailable__ incorretas no banco — 23 registros limpos
