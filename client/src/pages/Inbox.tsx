@@ -705,14 +705,14 @@ function NoSession() {
         <div className="w-20 h-20 rounded-full bg-wa-tint/10 flex items-center justify-center mx-auto mb-4">
           <MessageSquare className="w-10 h-10 text-wa-tint" />
         </div>
-        <h2 className="text-xl font-medium text-foreground mb-2">Nenhuma sessão WhatsApp ativa</h2>
+        <h2 className="text-xl font-medium text-foreground mb-2">WhatsApp não conectado</h2>
         <p className="text-[14px] text-muted-foreground mb-4">
-          Conecte uma sessão na página WhatsApp para ver suas conversas aqui.
+          Conecte seu WhatsApp para enviar e receber mensagens diretamente pelo sistema.
         </p>
         <a href="/whatsapp"
           className="inline-flex items-center gap-2 px-4 py-2.5 bg-wa-tint text-white rounded-xl text-sm font-medium hover:opacity-90 transition-all">
           <Phone className="w-4 h-4" />
-          Ir para WhatsApp
+          Conectar WhatsApp
         </a>
       </div>
     </div>

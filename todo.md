@@ -2311,3 +2311,14 @@
 - [x] Inbox deve filtrar sessões/conversas pelo userId do usuário logado
 - [x] Inbox deve mostrar tela "Conecte seu WhatsApp" quando o usuário não tem sessão ativa
 - [x] BUG: Erro ao conectar WhatsApp - instância não existe na Evolution API. Fluxo connect deve criar instância automaticamente.
+
+## Refatoração WhatsApp - Fluxo Simplificado
+- [x] Cada usuário tem exatamente 1 instância automática (sem pedir nome de sessão)
+- [x] Se nunca logou: criar instância automaticamente e gerar QR
+- [x] Se já logou: reconectar na mesma instância
+- [x] Sincronizar todas as conversas ao conectar pela primeira vez
+- [x] Sincronizar apenas novas conversas se já estava conectado antes
+- [x] Todas as conversas salvas no banco de dados
+- [x] Não expor detalhes da Evolution API ao usuário
+- [x] Alerta de API não oficial do WhatsApp ao conectar
+- [x] Frontend simplificado: apenas botão "Conectar WhatsApp" (sem nome de sessão)

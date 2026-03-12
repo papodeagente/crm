@@ -1,19 +1,23 @@
 /**
  * WhatsApp Evolution Manager
  * 
- * Substitui o WhatsAppManager baseado em Baileys por uma integração
- * com a Evolution API v2. Cada usuário CRM tem sua própria instância.
+ * Integração com Evolution API v2. Cada usuário CRM tem exatamente
+ * UMA instância. O sistema gerencia nomes de instância automaticamente.
  * 
- * Mantém a mesma interface de eventos (EventEmitter) para compatibilidade
- * com Socket.IO e o restante do sistema.
+ * Fluxo:
+ * - Se o usuário nunca logou → cria instância + gera QR
+ * - Se já logou → reconecta na mesma instância
+ * - Ao conectar → sincroniza conversas (todas se primeira vez, novas se já conectou)
+ * 
+ * Mantém EventEmitter para compatibilidade com Socket.IO.
  */
 
 import { EventEmitter } from "events";
 import { getDb } from "./db";
-import { whatsappSessions, waMessages } from "../drizzle/schema";
-import { eq, and, sql } from "drizzle-orm";
+import { whatsappSessions, waMessages, waConversations } from "../drizzle/schema";
+import { eq, and, sql, desc } from "drizzle-orm";
 import * as evo from "./evolutionApi";
-import { resolveInbound, resolveOutbound, updateConversationLastMessage } from "./conversationResolver";
+import { resolveInbound, updateConversationLastMessage } from "./conversationResolver";
 import { createNotification } from "./db";
 
 // ════════════════════════════════════════════════════════════
@@ -22,12 +26,12 @@ import { createNotification } from "./db";
 
 export interface EvolutionSessionState {
   instanceName: string;
-  sessionId: string; // same as instanceName for Evolution API
+  sessionId: string;
   userId: number;
   tenantId: number;
   status: "connecting" | "connected" | "disconnected" | "reconnecting";
   qrCode: string | null;
-  qrDataUrl: string | null; // base64 QR from Evolution API
+  qrDataUrl: string | null;
   user: { id: string; name: string; imgUrl?: string } | null;
   lastConnectedAt: number | null;
 }
@@ -38,7 +42,6 @@ export interface EvolutionSessionState {
 
 class WhatsAppEvolutionManager extends EventEmitter {
   private sessions: Map<string, EvolutionSessionState> = new Map();
-  // Map instanceName -> sessionId (for webhook routing)
   private instanceToSession: Map<string, string> = new Map();
 
   constructor() {
@@ -56,13 +59,15 @@ class WhatsAppEvolutionManager extends EventEmitter {
     return Array.from(this.sessions.values());
   }
 
-  // ─── CONNECT (Create instance + get QR) ───
+  // ─── CONNECT (Automatic — 1 instance per user) ───
+  // sessionId is auto-generated from tenantId + userId
+  // No user input needed — just call connectUser(userId, tenantId)
 
-  async connect(sessionId: string, userId: number, tenantId?: number): Promise<EvolutionSessionState> {
-    const tid = tenantId || 0;
-    const instanceName = evo.getInstanceName(tid, userId);
+  async connectUser(userId: number, tenantId: number): Promise<EvolutionSessionState> {
+    const instanceName = evo.getInstanceName(tenantId, userId);
+    const sessionId = instanceName; // sessionId = instanceName for simplicity
 
-    // Check if we already have this session in memory
+    // Check if we already have this session in memory and connected
     const existing = this.sessions.get(sessionId);
     if (existing?.status === "connected") {
       return existing;
@@ -73,7 +78,7 @@ class WhatsAppEvolutionManager extends EventEmitter {
       instanceName,
       sessionId,
       userId,
-      tenantId: tid,
+      tenantId,
       status: "connecting",
       qrCode: null,
       qrDataUrl: null,
@@ -89,7 +94,7 @@ class WhatsAppEvolutionManager extends EventEmitter {
 
       if (existingInstance) {
         if (existingInstance.connectionStatus === "open") {
-          // Already connected
+          // Already connected — sync conversations in background
           state.status = "connected";
           state.user = existingInstance.ownerJid ? {
             id: existingInstance.ownerJid,
@@ -98,8 +103,11 @@ class WhatsAppEvolutionManager extends EventEmitter {
           } : null;
           state.lastConnectedAt = Date.now();
 
-          await this.updateSessionInDb(sessionId, userId, tid, "connected", existingInstance);
+          await this.updateSessionInDb(sessionId, userId, tenantId, "connected", existingInstance);
           this.emit("status", { sessionId, status: "connected", user: state.user });
+
+          // Sync new conversations in background
+          this.syncConversationsBackground(state, false);
           return state;
         }
 
@@ -112,20 +120,17 @@ class WhatsAppEvolutionManager extends EventEmitter {
             this.emit("qr", { sessionId, qrDataUrl: qr.base64 });
           }
         } catch (e: any) {
-          console.warn(`[EvoWA] Connect failed for ${instanceName}, will try to recreate:`, e.message);
-          // If connect fails, delete and recreate
+          console.warn(`[EvoWA] Connect failed for ${instanceName}, will recreate:`, e.message);
           try { await evo.deleteInstance(instanceName); } catch {}
-          const result = await this.createNewInstance(instanceName, state);
-          return result;
+          await this.createNewInstance(instanceName, state);
         }
       } else {
-        // Create new instance
+        // First time — create new instance
         await this.createNewInstance(instanceName, state);
       }
 
       // Save to DB
-      await this.updateSessionInDb(sessionId, userId, tid, "connecting");
-
+      await this.updateSessionInDb(sessionId, userId, tenantId, "connecting");
       return state;
     } catch (error: any) {
       console.error(`[EvoWA] Error connecting ${sessionId}:`, error);
@@ -133,6 +138,11 @@ class WhatsAppEvolutionManager extends EventEmitter {
       this.emit("status", { sessionId, status: "disconnected" });
       throw error;
     }
+  }
+
+  // Legacy connect method (for backward compatibility with existing code)
+  async connect(sessionId: string, userId: number, tenantId?: number): Promise<EvolutionSessionState> {
+    return this.connectUser(userId, tenantId || 0);
   }
 
   private async createNewInstance(instanceName: string, state: EvolutionSessionState): Promise<EvolutionSessionState> {
@@ -183,7 +193,6 @@ class WhatsAppEvolutionManager extends EventEmitter {
       this.sessions.delete(sessionId);
     }
 
-    // Update DB
     const db = await getDb();
     if (!db) return;
 
@@ -202,14 +211,11 @@ class WhatsAppEvolutionManager extends EventEmitter {
 
   async sendTextMessage(sessionId: string, jid: string, text: string): Promise<any> {
     const session = this.sessions.get(sessionId);
-    if (!session) throw new Error(`Sessão "${sessionId}" não encontrada`);
-    if (session.status !== "connected") throw new Error(`Sessão "${sessionId}" não está conectada`);
+    if (!session) throw new Error(`Sessão não encontrada. Conecte seu WhatsApp primeiro.`);
+    if (session.status !== "connected") throw new Error(`WhatsApp não está conectado. Reconecte seu WhatsApp.`);
 
-    // Clean the JID to just the phone number
     const number = this.jidToNumber(jid);
-    const result = await evo.sendText(session.instanceName, number, text);
-
-    return result;
+    return evo.sendText(session.instanceName, number, text);
   }
 
   async sendMediaMessage(
@@ -222,12 +228,11 @@ class WhatsAppEvolutionManager extends EventEmitter {
     opts?: { ptt?: boolean; mimetype?: string; duration?: number }
   ): Promise<any> {
     const session = this.sessions.get(sessionId);
-    if (!session) throw new Error(`Sessão "${sessionId}" não encontrada`);
-    if (session.status !== "connected") throw new Error(`Sessão "${sessionId}" não está conectada`);
+    if (!session) throw new Error(`Sessão não encontrada. Conecte seu WhatsApp primeiro.`);
+    if (session.status !== "connected") throw new Error(`WhatsApp não está conectado. Reconecte seu WhatsApp.`);
 
     const number = this.jidToNumber(jid);
 
-    // For PTT audio, use the dedicated audio endpoint
     if (mediaType === "audio" && opts?.ptt) {
       return evo.sendAudio(session.instanceName, number, mediaUrl);
     }
@@ -253,7 +258,6 @@ class WhatsAppEvolutionManager extends EventEmitter {
     if (!session) return {};
 
     const result: Record<string, string | null> = {};
-    // Batch in parallel with concurrency limit
     const batchSize = 5;
     for (let i = 0; i < jids.length; i += batchSize) {
       const batch = jids.slice(i, i + batchSize);
@@ -270,33 +274,162 @@ class WhatsAppEvolutionManager extends EventEmitter {
   // ─── RESOLVE JID ───
 
   async resolveJidPublic(sessionId: string, phone: string): Promise<string> {
-    // For Evolution API, the JID is simply the phone@s.whatsapp.net
     const cleaned = phone.replace(/[^\d]/g, "");
     return `${cleaned}@s.whatsapp.net`;
   }
 
-  // ─── SYNC CONTACTS (not needed with Evolution API, but keep interface) ───
+  // ─── SYNC CONTACTS (interface compatibility) ───
 
   async syncContacts(sessionId: string): Promise<{ synced: number; total: number; resolved: number }> {
-    // Evolution API manages contacts internally
     return { synced: 0, total: 0, resolved: 0 };
   }
 
+  // ─── SYNC CONVERSATIONS ───
+  // Sincroniza conversas da Evolution API para o banco de dados.
+  // - isFirstSync=true: sincroniza TODOS os chats e suas últimas mensagens
+  // - isFirstSync=false: sincroniza apenas chats com mensagens mais recentes que as do banco
+
+  private async syncConversationsBackground(session: EvolutionSessionState, isFirstSync: boolean): Promise<void> {
+    try {
+      console.log(`[EvoWA Sync] Starting ${isFirstSync ? "FULL" : "incremental"} sync for ${session.instanceName}`);
+      
+      // Fetch all chats from Evolution API
+      const chats = await evo.findChats(session.instanceName);
+      console.log(`[EvoWA Sync] Found ${chats.length} chats on Evolution API`);
+
+      let synced = 0;
+      let skipped = 0;
+
+      for (const chat of chats) {
+        try {
+          const remoteJid = chat.remoteJid;
+          if (!remoteJid) continue;
+
+          // Skip groups and broadcast
+          if (remoteJid.endsWith("@g.us") || remoteJid === "status@broadcast" || remoteJid.endsWith("@lid")) {
+            skipped++;
+            continue;
+          }
+
+          const pushName = chat.pushName || null;
+
+          // Resolve conversation in our DB (creates if not exists)
+          const resolved = await resolveInbound(session.tenantId, session.sessionId, remoteJid, pushName);
+          if (!resolved) continue;
+
+          // Check if we need to sync messages for this chat
+          const db = await getDb();
+          if (!db) continue;
+
+          // Get the latest message timestamp we have for this conversation
+          const latestMsg = await db.select({ timestamp: waMessages.timestamp })
+            .from(waMessages)
+            .where(and(
+              eq(waMessages.sessionId, session.sessionId),
+              eq(waMessages.remoteJid, remoteJid)
+            ))
+            .orderBy(desc(waMessages.timestamp))
+            .limit(1);
+
+          const lastSyncedTimestamp = latestMsg.length > 0 ? latestMsg[0].timestamp : null;
+
+          // If not first sync and we already have messages, check if Evolution has newer ones
+          if (!isFirstSync && lastSyncedTimestamp) {
+            const lastMessageAt = chat.lastMessage?.messageTimestamp
+              ? new Date(Number(chat.lastMessage.messageTimestamp) * 1000)
+              : null;
+
+            if (lastMessageAt && lastMessageAt <= lastSyncedTimestamp) {
+              skipped++;
+              continue; // No new messages
+            }
+          }
+
+          // Fetch messages from Evolution API for this chat
+          const messages = await evo.findMessages(session.instanceName, remoteJid, {
+            limit: isFirstSync ? 50 : 20, // More messages on first sync
+          });
+
+          let newMsgCount = 0;
+          for (const msg of messages) {
+            const key = msg?.key;
+            if (!key?.id) continue;
+
+            const messageId = key.id;
+            const fromMe = key.fromMe || false;
+            const messageType = msg.messageType || "conversation";
+            const msgTimestamp = msg.messageTimestamp ? new Date(Number(msg.messageTimestamp) * 1000) : new Date();
+
+            // Skip if we already have this message
+            if (lastSyncedTimestamp && msgTimestamp <= lastSyncedTimestamp && !isFirstSync) continue;
+
+            // Check for duplicate by messageId
+            const existing = await db.select({ id: waMessages.id })
+              .from(waMessages)
+              .where(and(
+                eq(waMessages.sessionId, session.sessionId),
+                eq(waMessages.messageId, messageId)
+              ))
+              .limit(1);
+
+            if (existing.length > 0) continue;
+
+            const content = this.extractMessageContent(msg);
+
+            await db.insert(waMessages).values({
+              sessionId: session.sessionId,
+              tenantId: session.tenantId,
+              messageId,
+              remoteJid,
+              fromMe,
+              messageType,
+              content: content || null,
+              pushName: msg.pushName || null,
+              status: fromMe ? "sent" : "received",
+              timestamp: msgTimestamp,
+            });
+            newMsgCount++;
+          }
+
+          // Update conversation with last message info
+          if (messages.length > 0) {
+            const lastMsg = messages[0]; // Most recent
+            const lastContent = this.extractMessageContent(lastMsg);
+            const lastTimestamp = lastMsg.messageTimestamp
+              ? new Date(Number(lastMsg.messageTimestamp) * 1000)
+              : new Date();
+
+            await updateConversationLastMessage(resolved.conversationId, {
+              content: lastContent || "",
+              fromMe: lastMsg.key?.fromMe || false,
+              timestamp: lastTimestamp,
+              incrementUnread: false,
+            });
+          }
+
+          if (newMsgCount > 0) synced++;
+        } catch (e: any) {
+          // Skip individual chat errors
+          console.warn(`[EvoWA Sync] Error syncing chat:`, e.message);
+        }
+      }
+
+      console.log(`[EvoWA Sync] Done: ${synced} chats synced, ${skipped} skipped`);
+    } catch (error) {
+      console.error("[EvoWA Sync] Error:", error);
+    }
+  }
+
   // ─── WEBHOOK HANDLER ───
-  // Called by the webhook endpoint when Evolution API sends events
 
   async handleWebhookEvent(payload: evo.WebhookPayload): Promise<void> {
     const instanceName = payload.instance;
     const sessionId = this.instanceToSession.get(instanceName);
 
-    // If we don't have this session in memory, try to find it in DB
     let session = sessionId ? this.sessions.get(sessionId) : undefined;
     if (!session) {
-      // Try to load from DB by matching instanceName pattern
       const loaded = await this.loadSessionByInstanceName(instanceName);
-      if (loaded) {
-        session = loaded;
-      }
+      if (loaded) session = loaded;
     }
 
     switch (payload.event) {
@@ -329,7 +462,6 @@ class WhatsAppEvolutionManager extends EventEmitter {
                   name: inst.profileName || "",
                   imgUrl: inst.profilePicUrl || undefined,
                 };
-                // Update phone number in DB
                 const phoneMatch = inst.ownerJid?.match(/^(\d+)@/);
                 if (phoneMatch) {
                   const db = await getDb();
@@ -344,6 +476,17 @@ class WhatsAppEvolutionManager extends EventEmitter {
 
             await this.updateSessionInDb(session.sessionId, session.userId, session.tenantId, "connected");
             this.emit("status", { sessionId: session.sessionId, status: "connected", user: session.user });
+
+            // Sync conversations after connection
+            // Check if this is first time (no messages in DB for this session)
+            const db = await getDb();
+            if (db) {
+              const msgCount = await db.select({ count: sql<number>`count(*)` })
+                .from(waMessages)
+                .where(eq(waMessages.sessionId, session.sessionId));
+              const isFirstSync = (msgCount[0]?.count || 0) === 0;
+              this.syncConversationsBackground(session, isFirstSync);
+            }
           } else if (state === "close") {
             session.status = "disconnected";
             session.qrCode = null;
@@ -381,8 +524,10 @@ class WhatsAppEvolutionManager extends EventEmitter {
       const key = data?.key;
       if (!key?.remoteJid) return;
 
-      // Skip status messages and protocol messages
       if (key.remoteJid === "status@broadcast") return;
+      if (key.remoteJid.endsWith("@g.us")) return; // Skip groups
+      if (key.remoteJid.endsWith("@lid")) return; // Skip LID
+
       const messageType = data?.messageType || "conversation";
       const skipTypes = ["protocolMessage", "senderKeyDistributionMessage", "messageContextInfo", "reactionMessage", "ephemeralMessage"];
       if (skipTypes.includes(messageType)) return;
@@ -393,10 +538,8 @@ class WhatsAppEvolutionManager extends EventEmitter {
       const pushName = data?.pushName || "";
       const timestamp = data?.messageTimestamp ? Number(data.messageTimestamp) * 1000 : Date.now();
 
-      // Extract message content
       const content = this.extractMessageContent(data);
 
-      // Save to DB
       const db = await getDb();
       if (!db) return;
 
@@ -409,7 +552,7 @@ class WhatsAppEvolutionManager extends EventEmitter {
         ))
         .limit(1);
 
-      if (existing.length > 0) return; // Duplicate
+      if (existing.length > 0) return;
 
       await db.insert(waMessages).values({
         sessionId: session.sessionId,
@@ -426,26 +569,14 @@ class WhatsAppEvolutionManager extends EventEmitter {
 
       // Resolve conversation
       try {
-        if (fromMe) {
-          const resolved = await resolveOutbound(session.tenantId, session.sessionId, remoteJid);
-          if (resolved) {
-            await updateConversationLastMessage(resolved.conversationId, {
-              content: content || "",
-              fromMe,
-              timestamp: new Date(timestamp),
-              incrementUnread: false,
-            });
-          }
-        } else {
-          const resolved = await resolveInbound(session.tenantId, session.sessionId, remoteJid, pushName);
-          if (resolved) {
-            await updateConversationLastMessage(resolved.conversationId, {
-              content: content || "",
-              fromMe,
-              timestamp: new Date(timestamp),
-              incrementUnread: true,
-            });
-          }
+        const resolved = await resolveInbound(session.tenantId, session.sessionId, remoteJid, pushName);
+        if (resolved) {
+          await updateConversationLastMessage(resolved.conversationId, {
+            content: content || "",
+            fromMe,
+            timestamp: new Date(timestamp),
+            incrementUnread: !fromMe,
+          });
         }
       } catch (e) {
         console.warn("[EvoWA] Conversation resolver error:", e);
@@ -486,6 +617,8 @@ class WhatsAppEvolutionManager extends EventEmitter {
       if (!key?.remoteJid) return;
 
       const remoteJid = key.remoteJid;
+      if (remoteJid.endsWith("@g.us") || remoteJid === "status@broadcast") return;
+
       const messageId = key.id;
       const content = this.extractMessageContent(data);
       const messageType = data?.messageType || "conversation";
@@ -494,7 +627,6 @@ class WhatsAppEvolutionManager extends EventEmitter {
       const db = await getDb();
       if (!db) return;
 
-      // Check for duplicate
       const existing = await db.select({ id: waMessages.id })
         .from(waMessages)
         .where(and(
@@ -518,9 +650,8 @@ class WhatsAppEvolutionManager extends EventEmitter {
         timestamp: new Date(timestamp),
       });
 
-      // Resolve conversation
       try {
-        const resolved = await resolveOutbound(session.tenantId, session.sessionId, remoteJid);
+        const resolved = await resolveInbound(session.tenantId, session.sessionId, remoteJid);
         if (resolved) {
           await updateConversationLastMessage(resolved.conversationId, {
             content: content || "",
@@ -530,7 +661,6 @@ class WhatsAppEvolutionManager extends EventEmitter {
           });
         }
       } catch {}
-
     } catch (error) {
       console.error("[EvoWA] Error handling outgoing message:", error);
     }
@@ -538,7 +668,6 @@ class WhatsAppEvolutionManager extends EventEmitter {
 
   private async handleMessageStatusUpdate(session: EvolutionSessionState, data: any): Promise<void> {
     try {
-      // data can be an array of updates
       const updates = Array.isArray(data) ? data : [data];
       const db = await getDb();
       if (!db) return;
@@ -546,12 +675,7 @@ class WhatsAppEvolutionManager extends EventEmitter {
       for (const update of updates) {
         const messageId = update?.key?.id;
         const statusMap: Record<number, string> = {
-          0: "error",
-          1: "pending",
-          2: "sent",
-          3: "delivered",
-          4: "read",
-          5: "played",
+          0: "error", 1: "pending", 2: "sent", 3: "delivered", 4: "read", 5: "played",
         };
         const newStatus = statusMap[update?.update?.status] || update?.update?.status;
         if (!messageId || !newStatus) continue;
@@ -604,8 +728,17 @@ class WhatsAppEvolutionManager extends EventEmitter {
   // ─── HELPERS ───
 
   private jidToNumber(jid: string): string {
-    // Convert "5584999999999@s.whatsapp.net" to "5584999999999"
     return jid.replace(/@.*$/, "").replace(/[^\d]/g, "");
+  }
+
+  /**
+   * Get the session for a specific user (by tenantId + userId).
+   * Returns undefined if user has no session.
+   */
+  getSessionForUser(tenantId: number, userId: number): EvolutionSessionState | undefined {
+    const instanceName = evo.getInstanceName(tenantId, userId);
+    const sessionId = this.instanceToSession.get(instanceName) || instanceName;
+    return this.sessions.get(sessionId);
   }
 
   private async updateSessionInDb(
@@ -619,7 +752,6 @@ class WhatsAppEvolutionManager extends EventEmitter {
       const db = await getDb();
       if (!db) return;
 
-      // Check if session exists
       const existing = await db.select({ id: whatsappSessions.id })
         .from(whatsappSessions)
         .where(eq(whatsappSessions.sessionId, sessionId))
@@ -656,14 +788,12 @@ class WhatsAppEvolutionManager extends EventEmitter {
       const db = await getDb();
       if (!db) return undefined;
 
-      // Parse tenantId and userId from instanceName (crm-{tenantId}-{userId})
       const match = instanceName.match(/^crm-(\d+)-(\d+)$/);
       if (!match) return undefined;
 
       const tenantId = parseInt(match[1]);
       const userId = parseInt(match[2]);
 
-      // Find session in DB by tenantId and userId
       const rows = await db.select()
         .from(whatsappSessions)
         .where(and(
@@ -705,7 +835,6 @@ class WhatsAppEvolutionManager extends EventEmitter {
       const db = await getDb();
       if (!db) return;
 
-      // Find all non-deleted sessions
       const rows = await db.select()
         .from(whatsappSessions)
         .where(sql`${whatsappSessions.status} != 'deleted'`);
@@ -715,7 +844,6 @@ class WhatsAppEvolutionManager extends EventEmitter {
       for (const row of rows) {
         const instanceName = evo.getInstanceName(row.tenantId, row.userId);
 
-        // Check if instance exists and is connected on Evolution API
         try {
           const inst = await evo.fetchInstance(instanceName);
           if (inst) {
@@ -738,7 +866,6 @@ class WhatsAppEvolutionManager extends EventEmitter {
             this.sessions.set(row.sessionId, state);
             this.instanceToSession.set(instanceName, row.sessionId);
 
-            // Update DB status
             const dbStatus = inst.connectionStatus === "open" ? "connected" : "disconnected";
             await db.update(whatsappSessions)
               .set({ status: dbStatus })
@@ -746,7 +873,6 @@ class WhatsAppEvolutionManager extends EventEmitter {
 
             console.log(`[EvoWA AutoRestore] ${row.sessionId} -> ${instanceName} -> ${dbStatus}`);
           } else {
-            // Instance doesn't exist on Evolution API
             await db.update(whatsappSessions)
               .set({ status: "disconnected" })
               .where(eq(whatsappSessions.sessionId, row.sessionId));
@@ -771,8 +897,7 @@ class WhatsAppEvolutionManager extends EventEmitter {
   }
 }
 
-// ════════════════════════════════════════════════════════════
-// SINGLETON EXPORT
-// ════════════════════════════════════════════════════════════
+// ─── SINGLETON ───
 
 export const whatsappManager = new WhatsAppEvolutionManager();
+export default whatsappManager;

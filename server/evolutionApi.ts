@@ -329,6 +329,24 @@ export async function getProfilePicture(
 }
 
 /**
+ * Busca todos os chats de uma instância (para sincronização).
+ */
+export async function findChats(
+  instanceName: string
+): Promise<any[]> {
+  try {
+    const result = await evoFetch<any>(`/chat/findChats/${instanceName}`, {
+      method: "POST",
+      body: {},
+      timeout: 60000, // Can be slow for many chats
+    });
+    return Array.isArray(result) ? result : [];
+  } catch {
+    return [];
+  }
+}
+
+/**
  * Busca mensagens de um chat.
  */
 export async function findMessages(

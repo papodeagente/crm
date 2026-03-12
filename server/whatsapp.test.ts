@@ -153,12 +153,16 @@ describe("WhatsApp API Routes", () => {
     expect(settings?.maxTokens).toBe(200);
   });
 
-  it("whatsapp.connect input validation rejects empty sessionId", async () => {
+  it("whatsapp.connect requires no input (auto-creates instance)", async () => {
     const { ctx } = createAuthContext();
     const caller = appRouter.createCaller(ctx);
-    await expect(
-      caller.whatsapp.connect({ sessionId: "" })
-    ).rejects.toThrow();
+    // connect no longer takes sessionId — it auto-generates one per user
+    const result = await caller.whatsapp.connect();
+    expect(result).toBeDefined();
+    expect(result.sessionId).toBeDefined();
+    expect(typeof result.sessionId).toBe("string");
+    // Status should be connecting or connected (depends on Evolution API availability)
+    expect(["connecting", "connected", "disconnected"]).toContain(result.status);
   });
 
   it("whatsapp.sendMessage input validation rejects empty number", async () => {

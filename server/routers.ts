@@ -137,13 +137,12 @@ export const appRouter = router({
   // ─── WhatsApp API (existing) ───
   whatsapp: router({
     connect: protectedProcedure
-      .input(z.object({ sessionId: z.string().min(1).max(64) }))
-      .mutation(async ({ ctx, input }) => {
-        // Use CRM user ID (saasUser.id) for Evolution API instance naming
-        // Each CRM user gets their own WhatsApp instance
-        const tenantId = ctx.saasUser?.tenantId;
-        const userId = ctx.saasUser?.id || ctx.user.id;
-        const state = await whatsappManager.connect(input.sessionId, userId, tenantId);
+      .mutation(async ({ ctx }) => {
+        // Each CRM user gets exactly ONE WhatsApp instance
+        // No sessionId needed — system generates it automatically
+        const tenantId = ctx.saasUser?.tenantId || 0;
+        const userId = ctx.saasUser?.userId || ctx.user.id;
+        const state = await whatsappManager.connectUser(userId, tenantId);
         
         // If already connected, return immediately
         if (state.status === "connected") {
@@ -151,26 +150,23 @@ export const appRouter = router({
         }
         
         // Wait up to 15 seconds for QR code to be generated
-        // This makes the UX much better — the mutation returns WITH the QR code
         const startWait = Date.now();
         const MAX_WAIT_MS = 15_000;
         while (Date.now() - startWait < MAX_WAIT_MS) {
-          const current = whatsappManager.getSession(input.sessionId);
-          if (!current) break; // Session was deleted/failed
+          const current = whatsappManager.getSession(state.sessionId);
+          if (!current) break;
           if (current.qrDataUrl) {
             return { sessionId: current.sessionId, status: current.status, qrDataUrl: current.qrDataUrl, user: current.user };
           }
           if (current.status === "connected") {
             return { sessionId: current.sessionId, status: current.status, qrDataUrl: null, user: current.user };
           }
-          // Wait 500ms before checking again
           await new Promise(r => setTimeout(r, 500));
         }
         
-        // Return whatever state we have after waiting
-        const finalState = whatsappManager.getSession(input.sessionId);
+        const finalState = whatsappManager.getSession(state.sessionId);
         return {
-          sessionId: input.sessionId,
+          sessionId: state.sessionId,
           status: finalState?.status || state.status,
           qrDataUrl: finalState?.qrDataUrl || null,
           user: finalState?.user || null,
@@ -218,7 +214,7 @@ export const appRouter = router({
     sessions: protectedProcedure.query(async ({ ctx }) => {
       // Each user has their own WhatsApp instance (Evolution API)
       // Filter by the CRM userId (saasUser.id) so users only see their own sessions
-      const saasUserId = ctx.saasUser?.id;
+      const saasUserId = ctx.saasUser?.userId;
       let dbSessions;
       if (saasUserId) {
         dbSessions = await getSessionsByUser(saasUserId);
