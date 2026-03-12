@@ -2322,3 +2322,4 @@
 - [x] Não expor detalhes da Evolution API ao usuário
 - [x] Alerta de API não oficial do WhatsApp ao conectar
 - [x] Frontend simplificado: apenas botão "Conectar WhatsApp" (sem nome de sessão)
+- [x] BUG: Sistema não reconhece que instância está conectada na Evolution API. Inbox mostra "não conectado" mesmo com sessão ativa. Reconectar tenta gerar QR novamente.

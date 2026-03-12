@@ -55,6 +55,59 @@ class WhatsAppEvolutionManager extends EventEmitter {
     return this.sessions.get(sessionId);
   }
 
+  /**
+   * Get session with live check against Evolution API.
+   * If session is in memory, returns it. Otherwise, queries Evolution API
+   * and populates the in-memory cache.
+   */
+  async getSessionLive(sessionId: string): Promise<EvolutionSessionState | undefined> {
+    // First check in-memory
+    const cached = this.sessions.get(sessionId);
+    if (cached && cached.status === "connected") return cached;
+
+    // Try to fetch from Evolution API directly
+    try {
+      const inst = await evo.fetchInstance(sessionId);
+      if (!inst) return cached; // Not found on Evolution API, return whatever we have
+
+      const state: EvolutionSessionState = {
+        instanceName: sessionId,
+        sessionId,
+        userId: cached?.userId || 0,
+        tenantId: cached?.tenantId || 0,
+        status: inst.connectionStatus === "open" ? "connected" : "disconnected",
+        qrCode: null,
+        qrDataUrl: null,
+        user: inst.ownerJid ? {
+          id: inst.ownerJid,
+          name: inst.profileName || "",
+          imgUrl: inst.profilePicUrl || undefined,
+        } : null,
+        lastConnectedAt: inst.connectionStatus === "open" ? Date.now() : null,
+      };
+
+      // Update in-memory cache
+      this.sessions.set(sessionId, state);
+      this.instanceToSession.set(sessionId, sessionId);
+
+      // Also update DB status
+      const db = await getDb();
+      if (db) {
+        const dbStatus = state.status === "reconnecting" ? "connecting" as const : state.status as "connecting" | "connected" | "disconnected";
+        await db.update(whatsappSessions)
+          .set({
+            status: dbStatus,
+            phoneNumber: inst.ownerJid ? inst.ownerJid.replace("@s.whatsapp.net", "") : undefined,
+          })
+          .where(eq(whatsappSessions.sessionId, sessionId));
+      }
+
+      return state;
+    } catch (e) {
+      return cached;
+    }
+  }
+
   getAllSessions(): EvolutionSessionState[] {
     return Array.from(this.sessions.values());
   }

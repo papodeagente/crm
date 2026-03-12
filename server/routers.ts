@@ -199,8 +199,8 @@ export const appRouter = router({
       }),
     status: protectedProcedure
       .input(z.object({ sessionId: z.string() }))
-      .query(({ input }) => {
-        const session = whatsappManager.getSession(input.sessionId);
+      .query(async ({ input }) => {
+        const session = await whatsappManager.getSessionLive(input.sessionId);
         return { status: session?.status || "disconnected", qrDataUrl: session?.qrDataUrl || null, user: session?.user || null };
       }),
     // Request pairing code as alternative to QR code
@@ -221,12 +221,13 @@ export const appRouter = router({
       } else {
         dbSessions = await getSessionsByUser(ctx.user.id);
       }
-      return dbSessions.map((s) => {
-        const live = whatsappManager.getSession(s.sessionId);
-        // Use live in-memory status if available, otherwise use DB status
+      // Check live status from Evolution API for each session
+      const results = await Promise.all(dbSessions.map(async (s) => {
+        const live = await whatsappManager.getSessionLive(s.sessionId);
         const liveStatus = live?.status || s.status || "disconnected";
         return { ...s, liveStatus, qrDataUrl: live?.qrDataUrl || null, user: live?.user || null };
-      });
+      }));
+      return results;
     }),
     // Resolve a phone number to the actual WhatsApp JID
     resolveJid: protectedProcedure
