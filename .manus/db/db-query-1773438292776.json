@@ -1,0 +1,40 @@
+{
+  "query": "\nSELECT 'pipelines' as entity, COUNT(*) as total, COUNT(DISTINCT name) as unique_names FROM pipelines WHERE tenantId = 1\nUNION ALL\nSELECT 'contacts', COUNT(*), COUNT(DISTINCT email) FROM contacts WHERE tenantId = 1 AND deletedAt IS NULL AND email IS NOT NULL AND email != ''\nUNION ALL\nSELECT 'deals', COUNT(*), COUNT(DISTINCT title) FROM deals WHERE tenantId = 1 AND deletedAt IS NULL\nUNION ALL\nSELECT 'accounts', COUNT(*), COUNT(DISTINCT name) FROM accounts WHERE tenantId = 1\nUNION ALL\nSELECT 'crm_tasks', COUNT(*), COUNT(DISTINCT title) FROM crm_tasks WHERE tenantId = 1\nUNION ALL\nSELECT 'crm_users', COUNT(*), 0 FROM crm_users WHERE tenantId = 1\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute \nSELECT 'pipelines' as entity, COUNT(*) as total, COUNT(DISTINCT name) as unique_names FROM pipelines WHERE tenantId = 1\nUNION ALL\nSELECT 'contacts', COUNT(*), COUNT(DISTINCT email) FROM contacts WHERE tenantId = 1 AND deletedAt IS NULL AND email IS NOT NULL AND email != ''\nUNION ALL\nSELECT 'deals', COUNT(*), COUNT(DISTINCT title) FROM deals WHERE tenantId = 1 AND deletedAt IS NULL\nUNION ALL\nSELECT 'accounts', COUNT(*), COUNT(DISTINCT name) FROM accounts WHERE tenantId = 1\nUNION ALL\nSELECT 'crm_tasks', COUNT(*), COUNT(DISTINCT title) FROM crm_tasks WHERE tenantId = 1\nUNION ALL\nSELECT 'crm_users', COUNT(*), 0 FROM crm_users WHERE tenantId = 1\n",
+  "rows": [
+    {
+      "entity": "accounts",
+      "total": "0",
+      "unique_names": "0"
+    },
+    {
+      "entity": "pipelines",
+      "total": "0",
+      "unique_names": "0"
+    },
+    {
+      "entity": "crm_users",
+      "total": "0",
+      "unique_names": "0"
+    },
+    {
+      "entity": "contacts",
+      "total": "1",
+      "unique_names": "1"
+    },
+    {
+      "entity": "deals",
+      "total": "0",
+      "unique_names": "0"
+    },
+    {
+      "entity": "crm_tasks",
+      "total": "236",
+      "unique_names": "4"
+    }
+  ],
+  "messages": [],
+  "stdout": "entity\ttotal\tunique_names\naccounts\t0\t0\npipelines\t0\t0\ncrm_users\t0\t0\ncontacts\t1\t1\ndeals\t0\t0\ncrm_tasks\t236\t4\n",
+  "stderr": "",
+  "execution_time_ms": 76
+}

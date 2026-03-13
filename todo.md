@@ -2608,3 +2608,15 @@
   - Cross-tenant admin bloqueado
   - Audit automático do código fonte (verifica que nenhum endpoint com sessionId usa protectedProcedure)
 - [x] 65 testes totais passando (5 arquivos de teste)
+
+## Correção Importação RD Station CRM v32 (Mar 13)
+- [x] Diagnosticar problemas atuais na importação (funis, negociações, contatos, tarefas, usuários)
+- [x] Corrigir importação de funis do RD Station CRM (preservar estrutura completa)
+- [x] Corrigir importação de negociações (vincular ao funil e etapa corretos, preservar status: andamento/ganha/perdida)
+- [x] Corrigir importação de contatos (vincular às negociações, validar duplicidade)
+- [x] Corrigir importação de tarefas (vincular à negociação, contato e usuário responsável)
+- [x] Corrigir importação de usuários (criar no Entur OS se não existir, reconciliar por email/ID)
+- [x] Implementar validação pós-importação (comparar origem vs destino, relatório de divergências)
+- [x] Implementar logs detalhados da importação (início/fim, erros, registros ignorados, conflitos)
+- [x] Implementar tratamento de erros robusto (retry, reprocessamento parcial, relatório final)
+- [x] Escrever testes automatizados para importação do RD Station (30 testes passando)

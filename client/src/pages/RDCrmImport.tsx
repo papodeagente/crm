@@ -11,7 +11,7 @@ import {
   AlertTriangle, Loader2, Database, Users, Building2,
   Package, ListTodo, GitBranch, Megaphone, XCircle,
   Target, Key, Eye, EyeOff, ShieldCheck, Download,
-  BarChart3, Zap, RefreshCw,
+  BarChart3, Zap, RefreshCw, UserCog,
 } from "lucide-react";
 import { useTenantId } from "@/hooks/useTenantId";
 
@@ -28,6 +28,7 @@ interface ImportConfig {
   importSources: boolean;
   importCampaigns: boolean;
   importLossReasons: boolean;
+  importUsers: boolean;
 }
 
 const defaultConfig: ImportConfig = {
@@ -40,10 +41,12 @@ const defaultConfig: ImportConfig = {
   importSources: true,
   importCampaigns: true,
   importLossReasons: true,
+  importUsers: true,
 };
 
 const dataCategories = [
   { key: "importPipelines" as const, icon: GitBranch, label: "Funis de vendas", desc: "Funis e etapas do pipeline", summaryKey: "pipelines" },
+  { key: "importUsers" as const, icon: UserCog, label: "Usuários", desc: "Usuários e responsáveis do RD", summaryKey: "users" },
   { key: "importContacts" as const, icon: Users, label: "Contatos", desc: "Pessoas e informações de contato", summaryKey: "contacts" },
   { key: "importOrganizations" as const, icon: Building2, label: "Empresas", desc: "Organizações e contas", summaryKey: "organizations" },
   { key: "importDeals" as const, icon: Target, label: "Negociações", desc: "Deals com valores e status", summaryKey: "deals" },
@@ -56,6 +59,7 @@ const dataCategories = [
 
 const categoryLabels: Record<string, string> = {
   pipelines: "Funis",
+  users: "Usuários",
   sources: "Fontes",
   campaigns: "Campanhas",
   lossReasons: "Motivos de Perda",
@@ -64,6 +68,7 @@ const categoryLabels: Record<string, string> = {
   contacts: "Contatos",
   deals: "Negociações",
   tasks: "Tarefas",
+  validation: "Validação",
 };
 
 export default function RDCrmImport() {
@@ -560,6 +565,11 @@ export default function RDCrmImport() {
                       <Badge variant="outline" className="bg-green-500/10 text-green-500 border-green-500/20">
                         {value.imported.toLocaleString("pt-BR")} importados
                       </Badge>
+                      {(value as any).skipped > 0 && (
+                        <Badge variant="outline" className="bg-yellow-500/10 text-yellow-600 border-yellow-500/20">
+                          {(value as any).skipped.toLocaleString("pt-BR")} já existiam
+                        </Badge>
+                      )}
                       {value.errors.length > 0 && (
                         <Badge variant="outline" className="bg-red-500/10 text-red-500 border-red-500/20">
                           {value.errors.length} erros
@@ -571,6 +581,35 @@ export default function RDCrmImport() {
               })}
             </CardContent>
           </Card>
+
+          {/* Validation Report */}
+          {(progress as any).validation && (
+            <Card className="border-border/50">
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <ShieldCheck className="h-4 w-4 text-primary" />
+                  Relatório de Validação
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {(progress as any).validation.mismatches?.length > 0 ? (
+                  <div className="space-y-2">
+                    {(progress as any).validation.mismatches.map((m: string, i: number) => (
+                      <div key={i} className="flex items-start gap-2 text-sm">
+                        <AlertTriangle className="h-4 w-4 text-yellow-500 mt-0.5 shrink-0" />
+                        <span className="text-muted-foreground">{m}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 text-sm text-green-500">
+                    <CheckCircle2 className="h-4 w-4" />
+                    Nenhum problema encontrado na validação
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
 
           <div className="flex gap-3">
             <Button variant="outline" onClick={() => setLocation("/settings")} className="flex-1">
