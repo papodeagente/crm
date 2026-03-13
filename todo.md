@@ -2525,3 +2525,10 @@
 - [x] Frontend WhatsApp.tsx já está robusto: QR code via WebSocket + polling fallback, estados de loading, disclaimer API não oficial
 - [x] autoRestoreSessions + periodicSyncCheck (5min) + quickSync já implementados e funcionando
 - [x] Testes: 1030/1033 passando (3 timeouts pré-existentes em backup diário)
+
+## Fix Contact Name Bug - Nome do dono aparece em contatos (Mar 13 - v23)
+- [x] Investigar como contatos são criados/sincronizados e identificar onde o nome do dono da conta vaza para os contatos durante sync/criação — 3 pontos: syncConversationsBackground (chat.lastMessage.pushName quando fromMe), quickSync, deepSync
+- [x] Corrigir root cause: filtrar ownerName em isRealName() em 5 locais (syncConversationsBackground, syncContactsFromEvolution, quickSync, deepSync, handleIncomingMessage), não usar lastMessage.pushName quando fromMe=true, não salvar pushName em mensagens fromMe
+- [x] Criar procedure repairContactNames que corrige wa_conversations.contactPushName e contacts.name contaminados com nome do dono
+- [x] Executar repair: 6 sessões processadas, 1 conversa + 1 contato CRM corrigidos (sessão Fds Viagens)
+- [x] Testes: 1030/1033 passando (3 timeouts pré-existentes)

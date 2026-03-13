@@ -832,13 +832,19 @@ class WhatsAppEvolutionManager extends EventEmitter {
       // Also update contactPushName in wa_conversations for conversations that have a matching contact
       // This ensures the conversation list shows real names instead of phone numbers
       try {
-        const isRealName = (name: string | null | undefined): name is string => {
-          if (!name || name.trim() === '') return false;
-          if (name === 'Você' || name === 'You') return false;
-          const cleaned = name.replace(/[\s\-\(\)\+]/g, '');
-          if (/^\d+$/.test(cleaned)) return false;
-          return true;
-        };
+      // Get owner name to exclude from contact name resolution
+      const ownerName = session.user?.name?.trim() || null;
+
+      const isRealName = (name: string | null | undefined): name is string => {
+        if (!name || name.trim() === '') return false;
+        if (name === 'Você' || name === 'You') return false;
+        const cleaned = name.replace(/[\s\-\(\)\+]/g, '');
+        if (/^\d+$/.test(cleaned)) return false;
+        // CRITICAL: Reject the owner's own name
+        if (ownerName && name.trim().toLowerCase() === ownerName.toLowerCase()) return false;
+        return true;
+      };
+
 
         // Build a map of jid -> best name from contacts
         // Use API data (pushName) + DB data (savedName, verifiedName) for best coverage
@@ -982,30 +988,50 @@ class WhatsAppEvolutionManager extends EventEmitter {
       console.log(`[EvoWA Sync] Found ${chats.length} chats, ${contacts.length} contacts on Evolution API`);
 
       // Build a UNIFIED name map from multiple sources:
-      // Priority: contacts.pushName > chat.name > lastMessage.pushName
+      // Priority: contacts.pushName > chat.name > lastMessage.pushName (only if !fromMe)
       const contactNameMap = new Map<string, string>();
       
-      // 1) From contacts (highest priority - these are the contact names)
-      for (const contact of contacts) {
-        if (contact.remoteJid && contact.pushName && contact.pushName.trim() !== '') {
-          contactNameMap.set(contact.remoteJid, contact.pushName);
-        }
-      }
+      // Get the owner's name to EXCLUDE it from contact name resolution
+      // This prevents the bug where the owner's WhatsApp profile name gets assigned to contacts
+      const ownerName = session.user?.name?.trim() || null;
+      const ownerJid = session.user?.id || null;
       
-      // Helper: check if a string is a real name (not a phone number or "Você")
+      // Helper: check if a string is a real name (not a phone number, "Você", or the OWNER's name)
       const isRealName = (name: string | null | undefined): name is string => {
         if (!name || name.trim() === '') return false;
         if (name === 'Você' || name === 'You') return false;
         // If it's only digits (with optional +, spaces, dashes), it's a phone number
         const cleaned = name.replace(/[\s\-\(\)\+]/g, '');
         if (/^\d+$/.test(cleaned)) return false;
+        // CRITICAL: Reject the owner's own name — it should never be assigned to a contact
+        if (ownerName && name.trim().toLowerCase() === ownerName.toLowerCase()) return false;
         return true;
       };
 
-      // 2) From chats - use chat.name (saved contact name in WhatsApp) and lastMessage.pushName
+      // 1) From contacts (highest priority - these are the contact names)
+      for (const contact of contacts) {
+        if (contact.remoteJid && contact.pushName && contact.pushName.trim() !== '') {
+          // Skip the owner's own JID
+          if (ownerJid && contact.remoteJid === ownerJid) continue;
+          if (isRealName(contact.pushName)) {
+            contactNameMap.set(contact.remoteJid, contact.pushName);
+          }
+        }
+      }
+
+      // 2) From chats - use chat.name (saved contact name in WhatsApp)
+      // IMPORTANT: Only use lastMessage.pushName if the last message was NOT from the owner (fromMe === false)
       for (const chat of chats) {
         if (chat.remoteJid && !contactNameMap.has(chat.remoteJid)) {
-          const name = chat.name || chat.pushName || (chat.lastMessage?.pushName);
+          // Skip the owner's own JID
+          if (ownerJid && chat.remoteJid === ownerJid) continue;
+          // chat.name is the saved contact name — always safe to use
+          let name = chat.name;
+          // chat.pushName could be the owner's name if the last interaction was outgoing — skip it
+          // Only use lastMessage.pushName if the last message was INCOMING (!fromMe)
+          if (!name && chat.lastMessage && !chat.lastMessage.key?.fromMe) {
+            name = chat.lastMessage.pushName;
+          }
           if (isRealName(name)) {
             contactNameMap.set(chat.remoteJid, name);
           }
@@ -1048,7 +1074,12 @@ class WhatsAppEvolutionManager extends EventEmitter {
       for (const chat of chatsToProcess) {
         try {
           const remoteJid = chat.remoteJid;
-          const candidateName = contactNameMap.get(remoteJid) || chat.name || chat.pushName || chat.lastMessage?.pushName || null;
+          // CRITICAL: Do NOT use chat.pushName or lastMessage.pushName blindly — they may contain the OWNER's name
+          // Only use lastMessage.pushName if the message was incoming (!fromMe)
+          let candidateName = contactNameMap.get(remoteJid) || chat.name || null;
+          if (!candidateName && chat.lastMessage && !chat.lastMessage.key?.fromMe) {
+            candidateName = chat.lastMessage.pushName || null;
+          }
           const pushName = isRealName(candidateName) ? candidateName : null;
 
           // Resolve conversation in our DB (creates if not exists)
@@ -1109,7 +1140,8 @@ class WhatsAppEvolutionManager extends EventEmitter {
                   fromMe,
                   messageType,
                   content: content || null,
-                  pushName: lastMsg.pushName || pushName || null,
+                  // Only store pushName for incoming messages — for outgoing, pushName is the OWNER's name
+                  pushName: fromMe ? null : (lastMsg.pushName || pushName || null),
                   status: msgStatus,
                   timestamp: msgTimestamp,
                 });
@@ -2074,11 +2106,16 @@ class WhatsAppEvolutionManager extends EventEmitter {
         if (r.messageId) existingMsgIds.add(r.messageId);
       }
 
+      // Get owner name to exclude from contact name resolution
+      const ownerName = session.user?.name?.trim() || null;
+
       const isRealName = (name: string | null | undefined): name is string => {
         if (!name || name.trim() === '') return false;
-        if (name === 'Voc\u00ea' || name === 'You') return false;
+        if (name === 'Você' || name === 'You') return false;
         const cleaned = name.replace(/[\s\-\(\)\+]/g, '');
         if (/^\d+$/.test(cleaned)) return false;
+        // CRITICAL: Reject the owner's own name
+        if (ownerName && name.trim().toLowerCase() === ownerName.toLowerCase()) return false;
         return true;
       };
 
@@ -2299,11 +2336,16 @@ class WhatsAppEvolutionManager extends EventEmitter {
       }
       console.log(`[EvoWA DeepSync] ${existingMsgIds.size} existing messages in DB`);
 
+      // Get owner name to exclude from contact name resolution
+      const ownerName = session.user?.name?.trim() || null;
+
       const isRealName = (name: string | null | undefined): name is string => {
         if (!name || name.trim() === '') return false;
-        if (name === 'Voc\u00ea' || name === 'You') return false;
+        if (name === 'Você' || name === 'You') return false;
         const cleaned = name.replace(/[\s\-\(\)\+]/g, '');
         if (/^\d+$/.test(cleaned)) return false;
+        // CRITICAL: Reject the owner's own name
+        if (ownerName && name.trim().toLowerCase() === ownerName.toLowerCase()) return false;
         return true;
       };
 

@@ -738,6 +738,143 @@ export const appRouter = router({
         const { reconcileGhostThreads } = await import("./conversationResolver");
         return reconcileGhostThreads(input.tenantId, input.sessionId);
       }),
+    // Repair contact names contaminated by owner's name
+    repairContactNames: protectedProcedure
+      .mutation(async ({ ctx }) => {
+        const db = await (await import("./db")).getDb();
+        if (!db) throw new Error("Database not available");
+        const { whatsappSessions, waConversations, waContacts, contacts } = await import("../drizzle/schema");
+        const { eq, and, sql } = await import("drizzle-orm");
+
+        // Get all sessions with their owner pushName
+        const sessions = await db.select({
+          sessionId: whatsappSessions.sessionId,
+          tenantId: whatsappSessions.tenantId,
+          pushName: whatsappSessions.pushName,
+          phoneNumber: whatsappSessions.phoneNumber,
+        }).from(whatsappSessions)
+          .where(sql`${whatsappSessions.pushName} IS NOT NULL AND ${whatsappSessions.pushName} != ''`);
+
+        let totalConvsFixed = 0;
+        let totalContactsFixed = 0;
+        const details: { sessionId: string; ownerName: string; convsFixed: number; contactsFixed: number }[] = [];
+
+        for (const session of sessions) {
+          const ownerName = session.pushName!;
+          let convsFixed = 0;
+          let contactsFixed = 0;
+
+          // 1) Fix wa_conversations: find conversations where contactPushName == ownerName
+          const contaminated = await db.select({
+            id: waConversations.id,
+            remoteJid: waConversations.remoteJid,
+          }).from(waConversations)
+            .where(and(
+              eq(waConversations.sessionId, session.sessionId),
+              eq(waConversations.contactPushName, ownerName)
+            ));
+
+          if (contaminated.length > 0) {
+            // Try to find real names from wa_contacts
+            const contactNames = await db.select({
+              jid: waContacts.jid,
+              pushName: waContacts.pushName,
+              savedName: waContacts.savedName,
+              verifiedName: waContacts.verifiedName,
+            }).from(waContacts)
+              .where(eq(waContacts.sessionId, session.sessionId));
+            const nameMap = new Map<string, string>();
+            for (const c of contactNames) {
+              const realName = c.savedName || c.verifiedName || c.pushName;
+              if (realName && realName !== ownerName && realName.trim() !== '') {
+                const cleaned = realName.replace(/[\s\-\(\)\+]/g, '');
+                if (!/^\d+$/.test(cleaned)) {
+                  nameMap.set(c.jid, realName);
+                }
+              }
+            }
+
+            // Also check incoming messages for real pushNames
+            for (const conv of contaminated) {
+              if (!nameMap.has(conv.remoteJid)) {
+                const msgRows = await db.execute(
+                  sql`SELECT pushName FROM messages WHERE sessionId = ${session.sessionId} AND remoteJid = ${conv.remoteJid} AND fromMe = 0 AND pushName IS NOT NULL AND pushName != '' AND pushName != ${ownerName} ORDER BY id DESC LIMIT 1`
+                );
+                const msgData = (msgRows as any)[0];
+                if (msgData?.[0]?.pushName) {
+                  nameMap.set(conv.remoteJid, msgData[0].pushName);
+                }
+              }
+            }
+
+            // Update contaminated conversations
+            for (const conv of contaminated) {
+              const realName = nameMap.get(conv.remoteJid);
+              await db.update(waConversations)
+                .set({ contactPushName: realName || null })
+                .where(eq(waConversations.id, conv.id));
+              convsFixed++;
+            }
+          }
+
+          // 2) Fix contacts table: find CRM contacts where name == ownerName
+          const contaminatedContacts = await db.select({
+            id: contacts.id,
+            phoneE164: contacts.phoneE164,
+            phone: contacts.phone,
+          }).from(contacts)
+            .where(and(
+              eq(contacts.tenantId, session.tenantId),
+              eq(contacts.name, ownerName)
+            ));
+
+          for (const contact of contaminatedContacts) {
+            // Try to find real name from wa_contacts by matching phone
+            const phone = contact.phoneE164 || contact.phone || '';
+            const digits = phone.replace(/\D/g, '');
+            if (!digits) continue;
+
+            // Build JID variants to search
+            const jidVariants = [
+              `${digits}@s.whatsapp.net`,
+              digits.startsWith('55') && digits.length === 13 ? `${digits.slice(0,4)}${digits.slice(5)}@s.whatsapp.net` : null,
+              digits.startsWith('55') && digits.length === 12 ? `${digits.slice(0,4)}9${digits.slice(4)}@s.whatsapp.net` : null,
+            ].filter(Boolean) as string[];
+
+            let realName: string | null = null;
+            for (const jid of jidVariants) {
+              const waContact = await db.select({ pushName: waContacts.pushName, savedName: waContacts.savedName })
+                .from(waContacts)
+                .where(eq(waContacts.jid, jid))
+                .limit(1);
+              if (waContact[0]) {
+                const name = waContact[0].savedName || waContact[0].pushName;
+                if (name && name !== ownerName) {
+                  realName = name;
+                  break;
+                }
+              }
+            }
+
+            // Update contact name: use real name or fallback to phone number
+            await db.update(contacts)
+              .set({ name: realName || `+${digits}`, updatedAt: new Date() })
+              .where(eq(contacts.id, contact.id));
+            contactsFixed++;
+          }
+
+          totalConvsFixed += convsFixed;
+          totalContactsFixed += contactsFixed;
+          details.push({ sessionId: session.sessionId, ownerName, convsFixed, contactsFixed });
+        }
+
+        return {
+          totalConvsFixed,
+          totalContactsFixed,
+          sessionsProcessed: sessions.length,
+          details,
+        };
+      }),
     // Get wa_conversations debug info
     debugConversations: protectedProcedure
       .input(z.object({ tenantId: z.number().default(1), sessionId: z.string() }))

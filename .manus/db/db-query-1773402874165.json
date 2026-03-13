@@ -1,0 +1,46 @@
+{
+  "query": "SELECT sessionId, tenantId, pushName, phoneNumber FROM whatsapp_sessions WHERE status != 'deleted';",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute SELECT sessionId, tenantId, pushName, phoneNumber FROM whatsapp_sessions WHERE status != 'deleted';",
+  "rows": [
+    {
+      "sessionId": "crm-0-1",
+      "tenantId": "0",
+      "pushName": "NULL",
+      "phoneNumber": "NULL"
+    },
+    {
+      "sessionId": "crm-210002-240001",
+      "tenantId": "210002",
+      "pushName": "Fernando alves",
+      "phoneNumber": "554892118034"
+    },
+    {
+      "sessionId": "crm-210002-210001",
+      "tenantId": "210002",
+      "pushName": "Bruno Barbosa",
+      "phoneNumber": "558499838420"
+    },
+    {
+      "sessionId": "crm-240002-240002",
+      "tenantId": "240002",
+      "pushName": "NULL",
+      "phoneNumber": "NULL"
+    },
+    {
+      "sessionId": "crm-240006-240006",
+      "tenantId": "240006",
+      "pushName": "Fds Viagens",
+      "phoneNumber": "5511995200889"
+    },
+    {
+      "sessionId": "crm-240007-240007",
+      "tenantId": "240007",
+      "pushName": "Equipe Legu Tour",
+      "phoneNumber": "5511986853606"
+    }
+  ],
+  "messages": [],
+  "stdout": "sessionId\ttenantId\tpushName\tphoneNumber\ncrm-0-1\t0\tNULL\tNULL\ncrm-210002-240001\t210002\tFernando alves\t554892118034\ncrm-210002-210001\t210002\tBruno Barbosa\t558499838420\ncrm-240002-240002\t240002\tNULL\tNULL\ncrm-240006-240006\t240006\tFds Viagens\t5511995200889\ncrm-240007-240007\t240007\tEquipe Legu Tour\t5511986853606\n",
+  "stderr": "",
+  "execution_time_ms": 57
+}
