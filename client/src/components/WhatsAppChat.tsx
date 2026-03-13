@@ -349,12 +349,14 @@ function MediaLoader({ sessionId, messageId, messageType, mediaDuration, isVoice
     if (isAudio) return <AudioPlayer src={mediaUrl} duration={mediaDuration} isVoice={isVoiceNote || false} fromMe={fromMe} avatarUrl={avatarUrl} />;
     if (isImage) return (
       <div className="relative -mx-1 -mt-0.5 mb-1 overflow-hidden rounded-md">
-        <img src={mediaUrl} alt="Imagem" className="max-w-[300px] w-full h-auto object-cover cursor-pointer hover:opacity-95 transition-opacity rounded-lg" loading="lazy" onClick={() => onImageClick?.(mediaUrl)} />
+        <img src={mediaUrl} alt="Imagem" className="max-w-[300px] w-full h-auto object-cover cursor-pointer hover:opacity-95 transition-opacity rounded-lg" loading="lazy" onClick={() => onImageClick?.(mediaUrl)}
+          onError={() => setUnavailable(true)} />
       </div>
     );
     if (isVideo) return (
       <div className="relative -mx-1 -mt-0.5 mb-1 overflow-hidden rounded-md">
-        <video src={mediaUrl} controls className="max-w-[300px] w-full h-auto rounded-md" preload="metadata" />
+        <video src={mediaUrl} controls className="max-w-[300px] w-full h-auto rounded-md" preload="metadata"
+          onError={() => setUnavailable(true)} />
       </div>
     );
     if (isDocument) return (
@@ -367,7 +369,8 @@ function MediaLoader({ sessionId, messageId, messageType, mediaDuration, isVoice
         <Download className="w-4 h-4 text-muted-foreground shrink-0" />
       </a>
     );
-    if (isSticker) return <img src={mediaUrl} alt="Sticker" className="w-32 h-32 object-contain" loading="lazy" />;
+    if (isSticker) return <img src={mediaUrl} alt="Sticker" className="w-32 h-32 object-contain" loading="lazy"
+      onError={() => setUnavailable(true)} />;
   }
 
   if (loading) {
@@ -582,8 +585,8 @@ const MessageBubble = memo(({
   const isPtv = msg.messageType === "ptvMessage"; // Video message (round video)
   // Detect media by messageType (not just mediaUrl), since most messages have mediaUrl=null
   const isMediaType = isImage || isVideo || isAudio || isDocument || isSticker;
-  // WhatsApp CDN URLs (mmg.whatsapp.net) are temporary and expire — treat them as not having a valid URL
-  const hasMediaUrl = !!msg.mediaUrl && !msg.mediaUrl.includes('whatsapp.net/');
+  // Only treat permanent S3/CDN URLs as valid; WhatsApp CDN URLs (mmg.whatsapp.net, web.whatsapp.net) expire
+  const hasMediaUrl = !!msg.mediaUrl && !msg.mediaUrl.includes('whatsapp.net');
   const hasMedia = hasMediaUrl || isMediaType;
 
   const bubbleBase = fromMe

@@ -639,7 +639,7 @@ export const appRouter = router({
           .limit(1);
         if (!msg) throw new TRPCError({ code: "NOT_FOUND", message: "Message not found" });
         // Already has media URL cached (only if it's a permanent S3/CDN URL, not a temporary WhatsApp URL)
-        if (msg.mediaUrl && !msg.mediaUrl.includes('whatsapp.net/')) {
+        if (msg.mediaUrl && !msg.mediaUrl.includes('whatsapp.net')) {
           return { url: msg.mediaUrl, mimetype: msg.mediaMimeType, unavailable: false };
         }
         // Already marked as unavailable - don't retry

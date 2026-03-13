@@ -2551,3 +2551,10 @@
 - [x] Limpar URL quebrada do SVG no banco (id=540206) para que MediaLoader re-baixe com extensão correta
 - [x] Atualizar testes em media-features.test.ts com casos para svg+xml, xhtml+xml, etc.
 - [x] Todos os 10 testes de media-features passando
+
+## Fix Completo de Mídias Quebradas v26 (Mar 13)
+- [x] Stickers quebrados no Inbox — causa: URL 'https://web.whatsapp.net' (sem barra) passava pelo filtro 'whatsapp.net/' (com barra)
+- [x] Corrigir check hasMediaUrl: remover barra do filtro 'whatsapp.net/' → 'whatsapp.net' em 5 locais (frontend + backend + whatsappEvolution.ts x3)
+- [x] Adicionar onError handlers no MediaLoader — img/video/sticker re-baixados que falham mostram estado "expirado" em vez de ícone quebrado
+- [x] ImageWithFallback (checkpoint anterior) + hasMediaUrl fix = cobertura completa para todos os tipos de mídia
+- [x] 14 testes passando em media-features.test.ts (incluindo teste para web.whatsapp.net sem barra)

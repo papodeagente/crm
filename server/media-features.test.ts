@@ -70,6 +70,32 @@ describe("mimeToExt logic", () => {
   });
 });
 
+// Test the hasMediaUrl frontend logic
+describe("hasMediaUrl check", () => {
+  const hasMediaUrl = (url: string | null | undefined): boolean => {
+    return !!url && !url.includes('whatsapp.net');
+  };
+
+  it("should accept valid S3/CDN URLs", () => {
+    expect(hasMediaUrl("https://d2xsxph8kpxj0f.cloudfront.net/whatsapp-media/abc.jpg")).toBe(true);
+    expect(hasMediaUrl("https://example.com/media/file.pdf")).toBe(true);
+  });
+
+  it("should reject WhatsApp CDN URLs with path", () => {
+    expect(hasMediaUrl("https://mmg.whatsapp.net/v/t62.7118-24/12345.enc")).toBe(false);
+  });
+
+  it("should reject web.whatsapp.net without path (bogus URL)", () => {
+    expect(hasMediaUrl("https://web.whatsapp.net")).toBe(false);
+  });
+
+  it("should reject null/undefined/empty", () => {
+    expect(hasMediaUrl(null)).toBe(false);
+    expect(hasMediaUrl(undefined)).toBe(false);
+    expect(hasMediaUrl("")).toBe(false);
+  });
+});
+
 // Test the extractMediaInfo logic
 describe("extractMediaInfo logic", () => {
   it("should extract audio message info", () => {
