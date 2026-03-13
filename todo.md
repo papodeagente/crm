@@ -2502,3 +2502,11 @@
 - [x] Atualizar Etapas do Pipeline e Ações Rápidas com cores da marca
 - [x] Adicionar taxa de conversão entre etapas do funil (▼ XX%)
 - [x] Testar dashboard com dados reais — 1030/1033 testes passando (3 timeouts pre-existentes em backup)
+
+## Correções Críticas v20 (Mar 13)
+- [x] FUNIL: Redesenhar completamente com cores vibrantes rainbow (azul→ciano→roxo→dourado→verde→lima→magenta) e gradiente horizontal 3D, matching referência
+- [x] DASHBOARD: Dados são reais do banco de produção (3 ativas, 6 contatos, 4 viagens, 67% conversão, R$10.770 ticket médio)
+- [x] LOGIN: Corrigido redirecionamento — TopNavLayout agora redireciona para /login ao invés de mostrar botão Manus OAuth
+- [x] LOGIN: Corrigido bug de hooks React (useEffect depois de return condicional) que causava crash em todas as páginas
+- [x] AUDIT: Testadas todas as 30 páginas — todas funcionando após correção do bug de hooks
+- [x] AUDIT: Mapeamento completo: todas as rotas têm páginas implementadas e routers conectados

@@ -31,17 +31,31 @@ const ENTUR = {
   bg: "#06091A",
 };
 
-/* ─── Brand gradient stops for funnel (interpolated) ─── */
-function getEnturFunnelColor(index: number, total: number): string {
-  const colors = [
-    "#FFC7AC", "#FFB08E", "#FF9A70", "#FF7D5A", "#FF614C",
-    "#FF4C57", "#FF3761", "#FF2B61", "#ED16A4", "#DC00E7",
-    "#AE07EA", "#800EED", "#600FED", "#4A0BC0", "#350893",
-  ];
-  if (total <= 1) return colors[0];
-  const step = (colors.length - 1) / (total - 1);
+/* ─── Brand funnel colors — vibrant, distinct per stage ─── */
+const FUNNEL_PALETTE = [
+  { main: "#4A8FFF", light: "#6BA8FF", dark: "#2E6FE0" },  // Azul vibrante
+  { main: "#00D4C8", light: "#33E0D6", dark: "#00B0A6" },  // Ciano/Teal
+  { main: "#B44AFF", light: "#C96EFF", dark: "#9530E0" },  // Roxo vibrante
+  { main: "#FFB830", light: "#FFCA5C", dark: "#E09A10" },  // Dourado/Amber
+  { main: "#FF6B35", light: "#FF8A5C", dark: "#E05020" },  // Laranja
+  { main: "#22CC66", light: "#44DD80", dark: "#18AA50" },  // Verde
+  { main: "#00B89C", light: "#33CCAE", dark: "#009A80" },  // Teal escuro
+  { main: "#FF2B61", light: "#FF5580", dark: "#E01848" },  // Vermelho ENTUR
+  { main: "#DC00E7", light: "#E840F0", dark: "#B800C0" },  // Magenta ENTUR
+  { main: "#600FED", light: "#7E3EFF", dark: "#4A0BC0" },  // Roxo ENTUR
+  { main: "#C4ED0F", light: "#D4F540", dark: "#A8CC00" },  // Lima ENTUR
+];
+
+function getFunnelColor(index: number, total: number) {
+  if (total <= 1) return FUNNEL_PALETTE[0];
+  const step = (FUNNEL_PALETTE.length - 1) / (total - 1);
   const i = Math.round(index * step);
-  return colors[Math.min(i, colors.length - 1)];
+  return FUNNEL_PALETTE[Math.min(i, FUNNEL_PALETTE.length - 1)];
+}
+
+/* ─── Legacy helper for pipeline stages list ─── */
+function getEnturFunnelColor(index: number, total: number): string {
+  return getFunnelColor(index, total).main;
 }
 
 /* ─── Skeleton Pulse ─── */
@@ -138,86 +152,74 @@ function CustomTooltip({ active, payload, label, formatter }: any) {
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   VisualFunnel — Professional SVG funnel with ENTUR brand gradient
+   VisualFunnel — Vibrant rainbow funnel matching reference design
+   Each stage has a distinct color with horizontal gradient for 3D depth
    ═══════════════════════════════════════════════════════════════ */
 function VisualFunnel({ stages }: { stages: any[] }) {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
-    const t = setTimeout(() => setIsVisible(true), 150);
+    const t = setTimeout(() => setIsVisible(true), 100);
     return () => clearTimeout(t);
   }, []);
 
-  const totalCount = stages.reduce((s, st) => s + st.dealCount, 0) || 1;
+  const totalCount = stages.reduce((s, st) => s + st.dealCount, 0);
   const totalValue = stages.reduce((s, st) => s + st.totalValueCents, 0);
 
-  // SVG dimensions
-  const svgW = 460;
-  const stageH = stages.length <= 4 ? 56 : stages.length <= 6 ? 48 : 42;
-  const gap = 3;
-  const topPad = 6;
-  const svgH = topPad + stages.length * stageH + (stages.length - 1) * gap + 6;
-  const maxW = svgW - 20; // max trapezoid width
-  const minW = maxW * 0.22; // minimum width at bottom
+  // SVG layout — generous height, no gaps, smooth narrowing
+  const svgW = 600;
+  const stageH = stages.length <= 4 ? 80 : stages.length <= 6 ? 68 : 62;
+  const topPad = 8;
+  const botPad = 8;
+  const svgH = topPad + stages.length * stageH + botPad;
+
+  // Funnel narrows from 96% width at top to ~38% at bottom
+  const maxW = svgW * 0.96;
+  const minW = svgW * 0.38;
+
+  const widthAt = (idx: number) => {
+    if (stages.length <= 1) return maxW;
+    const t = idx / stages.length;
+    return maxW - t * (maxW - minW);
+  };
+
+  // Generate unique gradient IDs
+  const gradientId = (i: number) => `funnel-grad-${i}`;
 
   return (
     <div className="relative">
       <svg
         viewBox={`0 0 ${svgW} ${svgH}`}
         className="w-full"
-        style={{ maxHeight: Math.min(svgH, 500), overflow: "visible" }}
+        style={{ overflow: "visible" }}
+        preserveAspectRatio="xMidYMid meet"
       >
         <defs>
-          {/* Per-stage horizontal gradients for 3D cylinder effect */}
           {stages.map((_, i) => {
-            const c = getEnturFunnelColor(i, stages.length);
+            const c = getFunnelColor(i, stages.length);
             return (
-              <linearGradient key={`fg-${i}`} id={`fg-${i}`} x1="0%" y1="0%" x2="100%" y2="0%">
-                <stop offset="0%" stopColor={c} stopOpacity={0.55} />
-                <stop offset="18%" stopColor={c} stopOpacity={0.85} />
-                <stop offset="45%" stopColor={c} stopOpacity={1} />
-                <stop offset="55%" stopColor={c} stopOpacity={1} />
-                <stop offset="82%" stopColor={c} stopOpacity={0.85} />
-                <stop offset="100%" stopColor={c} stopOpacity={0.55} />
+              <linearGradient key={i} id={gradientId(i)} x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0%" stopColor={c.light} />
+                <stop offset="50%" stopColor={c.main} />
+                <stop offset="100%" stopColor={c.dark} />
               </linearGradient>
             );
           })}
-          {/* Top shine gradient */}
-          <linearGradient id="shine" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#fff" stopOpacity={0.28} />
-            <stop offset="100%" stopColor="#fff" stopOpacity={0} />
-          </linearGradient>
-          {/* Glow filter */}
-          <filter id="fglow" x="-20%" y="-20%" width="140%" height="140%">
-            <feGaussianBlur stdDeviation="6" result="b" />
-            <feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge>
-          </filter>
         </defs>
 
         {stages.map((stage, i) => {
-          const y = topPad + i * (stageH + gap);
+          const y = topPad + i * stageH;
           const cx = svgW / 2;
           const isHov = hoveredIndex === i;
-          const c = getEnturFunnelColor(i, stages.length);
 
-          // Width interpolation: linear from maxW to minW
-          const t = stages.length > 1 ? i / (stages.length - 1) : 0;
-          const w = maxW - t * (maxW - minW);
-          // Next stage width (for bottom edge of trapezoid)
-          const tNext = stages.length > 1 ? Math.min((i + 1) / (stages.length - 1), 1) : 0;
-          const wNext = i < stages.length - 1 ? maxW - tNext * (maxW - minW) : w * 0.75;
+          const wTop = widthAt(i);
+          const wBot = widthAt(i + 1);
 
-          const topL = cx - w / 2;
-          const topR = cx + w / 2;
-          const botL = cx - wNext / 2;
-          const botR = cx + wNext / 2;
-          const pts = `${topL},${y} ${topR},${y} ${botR},${y + stageH} ${botL},${y + stageH}`;
-
-          // Conversion rate
-          const convRate = i > 0 && stages[i - 1].dealCount > 0
-            ? Math.round((stage.dealCount / stages[i - 1].dealCount) * 100)
-            : null;
+          const topL = cx - wTop / 2;
+          const topR = cx + wTop / 2;
+          const botL = cx - wBot / 2;
+          const botR = cx + wBot / 2;
 
           return (
             <g
@@ -227,95 +229,72 @@ function VisualFunnel({ stages }: { stages: any[] }) {
               className="cursor-pointer"
               style={{
                 opacity: isVisible ? 1 : 0,
-                transform: isVisible ? "translateY(0)" : "translateY(8px)",
-                transition: `all 0.5s cubic-bezier(0.16, 1, 0.3, 1) ${i * 0.06}s`,
+                transform: isVisible ? "translateY(0)" : "translateY(16px)",
+                transition: `all 0.6s cubic-bezier(0.16, 1, 0.3, 1) ${i * 0.08}s`,
               }}
             >
-              {/* Hover glow behind */}
-              {isHov && (
-                <polygon
-                  points={pts}
-                  fill={c}
-                  opacity={0.3}
-                  filter="url(#fglow)"
-                />
-              )}
-
-              {/* Main trapezoid with 3D gradient */}
+              {/* Main trapezoid with horizontal gradient */}
               <polygon
-                points={pts}
-                fill={`url(#fg-${i})`}
-                stroke={isHov ? "rgba(255,255,255,0.25)" : "rgba(255,255,255,0.06)"}
-                strokeWidth={isHov ? 1.2 : 0.4}
+                points={`${topL},${y} ${topR},${y} ${botR},${y + stageH} ${botL},${y + stageH}`}
+                fill={`url(#${gradientId(i)})`}
                 style={{
-                  transition: "all 0.3s ease",
-                  transform: isHov ? `scale(1.025)` : "scale(1)",
-                  transformOrigin: `${cx}px ${y + stageH / 2}px`,
+                  transition: "filter 0.25s ease",
+                  filter: isHov ? "brightness(1.15) drop-shadow(0 4px 12px rgba(0,0,0,0.3))" : "brightness(1)",
                 }}
               />
 
-              {/* Top shine strip */}
-              <polygon
-                points={`${topL + 4},${y + 0.5} ${topR - 4},${y + 0.5} ${topR - 8},${y + 7} ${topL + 8},${y + 7}`}
-                fill="url(#shine)"
+              {/* Top edge highlight for 3D depth */}
+              <line
+                x1={topL + 4} y1={y + 1}
+                x2={topR - 4} y2={y + 1}
+                stroke="rgba(255,255,255,0.25)"
+                strokeWidth="1.5"
               />
 
-              {/* Stage name */}
+              {/* Stage name — bold, white, centered */}
               <text
                 x={cx}
                 y={y + stageH / 2 - 5}
                 textAnchor="middle"
-                fill="#fff"
-                fontSize="11.5"
-                fontWeight="700"
+                fill="#ffffff"
+                fontSize="15"
+                fontWeight="800"
+                fontFamily="system-ui, -apple-system, sans-serif"
                 style={{ textShadow: "0 1px 4px rgba(0,0,0,0.6)" }}
               >
                 {stage.name}
               </text>
 
-              {/* Count + Value */}
+              {/* Count + Value — white, slightly transparent */}
               <text
                 x={cx}
-                y={y + stageH / 2 + 10}
+                y={y + stageH / 2 + 14}
                 textAnchor="middle"
-                fill="rgba(255,255,255,0.8)"
-                fontSize="9.5"
-                fontWeight="500"
+                fill="rgba(255,255,255,0.85)"
+                fontSize="12"
+                fontWeight="600"
+                fontFamily="system-ui, -apple-system, sans-serif"
+                style={{ textShadow: "0 1px 3px rgba(0,0,0,0.5)" }}
               >
                 {stage.dealCount} neg. · {formatCurrency(stage.totalValueCents)}
               </text>
-
-              {/* Conversion rate between stages */}
-              {convRate !== null && (
-                <g>
-                  <text
-                    x={cx}
-                    y={y - gap / 2 + 1}
-                    textAnchor="middle"
-                    fill="rgba(255,255,255,0.35)"
-                    fontSize="8"
-                    fontWeight="700"
-                    letterSpacing="0.5"
-                  >
-                    ▼ {convRate}%
-                  </text>
-                </g>
-              )}
             </g>
           );
         })}
       </svg>
 
-      {/* Total summary with brand accent */}
-      <div className="flex items-center justify-center gap-8 mt-4 pt-4 border-t border-border/30">
+      {/* Total summary */}
+      <div className="flex items-center justify-center gap-12 mt-6 pt-5 border-t border-border/30">
         <div className="text-center">
-          <span className="text-[10px] text-muted-foreground font-semibold uppercase tracking-[0.1em]">Total</span>
-          <p className="text-[18px] font-extrabold text-foreground mt-0.5">{totalCount} <span className="text-[12px] font-medium text-muted-foreground">neg.</span></p>
+          <span className="text-[11px] text-muted-foreground font-semibold uppercase tracking-[0.12em]">TOTAL</span>
+          <p className="text-[24px] font-extrabold text-foreground mt-1">
+            {totalCount} <span className="text-[14px] font-medium text-muted-foreground">neg.</span>
+          </p>
         </div>
-        <div className="h-8 w-px bg-border/40" />
+        <div className="h-10 w-px bg-border/40" />
         <div className="text-center">
-          <span className="text-[10px] text-muted-foreground font-semibold uppercase tracking-[0.1em]">Valor Total</span>
-          <p className="text-[18px] font-extrabold mt-0.5" style={{ color: ENTUR.lime }}>
+          <span className="text-[11px] text-muted-foreground font-semibold uppercase tracking-[0.12em]">VALOR</span>
+          <p className="text-[24px] font-extrabold mt-1" style={{ color: ENTUR.lime }}>
             {formatCurrency(totalValue)}
           </p>
         </div>
