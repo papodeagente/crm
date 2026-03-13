@@ -2493,3 +2493,12 @@
 ## Correções (Mar 13 - v18)
 - [x] BUG: Sessão não persiste — FIX: Cookie sameSite alterado de 'none' para 'lax' em domínios próprios (mais compatível com navegadores modernos); staleTime aumentado para 10min no useAuth para evitar refetches desnecessários; null safety adicionado ao cookies.ts
 - [x] BUG: Nome errado no contato 555189238810 — FIX: resolveInbound agora recebe pushName=null quando fromMe=true (whatsapp.ts e whatsappEvolution.ts); corrigidos 2 contatos CRM com nomes errados (546353: Fernando alves -> CP, 540036: Fernando alves -> Fernando Alves 7D)
+
+## Dashboard Redesign v2 - Cores da Marca (Mar 13 - v19)
+- [x] Atualizar CSS global com cores da marca ENTUR (fundo #06091A, roxo #600FED, magenta #DC00E7, vermelho #FF2B61, coral #FF614C, peach #FFC7AC, verde lima #C4ED0F) — já feito no v17/v18
+- [x] Redesenhar funil de vendas com gradiente da marca (#FFC7AC → #FF614C → #FF2B61 → #DC00E7 → #600FED), design profissional 3D SVG com trapézios, efeitos de brilho e glow
+- [x] Atualizar KPI cards com gradientes da marca ENTUR (roxo/magenta, coral/red, red/magenta, peach/coral, lima)
+- [x] Atualizar gráficos (WhatsApp chart, donut conversão) com cores da marca (lima, roxo, vermelho)
+- [x] Atualizar Etapas do Pipeline e Ações Rápidas com cores da marca
+- [x] Adicionar taxa de conversão entre etapas do funil (▼ XX%)
+- [x] Testar dashboard com dados reais — 1030/1033 testes passando (3 timeouts pre-existentes em backup)

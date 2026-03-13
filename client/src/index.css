@@ -53,6 +53,14 @@
   --color-wa-tint: var(--wa-tint);
   --color-wa-divider: var(--wa-divider);
   --color-wa-input-bg: var(--wa-input-bg);
+  /* ENTUR Brand Colors */
+  --color-entur-bg: #06091A;
+  --color-entur-roxo: #600FED;
+  --color-entur-magenta: #DC00E7;
+  --color-entur-vermelho: #FF2B61;
+  --color-entur-coral: #FF614C;
+  --color-entur-peach: #FFC7AC;
+  --color-entur-lima: #C4ED0F;
 }
 
 /* ─── ENTUR OS — Light Theme ─── */
@@ -117,64 +125,64 @@
   --wa-input-bg: oklch(1.0 0 0);
 }
 
-/* ─── ENTUR OS — Dark Theme ─── */
+/* ─── ENTUR OS — Dark Theme (Brand Colors) ─── */
 .dark {
-  --background: oklch(0.14 0.015 270);
+  --background: #06091A;
   --foreground: oklch(0.93 0.005 260);
 
-  --card: oklch(0.19 0.015 270);
+  --card: #0D1129;
   --card-foreground: oklch(0.93 0.005 260);
 
-  --popover: oklch(0.19 0.015 270);
+  --popover: #0D1129;
   --popover-foreground: oklch(0.93 0.005 260);
 
-  --primary: oklch(0.65 0.20 290);
+  --primary: #600FED;
   --primary-foreground: oklch(1.0 0 0);
 
-  --secondary: oklch(0.22 0.015 270);
+  --secondary: #121736;
   --secondary-foreground: oklch(0.88 0.005 260);
 
-  --muted: oklch(0.22 0.012 270);
+  --muted: #121736;
   --muted-foreground: oklch(0.62 0.012 260);
 
-  --accent: oklch(0.24 0.025 290);
+  --accent: #1A1F45;
   --accent-foreground: oklch(0.93 0.005 260);
 
-  --destructive: oklch(0.58 0.24 25);
+  --destructive: #FF2B61;
   --destructive-foreground: oklch(1.0 0 0);
 
-  --border: oklch(0.30 0.015 270);
-  --input: oklch(0.26 0.015 270);
-  --ring: oklch(0.65 0.20 290);
+  --border: #1E2350;
+  --input: #161B3D;
+  --ring: #600FED;
 
-  --chart-1: oklch(0.65 0.20 290);
-  --chart-2: oklch(0.65 0.20 290);
-  --chart-3: oklch(0.55 0.25 330);
-  --chart-4: oklch(0.70 0.18 150);
-  --chart-5: oklch(0.50 0.22 270);
+  --chart-1: #600FED;
+  --chart-2: #DC00E7;
+  --chart-3: #FF2B61;
+  --chart-4: #C4ED0F;
+  --chart-5: #FF614C;
 
-  --sidebar: oklch(0.12 0.015 270);
+  --sidebar: #080C1F;
   --sidebar-foreground: oklch(0.68 0.008 260);
-  --sidebar-primary: oklch(0.65 0.20 290);
+  --sidebar-primary: #600FED;
   --sidebar-primary-foreground: oklch(1.0 0 0);
-  --sidebar-accent: oklch(0.22 0.02 290);
+  --sidebar-accent: #121736;
   --sidebar-accent-foreground: oklch(0.93 0.005 260);
-  --sidebar-border: oklch(0.26 0.015 270);
-  --sidebar-ring: oklch(0.65 0.20 290);
+  --sidebar-border: #1A1F45;
+  --sidebar-ring: #600FED;
 
   /* WhatsApp Inbox — Dark */
-  --wa-panel: oklch(0.17 0.012 270);
-  --wa-panel-header: oklch(0.20 0.015 270);
-  --wa-search-bg: oklch(0.15 0.012 270);
-  --wa-chat-bg: oklch(0.10 0.012 270);
-  --wa-bubble-out: oklch(0.25 0.06 170);
-  --wa-bubble-in: oklch(0.22 0.015 270);
-  --wa-active: oklch(0.22 0.025 290);
-  --wa-hover: oklch(0.20 0.012 270);
-  --wa-unread: oklch(0.55 0.18 155);
-  --wa-tint: oklch(0.55 0.18 155);
-  --wa-divider: oklch(0.24 0.012 270);
-  --wa-input-bg: oklch(0.20 0.012 270);
+  --wa-panel: #0D1129;
+  --wa-panel-header: #111535;
+  --wa-search-bg: #0A0E24;
+  --wa-chat-bg: #06091A;
+  --wa-bubble-out: #1A2E1E;
+  --wa-bubble-in: #121736;
+  --wa-active: #1A1F45;
+  --wa-hover: #111535;
+  --wa-unread: #C4ED0F;
+  --wa-tint: #C4ED0F;
+  --wa-divider: #1A1F45;
+  --wa-input-bg: #111535;
 }
 
 @layer base {
@@ -249,22 +257,22 @@
     transition: box-shadow 0.25s ease, transform 0.25s ease;
   }
   .dark .surface {
-    border-color: oklch(1 1 1 / 0.06);
+    border-color: rgba(255, 255, 255, 0.06);
     box-shadow:
-      0 0 0 0.5px oklch(1 1 1 / 0.03),
-      0 1px 2px oklch(0 0 0 / 0.2),
-      0 3px 10px oklch(0 0 0 / 0.15),
-      0 8px 30px oklch(0 0 0 / 0.1);
+      0 0 0 0.5px rgba(255, 255, 255, 0.03),
+      0 1px 2px rgba(0, 0, 0, 0.3),
+      0 3px 10px rgba(0, 0, 0, 0.2),
+      0 8px 30px rgba(0, 0, 0, 0.15);
   }
   .surface:hover {
     box-shadow: 0 2px 6px oklch(0 0 0 / 0.06), 0 4px 16px oklch(0 0 0 / 0.04);
   }
   .dark .surface:hover {
     box-shadow:
-      0 0 0 0.5px oklch(1 1 1 / 0.05),
-      0 2px 4px oklch(0 0 0 / 0.25),
-      0 6px 20px oklch(0 0 0 / 0.2),
-      0 0 40px oklch(0.60 0.25 300 / 0.04);
+      0 0 0 0.5px rgba(255, 255, 255, 0.05),
+      0 2px 4px rgba(0, 0, 0, 0.35),
+      0 6px 20px rgba(0, 0, 0, 0.25),
+      0 0 40px rgba(96, 15, 237, 0.06);
   }
 
   /* Glassmorphism — theme-aware */
@@ -272,7 +280,7 @@
     @apply bg-background/90 backdrop-blur-xl;
   }
   .dark .glass {
-    border-bottom-color: oklch(1 1 1 / 0.06);
+    border-bottom-color: rgba(255, 255, 255, 0.06);
   }
 
   /* Input inset — theme-aware */
@@ -282,7 +290,7 @@
   }
   .input-inset:focus-within {
     @apply bg-background border-primary/50;
-    box-shadow: 0 0 0 3px oklch(0.55 0.25 290 / 0.15);
+    box-shadow: 0 0 0 3px rgba(96, 15, 237, 0.2);
   }
 
   /* Section label */
@@ -296,9 +304,9 @@
     margin-bottom: 0.25rem;
   }
 
-  /* ENTUR OS gradient badge — purple → magenta → cyan */
+  /* ENTUR OS gradient badge — brand gradient */
   .badge-gradient {
-    background: linear-gradient(135deg, oklch(0.55 0.25 270), oklch(0.60 0.25 320), oklch(0.65 0.20 200));
+    background: linear-gradient(135deg, #600FED, #DC00E7, #FF2B61);
     color: white;
     font-size: 0.6875rem;
     font-weight: 600;
@@ -308,13 +316,16 @@
 
   /* ENTUR OS brand gradient for accents */
   .entur-gradient {
-    background: linear-gradient(135deg, oklch(0.55 0.25 270), oklch(0.60 0.25 320), oklch(0.65 0.20 200));
+    background: linear-gradient(135deg, #FFC7AC, #FF614C, #FF2B61, #DC00E7, #600FED);
   }
   .entur-gradient-text {
-    background: linear-gradient(135deg, oklch(0.65 0.25 270), oklch(0.70 0.25 320), oklch(0.75 0.20 200));
+    background: linear-gradient(135deg, #FFC7AC, #FF614C, #FF2B61, #DC00E7, #600FED);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
+  }
+  .entur-gradient-reverse {
+    background: linear-gradient(135deg, #600FED, #DC00E7, #FF2B61, #FF614C, #FFC7AC);
   }
 }
 
@@ -325,7 +336,7 @@
     scrollbar-color: oklch(0.80 0.005 270) transparent;
   }
   .dark .scrollbar-thin {
-    scrollbar-color: oklch(0.35 0.01 280) transparent;
+    scrollbar-color: #1E2350 transparent;
   }
   .scrollbar-thin::-webkit-scrollbar {
     width: 6px;
@@ -339,13 +350,13 @@
     border-radius: 10px;
   }
   .dark .scrollbar-thin::-webkit-scrollbar-thumb {
-    background-color: oklch(0.35 0.01 280);
+    background-color: #1E2350;
   }
   .scrollbar-thin::-webkit-scrollbar-thumb:hover {
     background-color: oklch(0.70 0.005 270);
   }
   .dark .scrollbar-thin::-webkit-scrollbar-thumb:hover {
-    background-color: oklch(0.45 0.01 280);
+    background-color: #2A3060;
   }
 
   /* Hide scrollbar but keep scrolling */

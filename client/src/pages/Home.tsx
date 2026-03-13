@@ -1,24 +1,48 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useTenantId } from "@/hooks/useTenantId";
 import {
   Briefcase, Users, Plane, CheckSquare, MessageSquare,
   TrendingUp, ArrowUpRight, ArrowDownRight, Clock,
   ChevronRight, Plus, Zap, AlertTriangle,
   Phone, Mail, Video, MessageCircle, Send, Inbox,
-  BarChart3, Target, DollarSign, Activity, Eye,
+  BarChart3, Target, DollarSign, Activity, Eye, ChevronDown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
 import { formatTime, formatDateShort, SYSTEM_TIMEZONE, SYSTEM_LOCALE } from "../../../shared/dateUtils";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar,
+  ResponsiveContainer, PieChart, Pie, Cell,
 } from "recharts";
 
 /* ─── Polling interval for real-time sync (15 seconds) ─── */
 const REFETCH_INTERVAL = 15_000;
+
+/* ─── ENTUR Brand Colors ─── */
+const ENTUR = {
+  peach: "#FFC7AC",
+  coral: "#FF614C",
+  red: "#FF2B61",
+  magenta: "#DC00E7",
+  purple: "#600FED",
+  lime: "#C4ED0F",
+  bg: "#06091A",
+};
+
+/* ─── Brand gradient stops for funnel (interpolated) ─── */
+function getEnturFunnelColor(index: number, total: number): string {
+  const colors = [
+    "#FFC7AC", "#FFB08E", "#FF9A70", "#FF7D5A", "#FF614C",
+    "#FF4C57", "#FF3761", "#FF2B61", "#ED16A4", "#DC00E7",
+    "#AE07EA", "#800EED", "#600FED", "#4A0BC0", "#350893",
+  ];
+  if (total <= 1) return colors[0];
+  const step = (colors.length - 1) / (total - 1);
+  const i = Math.round(index * step);
+  return colors[Math.min(i, colors.length - 1)];
+}
 
 /* ─── Skeleton Pulse ─── */
 function Skeleton({ className = "" }: { className?: string }) {
@@ -30,15 +54,15 @@ function AnimatedValue({ value, prefix = "", suffix = "" }: { value: string; pre
   return <span>{prefix}{value}{suffix}</span>;
 }
 
-/* ─── Metric Card with glassmorphism ─── */
-function MetricCard({ label, value, change, changeType, icon: Icon, gradient, loading, subtitle }: {
+/* ─── Metric Card with ENTUR brand gradients ─── */
+function MetricCard({ label, value, change, changeType, icon: Icon, gradient, iconColor, loading, subtitle }: {
   label: string; value: string; change?: string; changeType?: "up" | "down" | "neutral";
-  icon: any; gradient: string; loading?: boolean; subtitle?: string;
+  icon: any; gradient: string; iconColor: string; loading?: boolean; subtitle?: string;
 }) {
   return (
     <div className="relative group">
       <div className="absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500" style={{
-        background: gradient, filter: "blur(20px)", transform: "scale(0.85) translateY(8px)"
+        background: gradient, filter: "blur(24px)", transform: "scale(0.8) translateY(10px)"
       }} />
       <div className="surface relative p-5 flex flex-col gap-3 overflow-hidden hover:scale-[1.02] transition-transform duration-300">
         <div className="absolute top-0 left-0 right-0 h-[2px]" style={{ background: gradient }} />
@@ -47,7 +71,7 @@ function MetricCard({ label, value, change, changeType, icon: Icon, gradient, lo
           <div className="h-10 w-10 rounded-xl flex items-center justify-center" style={{
             background: gradient, opacity: 0.15
           }}>
-            <Icon className="h-5 w-5" style={{ color: gradient.includes("270") ? "#a78bfa" : gradient.includes("155") ? "#34d399" : gradient.includes("320") ? "#f472b6" : "#38bdf8" }} />
+            <Icon className="h-5 w-5" style={{ color: iconColor }} />
           </div>
         </div>
         <div>
@@ -113,71 +137,87 @@ function CustomTooltip({ active, payload, label, formatter }: any) {
   );
 }
 
-/* ─── Visual Sales Funnel (SVG trapezoid shape) ─── */
-const FUNNEL_COLORS = [
-  "#8b5cf6", "#a78bfa", "#7c3aed", "#6d28d9", "#5b21b6",
-  "#c084fc", "#9333ea", "#7e22ce", "#6b21a8", "#581c87",
-];
-
+/* ═══════════════════════════════════════════════════════════════
+   VisualFunnel — Professional SVG funnel with ENTUR brand gradient
+   ═══════════════════════════════════════════════════════════════ */
 function VisualFunnel({ stages }: { stages: any[] }) {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
-  const totalCount = stages.reduce((s, st) => s + st.dealCount, 0) || 1;
-  const svgWidth = 500;
-  const svgHeight = stages.length * 56 + 20;
-  const topPadding = 10;
-  const stageHeight = 50;
-  const stageGap = 6;
-  const maxWidth = svgWidth - 40;
-  const minWidth = 60;
+  const [isVisible, setIsVisible] = useState(false);
 
-  // Each stage gets a width proportional to its position (funnel narrows)
-  const stageWidths = stages.map((_, i) => {
-    const ratio = 1 - (i / Math.max(stages.length - 1, 1)) * 0.75;
-    return minWidth + (maxWidth - minWidth) * ratio;
-  });
+  useEffect(() => {
+    const t = setTimeout(() => setIsVisible(true), 150);
+    return () => clearTimeout(t);
+  }, []);
+
+  const totalCount = stages.reduce((s, st) => s + st.dealCount, 0) || 1;
+  const totalValue = stages.reduce((s, st) => s + st.totalValueCents, 0);
+
+  // SVG dimensions
+  const svgW = 460;
+  const stageH = stages.length <= 4 ? 56 : stages.length <= 6 ? 48 : 42;
+  const gap = 3;
+  const topPad = 6;
+  const svgH = topPad + stages.length * stageH + (stages.length - 1) * gap + 6;
+  const maxW = svgW - 20; // max trapezoid width
+  const minW = maxW * 0.22; // minimum width at bottom
 
   return (
     <div className="relative">
       <svg
-        viewBox={`0 0 ${svgWidth} ${svgHeight}`}
+        viewBox={`0 0 ${svgW} ${svgH}`}
         className="w-full"
-        style={{ maxHeight: Math.min(svgHeight, 400) }}
+        style={{ maxHeight: Math.min(svgH, 500), overflow: "visible" }}
       >
         <defs>
-          {stages.map((stage, i) => {
-            const color = stage.color || FUNNEL_COLORS[i % FUNNEL_COLORS.length];
+          {/* Per-stage horizontal gradients for 3D cylinder effect */}
+          {stages.map((_, i) => {
+            const c = getEnturFunnelColor(i, stages.length);
             return (
-              <linearGradient key={`grad-${i}`} id={`funnel-grad-${i}`} x1="0%" y1="0%" x2="100%" y2="0%">
-                <stop offset="0%" stopColor={color} stopOpacity={0.85} />
-                <stop offset="50%" stopColor={color} stopOpacity={1} />
-                <stop offset="100%" stopColor={color} stopOpacity={0.85} />
+              <linearGradient key={`fg-${i}`} id={`fg-${i}`} x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stopColor={c} stopOpacity={0.55} />
+                <stop offset="18%" stopColor={c} stopOpacity={0.85} />
+                <stop offset="45%" stopColor={c} stopOpacity={1} />
+                <stop offset="55%" stopColor={c} stopOpacity={1} />
+                <stop offset="82%" stopColor={c} stopOpacity={0.85} />
+                <stop offset="100%" stopColor={c} stopOpacity={0.55} />
               </linearGradient>
             );
           })}
-          <filter id="funnel-glow">
-            <feGaussianBlur stdDeviation="4" result="blur" />
-            <feMerge>
-              <feMergeNode in="blur" />
-              <feMergeNode in="SourceGraphic" />
-            </feMerge>
+          {/* Top shine gradient */}
+          <linearGradient id="shine" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#fff" stopOpacity={0.28} />
+            <stop offset="100%" stopColor="#fff" stopOpacity={0} />
+          </linearGradient>
+          {/* Glow filter */}
+          <filter id="fglow" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur stdDeviation="6" result="b" />
+            <feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge>
           </filter>
         </defs>
 
         {stages.map((stage, i) => {
-          const y = topPadding + i * (stageHeight + stageGap);
-          const currentWidth = stageWidths[i];
-          const nextWidth = i < stages.length - 1 ? stageWidths[i + 1] : currentWidth * 0.7;
-          const cx = svgWidth / 2;
-          const isHovered = hoveredIndex === i;
-          const color = stage.color || FUNNEL_COLORS[i % FUNNEL_COLORS.length];
+          const y = topPad + i * (stageH + gap);
+          const cx = svgW / 2;
+          const isHov = hoveredIndex === i;
+          const c = getEnturFunnelColor(i, stages.length);
 
-          // Trapezoid points: top-left, top-right, bottom-right, bottom-left
-          const topLeft = cx - currentWidth / 2;
-          const topRight = cx + currentWidth / 2;
-          const bottomLeft = cx - nextWidth / 2;
-          const bottomRight = cx + nextWidth / 2;
+          // Width interpolation: linear from maxW to minW
+          const t = stages.length > 1 ? i / (stages.length - 1) : 0;
+          const w = maxW - t * (maxW - minW);
+          // Next stage width (for bottom edge of trapezoid)
+          const tNext = stages.length > 1 ? Math.min((i + 1) / (stages.length - 1), 1) : 0;
+          const wNext = i < stages.length - 1 ? maxW - tNext * (maxW - minW) : w * 0.75;
 
-          const points = `${topLeft},${y} ${topRight},${y} ${bottomRight},${y + stageHeight} ${bottomLeft},${y + stageHeight}`;
+          const topL = cx - w / 2;
+          const topR = cx + w / 2;
+          const botL = cx - wNext / 2;
+          const botR = cx + wNext / 2;
+          const pts = `${topL},${y} ${topR},${y} ${botR},${y + stageH} ${botL},${y + stageH}`;
+
+          // Conversion rate
+          const convRate = i > 0 && stages[i - 1].dealCount > 0
+            ? Math.round((stage.dealCount / stages[i - 1].dealCount) * 100)
+            : null;
 
           return (
             <g
@@ -185,68 +225,98 @@ function VisualFunnel({ stages }: { stages: any[] }) {
               onMouseEnter={() => setHoveredIndex(i)}
               onMouseLeave={() => setHoveredIndex(null)}
               className="cursor-pointer"
-              style={{ transition: "transform 0.2s" }}
+              style={{
+                opacity: isVisible ? 1 : 0,
+                transform: isVisible ? "translateY(0)" : "translateY(8px)",
+                transition: `all 0.5s cubic-bezier(0.16, 1, 0.3, 1) ${i * 0.06}s`,
+              }}
             >
-              {/* Shadow/glow on hover */}
-              {isHovered && (
+              {/* Hover glow behind */}
+              {isHov && (
                 <polygon
-                  points={points}
-                  fill={color}
+                  points={pts}
+                  fill={c}
                   opacity={0.3}
-                  filter="url(#funnel-glow)"
+                  filter="url(#fglow)"
                 />
               )}
-              {/* Main trapezoid */}
+
+              {/* Main trapezoid with 3D gradient */}
               <polygon
-                points={points}
-                fill={`url(#funnel-grad-${i})`}
-                stroke={isHovered ? "rgba(255,255,255,0.3)" : "rgba(255,255,255,0.08)"}
-                strokeWidth={isHovered ? 1.5 : 0.5}
+                points={pts}
+                fill={`url(#fg-${i})`}
+                stroke={isHov ? "rgba(255,255,255,0.25)" : "rgba(255,255,255,0.06)"}
+                strokeWidth={isHov ? 1.2 : 0.4}
                 style={{
                   transition: "all 0.3s ease",
-                  transform: isHovered ? "scale(1.02)" : "scale(1)",
-                  transformOrigin: `${cx}px ${y + stageHeight / 2}px`,
+                  transform: isHov ? `scale(1.025)` : "scale(1)",
+                  transformOrigin: `${cx}px ${y + stageH / 2}px`,
                 }}
               />
-              {/* Shine effect */}
+
+              {/* Top shine strip */}
               <polygon
-                points={`${topLeft + 2},${y + 1} ${topRight - 2},${y + 1} ${topRight - 4},${y + 6} ${topLeft + 4},${y + 6}`}
-                fill="rgba(255,255,255,0.12)"
+                points={`${topL + 4},${y + 0.5} ${topR - 4},${y + 0.5} ${topR - 8},${y + 7} ${topL + 8},${y + 7}`}
+                fill="url(#shine)"
               />
+
               {/* Stage name */}
               <text
                 x={cx}
-                y={y + stageHeight / 2 - 6}
+                y={y + stageH / 2 - 5}
                 textAnchor="middle"
-                className="fill-white text-[11px] font-semibold"
-                style={{ textShadow: "0 1px 3px rgba(0,0,0,0.5)" }}
+                fill="#fff"
+                fontSize="11.5"
+                fontWeight="700"
+                style={{ textShadow: "0 1px 4px rgba(0,0,0,0.6)" }}
               >
                 {stage.name}
               </text>
+
               {/* Count + Value */}
               <text
                 x={cx}
-                y={y + stageHeight / 2 + 10}
+                y={y + stageH / 2 + 10}
                 textAnchor="middle"
-                className="fill-white/80 text-[10px] font-medium"
+                fill="rgba(255,255,255,0.8)"
+                fontSize="9.5"
+                fontWeight="500"
               >
                 {stage.dealCount} neg. · {formatCurrency(stage.totalValueCents)}
               </text>
+
+              {/* Conversion rate between stages */}
+              {convRate !== null && (
+                <g>
+                  <text
+                    x={cx}
+                    y={y - gap / 2 + 1}
+                    textAnchor="middle"
+                    fill="rgba(255,255,255,0.35)"
+                    fontSize="8"
+                    fontWeight="700"
+                    letterSpacing="0.5"
+                  >
+                    ▼ {convRate}%
+                  </text>
+                </g>
+              )}
             </g>
           );
         })}
       </svg>
 
-      {/* Total summary below funnel */}
-      <div className="flex items-center justify-center gap-6 mt-3 pt-3 border-t border-border/30">
+      {/* Total summary with brand accent */}
+      <div className="flex items-center justify-center gap-8 mt-4 pt-4 border-t border-border/30">
         <div className="text-center">
-          <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">Total</span>
-          <p className="text-[14px] font-bold text-foreground">{totalCount} neg.</p>
+          <span className="text-[10px] text-muted-foreground font-semibold uppercase tracking-[0.1em]">Total</span>
+          <p className="text-[18px] font-extrabold text-foreground mt-0.5">{totalCount} <span className="text-[12px] font-medium text-muted-foreground">neg.</span></p>
         </div>
+        <div className="h-8 w-px bg-border/40" />
         <div className="text-center">
-          <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">Valor</span>
-          <p className="text-[14px] font-bold text-foreground">
-            {formatCurrency(stages.reduce((s, st) => s + st.totalValueCents, 0))}
+          <span className="text-[10px] text-muted-foreground font-semibold uppercase tracking-[0.1em]">Valor Total</span>
+          <p className="text-[18px] font-extrabold mt-0.5" style={{ color: ENTUR.lime }}>
+            {formatCurrency(totalValue)}
           </p>
         </div>
       </div>
@@ -320,12 +390,12 @@ function formatNumber(n: number): string {
   return String(n);
 }
 
-/* ─── Conversion Donut ─── */
+/* ─── Conversion Donut with ENTUR colors ─── */
 function ConversionDonut({ rate, won, lost, open }: { rate: number; won: number; lost: number; open: number }) {
   const data = [
-    { name: "Ganhas", value: won, color: "#34d399" },
-    { name: "Perdidas", value: lost, color: "#f87171" },
-    { name: "Em aberto", value: open, color: "#a78bfa" },
+    { name: "Ganhas", value: won, color: ENTUR.lime },
+    { name: "Perdidas", value: lost, color: ENTUR.red },
+    { name: "Em aberto", value: open, color: ENTUR.purple },
   ].filter(d => d.value > 0);
 
   if (data.length === 0) data.push({ name: "Sem dados", value: 1, color: "#374151" });
@@ -484,14 +554,15 @@ export default function Home() {
         ))}
       </div>
 
-      {/* ─── KPI Row ─── */}
+      {/* ─── KPI Row with ENTUR brand gradients ─── */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
         <MetricCard
           label={dealStatus === 'won' ? 'Ganhas' : dealStatus === 'lost' ? 'Perdidas' : dealStatus === 'all' ? 'Negociações' : 'Ativas'}
           value={String(metrics?.activeDeals ?? 0)}
           change={dealsChange.text} changeType={dealsChange.type}
           icon={Briefcase}
-          gradient="linear-gradient(135deg, #a78bfa, #818cf8)"
+          gradient={`linear-gradient(135deg, ${ENTUR.purple}, ${ENTUR.magenta})`}
+          iconColor={ENTUR.purple}
           loading={loading}
           subtitle={metrics?.totalDealValueCents ? formatCurrency(metrics.totalDealValueCents) : undefined}
         />
@@ -500,7 +571,8 @@ export default function Home() {
           value={formatNumber(metrics?.totalContacts ?? 0)}
           change={contactsChange.text} changeType={contactsChange.type}
           icon={Users}
-          gradient="linear-gradient(135deg, #38bdf8, #22d3ee)"
+          gradient={`linear-gradient(135deg, ${ENTUR.coral}, ${ENTUR.red})`}
+          iconColor={ENTUR.coral}
           loading={loading}
         />
         <MetricCard
@@ -508,7 +580,8 @@ export default function Home() {
           value={String(metrics?.activeTrips ?? 0)}
           change={tripsChange.text} changeType={tripsChange.type}
           icon={Plane}
-          gradient="linear-gradient(135deg, #f472b6, #e879f9)"
+          gradient={`linear-gradient(135deg, ${ENTUR.red}, ${ENTUR.magenta})`}
+          iconColor={ENTUR.red}
           loading={loading}
         />
         <MetricCard
@@ -516,14 +589,16 @@ export default function Home() {
           value={String(metrics?.pendingTasks ?? 0)}
           change={tasksChange.text} changeType={tasksChange.type}
           icon={CheckSquare}
-          gradient="linear-gradient(135deg, #fb923c, #f59e0b)"
+          gradient={`linear-gradient(135deg, ${ENTUR.peach}, ${ENTUR.coral})`}
+          iconColor={ENTUR.peach}
           loading={loading}
         />
         <MetricCard
           label="WhatsApp"
           value={formatNumber(waMetrics?.totalMessages ?? 0)}
           icon={MessageCircle}
-          gradient="linear-gradient(135deg, #34d399, #22c55e)"
+          gradient={`linear-gradient(135deg, ${ENTUR.lime}, #8BC34A)`}
+          iconColor={ENTUR.lime}
           loading={waMetricsQ.isLoading}
           subtitle={waMetrics ? `${waMetrics.unreadConversations} não lidas` : undefined}
         />
@@ -541,11 +616,11 @@ export default function Home() {
             action={
               <div className="flex items-center gap-4 text-[11px]">
                 <div className="flex items-center gap-1.5">
-                  <div className="h-2 w-6 rounded-full bg-emerald-400" />
+                  <div className="h-2 w-6 rounded-full" style={{ background: ENTUR.lime }} />
                   <span className="text-muted-foreground">Enviadas</span>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <div className="h-2 w-6 rounded-full bg-violet-400" />
+                  <div className="h-2 w-6 rounded-full" style={{ background: ENTUR.purple }} />
                   <span className="text-muted-foreground">Recebidas</span>
                 </div>
               </div>
@@ -558,20 +633,20 @@ export default function Home() {
                 <AreaChart data={waChartData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
                   <defs>
                     <linearGradient id="gradSent" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#34d399" stopOpacity={0.3} />
-                      <stop offset="100%" stopColor="#34d399" stopOpacity={0} />
+                      <stop offset="0%" stopColor={ENTUR.lime} stopOpacity={0.3} />
+                      <stop offset="100%" stopColor={ENTUR.lime} stopOpacity={0} />
                     </linearGradient>
                     <linearGradient id="gradReceived" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#a78bfa" stopOpacity={0.3} />
-                      <stop offset="100%" stopColor="#a78bfa" stopOpacity={0} />
+                      <stop offset="0%" stopColor={ENTUR.purple} stopOpacity={0.3} />
+                      <stop offset="100%" stopColor={ENTUR.purple} stopOpacity={0} />
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" strokeOpacity={0.5} />
                   <XAxis dataKey="date" tick={{ fontSize: 10, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} />
                   <YAxis tick={{ fontSize: 10, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} />
                   <Tooltip content={<CustomTooltip />} />
-                  <Area type="monotone" dataKey="Enviadas" stroke="#34d399" strokeWidth={2.5} fill="url(#gradSent)" dot={false} />
-                  <Area type="monotone" dataKey="Recebidas" stroke="#a78bfa" strokeWidth={2.5} fill="url(#gradReceived)" dot={false} />
+                  <Area type="monotone" dataKey="Enviadas" stroke={ENTUR.lime} strokeWidth={2.5} fill="url(#gradSent)" dot={false} />
+                  <Area type="monotone" dataKey="Recebidas" stroke={ENTUR.purple} strokeWidth={2.5} fill="url(#gradReceived)" dot={false} />
                 </AreaChart>
               </ResponsiveContainer>
             ) : (
@@ -584,28 +659,28 @@ export default function Home() {
               <div className="grid grid-cols-4 gap-3 mt-4 pt-4 border-t border-border/50">
                 <div className="text-center">
                   <div className="flex items-center justify-center gap-1 mb-1">
-                    <Send className="h-3 w-3 text-emerald-400" />
+                    <Send className="h-3 w-3" style={{ color: ENTUR.lime }} />
                     <span className="text-[10px] text-muted-foreground font-medium">Enviadas</span>
                   </div>
                   <span className="text-[16px] font-bold text-foreground">{formatNumber(waMetrics.sentMessages)}</span>
                 </div>
                 <div className="text-center">
                   <div className="flex items-center justify-center gap-1 mb-1">
-                    <Inbox className="h-3 w-3 text-violet-400" />
+                    <Inbox className="h-3 w-3" style={{ color: ENTUR.purple }} />
                     <span className="text-[10px] text-muted-foreground font-medium">Recebidas</span>
                   </div>
                   <span className="text-[16px] font-bold text-foreground">{formatNumber(waMetrics.receivedMessages)}</span>
                 </div>
                 <div className="text-center">
                   <div className="flex items-center justify-center gap-1 mb-1">
-                    <MessageSquare className="h-3 w-3 text-blue-400" />
+                    <MessageSquare className="h-3 w-3" style={{ color: ENTUR.coral }} />
                     <span className="text-[10px] text-muted-foreground font-medium">Conversas</span>
                   </div>
                   <span className="text-[16px] font-bold text-foreground">{formatNumber(waMetrics.totalConversations)}</span>
                 </div>
                 <div className="text-center">
                   <div className="flex items-center justify-center gap-1 mb-1">
-                    <Eye className="h-3 w-3 text-amber-400" />
+                    <Eye className="h-3 w-3" style={{ color: ENTUR.red }} />
                     <span className="text-[10px] text-muted-foreground font-medium">Não lidas</span>
                   </div>
                   <span className="text-[16px] font-bold text-foreground">{waMetrics.unreadConversations}</span>
@@ -741,11 +816,12 @@ export default function Home() {
               iconColor="bg-indigo-500/15 text-indigo-400"
             >
               <div className="space-y-3">
-                {pipelineQ.data.map((s: any) => {
+                {pipelineQ.data.map((s: any, idx: number) => {
                   const maxDealCount = Math.max(...pipelineQ.data!.map((x: any) => x.dealCount), 1);
+                  const barColor = getEnturFunnelColor(idx, pipelineQ.data!.length);
                   return (
                     <div key={s.stageId} className="flex items-center gap-3">
-                      <div className="h-3 w-3 rounded-full shrink-0" style={{ backgroundColor: s.stageColor || "#6b7280" }} />
+                      <div className="h-3 w-3 rounded-full shrink-0" style={{ backgroundColor: barColor }} />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between mb-1">
                           <span className="text-[12px] font-medium text-foreground truncate">{s.stageName}</span>
@@ -759,7 +835,7 @@ export default function Home() {
                             className="h-full rounded-full transition-all duration-700"
                             style={{
                               width: `${Math.max((s.dealCount / maxDealCount) * 100, 3)}%`,
-                              backgroundColor: s.stageColor || "#6b7280",
+                              backgroundColor: barColor,
                             }}
                           />
                         </div>
@@ -772,7 +848,7 @@ export default function Home() {
           </div>
         )}
 
-        {/* ─── Quick Actions (2 cols or 7 cols) ─── */}
+        {/* ─── Quick Actions ─── */}
         <div className={pipelineQ.data && pipelineQ.data.length > 0 ? "lg:col-span-7" : "lg:col-span-12"}>
           <ChartCard
             title="Ações Rápidas"
@@ -781,18 +857,18 @@ export default function Home() {
           >
             <div className={`grid ${pipelineQ.data && pipelineQ.data.length > 0 ? "grid-cols-2 lg:grid-cols-4" : "grid-cols-2 lg:grid-cols-4"} gap-3`}>
               {[
-                { label: "Nova Negociação", icon: Briefcase, href: "/pipeline", color: "bg-purple-500/15 text-purple-400" },
-                { label: "Novo Contato", icon: Users, href: "/contacts", color: "bg-cyan-500/15 text-cyan-400" },
-                { label: "Enviar Mensagem", icon: MessageSquare, href: "/inbox", color: "bg-green-500/15 text-green-400" },
-                { label: "Criar Proposta", icon: Plane, href: "/proposals", color: "bg-pink-500/15 text-pink-400" },
+                { label: "Nova Negociação", icon: Briefcase, href: "/pipeline", color: ENTUR.purple, bg: "rgba(96,15,237,0.12)" },
+                { label: "Novo Contato", icon: Users, href: "/contacts", color: ENTUR.coral, bg: "rgba(255,97,76,0.12)" },
+                { label: "Enviar Mensagem", icon: MessageSquare, href: "/inbox", color: ENTUR.lime, bg: "rgba(196,237,15,0.12)" },
+                { label: "Criar Proposta", icon: Plane, href: "/proposals", color: ENTUR.magenta, bg: "rgba(220,0,231,0.12)" },
               ].map((action) => (
                 <Link
                   key={action.label}
                   href={action.href}
                   className="flex flex-col items-center gap-2.5 px-4 py-4 rounded-xl bg-muted/30 hover:bg-muted/60 border border-transparent hover:border-border/50 transition-all duration-200 group"
                 >
-                  <div className={`h-10 w-10 rounded-xl flex items-center justify-center ${action.color}`}>
-                    <action.icon className="h-5 w-5" />
+                  <div className="h-10 w-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: action.bg }}>
+                    <action.icon className="h-5 w-5" style={{ color: action.color }} />
                   </div>
                   <span className="text-[12px] font-medium text-foreground text-center">{action.label}</span>
                 </Link>
