@@ -45,6 +45,8 @@ export interface EvolutionSessionState {
 class WhatsAppEvolutionManager extends EventEmitter {
   private sessions: Map<string, EvolutionSessionState> = new Map();
   private instanceToSession: Map<string, string> = new Map();
+  private syncInProgress: Map<string, boolean> = new Map();
+  private syncDebounceTimers: Map<string, NodeJS.Timeout> = new Map();
 
   constructor() {
     super();
@@ -242,12 +244,36 @@ class WhatsAppEvolutionManager extends EventEmitter {
   }
 
   private async createNewInstance(instanceName: string, state: EvolutionSessionState): Promise<EvolutionSessionState> {
-    const result = await evo.createInstance(instanceName);
+    try {
+      const result = await evo.createInstance(instanceName);
 
-    if (result.qrcode?.base64) {
-      state.qrDataUrl = result.qrcode.base64;
-      state.qrCode = result.qrcode.base64;
-      this.emit("qr", { sessionId: state.sessionId, qrDataUrl: result.qrcode.base64 });
+      if (result.qrcode?.base64) {
+        state.qrDataUrl = result.qrcode.base64;
+        state.qrCode = result.qrcode.base64;
+        this.emit("qr", { sessionId: state.sessionId, qrDataUrl: result.qrcode.base64 });
+      }
+    } catch (e: any) {
+      console.error(`[EvoWA] createInstance failed for ${instanceName}:`, e.message);
+      state.status = "disconnected";
+      this.emit("status", { sessionId: state.sessionId, status: "disconnected", error: e.message });
+
+      // If it's a conflict (instance already exists), try to connect instead
+      if (e.message?.includes("already") || e.message?.includes("conflict") || e.message?.includes("409")) {
+        try {
+          const qr = await evo.connectInstance(instanceName);
+          if (qr?.base64) {
+            state.status = "connecting";
+            state.qrDataUrl = qr.base64;
+            state.qrCode = qr.base64;
+            this.emit("qr", { sessionId: state.sessionId, qrDataUrl: qr.base64 });
+          }
+        } catch (retryErr: any) {
+          console.error(`[EvoWA] Retry connect also failed for ${instanceName}:`, retryErr.message);
+          throw retryErr;
+        }
+      } else {
+        throw e;
+      }
     }
 
     return state;
@@ -924,6 +950,27 @@ class WhatsAppEvolutionManager extends EventEmitter {
   }
 
   private async syncConversationsBackground(session: EvolutionSessionState, isFirstSync: boolean): Promise<void> {
+    const syncKey = session.sessionId;
+
+    // Debounce: if a sync is already in progress for this session, skip
+    if (this.syncInProgress.get(syncKey)) {
+      console.log(`[EvoWA Sync] Sync already in progress for ${session.instanceName}, skipping`);
+      return;
+    }
+
+    // Debounce: clear any pending timer and set a short delay for non-first syncs
+    if (!isFirstSync) {
+      const existingTimer = this.syncDebounceTimers.get(syncKey);
+      if (existingTimer) clearTimeout(existingTimer);
+
+      await new Promise<void>((resolve) => {
+        const timer = setTimeout(resolve, 2000); // 2s debounce
+        this.syncDebounceTimers.set(syncKey, timer);
+      });
+      this.syncDebounceTimers.delete(syncKey);
+    }
+
+    this.syncInProgress.set(syncKey, true);
     try {
       console.log(`[EvoWA Sync] Starting ${isFirstSync ? "FULL" : "incremental"} sync for ${session.instanceName}`);
       
@@ -1137,6 +1184,8 @@ class WhatsAppEvolutionManager extends EventEmitter {
 
     } catch (error) {
       console.error("[EvoWA Sync] Error:", error);
+    } finally {
+      this.syncInProgress.set(syncKey, false);
     }
   }
 
@@ -1302,16 +1351,18 @@ class WhatsAppEvolutionManager extends EventEmitter {
       const db = await getDb();
       if (!db) return;
 
-      // Check for duplicate
-      const existing = await db.select({ id: waMessages.id })
-        .from(waMessages)
-        .where(and(
-          eq(waMessages.sessionId, session.sessionId),
-          eq(waMessages.messageId, messageId || "")
-        ))
-        .limit(1);
+      // Check for duplicate — only if we have a valid messageId
+      if (messageId) {
+        const existing = await db.select({ id: waMessages.id })
+          .from(waMessages)
+          .where(and(
+            eq(waMessages.sessionId, session.sessionId),
+            eq(waMessages.messageId, messageId)
+          ))
+          .limit(1);
 
-      if (existing.length > 0) return;
+        if (existing.length > 0) return;
+      }
 
       await db.insert(waMessages).values({
         sessionId: session.sessionId,
@@ -1425,15 +1476,18 @@ class WhatsAppEvolutionManager extends EventEmitter {
       const db = await getDb();
       if (!db) return;
 
-      const existing = await db.select({ id: waMessages.id })
-        .from(waMessages)
-        .where(and(
-          eq(waMessages.sessionId, session.sessionId),
-          eq(waMessages.messageId, messageId || "")
-        ))
-        .limit(1);
+      // Check for duplicate — only if we have a valid messageId
+      if (messageId) {
+        const existing = await db.select({ id: waMessages.id })
+          .from(waMessages)
+          .where(and(
+            eq(waMessages.sessionId, session.sessionId),
+            eq(waMessages.messageId, messageId)
+          ))
+          .limit(1);
 
-      if (existing.length > 0) return;
+        if (existing.length > 0) return;
+      }
 
       await db.insert(waMessages).values({
         sessionId: session.sessionId,
@@ -2013,7 +2067,7 @@ class WhatsAppEvolutionManager extends EventEmitter {
       // Get existing messageIds for this session to avoid duplicates
       const existingMsgIds = new Set<string>();
       const existingRows = await db.execute(
-        sql`SELECT messageId FROM messages WHERE sessionId = ${session.sessionId} AND messageId IS NOT NULL`
+        sql`SELECT messageId FROM messages WHERE sessionId = ${session.sessionId} AND messageId IS NOT NULL LIMIT 50000`
       );
       const rows = (existingRows as any)[0] || [];
       for (const r of rows) {
@@ -2237,7 +2291,7 @@ class WhatsAppEvolutionManager extends EventEmitter {
       // Get existing messageIds for this session to avoid duplicates
       const existingMsgIds = new Set<string>();
       const existingRows = await db.execute(
-        sql`SELECT messageId FROM messages WHERE sessionId = ${session.sessionId} AND messageId IS NOT NULL`
+        sql`SELECT messageId FROM messages WHERE sessionId = ${session.sessionId} AND messageId IS NOT NULL LIMIT 50000`
       );
       const rows = (existingRows as any)[0] || [];
       for (const r of rows) {

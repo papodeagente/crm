@@ -904,6 +904,14 @@ async function handleEvolutionWebhook(req: Request, res: Response) {
       return res.status(400).json({ error: "Invalid webhook payload" });
     }
 
+    // Validate apikey from webhook payload against our configured key
+    const expectedKey = process.env.EVOLUTION_API_KEY;
+    const receivedKey = body.apikey || req.headers["apikey"] || req.headers["x-api-key"];
+    if (expectedKey && receivedKey && receivedKey !== expectedKey) {
+      console.warn(`[Webhook /evolution] Invalid apikey from ${req.ip} — rejecting`);
+      return res.status(403).json({ error: "Invalid API key" });
+    }
+
     console.log(`[Webhook /evolution] Event: ${body.event} | Instance: ${body.instance} | Path: ${req.path}`);
 
     // Import the Evolution WhatsApp manager

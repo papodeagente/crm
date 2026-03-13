@@ -2513,3 +2513,15 @@
 
 ## Login Session Check Fix (Mar 13 - v21)
 - [x] Ao clicar "Entrar" com sessão ativa, redirecionar direto para /dashboard sem pedir login novamente
+
+## WhatsApp/Evolution API Audit & Hardening (Mar 13 - v22)
+- [x] Auditar todos os arquivos server-side de WhatsApp — 7 bugs críticos e 3 problemas de performance identificados
+- [x] Auditar páginas frontend de WhatsApp — WhatsApp.tsx, Inbox.tsx, WhatsAppChat.tsx, useSocket.ts revisados
+- [x] FIX BUG 3: createNewInstance sem tratamento de erro — adicionado try/catch com fallback para connectInstance em caso de conflito 409
+- [x] FIX BUG 4: Webhook sem validação de apikey — adicionado check EVOLUTION_API_KEY no webhook handler
+- [x] FIX BUG 5: evoFetch sem retry para erros transitórios — adicionado retry com backoff exponencial (3 tentativas) para 502/503/504/ECONNRESET
+- [x] FIX BUG 7: Duplicate check com messageId vazio — corrigido para só verificar duplicata quando messageId é válido (incoming + outgoing)
+- [x] FIX PERF 3: syncConversationsBackground sem debounce — adicionado lock syncInProgress + debounce 2s para syncs incrementais
+- [x] Frontend WhatsApp.tsx já está robusto: QR code via WebSocket + polling fallback, estados de loading, disclaimer API não oficial
+- [x] autoRestoreSessions + periodicSyncCheck (5min) + quickSync já implementados e funcionando
+- [x] Testes: 1030/1033 passando (3 timeouts pré-existentes em backup diário)
