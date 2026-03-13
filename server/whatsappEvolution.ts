@@ -359,7 +359,7 @@ class WhatsAppEvolutionManager extends EventEmitter {
 
           // Update wa_conversations with the latest message
           try {
-            const resolved = await resolveInbound(session.tenantId, session.sessionId, remoteJid);
+            const resolved = await resolveInbound(session.tenantId, session.sessionId, remoteJid, undefined, { skipContactCreation: true });
             if (resolved) {
               await updateConversationLastMessage(resolved.conversationId, {
                 content: text,
@@ -430,7 +430,7 @@ class WhatsAppEvolutionManager extends EventEmitter {
 
           // Update wa_conversations with the latest message
           try {
-            const resolved = await resolveInbound(session.tenantId, session.sessionId, remoteJid);
+            const resolved = await resolveInbound(session.tenantId, session.sessionId, remoteJid, undefined, { skipContactCreation: true });
             if (resolved) {
               await updateConversationLastMessage(resolved.conversationId, {
                 content: caption || `[Áudio]`,
@@ -521,7 +521,7 @@ class WhatsAppEvolutionManager extends EventEmitter {
 
           // Update wa_conversations with the latest message
           try {
-            const resolved = await resolveInbound(session.tenantId, session.sessionId, remoteJid);
+            const resolved = await resolveInbound(session.tenantId, session.sessionId, remoteJid, undefined, { skipContactCreation: true });
             if (resolved) {
               await updateConversationLastMessage(resolved.conversationId, {
                 content: text,
@@ -1463,9 +1463,10 @@ class WhatsAppEvolutionManager extends EventEmitter {
       // Resolve conversation
       // Only pass pushName when message is FROM the contact (fromMe=false)
       // When fromMe=true, pushName is the sender's (our) name, not the contact's
+      // skipContactCreation: true — contacts are only created when user opens a deal/negotiation
       try {
         const contactPushName = fromMe ? null : pushName;
-        const resolved = await resolveInbound(session.tenantId, session.sessionId, remoteJid, contactPushName);
+        const resolved = await resolveInbound(session.tenantId, session.sessionId, remoteJid, contactPushName, { skipContactCreation: true });
         if (resolved) {
           await updateConversationLastMessage(resolved.conversationId, {
             content: content || "",
@@ -1550,7 +1551,7 @@ class WhatsAppEvolutionManager extends EventEmitter {
       });
 
       try {
-        const resolved = await resolveInbound(session.tenantId, session.sessionId, remoteJid);
+        const resolved = await resolveInbound(session.tenantId, session.sessionId, remoteJid, undefined, { skipContactCreation: true });
         if (resolved) {
           await updateConversationLastMessage(resolved.conversationId, {
             content: content || "",

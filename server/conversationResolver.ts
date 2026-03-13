@@ -630,8 +630,8 @@ export async function migrateExistingData(tenantId: number): Promise<{ conversat
     const { sessionId, remoteJid, pushName } = row;
 
     try {
-      // Resolver conversa (cria se não existe)
-      const resolved = await resolveInbound(tenantId, sessionId, remoteJid, pushName);
+      // Resolver conversa (cria se não existe) - don't create CRM contacts during reconciliation
+      const resolved = await resolveInbound(tenantId, sessionId, remoteJid, pushName, { skipContactCreation: true });
 
       // Linkar mensagens existentes
       const jidVariants = getAllJidVariants(remoteJid);

@@ -759,7 +759,8 @@ class WhatsAppManager extends EventEmitter {
           // Only use pushName for contact name when message is FROM the contact (fromMe=false)
           // When fromMe=true, pushName is the sender's (our) name, not the contact's name
           const contactPushName = fromMe ? null : (msg.pushName || null);
-          const resolved = await resolveInbound(resolvedTenantId, sessionId, remoteJid, contactPushName);
+          // skipContactCreation: true — contacts are only created when user opens a deal/negotiation
+          const resolved = await resolveInbound(resolvedTenantId, sessionId, remoteJid, contactPushName, { skipContactCreation: true });
           waConversationId = resolved.conversationId;
         } catch (e) {
           console.error("[ConvResolver] Error resolving inbound:", e);
@@ -1319,7 +1320,7 @@ class WhatsAppManager extends EventEmitter {
     let waConversationId: number | undefined;
     try {
       const sState = this.sessions.get(sessionId);
-      const resolved = await resolveOutbound(sState?.tenantId ?? 0, sessionId, formattedJid);
+      const resolved = await resolveOutbound(sState?.tenantId ?? 0, sessionId, formattedJid, { skipContactCreation: true });
       waConversationId = resolved.conversationId;
     } catch (e) {
       console.error("[ConvResolver] Error resolving outbound:", e);
@@ -1388,7 +1389,7 @@ class WhatsAppManager extends EventEmitter {
     let waConversationId: number | undefined;
     try {
       const sState = this.sessions.get(sessionId);
-      const resolved = await resolveOutbound(sState?.tenantId ?? 0, sessionId, formattedJid);
+      const resolved = await resolveOutbound(sState?.tenantId ?? 0, sessionId, formattedJid, { skipContactCreation: true });
       waConversationId = resolved.conversationId;
     } catch (e) {
       console.error("[ConvResolver] Error resolving outbound media:", e);
@@ -1582,7 +1583,7 @@ class WhatsAppManager extends EventEmitter {
         let chatbotConvId: number | undefined;
         try {
           const sState = this.sessions.get(sessionId);
-          const resolved = await resolveOutbound(sState?.tenantId ?? 0, sessionId, remoteJid);
+          const resolved = await resolveOutbound(sState?.tenantId ?? 0, sessionId, remoteJid, { skipContactCreation: true });
           chatbotConvId = resolved.conversationId;
         } catch (e) {
           console.error("[ConvResolver] Error resolving chatbot outbound:", e);

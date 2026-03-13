@@ -2558,3 +2558,12 @@
 - [x] Adicionar onError handlers no MediaLoader — img/video/sticker re-baixados que falham mostram estado "expirado" em vez de ícone quebrado
 - [x] ImageWithFallback (checkpoint anterior) + hasMediaUrl fix = cobertura completa para todos os tipos de mídia
 - [x] 14 testes passando em media-features.test.ts (incluindo teste para web.whatsapp.net sem barra)
+
+## Limpeza de Contatos Sincronizados v27 (Mar 13)
+- [x] Investigar estrutura de contatos no banco — 2061 contatos com source='whatsapp', apenas 1 com negociação
+- [x] Identificar contatos sincronizados: source='whatsapp', createdBy=NULL, sem deals
+- [x] Executar limpeza no banco — soft-delete 2060 contatos (preservou 1 com negociação: Rosana Quintela)
+- [x] Corrigir código: skipContactCreation=true em TODOS os resolveInbound/resolveOutbound (8 locais em whatsappEvolution.ts, whatsapp.ts, conversationResolver.ts)
+- [x] Contatos só serão criados quando usuário abrir negociação ou manualmente
+- [x] Verificado: contatos de outros usuários/tenants não afetados (rd_station_crm: 4470 intactos)
+- [x] Testes passando: 26/26 (contactImportSettings + media-features)
