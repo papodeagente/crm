@@ -2574,3 +2574,11 @@
 - [x] Adicionar presets inteligentes: Rápido (3s-10s / 5s), Moderado (15s-60s / 30s), Seguro (60s-300s / 120s)
 - [x] Atualizar estimativa de tempo com formatação horas/minutos para intervalos longos
 - [x] Presets se adaptam ao modo (aleatório vs fixo) com highlight visual
+
+## Fix "Failed to fetch dynamically imported module" v29 (Mar 13)
+- [x] Investigar causas: chunks com hash mudam após deploy, usuários com aba aberta tentam carregar chunks antigos (404)
+- [x] Criar utilitário lazyWithRetry — retry 3x com backoff exponencial, auto-reload se todos falharem
+- [x] Substituir todos os 48 React.lazy() por lazyWithRetry() no App.tsx
+- [x] Melhorar ErrorBoundary — detecta chunk errors, auto-reload com cooldown de 10s, mensagem "Nova versão disponível" em PT-BR
+- [x] Proteção contra loop infinito de reload via sessionStorage cooldown
+- [x] 11 testes unitários para detecção de chunk errors e lógica de cooldown (chunkRetry.test.ts)
