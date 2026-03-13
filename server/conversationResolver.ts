@@ -130,7 +130,8 @@ export async function resolveContact(
   tenantId: number,
   phoneE164: string,
   name?: string | null,
-): Promise<{ contactId: number; isNew: boolean }> {
+  options?: { skipCreation?: boolean },
+): Promise<{ contactId: number; isNew: boolean } | null> {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
@@ -195,6 +196,11 @@ export async function resolveContact(
         .where(eq(contacts.id, c.id));
       return { contactId: c.id, isNew: false };
     }
+  }
+
+  // Se skipCreation está ativo, não criar novo contato (apenas retornar existente)
+  if (options?.skipCreation) {
+    return null;
   }
 
   // Criar novo contato
@@ -439,6 +445,7 @@ export async function resolveInbound(
   sessionId: string,
   remoteJid: string,
   pushName?: string | null,
+  options?: { skipContactCreation?: boolean },
 ): Promise<ResolvedConversation> {
   // Use raw JID for storage, but normalize phone for canonical key/deduplication
   const jidDigits = remoteJid.replace(/@.*$/, "").replace(/\D/g, "");
@@ -449,8 +456,8 @@ export async function resolveInbound(
   // Resolver contato se telefone válido
   if (phone.valid) {
     try {
-      const contactResult = await resolveContact(tenantId, phone.phoneE164, pushName);
-      contactId = contactResult.contactId;
+      const contactResult = await resolveContact(tenantId, phone.phoneE164, pushName, { skipCreation: options?.skipContactCreation });
+      contactId = contactResult?.contactId ?? null;
     } catch (e) {
       console.error("[ConvResolver] Error resolving contact:", e);
     }
@@ -494,8 +501,9 @@ export async function resolveOutbound(
   tenantId: number,
   sessionId: string,
   targetJid: string,
+  options?: { skipContactCreation?: boolean },
 ): Promise<ResolvedConversation> {
-  return resolveInbound(tenantId, sessionId, targetJid);
+  return resolveInbound(tenantId, sessionId, targetJid, undefined, options);
 }
 
 // ════════════════════════════════════════════════════════════

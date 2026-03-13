@@ -875,6 +875,81 @@ export const appRouter = router({
           details,
         };
       }),
+    // WhatsApp contact import settings
+    getContactImportSettings: protectedProcedure
+      .input(z.object({ tenantId: z.number() }))
+      .query(async ({ input }) => {
+        const db = await (await import("./db")).getDb();
+        if (!db) return { importContactsFromAgenda: false };
+        const { tenants } = await import("../drizzle/schema");
+        const { eq } = await import("drizzle-orm");
+        const rows = await db.select({ settingsJson: tenants.settingsJson }).from(tenants).where(eq(tenants.id, input.tenantId)).limit(1);
+        const settings = (rows[0]?.settingsJson as any) || {};
+        return { importContactsFromAgenda: settings.whatsapp?.importContactsFromAgenda ?? false };
+      }),
+    saveContactImportSettings: protectedProcedure
+      .input(z.object({ tenantId: z.number(), importContactsFromAgenda: z.boolean() }))
+      .mutation(async ({ input }) => {
+        const db = await (await import("./db")).getDb();
+        if (!db) return { success: false };
+        const { tenants } = await import("../drizzle/schema");
+        const { eq } = await import("drizzle-orm");
+        const rows = await db.select({ settingsJson: tenants.settingsJson }).from(tenants).where(eq(tenants.id, input.tenantId)).limit(1);
+        const currentSettings = (rows[0]?.settingsJson as any) || {};
+        if (!currentSettings.whatsapp) currentSettings.whatsapp = {};
+        currentSettings.whatsapp.importContactsFromAgenda = input.importContactsFromAgenda;
+        await db.update(tenants).set({ settingsJson: currentSettings }).where(eq(tenants.id, input.tenantId));
+        return { success: true };
+      }),
+    // Cleanup synced contacts: remove contacts with source="whatsapp" that have NO deals and were NOT manually created
+    cleanupSyncedContacts: protectedProcedure
+      .input(z.object({ tenantId: z.number(), dryRun: z.boolean().default(true) }))
+      .mutation(async ({ input }) => {
+        const db = await (await import("./db")).getDb();
+        if (!db) throw new Error("Database not available");
+        const { contacts, deals } = await import("../drizzle/schema");
+        const { eq, and, sql, isNull } = await import("drizzle-orm");
+
+        // Find contacts with source="whatsapp" that have NO associated deals
+        // A contact has a deal if deals.contactId matches the contact.id
+        const syncedContacts = await db.execute(
+          sql`SELECT c.id, c.name, c.phone, c.phoneE164, c.source, c.createdAt
+              FROM contacts c
+              WHERE c.tenantId = ${input.tenantId}
+                AND c.source = 'whatsapp'
+                AND c.id NOT IN (
+                  SELECT DISTINCT d.contactId FROM deals d WHERE d.tenantId = ${input.tenantId} AND d.contactId IS NOT NULL
+                )`
+        );
+
+        const toDelete = (syncedContacts as any)[0] || [];
+        const count = toDelete.length;
+
+        if (input.dryRun) {
+          return {
+            dryRun: true,
+            contactsToDelete: count,
+            sample: toDelete.slice(0, 20).map((c: any) => ({ id: c.id, name: c.name, phone: c.phoneE164 || c.phone })),
+          };
+        }
+
+        // Actually delete the contacts
+        if (count > 0) {
+          const ids = toDelete.map((c: any) => c.id);
+          // Delete in batches of 100 to avoid query size limits
+          for (let i = 0; i < ids.length; i += 100) {
+            const batch = ids.slice(i, i + 100);
+            await db.execute(
+              sql`DELETE FROM contacts WHERE id IN (${sql.join(batch.map((id: number) => sql`${id}`), sql`, `)})`
+            );
+          }
+        }
+
+        return {
+          dryRun: false,
+          contactsDeleted: count,
+        };
+      }),
     // Get wa_conversations debug info
     debugConversations: protectedProcedure
       .input(z.object({ tenantId: z.number().default(1), sessionId: z.string() }))

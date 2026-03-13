@@ -14,7 +14,7 @@
 
 import { EventEmitter } from "events";
 import { getDb } from "./db";
-import { whatsappSessions, waMessages, waConversations, waContacts } from "../drizzle/schema";
+import { whatsappSessions, waMessages, waConversations, waContacts, tenants } from "../drizzle/schema";
 import { eq, and, sql, desc } from "drizzle-orm";
 import * as evo from "./evolutionApi";
 import { resolveInbound, updateConversationLastMessage } from "./conversationResolver";
@@ -980,6 +980,21 @@ class WhatsAppEvolutionManager extends EventEmitter {
     try {
       console.log(`[EvoWA Sync] Starting ${isFirstSync ? "FULL" : "incremental"} sync for ${session.instanceName}`);
       
+      // Check tenant settings: should we auto-create CRM contacts from WhatsApp agenda?
+      // Default: false (don't import contacts from agenda, only create when there's a deal/negotiation)
+      let skipContactCreation = true; // Default: skip creating CRM contacts during sync
+      try {
+        const db = await getDb();
+        if (db) {
+          const tenantRows = await db.select({ settingsJson: tenants.settingsJson }).from(tenants).where(eq(tenants.id, session.tenantId)).limit(1);
+          const settings = (tenantRows[0]?.settingsJson as any) || {};
+          const importContacts = settings.whatsapp?.importContactsFromAgenda ?? false;
+          skipContactCreation = !importContacts;
+        }
+      } catch (e) {
+        console.warn(`[EvoWA Sync] Error reading tenant settings, defaulting to skipContactCreation=true:`, (e as Error).message);
+      }
+
       // Fetch all chats and contacts from Evolution API
       const [chats, contacts] = await Promise.all([
         evo.findChats(session.instanceName),
@@ -1083,7 +1098,7 @@ class WhatsAppEvolutionManager extends EventEmitter {
           const pushName = isRealName(candidateName) ? candidateName : null;
 
           // Resolve conversation in our DB (creates if not exists)
-          const resolved = await resolveInbound(session.tenantId, session.sessionId, remoteJid, pushName);
+          const resolved = await resolveInbound(session.tenantId, session.sessionId, remoteJid, pushName, { skipContactCreation });
           if (!resolved) continue;
           if (resolved.isNew) newChats++;
 

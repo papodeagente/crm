@@ -121,6 +121,9 @@ export const rfvRouter = router({
       messageTemplate: z.string().min(1).max(4096),
       sessionId: z.string().min(1),
       delayMs: z.number().min(1000).max(30000).optional(),
+      randomDelay: z.boolean().optional(),
+      delayMinMs: z.number().min(1000).max(30000).optional(),
+      delayMaxMs: z.number().min(2000).max(60000).optional(),
       campaignName: z.string().max(255).optional(),
       audienceFilter: z.string().max(128).optional(),
     }))

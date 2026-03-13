@@ -2532,3 +2532,14 @@
 - [x] Criar procedure repairContactNames que corrige wa_conversations.contactPushName e contacts.name contaminados com nome do dono
 - [x] Executar repair: 6 sessões processadas, 1 conversa + 1 contato CRM corrigidos (sessão Fds Viagens)
 - [x] Testes: 1030/1033 passando (3 timeouts pré-existentes)
+## Correções v24 (Mar 13)
+- [x] RFV: Corrigir "WhatsApp reconectando..." — página RFV não conecta com Evolution API
+- [x] Envio em massa: Adicionar opção de intervalo randômico (recomendada) para evitar bloqueios
+- [x] Contatos: Backend — procedures getContactImportSettings, saveContactImportSettings, cleanupSyncedContacts criados no router whatsapp
+- [x] Contatos: Adicionar configuração opcional para importar contatos da agenda WhatsApp (desativada por padrão)
+- [x] Contatos: Limpar contatos sincronizados da agenda pessoal que NÃO têm negociação (manter: contatos com negociação, contatos adicionados manualmente)
+- [x] Contatos: UI na página WhatsApp — toggle "Importar contatos da agenda do WhatsApp" com Switch
+- [x] Contatos: UI na página WhatsApp — botão "Limpar contatos sincronizados" com AlertDialog de confirmação (dry run + amostra + confirmação)
+- [x] Contatos: 12 testes unitários para procedures de configuração e limpeza (contactImportSettings.test.ts)
+- [x] Testes: 1042/1045 passando (3 timeouts pré-existentes em backup diário)
+- [ ] Contatos: Garantir que ao abrir negociação no inbox, contato é salvo automaticamente

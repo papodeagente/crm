@@ -6,7 +6,40 @@
 import { getDb } from "./db";
 import { rfvContacts, whatsappSessions, bulkCampaigns, bulkCampaignMessages } from "../drizzle/schema";
 import { eq, and, inArray, desc, sql, count } from "drizzle-orm";
-import { whatsappManager } from "./whatsapp";
+import { whatsappManager as baileysManager } from "./whatsapp";
+import { whatsappManager as evolutionManager } from "./whatsappEvolution";
+
+// ─── Dual-manager helper ───
+// Sessions may be managed by Baileys (legacy) or Evolution API (SaaS tenants).
+// This helper checks both managers to find the active session.
+function getSessionFromAnyManager(sessionId: string): { status: string; socket?: any } | undefined {
+  // Try Evolution API first (most common for SaaS tenants)
+  const evoSession = evolutionManager.getSession(sessionId);
+  if (evoSession) return evoSession;
+  // Fall back to Baileys
+  const baileysSession = baileysManager.getSession(sessionId);
+  if (baileysSession) return baileysSession;
+  return undefined;
+}
+
+async function sendTextMessageViaAnyManager(sessionId: string, jid: string, text: string): Promise<any> {
+  // Try Evolution API first
+  const evoSession = evolutionManager.getSession(sessionId);
+  if (evoSession && evoSession.status === "connected") {
+    return evolutionManager.sendTextMessage(sessionId, jid, text);
+  }
+  // Fall back to Baileys
+  return baileysManager.sendTextMessage(sessionId, jid, text);
+}
+
+async function connectViaAnyManager(sessionId: string, userId: number, tenantId: number): Promise<any> {
+  // Try Evolution API first (SaaS tenants use crm- prefix)
+  if (sessionId.startsWith("crm-")) {
+    return evolutionManager.connect(sessionId, userId, tenantId);
+  }
+  // Fall back to Baileys
+  return baileysManager.connect(sessionId, userId, tenantId);
+}
 
 // ─── Types ───
 export interface BulkSendRequest {
@@ -17,6 +50,9 @@ export interface BulkSendRequest {
   messageTemplate: string;
   sessionId: string;
   delayMs?: number;
+  randomDelay?: boolean; // If true, use random interval between delayMs*0.5 and delayMs*1.5
+  delayMinMs?: number;   // Min delay when randomDelay is true (default: delayMs * 0.5)
+  delayMaxMs?: number;   // Max delay when randomDelay is true (default: delayMs * 1.5)
   campaignName?: string;
   source?: string;
   audienceFilter?: string;
@@ -113,7 +149,7 @@ function phoneToJid(phone: string): string | null {
  * Creates a campaign record and tracks each message individually.
  */
 export async function startBulkSend(request: BulkSendRequest): Promise<{ jobId: string; campaignId: number }> {
-  const { tenantId, userId, userName, contactIds, messageTemplate, sessionId, delayMs = 3000, source = "rfv", audienceFilter } = request;
+  const { tenantId, userId, userName, contactIds, messageTemplate, sessionId, delayMs = 3000, randomDelay = false, delayMinMs, delayMaxMs, source = "rfv", audienceFilter } = request;
   const key = jobKey(tenantId);
 
   // Check if there's already a running job
@@ -123,7 +159,7 @@ export async function startBulkSend(request: BulkSendRequest): Promise<{ jobId: 
   }
 
   // Verify session is connected
-  const session = whatsappManager.getSession(sessionId);
+  const session = getSessionFromAnyManager(sessionId);
   if (!session || session.status !== "connected") {
     throw new Error("Sessão WhatsApp não está conectada. Conecte-se primeiro.");
   }
@@ -200,7 +236,7 @@ export async function startBulkSend(request: BulkSendRequest): Promise<{ jobId: 
   activeJobs.set(key, job);
 
   // Run async (don't await — fire and forget)
-  processBulkSend(key, job, campaignId, contacts, messageTemplate, sessionId, delayMs).catch((err) => {
+  processBulkSend(key, job, campaignId, contacts, messageTemplate, sessionId, delayMs, randomDelay, delayMinMs, delayMaxMs).catch((err) => {
     console.error("[BulkSend] Fatal error:", err);
     job.status = "completed";
     // Mark campaign as failed
@@ -225,6 +261,9 @@ async function processBulkSend(
   messageTemplate: string,
   sessionId: string,
   delayMs: number,
+  randomDelay: boolean = false,
+  delayMinMs?: number,
+  delayMaxMs?: number,
 ) {
   const db = await getDb();
   if (!db) return;
@@ -292,7 +331,7 @@ async function processBulkSend(
 
         try {
           const message = interpolateTemplate(messageTemplate, contact);
-          const sendResult = await whatsappManager.sendTextMessage(sessionId, jid, message);
+          const sendResult = await sendTextMessageViaAnyManager(sessionId, jid, message);
           const waMessageId = sendResult?.key?.id || null;
           
           result.status = "sent";
@@ -340,7 +379,14 @@ async function processBulkSend(
 
     // Rate-limit delay between messages (skip for last message)
     if (job.status === "running" && job.processed < job.total) {
-      await new Promise((resolve) => setTimeout(resolve, delayMs));
+      let actualDelay = delayMs;
+      if (randomDelay) {
+        // Random interval between min and max to avoid WhatsApp blocking patterns
+        const min = delayMinMs ?? Math.round(delayMs * 0.5);
+        const max = delayMaxMs ?? Math.round(delayMs * 1.5);
+        actualDelay = Math.round(min + Math.random() * (max - min));
+      }
+      await new Promise((resolve) => setTimeout(resolve, actualDelay));
     }
   }
 
@@ -492,9 +538,9 @@ export async function getActiveSessionForTenant(tenantId: number): Promise<{ ses
 
   if (sessions.length === 0) return null;
 
-  // Find the first connected session (in-memory takes priority)
+  // Find the first connected session (in-memory takes priority — check BOTH managers)
   for (const s of sessions) {
-    const live = whatsappManager.getSession(s.sessionId);
+    const live = getSessionFromAnyManager(s.sessionId);
     if (live && live.status === "connected") {
       return { sessionId: s.sessionId, status: "connected" };
     }
@@ -502,7 +548,7 @@ export async function getActiveSessionForTenant(tenantId: number): Promise<{ ses
 
   // Check if any session is currently connecting (in-memory)
   for (const s of sessions) {
-    const live = whatsappManager.getSession(s.sessionId);
+    const live = getSessionFromAnyManager(s.sessionId);
     if (live && live.status === "connecting") {
       return { sessionId: s.sessionId, status: "connecting" };
     }
@@ -512,10 +558,10 @@ export async function getActiveSessionForTenant(tenantId: number): Promise<{ ses
   // Check if DB says "connected" — if so, trigger auto-reconnect in background
   for (const s of sessions) {
     if (s.status === "connected") {
-      const live = whatsappManager.getSession(s.sessionId);
+      const live = getSessionFromAnyManager(s.sessionId);
       if (!live) {
         console.log(`[ActiveSession] DB says connected but no in-memory session for ${s.sessionId}. Triggering reconnect (tenant: ${s.tenantId})...`);
-        whatsappManager.connect(s.sessionId, s.userId, s.tenantId).catch((e: any) => {
+        connectViaAnyManager(s.sessionId, s.userId, s.tenantId).catch((e: any) => {
           console.error(`[ActiveSession] Auto-reconnect failed for ${s.sessionId}:`, e);
         });
         return { sessionId: s.sessionId, status: "connecting" };
@@ -525,6 +571,6 @@ export async function getActiveSessionForTenant(tenantId: number): Promise<{ ses
 
   // Return first session with its actual status
   const firstSession = sessions[0];
-  const live = whatsappManager.getSession(firstSession.sessionId);
+  const live = getSessionFromAnyManager(firstSession.sessionId);
   return { sessionId: firstSession.sessionId, status: live?.status || firstSession.status || "disconnected" };
 }

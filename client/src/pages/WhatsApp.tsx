@@ -1,21 +1,42 @@
 import { trpc } from "@/lib/trpc";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import {
-  Smartphone, Wifi, WifiOff, QrCode, AlertTriangle,
-  ShieldAlert, Loader2, RefreshCw, CheckCircle2
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import {
+  Smartphone, Wifi, WifiOff, QrCode,
+  ShieldAlert, Loader2, RefreshCw, CheckCircle2,
+  Settings2, Trash2, Users, Info
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { useSocket } from "@/hooks/useSocket";
+import { useTenantId } from "@/hooks/useTenantId";
 
 export default function WhatsApp() {
   const [qrCode, setQrCode] = useState<string | null>(null);
   const [qrSessionId, setQrSessionId] = useState<string | null>(null);
   const [isWaitingQr, setIsWaitingQr] = useState(false);
+  const [cleanupDialogOpen, setCleanupDialogOpen] = useState(false);
+  const [dryRunResult, setDryRunResult] = useState<{
+    contactsToDelete: number;
+    sample: Array<{ id: number; name: string; phone: string }>;
+  } | null>(null);
 
   const utils = trpc.useUtils();
   const { qrData, waStatus } = useSocket();
+  const tenantId = useTenantId();
 
   const sessions = trpc.whatsapp.sessions.useQuery(undefined, { refetchInterval: 5000 });
 
@@ -24,6 +45,50 @@ export default function WhatsApp() {
   const isConnected = mySession?.liveStatus === "connected";
   const isConnecting = mySession?.liveStatus === "connecting" || mySession?.liveStatus === "reconnecting";
 
+  // ─── Contact Import Settings ───
+  const contactSettings = trpc.whatsapp.getContactImportSettings.useQuery(
+    { tenantId },
+    { enabled: tenantId > 0, staleTime: 30_000 }
+  );
+
+  const saveSettings = trpc.whatsapp.saveContactImportSettings.useMutation({
+    onSuccess: () => {
+      utils.whatsapp.getContactImportSettings.invalidate();
+      toast.success("Configuração salva com sucesso!");
+    },
+    onError: (err) => toast.error(`Erro ao salvar: ${err.message}`),
+  });
+
+  const cleanupMutation = trpc.whatsapp.cleanupSyncedContacts.useMutation({
+    onSuccess: (data) => {
+      if (data.dryRun) {
+        setDryRunResult({
+          contactsToDelete: data.contactsToDelete ?? 0,
+          sample: (data.sample as any) ?? [],
+        });
+      } else {
+        setDryRunResult(null);
+        setCleanupDialogOpen(false);
+        toast.success(`${data.contactsDeleted} contato(s) removido(s) com sucesso!`);
+      }
+    },
+    onError: (err) => toast.error(`Erro na limpeza: ${err.message}`),
+  });
+
+  const handleToggleImport = (checked: boolean) => {
+    saveSettings.mutate({ tenantId, importContactsFromAgenda: checked });
+  };
+
+  const handleCleanupDryRun = () => {
+    setDryRunResult(null);
+    cleanupMutation.mutate({ tenantId, dryRun: true });
+  };
+
+  const handleCleanupConfirm = () => {
+    cleanupMutation.mutate({ tenantId, dryRun: false });
+  };
+
+  // ─── WhatsApp Connection Logic ───
   const connect = trpc.whatsapp.connect.useMutation({
     onMutate: () => {
       setIsWaitingQr(true);
@@ -309,6 +374,186 @@ export default function WhatsApp() {
           </div>
         </Card>
       )}
+
+      {/* ─── CONFIGURAÇÕES DE CONTATOS ─── */}
+      <div className="mt-8">
+        <div className="flex items-center gap-2 mb-4">
+          <Settings2 className="h-5 w-5 text-muted-foreground" />
+          <h2 className="text-[15px] font-semibold text-foreground">Configurações de Contatos</h2>
+        </div>
+
+        <Card className="border border-border/40 shadow-none rounded-xl">
+          <div className="p-5 space-y-5">
+            {/* Toggle: Import contacts from WhatsApp agenda */}
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex gap-3 items-start">
+                <div className="h-9 w-9 rounded-lg bg-blue-50 flex items-center justify-center shrink-0 mt-0.5">
+                  <Users className="h-4.5 w-4.5 text-blue-600" />
+                </div>
+                <div>
+                  <Label htmlFor="import-contacts-toggle" className="text-[13px] font-medium text-foreground cursor-pointer">
+                    Importar contatos da agenda do WhatsApp
+                  </Label>
+                  <p className="text-[12px] text-muted-foreground mt-1 leading-relaxed max-w-md">
+                    Quando ativado, os contatos salvos na agenda do seu WhatsApp serão automaticamente
+                    importados para o CRM durante a sincronização. Quando desativado, apenas contatos
+                    de conversas ativas serão criados.
+                  </p>
+                </div>
+              </div>
+              <Switch
+                id="import-contacts-toggle"
+                checked={contactSettings.data?.importContactsFromAgenda ?? false}
+                onCheckedChange={handleToggleImport}
+                disabled={saveSettings.isPending || contactSettings.isLoading}
+                className="shrink-0 mt-1"
+              />
+            </div>
+
+            {/* Divider */}
+            <div className="border-t border-border/40" />
+
+            {/* Cleanup synced contacts */}
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex gap-3 items-start">
+                <div className="h-9 w-9 rounded-lg bg-red-50 flex items-center justify-center shrink-0 mt-0.5">
+                  <Trash2 className="h-4.5 w-4.5 text-red-500" />
+                </div>
+                <div>
+                  <p className="text-[13px] font-medium text-foreground">
+                    Limpar contatos sincronizados
+                  </p>
+                  <p className="text-[12px] text-muted-foreground mt-1 leading-relaxed max-w-md">
+                    Remove contatos que foram importados automaticamente da agenda do WhatsApp e que
+                    <strong> não possuem negociações</strong> associadas. Contatos criados manualmente
+                    e contatos com negociações serão preservados.
+                  </p>
+                </div>
+              </div>
+
+              <AlertDialog open={cleanupDialogOpen} onOpenChange={(open) => {
+                setCleanupDialogOpen(open);
+                if (!open) setDryRunResult(null);
+              }}>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="shrink-0 mt-1 h-9 px-4 rounded-lg text-[12px] border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 gap-1.5"
+                    onClick={() => {
+                      setCleanupDialogOpen(true);
+                      handleCleanupDryRun();
+                    }}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    Limpar
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent className="max-w-md">
+                  <AlertDialogHeader>
+                    <AlertDialogTitle className="text-[16px]">Limpar contatos sincronizados</AlertDialogTitle>
+                    <AlertDialogDescription asChild>
+                      <div className="space-y-3">
+                        {cleanupMutation.isPending && !dryRunResult && (
+                          <div className="flex items-center gap-2 py-4 justify-center">
+                            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                            <span className="text-[13px] text-muted-foreground">Analisando contatos...</span>
+                          </div>
+                        )}
+
+                        {dryRunResult && (
+                          <>
+                            {dryRunResult.contactsToDelete === 0 ? (
+                              <div className="rounded-lg bg-emerald-50 border border-emerald-200/60 p-3.5">
+                                <div className="flex items-center gap-2">
+                                  <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                                  <p className="text-[13px] text-emerald-700 font-medium">
+                                    Nenhum contato para remover!
+                                  </p>
+                                </div>
+                                <p className="text-[12px] text-emerald-600 mt-1.5 ml-6">
+                                  Todos os contatos sincronizados já possuem negociações associadas
+                                  ou foram criados manualmente.
+                                </p>
+                              </div>
+                            ) : (
+                              <>
+                                <div className="rounded-lg bg-red-50 border border-red-200/60 p-3.5">
+                                  <p className="text-[13px] text-red-700 font-medium">
+                                    {dryRunResult.contactsToDelete} contato(s) será(ão) removido(s)
+                                  </p>
+                                  <p className="text-[12px] text-red-600 mt-1">
+                                    Estes contatos foram importados da agenda do WhatsApp e não possuem
+                                    negociações no CRM.
+                                  </p>
+                                </div>
+
+                                {dryRunResult.sample.length > 0 && (
+                                  <div className="rounded-lg border border-border/40 overflow-hidden">
+                                    <div className="px-3 py-2 bg-muted/30 border-b border-border/40">
+                                      <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+                                        Amostra dos contatos a remover
+                                      </p>
+                                    </div>
+                                    <div className="max-h-[200px] overflow-y-auto">
+                                      {dryRunResult.sample.map((c) => (
+                                        <div key={c.id} className="px-3 py-2 border-b border-border/20 last:border-0 flex justify-between items-center">
+                                          <span className="text-[12px] text-foreground">{c.name || "Sem nome"}</span>
+                                          <span className="text-[11px] text-muted-foreground font-mono">{c.phone}</span>
+                                        </div>
+                                      ))}
+                                      {dryRunResult.contactsToDelete > dryRunResult.sample.length && (
+                                        <div className="px-3 py-2 text-center">
+                                          <span className="text-[11px] text-muted-foreground">
+                                            ... e mais {dryRunResult.contactsToDelete - dryRunResult.sample.length} contato(s)
+                                          </span>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                )}
+
+                                <div className="rounded-lg bg-amber-50 border border-amber-200/60 p-3">
+                                  <div className="flex gap-2 items-start">
+                                    <Info className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
+                                    <p className="text-[11px] text-amber-700 leading-relaxed">
+                                      Esta ação <strong>não pode ser desfeita</strong>. Contatos com negociações
+                                      e contatos criados manualmente serão preservados.
+                                    </p>
+                                  </div>
+                                </div>
+                              </>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel className="rounded-lg text-[13px]">Cancelar</AlertDialogCancel>
+                    {dryRunResult && dryRunResult.contactsToDelete > 0 && (
+                      <AlertDialogAction
+                        className="rounded-lg text-[13px] bg-red-600 hover:bg-red-700 text-white"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          handleCleanupConfirm();
+                        }}
+                        disabled={cleanupMutation.isPending}
+                      >
+                        {cleanupMutation.isPending ? (
+                          <><Loader2 className="h-4 w-4 animate-spin mr-1.5" />Removendo...</>
+                        ) : (
+                          <>Confirmar remoção</>
+                        )}
+                      </AlertDialogAction>
+                    )}
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </div>
+          </div>
+        </Card>
+      </div>
     </div>
   );
 }
