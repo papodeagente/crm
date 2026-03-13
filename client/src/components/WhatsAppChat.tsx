@@ -519,6 +519,39 @@ function MessageContextMenu({
   );
 }
 
+/* ─── Image with Fallback to MediaLoader ─── */
+function ImageWithFallback({ msg, fromMe, myAvatarUrl, contactAvatarUrl, onImageClick, isSticker }: {
+  msg: Message; fromMe: boolean; myAvatarUrl?: string; contactAvatarUrl?: string;
+  onImageClick?: (url: string) => void; isSticker?: boolean;
+}) {
+  const [broken, setBroken] = useState(false);
+
+  // If image failed to load, fall back to MediaLoader for re-download
+  if (broken && msg.messageId) {
+    return <MediaLoader
+      sessionId={msg.sessionId} messageId={msg.messageId}
+      messageType={msg.messageType} mediaDuration={msg.mediaDuration}
+      isVoiceNote={msg.isVoiceNote} mediaFileName={msg.mediaFileName}
+      mediaMimeType={msg.mediaMimeType} fromMe={fromMe}
+      avatarUrl={fromMe ? myAvatarUrl : contactAvatarUrl}
+      onImageClick={onImageClick}
+    />;
+  }
+
+  if (isSticker) {
+    return <img src={msg.mediaUrl!} alt="Sticker" className="w-32 h-32 object-contain" loading="lazy"
+      onError={() => setBroken(true)} />;
+  }
+
+  return (
+    <div className="relative -mx-1 -mt-0.5 mb-1 overflow-hidden rounded-md">
+      <img src={msg.mediaUrl!} alt="Imagem" className="max-w-[300px] w-full h-auto object-cover cursor-pointer hover:opacity-95 transition-opacity rounded-lg" loading="lazy"
+        onClick={() => onImageClick?.(msg.mediaUrl!)}
+        onError={() => setBroken(true)} />
+    </div>
+  );
+}
+
 /* ─── Message Bubble ─── */
 const MessageBubble = memo(({
   msg, isFirst, isLast, allMessages,
@@ -624,11 +657,7 @@ const MessageBubble = memo(({
     // If we have a mediaUrl, render the media directly
     if (hasMediaUrl) {
       if (isImage && msg.mediaUrl) {
-        return (
-          <div className="relative -mx-1 -mt-0.5 mb-1 overflow-hidden rounded-md">
-            <img src={msg.mediaUrl} alt="Imagem" className="max-w-[300px] w-full h-auto object-cover cursor-pointer hover:opacity-95 transition-opacity rounded-lg" loading="lazy" onClick={() => onImageClick?.(msg.mediaUrl!)} />
-          </div>
-        );
+        return <ImageWithFallback msg={msg} fromMe={fromMe} myAvatarUrl={myAvatarUrl} contactAvatarUrl={contactAvatarUrl} onImageClick={onImageClick} />;
       }
       if (isVideo && msg.mediaUrl) {
         return (
@@ -655,7 +684,7 @@ const MessageBubble = memo(({
         );
       }
       if (isSticker && msg.mediaUrl) {
-        return <img src={msg.mediaUrl} alt="Sticker" className="w-32 h-32 object-contain" loading="lazy" />;
+        return <ImageWithFallback msg={msg} fromMe={fromMe} myAvatarUrl={myAvatarUrl} contactAvatarUrl={contactAvatarUrl} onImageClick={onImageClick} isSticker />;
       }
     }
 

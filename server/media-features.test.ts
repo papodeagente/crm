@@ -41,12 +41,32 @@ describe("mimeToExt logic", () => {
       const map: Record<string, string> = {
         "image/jpeg": "jpg", "audio/ogg": "ogg",
       };
-      return map[mime] || mime.split("/")[1]?.split(";")[0] || "bin";
+      const rawExt = mime.split("/")[1]?.split(";")[0] || "bin";
+      return map[mime] || rawExt.split("+")[0] || "bin";
     };
     
     expect(mimeToExt("application/zip")).toBe("zip");
     expect(mimeToExt("audio/ogg; codecs=opus")).toBe("ogg");
     expect(mimeToExt("unknown")).toBe("bin");
+  });
+
+  it("should handle complex mimetypes with + suffix (e.g. svg+xml)", () => {
+    // This is the fix for broken S3 URLs where svg+xml was used as extension
+    const mimeToExt = (mime: string): string => {
+      const map: Record<string, string> = {
+        "image/jpeg": "jpg", "audio/ogg": "ogg",
+      };
+      const rawExt = mime.split("/")[1]?.split(";")[0] || "bin";
+      return map[mime] || rawExt.split("+")[0] || "bin";
+    };
+    
+    expect(mimeToExt("image/svg+xml")).toBe("svg");
+    expect(mimeToExt("application/xhtml+xml")).toBe("xhtml");
+    expect(mimeToExt("application/soap+xml")).toBe("soap");
+    expect(mimeToExt("image/jpeg")).toBe("jpg"); // known mime still works
+    expect(mimeToExt("audio/ogg; codecs=opus")).toBe("ogg"); // known mime still works
+    expect(mimeToExt("application/pdf")).toBe("pdf"); // no + in mime
+    expect(mimeToExt("video/mp4")).toBe("mp4"); // no + in mime
   });
 });
 

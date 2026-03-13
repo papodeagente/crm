@@ -1,0 +1,63 @@
+{
+  "query": "SELECT id, messageId, sessionId, messageType, mediaUrl, media_mime_type, media_file_name, LEFT(content, 100) as content_preview FROM messages WHERE media_file_name LIKE '%branca%' OR content LIKE '%branca%' LIMIT 5",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute SELECT id, messageId, sessionId, messageType, mediaUrl, media_mime_type, media_file_name, LEFT(content, 100) as content_preview FROM messages WHERE media_file_name LIKE '%branca%' OR content LIKE '%branca%' LIMIT 5",
+  "rows": [
+    {
+      "id": "360481",
+      "messageId": "3EB0FD3005016B89F70CA5",
+      "sessionId": "Whatsapp",
+      "messageType": "conversation",
+      "mediaUrl": "NULL",
+      "media_mime_type": "NULL",
+      "media_file_name": "NULL",
+      "content_preview": "Amém! Obrigado pela lembrança, Edson!"
+    },
+    {
+      "id": "360519",
+      "messageId": "3A3323A524D8A2D60FE1",
+      "sessionId": "Whatsapp",
+      "messageType": "conversation",
+      "mediaUrl": "NULL",
+      "media_mime_type": "NULL",
+      "media_file_name": "NULL",
+      "content_preview": "Bom dia Bruno!"
+    },
+    {
+      "id": "360678",
+      "messageId": "3EB0457F1FBD9C48F14681",
+      "sessionId": "Whatsapp",
+      "messageType": "extendedTextMessage",
+      "mediaUrl": "NULL",
+      "media_mime_type": "NULL",
+      "media_file_name": "NULL",
+      "content_preview": "a cobrança dela é sobre o plano RD Station"
+    },
+    {
+      "id": "481158",
+      "messageId": "3A2C0A7D1A0E77D3B22D",
+      "sessionId": "crm-210002-240001",
+      "messageType": "conversation",
+      "mediaUrl": "NULL",
+      "media_mime_type": "NULL",
+      "media_file_name": "NULL",
+      "content_preview": "Fala Fernando!!!! imagina estamos juntos! agradeço vcs a lembrança de sempre! pois então estamos na "
+    },
+    {
+      "id": "487367",
+      "messageId": "3A37863C11E0EA41D8AC",
+      "sessionId": "crm-210002-240001",
+      "messageType": "conversation",
+      "mediaUrl": "NULL",
+      "media_mime_type": "NULL",
+      "media_file_name": "NULL",
+      "content_preview": "Essa branca o que acha?"
+    }
+  ],
+  "messages": [
+    "Que delícia receber essa sua mensagem! 🥰",
+    "Que palavra preciosa para começar o dia…Obri"
+  ],
+  "stdout": "id\tmessageId\tsessionId\tmessageType\tmediaUrl\tmedia_mime_type\tmedia_file_name\tcontent_preview\n360481\t3EB0FD3005016B89F70CA5\tWhatsapp\tconversation\tNULL\tNULL\tNULL\tAmém! Obrigado pela lembrança, Edson!\n360519\t3A3323A524D8A2D60FE1\tWhatsapp\tconversation\tNULL\tNULL\tNULL\tBom dia Bruno!\nQue delícia receber essa sua mensagem! 🥰\nQue palavra preciosa para começar o dia…Obri\n360678\t3EB0457F1FBD9C48F14681\tWhatsapp\textendedTextMessage\tNULL\tNULL\tNULL\ta cobrança dela é sobre o plano RD Station\n481158\t3A2C0A7D1A0E77D3B22D\tcrm-210002-240001\tconversation\tNULL\tNULL\tNULL\tFala Fernando!!!! imagina estamos juntos! agradeço vcs a lembrança de sempre! pois então estamos na \n487367\t3A37863C11E0EA41D8AC\tcrm-210002-240001\tconversation\tNULL\tNULL\tNULL\tEssa branca o que acha?\n",
+  "stderr": "",
+  "execution_time_ms": 77
+}

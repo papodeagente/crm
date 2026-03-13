@@ -2543,3 +2543,11 @@
 - [x] Contatos: 12 testes unitários para procedures de configuração e limpeza (contactImportSettings.test.ts)
 - [x] Testes: 1042/1045 passando (3 timeouts pré-existentes em backup diário)
 - [ ] Contatos: Garantir que ao abrir negociação no inbox, contato é salvo automaticamente
+
+## Fix Imagens Quebradas no Inbox v25 (Mar 13)
+- [x] Investigar imagens quebradas no chat do Inbox — causa raiz: extensão de arquivo gerada incorretamente para mimetypes com "+" (ex: image/svg+xml → .svg+xml em vez de .svg)
+- [x] Corrigir geração de extensão em 3 locais: routers.ts (getMediaUrl), whatsappEvolution.ts (mimeToExt), whatsapp.ts (Baileys media download)
+- [x] Adicionar componente ImageWithFallback — quando <img> falha (onError), cai automaticamente no MediaLoader para re-download
+- [x] Limpar URL quebrada do SVG no banco (id=540206) para que MediaLoader re-baixe com extensão correta
+- [x] Atualizar testes em media-features.test.ts com casos para svg+xml, xhtml+xml, etc.
+- [x] Todos os 10 testes de media-features passando

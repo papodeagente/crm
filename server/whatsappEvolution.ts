@@ -1826,7 +1826,8 @@ class WhatsAppEvolutionManager extends EventEmitter {
       "application/vnd.ms-excel": "xls",
       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "xlsx",
     };
-    return map[mime] || mime.split("/")[1]?.split(";")[0] || "bin";
+    const rawExt = mime.split("/")[1]?.split(";")[0] || "bin";
+    return map[mime] || rawExt.split("+")[0] || "bin"; // svg+xml → svg
   }
 
   private jidToNumber(jid: string): string {

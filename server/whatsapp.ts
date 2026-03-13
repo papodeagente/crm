@@ -728,7 +728,10 @@ class WhatsAppManager extends EventEmitter {
               const buffer = await downloadMediaMessage(msg, "buffer", {}, { logger, reuploadRequest: sock.updateMediaMessage });
               let ext = "bin";
               if (msg.message.stickerMessage) ext = "webp";
-              else if (capturedMimeType) ext = capturedMimeType.split("/")[1]?.split(";")[0] || "bin";
+              else if (capturedMimeType) {
+                const rawExt = capturedMimeType.split("/")[1]?.split(";")[0] || "bin";
+                ext = rawExt.split("+")[0] || "bin"; // svg+xml → svg
+              }
               const key = capturedFileName
                 ? `whatsapp-media/${nanoid()}-${capturedFileName}`
                 : `whatsapp-media/${nanoid()}.${ext}`;

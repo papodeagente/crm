@@ -661,7 +661,9 @@ export const appRouter = router({
           return { url: null, mimetype: null, unavailable: true };
         }
         // Upload to S3
-        const ext = (base64Data.mimetype || "bin").split("/")[1]?.split(";")[0] || "bin";
+        // Handle complex mimetypes like image/svg+xml → svg, audio/ogg; codecs=opus → ogg
+        const rawExt = (base64Data.mimetype || "bin").split("/")[1]?.split(";")[0] || "bin";
+        const ext = rawExt.split("+")[0]; // svg+xml → svg, gzip+json → gzip
         const fileKey = `whatsapp-media/${input.sessionId}/${nanoid()}.${ext}`;
         const buffer = Buffer.from(base64Data.base64, "base64");
         const { url } = await storagePut(fileKey, buffer, base64Data.mimetype || "application/octet-stream");
