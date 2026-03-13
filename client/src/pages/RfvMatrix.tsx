@@ -1000,6 +1000,45 @@ export default function RfvMatrix() {
                 </button>
               </div>
 
+              {/* Presets: Curto / Médio / Longo */}
+              <div className="space-y-2">
+                <Label className="text-xs text-muted-foreground">Velocidade:</Label>
+                <div className="grid grid-cols-3 gap-2">
+                  {([
+                    { label: "Rápido", desc: delayMode === "random" ? "3s – 10s" : "5s", icon: "⚡",
+                      apply: () => delayMode === "random" ? (setDelayMinSeconds(3), setDelayMaxSeconds(10)) : setDelaySeconds(5) },
+                    { label: "Moderado", desc: delayMode === "random" ? "15s – 60s" : "30s", icon: "⏱",
+                      apply: () => delayMode === "random" ? (setDelayMinSeconds(15), setDelayMaxSeconds(60)) : setDelaySeconds(30) },
+                    { label: "Seguro", desc: delayMode === "random" ? "60s – 300s" : "120s", icon: "🛡",
+                      apply: () => delayMode === "random" ? (setDelayMinSeconds(60), setDelayMaxSeconds(300)) : setDelaySeconds(120) },
+                  ] as const).map((preset) => {
+                    const isActive = delayMode === "random"
+                      ? (preset.label === "Rápido" && delayMinSeconds === 3 && delayMaxSeconds === 10)
+                        || (preset.label === "Moderado" && delayMinSeconds === 15 && delayMaxSeconds === 60)
+                        || (preset.label === "Seguro" && delayMinSeconds === 60 && delayMaxSeconds === 300)
+                      : (preset.label === "Rápido" && delaySeconds === 5)
+                        || (preset.label === "Moderado" && delaySeconds === 30)
+                        || (preset.label === "Seguro" && delaySeconds === 120);
+                    return (
+                      <button
+                        key={preset.label}
+                        type="button"
+                        onClick={() => preset.apply()}
+                        className={`flex flex-col items-center gap-0.5 px-2 py-2 rounded-lg text-xs border transition-colors ${
+                          isActive
+                            ? "bg-[#600FED]/10 border-[#600FED] text-[#600FED]"
+                            : "bg-transparent border-border text-muted-foreground hover:border-[#600FED]/40"
+                        }`}
+                      >
+                        <span className="text-base">{preset.icon}</span>
+                        <span className="font-medium">{preset.label}</span>
+                        <span className="text-[10px] opacity-70">{preset.desc}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
               {delayMode === "random" ? (
                 <div className="space-y-2">
                   <p className="text-xs text-muted-foreground">
@@ -1018,6 +1057,14 @@ export default function RfvMatrix() {
                           <SelectItem value="5">5s</SelectItem>
                           <SelectItem value="8">8s</SelectItem>
                           <SelectItem value="10">10s</SelectItem>
+                          <SelectItem value="15">15s</SelectItem>
+                          <SelectItem value="20">20s</SelectItem>
+                          <SelectItem value="30">30s</SelectItem>
+                          <SelectItem value="45">45s</SelectItem>
+                          <SelectItem value="60">1 min</SelectItem>
+                          <SelectItem value="120">2 min</SelectItem>
+                          <SelectItem value="180">3 min</SelectItem>
+                          <SelectItem value="300">5 min</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -1035,25 +1082,48 @@ export default function RfvMatrix() {
                           <SelectItem value="15">15s</SelectItem>
                           <SelectItem value="20">20s</SelectItem>
                           <SelectItem value="30">30s</SelectItem>
+                          <SelectItem value="45">45s</SelectItem>
+                          <SelectItem value="60">1 min</SelectItem>
+                          <SelectItem value="90">1.5 min</SelectItem>
+                          <SelectItem value="120">2 min</SelectItem>
+                          <SelectItem value="180">3 min</SelectItem>
+                          <SelectItem value="300">5 min</SelectItem>
+                          <SelectItem value="420">7 min</SelectItem>
+                          <SelectItem value="600">10 min</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
                   </div>
                 </div>
               ) : (
-                <Select value={String(delaySeconds)} onValueChange={(v) => setDelaySeconds(Number(v))}>
-                  <SelectTrigger className="w-[140px]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="2">2 segundos</SelectItem>
-                    <SelectItem value="3">3 segundos</SelectItem>
-                    <SelectItem value="5">5 segundos</SelectItem>
-                    <SelectItem value="10">10 segundos</SelectItem>
-                    <SelectItem value="15">15 segundos</SelectItem>
-                    <SelectItem value="30">30 segundos</SelectItem>
-                  </SelectContent>
-                </Select>
+                <div className="space-y-2">
+                  <p className="text-xs text-muted-foreground">
+                    Intervalo fixo entre cada mensagem.
+                  </p>
+                  <Select value={String(delaySeconds)} onValueChange={(v) => setDelaySeconds(Number(v))}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="2">2 segundos</SelectItem>
+                      <SelectItem value="3">3 segundos</SelectItem>
+                      <SelectItem value="5">5 segundos</SelectItem>
+                      <SelectItem value="8">8 segundos</SelectItem>
+                      <SelectItem value="10">10 segundos</SelectItem>
+                      <SelectItem value="15">15 segundos</SelectItem>
+                      <SelectItem value="20">20 segundos</SelectItem>
+                      <SelectItem value="30">30 segundos</SelectItem>
+                      <SelectItem value="45">45 segundos</SelectItem>
+                      <SelectItem value="60">1 minuto</SelectItem>
+                      <SelectItem value="90">1 min 30s</SelectItem>
+                      <SelectItem value="120">2 minutos</SelectItem>
+                      <SelectItem value="180">3 minutos</SelectItem>
+                      <SelectItem value="300">5 minutos</SelectItem>
+                      <SelectItem value="420">7 minutos</SelectItem>
+                      <SelectItem value="600">10 minutos</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               )}
             </div>
 
@@ -1075,11 +1145,21 @@ export default function RfvMatrix() {
 
             {/* Estimated time */}
             <div className="text-xs text-muted-foreground">
-              {delayMode === "random" ? (
-                <>Tempo estimado: ~{Math.ceil((selectedIds.size * (delayMinSeconds + delayMaxSeconds) / 2) / 60)} minuto{Math.ceil((selectedIds.size * (delayMinSeconds + delayMaxSeconds) / 2) / 60) !== 1 ? "s" : ""} (intervalo {delayMinSeconds}s–{delayMaxSeconds}s)</>
-              ) : (
-                <>Tempo estimado: ~{Math.ceil((selectedIds.size * delaySeconds) / 60)} minuto{Math.ceil((selectedIds.size * delaySeconds) / 60) !== 1 ? "s" : ""}</>
-              )}
+              {(() => {
+                const avgDelay = delayMode === "random"
+                  ? (delayMinSeconds + delayMaxSeconds) / 2
+                  : delaySeconds;
+                const totalSec = selectedIds.size * avgDelay;
+                const hours = Math.floor(totalSec / 3600);
+                const mins = Math.ceil((totalSec % 3600) / 60);
+                const formatDelay = (s: number) => s >= 60 ? `${Math.round(s / 60)} min` : `${s}s`;
+                const timeStr = hours > 0
+                  ? `${hours}h ${mins > 0 ? `${mins}min` : ""}`
+                  : mins > 0 ? `${mins} minuto${mins !== 1 ? "s" : ""}` : "< 1 minuto";
+                return delayMode === "random"
+                  ? <>Tempo estimado: ~{timeStr} (intervalo {formatDelay(delayMinSeconds)}–{formatDelay(delayMaxSeconds)})</>
+                  : <>Tempo estimado: ~{timeStr}</>;
+              })()}
             </div>
           </div>
 

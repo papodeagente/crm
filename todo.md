@@ -2567,3 +2567,10 @@
 - [x] Contatos só serão criados quando usuário abrir negociação ou manualmente
 - [x] Verificado: contatos de outros usuários/tenants não afetados (rd_station_crm: 4470 intactos)
 - [x] Testes passando: 26/26 (contactImportSettings + media-features)
+
+## Melhorar Intervalos Envio em Massa v28 (Mar 13)
+- [x] Ampliar opções de intervalo fixo: 2s até 10 minutos (16 opções)
+- [x] Ampliar opções de intervalo aleatório: mínimo até 5min, máximo até 10min (13+14 opções)
+- [x] Adicionar presets inteligentes: Rápido (3s-10s / 5s), Moderado (15s-60s / 30s), Seguro (60s-300s / 120s)
+- [x] Atualizar estimativa de tempo com formatação horas/minutos para intervalos longos
+- [x] Presets se adaptam ao modo (aleatório vs fixo) com highlight visual
