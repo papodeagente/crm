@@ -2510,3 +2510,6 @@
 - [x] LOGIN: Corrigido bug de hooks React (useEffect depois de return condicional) que causava crash em todas as páginas
 - [x] AUDIT: Testadas todas as 30 páginas — todas funcionando após correção do bug de hooks
 - [x] AUDIT: Mapeamento completo: todas as rotas têm páginas implementadas e routers conectados
+
+## Login Session Check Fix (Mar 13 - v21)
+- [x] Ao clicar "Entrar" com sessão ativa, redirecionar direto para /dashboard sem pedir login novamente

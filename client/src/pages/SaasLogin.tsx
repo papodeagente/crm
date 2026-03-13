@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,6 +12,24 @@ export default function SaasLogin() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [checkingSession, setCheckingSession] = useState(true);
+
+  // Check if user already has an active session
+  const meQuery = trpc.saasAuth.me.useQuery(undefined, {
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
+
+  useEffect(() => {
+    if (meQuery.isLoading) return;
+    if (meQuery.data) {
+      // User already has an active session — redirect to dashboard
+      window.location.href = "/dashboard";
+      return;
+    }
+    // No session, show login form
+    setCheckingSession(false);
+  }, [meQuery.isLoading, meQuery.data]);
 
   const loginMutation = trpc.saasAuth.login.useMutation({
     onSuccess: () => {
@@ -31,6 +49,18 @@ export default function SaasLogin() {
     e.preventDefault();
     loginMutation.mutate({ email, password });
   };
+
+  // Show loading while checking session
+  if (checkingSession) {
+    return (
+      <div className="min-h-screen bg-[#0a0a12] flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="w-8 h-8 animate-spin text-purple-500" />
+          <p className="text-sm text-gray-400">Verificando sessão...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#0a0a12] flex items-center justify-center p-4 relative overflow-hidden">
