@@ -525,17 +525,46 @@ export async function getCampaignMessages(campaignId: number, tenantId: number, 
 }
 
 /**
- * Get active session for a tenant.
+ * Get active session for a specific user within a tenant.
+ * This ensures each user sends from their own WhatsApp number.
+ * Falls back to tenant-wide search only if userId is not provided.
  */
-export async function getActiveSessionForTenant(tenantId: number): Promise<{ sessionId: string; status: string } | null> {
+export async function getActiveSessionForTenant(tenantId: number, userId?: number): Promise<{ sessionId: string; status: string } | null> {
   const db = await getDb();
   if (!db) return null;
 
-  const sessions = await db
+  // If userId is provided, prioritize that user's sessions first
+  let sessions;
+  if (userId) {
+    sessions = await db
+      .select()
+      .from(whatsappSessions)
+      .where(and(
+        eq(whatsappSessions.tenantId, tenantId),
+        eq(whatsappSessions.userId, userId),
+      ));
+    
+    // Try to find connected/connecting session for this specific user
+    const userResult = findBestSession(sessions, tenantId);
+    if (userResult) return userResult;
+    
+    // If no session found for this user, DO NOT fall back to other users' sessions
+    // This prevents sending from the wrong number
+    console.log(`[ActiveSession] No session found for user ${userId} in tenant ${tenantId}`);
+    return null;
+  }
+
+  // Legacy fallback: no userId provided, search all tenant sessions
+  sessions = await db
     .select()
     .from(whatsappSessions)
     .where(eq(whatsappSessions.tenantId, tenantId));
 
+  return findBestSession(sessions, tenantId);
+}
+
+/** Internal helper: find the best session from a list of candidates */
+function findBestSession(sessions: any[], tenantId: number): { sessionId: string; status: string } | null {
   if (sessions.length === 0) return null;
 
   // Find the first connected session (in-memory takes priority — check BOTH managers)

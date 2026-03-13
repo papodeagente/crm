@@ -2582,3 +2582,29 @@
 - [x] Melhorar ErrorBoundary — detecta chunk errors, auto-reload com cooldown de 10s, mensagem "Nova versão disponível" em PT-BR
 - [x] Proteção contra loop infinito de reload via sessionStorage cooldown
 - [x] 11 testes unitários para detecção de chunk errors e lógica de cooldown (chunkRetry.test.ts)
+
+## URGENTE: RFV envia do número errado v30 (Mar 13)
+- [x] RFV enviava do número do Fernando porque getActiveSessionForTenant buscava por tenantId e retornava a primeira sessão conectada
+- [x] Causa raiz: rfv.activeSession não passava userId — pegava qualquer sessão do tenant
+- [x] Correção: getActiveSessionForTenant agora aceita userId opcional, filtra por userId+tenantId
+- [x] rfv.activeSession agora passa ctx.saasUser.userId para garantir sessão do usuário logado
+- [x] Se usuário não tem sessão própria, retorna null (NÃO cai para sessão de outro usuário)
+- [x] Inbox e DealDetail já usavam trpc.whatsapp.sessions (filtrado por userId) — não afetados
+- [x] 12 testes unitários atualizados em rfvActiveSession.test.ts (incluindo cenário Bruno vs Fernando)
+
+## SEGURANÇA: Blindagem de sessões/mensagens WhatsApp v31 (Mar 13)
+- [x] Auditados 54 endpoints que recebem sessionId — TODOS convertidos para sessionProtectedProcedure
+- [x] Criado validateSessionOwnership(sessionId, userId, opts) em db.ts com 3 níveis de acesso:
+  - Platform owner (Manus OAuth): acesso total
+  - CRM admin: acesso a sessões do próprio tenant
+  - Usuário regular: APENAS sessões próprias
+- [x] Criado sessionProtectedProcedure middleware em trpc.ts — extrai sessionId do input e valida automaticamente
+- [x] Proteção cross-tenant: admin de um tenant NÃO pode acessar sessões de outro tenant
+- [x] Proteção cross-user: mesmo userId em tenants diferentes é bloqueado
+- [x] Log de segurança: tentativas bloqueadas geram console.warn com detalhes
+- [x] rfvRouter.bulkSend também convertido para sessionProtectedProcedure
+- [x] 16 testes de segurança passando (sessionSecurity.test.ts) incluindo:
+  - Cenário real Bruno vs Fernando na Boxtour
+  - Cross-tenant admin bloqueado
+  - Audit automático do código fonte (verifica que nenhum endpoint com sessionId usa protectedProcedure)
+- [x] 65 testes totais passando (5 arquivos de teste)

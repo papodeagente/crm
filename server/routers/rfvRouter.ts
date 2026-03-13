@@ -2,7 +2,7 @@
  * RFV Router — tRPC endpoints for Matriz RFV + Campaign Registry
  */
 import { z } from "zod";
-import { protectedProcedure, router } from "../_core/trpc";
+import { protectedProcedure, sessionProtectedProcedure, router } from "../_core/trpc";
 import { TRPCError } from "@trpc/server";
 import {
   getRfvContacts,
@@ -114,7 +114,7 @@ export const rfvRouter = router({
     }),
 
   // ─── Bulk Send WhatsApp Messages ───
-  bulkSend: protectedProcedure
+  bulkSend: sessionProtectedProcedure
     .input(z.object({
       tenantId: z.number(),
       contactIds: z.array(z.number()).min(1).max(5000),
@@ -152,11 +152,13 @@ export const rfvRouter = router({
       return { cancelled: true };
     }),
 
-  // ─── Get Active WhatsApp Session for Tenant ───
+  // ─── Get Active WhatsApp Session for User ───
   activeSession: protectedProcedure
     .input(z.object({ tenantId: z.number() }))
-    .query(async ({ input }) => {
-      return getActiveSessionForTenant(input.tenantId);
+    .query(async ({ input, ctx }) => {
+      // Use the logged-in user's CRM userId to find THEIR session, not any tenant session
+      const userId = ctx.saasUser?.userId || ctx.user?.id;
+      return getActiveSessionForTenant(input.tenantId, userId);
     }),
 
   // ─── Run RFV Notification Check (manual trigger) ───

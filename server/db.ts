@@ -112,6 +112,54 @@ export async function getSessionBySessionId(sessionId: string) {
   return result[0] || null;
 }
 
+/**
+ * Validate that a session belongs to the given user.
+ * Returns the session if valid, throws TRPCError FORBIDDEN if not.
+ * 
+ * Access rules:
+ * - SaaS users can only access their own sessions (userId match)
+ * - CRM admins can access any session in their tenant
+ * - Platform owner (non-SaaS Manus OAuth) can access all sessions
+ */
+export async function validateSessionOwnership(
+  sessionId: string,
+  userId: number,
+  opts?: { tenantId?: number; role?: string; isSaasUser?: boolean },
+  _getSession?: typeof getSessionBySessionId
+): Promise<void> {
+  if (!sessionId) return; // No session to validate
+  
+  // Platform owner (Manus OAuth, non-SaaS) has full access
+  if (!opts?.isSaasUser) return;
+  
+  const fetchSession = _getSession || getSessionBySessionId;
+  const session = await fetchSession(sessionId);
+  if (!session) return; // Session doesn't exist, let downstream handle
+  
+  // CRM admin can access any session in their tenant
+  if (opts?.role === 'admin' && opts?.tenantId && session.tenantId === opts.tenantId) return;
+  
+  // Cross-tenant check: even admins cannot access sessions from other tenants
+  if (opts?.tenantId && session.tenantId && session.tenantId !== opts.tenantId) {
+    console.warn(`[SECURITY] User ${userId} (tenant ${opts.tenantId}) attempted cross-tenant access to session ${sessionId} (tenant ${session.tenantId})`);
+    const { TRPCError } = await import('@trpc/server');
+    throw new TRPCError({
+      code: 'FORBIDDEN',
+      message: 'Você não tem permissão para acessar esta sessão do WhatsApp.',
+    });
+  }
+
+  // Regular user: must own the session
+  if (session.userId !== userId) {
+    console.warn(`[SECURITY] User ${userId} attempted to access session ${sessionId} owned by user ${session.userId}`);
+    const { TRPCError } = await import('@trpc/server');
+    throw new TRPCError({
+      code: 'FORBIDDEN',
+      message: 'Você não tem permissão para acessar esta sessão do WhatsApp.',
+    });
+  }
+}
+
 // Messages
 export async function getMessages(sessionId: string, limit = 50, offset = 0) {
   const db = await getDb();

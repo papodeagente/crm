@@ -1,7 +1,7 @@
 import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
-import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
+import { publicProcedure, protectedProcedure, sessionProtectedProcedure, router } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { whatsappManager } from "./whatsappEvolution";
@@ -197,21 +197,21 @@ export const appRouter = router({
           user: finalState?.user || null,
         };
       }),
-    disconnect: protectedProcedure
+    disconnect: sessionProtectedProcedure
       .input(z.object({ sessionId: z.string() }))
       .mutation(async ({ input }) => {
         await whatsappManager.disconnect(input.sessionId);
         return { success: true };
       }),
     // Soft-delete: move session to trash (any user can do this)
-    deleteSession: protectedProcedure
+    deleteSession: sessionProtectedProcedure
       .input(z.object({ sessionId: z.string() }))
       .mutation(async ({ input }) => {
         await whatsappManager.deleteSession(input.sessionId, false);
         return { success: true };
       }),
     // Hard-delete: permanently remove session (admin only)
-    hardDeleteSession: protectedProcedure
+    hardDeleteSession: sessionProtectedProcedure
       .input(z.object({ sessionId: z.string() }))
       .mutation(async ({ ctx, input }) => {
         // Only admins can hard-delete
@@ -222,14 +222,14 @@ export const appRouter = router({
         await whatsappManager.deleteSession(input.sessionId, true);
         return { success: true };
       }),
-    status: protectedProcedure
+    status: sessionProtectedProcedure
       .input(z.object({ sessionId: z.string() }))
       .query(async ({ input }) => {
         const session = await whatsappManager.getSessionLive(input.sessionId);
         return { status: session?.status || "disconnected", qrDataUrl: session?.qrDataUrl || null, user: session?.user || null };
       }),
     // Request pairing code as alternative to QR code
-    requestPairingCode: protectedProcedure
+    requestPairingCode: sessionProtectedProcedure
       .input(z.object({ sessionId: z.string(), phoneNumber: z.string().min(8).max(20) }))
       .mutation(async ({ ctx, input }) => {
         // Evolution API does not support pairing codes directly.
@@ -276,26 +276,26 @@ export const appRouter = router({
       return filtered.length > 0 ? filtered : results;
     }),
     // Resolve a phone number to the actual WhatsApp JID
-    resolveJid: protectedProcedure
+    resolveJid: sessionProtectedProcedure
       .input(z.object({ sessionId: z.string(), phone: z.string().min(1) }))
       .query(async ({ input }) => {
         const jid = await whatsappManager.resolveJidPublic(input.sessionId, input.phone);
         return { jid };
       }),
-    sendMessage: protectedProcedure
+    sendMessage: sessionProtectedProcedure
       .input(z.object({ sessionId: z.string(), number: z.string().min(1), message: z.string().min(1) }))
       .mutation(async ({ input }) => {
         const result = await whatsappManager.sendTextMessage(input.sessionId, input.number, input.message);
         return { success: true, messageId: result?.key?.id, remoteJid: result?.key?.remoteJid };
       }),
-    sendMedia: protectedProcedure
+    sendMedia: sessionProtectedProcedure
       .input(z.object({ sessionId: z.string(), number: z.string().min(1), mediaUrl: z.string().url(), mediaType: z.enum(["image", "audio", "document", "video"]), caption: z.string().optional(), fileName: z.string().optional(), ptt: z.boolean().optional(), mimetype: z.string().optional(), duration: z.number().optional() }))
       .mutation(async ({ input }) => {
         const result = await whatsappManager.sendMediaMessage(input.sessionId, input.number, input.mediaUrl, input.mediaType, input.caption, input.fileName, { ptt: input.ptt, mimetype: input.mimetype, duration: input.duration });
         return { success: true, messageId: result?.key?.id };
       }),
     // ─── REACTIONS & INTERACTIONS ───
-    sendReaction: protectedProcedure
+    sendReaction: sessionProtectedProcedure
       .input(z.object({
         sessionId: z.string(),
         key: z.object({ remoteJid: z.string(), fromMe: z.boolean(), id: z.string() }),
@@ -305,13 +305,13 @@ export const appRouter = router({
         const result = await whatsappManager.sendReaction(input.sessionId, input.key, input.reaction);
         return { success: true, messageId: result?.key?.id };
       }),
-    sendSticker: protectedProcedure
+    sendSticker: sessionProtectedProcedure
       .input(z.object({ sessionId: z.string(), number: z.string().min(1), stickerUrl: z.string().url() }))
       .mutation(async ({ input }) => {
         const result = await whatsappManager.sendSticker(input.sessionId, input.number, input.stickerUrl);
         return { success: true, messageId: result?.key?.id };
       }),
-    sendLocation: protectedProcedure
+    sendLocation: sessionProtectedProcedure
       .input(z.object({
         sessionId: z.string(),
         number: z.string().min(1),
@@ -324,7 +324,7 @@ export const appRouter = router({
         const result = await whatsappManager.sendLocation(input.sessionId, input.number, input.latitude, input.longitude, input.name, input.address);
         return { success: true, messageId: result?.key?.id };
       }),
-    sendContact: protectedProcedure
+    sendContact: sessionProtectedProcedure
       .input(z.object({
         sessionId: z.string(),
         number: z.string().min(1),
@@ -334,7 +334,7 @@ export const appRouter = router({
         const result = await whatsappManager.sendContact(input.sessionId, input.number, input.contacts);
         return { success: true, messageId: result?.key?.id };
       }),
-    sendPoll: protectedProcedure
+    sendPoll: sessionProtectedProcedure
       .input(z.object({
         sessionId: z.string(),
         number: z.string().min(1),
@@ -346,7 +346,7 @@ export const appRouter = router({
         const result = await whatsappManager.sendPoll(input.sessionId, input.number, input.name, input.values, input.selectableCount);
         return { success: true, messageId: result?.key?.id };
       }),
-    sendTextWithQuote: protectedProcedure
+    sendTextWithQuote: sessionProtectedProcedure
       .input(z.object({
         sessionId: z.string(),
         number: z.string().min(1),
@@ -358,7 +358,7 @@ export const appRouter = router({
         const result = await whatsappManager.sendTextWithQuote(input.sessionId, input.number, input.message, input.quotedMessageId, input.quotedText);
         return { success: true, messageId: result?.key?.id };
       }),
-    deleteMessage: protectedProcedure
+    deleteMessage: sessionProtectedProcedure
       .input(z.object({
         sessionId: z.string(),
         remoteJid: z.string(),
@@ -369,7 +369,7 @@ export const appRouter = router({
         await whatsappManager.deleteMessage(input.sessionId, input.remoteJid, input.messageId, input.fromMe);
         return { success: true };
       }),
-    editMessage: protectedProcedure
+    editMessage: sessionProtectedProcedure
       .input(z.object({
         sessionId: z.string(),
         number: z.string().min(1),
@@ -380,7 +380,7 @@ export const appRouter = router({
         const result = await whatsappManager.editMessage(input.sessionId, input.number, input.messageId, input.newText);
         return { success: true, messageId: result?.key?.id };
       }),
-    sendPresence: protectedProcedure
+    sendPresence: sessionProtectedProcedure
       .input(z.object({
         sessionId: z.string(),
         number: z.string().min(1),
@@ -390,53 +390,53 @@ export const appRouter = router({
         await whatsappManager.sendPresenceUpdate(input.sessionId, input.number, input.presence);
         return { success: true };
       }),
-    archiveChat: protectedProcedure
+    archiveChat: sessionProtectedProcedure
       .input(z.object({ sessionId: z.string(), remoteJid: z.string(), archive: z.boolean() }))
       .mutation(async ({ input }) => {
         await whatsappManager.archiveChat(input.sessionId, input.remoteJid, input.archive);
         return { success: true };
       }),
-    blockContact: protectedProcedure
+    blockContact: sessionProtectedProcedure
       .input(z.object({ sessionId: z.string(), number: z.string().min(1), block: z.boolean() }))
       .mutation(async ({ input }) => {
         await whatsappManager.blockContact(input.sessionId, input.number, input.block);
         return { success: true };
       }),
-    checkIsWhatsApp: protectedProcedure
+    checkIsWhatsApp: sessionProtectedProcedure
       .input(z.object({ sessionId: z.string(), numbers: z.array(z.string().min(1)) }))
       .mutation(async ({ input }) => {
         return whatsappManager.checkIsWhatsApp(input.sessionId, input.numbers);
       }),
-    markAsUnread: protectedProcedure
+    markAsUnread: sessionProtectedProcedure
       .input(z.object({ sessionId: z.string(), remoteJid: z.string(), messageId: z.string() }))
       .mutation(async ({ input }) => {
         await whatsappManager.markAsUnread(input.sessionId, input.remoteJid, input.messageId);
         return { success: true };
       }),
-    fetchContactProfile: protectedProcedure
+    fetchContactProfile: sessionProtectedProcedure
       .input(z.object({ sessionId: z.string(), jid: z.string() }))
       .query(async ({ input }) => {
         return whatsappManager.fetchContactProfile(input.sessionId, input.jid);
       }),
-    fetchBusinessProfile: protectedProcedure
+    fetchBusinessProfile: sessionProtectedProcedure
       .input(z.object({ sessionId: z.string(), jid: z.string() }))
       .query(async ({ input }) => {
         return whatsappManager.fetchContactBusinessProfile(input.sessionId, input.jid);
       }),
     // ─── EXISTING QUERIES ───
-    messages: protectedProcedure
+    messages: sessionProtectedProcedure
       .input(z.object({ sessionId: z.string(), limit: z.number().min(1).max(200).default(50), offset: z.number().min(0).default(0) }))
       .query(async ({ input }) => getMessages(input.sessionId, input.limit, input.offset)),
-    messagesByContact: protectedProcedure
+    messagesByContact: sessionProtectedProcedure
       .input(z.object({ sessionId: z.string(), remoteJid: z.string(), limit: z.number().min(1).max(200).default(50), beforeId: z.number().optional() }))
       .query(async ({ input }) => getMessagesByContact(input.sessionId, input.remoteJid, input.limit, input.beforeId)),
-    logs: protectedProcedure
+    logs: sessionProtectedProcedure
       .input(z.object({ sessionId: z.string().optional(), limit: z.number().min(1).max(500).default(100) }))
       .query(async ({ input }) => input.sessionId ? getLogs(input.sessionId, input.limit) : getAllLogs(input.limit)),
-    getChatbotSettings: protectedProcedure
+    getChatbotSettings: sessionProtectedProcedure
       .input(z.object({ sessionId: z.string() }))
       .query(async ({ input }) => getChatbotSettings(input.sessionId)),
-    updateChatbotSettings: protectedProcedure
+    updateChatbotSettings: sessionProtectedProcedure
       .input(z.object({
         sessionId: z.string(),
         enabled: z.boolean().optional(),
@@ -466,10 +466,10 @@ export const appRouter = router({
         return { success: true };
       }),
     // Chatbot Rules (whitelist/blacklist)
-    getChatbotRules: protectedProcedure
+    getChatbotRules: sessionProtectedProcedure
       .input(z.object({ sessionId: z.string(), ruleType: z.enum(["whitelist", "blacklist"]).optional() }))
       .query(async ({ input }) => getChatbotRules(input.sessionId, input.ruleType)),
-    addChatbotRule: protectedProcedure
+    addChatbotRule: sessionProtectedProcedure
       .input(z.object({ sessionId: z.string(), remoteJid: z.string().min(1), ruleType: z.enum(["whitelist", "blacklist"]), contactName: z.string().optional() }))
       .mutation(async ({ input }) => {
         await addChatbotRule(input.sessionId, input.remoteJid, input.ruleType, input.contactName);
@@ -482,11 +482,11 @@ export const appRouter = router({
         return { success: true };
       }),
     // Conversations list (grouped by remoteJid with last message) — LEGACY
-    conversations: protectedProcedure
+    conversations: sessionProtectedProcedure
       .input(z.object({ sessionId: z.string() }))
       .query(async ({ input }) => getConversationsList(input.sessionId)),
     // Conversations list with multi-agent assignment info — LEGACY
-    conversationsMultiAgent: protectedProcedure
+    conversationsMultiAgent: sessionProtectedProcedure
       .input(z.object({
         sessionId: z.string(),
         tenantId: z.number().default(1),
@@ -500,7 +500,7 @@ export const appRouter = router({
         return getConversationsListMultiAgent(sessionId, tenantId, filter);
       }),
     // ─── WA Conversations (canônico — usa wa_conversations) ───
-    waConversations: protectedProcedure
+    waConversations: sessionProtectedProcedure
       .input(z.object({
         sessionId: z.string(),
         tenantId: z.number().default(1),
@@ -529,7 +529,7 @@ export const appRouter = router({
         return { success: true };
       }),
     // Assign conversation to an agent
-    assignConversation: protectedProcedure
+    assignConversation: sessionProtectedProcedure
       .input(z.object({
         tenantId: z.number().default(1),
         sessionId: z.string(),
@@ -542,7 +542,7 @@ export const appRouter = router({
         return result;
       }),
     // Transfer conversation to another agent
-    transferConversation: protectedProcedure
+    transferConversation: sessionProtectedProcedure
       .input(z.object({
         tenantId: z.number().default(1),
         sessionId: z.string(),
@@ -555,7 +555,7 @@ export const appRouter = router({
         return result;
       }),
     // Update conversation assignment status
-    updateAssignmentStatus: protectedProcedure
+    updateAssignmentStatus: sessionProtectedProcedure
       .input(z.object({
         tenantId: z.number().default(1),
         sessionId: z.string(),
@@ -567,7 +567,7 @@ export const appRouter = router({
         return { success: true };
       }),
     // Get assignment for a specific conversation
-    getAssignment: protectedProcedure
+    getAssignment: sessionProtectedProcedure
       .input(z.object({
         tenantId: z.number().default(1),
         sessionId: z.string(),
@@ -585,7 +585,7 @@ export const appRouter = router({
       .input(z.object({ tenantId: z.number().default(1) }))
       .query(async ({ input }) => getTeamsForTenant(input.tenantId)),
     // Auto-assign via round-robin
-    autoAssign: protectedProcedure
+    autoAssign: sessionProtectedProcedure
       .input(z.object({
         tenantId: z.number().default(1),
         sessionId: z.string(),
@@ -598,21 +598,21 @@ export const appRouter = router({
         return { assigned: true, assignment: result };
       }),
     // Mark conversation as read
-    markRead: protectedProcedure
+    markRead: sessionProtectedProcedure
       .input(z.object({ sessionId: z.string(), remoteJid: z.string() }))
       .mutation(async ({ input }) => {
         await markConversationRead(input.sessionId, input.remoteJid);
         return { success: true };
       }),
     // Get profile picture for a single JID
-    profilePicture: protectedProcedure
+    profilePicture: sessionProtectedProcedure
       .input(z.object({ sessionId: z.string(), jid: z.string() }))
       .query(async ({ input }) => {
         const url = await whatsappManager.getProfilePicture(input.sessionId, input.jid);
         return { url };
       }),
     // Get profile pictures for multiple JIDs (batch)
-    profilePictures: protectedProcedure
+    profilePictures: sessionProtectedProcedure
       .input(z.object({ sessionId: z.string(), jids: z.array(z.string()).max(50) }))
       .query(async ({ input }) => {
         const pictures = await whatsappManager.getProfilePictures(input.sessionId, input.jids);
@@ -627,7 +627,7 @@ export const appRouter = router({
         return { url, fileKey };
       }),
     // Download media from Evolution API for messages that don't have mediaUrl yet
-    getMediaUrl: protectedProcedure
+    getMediaUrl: sessionProtectedProcedure
       .input(z.object({ sessionId: z.string(), messageId: z.string() }))
       .mutation(async ({ input }) => {
         const { getBase64FromMediaMessage } = await import("./evolutionApi");
@@ -674,7 +674,7 @@ export const appRouter = router({
         return { url, mimetype: base64Data.mimetype, unavailable: false };
       }),
     // WA Contacts map (LID ↔ Phone resolution)
-    waContactsMap: protectedProcedure
+    waContactsMap: sessionProtectedProcedure
       .input(z.object({ sessionId: z.string() }))
       .query(async ({ input }) => {
         const db = await getDb();
@@ -707,14 +707,14 @@ export const appRouter = router({
         return map;
       }),
     // Force sync contacts from WhatsApp
-    syncContacts: protectedProcedure
+    syncContacts: sessionProtectedProcedure
       .input(z.object({ sessionId: z.string() }))
       .mutation(async ({ input }) => {
         const result = await whatsappManager.syncContacts(input.sessionId);
         return result;
       }),
     // Trigger deep sync of all messages from Evolution API
-    triggerDeepSync: protectedProcedure
+    triggerDeepSync: sessionProtectedProcedure
       .input(z.object({ sessionId: z.string() }))
       .mutation(async ({ input }) => {
         const result = await whatsappManager.triggerDeepSync(input.sessionId);
@@ -734,7 +734,7 @@ export const appRouter = router({
         const { migrateExistingData } = await import("./conversationResolver");
         return migrateExistingData(input.tenantId);
       }),
-    reconcileGhosts: protectedProcedure
+    reconcileGhosts: sessionProtectedProcedure
       .input(z.object({ tenantId: z.number().default(1), sessionId: z.string() }))
       .mutation(async ({ input }) => {
         const { reconcileGhostThreads } = await import("./conversationResolver");
@@ -953,7 +953,7 @@ export const appRouter = router({
         };
       }),
     // Get wa_conversations debug info
-    debugConversations: protectedProcedure
+    debugConversations: sessionProtectedProcedure
       .input(z.object({ tenantId: z.number().default(1), sessionId: z.string() }))
       .query(async ({ input }) => {
         const db = (await import("./db")).getDb;
@@ -975,37 +975,37 @@ export const appRouter = router({
 
   // ─── Message Monitoring ───
   monitoring: router({
-    statusMetrics: protectedProcedure
+    statusMetrics: sessionProtectedProcedure
       .input(z.object({ sessionId: z.string(), periodDays: z.number().min(1).max(365).default(7) }))
       .query(async ({ input }) => {
         return getMessageStatusMetrics(input.sessionId, input.periodDays);
       }),
-    volumeOverTime: protectedProcedure
+    volumeOverTime: sessionProtectedProcedure
       .input(z.object({ sessionId: z.string(), periodDays: z.number().min(1).max(365).default(7), granularity: z.enum(["hour", "day"]).default("day") }))
       .query(async ({ input }) => {
         return getMessageVolumeOverTime(input.sessionId, input.periodDays, input.granularity);
       }),
-    deliveryRate: protectedProcedure
+    deliveryRate: sessionProtectedProcedure
       .input(z.object({ sessionId: z.string(), periodDays: z.number().min(1).max(365).default(7) }))
       .query(async ({ input }) => {
         return getDeliveryRateMetrics(input.sessionId, input.periodDays);
       }),
-    recentActivity: protectedProcedure
+    recentActivity: sessionProtectedProcedure
       .input(z.object({ sessionId: z.string(), limit: z.number().min(1).max(200).default(50) }))
       .query(async ({ input }) => {
         return getRecentMessageActivity(input.sessionId, input.limit);
       }),
-    typeDistribution: protectedProcedure
+    typeDistribution: sessionProtectedProcedure
       .input(z.object({ sessionId: z.string(), periodDays: z.number().min(1).max(365).default(7) }))
       .query(async ({ input }) => {
         return getMessageTypeDistribution(input.sessionId, input.periodDays);
       }),
-    topContacts: protectedProcedure
+    topContacts: sessionProtectedProcedure
       .input(z.object({ sessionId: z.string(), periodDays: z.number().min(1).max(365).default(7), limit: z.number().min(1).max(50).default(10) }))
       .query(async ({ input }) => {
         return getTopContactsByVolume(input.sessionId, input.periodDays, input.limit);
       }),
-    responseTime: protectedProcedure
+    responseTime: sessionProtectedProcedure
       .input(z.object({ sessionId: z.string(), periodDays: z.number().min(1).max(365).default(7) }))
       .query(async ({ input }) => {
         return getResponseTimeMetrics(input.sessionId, input.periodDays);

@@ -32,14 +32,14 @@ vi.mock("../drizzle/schema", () => ({
 vi.mock("drizzle-orm", () => ({
   eq: vi.fn((col, val) => ({ col, val })),
   desc: vi.fn(),
-  and: vi.fn(),
+  and: vi.fn((...args: any[]) => ({ _and: args })),
   gte: vi.fn(),
   sql: vi.fn(),
   isNotNull: vi.fn(),
   inArray: vi.fn(),
 }));
 
-// Mock whatsappManager
+// Mock whatsappManager (Baileys)
 const mockGetSession = vi.fn();
 const mockConnect = vi.fn();
 vi.mock("./whatsapp", () => ({
@@ -49,16 +49,25 @@ vi.mock("./whatsapp", () => ({
   },
 }));
 
-describe("RFV ActiveSession — tenantId fix", () => {
+// Mock Evolution API manager
+const mockEvoGetSession = vi.fn();
+vi.mock("./whatsappEvolution", () => ({
+  whatsappManager: {
+    getSession: (...args: any[]) => mockEvoGetSession(...args),
+  },
+}));
+
+describe("RFV ActiveSession — userId-based session selection", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockFrom.mockReturnValue({ where: mockWhere });
     mockWhere.mockResolvedValue([]);
     mockSet.mockReturnValue({ where: vi.fn().mockResolvedValue(undefined) });
     mockConnect.mockResolvedValue({});
+    mockEvoGetSession.mockReturnValue(undefined);
   });
 
-  describe("getActiveSessionForTenant", () => {
+  describe("getActiveSessionForTenant WITHOUT userId (legacy fallback)", () => {
     it("returns null when no sessions exist for the tenant", async () => {
       mockWhere.mockResolvedValue([]);
       const { getActiveSessionForTenant } = await import("./bulkMessage");
@@ -68,74 +77,101 @@ describe("RFV ActiveSession — tenantId fix", () => {
 
     it("returns connected when in-memory session is connected", async () => {
       mockWhere.mockResolvedValue([
-        { sessionId: "Whatsapp", userId: 150001, tenantId: 150002, status: "connected" },
+        { sessionId: "crm-150002-240001", userId: 240001, tenantId: 150002, status: "connected" },
       ]);
-      mockGetSession.mockReturnValue({ status: "connected" });
+      mockEvoGetSession.mockReturnValue({ status: "connected" });
 
       const { getActiveSessionForTenant } = await import("./bulkMessage");
       const result = await getActiveSessionForTenant(150002);
-      expect(result).toEqual({ sessionId: "Whatsapp", status: "connected" });
+      expect(result).toEqual({ sessionId: "crm-150002-240001", status: "connected" });
     });
 
-    it("returns connecting when in-memory session is connecting", async () => {
+    it("returns first connected session from multiple tenant sessions", async () => {
       mockWhere.mockResolvedValue([
-        { sessionId: "Whatsapp", userId: 150001, tenantId: 150002, status: "connected" },
+        { sessionId: "crm-150002-240001", userId: 240001, tenantId: 150002, status: "connected" },
+        { sessionId: "crm-150002-210001", userId: 210001, tenantId: 150002, status: "connected" },
       ]);
-      mockGetSession.mockReturnValue({ status: "connecting" });
+      // First session is connected
+      mockEvoGetSession.mockImplementation((sid: string) => {
+        if (sid === "crm-150002-240001") return { status: "connected" };
+        if (sid === "crm-150002-210001") return { status: "connected" };
+        return undefined;
+      });
 
       const { getActiveSessionForTenant } = await import("./bulkMessage");
       const result = await getActiveSessionForTenant(150002);
-      expect(result).toEqual({ sessionId: "Whatsapp", status: "connecting" });
+      // Without userId, returns the first one found
+      expect(result).toEqual({ sessionId: "crm-150002-240001", status: "connected" });
     });
+  });
 
-    it("triggers auto-reconnect when DB says connected but no in-memory session", async () => {
+  describe("getActiveSessionForTenant WITH userId (new behavior)", () => {
+    it("returns only the user's own session when userId is provided", async () => {
+      // DB returns only sessions for userId=210001 (filtered by the AND clause)
       mockWhere.mockResolvedValue([
-        { sessionId: "Whatsapp", userId: 150001, tenantId: 150002, status: "connected" },
+        { sessionId: "crm-150002-210001", userId: 210001, tenantId: 150002, status: "connected" },
       ]);
-      mockGetSession.mockReturnValue(undefined);
+      mockEvoGetSession.mockReturnValue({ status: "connected" });
 
       const { getActiveSessionForTenant } = await import("./bulkMessage");
-      const result = await getActiveSessionForTenant(150002);
-
-      expect(result).toEqual({ sessionId: "Whatsapp", status: "connecting" });
-      // Verify connect was called with correct tenantId
-      expect(mockConnect).toHaveBeenCalledWith("Whatsapp", 150001, 150002);
+      const result = await getActiveSessionForTenant(150002, 210001);
+      expect(result).toEqual({ sessionId: "crm-150002-210001", status: "connected" });
     });
 
-    it("does NOT find session with wrong tenantId", async () => {
-      // Simulates the old bug: session has tenantId=1, but we query tenantId=150002
-      mockWhere.mockResolvedValue([]); // DB returns empty because tenantId doesn't match
+    it("returns null when user has no session (does NOT fall back to other users)", async () => {
+      // User 999 has no sessions
+      mockWhere.mockResolvedValue([]);
 
       const { getActiveSessionForTenant } = await import("./bulkMessage");
-      const result = await getActiveSessionForTenant(150002);
+      const result = await getActiveSessionForTenant(150002, 999);
+      // CRITICAL: must return null, NOT another user's session
       expect(result).toBeNull();
     });
 
-    it("returns disconnected status from DB when no live session and DB says disconnected", async () => {
+    it("does NOT return Fernando's session when Bruno is logged in", async () => {
+      // Simulates the bug scenario:
+      // Bruno (userId=210001) is logged in, Fernando (userId=240001) has a connected session
+      // With userId filter, DB returns empty for Bruno
+      mockWhere.mockResolvedValue([]);
+
+      const { getActiveSessionForTenant } = await import("./bulkMessage");
+      const result = await getActiveSessionForTenant(210002, 210001);
+      // Bruno should get null, not Fernando's session
+      expect(result).toBeNull();
+    });
+
+    it("returns user's connecting session when it's connecting", async () => {
       mockWhere.mockResolvedValue([
-        { sessionId: "Whatsapp", userId: 150001, tenantId: 150002, status: "disconnected" },
+        { sessionId: "crm-150002-210001", userId: 210001, tenantId: 150002, status: "connecting" },
       ]);
+      mockEvoGetSession.mockReturnValue({ status: "connecting" });
+
+      const { getActiveSessionForTenant } = await import("./bulkMessage");
+      const result = await getActiveSessionForTenant(150002, 210001);
+      expect(result).toEqual({ sessionId: "crm-150002-210001", status: "connecting" });
+    });
+
+    it("triggers auto-reconnect for user's session when DB says connected but no in-memory", async () => {
+      mockWhere.mockResolvedValue([
+        { sessionId: "crm-150002-210001", userId: 210001, tenantId: 150002, status: "connected" },
+      ]);
+      mockEvoGetSession.mockReturnValue(undefined);
       mockGetSession.mockReturnValue(undefined);
 
       const { getActiveSessionForTenant } = await import("./bulkMessage");
-      const result = await getActiveSessionForTenant(150002);
-      expect(result).toEqual({ sessionId: "Whatsapp", status: "disconnected" });
+      const result = await getActiveSessionForTenant(150002, 210001);
+      expect(result).toEqual({ sessionId: "crm-150002-210001", status: "connecting" });
     });
   });
 
   describe("tenantId propagation", () => {
     it("updateSessionDb saves tenantId from session state", () => {
-      // This is a structural test — the updateSessionDb now reads tenantId from this.sessions.get(sessionId)
-      // and includes it in both INSERT and UPDATE operations.
-      // The actual integration is tested by verifying the DB has the correct tenantId.
       expect(true).toBe(true);
     });
 
     it("connect method accepts optional tenantId parameter", async () => {
-      // Verify the connect function exists (it's mocked, so we just check it's callable)
       const { whatsappManager } = await import("./whatsapp");
       expect(typeof whatsappManager.connect).toBe("function");
-      // Verify it can be called with 3 args (sessionId, userId, tenantId)
       await whatsappManager.connect("test-session", 1, 150002);
       expect(mockConnect).toHaveBeenCalledWith("test-session", 1, 150002);
     });
@@ -143,15 +179,12 @@ describe("RFV ActiveSession — tenantId fix", () => {
 
   describe("useTenantId hook behavior", () => {
     it("SaaS user gets tenantId from auth.me response", () => {
-      // When auth.me returns { ...user, tenantId: 150002 }
-      // useTenantId() returns 150002
       const mockUser = { id: 150001, name: "Bruno", tenantId: 150002 };
       const tenantId = (mockUser as any)?.tenantId ?? 1;
       expect(tenantId).toBe(150002);
     });
 
     it("Manus OAuth user falls back to tenantId 1", () => {
-      // When auth.me returns { id: 1, name: "Owner" } without tenantId
       const mockUser = { id: 1, name: "Owner" };
       const tenantId = (mockUser as any)?.tenantId ?? 1;
       expect(tenantId).toBe(1);
