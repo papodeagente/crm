@@ -2795,3 +2795,9 @@
 - [x] Atualizar lista de modelos: OpenAI (GPT-5.4, GPT-5 Mini), Anthropic (Claude Opus 4.6, Sonnet 4.6, Haiku 4.5)
 - [x] Simplificar UI: apenas provedor, chave API, modelo — sem configurações avançadas
 - [x] Atualizar testes (18 passando)
+
+## Bug Fix: max_tokens → max_completion_tokens (Mar 14 - v8.2)
+- [x] Corrigir parâmetro OpenAI: usar max_completion_tokens em vez de max_tokens
+- [x] Corrigir em routers.ts (invoke)
+- [x] Corrigir em aiService.ts
+- [x] Corrigir em testAiApiKey (db.ts)

@@ -2888,7 +2888,7 @@ export async function testAiApiKey(provider: "openai" | "anthropic", apiKey: str
         body: JSON.stringify({
           model,
           messages: [{ role: "user", content: "Say hello" }],
-          max_tokens: 5,
+          max_completion_tokens: 5,
         }),
       });
       if (!res.ok) {

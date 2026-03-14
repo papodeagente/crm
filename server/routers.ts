@@ -2484,7 +2484,7 @@ export const appRouter = router({
               body: JSON.stringify({
                 model,
                 messages: input.messages,
-                max_tokens: maxTokens,
+                max_completion_tokens: maxTokens,
               }),
             });
             if (!res.ok) {

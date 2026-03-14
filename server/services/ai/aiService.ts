@@ -63,7 +63,7 @@ async function invokeOpenAI(req: AiCompletionRequest): Promise<AiCompletionRespo
     body: JSON.stringify({
       model: req.model,
       messages: req.messages.map(m => ({ role: m.role, content: m.content })),
-      max_tokens: req.maxTokens ?? 1024,
+      max_completion_tokens: req.maxTokens ?? 1024,
     }),
   });
 
