@@ -2699,3 +2699,7 @@
   - [x] Quick Replies popup (digitar / para ativar respostas rápidas)
   - [x] Corrigir badge da fila (usar 'total' em vez de 'waiting')
   - [x] Testes automatizados (16 testes webhook-realtime)
+## Painel de Supervisão no Menu (Mar 14)
+- [x] Adicionar item "Supervisão" / "Atendentes" no menu lateral ao lado do Inbox
+- [x] Garantir que a rota do painel de supervisão está registrada no App.tsx
+- [x] Verificar que o painel de supervisão funciona corretamente
