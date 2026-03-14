@@ -2739,3 +2739,14 @@
 - [x] BUG: Lógica de sobrecarga: threshold mínimo 10 ativos + 2x média (era 1.5x sem mínimo)
 - [x] BUG: Devolver à fila: query corrigida para incluir queuedAt IS NOT NULL (getQueueConversations + getQueueStats)
 - [x] DESIGN: Botões Puxar/Atribuir modernizados: ícones circulares coloridos no hover + painel de atribuição slide-in
+
+## Modernização Inbox + Fotos de Perfil (Mar 14 - v4)
+- [x] Corrigir fotos de perfil: avatar com iniciais coloridas (gradientes vibrantes) como fallback para URLs expiradas do WhatsApp
+- [x] Modernizar design do Inbox completo
+  - [x] Header: backdrop-blur, indicador de conexão verde, botões rounded-lg menores
+  - [x] Search bar: rounded-xl com ring de foco, botão X para limpar
+  - [x] Tabs: pills com bg-primary/10, uppercase, tracking-wide, sem underline
+  - [x] ConversationItem: border-l-2 ativo, tamanhos refinados, badges bg-primary
+  - [x] Contatos: border-l hover, tamanhos menores, espaçamento refinado
+  - [x] EmptyChat: ícone rounded-2xl com gradiente, texto mais conciso
+  - [x] Filtros: pills rounded-lg com transições suaves

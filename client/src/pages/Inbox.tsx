@@ -133,12 +133,44 @@ StatusTick.displayName = "StatusTick";
    AVATAR — WhatsApp style with real profile picture
    ═══════════════════════════════════════════════════════ */
 
+// Gradient palette for avatar initials — vibrant, modern colors
+const AVATAR_GRADIENTS = [
+  "from-violet-500 to-purple-600",
+  "from-blue-500 to-cyan-500",
+  "from-emerald-500 to-teal-500",
+  "from-rose-500 to-pink-500",
+  "from-amber-500 to-orange-500",
+  "from-indigo-500 to-blue-600",
+  "from-fuchsia-500 to-pink-600",
+  "from-teal-500 to-green-500",
+  "from-sky-500 to-indigo-500",
+  "from-red-500 to-rose-500",
+  "from-lime-500 to-emerald-500",
+  "from-cyan-500 to-blue-500",
+];
+
+function getAvatarGradient(name: string): string {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  return AVATAR_GRADIENTS[Math.abs(hash) % AVATAR_GRADIENTS.length];
+}
+
+function getInitials(name: string): string {
+  if (!name || !name.trim()) return "?";
+  const cleaned = name.replace(/[^a-zA-Z0-9\s\u00C0-\u024F]/g, "").trim();
+  if (!cleaned) return name.charAt(0).toUpperCase();
+  const words = cleaned.split(/\s+/).filter(Boolean);
+  if (words.length >= 2) return (words[0][0] + words[1][0]).toUpperCase();
+  return words[0].substring(0, 2).toUpperCase();
+}
+
 const WaAvatar = memo(({ name, size = 49, pictureUrl }: { name: string; size?: number; pictureUrl?: string | null }) => {
   const [imgError, setImgError] = useState(false);
+  const fontSize = size < 36 ? 11 : size < 44 ? 13 : 16;
 
   if (pictureUrl && !imgError) {
     return (
-      <div className="rounded-full shrink-0 overflow-hidden" style={{ width: size, height: size }}>
+      <div className="rounded-full shrink-0 overflow-hidden ring-1 ring-white/10" style={{ width: size, height: size }}>
         <img
           src={pictureUrl}
           alt={name}
@@ -150,13 +182,17 @@ const WaAvatar = memo(({ name, size = 49, pictureUrl }: { name: string; size?: n
     );
   }
 
-  // Default WhatsApp avatar SVG
+  // Colored initials avatar
+  const gradient = getAvatarGradient(name);
+  const initials = getInitials(name);
   return (
-    <div className="rounded-full bg-muted/60 shrink-0 overflow-hidden" style={{ width: size, height: size }}>
-      <svg viewBox="0 0 212 212" width={size} height={size}>
-        <path className="fill-muted" d="M106 0C47.5 0 0 47.5 0 106s47.5 106 106 106 106-47.5 106-106S164.5 0 106 0z" />
-        <path className="fill-muted-foreground/30" d="M106 45c-20.7 0-37.5 16.8-37.5 37.5S85.3 120 106 120s37.5-16.8 37.5-37.5S126.7 45 106 45zm0 105c-28.3 0-52.5 14.3-52.5 32v10h105v-10c0-17.7-24.2-32-52.5-32z" />
-      </svg>
+    <div
+      className={`rounded-full shrink-0 flex items-center justify-center bg-gradient-to-br ${gradient} ring-1 ring-white/10`}
+      style={{ width: size, height: size }}
+    >
+      <span className="text-white font-semibold select-none leading-none" style={{ fontSize }}>
+        {initials}
+      </span>
     </div>
   );
 });
@@ -233,48 +269,52 @@ const ConversationItem = memo(({
   return (
     <div
       onClick={onClick}
-      className={`flex items-center px-3 cursor-pointer transition-colors duration-75 ${
-        isActive ? "bg-wa-active" : "hover:bg-wa-hover"
+      className={`flex items-center px-3 cursor-pointer transition-all duration-100 ${
+        isActive
+          ? "bg-primary/8 border-l-2 border-l-primary"
+          : "hover:bg-wa-hover/70 border-l-2 border-l-transparent"
       }`}
     >
-      <div className="py-[6px] pr-[13px] relative">
-        <WaAvatar name={contactName} size={49} pictureUrl={pictureUrl} />
+      <div className="py-2 pr-3 relative">
+        <WaAvatar name={contactName} size={46} pictureUrl={pictureUrl} />
         {/* Assignment status dot */}
         {conv.assignmentStatus && conv.assignmentStatus !== "open" && (
-          <div className="absolute bottom-[6px] right-[10px]">
+          <div className="absolute bottom-2 right-2.5">
             <StatusDot status={conv.assignmentStatus} />
           </div>
         )}
       </div>
-      <div className="flex-1 min-w-0 py-[10px] border-b border-wa-divider">
-        <div className="flex items-center justify-between mb-[2px] gap-1">
-          <span className="text-[16px] text-foreground truncate leading-[21px] font-normal flex-1 min-w-0">
+      <div className="flex-1 min-w-0 py-2.5 border-b border-wa-divider/50">
+        <div className="flex items-center justify-between mb-0.5 gap-1">
+          <span className={`text-[14px] truncate leading-5 flex-1 min-w-0 ${
+            unread > 0 ? "text-foreground font-semibold" : "text-foreground font-normal"
+          }`}>
             {contactName}
           </span>
-          <div className="flex items-center gap-[5px] shrink-0">
+          <div className="flex items-center gap-1.5 shrink-0">
             <AgentBadge name={conv.assignedAgentName} avatarUrl={conv.assignedAgentAvatar} />
             {waitLabel && (
-              <span className="text-[10px] text-amber-400 bg-amber-400/10 px-1.5 py-0.5 rounded font-medium flex items-center gap-0.5">
+              <span className="text-[10px] text-amber-400 bg-amber-400/10 px-1.5 py-0.5 rounded-md font-medium flex items-center gap-0.5">
                 <Timer className="w-2.5 h-2.5" />
                 {waitLabel}
               </span>
             )}
-            <span className={`text-[12px] leading-[14px] ${
-              unread > 0 ? "text-wa-unread font-medium" : "text-muted-foreground"
+            <span className={`text-[11px] leading-[14px] ${
+              unread > 0 ? "text-primary font-semibold" : "text-muted-foreground/70"
             }`}>
               {time}
             </span>
           </div>
         </div>
-        <div className="flex items-center gap-[3px]">
+        <div className="flex items-center gap-1">
           <StatusTick status={conv.lastStatus} fromMe={fromMe} />
-          <span className={`text-[13.5px] truncate flex-1 leading-[20px] ${
-            unread > 0 ? "text-foreground/80" : "text-muted-foreground"
+          <span className={`text-[13px] truncate flex-1 leading-5 ${
+            unread > 0 ? "text-foreground/70" : "text-muted-foreground/60"
           }`}>
             {preview || "Sem mensagens"}
           </span>
           {unread > 0 && (
-            <span className="bg-wa-unread text-white text-[11px] font-bold rounded-full min-w-[20px] h-[20px] flex items-center justify-center px-[5px] shrink-0 ml-[4px]">
+            <span className="bg-primary text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1 shrink-0">
               {unread > 99 ? "99+" : unread}
             </span>
           )}
@@ -683,23 +723,23 @@ function NewChatPanel({
 function EmptyChat() {
   return (
     <div className="flex-1 flex flex-col items-center justify-center bg-wa-chat-bg">
-      <div className="text-center max-w-[500px] px-8">
-        <div className="mb-8">
-          <div className="w-[72px] h-[72px] mx-auto rounded-full bg-wa-tint/10 flex items-center justify-center">
-            <MessageSquare className="w-8 h-8 text-wa-tint" />
+      <div className="text-center max-w-[420px] px-8">
+        <div className="mb-6">
+          <div className="w-20 h-20 mx-auto rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center shadow-lg shadow-primary/5">
+            <MessageSquare className="w-9 h-9 text-primary" />
           </div>
         </div>
-        <h1 className="text-[28px] font-light text-foreground/80 leading-[34px] mb-3">
-          ENTUR OS WhatsApp
+        <h1 className="text-2xl font-semibold text-foreground/90 leading-tight mb-2 tracking-tight">
+          Selecione uma conversa
         </h1>
-        <p className="text-[14px] text-muted-foreground leading-[20px]">
-          Envie e receba mensagens sem manter seu celular conectado.
+        <p className="text-[13px] text-muted-foreground/70 leading-relaxed">
+          Escolha uma conversa ao lado para começar a atender.
           <br />
-          Selecione uma conversa ao lado para começar.
+          Mensagens são sincronizadas automaticamente.
         </p>
-        <div className="mt-10 pt-5 border-t border-wa-divider">
-          <p className="text-[13px] text-muted-foreground/60 flex items-center justify-center gap-2">
-            <Lock className="w-3.5 h-3.5" />
+        <div className="mt-8 pt-4 border-t border-wa-divider/30">
+          <p className="text-[12px] text-muted-foreground/40 flex items-center justify-center gap-1.5">
+            <Lock className="w-3 h-3" />
             Criptografia de ponta a ponta
           </p>
         </div>
@@ -1150,7 +1190,7 @@ export default function InboxPage() {
           width: "100%",
           maxWidth: "420px",
           minWidth: "320px",
-          borderRight: "1px solid var(--wa-divider)",
+          borderRight: "1px solid color-mix(in srgb, var(--wa-divider) 60%, transparent)",
           position: "relative",
         }}
       >
@@ -1163,16 +1203,19 @@ export default function InboxPage() {
         />
 
         {/* ── Header ── */}
-        <div className="flex items-center justify-between shrink-0 h-[59px] px-4 bg-wa-panel-header border-b border-wa-divider">
-          <WaAvatar name="Eu" size={40} />
-          <div className="flex items-center gap-1">
+        <div className="flex items-center justify-between shrink-0 h-[56px] px-4 bg-wa-panel-header/80 backdrop-blur-md border-b border-wa-divider">
+          <div className="flex items-center gap-3">
+            <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" style={{ display: isConnected ? 'block' : 'none' }} />
+            <h2 className="text-[15px] font-semibold text-foreground tracking-tight">Conversas</h2>
+          </div>
+          <div className="flex items-center gap-0.5">
             <button
               onClick={toggleMute}
-              className="w-[40px] h-[40px] flex items-center justify-center rounded-full hover:bg-wa-hover transition-colors relative group"
+              className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-wa-hover transition-colors relative group"
               title={isMuted ? "Ativar som de notificação" : "Silenciar notificações"}
             >
-              {isMuted ? <VolumeX className="w-[20px] h-[20px] text-destructive" /> : <Volume2 className="w-[20px] h-[20px] text-muted-foreground" />}
-              <span className="absolute -bottom-8 left-1/2 -translate-x-1/2 bg-foreground text-background text-[11px] px-2 py-1 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+              {isMuted ? <VolumeX className="w-[18px] h-[18px] text-destructive/80" /> : <Volume2 className="w-[18px] h-[18px] text-muted-foreground" />}
+              <span className="absolute -bottom-8 left-1/2 -translate-x-1/2 bg-foreground text-background text-[10px] px-2 py-1 rounded-md whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
                 {isMuted ? "Som desativado" : "Som ativado"}
               </span>
             </button>
@@ -1182,43 +1225,48 @@ export default function InboxPage() {
                 syncContactsMut.mutate({ sessionId: activeSession.sessionId });
               }}
               disabled={syncContactsMut.isPending}
-              className="w-[40px] h-[40px] flex items-center justify-center rounded-full hover:bg-wa-hover transition-colors relative group"
+              className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-wa-hover transition-colors relative group"
               title="Sincronizar contatos"
             >
-              <RefreshCw className={`w-[20px] h-[20px] text-muted-foreground ${syncContactsMut.isPending ? "animate-spin" : ""}`} />
-              <span className="absolute -bottom-8 left-1/2 -translate-x-1/2 bg-foreground text-background text-[11px] px-2 py-1 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+              <RefreshCw className={`w-[18px] h-[18px] text-muted-foreground ${syncContactsMut.isPending ? "animate-spin" : ""}`} />
+              <span className="absolute -bottom-8 left-1/2 -translate-x-1/2 bg-foreground text-background text-[10px] px-2 py-1 rounded-md whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
                 {syncContactsMut.isPending ? "Sincronizando..." : "Sincronizar contatos"}
               </span>
             </button>
-            <button onClick={() => setShowNewChat(true)} className="w-[40px] h-[40px] flex items-center justify-center rounded-full hover:bg-wa-hover transition-colors" title="Nova conversa">
-              <MessageCircle className="w-[20px] h-[20px] text-muted-foreground" />
+            <button onClick={() => setShowNewChat(true)} className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-wa-hover transition-colors" title="Nova conversa">
+              <MessageCircle className="w-[18px] h-[18px] text-muted-foreground" />
             </button>
-            <button className="w-[40px] h-[40px] flex items-center justify-center rounded-full hover:bg-wa-hover transition-colors">
-              <MoreVertical className="w-[20px] h-[20px] text-muted-foreground" />
+            <button className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-wa-hover transition-colors">
+              <MoreVertical className="w-[18px] h-[18px] text-muted-foreground" />
             </button>
           </div>
         </div>
 
         {/* ── Search Bar ── */}
-        <div className="shrink-0 px-3 py-[7px] bg-wa-panel">
-          <div className="flex items-center rounded-lg overflow-hidden h-[35px] bg-wa-search-bg px-3">
+        <div className="shrink-0 px-3 py-2 bg-wa-panel">
+          <div className={`flex items-center rounded-xl h-[36px] px-3 transition-all duration-200 ${searchFocused ? 'bg-wa-search-bg ring-1 ring-primary/30' : 'bg-wa-search-bg'}`}>
             <Search
               className="shrink-0 transition-colors duration-200"
               style={{ width: "15px", height: "15px" }}
               color={searchFocused ? "var(--wa-tint)" : undefined}
             />
             <input
-              type="text" placeholder="Pesquisar" value={search}
+              type="text" placeholder="Pesquisar conversa..." value={search}
               onChange={(e) => setSearch(e.target.value)}
               onFocus={() => setSearchFocused(true)}
               onBlur={() => setSearchFocused(false)}
-              className="flex-1 bg-transparent border-none outline-none text-[14px] text-foreground placeholder:text-muted-foreground pl-3 h-full"
+              className="flex-1 bg-transparent border-none outline-none text-[13px] text-foreground placeholder:text-muted-foreground/60 pl-3 h-full"
             />
+            {search && (
+              <button onClick={() => setSearch("")} className="p-0.5 rounded-full hover:bg-muted transition-colors">
+                <X className="w-3.5 h-3.5 text-muted-foreground" />
+              </button>
+            )}
           </div>
         </div>
 
         {/* ── Main Tabs (Meus Chats | Fila | Contatos WA | Todas) ── */}
-        <div className="flex items-center shrink-0 border-b border-wa-divider">
+        <div className="flex items-center shrink-0 px-2 gap-1 py-1.5 bg-wa-panel">
           {([
             { id: "mine" as InboxTab, label: "Meus Chats", icon: <InboxIcon className="w-[14px] h-[14px]" />, badge: myConvsCount },
             { id: "queue" as InboxTab, label: "Fila", icon: <Timer className="w-[14px] h-[14px]" />, badge: queueCount },
@@ -1230,37 +1278,37 @@ export default function InboxPage() {
               <button
                 key={tab.id}
                 onClick={() => { setActiveTab(tab.id); setFilter("all"); }}
-                className={`flex-1 flex items-center justify-center gap-1.5 py-[10px] text-[13px] font-medium transition-colors relative ${
+                className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-[12px] font-semibold tracking-wide uppercase transition-all duration-200 rounded-lg ${
                   active
-                    ? "text-wa-tint"
-                    : "text-muted-foreground hover:text-foreground hover:bg-wa-hover/50"
+                    ? "bg-primary/10 text-primary shadow-sm"
+                    : "text-muted-foreground hover:text-foreground hover:bg-wa-hover"
                 }`}
               >
                 {tab.icon}
                 <span>{tab.label}</span>
                 {tab.badge > 0 && (
                   <span className={`text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-[4px] ${
-                    active ? "bg-wa-tint text-white" : "bg-muted text-muted-foreground"
+                    active ? "bg-primary text-white" : "bg-muted text-muted-foreground"
                   }`}>
                     {tab.badge > 99 ? "99+" : tab.badge}
                   </span>
                 )}
-                {active && <div className="absolute bottom-0 left-[20%] right-[20%] h-[2px] bg-wa-tint rounded-t" />}
               </button>
             );
           })}
         </div>
+        <div className="h-px bg-wa-divider" />
         {/* ── Secondary Filter (only for mine/all tabs) ── */}
         {(activeTab === "mine" || activeTab === "all") && (
-          <div className="flex items-center gap-[6px] shrink-0 px-3 py-[5px] overflow-x-auto scrollbar-none">
+          <div className="flex items-center gap-1.5 shrink-0 px-3 py-1.5 overflow-x-auto scrollbar-none">
             {(["all", "unread"] as const).map((f) => {
               const labels: Record<string, string> = { all: "Todas", unread: "Não lidas" };
               const active = filter === f;
               return (
                 <button
                   key={f} onClick={() => setFilter(f)}
-                  className={`rounded-full text-[12px] font-medium transition-colors px-2.5 py-[4px] shrink-0 ${
-                    active ? "bg-wa-tint/15 text-wa-tint" : "bg-wa-search-bg text-muted-foreground hover:bg-wa-hover"
+                  className={`rounded-lg text-[11px] font-medium transition-all duration-150 px-3 py-1.5 shrink-0 ${
+                    active ? "bg-primary/10 text-primary" : "bg-transparent text-muted-foreground hover:bg-wa-hover hover:text-foreground"
                   }`}
                 >
                   {labels[f]}
@@ -1432,14 +1480,14 @@ export default function InboxPage() {
                     <button
                       key={contact.jid}
                       onClick={() => handleSelectConv(contact.jid)}
-                      className="w-full flex items-center gap-3 px-3 hover:bg-wa-hover transition-colors text-left"
+                      className="w-full flex items-center gap-3 px-3 hover:bg-wa-hover/70 transition-all duration-100 text-left border-l-2 border-l-transparent hover:border-l-primary/30"
                     >
-                      <div className="py-[6px] pr-[2px]">
-                        <WaAvatar name={contact.displayName} size={49} pictureUrl={profilePicMap[contact.jid]} />
+                      <div className="py-2">
+                        <WaAvatar name={contact.displayName} size={42} pictureUrl={profilePicMap[contact.jid]} />
                       </div>
-                      <div className="flex-1 min-w-0 py-[10px] border-b border-wa-divider">
-                        <p className="text-[15px] text-foreground truncate">{contact.displayName}</p>
-                        <p className="text-[13px] text-muted-foreground truncate">
+                      <div className="flex-1 min-w-0 py-2.5 border-b border-wa-divider/50">
+                        <p className="text-[14px] text-foreground truncate">{contact.displayName}</p>
+                        <p className="text-[12px] text-muted-foreground/60 truncate">
                           {contact.phoneNumber ? formatPhoneNumber(contact.phoneNumber) : formatPhoneNumber(contact.jid)}
                         </p>
                       </div>
