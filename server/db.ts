@@ -2589,8 +2589,9 @@ export async function getAgentConversations(tenantId: number, sessionId: string,
 
 export async function getQueueStats(tenantId: number, sessionId: string) {
   const db = await getDb();
-  if (!db) return { total: 0, oldest: null };
-  const result = await db.execute(sql`
+  if (!db) return { total: 0, oldest: null, items: [] };
+  // Get count + oldest
+  const countResult = await db.execute(sql`
     SELECT 
       COUNT(*) AS total,
       MIN(COALESCE(wc.queuedAt, wc.lastMessageAt)) AS oldestEntry
@@ -2603,8 +2604,34 @@ export async function getQueueStats(tenantId: number, sessionId: string) {
     AND wc.lastMessageAt IS NOT NULL
     AND wc.unreadCount > 0
   `);
-  const rows = (result as any)[0] || [];
-  return { total: Number(rows[0]?.total || 0), oldest: rows[0]?.oldestEntry || null };
+  const countRows = (countResult as any)[0] || [];
+  // Get queue items with details
+  const itemsResult = await db.execute(sql`
+    SELECT 
+      wc.remoteJid,
+      wc.contactPushName,
+      wc.lastMessagePreview AS lastMessage,
+      wc.lastMessageAt,
+      wc.unreadCount,
+      COALESCE(wc.queuedAt, wc.lastMessageAt) AS waitingSince,
+      c.name AS contactName
+    FROM wa_conversations wc
+    LEFT JOIN contacts c ON c.id = wc.contactId
+    WHERE wc.tenantId = ${tenantId}
+    AND wc.sessionId = ${sessionId}
+    AND wc.assignedUserId IS NULL
+    AND wc.status IN ('open', 'pending')
+    AND wc.mergedIntoId IS NULL
+    AND wc.lastMessageAt IS NOT NULL
+    AND wc.unreadCount > 0
+    ORDER BY COALESCE(wc.queuedAt, wc.lastMessageAt) ASC
+    LIMIT 50
+  `);
+  return {
+    total: Number(countRows[0]?.total || 0),
+    oldest: countRows[0]?.oldestEntry || null,
+    items: (itemsResult as any)[0] || [],
+  };
 }
 
 // ════════════════════════════════════════════════════════════

@@ -2719,3 +2719,18 @@
 - [x] Manter QuickSync (5min) como backup para sync profundo
 - [x] Manter webhook handler funcional para quando Evolution API voltar a enviar
 - [x] Identificar e corrigir o gargalo real (FastPoll 30s + frontend 10s)
+
+## Redesign Painel de Supervisão + Correção da Fila (Mar 14)
+- [x] Redesenhar Painel de Supervisão: visão completa de todos os atendentes com suas filas e status
+  - [x] KPIs no topo: Atendentes Online, Em Atendimento, Na Fila, Tempo Espera, Média/Agente
+  - [x] Cards de cada atendente mostrando: nome, status (online/offline), ativos, não lidos, indicador sobrecarga
+  - [x] Lista de conversas atribuídas a cada atendente (expansível com botão devolver à fila)
+  - [x] Visão geral da fila com itens detalhados: nome, última msg, tempo espera, não lidos
+  - [x] Ações de admin: atribuir da fila para agente específico, devolver para fila
+  - [x] Métricas em tempo real atualizando a cada 10s
+  - [x] Backend: getQueueStats retorna items com detalhes, assignToAgent e returnToQueue mutations
+- [x] Corrigir Fila do Inbox: remover auto-claim ao clicar em conversa
+  - [x] Ao clicar em conversa da fila, abrir preview da conversa (sem assumir)
+  - [x] Botão "Puxar" explícito para assumir o atendimento
+  - [x] Botão "Atribuir" ao lado de Puxar para transferir para outro atendente (admin only)
+  - [x] Dropdown de seleção de agente ao clicar em Atribuir

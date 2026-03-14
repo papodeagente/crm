@@ -801,6 +801,18 @@ export default function InboxPage() {
     onError: (e) => toast.error(e.message || "Erro ao puxar conversa"),
   });
 
+  // Assign from queue to specific agent (admin only)
+  const [assigningQueueJid, setAssigningQueueJid] = useState<string | null>(null);
+  const [selectedAgentForQueue, setSelectedAgentForQueue] = useState<number | null>(null);
+  const assignFromQueueMut = trpc.whatsapp.supervision.assignToAgent.useMutation({
+    onSuccess: () => {
+      conversationsQ.refetch(); queueQ.refetch(); queueStatsQ.refetch();
+      toast.success("Conversa atribuída ao agente");
+      setAssigningQueueJid(null); setSelectedAgentForQueue(null);
+    },
+    onError: (e) => toast.error(e.message || "Erro ao atribuir"),
+  });
+
   // WA Contacts for Contacts tab (reuse waContactsMap but as a list)
   const waContactsForTabQ = trpc.whatsapp.waContactsMap.useQuery(
     { sessionId: activeSession?.sessionId || "" },
@@ -969,16 +981,12 @@ export default function InboxPage() {
     }
   }, [activeSession?.sessionId, markRead]);
 
-  // Auto-claim: when clicking a queue conversation, automatically claim it
+  // View queue conversation WITHOUT auto-claiming
   const handleSelectQueueConv = useCallback((jid: string) => {
     setSelectedJid(jid);
     setShowMobileChat(true);
-    if (activeSession?.sessionId) {
-      markRead.mutate({ sessionId: activeSession.sessionId, remoteJid: jid });
-      // Auto-claim the conversation
-      claimMutation.mutate({ sessionId: activeSession.sessionId, remoteJid: jid });
-    }
-  }, [activeSession?.sessionId, markRead, claimMutation]);
+    // Do NOT auto-claim — user must click "Puxar" or "Atribuir" explicitly
+  }, []);
 
   // Current user ID for filtering "mine" tab
   const meQ = trpc.auth.me.useQuery();
@@ -1316,8 +1324,9 @@ export default function InboxPage() {
                   const waitTime = conv.queuedAt || conv.lastTimestamp;
                   const waitMinutes = waitTime ? Math.floor((Date.now() - new Date(waitTime).getTime()) / 60000) : 0;
                   const waitLabel = waitMinutes < 1 ? "agora" : waitMinutes < 60 ? `${waitMinutes}min` : `${Math.floor(waitMinutes / 60)}h${waitMinutes % 60}min`;
+                  const isAssigningThis = assigningQueueJid === conv.remoteJid;
                   return (
-                  <div key={conv.remoteJid} className="relative group">
+                  <div key={conv.remoteJid} className="relative">
                     <ConversationItem
                       conv={conv}
                       isActive={selectedJid === conv.remoteJid}
@@ -1326,20 +1335,71 @@ export default function InboxPage() {
                       onClick={() => handleSelectQueueConv(conv.remoteJid)}
                       waitLabel={waitLabel}
                     />
-                    {/* Claim button overlay */}
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (activeSession?.sessionId) {
-                          claimMutation.mutate({ sessionId: activeSession.sessionId, remoteJid: conv.remoteJid });
-                        }
-                      }}
-                      disabled={claimMutation.isPending}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity bg-wa-tint text-white text-[11px] font-medium px-3 py-1.5 rounded-lg shadow-lg hover:opacity-90 flex items-center gap-1"
-                    >
-                      <HandMetal className="w-3 h-3" />
-                      Puxar
-                    </button>
+                    {/* Action buttons below the conversation item */}
+                    <div className="flex items-center gap-1.5 px-3 pb-2 -mt-1">
+                      {!isAssigningThis ? (
+                        <>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (activeSession?.sessionId) {
+                                claimMutation.mutate({ sessionId: activeSession.sessionId, remoteJid: conv.remoteJid });
+                              }
+                            }}
+                            disabled={claimMutation.isPending}
+                            className="flex items-center gap-1 px-2.5 py-1 bg-wa-tint/10 text-wa-tint text-[11px] font-medium rounded-md hover:bg-wa-tint/20 transition-colors"
+                          >
+                            <HandMetal className="w-3 h-3" />
+                            Puxar
+                          </button>
+                          {isAdmin.isAdmin && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setAssigningQueueJid(conv.remoteJid);
+                              }}
+                              className="flex items-center gap-1 px-2.5 py-1 bg-blue-500/10 text-blue-600 text-[11px] font-medium rounded-md hover:bg-blue-500/20 transition-colors"
+                            >
+                              <UserPlus className="w-3 h-3" />
+                              Atribuir
+                            </button>
+                          )}
+                        </>
+                      ) : (
+                        /* Agent selection dropdown */
+                        <div className="flex items-center gap-1.5 w-full">
+                          <select
+                            value={selectedAgentForQueue || ""}
+                            onChange={(e) => setSelectedAgentForQueue(Number(e.target.value))}
+                            className="flex-1 px-2 py-1 bg-muted/50 border border-border rounded-md text-[11px] text-foreground outline-none"
+                            autoFocus
+                          >
+                            <option value="">Selecionar agente...</option>
+                            {agents.map((a) => (
+                              <option key={a.id} value={a.id}>{a.name}</option>
+                            ))}
+                          </select>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (selectedAgentForQueue && activeSession?.sessionId) {
+                                assignFromQueueMut.mutate({ sessionId: activeSession.sessionId, remoteJid: conv.remoteJid, agentId: selectedAgentForQueue });
+                              }
+                            }}
+                            disabled={!selectedAgentForQueue || assignFromQueueMut.isPending}
+                            className="px-2 py-1 bg-blue-500 text-white text-[11px] font-medium rounded-md hover:bg-blue-600 transition-colors disabled:opacity-50"
+                          >
+                            {assignFromQueueMut.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "OK"}
+                          </button>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setAssigningQueueJid(null); setSelectedAgentForQueue(null); }}
+                            className="px-1.5 py-1 text-muted-foreground text-[11px] rounded-md hover:bg-muted transition-colors"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
                   );
                 })

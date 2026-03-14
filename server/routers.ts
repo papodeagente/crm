@@ -1314,6 +1314,28 @@ export const appRouter = router({
         const tenantId = ctx.saasUser?.tenantId || 1;
         return getQueueStats(tenantId, input.sessionId);
       }),
+    // Assign a queue conversation to a specific agent (admin action)
+    assignToAgent: sessionProtectedProcedure
+      .input(z.object({
+        sessionId: z.string(),
+        remoteJid: z.string(),
+        agentId: z.number(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const tenantId = ctx.saasUser?.tenantId || 1;
+        return assignConversation(tenantId, input.sessionId, input.remoteJid, input.agentId);
+      }),
+    // Return a conversation from an agent back to the queue
+    returnToQueue: sessionProtectedProcedure
+      .input(z.object({
+        sessionId: z.string(),
+        remoteJid: z.string(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const tenantId = ctx.saasUser?.tenantId || 1;
+        await enqueueConversation(tenantId, input.sessionId, input.remoteJid);
+        return { success: true };
+      }),
     }),
 
     // ─── Helpdesk: Quick Replies ───
