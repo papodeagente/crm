@@ -2645,3 +2645,40 @@
 - [x] Implementar experiência do usuário que recebe sessão compartilhada
 - [x] Escrever testes automatizados (20 testes passando)
 - [x] Testar cenários end-to-end
+
+## Sistema de Atendimento por Agente (DigiSAC-style)
+
+### Fase 1 — Core: Inbox com 3 abas
+- [x] Schema: criar tabela conversation_events (timeline de eventos)
+- [x] Schema: criar tabela internal_notes (notas internas)
+- [x] Schema: criar tabela quick_replies (mensagens rápidas)
+- [x] Schema: adicionar campos assignedUserId, assignedTeamId, queuedAt, firstResponseAt, slaDeadlineAt em wa_conversations
+- [x] DB helpers: CRUD notas internas
+- [x] DB helpers: CRUD eventos de conversa (timeline)
+- [x] DB helpers: query fila de espera (conversas sem agente, ordenadas por tempo)
+- [x] DB helpers: query "meus chats" (conversas do agente logado)
+- [x] DB helpers: contatos WhatsApp separados dos CRM
+- [x] tRPC routers: endpoints notas internas (create, list, delete)
+- [x] tRPC routers: endpoints eventos/timeline (list por conversa)
+- [x] tRPC routers: endpoint fila de espera com ordenação
+- [x] tRPC routers: endpoint "puxar da fila" (atribuir a si mesmo)
+- [x] tRPC routers: endpoint contatos WhatsApp (lista separada)
+- [x] Frontend: Redesign Inbox com 3 abas (Meus Chats, Fila, Contatos WA)
+- [x] Frontend: Aba "Meus Chats" com badge de não-lidas
+- [x] Frontend: Aba "Fila" com timer de espera e botão "Atender"
+- [x] Frontend: Aba "Contatos WA" com busca e botão "Iniciar conversa"
+- [x] Frontend: Aba "Todas" para admin com filtro por agente
+
+### Fase 2 — Notas Internas e Transferência
+- [x] Frontend: Toggle nota interna na barra de input (modo amarelo)
+- [x] Frontend: Renderizar notas internas como bolhas âmbar na timeline
+- [x] Frontend: Dialog de transferência com nota opcional
+- [x] Frontend: Timeline de eventos na conversa (atribuição, transferência, resolução)
+- [x] Backend: registrar evento na timeline ao atribuir/transferir/resolver
+
+### Fase 3 — Painel de Supervisão
+- [x] DB helpers: métricas por agente (conversas ativas, tempo médio resposta)
+- [x] tRPC routers: endpoint painel supervisão (agentes + métricas + conversas)
+- [x] Frontend: Página/seção Painel de Supervisão com cards por agente
+- [x] Frontend: Métricas em tempo real (fila, carga, SLA)
+- [x] Frontend: Ações rápidas de reatribuição pelo admin

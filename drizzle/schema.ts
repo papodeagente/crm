@@ -1154,6 +1154,12 @@ export const waConversations = mysqlTable("wa_conversations", {
   status: mysqlEnum("status", ["open", "pending", "resolved", "closed"]).default("open").notNull(),
   contactPushName: varchar("contactPushName", { length: 128 }),
   mergedIntoId: int("mergedIntoId"),
+  // Helpdesk fields (denormalized from conversation_assignments)
+  assignedUserId: int("assignedUserId"),
+  assignedTeamId: int("assignedTeamId"),
+  queuedAt: timestamp("queuedAt"),
+  firstResponseAt: timestamp("firstResponseAt"),
+  slaDeadlineAt: timestamp("slaDeadlineAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 }, (t) => [
@@ -1162,6 +1168,8 @@ export const waConversations = mysqlTable("wa_conversations", {
   index("idx_wc_tenant_jid").on(t.tenantId, t.sessionId, t.remoteJid),
   index("idx_wc_phone").on(t.tenantId, t.phoneE164),
   index("idx_wc_merged").on(t.mergedIntoId),
+  index("idx_wc_assigned_user").on(t.tenantId, t.assignedUserId),
+  index("idx_wc_queued").on(t.tenantId, t.queuedAt),
 ]);
 
 export const waIdentities = mysqlTable("wa_identities", {
@@ -1747,3 +1755,74 @@ export const sessionShares = mysqlTable("session_shares", {
 
 export type SessionShare = typeof sessionShares.$inferSelect;
 export type InsertSessionShare = typeof sessionShares.$inferInsert;
+
+
+// ════════════════════════════════════════════════════════════
+// HELPDESK — Conversation Events (Timeline)
+// ════════════════════════════════════════════════════════════
+export const conversationEvents = mysqlTable("conversation_events", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  waConversationId: int("waConversationId").notNull(),
+  sessionId: varchar("sessionId", { length: 128 }).notNull(),
+  remoteJid: varchar("remoteJid", { length: 128 }).notNull(),
+  eventType: mysqlEnum("eventType", [
+    "created", "assigned", "transferred", "note", "resolved",
+    "reopened", "queued", "sla_breach", "closed", "priority_changed"
+  ]).notNull(),
+  fromUserId: int("fromUserId"),
+  toUserId: int("toUserId"),
+  fromTeamId: int("fromTeamId"),
+  toTeamId: int("toTeamId"),
+  content: text("content"),
+  metadata: json("metadata"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (t) => [
+  index("ce_tenant_conv_idx").on(t.tenantId, t.waConversationId, t.createdAt),
+  index("ce_tenant_session_idx").on(t.tenantId, t.sessionId),
+  index("ce_event_type_idx").on(t.tenantId, t.eventType),
+]);
+export type ConversationEvent = typeof conversationEvents.$inferSelect;
+export type InsertConversationEvent = typeof conversationEvents.$inferInsert;
+
+// ════════════════════════════════════════════════════════════
+// HELPDESK — Internal Notes (visible only to team)
+// ════════════════════════════════════════════════════════════
+export const internalNotes = mysqlTable("internal_notes", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  waConversationId: int("waConversationId").notNull(),
+  sessionId: varchar("sessionId", { length: 128 }).notNull(),
+  remoteJid: varchar("remoteJid", { length: 128 }).notNull(),
+  authorUserId: int("authorUserId").notNull(),
+  content: text("content").notNull(),
+  mentionedUserIds: json("mentionedUserIds"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (t) => [
+  index("in_tenant_conv_idx").on(t.tenantId, t.waConversationId, t.createdAt),
+  index("in_author_idx").on(t.tenantId, t.authorUserId),
+]);
+export type InternalNote = typeof internalNotes.$inferSelect;
+export type InsertInternalNote = typeof internalNotes.$inferInsert;
+
+// ════════════════════════════════════════════════════════════
+// HELPDESK — Quick Replies (message templates per team)
+// ════════════════════════════════════════════════════════════
+export const quickReplies = mysqlTable("quick_replies", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  teamId: int("teamId"),
+  shortcut: varchar("shortcut", { length: 32 }).notNull(),
+  title: varchar("title", { length: 128 }).notNull(),
+  content: text("content").notNull(),
+  category: varchar("category", { length: 64 }),
+  createdBy: int("createdBy").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (t) => [
+  index("qr_tenant_idx").on(t.tenantId),
+  index("qr_tenant_team_idx").on(t.tenantId, t.teamId),
+  index("qr_shortcut_idx").on(t.tenantId, t.shortcut),
+]);
+export type QuickReply = typeof quickReplies.$inferSelect;
+export type InsertQuickReply = typeof quickReplies.$inferInsert;

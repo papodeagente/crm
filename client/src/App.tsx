@@ -49,6 +49,7 @@ const RfvMatrix = lazyWithRetry(() => import("./pages/RfvMatrix"));
 const Campaigns = lazyWithRetry(() => import("./pages/Campaigns"));
 const Profile = lazyWithRetry(() => import("./pages/Profile"));
 const CampaignDetail = lazyWithRetry(() => import("./pages/CampaignDetail"));
+const Supervision = lazyWithRetry(() => import("./pages/Supervision"));
 
 // SaaS pages (outside TopNavLayout)
 const SaasLogin = lazyWithRetry(() => import("./pages/SaasLogin"));
@@ -124,6 +125,7 @@ function AppRouter() {
                 <Route path="/settings/rdstation" component={RDStationIntegration} />
                 <Route path="/settings/rdstation/mappings" component={RDFieldMappings} />
                 <Route path="/settings/import-rd-crm" component={RDCrmImport} />
+                <Route path="/supervision" component={Supervision} />
                 <Route path="/settings/automations" component={TaskAutomationSettings} />
                 <Route path="/settings/date-automations" component={DateAutomationSettings} />
                 <Route path="/settings/classification" component={ClassificationSettings} />

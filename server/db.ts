@@ -1,6 +1,6 @@
 import { eq, desc, and, or, like, lt, gt, isNotNull, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users, whatsappSessions, waMessages as messages, activityLogs, chatbotSettings, chatbotRules, conversationAssignments, crmUsers, teams, teamMembers, distributionRules, customFields, customFieldValues, waConversations, userPreferences, sessionShares } from "../drizzle/schema";
+import { InsertUser, users, whatsappSessions, waMessages as messages, activityLogs, chatbotSettings, chatbotRules, conversationAssignments, crmUsers, teams, teamMembers, distributionRules, customFields, customFieldValues, waConversations, userPreferences, sessionShares, conversationEvents, internalNotes, quickReplies } from "../drizzle/schema";
 import { ENV } from './_core/env';
 import { normalizeJid } from "./phoneUtils";
 
@@ -430,11 +430,11 @@ export async function getOrCreateAssignment(tenantId: number, sessionId: string,
   return created[0] || null;
 }
 
-export async function assignConversation(tenantId: number, sessionId: string, remoteJid: string, assignedUserId: number | null, assignedTeamId?: number | null) {
+export async function assignConversation(tenantId: number, sessionId: string, remoteJid: string, assignedUserId: number | null, assignedTeamId?: number | null, assignedByUserId?: number) {
   const db = await getDb();
   if (!db) return null;
-  // Ensure assignment exists
-  await getOrCreateAssignment(tenantId, sessionId, remoteJid);
+  // Get previous assignment for event logging
+  const prev = await getOrCreateAssignment(tenantId, sessionId, remoteJid);
   const updateData: any = { assignedUserId, lastAssignedAt: new Date() };
   if (assignedTeamId !== undefined) updateData.assignedTeamId = assignedTeamId;
   await db.update(conversationAssignments)
@@ -444,10 +444,38 @@ export async function assignConversation(tenantId: number, sessionId: string, re
       eq(conversationAssignments.sessionId, sessionId),
       eq(conversationAssignments.remoteJid, remoteJid)
     ));
+  // Denormalize to wa_conversations
+  const wcUpdate: any = { assignedUserId, queuedAt: assignedUserId ? null : undefined };
+  if (assignedTeamId !== undefined) wcUpdate.assignedTeamId = assignedTeamId;
+  await db.update(waConversations)
+    .set(wcUpdate)
+    .where(and(
+      eq(waConversations.tenantId, tenantId),
+      eq(waConversations.sessionId, sessionId),
+      eq(waConversations.remoteJid, remoteJid)
+    ));
+  // Log event
+  const waConv = await db.select({ id: waConversations.id }).from(waConversations)
+    .where(and(eq(waConversations.tenantId, tenantId), eq(waConversations.sessionId, sessionId), eq(waConversations.remoteJid, remoteJid)))
+    .limit(1);
+  if (waConv.length > 0) {
+    const isTransfer = prev && prev.assignedUserId && assignedUserId && prev.assignedUserId !== assignedUserId;
+    await db.insert(conversationEvents).values({
+      tenantId,
+      waConversationId: waConv[0].id,
+      sessionId,
+      remoteJid,
+      eventType: isTransfer ? "transferred" : "assigned",
+      fromUserId: prev?.assignedUserId || assignedByUserId || undefined,
+      toUserId: assignedUserId || undefined,
+      fromTeamId: prev?.assignedTeamId || undefined,
+      toTeamId: assignedTeamId || undefined,
+    });
+  }
   return getOrCreateAssignment(tenantId, sessionId, remoteJid);
 }
 
-export async function updateAssignmentStatus(tenantId: number, sessionId: string, remoteJid: string, status: "open" | "pending" | "resolved" | "closed") {
+export async function updateAssignmentStatus(tenantId: number, sessionId: string, remoteJid: string, status: "open" | "pending" | "resolved" | "closed", userId?: number) {
   const db = await getDb();
   if (!db) return;
   const updateData: any = { status };
@@ -459,6 +487,30 @@ export async function updateAssignmentStatus(tenantId: number, sessionId: string
       eq(conversationAssignments.sessionId, sessionId),
       eq(conversationAssignments.remoteJid, remoteJid)
     ));
+  // Denormalize status to wa_conversations
+  await db.update(waConversations)
+    .set({ status })
+    .where(and(
+      eq(waConversations.tenantId, tenantId),
+      eq(waConversations.sessionId, sessionId),
+      eq(waConversations.remoteJid, remoteJid)
+    ));
+  // Log event
+  const waConv = await db.select({ id: waConversations.id }).from(waConversations)
+    .where(and(eq(waConversations.tenantId, tenantId), eq(waConversations.sessionId, sessionId), eq(waConversations.remoteJid, remoteJid)))
+    .limit(1);
+  if (waConv.length > 0) {
+    const eventType = status === "resolved" ? "resolved" as const : status === "closed" ? "closed" as const : status === "open" ? "reopened" as const : "assigned" as const;
+    await db.insert(conversationEvents).values({
+      tenantId,
+      waConversationId: waConv[0].id,
+      sessionId,
+      remoteJid,
+      eventType,
+      fromUserId: userId || undefined,
+      metadata: { status },
+    });
+  }
 }
 
 export async function getAssignmentsForSession(tenantId: number, sessionId: string) {
@@ -1579,8 +1631,11 @@ export async function getWaConversationsList(
       wc.unreadCount,
       wc.status AS conversationStatus,
       wc.conversationKey,
-      ca.assignedUserId,
-      ca.assignedTeamId,
+      wc.queuedAt,
+      wc.firstResponseAt,
+      wc.slaDeadlineAt,
+      COALESCE(wc.assignedUserId, ca.assignedUserId) AS assignedUserId,
+      COALESCE(wc.assignedTeamId, ca.assignedTeamId) AS assignedTeamId,
       ca.status AS assignmentStatus,
       ca.priority AS assignmentPriority,
       agent.name AS assignedAgentName,
@@ -1593,7 +1648,7 @@ export async function getWaConversationsList(
       ON ca.sessionId = wc.sessionId 
       AND ca.remoteJid = wc.remoteJid
       AND ca.tenantId = wc.tenantId
-    LEFT JOIN crm_users agent ON agent.id = ca.assignedUserId
+    LEFT JOIN crm_users agent ON agent.id = COALESCE(wc.assignedUserId, ca.assignedUserId)
     LEFT JOIN contacts c ON c.id = wc.contactId
     WHERE wc.sessionId = ${sessionId}
     AND wc.tenantId = ${tenantId}
@@ -2276,4 +2331,344 @@ export async function hasActiveShareForSession(tenantId: number, targetUserId: n
     ))
     .limit(1);
   return rows.length > 0;
+}
+
+
+// ════════════════════════════════════════════════════════════
+// HELPDESK — Internal Notes
+// ════════════════════════════════════════════════════════════
+
+export async function createInternalNote(tenantId: number, waConversationId: number, sessionId: string, remoteJid: string, authorUserId: number, content: string, mentionedUserIds?: number[]) {
+  const db = await getDb();
+  if (!db) return null;
+  const [result] = await db.insert(internalNotes).values({
+    tenantId,
+    waConversationId,
+    sessionId,
+    remoteJid,
+    authorUserId,
+    content,
+    mentionedUserIds: mentionedUserIds ? JSON.stringify(mentionedUserIds) : undefined,
+  }).$returningId();
+  // Also log as event
+  await db.insert(conversationEvents).values({
+    tenantId,
+    waConversationId,
+    sessionId,
+    remoteJid,
+    eventType: "note",
+    fromUserId: authorUserId,
+    content,
+  });
+  return result;
+}
+
+export async function getInternalNotes(tenantId: number, waConversationId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  const result = await db.execute(sql`
+    SELECT 
+      n.id,
+      n.waConversationId,
+      n.content,
+      n.mentionedUserIds,
+      n.createdAt,
+      n.authorUserId,
+      u.name AS authorName,
+      u.avatarUrl AS authorAvatar
+    FROM internal_notes n
+    LEFT JOIN crm_users u ON u.id = n.authorUserId
+    WHERE n.tenantId = ${tenantId}
+    AND n.waConversationId = ${waConversationId}
+    ORDER BY n.createdAt ASC
+  `);
+  return (result as any)[0] || [];
+}
+
+export async function deleteInternalNote(tenantId: number, noteId: number) {
+  const db = await getDb();
+  if (!db) return;
+  await db.delete(internalNotes).where(and(
+    eq(internalNotes.tenantId, tenantId),
+    eq(internalNotes.id, noteId),
+  ));
+}
+
+// ════════════════════════════════════════════════════════════
+// HELPDESK — Conversation Events (Timeline)
+// ════════════════════════════════════════════════════════════
+
+export async function getConversationEvents(tenantId: number, waConversationId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  const result = await db.execute(sql`
+    SELECT 
+      e.id,
+      e.eventType,
+      e.fromUserId,
+      e.toUserId,
+      e.fromTeamId,
+      e.toTeamId,
+      e.content,
+      e.metadata,
+      e.createdAt,
+      fu.name AS fromUserName,
+      tu.name AS toUserName,
+      ft.name AS fromTeamName,
+      tt.name AS toTeamName
+    FROM conversation_events e
+    LEFT JOIN crm_users fu ON fu.id = e.fromUserId
+    LEFT JOIN crm_users tu ON tu.id = e.toUserId
+    LEFT JOIN teams ft ON ft.id = e.fromTeamId
+    LEFT JOIN teams tt ON tt.id = e.toTeamId
+    WHERE e.tenantId = ${tenantId}
+    AND e.waConversationId = ${waConversationId}
+    ORDER BY e.createdAt ASC
+  `);
+  return (result as any)[0] || [];
+}
+
+export async function logConversationEvent(
+  tenantId: number, waConversationId: number, sessionId: string, remoteJid: string,
+  eventType: "created" | "assigned" | "transferred" | "note" | "resolved" | "reopened" | "queued" | "sla_breach" | "closed" | "priority_changed",
+  opts?: { fromUserId?: number; toUserId?: number; fromTeamId?: number; toTeamId?: number; content?: string; metadata?: any }
+) {
+  const db = await getDb();
+  if (!db) return;
+  await db.insert(conversationEvents).values({
+    tenantId,
+    waConversationId,
+    sessionId,
+    remoteJid,
+    eventType,
+    fromUserId: opts?.fromUserId,
+    toUserId: opts?.toUserId,
+    fromTeamId: opts?.fromTeamId,
+    toTeamId: opts?.toTeamId,
+    content: opts?.content,
+    metadata: opts?.metadata,
+  });
+}
+
+// ════════════════════════════════════════════════════════════
+// HELPDESK — Queue (Fila de espera)
+// ════════════════════════════════════════════════════════════
+
+export async function getQueueConversations(sessionId: string, tenantId: number, limit = 100) {
+  const db = await getDb();
+  if (!db) return [];
+  const result = await db.execute(sql`
+    SELECT 
+      wc.id AS conversationId,
+      wc.remoteJid,
+      wc.phoneE164,
+      wc.contactId,
+      wc.contactPushName,
+      wc.lastMessagePreview AS lastMessage,
+      wc.lastMessageType,
+      wc.lastFromMe,
+      wc.lastMessageAt AS lastTimestamp,
+      wc.unreadCount,
+      wc.status AS conversationStatus,
+      wc.conversationKey,
+      wc.queuedAt,
+      c.name AS contactName,
+      c.email AS contactEmail,
+      c.phone AS contactPhone
+    FROM wa_conversations wc
+    LEFT JOIN contacts c ON c.id = wc.contactId
+    WHERE wc.sessionId = ${sessionId}
+    AND wc.tenantId = ${tenantId}
+    AND wc.mergedIntoId IS NULL
+    AND wc.lastMessageAt IS NOT NULL
+    AND (wc.assignedUserId IS NULL)
+    AND wc.status IN ('open', 'pending')
+    ORDER BY COALESCE(wc.queuedAt, wc.lastMessageAt) ASC
+    LIMIT ${limit}
+  `);
+  return (result as any)[0] || [];
+}
+
+export async function claimConversation(tenantId: number, sessionId: string, remoteJid: string, userId: number) {
+  // "Puxar da fila" — assign to self
+  return assignConversation(tenantId, sessionId, remoteJid, userId, undefined, userId);
+}
+
+export async function enqueueConversation(tenantId: number, sessionId: string, remoteJid: string) {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(waConversations)
+    .set({ assignedUserId: null, queuedAt: new Date() })
+    .where(and(
+      eq(waConversations.tenantId, tenantId),
+      eq(waConversations.sessionId, sessionId),
+      eq(waConversations.remoteJid, remoteJid)
+    ));
+  // Also clear assignment
+  await db.update(conversationAssignments)
+    .set({ assignedUserId: null })
+    .where(and(
+      eq(conversationAssignments.tenantId, tenantId),
+      eq(conversationAssignments.sessionId, sessionId),
+      eq(conversationAssignments.remoteJid, remoteJid)
+    ));
+  // Log event
+  const waConv = await db.select({ id: waConversations.id }).from(waConversations)
+    .where(and(eq(waConversations.tenantId, tenantId), eq(waConversations.sessionId, sessionId), eq(waConversations.remoteJid, remoteJid)))
+    .limit(1);
+  if (waConv.length > 0) {
+    await db.insert(conversationEvents).values({
+      tenantId,
+      waConversationId: waConv[0].id,
+      sessionId,
+      remoteJid,
+      eventType: "queued",
+    });
+  }
+}
+
+// ════════════════════════════════════════════════════════════
+// HELPDESK — Supervision Dashboard
+// ════════════════════════════════════════════════════════════
+
+export async function getAgentWorkload(tenantId: number, sessionId: string) {
+  const db = await getDb();
+  if (!db) return [];
+  const result = await db.execute(sql`
+    SELECT 
+      cu.id AS agentId,
+      cu.name AS agentName,
+      cu.email AS agentEmail,
+      cu.avatarUrl AS agentAvatar,
+      cu.status AS agentStatus,
+      COUNT(CASE WHEN wc.status IN ('open', 'pending') THEN 1 END) AS activeConversations,
+      COUNT(CASE WHEN wc.unreadCount > 0 THEN 1 END) AS unreadConversations,
+      MIN(wc.lastMessageAt) AS oldestConversation,
+      MAX(wc.lastMessageAt) AS newestConversation
+    FROM crm_users cu
+    LEFT JOIN wa_conversations wc 
+      ON wc.assignedUserId = cu.id 
+      AND wc.tenantId = ${tenantId}
+      AND wc.sessionId = ${sessionId}
+      AND wc.status IN ('open', 'pending')
+      AND wc.mergedIntoId IS NULL
+    WHERE cu.tenantId = ${tenantId}
+    AND cu.status = 'active'
+    GROUP BY cu.id, cu.name, cu.email, cu.avatarUrl, cu.status
+    ORDER BY activeConversations DESC
+  `);
+  return (result as any)[0] || [];
+}
+
+export async function getAgentConversations(tenantId: number, sessionId: string, agentId: number, limit = 10) {
+  const db = await getDb();
+  if (!db) return [];
+  const result = await db.execute(sql`
+    SELECT 
+      wc.id AS conversationId,
+      wc.remoteJid,
+      wc.contactPushName,
+      wc.lastMessagePreview AS lastMessage,
+      wc.lastMessageAt AS lastTimestamp,
+      wc.unreadCount,
+      wc.status AS conversationStatus,
+      c.name AS contactName
+    FROM wa_conversations wc
+    LEFT JOIN contacts c ON c.id = wc.contactId
+    WHERE wc.tenantId = ${tenantId}
+    AND wc.sessionId = ${sessionId}
+    AND wc.assignedUserId = ${agentId}
+    AND wc.status IN ('open', 'pending')
+    AND wc.mergedIntoId IS NULL
+    ORDER BY wc.lastMessageAt DESC
+    LIMIT ${limit}
+  `);
+  return (result as any)[0] || [];
+}
+
+export async function getQueueStats(tenantId: number, sessionId: string) {
+  const db = await getDb();
+  if (!db) return { total: 0, oldest: null };
+  const result = await db.execute(sql`
+    SELECT 
+      COUNT(*) AS total,
+      MIN(COALESCE(wc.queuedAt, wc.lastMessageAt)) AS oldestEntry
+    FROM wa_conversations wc
+    WHERE wc.tenantId = ${tenantId}
+    AND wc.sessionId = ${sessionId}
+    AND wc.assignedUserId IS NULL
+    AND wc.status IN ('open', 'pending')
+    AND wc.mergedIntoId IS NULL
+    AND wc.lastMessageAt IS NOT NULL
+  `);
+  const rows = (result as any)[0] || [];
+  return { total: Number(rows[0]?.total || 0), oldest: rows[0]?.oldestEntry || null };
+}
+
+// ════════════════════════════════════════════════════════════
+// HELPDESK — Quick Replies
+// ════════════════════════════════════════════════════════════
+
+export async function getQuickReplies(tenantId: number, teamId?: number) {
+  const db = await getDb();
+  if (!db) return [];
+  if (teamId) {
+    return db.select().from(quickReplies)
+      .where(and(
+        eq(quickReplies.tenantId, tenantId),
+        or(eq(quickReplies.teamId, teamId), sql`${quickReplies.teamId} IS NULL`)
+      ))
+      .orderBy(quickReplies.shortcut);
+  }
+  return db.select().from(quickReplies)
+    .where(eq(quickReplies.tenantId, tenantId))
+    .orderBy(quickReplies.shortcut);
+}
+
+export async function createQuickReply(tenantId: number, data: { shortcut: string; title: string; content: string; teamId?: number; category?: string; createdBy: number }) {
+  const db = await getDb();
+  if (!db) return null;
+  const [result] = await db.insert(quickReplies).values({
+    tenantId,
+    shortcut: data.shortcut,
+    title: data.title,
+    content: data.content,
+    teamId: data.teamId,
+    category: data.category,
+    createdBy: data.createdBy,
+  }).$returningId();
+  return result;
+}
+
+export async function deleteQuickReply(tenantId: number, id: number) {
+  const db = await getDb();
+  if (!db) return;
+  await db.delete(quickReplies).where(and(
+    eq(quickReplies.tenantId, tenantId),
+    eq(quickReplies.id, id),
+  ));
+}
+
+// ════════════════════════════════════════════════════════════
+// HELPDESK — Transfer with note
+// ════════════════════════════════════════════════════════════
+
+export async function transferConversationWithNote(
+  tenantId: number, sessionId: string, remoteJid: string,
+  fromUserId: number, toUserId: number, toTeamId?: number | null,
+  note?: string
+) {
+  const db = await getDb();
+  if (!db) return null;
+  // If there's a transfer note, create internal note first
+  if (note) {
+    const waConv = await db.select({ id: waConversations.id }).from(waConversations)
+      .where(and(eq(waConversations.tenantId, tenantId), eq(waConversations.sessionId, sessionId), eq(waConversations.remoteJid, remoteJid)))
+      .limit(1);
+    if (waConv.length > 0) {
+      await createInternalNote(tenantId, waConv[0].id, sessionId, remoteJid, fromUserId, note);
+    }
+  }
+  // Perform the assignment (which logs the transfer event)
+  return assignConversation(tenantId, sessionId, remoteJid, toUserId, toTeamId, fromUserId);
 }

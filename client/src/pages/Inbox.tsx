@@ -13,6 +13,8 @@ import { formatTime } from "../../../shared/dateUtils";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
 import { useTenantId } from "@/hooks/useTenantId";
+import { useIsAdmin } from "@/components/AdminOnlyGuard";
+import { Inbox as InboxIcon, ListOrdered, Contact2, LayoutGrid, HandMetal, Timer, ArrowRightLeft as Transfer } from "lucide-react";
 
 /* ═══════════════════════════════════════════════════════
    NOTIFICATION SOUND (Web Audio API — WhatsApp style)
@@ -728,6 +730,7 @@ function NoSession() {
    MAIN INBOX PAGE
    ═══════════════════════════════════════════════════════ */
 
+type InboxTab = "mine" | "queue" | "contacts" | "all";
 type AgentFilter = "all" | "unread" | "mine" | "unassigned";
 
 export default function InboxPage() {
@@ -737,7 +740,9 @@ export default function InboxPage() {
   const [search, setSearch] = useState("");
   const [searchFocused, setSearchFocused] = useState(false);
   const [showMobileChat, setShowMobileChat] = useState(false);
+  const [activeTab, setActiveTab] = useState<InboxTab>("mine");
   const [filter, setFilter] = useState<AgentFilter>("all");
+  const isAdmin = useIsAdmin();
   const [showCreateDeal, setShowCreateDeal] = useState(false);
   const [showCreateContact, setShowCreateContact] = useState(false);
   const [showNewChat, setShowNewChat] = useState(false);
@@ -775,9 +780,42 @@ export default function InboxPage() {
   const agentsQ = trpc.whatsapp.agents.useQuery({ tenantId }, { staleTime: 5 * 60 * 1000 });
   const agents = useMemo(() => (agentsQ.data || []) as Array<{ id: number; name: string; email: string; avatarUrl?: string | null; status: string }>, [agentsQ.data]);
 
+  // Queue conversations
+  const queueQ = trpc.whatsapp.queue.list.useQuery(
+    { sessionId: activeSession?.sessionId || "", limit: 100 },
+    { enabled: !!activeSession?.sessionId && (activeTab === "queue" || activeTab === "all"), refetchInterval: isConnected ? 15000 : 60000, staleTime: 10000 }
+  );
+  const queueStatsQ = trpc.whatsapp.queue.stats.useQuery(
+    { sessionId: activeSession?.sessionId || "" },
+    { enabled: !!activeSession?.sessionId, refetchInterval: 30000, staleTime: 15000 }
+  );
+  const claimMutation = trpc.whatsapp.queue.claim.useMutation({
+    onSuccess: () => { conversationsQ.refetch(); queueQ.refetch(); queueStatsQ.refetch(); toast.success("Conversa atribuída a você"); },
+    onError: (e) => toast.error(e.message || "Erro ao puxar conversa"),
+  });
+
+  // WA Contacts for Contacts tab (reuse waContactsMap but as a list)
+  const waContactsForTabQ = trpc.whatsapp.waContactsMap.useQuery(
+    { sessionId: activeSession?.sessionId || "" },
+    { enabled: !!activeSession?.sessionId && activeTab === "contacts", staleTime: 5 * 60 * 1000 }
+  );
+  const waContactsList = useMemo(() => {
+    const map = waContactsForTabQ.data || {};
+    return Object.entries(map)
+      .map(([jid, c]) => ({
+        jid,
+        phoneNumber: c.phoneNumber,
+        pushName: c.pushName,
+        savedName: c.savedName,
+        verifiedName: c.verifiedName,
+        displayName: c.savedName || c.verifiedName || c.pushName || formatPhoneNumber(jid),
+      }))
+      .sort((a, b) => a.displayName.localeCompare(b.displayName));
+  }, [waContactsForTabQ.data]);
+
   // Assignment mutations
   const assignMutation = trpc.whatsapp.assignConversation.useMutation({
-    onSuccess: () => { conversationsQ.refetch(); toast.success("Conversa atribuída com sucesso"); },
+    onSuccess: () => { conversationsQ.refetch(); queueQ.refetch(); queueStatsQ.refetch(); toast.success("Conversa atribuída com sucesso"); },
     onError: (e) => toast.error(e.message || "Erro ao atribuir conversa"),
   });
   const updateStatusMutation = trpc.whatsapp.updateAssignmentStatus.useMutation({
@@ -921,13 +959,26 @@ export default function InboxPage() {
     }
   }, [activeSession?.sessionId, markRead]);
 
-  // Filter conversations (multi-agent aware)
+  // Current user ID for filtering "mine" tab
+  const meQ = trpc.auth.me.useQuery();
+  const myUserId = useMemo(() => (meQ.data as any)?.saasUser?.userId || (meQ.data as any)?.id || 0, [meQ.data]);
+
+  // Filter conversations based on active tab
   const filteredConvs = useMemo(() => {
     let convs = (conversationsQ.data || []) as ConvItem[];
-    // Agent-based filters
+    // Tab-based primary filter
+    if (activeTab === "mine") {
+      convs = convs.filter((c) => c.assignedUserId === myUserId);
+    } else if (activeTab === "queue") {
+      // Queue tab uses its own data source, return empty for main list
+      return [];
+    } else if (activeTab === "contacts") {
+      // Contacts tab uses its own data source
+      return [];
+    }
+    // "all" tab shows everything
+    // Secondary filter (within tab)
     if (filter === "unread") convs = convs.filter((c) => Number(c.unreadCount) > 0);
-    else if (filter === "mine") convs = convs.filter((c) => c.assignedUserId != null);
-    else if (filter === "unassigned") convs = convs.filter((c) => c.assignedUserId == null);
     // Search filter
     if (search) {
       const s = search.toLowerCase();
@@ -938,7 +989,44 @@ export default function InboxPage() {
       });
     }
     return convs;
-  }, [conversationsQ.data, search, filter, getDisplayName]);
+  }, [conversationsQ.data, search, filter, activeTab, getDisplayName, myUserId]);
+
+  // Queue conversations filtered by search
+  const filteredQueueConvs = useMemo(() => {
+    if (activeTab !== "queue") return [];
+    let convs = (queueQ.data || []) as ConvItem[];
+    if (search) {
+      const s = search.toLowerCase();
+      convs = convs.filter((c) => {
+        const name = getDisplayName(c.remoteJid, c).toLowerCase();
+        const phone = c.remoteJid.split("@")[0];
+        return name.includes(s) || phone.includes(s);
+      });
+    }
+    return convs;
+  }, [queueQ.data, search, activeTab, getDisplayName]);
+
+  // WA Contacts filtered by search
+  const filteredWaContacts = useMemo(() => {
+    if (activeTab !== "contacts") return [];
+    if (!search) return waContactsList;
+    const s = search.toLowerCase();
+    return waContactsList.filter((c) => {
+      return c.displayName.toLowerCase().includes(s) ||
+        (c.phoneNumber && c.phoneNumber.includes(s)) ||
+        c.jid.split("@")[0].includes(s);
+    });
+  }, [waContactsList, search, activeTab]);
+
+  // My conversations count for badge
+  const myConvsCount = useMemo(() => {
+    return ((conversationsQ.data || []) as ConvItem[]).filter((c) => c.assignedUserId === myUserId).length;
+  }, [conversationsQ.data, myUserId]);
+
+  // Queue count for badge
+  const queueCount = useMemo(() => {
+    return (queueStatsQ.data as any)?.waiting || 0;
+  }, [queueStatsQ.data]);
 
   // Get assignment for selected conversation
   const selectedAssignment = useMemo(() => {
@@ -990,6 +1078,13 @@ export default function InboxPage() {
     if (!selectedJid) return false;
     return !!getContactForJid(selectedJid);
   }, [selectedJid, getContactForJid]);
+
+  // Get waConversationId for selected conversation (for notes/events)
+  const selectedWaConversationId = useMemo(() => {
+    if (!selectedJid) return undefined;
+    const conv = (conversationsQ.data as ConvItem[] || []).find(c => c.remoteJid === selectedJid);
+    return conv?.conversationId;
+  }, [selectedJid, conversationsQ.data]);
 
   const toggleMute = useCallback(() => {
     setIsMuted(prev => {
@@ -1093,57 +1188,180 @@ export default function InboxPage() {
           </div>
         </div>
 
-        {/* ── Filter Tabs (Multi-Agent) ── */}
-        <div className="flex items-center gap-[6px] shrink-0 px-3 py-[6px] overflow-x-auto scrollbar-none">
-          {(["all", "unread", "mine", "unassigned"] as const).map((f) => {
-            const labels: Record<AgentFilter, string> = { all: "Todas", unread: "Não lidas", mine: "Minhas", unassigned: "Sem agente" };
-            const icons: Record<AgentFilter, React.ReactNode> = {
-              all: null,
-              unread: null,
-              mine: <UserCheck className="w-[12px] h-[12px]" />,
-              unassigned: <UserX className="w-[12px] h-[12px]" />,
-            };
-            const active = filter === f;
+        {/* ── Main Tabs (Meus Chats | Fila | Contatos WA | Todas) ── */}
+        <div className="flex items-center shrink-0 border-b border-wa-divider">
+          {([
+            { id: "mine" as InboxTab, label: "Meus Chats", icon: <InboxIcon className="w-[14px] h-[14px]" />, badge: myConvsCount },
+            { id: "queue" as InboxTab, label: "Fila", icon: <Timer className="w-[14px] h-[14px]" />, badge: queueCount },
+            { id: "contacts" as InboxTab, label: "Contatos", icon: <Contact2 className="w-[14px] h-[14px]" />, badge: 0 },
+            ...(isAdmin ? [{ id: "all" as InboxTab, label: "Todas", icon: <LayoutGrid className="w-[14px] h-[14px]" />, badge: 0 }] : []),
+          ]).map((tab) => {
+            const active = activeTab === tab.id;
             return (
               <button
-                key={f} onClick={() => setFilter(f)}
-                className={`rounded-full text-[13px] font-medium transition-colors px-3 py-[5px] flex items-center gap-1 shrink-0 ${
+                key={tab.id}
+                onClick={() => { setActiveTab(tab.id); setFilter("all"); }}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-[10px] text-[13px] font-medium transition-colors relative ${
                   active
-                    ? "bg-wa-tint/15 text-wa-tint"
-                    : "bg-wa-search-bg text-muted-foreground hover:bg-wa-hover"
+                    ? "text-wa-tint"
+                    : "text-muted-foreground hover:text-foreground hover:bg-wa-hover/50"
                 }`}
               >
-                {icons[f]}
-                {labels[f]}
+                {tab.icon}
+                <span>{tab.label}</span>
+                {tab.badge > 0 && (
+                  <span className={`text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-[4px] ${
+                    active ? "bg-wa-tint text-white" : "bg-muted text-muted-foreground"
+                  }`}>
+                    {tab.badge > 99 ? "99+" : tab.badge}
+                  </span>
+                )}
+                {active && <div className="absolute bottom-0 left-[20%] right-[20%] h-[2px] bg-wa-tint rounded-t" />}
               </button>
             );
           })}
         </div>
+        {/* ── Secondary Filter (only for mine/all tabs) ── */}
+        {(activeTab === "mine" || activeTab === "all") && (
+          <div className="flex items-center gap-[6px] shrink-0 px-3 py-[5px] overflow-x-auto scrollbar-none">
+            {(["all", "unread"] as const).map((f) => {
+              const labels: Record<string, string> = { all: "Todas", unread: "Não lidas" };
+              const active = filter === f;
+              return (
+                <button
+                  key={f} onClick={() => setFilter(f)}
+                  className={`rounded-full text-[12px] font-medium transition-colors px-2.5 py-[4px] shrink-0 ${
+                    active ? "bg-wa-tint/15 text-wa-tint" : "bg-wa-search-bg text-muted-foreground hover:bg-wa-hover"
+                  }`}
+                >
+                  {labels[f]}
+                </button>
+              );
+            })}
+          </div>
+        )}
 
-        {/* ── Conversations List ── */}
+        {/* ── Content List (depends on active tab) ── */}
         <div className="flex-1 overflow-y-auto scrollbar-thin" style={{ overscrollBehavior: "contain" }}>
-          {conversationsQ.isLoading || sessionsQ.isLoading ? (
-            <div className="flex items-center justify-center py-16">
-              <Loader2 className="w-6 h-6 text-wa-tint animate-spin" />
-            </div>
-          ) : filteredConvs.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
-              <MessageSquare className="w-12 h-12 text-muted-foreground/15 mb-3" />
-              <p className="text-[14px] text-muted-foreground">
-                {search ? "Nenhuma conversa encontrada" : filter === "unread" ? "Nenhuma conversa não lida" : "Nenhuma conversa ainda"}
-              </p>
-            </div>
-          ) : (
-            filteredConvs.map((conv) => (
-              <ConversationItem
-                key={conv.remoteJid}
-                conv={conv}
-                isActive={selectedJid === conv.remoteJid}
-                contactName={getDisplayName(conv.remoteJid, conv)}
-                pictureUrl={profilePicMap[conv.remoteJid]}
-                onClick={() => handleSelectConv(conv.remoteJid)}
-              />
-            ))
+          {/* MINE / ALL tabs: show conversations */}
+          {(activeTab === "mine" || activeTab === "all") && (
+            <>
+              {conversationsQ.isLoading || sessionsQ.isLoading ? (
+                <div className="flex items-center justify-center py-16">
+                  <Loader2 className="w-6 h-6 text-wa-tint animate-spin" />
+                </div>
+              ) : filteredConvs.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
+                  <MessageSquare className="w-12 h-12 text-muted-foreground/15 mb-3" />
+                  <p className="text-[14px] text-muted-foreground">
+                    {search ? "Nenhuma conversa encontrada" : activeTab === "mine" ? "Nenhuma conversa atribuída a você" : "Nenhuma conversa ainda"}
+                  </p>
+                  {activeTab === "mine" && !search && (
+                    <p className="text-[12px] text-muted-foreground/60 mt-1">Puxe conversas da Fila para começar a atender</p>
+                  )}
+                </div>
+              ) : (
+                filteredConvs.map((conv) => (
+                  <ConversationItem
+                    key={conv.remoteJid}
+                    conv={conv}
+                    isActive={selectedJid === conv.remoteJid}
+                    contactName={getDisplayName(conv.remoteJid, conv)}
+                    pictureUrl={profilePicMap[conv.remoteJid]}
+                    onClick={() => handleSelectConv(conv.remoteJid)}
+                  />
+                ))
+              )}
+            </>
+          )}
+
+          {/* QUEUE tab: show waiting conversations */}
+          {activeTab === "queue" && (
+            <>
+              {queueQ.isLoading ? (
+                <div className="flex items-center justify-center py-16">
+                  <Loader2 className="w-6 h-6 text-wa-tint animate-spin" />
+                </div>
+              ) : filteredQueueConvs.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
+                  <Timer className="w-12 h-12 text-muted-foreground/15 mb-3" />
+                  <p className="text-[14px] text-muted-foreground">
+                    {search ? "Nenhuma conversa encontrada na fila" : "Fila vazia"}
+                  </p>
+                  <p className="text-[12px] text-muted-foreground/60 mt-1">Novas mensagens sem agente aparecerão aqui</p>
+                </div>
+              ) : (
+                filteredQueueConvs.map((conv) => (
+                  <div key={conv.remoteJid} className="relative group">
+                    <ConversationItem
+                      conv={conv}
+                      isActive={selectedJid === conv.remoteJid}
+                      contactName={getDisplayName(conv.remoteJid, conv)}
+                      pictureUrl={profilePicMap[conv.remoteJid]}
+                      onClick={() => handleSelectConv(conv.remoteJid)}
+                    />
+                    {/* Claim button overlay */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (activeSession?.sessionId) {
+                          claimMutation.mutate({ sessionId: activeSession.sessionId, remoteJid: conv.remoteJid });
+                        }
+                      }}
+                      disabled={claimMutation.isPending}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity bg-wa-tint text-white text-[11px] font-medium px-3 py-1.5 rounded-lg shadow-lg hover:opacity-90 flex items-center gap-1"
+                    >
+                      <HandMetal className="w-3 h-3" />
+                      Puxar
+                    </button>
+                  </div>
+                ))
+              )}
+            </>
+          )}
+
+          {/* CONTACTS tab: show WA contacts */}
+          {activeTab === "contacts" && (
+            <>
+              {waContactsForTabQ.isLoading ? (
+                <div className="flex items-center justify-center py-16">
+                  <Loader2 className="w-6 h-6 text-wa-tint animate-spin" />
+                </div>
+              ) : filteredWaContacts.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
+                  <Contact2 className="w-12 h-12 text-muted-foreground/15 mb-3" />
+                  <p className="text-[14px] text-muted-foreground">
+                    {search ? "Nenhum contato encontrado" : "Nenhum contato do WhatsApp"}
+                  </p>
+                  <p className="text-[12px] text-muted-foreground/60 mt-1">Sincronize os contatos na página WhatsApp</p>
+                </div>
+              ) : (
+                <>
+                  <div className="px-4 py-2">
+                    <p className="text-[11px] text-muted-foreground uppercase tracking-wider font-medium">
+                      {filteredWaContacts.length} contatos do WhatsApp
+                    </p>
+                  </div>
+                  {filteredWaContacts.map((contact) => (
+                    <button
+                      key={contact.jid}
+                      onClick={() => handleSelectConv(contact.jid)}
+                      className="w-full flex items-center gap-3 px-3 hover:bg-wa-hover transition-colors text-left"
+                    >
+                      <div className="py-[6px] pr-[2px]">
+                        <WaAvatar name={contact.displayName} size={49} pictureUrl={profilePicMap[contact.jid]} />
+                      </div>
+                      <div className="flex-1 min-w-0 py-[10px] border-b border-wa-divider">
+                        <p className="text-[15px] text-foreground truncate">{contact.displayName}</p>
+                        <p className="text-[13px] text-muted-foreground truncate">
+                          {contact.phoneNumber ? formatPhoneNumber(contact.phoneNumber) : formatPhoneNumber(contact.jid)}
+                        </p>
+                      </div>
+                    </button>
+                  ))}
+                </>
+              )}
+            </>
           )}
         </div>
       </div>
@@ -1174,6 +1392,7 @@ export default function InboxPage() {
               onAssign={handleAssign}
               onStatusChange={handleStatusChange}
               myAvatarUrl={activeSession.user?.imgUrl}
+              waConversationId={selectedWaConversationId}
             />
           </div>
         )}

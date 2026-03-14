@@ -93,6 +93,22 @@ import {
   revokeSessionShare,
   revokeAllSharesForSession,
   getSessionBySessionId,
+  // Helpdesk
+  createInternalNote,
+  getInternalNotes,
+  deleteInternalNote,
+  getConversationEvents,
+  logConversationEvent,
+  getQueueConversations,
+  claimConversation,
+  enqueueConversation,
+  getAgentWorkload,
+  getAgentConversations,
+  getQueueStats,
+  getQuickReplies,
+  createQuickReply,
+  deleteQuickReply,
+  transferConversationWithNote,
 } from "./db";
 import { storagePut } from "./storage";
 import { nanoid } from "nanoid";
@@ -1183,6 +1199,151 @@ export const appRouter = router({
           pushName: session?.pushName || null,
         };
       }),
+
+    // ─── Helpdesk: Internal Notes ───
+    notes: router({
+    list: protectedProcedure
+      .input(z.object({ waConversationId: z.number() }))
+      .query(async ({ ctx, input }) => {
+        const tenantId = ctx.saasUser?.tenantId || 1;
+        return getInternalNotes(tenantId, input.waConversationId);
+      }),
+    create: sessionProtectedProcedure
+      .input(z.object({
+        waConversationId: z.number(),
+        sessionId: z.string(),
+        remoteJid: z.string(),
+        content: z.string().min(1),
+        mentionedUserIds: z.array(z.number()).optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const tenantId = ctx.saasUser?.tenantId || 1;
+        const userId = ctx.saasUser?.userId || ctx.user.id;
+        return createInternalNote(
+          tenantId, input.waConversationId, input.sessionId, input.remoteJid,
+          userId, input.content, input.mentionedUserIds
+        );
+      }),
+    delete: protectedProcedure
+      .input(z.object({ noteId: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        const tenantId = ctx.saasUser?.tenantId || 1;
+        await deleteInternalNote(tenantId, input.noteId);
+        return { success: true };
+      }),
+    }),
+
+    // ─── Helpdesk: Conversation Events / Timeline ───
+    events: router({
+    list: protectedProcedure
+      .input(z.object({ waConversationId: z.number() }))
+      .query(async ({ ctx, input }) => {
+        const tenantId = ctx.saasUser?.tenantId || 1;
+        return getConversationEvents(tenantId, input.waConversationId);
+      }),
+    }),
+
+    // ─── Helpdesk: Queue (Fila) ───
+    queue: router({
+    list: sessionProtectedProcedure
+      .input(z.object({ sessionId: z.string(), limit: z.number().max(200).default(100) }))
+      .query(async ({ ctx, input }) => {
+        const tenantId = ctx.saasUser?.tenantId || 1;
+        return getQueueConversations(input.sessionId, tenantId, input.limit);
+      }),
+    claim: sessionProtectedProcedure
+      .input(z.object({ sessionId: z.string(), remoteJid: z.string() }))
+      .mutation(async ({ ctx, input }) => {
+        const tenantId = ctx.saasUser?.tenantId || 1;
+        const userId = ctx.saasUser?.userId || ctx.user.id;
+        return claimConversation(tenantId, input.sessionId, input.remoteJid, userId);
+      }),
+    enqueue: sessionProtectedProcedure
+      .input(z.object({ sessionId: z.string(), remoteJid: z.string() }))
+      .mutation(async ({ ctx, input }) => {
+        const tenantId = ctx.saasUser?.tenantId || 1;
+        await enqueueConversation(tenantId, input.sessionId, input.remoteJid);
+        return { success: true };
+      }),
+    stats: sessionProtectedProcedure
+      .input(z.object({ sessionId: z.string() }))
+      .query(async ({ ctx, input }) => {
+        const tenantId = ctx.saasUser?.tenantId || 1;
+        return getQueueStats(tenantId, input.sessionId);
+      }),
+    }),
+
+    // ─── Helpdesk: Transfer ───
+    transfer: router({
+    execute: sessionProtectedProcedure
+      .input(z.object({
+        sessionId: z.string(),
+        remoteJid: z.string(),
+        toUserId: z.number(),
+        toTeamId: z.number().optional(),
+        note: z.string().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const tenantId = ctx.saasUser?.tenantId || 1;
+        const fromUserId = ctx.saasUser?.userId || ctx.user.id;
+        return transferConversationWithNote(
+          tenantId, input.sessionId, input.remoteJid,
+          fromUserId, input.toUserId, input.toTeamId, input.note
+        );
+      }),
+    }),
+
+    // ─── Helpdesk: Supervision Dashboard ───
+    supervision: router({
+    agentWorkload: sessionProtectedProcedure
+      .input(z.object({ sessionId: z.string() }))
+      .query(async ({ ctx, input }) => {
+        const tenantId = ctx.saasUser?.tenantId || 1;
+        return getAgentWorkload(tenantId, input.sessionId);
+      }),
+    agentConversations: sessionProtectedProcedure
+      .input(z.object({ sessionId: z.string(), agentId: z.number(), limit: z.number().max(50).default(10) }))
+      .query(async ({ ctx, input }) => {
+        const tenantId = ctx.saasUser?.tenantId || 1;
+        return getAgentConversations(tenantId, input.sessionId, input.agentId, input.limit);
+      }),
+    queueStats: sessionProtectedProcedure
+      .input(z.object({ sessionId: z.string() }))
+      .query(async ({ ctx, input }) => {
+        const tenantId = ctx.saasUser?.tenantId || 1;
+        return getQueueStats(tenantId, input.sessionId);
+      }),
+    }),
+
+    // ─── Helpdesk: Quick Replies ───
+    quickReplies: router({
+    list: protectedProcedure
+      .input(z.object({ teamId: z.number().optional() }))
+      .query(async ({ ctx, input }) => {
+        const tenantId = ctx.saasUser?.tenantId || 1;
+        return getQuickReplies(tenantId, input.teamId);
+      }),
+    create: protectedProcedure
+      .input(z.object({
+        shortcut: z.string().min(1).max(32),
+        title: z.string().min(1).max(128),
+        content: z.string().min(1),
+        teamId: z.number().optional(),
+        category: z.string().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const tenantId = ctx.saasUser?.tenantId || 1;
+        const userId = ctx.saasUser?.userId || ctx.user.id;
+        return createQuickReply(tenantId, { ...input, createdBy: userId });
+      }),
+    delete: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        const tenantId = ctx.saasUser?.tenantId || 1;
+        await deleteQuickReply(tenantId, input.id);
+        return { success: true };
+      }),
+    }),
   }),
 
   // ─── Message Monitoring ───

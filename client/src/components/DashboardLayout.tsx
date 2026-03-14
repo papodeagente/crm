@@ -30,12 +30,13 @@ import {
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from "./DashboardLayoutSkeleton";
+import { useIsAdmin } from "./AdminOnlyGuard";
 import { Button } from "./ui/button";
 import { Separator } from "./ui/separator";
 
 interface MenuSection {
   label: string;
-  items: { icon: any; label: string; path: string }[];
+  items: { icon: any; label: string; path: string; adminOnly?: boolean }[];
 }
 
 const menuSections: MenuSection[] = [
@@ -62,6 +63,7 @@ const menuSections: MenuSection[] = [
       { icon: Inbox, label: "Inbox", path: "/inbox" },
       { icon: Send, label: "WhatsApp", path: "/whatsapp" },
       { icon: Bot, label: "Chatbot IA", path: "/chatbot" },
+      { icon: Users, label: "Supervisão", path: "/supervision", adminOnly: true },
     ],
   },
   {
@@ -158,6 +160,7 @@ function DashboardLayoutContent({
   const sidebarRef = useRef<HTMLDivElement>(null);
   const activeMenuItem = allMenuItems.find((item) => item.path === location);
   const isMobile = useIsMobile();
+  const { isAdmin } = useIsAdmin();
 
   useEffect(() => {
     if (isCollapsed) setIsResizing(false);
@@ -223,7 +226,7 @@ function DashboardLayoutContent({
                   </p>
                 )}
                 <SidebarMenu className="px-2 py-0.5">
-                  {section.items.map((item) => {
+                  {section.items.filter(item => !item.adminOnly || isAdmin).map((item) => {
                     const isActive = location === item.path;
                     return (
                       <SidebarMenuItem key={item.path}>

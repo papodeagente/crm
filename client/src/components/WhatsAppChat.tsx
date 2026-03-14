@@ -7,12 +7,13 @@ import {
   Mic, MicOff, Paperclip, Pause, Phone, Play, Search, Send, Smile,
   Video, X, Camera, FileText, ArrowDown, Volume2, Loader2, ChevronDown,
   UserPlus, Briefcase, Users, Reply, Trash2, Pencil, Forward, MapPin,
-  Contact, BarChart3, Copy, Ban
+  Contact, BarChart3, Copy, Ban, StickyNote, ArrowRightLeft, History
 } from "lucide-react";
 import Picker from "@emoji-mart/react";
 import data from "@emoji-mart/data";
 
 import { formatTime, SYSTEM_TIMEZONE, SYSTEM_LOCALE } from "../../../shared/dateUtils";
+import TransferDialog from "./TransferDialog";
 
 /* ─── Types ─── */
 interface Message {
@@ -68,6 +69,8 @@ export interface WhatsAppChatProps {
   onAssign?: (agentId: number | null) => void;
   onStatusChange?: (status: "open" | "pending" | "resolved" | "closed") => void;
   myAvatarUrl?: string;
+  // Helpdesk
+  waConversationId?: number;
 }
 
 /* ─── WhatsApp Text Formatting ─── */
@@ -1049,7 +1052,7 @@ function EditMessageModal({ currentText, onSave, onClose }: { currentText: strin
    MAIN CHAT COMPONENT
    ═══════════════════════════════════════════════════════ */
 
-export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDeal, onCreateContact, hasCrmContact, assignment, agents, onAssign, onStatusChange, myAvatarUrl }: WhatsAppChatProps) {
+export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDeal, onCreateContact, hasCrmContact, assignment, agents, onAssign, onStatusChange, myAvatarUrl, waConversationId }: WhatsAppChatProps) {
   const [showAgentDropdown, setShowAgentDropdown] = useState(false);
   const { lastMessage, lastStatusUpdate } = useSocket();
   const [messageText, setMessageText] = useState("");
@@ -1065,6 +1068,9 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
   const [showPollModal, setShowPollModal] = useState(false);
   const [editTarget, setEditTarget] = useState<{ messageId: string; text: string } | null>(null);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  const [isNoteMode, setIsNoteMode] = useState(false);
+  const [showTimeline, setShowTimeline] = useState(false);
+  const [showTransfer, setShowTransfer] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -1073,6 +1079,28 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
   const presenceTimerRef = useRef<NodeJS.Timeout | null>(null);
   const emojiPickerRef = useRef<HTMLDivElement>(null);
   const attachMenuRef = useRef<HTMLDivElement>(null);
+
+  // Internal notes queries
+  const notesQ = trpc.whatsapp.notes.list.useQuery(
+    { waConversationId: waConversationId || 0 },
+    { enabled: !!waConversationId, refetchInterval: 15000 }
+  );
+  const createNoteMut = trpc.whatsapp.notes.create.useMutation({
+    onSuccess: () => { notesQ.refetch(); toast.success("Nota interna adicionada"); setMessageText(""); setIsNoteMode(false); },
+    onError: (e) => toast.error(e.message || "Erro ao criar nota"),
+  });
+
+  // Conversation events/timeline
+  const eventsQ = trpc.whatsapp.events.list.useQuery(
+    { waConversationId: waConversationId || 0 },
+    { enabled: !!waConversationId && showTimeline, refetchInterval: 30000 }
+  );
+
+  // Transfer mutation
+  const transferMut = trpc.whatsapp.transfer.execute.useMutation({
+    onSuccess: () => { eventsQ.refetch(); notesQ.refetch(); toast.success("Conversa transferida com sucesso"); },
+    onError: (e) => toast.error(e.message || "Erro ao transferir"),
+  });
 
   // Queries
   const messagesQ = trpc.whatsapp.messagesByContact.useQuery(
@@ -1304,6 +1332,19 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
     const number = contact?.phone?.replace(/\D/g, "") || "";
     if (!number) return;
 
+    // Internal note mode: send as note instead of WA message
+    if (isNoteMode && waConversationId) {
+      createNoteMut.mutate({
+        waConversationId,
+        sessionId,
+        remoteJid,
+        content: messageText.trim(),
+      });
+      setMessageText("");
+      if (textareaRef.current) textareaRef.current.style.height = "42px";
+      return;
+    }
+
     if (replyTarget) {
       sendTextWithQuote.mutate({
         sessionId, number,
@@ -1319,7 +1360,7 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
     if (textareaRef.current) textareaRef.current.style.height = "42px";
     // Send paused presence
     sendPresencePaused();
-  }, [messageText, sessionId, contact, isSending, replyTarget]);
+  }, [messageText, sessionId, contact, isSending, replyTarget, isNoteMode, waConversationId, remoteJid]);
 
   // File uploads
   const handleFileSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1640,6 +1681,26 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
               <Briefcase className="w-[18px] h-[18px] text-muted-foreground" />
             </button>
           )}
+          {/* Transfer button */}
+          {waConversationId && (
+            <button
+              onClick={() => setShowTransfer(true)}
+              title="Transferir conversa"
+              className="w-[34px] h-[34px] flex items-center justify-center hover:bg-wa-hover rounded-full transition-colors text-muted-foreground"
+            >
+              <ArrowRightLeft className="w-[18px] h-[18px]" />
+            </button>
+          )}
+          {/* Timeline toggle */}
+          <button
+            onClick={() => setShowTimeline(!showTimeline)}
+            title="Timeline de eventos"
+            className={`w-[34px] h-[34px] flex items-center justify-center rounded-full transition-colors ${
+              showTimeline ? "bg-blue-500/15 text-blue-500" : "hover:bg-wa-hover text-muted-foreground"
+            }`}
+          >
+            <History className="w-[18px] h-[18px]" />
+          </button>
           <button className="w-[34px] h-[34px] flex items-center justify-center hover:bg-wa-hover rounded-full transition-colors">
             <Search className="w-[18px] h-[18px] text-muted-foreground" />
           </button>
@@ -1703,6 +1764,71 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
               </div>
             ))
           )}
+          {/* Internal Notes (displayed inline as yellow bubbles) */}
+          {notesQ.data && (notesQ.data as any[]).length > 0 && (
+            <div className="px-4 py-2">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="h-px flex-1 bg-amber-300/30" />
+                <span className="text-[11px] font-medium text-amber-600 uppercase tracking-wider flex items-center gap-1">
+                  <StickyNote className="w-3 h-3" /> Notas Internas
+                </span>
+                <div className="h-px flex-1 bg-amber-300/30" />
+              </div>
+              {(notesQ.data as any[]).map((note: any) => (
+                <div key={note.id} className="flex justify-end mb-1.5">
+                  <div className="max-w-[75%] bg-amber-100 border border-amber-200 rounded-lg px-3 py-2 shadow-sm">
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <StickyNote className="w-3 h-3 text-amber-600" />
+                      <span className="text-[11px] font-semibold text-amber-700">{note.authorName || 'Agente'}</span>
+                      <span className="text-[10px] text-amber-500">
+                        {new Date(note.createdAt).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </div>
+                    <p className="text-[14px] text-amber-900 whitespace-pre-wrap">{note.content}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Conversation Events Timeline */}
+          {showTimeline && eventsQ.data && (eventsQ.data as any[]).length > 0 && (
+            <div className="px-4 py-2">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="h-px flex-1 bg-blue-300/30" />
+                <span className="text-[11px] font-medium text-blue-600 uppercase tracking-wider flex items-center gap-1">
+                  <History className="w-3 h-3" /> Timeline
+                </span>
+                <div className="h-px flex-1 bg-blue-300/30" />
+              </div>
+              {(eventsQ.data as any[]).map((event: any) => (
+                <div key={event.id} className="flex justify-center mb-1.5">
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-1.5 shadow-sm max-w-[85%]">
+                    <div className="flex items-center gap-2 text-[12px]">
+                      {event.eventType === 'transfer' && <ArrowRightLeft className="w-3 h-3 text-blue-500" />}
+                      {event.eventType === 'assignment' && <Users className="w-3 h-3 text-green-500" />}
+                      {event.eventType === 'status_change' && <Check className="w-3 h-3 text-purple-500" />}
+                      {event.eventType === 'note' && <StickyNote className="w-3 h-3 text-amber-500" />}
+                      <span className="text-blue-700">
+                        {event.eventType === 'transfer' && `Transferido por ${event.actorName || 'Sistema'}`}
+                        {event.eventType === 'assignment' && `Atribuído a ${event.metadata?.toAgentName || 'agente'}`}
+                        {event.eventType === 'status_change' && `Status: ${event.metadata?.newStatus || ''}`}
+                        {event.eventType === 'note' && `Nota de ${event.actorName || 'Agente'}`}
+                        {event.eventType === 'queue_claim' && `Puxado da fila por ${event.actorName || 'Agente'}`}
+                      </span>
+                      <span className="text-blue-400 text-[10px]">
+                        {new Date(event.createdAt).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </div>
+                    {event.metadata?.note && (
+                      <p className="text-[11px] text-blue-600 mt-0.5 italic">"{event.metadata.note}"</p>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
           <div ref={messagesEndRef} />
         </div>
 
@@ -1728,12 +1854,35 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
         </div>
       )}
 
+      {/* ─── Note Mode Banner ─── */}
+      {isNoteMode && (
+        <div className="bg-amber-400/20 border-t border-amber-400/40 px-4 py-2 flex items-center gap-2 z-10 shrink-0">
+          <StickyNote className="w-4 h-4 text-amber-600" />
+          <span className="text-[13px] font-medium text-amber-700">Modo Nota Interna</span>
+          <span className="text-[12px] text-amber-600/80">— Só a equipe verá esta mensagem</span>
+          <button onClick={() => setIsNoteMode(false)} className="ml-auto p-1 hover:bg-amber-400/30 rounded-full transition-colors">
+            <X className="w-4 h-4 text-amber-600" />
+          </button>
+        </div>
+      )}
+
       {/* ─── Input Area ─── */}
-      <div className="bg-wa-panel-header border-t border-wa-divider px-3 py-[5px] z-10 shrink-0">
+      <div className={`border-t px-3 py-[5px] z-10 shrink-0 transition-colors ${isNoteMode ? "bg-amber-50 border-amber-300" : "bg-wa-panel-header border-wa-divider"}`}>
         {isRecording ? (
           <VoiceRecorder onSend={handleVoiceSend} onCancel={() => setIsRecording(false)} />
         ) : (
           <div className="flex items-end gap-1.5">
+            {/* Note toggle button */}
+            <button
+              onClick={() => setIsNoteMode(!isNoteMode)}
+              title={isNoteMode ? "Voltar para mensagem" : "Nota interna (só equipe vê)"}
+              className={`w-[42px] h-[42px] flex items-center justify-center rounded-full transition-all duration-200 shrink-0 self-end ${
+                isNoteMode ? "bg-amber-400/30 text-amber-600" : "hover:bg-wa-hover text-muted-foreground"
+              }`}
+            >
+              <StickyNote className="w-[20px] h-[20px]" />
+            </button>
+
             {/* Emoji picker */}
             <div className="relative shrink-0 self-end" ref={emojiPickerRef}>
               <button onClick={() => { setShowEmojiPicker(!showEmojiPicker); if (!showEmojiPicker) setShowAttach(false); }}
@@ -1760,8 +1909,12 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
             <div className="flex-1 relative">
               <textarea
                 ref={textareaRef} value={messageText} onChange={handleTextareaChange}
-                placeholder="Mensagem" rows={1}
-                className="w-full bg-wa-input-bg rounded-lg px-3 py-2.5 text-[15px] text-foreground placeholder:text-muted-foreground border border-wa-divider outline-none resize-none leading-[20px] focus:border-wa-tint/50 transition-colors"
+                placeholder={isNoteMode ? "Escreva uma nota interna (só a equipe vê)..." : "Mensagem"} rows={1}
+                className={`w-full rounded-lg px-3 py-2.5 text-[15px] placeholder:text-muted-foreground outline-none resize-none leading-[20px] transition-colors ${
+                  isNoteMode
+                    ? "bg-amber-100 border-amber-300 text-amber-900 focus:border-amber-400"
+                    : "bg-wa-input-bg border-wa-divider text-foreground focus:border-wa-tint/50"
+                } border`}
                 style={{ height: "42px", maxHeight: "140px" }}
                 onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
               />
@@ -1769,9 +1922,15 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
 
             {/* Send / Mic button */}
             {messageText.trim() ? (
-              <button onClick={handleSend} disabled={sendMessage.isPending || sendTextWithQuote.isPending || isSending}
-                className="w-[42px] h-[42px] flex items-center justify-center bg-wa-tint hover:opacity-90 rounded-full transition-all shrink-0 self-end disabled:opacity-50">
-                {sendMessage.isPending || sendTextWithQuote.isPending || isSending ? <Loader2 className="w-5 h-5 text-white animate-spin" /> : <Send className="w-[20px] h-[20px] text-white" />}
+              <button onClick={handleSend} disabled={sendMessage.isPending || sendTextWithQuote.isPending || isSending || createNoteMut.isPending}
+                className={`w-[42px] h-[42px] flex items-center justify-center hover:opacity-90 rounded-full transition-all shrink-0 self-end disabled:opacity-50 ${
+                  isNoteMode ? "bg-amber-500" : "bg-wa-tint"
+                }`}>
+                {sendMessage.isPending || sendTextWithQuote.isPending || isSending || createNoteMut.isPending
+                  ? <Loader2 className="w-5 h-5 text-white animate-spin" />
+                  : isNoteMode
+                    ? <StickyNote className="w-[20px] h-[20px] text-white" />
+                    : <Send className="w-[20px] h-[20px] text-white" />}
               </button>
             ) : (
               <button onClick={() => { setIsRecording(true); sendPresenceMut.mutate({ sessionId, number: contact?.phone?.replace(/\D/g, "") || "", presence: "recording" }); }}
@@ -1802,6 +1961,19 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
           </div>
         </div>
       )}
+      {/* ─── Transfer Dialog ─── */}
+      {showTransfer && waConversationId && (
+        <TransferDialog
+          open={showTransfer}
+          onClose={() => setShowTransfer(false)}
+          waConversationId={waConversationId}
+          sessionId={sessionId}
+          remoteJid={remoteJid}
+          currentAgentId={assignment?.assignedUserId}
+          contactName={contact?.name || remoteJid.split("@")[0]}
+        />
+      )}
+
       {/* ─── Image Lightbox ─── */}
       {lightboxUrl && (
         <div
