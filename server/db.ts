@@ -2483,7 +2483,7 @@ export async function getQueueConversations(sessionId: string, tenantId: number,
     AND wc.lastMessageAt IS NOT NULL
     AND (wc.assignedUserId IS NULL)
     AND wc.status IN ('open', 'pending')
-    AND wc.unreadCount > 0
+    AND (wc.unreadCount > 0 OR wc.queuedAt IS NOT NULL)
     ORDER BY COALESCE(wc.queuedAt, wc.lastMessageAt) DESC
     LIMIT ${limit}
   `);
@@ -2602,7 +2602,7 @@ export async function getQueueStats(tenantId: number, sessionId: string) {
     AND wc.status IN ('open', 'pending')
     AND wc.mergedIntoId IS NULL
     AND wc.lastMessageAt IS NOT NULL
-    AND wc.unreadCount > 0
+    AND (wc.unreadCount > 0 OR wc.queuedAt IS NOT NULL)
   `);
   const countRows = (countResult as any)[0] || [];
   // Get queue items with details
@@ -2623,7 +2623,7 @@ export async function getQueueStats(tenantId: number, sessionId: string) {
     AND wc.status IN ('open', 'pending')
     AND wc.mergedIntoId IS NULL
     AND wc.lastMessageAt IS NOT NULL
-    AND wc.unreadCount > 0
+    AND (wc.unreadCount > 0 OR wc.queuedAt IS NOT NULL)
     ORDER BY COALESCE(wc.queuedAt, wc.lastMessageAt) ASC
     LIMIT 50
   `);

@@ -451,7 +451,8 @@ function AgentCard({
   const isOnline = agent.agentStatus === "online" || agent.agentStatus === "active";
   const active = Number(agent.activeConversations || 0);
   const unread = Number(agent.unreadConversations || 0);
-  const isOverloaded = active > avgTickets * 1.5 && avgTickets > 0;
+  // Only show overloaded when agent has significantly more than average AND at least 10 active
+  const isOverloaded = active >= 10 && avgTickets > 0 && active > avgTickets * 2;
 
   return (
     <div className={`bg-card border rounded-xl overflow-hidden transition-all ${

@@ -2734,3 +2734,8 @@
   - [x] Botão "Puxar" explícito para assumir o atendimento
   - [x] Botão "Atribuir" ao lado de Puxar para transferir para outro atendente (admin only)
   - [x] Dropdown de seleção de agente ao clicar em Atribuir
+
+## Correções Supervisão + Fila Inbox (Mar 14 - v3)
+- [x] BUG: Lógica de sobrecarga: threshold mínimo 10 ativos + 2x média (era 1.5x sem mínimo)
+- [x] BUG: Devolver à fila: query corrigida para incluir queuedAt IS NOT NULL (getQueueConversations + getQueueStats)
+- [x] DESIGN: Botões Puxar/Atribuir modernizados: ícones circulares coloridos no hover + painel de atribuição slide-in

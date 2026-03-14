@@ -1326,7 +1326,7 @@ export default function InboxPage() {
                   const waitLabel = waitMinutes < 1 ? "agora" : waitMinutes < 60 ? `${waitMinutes}min` : `${Math.floor(waitMinutes / 60)}h${waitMinutes % 60}min`;
                   const isAssigningThis = assigningQueueJid === conv.remoteJid;
                   return (
-                  <div key={conv.remoteJid} className="relative">
+                  <div key={conv.remoteJid} className="group/q relative">
                     <ConversationItem
                       conv={conv}
                       isActive={selectedJid === conv.remoteJid}
@@ -1335,71 +1335,70 @@ export default function InboxPage() {
                       onClick={() => handleSelectQueueConv(conv.remoteJid)}
                       waitLabel={waitLabel}
                     />
-                    {/* Action buttons below the conversation item */}
-                    <div className="flex items-center gap-1.5 px-3 pb-2 -mt-1">
-                      {!isAssigningThis ? (
-                        <>
+                    {/* Hover action icons — clean overlay on the right side */}
+                    {!isAssigningThis && (
+                      <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 opacity-0 group-hover/q:opacity-100 transition-all duration-150">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (activeSession?.sessionId) {
+                              claimMutation.mutate({ sessionId: activeSession.sessionId, remoteJid: conv.remoteJid });
+                            }
+                          }}
+                          disabled={claimMutation.isPending}
+                          title="Puxar para mim"
+                          className="w-8 h-8 flex items-center justify-center rounded-full bg-wa-tint text-white shadow-lg shadow-wa-tint/30 hover:scale-110 transition-transform"
+                        >
+                          <HandMetal className="w-3.5 h-3.5" />
+                        </button>
+                        {isAdmin.isAdmin && (
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              if (activeSession?.sessionId) {
-                                claimMutation.mutate({ sessionId: activeSession.sessionId, remoteJid: conv.remoteJid });
-                              }
+                              setAssigningQueueJid(conv.remoteJid);
                             }}
-                            disabled={claimMutation.isPending}
-                            className="flex items-center gap-1 px-2.5 py-1 bg-wa-tint/10 text-wa-tint text-[11px] font-medium rounded-md hover:bg-wa-tint/20 transition-colors"
+                            title="Atribuir a agente"
+                            className="w-8 h-8 flex items-center justify-center rounded-full bg-blue-500 text-white shadow-lg shadow-blue-500/30 hover:scale-110 transition-transform"
                           >
-                            <HandMetal className="w-3 h-3" />
-                            Puxar
+                            <UserPlus className="w-3.5 h-3.5" />
                           </button>
-                          {isAdmin.isAdmin && (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setAssigningQueueJid(conv.remoteJid);
-                              }}
-                              className="flex items-center gap-1 px-2.5 py-1 bg-blue-500/10 text-blue-600 text-[11px] font-medium rounded-md hover:bg-blue-500/20 transition-colors"
-                            >
-                              <UserPlus className="w-3 h-3" />
-                              Atribuir
-                            </button>
-                          )}
-                        </>
-                      ) : (
-                        /* Agent selection dropdown */
-                        <div className="flex items-center gap-1.5 w-full">
-                          <select
-                            value={selectedAgentForQueue || ""}
-                            onChange={(e) => setSelectedAgentForQueue(Number(e.target.value))}
-                            className="flex-1 px-2 py-1 bg-muted/50 border border-border rounded-md text-[11px] text-foreground outline-none"
-                            autoFocus
-                          >
-                            <option value="">Selecionar agente...</option>
-                            {agents.map((a) => (
-                              <option key={a.id} value={a.id}>{a.name}</option>
-                            ))}
-                          </select>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (selectedAgentForQueue && activeSession?.sessionId) {
-                                assignFromQueueMut.mutate({ sessionId: activeSession.sessionId, remoteJid: conv.remoteJid, agentId: selectedAgentForQueue });
-                              }
-                            }}
-                            disabled={!selectedAgentForQueue || assignFromQueueMut.isPending}
-                            className="px-2 py-1 bg-blue-500 text-white text-[11px] font-medium rounded-md hover:bg-blue-600 transition-colors disabled:opacity-50"
-                          >
-                            {assignFromQueueMut.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "OK"}
-                          </button>
-                          <button
-                            onClick={(e) => { e.stopPropagation(); setAssigningQueueJid(null); setSelectedAgentForQueue(null); }}
-                            className="px-1.5 py-1 text-muted-foreground text-[11px] rounded-md hover:bg-muted transition-colors"
-                          >
-                            ✕
-                          </button>
-                        </div>
-                      )}
-                    </div>
+                        )}
+                      </div>
+                    )}
+                    {/* Agent assignment inline — slides in below */}
+                    {isAssigningThis && (
+                      <div className="mx-3 mb-1 flex items-center gap-1.5 p-1.5 bg-blue-500/5 border border-blue-500/20 rounded-lg animate-in slide-in-from-top-1 duration-150">
+                        <select
+                          value={selectedAgentForQueue || ""}
+                          onChange={(e) => setSelectedAgentForQueue(Number(e.target.value))}
+                          className="flex-1 px-2 py-1.5 bg-background border border-border rounded-md text-[12px] text-foreground outline-none focus:border-blue-400"
+                          autoFocus
+                        >
+                          <option value="">Selecionar agente...</option>
+                          {agents.map((a) => (
+                            <option key={a.id} value={a.id}>{a.name}</option>
+                          ))}
+                        </select>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (selectedAgentForQueue && activeSession?.sessionId) {
+                              assignFromQueueMut.mutate({ sessionId: activeSession.sessionId, remoteJid: conv.remoteJid, agentId: selectedAgentForQueue });
+                            }
+                          }}
+                          disabled={!selectedAgentForQueue || assignFromQueueMut.isPending}
+                          className="px-3 py-1.5 bg-blue-500 text-white text-[12px] font-medium rounded-md hover:bg-blue-600 transition-colors disabled:opacity-40"
+                        >
+                          {assignFromQueueMut.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "Confirmar"}
+                        </button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setAssigningQueueJid(null); setSelectedAgentForQueue(null); }}
+                          className="w-7 h-7 flex items-center justify-center text-muted-foreground rounded-md hover:bg-muted transition-colors"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    )}
                   </div>
                   );
                 })
