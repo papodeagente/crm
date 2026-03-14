@@ -37,8 +37,10 @@ export default function Deals() {
   const dateFilter = useDateFilter("all");
   const dealFilters = useDealFilters();
 
+  const [dealPage, setDealPage] = useState(0);
+  const dealPageSize = 50;
   const deals = trpc.crm.deals.list.useQuery({
-    tenantId: TENANT_ID, limit: 200,
+    tenantId: TENANT_ID, limit: dealPageSize, offset: dealPage * dealPageSize,
     dateFrom: dateFilter.dates.dateFrom, dateTo: dateFilter.dates.dateTo,
     ...dealFilters.filters,
   });
@@ -79,10 +81,11 @@ export default function Deals() {
   });
 
   const defaultPipeline = pipelines.data?.[0];
-  const currentList = showTrash ? (deletedDeals.data || []) : (deals.data || []);
-  const totalValue = (deals.data || []).reduce((sum: number, d: any) => sum + (d.valueCents || 0), 0);
-  const openCount = (deals.data || []).filter((d: any) => d.status === "open").length;
-  const wonCount = (deals.data || []).filter((d: any) => d.status === "won").length;
+  const dealItems = (deals.data as any)?.items || deals.data || [];
+  const currentList = showTrash ? (deletedDeals.data || []) : (Array.isArray(dealItems) ? dealItems : []);
+  const totalValue = (Array.isArray(dealItems) ? dealItems : []).reduce((sum: number, d: any) => sum + (d.valueCents || 0), 0);
+  const openCount = (Array.isArray(dealItems) ? dealItems : []).filter((d: any) => d.status === "open").length;
+  const wonCount = (Array.isArray(dealItems) ? dealItems : []).filter((d: any) => d.status === "won").length;
 
   const allSelected = currentList.length > 0 && currentList.every((d: any) => selectedIds.has(d.id));
   const someSelected = selectedIds.size > 0;
@@ -311,6 +314,24 @@ export default function Deals() {
           </table>
         </div>
       </Card>
+
+      {/* Pagination */}
+      {!showTrash && (deals.data as any)?.totalCount > dealPageSize && (
+        <div className="flex items-center justify-between px-4 py-3">
+          <p className="text-xs text-muted-foreground">
+            Mostrando {dealPage * dealPageSize + 1}–{Math.min((dealPage + 1) * dealPageSize, (deals.data as any)?.totalCount || 0)} de {(deals.data as any)?.totalCount || 0} negociações
+          </p>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" disabled={dealPage === 0} onClick={() => setDealPage(p => p - 1)}>
+              Anterior
+            </Button>
+            <span className="text-xs text-muted-foreground">Página {dealPage + 1} de {Math.ceil(((deals.data as any)?.totalCount || 0) / dealPageSize)}</span>
+            <Button variant="outline" size="sm" disabled={dealPage >= Math.ceil(((deals.data as any)?.totalCount || 0) / dealPageSize) - 1} onClick={() => setDealPage(p => p + 1)}>
+              Próximo
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Confirm bulk soft-delete dialog */}
       <Dialog open={confirmDelete} onOpenChange={setConfirmDelete}>

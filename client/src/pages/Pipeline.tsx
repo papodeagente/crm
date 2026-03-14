@@ -143,7 +143,8 @@ export default function Pipeline() {
     {
       tenantId: TENANT_ID,
       pipelineId: activePipeline?.id,
-      limit: 200,
+      limit: 5000,
+      status: statusFilter !== "all" ? statusFilter : undefined,
       ...dealFilters.filters,
       ...(ownerFilter !== "all" ? { ownerUserId: ownerFilter } : {}),
     },
@@ -217,25 +218,30 @@ export default function Pipeline() {
   const moveStage = trpc.crm.deals.moveStage.useMutation({
     onMutate: async ({ dealId, toStageId }) => {
       await utils.crm.deals.list.cancel();
-      const prev = utils.crm.deals.list.getData({ tenantId: TENANT_ID, pipelineId: activePipeline?.id, limit: 200 });
+      const prev = utils.crm.deals.list.getData({ tenantId: TENANT_ID, pipelineId: activePipeline?.id, limit: 5000, status: statusFilter !== "all" ? statusFilter : undefined });
       utils.crm.deals.list.setData(
-        { tenantId: TENANT_ID, pipelineId: activePipeline?.id, limit: 200 },
-        (old: any) => old?.map((d: any) => d.id === dealId ? { ...d, stageId: toStageId } : d)
+        { tenantId: TENANT_ID, pipelineId: activePipeline?.id, limit: 5000, status: statusFilter !== "all" ? statusFilter : undefined },
+        (old: any) => {
+          if (!old) return old;
+          if (old.items) return { ...old, items: old.items.map((d: any) => d.id === dealId ? { ...d, stageId: toStageId } : d) };
+          return old;
+        }
       );
       return { prev };
     },
     onError: (_err, _vars, ctx) => {
       if (ctx?.prev) {
-        utils.crm.deals.list.setData({ tenantId: TENANT_ID, pipelineId: activePipeline?.id, limit: 200 }, ctx.prev);
+        utils.crm.deals.list.setData({ tenantId: TENANT_ID, pipelineId: activePipeline?.id, limit: 5000, status: statusFilter !== "all" ? statusFilter : undefined }, ctx.prev);
       }
       toast.error("Erro ao mover negociação");
     },
     onSettled: () => { utils.crm.deals.list.invalidate(); },
   });
 
+  const dealItems = deals.data?.items || deals.data as any || [];
   const sortedDeals = useMemo(() => {
-    if (!deals.data) return [];
-    let filtered = [...deals.data];
+    if (!dealItems || !Array.isArray(dealItems)) return [];
+    let filtered = [...dealItems];
     if (statusFilter !== "all") filtered = filtered.filter((d: any) => d.status === statusFilter);
     filtered.sort((a: any, b: any) => {
       switch (sortMode) {
@@ -246,7 +252,7 @@ export default function Pipeline() {
       }
     });
     return filtered;
-  }, [deals.data, statusFilter, sortMode]);
+  }, [dealItems, statusFilter, sortMode]);
 
   const totalDeals = sortedDeals.length;
 
@@ -526,7 +532,7 @@ export default function Pipeline() {
                           <DealCard
                             key={deal.id}
                             deal={deal}
-                            contacts={contacts.data || []}
+                            contacts={(contacts.data as any)?.items || contacts.data || []}
                             accounts={allAccounts.data || []}
                             overdueData={(overdueSummary.data as any)?.[deal.id] || null}
                             pendingCount={(pendingCounts.data as any)?.[deal.id] || 0}
@@ -612,7 +618,7 @@ export default function Pipeline() {
                 </thead>
                 <tbody>
                   {sortedDeals.map((deal: any) => {
-                    const contact = (contacts.data || []).find((c: any) => c.id === deal.contactId);
+                    const contact = ((contacts.data as any)?.items || contacts.data || []).find((c: any) => c.id === deal.contactId);
                     const stage = (stages.data || []).find((s: any) => s.id === deal.stageId);
                     const style = getStatusStyle(deal.status);
                     const isSelected = selectedDealIds.has(deal.id);
@@ -661,7 +667,7 @@ export default function Pipeline() {
                 </thead>
                 <tbody>
                   {(deletedDeals.data || []).map((deal: any) => {
-                    const contact = (contacts.data || []).find((c: any) => c.id === deal.contactId);
+                    const contact = ((contacts.data as any)?.items || contacts.data || []).find((c: any) => c.id === deal.contactId);
                     const style = getStatusStyle(deal.status);
                     const isSelected = selectedDealIds.has(deal.id);
                     return (
@@ -723,7 +729,7 @@ export default function Pipeline() {
         dealTitle={celebration.title}
         dealValue={celebration.value}
       />
-      <CreateDealDialog open={showCreateDeal} onOpenChange={setShowCreateDeal} pipelineId={activePipeline?.id} stages={stages.data || []} contacts={contacts.data || []} accounts={allAccounts.data || []} pipelines={pipelines.data?.filter((p: any) => !p.isArchived) || []} />
+      <CreateDealDialog open={showCreateDeal} onOpenChange={setShowCreateDeal} pipelineId={activePipeline?.id} stages={stages.data || []} contacts={(contacts.data as any)?.items || contacts.data || []} accounts={allAccounts.data || []} pipelines={pipelines.data?.filter((p: any) => !p.isArchived) || []} />
       {showTaskForm && (
         <TaskFormDialog
           open={true}

@@ -17,7 +17,9 @@ export const crmRouter = router({
         // Non-admin users only see their own contacts
         const isAdmin = ctx.saasUser?.role === "admin";
         const ownerUserId = isAdmin ? undefined : ctx.saasUser?.userId;
-        return crm.listContacts(input.tenantId, { ...input, ownerUserId });
+        const items = await crm.listContacts(input.tenantId, { ...input, ownerUserId });
+        const totalCount = await crm.countContacts(input.tenantId, { ...input, ownerUserId });
+        return { items, totalCount };
       }),
     get: protectedProcedure
       .input(z.object({ tenantId: z.number(), id: z.number() }))
@@ -247,7 +249,7 @@ export const crmRouter = router({
         pipelineId: z.number().optional(),
         stageId: z.number().optional(),
         status: z.string().optional(),
-        limit: z.number().default(200),
+        limit: z.number().default(5000),
         offset: z.number().default(0),
         dateFrom: z.string().optional(),
         dateTo: z.string().optional(),
@@ -274,7 +276,9 @@ export const crmRouter = router({
         // Non-admin users only see their own deals (unless they explicitly filter by another owner)
         const isAdmin = ctx.saasUser?.role === "admin";
         const ownerFilter = isAdmin ? input.ownerUserId : (input.ownerUserId || ctx.saasUser?.userId);
-        return crm.listDeals(input.tenantId, { ...input, ownerUserId: ownerFilter });
+        const items = await crm.listDeals(input.tenantId, { ...input, ownerUserId: ownerFilter });
+        const totalCount = await crm.countDeals(input.tenantId, input.status, { ...input, ownerUserId: ownerFilter });
+        return { items, totalCount };
       }),
     get: protectedProcedure
       .input(z.object({ tenantId: z.number(), id: z.number() }))

@@ -182,6 +182,7 @@ export const rdCrmImportRouter = router({
       importCampaigns: z.boolean().default(true),
       importLossReasons: z.boolean().default(true),
       importUsers: z.boolean().default(true),
+      cleanBeforeImport: z.boolean().default(false),
     }))
     .mutation(async ({ ctx, input }) => {
       const tenantId = (ctx as any).saasUser?.tenantId ?? input.tenantId;
@@ -235,6 +236,7 @@ async function runImport(
     importContacts: boolean;
     importDeals: boolean;
     importTasks: boolean;
+    cleanBeforeImport: boolean;
   },
   enabledCategories: string[],
 ) {
@@ -248,6 +250,42 @@ async function runImport(
   console.log("[RD Import] Ensuring rdExternalId columns exist...");
   updateProgress(userId, { phase: "Preparando banco de dados..." });
   await ensureRdExternalIdColumns();
+
+  // ─── Clean before import: remove all RD-imported data ───
+  if (input.cleanBeforeImport) {
+    console.log("[RD Import] Cleaning all previously imported RD Station data...");
+    updateProgress(userId, { phase: "Limpando dados importados anteriormente..." });
+    try {
+      // Delete in order: tasks → deal_products → deal_history → deals → contacts → accounts → stages → pipelines → products → sources → campaigns → loss_reasons → crm_users (with rdExternalId)
+      await db.execute(sql.raw(`DELETE FROM crm_tasks WHERE tenantId = ${tenantId} AND rdExternalId IS NOT NULL`));
+      await db.execute(sql.raw(`DELETE FROM deal_products WHERE tenantId = ${tenantId} AND dealId IN (SELECT id FROM deals WHERE tenantId = ${tenantId} AND rdExternalId IS NOT NULL)`));
+      await db.execute(sql.raw(`DELETE FROM deal_history WHERE tenantId = ${tenantId} AND dealId IN (SELECT id FROM deals WHERE tenantId = ${tenantId} AND rdExternalId IS NOT NULL)`));
+      await db.execute(sql.raw(`DELETE FROM deals WHERE tenantId = ${tenantId} AND rdExternalId IS NOT NULL`));
+      // Also delete deals that were imported via leadSource but don't have rdExternalId (from old imports)
+      await db.execute(sql.raw(`DELETE FROM deal_products WHERE tenantId = ${tenantId} AND dealId IN (SELECT id FROM deals WHERE tenantId = ${tenantId} AND leadSource = 'rd_station_crm')`));
+      await db.execute(sql.raw(`DELETE FROM deal_history WHERE tenantId = ${tenantId} AND dealId IN (SELECT id FROM deals WHERE tenantId = ${tenantId} AND leadSource = 'rd_station_crm')`));
+      await db.execute(sql.raw(`DELETE FROM deals WHERE tenantId = ${tenantId} AND leadSource = 'rd_station_crm'`));
+      await db.execute(sql.raw(`DELETE FROM contacts WHERE tenantId = ${tenantId} AND rdExternalId IS NOT NULL`));
+      await db.execute(sql.raw(`DELETE FROM contacts WHERE tenantId = ${tenantId} AND source = 'rd_station_crm'`));
+      await db.execute(sql.raw(`DELETE FROM accounts WHERE tenantId = ${tenantId} AND rdExternalId IS NOT NULL`));
+      await db.execute(sql.raw(`DELETE FROM pipeline_stages WHERE tenantId = ${tenantId} AND rdExternalId IS NOT NULL`));
+      // Delete non-default pipelines that have rdExternalId or were created by old imports (not the system defaults)
+      await db.execute(sql.raw(`DELETE FROM pipeline_stages WHERE tenantId = ${tenantId} AND pipelineId IN (SELECT id FROM pipelines WHERE tenantId = ${tenantId} AND rdExternalId IS NOT NULL)`));
+      await db.execute(sql.raw(`DELETE FROM pipelines WHERE tenantId = ${tenantId} AND rdExternalId IS NOT NULL`));
+      // Also delete pipelines that match RD Station names but don't have rdExternalId (old imports)
+      await db.execute(sql.raw(`DELETE FROM pipeline_stages WHERE tenantId = ${tenantId} AND pipelineId IN (SELECT id FROM pipelines WHERE tenantId = ${tenantId} AND isDefault = 0 AND name NOT IN ('Funil de Vendas', 'Funil de Pós-Venda'))`));
+      await db.execute(sql.raw(`DELETE FROM pipelines WHERE tenantId = ${tenantId} AND isDefault = 0 AND name NOT IN ('Funil de Vendas', 'Funil de Pós-Venda')`));
+      await db.execute(sql.raw(`DELETE FROM product_catalog WHERE tenantId = ${tenantId} AND rdExternalId IS NOT NULL`));
+      await db.execute(sql.raw(`DELETE FROM lead_sources WHERE tenantId = ${tenantId} AND rdExternalId IS NOT NULL`));
+      await db.execute(sql.raw(`DELETE FROM campaigns WHERE tenantId = ${tenantId} AND rdExternalId IS NOT NULL`));
+      await db.execute(sql.raw(`DELETE FROM loss_reasons WHERE tenantId = ${tenantId} AND rdExternalId IS NOT NULL`));
+      await db.execute(sql.raw(`DELETE FROM crm_users WHERE tenantId = ${tenantId} AND rdExternalId IS NOT NULL`));
+      console.log("[RD Import] Clean complete.");
+    } catch (e: any) {
+      console.error("[RD Import] Clean error:", e.message);
+      // Continue with import even if clean fails partially
+    }
+  }
 
   const results: Record<string, { imported: number; skipped: number; updated: number; errors: string[] }> = {};
   const rdCounts: Record<string, number> = {};
@@ -682,7 +720,8 @@ async function runImport(
             }
 
             const email = c.emails?.[0]?.email || undefined;
-            const phone = c.phones?.[0]?.phone || undefined;
+            const rawPhone = c.phones?.[0]?.phone || undefined;
+            const phone = rawPhone ? rawPhone.substring(0, 32) : undefined;
             const contactName = (c.name || "").trim() || email || phone || "Sem nome";
 
             const result = await crm.createContact({
@@ -842,7 +881,8 @@ async function runImport(
               if (!contactId) {
                 const dealContactEmail = firstContact.emails?.[0]?.email;
                 const dealContactName = (firstContact.name || "").trim();
-                const phone = firstContact.phones?.[0]?.phone || undefined;
+                const rawPhone = firstContact.phones?.[0]?.phone || undefined;
+                const phone = rawPhone ? rawPhone.substring(0, 32) : undefined;
                 if (dealContactName || dealContactEmail) {
                   try {
                     const newContact = await crm.createContact({

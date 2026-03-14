@@ -439,7 +439,7 @@ function CreateDealDialog({
     try {
       const cleaned = contactPhone.replace(/\D/g, "");
       const formatted = cleaned.startsWith("55") ? `+${cleaned}` : `+55${cleaned}`;
-      const contacts = (contactsQ.data || []) as any[];
+      const contacts = ((contactsQ.data as any)?.items || contactsQ.data || []) as any[];
       let contactId = contacts.find((c: any) => {
         const cPhone = c.phone?.replace(/\D/g, "") || "";
         return cPhone === cleaned || cPhone === cleaned.replace(/^55/, "") || `55${cPhone}` === cleaned;
@@ -542,7 +542,7 @@ function NewChatPanel({
   const trpcUtils = trpc.useUtils();
 
   const contacts = useMemo(() => {
-    const list = (contactsQ.data || []) as Array<{ id: number; name: string; phone?: string | null; email?: string | null; accountName?: string | null }>;
+    const list = (((contactsQ.data as any)?.items || contactsQ.data || []) as any) as Array<{ id: number; name: string; phone?: string | null; email?: string | null; accountName?: string | null }>;
     if (!searchTerm.trim()) return list.filter((c) => c.phone);
     const q = searchTerm.toLowerCase();
     return list.filter((c) => c.phone && (c.name.toLowerCase().includes(q) || (c.phone && c.phone.includes(q)) || (c.accountName && c.accountName.toLowerCase().includes(q))));
@@ -838,7 +838,7 @@ export default function InboxPage() {
   // Contact name map (CRM phone → contact info)
   const contactNameMap = useMemo(() => {
     const map = new Map<string, { id: number; name: string; phone: string; email?: string; avatarUrl?: string }>();
-    for (const c of (contactsQ.data as any[]) || []) {
+    for (const c of (((contactsQ.data as any)?.items || contactsQ.data || []) as any[])) {
       if (c.phone) {
         const cleaned = c.phone.replace(/\D/g, "");
         const entry = { id: c.id, name: c.name, phone: c.phone, email: c.email || undefined, avatarUrl: undefined };

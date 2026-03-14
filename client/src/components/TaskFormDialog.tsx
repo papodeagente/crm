@@ -159,15 +159,16 @@ export default function TaskFormDialog({
   }, [open, editTask, dealId, editAssigneeIds]);
 
   // Filter deals by selected account
+  const dealItemsList = (deals.data as any)?.items || (Array.isArray(deals.data) ? deals.data : []);
   const filteredDeals = useMemo(() => {
-    if (!deals.data) return [];
-    if (selectedAccountId === "none") return deals.data;
-    return deals.data.filter((d: any) => d.accountId === Number(selectedAccountId));
-  }, [deals.data, selectedAccountId]);
+    if (!dealItemsList || !dealItemsList.length) return [];
+    if (selectedAccountId === "none") return dealItemsList;
+    return dealItemsList.filter((d: any) => d.accountId === Number(selectedAccountId));
+  }, [dealItemsList, selectedAccountId]);
 
   const effectiveDealId = showDealSelector ? selectedDealId : (dealId || editTask?.entityId);
   const effectiveDealTitle = showDealSelector
-    ? (deals.data?.find((d: any) => d.id === selectedDealId)?.title || "")
+    ? (dealItemsList?.find((d: any) => d.id === selectedDealId)?.title || "")
     : (dealTitle || "");
 
   const handleRemoveAssignee = (userId: number) => {

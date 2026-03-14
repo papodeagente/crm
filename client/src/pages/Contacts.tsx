@@ -38,7 +38,9 @@ export default function Contacts() {
   const isAdmin = user?.role === "admin";
   const dateFilter = useDateFilter("all");
 
-  const contacts = trpc.crm.contacts.list.useQuery({ tenantId: TENANT_ID, search: search || undefined, limit: 100, dateFrom: dateFilter.dates.dateFrom, dateTo: dateFilter.dates.dateTo });
+  const [page, setPage] = useState(0);
+  const pageSize = 50;
+  const contacts = trpc.crm.contacts.list.useQuery({ tenantId: TENANT_ID, search: search || undefined, limit: pageSize, offset: page * pageSize, dateFrom: dateFilter.dates.dateFrom, dateTo: dateFilter.dates.dateTo });
   const deletedContacts = trpc.crm.contacts.listDeleted.useQuery({ tenantId: TENANT_ID, limit: 100 }, { enabled: showTrash });
 
   const createContact = trpc.crm.contacts.create.useMutation({
@@ -77,8 +79,11 @@ export default function Contacts() {
     onError: (err) => toast.error(err.message),
   });
 
-  const currentList = showTrash ? (deletedContacts.data || []) : (contacts.data || []);
-  const total = contacts.data?.length ?? 0;
+  const contactItems = contacts.data?.items || [];
+  const totalCount = contacts.data?.totalCount ?? 0;
+  const currentList = showTrash ? (deletedContacts.data || []) : contactItems;
+  const total = totalCount;
+  const totalPages = Math.ceil(totalCount / pageSize);
 
   const allSelected = currentList.length > 0 && currentList.every((c: any) => selectedIds.has(c.id));
   const someSelected = selectedIds.size > 0;
@@ -320,6 +325,24 @@ export default function Contacts() {
           </tbody>
         </table>
       </div>
+
+      {/* Pagination */}
+      {!showTrash && totalPages > 1 && (
+        <div className="flex items-center justify-between px-4 py-3 border-t border-border/30">
+          <p className="text-xs text-muted-foreground">
+            Mostrando {page * pageSize + 1}–{Math.min((page + 1) * pageSize, totalCount)} de {totalCount} contatos
+          </p>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" disabled={page === 0} onClick={() => setPage(p => p - 1)}>
+              Anterior
+            </Button>
+            <span className="text-xs text-muted-foreground">Página {page + 1} de {totalPages}</span>
+            <Button variant="outline" size="sm" disabled={page >= totalPages - 1} onClick={() => setPage(p => p + 1)}>
+              Próximo
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Confirm bulk soft-delete dialog */}
       <Dialog open={confirmDelete} onOpenChange={setConfirmDelete}>

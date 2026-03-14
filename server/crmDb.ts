@@ -187,9 +187,14 @@ export async function listDeletedContacts(tenantId: number, limit = 50) {
   const db = await getDb(); if (!db) return [];
   return db.select().from(contacts).where(and(eq(contacts.tenantId, tenantId), isNotNull(contacts.deletedAt))).orderBy(desc(contacts.deletedAt)).limit(limit);
 }
-export async function countContacts(tenantId: number) {
+export async function countContacts(tenantId: number, opts?: { search?: string; stage?: string; dateFrom?: string; dateTo?: string; ownerUserId?: number }) {
   const db = await getDb(); if (!db) return 0;
-  const rows = await db.select({ count: sql<number>`count(*)` }).from(contacts).where(and(eq(contacts.tenantId, tenantId), isNull(contacts.deletedAt)));
+  const conditions: any[] = [eq(contacts.tenantId, tenantId), isNull(contacts.deletedAt)];
+  if (opts?.search) conditions.push(like(contacts.name, `%${opts.search}%`));
+  if (opts?.dateFrom) conditions.push(gte(contacts.createdAt, new Date(opts.dateFrom + "T00:00:00")));
+  if (opts?.dateTo) conditions.push(lte(contacts.createdAt, new Date(opts.dateTo + "T23:59:59")));
+  if (opts?.ownerUserId) conditions.push(eq(contacts.ownerUserId, opts.ownerUserId));
+  const rows = await db.select({ count: sql<number>`count(*)` }).from(contacts).where(and(...conditions));
   return rows[0]?.count || 0;
 }
 
@@ -324,10 +329,16 @@ export async function updateDeal(tenantId: number, id: number, data: Partial<{ t
   const db = await getDb(); if (!db) return;
   await db.update(deals).set({ ...data, lastActivityAt: new Date() }).where(and(eq(deals.id, id), eq(deals.tenantId, tenantId)));
 }
-export async function countDeals(tenantId: number, status?: string) {
+export async function countDeals(tenantId: number, status?: string, opts?: { pipelineId?: number; stageId?: number; titleSearch?: string; dateFrom?: string; dateTo?: string; ownerUserId?: number }) {
   const db = await getDb(); if (!db) return 0;
   const conditions: any[] = [eq(deals.tenantId, tenantId), isNull(deals.deletedAt)];
   if (status) conditions.push(eq(deals.status, status as any));
+  if (opts?.pipelineId) conditions.push(eq(deals.pipelineId, opts.pipelineId));
+  if (opts?.stageId) conditions.push(eq(deals.stageId, opts.stageId));
+  if (opts?.titleSearch) conditions.push(like(deals.title, `%${opts.titleSearch}%`));
+  if (opts?.dateFrom) conditions.push(gte(deals.createdAt, new Date(opts.dateFrom + "T00:00:00")));
+  if (opts?.dateTo) conditions.push(lte(deals.createdAt, new Date(opts.dateTo + "T23:59:59")));
+  if (opts?.ownerUserId) conditions.push(eq(deals.ownerUserId, opts.ownerUserId));
   const rows = await db.select({ count: sql<number>`count(*)` }).from(deals).where(and(...conditions));
   return rows[0]?.count || 0;
 }

@@ -964,7 +964,7 @@ export default function DealDetail() {
             {activeTab === "participants" && (
               <ParticipantsPanel
                 participants={participantsQ.data || []}
-                contacts={contactsQ.data || []}
+                contacts={(contactsQ.data as any)?.items || contactsQ.data || []}
                 dealId={dealId}
                 onRefresh={() => participantsQ.refetch()}
               />
@@ -1122,7 +1122,7 @@ export default function DealDetail() {
                 <Select value={selectedContactId ? String(selectedContactId) : ""} onValueChange={(v) => setSelectedContactId(Number(v))}>
                   <SelectTrigger><SelectValue placeholder="Buscar contato..." /></SelectTrigger>
                   <SelectContent>
-                    {(contactsQ.data || []).map((c: any) => (
+                    {((contactsQ.data as any)?.items || contactsQ.data || []).map((c: any) => (
                       <SelectItem key={c.id} value={String(c.id)}>{c.name}{c.phone ? ` — ${c.phone}` : ""}</SelectItem>
                     ))}
                   </SelectContent>

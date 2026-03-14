@@ -2620,3 +2620,17 @@
 - [x] Implementar logs detalhados da importação (início/fim, erros, registros ignorados, conflitos)
 - [x] Implementar tratamento de erros robusto (retry, reprocessamento parcial, relatório final)
 - [x] Escrever testes automatizados para importação do RD Station (30 testes passando)
+
+## Correção Importação RD Station CRM v3 — Fidelidade Total (Mar 14)
+- [x] Diagnosticar por que 2049 negociações ativas não aparecem no funil Kanban (pipeline/stage não vinculados)
+- [x] Corrigir importação para vincular deals ao pipeline e stage corretos (clonar estrutura do RD)
+- [x] Remover limite de 100 na listagem de contatos (mostrar todos com paginação server-side)
+- [x] Remover limite na listagem de negociações em modo lista (mostrar todos com limit 5000)
+- [x] Testar importação real com token do RD Station (13.955 deals, 10.000 contatos, 10.000 tasks importados)
+- [x] Validar que 83 negociações em andamento do Funil de Vendas 1 aparecem corretamente no Kanban (100% match)
+- [x] Garantir fidelidade entre RD Station e Entur OS (2.049 open deals = 100% match em todos os 7 pipelines)
+- [x] Adicionar opção 'Limpar antes de reimportar' na tela de importação
+- [x] Adicionar filtro de status no backend para Kanban (evitar carregar deals won/lost desnecessariamente)
+- [x] Corrigir truncamento de telefone > 32 chars que causava erro na importação
+- [x] Paginação server-side em Contatos (50/página, 315 páginas para 15.705 contatos)
+- [x] Todos os 12 testes do RD CRM Import passando

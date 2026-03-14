@@ -78,6 +78,7 @@ export default function RDCrmImport() {
   const [token, setToken] = useState("");
   const [showToken, setShowToken] = useState(false);
   const [config, setConfig] = useState<ImportConfig>(defaultConfig);
+  const [cleanBeforeImport, setCleanBeforeImport] = useState(false);
   const [summary, setSummary] = useState<Record<string, number> | null>(null);
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -136,6 +137,7 @@ export default function RDCrmImport() {
         tenantId: TENANT_ID,
         token: token.trim(),
         ...config,
+        cleanBeforeImport,
       });
       // The polling will handle the transition to "done"
     } catch (e: any) {
@@ -407,13 +409,32 @@ export default function RDCrmImport() {
             </CardContent>
           </Card>
 
-          <div className="flex items-start gap-3 p-3 rounded-lg bg-amber-500/5 border border-amber-500/10">
-            <AlertTriangle className="h-5 w-5 text-amber-400 mt-0.5 shrink-0" />
-            <div className="text-xs text-muted-foreground">
-              <p className="font-medium text-foreground mb-1">Atenção</p>
-              <p>A importação criará novos registros no Entur OS. Registros duplicados podem ser criados se você já tiver dados similares. Recomendamos fazer a importação em uma conta limpa.</p>
-            </div>
-          </div>
+          {/* Clean before import option */}
+          <Card className="border-destructive/30 bg-destructive/5">
+            <CardContent className="py-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="h-9 w-9 rounded-lg flex items-center justify-center shrink-0 bg-destructive/10 text-destructive">
+                    <RefreshCw className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-foreground">Limpar dados anteriores</p>
+                    <p className="text-[11px] text-muted-foreground">Remove todos os dados importados do RD Station antes de reimportar (importação limpa)</p>
+                  </div>
+                </div>
+                <Switch
+                  checked={cleanBeforeImport}
+                  onCheckedChange={setCleanBeforeImport}
+                />
+              </div>
+              {cleanBeforeImport && (
+                <div className="mt-3 flex items-start gap-2 p-2 rounded-lg bg-destructive/10 border border-destructive/20">
+                  <AlertTriangle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
+                  <p className="text-[11px] text-destructive">Todos os dados previamente importados do RD Station serão removidos antes da nova importação. Os dados criados manualmente no Entur OS não serão afetados.</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
           <div className="flex gap-3">
             <Button variant="outline" onClick={() => setStep("preview")} className="flex-1">
