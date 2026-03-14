@@ -41,7 +41,7 @@ export default function WhatsApp() {
   const tenantId = useTenantId();
   const { isAdmin } = useIsAdmin();
 
-  const sessions = trpc.whatsapp.sessions.useQuery(undefined, { refetchInterval: 5000 });
+  const sessions = trpc.whatsapp.sessions.useQuery(undefined, { refetchInterval: 15000, staleTime: 10000 });
 
   // The user's session (each user has exactly one)
   const mySession = sessions.data?.[0] || null;
@@ -126,6 +126,13 @@ export default function WhatsApp() {
       toast.success("WhatsApp desconectado.");
     },
     onError: (err) => toast.error(`Erro ao desconectar: ${err.message}`),
+  });
+
+  const fixWebhooks = trpc.monitoring.fixWebhooks.useMutation({
+    onSuccess: (data) => {
+      toast.success(`Webhooks verificados: ${data.results.filter((r: any) => r.success).length}/${data.results.length} corrigidos`);
+    },
+    onError: (err) => toast.error(`Erro ao corrigir webhooks: ${err.message}`),
   });
 
   // Update QR code from WebSocket events (real-time)
@@ -259,20 +266,36 @@ export default function WhatsApp() {
               )}
             </div>
 
-            <Button
-              variant="outline"
-              className="w-full h-10 rounded-xl text-[13px] border-red-200 text-red-600 hover:bg-red-50"
-              disabled={disconnect.isPending}
-              onClick={() => {
-                if (mySession) disconnect.mutate({ sessionId: mySession.sessionId });
-              }}
-            >
-              {disconnect.isPending ? (
-                <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Desconectando...</>
-              ) : (
-                <><WifiOff className="h-4 w-4 mr-2" />Desconectar WhatsApp</>
+            <div className="flex gap-2">
+              {isAdmin && (
+                <Button
+                  variant="outline"
+                  className="flex-1 h-10 rounded-xl text-[13px]"
+                  disabled={fixWebhooks.isPending}
+                  onClick={() => fixWebhooks.mutate()}
+                >
+                  {fixWebhooks.isPending ? (
+                    <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Verificando...</>
+                  ) : (
+                    <><RefreshCw className="h-4 w-4 mr-2" />Corrigir Webhooks</>
+                  )}
+                </Button>
               )}
-            </Button>
+              <Button
+                variant="outline"
+                className={`${isAdmin ? 'flex-1' : 'w-full'} h-10 rounded-xl text-[13px] border-red-200 text-red-600 hover:bg-red-50`}
+                disabled={disconnect.isPending}
+                onClick={() => {
+                  if (mySession) disconnect.mutate({ sessionId: mySession.sessionId });
+                }}
+              >
+                {disconnect.isPending ? (
+                  <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Desconectando...</>
+                ) : (
+                  <><WifiOff className="h-4 w-4 mr-2" />Desconectar WhatsApp</>
+                )}
+              </Button>
+            </div>
           </div>
         </Card>
       )}

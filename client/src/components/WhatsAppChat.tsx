@@ -1083,7 +1083,7 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
   // Internal notes queries
   const notesQ = trpc.whatsapp.notes.list.useQuery(
     { waConversationId: waConversationId || 0 },
-    { enabled: !!waConversationId, refetchInterval: 15000 }
+    { enabled: !!waConversationId, refetchInterval: 30000, staleTime: 15000 }
   );
   const createNoteMut = trpc.whatsapp.notes.create.useMutation({
     onSuccess: () => { notesQ.refetch(); toast.success("Nota interna adicionada"); setMessageText(""); setIsNoteMode(false); },
@@ -1093,7 +1093,7 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
   // Conversation events/timeline
   const eventsQ = trpc.whatsapp.events.list.useQuery(
     { waConversationId: waConversationId || 0 },
-    { enabled: !!waConversationId && showTimeline, refetchInterval: 30000 }
+    { enabled: !!waConversationId && showTimeline, refetchInterval: 60000, staleTime: 30000 }
   );
 
   // Transfer mutation
@@ -1105,7 +1105,7 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
   // Queries
   const messagesQ = trpc.whatsapp.messagesByContact.useQuery(
     { sessionId, remoteJid, limit: 100 },
-    { enabled: !!sessionId && !!remoteJid, refetchInterval: 8000 }
+    { enabled: !!sessionId && !!remoteJid, refetchInterval: 15000, staleTime: 8000 }
   );
 
   const utils = trpc.useUtils();

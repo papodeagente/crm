@@ -2686,3 +2686,5 @@
 ### Correções
 - [x] Fila: ordenar conversas sem atendente da mais antiga para a mais recente (quem espera mais aparece primeiro)
 - [x] Fila: filtrar apenas conversas sem agente E com mensagens não lidas (unreadCount > 0), ordenar DESC (mais recente primeiro)
+- [x] BUG: Mensagens WhatsApp não chegando em tempo real (webhook auto-verificação + botão Corrigir Webhooks)
+- [x] BUG: Inbox e telas WhatsApp extremamente lentos (profilePictures via DB, polling otimizado, staleTime)

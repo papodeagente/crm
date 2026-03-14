@@ -1010,3 +1010,78 @@ export async function healthCheck(): Promise<{
     return { ok: false, error: e.message };
   }
 }
+
+
+// ════════════════════════════════════════════════════════════
+// WEBHOOK MANAGEMENT
+// ════════════════════════════════════════════════════════════
+
+/**
+ * Get current webhook configuration for an instance.
+ */
+export async function findWebhook(instanceName: string): Promise<{
+  enabled: boolean;
+  url: string;
+  events: string[];
+} | null> {
+  try {
+    const data = await evoFetch<any>(`/webhook/find/${instanceName}`, { timeout: 10000 });
+    return data;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Set/update webhook configuration for an instance.
+ */
+export async function setWebhook(instanceName: string, opts?: { url?: string; events?: string[] }): Promise<boolean> {
+  const webhookUrl = opts?.url || `${WEBHOOK_BASE_URL}/api/webhooks/evolution`;
+  const events = opts?.events || [
+    "MESSAGES_UPSERT",
+    "MESSAGES_UPDATE",
+    "CONNECTION_UPDATE",
+    "QRCODE_UPDATED",
+    "SEND_MESSAGE",
+    "MESSAGES_DELETE",
+    "CONTACTS_UPSERT",
+  ];
+  try {
+    await evoFetch(`/webhook/set/${instanceName}`, {
+      method: "POST",
+      body: {
+        webhook: {
+          enabled: true,
+          url: webhookUrl,
+          byEvents: false,
+          base64: false,
+          events,
+        },
+      },
+      timeout: 15000,
+    });
+    return true;
+  } catch (e: any) {
+    console.error(`[EvoAPI] Failed to set webhook for ${instanceName}:`, e.message);
+    return false;
+  }
+}
+
+/**
+ * Verify and fix webhook configuration for an instance.
+ * Returns true if webhook was already correct or was successfully fixed.
+ */
+export async function ensureWebhook(instanceName: string): Promise<boolean> {
+  const expectedUrl = `${WEBHOOK_BASE_URL}/api/webhooks/evolution`;
+  try {
+    const current = await findWebhook(instanceName);
+    if (current && current.enabled && current.url === expectedUrl) {
+      return true; // Already correct
+    }
+    console.log(`[EvoAPI] Webhook misconfigured for ${instanceName}, fixing... (current: ${current?.url || "none"}, expected: ${expectedUrl})`);
+    return await setWebhook(instanceName);
+  } catch (e: any) {
+    console.error(`[EvoAPI] Error ensuring webhook for ${instanceName}:`, e.message);
+    return false;
+  }
+}

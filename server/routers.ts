@@ -108,6 +108,7 @@ import {
   getQuickReplies,
   createQuickReply,
   deleteQuickReply,
+  getProfilePicturesFromDb,
   transferConversationWithNote,
 } from "./db";
 import { storagePut } from "./storage";
@@ -677,10 +678,10 @@ export const appRouter = router({
       }),
     // Get profile pictures for multiple JIDs (batch)
     profilePictures: sessionProtectedProcedure
-      .input(z.object({ sessionId: z.string(), jids: z.array(z.string()).max(50) }))
+      .input(z.object({ sessionId: z.string(), jids: z.array(z.string()).max(100) }))
       .query(async ({ input }) => {
-        const pictures = await whatsappManager.getProfilePictures(input.sessionId, input.jids);
-        return pictures;
+        // Use fast DB query instead of N API calls to Evolution
+        return getProfilePicturesFromDb(input.sessionId, input.jids);
       }),
     uploadMedia: protectedProcedure
       .input(z.object({ fileName: z.string(), fileBase64: z.string(), contentType: z.string() }))
@@ -1382,6 +1383,18 @@ export const appRouter = router({
       .input(z.object({ sessionId: z.string(), periodDays: z.number().min(1).max(365).default(7) }))
       .query(async ({ input }) => {
         return getResponseTimeMetrics(input.sessionId, input.periodDays);
+      }),
+    fixWebhooks: protectedProcedure
+      .mutation(async () => {
+        const results: Array<{ instance: string; ok: boolean }> = [];
+        const sessions = whatsappManager.getAllSessions();
+        for (const sess of sessions) {
+          if (sess.status === "connected") {
+            const ok = await (await import("./evolutionApi")).ensureWebhook(sess.instanceName);
+            results.push({ instance: sess.instanceName, ok });
+          }
+        }
+        return { fixed: results.filter(r => r.ok).length, total: results.length, results };
       }),
   }),
 

@@ -1293,6 +1293,9 @@ class WhatsAppEvolutionManager extends EventEmitter {
             await this.updateSessionInDb(session.sessionId, session.userId, session.tenantId, "connected");
             this.emit("status", { sessionId: session.sessionId, status: "connected", user: session.user });
 
+            // Ensure webhook is correctly configured
+            evo.ensureWebhook(session.instanceName).catch(() => {});
+
             // Sync conversations after connection
             // Check if this is first time (no messages in DB for this session)
             const db = await getDb();
@@ -2069,8 +2072,12 @@ class WhatsAppEvolutionManager extends EventEmitter {
               .where(eq(whatsappSessions.sessionId, row.sessionId));
             console.log(`[EvoWA AutoRestore] ${row.sessionId} -> ${nameToCheck} -> ${dbStatus}`);
 
-            // Sync conversations in background for connected sessions
+            // Ensure webhook is correctly configured for connected sessions
             if (dbStatus === "connected") {
+              evo.ensureWebhook(nameToCheck).then(ok => {
+                if (ok) console.log(`[EvoWA AutoRestore] Webhook verified for ${nameToCheck}`);
+                else console.warn(`[EvoWA AutoRestore] Webhook fix failed for ${nameToCheck}`);
+              }).catch(() => {});
               this.syncConversationsBackground(state, false);
             }
           } else {

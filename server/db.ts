@@ -1,6 +1,6 @@
-import { eq, desc, and, or, like, lt, gt, isNotNull, sql } from "drizzle-orm";
+import { eq, desc, and, or, like, lt, gt, isNotNull, sql, inArray } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users, whatsappSessions, waMessages as messages, activityLogs, chatbotSettings, chatbotRules, conversationAssignments, crmUsers, teams, teamMembers, distributionRules, customFields, customFieldValues, waConversations, userPreferences, sessionShares, conversationEvents, internalNotes, quickReplies } from "../drizzle/schema";
+import { InsertUser, users, whatsappSessions, waMessages as messages, activityLogs, chatbotSettings, chatbotRules, conversationAssignments, crmUsers, teams, teamMembers, distributionRules, customFields, customFieldValues, waConversations, userPreferences, sessionShares, conversationEvents, internalNotes, quickReplies, waContacts } from "../drizzle/schema";
 import { ENV } from './_core/env';
 import { normalizeJid } from "./phoneUtils";
 
@@ -2673,4 +2673,60 @@ export async function transferConversationWithNote(
   }
   // Perform the assignment (which logs the transfer event)
   return assignConversation(tenantId, sessionId, remoteJid, toUserId, toTeamId, fromUserId);
+}
+
+
+// ═══════════════════════════════════════
+// PROFILE PICTURES FROM DB (FAST)
+// ═══════════════════════════════════════
+
+/**
+ * Get profile picture URLs from wa_contacts table (instant DB query, no API calls).
+ * Falls back to null for contacts without stored pictures.
+ */
+export async function getProfilePicturesFromDb(
+  sessionId: string,
+  jids: string[]
+): Promise<Record<string, string | null>> {
+  const db = await getDb();
+  if (!db || jids.length === 0) return {};
+
+  const result: Record<string, string | null> = {};
+  // Initialize all jids as null
+  for (const jid of jids) result[jid] = null;
+
+  // Query wa_contacts for all matching jids at once
+  const contacts = await db
+    .select({
+      jid: waContacts.jid,
+      lid: waContacts.lid,
+      phoneNumber: waContacts.phoneNumber,
+      profilePictureUrl: waContacts.profilePictureUrl,
+    })
+    .from(waContacts)
+    .where(
+      and(
+        eq(waContacts.sessionId, sessionId),
+        or(
+          inArray(waContacts.jid, jids),
+          inArray(waContacts.lid, jids),
+          inArray(waContacts.phoneNumber, jids.map(j => j.replace(/@.*/, "")))
+        )
+      )
+    );
+
+  // Map results back to JIDs
+  for (const contact of contacts) {
+    const url = contact.profilePictureUrl || null;
+    if (url) {
+      // Match by jid, lid, or phoneNumber
+      for (const jid of jids) {
+        if (contact.jid === jid || contact.lid === jid || jid.startsWith(contact.phoneNumber || "___")) {
+          result[jid] = url;
+        }
+      }
+    }
+  }
+
+  return result;
 }

@@ -773,7 +773,7 @@ export default function InboxPage() {
   // Use wa_conversations table (canonical, with correct names and ordering)
   const conversationsQ = trpc.whatsapp.waConversations.useQuery(
     { sessionId: activeSession?.sessionId || "", tenantId },
-    { enabled: !!activeSession?.sessionId, refetchInterval: isConnected ? 15000 : 60000, staleTime: 10000 }
+    { enabled: !!activeSession?.sessionId, refetchInterval: isConnected ? 30000 : 120000, staleTime: 20000 }
   );
 
   // Agents list for assignment
@@ -783,11 +783,11 @@ export default function InboxPage() {
   // Queue conversations
   const queueQ = trpc.whatsapp.queue.list.useQuery(
     { sessionId: activeSession?.sessionId || "", limit: 100 },
-    { enabled: !!activeSession?.sessionId && (activeTab === "queue" || activeTab === "all"), refetchInterval: isConnected ? 15000 : 60000, staleTime: 10000 }
+    { enabled: !!activeSession?.sessionId && (activeTab === "queue" || activeTab === "all"), refetchInterval: isConnected ? 30000 : 120000, staleTime: 20000 }
   );
   const queueStatsQ = trpc.whatsapp.queue.stats.useQuery(
     { sessionId: activeSession?.sessionId || "" },
-    { enabled: !!activeSession?.sessionId, refetchInterval: 30000, staleTime: 15000 }
+    { enabled: !!activeSession?.sessionId, refetchInterval: 60000, staleTime: 30000 }
   );
   const claimMutation = trpc.whatsapp.queue.claim.useMutation({
     onSuccess: () => { conversationsQ.refetch(); queueQ.refetch(); queueStatsQ.refetch(); toast.success("Conversa atribuída a você"); },
@@ -832,8 +832,8 @@ export default function InboxPage() {
     return ((conversationsQ.data || []) as ConvItem[]).map((c) => c.remoteJid);
   }, [conversationsQ.data]);
 
-  // Only fetch profile pics for visible conversations (top 30) and with long staleTime
-  const visibleJids = useMemo(() => convJids.slice(0, 30), [convJids]);
+  // Fetch profile pics from DB (fast query, no API calls) — can handle more
+  const visibleJids = useMemo(() => convJids.slice(0, 100), [convJids]);
   const profilePicsQ = trpc.whatsapp.profilePictures.useQuery(
     { sessionId: activeSession?.sessionId || "", jids: visibleJids },
     { enabled: !!activeSession?.sessionId && visibleJids.length > 0, staleTime: 30 * 60 * 1000, refetchInterval: false }
