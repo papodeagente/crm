@@ -239,6 +239,13 @@
       "when": 1773254005496,
       "tag": "0033_nasty_red_hulk",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "5",
+      "when": 1773497924719,
+      "tag": "0034_puzzling_quentin_quire",
+      "breakpoints": true
     }
   ]
 }

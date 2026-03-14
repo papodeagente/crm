@@ -85,6 +85,14 @@ import {
   getDashboardConversionRates,
   getDashboardFunnelData,
   getDashboardAllPipelines,
+  // Session sharing
+  getActiveShareForUser,
+  getSharesForSession,
+  getAllSharesForTenant,
+  createSessionShare,
+  revokeSessionShare,
+  revokeAllSharesForSession,
+  getSessionBySessionId,
 } from "./db";
 import { storagePut } from "./storage";
 import { nanoid } from "nanoid";
@@ -114,7 +122,7 @@ import {
 } from "./leadProcessor";
 import { randomBytes } from "crypto";
 import { getDb } from "./db";
-import { trackingTokens, rdStationConfig, rdStationWebhookLog, rdFieldMappings, customFields } from "../drizzle/schema";
+import { trackingTokens, rdStationConfig, rdStationWebhookLog, rdFieldMappings, customFields, crmUsers as crmUsersSchema } from "../drizzle/schema";
 import { generateTrackerScript } from "./tracker-script";
 import { eq, and, desc, sql } from "drizzle-orm";
 
@@ -167,6 +175,18 @@ export const appRouter = router({
         // No sessionId needed — system generates it automatically
         const tenantId = ctx.saasUser?.tenantId || 0;
         const userId = ctx.saasUser?.userId || ctx.user.id;
+
+        // Block connection if user has an active session share
+        if (tenantId > 0) {
+          const activeShare = await getActiveShareForUser(tenantId, userId);
+          if (activeShare) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message: "Você está usando uma sessão compartilhada. Para conectar seu próprio WhatsApp, peça ao administrador para revogar o compartilhamento.",
+            });
+          }
+        }
+
         const state = await whatsappManager.connectUser(userId, tenantId);
         
         // If already connected, return immediately
@@ -241,39 +261,67 @@ export const appRouter = router({
       // Filter by the CRM userId (saasUser.id) so users only see their own sessions
       const saasUserId = ctx.saasUser?.userId;
       const tenantId = ctx.saasUser?.tenantId || 0;
-      let dbSessions;
-      if (saasUserId) {
-        dbSessions = await getSessionsByUser(saasUserId);
-      } else {
-        dbSessions = await getSessionsByUser(ctx.user.id);
-      }
+      const userId = saasUserId || ctx.user.id;
+
+      // 1. Get user's own sessions
+      let dbSessions = await getSessionsByUser(userId);
 
       // Determine the canonical session name for this user
-      const userId = saasUserId || ctx.user.id;
       const canonicalName = `crm-${tenantId}-${userId}`;
 
       // Check live status from Evolution API for each session
       const results = await Promise.all(dbSessions.map(async (s) => {
         const live = await whatsappManager.getSessionLive(s.sessionId);
         const liveStatus = live?.status || s.status || "disconnected";
-        return { ...s, liveStatus, qrDataUrl: live?.qrDataUrl || null, user: live?.user || null };
+        return { ...s, liveStatus, qrDataUrl: live?.qrDataUrl || null, user: live?.user || null, isShared: false, sharedByName: null as string | null };
       }));
 
       // Filter out phantom sessions: if a session is not the canonical name
       // AND its liveStatus is disconnected, remove it from results
       const filtered = results.filter(s => {
-        if (s.sessionId === canonicalName) return true; // Always keep canonical
-        if (s.liveStatus === "connected") return true; // Keep any connected session
-        return false; // Remove disconnected legacy sessions
+        if (s.sessionId === canonicalName) return true;
+        if (s.liveStatus === "connected") return true;
+        return false;
       });
 
-      // If no sessions remain but we had some, return the canonical one if it exists
-      if (filtered.length === 0 && results.length > 0) {
-        const canonical = results.find(s => s.sessionId === canonicalName);
-        if (canonical) return [canonical];
+      const ownSessions = filtered.length > 0 ? filtered : (results.length > 0 ? [results.find(s => s.sessionId === canonicalName) || results[0]] : results);
+
+      // 2. Check for active session share
+      if (tenantId > 0) {
+        const activeShare = await getActiveShareForUser(tenantId, userId);
+        if (activeShare) {
+          // Fetch the shared session details
+          const sharedSession = await getSessionBySessionId(activeShare.sourceSessionId);
+          if (sharedSession) {
+            const live = await whatsappManager.getSessionLive(sharedSession.sessionId);
+            const liveStatus = live?.status || sharedSession.status || "disconnected";
+            // Get the name of the user who owns the shared session
+            let sharedByName: string | null = null;
+            try {
+              const db = await getDb();
+              if (db) {
+                const [ownerRows] = await db.execute(sql`SELECT name FROM crm_users WHERE id = ${activeShare.sourceUserId} LIMIT 1`);
+                const ownerRow = (ownerRows as unknown as any[])[0];
+                if (ownerRow?.name) sharedByName = String(ownerRow.name);
+              }
+            } catch { /* ignore */ }
+
+            const sharedResult = {
+              ...sharedSession,
+              liveStatus,
+              qrDataUrl: null as string | null,
+              user: live?.user || null,
+              isShared: true,
+              sharedByName,
+              shareId: activeShare.id,
+            };
+            // Shared session comes FIRST (priority)
+            return [sharedResult, ...ownSessions];
+          }
+        }
       }
 
-      return filtered.length > 0 ? filtered : results;
+      return ownSessions;
     }),
     // Resolve a phone number to the actual WhatsApp JID
     resolveJid: sessionProtectedProcedure
@@ -970,6 +1018,170 @@ export const appRouter = router({
           .orderBy(desc(waIdentities.lastSeenAt))
           .limit(100);
         return { conversations: convs, identities: ids };
+      }),
+
+    // ─── SESSION SHARING (Admin) ───
+    // List all shares for the tenant
+    listShares: protectedProcedure
+      .input(z.object({ tenantId: z.number() }))
+      .query(async ({ ctx, input }) => {
+        const role = ctx.saasUser?.role;
+        if (role !== "admin" && ctx.saasUser) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Apenas administradores podem gerenciar compartilhamentos." });
+        }
+        const shares = await getAllSharesForTenant(input.tenantId);
+        // Enrich with user names
+        const db = await getDb();
+        if (!db) return shares.map(s => ({ ...s, targetUserName: null, sourceUserName: null, sharedByName: null }));
+        const userIds = Array.from(new Set([...shares.map(s => s.targetUserId), ...shares.map(s => s.sourceUserId), ...shares.map(s => s.sharedBy)]));
+        if (userIds.length === 0) return [];
+        const [userRows] = await db.execute(sql`SELECT id, name, email FROM crm_users WHERE id IN (${sql.join(userIds.map(id => sql`${id}`), sql`, `)})`);
+        const userMap = new Map((userRows as unknown as any[]).map((u: any) => [Number(u.id), { name: String(u.name), email: String(u.email) }]));
+        return shares.map(s => ({
+          ...s,
+          targetUserName: userMap.get(s.targetUserId)?.name || null,
+          targetUserEmail: userMap.get(s.targetUserId)?.email || null,
+          sourceUserName: userMap.get(s.sourceUserId)?.name || null,
+          sharedByName: userMap.get(s.sharedBy)?.name || null,
+        }));
+      }),
+
+    // Share a session with a user
+    shareSession: protectedProcedure
+      .input(z.object({
+        tenantId: z.number(),
+        sourceSessionId: z.string(),
+        targetUserIds: z.array(z.number()).min(1),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const role = ctx.saasUser?.role;
+        if (role !== "admin" && ctx.saasUser) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Apenas administradores podem compartilhar sessões." });
+        }
+        const adminUserId = ctx.saasUser?.userId || ctx.user.id;
+
+        // Verify the session exists and belongs to this tenant
+        const session = await getSessionBySessionId(input.sourceSessionId);
+        if (!session || session.tenantId !== input.tenantId) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Sessão não encontrada." });
+        }
+
+        // Cannot share with yourself
+        const filteredTargets = input.targetUserIds.filter(id => id !== session.userId);
+        if (filteredTargets.length === 0) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Não é possível compartilhar a sessão com o próprio dono." });
+        }
+
+        // Create shares for each target user
+        const results = [];
+        for (const targetUserId of filteredTargets) {
+          // Disconnect target user's own session if connected
+          const targetCanonical = `crm-${input.tenantId}-${targetUserId}`;
+          try {
+            const targetSession = await getSessionBySessionId(targetCanonical);
+            if (targetSession) {
+              const live = await whatsappManager.getSessionLive(targetCanonical);
+              if (live?.status === "connected") {
+                await whatsappManager.disconnect(targetCanonical);
+                console.log(`[SessionShare] Disconnected ${targetCanonical} because user ${targetUserId} is receiving shared session ${input.sourceSessionId}`);
+              }
+            }
+          } catch (e) {
+            console.warn(`[SessionShare] Failed to disconnect ${targetCanonical}:`, e);
+          }
+
+          const result = await createSessionShare(
+            input.tenantId,
+            input.sourceSessionId,
+            session.userId,
+            targetUserId,
+            adminUserId,
+          );
+          results.push(result);
+        }
+
+        return { success: true, created: results.length };
+      }),
+
+    // Revoke a specific share
+    revokeShare: protectedProcedure
+      .input(z.object({ tenantId: z.number(), shareId: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        const role = ctx.saasUser?.role;
+        if (role !== "admin" && ctx.saasUser) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Apenas administradores podem revogar compartilhamentos." });
+        }
+        await revokeSessionShare(input.shareId, input.tenantId);
+        return { success: true };
+      }),
+
+    // Revoke all shares for a session
+    revokeAllShares: protectedProcedure
+      .input(z.object({ tenantId: z.number(), sourceSessionId: z.string() }))
+      .mutation(async ({ ctx, input }) => {
+        const role = ctx.saasUser?.role;
+        if (role !== "admin" && ctx.saasUser) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Apenas administradores podem revogar compartilhamentos." });
+        }
+        await revokeAllSharesForSession(input.tenantId, input.sourceSessionId);
+        return { success: true };
+      }),
+
+    // Get all tenant sessions (for admin to choose which to share)
+    tenantSessions: protectedProcedure
+      .input(z.object({ tenantId: z.number() }))
+      .query(async ({ ctx, input }) => {
+        const role = ctx.saasUser?.role;
+        if (role !== "admin" && ctx.saasUser) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Apenas administradores podem ver todas as sessões." });
+        }
+        const sessions = await getSessionsByTenant(input.tenantId);
+        // Enrich with live status and owner name
+        const db = await getDb();
+        const enriched = await Promise.all(sessions.map(async (s) => {
+          const live = await whatsappManager.getSessionLive(s.sessionId);
+          let ownerName: string | null = null;
+          if (db) {
+            try {
+              const [rows] = await db.execute(sql`SELECT name FROM crm_users WHERE id = ${s.userId} LIMIT 1`);
+              const row = (rows as unknown as any[])[0];
+              if (row?.name) ownerName = String(row.name);
+            } catch { /* ignore */ }
+          }
+          return {
+            ...s,
+            liveStatus: live?.status || s.status || "disconnected",
+            ownerName,
+            user: live?.user || null,
+          };
+        }));
+        return enriched;
+      }),
+
+    // Get active share for current user (used by frontend to show banner)
+    myActiveShare: protectedProcedure
+      .input(z.object({ tenantId: z.number() }))
+      .query(async ({ ctx, input }) => {
+        const userId = ctx.saasUser?.userId || ctx.user.id;
+        const share = await getActiveShareForUser(input.tenantId, userId);
+        if (!share) return null;
+        // Enrich with owner name and phone
+        const session = await getSessionBySessionId(share.sourceSessionId);
+        let ownerName: string | null = null;
+        try {
+          const db = await getDb();
+          if (db) {
+            const [rows] = await db.execute(sql`SELECT name FROM crm_users WHERE id = ${share.sourceUserId} LIMIT 1`);
+            const row = (rows as unknown as any[])[0];
+            if (row?.name) ownerName = String(row.name);
+          }
+        } catch { /* ignore */ }
+        return {
+          ...share,
+          ownerName,
+          phoneNumber: session?.phoneNumber || null,
+          pushName: session?.pushName || null,
+        };
       }),
   }),
 

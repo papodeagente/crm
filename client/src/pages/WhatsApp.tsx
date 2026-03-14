@@ -17,12 +17,14 @@ import {
 import {
   Smartphone, Wifi, WifiOff, QrCode,
   ShieldAlert, Loader2, RefreshCw, CheckCircle2,
-  Settings2, Trash2, Users, Info
+  Settings2, Trash2, Users, Info, Share2
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { useSocket } from "@/hooks/useSocket";
 import { useTenantId } from "@/hooks/useTenantId";
+import { useIsAdmin } from "@/components/AdminOnlyGuard";
+import SessionSharing from "@/components/SessionSharing";
 
 export default function WhatsApp() {
   const [qrCode, setQrCode] = useState<string | null>(null);
@@ -37,6 +39,7 @@ export default function WhatsApp() {
   const utils = trpc.useUtils();
   const { qrData, waStatus } = useSocket();
   const tenantId = useTenantId();
+  const { isAdmin } = useIsAdmin();
 
   const sessions = trpc.whatsapp.sessions.useQuery(undefined, { refetchInterval: 5000 });
 
@@ -374,6 +377,29 @@ export default function WhatsApp() {
           </div>
         </Card>
       )}
+
+      {/* ─── SHARED SESSION BANNER (for non-admin users) ─── */}
+      {!sessions.isLoading && mySession && (mySession as any).isShared && (
+        <Card className="border border-violet-200/60 bg-violet-50/30 shadow-none rounded-xl overflow-hidden mb-4">
+          <div className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-xl bg-violet-100 flex items-center justify-center shrink-0">
+                <Share2 className="h-5 w-5 text-violet-600" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-[13px] font-semibold text-violet-800">Sessão Compartilhada</p>
+                <p className="text-[12px] text-violet-600 mt-0.5">
+                  Você está usando a sessão de <strong>{(mySession as any).sharedByName || 'outro usuário'}</strong>.
+                  {mySession.phoneNumber && ` Número: ${mySession.phoneNumber}`}
+                </p>
+              </div>
+            </div>
+          </div>
+        </Card>
+      )}
+
+      {/* ─── SESSION SHARING (Admin only) ─── */}
+      {isAdmin && <SessionSharing tenantId={tenantId} />}
 
       {/* ─── CONFIGURAÇÕES DE CONTATOS ─── */}
       <div className="mt-8">

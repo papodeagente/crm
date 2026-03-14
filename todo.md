@@ -2634,3 +2634,14 @@
 - [x] Corrigir truncamento de telefone > 32 chars que causava erro na importação
 - [x] Paginação server-side em Contatos (50/página, 315 páginas para 15.705 contatos)
 - [x] Todos os 12 testes do RD CRM Import passando
+
+## Compartilhamento de Sessão WhatsApp (Mar 14)
+- [x] Auditar arquitetura atual de sessões WhatsApp, inbox e Evolution API
+- [x] Definir regras de negócio e cenários para compartilhamento de sessão
+- [x] Criar modelo de dados (tabela session_shares)
+- [x] Implementar backend: routers para admin compartilhar/revogar sessão
+- [x] Implementar lógica de auto-switch quando sessão é compartilhada com usuário já conectado
+- [x] Implementar frontend: UI de compartilhamento para admin
+- [x] Implementar experiência do usuário que recebe sessão compartilhada
+- [x] Escrever testes automatizados (20 testes passando)
+- [x] Testar cenários end-to-end

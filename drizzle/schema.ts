@@ -1723,3 +1723,27 @@ export const googleCalendarTokens = mysqlTable("google_calendar_tokens", {
 
 export type GoogleCalendarToken = typeof googleCalendarTokens.$inferSelect;
 export type InsertGoogleCalendarToken = typeof googleCalendarTokens.$inferInsert;
+
+// ════════════════════════════════════════════════════════════
+// SESSION SHARING (Admin shares WhatsApp session with users)
+// ════════════════════════════════════════════════════════════
+
+export const sessionShares = mysqlTable("session_shares", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  sourceSessionId: varchar("sourceSessionId", { length: 128 }).notNull(),
+  sourceUserId: int("sourceUserId").notNull(),
+  targetUserId: int("targetUserId").notNull(),
+  status: mysqlEnum("share_status", ["active", "revoked"]).default("active").notNull(),
+  sharedBy: int("sharedBy").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  revokedAt: timestamp("revokedAt"),
+}, (t) => [
+  index("ss_tenant_idx").on(t.tenantId),
+  index("ss_target_user_idx").on(t.tenantId, t.targetUserId),
+  index("ss_source_session_idx").on(t.tenantId, t.sourceSessionId),
+]);
+
+export type SessionShare = typeof sessionShares.$inferSelect;
+export type InsertSessionShare = typeof sessionShares.$inferInsert;

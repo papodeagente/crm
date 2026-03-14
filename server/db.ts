@@ -1,6 +1,6 @@
 import { eq, desc, and, or, like, lt, gt, isNotNull, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users, whatsappSessions, waMessages as messages, activityLogs, chatbotSettings, chatbotRules, conversationAssignments, crmUsers, teams, teamMembers, distributionRules, customFields, customFieldValues, waConversations, userPreferences } from "../drizzle/schema";
+import { InsertUser, users, whatsappSessions, waMessages as messages, activityLogs, chatbotSettings, chatbotRules, conversationAssignments, crmUsers, teams, teamMembers, distributionRules, customFields, customFieldValues, waConversations, userPreferences, sessionShares } from "../drizzle/schema";
 import { ENV } from './_core/env';
 import { normalizeJid } from "./phoneUtils";
 
@@ -149,8 +149,16 @@ export async function validateSessionOwnership(
     });
   }
 
-  // Regular user: must own the session
+  // Regular user: must own the session OR have an active share
   if (session.userId !== userId) {
+    // Check if user has an active session share for this session
+    const hasShare = await hasActiveShareForSession(
+      opts?.tenantId || session.tenantId || 0,
+      userId,
+      sessionId,
+    );
+    if (hasShare) return; // User has a valid share, allow access
+
     console.warn(`[SECURITY] User ${userId} attempted to access session ${sessionId} owned by user ${session.userId}`);
     const { TRPCError } = await import('@trpc/server');
     throw new TRPCError({
@@ -2137,4 +2145,135 @@ export async function getDashboardAllPipelines(tenantId: number) {
     id: Number(r.id),
     name: String(r.name),
   }));
+}
+
+
+// ════════════════════════════════════════════════════════════
+// SESSION SHARING HELPERS
+// ════════════════════════════════════════════════════════════
+
+/**
+ * Get the active session share for a target user.
+ * A user can have at most ONE active share at a time.
+ */
+export async function getActiveShareForUser(tenantId: number, targetUserId: number) {
+  const db = await getDb();
+  if (!db) return null;
+  const rows = await db.select().from(sessionShares)
+    .where(and(
+      eq(sessionShares.tenantId, tenantId),
+      eq(sessionShares.targetUserId, targetUserId),
+      eq(sessionShares.status, "active"),
+    ))
+    .limit(1);
+  return rows[0] || null;
+}
+
+/**
+ * Get all shares for a given session (active and revoked).
+ */
+export async function getSharesForSession(tenantId: number, sourceSessionId: string) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(sessionShares)
+    .where(and(
+      eq(sessionShares.tenantId, tenantId),
+      eq(sessionShares.sourceSessionId, sourceSessionId),
+    ))
+    .orderBy(desc(sessionShares.createdAt));
+}
+
+/**
+ * Get all active shares for a tenant (for admin listing).
+ */
+export async function getAllSharesForTenant(tenantId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(sessionShares)
+    .where(eq(sessionShares.tenantId, tenantId))
+    .orderBy(desc(sessionShares.createdAt));
+}
+
+/**
+ * Create a session share. Automatically revokes any existing active share
+ * for the target user (a user can only have ONE active share).
+ */
+export async function createSessionShare(
+  tenantId: number,
+  sourceSessionId: string,
+  sourceUserId: number,
+  targetUserId: number,
+  sharedBy: number,
+) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  // Revoke any existing active share for this target user
+  await db.update(sessionShares)
+    .set({ status: "revoked", revokedAt: new Date() })
+    .where(and(
+      eq(sessionShares.tenantId, tenantId),
+      eq(sessionShares.targetUserId, targetUserId),
+      eq(sessionShares.status, "active"),
+    ));
+
+  // Create the new share
+  const result = await db.insert(sessionShares).values({
+    tenantId,
+    sourceSessionId,
+    sourceUserId,
+    targetUserId,
+    sharedBy,
+    status: "active",
+  });
+
+  return { id: Number(result[0].insertId) };
+}
+
+/**
+ * Revoke a specific share by ID.
+ */
+export async function revokeSessionShare(shareId: number, tenantId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.update(sessionShares)
+    .set({ status: "revoked", revokedAt: new Date() })
+    .where(and(
+      eq(sessionShares.id, shareId),
+      eq(sessionShares.tenantId, tenantId),
+    ));
+}
+
+/**
+ * Revoke all active shares for a given session (e.g., when session is deleted).
+ */
+export async function revokeAllSharesForSession(tenantId: number, sourceSessionId: string) {
+  const db = await getDb();
+  if (!db) return;
+
+  await db.update(sessionShares)
+    .set({ status: "revoked", revokedAt: new Date() })
+    .where(and(
+      eq(sessionShares.tenantId, tenantId),
+      eq(sessionShares.sourceSessionId, sourceSessionId),
+      eq(sessionShares.status, "active"),
+    ));
+}
+
+/**
+ * Check if a user has an active share for a specific session.
+ */
+export async function hasActiveShareForSession(tenantId: number, targetUserId: number, sessionId: string): Promise<boolean> {
+  const db = await getDb();
+  if (!db) return false;
+  const rows = await db.select({ id: sessionShares.id }).from(sessionShares)
+    .where(and(
+      eq(sessionShares.tenantId, tenantId),
+      eq(sessionShares.targetUserId, targetUserId),
+      eq(sessionShares.sourceSessionId, sessionId),
+      eq(sessionShares.status, "active"),
+    ))
+    .limit(1);
+  return rows.length > 0;
 }

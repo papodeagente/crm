@@ -1,0 +1,9 @@
+{
+  "query": "CREATE TABLE `session_shares` (\n\t`id` int AUTO_INCREMENT NOT NULL,\n\t`tenantId` int NOT NULL,\n\t`sourceSessionId` varchar(128) NOT NULL,\n\t`sourceUserId` int NOT NULL,\n\t`targetUserId` int NOT NULL,\n\t`share_status` enum('active','revoked') NOT NULL DEFAULT 'active',\n\t`sharedBy` int NOT NULL,\n\t`createdAt` timestamp NOT NULL DEFAULT (now()),\n\t`updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,\n\t`revokedAt` timestamp,\n\tCONSTRAINT `session_shares_id` PRIMARY KEY(`id`)\n);\nCREATE INDEX `ss_tenant_idx` ON `session_shares` (`tenantId`);\nCREATE INDEX `ss_target_user_idx` ON `session_shares` (`tenantId`,`targetUserId`);\nCREATE INDEX `ss_source_session_idx` ON `session_shares` (`tenantId`,`sourceSessionId`);",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute CREATE TABLE `session_shares` (\n\t`id` int AUTO_INCREMENT NOT NULL,\n\t`tenantId` int NOT NULL,\n\t`sourceSessionId` varchar(128) NOT NULL,\n\t`sourceUserId` int NOT NULL,\n\t`targetUserId` int NOT NULL,\n\t`share_status` enum('active','revoked') NOT NULL DEFAULT 'active',\n\t`sharedBy` int NOT NULL,\n\t`createdAt` timestamp NOT NULL DEFAULT (now()),\n\t`updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,\n\t`revokedAt` timestamp,\n\tCONSTRAINT `session_shares_id` PRIMARY KEY(`id`)\n);\nCREATE INDEX `ss_tenant_idx` ON `session_shares` (`tenantId`);\nCREATE INDEX `ss_target_user_idx` ON `session_shares` (`tenantId`,`targetUserId`);\nCREATE INDEX `ss_source_session_idx` ON `session_shares` (`tenantId`,`sourceSessionId`);",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 777
+}
