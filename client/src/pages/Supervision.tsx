@@ -17,6 +17,8 @@ interface AgentData {
   agentEmail: string;
   agentAvatar?: string;
   agentStatus: string;
+  isOnline: number;
+  lastActiveAt?: string;
   activeConversations: number;
   unreadConversations: number;
   oldestConversation?: number;
@@ -113,7 +115,7 @@ export default function Supervision() {
 
   const totalActive = agents.reduce((sum, a) => sum + Number(a.activeConversations || 0), 0);
   const totalUnread = agents.reduce((sum, a) => sum + Number(a.unreadConversations || 0), 0);
-  const onlineAgents = agents.filter((a) => a.agentStatus === "online" || a.agentStatus === "active").length;
+  const onlineAgents = agents.filter((a) => Number(a.isOnline) === 1).length;
   const avgPerAgent = agents.length > 0 ? (totalActive / agents.length).toFixed(1) : "0";
 
   // Oldest wait time
@@ -448,7 +450,7 @@ function AgentCard({
   sessionId: string; onReturnToQueue: (jid: string) => void; isReturning: boolean;
 }) {
   const initials = agent.agentName?.split(" ").map((w) => w[0]).join("").substring(0, 2).toUpperCase() || "?";
-  const isOnline = agent.agentStatus === "online" || agent.agentStatus === "active";
+  const isOnline = Number(agent.isOnline) === 1;
   const active = Number(agent.activeConversations || 0);
   const unread = Number(agent.unreadConversations || 0);
   // Only show overloaded when agent has significantly more than average AND at least 10 active

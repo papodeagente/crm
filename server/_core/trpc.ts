@@ -10,11 +10,35 @@ const t = initTRPC.context<TrpcContext>().create({
 export const router = t.router;
 export const publicProcedure = t.procedure;
 
+// ─── Presence tracking: update lastActiveAt with 60s debounce ───
+const lastActiveCache = new Map<number, number>(); // userId -> lastUpdateTimestamp
+const PRESENCE_DEBOUNCE_MS = 60_000; // Only update DB once per minute per user
+
+async function touchPresence(userId: number) {
+  const now = Date.now();
+  const lastUpdate = lastActiveCache.get(userId) || 0;
+  if (now - lastUpdate < PRESENCE_DEBOUNCE_MS) return; // skip if updated recently
+  lastActiveCache.set(userId, now);
+  try {
+    const { getDb } = await import("../db");
+    const db = await getDb();
+    if (db) {
+      const { sql } = await import("drizzle-orm");
+      await db.execute(sql`UPDATE crm_users SET lastActiveAt = NOW() WHERE id = ${userId}`);
+    }
+  } catch (_) { /* non-critical */ }
+}
+
 const requireUser = t.middleware(async opts => {
   const { ctx, next } = opts;
 
   if (!ctx.user) {
     throw new TRPCError({ code: "UNAUTHORIZED", message: UNAUTHED_ERR_MSG });
+  }
+
+  // Track presence (fire-and-forget, non-blocking)
+  if (ctx.saasUser?.userId) {
+    touchPresence(ctx.saasUser.userId).catch(() => {});
   }
 
   return next({

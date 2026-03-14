@@ -172,6 +172,7 @@ export const crmUsers = mysqlTable("crm_users", {
   status: mysqlEnum("status", ["active", "inactive", "invited"]).default("invited").notNull(),
   avatarUrl: text("avatarUrl"),
   lastLoginAt: timestamp("lastLoginAt"),
+  lastActiveAt: timestamp("lastActiveAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   createdBy: int("createdBy"),

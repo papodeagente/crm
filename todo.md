@@ -2750,3 +2750,11 @@
   - [x] Contatos: border-l hover, tamanhos menores, espaçamento refinado
   - [x] EmptyChat: ícone rounded-2xl com gradiente, texto mais conciso
   - [x] Filtros: pills rounded-lg com transições suaves
+
+## Corrigir KPI Atendentes Online (Mar 14 - v5)
+- [x] KPI "Atendentes Online" mostra apenas quem está realmente online (lastActiveAt < 5min)
+  - [x] Adicionado campo lastActiveAt na tabela crm_users
+  - [x] Middleware touchPresence atualiza lastActiveAt a cada request (debounce 60s)
+  - [x] Query getAgentWorkload calcula isOnline via SQL (DATE_SUB 5 MINUTE)
+  - [x] Frontend usa isOnline do backend em vez de agentStatus
+  - [x] Agentes ordenados: online primeiro, depois por atendimentos ativos

@@ -2542,6 +2542,8 @@ export async function getAgentWorkload(tenantId: number, sessionId: string) {
       cu.email AS agentEmail,
       cu.avatarUrl AS agentAvatar,
       cu.status AS agentStatus,
+      cu.lastActiveAt AS lastActiveAt,
+      CASE WHEN cu.lastActiveAt >= DATE_SUB(NOW(), INTERVAL 5 MINUTE) THEN 1 ELSE 0 END AS isOnline,
       COUNT(CASE WHEN wc.status IN ('open', 'pending') THEN 1 END) AS activeConversations,
       COUNT(CASE WHEN wc.unreadCount > 0 THEN 1 END) AS unreadConversations,
       MIN(wc.lastMessageAt) AS oldestConversation,
@@ -2555,8 +2557,8 @@ export async function getAgentWorkload(tenantId: number, sessionId: string) {
       AND wc.mergedIntoId IS NULL
     WHERE cu.tenantId = ${tenantId}
     AND cu.status = 'active'
-    GROUP BY cu.id, cu.name, cu.email, cu.avatarUrl, cu.status
-    ORDER BY activeConversations DESC
+    GROUP BY cu.id, cu.name, cu.email, cu.avatarUrl, cu.status, cu.lastActiveAt
+    ORDER BY isOnline DESC, activeConversations DESC
   `);
   return (result as any)[0] || [];
 }
