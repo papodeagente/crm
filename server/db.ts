@@ -2483,7 +2483,8 @@ export async function getQueueConversations(sessionId: string, tenantId: number,
     AND wc.lastMessageAt IS NOT NULL
     AND (wc.assignedUserId IS NULL)
     AND wc.status IN ('open', 'pending')
-    ORDER BY COALESCE(wc.queuedAt, wc.lastMessageAt) ASC
+    AND wc.unreadCount > 0
+    ORDER BY COALESCE(wc.queuedAt, wc.lastMessageAt) DESC
     LIMIT ${limit}
   `);
   return (result as any)[0] || [];
@@ -2600,6 +2601,7 @@ export async function getQueueStats(tenantId: number, sessionId: string) {
     AND wc.status IN ('open', 'pending')
     AND wc.mergedIntoId IS NULL
     AND wc.lastMessageAt IS NOT NULL
+    AND wc.unreadCount > 0
   `);
   const rows = (result as any)[0] || [];
   return { total: Number(rows[0]?.total || 0), oldest: rows[0]?.oldestEntry || null };

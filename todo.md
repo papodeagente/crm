@@ -2682,3 +2682,7 @@
 - [x] Frontend: Página/seção Painel de Supervisão com cards por agente
 - [x] Frontend: Métricas em tempo real (fila, carga, SLA)
 - [x] Frontend: Ações rápidas de reatribuição pelo admin
+
+### Correções
+- [x] Fila: ordenar conversas sem atendente da mais antiga para a mais recente (quem espera mais aparece primeiro)
+- [x] Fila: filtrar apenas conversas sem agente E com mensagens não lidas (unreadCount > 0), ordenar DESC (mais recente primeiro)
