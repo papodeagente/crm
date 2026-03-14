@@ -1119,7 +1119,7 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
   // Queries
   const messagesQ = trpc.whatsapp.messagesByContact.useQuery(
     { sessionId, remoteJid, limit: 100 },
-    { enabled: !!sessionId && !!remoteJid, refetchInterval: 15000, staleTime: 8000 }
+    { enabled: !!sessionId && !!remoteJid, refetchInterval: 8000, staleTime: 3000 }
   );
 
   const utils = trpc.useUtils();

@@ -2660,9 +2660,238 @@ class WhatsAppEvolutionManager extends EventEmitter {
     return { status: 'started', chats: individualChats.length };
   }
 
-  // ─── PERIODIC SYNC POLLING ───
-  // Polls Evolution API every 5 minutes to detect reconnections and sync new messages
-  // This is a fallback for when webhooks don't arrive (e.g., after disconnect/reconnect)
+  // ─── FAST POLLING (30s) ───
+  // Lightweight poll that only checks the most recently active chats for new messages.
+  // This is the PRIMARY mechanism for near-real-time message delivery when webhooks
+  // from Evolution API are not being delivered (which is the observed behavior).
+
+  private fastPollInterval: ReturnType<typeof setInterval> | null = null;
+  private fastPollInProgress = new Set<string>();
+  private lastKnownMessageIds = new Map<string, Set<string>>(); // sessionId -> set of recent msgIds
+
+  startFastPoll(intervalMs = 30 * 1000): void {
+    if (this.fastPollInterval) return;
+    console.log(`[EvoWA FastPoll] Starting fast poll every ${intervalMs / 1000}s`);
+    // Run immediately on start
+    this.fastPollAllSessions().catch(e => console.error('[EvoWA FastPoll] Error:', e));
+    this.fastPollInterval = setInterval(() => {
+      this.fastPollAllSessions().catch(e => console.error('[EvoWA FastPoll] Error:', e));
+    }, intervalMs);
+  }
+
+  private async fastPollAllSessions(): Promise<void> {
+    const sessions = Array.from(this.sessions.entries());
+    for (const [sessionId, session] of sessions) {
+      if (session.status !== 'connected') continue;
+      if (this.fastPollInProgress.has(sessionId)) continue;
+      this.fastPollInProgress.add(sessionId);
+      try {
+        await this.fastPollSession(session);
+      } catch (e: any) {
+        console.warn(`[EvoWA FastPoll] Error for ${sessionId}:`, e.message);
+      } finally {
+        this.fastPollInProgress.delete(sessionId);
+      }
+    }
+  }
+
+  private async fastPollSession(session: EvolutionSessionState): Promise<void> {
+    const db = await getDb();
+    if (!db) return;
+
+    // Fetch chat list (sorted by most recent activity by default)
+    const chats = await evo.findChats(session.instanceName);
+    if (!chats || chats.length === 0) return;
+
+    // Filter out groups and status, sort by most recent
+    const individualChats = chats
+      .filter((c: any) => c.remoteJid && !c.remoteJid.endsWith('@g.us') && c.remoteJid !== 'status@broadcast' && !c.remoteJid.endsWith('@lid'))
+      .sort((a: any, b: any) => {
+        const tsA = Number(a.lastMessage?.messageTimestamp || 0);
+        const tsB = Number(b.lastMessage?.messageTimestamp || 0);
+        return tsB - tsA;
+      });
+
+    // Only check the top 15 most recently active chats
+    const topChats = individualChats.slice(0, 15);
+    let newMessagesFound = 0;
+
+    // Get existing messageIds for this session (recent ones only)
+    const existingMsgIds = new Set<string>();
+    try {
+      const existingRows = await db.execute(
+        sql`SELECT messageId FROM messages WHERE sessionId = ${session.sessionId} AND messageId IS NOT NULL ORDER BY id DESC LIMIT 5000`
+      );
+      const rows = (existingRows as any)[0] || [];
+      for (const r of rows) {
+        if (r.messageId) existingMsgIds.add(r.messageId);
+      }
+    } catch {}
+
+    const ownerName = session.user?.name?.trim() || null;
+    const isRealName = (name: string | null | undefined): name is string => {
+      if (!name || name.trim() === '') return false;
+      if (name === 'Voc\u00ea' || name === 'You') return false;
+      const cleaned = name.replace(/[\s\-\(\)\+]/g, '');
+      if (/^\d+$/.test(cleaned)) return false;
+      if (ownerName && name.trim().toLowerCase() === ownerName.toLowerCase()) return false;
+      return true;
+    };
+
+    for (const chat of topChats) {
+      const remoteJid = chat.remoteJid;
+      if (!remoteJid) continue;
+
+      try {
+        // Only fetch page 1 (most recent 20 messages)
+        const messages = await evo.findMessages(session.instanceName, remoteJid, {
+          limit: 20,
+          page: 1,
+        });
+        if (!messages || messages.length === 0) continue;
+
+        for (const msg of messages) {
+          const msgId = msg.key?.id;
+          if (!msgId) continue;
+          if (existingMsgIds.has(msgId)) continue;
+
+          // New message found!
+          const fromMe = msg.key?.fromMe || false;
+          const messageType = msg.messageType || 'conversation';
+          const skipTypes = ['protocolMessage', 'senderKeyDistributionMessage', 'messageContextInfo', 'ephemeralMessage'];
+          if (skipTypes.includes(messageType)) continue;
+
+          const timestamp = msg.messageTimestamp
+            ? new Date(Number(msg.messageTimestamp) * 1000)
+            : new Date();
+          const pushName = msg.pushName || null;
+
+          const msgContent = msg.message;
+          let content = '';
+          if (msgContent) {
+            content = msgContent.conversation
+              || msgContent.extendedTextMessage?.text
+              || (msgContent.imageMessage?.caption ? `[Imagem] ${msgContent.imageMessage.caption}` : '')
+              || (msgContent.imageMessage ? '[Imagem]' : '')
+              || (msgContent.videoMessage?.caption ? `[V\u00eddeo] ${msgContent.videoMessage.caption}` : '')
+              || (msgContent.videoMessage ? '[V\u00eddeo]' : '')
+              || (msgContent.audioMessage ? '[\u00c1udio]' : '')
+              || (msgContent.documentMessage ? `[Documento] ${msgContent.documentMessage.fileName || ''}` : '')
+              || (msgContent.stickerMessage ? '[Sticker]' : '')
+              || (msgContent.contactMessage ? `[Contato] ${msgContent.contactMessage.displayName || ''}` : '')
+              || (msgContent.locationMessage ? '[Localiza\u00e7\u00e3o]' : '')
+              || '';
+          }
+
+          let msgStatus = fromMe ? 'sent' : 'received';
+          const rawStatus = msg.status;
+          if (fromMe && typeof rawStatus === 'number') {
+            const statusMap: Record<number, string> = { 0: 'error', 1: 'pending', 2: 'sent', 3: 'delivered', 4: 'read', 5: 'played' };
+            msgStatus = statusMap[rawStatus] || 'sent';
+          }
+
+          const syncMediaInfo = this.extractMediaInfo(msg);
+          const permanentMediaUrl = syncMediaInfo.mediaUrl && !syncMediaInfo.mediaUrl.includes('whatsapp.net') ? syncMediaInfo.mediaUrl : null;
+
+          try {
+            await db.insert(waMessages).values({
+              sessionId: session.sessionId,
+              tenantId: session.tenantId,
+              messageId: msgId,
+              remoteJid,
+              fromMe,
+              messageType,
+              content: content || null,
+              pushName: fromMe ? null : (pushName || null),
+              status: msgStatus,
+              timestamp,
+              mediaUrl: permanentMediaUrl,
+              mediaMimeType: syncMediaInfo.mediaMimeType || null,
+              mediaFileName: syncMediaInfo.mediaFileName || null,
+              mediaDuration: syncMediaInfo.mediaDuration || null,
+              isVoiceNote: syncMediaInfo.isVoiceNote || false,
+              quotedMessageId: syncMediaInfo.quotedMessageId || null,
+            });
+
+            existingMsgIds.add(msgId);
+            newMessagesFound++;
+
+            // Update conversation
+            try {
+              const contactPushName = fromMe ? null : pushName;
+              const resolved = await resolveInbound(session.tenantId, session.sessionId, remoteJid, contactPushName, { skipContactCreation: true });
+              if (resolved) {
+                await updateConversationLastMessage(resolved.conversationId, {
+                  content: content || '',
+                  fromMe,
+                  timestamp,
+                  incrementUnread: !fromMe,
+                });
+              }
+            } catch {}
+
+            // Emit Socket.IO event for real-time update
+            this.emit('message', {
+              sessionId: session.sessionId,
+              tenantId: session.tenantId,
+              content,
+              fromMe,
+              remoteJid,
+              messageType,
+              pushName: pushName || '',
+              timestamp: timestamp.getTime(),
+            });
+
+            // Download media in background
+            const hasMediaType = ['imageMessage', 'videoMessage', 'audioMessage', 'documentMessage', 'stickerMessage', 'pttMessage'].includes(messageType);
+            if (hasMediaType && !permanentMediaUrl && msgId) {
+              this.downloadAndStoreMedia(session, msgId, remoteJid, fromMe, syncMediaInfo).catch(() => {});
+            }
+
+            // Update wa_contacts with pushName
+            if (pushName && !fromMe && isRealName(pushName)) {
+              db.insert(waContacts).values({
+                sessionId: session.sessionId,
+                jid: remoteJid,
+                phoneNumber: remoteJid.endsWith('@s.whatsapp.net') ? remoteJid : null,
+                pushName,
+                savedName: null,
+                verifiedName: null,
+                profilePictureUrl: null,
+              }).onDuplicateKeyUpdate({
+                set: { pushName: sql`${pushName}` },
+              }).catch(() => {});
+            }
+
+            // Create notification for incoming messages
+            if (!fromMe) {
+              createNotification(session.tenantId, {
+                type: 'whatsapp_message',
+                title: `Nova mensagem de ${pushName || remoteJid.split('@')[0]}`,
+                body: content?.substring(0, 200) || 'Nova mensagem recebida',
+                entityType: 'whatsapp',
+                entityId: session.sessionId,
+              }).catch(() => {});
+            }
+          } catch {
+            // Duplicate key or other insert error — skip
+          }
+        }
+
+        // Small delay between chats to avoid overwhelming the API
+        await new Promise(resolve => setTimeout(resolve, 50));
+      } catch (e: any) {
+        // Skip this chat on error
+      }
+    }
+
+    if (newMessagesFound > 0) {
+      console.log(`[EvoWA FastPoll] ${session.sessionId}: Found ${newMessagesFound} new messages`);
+    }
+  }
+
+  // ─── PERIODIC SYNC POLLING (5 min) ───
+  // Heavy sync that processes ALL chats — used as a backup to catch anything FastPoll missed
 
   private pollingInterval: ReturnType<typeof setInterval> | null = null;
   private lastSyncTimestamps = new Map<string, number>();
@@ -2750,6 +2979,10 @@ class WhatsAppEvolutionManager extends EventEmitter {
 
   async shutdown(): Promise<void> {
     console.log("[EvoWA] Shutting down...");
+    if (this.fastPollInterval) {
+      clearInterval(this.fastPollInterval);
+      this.fastPollInterval = null;
+    }
     if (this.pollingInterval) {
       clearInterval(this.pollingInterval);
       this.pollingInterval = null;

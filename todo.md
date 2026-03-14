@@ -2703,3 +2703,19 @@
 - [x] Adicionar item "Supervisão" / "Atendentes" no menu lateral ao lado do Inbox
 - [x] Garantir que a rota do painel de supervisão está registrada no App.tsx
 - [x] Verificar que o painel de supervisão funciona corretamente
+## BUG CRÍTICO: Mensagens ainda demoram a aparecer no Inbox (Mar 14 - v2)
+- [x] Investigar logs reais do webhook handler (timing de recebimento)
+  - CAUSA RAIZ: Evolution API NÃO envia webhooks para mensagens reais (config OK, mas não dispara)
+  - Todas as mensagens eram inseridas pelo QuickSync (polling 5min) — delay de 3-5 minutos
+  - Webhook funciona quando testado manualmente via curl (1s de delay)
+- [x] Investigar se Socket.IO está realmente emitindo e o frontend recebendo
+  - Socket.IO funciona corretamente, mas não era acionado porque o webhook não chegava
+- [x] Investigar se o Inbox está usando polling em vez de Socket.IO para atualizar
+  - Frontend dependia do Socket.IO (que nunca disparava) + refetch a cada 30s
+- [x] SOLUÇÃO: Implementar FastPoll (30s) — verifica os 15 chats mais recentes via API
+  - Insere mensagens novas e emite Socket.IO para atualização instantânea
+  - Muito mais leve que o QuickSync (15 chats x 20 msgs vs todos os chats x 150 msgs)
+- [x] Reduzir refetchInterval do frontend: conversas 10s, mensagens 8s, fila 10s
+- [x] Manter QuickSync (5min) como backup para sync profundo
+- [x] Manter webhook handler funcional para quando Evolution API voltar a enviar
+- [x] Identificar e corrigir o gargalo real (FastPoll 30s + frontend 10s)

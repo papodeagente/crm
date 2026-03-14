@@ -780,7 +780,7 @@ export default function InboxPage() {
   // Use wa_conversations table (canonical, with correct names and ordering)
   const conversationsQ = trpc.whatsapp.waConversations.useQuery(
     { sessionId: activeSession?.sessionId || "", tenantId },
-    { enabled: !!activeSession?.sessionId, refetchInterval: isConnected ? 30000 : 120000, staleTime: 20000 }
+    { enabled: !!activeSession?.sessionId, refetchInterval: isConnected ? 10000 : 30000, staleTime: 5000 }
   );
 
   // Agents list for assignment
@@ -790,11 +790,11 @@ export default function InboxPage() {
   // Queue conversations
   const queueQ = trpc.whatsapp.queue.list.useQuery(
     { sessionId: activeSession?.sessionId || "", limit: 100 },
-    { enabled: !!activeSession?.sessionId && (activeTab === "queue" || activeTab === "all"), refetchInterval: isConnected ? 30000 : 120000, staleTime: 20000 }
+    { enabled: !!activeSession?.sessionId && (activeTab === "queue" || activeTab === "all"), refetchInterval: isConnected ? 10000 : 30000, staleTime: 5000 }
   );
   const queueStatsQ = trpc.whatsapp.queue.stats.useQuery(
     { sessionId: activeSession?.sessionId || "" },
-    { enabled: !!activeSession?.sessionId, refetchInterval: 60000, staleTime: 30000 }
+    { enabled: !!activeSession?.sessionId, refetchInterval: 15000, staleTime: 10000 }
   );
   const claimMutation = trpc.whatsapp.queue.claim.useMutation({
     onSuccess: () => { conversationsQ.refetch(); queueQ.refetch(); queueStatsQ.refetch(); toast.success("Conversa atribuída a você"); },
