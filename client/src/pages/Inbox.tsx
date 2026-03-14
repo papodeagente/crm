@@ -189,6 +189,7 @@ interface ConvItem {
   contactName?: string | null;
   contactEmail?: string | null;
   contactPhone?: string | null;
+  queuedAt?: string | Date | null;
 }
 
 const AgentBadge = memo(({ name, avatarUrl }: { name?: string | null; avatarUrl?: string | null }) => {
@@ -220,9 +221,9 @@ const StatusDot = memo(({ status }: { status?: string | null }) => {
 StatusDot.displayName = "StatusDot";
 
 const ConversationItem = memo(({
-  conv, isActive, contactName, pictureUrl, onClick,
+  conv, isActive, contactName, pictureUrl, onClick, waitLabel,
 }: {
-  conv: ConvItem; isActive: boolean; contactName: string; pictureUrl?: string | null; onClick: () => void;
+  conv: ConvItem; isActive: boolean; contactName: string; pictureUrl?: string | null; onClick: () => void; waitLabel?: string;
 }) => {
   const fromMe = conv.lastFromMe === true || conv.lastFromMe === 1;
   const unread = Number(conv.unreadCount) || 0;
@@ -252,6 +253,12 @@ const ConversationItem = memo(({
           </span>
           <div className="flex items-center gap-[5px] shrink-0">
             <AgentBadge name={conv.assignedAgentName} avatarUrl={conv.assignedAgentAvatar} />
+            {waitLabel && (
+              <span className="text-[10px] text-amber-400 bg-amber-400/10 px-1.5 py-0.5 rounded font-medium flex items-center gap-0.5">
+                <Timer className="w-2.5 h-2.5" />
+                {waitLabel}
+              </span>
+            )}
             <span className={`text-[12px] leading-[14px] ${
               unread > 0 ? "text-wa-unread font-medium" : "text-muted-foreground"
             }`}>
@@ -939,7 +946,10 @@ export default function InboxPage() {
   // Notification sound on new messages
   useEffect(() => {
     if (!lastMessage) return;
+    console.log('[Inbox] Socket message received:', lastMessage.remoteJid, lastMessage.fromMe, lastMessage.content?.substring(0, 30));
     conversationsQ.refetch();
+    queueQ.refetch();
+    queueStatsQ.refetch();
     const isNew = !prevMessageRef.current ||
       lastMessage.timestamp !== prevMessageRef.current.timestamp ||
       lastMessage.remoteJid !== prevMessageRef.current.remoteJid ||
@@ -958,6 +968,17 @@ export default function InboxPage() {
       markRead.mutate({ sessionId: activeSession.sessionId, remoteJid: jid });
     }
   }, [activeSession?.sessionId, markRead]);
+
+  // Auto-claim: when clicking a queue conversation, automatically claim it
+  const handleSelectQueueConv = useCallback((jid: string) => {
+    setSelectedJid(jid);
+    setShowMobileChat(true);
+    if (activeSession?.sessionId) {
+      markRead.mutate({ sessionId: activeSession.sessionId, remoteJid: jid });
+      // Auto-claim the conversation
+      claimMutation.mutate({ sessionId: activeSession.sessionId, remoteJid: jid });
+    }
+  }, [activeSession?.sessionId, markRead, claimMutation]);
 
   // Current user ID for filtering "mine" tab
   const meQ = trpc.auth.me.useQuery();
@@ -1025,7 +1046,7 @@ export default function InboxPage() {
 
   // Queue count for badge
   const queueCount = useMemo(() => {
-    return (queueStatsQ.data as any)?.waiting || 0;
+    return (queueStatsQ.data as any)?.total || 0;
   }, [queueStatsQ.data]);
 
   // Get assignment for selected conversation
@@ -1291,14 +1312,19 @@ export default function InboxPage() {
                   <p className="text-[12px] text-muted-foreground/60 mt-1">Novas mensagens sem agente aparecerão aqui</p>
                 </div>
               ) : (
-                filteredQueueConvs.map((conv) => (
+                filteredQueueConvs.map((conv) => {
+                  const waitTime = conv.queuedAt || conv.lastTimestamp;
+                  const waitMinutes = waitTime ? Math.floor((Date.now() - new Date(waitTime).getTime()) / 60000) : 0;
+                  const waitLabel = waitMinutes < 1 ? "agora" : waitMinutes < 60 ? `${waitMinutes}min` : `${Math.floor(waitMinutes / 60)}h${waitMinutes % 60}min`;
+                  return (
                   <div key={conv.remoteJid} className="relative group">
                     <ConversationItem
                       conv={conv}
                       isActive={selectedJid === conv.remoteJid}
                       contactName={getDisplayName(conv.remoteJid, conv)}
                       pictureUrl={profilePicMap[conv.remoteJid]}
-                      onClick={() => handleSelectConv(conv.remoteJid)}
+                      onClick={() => handleSelectQueueConv(conv.remoteJid)}
+                      waitLabel={waitLabel}
                     />
                     {/* Claim button overlay */}
                     <button
@@ -1315,7 +1341,8 @@ export default function InboxPage() {
                       Puxar
                     </button>
                   </div>
-                ))
+                  );
+                })
               )}
             </>
           )}

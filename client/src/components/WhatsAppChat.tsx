@@ -1071,6 +1071,8 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
   const [isNoteMode, setIsNoteMode] = useState(false);
   const [showTimeline, setShowTimeline] = useState(false);
   const [showTransfer, setShowTransfer] = useState(false);
+  const [showQuickReplies, setShowQuickReplies] = useState(false);
+  const [quickReplyFilter, setQuickReplyFilter] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -1089,6 +1091,18 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
     onSuccess: () => { notesQ.refetch(); toast.success("Nota interna adicionada"); setMessageText(""); setIsNoteMode(false); },
     onError: (e) => toast.error(e.message || "Erro ao criar nota"),
   });
+
+  // Quick replies
+  const quickRepliesQ = trpc.whatsapp.quickReplies.list.useQuery(
+    {},
+    { staleTime: 5 * 60 * 1000 }
+  );
+  const filteredQuickReplies = useMemo(() => {
+    const replies = (quickRepliesQ.data || []) as Array<{ id: number; shortcut: string; title: string; content: string; category?: string | null }>;
+    if (!quickReplyFilter) return replies.slice(0, 10);
+    const f = quickReplyFilter.toLowerCase();
+    return replies.filter(r => r.shortcut.toLowerCase().includes(f) || r.title.toLowerCase().includes(f)).slice(0, 10);
+  }, [quickRepliesQ.data, quickReplyFilter]);
 
   // Conversation events/timeline
   const eventsQ = trpc.whatsapp.events.list.useQuery(
@@ -1426,10 +1440,20 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
   }, []);
 
   const handleTextareaChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setMessageText(e.target.value);
+    const val = e.target.value;
+    setMessageText(val);
     const el = e.target;
     el.style.height = "42px";
     el.style.height = Math.min(el.scrollHeight, 140) + "px";
+
+    // Quick replies trigger: typing / at start shows quick replies
+    if (val.startsWith("/")) {
+      setShowQuickReplies(true);
+      setQuickReplyFilter(val.substring(1));
+    } else {
+      setShowQuickReplies(false);
+      setQuickReplyFilter("");
+    }
 
     // Send composing presence (debounced)
     if (presenceTimerRef.current) clearTimeout(presenceTimerRef.current);
@@ -1907,16 +1931,45 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
 
             {/* Text input */}
             <div className="flex-1 relative">
+              {/* Quick Replies popup */}
+              {showQuickReplies && filteredQuickReplies.length > 0 && (
+                <div className="absolute bottom-full left-0 right-0 mb-1 bg-popover border border-border rounded-lg shadow-xl max-h-[200px] overflow-y-auto z-50">
+                  <div className="px-3 py-1.5 text-[11px] text-muted-foreground font-medium uppercase tracking-wider border-b border-border/50">
+                    Respostas Rápidas
+                  </div>
+                  {filteredQuickReplies.map((qr) => (
+                    <button
+                      key={qr.id}
+                      className="w-full text-left px-3 py-2 hover:bg-accent/50 transition-colors border-b border-border/20 last:border-0"
+                      onClick={() => {
+                        setMessageText(qr.content);
+                        setShowQuickReplies(false);
+                        setQuickReplyFilter("");
+                        textareaRef.current?.focus();
+                      }}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="text-[11px] font-mono text-wa-tint bg-wa-tint/10 px-1.5 py-0.5 rounded">/{qr.shortcut}</span>
+                        <span className="text-[13px] font-medium text-foreground truncate">{qr.title}</span>
+                      </div>
+                      <p className="text-[12px] text-muted-foreground mt-0.5 truncate">{qr.content.substring(0, 80)}</p>
+                    </button>
+                  ))}
+                </div>
+              )}
               <textarea
                 ref={textareaRef} value={messageText} onChange={handleTextareaChange}
-                placeholder={isNoteMode ? "Escreva uma nota interna (só a equipe vê)..." : "Mensagem"} rows={1}
+                placeholder={isNoteMode ? "Escreva uma nota interna (só a equipe vê)..." : "Mensagem (digite / para respostas rápidas)"} rows={1}
                 className={`w-full rounded-lg px-3 py-2.5 text-[15px] placeholder:text-muted-foreground outline-none resize-none leading-[20px] transition-colors ${
                   isNoteMode
                     ? "bg-amber-100 border-amber-300 text-amber-900 focus:border-amber-400"
                     : "bg-wa-input-bg border-wa-divider text-foreground focus:border-wa-tint/50"
                 } border`}
                 style={{ height: "42px", maxHeight: "140px" }}
-                onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape" && showQuickReplies) { setShowQuickReplies(false); return; }
+                  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); if (showQuickReplies) { setShowQuickReplies(false); } else { handleSend(); } }
+                }}
               />
             </div>
 

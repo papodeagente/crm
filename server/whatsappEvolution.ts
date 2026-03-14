@@ -1241,11 +1241,17 @@ class WhatsAppEvolutionManager extends EventEmitter {
   async handleWebhookEvent(payload: evo.WebhookPayload): Promise<void> {
     const instanceName = payload.instance;
     const sessionId = this.instanceToSession.get(instanceName);
+    console.log(`[EvoWA Webhook] Received event: ${payload.event} | Instance: ${instanceName} | SessionId: ${sessionId || 'NOT_FOUND'}`);
 
     let session = sessionId ? this.sessions.get(sessionId) : undefined;
     if (!session) {
       const loaded = await this.loadSessionByInstanceName(instanceName);
-      if (loaded) session = loaded;
+      if (loaded) {
+        session = loaded;
+        console.log(`[EvoWA Webhook] Loaded session from DB: ${loaded.sessionId}`);
+      } else {
+        console.warn(`[EvoWA Webhook] No session found for instance: ${instanceName}`);
+      }
     }
 
     switch (payload.event) {
@@ -1318,7 +1324,10 @@ class WhatsAppEvolutionManager extends EventEmitter {
 
       case "messages.upsert":
         if (session) {
+          console.log(`[EvoWA Webhook] Processing messages.upsert for session ${session.sessionId} | remoteJid: ${payload.data?.key?.remoteJid || 'unknown'} | fromMe: ${payload.data?.key?.fromMe}`);
           await this.handleIncomingMessage(session, payload.data);
+        } else {
+          console.warn(`[EvoWA Webhook] messages.upsert ignored - no session for instance: ${instanceName}`);
         }
         break;
 
@@ -1374,30 +1383,6 @@ class WhatsAppEvolutionManager extends EventEmitter {
       // Extract media info from the message payload
       const mediaInfo = this.extractMediaInfo(data);
 
-      // If message has media but no permanent S3 URL, download from Evolution API and upload to S3
-      // WhatsApp CDN URLs (mmg.whatsapp.net) are temporary and expire, so always download to S3
-      const hasMediaType = ["imageMessage", "videoMessage", "audioMessage", "documentMessage", "stickerMessage", "pttMessage"].includes(messageType);
-      const hasPermanentUrl = mediaInfo.mediaUrl && !mediaInfo.mediaUrl.includes('whatsapp.net');
-      if (hasMediaType && !hasPermanentUrl && messageId) {
-        try {
-          const base64Data = await evo.getBase64FromMediaMessage(session.instanceName, messageId, {
-            remoteJid,
-            fromMe,
-          });
-          if (base64Data?.base64) {
-            const ext = this.mimeToExt(base64Data.mimetype || mediaInfo.mediaMimeType || "application/octet-stream");
-            const fileKey = `whatsapp-media/${session.sessionId}/${nanoid()}.${ext}`;
-            const buffer = Buffer.from(base64Data.base64, "base64");
-            const { url } = await storagePut(fileKey, buffer, base64Data.mimetype || mediaInfo.mediaMimeType || "application/octet-stream");
-            mediaInfo.mediaUrl = url;
-            if (base64Data.mimetype) mediaInfo.mediaMimeType = base64Data.mimetype;
-            if (base64Data.fileName) mediaInfo.mediaFileName = base64Data.fileName;
-          }
-        } catch (e: any) {
-          console.error(`[EvoWA] Failed to download media for ${messageId}:`, e.message);
-        }
-      }
-
       const db = await getDb();
       if (!db) return;
 
@@ -1414,6 +1399,8 @@ class WhatsAppEvolutionManager extends EventEmitter {
         if (existing.length > 0) return;
       }
 
+      // Insert message into DB immediately (without waiting for media download)
+      // Media will be downloaded in background and the row updated later
       await db.insert(waMessages).values({
         sessionId: session.sessionId,
         tenantId: session.tenantId,
@@ -1422,7 +1409,7 @@ class WhatsAppEvolutionManager extends EventEmitter {
         fromMe,
         messageType,
         content: content || null,
-        pushName: pushName || null,
+        pushName: fromMe ? null : (pushName || null),
         status: fromMe ? "sent" : "received",
         timestamp: new Date(timestamp),
         mediaUrl: mediaInfo.mediaUrl || null,
@@ -1433,40 +1420,7 @@ class WhatsAppEvolutionManager extends EventEmitter {
         quotedMessageId: mediaInfo.quotedMessageId || null,
       });
 
-      // Update wa_contacts with pushName if it's a real name (not a phone number)
-      if (pushName && !fromMe) {
-        const cleanedPush = pushName.replace(/[\s\-\(\)\+]/g, '');
-        const isRealName = !/^\d+$/.test(cleanedPush) && pushName !== 'Voc\u00ea' && pushName !== 'You';
-        if (isRealName) {
-          try {
-            // Upsert wa_contacts with the real pushName
-            await db.insert(waContacts).values({
-              sessionId: session.sessionId,
-              jid: remoteJid,
-              phoneNumber: remoteJid.endsWith('@s.whatsapp.net') ? remoteJid : null,
-              pushName,
-              savedName: null,
-              verifiedName: null,
-              profilePictureUrl: null,
-            }).onDuplicateKeyUpdate({
-              set: { pushName: sql`${pushName}` },
-            }).catch(() => {
-              // Fallback: just update
-              return db.update(waContacts)
-                .set({ pushName })
-                .where(and(
-                  eq(waContacts.sessionId, session.sessionId),
-                  eq(waContacts.jid, remoteJid)
-                )).catch(() => {});
-            });
-          } catch {}
-        }
-      }
-
-      // Resolve conversation
-      // Only pass pushName when message is FROM the contact (fromMe=false)
-      // When fromMe=true, pushName is the sender's (our) name, not the contact's
-      // skipContactCreation: true — contacts are only created when user opens a deal/negotiation
+      // Resolve conversation (update last message, unread count)
       try {
         const contactPushName = fromMe ? null : pushName;
         const resolved = await resolveInbound(session.tenantId, session.sessionId, remoteJid, contactPushName, { skipContactCreation: true });
@@ -1482,7 +1436,9 @@ class WhatsAppEvolutionManager extends EventEmitter {
         console.warn("[EvoWA] Conversation resolver error:", e);
       }
 
-      // Emit event for Socket.IO
+      // *** EMIT Socket.IO event IMMEDIATELY — before media download ***
+      // This ensures the frontend gets notified in real-time
+      console.log(`[EvoWA Webhook] Emitting socket message: session=${session.sessionId} jid=${remoteJid} fromMe=${fromMe} content=${(content || '').substring(0, 50)}`);
       this.emit("message", {
         sessionId: session.sessionId,
         tenantId: session.tenantId,
@@ -1494,20 +1450,106 @@ class WhatsAppEvolutionManager extends EventEmitter {
         timestamp,
       });
 
-      // Create notification for incoming messages
+      // *** Background tasks — run in parallel, don't block webhook response ***
+      // 1. Download media and upload to S3
+      const hasMediaType = ["imageMessage", "videoMessage", "audioMessage", "documentMessage", "stickerMessage", "pttMessage"].includes(messageType);
+      const hasPermanentUrl = mediaInfo.mediaUrl && !mediaInfo.mediaUrl.includes('whatsapp.net');
+      if (hasMediaType && !hasPermanentUrl && messageId) {
+        this.downloadAndStoreMedia(session, messageId, remoteJid, fromMe, mediaInfo).catch(e =>
+          console.error(`[EvoWA] Background media download failed for ${messageId}:`, e.message)
+        );
+      }
+
+      // 2. Update wa_contacts with pushName
+      if (pushName && !fromMe) {
+        const cleanedPush = pushName.replace(/[\s\-\(\)\+]/g, '');
+        const isRealName = !/^\d+$/.test(cleanedPush) && pushName !== 'Voc\u00ea' && pushName !== 'You';
+        if (isRealName) {
+          db.insert(waContacts).values({
+            sessionId: session.sessionId,
+            jid: remoteJid,
+            phoneNumber: remoteJid.endsWith('@s.whatsapp.net') ? remoteJid : null,
+            pushName,
+            savedName: null,
+            verifiedName: null,
+            profilePictureUrl: null,
+          }).onDuplicateKeyUpdate({
+            set: { pushName: sql`${pushName}` },
+          }).catch(() =>
+            db.update(waContacts)
+              .set({ pushName })
+              .where(and(
+                eq(waContacts.sessionId, session.sessionId),
+                eq(waContacts.jid, remoteJid)
+              )).catch(() => {})
+          ).catch(() => {});
+        }
+      }
+
+      // 3. Create notification for incoming messages
       if (!fromMe) {
-        try {
-          await createNotification(session.tenantId, {
-            type: "whatsapp_message",
-            title: `Nova mensagem de ${pushName || remoteJid.split("@")[0]}`,
-            body: content?.substring(0, 200) || "Nova mensagem recebida",
-            entityType: "whatsapp",
-            entityId: session.sessionId,
-          });
-        } catch {}
+        createNotification(session.tenantId, {
+          type: "whatsapp_message",
+          title: `Nova mensagem de ${pushName || remoteJid.split("@")[0]}`,
+          body: content?.substring(0, 200) || "Nova mensagem recebida",
+          entityType: "whatsapp",
+          entityId: session.sessionId,
+        }).catch(() => {});
       }
     } catch (error) {
       console.error("[EvoWA] Error handling incoming message:", error);
+    }
+  }
+
+  /** Download media from Evolution API and upload to S3, then update the DB row */
+  private async downloadAndStoreMedia(
+    session: EvolutionSessionState,
+    messageId: string,
+    remoteJid: string,
+    fromMe: boolean,
+    mediaInfo: { mediaUrl?: string | null; mediaMimeType?: string | null; mediaFileName?: string | null }
+  ): Promise<void> {
+    try {
+      const base64Data = await evo.getBase64FromMediaMessage(session.instanceName, messageId, {
+        remoteJid,
+        fromMe,
+      });
+      if (base64Data?.base64) {
+        const ext = this.mimeToExt(base64Data.mimetype || mediaInfo.mediaMimeType || "application/octet-stream");
+        const fileKey = `whatsapp-media/${session.sessionId}/${nanoid()}.${ext}`;
+        const buffer = Buffer.from(base64Data.base64, "base64");
+        const { url } = await storagePut(fileKey, buffer, base64Data.mimetype || mediaInfo.mediaMimeType || "application/octet-stream");
+
+        // Update the message row with the permanent S3 URL
+        const db = await getDb();
+        if (db) {
+          await db.update(waMessages)
+            .set({
+              mediaUrl: url,
+              mediaMimeType: base64Data.mimetype || mediaInfo.mediaMimeType || null,
+              mediaFileName: base64Data.fileName || mediaInfo.mediaFileName || null,
+            })
+            .where(and(
+              eq(waMessages.sessionId, session.sessionId),
+              eq(waMessages.messageId, messageId)
+            ));
+          console.log(`[EvoWA] Media stored for ${messageId}: ${url}`);
+
+          // Emit a second socket event so frontend can refresh and show the media
+          this.emit("message", {
+            sessionId: session.sessionId,
+            tenantId: session.tenantId,
+            content: "[media_ready]",
+            fromMe,
+            remoteJid,
+            messageType: "media_update",
+            pushName: "",
+            timestamp: Date.now(),
+          });
+        }
+      }
+    } catch (e: any) {
+      console.error(`[EvoWA] Failed to download/store media for ${messageId}:`, e.message);
     }
   }
 
@@ -1564,6 +1606,18 @@ class WhatsAppEvolutionManager extends EventEmitter {
           });
         }
       } catch {}
+
+      // Emit Socket.IO event for outgoing messages too
+      this.emit("message", {
+        sessionId: session.sessionId,
+        tenantId: session.tenantId,
+        content,
+        fromMe: true,
+        remoteJid,
+        messageType,
+        pushName: "",
+        timestamp,
+      });
     } catch (error) {
       console.error("[EvoWA] Error handling outgoing message:", error);
     }

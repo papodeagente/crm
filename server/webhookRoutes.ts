@@ -897,6 +897,7 @@ router.post("/api/webhooks/rdstation", async (req: Request, res: Response) => {
 
 // Handler shared by both routes
 async function handleEvolutionWebhook(req: Request, res: Response) {
+  const startTime = Date.now();
   try {
     const body = req.body;
     if (!body || !body.event) {
@@ -912,13 +913,18 @@ async function handleEvolutionWebhook(req: Request, res: Response) {
       return res.status(403).json({ error: "Invalid API key" });
     }
 
-    console.log(`[Webhook /evolution] Event: ${body.event} | Instance: ${body.instance} | Path: ${req.path}`);
+    // Detailed logging for debugging
+    const remoteJid = body.data?.key?.remoteJid || body.data?.remoteJid || 'unknown';
+    const fromMe = body.data?.key?.fromMe;
+    const msgContent = body.data?.message?.conversation || body.data?.message?.extendedTextMessage?.text || '';
+    console.log(`[Webhook /evolution] Event: ${body.event} | Instance: ${body.instance} | JID: ${remoteJid} | fromMe: ${fromMe} | Content: ${msgContent.substring(0, 40)} | Path: ${req.path}`);
 
     // Import the Evolution WhatsApp manager
     const { whatsappManager } = await import("./whatsappEvolution");
 
-    // Route the event to the manager
-    await whatsappManager.handleWebhookEvent({
+    // Route the event to the manager — DON'T await to respond faster
+    // The webhook handler should return 200 ASAP to avoid Evolution API retries
+    const eventPayload = {
       event: body.event,
       instance: body.instance,
       data: body.data,
@@ -926,11 +932,23 @@ async function handleEvolutionWebhook(req: Request, res: Response) {
       date_time: body.date_time,
       server_url: body.server_url,
       apikey: body.apikey,
-    });
+    };
 
+    // For message events, process async to respond immediately
+    if (body.event === 'messages.upsert' || body.event === 'send.message') {
+      whatsappManager.handleWebhookEvent(eventPayload).catch(e =>
+        console.error(`[Webhook /evolution] Async processing error for ${body.event}:`, e.message)
+      );
+      console.log(`[Webhook /evolution] Responded in ${Date.now() - startTime}ms (async processing)`);
+      return res.status(200).json({ received: true });
+    }
+
+    // For other events (connection, qr, etc.), process synchronously
+    await whatsappManager.handleWebhookEvent(eventPayload);
+    console.log(`[Webhook /evolution] Responded in ${Date.now() - startTime}ms`);
     return res.status(200).json({ received: true });
   } catch (error: any) {
-    console.error("[Webhook /evolution] Error:", error.message);
+    console.error(`[Webhook /evolution] Error after ${Date.now() - startTime}ms:`, error.message);
     return res.status(200).json({ received: true, error: error.message });
   }
 }
