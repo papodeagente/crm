@@ -2,7 +2,6 @@ import { trpc } from "@/lib/trpc";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -20,10 +19,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  Share2, Users, Loader2, XCircle, Wifi, WifiOff,
-  Phone, UserPlus, Trash2, CheckCircle2, AlertTriangle
+  Share2, Loader2, XCircle, Wifi, WifiOff,
+  UserPlus, Check, AlertTriangle, ChevronRight
 } from "lucide-react";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { toast } from "sonner";
 
 interface SessionSharingProps {
@@ -56,7 +55,7 @@ export default function SessionSharing({ tenantId }: SessionSharingProps) {
   // Mutations
   const shareSession = trpc.whatsapp.shareSession.useMutation({
     onSuccess: (data) => {
-      toast.success(`Sessão compartilhada com ${data.created} usuário(s)!`);
+      toast.success(`Sessão compartilhada com ${data.created} agente(s)!`);
       utils.whatsapp.listShares.invalidate();
       utils.whatsapp.tenantSessions.invalidate();
       setShareDialogOpen(false);
@@ -68,15 +67,7 @@ export default function SessionSharing({ tenantId }: SessionSharingProps) {
 
   const revokeShare = trpc.whatsapp.revokeShare.useMutation({
     onSuccess: () => {
-      toast.success("Compartilhamento revogado.");
-      utils.whatsapp.listShares.invalidate();
-    },
-    onError: (err) => toast.error(`Erro: ${err.message}`),
-  });
-
-  const revokeAll = trpc.whatsapp.revokeAllShares.useMutation({
-    onSuccess: () => {
-      toast.success("Todos os compartilhamentos revogados.");
+      toast.success("Acesso revogado.");
       utils.whatsapp.listShares.invalidate();
     },
     onError: (err) => toast.error(`Erro: ${err.message}`),
@@ -93,7 +84,6 @@ export default function SessionSharing({ tenantId }: SessionSharingProps) {
     [shares.data]
   );
 
-  // Get the selected session's owner to exclude from target list
   const selectedSession = useMemo(
     () => connectedSessions.find((s: any) => s.sessionId === selectedSessionId),
     [connectedSessions, selectedSessionId]
@@ -106,13 +96,14 @@ export default function SessionSharing({ tenantId }: SessionSharingProps) {
     );
   }, [agents.data, selectedSession]);
 
-  const toggleUser = (userId: number) => {
+  // Toggle user selection — memoized to avoid re-renders
+  const toggleUser = useCallback((userId: number) => {
     setSelectedUserIds(prev =>
       prev.includes(userId)
         ? prev.filter(id => id !== userId)
         : [...prev, userId]
     );
-  };
+  }, []);
 
   const handleShare = () => {
     if (!selectedSessionId || selectedUserIds.length === 0) return;
@@ -123,12 +114,34 @@ export default function SessionSharing({ tenantId }: SessionSharingProps) {
     });
   };
 
+  // Get initials for avatar
+  const getInitials = (name: string) => {
+    return name?.split(" ").map(w => w[0]).join("").substring(0, 2).toUpperCase() || "?";
+  };
+
+  // Group shares by source session
+  const sharesBySession = useMemo(() => {
+    const map = new Map<string, any[]>();
+    activeShares.forEach((s: any) => {
+      const key = s.sourceSessionId;
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(s);
+    });
+    return map;
+  }, [activeShares]);
+
   return (
-    <div className="mt-8">
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
-          <Share2 className="h-5 w-5 text-muted-foreground" />
-          <h2 className="text-[15px] font-semibold text-foreground">Compartilhamento de Sessão</h2>
+    <div className="mt-8 space-y-5">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-[15px] font-semibold text-foreground flex items-center gap-2">
+            <Share2 className="h-4.5 w-4.5 text-violet-500" />
+            Compartilhar Sessão
+          </h2>
+          <p className="text-[12px] text-muted-foreground mt-0.5">
+            Permita que agentes atendam usando o mesmo número WhatsApp
+          </p>
         </div>
         <Dialog open={shareDialogOpen} onOpenChange={(open) => {
           setShareDialogOpen(open);
@@ -144,36 +157,35 @@ export default function SessionSharing({ tenantId }: SessionSharingProps) {
               disabled={connectedSessions.length === 0}
             >
               <UserPlus className="h-3.5 w-3.5" />
-              Compartilhar Sessão
+              Compartilhar
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-lg">
+          <DialogContent className="max-w-md">
             <DialogHeader>
-              <DialogTitle className="text-[16px]">Compartilhar Sessão WhatsApp</DialogTitle>
+              <DialogTitle className="text-[16px]">Compartilhar Sessão</DialogTitle>
               <DialogDescription className="text-[13px]">
-                Selecione uma sessão conectada e os agentes que receberão acesso.
-                Os agentes selecionados terão sua própria sessão desconectada e passarão a usar a sessão compartilhada.
+                Escolha a sessão e selecione os agentes que terão acesso.
               </DialogDescription>
             </DialogHeader>
 
             <div className="space-y-4 py-2">
-              {/* Session selector */}
+              {/* Step 1: Session selector */}
               <div>
                 <label className="text-[12px] font-medium text-muted-foreground mb-1.5 block">
-                  Sessão de origem
+                  1. Sessão WhatsApp
                 </label>
                 <Select value={selectedSessionId} onValueChange={(v) => {
                   setSelectedSessionId(v);
                   setSelectedUserIds([]);
                 }}>
                   <SelectTrigger className="rounded-lg h-10">
-                    <SelectValue placeholder="Selecione uma sessão conectada..." />
+                    <SelectValue placeholder="Selecione a sessão..." />
                   </SelectTrigger>
                   <SelectContent>
                     {connectedSessions.map((s: any) => (
                       <SelectItem key={s.sessionId} value={s.sessionId}>
                         <div className="flex items-center gap-2">
-                          <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                          <span className="h-2 w-2 rounded-full bg-emerald-500 shrink-0" />
                           <span>{s.ownerName || "Sem nome"}</span>
                           {s.phoneNumber && (
                             <span className="text-muted-foreground text-[11px]">({s.phoneNumber})</span>
@@ -181,25 +193,42 @@ export default function SessionSharing({ tenantId }: SessionSharingProps) {
                         </div>
                       </SelectItem>
                     ))}
-                    {connectedSessions.length === 0 && (
-                      <div className="p-3 text-center text-[12px] text-muted-foreground">
-                        Nenhuma sessão conectada disponível
-                      </div>
-                    )}
                   </SelectContent>
                 </Select>
               </div>
 
-              {/* Target users */}
+              {/* Step 2: Agent selection */}
               {selectedSessionId && (
                 <div>
-                  <label className="text-[12px] font-medium text-muted-foreground mb-1.5 block">
-                    Agentes que receberão acesso ({selectedUserIds.length} selecionado{selectedUserIds.length !== 1 ? "s" : ""})
-                  </label>
-                  <div className="border border-border/40 rounded-lg max-h-[240px] overflow-y-auto">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-[12px] font-medium text-muted-foreground">
+                      2. Selecione os agentes
+                    </label>
+                    {availableTargetUsers.length > 0 && (
+                      <button
+                        type="button"
+                        className="text-[11px] text-violet-500 hover:text-violet-400 font-medium transition-colors"
+                        onClick={() => {
+                          const allAvailable = availableTargetUsers
+                            .filter((a: any) => !activeShares.some(
+                              (s: any) => s.targetUserId === a.id && s.sourceSessionId === selectedSessionId
+                            ))
+                            .map((a: any) => a.id);
+                          setSelectedUserIds(prev =>
+                            prev.length === allAvailable.length ? [] : allAvailable
+                          );
+                        }}
+                      >
+                        {selectedUserIds.length === availableTargetUsers.filter((a: any) => !activeShares.some(
+                          (s: any) => s.targetUserId === a.id && s.sourceSessionId === selectedSessionId
+                        )).length ? "Desmarcar todos" : "Selecionar todos"}
+                      </button>
+                    )}
+                  </div>
+                  <div className="border border-border/40 rounded-lg max-h-[260px] overflow-y-auto divide-y divide-border/20">
                     {availableTargetUsers.length === 0 ? (
-                      <div className="p-4 text-center text-[12px] text-muted-foreground">
-                        Nenhum agente disponível para compartilhar
+                      <div className="p-6 text-center text-[12px] text-muted-foreground">
+                        Nenhum agente disponível
                       </div>
                     ) : (
                       availableTargetUsers.map((agent: any) => {
@@ -208,26 +237,52 @@ export default function SessionSharing({ tenantId }: SessionSharingProps) {
                           (s: any) => s.targetUserId === agent.id && s.sourceSessionId === selectedSessionId
                         );
                         return (
-                          <div
+                          <button
+                            type="button"
                             key={agent.id}
-                            className={`flex items-center gap-3 px-3 py-2.5 border-b border-border/20 last:border-0 cursor-pointer hover:bg-muted/30 transition-colors ${isSelected ? "bg-violet-50/50" : ""}`}
+                            disabled={hasExistingShare}
+                            className={`w-full flex items-center gap-3 px-3 py-2.5 text-left transition-all
+                              ${hasExistingShare
+                                ? "opacity-50 cursor-not-allowed"
+                                : "cursor-pointer hover:bg-violet-500/5 active:bg-violet-500/10"
+                              }
+                              ${isSelected ? "bg-violet-500/10" : ""}
+                            `}
                             onClick={() => !hasExistingShare && toggleUser(agent.id)}
                           >
-                            <Checkbox
-                              checked={isSelected || hasExistingShare}
-                              disabled={hasExistingShare}
-                              onCheckedChange={() => !hasExistingShare && toggleUser(agent.id)}
-                            />
+                            {/* Custom checkbox */}
+                            <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition-all
+                              ${isSelected
+                                ? "bg-violet-600 border-violet-600"
+                                : hasExistingShare
+                                  ? "bg-violet-600/30 border-violet-600/30"
+                                  : "border-border/60 hover:border-violet-400"
+                              }
+                            `}>
+                              {(isSelected || hasExistingShare) && (
+                                <Check className="h-3 w-3 text-white" strokeWidth={3} />
+                              )}
+                            </div>
+
+                            {/* Avatar */}
+                            <div className="w-8 h-8 rounded-full bg-violet-500/15 flex items-center justify-center shrink-0">
+                              <span className="text-[11px] font-bold text-violet-400">
+                                {getInitials(agent.name)}
+                              </span>
+                            </div>
+
+                            {/* Info */}
                             <div className="flex-1 min-w-0">
                               <p className="text-[13px] font-medium text-foreground truncate">{agent.name}</p>
                               <p className="text-[11px] text-muted-foreground truncate">{agent.email}</p>
                             </div>
+
                             {hasExistingShare && (
-                              <Badge variant="outline" className="text-[10px] shrink-0 border-violet-200 text-violet-600">
-                                Já compartilhado
-                              </Badge>
+                              <span className="text-[10px] text-violet-400 font-medium shrink-0">
+                                Já tem acesso
+                              </span>
                             )}
-                          </div>
+                          </button>
                         );
                       })
                     )}
@@ -235,17 +290,14 @@ export default function SessionSharing({ tenantId }: SessionSharingProps) {
                 </div>
               )}
 
-              {/* Warning */}
+              {/* Info notice */}
               {selectedUserIds.length > 0 && (
-                <div className="rounded-lg bg-amber-50 border border-amber-200/60 p-3">
-                  <div className="flex gap-2 items-start">
-                    <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
-                    <p className="text-[11px] text-amber-700 leading-relaxed">
-                      Os agentes selecionados terão sua sessão própria <strong>desconectada</strong> e
-                      passarão a usar a sessão compartilhada. Eles poderão ver e responder conversas
-                      da sessão de origem. Para reverter, revogue o compartilhamento.
-                    </p>
-                  </div>
+                <div className="rounded-lg bg-amber-500/10 border border-amber-500/20 p-3 flex gap-2 items-start">
+                  <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
+                  <p className="text-[11px] text-amber-200/80 leading-relaxed">
+                    Os agentes selecionados passarão a usar esta sessão compartilhada.
+                    Você pode revogar o acesso a qualquer momento.
+                  </p>
                 </div>
               )}
             </div>
@@ -262,7 +314,10 @@ export default function SessionSharing({ tenantId }: SessionSharingProps) {
                 {shareSession.isPending ? (
                   <><Loader2 className="h-4 w-4 animate-spin" />Compartilhando...</>
                 ) : (
-                  <><Share2 className="h-4 w-4" />Compartilhar com {selectedUserIds.length} agente{selectedUserIds.length !== 1 ? "s" : ""}</>
+                  <>
+                    <Share2 className="h-3.5 w-3.5" />
+                    Compartilhar com {selectedUserIds.length} agente{selectedUserIds.length !== 1 ? "s" : ""}
+                  </>
                 )}
               </Button>
             </DialogFooter>
@@ -270,113 +325,112 @@ export default function SessionSharing({ tenantId }: SessionSharingProps) {
         </Dialog>
       </div>
 
-      {/* Active Shares List */}
-      <Card className="border border-border/40 shadow-none rounded-xl">
-        <div className="p-5">
-          {shares.isLoading ? (
-            <div className="flex items-center justify-center py-8 gap-2">
-              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-              <span className="text-[13px] text-muted-foreground">Carregando compartilhamentos...</span>
+      {/* Active Shares — grouped by session */}
+      <Card className="border border-border/40 shadow-none rounded-xl overflow-hidden">
+        {shares.isLoading ? (
+          <div className="flex items-center justify-center py-10 gap-2">
+            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            <span className="text-[13px] text-muted-foreground">Carregando...</span>
+          </div>
+        ) : activeShares.length === 0 ? (
+          <div className="flex flex-col items-center py-10 gap-3">
+            <div className="h-12 w-12 rounded-xl bg-violet-500/10 flex items-center justify-center">
+              <Share2 className="h-6 w-6 text-violet-500/40" />
             </div>
-          ) : activeShares.length === 0 ? (
-            <div className="flex flex-col items-center py-8 gap-3">
-              <div className="h-14 w-14 rounded-2xl bg-muted/30 flex items-center justify-center">
-                <Share2 className="h-7 w-7 text-muted-foreground/30" />
-              </div>
-              <div className="text-center">
-                <p className="text-[14px] font-medium text-foreground">Nenhum compartilhamento ativo</p>
-                <p className="text-[12px] text-muted-foreground mt-1 max-w-sm">
-                  Compartilhe uma sessão WhatsApp conectada com outros agentes da equipe para que
-                  eles possam atender usando o mesmo número.
-                </p>
-              </div>
+            <div className="text-center">
+              <p className="text-[13px] font-medium text-foreground">Nenhum compartilhamento ativo</p>
+              <p className="text-[12px] text-muted-foreground mt-1">
+                Compartilhe uma sessão para que agentes atendam pelo mesmo número.
+              </p>
             </div>
-          ) : (
-            <div className="space-y-3">
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-[12px] font-medium text-muted-foreground uppercase tracking-wider">
-                  {activeShares.length} compartilhamento{activeShares.length !== 1 ? "s" : ""} ativo{activeShares.length !== 1 ? "s" : ""}
-                </p>
-              </div>
-
-              {activeShares.map((share: any) => (
-                <div
-                  key={share.id}
-                  className="flex items-center gap-3 p-3 rounded-lg border border-border/30 bg-muted/10 hover:bg-muted/20 transition-colors"
-                >
-                  <div className="h-9 w-9 rounded-lg bg-violet-50 flex items-center justify-center shrink-0">
-                    <Share2 className="h-4 w-4 text-violet-600" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <p className="text-[13px] font-medium text-foreground truncate">
-                        {share.sourceUserName || "Sessão"}
-                      </p>
-                      <span className="text-[11px] text-muted-foreground">&rarr;</span>
-                      <p className="text-[13px] font-medium text-violet-600 truncate">
-                        {share.targetUserName || `Usuário #${share.targetUserId}`}
-                      </p>
-                    </div>
-                    <p className="text-[11px] text-muted-foreground mt-0.5">
-                      Sessão: {share.sourceSessionId}
-                      {share.sharedByName && ` · Compartilhado por ${share.sharedByName}`}
-                    </p>
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-7 px-2.5 rounded-md text-[11px] border-red-200 text-red-500 hover:bg-red-50 hover:text-red-600 shrink-0"
-                    disabled={revokeShare.isPending}
-                    onClick={() => revokeShare.mutate({ tenantId, shareId: share.id })}
-                  >
-                    {revokeShare.isPending ? (
-                      <Loader2 className="h-3 w-3 animate-spin" />
+          </div>
+        ) : (
+          <div className="divide-y divide-border/20">
+            {Array.from(sharesBySession.entries()).map(([sessionId, sessionShares]) => {
+              const session = (tenantSessions.data || []).find((s: any) => s.sessionId === sessionId);
+              return (
+                <div key={sessionId}>
+                  {/* Session header */}
+                  <div className="px-4 py-2.5 bg-muted/20 flex items-center gap-2">
+                    {session?.liveStatus === "connected" ? (
+                      <Wifi className="h-3.5 w-3.5 text-emerald-500" />
                     ) : (
-                      <><XCircle className="h-3 w-3 mr-1" />Revogar</>
+                      <WifiOff className="h-3.5 w-3.5 text-muted-foreground" />
                     )}
-                  </Button>
+                    <span className="text-[12px] font-medium text-foreground">
+                      {session?.ownerName || sessionId}
+                    </span>
+                    {session?.phoneNumber && (
+                      <span className="text-[11px] text-muted-foreground">({session.phoneNumber})</span>
+                    )}
+                    <ChevronRight className="h-3 w-3 text-muted-foreground ml-auto" />
+                    <span className="text-[11px] text-muted-foreground">
+                      {sessionShares.length} agente{sessionShares.length !== 1 ? "s" : ""}
+                    </span>
+                  </div>
+
+                  {/* Shared agents */}
+                  {sessionShares.map((share: any) => (
+                    <div
+                      key={share.id}
+                      className="flex items-center gap-3 px-4 py-2.5 hover:bg-muted/10 transition-colors"
+                    >
+                      <div className="w-8 h-8 rounded-full bg-violet-500/15 flex items-center justify-center shrink-0">
+                        <span className="text-[11px] font-bold text-violet-400">
+                          {getInitials(share.targetUserName || "")}
+                        </span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[13px] font-medium text-foreground truncate">
+                          {share.targetUserName || `Usuário #${share.targetUserId}`}
+                        </p>
+                        {share.sharedByName && (
+                          <p className="text-[11px] text-muted-foreground truncate">
+                            Adicionado por {share.sharedByName}
+                          </p>
+                        )}
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 px-2 rounded-md text-[11px] text-red-400 hover:text-red-300 hover:bg-red-500/10 shrink-0"
+                        disabled={revokeShare.isPending}
+                        onClick={() => revokeShare.mutate({ tenantId, shareId: share.id })}
+                      >
+                        {revokeShare.isPending ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <><XCircle className="h-3.5 w-3.5 mr-1" />Revogar</>
+                        )}
+                      </Button>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
+              );
+            })}
+          </div>
+        )}
       </Card>
 
-      {/* Connected Sessions Overview */}
+      {/* Connected Sessions — compact */}
       {tenantSessions.data && tenantSessions.data.length > 0 && (
-        <div className="mt-4">
-          <p className="text-[12px] font-medium text-muted-foreground mb-2 uppercase tracking-wider">
-            Sessões do Tenant
+        <div>
+          <p className="text-[11px] font-medium text-muted-foreground mb-2 uppercase tracking-wider">
+            Sessões disponíveis
           </p>
-          <div className="grid gap-2">
+          <div className="flex flex-wrap gap-2">
             {tenantSessions.data.map((s: any) => (
               <div
                 key={s.sessionId}
-                className="flex items-center gap-3 p-2.5 rounded-lg border border-border/20 bg-background"
+                className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-border/30 bg-muted/10 text-[12px]"
               >
-                {s.liveStatus === "connected" ? (
-                  <Wifi className="h-4 w-4 text-emerald-500 shrink-0" />
-                ) : (
-                  <WifiOff className="h-4 w-4 text-slate-400 shrink-0" />
+                <span className={`h-2 w-2 rounded-full shrink-0 ${
+                  s.liveStatus === "connected" ? "bg-emerald-500" : "bg-muted-foreground/30"
+                }`} />
+                <span className="text-foreground font-medium">{s.ownerName || s.sessionId}</span>
+                {s.phoneNumber && (
+                  <span className="text-muted-foreground text-[11px]">{s.phoneNumber}</span>
                 )}
-                <div className="flex-1 min-w-0">
-                  <p className="text-[12px] font-medium text-foreground truncate">
-                    {s.ownerName || s.sessionId}
-                  </p>
-                  {s.phoneNumber && (
-                    <p className="text-[11px] text-muted-foreground">{s.phoneNumber}</p>
-                  )}
-                </div>
-                <Badge
-                  variant="outline"
-                  className={`text-[10px] shrink-0 ${
-                    s.liveStatus === "connected"
-                      ? "border-emerald-200 text-emerald-600"
-                      : "border-slate-200 text-slate-500"
-                  }`}
-                >
-                  {s.liveStatus === "connected" ? "Online" : "Offline"}
-                </Badge>
               </div>
             ))}
           </div>

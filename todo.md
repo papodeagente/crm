@@ -2758,3 +2758,8 @@
   - [x] Query getAgentWorkload calcula isOnline via SQL (DATE_SUB 5 MINUTE)
   - [x] Frontend usa isOnline do backend em vez de agentStatus
   - [x] Agentes ordenados: online primeiro, depois por atendimentos ativos
+
+## Simplificar Compartilhar Sessão WhatsApp (Mar 14 - v6)
+- [x] Simplificar o fluxo de compartilhamento de sessão (reescrito do zero)
+- [x] Corrigir seleção de pessoas: agora usa <button> com checkbox customizado (sem conflito de clique)
+- [x] Tornar o processo mais intuitivo: passos 1/2 claros, selecionar/desmarcar todos, agrupamento por sessão
