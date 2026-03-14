@@ -7,7 +7,7 @@ import {
   Plug, Plus, Webhook, Zap, Globe, Facebook, Copy, RefreshCw, Check,
   AlertCircle, CheckCircle2, Clock, XCircle, RotateCcw, Eye, EyeOff,
   Link2, ArrowRight, FileText, Filter, Code2, Trash2, Power, Edit2,
-  ExternalLink, Shield,
+  ExternalLink, Shield, Brain,
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -20,6 +20,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { useTenantId } from "@/hooks/useTenantId";
 import { formatDateTimeShort } from "../../../shared/dateUtils";
+import AiIntegrationsTab from "./AiIntegrationsTab";
 
 
 function StatusBadge({ status }: { status: string }) {
@@ -891,6 +892,9 @@ export default function Integrations() {
           <TabsTrigger value="connectors" className="rounded-lg text-[13px] data-[state=active]:bg-primary data-[state=active]:text-white gap-1.5">
             <Zap className="h-3.5 w-3.5" />Conectores
           </TabsTrigger>
+          <TabsTrigger value="ai" className="rounded-lg text-[13px] data-[state=active]:bg-primary data-[state=active]:text-white gap-1.5">
+            <Brain className="h-3.5 w-3.5" />IA
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="webhook">
@@ -943,6 +947,10 @@ export default function Integrations() {
               ))}
             </div>
           )}
+        </TabsContent>
+
+        <TabsContent value="ai">
+          <AiIntegrationsTab />
         </TabsContent>
       </Tabs>
     </div>

@@ -267,6 +267,13 @@
       "when": 1773520754396,
       "tag": "0037_loose_bushwacker",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "5",
+      "when": 1773528593329,
+      "tag": "0038_known_patriot",
+      "breakpoints": true
     }
   ]
 }

@@ -1,6 +1,6 @@
 import { eq, desc, and, or, like, lt, gt, isNotNull, sql, inArray } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users, whatsappSessions, waMessages as messages, activityLogs, chatbotSettings, chatbotRules, conversationAssignments, crmUsers, teams, teamMembers, distributionRules, customFields, customFieldValues, waConversations, userPreferences, sessionShares, conversationEvents, internalNotes, quickReplies, waContacts } from "../drizzle/schema";
+import { InsertUser, users, whatsappSessions, waMessages as messages, activityLogs, chatbotSettings, chatbotRules, conversationAssignments, crmUsers, teams, teamMembers, distributionRules, customFields, customFieldValues, waConversations, userPreferences, sessionShares, conversationEvents, internalNotes, quickReplies, waContacts, aiIntegrations } from "../drizzle/schema";
 import { ENV } from './_core/env';
 import { normalizeJid } from "./phoneUtils";
 
@@ -2794,4 +2794,141 @@ export async function getProfilePicturesFromDb(
   }
 
   return result;
+}
+
+
+// ════════════════════════════════════════════════════════════
+// AI INTEGRATIONS — CRUD helpers
+// ════════════════════════════════════════════════════════════
+
+export async function listAiIntegrations(tenantId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(aiIntegrations)
+    .where(eq(aiIntegrations.tenantId, tenantId))
+    .orderBy(desc(aiIntegrations.createdAt));
+}
+
+export async function getAiIntegration(tenantId: number, id: number) {
+  const db = await getDb();
+  if (!db) return null;
+  const rows = await db.select().from(aiIntegrations)
+    .where(and(eq(aiIntegrations.id, id), eq(aiIntegrations.tenantId, tenantId)))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+export async function getActiveAiIntegration(tenantId: number, provider: "openai" | "anthropic") {
+  const db = await getDb();
+  if (!db) return null;
+  const rows = await db.select().from(aiIntegrations)
+    .where(and(
+      eq(aiIntegrations.tenantId, tenantId),
+      eq(aiIntegrations.provider, provider),
+      eq(aiIntegrations.isActive, true),
+    ))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+export async function createAiIntegration(data: {
+  tenantId: number;
+  provider: "openai" | "anthropic";
+  apiKey: string;
+  defaultModel: string;
+  isActive?: boolean;
+  label?: string;
+  maxTokens?: number;
+  temperature?: string;
+  createdBy: number;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(aiIntegrations).values({
+    tenantId: data.tenantId,
+    provider: data.provider,
+    apiKey: data.apiKey,
+    defaultModel: data.defaultModel,
+    isActive: data.isActive ?? true,
+    label: data.label ?? null,
+    maxTokens: data.maxTokens ?? 1024,
+    temperature: data.temperature ?? "0.7",
+    createdBy: data.createdBy,
+  });
+  return { id: Number(result[0].insertId) };
+}
+
+export async function updateAiIntegration(tenantId: number, id: number, data: {
+  apiKey?: string;
+  defaultModel?: string;
+  isActive?: boolean;
+  label?: string;
+  maxTokens?: number;
+  temperature?: string;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const updateData: Record<string, unknown> = {};
+  if (data.apiKey !== undefined) updateData.apiKey = data.apiKey;
+  if (data.defaultModel !== undefined) updateData.defaultModel = data.defaultModel;
+  if (data.isActive !== undefined) updateData.isActive = data.isActive;
+  if (data.label !== undefined) updateData.label = data.label;
+  if (data.maxTokens !== undefined) updateData.maxTokens = data.maxTokens;
+  if (data.temperature !== undefined) updateData.temperature = data.temperature;
+  if (Object.keys(updateData).length === 0) return;
+  await db.update(aiIntegrations)
+    .set(updateData)
+    .where(and(eq(aiIntegrations.id, id), eq(aiIntegrations.tenantId, tenantId)));
+}
+
+export async function deleteAiIntegration(tenantId: number, id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.delete(aiIntegrations)
+    .where(and(eq(aiIntegrations.id, id), eq(aiIntegrations.tenantId, tenantId)));
+}
+
+export async function testAiApiKey(provider: "openai" | "anthropic", apiKey: string, model: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    if (provider === "openai") {
+      const res = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model,
+          messages: [{ role: "user", content: "Say hello" }],
+          max_tokens: 5,
+        }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        return { success: false, error: body?.error?.message || `HTTP ${res.status}` };
+      }
+      return { success: true };
+    } else {
+      const res = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": apiKey,
+          "anthropic-version": "2023-06-01",
+        },
+        body: JSON.stringify({
+          model,
+          messages: [{ role: "user", content: "Say hello" }],
+          max_tokens: 5,
+        }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        return { success: false, error: body?.error?.message || `HTTP ${res.status}` };
+      }
+      return { success: true };
+    }
+  } catch (err: any) {
+    return { success: false, error: err.message || "Connection failed" };
+  }
 }

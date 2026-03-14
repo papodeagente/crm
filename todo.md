@@ -2771,3 +2771,19 @@
 - [x] Timer na fila: UrgencyTimer com queuedAt, cores dinâmicas, atualiza a cada segundo
 - [x] Sistema de cores: emerald (<5min), yellow (5-15min), orange (15-30min), red (>30min) + ponto pulsante
 - [x] Design compacto (10px font-mono pill) integrado sem bagunçar layout
+
+## Integração de IA - OpenAI e Claude (Mar 14 - v8)
+- [x] Pesquisar documentação OpenAI: modelos disponíveis, preços, endpoints
+- [x] Pesquisar documentação Claude/Anthropic: modelos disponíveis, preços, endpoints
+- [x] Criar tabela ai_integrations no banco para armazenar API keys e configurações
+- [x] Criar routers tRPC para CRUD de integrações de IA (list, get, create, update, delete, testKey, invoke, models)
+- [x] Criar helper genérico para invocar OpenAI e Claude (server/services/ai/aiService.ts)
+- [x] Implementar página de configuração de IA nas Integrações (frontend) — aba "IA" com AiIntegrationsTab
+- [x] Seletor de provedor (OpenAI / Claude) e modelo com descrições em PT-BR
+- [x] Validação de API key com teste de conexão (botão "Testar" com feedback visual)
+- [x] Configurações avançadas: max tokens, temperatura (slider), ativar/desativar
+- [x] Cards de integração com toggle ativo/inativo, editar, remover
+- [x] API keys mascaradas na listagem (segurança)
+- [x] Dialog de confirmação para remoção
+- [x] 23 testes vitest passando (aiIntegrations.test.ts)
+- [x] Modelos: OpenAI (gpt-4o, gpt-4o-mini, gpt-4-turbo, gpt-3.5-turbo), Claude (Sonnet 4, 3.5 Sonnet, 3.5 Haiku, 3 Opus)

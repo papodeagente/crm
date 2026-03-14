@@ -1827,3 +1827,27 @@ export const quickReplies = mysqlTable("quick_replies", {
 ]);
 export type QuickReply = typeof quickReplies.$inferSelect;
 export type InsertQuickReply = typeof quickReplies.$inferInsert;
+
+
+// ════════════════════════════════════════════════════════════
+// AI INTEGRATIONS — OpenAI & Anthropic Claude configuration
+// ════════════════════════════════════════════════════════════
+export const aiIntegrations = mysqlTable("ai_integrations", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  provider: mysqlEnum("provider", ["openai", "anthropic"]).notNull(),
+  apiKey: text("apiKey").notNull(),
+  defaultModel: varchar("defaultModel", { length: 128 }).notNull(),
+  isActive: boolean("isActive").default(true).notNull(),
+  label: varchar("label", { length: 128 }),
+  maxTokens: int("maxTokens").default(1024),
+  temperature: varchar("temperature", { length: 8 }).default("0.7"),
+  createdBy: int("createdBy").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (t) => [
+  index("ai_tenant_idx").on(t.tenantId),
+  index("ai_tenant_provider_idx").on(t.tenantId, t.provider),
+]);
+export type AiIntegration = typeof aiIntegrations.$inferSelect;
+export type InsertAiIntegration = typeof aiIntegrations.$inferInsert;

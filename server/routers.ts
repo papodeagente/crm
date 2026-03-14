@@ -111,6 +111,14 @@ import {
   deleteQuickReply,
   getProfilePicturesFromDb,
   transferConversationWithNote,
+  // AI Integrations
+  listAiIntegrations,
+  getAiIntegration,
+  getActiveAiIntegration,
+  createAiIntegration,
+  updateAiIntegration,
+  deleteAiIntegration,
+  testAiApiKey,
 } from "./db";
 import { storagePut } from "./storage";
 import { nanoid } from "nanoid";
@@ -2372,6 +2380,188 @@ export const appRouter = router({
           entity: f.entity,
           fieldType: f.fieldType,
         }));
+      }),
+  }),
+
+  // ════════════════════════════════════════════════════════════
+  // AI INTEGRATIONS — OpenAI & Anthropic configuration
+  // ════════════════════════════════════════════════════════════
+  ai: router({
+    list: protectedProcedure
+      .input(z.object({ tenantId: z.number() }))
+      .query(async ({ input }) => {
+        const integrations = await listAiIntegrations(input.tenantId);
+        // Mask API keys for security
+        return integrations.map(i => ({
+          ...i,
+          apiKey: i.apiKey ? `${i.apiKey.substring(0, 8)}...${i.apiKey.substring(i.apiKey.length - 4)}` : "",
+        }));
+      }),
+
+    get: protectedProcedure
+      .input(z.object({ tenantId: z.number(), id: z.number() }))
+      .query(async ({ input }) => {
+        const integration = await getAiIntegration(input.tenantId, input.id);
+        if (!integration) throw new TRPCError({ code: "NOT_FOUND", message: "Integration not found" });
+        return {
+          ...integration,
+          apiKey: integration.apiKey ? `${integration.apiKey.substring(0, 8)}...${integration.apiKey.substring(integration.apiKey.length - 4)}` : "",
+        };
+      }),
+
+    create: protectedProcedure
+      .input(z.object({
+        tenantId: z.number(),
+        provider: z.enum(["openai", "anthropic"]),
+        apiKey: z.string().min(10),
+        defaultModel: z.string().min(1),
+        isActive: z.boolean().optional(),
+        label: z.string().optional(),
+        maxTokens: z.number().min(1).max(128000).optional(),
+        temperature: z.string().optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const userId = (ctx as any).user?.id ?? 0;
+        return createAiIntegration({ ...input, createdBy: userId });
+      }),
+
+    update: protectedProcedure
+      .input(z.object({
+        tenantId: z.number(),
+        id: z.number(),
+        apiKey: z.string().min(10).optional(),
+        defaultModel: z.string().min(1).optional(),
+        isActive: z.boolean().optional(),
+        label: z.string().optional(),
+        maxTokens: z.number().min(1).max(128000).optional(),
+        temperature: z.string().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const { tenantId, id, ...data } = input;
+        await updateAiIntegration(tenantId, id, data);
+        return { success: true };
+      }),
+
+    delete: protectedProcedure
+      .input(z.object({ tenantId: z.number(), id: z.number() }))
+      .mutation(async ({ input }) => {
+        await deleteAiIntegration(input.tenantId, input.id);
+        return { success: true };
+      }),
+
+    testKey: protectedProcedure
+      .input(z.object({
+        provider: z.enum(["openai", "anthropic"]),
+        apiKey: z.string().min(10),
+        model: z.string().min(1),
+      }))
+      .mutation(async ({ input }) => {
+        return testAiApiKey(input.provider, input.apiKey, input.model);
+      }),
+
+    // Invoke AI completion (generic endpoint for both providers)
+    invoke: protectedProcedure
+      .input(z.object({
+        tenantId: z.number(),
+        provider: z.enum(["openai", "anthropic"]),
+        messages: z.array(z.object({
+          role: z.enum(["system", "user", "assistant"]),
+          content: z.string(),
+        })),
+        maxTokens: z.number().optional(),
+        temperature: z.number().min(0).max(2).optional(),
+        model: z.string().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const integration = await getActiveAiIntegration(input.tenantId, input.provider);
+        if (!integration) {
+          throw new TRPCError({ code: "NOT_FOUND", message: `No active ${input.provider} integration found` });
+        }
+        const model = input.model || integration.defaultModel;
+        const maxTokens = input.maxTokens || integration.maxTokens || 1024;
+        const temperature = input.temperature ?? parseFloat(integration.temperature || "0.7");
+
+        try {
+          if (input.provider === "openai") {
+            const res = await fetch("https://api.openai.com/v1/chat/completions", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${integration.apiKey}`,
+              },
+              body: JSON.stringify({
+                model,
+                messages: input.messages,
+                max_tokens: maxTokens,
+                temperature,
+              }),
+            });
+            if (!res.ok) {
+              const body = await res.json().catch(() => ({}));
+              throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: body?.error?.message || `OpenAI API error: ${res.status}` });
+            }
+            const data = await res.json();
+            return {
+              content: data.choices?.[0]?.message?.content || "",
+              model: data.model,
+              usage: data.usage,
+            };
+          } else {
+            // Anthropic Claude
+            const systemMsg = input.messages.find(m => m.role === "system");
+            const nonSystemMsgs = input.messages.filter(m => m.role !== "system");
+            const body: any = {
+              model,
+              messages: nonSystemMsgs.map(m => ({ role: m.role, content: m.content })),
+              max_tokens: maxTokens,
+              temperature,
+            };
+            if (systemMsg) body.system = systemMsg.content;
+            const res = await fetch("https://api.anthropic.com/v1/messages", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "x-api-key": integration.apiKey,
+                "anthropic-version": "2023-06-01",
+              },
+              body: JSON.stringify(body),
+            });
+            if (!res.ok) {
+              const errBody = await res.json().catch(() => ({}));
+              throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: errBody?.error?.message || `Anthropic API error: ${res.status}` });
+            }
+            const data = await res.json();
+            return {
+              content: data.content?.[0]?.text || "",
+              model: data.model,
+              usage: { prompt_tokens: data.usage?.input_tokens, completion_tokens: data.usage?.output_tokens, total_tokens: (data.usage?.input_tokens || 0) + (data.usage?.output_tokens || 0) },
+            };
+          }
+        } catch (err: any) {
+          if (err instanceof TRPCError) throw err;
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: err.message || "AI invocation failed" });
+        }
+      }),
+
+    // List available models per provider
+    models: publicProcedure
+      .input(z.object({ provider: z.enum(["openai", "anthropic"]) }))
+      .query(({ input }) => {
+        if (input.provider === "openai") {
+          return [
+            { id: "gpt-4o", name: "GPT-4o", description: "Modelo mais capaz e rápido da OpenAI", contextWindow: "128K" },
+            { id: "gpt-4o-mini", name: "GPT-4o Mini", description: "Versão compacta e econômica do GPT-4o", contextWindow: "128K" },
+            { id: "gpt-4-turbo", name: "GPT-4 Turbo", description: "GPT-4 otimizado para velocidade", contextWindow: "128K" },
+            { id: "gpt-3.5-turbo", name: "GPT-3.5 Turbo", description: "Modelo rápido e econômico", contextWindow: "16K" },
+          ];
+        } else {
+          return [
+            { id: "claude-sonnet-4-20250514", name: "Claude Sonnet 4", description: "Equilíbrio ideal entre inteligência e velocidade", contextWindow: "200K" },
+            { id: "claude-3-5-sonnet-20241022", name: "Claude 3.5 Sonnet", description: "Modelo rápido e inteligente", contextWindow: "200K" },
+            { id: "claude-3-5-haiku-20241022", name: "Claude 3.5 Haiku", description: "Modelo mais rápido e econômico", contextWindow: "200K" },
+            { id: "claude-3-opus-20240229", name: "Claude 3 Opus", description: "Modelo mais poderoso para tarefas complexas", contextWindow: "200K" },
+          ];
+        }
       }),
   }),
 });
