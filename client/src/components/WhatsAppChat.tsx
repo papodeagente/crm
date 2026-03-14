@@ -7,13 +7,14 @@ import {
   Mic, MicOff, Paperclip, Pause, Phone, Play, Search, Send, Smile,
   Video, X, Camera, FileText, ArrowDown, Volume2, Loader2, ChevronDown,
   UserPlus, Briefcase, Users, Reply, Trash2, Pencil, Forward, MapPin,
-  Contact, BarChart3, Copy, Ban, StickyNote, ArrowRightLeft, History
+  Contact, BarChart3, Copy, Ban, StickyNote, ArrowRightLeft, History, Sparkles, Brain
 } from "lucide-react";
 import Picker from "@emoji-mart/react";
 import data from "@emoji-mart/data";
 
 import { formatTime, SYSTEM_TIMEZONE, SYSTEM_LOCALE } from "../../../shared/dateUtils";
 import TransferDialog from "./TransferDialog";
+import { useTenantId } from "@/hooks/useTenantId";
 
 /* ─── Types ─── */
 interface Message {
@@ -561,7 +562,8 @@ function ImageWithFallback({ msg, fromMe, myAvatarUrl, contactAvatarUrl, onImage
 /* ─── Message Bubble ─── */
 const MessageBubble = memo(({
   msg, isFirst, isLast, allMessages,
-  onReply, onReact, onDelete, onEdit, onForward, contactAvatarUrl, myAvatarUrl, onImageClick
+  onReply, onReact, onDelete, onEdit, onForward, contactAvatarUrl, myAvatarUrl, onImageClick,
+  autoTranscribe, onTranscribe, transcriptions
 }: {
   msg: Message; isFirst: boolean; isLast: boolean; allMessages: Message[];
   onReply: (target: ReplyTarget) => void;
@@ -572,6 +574,9 @@ const MessageBubble = memo(({
   contactAvatarUrl?: string;
   myAvatarUrl?: string;
   onImageClick?: (url: string) => void;
+  autoTranscribe?: boolean;
+  onTranscribe?: (msgId: number, audioUrl: string) => void;
+  transcriptions?: Record<number, { text?: string; loading?: boolean; error?: string }>;
 }) => {
   const [showMenu, setShowMenu] = useState(false);
   const fromMe = msg.fromMe;
@@ -778,6 +783,40 @@ const MessageBubble = memo(({
 
           {renderQuotedMessage()}
           {renderMedia()}
+
+          {/* Audio transcription */}
+          {isAudio && msg.mediaUrl && !msg.mediaUrl.includes('whatsapp.net') && (() => {
+            const t = transcriptions?.[msg.id];
+            if (t?.loading) return (
+              <div className="mt-1 px-2 py-1.5 bg-violet-50 dark:bg-violet-950/20 rounded text-[12px] text-violet-600 dark:text-violet-400 flex items-center gap-1.5">
+                <Loader2 className="h-3 w-3 animate-spin" /> Transcrevendo...
+              </div>
+            );
+            if (t?.text) return (
+              <div className="mt-1 px-2 py-1.5 bg-violet-50 dark:bg-violet-950/20 rounded">
+                <div className="flex items-center gap-1 mb-0.5">
+                  <FileText className="h-3 w-3 text-violet-500" />
+                  <span className="text-[10px] font-medium text-violet-500 uppercase">Transcrição</span>
+                </div>
+                <p className="text-[13px] text-foreground leading-[18px]">{t.text}</p>
+              </div>
+            );
+            if (t?.error) return (
+              <div className="mt-1 px-2 py-1 bg-red-50 dark:bg-red-950/20 rounded text-[11px] text-red-500">
+                Erro na transcrição: {t.error}
+              </div>
+            );
+            // Show manual transcribe button if not auto
+            if (!autoTranscribe && onTranscribe) return (
+              <button
+                onClick={() => onTranscribe(msg.id, msg.mediaUrl!)}
+                className="mt-1 text-[11px] text-violet-500 hover:text-violet-600 flex items-center gap-1 transition-colors"
+              >
+                <FileText className="h-3 w-3" /> Transcrever áudio
+              </button>
+            );
+            return null;
+          })()}
 
           {textContent && (
             <span className="text-[14.2px] leading-[19px] whitespace-pre-wrap break-words">{formatWhatsAppText(textContent)}</span>
@@ -1073,6 +1112,10 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
   const [showTransfer, setShowTransfer] = useState(false);
   const [showQuickReplies, setShowQuickReplies] = useState(false);
   const [quickReplyFilter, setQuickReplyFilter] = useState("");
+  const [aiSuggestion, setAiSuggestion] = useState<string | null>(null);
+  const [showAiSuggestion, setShowAiSuggestion] = useState(false);
+  const [transcriptions, setTranscriptions] = useState<Record<number, { text?: string; loading?: boolean; error?: string }>>({});
+  const tenantId = useTenantId();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -1116,6 +1159,73 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
     onError: (e) => toast.error(e.message || "Erro ao transferir"),
   });
 
+  // AI Suggestion mutation
+  const aiSuggestMut = trpc.ai.suggest.useMutation({
+    onSuccess: (data) => {
+      setAiSuggestion(data.suggestion);
+      setShowAiSuggestion(true);
+    },
+    onError: (err) => {
+      if (err.message === "NO_AI_CONFIGURED") {
+        toast.error("Nenhuma IA configurada. Vá em Integrações > IA para conectar sua API.", { duration: 5000 });
+      } else {
+        toast.error(err.message || "Erro ao gerar sugestão");
+      }
+    },
+  });
+
+  const handleAiSuggest = () => {
+    if (!tenantId) { toast.error("Tenant não identificado"); return; }
+    const msgs = (messagesQ.data || []).filter((m: any) => m.content).map((m: any) => ({
+      fromMe: m.fromMe,
+      content: m.content || "",
+      timestamp: m.timestamp,
+    }));
+    if (msgs.length === 0) { toast.error("Sem mensagens para analisar"); return; }
+    aiSuggestMut.mutate({
+      tenantId,
+      messages: msgs.reverse(),
+      contactName: contact?.name,
+    });
+  };
+
+  const useAiSuggestion = () => {
+    if (aiSuggestion) {
+      setMessageText(aiSuggestion);
+      setShowAiSuggestion(false);
+      setAiSuggestion(null);
+    }
+  };
+
+  // AI Settings query (for auto-transcription)
+  const aiSettingsQ = trpc.ai.getSettings.useQuery(
+    { tenantId: tenantId || 0 },
+    { enabled: !!tenantId, staleTime: 60000 }
+  );
+
+  // Transcription mutation
+  const transcribeMut = trpc.ai.transcribe.useMutation();
+
+  const handleTranscribe = useCallback((msgId: number, audioUrl: string) => {
+    if (!tenantId) return;
+    setTranscriptions(prev => ({ ...prev, [msgId]: { loading: true } }));
+    transcribeMut.mutate(
+      { tenantId, audioUrl },
+      {
+        onSuccess: (data) => {
+          setTranscriptions(prev => ({ ...prev, [msgId]: { text: data.text } }));
+        },
+        onError: (err) => {
+          if (err.message === "OPENAI_REQUIRED") {
+            setTranscriptions(prev => ({ ...prev, [msgId]: { error: "Conecte a API da OpenAI em Integrações > IA" } }));
+          } else {
+            setTranscriptions(prev => ({ ...prev, [msgId]: { error: err.message || "Falha" } }));
+          }
+        },
+      }
+    );
+  }, [tenantId, transcribeMut]);
+
   // Queries
   const messagesQ = trpc.whatsapp.messagesByContact.useQuery(
     { sessionId, remoteJid, limit: 100 },
@@ -1123,6 +1233,20 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
   );
 
   const utils = trpc.useUtils();
+
+  // Auto-transcribe new audio messages
+  const autoTranscribedRef = useRef<Set<number>>(new Set());
+  useEffect(() => {
+    if (!aiSettingsQ.data?.audioTranscriptionEnabled || !tenantId) return;
+    const msgs = messagesQ.data || [];
+    for (const m of msgs) {
+      const isAudio = m.messageType === "audioMessage" || m.messageType === "pttMessage" || m.messageType === "audio" || m.mediaMimeType?.startsWith("audio/");
+      if (isAudio && m.mediaUrl && !m.mediaUrl.includes('whatsapp.net') && !m.fromMe && !autoTranscribedRef.current.has(m.id) && !transcriptions[m.id]) {
+        autoTranscribedRef.current.add(m.id);
+        handleTranscribe(m.id, m.mediaUrl);
+      }
+    }
+  }, [messagesQ.data, aiSettingsQ.data?.audioTranscriptionEnabled, tenantId, handleTranscribe, transcriptions]);
 
   // Optimistic update helper: add message to cache immediately
   const addOptimisticMessage = useCallback((text: string, quotedId?: string | null) => {
@@ -1782,6 +1906,9 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
                       contactAvatarUrl={contact?.avatarUrl}
                       myAvatarUrl={myAvatarUrl}
                       onImageClick={setLightboxUrl}
+                      autoTranscribe={aiSettingsQ.data?.audioTranscriptionEnabled}
+                      onTranscribe={handleTranscribe}
+                      transcriptions={transcriptions}
                     />
                   );
                 })}
@@ -1929,8 +2056,53 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
               {showAttach && <AttachMenu onSelect={handleAttachSelect} onClose={() => setShowAttach(false)} />}
             </div>
 
+            {/* AI Suggestion button */}
+            <button
+              onClick={handleAiSuggest}
+              disabled={aiSuggestMut.isPending}
+              title="Sugestão de resposta com IA (SPIN Selling)"
+              className={`w-[42px] h-[42px] flex items-center justify-center rounded-full transition-all duration-200 shrink-0 self-end ${
+                aiSuggestMut.isPending ? "bg-violet-500/20 text-violet-500" : showAiSuggestion ? "bg-violet-500/20 text-violet-500" : "hover:bg-wa-hover text-muted-foreground"
+              }`}
+            >
+              {aiSuggestMut.isPending ? <Loader2 className="w-[20px] h-[20px] animate-spin" /> : <Sparkles className="w-[20px] h-[20px]" />}
+            </button>
+
             {/* Text input */}
             <div className="flex-1 relative">
+              {/* AI Suggestion popup */}
+              {showAiSuggestion && aiSuggestion && (
+                <div className="absolute bottom-full left-0 right-0 mb-1 bg-violet-50 dark:bg-violet-950/30 border border-violet-200 dark:border-violet-800 rounded-lg shadow-xl z-50 overflow-hidden">
+                  <div className="px-3 py-1.5 flex items-center justify-between border-b border-violet-200 dark:border-violet-800">
+                    <div className="flex items-center gap-1.5">
+                      <Brain className="h-3.5 w-3.5 text-violet-500" />
+                      <span className="text-[11px] font-medium text-violet-600 dark:text-violet-400 uppercase tracking-wider">Sugestão IA (SPIN Selling)</span>
+                    </div>
+                    <button onClick={() => { setShowAiSuggestion(false); setAiSuggestion(null); }} className="text-muted-foreground hover:text-foreground">
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                  <div className="px-3 py-2 text-[13px] text-foreground whitespace-pre-wrap max-h-[150px] overflow-y-auto">
+                    {aiSuggestion}
+                  </div>
+                  <div className="px-3 py-2 flex gap-2 border-t border-violet-200 dark:border-violet-800">
+                    <button
+                      onClick={useAiSuggestion}
+                      className="flex-1 text-[12px] font-medium bg-violet-500 hover:bg-violet-600 text-white rounded-md py-1.5 transition-colors flex items-center justify-center gap-1.5"
+                    >
+                      <Copy className="h-3 w-3" /> Usar esta sugestão
+                    </button>
+                    <button
+                      onClick={handleAiSuggest}
+                      disabled={aiSuggestMut.isPending}
+                      className="text-[12px] font-medium text-violet-600 hover:text-violet-700 dark:text-violet-400 rounded-md px-3 py-1.5 transition-colors border border-violet-200 dark:border-violet-700 hover:bg-violet-100 dark:hover:bg-violet-900/30 flex items-center gap-1.5"
+                    >
+                      {aiSuggestMut.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />} Gerar outra
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* Quick Replies popup */}
               {showQuickReplies && filteredQuickReplies.length > 0 && (
                 <div className="absolute bottom-full left-0 right-0 mb-1 bg-popover border border-border rounded-lg shadow-xl max-h-[200px] overflow-y-auto z-50">

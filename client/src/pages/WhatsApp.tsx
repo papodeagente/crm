@@ -17,7 +17,7 @@ import {
 import {
   Smartphone, Wifi, WifiOff, QrCode,
   ShieldAlert, Loader2, RefreshCw, CheckCircle2,
-  Settings2, Trash2, Users, Info, Share2
+  Settings2, Trash2, Users, Info, Share2, Mic, Brain, AlertTriangle
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
@@ -47,6 +47,19 @@ export default function WhatsApp() {
   const mySession = sessions.data?.[0] || null;
   const isConnected = mySession?.liveStatus === "connected";
   const isConnecting = mySession?.liveStatus === "connecting" || mySession?.liveStatus === "reconnecting";
+
+  // ─── AI Settings (transcription) ───
+  const aiSettingsQ = trpc.ai.getSettings.useQuery(
+    { tenantId: tenantId || 0 },
+    { enabled: tenantId > 0, staleTime: 30_000 }
+  );
+  const updateAiSettingsMut = trpc.ai.updateSettings.useMutation({
+    onSuccess: () => {
+      utils.ai.getSettings.invalidate();
+      toast.success("Configuração salva com sucesso!");
+    },
+    onError: (err: any) => toast.error(`Erro ao salvar: ${err.message}`),
+  });
 
   // ─── Contact Import Settings ───
   const contactSettings = trpc.whatsapp.getContactImportSettings.useQuery(
@@ -599,6 +612,56 @@ export default function WhatsApp() {
                   </AlertDialogFooter>
                 </AlertDialogContent>
               </AlertDialog>
+            </div>
+          </div>
+        </Card>
+      </div>
+
+      {/* ─── TRANSCRIÇÃO DE ÁUDIOS COM IA ─── */}
+      <div className="mt-8">
+        <div className="flex items-center gap-2 mb-4">
+          <Brain className="h-5 w-5 text-muted-foreground" />
+          <h2 className="text-[15px] font-semibold text-foreground">Transcrição de Áudios com IA</h2>
+        </div>
+
+        <Card className="border border-border/40 shadow-none rounded-xl">
+          <div className="p-5 space-y-4">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex gap-3 items-start">
+                <div className="h-9 w-9 rounded-lg bg-violet-50 flex items-center justify-center shrink-0 mt-0.5">
+                  <Mic className="h-4.5 w-4.5 text-violet-600" />
+                </div>
+                <div>
+                  <Label htmlFor="transcription-toggle" className="text-[13px] font-medium text-foreground cursor-pointer">
+                    Transcrever áudios automaticamente
+                  </Label>
+                  <p className="text-[12px] text-muted-foreground mt-1 leading-relaxed max-w-md">
+                    Quando ativado, todos os áudios recebidos nas conversas serão automaticamente
+                    transcritos para texto usando a API da OpenAI (Whisper).
+                  </p>
+                </div>
+              </div>
+              <Switch
+                id="transcription-toggle"
+                checked={aiSettingsQ.data?.audioTranscriptionEnabled ?? false}
+                onCheckedChange={(checked) => {
+                  if (!tenantId) return;
+                  updateAiSettingsMut.mutate({ tenantId, audioTranscriptionEnabled: checked });
+                }}
+                disabled={updateAiSettingsMut.isPending || aiSettingsQ.isLoading}
+                className="shrink-0 mt-1"
+              />
+            </div>
+
+            {/* Warning about OpenAI requirement */}
+            <div className="rounded-lg bg-amber-50 border border-amber-200/60 p-3">
+              <div className="flex gap-2 items-start">
+                <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
+                <p className="text-[11px] text-amber-700 leading-relaxed">
+                  Esta funcionalidade requer uma <strong>API da OpenAI</strong> conectada.
+                  Configure em <strong>Integrações &gt; IA</strong> para que a transcrição funcione.
+                </p>
+              </div>
             </div>
           </div>
         </Card>

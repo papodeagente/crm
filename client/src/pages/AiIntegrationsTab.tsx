@@ -83,6 +83,7 @@ export default function AiIntegrationsTab() {
   const [isActive, setIsActive] = useState(true);
   const [showKey, setShowKey] = useState(false);
   const [testResult, setTestResult] = useState<"idle" | "success" | "error">("idle");
+  const [maskedKey, setMaskedKey] = useState("");
 
   // Models query
   const modelsQ = trpc.ai.models.useQuery({ provider });
@@ -90,6 +91,7 @@ export default function AiIntegrationsTab() {
   const resetForm = () => {
     setProvider("openai");
     setApiKey("");
+    setMaskedKey("");
     setModel("");
     setIsActive(true);
     setShowKey(false);
@@ -106,6 +108,7 @@ export default function AiIntegrationsTab() {
     setEditingId(integration.id);
     setProvider(integration.provider);
     setApiKey("");
+    setMaskedKey(integration.apiKey || "");
     setModel(integration.defaultModel);
     setIsActive(integration.isActive);
     setShowKey(false);
@@ -277,15 +280,20 @@ export default function AiIntegrationsTab() {
             {/* API Key */}
             <div className="space-y-2">
               <Label className="text-[12px] font-medium text-muted-foreground uppercase tracking-wider">
-                Chave API {editingId && <span className="text-muted-foreground/50 normal-case">(deixe vazio para manter a atual)</span>}
+                Chave API
               </Label>
+              {editingId && maskedKey && !apiKey && (
+                <p className="text-[11px] text-emerald-600 flex items-center gap-1">
+                  <CheckCircle2 className="h-3 w-3" /> Chave atual: <span className="font-mono">{maskedKey}</span> — preencha apenas se quiser trocar
+                </p>
+              )}
               <div className="flex gap-2">
                 <div className="relative flex-1">
                   <Input
                     type={showKey ? "text" : "password"}
                     value={apiKey}
                     onChange={(e) => { setApiKey(e.target.value); setTestResult("idle"); }}
-                    placeholder={provider === "openai" ? "sk-..." : "sk-ant-..."}
+                    placeholder={editingId && maskedKey ? maskedKey : (provider === "openai" ? "sk-..." : "sk-ant-...")}
                     className="font-mono text-[12px] pr-10"
                   />
                   <button

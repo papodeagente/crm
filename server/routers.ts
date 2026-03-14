@@ -119,6 +119,10 @@ import {
   updateAiIntegration,
   deleteAiIntegration,
   testAiApiKey,
+  // Tenant AI settings
+  getTenantAiSettings,
+  updateTenantAiSettings,
+  getAnyActiveAiIntegration,
 } from "./db";
 import { storagePut } from "./storage";
 import { nanoid } from "nanoid";
@@ -2530,6 +2534,178 @@ export const appRouter = router({
         } catch (err: any) {
           if (err instanceof TRPCError) throw err;
           throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: err.message || "AI invocation failed" });
+        }
+      }),
+
+    // ── Tenant AI Settings ──
+    getSettings: protectedProcedure
+      .input(z.object({ tenantId: z.number() }))
+      .query(async ({ input }) => {
+        return getTenantAiSettings(input.tenantId);
+      }),
+
+    updateSettings: protectedProcedure
+      .input(z.object({
+        tenantId: z.number(),
+        defaultAiProvider: z.enum(["openai", "anthropic"]).optional(),
+        defaultAiModel: z.string().optional(),
+        audioTranscriptionEnabled: z.boolean().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const { tenantId, ...patch } = input;
+        await updateTenantAiSettings(tenantId, patch);
+        return { success: true };
+      }),
+
+    // ── AI Suggestion (SPIN Selling) ──
+    suggest: protectedProcedure
+      .input(z.object({
+        tenantId: z.number(),
+        messages: z.array(z.object({
+          fromMe: z.boolean(),
+          content: z.string(),
+          timestamp: z.string().optional(),
+        })),
+        contactName: z.string().optional(),
+        dealTitle: z.string().optional(),
+        dealValue: z.number().optional(),
+        dealStage: z.string().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const integration = await getAnyActiveAiIntegration(input.tenantId);
+        if (!integration) {
+          throw new TRPCError({
+            code: "PRECONDITION_FAILED",
+            message: "NO_AI_CONFIGURED",
+          });
+        }
+        const settings = await getTenantAiSettings(input.tenantId);
+        const model = settings.defaultAiModel || integration.defaultModel;
+
+        // Build context from conversation
+        const conversationContext = input.messages
+          .slice(-30)
+          .map(m => `${m.fromMe ? "Agente" : (input.contactName || "Cliente")}: ${m.content}`)
+          .join("\n");
+
+        const dealContext = input.dealTitle
+          ? `\n\nContexto do Negócio:\n- Título: ${input.dealTitle}\n- Valor: R$ ${((input.dealValue || 0) / 100).toFixed(2)}\n- Etapa: ${input.dealStage || "N/A"}`
+          : "";
+
+        const systemPrompt = `Você é um assistente de vendas especialista em SPIN Selling para uma agência de viagens.
+
+SPIN Selling:
+- **S (Situação)**: Perguntas para entender o contexto atual do cliente (destino desejado, datas, quem viaja, orçamento, experiências anteriores).
+- **P (Problema)**: Perguntas para identificar dificuldades, insatisfações ou necessidades não atendidas (medo de viajar sozinho, dificuldade em planejar, experiências ruins anteriores).
+- **I (Implicação)**: Perguntas que mostram as consequências de não resolver o problema (perder a oportunidade, gastar mais por falta de planejamento, stress).
+- **N (Necessidade de solução)**: Perguntas que levam o cliente a perceber o valor da solução (como seria ter tudo organizado, tranquilidade, economia).
+
+Regras:
+1. Analise TODA a conversa para entender em qual fase do SPIN o atendimento está.
+2. Sugira UMA resposta natural e empática, adequada ao momento da conversa.
+3. A resposta deve soar humana, não robótica. Use o tom da conversa.
+4. Se o cliente já demonstrou interesse claro, foque em fechar (proposta, valores, próximos passos).
+5. Se o cliente está indeciso, use Implicação ou Necessidade.
+6. Responda APENAS com o texto da sugestão, sem explicações ou prefixos.
+7. Máximo 3 parágrafos curtos.
+8. Use português brasileiro natural.`;
+
+        const userPrompt = `Conversa atual:\n${conversationContext}${dealContext}\n\nSugira a próxima resposta do agente usando SPIN Selling:`;
+
+        try {
+          if (integration.provider === "openai") {
+            const res = await fetch("https://api.openai.com/v1/chat/completions", {
+              method: "POST",
+              headers: { "Content-Type": "application/json", "Authorization": `Bearer ${integration.apiKey}` },
+              body: JSON.stringify({
+                model,
+                messages: [
+                  { role: "system", content: systemPrompt },
+                  { role: "user", content: userPrompt },
+                ],
+                max_completion_tokens: 500,
+              }),
+            });
+            if (!res.ok) {
+              const body = await res.json().catch(() => ({}));
+              throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: body?.error?.message || `OpenAI error: ${res.status}` });
+            }
+            const data = await res.json();
+            return { suggestion: data.choices?.[0]?.message?.content || "", provider: "openai", model };
+          } else {
+            const res = await fetch("https://api.anthropic.com/v1/messages", {
+              method: "POST",
+              headers: { "Content-Type": "application/json", "x-api-key": integration.apiKey, "anthropic-version": "2023-06-01" },
+              body: JSON.stringify({
+                model,
+                system: systemPrompt,
+                messages: [{ role: "user", content: userPrompt }],
+                max_tokens: 500,
+              }),
+            });
+            if (!res.ok) {
+              const body = await res.json().catch(() => ({}));
+              throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: body?.error?.message || `Anthropic error: ${res.status}` });
+            }
+            const data = await res.json();
+            return { suggestion: data.content?.[0]?.text || "", provider: "anthropic", model };
+          }
+        } catch (err: any) {
+          if (err instanceof TRPCError) throw err;
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: err.message || "AI suggestion failed" });
+        }
+      }),
+
+    // ── Audio Transcription via OpenAI Whisper ──
+    transcribe: protectedProcedure
+      .input(z.object({
+        tenantId: z.number(),
+        audioUrl: z.string(),
+      }))
+      .mutation(async ({ input }) => {
+        // Check if tenant has OpenAI integration
+        const integration = await getActiveAiIntegration(input.tenantId, "openai");
+        if (!integration) {
+          throw new TRPCError({
+            code: "PRECONDITION_FAILED",
+            message: "OPENAI_REQUIRED",
+          });
+        }
+
+        try {
+          // Download audio file
+          const audioRes = await fetch(input.audioUrl);
+          if (!audioRes.ok) throw new Error(`Failed to download audio: ${audioRes.status}`);
+          const audioBuffer = await audioRes.arrayBuffer();
+          const audioBlob = new Blob([audioBuffer]);
+
+          // Determine file extension from URL
+          const urlPath = new URL(input.audioUrl).pathname;
+          const ext = urlPath.split(".").pop() || "ogg";
+
+          // Create FormData for Whisper API
+          const formData = new FormData();
+          formData.append("file", audioBlob, `audio.${ext}`);
+          formData.append("model", "whisper-1");
+          formData.append("language", "pt");
+          formData.append("response_format", "json");
+
+          const whisperRes = await fetch("https://api.openai.com/v1/audio/transcriptions", {
+            method: "POST",
+            headers: { "Authorization": `Bearer ${integration.apiKey}` },
+            body: formData,
+          });
+
+          if (!whisperRes.ok) {
+            const body = await whisperRes.json().catch(() => ({}));
+            throw new Error(body?.error?.message || `Whisper API error: ${whisperRes.status}`);
+          }
+
+          const result = await whisperRes.json();
+          return { text: result.text || "", language: result.language || "pt" };
+        } catch (err: any) {
+          if (err instanceof TRPCError) throw err;
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: err.message || "Transcription failed" });
         }
       }),
 

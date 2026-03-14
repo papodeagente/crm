@@ -2801,3 +2801,16 @@
 - [x] Corrigir em routers.ts (invoke)
 - [x] Corrigir em aiService.ts
 - [x] Corrigir em testAiApiKey (db.ts)
+
+## Melhorias IA - Inbox + WhatsApp (Mar 14 - v8.3)
+- [x] Fix: mostrar API key mascarada ao editar integração (placeholder + aviso visual)
+- [x] Configuração de IA padrão (provedor + modelo) por tenant (via settingsJson)
+- [x] Backend: endpoint de sugestão de resposta IA com SPIN Selling (ai.suggest)
+- [x] Frontend: botão de sugestão IA no Inbox (Sparkles) com orientação se não tiver IA conectada
+- [x] Backend: transcrição automática de áudios via OpenAI Whisper (ai.transcribe)
+- [x] Frontend: toggle de transcrição de áudios nas configurações WhatsApp
+- [x] Aviso de dependência da API OpenAI para transcrição
+- [x] Auto-transcrição de áudios recebidos quando toggle ativado
+- [x] Botão manual "Transcrever áudio" em cada bolha de áudio
+- [x] Popup de sugestão IA com opções "Usar" e "Gerar outra"
+- [x] 28 testes vitest passando (aiIntegrations.test.ts)

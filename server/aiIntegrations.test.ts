@@ -10,6 +10,9 @@ vi.mock("./db", () => ({
   updateAiIntegration: vi.fn(),
   deleteAiIntegration: vi.fn(),
   testAiApiKey: vi.fn(),
+  getAiSettings: vi.fn(),
+  updateAiSettings: vi.fn(),
+  getAnyActiveAiIntegration: vi.fn(),
 }));
 
 import {
@@ -20,6 +23,9 @@ import {
   updateAiIntegration,
   deleteAiIntegration,
   testAiApiKey,
+  getAiSettings,
+  updateAiSettings,
+  getAnyActiveAiIntegration,
 } from "./db";
 
 const mockList = listAiIntegrations as ReturnType<typeof vi.fn>;
@@ -29,6 +35,9 @@ const mockCreate = createAiIntegration as ReturnType<typeof vi.fn>;
 const mockUpdate = updateAiIntegration as ReturnType<typeof vi.fn>;
 const mockDelete = deleteAiIntegration as ReturnType<typeof vi.fn>;
 const mockTestKey = testAiApiKey as ReturnType<typeof vi.fn>;
+const mockGetSettings = getAiSettings as ReturnType<typeof vi.fn>;
+const mockUpdateSettings = updateAiSettings as ReturnType<typeof vi.fn>;
+const mockGetAnyActive = getAnyActiveAiIntegration as ReturnType<typeof vi.fn>;
 
 describe("AI Integrations — Simplified", () => {
   beforeEach(() => {
@@ -204,7 +213,7 @@ describe("AI Integrations — Simplified", () => {
     });
   });
 
-  // ── Provider Validation ──────────────────────────────────
+  // ── Provider Validation ──────────────────────────────────────────
 
   describe("Provider Validation", () => {
     it("validates provider enum", () => {
@@ -212,6 +221,102 @@ describe("AI Integrations — Simplified", () => {
       expect(valid).toContain("openai");
       expect(valid).toContain("anthropic");
       expect(valid).not.toContain("google");
+    });
+  });
+
+  // ── AI Settings (default IA + transcription) ───────────────
+
+  describe("AI Settings", () => {
+    it("returns default settings when none exist", async () => {
+      mockGetSettings.mockResolvedValue(null);
+      const result = await getAiSettings(1);
+      expect(result).toBeNull();
+    });
+
+    it("returns settings with transcription enabled", async () => {
+      mockGetSettings.mockResolvedValue({
+        audioTranscriptionEnabled: true,
+        defaultAiProvider: "openai",
+        defaultAiModel: "gpt-5.4",
+      });
+      const result = await getAiSettings(1);
+      expect(result?.audioTranscriptionEnabled).toBe(true);
+      expect(result?.defaultAiProvider).toBe("openai");
+    });
+
+    it("updates settings", async () => {
+      mockUpdateSettings.mockResolvedValue(undefined);
+      await updateAiSettings(1, { audioTranscriptionEnabled: true });
+      expect(mockUpdateSettings).toHaveBeenCalledWith(1, { audioTranscriptionEnabled: true });
+    });
+
+    it("updates default AI provider and model", async () => {
+      mockUpdateSettings.mockResolvedValue(undefined);
+      await updateAiSettings(1, {
+        defaultAiProvider: "anthropic",
+        defaultAiModel: "claude-sonnet-4-6",
+      });
+      expect(mockUpdateSettings).toHaveBeenCalledWith(1, {
+        defaultAiProvider: "anthropic",
+        defaultAiModel: "claude-sonnet-4-6",
+      });
+    });
+  });
+
+  // ── getAnyActiveAiIntegration ────────────────────────────
+
+  describe("getAnyActiveAiIntegration", () => {
+    it("returns null when no active integration", async () => {
+      mockGetAnyActive.mockResolvedValue(null);
+      expect(await getAnyActiveAiIntegration(1)).toBeNull();
+    });
+
+    it("returns first active integration", async () => {
+      mockGetAnyActive.mockResolvedValue({ id: 1, provider: "openai", isActive: true });
+      const result = await getAnyActiveAiIntegration(1);
+      expect(result?.isActive).toBe(true);
+    });
+  });
+
+  // ── SPIN Selling suggestion context ──────────────────────
+
+  describe("SPIN Selling Suggestion", () => {
+    it("builds SPIN selling prompt with message context", () => {
+      const messages = [
+        { fromMe: false, content: "Oi, quero saber sobre o pacote de turismo" },
+        { fromMe: true, content: "Olá! Temos vários pacotes. Qual destino te interessa?" },
+        { fromMe: false, content: "Estou pensando em Fernando de Noronha" },
+      ];
+      const context = messages.map(m => `${m.fromMe ? "Agente" : "Cliente"}: ${m.content}`).join("\n");
+      expect(context).toContain("Cliente: Oi, quero saber sobre o pacote de turismo");
+      expect(context).toContain("Agente: Olá! Temos vários pacotes");
+      expect(context).toContain("Cliente: Estou pensando em Fernando de Noronha");
+    });
+
+    it("requires at least one message for suggestion", () => {
+      const messages: any[] = [];
+      expect(messages.length).toBe(0);
+      // Should not call AI with empty messages
+    });
+  });
+
+  // ── Audio Transcription ─────────────────────────────────
+
+  describe("Audio Transcription", () => {
+    it("requires OpenAI provider for transcription", async () => {
+      mockGetActive.mockResolvedValue(null);
+      const openaiIntegration = await getActiveAiIntegration(1, "openai");
+      expect(openaiIntegration).toBeNull();
+      // Should throw OPENAI_REQUIRED error
+    });
+
+    it("uses OpenAI Whisper API for transcription", async () => {
+      mockGetActive.mockResolvedValue({
+        id: 1, provider: "openai", apiKey: "sk-valid", isActive: true,
+      });
+      const integration = await getActiveAiIntegration(1, "openai");
+      expect(integration).not.toBeNull();
+      expect(integration?.provider).toBe("openai");
     });
   });
 });

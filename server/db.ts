@@ -1,6 +1,6 @@
 import { eq, desc, and, or, like, lt, gt, isNotNull, sql, inArray } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users, whatsappSessions, waMessages as messages, activityLogs, chatbotSettings, chatbotRules, conversationAssignments, crmUsers, teams, teamMembers, distributionRules, customFields, customFieldValues, waConversations, userPreferences, sessionShares, conversationEvents, internalNotes, quickReplies, waContacts, aiIntegrations } from "../drizzle/schema";
+import { InsertUser, users, whatsappSessions, waMessages as messages, activityLogs, chatbotSettings, chatbotRules, conversationAssignments, crmUsers, teams, teamMembers, distributionRules, customFields, customFieldValues, waConversations, userPreferences, sessionShares, conversationEvents, internalNotes, quickReplies, waContacts, aiIntegrations, tenants } from "../drizzle/schema";
 import { ENV } from './_core/env';
 import { normalizeJid } from "./phoneUtils";
 
@@ -2919,4 +2919,52 @@ export async function testAiApiKey(provider: "openai" | "anthropic", apiKey: str
   } catch (err: any) {
     return { success: false, error: err.message || "Connection failed" };
   }
+}
+
+
+// ── Tenant AI Settings (stored in tenants.settingsJson) ──
+
+export interface TenantAiSettings {
+  defaultAiProvider?: "openai" | "anthropic";
+  defaultAiModel?: string;
+  audioTranscriptionEnabled?: boolean;
+}
+
+export async function getTenantAiSettings(tenantId: number): Promise<TenantAiSettings> {
+  const db = await getDb();
+  if (!db) return {};
+  const rows = await db.select({ settingsJson: tenants.settingsJson }).from(tenants).where(eq(tenants.id, tenantId)).limit(1);
+  const raw = rows[0]?.settingsJson as Record<string, unknown> | null;
+  if (!raw) return {};
+  return {
+    defaultAiProvider: raw.defaultAiProvider as TenantAiSettings["defaultAiProvider"],
+    defaultAiModel: raw.defaultAiModel as string | undefined,
+    audioTranscriptionEnabled: raw.audioTranscriptionEnabled as boolean | undefined,
+  };
+}
+
+export async function updateTenantAiSettings(tenantId: number, patch: Partial<TenantAiSettings>) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const rows = await db.select({ settingsJson: tenants.settingsJson }).from(tenants).where(eq(tenants.id, tenantId)).limit(1);
+  const existing = (rows[0]?.settingsJson as Record<string, unknown>) || {};
+  const merged = { ...existing, ...patch };
+  await db.update(tenants).set({ settingsJson: merged }).where(eq(tenants.id, tenantId));
+}
+
+// Get the first active AI integration for a tenant (any provider)
+export async function getAnyActiveAiIntegration(tenantId: number) {
+  const db = await getDb();
+  if (!db) return null;
+  // Try to get the default provider first
+  const settings = await getTenantAiSettings(tenantId);
+  if (settings.defaultAiProvider) {
+    const preferred = await getActiveAiIntegration(tenantId, settings.defaultAiProvider);
+    if (preferred) return preferred;
+  }
+  // Fallback: any active integration
+  const rows = await db.select().from(aiIntegrations)
+    .where(and(eq(aiIntegrations.tenantId, tenantId), eq(aiIntegrations.isActive, true)))
+    .limit(1);
+  return rows[0] ?? null;
 }
