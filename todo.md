@@ -2763,3 +2763,11 @@
 - [x] Simplificar o fluxo de compartilhamento de sessão (reescrito do zero)
 - [x] Corrigir seleção de pessoas: agora usa <button> com checkbox customizado (sem conflito de clique)
 - [x] Tornar o processo mais intuitivo: passos 1/2 claros, selecionar/desmarcar todos, agrupamento por sessão
+
+## Timers Dinâmicos + Finalizar Atendimento (Mar 14 - v7)
+- [x] Timer dinâmico nos chats: UrgencyTimer mostra quando última msg é do cliente (aguardando resposta)
+- [x] Timer de "aguardando resposta": cores dinâmicas baseadas no tempo sem resposta
+- [x] Botão de finalizar atendimento: CheckCircle2 verde no hover, resolve + unassign do agente
+- [x] Timer na fila: UrgencyTimer com queuedAt, cores dinâmicas, atualiza a cada segundo
+- [x] Sistema de cores: emerald (<5min), yellow (5-15min), orange (15-30min), red (>30min) + ponto pulsante
+- [x] Design compacto (10px font-mono pill) integrado sem bagunçar layout

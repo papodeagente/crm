@@ -7,7 +7,7 @@ import {
   Check, CheckCheck, Clock, Phone, Loader2,
   MessageCircle, Briefcase, Plus, X, Volume2, VolumeX,
   UserPlus, Lock, Users, UserCheck, UserX, ArrowRightLeft,
-  CircleDot, ChevronDown, WifiOff, RefreshCw
+  CircleDot, ChevronDown, WifiOff, RefreshCw, CheckCircle2, LogOut
 } from "lucide-react";
 import { formatTime } from "../../../shared/dateUtils";
 import { toast } from "sonner";
@@ -199,6 +199,63 @@ const WaAvatar = memo(({ name, size = 49, pictureUrl }: { name: string; size?: n
 WaAvatar.displayName = "WaAvatar";
 
 /* ═══════════════════════════════════════════════════════
+   URGENCY TIMER — live countdown with color coding
+   Green < 5min | Yellow 5-15min | Orange 15-30min | Red > 30min
+   ═══════════════════════════════════════════════════════ */
+
+function getUrgencyColor(minutes: number): { text: string; bg: string; ring: string; dot: string } {
+  if (minutes < 5) return { text: "text-emerald-400", bg: "bg-emerald-400/10", ring: "ring-emerald-400/20", dot: "bg-emerald-400" };
+  if (minutes < 15) return { text: "text-yellow-400", bg: "bg-yellow-400/10", ring: "ring-yellow-400/20", dot: "bg-yellow-400" };
+  if (minutes < 30) return { text: "text-orange-400", bg: "bg-orange-400/10", ring: "ring-orange-400/20", dot: "bg-orange-400" };
+  return { text: "text-red-400", bg: "bg-red-400/10", ring: "ring-red-400/20", dot: "bg-red-400" };
+}
+
+function formatTimerDuration(ms: number): string {
+  const totalSec = Math.floor(ms / 1000);
+  if (totalSec < 60) return `${totalSec}s`;
+  const min = Math.floor(totalSec / 60);
+  const sec = totalSec % 60;
+  if (min < 60) return `${min}:${sec.toString().padStart(2, "0")}`;
+  const hrs = Math.floor(min / 60);
+  const remMin = min % 60;
+  return `${hrs}h${remMin.toString().padStart(2, "0")}`;
+}
+
+const UrgencyTimer = memo(({ since, label, compact }: { since: Date | string | number; label?: string; compact?: boolean }) => {
+  const [elapsed, setElapsed] = useState(0);
+
+  useEffect(() => {
+    const sinceMs = new Date(since).getTime();
+    const update = () => setElapsed(Math.max(0, Date.now() - sinceMs));
+    update();
+    const interval = setInterval(update, 1000);
+    return () => clearInterval(interval);
+  }, [since]);
+
+  const minutes = elapsed / 60000;
+  const colors = getUrgencyColor(minutes);
+  const display = formatTimerDuration(elapsed);
+
+  if (compact) {
+    return (
+      <span className={`inline-flex items-center gap-1 text-[10px] font-mono font-medium px-1.5 py-0.5 rounded-md ${colors.bg} ${colors.text}`}>
+        <span className={`w-1.5 h-1.5 rounded-full ${colors.dot} animate-pulse`} />
+        {display}
+      </span>
+    );
+  }
+
+  return (
+    <span className={`inline-flex items-center gap-1 text-[10px] font-mono font-medium px-2 py-0.5 rounded-md ring-1 ${colors.bg} ${colors.text} ${colors.ring}`}>
+      <span className={`w-1.5 h-1.5 rounded-full ${colors.dot} animate-pulse`} />
+      {label && <span className="font-sans text-[9px] opacity-70">{label}</span>}
+      {display}
+    </span>
+  );
+});
+UrgencyTimer.displayName = "UrgencyTimer";
+
+/* ═══════════════════════════════════════════════════════
    CONVERSATION ITEM — WhatsApp Web faithful
    ═══════════════════════════════════════════════════════ */
 
@@ -257,19 +314,22 @@ const StatusDot = memo(({ status }: { status?: string | null }) => {
 StatusDot.displayName = "StatusDot";
 
 const ConversationItem = memo(({
-  conv, isActive, contactName, pictureUrl, onClick, waitLabel,
+  conv, isActive, contactName, pictureUrl, onClick, waitLabel, showTimer, showFinish, onFinish,
 }: {
-  conv: ConvItem; isActive: boolean; contactName: string; pictureUrl?: string | null; onClick: () => void; waitLabel?: string;
+  conv: ConvItem; isActive: boolean; contactName: string; pictureUrl?: string | null; onClick: () => void;
+  waitLabel?: string; showTimer?: boolean; showFinish?: boolean; onFinish?: () => void;
 }) => {
   const fromMe = conv.lastFromMe === true || conv.lastFromMe === 1;
   const unread = Number(conv.unreadCount) || 0;
   const preview = getMessagePreview(conv.lastMessage, conv.lastMessageType);
   const time = formatConversationTime(conv.lastTimestamp);
+  // "Aguardando resposta" timer: show when last message is NOT from me (client is waiting)
+  const isWaitingResponse = showTimer && !fromMe && conv.lastTimestamp;
 
   return (
     <div
       onClick={onClick}
-      className={`flex items-center px-3 cursor-pointer transition-all duration-100 ${
+      className={`group/conv flex items-center px-3 cursor-pointer transition-all duration-100 ${
         isActive
           ? "bg-primary/8 border-l-2 border-l-primary"
           : "hover:bg-wa-hover/70 border-l-2 border-l-transparent"
@@ -293,7 +353,8 @@ const ConversationItem = memo(({
           </span>
           <div className="flex items-center gap-1.5 shrink-0">
             <AgentBadge name={conv.assignedAgentName} avatarUrl={conv.assignedAgentAvatar} />
-            {waitLabel && (
+            {/* Urgency timer for queue items */}
+            {waitLabel && !showTimer && (
               <span className="text-[10px] text-amber-400 bg-amber-400/10 px-1.5 py-0.5 rounded-md font-medium flex items-center gap-0.5">
                 <Timer className="w-2.5 h-2.5" />
                 {waitLabel}
@@ -313,10 +374,24 @@ const ConversationItem = memo(({
           }`}>
             {preview || "Sem mensagens"}
           </span>
+          {/* Waiting response timer — only when client sent last message */}
+          {isWaitingResponse && (
+            <UrgencyTimer since={conv.lastTimestamp!} compact />
+          )}
           {unread > 0 && (
             <span className="bg-primary text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1 shrink-0">
               {unread > 99 ? "99+" : unread}
             </span>
+          )}
+          {/* Finish attendance button — visible on hover */}
+          {showFinish && onFinish && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onFinish(); }}
+              title="Finalizar atendimento"
+              className="w-7 h-7 flex items-center justify-center rounded-full opacity-0 group-hover/conv:opacity-100 transition-all duration-150 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 hover:scale-110 shrink-0"
+            >
+              <CheckCircle2 className="w-3.5 h-3.5" />
+            </button>
           )}
         </div>
       </div>
@@ -853,6 +928,21 @@ export default function InboxPage() {
     onError: (e) => toast.error(e.message || "Erro ao atribuir"),
   });
 
+  // Finish attendance mutation
+  const finishMut = trpc.whatsapp.finishAttendance.useMutation({
+    onSuccess: () => {
+      conversationsQ.refetch(); queueStatsQ.refetch();
+      toast.success("Atendimento finalizado");
+      setSelectedJid(null);
+    },
+    onError: (e: any) => toast.error(e.message || "Erro ao finalizar"),
+  });
+
+  const handleFinishAttendance = useCallback((remoteJid: string) => {
+    if (!activeSession?.sessionId) return;
+    finishMut.mutate({ sessionId: activeSession.sessionId, remoteJid });
+  }, [activeSession?.sessionId, finishMut]);
+
   // WA Contacts for Contacts tab (reuse waContactsMap but as a list)
   const waContactsForTabQ = trpc.whatsapp.waContactsMap.useQuery(
     { sessionId: activeSession?.sessionId || "" },
@@ -1346,6 +1436,9 @@ export default function InboxPage() {
                     contactName={getDisplayName(conv.remoteJid, conv)}
                     pictureUrl={profilePicMap[conv.remoteJid]}
                     onClick={() => handleSelectConv(conv.remoteJid)}
+                    showTimer={activeTab === "mine"}
+                    showFinish={activeTab === "mine"}
+                    onFinish={() => handleFinishAttendance(conv.remoteJid)}
                   />
                 ))
               )}
@@ -1370,19 +1463,41 @@ export default function InboxPage() {
               ) : (
                 filteredQueueConvs.map((conv) => {
                   const waitTime = conv.queuedAt || conv.lastTimestamp;
-                  const waitMinutes = waitTime ? Math.floor((Date.now() - new Date(waitTime).getTime()) / 60000) : 0;
-                  const waitLabel = waitMinutes < 1 ? "agora" : waitMinutes < 60 ? `${waitMinutes}min` : `${Math.floor(waitMinutes / 60)}h${waitMinutes % 60}min`;
                   const isAssigningThis = assigningQueueJid === conv.remoteJid;
                   return (
                   <div key={conv.remoteJid} className="group/q relative">
-                    <ConversationItem
-                      conv={conv}
-                      isActive={selectedJid === conv.remoteJid}
-                      contactName={getDisplayName(conv.remoteJid, conv)}
-                      pictureUrl={profilePicMap[conv.remoteJid]}
+                    <div
                       onClick={() => handleSelectQueueConv(conv.remoteJid)}
-                      waitLabel={waitLabel}
-                    />
+                      className={`flex items-center px-3 cursor-pointer transition-all duration-100 ${
+                        selectedJid === conv.remoteJid
+                          ? "bg-primary/8 border-l-2 border-l-primary"
+                          : "hover:bg-wa-hover/70 border-l-2 border-l-transparent"
+                      }`}
+                    >
+                      <div className="py-2 pr-3">
+                        <WaAvatar name={getDisplayName(conv.remoteJid, conv)} size={46} pictureUrl={profilePicMap[conv.remoteJid]} />
+                      </div>
+                      <div className="flex-1 min-w-0 py-2.5 border-b border-wa-divider/50">
+                        <div className="flex items-center justify-between mb-0.5 gap-1">
+                          <span className="text-[14px] truncate leading-5 flex-1 min-w-0 text-foreground font-medium">
+                            {getDisplayName(conv.remoteJid, conv)}
+                          </span>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            {waitTime && <UrgencyTimer since={waitTime} compact />}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <span className="text-[13px] truncate flex-1 leading-5 text-muted-foreground/60">
+                            {getMessagePreview(conv.lastMessage, conv.lastMessageType) || "Sem mensagens"}
+                          </span>
+                          {Number(conv.unreadCount) > 0 && (
+                            <span className="bg-primary text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1 shrink-0">
+                              {Number(conv.unreadCount) > 99 ? "99+" : conv.unreadCount}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
                     {/* Hover action icons — clean overlay on the right side */}
                     {!isAssigningThis && (
                       <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 opacity-0 group-hover/q:opacity-100 transition-all duration-150">

@@ -33,6 +33,7 @@ import {
   getConversationsListMultiAgent,
   assignConversation,
   updateAssignmentStatus,
+  finishAttendance,
   getAssignmentForConversation,
   getAgentsForTenant,
   getTeamsForTenant,
@@ -629,6 +630,18 @@ export const appRouter = router({
       }))
       .mutation(async ({ input }) => {
         await updateAssignmentStatus(input.tenantId, input.sessionId, input.remoteJid, input.status);
+        return { success: true };
+      }),
+    // Finish attendance — resolve and unassign from agent
+    finishAttendance: sessionProtectedProcedure
+      .input(z.object({
+        tenantId: z.number().default(1),
+        sessionId: z.string(),
+        remoteJid: z.string(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const userId = (ctx as any).user?.saasUser?.userId || (ctx as any).user?.id || 0;
+        await finishAttendance(input.tenantId, input.sessionId, input.remoteJid, userId);
         return { success: true };
       }),
     // Get assignment for a specific conversation

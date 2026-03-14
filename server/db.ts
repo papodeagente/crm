@@ -513,6 +513,42 @@ export async function updateAssignmentStatus(tenantId: number, sessionId: string
   }
 }
 
+export async function finishAttendance(tenantId: number, sessionId: string, remoteJid: string, userId: number) {
+  const db = await getDb();
+  if (!db) return;
+  // Set assignment status to resolved
+  await db.update(conversationAssignments)
+    .set({ status: "resolved", resolvedAt: new Date() })
+    .where(and(
+      eq(conversationAssignments.tenantId, tenantId),
+      eq(conversationAssignments.sessionId, sessionId),
+      eq(conversationAssignments.remoteJid, remoteJid)
+    ));
+  // Clear assignedUserId and set status on wa_conversations so it leaves "Meus Chats"
+  await db.update(waConversations)
+    .set({ assignedUserId: null, assignedTeamId: null, status: "resolved", queuedAt: null })
+    .where(and(
+      eq(waConversations.tenantId, tenantId),
+      eq(waConversations.sessionId, sessionId),
+      eq(waConversations.remoteJid, remoteJid)
+    ));
+  // Log event
+  const waConv = await db.select({ id: waConversations.id }).from(waConversations)
+    .where(and(eq(waConversations.tenantId, tenantId), eq(waConversations.sessionId, sessionId), eq(waConversations.remoteJid, remoteJid)))
+    .limit(1);
+  if (waConv.length > 0) {
+    await db.insert(conversationEvents).values({
+      tenantId,
+      waConversationId: waConv[0].id,
+      sessionId,
+      remoteJid,
+      eventType: "resolved" as const,
+      fromUserId: userId,
+      metadata: { action: "finish_attendance" },
+    });
+  }
+}
+
 export async function getAssignmentsForSession(tenantId: number, sessionId: string) {
   const db = await getDb();
   if (!db) return [];
