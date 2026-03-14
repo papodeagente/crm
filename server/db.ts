@@ -2837,9 +2837,6 @@ export async function createAiIntegration(data: {
   apiKey: string;
   defaultModel: string;
   isActive?: boolean;
-  label?: string;
-  maxTokens?: number;
-  temperature?: string;
   createdBy: number;
 }) {
   const db = await getDb();
@@ -2850,9 +2847,6 @@ export async function createAiIntegration(data: {
     apiKey: data.apiKey,
     defaultModel: data.defaultModel,
     isActive: data.isActive ?? true,
-    label: data.label ?? null,
-    maxTokens: data.maxTokens ?? 1024,
-    temperature: data.temperature ?? "0.7",
     createdBy: data.createdBy,
   });
   return { id: Number(result[0].insertId) };
@@ -2862,9 +2856,6 @@ export async function updateAiIntegration(tenantId: number, id: number, data: {
   apiKey?: string;
   defaultModel?: string;
   isActive?: boolean;
-  label?: string;
-  maxTokens?: number;
-  temperature?: string;
 }) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
@@ -2872,9 +2863,6 @@ export async function updateAiIntegration(tenantId: number, id: number, data: {
   if (data.apiKey !== undefined) updateData.apiKey = data.apiKey;
   if (data.defaultModel !== undefined) updateData.defaultModel = data.defaultModel;
   if (data.isActive !== undefined) updateData.isActive = data.isActive;
-  if (data.label !== undefined) updateData.label = data.label;
-  if (data.maxTokens !== undefined) updateData.maxTokens = data.maxTokens;
-  if (data.temperature !== undefined) updateData.temperature = data.temperature;
   if (Object.keys(updateData).length === 0) return;
   await db.update(aiIntegrations)
     .set(updateData)

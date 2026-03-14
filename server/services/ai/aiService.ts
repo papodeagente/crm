@@ -1,8 +1,7 @@
 /**
  * Generic AI Service — Unified interface for OpenAI and Anthropic Claude
  * 
- * This service provides a common interface for invoking AI completions
- * from both providers, handling the API differences transparently.
+ * Simple wrapper to invoke AI completions from both providers.
  */
 
 export interface AiMessage {
@@ -16,8 +15,6 @@ export interface AiCompletionRequest {
   model: string;
   messages: AiMessage[];
   maxTokens?: number;
-  temperature?: number;
-  systemPrompt?: string;
 }
 
 export interface AiCompletionResponse {
@@ -32,20 +29,17 @@ export interface AiCompletionResponse {
   finishReason: string;
 }
 
-// ── OpenAI Models ──────────────────────────────────────────
+// ── OpenAI Models (Março 2026) ────────────────────────────────
 export const OPENAI_MODELS = [
-  { id: "gpt-4o", name: "GPT-4o", description: "Modelo mais capaz e rápido da OpenAI", contextWindow: "128K", recommended: true },
-  { id: "gpt-4o-mini", name: "GPT-4o Mini", description: "Versão compacta e econômica do GPT-4o", contextWindow: "128K", recommended: false },
-  { id: "gpt-4-turbo", name: "GPT-4 Turbo", description: "GPT-4 otimizado para velocidade", contextWindow: "128K", recommended: false },
-  { id: "gpt-3.5-turbo", name: "GPT-3.5 Turbo", description: "Modelo rápido e econômico", contextWindow: "16K", recommended: false },
+  { id: "gpt-5.4", name: "GPT-5.4", description: "Modelo mais inteligente da OpenAI para raciocínio e código", contextWindow: "1M" },
+  { id: "gpt-5-mini", name: "GPT-5 Mini", description: "Rápido e econômico, ideal para alto volume", contextWindow: "400K" },
 ] as const;
 
-// ── Anthropic Models ───────────────────────────────────────
+// ── Anthropic Models (Março 2026) ─────────────────────────────
 export const ANTHROPIC_MODELS = [
-  { id: "claude-sonnet-4-20250514", name: "Claude Sonnet 4", description: "Equilíbrio ideal entre inteligência e velocidade", contextWindow: "200K", recommended: true },
-  { id: "claude-3-5-sonnet-20241022", name: "Claude 3.5 Sonnet", description: "Modelo rápido e inteligente", contextWindow: "200K", recommended: false },
-  { id: "claude-3-5-haiku-20241022", name: "Claude 3.5 Haiku", description: "Modelo mais rápido e econômico", contextWindow: "200K", recommended: false },
-  { id: "claude-3-opus-20240229", name: "Claude 3 Opus", description: "Modelo mais poderoso para tarefas complexas", contextWindow: "200K", recommended: false },
+  { id: "claude-opus-4-6", name: "Claude Opus 4.6", description: "Mais inteligente para agentes e código", contextWindow: "1M" },
+  { id: "claude-sonnet-4-6", name: "Claude Sonnet 4.6", description: "Melhor equilíbrio entre velocidade e inteligência", contextWindow: "1M" },
+  { id: "claude-haiku-4-5", name: "Claude Haiku 4.5", description: "Mais rápido e econômico", contextWindow: "200K" },
 ] as const;
 
 /**
@@ -60,11 +54,6 @@ export async function invokeAiCompletion(req: AiCompletionRequest): Promise<AiCo
 }
 
 async function invokeOpenAI(req: AiCompletionRequest): Promise<AiCompletionResponse> {
-  const messages = req.messages.map(m => ({
-    role: m.role,
-    content: m.content,
-  }));
-
   const res = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: {
@@ -73,9 +62,8 @@ async function invokeOpenAI(req: AiCompletionRequest): Promise<AiCompletionRespo
     },
     body: JSON.stringify({
       model: req.model,
-      messages,
+      messages: req.messages.map(m => ({ role: m.role, content: m.content })),
       max_tokens: req.maxTokens ?? 1024,
-      temperature: req.temperature ?? 0.7,
     }),
   });
 
@@ -101,7 +89,6 @@ async function invokeOpenAI(req: AiCompletionRequest): Promise<AiCompletionRespo
 }
 
 async function invokeAnthropic(req: AiCompletionRequest): Promise<AiCompletionResponse> {
-  // Anthropic uses a separate system parameter instead of system role messages
   const systemMsg = req.messages.find(m => m.role === "system");
   const nonSystemMsgs = req.messages.filter(m => m.role !== "system");
 
@@ -109,7 +96,6 @@ async function invokeAnthropic(req: AiCompletionRequest): Promise<AiCompletionRe
     model: req.model,
     messages: nonSystemMsgs.map(m => ({ role: m.role, content: m.content })),
     max_tokens: req.maxTokens ?? 1024,
-    temperature: req.temperature ?? 0.7,
   };
 
   if (systemMsg) {
@@ -155,7 +141,7 @@ export async function validateApiKey(
   model?: string
 ): Promise<{ valid: boolean; error?: string }> {
   try {
-    const testModel = model || (provider === "openai" ? "gpt-3.5-turbo" : "claude-3-5-haiku-20241022");
+    const testModel = model || (provider === "openai" ? "gpt-5-mini" : "claude-haiku-4-5");
     await invokeAiCompletion({
       provider,
       apiKey,

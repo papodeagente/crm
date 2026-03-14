@@ -2416,9 +2416,6 @@ export const appRouter = router({
         apiKey: z.string().min(10),
         defaultModel: z.string().min(1),
         isActive: z.boolean().optional(),
-        label: z.string().optional(),
-        maxTokens: z.number().min(1).max(128000).optional(),
-        temperature: z.string().optional(),
       }))
       .mutation(async ({ input, ctx }) => {
         const userId = (ctx as any).user?.id ?? 0;
@@ -2432,9 +2429,6 @@ export const appRouter = router({
         apiKey: z.string().min(10).optional(),
         defaultModel: z.string().min(1).optional(),
         isActive: z.boolean().optional(),
-        label: z.string().optional(),
-        maxTokens: z.number().min(1).max(128000).optional(),
-        temperature: z.string().optional(),
       }))
       .mutation(async ({ input }) => {
         const { tenantId, id, ...data } = input;
@@ -2469,7 +2463,6 @@ export const appRouter = router({
           content: z.string(),
         })),
         maxTokens: z.number().optional(),
-        temperature: z.number().min(0).max(2).optional(),
         model: z.string().optional(),
       }))
       .mutation(async ({ input }) => {
@@ -2478,8 +2471,7 @@ export const appRouter = router({
           throw new TRPCError({ code: "NOT_FOUND", message: `No active ${input.provider} integration found` });
         }
         const model = input.model || integration.defaultModel;
-        const maxTokens = input.maxTokens || integration.maxTokens || 1024;
-        const temperature = input.temperature ?? parseFloat(integration.temperature || "0.7");
+        const maxTokens = input.maxTokens || 1024;
 
         try {
           if (input.provider === "openai") {
@@ -2493,7 +2485,6 @@ export const appRouter = router({
                 model,
                 messages: input.messages,
                 max_tokens: maxTokens,
-                temperature,
               }),
             });
             if (!res.ok) {
@@ -2514,7 +2505,6 @@ export const appRouter = router({
               model,
               messages: nonSystemMsgs.map(m => ({ role: m.role, content: m.content })),
               max_tokens: maxTokens,
-              temperature,
             };
             if (systemMsg) body.system = systemMsg.content;
             const res = await fetch("https://api.anthropic.com/v1/messages", {
@@ -2549,17 +2539,14 @@ export const appRouter = router({
       .query(({ input }) => {
         if (input.provider === "openai") {
           return [
-            { id: "gpt-4o", name: "GPT-4o", description: "Modelo mais capaz e rápido da OpenAI", contextWindow: "128K" },
-            { id: "gpt-4o-mini", name: "GPT-4o Mini", description: "Versão compacta e econômica do GPT-4o", contextWindow: "128K" },
-            { id: "gpt-4-turbo", name: "GPT-4 Turbo", description: "GPT-4 otimizado para velocidade", contextWindow: "128K" },
-            { id: "gpt-3.5-turbo", name: "GPT-3.5 Turbo", description: "Modelo rápido e econômico", contextWindow: "16K" },
+            { id: "gpt-5.4", name: "GPT-5.4", description: "Modelo mais inteligente da OpenAI para raciocínio e código", contextWindow: "1M" },
+            { id: "gpt-5-mini", name: "GPT-5 Mini", description: "Rápido e econômico, ideal para alto volume", contextWindow: "400K" },
           ];
         } else {
           return [
-            { id: "claude-sonnet-4-20250514", name: "Claude Sonnet 4", description: "Equilíbrio ideal entre inteligência e velocidade", contextWindow: "200K" },
-            { id: "claude-3-5-sonnet-20241022", name: "Claude 3.5 Sonnet", description: "Modelo rápido e inteligente", contextWindow: "200K" },
-            { id: "claude-3-5-haiku-20241022", name: "Claude 3.5 Haiku", description: "Modelo mais rápido e econômico", contextWindow: "200K" },
-            { id: "claude-3-opus-20240229", name: "Claude 3 Opus", description: "Modelo mais poderoso para tarefas complexas", contextWindow: "200K" },
+            { id: "claude-opus-4-6", name: "Claude Opus 4.6", description: "Mais inteligente para agentes e código", contextWindow: "1M" },
+            { id: "claude-sonnet-4-6", name: "Claude Sonnet 4.6", description: "Melhor equilíbrio entre velocidade e inteligência", contextWindow: "1M" },
+            { id: "claude-haiku-4-5", name: "Claude Haiku 4.5", description: "Mais rápido e econômico", contextWindow: "200K" },
           ];
         }
       }),

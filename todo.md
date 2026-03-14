@@ -2787,3 +2787,11 @@
 - [x] Dialog de confirmação para remoção
 - [x] 23 testes vitest passando (aiIntegrations.test.ts)
 - [x] Modelos: OpenAI (gpt-4o, gpt-4o-mini, gpt-4-turbo, gpt-3.5-turbo), Claude (Sonnet 4, 3.5 Sonnet, 3.5 Haiku, 3 Opus)
+
+## Simplificação da Integração de IA (Mar 14 - v8.1)
+- [x] Pesquisar modelos ATUAIS da OpenAI (documentação oficial)
+- [x] Pesquisar modelos ATUAIS da Anthropic Claude (documentação oficial)
+- [x] Remover campos desnecessários do backend (temperature, maxTokens, label)
+- [x] Atualizar lista de modelos: OpenAI (GPT-5.4, GPT-5 Mini), Anthropic (Claude Opus 4.6, Sonnet 4.6, Haiku 4.5)
+- [x] Simplificar UI: apenas provedor, chave API, modelo — sem configurações avançadas
+- [x] Atualizar testes (18 passando)

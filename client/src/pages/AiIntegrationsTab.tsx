@@ -7,28 +7,27 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from "@/components/ui/dialog";
 import {
   Brain, Plus, Eye, EyeOff, Trash2, Edit2, CheckCircle2, XCircle,
-  Loader2, Sparkles, Cpu, Zap, TestTube, Settings2, AlertTriangle,
+  Loader2, Sparkles, Cpu, TestTube, AlertTriangle,
 } from "lucide-react";
 import { useTenantId } from "@/hooks/useTenantId";
-import { Slider } from "@/components/ui/slider";
 
-// ── Provider logos / icons ──────────────────────────────────
+// ── Provider icons ──────────────────────────────────────────
 function ProviderIcon({ provider, size = 20 }: { provider: string; size?: number }) {
   if (provider === "openai") {
     return (
-      <div className={`flex items-center justify-center rounded-lg bg-gradient-to-br from-emerald-500/15 to-teal-500/15`} style={{ width: size + 12, height: size + 12 }}>
+      <div className="flex items-center justify-center rounded-lg bg-gradient-to-br from-emerald-500/15 to-teal-500/15" style={{ width: size + 12, height: size + 12 }}>
         <Sparkles className="text-emerald-500" style={{ width: size, height: size }} />
       </div>
     );
   }
   return (
-    <div className={`flex items-center justify-center rounded-lg bg-gradient-to-br from-orange-500/15 to-amber-500/15`} style={{ width: size + 12, height: size + 12 }}>
+    <div className="flex items-center justify-center rounded-lg bg-gradient-to-br from-orange-500/15 to-amber-500/15" style={{ width: size + 12, height: size + 12 }}>
       <Cpu className="text-orange-500" style={{ width: size, height: size }} />
     </div>
   );
@@ -77,13 +76,10 @@ export default function AiIntegrationsTab() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
 
-  // Form state
+  // Form state — simple: provider, apiKey, model
   const [provider, setProvider] = useState<"openai" | "anthropic">("openai");
   const [apiKey, setApiKey] = useState("");
   const [model, setModel] = useState("");
-  const [label, setLabel] = useState("");
-  const [maxTokens, setMaxTokens] = useState(1024);
-  const [temperature, setTemperature] = useState(0.7);
   const [isActive, setIsActive] = useState(true);
   const [showKey, setShowKey] = useState(false);
   const [testResult, setTestResult] = useState<"idle" | "success" | "error">("idle");
@@ -95,9 +91,6 @@ export default function AiIntegrationsTab() {
     setProvider("openai");
     setApiKey("");
     setModel("");
-    setLabel("");
-    setMaxTokens(1024);
-    setTemperature(0.7);
     setIsActive(true);
     setShowKey(false);
     setTestResult("idle");
@@ -112,11 +105,8 @@ export default function AiIntegrationsTab() {
   const openEdit = (integration: any) => {
     setEditingId(integration.id);
     setProvider(integration.provider);
-    setApiKey(""); // Don't pre-fill for security
+    setApiKey("");
     setModel(integration.defaultModel);
-    setLabel(integration.label || "");
-    setMaxTokens(integration.maxTokens || 1024);
-    setTemperature(parseFloat(integration.temperature || "0.7"));
     setIsActive(integration.isActive);
     setShowKey(false);
     setTestResult("idle");
@@ -126,7 +116,7 @@ export default function AiIntegrationsTab() {
   const handleSave = () => {
     if (!model) { toast.error("Selecione um modelo."); return; }
     if (editingId) {
-      const data: any = { tenantId: TENANT_ID, id: editingId, defaultModel: model, isActive, label: label || undefined, maxTokens, temperature: String(temperature) };
+      const data: any = { tenantId: TENANT_ID, id: editingId, defaultModel: model, isActive };
       if (apiKey.length >= 10) data.apiKey = apiKey;
       updateMut.mutate(data);
     } else {
@@ -137,9 +127,6 @@ export default function AiIntegrationsTab() {
         apiKey,
         defaultModel: model,
         isActive,
-        label: label || undefined,
-        maxTokens,
-        temperature: String(temperature),
       });
     }
   };
@@ -157,7 +144,7 @@ export default function AiIntegrationsTab() {
 
   return (
     <div className="space-y-6">
-      {/* Header card */}
+      {/* Header */}
       <Card className="border border-border/40 shadow-none rounded-xl overflow-hidden">
         <div className="relative p-6">
           <div className="absolute inset-0 bg-gradient-to-r from-violet-500/5 via-purple-500/5 to-fuchsia-500/5" />
@@ -169,13 +156,13 @@ export default function AiIntegrationsTab() {
               <div>
                 <h3 className="text-[16px] font-bold">Inteligência Artificial</h3>
                 <p className="text-[13px] text-muted-foreground mt-0.5">
-                  Configure provedores de IA para chatbots, respostas automáticas e análises inteligentes.
+                  Conecte sua API da OpenAI ou Anthropic Claude para usar IA no sistema.
                 </p>
               </div>
             </div>
             <Button onClick={openCreate} className="gap-2 bg-violet-600 hover:bg-violet-700 text-white">
               <Plus className="h-4 w-4" />
-              Nova Integração
+              Conectar IA
             </Button>
           </div>
         </div>
@@ -192,19 +179,18 @@ export default function AiIntegrationsTab() {
             <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-violet-500/10 to-purple-500/10 flex items-center justify-center mx-auto mb-4">
               <Brain className="h-8 w-8 text-violet-500/40" />
             </div>
-            <p className="text-[15px] font-semibold text-muted-foreground/60">Nenhuma integração de IA configurada</p>
+            <p className="text-[15px] font-semibold text-muted-foreground/60">Nenhuma IA conectada</p>
             <p className="text-[13px] text-muted-foreground/40 mt-1.5 max-w-md mx-auto">
-              Adicione sua chave API da OpenAI ou Anthropic para habilitar funcionalidades de IA como chatbots, respostas automáticas e análises.
+              Adicione sua chave API da OpenAI ou Anthropic para habilitar funcionalidades de IA.
             </p>
             <Button onClick={openCreate} variant="outline" className="mt-5 gap-2">
               <Plus className="h-4 w-4" />
-              Adicionar Integração
+              Conectar IA
             </Button>
           </div>
         </Card>
       ) : (
         <div className="space-y-4">
-          {/* OpenAI Section */}
           {openaiIntegrations.length > 0 && (
             <div className="space-y-3">
               <div className="flex items-center gap-2">
@@ -219,7 +205,6 @@ export default function AiIntegrationsTab() {
             </div>
           )}
 
-          {/* Anthropic Section */}
           {anthropicIntegrations.length > 0 && (
             <div className="space-y-3">
               <div className="flex items-center gap-2">
@@ -238,14 +223,14 @@ export default function AiIntegrationsTab() {
 
       {/* Create/Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={(open) => { if (!open) { setDialogOpen(false); resetForm(); } }}>
-        <DialogContent className="sm:max-w-[540px] bg-background border-border/60">
+        <DialogContent className="sm:max-w-[480px] bg-background border-border/60">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-[16px]">
               <Brain className="h-5 w-5 text-violet-500" />
-              {editingId ? "Editar Integração de IA" : "Nova Integração de IA"}
+              {editingId ? "Editar Conexão de IA" : "Conectar IA"}
             </DialogTitle>
             <DialogDescription className="text-[13px]">
-              {editingId ? "Atualize as configurações da integração." : "Configure uma nova conexão com OpenAI ou Anthropic Claude."}
+              {editingId ? "Atualize a chave API ou modelo." : "Insira sua chave API para conectar."}
             </DialogDescription>
           </DialogHeader>
 
@@ -267,7 +252,7 @@ export default function AiIntegrationsTab() {
                     <ProviderIcon provider="openai" size={18} />
                     <div className="text-left">
                       <p className="text-[13px] font-semibold">OpenAI</p>
-                      <p className="text-[11px] text-muted-foreground">GPT-4o, GPT-3.5</p>
+                      <p className="text-[11px] text-muted-foreground">GPT-5.4, GPT-5 Mini</p>
                     </div>
                   </button>
                   <button
@@ -282,23 +267,12 @@ export default function AiIntegrationsTab() {
                     <ProviderIcon provider="anthropic" size={18} />
                     <div className="text-left">
                       <p className="text-[13px] font-semibold">Anthropic</p>
-                      <p className="text-[11px] text-muted-foreground">Claude Sonnet, Opus</p>
+                      <p className="text-[11px] text-muted-foreground">Claude Opus, Sonnet, Haiku</p>
                     </div>
                   </button>
                 </div>
               </div>
             )}
-
-            {/* Label */}
-            <div className="space-y-2">
-              <Label className="text-[12px] font-medium text-muted-foreground uppercase tracking-wider">Nome / Rótulo (opcional)</Label>
-              <Input
-                value={label}
-                onChange={(e) => setLabel(e.target.value)}
-                placeholder={`Ex: ${provider === "openai" ? "OpenAI Produção" : "Claude Atendimento"}`}
-                className="text-[13px]"
-              />
-            </div>
 
             {/* API Key */}
             <div className="space-y-2">
@@ -343,7 +317,7 @@ export default function AiIntegrationsTab() {
               </div>
               {testResult === "success" && (
                 <p className="text-[11px] text-emerald-500 flex items-center gap-1">
-                  <CheckCircle2 className="h-3 w-3" /> Chave válida — conexão bem-sucedida
+                  <CheckCircle2 className="h-3 w-3" /> Conexão bem-sucedida
                 </p>
               )}
               {testResult === "error" && (
@@ -355,7 +329,7 @@ export default function AiIntegrationsTab() {
 
             {/* Model Selection */}
             <div className="space-y-2">
-              <Label className="text-[12px] font-medium text-muted-foreground uppercase tracking-wider">Modelo Padrão</Label>
+              <Label className="text-[12px] font-medium text-muted-foreground uppercase tracking-wider">Modelo</Label>
               <Select value={model} onValueChange={setModel}>
                 <SelectTrigger className="text-[13px]">
                   <SelectValue placeholder="Selecione um modelo" />
@@ -366,7 +340,6 @@ export default function AiIntegrationsTab() {
                       <div className="flex items-center gap-2">
                         <span className="font-medium">{m.name}</span>
                         <span className="text-[11px] text-muted-foreground">({m.contextWindow})</span>
-                        {m.recommended && <Badge variant="outline" className="text-[9px] h-4 px-1.5 bg-violet-500/10 text-violet-500 border-violet-500/20">Recomendado</Badge>}
                       </div>
                     </SelectItem>
                   ))}
@@ -377,56 +350,6 @@ export default function AiIntegrationsTab() {
                   {modelsQ.data.find((m: any) => m.id === model)?.description}
                 </p>
               )}
-            </div>
-
-            {/* Advanced Settings */}
-            <div className="space-y-4 pt-2 border-t border-border/30">
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <Settings2 className="h-3.5 w-3.5" />
-                <span className="text-[12px] font-medium uppercase tracking-wider">Configurações Avançadas</span>
-              </div>
-
-              {/* Max Tokens */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label className="text-[12px] text-muted-foreground">Max Tokens</Label>
-                  <span className="text-[12px] font-mono text-muted-foreground">{maxTokens.toLocaleString()}</span>
-                </div>
-                <Input
-                  type="number"
-                  value={maxTokens}
-                  onChange={(e) => setMaxTokens(Math.max(1, Math.min(128000, parseInt(e.target.value) || 1024)))}
-                  className="text-[13px] font-mono"
-                  min={1}
-                  max={128000}
-                />
-              </div>
-
-              {/* Temperature */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label className="text-[12px] text-muted-foreground">Temperatura</Label>
-                  <span className="text-[12px] font-mono text-muted-foreground">{temperature.toFixed(1)}</span>
-                </div>
-                <Slider
-                  value={[temperature]}
-                  onValueChange={([v]) => setTemperature(v)}
-                  min={0}
-                  max={2}
-                  step={0.1}
-                  className="w-full"
-                />
-                <div className="flex justify-between text-[10px] text-muted-foreground/50">
-                  <span>Preciso</span>
-                  <span>Criativo</span>
-                </div>
-              </div>
-
-              {/* Active toggle */}
-              <div className="flex items-center justify-between">
-                <Label className="text-[12px] text-muted-foreground">Ativar integração</Label>
-                <Switch checked={isActive} onCheckedChange={setIsActive} />
-              </div>
             </div>
           </div>
 
@@ -440,22 +363,22 @@ export default function AiIntegrationsTab() {
               className="gap-2 bg-violet-600 hover:bg-violet-700 text-white"
             >
               {(createMut.isPending || updateMut.isPending) && <Loader2 className="h-4 w-4 animate-spin" />}
-              {editingId ? "Salvar Alterações" : "Criar Integração"}
+              {editingId ? "Salvar" : "Conectar"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation Dialog */}
+      {/* Delete Confirmation */}
       <Dialog open={deleteConfirm !== null} onOpenChange={(open) => { if (!open) setDeleteConfirm(null); }}>
         <DialogContent className="sm:max-w-[400px] bg-background border-border/60">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-[15px] text-red-500">
               <AlertTriangle className="h-5 w-5" />
-              Remover Integração
+              Remover Conexão
             </DialogTitle>
             <DialogDescription className="text-[13px]">
-              Tem certeza que deseja remover esta integração de IA? Esta ação não pode ser desfeita e pode afetar chatbots e automações que dependem dela.
+              Tem certeza que deseja remover esta conexão de IA? Funcionalidades que dependem dela podem parar de funcionar.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2">
@@ -491,18 +414,17 @@ function IntegrationCard({ integration, onEdit, onDelete, onToggle }: {
             <ProviderIcon provider={integration.provider} size={18} />
             <div>
               <div className="flex items-center gap-2">
-                <p className="text-[14px] font-semibold">{integration.label || providerLabel(integration.provider)}</p>
+                <p className="text-[14px] font-semibold">{providerLabel(integration.provider)}</p>
                 {integration.isActive ? (
                   <Badge variant="outline" className="text-[9px] h-4 px-1.5 bg-emerald-500/10 text-emerald-500 border-emerald-500/20 gap-1">
-                    <span className="h-1 w-1 rounded-full bg-emerald-500" />Ativo
+                    <span className="h-1 w-1 rounded-full bg-emerald-500" />Conectado
                   </Badge>
                 ) : (
-                  <Badge variant="outline" className="text-[9px] h-4 px-1.5 bg-slate-500/10 text-slate-400 border-slate-500/20">
-                    Inativo
+                  <Badge variant="outline" className="text-[9px] h-4 px-1.5 bg-muted text-muted-foreground border-border/40 gap-1">
+                    Desconectado
                   </Badge>
                 )}
               </div>
-              <p className="text-[12px] text-muted-foreground mt-0.5">{providerLabel(integration.provider)}</p>
             </div>
           </div>
           <Switch
@@ -520,14 +442,6 @@ function IntegrationCard({ integration, onEdit, onDelete, onToggle }: {
           <div className="flex justify-between text-[12px]">
             <span className="text-muted-foreground">Chave API:</span>
             <span className="font-mono text-muted-foreground/70">{integration.apiKey}</span>
-          </div>
-          <div className="flex justify-between text-[12px]">
-            <span className="text-muted-foreground">Max Tokens:</span>
-            <span className="font-mono">{(integration.maxTokens || 1024).toLocaleString()}</span>
-          </div>
-          <div className="flex justify-between text-[12px]">
-            <span className="text-muted-foreground">Temperatura:</span>
-            <span className="font-mono">{integration.temperature || "0.7"}</span>
           </div>
         </div>
 
