@@ -35,6 +35,8 @@ interface ConfigFormData {
   defaultOwnerUserId: number | null;
   autoWhatsAppEnabled: boolean;
   autoWhatsAppMessageTemplate: string;
+  dealNameTemplate: string;
+  autoProductId: number | null;
 }
 
 const DEFAULT_FORM: ConfigFormData = {
@@ -46,6 +48,8 @@ const DEFAULT_FORM: ConfigFormData = {
   defaultOwnerUserId: null,
   autoWhatsAppEnabled: false,
   autoWhatsAppMessageTemplate: "",
+  dealNameTemplate: "",
+  autoProductId: null,
 };
 
 const DEFAULT_TEMPLATE = `Olá {primeiro_nome}! 👋
@@ -84,6 +88,11 @@ export default function RDStationIntegration() {
   const [logFilter, setLogFilter] = useState<"success" | "failed" | "duplicate" | undefined>(undefined);
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
   const [showPreview, setShowPreview] = useState(false);
+  const [showDealNamePreview, setShowDealNamePreview] = useState(false);
+  const [configTasksCache, setConfigTasksCache] = useState<any[]>([]);
+  const [newTaskTitle, setNewTaskTitle] = useState("");
+  const [newTaskDueDays, setNewTaskDueDays] = useState(0);
+  const [newTaskPriority, setNewTaskPriority] = useState<"low" | "medium" | "high" | "urgent">("medium");
 
   // Queries
   const configsQuery = trpc.rdStation.listConfigs.useQuery({ tenantId: TENANT_ID });
@@ -91,6 +100,7 @@ export default function RDStationIntegration() {
   const pipelinesQuery = trpc.rdStation.listPipelines.useQuery({ tenantId: TENANT_ID });
   const teamQuery = trpc.rdStation.listTeamMembers.useQuery({ tenantId: TENANT_ID });
   const waStatusQuery = trpc.rdStation.getWhatsAppStatus.useQuery({ tenantId: TENANT_ID });
+  const productsQuery = trpc.rdStation.listProducts.useQuery({ tenantId: TENANT_ID });
 
   const selectedPipelineId = form.defaultPipelineId;
   const stagesQuery = trpc.rdStation.listStages.useQuery(
@@ -151,6 +161,32 @@ export default function RDStationIntegration() {
     onError: (err) => toast.error(err.message),
   });
 
+  const configTasksQuery = trpc.rdStation.listConfigTasks.useQuery(
+    { configId: editingConfigId!, tenantId: TENANT_ID },
+    { enabled: !!editingConfigId,
+      onSuccess: (data: any) => setConfigTasksCache(data || []),
+    } as any
+  );
+
+  const addTaskMutation = trpc.rdStation.addConfigTask.useMutation({
+    onSuccess: (task) => {
+      setConfigTasksCache((prev) => [...prev, task]);
+      setNewTaskTitle("");
+      setNewTaskDueDays(0);
+      setNewTaskPriority("medium");
+      toast.success("Tarefa adicionada!");
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
+  const removeTaskMutation = trpc.rdStation.removeConfigTask.useMutation({
+    onSuccess: (_, vars) => {
+      setConfigTasksCache((prev) => prev.filter((t) => t.id !== vars.taskId));
+      toast.success("Tarefa removida.");
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
   // ─── Helpers ───────────────────────────────────────────
 
   const configs = configsQuery.data || [];
@@ -159,6 +195,7 @@ export default function RDStationIntegration() {
     setEditingConfigId(null);
     setForm({ ...DEFAULT_FORM, autoWhatsAppMessageTemplate: DEFAULT_TEMPLATE });
     setShowForm(true);
+    setConfigTasksCache([]);
   }
 
   function openEditForm(config: any) {
@@ -172,6 +209,8 @@ export default function RDStationIntegration() {
       defaultOwnerUserId: config.defaultOwnerUserId ?? null,
       autoWhatsAppEnabled: config.autoWhatsAppEnabled ?? false,
       autoWhatsAppMessageTemplate: config.autoWhatsAppMessageTemplate || DEFAULT_TEMPLATE,
+      dealNameTemplate: config.dealNameTemplate || "",
+      autoProductId: config.autoProductId ?? null,
     });
     setShowForm(true);
   }
@@ -193,6 +232,8 @@ export default function RDStationIntegration() {
         defaultOwnerUserId: form.defaultOwnerUserId,
         autoWhatsAppEnabled: form.autoWhatsAppEnabled,
         autoWhatsAppMessageTemplate: form.autoWhatsAppMessageTemplate || null,
+        dealNameTemplate: form.dealNameTemplate || null,
+        autoProductId: form.autoProductId,
       });
     } else {
       createMutation.mutate({
@@ -205,6 +246,8 @@ export default function RDStationIntegration() {
         defaultOwnerUserId: form.defaultOwnerUserId ?? undefined,
         autoWhatsAppEnabled: form.autoWhatsAppEnabled,
         autoWhatsAppMessageTemplate: form.autoWhatsAppMessageTemplate || undefined,
+        dealNameTemplate: form.dealNameTemplate || undefined,
+        autoProductId: form.autoProductId ?? undefined,
       });
     }
   }
@@ -672,6 +715,163 @@ export default function RDStationIntegration() {
                 </SelectContent>
               </Select>
             </div>
+
+            {/* Deal Name Template */}
+            <div className="border border-border/50 rounded-lg p-4 space-y-3">
+              <div className="flex items-center gap-2">
+                <FileText className="h-4 w-4 text-blue-500" />
+                <Label className="font-medium">Nome personalizado da negociação</Label>
+              </div>
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <Label htmlFor="cfg-dealname" className="text-xs">Template do nome</Label>
+                  <Button variant="ghost" size="sm" className="h-6 text-xs gap-1" onClick={() => setShowDealNamePreview(!showDealNamePreview)}>
+                    <Eye className="h-3 w-3" /> {showDealNamePreview ? "Ocultar" : "Preview"}
+                  </Button>
+                </div>
+                <Input
+                  id="cfg-dealname"
+                  placeholder="Ex: {primeiro_nome} - {campanha}"
+                  value={form.dealNameTemplate}
+                  onChange={(e) => setForm({ ...form, dealNameTemplate: e.target.value })}
+                />
+                <p className="text-[10px] text-muted-foreground mt-1">
+                  Variáveis: {"\u007Bnome\u007D"} {"\u007Bprimeiro_nome\u007D"} {"\u007Bemail\u007D"} {"\u007Btelefone\u007D"} {"\u007Borigem\u007D"} {"\u007Bcampanha\u007D"} &mdash; Deixe vazio para usar o nome padrão.
+                </p>
+              </div>
+              {showDealNamePreview && form.dealNameTemplate && (
+                <div className="bg-blue-500/5 border border-blue-500/20 rounded-lg p-3">
+                  <div className="text-[10px] text-muted-foreground mb-1 font-medium">Preview:</div>
+                  <div className="text-sm text-foreground">{interpolateTemplate(form.dealNameTemplate)}</div>
+                </div>
+              )}
+            </div>
+
+            {/* Auto Product */}
+            <div className="border border-border/50 rounded-lg p-4 space-y-3">
+              <div className="flex items-center gap-2">
+                <Zap className="h-4 w-4 text-amber-500" />
+                <Label className="font-medium">Produto automático</Label>
+              </div>
+              <Select
+                value={form.autoProductId ? String(form.autoProductId) : "none"}
+                onValueChange={(v) => setForm({ ...form, autoProductId: v === "none" ? null : Number(v) })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Nenhum (não vincular produto)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Nenhum (não vincular produto)</SelectItem>
+                  {productsQuery.data?.map((p) => (
+                    <SelectItem key={p.id} value={String(p.id)}>
+                      {p.name} {p.basePriceCents ? `— R$${(p.basePriceCents / 100).toFixed(2)}` : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-[10px] text-muted-foreground">
+                O produto selecionado será vinculado automaticamente a cada negociação criada por este webhook.
+              </p>
+            </div>
+
+            {/* Auto Tasks */}
+            {editingConfigId && (
+              <div className="border border-border/50 rounded-lg p-4 space-y-3">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4 text-violet-500" />
+                  <Label className="font-medium">Tarefas automáticas</Label>
+                </div>
+                <p className="text-[10px] text-muted-foreground">
+                  Tarefas criadas automaticamente para cada lead recebido por este webhook.
+                </p>
+
+                {/* Existing tasks */}
+                {configTasksCache.length > 0 && (
+                  <div className="space-y-2">
+                    {configTasksCache.map((task) => (
+                      <div key={task.id} className="flex items-center gap-2 bg-muted/30 rounded px-3 py-2">
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium text-foreground truncate">{task.title}</div>
+                          <div className="text-[10px] text-muted-foreground">
+                            {task.dueDaysOffset === 0 ? "Mesmo dia" : `+${task.dueDaysOffset} dia(s)`}
+                            {task.dueTime ? ` às ${task.dueTime}` : ""}
+                            {" • "}
+                            {task.priority === "urgent" ? "Urgente" : task.priority === "high" ? "Alta" : task.priority === "medium" ? "Média" : "Baixa"}
+                          </div>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                          onClick={() => removeTaskMutation.mutate({ taskId: task.id, tenantId: TENANT_ID })}
+                          disabled={removeTaskMutation.isPending}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Add new task */}
+                <div className="flex items-end gap-2">
+                  <div className="flex-1">
+                    <Label htmlFor="new-task-title" className="text-xs">Título da tarefa</Label>
+                    <Input
+                      id="new-task-title"
+                      placeholder="Ex: Ligar para o lead"
+                      value={newTaskTitle}
+                      onChange={(e) => setNewTaskTitle(e.target.value)}
+                    />
+                  </div>
+                  <div className="w-20">
+                    <Label className="text-xs">Dias</Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      max={365}
+                      value={newTaskDueDays}
+                      onChange={(e) => setNewTaskDueDays(Number(e.target.value))}
+                    />
+                  </div>
+                  <div className="w-28">
+                    <Label className="text-xs">Prioridade</Label>
+                    <Select value={newTaskPriority} onValueChange={(v: any) => setNewTaskPriority(v)}>
+                      <SelectTrigger className="h-9">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="low">Baixa</SelectItem>
+                        <SelectItem value="medium">Média</SelectItem>
+                        <SelectItem value="high">Alta</SelectItem>
+                        <SelectItem value="urgent">Urgente</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Button
+                    size="sm"
+                    className="h-9 gap-1"
+                    disabled={!newTaskTitle.trim() || addTaskMutation.isPending}
+                    onClick={() => {
+                      if (!newTaskTitle.trim() || !editingConfigId) return;
+                      addTaskMutation.mutate({
+                        configId: editingConfigId,
+                        tenantId: TENANT_ID,
+                        title: newTaskTitle.trim(),
+                        dueDaysOffset: newTaskDueDays,
+                        priority: newTaskPriority,
+                      });
+                    }}
+                  >
+                    {addTaskMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
+                    Adicionar
+                  </Button>
+                </div>
+                {!editingConfigId && (
+                  <p className="text-[10px] text-amber-500">Salve a configuração primeiro para adicionar tarefas.</p>
+                )}
+              </div>
+            )}
 
             {/* Auto WhatsApp */}
             <div className="border border-border/50 rounded-lg p-4 space-y-3">

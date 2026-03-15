@@ -1363,6 +1363,8 @@ export const rdStationConfig = mysqlTable("rd_station_config", {
   defaultOwnerUserId: int("defaultOwnerUserId"),
   autoWhatsAppEnabled: boolean("autoWhatsAppEnabled").default(false).notNull(),
   autoWhatsAppMessageTemplate: text("autoWhatsAppMessageTemplate"),
+  dealNameTemplate: text("dealNameTemplate"),
+  autoProductId: int("autoProductId"),
   totalLeadsReceived: int("totalLeadsReceived").default(0).notNull(),
   lastLeadReceivedAt: timestamp("lastLeadReceivedAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -1390,6 +1392,12 @@ export const rdStationWebhookLog = mysqlTable("rd_station_webhook_log", {
   configId: int("configId"),
   autoWhatsAppStatus: varchar("autoWhatsAppStatus", { length: 32 }),
   autoWhatsAppError: text("autoWhatsAppError"),
+  autoProductStatus: varchar("autoProductStatus", { length: 32 }),
+  autoProductError: text("autoProductError"),
+  autoTasksCreated: int("autoTasksCreated").default(0),
+  autoTasksFailed: int("autoTasksFailed").default(0),
+  autoTasksError: text("autoTasksError"),
+  customDealName: boolean("customDealName").default(false),
   error: text("error"),
   rawPayload: json("rawPayload"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -1403,6 +1411,31 @@ export const rdStationWebhookLog = mysqlTable("rd_station_webhook_log", {
 export type RdStationConfig = typeof rdStationConfig.$inferSelect;
 export type InsertRdStationConfig = typeof rdStationConfig.$inferInsert;
 export type RdStationWebhookLog = typeof rdStationWebhookLog.$inferSelect;
+
+// ════════════════════════════════════════════════════════════
+// RD STATION CONFIG TASKS (Templates de Tarefas Automáticas)
+// ════════════════════════════════════════════════════════════
+
+export const rdStationConfigTasks = mysqlTable("rd_station_config_tasks", {
+  id: int("id").autoincrement().primaryKey(),
+  configId: int("configId").notNull(),
+  tenantId: int("tenantId").notNull(),
+  title: varchar("title", { length: 255 }).notNull(),
+  description: text("description"),
+  taskType: varchar("taskType", { length: 32 }).default("task"),
+  assignedToUserId: int("assignedToUserId"),
+  dueDaysOffset: int("dueDaysOffset").default(0).notNull(),
+  dueTime: varchar("dueTime", { length: 5 }),
+  priority: mysqlEnum("priority", ["low", "medium", "high", "urgent"]).default("medium").notNull(),
+  orderIndex: int("orderIndex").default(0).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (t) => [
+  index("rdctask_config_idx").on(t.configId),
+  index("rdctask_tenant_idx").on(t.tenantId),
+]);
+
+export type RdStationConfigTask = typeof rdStationConfigTasks.$inferSelect;
+export type InsertRdStationConfigTask = typeof rdStationConfigTasks.$inferInsert;
 
 
 // ════════════════════════════════════════════════════════════

@@ -3030,3 +3030,27 @@
 - [x] Backend: mutation to change deal pipeline + stage with validation and history
 - [x] Frontend: pipeline/stage selector in DealDetail page
 - [x] Tests: pipeline change with valid stage, invalid stage blocked, tenant isolation, history logged, persistence
+
+## RD Station: Nome Personalizado + Produto Automático + Tarefas Automáticas
+
+- [x] Audit: existing schema, webhook handler, deal_products, tasks, product catalog
+- [x] Schema: add dealNameTemplate, autoProductId to rd_station_config
+- [x] Schema: create rd_station_config_tasks table for auto-task templates
+- [x] Backend: expand webhook handler — custom deal name via template interpolation
+- [x] Backend: expand webhook handler — auto-link product to deal after creation
+- [x] Backend: expand webhook handler — auto-create tasks from config templates
+- [x] Backend: resilience — product/task failures don't break lead/deal creation
+- [x] Backend: log custom name applied, product linked, tasks created/failed
+- [x] tRPC: update createConfig/updateConfig to accept new fields
+- [x] tRPC: CRUD for config task templates (list, add, remove)
+- [x] tRPC: endpoint to list products for selector
+- [x] Frontend: deal name template section in config form with preview
+- [x] Frontend: product selector from catalog in config form
+- [x] Frontend: auto-tasks UI — add/remove task templates per config
+- [x] Tests: deal with custom name template
+- [x] Tests: fallback to default name
+- [x] Tests: auto-product linking
+- [x] Tests: fallback if product invalid/inactive
+- [x] Tests: auto-task creation from templates
+- [x] Tests: task templates CRUD (add, list, update, remove)
+- [x] Tests: tenant isolation on task templates

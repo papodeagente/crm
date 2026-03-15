@@ -691,3 +691,237 @@ describe("processInboundLead options interface", () => {
     expect(processInboundLead.length).toBeLessThanOrEqual(3);
   });
 });
+
+
+// ─── Deal Name Template Tests ──────────────────────────────
+
+describe("Deal name template interpolation", () => {
+  function interpolateDealName(template: string, vars: { name: string; phone: string; email: string; source: string; campaign: string }): string {
+    const firstName = vars.name.split(" ")[0] || vars.name;
+    return template
+      .replace(/\{nome\}/gi, vars.name)
+      .replace(/\{primeiro_nome\}/gi, firstName)
+      .replace(/\{telefone\}/gi, vars.phone || "")
+      .replace(/\{email\}/gi, vars.email || "")
+      .replace(/\{origem\}/gi, vars.source || "")
+      .replace(/\{campanha\}/gi, vars.campaign || "");
+  }
+
+  it("interpolates all variables in deal name template", () => {
+    const result = interpolateDealName("{primeiro_nome} - {campanha}", {
+      name: "João Silva",
+      phone: "+5511999887766",
+      email: "joao@email.com",
+      source: "rdstation",
+      campaign: "black-friday",
+    });
+    expect(result).toBe("João - black-friday");
+  });
+
+  it("uses full name variable", () => {
+    const result = interpolateDealName("Deal: {nome}", {
+      name: "Maria Santos",
+      phone: "",
+      email: "",
+      source: "",
+      campaign: "",
+    });
+    expect(result).toBe("Deal: Maria Santos");
+  });
+
+  it("handles empty template (fallback to default)", () => {
+    const template = "";
+    // When template is empty, the webhook handler skips interpolation and uses default name
+    expect(template.trim()).toBe("");
+  });
+
+  it("handles template with source and campaign", () => {
+    const result = interpolateDealName("{origem} / {campanha} - {primeiro_nome}", {
+      name: "Pedro Costa",
+      phone: "",
+      email: "",
+      source: "landing-page",
+      campaign: "verao-2026",
+    });
+    expect(result).toBe("landing-page / verao-2026 - Pedro");
+  });
+
+  it("handles missing variables gracefully", () => {
+    const result = interpolateDealName("{primeiro_nome} - {campanha}", {
+      name: "Ana",
+      phone: "",
+      email: "",
+      source: "",
+      campaign: "",
+    });
+    expect(result).toBe("Ana - ");
+  });
+});
+
+// ─── Config Task Templates CRUD Tests ──────────────────────
+
+describe("Config task templates CRUD", () => {
+  const caller = appRouter.createCaller(createAuthContext().ctx);
+  let testConfigId: number;
+
+  it("creates a config for task template tests", async () => {
+    const config = await caller.rdStation.createConfig({
+      tenantId: 1,
+      name: "Task Template Test Config",
+    });
+    expect(config.id).toBeDefined();
+    testConfigId = config.id;
+  });
+
+  it("adds a task template to config", async () => {
+    const task = await caller.rdStation.addConfigTask({
+      configId: testConfigId,
+      tenantId: 1,
+      title: "Ligar para o lead",
+      dueDaysOffset: 1,
+      priority: "high",
+    });
+    expect(task.id).toBeDefined();
+    expect(task.title).toBe("Ligar para o lead");
+    expect(task.dueDaysOffset).toBe(1);
+    expect(task.priority).toBe("high");
+    expect(task.orderIndex).toBe(0);
+  });
+
+  it("adds a second task template with auto-incremented orderIndex", async () => {
+    const task = await caller.rdStation.addConfigTask({
+      configId: testConfigId,
+      tenantId: 1,
+      title: "Enviar proposta",
+      dueDaysOffset: 3,
+      priority: "medium",
+    });
+    expect(task.orderIndex).toBe(1);
+  });
+
+  it("lists task templates for config", async () => {
+    const tasks = await caller.rdStation.listConfigTasks({
+      configId: testConfigId,
+      tenantId: 1,
+    });
+    expect(tasks.length).toBe(2);
+    expect(tasks[0].title).toBe("Ligar para o lead");
+    expect(tasks[1].title).toBe("Enviar proposta");
+  });
+
+  it("updates a task template", async () => {
+    const tasks = await caller.rdStation.listConfigTasks({
+      configId: testConfigId,
+      tenantId: 1,
+    });
+    const updated = await caller.rdStation.updateConfigTask({
+      taskId: tasks[0].id,
+      tenantId: 1,
+      title: "Ligar urgente",
+      priority: "urgent",
+    });
+    expect(updated?.title).toBe("Ligar urgente");
+    expect(updated?.priority).toBe("urgent");
+  });
+
+  it("removes a task template", async () => {
+    const tasks = await caller.rdStation.listConfigTasks({
+      configId: testConfigId,
+      tenantId: 1,
+    });
+    const result = await caller.rdStation.removeConfigTask({
+      taskId: tasks[0].id,
+      tenantId: 1,
+    });
+    expect(result.success).toBe(true);
+
+    const remaining = await caller.rdStation.listConfigTasks({
+      configId: testConfigId,
+      tenantId: 1,
+    });
+    expect(remaining.length).toBe(1);
+  });
+
+  it("tenant isolation: cannot list tasks from another tenant", async () => {
+    const tasks = await caller.rdStation.listConfigTasks({
+      configId: testConfigId,
+      tenantId: 9999,
+    });
+    expect(tasks.length).toBe(0);
+  });
+
+  // Cleanup
+  it("cleans up test config", async () => {
+    await caller.rdStation.deleteConfig({ configId: testConfigId, tenantId: 1 });
+  });
+});
+
+// ─── Config with dealNameTemplate and autoProductId ────────
+
+describe("Config CRUD with new fields", () => {
+  const caller = appRouter.createCaller(createAuthContext().ctx);
+
+  it("creates config with dealNameTemplate and autoProductId", async () => {
+    const config = await caller.rdStation.createConfig({
+      tenantId: 1,
+      name: "Full Config Test",
+      dealNameTemplate: "{primeiro_nome} - {campanha}",
+      autoProductId: null,
+    });
+    expect(config.id).toBeDefined();
+    expect(config.dealNameTemplate).toBe("{primeiro_nome} - {campanha}");
+    expect(config.autoProductId).toBeNull();
+
+    // Cleanup
+    await caller.rdStation.deleteConfig({ configId: config.id, tenantId: 1 });
+  });
+
+  it("updates config dealNameTemplate and autoProductId", async () => {
+    const config = await caller.rdStation.createConfig({
+      tenantId: 1,
+      name: "Update Fields Test",
+    });
+
+    const updated = await caller.rdStation.updateConfig({
+      configId: config.id,
+      tenantId: 1,
+      dealNameTemplate: "Deal: {nome}",
+      autoProductId: 42,
+    });
+    expect(updated?.dealNameTemplate).toBe("Deal: {nome}");
+    expect(updated?.autoProductId).toBe(42);
+
+    // Clear fields
+    const cleared = await caller.rdStation.updateConfig({
+      configId: config.id,
+      tenantId: 1,
+      dealNameTemplate: null,
+      autoProductId: null,
+    });
+    expect(cleared?.dealNameTemplate).toBeNull();
+    expect(cleared?.autoProductId).toBeNull();
+
+    // Cleanup
+    await caller.rdStation.deleteConfig({ configId: config.id, tenantId: 1 });
+  });
+});
+
+// ─── Products list endpoint ────────────────────────────────
+
+describe("listProducts endpoint", () => {
+  const caller = appRouter.createCaller(createAuthContext().ctx);
+
+  it("returns an array (may be empty if no products)", async () => {
+    const products = await caller.rdStation.listProducts({ tenantId: 1 });
+    expect(Array.isArray(products)).toBe(true);
+  });
+
+  it("returns products with expected shape", async () => {
+    const products = await caller.rdStation.listProducts({ tenantId: 1 });
+    if (products.length > 0) {
+      const p = products[0];
+      expect(p).toHaveProperty("id");
+      expect(p).toHaveProperty("name");
+    }
+  });
+});

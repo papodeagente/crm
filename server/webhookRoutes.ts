@@ -16,7 +16,8 @@ import {
   type InboundLeadPayload,
 } from "./leadProcessor";
 import { getDb } from "./db";
-import { eventLog, trackingTokens, rdStationConfig, rdStationWebhookLog, whatsappSessions } from "../drizzle/schema";
+import { eventLog, trackingTokens, rdStationConfig, rdStationWebhookLog, whatsappSessions, rdStationConfigTasks, productCatalog, dealProducts, tasks } from "../drizzle/schema";
+import { createDealProduct, createTask } from "./crmDb";
 import { eq, and, sql } from "drizzle-orm";
 import { ENV } from "./_core/env";
 import { generateTrackerScript } from "./tracker-script";
@@ -816,6 +817,22 @@ router.post("/api/webhooks/rdstation", async (req: Request, res: Response) => {
           raw: lead,
         };
 
+        // 8a. Custom deal name template
+        let customDealTitle: string | undefined;
+        if (config.dealNameTemplate && config.dealNameTemplate.trim()) {
+          const leadName = name || company || "Lead";
+          const firstName = leadName.split(" ")[0] || leadName;
+          customDealTitle = config.dealNameTemplate
+            .replace(/\{nome\}/gi, leadName)
+            .replace(/\{primeiro_nome\}/gi, firstName)
+            .replace(/\{telefone\}/gi, phone || "")
+            .replace(/\{email\}/gi, email || "")
+            .replace(/\{origem\}/gi, config.defaultSource || directUtmSource || "rdstation")
+            .replace(/\{campanha\}/gi, config.defaultCampaign || directUtmCampaign || "")
+            .trim();
+          if (!customDealTitle) customDealTitle = undefined;
+        }
+
         // 8. Process the lead — pass config overrides
         const result = await processInboundLead(tenantId, payload, {
           pipelineId: config.defaultPipelineId ?? undefined,
@@ -823,7 +840,97 @@ router.post("/api/webhooks/rdstation", async (req: Request, res: Response) => {
           ownerUserId: config.defaultOwnerUserId ?? undefined,
           source: config.defaultSource || undefined,
           campaign: config.defaultCampaign || undefined,
+          dealTitle: customDealTitle,
         });
+
+        // 8b. Auto-link product to deal
+        let autoProductStatus: string | null = null;
+        let autoProductError: string | null = null;
+        if (config.autoProductId && result.success && result.dealId && !result.isExisting) {
+          try {
+            const [product] = await db
+              .select()
+              .from(productCatalog)
+              .where(and(eq(productCatalog.id, config.autoProductId), eq(productCatalog.tenantId, tenantId)))
+              .limit(1);
+            if (!product) {
+              autoProductStatus = "skipped";
+              autoProductError = `Produto #${config.autoProductId} n\u00e3o encontrado`;
+              console.warn(`[RD Station Webhook] Auto-product #${config.autoProductId} not found for tenant ${tenantId}`);
+            } else if (!product.isActive) {
+              autoProductStatus = "skipped";
+              autoProductError = `Produto "${product.name}" est\u00e1 inativo`;
+              console.warn(`[RD Station Webhook] Auto-product "${product.name}" is inactive`);
+            } else {
+              await createDealProduct({
+                tenantId,
+                dealId: result.dealId,
+                productId: product.id,
+                name: product.name,
+                description: product.description ?? undefined,
+                category: (product.productType === "package" ? "other" : product.productType) as any,
+                quantity: 1,
+                unitPriceCents: product.basePriceCents,
+                supplier: product.supplier ?? undefined,
+              });
+              autoProductStatus = "linked";
+              console.log(`[RD Station Webhook] Auto-product "${product.name}" linked to deal #${result.dealId}`);
+            }
+          } catch (prodErr: any) {
+            autoProductStatus = "failed";
+            autoProductError = prodErr.message || String(prodErr);
+            console.error(`[RD Station Webhook] Auto-product failed:`, prodErr.message);
+          }
+        }
+
+        // 8c. Auto-create tasks from config templates
+        let autoTasksCreated = 0;
+        let autoTasksFailed = 0;
+        let autoTasksError: string | null = null;
+        if (result.success && result.dealId && !result.isExisting) {
+          try {
+            const taskTemplates = await db
+              .select()
+              .from(rdStationConfigTasks)
+              .where(and(eq(rdStationConfigTasks.configId, config.id), eq(rdStationConfigTasks.tenantId, tenantId)));
+
+            for (const tmpl of taskTemplates) {
+              try {
+                const dueDate = new Date();
+                dueDate.setDate(dueDate.getDate() + (tmpl.dueDaysOffset || 0));
+                if (tmpl.dueTime) {
+                  const [hours, minutes] = tmpl.dueTime.split(":").map(Number);
+                  if (!isNaN(hours!) && !isNaN(minutes!)) {
+                    dueDate.setHours(hours!, minutes!, 0, 0);
+                  }
+                }
+                const assignee = tmpl.assignedToUserId ?? config.defaultOwnerUserId ?? undefined;
+                await createTask({
+                  tenantId,
+                  entityType: "deal",
+                  entityId: result.dealId,
+                  title: tmpl.title,
+                  description: tmpl.description ?? undefined,
+                  taskType: tmpl.taskType ?? "task",
+                  dueAt: dueDate,
+                  assignedToUserId: assignee ?? undefined,
+                  priority: tmpl.priority as any,
+                });
+                autoTasksCreated++;
+              } catch (taskErr: any) {
+                autoTasksFailed++;
+                autoTasksError = (autoTasksError ? autoTasksError + "; " : "") + taskErr.message;
+                console.error(`[RD Station Webhook] Auto-task "${tmpl.title}" failed:`, taskErr.message);
+              }
+            }
+            if (taskTemplates.length > 0) {
+              console.log(`[RD Station Webhook] Auto-tasks: ${autoTasksCreated} created, ${autoTasksFailed} failed for deal #${result.dealId}`);
+            }
+          } catch (tasksErr: any) {
+            autoTasksError = tasksErr.message || String(tasksErr);
+            console.error(`[RD Station Webhook] Auto-tasks query failed:`, tasksErr.message);
+          }
+        }
 
         // 9. Auto-WhatsApp sending
         let autoWhatsAppStatus: string | null = null;
@@ -902,6 +1009,12 @@ router.post("/api/webhooks/rdstation", async (req: Request, res: Response) => {
           configId: config.id,
           autoWhatsAppStatus,
           autoWhatsAppError,
+          autoProductStatus,
+          autoProductError,
+          autoTasksCreated,
+          autoTasksFailed,
+          autoTasksError,
+          customDealName: !!customDealTitle,
           error: result.error || null,
           rawPayload: lead as any,
         });

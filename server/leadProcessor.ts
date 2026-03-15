@@ -242,6 +242,7 @@ export interface ProcessInboundLeadOptions {
   ownerUserId?: number;
   source?: string;
   campaign?: string;
+  dealTitle?: string;
 }
 
 export async function processInboundLead(
@@ -337,7 +338,7 @@ export async function processInboundLead(
     const ownerUserId = options?.ownerUserId ?? await getNextOwner(tenantId);
 
     // 8. Create Deal
-    const dealTitle = `${normalizedName} • ${payload.source}`;
+    const dealTitle = options?.dealTitle || `${normalizedName} • ${payload.source}`;
     const [dealResult] = await db.insert(deals).values({
       tenantId,
       title: dealTitle,

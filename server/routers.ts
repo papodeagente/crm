@@ -152,7 +152,7 @@ import {
 } from "./leadProcessor";
 import { randomBytes } from "crypto";
 import { getDb } from "./db";
-import { trackingTokens, rdStationConfig, rdStationWebhookLog, rdFieldMappings, customFields, crmUsers as crmUsersSchema, pipelines, pipelineStages, whatsappSessions } from "../drizzle/schema";
+import { trackingTokens, rdStationConfig, rdStationWebhookLog, rdFieldMappings, customFields, crmUsers as crmUsersSchema, pipelines, pipelineStages, whatsappSessions, rdStationConfigTasks, productCatalog } from "../drizzle/schema";
 import { generateTrackerScript } from "./tracker-script";
 import { eq, and, desc, asc, sql, lt } from "drizzle-orm";
 import { generateSuggestion, refineSuggestion, splitTextNaturally, type ResponseStyle } from "./aiSuggestionService";
@@ -2392,6 +2392,8 @@ export const appRouter = router({
         defaultOwnerUserId: z.number().optional(),
         autoWhatsAppEnabled: z.boolean().default(false),
         autoWhatsAppMessageTemplate: z.string().optional(),
+        dealNameTemplate: z.string().optional(),
+        autoProductId: z.number().nullable().optional(),
       }))
       .mutation(async ({ input }) => {
         const db = await getDb();
@@ -2409,6 +2411,8 @@ export const appRouter = router({
           defaultOwnerUserId: input.defaultOwnerUserId ?? null,
           autoWhatsAppEnabled: input.autoWhatsAppEnabled,
           autoWhatsAppMessageTemplate: input.autoWhatsAppMessageTemplate ?? null,
+          dealNameTemplate: input.dealNameTemplate ?? null,
+          autoProductId: input.autoProductId ?? null,
         }).$returningId();
 
         const rows = await db
@@ -2433,6 +2437,8 @@ export const appRouter = router({
         defaultOwnerUserId: z.number().nullable().optional(),
         autoWhatsAppEnabled: z.boolean().optional(),
         autoWhatsAppMessageTemplate: z.string().nullable().optional(),
+        dealNameTemplate: z.string().nullable().optional(),
+        autoProductId: z.number().nullable().optional(),
       }))
       .mutation(async ({ input }) => {
         const db = await getDb();
@@ -2451,6 +2457,8 @@ export const appRouter = router({
         if (updates.defaultOwnerUserId !== undefined) setObj.defaultOwnerUserId = updates.defaultOwnerUserId;
         if (updates.autoWhatsAppEnabled !== undefined) setObj.autoWhatsAppEnabled = updates.autoWhatsAppEnabled;
         if (updates.autoWhatsAppMessageTemplate !== undefined) setObj.autoWhatsAppMessageTemplate = updates.autoWhatsAppMessageTemplate;
+        if (updates.dealNameTemplate !== undefined) setObj.dealNameTemplate = updates.dealNameTemplate;
+        if (updates.autoProductId !== undefined) setObj.autoProductId = updates.autoProductId;
 
         if (Object.keys(setObj).length > 0) {
           await db
@@ -2579,6 +2587,117 @@ export const appRouter = router({
           .where(and(eq(crmUsersSchema.tenantId, input.tenantId), eq(crmUsersSchema.status, "active")))
           .orderBy(asc(crmUsersSchema.name));
         return rows;
+      }),
+
+    // ─── Config Task Templates CRUD ───
+    listConfigTasks: protectedProcedure
+      .input(z.object({ configId: z.number(), tenantId: z.number() }))
+      .query(async ({ input }) => {
+        const db = await getDb();
+        if (!db) return [];
+        return db
+          .select()
+          .from(rdStationConfigTasks)
+          .where(and(eq(rdStationConfigTasks.configId, input.configId), eq(rdStationConfigTasks.tenantId, input.tenantId)))
+          .orderBy(asc(rdStationConfigTasks.orderIndex));
+      }),
+
+    addConfigTask: protectedProcedure
+      .input(z.object({
+        configId: z.number(),
+        tenantId: z.number(),
+        title: z.string().min(1).max(255),
+        description: z.string().optional(),
+        taskType: z.string().max(32).default("task"),
+        assignedToUserId: z.number().nullable().optional(),
+        dueDaysOffset: z.number().min(0).max(365).default(0),
+        dueTime: z.string().max(5).optional(),
+        priority: z.enum(["low", "medium", "high", "urgent"]).default("medium"),
+      }))
+      .mutation(async ({ input }) => {
+        const db = await getDb();
+        if (!db) throw new Error("Database not available");
+
+        // Get next orderIndex
+        const existing = await db
+          .select({ maxOrder: sql<number>`COALESCE(MAX(${rdStationConfigTasks.orderIndex}), -1)` })
+          .from(rdStationConfigTasks)
+          .where(and(eq(rdStationConfigTasks.configId, input.configId), eq(rdStationConfigTasks.tenantId, input.tenantId)));
+        const nextOrder = (existing[0]?.maxOrder ?? -1) + 1;
+
+        const [result] = await db.insert(rdStationConfigTasks).values({
+          configId: input.configId,
+          tenantId: input.tenantId,
+          title: input.title,
+          description: input.description ?? null,
+          taskType: input.taskType,
+          assignedToUserId: input.assignedToUserId ?? null,
+          dueDaysOffset: input.dueDaysOffset,
+          dueTime: input.dueTime ?? null,
+          priority: input.priority,
+          orderIndex: nextOrder,
+        }).$returningId();
+
+        const rows = await db.select().from(rdStationConfigTasks).where(eq(rdStationConfigTasks.id, result!.id)).limit(1);
+        return rows[0]!;
+      }),
+
+    updateConfigTask: protectedProcedure
+      .input(z.object({
+        taskId: z.number(),
+        tenantId: z.number(),
+        title: z.string().min(1).max(255).optional(),
+        description: z.string().nullable().optional(),
+        taskType: z.string().max(32).optional(),
+        assignedToUserId: z.number().nullable().optional(),
+        dueDaysOffset: z.number().min(0).max(365).optional(),
+        dueTime: z.string().max(5).nullable().optional(),
+        priority: z.enum(["low", "medium", "high", "urgent"]).optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const db = await getDb();
+        if (!db) throw new Error("Database not available");
+
+        const { taskId, tenantId, ...updates } = input;
+        const setObj: Record<string, any> = {};
+        if (updates.title !== undefined) setObj.title = updates.title;
+        if (updates.description !== undefined) setObj.description = updates.description;
+        if (updates.taskType !== undefined) setObj.taskType = updates.taskType;
+        if (updates.assignedToUserId !== undefined) setObj.assignedToUserId = updates.assignedToUserId;
+        if (updates.dueDaysOffset !== undefined) setObj.dueDaysOffset = updates.dueDaysOffset;
+        if (updates.dueTime !== undefined) setObj.dueTime = updates.dueTime;
+        if (updates.priority !== undefined) setObj.priority = updates.priority;
+
+        if (Object.keys(setObj).length > 0) {
+          await db.update(rdStationConfigTasks).set(setObj)
+            .where(and(eq(rdStationConfigTasks.id, taskId), eq(rdStationConfigTasks.tenantId, tenantId)));
+        }
+
+        const rows = await db.select().from(rdStationConfigTasks).where(eq(rdStationConfigTasks.id, taskId)).limit(1);
+        return rows[0] ?? null;
+      }),
+
+    removeConfigTask: protectedProcedure
+      .input(z.object({ taskId: z.number(), tenantId: z.number() }))
+      .mutation(async ({ input }) => {
+        const db = await getDb();
+        if (!db) throw new Error("Database not available");
+        await db.delete(rdStationConfigTasks)
+          .where(and(eq(rdStationConfigTasks.id, input.taskId), eq(rdStationConfigTasks.tenantId, input.tenantId)));
+        return { success: true };
+      }),
+
+    // ─── Helper: list active products for auto-product selector ───
+    listProducts: protectedProcedure
+      .input(z.object({ tenantId: z.number() }))
+      .query(async ({ input }) => {
+        const db = await getDb();
+        if (!db) return [];
+        return db
+          .select({ id: productCatalog.id, name: productCatalog.name, productType: productCatalog.productType, basePriceCents: productCatalog.basePriceCents })
+          .from(productCatalog)
+          .where(and(eq(productCatalog.tenantId, input.tenantId), eq(productCatalog.isActive, true)))
+          .orderBy(asc(productCatalog.name));
       }),
 
     // ─── Helper: check WhatsApp session status for tenant ───
