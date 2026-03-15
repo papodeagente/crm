@@ -3146,3 +3146,8 @@
 - [x] Fix: instâncias sem credenciais devem esperar conexão manual do usuário
 - [x] Fix: evitar loop de geração de QR Code em instâncias não autenticadas
 - [x] Tests: verificar que auto-restore filtra corretamente
+
+## Auto-Restore — Skipar instâncias 'connecting' da Evolution API
+- [x] Fix: só restaurar instâncias com connectionStatus 'open' da Evolution API
+- [x] Fix: marcar instâncias 'connecting' e 'close' como disconnected no DB
+- [x] Tests: atualizar testes para cobrir novo filtro

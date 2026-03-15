@@ -2105,11 +2105,12 @@ class WhatsAppEvolutionManager extends EventEmitter {
           }
 
           if (inst) {
-            // Skip instances without ownerJid — they have no saved auth credentials.
-            // Reconnecting them would trigger QR code generation that nobody scans,
-            // creating a loop that overloads the server.
-            if (!inst.ownerJid && inst.connectionStatus !== "open") {
-              console.log(`[EvoWA AutoRestore] ${row.sessionId} -> ${nameToCheck} -> no credentials (ownerJid null), skipping`);
+            // ONLY restore instances that are actually 'open' (connected) on Evolution.
+            // Instances with 'connecting' status enter QR code generation loops that
+            // nobody scans, overloading the server. Instances with 'close' have no
+            // active session. Both must wait for manual user reconnection via Inbox.
+            if (inst.connectionStatus !== "open") {
+              console.log(`[EvoWA AutoRestore] ${row.sessionId} -> ${nameToCheck} -> Evolution status '${inst.connectionStatus}', skipping (only 'open' restored)`);
               await db.update(whatsappSessions)
                 .set({ status: "disconnected" })
                 .where(eq(whatsappSessions.sessionId, row.sessionId));
@@ -2121,7 +2122,7 @@ class WhatsAppEvolutionManager extends EventEmitter {
               sessionId: row.sessionId,
               userId: row.userId,
               tenantId: row.tenantId,
-              status: inst.connectionStatus === "open" ? "connected" : "disconnected",
+              status: "connected",
               qrCode: null,
               qrDataUrl: null,
               user: inst.ownerJid ? {
@@ -2129,25 +2130,22 @@ class WhatsAppEvolutionManager extends EventEmitter {
                 name: inst.profileName || "",
                 imgUrl: inst.profilePicUrl || undefined,
               } : null,
-              lastConnectedAt: inst.connectionStatus === "open" ? Date.now() : null,
+              lastConnectedAt: Date.now(),
             };
 
             this.sessions.set(row.sessionId, state);
             this.instanceToSession.set(nameToCheck, row.sessionId);
-            const dbStatus = inst.connectionStatus === "open" ? "connected" : "disconnected";
             await db.update(whatsappSessions)
-              .set({ status: dbStatus })
+              .set({ status: "connected" })
               .where(eq(whatsappSessions.sessionId, row.sessionId));
-            console.log(`[EvoWA AutoRestore] ${row.sessionId} -> ${nameToCheck} -> ${dbStatus}`);
+            console.log(`[EvoWA AutoRestore] ${row.sessionId} -> ${nameToCheck} -> connected`);
 
-            // Ensure webhook is correctly configured for connected sessions
-            if (dbStatus === "connected") {
-              evo.ensureWebhook(nameToCheck).then(ok => {
-                if (ok) console.log(`[EvoWA AutoRestore] Webhook verified for ${nameToCheck}`);
-                else console.warn(`[EvoWA AutoRestore] Webhook fix failed for ${nameToCheck}`);
-              }).catch(() => {});
-              this.syncConversationsBackground(state, false);
-            }
+            // Ensure webhook is correctly configured
+            evo.ensureWebhook(nameToCheck).then(ok => {
+              if (ok) console.log(`[EvoWA AutoRestore] Webhook verified for ${nameToCheck}`);
+              else console.warn(`[EvoWA AutoRestore] Webhook fix failed for ${nameToCheck}`);
+            }).catch(() => {});
+            this.syncConversationsBackground(state, false);
           } else {
             // Instance not found on Evolution — mark as deleted (not just disconnected)
             // because there's nothing to reconnect to
