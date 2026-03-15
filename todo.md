@@ -2881,3 +2881,7 @@
 - [x] Ao clicar deve mostrar seletor de IA/modelo PRIMEIRO, sem auto-gerar (UI com fases: select → loading → result)
 - [x] Tooltips dos ícones na barra inferior (adicionado InstantTooltip em Emoji e Anexar)
 - [x] Modelos OpenAI atualizados: gpt-4.1, gpt-4.1-mini, gpt-4.1-nano, gpt-5-mini, gpt-5.4, o4-mini + max_tokens vs max_completion_tokens
+
+## Bug Fix: Tooltips cortados na barra inferior (Mar 15 - v8.14)
+- [x] Tooltips da barra inferior aparecem para baixo e são cortados pela borda da tela
+- [x] Corrigir todos os tooltips para side="top" (aparecer acima dos ícones)

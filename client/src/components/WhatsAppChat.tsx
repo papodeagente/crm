@@ -2034,7 +2034,7 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
 
             {/* AI Suggestion button */}
             <div className="relative shrink-0 self-end">
-              <InstantTooltip label="Sugestão IA">
+              <InstantTooltip label="Sugestão IA" side="top">
                 <button
                   onClick={() => setShowAiSuggestion(prev => !prev)}
                   className={`p-1.5 rounded-md transition-colors ${
