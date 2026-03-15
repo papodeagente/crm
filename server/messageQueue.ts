@@ -8,10 +8,11 @@
  * - Retry with exponential backoff
  * - Graceful fallback to synchronous processing if Redis unavailable
  * 
- * Feature flag: process.env.USE_QUEUE (defaults to "true")
+ * Requires: REDIS_URL environment variable (e.g., redis://host:6379)
+ * Optional: USE_QUEUE=false to force synchronous processing
  */
 
-import { Queue, Worker, Job, QueueEvents } from "bullmq";
+import { Queue, Worker, Job } from "bullmq";
 import IORedis from "ioredis";
 
 // ── Types ──────────────────────────────────────────────────────
@@ -38,37 +39,49 @@ export interface QueueStats {
 let redisConnection: IORedis | null = null;
 let connectionReady = false;
 let connectionFailed = false;
+let initAttempted = false;
 
-function getRedisUrl(): string {
-  return process.env.REDIS_URL || "redis://127.0.0.1:6379";
+function getRedisUrl(): string | null {
+  return process.env.REDIS_URL || null;
 }
 
+/**
+ * Get or create the Redis connection.
+ * Returns null if REDIS_URL is not configured or connection failed.
+ */
 export function getRedisConnection(): IORedis | null {
   if (connectionFailed) return null;
-  if (redisConnection) return redisConnection;
+  if (redisConnection && connectionReady) return redisConnection;
+  if (redisConnection) return redisConnection; // Connection in progress
+  if (initAttempted) return null; // Already tried and failed
 
-  // Check if REDIS_URL is configured — if not, skip silently
-  if (!process.env.REDIS_URL) {
+  const redisUrl = getRedisUrl();
+  if (!redisUrl) {
     connectionFailed = true;
+    initAttempted = true;
     console.log("[Queue] No REDIS_URL configured — using synchronous message processing");
     return null;
   }
 
+  initAttempted = true;
+
   try {
-    let errorLogged = false;
-    redisConnection = new IORedis(getRedisUrl(), {
+    let firstErrorLogged = false;
+
+    redisConnection = new IORedis(redisUrl, {
       maxRetriesPerRequest: null, // Required by BullMQ
       enableReadyCheck: true,
+      connectTimeout: 10000,
       retryStrategy(times) {
-        if (times > 3) {
-          if (!errorLogged) {
-            console.warn("[Queue] Redis connection failed after 3 retries, falling back to sync processing");
-            errorLogged = true;
+        if (times > 5) {
+          if (!firstErrorLogged) {
+            console.warn("[Queue] Redis connection failed after 5 retries — falling back to sync processing");
+            firstErrorLogged = true;
           }
           connectionFailed = true;
           return null; // Stop retrying
         }
-        return Math.min(times * 200, 2000);
+        return Math.min(times * 500, 3000);
       },
       lazyConnect: true,
     });
@@ -80,10 +93,9 @@ export function getRedisConnection(): IORedis | null {
     });
 
     redisConnection.on("error", (err) => {
-      // Only log the first error, suppress subsequent ones
-      if (!connectionFailed && !errorLogged) {
+      if (!firstErrorLogged) {
         console.warn("[Queue] Redis error:", err.message);
-        errorLogged = true;
+        firstErrorLogged = true;
       }
     });
 
@@ -91,8 +103,16 @@ export function getRedisConnection(): IORedis | null {
       connectionReady = false;
     });
 
-    // Try to connect
-    redisConnection.connect().catch(() => {
+    redisConnection.on("reconnecting", () => {
+      // Silent reconnection
+    });
+
+    // Initiate connection
+    redisConnection.connect().catch((err) => {
+      if (!firstErrorLogged) {
+        console.warn("[Queue] Redis connect failed:", err.message);
+        firstErrorLogged = true;
+      }
       connectionFailed = true;
       redisConnection = null;
     });
@@ -105,9 +125,20 @@ export function getRedisConnection(): IORedis | null {
   }
 }
 
+/**
+ * Check if the queue system is enabled and available.
+ * Returns true only when Redis is connected and USE_QUEUE is not explicitly disabled.
+ */
 export function isQueueEnabled(): boolean {
   const flag = process.env.USE_QUEUE ?? "true";
-  return flag === "true" && !connectionFailed;
+  if (flag !== "true") return false;
+  
+  // Try to get connection if not yet attempted
+  if (!initAttempted) {
+    getRedisConnection();
+  }
+  
+  return !connectionFailed;
 }
 
 export function isRedisReady(): boolean {
@@ -160,13 +191,28 @@ export async function enqueueMessageEvent(payload: MessageEventPayload): Promise
   if (!queue) return false;
 
   try {
-    const jobId = payload.data?.key?.id
-      ? `${payload.sessionId}:${payload.data.key.id}`
-      : undefined;
+    // For messages.update, use a different job ID pattern since there's no key.id
+    let jobId: string | undefined;
+    if (payload.event === "messages.upsert" || payload.event === "send.message") {
+      jobId = payload.data?.key?.id
+        ? `${payload.instanceName}:${payload.data.key.id}`
+        : undefined;
+    } else if (payload.event === "messages.update") {
+      // For status updates, allow multiple updates for the same message
+      const updateId = payload.data?.key?.id || payload.data?.keyId || payload.data?.messageId;
+      const status = payload.data?.update?.status ?? payload.data?.status;
+      jobId = updateId ? `status:${payload.instanceName}:${updateId}:${status}` : undefined;
+    } else if (payload.event === "messages.delete") {
+      const deleteId = payload.data?.key?.id || payload.data?.id;
+      jobId = deleteId ? `delete:${payload.instanceName}:${deleteId}` : undefined;
+    }
+
+    // Priority: status updates are lower priority than new messages
+    const priority = (payload.event === "messages.upsert" || payload.event === "send.message") ? 1 : 2;
 
     await queue.add(payload.event, payload, {
-      jobId, // Dedup: same messageId won't be enqueued twice
-      priority: payload.event === "messages.upsert" ? 1 : 2,
+      jobId,
+      priority,
     });
 
     return true;
@@ -202,10 +248,10 @@ export function startMessageWorker(processor: MessageProcessor): Worker | null {
           
           const elapsed = Date.now() - startTime;
           if (elapsed > 1000) {
-            console.warn(`[Worker] Slow job ${job.id}: ${elapsed}ms`);
+            console.warn(`[Worker] Slow job ${job.id}: ${elapsed}ms (${payload.event})`);
           }
         } catch (error: any) {
-          console.error(`[Worker] Job ${job.id} failed:`, error.message);
+          console.error(`[Worker] Job ${job.id} failed (${payload.event}):`, error.message);
           throw error; // BullMQ will retry based on attempts config
         }
       },
@@ -219,7 +265,7 @@ export function startMessageWorker(processor: MessageProcessor): Worker | null {
       }
     );
 
-    messageWorker.on("completed", (job) => {
+    messageWorker.on("completed", (_job) => {
       // Silent — logged only if slow
     });
 

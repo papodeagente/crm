@@ -717,7 +717,6 @@ function EventLogsTab() { const [sourceFilter, setSourceFilter] = useState<strin
     source: sourceFilter === "all" ? undefined : sourceFilter,
     status: statusFilter === "all" ? undefined : statusFilter,
     limit: LIMIT,
-    offset: page * LIMIT,
   });
 
   const reprocess = trpc.leadCapture.reprocessEvent.useMutation({

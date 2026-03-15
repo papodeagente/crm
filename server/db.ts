@@ -169,16 +169,19 @@ export async function validateSessionOwnership(
 }
 
 // Messages
-export async function getMessages(sessionId: string, limit = 50, offset = 0) {
+export async function getMessages(sessionId: string, limit = 50, beforeId?: number) {
   const db = await getDb();
   if (!db) return [];
+  const conditions: any[] = [eq(messages.sessionId, sessionId)];
+  if (beforeId) {
+    conditions.push(lt(messages.id, beforeId));
+  }
   return db
     .select()
     .from(messages)
-    .where(eq(messages.sessionId, sessionId))
+    .where(and(...conditions))
     .orderBy(desc(messages.timestamp))
-    .limit(limit)
-    .offset(offset);
+    .limit(limit);
 }
 
 export async function getMessagesByContact(sessionId: string, remoteJid: string, limit = 50, beforeId?: number) {
@@ -1078,29 +1081,29 @@ export async function createNotification(tenantId: number, data: {
   return result;
 }
 
-export async function getNotifications(tenantId: number, opts?: { onlyUnread?: boolean; limit?: number; offset?: number }) {
+export async function getNotifications(tenantId: number, opts?: { onlyUnread?: boolean; limit?: number; beforeId?: number }) {
   const db = await getDb();
   if (!db) return [];
 
   const limit = opts?.limit ?? 50;
-  const offset = opts?.offset ?? 0;
+  const cursorClause = opts?.beforeId ? sql`AND id < ${opts.beforeId}` : sql``;
 
   let rows: any;
   if (opts?.onlyUnread) {
     [rows] = await db.execute(sql`
       SELECT id, tenantId, type, title, body, entityType, entityId, isRead, createdAt
       FROM notifications
-      WHERE tenantId = ${tenantId} AND isRead = false
+      WHERE tenantId = ${tenantId} AND isRead = false ${cursorClause}
       ORDER BY createdAt DESC
-      LIMIT ${limit} OFFSET ${offset}
+      LIMIT ${limit}
     `);
   } else {
     [rows] = await db.execute(sql`
       SELECT id, tenantId, type, title, body, entityType, entityId, isRead, createdAt
       FROM notifications
-      WHERE tenantId = ${tenantId}
+      WHERE tenantId = ${tenantId} ${cursorClause}
       ORDER BY createdAt DESC
-      LIMIT ${limit} OFFSET ${offset}
+      LIMIT ${limit}
     `);
   }
 

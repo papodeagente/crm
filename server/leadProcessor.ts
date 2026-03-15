@@ -22,7 +22,7 @@ import {
   contacts, deals, pipelines, pipelineStages,
   leadEventLog, crmUsers,
 } from "../drizzle/schema";
-import { eq, and, or, sql, asc } from "drizzle-orm";
+import { eq, and, or, sql, asc, lt } from "drizzle-orm";
 import { normalizeBrazilianPhone } from "./phoneUtils";
 
 // ─── Types ───────────────────────────────────────────────
@@ -432,7 +432,7 @@ export async function reprocessLeadEvent(
 
 export async function listLeadEvents(
   tenantId: number,
-  opts?: { source?: string; status?: string; limit?: number; offset?: number }
+  opts?: { source?: string; status?: string; limit?: number; offset?: number; beforeId?: number }
 ) {
   const db = await getDb();
   if (!db) return [];
@@ -440,14 +440,14 @@ export async function listLeadEvents(
   const conditions: any[] = [eq(leadEventLog.tenantId, tenantId)];
   if (opts?.source) conditions.push(eq(leadEventLog.source, opts.source));
   if (opts?.status) conditions.push(eq(leadEventLog.status, opts.status));
+  if (opts?.beforeId) conditions.push(lt(leadEventLog.id, opts.beforeId));
 
   return db
     .select()
     .from(leadEventLog)
     .where(and(...conditions))
     .orderBy(sql`${leadEventLog.createdAt} DESC`)
-    .limit(opts?.limit || 50)
-    .offset(opts?.offset || 0);
+    .limit(opts?.limit || 50);
 }
 
 export async function countLeadEvents(

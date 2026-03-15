@@ -1,20 +1,25 @@
 /**
  * Message Worker — Processes queued webhook events asynchronously
  * 
- * Extracts the heavy processing logic from handleIncomingMessage:
- * 1. Validate & dedup by messageId
- * 2. Insert message into DB
- * 3. Resolve conversation (upsert wa_conversations)
- * 4. Update lastMessage + incremental unreadCount
- * 5. Emit Socket.IO event
- * 6. Background: media download, contact update, notification
+ * Handles ALL message-related events:
+ * 1. messages.upsert / send.message → Insert new messages (all types incl. sticker)
+ * 2. messages.update → Status updates (sent ✓ / delivered ✓✓ / read ✓✓ blue)
+ * 3. messages.delete → Mark messages as deleted
+ * 
+ * Processing flow for new messages:
+ * a. Validate & dedup by messageId
+ * b. Insert message into DB
+ * c. Resolve conversation (upsert wa_conversations)
+ * d. Update lastMessage + incremental unreadCount
+ * e. Emit Socket.IO event
+ * f. Background: media download, contact update, notification
  * 
  * This worker is started from server/_core/index.ts alongside the Express server.
  */
 
 import { getDb } from "./db";
 import { and, eq, sql } from "drizzle-orm";
-import { waMessages, waContacts } from "../drizzle/schema";
+import { waMessages, waContacts, waConversations } from "../drizzle/schema";
 import { resolveInbound, updateConversationLastMessage } from "./conversationResolver";
 import { storagePut } from "./storage";
 import { createNotification } from "./db";
@@ -80,10 +85,10 @@ function extractMessageContent(data: any): string | null {
   if (msg.videoMessage?.caption) return msg.videoMessage.caption;
   if (msg.documentMessage?.caption) return msg.documentMessage.caption;
   if (msg.documentMessage?.fileName) return `📄 ${msg.documentMessage.fileName}`;
+  if (msg.stickerMessage) return "🏷️ Figurinha";
   if (msg.audioMessage || msg.pttMessage) return "🎵 Áudio";
   if (msg.imageMessage) return "📷 Imagem";
   if (msg.videoMessage) return "🎥 Vídeo";
-  if (msg.stickerMessage) return "🏷️ Sticker";
   if (msg.contactMessage) return `👤 ${msg.contactMessage.displayName || "Contato"}`;
   if (msg.locationMessage) return "📍 Localização";
   if (msg.listResponseMessage?.title) return msg.listResponseMessage.title;
@@ -112,12 +117,13 @@ function extractMediaInfo(data: any): {
     msg.imageMessage?.contextInfo ||
     msg.videoMessage?.contextInfo ||
     msg.audioMessage?.contextInfo ||
-    msg.documentMessage?.contextInfo;
+    msg.documentMessage?.contextInfo ||
+    msg.stickerMessage?.contextInfo;
   if (contextInfo?.quotedMessage) {
     result.quotedMessageId = contextInfo.stanzaId || null;
   }
 
-  // Media types
+  // Media types — including stickerMessage
   const mediaTypes = ["imageMessage", "videoMessage", "audioMessage", "documentMessage", "stickerMessage", "pttMessage"];
   for (const type of mediaTypes) {
     if (msg[type]) {
@@ -143,33 +149,95 @@ function mimeToExt(mime: string): string {
   return map[mime] || mime.split("/")[1] || "bin";
 }
 
-// ── Core Message Processor ─────────────────────────────────────
+// ── Determine message type from payload ───────────────────────
 
 /**
- * Process a single message event from the queue.
- * This is the same logic as handleIncomingMessage but extracted for worker use.
+ * Determine the actual message type from the Evolution API payload.
+ * The messageType field from Evolution may not always be accurate,
+ * so we also inspect the message object directly.
+ */
+function resolveMessageType(data: any): string {
+  const reportedType = data?.messageType || "conversation";
+  const msg = data?.message;
+  
+  if (!msg) return reportedType;
+  
+  // Check actual message content to determine type
+  if (msg.stickerMessage) return "stickerMessage";
+  if (msg.imageMessage) return "imageMessage";
+  if (msg.videoMessage) return "videoMessage";
+  if (msg.audioMessage) return "audioMessage";
+  if (msg.pttMessage) return "pttMessage";
+  if (msg.documentMessage) return "documentMessage";
+  if (msg.extendedTextMessage) return "extendedTextMessage";
+  if (msg.conversation) return "conversation";
+  if (msg.contactMessage) return "contactMessage";
+  if (msg.locationMessage) return "locationMessage";
+  if (msg.listResponseMessage) return "listResponseMessage";
+  if (msg.buttonsResponseMessage) return "buttonsResponseMessage";
+  if (msg.templateButtonReplyMessage) return "templateButtonReplyMessage";
+  if (msg.reactionMessage) return "reactionMessage";
+  
+  return reportedType;
+}
+
+// ── Status Maps ───────────────────────────────────────────────
+
+const NUMERIC_STATUS_MAP: Record<number, string> = {
+  0: "error", 1: "pending", 2: "sent", 3: "delivered", 4: "read", 5: "played",
+};
+
+const STRING_STATUS_MAP: Record<string, string> = {
+  "ERROR": "error", "PENDING": "pending", "SENT": "sent",
+  "SERVER_ACK": "sent", "DELIVERY_ACK": "delivered", "DELIVERED": "delivered",
+  "READ": "read", "PLAYED": "played", "DELETED": "deleted",
+};
+
+// ── Core Event Processor ──────────────────────────────────────
+
+/**
+ * Process a single event from the queue.
+ * Routes to the appropriate handler based on event type.
  */
 export async function processMessageEvent(payload: MessageEventPayload): Promise<void> {
-  const { event, data, sessionId: payloadSessionId, instanceName, tenantId: payloadTenantId } = payload;
+  const { event, data, sessionId: payloadSessionId, instanceName } = payload;
 
-  // For non-message events, delegate back to the manager
-  if (event !== "messages.upsert" && event !== "send.message") {
-    const { whatsappManager } = await import("./whatsappEvolution");
-    await whatsappManager.handleWebhookEvent({
-      event: event as import("./evolutionApi").WebhookEventType,
-      instance: instanceName,
-      data,
-    });
-    return;
-  }
-
-  // Resolve session
+  // Resolve session for all event types
   const session = await getSessionInfo(instanceName, payloadSessionId);
   if (!session) {
-    console.warn(`[Worker] No session found for instance: ${instanceName}`);
+    console.warn(`[Worker] No session found for instance: ${instanceName} (event: ${event})`);
     return;
   }
 
+  switch (event) {
+    case "messages.upsert":
+    case "send.message":
+      await processNewMessage(session, data);
+      break;
+
+    case "messages.update":
+      await processStatusUpdate(session, data);
+      break;
+
+    case "messages.delete":
+      await processMessageDelete(session, data);
+      break;
+
+    default:
+      // Delegate unknown events back to the manager
+      const { whatsappManager } = await import("./whatsappEvolution");
+      await whatsappManager.handleWebhookEvent({
+        event: event as import("./evolutionApi").WebhookEventType,
+        instance: instanceName,
+        data,
+      });
+      break;
+  }
+}
+
+// ── New Message Handler ───────────────────────────────────────
+
+async function processNewMessage(session: SessionInfo, data: any): Promise<void> {
   const { sessionId, tenantId } = session;
 
   try {
@@ -181,10 +249,30 @@ export async function processMessageEvent(payload: MessageEventPayload): Promise
     if (key.remoteJid.endsWith("@g.us")) return;
     if (key.remoteJid.endsWith("@lid")) return;
 
-    // Skip protocol messages
-    const messageType = data?.messageType || "conversation";
-    const skipTypes = ["protocolMessage", "senderKeyDistributionMessage", "messageContextInfo", "ephemeralMessage"];
+    // Resolve the actual message type from the payload
+    const messageType = resolveMessageType(data);
+
+    // Only skip truly non-content protocol messages
+    // senderKeyDistributionMessage and messageContextInfo are internal WhatsApp protocol
+    // ephemeralMessage is a wrapper, not actual content
+    // protocolMessage can be a delete notification — but those come via messages.delete event
+    const skipTypes = ["senderKeyDistributionMessage", "messageContextInfo", "ephemeralMessage"];
     if (skipTypes.includes(messageType)) return;
+
+    // protocolMessage: check if it contains a delete notification
+    if (messageType === "protocolMessage") {
+      const protoMsg = data?.message?.protocolMessage;
+      if (protoMsg?.type === 0 || protoMsg?.type === "REVOKE") {
+        // This is a message revoke/delete — handle it
+        const deletedMsgId = protoMsg?.key?.id;
+        if (deletedMsgId) {
+          await processMessageDelete(session, { key: { id: deletedMsgId, remoteJid: key.remoteJid } });
+        }
+        return;
+      }
+      // Other protocol messages (ephemeral settings, etc.) — skip
+      return;
+    }
 
     const fromMe = key.fromMe || false;
     const remoteJid = key.remoteJid;
@@ -263,7 +351,8 @@ export async function processMessageEvent(payload: MessageEventPayload): Promise
     // ── Step 5: Background tasks (non-blocking) ──
 
     // 5a. Download media and upload to S3
-    const hasMediaType = ["imageMessage", "videoMessage", "audioMessage", "documentMessage", "stickerMessage", "pttMessage"].includes(messageType);
+    const mediaMessageTypes = ["imageMessage", "videoMessage", "audioMessage", "documentMessage", "stickerMessage", "pttMessage"];
+    const hasMediaType = mediaMessageTypes.includes(messageType);
     const hasPermanentUrl = mediaInfo.mediaUrl && !mediaInfo.mediaUrl.includes('whatsapp.net');
     if (hasMediaType && !hasPermanentUrl && messageId) {
       downloadAndStoreMedia(session, messageId, remoteJid, fromMe, mediaInfo).catch(e =>
@@ -309,8 +398,119 @@ export async function processMessageEvent(payload: MessageEventPayload): Promise
     }
 
   } catch (error) {
-    console.error("[Worker] Error processing message event:", error);
+    console.error("[Worker] Error processing new message:", error);
     throw error; // Re-throw so BullMQ can retry
+  }
+}
+
+// ── Status Update Handler ─────────────────────────────────────
+
+/**
+ * Process message status updates (sent ✓ / delivered ✓✓ / read ✓✓ blue).
+ * Replicates the logic from whatsappEvolution.handleMessageStatusUpdate.
+ */
+async function processStatusUpdate(session: SessionInfo, data: any): Promise<void> {
+  const { sessionId } = session;
+
+  try {
+    const updates = Array.isArray(data) ? data : [data];
+    const db = await getDb();
+    if (!db) return;
+
+    for (const update of updates) {
+      // Support both Evolution API formats:
+      // Format A (Baileys/internal): { key: { id, remoteJid, fromMe }, update: { status: number } }
+      // Format B (Evolution v2 webhook): { keyId, remoteJid, fromMe, status: string, messageId }
+      const messageId = update?.key?.id || update?.keyId || update?.messageId;
+      const remoteJid = update?.key?.remoteJid || update?.remoteJid;
+      const fromMe = update?.key?.fromMe ?? update?.fromMe;
+
+      // Resolve status from either format
+      let newStatus: string | undefined;
+      const rawStatus = update?.update?.status ?? update?.status;
+      if (typeof rawStatus === "number") {
+        newStatus = NUMERIC_STATUS_MAP[rawStatus];
+      } else if (typeof rawStatus === "string") {
+        newStatus = STRING_STATUS_MAP[rawStatus.toUpperCase()] || rawStatus.toLowerCase();
+      }
+
+      if (!messageId || !newStatus) {
+        console.log(`[Worker] Skipping status update - no messageId or status:`, JSON.stringify(update)?.substring(0, 200));
+        continue;
+      }
+
+      console.log(`[Worker] Status update: ${messageId} -> ${newStatus} (jid: ${remoteJid}, fromMe: ${fromMe})`);
+
+      // Update message status in DB
+      await db.update(waMessages)
+        .set({ status: newStatus })
+        .where(and(
+          eq(waMessages.sessionId, sessionId),
+          eq(waMessages.messageId, messageId)
+        ));
+
+      // Also update lastStatus in wa_conversations if this is the last message from us
+      if (remoteJid && fromMe) {
+        await db.update(waConversations)
+          .set({ lastStatus: newStatus })
+          .where(and(
+            eq(waConversations.sessionId, sessionId),
+            eq(waConversations.remoteJid, remoteJid),
+            eq(waConversations.lastFromMe, true)
+          ));
+      }
+
+      // Emit Socket.IO event for real-time UI update
+      const { whatsappManager } = await import("./whatsappEvolution");
+      whatsappManager.emit("message:status", {
+        sessionId,
+        messageId,
+        status: newStatus,
+        remoteJid: remoteJid || null,
+        timestamp: Date.now(),
+      });
+    }
+  } catch (error) {
+    console.error("[Worker] Error processing status update:", error);
+    throw error;
+  }
+}
+
+// ── Message Delete Handler ────────────────────────────────────
+
+/**
+ * Process message deletion events.
+ * Marks the message as deleted in DB and emits Socket.IO event.
+ */
+async function processMessageDelete(session: SessionInfo, data: any): Promise<void> {
+  const { sessionId } = session;
+
+  try {
+    const key = data?.key || data;
+    const messageId = key?.id;
+    if (!messageId) return;
+
+    const db = await getDb();
+    if (!db) return;
+
+    // Mark message as deleted in DB
+    await db.update(waMessages)
+      .set({ content: "[Mensagem apagada]", messageType: "protocolMessage" })
+      .where(and(
+        eq(waMessages.sessionId, sessionId),
+        eq(waMessages.messageId, messageId)
+      ));
+
+    // Emit Socket.IO event
+    const { whatsappManager } = await import("./whatsappEvolution");
+    whatsappManager.emit("message:deleted", {
+      sessionId,
+      messageId,
+      remoteJid: key?.remoteJid,
+    });
+  } catch (error) {
+    console.error("[Worker] Error processing message delete:", error);
+    throw error;
   }
 }
 

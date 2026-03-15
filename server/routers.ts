@@ -154,7 +154,7 @@ import { randomBytes } from "crypto";
 import { getDb } from "./db";
 import { trackingTokens, rdStationConfig, rdStationWebhookLog, rdFieldMappings, customFields, crmUsers as crmUsersSchema } from "../drizzle/schema";
 import { generateTrackerScript } from "./tracker-script";
-import { eq, and, desc, sql } from "drizzle-orm";
+import { eq, and, desc, sql, lt } from "drizzle-orm";
 import { generateSuggestion, refineSuggestion, splitTextNaturally, type ResponseStyle } from "./aiSuggestionService";
 
 /** Parse AI suggestion response into parts array. Handles JSON or plain text fallback. */
@@ -577,8 +577,8 @@ export const appRouter = router({
       }),
     // ─── EXISTING QUERIES ───
     messages: sessionProtectedProcedure
-      .input(z.object({ sessionId: z.string(), limit: z.number().min(1).max(200).default(50), offset: z.number().min(0).default(0) }))
-      .query(async ({ input }) => getMessages(input.sessionId, input.limit, input.offset)),
+      .input(z.object({ sessionId: z.string(), limit: z.number().min(1).max(200).default(50), beforeId: z.number().optional() }))
+      .query(async ({ input }) => getMessages(input.sessionId, input.limit, input.beforeId)),
     messagesByContact: sessionProtectedProcedure
       .input(z.object({ sessionId: z.string(), remoteJid: z.string(), limit: z.number().min(1).max(200).default(50), beforeId: z.number().optional() }))
       .query(async ({ input }) => getMessagesByContact(input.sessionId, input.remoteJid, input.limit, input.beforeId)),
@@ -1613,13 +1613,13 @@ export const appRouter = router({
         tenantId: z.number(),
         onlyUnread: z.boolean().optional(),
         limit: z.number().optional(),
-        offset: z.number().optional(),
+        beforeId: z.number().optional(),
       }))
       .query(async ({ input }) => {
         return getNotifications(input.tenantId, {
           onlyUnread: input.onlyUnread,
           limit: input.limit,
-          offset: input.offset,
+          beforeId: input.beforeId,
         });
       }),
     unreadCount: protectedProcedure
@@ -2011,7 +2011,7 @@ export const appRouter = router({
         source: z.string().optional(),
         status: z.string().optional(),
         limit: z.number().optional(),
-        offset: z.number().optional(),
+        beforeId: z.number().optional(),
       }))
       .query(async ({ input }) => {
         const [events, total] = await Promise.all([
@@ -2305,7 +2305,7 @@ export const appRouter = router({
         tenantId: z.number(),
         status: z.enum(["success", "failed", "duplicate"]).optional(),
         limit: z.number().default(50),
-        offset: z.number().default(0),
+        beforeId: z.number().optional(),
       }))
       .query(async ({ input }) => {
         const db = await getDb();
@@ -2315,19 +2315,25 @@ export const appRouter = router({
         if (input.status) {
           conditions.push(eq(rdStationWebhookLog.status, input.status));
         }
+        if (input.beforeId) {
+          conditions.push(lt(rdStationWebhookLog.id, input.beforeId));
+        }
 
         const logs = await db
           .select()
           .from(rdStationWebhookLog)
           .where(and(...conditions))
           .orderBy(desc(rdStationWebhookLog.createdAt))
-          .limit(input.limit)
-          .offset(input.offset);
+          .limit(input.limit);
 
+        const countConditions: any[] = [eq(rdStationWebhookLog.tenantId, input.tenantId)];
+        if (input.status) {
+          countConditions.push(eq(rdStationWebhookLog.status, input.status));
+        }
         const countResult = await db
           .select({ count: sql<number>`count(*)` })
           .from(rdStationWebhookLog)
-          .where(and(...conditions));
+          .where(and(...countConditions));
 
         return {
           logs,

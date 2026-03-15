@@ -934,8 +934,14 @@ async function handleEvolutionWebhook(req: Request, res: Response) {
       apikey: body.apikey,
     };
 
-    // For message events, try to enqueue via BullMQ first, fallback to sync
-    if (body.event === 'messages.upsert' || body.event === 'send.message') {
+    // Events that should be enqueued for async processing via BullMQ
+    const queueableEvents = [
+      'messages.upsert', 'send.message',
+      'messages.update',  // Status updates (sent/delivered/read ticks)
+      'messages.delete',  // Message deletions
+    ];
+
+    if (queueableEvents.includes(body.event)) {
       const { enqueueMessageEvent, isQueueEnabled } = await import("./messageQueue");
       
       if (isQueueEnabled()) {
@@ -950,7 +956,7 @@ async function handleEvolutionWebhook(req: Request, res: Response) {
         });
 
         if (enqueued) {
-          console.log(`[Webhook /evolution] Enqueued in ${Date.now() - startTime}ms (queue)`);
+          console.log(`[Webhook /evolution] Enqueued ${body.event} in ${Date.now() - startTime}ms (queue)`);
           return res.status(200).json({ received: true, queued: true });
         }
       }

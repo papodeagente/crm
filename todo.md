@@ -2953,3 +2953,13 @@
 - [x] Criar 6 índices otimizados: idx_msg_wa_conv_ts, idx_wc_inbox, idx_notif_tenant_created, idx_msg_tenant_ts, idx_wc_assigned_ts
 - [x] Escrever 14 testes para messageQueue, messageWorker, cursor pagination (todos passando)
 - [x] Validar zero regressão: 1273/1276 testes passando (3 falhas pré-existentes em whatsappDailyBackup)
+
+## Correções Event-Driven — Bugs Detectados (Mar 15)
+- [x] Worker: processar protocolMessage para atualizar status (enviado/entregue/lido) — processStatusUpdate com NUMERIC_STATUS_MAP + STRING_STATUS_MAP
+- [x] Worker: processar message receipts (messages.update) — webhook agora enfileira messages.update e messages.delete
+- [x] Worker: suportar stickerMessage (figurinhas) — resolveMessageType inspeciona msg.stickerMessage diretamente
+- [x] Worker: suporte completo para todos os tipos: sticker, image, video, audio, ptt, document, extendedText, conversation, contact, location, reaction, listResponse, buttonsResponse
+- [x] MessageQueue: REDIS_URL usado corretamente com BullMQ, fallback síncrono mantido quando Redis indisponível
+- [x] Eliminar OFFSET: convertidos getMessages, getMessagesByContact, getNotifications, getWebhookLogs, listLeadEvents para cursor (beforeId)
+- [x] Testes: 25 testes cobrindo protocolMessage REVOKE, messages.update (numérico/string/array), todos os tipos de mensagem, cursor pagination
+- [x] Testes: 1284/1287 passando (3 falhas pré-existentes em whatsappDailyBackup timeout)
