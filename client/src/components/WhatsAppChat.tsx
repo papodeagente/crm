@@ -1179,7 +1179,7 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
     const msgs = (messagesQ.data || []).filter((m: any) => m.content).map((m: any) => ({
       fromMe: m.fromMe,
       content: m.content || "",
-      timestamp: m.timestamp,
+      timestamp: m.timestamp instanceof Date ? m.timestamp.toISOString() : (m.timestamp ? String(m.timestamp) : undefined),
     }));
     if (msgs.length === 0) { toast.error("Sem mensagens para analisar"); return; }
     aiSuggestMut.mutate({

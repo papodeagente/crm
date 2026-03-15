@@ -2814,3 +2814,6 @@
 - [x] Botão manual "Transcrever áudio" em cada bolha de áudio
 - [x] Popup de sugestão IA com opções "Usar" e "Gerar outra"
 - [x] 28 testes vitest passando (aiIntegrations.test.ts)
+
+## Bug Fix: timestamp Date → string no ai.suggest (Mar 14 - v8.4)
+- [x] Corrigir tipo do timestamp: frontend envia Date mas Zod espera string (convertido com toISOString)
