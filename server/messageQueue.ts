@@ -89,7 +89,7 @@ export function getRedisConnection(): IORedis | null {
     redisConnection.on("ready", () => {
       connectionReady = true;
       connectionFailed = false;
-      console.log("[Queue] Redis connected successfully");
+      console.log("Redis connected - async queue enabled");
     });
 
     redisConnection.on("error", (err) => {

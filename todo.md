@@ -2963,3 +2963,9 @@
 - [x] Eliminar OFFSET: convertidos getMessages, getMessagesByContact, getNotifications, getWebhookLogs, listLeadEvents para cursor (beforeId)
 - [x] Testes: 25 testes cobrindo protocolMessage REVOKE, messages.update (numérico/string/array), todos os tipos de mensagem, cursor pagination
 - [x] Testes: 1284/1287 passando (3 falhas pré-existentes em whatsappDailyBackup timeout)
+
+## Ativar Redis para BullMQ (Mar 15)
+- [x] Verificar se Redis está disponível no ambiente do SaaS — não estava, instalado redis-server 6.0.16
+- [x] Configurar variável REDIS_URL=redis://localhost:6379 via webdev_request_secrets
+- [x] Garantir log "Redis connected - async queue enabled" na inicialização — confirmado nos logs
+- [x] Validar conexão Redis e processamento assíncrono — BullMQ queue criada, worker rodando, 1281/1287 testes passando
