@@ -2824,3 +2824,10 @@
 - [x] Frontend: seletor de IA e modelo no popup de sugestão (dropdown com integrações ativas)
 - [x] Frontend: exibir qual IA/modelo gerou a sugestão (header do popup)
 - [x] Frontend: permitir trocar IA/modelo e regerar sugestão (botão "Trocar IA")
+
+## UX: Tooltips instantâneos nos ícones do Inbox (Mar 15 - v8.6)
+- [x] Corrigir delay dos tooltips nos ícones do menu do Inbox para aparecerem imediatamente
+- [x] Criado componente InstantTooltip (sem delay, aparece instantâneo)
+- [x] Aplicado em todos os botões do header do Inbox (som, sync, nova conversa)
+- [x] Aplicado em todos os botões do header do WhatsAppChat (contato, negociação, transferência, timeline, busca, menu)
+- [x] Aplicado no botão de nota interna

@@ -15,6 +15,7 @@ import { useLocation } from "wouter";
 import { useTenantId } from "@/hooks/useTenantId";
 import { useIsAdmin } from "@/components/AdminOnlyGuard";
 import { Inbox as InboxIcon, ListOrdered, Contact2, LayoutGrid, HandMetal, Timer, ArrowRightLeft as Transfer } from "lucide-react";
+import InstantTooltip from "@/components/InstantTooltip";
 
 /* ═══════════════════════════════════════════════════════
    NOTIFICATION SOUND (Web Audio API — WhatsApp style)
@@ -387,7 +388,6 @@ const ConversationItem = memo(({
           {showFinish && onFinish && (
             <button
               onClick={(e) => { e.stopPropagation(); onFinish(); }}
-              title="Finalizar atendimento"
               className="w-7 h-7 flex items-center justify-center rounded-full opacity-0 group-hover/conv:opacity-100 transition-all duration-150 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 hover:scale-110 shrink-0"
             >
               <CheckCircle2 className="w-3.5 h-3.5" />
@@ -1299,33 +1299,31 @@ export default function InboxPage() {
             <h2 className="text-[15px] font-semibold text-foreground tracking-tight">Conversas</h2>
           </div>
           <div className="flex items-center gap-0.5">
-            <button
-              onClick={toggleMute}
-              className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-wa-hover transition-colors relative group"
-              title={isMuted ? "Ativar som de notificação" : "Silenciar notificações"}
-            >
-              {isMuted ? <VolumeX className="w-[18px] h-[18px] text-destructive/80" /> : <Volume2 className="w-[18px] h-[18px] text-muted-foreground" />}
-              <span className="absolute -bottom-8 left-1/2 -translate-x-1/2 bg-foreground text-background text-[10px] px-2 py-1 rounded-md whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
-                {isMuted ? "Som desativado" : "Som ativado"}
-              </span>
-            </button>
-            <button
-              onClick={() => {
-                if (!activeSession?.sessionId) { toast.error("Nenhuma sessão ativa"); return; }
-                syncContactsMut.mutate({ sessionId: activeSession.sessionId });
-              }}
-              disabled={syncContactsMut.isPending}
-              className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-wa-hover transition-colors relative group"
-              title="Sincronizar contatos"
-            >
-              <RefreshCw className={`w-[18px] h-[18px] text-muted-foreground ${syncContactsMut.isPending ? "animate-spin" : ""}`} />
-              <span className="absolute -bottom-8 left-1/2 -translate-x-1/2 bg-foreground text-background text-[10px] px-2 py-1 rounded-md whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
-                {syncContactsMut.isPending ? "Sincronizando..." : "Sincronizar contatos"}
-              </span>
-            </button>
-            <button onClick={() => setShowNewChat(true)} className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-wa-hover transition-colors" title="Nova conversa">
-              <MessageCircle className="w-[18px] h-[18px] text-muted-foreground" />
-            </button>
+            <InstantTooltip label={isMuted ? "Som desativado" : "Som ativado"}>
+              <button
+                onClick={toggleMute}
+                className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-wa-hover transition-colors"
+              >
+                {isMuted ? <VolumeX className="w-[18px] h-[18px] text-destructive/80" /> : <Volume2 className="w-[18px] h-[18px] text-muted-foreground" />}
+              </button>
+            </InstantTooltip>
+            <InstantTooltip label={syncContactsMut.isPending ? "Sincronizando..." : "Sincronizar contatos"}>
+              <button
+                onClick={() => {
+                  if (!activeSession?.sessionId) { toast.error("Nenhuma sessão ativa"); return; }
+                  syncContactsMut.mutate({ sessionId: activeSession.sessionId });
+                }}
+                disabled={syncContactsMut.isPending}
+                className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-wa-hover transition-colors"
+              >
+                <RefreshCw className={`w-[18px] h-[18px] text-muted-foreground ${syncContactsMut.isPending ? "animate-spin" : ""}`} />
+              </button>
+            </InstantTooltip>
+            <InstantTooltip label="Nova conversa">
+              <button onClick={() => setShowNewChat(true)} className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-wa-hover transition-colors">
+                <MessageCircle className="w-[18px] h-[18px] text-muted-foreground" />
+              </button>
+            </InstantTooltip>
             <button className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-wa-hover transition-colors">
               <MoreVertical className="w-[18px] h-[18px] text-muted-foreground" />
             </button>
@@ -1509,8 +1507,8 @@ export default function InboxPage() {
                             }
                           }}
                           disabled={claimMutation.isPending}
-                          title="Puxar para mim"
                           className="w-8 h-8 flex items-center justify-center rounded-full bg-wa-tint text-white shadow-lg shadow-wa-tint/30 hover:scale-110 transition-transform"
+                          title="Puxar para mim"
                         >
                           <HandMetal className="w-3.5 h-3.5" />
                         </button>
@@ -1520,8 +1518,8 @@ export default function InboxPage() {
                               e.stopPropagation();
                               setAssigningQueueJid(conv.remoteJid);
                             }}
-                            title="Atribuir a agente"
                             className="w-8 h-8 flex items-center justify-center rounded-full bg-blue-500 text-white shadow-lg shadow-blue-500/30 hover:scale-110 transition-transform"
+                            title="Atribuir a agente"
                           >
                             <UserPlus className="w-3.5 h-3.5" />
                           </button>

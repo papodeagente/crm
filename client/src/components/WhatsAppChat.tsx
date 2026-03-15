@@ -15,6 +15,7 @@ import data from "@emoji-mart/data";
 import { formatTime, SYSTEM_TIMEZONE, SYSTEM_LOCALE } from "../../../shared/dateUtils";
 import TransferDialog from "./TransferDialog";
 import { useTenantId } from "@/hooks/useTenantId";
+import InstantTooltip from "@/components/InstantTooltip";
 
 /* ─── Types ─── */
 interface Message {
@@ -1828,46 +1829,54 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
             </div>
           )}
           {onCreateContact && !hasCrmContact && (
-            <button onClick={onCreateContact}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 bg-wa-tint hover:opacity-90 text-white text-xs font-medium rounded-full transition-all mr-1"
-              title="Criar contato no CRM">
-              <UserPlus className="w-[14px] h-[14px]" />
-              <span className="hidden sm:inline">Criar Contato</span>
-            </button>
+            <InstantTooltip label="Criar contato no CRM">
+              <button onClick={onCreateContact}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 bg-wa-tint hover:opacity-90 text-white text-xs font-medium rounded-full transition-all mr-1">
+                <UserPlus className="w-[14px] h-[14px]" />
+                <span className="hidden sm:inline">Criar Contato</span>
+              </button>
+            </InstantTooltip>
           )}
           {onCreateDeal && (
-            <button onClick={onCreateDeal}
-              className="w-[34px] h-[34px] flex items-center justify-center hover:bg-wa-hover rounded-full transition-colors"
-              title="Criar negociação">
-              <Briefcase className="w-[18px] h-[18px] text-muted-foreground" />
-            </button>
+            <InstantTooltip label="Criar negociação">
+              <button onClick={onCreateDeal}
+                className="w-[34px] h-[34px] flex items-center justify-center hover:bg-wa-hover rounded-full transition-colors">
+                <Briefcase className="w-[18px] h-[18px] text-muted-foreground" />
+              </button>
+            </InstantTooltip>
           )}
           {/* Transfer button */}
           {waConversationId && (
-            <button
-              onClick={() => setShowTransfer(true)}
-              title="Transferir conversa"
-              className="w-[34px] h-[34px] flex items-center justify-center hover:bg-wa-hover rounded-full transition-colors text-muted-foreground"
-            >
-              <ArrowRightLeft className="w-[18px] h-[18px]" />
-            </button>
+            <InstantTooltip label="Transferir conversa">
+              <button
+                onClick={() => setShowTransfer(true)}
+                className="w-[34px] h-[34px] flex items-center justify-center hover:bg-wa-hover rounded-full transition-colors text-muted-foreground"
+              >
+                <ArrowRightLeft className="w-[18px] h-[18px]" />
+              </button>
+            </InstantTooltip>
           )}
           {/* Timeline toggle */}
-          <button
-            onClick={() => setShowTimeline(!showTimeline)}
-            title="Timeline de eventos"
-            className={`w-[34px] h-[34px] flex items-center justify-center rounded-full transition-colors ${
-              showTimeline ? "bg-blue-500/15 text-blue-500" : "hover:bg-wa-hover text-muted-foreground"
-            }`}
-          >
-            <History className="w-[18px] h-[18px]" />
-          </button>
-          <button className="w-[34px] h-[34px] flex items-center justify-center hover:bg-wa-hover rounded-full transition-colors">
-            <Search className="w-[18px] h-[18px] text-muted-foreground" />
-          </button>
-          <button className="w-[34px] h-[34px] flex items-center justify-center hover:bg-wa-hover rounded-full transition-colors">
-            <ChevronDown className="w-[18px] h-[18px] text-muted-foreground" />
-          </button>
+          <InstantTooltip label="Timeline de eventos">
+            <button
+              onClick={() => setShowTimeline(!showTimeline)}
+              className={`w-[34px] h-[34px] flex items-center justify-center rounded-full transition-colors ${
+                showTimeline ? "bg-blue-500/15 text-blue-500" : "hover:bg-wa-hover text-muted-foreground"
+              }`}
+            >
+              <History className="w-[18px] h-[18px]" />
+            </button>
+          </InstantTooltip>
+          <InstantTooltip label="Buscar na conversa">
+            <button className="w-[34px] h-[34px] flex items-center justify-center hover:bg-wa-hover rounded-full transition-colors">
+              <Search className="w-[18px] h-[18px] text-muted-foreground" />
+            </button>
+          </InstantTooltip>
+          <InstantTooltip label="Menu">
+            <button className="w-[34px] h-[34px] flex items-center justify-center hover:bg-wa-hover rounded-full transition-colors">
+              <ChevronDown className="w-[18px] h-[18px] text-muted-foreground" />
+            </button>
+          </InstantTooltip>
         </div>
       </div>
 
@@ -2037,15 +2046,16 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
         ) : (
           <div className="flex items-end gap-1.5">
             {/* Note toggle button */}
-            <button
-              onClick={() => setIsNoteMode(!isNoteMode)}
-              title={isNoteMode ? "Voltar para mensagem" : "Nota interna (só equipe vê)"}
-              className={`w-[42px] h-[42px] flex items-center justify-center rounded-full transition-all duration-200 shrink-0 self-end ${
-                isNoteMode ? "bg-amber-400/30 text-amber-600" : "hover:bg-wa-hover text-muted-foreground"
-              }`}
-            >
-              <StickyNote className="w-[20px] h-[20px]" />
-            </button>
+            <InstantTooltip label={isNoteMode ? "Voltar para mensagem" : "Nota interna (só equipe vê)"} side="top">
+              <button
+                onClick={() => setIsNoteMode(!isNoteMode)}
+                className={`w-[42px] h-[42px] flex items-center justify-center rounded-full transition-all duration-200 shrink-0 self-end ${
+                  isNoteMode ? "bg-amber-400/30 text-amber-600" : "hover:bg-wa-hover text-muted-foreground"
+                }`}
+              >
+                <StickyNote className="w-[20px] h-[20px]" />
+              </button>
+            </InstantTooltip>
 
             {/* Emoji picker */}
             <div className="relative shrink-0 self-end" ref={emojiPickerRef}>
@@ -2087,7 +2097,6 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
                   }
                 }}
                 disabled={aiSuggestMut.isPending}
-                title="Sugestão de resposta com IA (SPIN Selling)"
                 className={`w-[42px] h-[42px] flex items-center justify-center rounded-full transition-all duration-200 ${
                   aiSuggestMut.isPending ? "bg-violet-500/20 text-violet-500" : showAiSuggestion || showAiSelector ? "bg-violet-500/20 text-violet-500" : "hover:bg-wa-hover text-muted-foreground"
                 }`}
@@ -2325,7 +2334,7 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
           <button
             onClick={(e) => { e.stopPropagation(); window.open(lightboxUrl, '_blank'); }}
             className="absolute top-4 right-16 p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors z-10"
-            title="Abrir em nova aba"
+
           >
             <Download className="w-6 h-6 text-white" />
           </button>
