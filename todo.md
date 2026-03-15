@@ -3158,3 +3158,17 @@
 - [x] Fix: adicionar timeout de 5min para instâncias stuck em 'connecting'
 - [x] Fix: verificar se fast poll ou periodic sync também reconectam indevidamente
 - [x] Tests: cobrir filtro estrito e timeout de 5min
+
+## Diagnóstico e Estabilização Completa do Ambiente WhatsApp SaaS
+- [x] 1. Audit: verificar estado atual do auto-restore (já corrigido parcialmente)
+- [x] 2. Audit: verificar webhook 403 (já corrigido parcialmente)
+- [x] 3. Audit: verificar processamento de messages.update e message-receipt.update (ticks ✓✓)
+- [x] 4. Audit: verificar Redis/BullMQ worker e filas
+- [x] 5. Fix: garantir processamento de protocolMessage e stickerMessage (já implementado)
+- [x] 6. Fix: garantir ticks ✓✓ e ✓✓ azul funcionando (handler completo, ambos formatos)
+- [x] 7. Fix: instâncias stuck em 'connecting' no banco do SaaS (timeout 5min)
+- [x] 8. Fix: instâncias órfãs — lógica de detecção testada, runbook com SQL para VPS
+- [x] 9. Verify: Redis instável, sync fallback ativo, error suppression aplicado
+- [x] 10. Create: runbook para operações no VPS (docker stats, PostgreSQL Evolution, restart)
+- [x] 11. Tests: cobrir processamento de status de mensagem (50 testes)
+- [x] 12. Tests: cobrir webhook para todos os tipos de evento (24 testes)

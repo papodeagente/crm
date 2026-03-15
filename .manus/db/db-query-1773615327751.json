@@ -1,0 +1,118 @@
+{
+  "query": "SELECT sessionId, status, phoneNumber, pushName FROM whatsapp_sessions ORDER BY status, sessionId;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute SELECT sessionId, status, phoneNumber, pushName FROM whatsapp_sessions ORDER BY status, sessionId;",
+  "rows": [
+    {
+      "sessionId": "crm-240005-240005",
+      "status": "connected",
+      "phoneNumber": "5511970147968",
+      "pushName": "cassinotravel"
+    },
+    {
+      "sessionId": "crm-240006-240006",
+      "status": "connected",
+      "phoneNumber": "5511995200889",
+      "pushName": "Fds Viagens"
+    },
+    {
+      "sessionId": "crm-240007-240007",
+      "status": "connected",
+      "phoneNumber": "5511986853606",
+      "pushName": "Equipe Legu Tour"
+    },
+    {
+      "sessionId": "crm-240010-240010",
+      "status": "connected",
+      "phoneNumber": "558586153479",
+      "pushName": "Apolo Turismo"
+    },
+    {
+      "sessionId": "crm-270008-270062",
+      "status": "connected",
+      "phoneNumber": "556596597661",
+      "pushName": "Viagem Aqui"
+    },
+    {
+      "sessionId": "crm-0-1",
+      "status": "disconnected",
+      "phoneNumber": "NULL",
+      "pushName": "NULL"
+    },
+    {
+      "sessionId": "crm-150002-150001",
+      "status": "disconnected",
+      "phoneNumber": "558499838420",
+      "pushName": "NULL"
+    },
+    {
+      "sessionId": "crm-210002-210001",
+      "status": "disconnected",
+      "phoneNumber": "558499838420",
+      "pushName": "Bruno Barbosa"
+    },
+    {
+      "sessionId": "crm-210002-240001",
+      "status": "disconnected",
+      "phoneNumber": "554892118034",
+      "pushName": "Fernando alves"
+    },
+    {
+      "sessionId": "crm-240002-240002",
+      "status": "disconnected",
+      "phoneNumber": "NULL",
+      "pushName": "NULL"
+    },
+    {
+      "sessionId": "crm-240005-270063",
+      "status": "disconnected",
+      "phoneNumber": "5511970147968",
+      "pushName": "NULL"
+    },
+    {
+      "sessionId": "crm-270009-270064",
+      "status": "disconnected",
+      "phoneNumber": "NULL",
+      "pushName": "NULL"
+    },
+    {
+      "sessionId": "Boxtour",
+      "status": "deleted",
+      "phoneNumber": "558499838420",
+      "pushName": "Bruno Barbosa"
+    },
+    {
+      "sessionId": "Boxtour 2",
+      "status": "deleted",
+      "phoneNumber": "NULL",
+      "pushName": "NULL"
+    },
+    {
+      "sessionId": "Bruno oficial",
+      "status": "deleted",
+      "phoneNumber": "NULL",
+      "pushName": "NULL"
+    },
+    {
+      "sessionId": "Teste QR",
+      "status": "deleted",
+      "phoneNumber": "NULL",
+      "pushName": "NULL"
+    },
+    {
+      "sessionId": "Whatsapp",
+      "status": "deleted",
+      "phoneNumber": "558499838420",
+      "pushName": "Bruno Barbosa"
+    },
+    {
+      "sessionId": "Whatsapp Oficial",
+      "status": "deleted",
+      "phoneNumber": "NULL",
+      "pushName": "NULL"
+    }
+  ],
+  "messages": [],
+  "stdout": "sessionId\tstatus\tphoneNumber\tpushName\ncrm-240005-240005\tconnected\t5511970147968\tcassinotravel\ncrm-240006-240006\tconnected\t5511995200889\tFds Viagens\ncrm-240007-240007\tconnected\t5511986853606\tEquipe Legu Tour\ncrm-240010-240010\tconnected\t558586153479\tApolo Turismo\ncrm-270008-270062\tconnected\t556596597661\tViagem Aqui\ncrm-0-1\tdisconnected\tNULL\tNULL\ncrm-150002-150001\tdisconnected\t558499838420\tNULL\ncrm-210002-210001\tdisconnected\t558499838420\tBruno Barbosa\ncrm-210002-240001\tdisconnected\t554892118034\tFernando alves\ncrm-240002-240002\tdisconnected\tNULL\tNULL\ncrm-240005-270063\tdisconnected\t5511970147968\tNULL\ncrm-270009-270064\tdisconnected\tNULL\tNULL\nBoxtour\tdeleted\t558499838420\tBruno Barbosa\nBoxtour 2\tdeleted\tNULL\tNULL\nBruno oficial\tdeleted\tNULL\tNULL\nTeste QR\tdeleted\tNULL\tNULL\nWhatsapp\tdeleted\t558499838420\tBruno Barbosa\nWhatsapp Oficial\tdeleted\tNULL\tNULL\n",
+  "stderr": "",
+  "execution_time_ms": 58
+}

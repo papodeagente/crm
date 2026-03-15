@@ -66,7 +66,8 @@ export function getRedisConnection(): IORedis | null {
   initAttempted = true;
 
   try {
-    let firstErrorLogged = false;
+    let errorCount = 0;
+    const MAX_LOG_ERRORS = 3; // Only log first 3 errors to avoid spam
 
     redisConnection = new IORedis(redisUrl, {
       maxRetriesPerRequest: null, // Required by BullMQ
@@ -74,9 +75,9 @@ export function getRedisConnection(): IORedis | null {
       connectTimeout: 10000,
       retryStrategy(times) {
         if (times > 5) {
-          if (!firstErrorLogged) {
+          if (errorCount < MAX_LOG_ERRORS) {
             console.warn("[Queue] Redis connection failed after 5 retries — falling back to sync processing");
-            firstErrorLogged = true;
+            errorCount++;
           }
           connectionFailed = true;
           return null; // Stop retrying
@@ -89,13 +90,17 @@ export function getRedisConnection(): IORedis | null {
     redisConnection.on("ready", () => {
       connectionReady = true;
       connectionFailed = false;
-      console.log("Redis connected - async queue enabled");
+      errorCount = 0; // Reset error count on successful connection
+      console.log("[Queue] Redis connected — async queue enabled");
     });
 
     redisConnection.on("error", (err) => {
-      if (!firstErrorLogged) {
+      if (errorCount < MAX_LOG_ERRORS) {
         console.warn("[Queue] Redis error:", err.message);
-        firstErrorLogged = true;
+        errorCount++;
+        if (errorCount === MAX_LOG_ERRORS) {
+          console.warn("[Queue] Suppressing further Redis errors (sync fallback active)");
+        }
       }
     });
 
@@ -109,9 +114,9 @@ export function getRedisConnection(): IORedis | null {
 
     // Initiate connection
     redisConnection.connect().catch((err) => {
-      if (!firstErrorLogged) {
+      if (errorCount < MAX_LOG_ERRORS) {
         console.warn("[Queue] Redis connect failed:", err.message);
-        firstErrorLogged = true;
+        errorCount++;
       }
       connectionFailed = true;
       redisConnection = null;
@@ -273,8 +278,15 @@ export function startMessageWorker(processor: MessageProcessor): Worker | null {
       console.error(`[Worker] Job ${job?.id} permanently failed:`, err.message);
     });
 
+    let workerErrorCount = 0;
     messageWorker.on("error", (err) => {
-      console.error("[Worker] Worker error:", err.message);
+      workerErrorCount++;
+      if (workerErrorCount <= 3) {
+        console.error("[Worker] Worker error:", err.message);
+        if (workerErrorCount === 3) {
+          console.warn("[Worker] Suppressing further worker errors (Redis unavailable, sync fallback active)");
+        }
+      }
     });
 
     console.log("[Queue] Message worker started (concurrency: 5)");
