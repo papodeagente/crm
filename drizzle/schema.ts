@@ -1850,3 +1850,31 @@ export const aiIntegrations = mysqlTable("ai_integrations", {
 ]);
 export type AiIntegration = typeof aiIntegrations.$inferSelect;
 export type InsertAiIntegration = typeof aiIntegrations.$inferInsert;
+
+// ════════════════════════════════════════════════════════════
+// AI Suggestion Logs (Telemetry)
+// ════════════════════════════════════════════════════════════
+export const aiSuggestionLogs = mysqlTable("ai_suggestion_logs", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  userId: int("userId"),
+  provider: varchar("provider", { length: 32 }).notNull(),
+  model: varchar("model", { length: 128 }).notNull(),
+  intentClassified: varchar("intentClassified", { length: 32 }),
+  style: varchar("style", { length: 32 }).default("default"),
+  durationMs: int("durationMs"),
+  contextMessageCount: int("contextMessageCount"),
+  hasCrmContext: boolean("hasCrmContext").default(false),
+  success: boolean("success").default(true).notNull(),
+  errorMessage: text("errorMessage"),
+  wasEdited: boolean("wasEdited"),
+  wasSent: boolean("wasSent"),
+  sendMethod: varchar("sendMethod", { length: 32 }), // "use_field", "send_broken", null
+  partsCount: int("partsCount"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (t) => [
+  index("aisl_tenant_idx").on(t.tenantId),
+  index("aisl_tenant_created_idx").on(t.tenantId, t.createdAt),
+]);
+export type AiSuggestionLog = typeof aiSuggestionLogs.$inferSelect;
+export type InsertAiSuggestionLog = typeof aiSuggestionLogs.$inferInsert;

@@ -155,6 +155,7 @@ import { getDb } from "./db";
 import { trackingTokens, rdStationConfig, rdStationWebhookLog, rdFieldMappings, customFields, crmUsers as crmUsersSchema } from "../drizzle/schema";
 import { generateTrackerScript } from "./tracker-script";
 import { eq, and, desc, sql } from "drizzle-orm";
+import { generateSuggestion, refineSuggestion, splitTextNaturally, type ResponseStyle } from "./aiSuggestionService";
 
 /** Parse AI suggestion response into parts array. Handles JSON or plain text fallback. */
 function parseAiSuggestionParts(raw: string): { full: string; parts: string[] } {
@@ -492,6 +493,55 @@ export const appRouter = router({
         await whatsappManager.sendPresenceUpdate(input.sessionId, input.number, input.presence);
         return { success: true };
       }),
+    // ── Send Broken Message (server-side with composing presence) ──
+    sendBrokenMessage: sessionProtectedProcedure
+      .input(z.object({
+        sessionId: z.string(),
+        number: z.string().min(1),
+        parts: z.array(z.string().min(1)).min(1).max(10),
+        pacing: z.enum(["fast", "normal", "human"]).default("normal"),
+      }))
+      .mutation(async ({ input }) => {
+        const pacingConfig = {
+          fast: { minDelay: 400, maxDelay: 800, composingTime: 300 },
+          normal: { minDelay: 1000, maxDelay: 2000, composingTime: 800 },
+          human: { minDelay: 2000, maxDelay: 4000, composingTime: 1500 },
+        };
+        const config = pacingConfig[input.pacing];
+        const results: { messageId?: string; part: number }[] = [];
+
+        for (let i = 0; i < input.parts.length; i++) {
+          const part = input.parts[i];
+
+          // Send "composing" presence before each part
+          try {
+            await whatsappManager.sendPresenceUpdate(input.sessionId, input.number, "composing");
+          } catch {}
+
+          // Wait composing time (proportional to message length)
+          const charFactor = Math.min(part.length / 50, 2);
+          const composingWait = Math.floor(config.composingTime * (0.5 + charFactor * 0.5));
+          await new Promise(r => setTimeout(r, composingWait));
+
+          // Send the message
+          const result = await whatsappManager.sendTextMessage(input.sessionId, input.number, part);
+          results.push({ messageId: result?.key?.id, part: i });
+
+          // Delay between parts (not after last)
+          if (i < input.parts.length - 1) {
+            const delay = config.minDelay + Math.floor(Math.random() * (config.maxDelay - config.minDelay));
+            await new Promise(r => setTimeout(r, delay));
+          }
+        }
+
+        // Send "paused" presence after all parts
+        try {
+          await whatsappManager.sendPresenceUpdate(input.sessionId, input.number, "paused");
+        } catch {}
+
+        return { success: true, sentParts: results.length, results };
+      }),
+
     archiveChat: sessionProtectedProcedure
       .input(z.object({ sessionId: z.string(), remoteJid: z.string(), archive: z.boolean() }))
       .mutation(async ({ input }) => {
@@ -2581,23 +2631,54 @@ export const appRouter = router({
         return { success: true };
       }),
 
-    // ── AI Suggestion (SPIN Selling) ──
+    // ── AI Suggestion (SPIN Selling) — uses isolated service ──
     suggest: protectedProcedure
       .input(z.object({
         tenantId: z.number(),
+        // Legacy: messages from frontend (kept for backward compat, ignored when sessionId+remoteJid present)
         messages: z.array(z.object({
           fromMe: z.boolean(),
           content: z.string(),
           timestamp: z.string().optional(),
-        })),
+        })).optional(),
         contactName: z.string().optional(),
         dealTitle: z.string().optional(),
         dealValue: z.number().optional(),
         dealStage: z.string().optional(),
         integrationId: z.number().optional(),
         overrideModel: z.string().optional(),
+        // New: fetch from DB directly
+        sessionId: z.string().optional(),
+        remoteJid: z.string().optional(),
+        style: z.enum(["default", "shorter", "human", "objective", "consultive"]).optional(),
+        customInstruction: z.string().optional(),
       }))
       .mutation(async ({ input }) => {
+        // New path: use isolated service when sessionId + remoteJid are provided
+        if (input.sessionId && input.remoteJid) {
+          const result = await generateSuggestion({
+            tenantId: input.tenantId,
+            sessionId: input.sessionId,
+            remoteJid: input.remoteJid,
+            contactName: input.contactName,
+            integrationId: input.integrationId,
+            overrideModel: input.overrideModel,
+            style: input.style as ResponseStyle,
+            customInstruction: input.customInstruction,
+          });
+          return {
+            suggestion: result.suggestion,
+            parts: result.parts,
+            provider: result.provider,
+            model: result.model,
+            intentClassified: result.intentClassified,
+            durationMs: result.durationMs,
+            contextMessageCount: result.contextMessageCount,
+            hasCrmContext: result.hasCrmContext,
+          };
+        }
+
+        // Legacy fallback: use messages from frontend
         let integration: any = null;
         if (input.integrationId) {
           integration = await getAiIntegration(input.tenantId, input.integrationId);
@@ -2615,7 +2696,8 @@ export const appRouter = router({
         const model = input.overrideModel || settings.defaultAiModel || integration.defaultModel;
 
         // Build context from conversation
-        const conversationContext = input.messages
+        const msgs = input.messages || [];
+        const conversationContext = msgs
           .slice(-30)
           .map(m => `${m.fromMe ? "Agente" : (input.contactName || "Cliente")}: ${m.content}`)
           .join("\n");
@@ -2771,6 +2853,32 @@ REGRAS:
           if (err instanceof TRPCError) throw err;
           throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: err.message || "Transcription failed" });
         }
+      }),
+
+    // ── Refine existing suggestion with different style ──
+    refine: protectedProcedure
+      .input(z.object({
+        tenantId: z.number(),
+        originalText: z.string(),
+        style: z.enum(["default", "shorter", "human", "objective", "consultive"]),
+        integrationId: z.number().optional(),
+        overrideModel: z.string().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        return refineSuggestion({
+          tenantId: input.tenantId,
+          originalText: input.originalText,
+          style: input.style as ResponseStyle,
+          integrationId: input.integrationId,
+          overrideModel: input.overrideModel,
+        });
+      }),
+
+    // ── Split text into natural parts for broken sending ──
+    splitParts: publicProcedure
+      .input(z.object({ text: z.string() }))
+      .mutation(({ input }) => {
+        return { parts: splitTextNaturally(input.text) };
       }),
 
     // List available models per provider

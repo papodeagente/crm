@@ -2065,15 +2065,11 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
                     setShowAiSuggestion(false);
                     textareaRef.current?.focus();
                   }}
-                  onSendBroken={async (parts) => {
-                    const number = contact?.phone?.replace(/\D/g, "") || "";
-                    if (!number || !sessionId) { toast.error("Sem número ou sessão"); return; }
-                    for (let i = 0; i < parts.length; i++) {
-                      sendMessage.mutate({ sessionId, number, message: parts[i] });
-                      if (i < parts.length - 1) await new Promise(r => setTimeout(r, 1200));
-                    }
+                  onSendBroken={(parts) => {
+                    // Server-side broken sending is now handled inside AiSuggestionPanel
+                    // This callback is kept for backward compat (e.g. if panel closes after send)
                     setShowAiSuggestion(false);
-                    toast.success(`${parts.length} mensagens enviadas`);
+                    setTimeout(() => messagesQ.refetch(), 2000);
                   }}
                   onClose={() => setShowAiSuggestion(false)}
                 />

@@ -1,7 +1,12 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
-import { Sparkles, X, Loader2, Copy, Send, RefreshCw, ChevronDown, ChevronUp } from "lucide-react";
+import {
+  Sparkles, X, Loader2, Copy, Send, RefreshCw,
+  ChevronDown, ChevronUp, Settings2, Zap,
+  MessageSquare, Target, UserCheck, Scissors,
+  Info,
+} from "lucide-react";
 
 interface AiSuggestionPanelProps {
   tenantId: number;
@@ -13,7 +18,22 @@ interface AiSuggestionPanelProps {
   onClose: () => void;
 }
 
-// All available models per provider
+type ResponseStyle = "default" | "shorter" | "human" | "objective" | "consultive";
+type PacingMode = "fast" | "normal" | "human";
+
+const STYLE_OPTIONS: { id: ResponseStyle; label: string; icon: typeof Zap; desc: string }[] = [
+  { id: "shorter", label: "Mais curta", icon: Scissors, desc: "1-2 frases" },
+  { id: "human", label: "Mais humana", icon: UserCheck, desc: "Informal" },
+  { id: "objective", label: "Objetiva", icon: Target, desc: "Direto ao ponto" },
+  { id: "consultive", label: "Consultiva", icon: MessageSquare, desc: "Perguntas" },
+];
+
+const PACING_OPTIONS: { id: PacingMode; label: string; desc: string }[] = [
+  { id: "fast", label: "Rápido", desc: "0.4-0.8s" },
+  { id: "normal", label: "Normal", desc: "1-2s" },
+  { id: "human", label: "Humano", desc: "2-4s" },
+];
+
 const MODELS_BY_PROVIDER: Record<string, { id: string; name: string; desc: string }[]> = {
   openai: [
     { id: "gpt-4.1", name: "GPT-4.1", desc: "Melhor custo-benefício" },
@@ -42,17 +62,18 @@ export default function AiSuggestionPanel({
   // State
   const [suggestion, setSuggestion] = useState("");
   const [editedText, setEditedText] = useState("");
-  const [meta, setMeta] = useState<{ provider: string; model: string } | null>(null);
+  const [meta, setMeta] = useState<{
+    provider: string; model: string;
+    intentClassified?: string; durationMs?: number;
+    contextMessageCount?: number; hasCrmContext?: boolean;
+  } | null>(null);
   const [selectedIntegrationId, setSelectedIntegrationId] = useState<number | undefined>();
   const [selectedModel, setSelectedModel] = useState<string | undefined>();
-  const [phase, setPhase] = useState<"select" | "loading" | "result" | "error">("select");
+  const [phase, setPhase] = useState<"idle" | "loading" | "result" | "error" | "sending">("idle");
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const [showModelList, setShowModelList] = useState(false);
-
-  // Fetch messages directly inside this component
-  const messagesQ = trpc.whatsapp.messagesByContact.useQuery(
-    { sessionId, remoteJid, limit: 50 },
-    { enabled: !!sessionId && !!remoteJid, staleTime: 30000 }
-  );
+  const [pacing, setPacing] = useState<PacingMode>("normal");
+  const [sendingProgress, setSendingProgress] = useState({ current: 0, total: 0 });
 
   // Fetch available AI integrations
   const integrationsQ = trpc.ai.list.useQuery(
@@ -60,12 +81,19 @@ export default function AiSuggestionPanel({
     { enabled: !!tenantId }
   );
 
-  // Mutation
+  // Mutations
   const suggestMut = trpc.ai.suggest.useMutation({
     onSuccess: (data) => {
       setSuggestion(data.suggestion);
       setEditedText(data.suggestion);
-      setMeta({ provider: data.provider, model: data.model });
+      setMeta({
+        provider: data.provider,
+        model: data.model,
+        intentClassified: (data as any).intentClassified,
+        durationMs: (data as any).durationMs,
+        contextMessageCount: (data as any).contextMessageCount,
+        hasCrmContext: (data as any).hasCrmContext,
+      });
       setPhase("result");
     },
     onError: (err) => {
@@ -79,26 +107,43 @@ export default function AiSuggestionPanel({
     },
   });
 
-  const doGenerate = useCallback((overrideIntegrationId?: number, overrideModelId?: string) => {
-    const rawMsgs = messagesQ.data;
-    if (!rawMsgs || rawMsgs.length === 0) {
-      toast.error("Sem mensagens para analisar.");
-      return;
-    }
+  const refineMut = trpc.ai.refine.useMutation({
+    onSuccess: (data) => {
+      setSuggestion(data.suggestion);
+      setEditedText(data.suggestion);
+      setMeta(prev => prev ? { ...prev, provider: data.provider, model: data.model } : null);
+      toast.success("Sugestão refinada!");
+    },
+    onError: (err) => {
+      toast.error(err.message || "Erro ao refinar", { duration: 3000 });
+    },
+  });
 
-    const msgs = rawMsgs
-      .filter((m: any) => m.content)
-      .map((m: any) => ({
-        fromMe: m.fromMe,
-        content: m.content || "",
-        timestamp: m.timestamp instanceof Date ? m.timestamp.toISOString() : m.timestamp ? String(m.timestamp) : undefined,
-      }));
+  const sendBrokenMut = trpc.whatsapp.sendBrokenMessage.useMutation({
+    onSuccess: (data) => {
+      toast.success(`${data.sentParts} mensagens enviadas!`);
+      setPhase("idle");
+      onClose();
+    },
+    onError: (err) => {
+      toast.error(err.message || "Erro ao enviar", { duration: 3000 });
+      setPhase("result");
+    },
+  });
 
-    if (msgs.length === 0) {
-      toast.error("Sem mensagens com conteúdo para analisar.");
-      return;
-    }
+  const activeIntegrations = useMemo(
+    () => (integrationsQ.data || []).filter((i: any) => i.isActive),
+    [integrationsQ.data]
+  );
 
+  const effectiveIntegrationId = selectedIntegrationId ?? activeIntegrations[0]?.id;
+  const effectiveIntegration = activeIntegrations.find((i: any) => i.id === effectiveIntegrationId);
+  const effectiveProvider = effectiveIntegration?.provider || "openai";
+  const effectiveModel = selectedModel || effectiveIntegration?.defaultModel || MODELS_BY_PROVIDER[effectiveProvider]?.[0]?.id;
+  const providerModels = MODELS_BY_PROVIDER[effectiveProvider] || [];
+
+  // Generate suggestion using new server-side context
+  const doGenerate = useCallback((style?: ResponseStyle) => {
     setSuggestion("");
     setEditedText("");
     setMeta(null);
@@ -106,27 +151,52 @@ export default function AiSuggestionPanel({
 
     suggestMut.mutate({
       tenantId,
-      messages: msgs,
+      sessionId,
+      remoteJid,
       contactName,
-      integrationId: overrideIntegrationId ?? selectedIntegrationId,
-      overrideModel: overrideModelId ?? selectedModel,
+      integrationId: effectiveIntegrationId,
+      overrideModel: effectiveModel,
+      style: style || "default",
     });
-  }, [messagesQ.data, tenantId, contactName, selectedIntegrationId, selectedModel, suggestMut]);
+  }, [tenantId, sessionId, remoteJid, contactName, effectiveIntegrationId, effectiveModel, suggestMut]);
 
-  const activeIntegrations = (integrationsQ.data || []).filter((i: any) => i.isActive);
-  const parts = editedText.split(/\n\n+/).map((p: string) => p.trim()).filter(Boolean);
+  // Refine with a different style
+  const doRefine = useCallback((style: ResponseStyle) => {
+    if (!editedText.trim()) return;
+    refineMut.mutate({
+      tenantId,
+      originalText: editedText.trim(),
+      style,
+      integrationId: effectiveIntegrationId,
+      overrideModel: effectiveModel,
+    });
+  }, [tenantId, editedText, effectiveIntegrationId, effectiveModel, refineMut]);
+
+  // Server-side broken sending
+  const doSendBroken = useCallback((partsToSend: string[]) => {
+    if (partsToSend.length === 0) return;
+    setPhase("sending");
+    setSendingProgress({ current: 0, total: partsToSend.length });
+
+    const number = remoteJid.replace(/@.*$/, "");
+    sendBrokenMut.mutate({
+      sessionId,
+      number,
+      parts: partsToSend,
+      pacing,
+    });
+  }, [sessionId, remoteJid, pacing, sendBrokenMut]);
+
+  const parts = useMemo(
+    () => editedText.split(/\n\n+/).map((p: string) => p.trim()).filter(Boolean),
+    [editedText]
+  );
   const hasMultipleParts = parts.length > 1;
   const providerLabel = meta?.provider === "openai" ? "OpenAI" : meta?.provider === "anthropic" ? "Anthropic" : "";
-
-  // Auto-select first integration if none selected
-  const effectiveIntegrationId = selectedIntegrationId ?? activeIntegrations[0]?.id;
-  const effectiveIntegration = activeIntegrations.find((i: any) => i.id === effectiveIntegrationId);
-  const effectiveProvider = effectiveIntegration?.provider || "openai";
-  const effectiveModel = selectedModel || effectiveIntegration?.defaultModel || MODELS_BY_PROVIDER[effectiveProvider]?.[0]?.id;
-  const providerModels = MODELS_BY_PROVIDER[effectiveProvider] || [];
+  const hasNoIntegrations = activeIntegrations.length === 0;
 
   return (
-    <div className="absolute bottom-full left-0 right-0 mb-1 bg-violet-50 dark:bg-violet-950/30 border border-violet-200 dark:border-violet-800 rounded-lg shadow-xl z-50 overflow-hidden max-h-[400px] overflow-y-auto">
+    <div className="absolute bottom-full left-0 right-0 mb-1 bg-violet-50 dark:bg-violet-950/30 border border-violet-200 dark:border-violet-800 rounded-lg shadow-xl z-50 overflow-hidden max-h-[450px] overflow-y-auto">
       {/* Header */}
       <div className="px-3 py-1.5 flex items-center justify-between border-b border-violet-200 dark:border-violet-800 sticky top-0 bg-violet-50 dark:bg-violet-950/30 z-10">
         <div className="flex items-center gap-1.5">
@@ -137,93 +207,127 @@ export default function AiSuggestionPanel({
           {meta && (
             <span className="text-[10px] text-muted-foreground ml-1">
               {providerLabel} · {meta.model}
+              {meta.durationMs ? ` · ${(meta.durationMs / 1000).toFixed(1)}s` : ""}
             </span>
           )}
         </div>
-        <button onClick={onClose} className="text-muted-foreground hover:text-foreground p-0.5">
-          <X className="h-3.5 w-3.5" />
-        </button>
+        <div className="flex items-center gap-1">
+          {phase !== "idle" && phase !== "loading" && phase !== "sending" && (
+            <button
+              onClick={() => setShowAdvanced(!showAdvanced)}
+              className={`p-0.5 rounded transition-colors ${showAdvanced ? "text-violet-500" : "text-muted-foreground hover:text-foreground"}`}
+              title="Configurações avançadas"
+            >
+              <Settings2 className="h-3.5 w-3.5" />
+            </button>
+          )}
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground p-0.5">
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
       </div>
 
-      {/* ── PHASE: SELECT ── Show model selector first, user must click Generate */}
-      {phase === "select" && (
+      {/* ── PHASE: IDLE ── Quick generate or advanced */}
+      {phase === "idle" && (
         <div className="px-3 py-3">
-          {activeIntegrations.length === 0 ? (
+          {hasNoIntegrations ? (
             <div className="text-center py-4">
               <p className="text-[12px] text-muted-foreground mb-2">Nenhuma IA configurada.</p>
               <p className="text-[11px] text-muted-foreground">Vá em Integrações &gt; IA para conectar sua API OpenAI ou Anthropic.</p>
             </div>
           ) : (
             <>
-              {/* Provider tabs */}
-              {activeIntegrations.length > 1 && (
-                <div className="flex gap-1.5 mb-2">
-                  {activeIntegrations.map((integ: any) => (
+              {/* Quick generate button (simple mode) */}
+              <button
+                onClick={() => doGenerate()}
+                className="w-full text-[12px] font-medium bg-violet-500 hover:bg-violet-600 text-white rounded-md py-2.5 transition-colors flex items-center justify-center gap-2"
+              >
+                <Sparkles className="h-3.5 w-3.5" /> Sugerir resposta
+              </button>
+
+              {/* Toggle advanced */}
+              <button
+                onClick={() => setShowAdvanced(!showAdvanced)}
+                className="w-full mt-2 text-[10px] text-muted-foreground hover:text-violet-500 flex items-center justify-center gap-1 transition-colors"
+              >
+                <Settings2 className="h-3 w-3" />
+                {showAdvanced ? "Ocultar opções" : "Opções avançadas"}
+              </button>
+
+              {/* Advanced options */}
+              {showAdvanced && (
+                <div className="mt-2 space-y-2 pt-2 border-t border-violet-200 dark:border-violet-800">
+                  {/* Provider tabs */}
+                  {activeIntegrations.length > 1 && (
+                    <div className="flex gap-1.5">
+                      {activeIntegrations.map((integ: any) => (
+                        <button
+                          key={integ.id}
+                          onClick={() => {
+                            setSelectedIntegrationId(integ.id);
+                            setSelectedModel(integ.defaultModel);
+                          }}
+                          className={`text-[11px] px-3 py-1 rounded-full border transition-colors ${
+                            effectiveIntegrationId === integ.id
+                              ? "border-violet-500 bg-violet-500/10 text-violet-700 dark:text-violet-300 font-medium"
+                              : "border-violet-200 dark:border-violet-700 text-muted-foreground hover:border-violet-400"
+                          }`}
+                        >
+                          {integ.provider === "openai" ? "OpenAI" : "Anthropic"}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Model selector */}
+                  <div>
                     <button
-                      key={integ.id}
-                      onClick={() => {
-                        setSelectedIntegrationId(integ.id);
-                        setSelectedModel(integ.defaultModel);
-                      }}
-                      className={`text-[11px] px-3 py-1 rounded-full border transition-colors ${
-                        effectiveIntegrationId === integ.id
-                          ? "border-violet-500 bg-violet-500/10 text-violet-700 dark:text-violet-300 font-medium"
-                          : "border-violet-200 dark:border-violet-700 text-muted-foreground hover:border-violet-400"
-                      }`}
+                      onClick={() => setShowModelList(!showModelList)}
+                      className="w-full flex items-center justify-between px-3 py-1.5 bg-white dark:bg-violet-900/20 border border-violet-200 dark:border-violet-700 rounded-md text-[11px] hover:border-violet-400 transition-colors"
                     >
-                      {integ.provider === "openai" ? "OpenAI" : "Anthropic"}
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-foreground">
+                          {providerModels.find(m => m.id === effectiveModel)?.name || effectiveModel}
+                        </span>
+                        <span className="text-[10px] text-muted-foreground">
+                          {providerModels.find(m => m.id === effectiveModel)?.desc || ""}
+                        </span>
+                      </div>
+                      {showModelList ? <ChevronUp className="h-3 w-3 text-muted-foreground" /> : <ChevronDown className="h-3 w-3 text-muted-foreground" />}
                     </button>
-                  ))}
-                </div>
-              )}
 
-              {/* Model selector */}
-              <div className="mb-3">
-                <button
-                  onClick={() => setShowModelList(!showModelList)}
-                  className="w-full flex items-center justify-between px-3 py-2 bg-white dark:bg-violet-900/20 border border-violet-200 dark:border-violet-700 rounded-md text-[12px] hover:border-violet-400 transition-colors"
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium text-foreground">
-                      {providerModels.find(m => m.id === effectiveModel)?.name || effectiveModel}
-                    </span>
-                    <span className="text-[10px] text-muted-foreground">
-                      {providerModels.find(m => m.id === effectiveModel)?.desc || ""}
-                    </span>
+                    {showModelList && (
+                      <div className="mt-1 bg-white dark:bg-violet-900/30 border border-violet-200 dark:border-violet-700 rounded-md overflow-hidden">
+                        {providerModels.map((m) => (
+                          <button
+                            key={m.id}
+                            onClick={() => { setSelectedModel(m.id); setShowModelList(false); }}
+                            className={`w-full text-left px-3 py-1.5 text-[11px] hover:bg-violet-100 dark:hover:bg-violet-800/30 transition-colors flex items-center justify-between ${
+                              effectiveModel === m.id ? "bg-violet-100 dark:bg-violet-800/20 font-medium" : ""
+                            }`}
+                          >
+                            <span className="text-foreground">{m.name}</span>
+                            <span className="text-[10px] text-muted-foreground">{m.desc}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                  {showModelList ? <ChevronUp className="h-3 w-3 text-muted-foreground" /> : <ChevronDown className="h-3 w-3 text-muted-foreground" />}
-                </button>
 
-                {showModelList && (
-                  <div className="mt-1 bg-white dark:bg-violet-900/30 border border-violet-200 dark:border-violet-700 rounded-md overflow-hidden">
-                    {providerModels.map((m) => (
+                  {/* Style-specific generate buttons */}
+                  <div className="flex flex-wrap gap-1.5">
+                    {STYLE_OPTIONS.map((s) => (
                       <button
-                        key={m.id}
-                        onClick={() => { setSelectedModel(m.id); setShowModelList(false); }}
-                        className={`w-full text-left px-3 py-1.5 text-[11px] hover:bg-violet-100 dark:hover:bg-violet-800/30 transition-colors flex items-center justify-between ${
-                          effectiveModel === m.id ? "bg-violet-100 dark:bg-violet-800/20 font-medium" : ""
-                        }`}
+                        key={s.id}
+                        onClick={() => doGenerate(s.id)}
+                        className="text-[10px] px-2.5 py-1 rounded-full border border-violet-200 dark:border-violet-700 text-muted-foreground hover:border-violet-400 hover:text-violet-600 transition-colors flex items-center gap-1"
                       >
-                        <span className="text-foreground">{m.name}</span>
-                        <span className="text-[10px] text-muted-foreground">{m.desc}</span>
+                        <s.icon className="h-3 w-3" /> {s.label}
                       </button>
                     ))}
                   </div>
-                )}
-              </div>
-
-              {/* Generate button */}
-              <button
-                onClick={() => doGenerate(effectiveIntegrationId, effectiveModel)}
-                disabled={messagesQ.isLoading}
-                className="w-full text-[12px] font-medium bg-violet-500 hover:bg-violet-600 text-white rounded-md py-2 transition-colors flex items-center justify-center gap-2"
-              >
-                {messagesQ.isLoading ? (
-                  <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Carregando conversa...</>
-                ) : (
-                  <><Sparkles className="h-3.5 w-3.5" /> Gerar Sugestão de Resposta</>
-                )}
-              </button>
+                </div>
+              )}
             </>
           )}
         </div>
@@ -235,7 +339,7 @@ export default function AiSuggestionPanel({
           <Loader2 className="h-6 w-6 animate-spin text-violet-500" />
           <span className="text-[12px] text-muted-foreground">Analisando conversa e gerando sugestão...</span>
           <span className="text-[10px] text-muted-foreground">
-            {effectiveProvider === "openai" ? "OpenAI" : "Anthropic"} · {effectiveModel}
+            Contexto completo do banco + CRM + SPIN Selling
           </span>
         </div>
       )}
@@ -246,13 +350,13 @@ export default function AiSuggestionPanel({
           <span className="text-[12px] text-red-500">Erro ao gerar sugestão</span>
           <div className="flex gap-2">
             <button
-              onClick={() => setPhase("select")}
+              onClick={() => setPhase("idle")}
               className="text-[11px] font-medium text-violet-600 hover:text-violet-700 flex items-center gap-1 px-3 py-1 border border-violet-200 rounded-md"
             >
-              Trocar modelo
+              Voltar
             </button>
             <button
-              onClick={() => doGenerate(effectiveIntegrationId, effectiveModel)}
+              onClick={() => doGenerate()}
               className="text-[11px] font-medium text-violet-600 hover:text-violet-700 flex items-center gap-1 px-3 py-1 border border-violet-200 rounded-md"
             >
               <RefreshCw className="h-3 w-3" /> Tentar novamente
@@ -261,9 +365,45 @@ export default function AiSuggestionPanel({
         </div>
       )}
 
-      {/* ── PHASE: RESULT ── Editable suggestion */}
+      {/* ── PHASE: SENDING ── */}
+      {phase === "sending" && (
+        <div className="px-4 py-6 flex flex-col items-center gap-2">
+          <Loader2 className="h-6 w-6 animate-spin text-emerald-500" />
+          <span className="text-[12px] text-muted-foreground">
+            Enviando mensagens com ritmo {pacing === "fast" ? "rápido" : pacing === "human" ? "humano" : "normal"}...
+          </span>
+          <span className="text-[10px] text-muted-foreground">
+            Digitando e enviando {parts.length} partes
+          </span>
+        </div>
+      )}
+
+      {/* ── PHASE: RESULT ── Editable suggestion with refinement */}
       {phase === "result" && suggestion && (
         <>
+          {/* Context info badge */}
+          {meta && (meta.intentClassified || meta.hasCrmContext) && (
+            <div className="px-3 pt-2 flex flex-wrap gap-1.5">
+              {meta.intentClassified && meta.intentClassified !== "outro" && (
+                <span className="text-[9px] px-2 py-0.5 rounded-full bg-violet-100 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400 border border-violet-200 dark:border-violet-700 flex items-center gap-1">
+                  <Info className="h-2.5 w-2.5" />
+                  Intenção: {meta.intentClassified.replace("_", " ")}
+                </span>
+              )}
+              {meta.hasCrmContext && (
+                <span className="text-[9px] px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-700">
+                  CRM enriquecido
+                </span>
+              )}
+              {meta.contextMessageCount && (
+                <span className="text-[9px] px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-700">
+                  {meta.contextMessageCount} msgs analisadas
+                </span>
+              )}
+            </div>
+          )}
+
+          {/* Editable textarea */}
           <div className="px-3 py-2">
             <textarea
               value={editedText}
@@ -273,9 +413,49 @@ export default function AiSuggestionPanel({
               placeholder="Edite a sugestão antes de enviar..."
             />
             <p className="text-[10px] text-muted-foreground mt-1">
-              Edite o texto acima. Separe parágrafos com Enter duplo para enviar como mensagens separadas.
+              Separe parágrafos com Enter duplo para enviar como mensagens separadas.
             </p>
           </div>
+
+          {/* Refinement buttons */}
+          <div className="px-3 pb-1.5 flex flex-wrap gap-1.5">
+            {STYLE_OPTIONS.map((s) => (
+              <button
+                key={s.id}
+                onClick={() => doRefine(s.id)}
+                disabled={refineMut.isPending}
+                className="text-[10px] px-2 py-0.5 rounded-full border border-violet-200 dark:border-violet-700 text-muted-foreground hover:border-violet-400 hover:text-violet-600 transition-colors flex items-center gap-1 disabled:opacity-50"
+              >
+                {refineMut.isPending ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : <s.icon className="h-2.5 w-2.5" />}
+                {s.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Advanced settings (model, pacing) */}
+          {showAdvanced && (
+            <div className="px-3 pb-2 space-y-2 border-t border-violet-100 dark:border-violet-800 pt-2">
+              {/* Pacing selector */}
+              <div>
+                <span className="text-[10px] text-muted-foreground block mb-1">Ritmo de envio:</span>
+                <div className="flex gap-1.5">
+                  {PACING_OPTIONS.map((p) => (
+                    <button
+                      key={p.id}
+                      onClick={() => setPacing(p.id)}
+                      className={`text-[10px] px-2.5 py-1 rounded-full border transition-colors ${
+                        pacing === p.id
+                          ? "border-emerald-500 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 font-medium"
+                          : "border-violet-200 dark:border-violet-700 text-muted-foreground hover:border-emerald-400"
+                      }`}
+                    >
+                      {p.label} <span className="text-[9px] opacity-70">({p.desc})</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Action buttons */}
           <div className="px-3 py-2 flex flex-wrap gap-2 border-t border-violet-200 dark:border-violet-800">
@@ -287,17 +467,23 @@ export default function AiSuggestionPanel({
             </button>
             {hasMultipleParts && (
               <button
-                onClick={() => onSendBroken(parts)}
-                className="flex-1 text-[12px] font-medium bg-emerald-500 hover:bg-emerald-600 text-white rounded-md py-1.5 transition-colors flex items-center justify-center gap-1.5"
+                onClick={() => doSendBroken(parts)}
+                disabled={sendBrokenMut.isPending}
+                className="flex-1 text-[12px] font-medium bg-emerald-500 hover:bg-emerald-600 text-white rounded-md py-1.5 transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50"
               >
-                <Send className="h-3 w-3" /> Enviar separado ({parts.length} msgs)
+                {sendBrokenMut.isPending ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <Send className="h-3 w-3" />
+                )}
+                Enviar separado ({parts.length} msgs)
               </button>
             )}
             <button
-              onClick={() => setPhase("select")}
+              onClick={() => doGenerate()}
               className="text-[12px] font-medium text-violet-600 hover:text-violet-700 dark:text-violet-400 rounded-md px-3 py-1.5 transition-colors border border-violet-200 dark:border-violet-700 hover:bg-violet-100 dark:hover:bg-violet-900/30 flex items-center gap-1.5"
             >
-              <RefreshCw className="h-3 w-3" /> Gerar outra
+              <RefreshCw className="h-3 w-3" /> Nova
             </button>
           </div>
         </>

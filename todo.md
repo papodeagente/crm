@@ -2909,3 +2909,24 @@
 - [x] Garantir que o email bruno@entur.com.br mantenha acesso intacto após exclusão de qualquer tenant
 - [x] Adicionar tabelas faltantes ao deleteTenantCompletely (12 tabelas: ai_integrations, rfv_contacts, rfv_filter_snapshots, session_shares, quick_replies, google_calendar_tokens, internal_notes, conversation_events, contact_action_logs, bulk_campaign_messages, bulk_campaigns, messages)
 - [x] Testes super admin passando (15/15)
+
+## Profissionalizar Sugestão de Resposta com IA no Inbox (Mar 15)
+- [x] Criar serviço isolado server/aiSuggestionService.ts (desacoplado da UI)
+- [x] Buscar histórico completo da conversa do banco (não do frontend) - até 80 msgs
+- [x] Montar contexto estruturado com timestamps e distinção agente/cliente
+- [x] Resumir conversas longas (>40 msgs recentes completas, anteriores resumidas)
+- [x] Enriquecer contexto com dados CRM (contato, deal, stage) quando disponíveis
+- [x] Classificar intenção da última mensagem (12 categorias: duvida, objecao, pedido_preco, pedido_prazo, interesse, indecisao, retomada, fechamento, saudacao, agradecimento, reclamacao, outro)
+- [x] Implementar prompt SPIN Selling profissional como framework de raciocínio interno
+- [x] Suportar parâmetros de estilo: default, shorter, human, objective, consultive
+- [x] Refatorar ai.suggest para chamar serviço isolado buscando msgs do banco (com fallback legacy)
+- [x] Criar endpoint ai.refine para reescrever com estilo diferente
+- [x] Refatorar AiSuggestionPanel: modo simples (1 clique "Sugerir resposta") + modo avançado (provider/model/style)
+- [x] Adicionar botões de refinamento na UI (Mais curta, Mais humana, Objetiva, Consultiva)
+- [x] Criar endpoint whatsapp.sendBrokenMessage server-side com sendPresence composing
+- [x] Implementar delay variável/humano entre partes (perfis: fast 0.4-0.8s, normal 1-2s, human 2-4s)
+- [x] Composing time proporcional ao tamanho da mensagem
+- [x] Criar tabela ai_suggestion_logs para telemetria
+- [x] Registrar provider, modelo, tempo, sucesso/falha, intenção classificada, contexto CRM
+- [x] Escrever testes unitários: classifyIntent (26 testes), parseAiResponse, splitTextNaturally
+- [x] Validar zero regressão: 1259/1262 testes passando (3 falhas pré-existentes em whatsappDailyBackup)
