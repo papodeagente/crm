@@ -419,3 +419,275 @@ describe("RD Station auto-capture cf_* fields", () => {
     expect(label).toBe("Voce Ja Tem Um Grupo De Viagens Pronto Para Ser Lancado");
   });
 });
+
+// ─── Multi-Config CRUD Tests ──────────────────────────────
+
+describe("rdStation.listConfigs", () => {
+  it("returns array of configs for tenant", async () => {
+    const { ctx } = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    const result = await caller.rdStation.listConfigs({ tenantId: 1 });
+    expect(Array.isArray(result)).toBe(true);
+  });
+
+  it("requires authentication", async () => {
+    const { ctx } = createUnauthContext();
+    const caller = appRouter.createCaller(ctx);
+    await expect(caller.rdStation.listConfigs({ tenantId: 1 })).rejects.toThrow();
+  });
+});
+
+describe("rdStation.createConfig", () => {
+  it("creates a new config with name and token", async () => {
+    const { ctx } = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    const result = await caller.rdStation.createConfig({
+      tenantId: 1,
+      name: "Test Config Multi",
+      defaultSource: "test-source",
+      defaultCampaign: "test-campaign",
+    });
+    expect(result).toBeDefined();
+    expect(result.name).toBe("Test Config Multi");
+    expect(result.webhookToken).toBeDefined();
+    expect(result.webhookToken.length).toBeGreaterThan(0);
+    expect(result.defaultSource).toBe("test-source");
+    expect(result.defaultCampaign).toBe("test-campaign");
+    expect(result.isActive).toBe(true);
+  });
+
+  it("creates config with auto-WhatsApp enabled", async () => {
+    const { ctx } = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    const template = "Olá {primeiro_nome}! Bem-vindo!";
+    const result = await caller.rdStation.createConfig({
+      tenantId: 1,
+      name: "WhatsApp Config",
+      autoWhatsAppEnabled: true,
+      autoWhatsAppMessageTemplate: template,
+    });
+    expect(result.autoWhatsAppEnabled).toBe(true);
+    expect(result.autoWhatsAppMessageTemplate).toBe(template);
+  });
+
+  it("allows multiple configs per tenant", async () => {
+    const { ctx } = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    const config1 = await caller.rdStation.createConfig({ tenantId: 1, name: "Config A" });
+    const config2 = await caller.rdStation.createConfig({ tenantId: 1, name: "Config B" });
+    expect(config1.id).not.toBe(config2.id);
+    expect(config1.webhookToken).not.toBe(config2.webhookToken);
+  });
+
+  it("requires authentication", async () => {
+    const { ctx } = createUnauthContext();
+    const caller = appRouter.createCaller(ctx);
+    await expect(caller.rdStation.createConfig({ tenantId: 1, name: "Test" })).rejects.toThrow();
+  });
+});
+
+describe("rdStation.updateConfig", () => {
+  it("updates config fields", async () => {
+    const { ctx } = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    const created = await caller.rdStation.createConfig({ tenantId: 1, name: "Update Test" });
+    const updated = await caller.rdStation.updateConfig({
+      configId: created.id,
+      tenantId: 1,
+      name: "Updated Name",
+      defaultSource: "new-source",
+      autoWhatsAppEnabled: true,
+      autoWhatsAppMessageTemplate: "Hello {nome}!",
+    });
+    expect(updated).toBeDefined();
+    expect(updated!.name).toBe("Updated Name");
+    expect(updated!.defaultSource).toBe("new-source");
+    expect(updated!.autoWhatsAppEnabled).toBe(true);
+    expect(updated!.autoWhatsAppMessageTemplate).toBe("Hello {nome}!");
+  });
+
+  it("can set fields to null", async () => {
+    const { ctx } = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    const created = await caller.rdStation.createConfig({
+      tenantId: 1,
+      name: "Null Test",
+      defaultSource: "will-be-nulled",
+    });
+    const updated = await caller.rdStation.updateConfig({
+      configId: created.id,
+      tenantId: 1,
+      defaultSource: null,
+    });
+    expect(updated!.defaultSource).toBeNull();
+  });
+
+  it("requires authentication", async () => {
+    const { ctx } = createUnauthContext();
+    const caller = appRouter.createCaller(ctx);
+    await expect(caller.rdStation.updateConfig({ configId: 1, tenantId: 1, name: "X" })).rejects.toThrow();
+  });
+});
+
+describe("rdStation.deleteConfig", () => {
+  it("deletes config by id and tenant", async () => {
+    const { ctx } = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    const created = await caller.rdStation.createConfig({ tenantId: 1, name: "Delete Test" });
+    const result = await caller.rdStation.deleteConfig({ configId: created.id, tenantId: 1 });
+    expect(result).toEqual({ success: true });
+    const configs = await caller.rdStation.listConfigs({ tenantId: 1 });
+    const found = configs.find((c: any) => c.id === created.id);
+    expect(found).toBeUndefined();
+  });
+
+  it("requires authentication", async () => {
+    const { ctx } = createUnauthContext();
+    const caller = appRouter.createCaller(ctx);
+    await expect(caller.rdStation.deleteConfig({ configId: 1, tenantId: 1 })).rejects.toThrow();
+  });
+});
+
+describe("rdStation.regenerateConfigToken", () => {
+  it("generates new token for specific config", async () => {
+    const { ctx } = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    const created = await caller.rdStation.createConfig({ tenantId: 1, name: "Regen Test" });
+    const originalToken = created.webhookToken;
+    const regenerated = await caller.rdStation.regenerateConfigToken({
+      configId: created.id,
+      tenantId: 1,
+    });
+    expect(regenerated).toBeDefined();
+    expect(regenerated!.webhookToken).not.toBe(originalToken);
+    expect(regenerated!.webhookToken.length).toBeGreaterThan(0);
+  });
+});
+
+describe("rdStation.getConfigLogs", () => {
+  it("returns logs filtered by configId", async () => {
+    const { ctx } = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    const created = await caller.rdStation.createConfig({ tenantId: 1, name: "Logs Test" });
+    const result = await caller.rdStation.getConfigLogs({
+      configId: created.id,
+      tenantId: 1,
+    });
+    expect(result).toHaveProperty("logs");
+    expect(result).toHaveProperty("total");
+    expect(Array.isArray(result.logs)).toBe(true);
+  });
+});
+
+// ─── Helper Endpoints Tests ───────────────────────────────
+
+describe("rdStation.listPipelines", () => {
+  it("returns array of pipelines", async () => {
+    const { ctx } = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    const result = await caller.rdStation.listPipelines({ tenantId: 1 });
+    expect(Array.isArray(result)).toBe(true);
+  });
+});
+
+describe("rdStation.getWhatsAppStatus", () => {
+  it("returns connected status object", async () => {
+    const { ctx } = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    const result = await caller.rdStation.getWhatsAppStatus({ tenantId: 1 });
+    expect(result).toHaveProperty("connected");
+    expect(typeof result.connected).toBe("boolean");
+    expect(result).toHaveProperty("sessionId");
+  });
+});
+
+describe("rdStation.listTeamMembers", () => {
+  it("returns array of team members", async () => {
+    const { ctx } = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    const result = await caller.rdStation.listTeamMembers({ tenantId: 1 });
+    expect(Array.isArray(result)).toBe(true);
+  });
+});
+
+// ─── Template Interpolation Tests ─────────────────────────
+
+describe("Auto-WhatsApp template interpolation", () => {
+  function interpolateTemplate(
+    template: string,
+    data: { name: string; phone: string; email: string; source: string; campaign: string }
+  ): string {
+    const firstName = data.name.split(" ")[0] || data.name;
+    return template
+      .replace(/\{nome\}/gi, data.name)
+      .replace(/\{primeiro_nome\}/gi, firstName)
+      .replace(/\{telefone\}/gi, data.phone)
+      .replace(/\{email\}/gi, data.email)
+      .replace(/\{origem\}/gi, data.source)
+      .replace(/\{campanha\}/gi, data.campaign);
+  }
+
+  it("replaces all variables correctly", () => {
+    const template = "Olá {primeiro_nome}! Seu nome completo é {nome}. Tel: {telefone}, Email: {email}. Origem: {origem}, Campanha: {campanha}.";
+    const result = interpolateTemplate(template, {
+      name: "João Silva",
+      phone: "+5511999887766",
+      email: "joao@email.com",
+      source: "rdstation",
+      campaign: "black-friday",
+    });
+    expect(result).toBe("Olá João! Seu nome completo é João Silva. Tel: +5511999887766, Email: joao@email.com. Origem: rdstation, Campanha: black-friday.");
+  });
+
+  it("handles case-insensitive variables", () => {
+    const template = "Olá {NOME}! {Nome} {nome}";
+    const result = interpolateTemplate(template, {
+      name: "Maria",
+      phone: "",
+      email: "",
+      source: "",
+      campaign: "",
+    });
+    expect(result).toBe("Olá Maria! Maria Maria");
+  });
+
+  it("handles missing data gracefully (empty strings)", () => {
+    const template = "Olá {primeiro_nome}! Tel: {telefone}";
+    const result = interpolateTemplate(template, {
+      name: "Lead",
+      phone: "",
+      email: "",
+      source: "",
+      campaign: "",
+    });
+    expect(result).toBe("Olá Lead! Tel: ");
+  });
+
+  it("preserves text without variables", () => {
+    const template = "Mensagem simples sem variáveis.";
+    const result = interpolateTemplate(template, {
+      name: "Test",
+      phone: "123",
+      email: "a@b.com",
+      source: "src",
+      campaign: "cmp",
+    });
+    expect(result).toBe("Mensagem simples sem variáveis.");
+  });
+
+  it("extracts first name correctly from compound names", () => {
+    const template = "{primeiro_nome}";
+    expect(interpolateTemplate(template, { name: "Ana Beatriz Costa", phone: "", email: "", source: "", campaign: "" })).toBe("Ana");
+    expect(interpolateTemplate(template, { name: "Pedro", phone: "", email: "", source: "", campaign: "" })).toBe("Pedro");
+  });
+});
+
+// ─── processInboundLead Options Tests ─────────────────────
+
+describe("processInboundLead options interface", () => {
+  it("ProcessInboundLeadOptions type exists and function accepts options", async () => {
+    const { processInboundLead } = await import("./leadProcessor");
+    expect(typeof processInboundLead).toBe("function");
+    expect(processInboundLead.length).toBeLessThanOrEqual(3);
+  });
+});

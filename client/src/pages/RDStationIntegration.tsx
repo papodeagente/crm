@@ -1,756 +1,772 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 import { toast } from "sonner";
 import {
-  ArrowLeft, Copy, Check, RefreshCw, ExternalLink,
-  CheckCircle2, Circle, AlertTriangle, BarChart3,
-  Megaphone, Zap, Shield, Clock, ChevronDown, ChevronUp,
-  FileText, Eye, EyeOff, XCircle, Loader2,
+  ArrowLeft, Copy, Check, RefreshCw, Plus, Pencil, Trash2,
+  CheckCircle2, Circle, AlertTriangle, Megaphone, Zap, Shield,
+  ChevronDown, ChevronUp, Eye, EyeOff, Loader2, MessageSquare,
+  Phone, XCircle, BarChart3, Settings2, FileText,
 } from "lucide-react";
 import { formatFullDateTime } from "../../../shared/dateUtils";
 import { useTenantId } from "@/hooks/useTenantId";
 
+// ─── Types ───────────────────────────────────────────────
+
+interface ConfigFormData {
+  name: string;
+  defaultPipelineId: number | null;
+  defaultStageId: number | null;
+  defaultSource: string;
+  defaultCampaign: string;
+  defaultOwnerUserId: number | null;
+  autoWhatsAppEnabled: boolean;
+  autoWhatsAppMessageTemplate: string;
+}
+
+const DEFAULT_FORM: ConfigFormData = {
+  name: "",
+  defaultPipelineId: null,
+  defaultStageId: null,
+  defaultSource: "",
+  defaultCampaign: "",
+  defaultOwnerUserId: null,
+  autoWhatsAppEnabled: false,
+  autoWhatsAppMessageTemplate: "",
+};
+
+const DEFAULT_TEMPLATE = `Olá {primeiro_nome}! 👋
+
+Recebemos seu cadastro e estamos muito felizes em ter você conosco.
+
+Um de nossos consultores entrará em contato em breve para te ajudar.
+
+Enquanto isso, posso te ajudar com algo?`;
+
+// ─── Template Preview ────────────────────────────────────
+
+function interpolateTemplate(template: string): string {
+  return template
+    .replace(/\{nome\}/gi, "João Silva")
+    .replace(/\{primeiro_nome\}/gi, "João")
+    .replace(/\{telefone\}/gi, "+5511999887766")
+    .replace(/\{email\}/gi, "joao@email.com")
+    .replace(/\{origem\}/gi, "rdstation")
+    .replace(/\{campanha\}/gi, "black-friday");
+}
+
+// ─── Main Component ──────────────────────────────────────
 
 export default function RDStationIntegration() {
   const TENANT_ID = useTenantId();
   const [, setLocation] = useLocation();
-  const [copied, setCopied] = useState(false);
-  const [showToken, setShowToken] = useState(false);
-  const [showLogs, setShowLogs] = useState(false);
+
+  // UI State
+  const [showForm, setShowForm] = useState(false);
+  const [editingConfigId, setEditingConfigId] = useState<number | null>(null);
+  const [form, setForm] = useState<ConfigFormData>(DEFAULT_FORM);
+  const [copiedId, setCopiedId] = useState<number | null>(null);
+  const [showTokenId, setShowTokenId] = useState<number | null>(null);
+  const [expandedLogsId, setExpandedLogsId] = useState<number | null>(null);
   const [logFilter, setLogFilter] = useState<"success" | "failed" | "duplicate" | undefined>(undefined);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
+  const [showPreview, setShowPreview] = useState(false);
 
   // Queries
-  const configQuery = trpc.rdStation.getConfig.useQuery({ tenantId: TENANT_ID });
+  const configsQuery = trpc.rdStation.listConfigs.useQuery({ tenantId: TENANT_ID });
   const statsQuery = trpc.rdStation.getStats.useQuery({ tenantId: TENANT_ID });
-  const logsQuery = trpc.rdStation.getWebhookLogs.useQuery(
-    { tenantId: TENANT_ID, status: logFilter, limit: 20 },
-    { enabled: showLogs }
+  const pipelinesQuery = trpc.rdStation.listPipelines.useQuery({ tenantId: TENANT_ID });
+  const teamQuery = trpc.rdStation.listTeamMembers.useQuery({ tenantId: TENANT_ID });
+  const waStatusQuery = trpc.rdStation.getWhatsAppStatus.useQuery({ tenantId: TENANT_ID });
+
+  const selectedPipelineId = form.defaultPipelineId;
+  const stagesQuery = trpc.rdStation.listStages.useQuery(
+    { tenantId: TENANT_ID, pipelineId: selectedPipelineId! },
+    { enabled: !!selectedPipelineId }
   );
 
+  const logsQuery = trpc.rdStation.getConfigLogs.useQuery(
+    { tenantId: TENANT_ID, configId: expandedLogsId!, status: logFilter, limit: 20 },
+    { enabled: !!expandedLogsId }
+  );
+
+  const utils = trpc.useUtils();
+
   // Mutations
-  const setupMutation = trpc.rdStation.setupIntegration.useMutation({
+  const createMutation = trpc.rdStation.createConfig.useMutation({
     onSuccess: () => {
-      configQuery.refetch();
-      toast.success("Integração ativada! Sua URL de webhook foi gerada com sucesso.");
+      utils.rdStation.listConfigs.invalidate();
+      setShowForm(false);
+      setForm(DEFAULT_FORM);
+      toast.success("Configuração criada com sucesso!");
     },
-    onError: (err) => {
-      toast.error(err.message);
+    onError: (err) => toast.error(err.message),
+  });
+
+  const updateMutation = trpc.rdStation.updateConfig.useMutation({
+    onSuccess: () => {
+      utils.rdStation.listConfigs.invalidate();
+      setShowForm(false);
+      setEditingConfigId(null);
+      setForm(DEFAULT_FORM);
+      toast.success("Configuração atualizada!");
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
+  const deleteMutation = trpc.rdStation.deleteConfig.useMutation({
+    onSuccess: () => {
+      utils.rdStation.listConfigs.invalidate();
+      utils.rdStation.getStats.invalidate();
+      setDeleteConfirmId(null);
+      toast.success("Configuração excluída.");
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
+  const toggleMutation = trpc.rdStation.updateConfig.useMutation({
+    onSuccess: () => {
+      utils.rdStation.listConfigs.invalidate();
     },
   });
 
-  const regenerateMutation = trpc.rdStation.regenerateToken.useMutation({
+  const regenTokenMutation = trpc.rdStation.regenerateConfigToken.useMutation({
     onSuccess: () => {
-      configQuery.refetch();
-      toast.success("Token regenerado! Lembre-se de atualizar a URL no RD Station.");
+      utils.rdStation.listConfigs.invalidate();
+      toast.success("Token regenerado! Atualize a URL no RD Station.");
     },
+    onError: (err) => toast.error(err.message),
   });
 
-  const toggleMutation = trpc.rdStation.toggleActive.useMutation({
-    onSuccess: () => {
-      configQuery.refetch();
-    },
-  });
+  // ─── Helpers ───────────────────────────────────────────
 
-  const config = configQuery.data;
-  const stats = statsQuery.data;
+  const configs = configsQuery.data || [];
 
-  // Build webhook URL
-  const getWebhookUrl = () => {
-    if (!config?.webhookToken) return "";
-    const baseUrl = window.location.origin;
-    return `${baseUrl}/api/webhooks/rdstation?token=${config.webhookToken}`;
-  };
+  function openCreateForm() {
+    setEditingConfigId(null);
+    setForm({ ...DEFAULT_FORM, autoWhatsAppMessageTemplate: DEFAULT_TEMPLATE });
+    setShowForm(true);
+  }
 
-  const copyToClipboard = async (text: string) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopied(true);
-      toast.success("URL copiada para a área de transferência!");
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      toast.error("Erro ao copiar");
+  function openEditForm(config: any) {
+    setEditingConfigId(config.id);
+    setForm({
+      name: config.name || `Configuração #${config.id}`,
+      defaultPipelineId: config.defaultPipelineId ?? null,
+      defaultStageId: config.defaultStageId ?? null,
+      defaultSource: config.defaultSource || "",
+      defaultCampaign: config.defaultCampaign || "",
+      defaultOwnerUserId: config.defaultOwnerUserId ?? null,
+      autoWhatsAppEnabled: config.autoWhatsAppEnabled ?? false,
+      autoWhatsAppMessageTemplate: config.autoWhatsAppMessageTemplate || DEFAULT_TEMPLATE,
+    });
+    setShowForm(true);
+  }
+
+  function handleSave() {
+    if (!form.name.trim()) {
+      toast.error("Informe um nome para a configuração.");
+      return;
     }
-  };
+    if (editingConfigId) {
+      updateMutation.mutate({
+        configId: editingConfigId,
+        tenantId: TENANT_ID,
+        name: form.name,
+        defaultPipelineId: form.defaultPipelineId,
+        defaultStageId: form.defaultStageId,
+        defaultSource: form.defaultSource || null,
+        defaultCampaign: form.defaultCampaign || null,
+        defaultOwnerUserId: form.defaultOwnerUserId,
+        autoWhatsAppEnabled: form.autoWhatsAppEnabled,
+        autoWhatsAppMessageTemplate: form.autoWhatsAppMessageTemplate || null,
+      });
+    } else {
+      createMutation.mutate({
+        tenantId: TENANT_ID,
+        name: form.name,
+        defaultPipelineId: form.defaultPipelineId ?? undefined,
+        defaultStageId: form.defaultStageId ?? undefined,
+        defaultSource: form.defaultSource || undefined,
+        defaultCampaign: form.defaultCampaign || undefined,
+        defaultOwnerUserId: form.defaultOwnerUserId ?? undefined,
+        autoWhatsAppEnabled: form.autoWhatsAppEnabled,
+        autoWhatsAppMessageTemplate: form.autoWhatsAppMessageTemplate || undefined,
+      });
+    }
+  }
+
+  function copyWebhookUrl(config: any) {
+    const url = `${window.location.origin}/api/webhooks/rdstation?token=${config.webhookToken}`;
+    navigator.clipboard.writeText(url);
+    setCopiedId(config.id);
+    toast.success("URL copiada!");
+    setTimeout(() => setCopiedId(null), 2000);
+  }
+
+  const previewMessage = useMemo(
+    () => interpolateTemplate(form.autoWhatsAppMessageTemplate || ""),
+    [form.autoWhatsAppMessageTemplate]
+  );
+
+  // ─── Render ────────────────────────────────────────────
 
   return (
-    <div className="page-content max-w-4xl mx-auto">
+    <div className="max-w-4xl mx-auto px-4 py-8">
       {/* Header */}
-      <div className="mb-8">
-        <button
-          onClick={() => setLocation("/settings")}
-          className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors mb-4"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Voltar para Configurações
-        </button>
-
-        <div className="flex items-center gap-3">
-          <div className="h-12 w-12 rounded-xl flex items-center justify-center bg-gradient-to-br from-orange-500 to-red-500">
-            <Megaphone className="h-6 w-6 text-white" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-              RD Station Marketing
-            </h1>
-            <p className="text-sm text-muted-foreground">
-              Receba leads automaticamente do RD Station com dados de UTM
-            </p>
-          </div>
-          {config && (
-            <Badge
-              variant={config.isActive ? "default" : "secondary"}
-              className="ml-auto"
-            >
-              {config.isActive ? "Ativo" : "Inativo"}
-            </Badge>
-          )}
+      <div className="flex items-center gap-3 mb-6">
+        <Button variant="ghost" size="icon" onClick={() => setLocation("/settings")}>
+          <ArrowLeft className="h-5 w-5" />
+        </Button>
+        <div className="flex-1">
+          <h1 className="text-xl font-semibold text-foreground flex items-center gap-2">
+            <Megaphone className="h-5 w-5 text-purple-500" />
+            RD Station Marketing
+          </h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            Gerencie múltiplas configurações de webhook para receber leads automaticamente.
+          </p>
         </div>
+        <Button onClick={openCreateForm} className="gap-2">
+          <Plus className="h-4 w-4" /> Nova Configuração
+        </Button>
       </div>
 
-      {/* Status Cards */}
-      {config && stats && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
-          <Card className="border-border/50">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-2 mb-1">
-                <BarChart3 className="h-4 w-4 text-muted-foreground" />
-                <span className="text-xs text-muted-foreground">Total recebidos</span>
-              </div>
-              <p className="text-2xl font-bold text-foreground">{stats.total}</p>
-            </CardContent>
-          </Card>
-          <Card className="border-border/50">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-2 mb-1">
-                <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-                <span className="text-xs text-muted-foreground">Sucesso</span>
-              </div>
-              <p className="text-2xl font-bold text-emerald-500">{stats.success}</p>
-            </CardContent>
-          </Card>
-          <Card className="border-border/50">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-2 mb-1">
-                <XCircle className="h-4 w-4 text-red-500" />
-                <span className="text-xs text-muted-foreground">Falhas</span>
-              </div>
-              <p className="text-2xl font-bold text-red-500">{stats.failed}</p>
-            </CardContent>
-          </Card>
-          <Card className="border-border/50">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-2 mb-1">
-                <AlertTriangle className="h-4 w-4 text-amber-500" />
-                <span className="text-xs text-muted-foreground">Duplicados</span>
-              </div>
-              <p className="text-2xl font-bold text-amber-500">{stats.duplicate}</p>
-            </CardContent>
-          </Card>
+      {/* Stats Summary */}
+      {statsQuery.data && statsQuery.data.total > 0 && (
+        <div className="grid grid-cols-4 gap-3 mb-6">
+          {[
+            { label: "Total", value: statsQuery.data.total, color: "text-foreground" },
+            { label: "Sucesso", value: statsQuery.data.success, color: "text-emerald-500" },
+            { label: "Falha", value: statsQuery.data.failed, color: "text-red-500" },
+            { label: "Duplicados", value: statsQuery.data.duplicate, color: "text-amber-500" },
+          ].map((s) => (
+            <Card key={s.label} className="border-border/50">
+              <CardContent className="p-3 text-center">
+                <div className={`text-2xl font-bold ${s.color}`}>{s.value}</div>
+                <div className="text-xs text-muted-foreground">{s.label}</div>
+              </CardContent>
+            </Card>
+          ))}
         </div>
       )}
 
-      {/* Setup or Config */}
-      {!config ? (
-        /* ─── Initial Setup ─── */
-        <Card className="mb-8 border-border/50">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Zap className="h-5 w-5 text-amber-500" />
-              Ativar Integração
-            </CardTitle>
-            <CardDescription>
-              Conecte seu RD Station Marketing para receber leads automaticamente no CRM.
-              Os dados de UTM (fonte, campanha, mídia) serão capturados junto com cada lead.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button
-              onClick={() => setupMutation.mutate({ tenantId: TENANT_ID })}
-              disabled={setupMutation.isPending}
-              className="gap-2"
-            >
-              {setupMutation.isPending ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Zap className="h-4 w-4" />
-              )}
-              Ativar integração com RD Station
+      {/* WhatsApp Status Banner */}
+      {waStatusQuery.data && !waStatusQuery.data.connected && (
+        <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-3 mb-6 flex items-center gap-3">
+          <AlertTriangle className="h-5 w-5 text-amber-500 shrink-0" />
+          <div className="text-sm">
+            <strong className="text-amber-600 dark:text-amber-400">WhatsApp não conectado.</strong>{" "}
+            <span className="text-muted-foreground">
+              Para envio automático de mensagens, conecte seu WhatsApp na página de{" "}
+              <button onClick={() => setLocation("/whatsapp")} className="underline text-amber-600 dark:text-amber-400">
+                Configurações do WhatsApp
+              </button>.
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* Configs List */}
+      {configsQuery.isLoading ? (
+        <div className="flex items-center justify-center py-16">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        </div>
+      ) : configs.length === 0 ? (
+        <Card className="border-dashed border-2 border-border/50">
+          <CardContent className="py-12 text-center">
+            <Megaphone className="h-10 w-10 text-muted-foreground/40 mx-auto mb-3" />
+            <h3 className="text-lg font-medium text-foreground mb-1">Nenhuma configuração criada</h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              Crie sua primeira configuração para começar a receber leads do RD Station Marketing.
+            </p>
+            <Button onClick={openCreateForm} className="gap-2">
+              <Plus className="h-4 w-4" /> Criar Configuração
             </Button>
           </CardContent>
         </Card>
       ) : (
-        /* ─── Active Config ─── */
-        <>
-          {/* Webhook URL Card */}
-          <Card className="mb-6 border-border/50">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="text-base">URL do Webhook</CardTitle>
-                  <CardDescription>
-                    Cole esta URL no RD Station para receber leads automaticamente
-                  </CardDescription>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-muted-foreground">Ativo</span>
-                  <Switch
-                    checked={config.isActive}
-                    onCheckedChange={(checked) =>
-                      toggleMutation.mutate({ tenantId: TENANT_ID, isActive: checked })
-                    }
-                  />
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {/* URL Display */}
-              <div className="relative">
-                <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50 border border-border font-mono text-sm break-all">
-                  <span className="flex-1 text-foreground/80">
-                    {showToken ? getWebhookUrl() : getWebhookUrl().replace(/token=.*$/, "token=••••••••")}
-                  </span>
-                  <button
-                    onClick={() => setShowToken(!showToken)}
-                    className="shrink-0 p-1.5 rounded hover:bg-accent transition-colors"
-                    title={showToken ? "Ocultar token" : "Mostrar token"}
-                  >
-                    {showToken ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </button>
-                  <button
-                    onClick={() => copyToClipboard(getWebhookUrl())}
-                    className="shrink-0 p-1.5 rounded hover:bg-accent transition-colors"
-                    title="Copiar URL"
-                  >
-                    {copied ? (
-                      <Check className="h-4 w-4 text-emerald-500" />
-                    ) : (
-                      <Copy className="h-4 w-4" />
-                    )}
-                  </button>
-                </div>
-              </div>
-
-              {/* Actions */}
-              <div className="flex items-center gap-3">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    if (confirm("Tem certeza? Você precisará atualizar a URL no RD Station.")) {
-                      regenerateMutation.mutate({ tenantId: TENANT_ID });
-                    }
-                  }}
-                  disabled={regenerateMutation.isPending}
-                  className="gap-1.5"
-                >
-                  <RefreshCw className={`h-3.5 w-3.5 ${regenerateMutation.isPending ? "animate-spin" : ""}`} />
-                  Regenerar token
-                </Button>
-                {config.lastLeadReceivedAt && (
-                  <span className="text-xs text-muted-foreground flex items-center gap-1">
-                    <Clock className="h-3 w-3" />
-                    Último lead: {formatFullDateTime(config.lastLeadReceivedAt)}
-                  </span>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* ─── Mapeamento de Campos (Auto-captura) ─── */}
-          <Card className="mb-6 border-border/50 bg-gradient-to-br from-orange-500/5 to-transparent">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-500 to-amber-500 flex items-center justify-center">
-                    <Zap className="h-5 w-5 text-white" />
-                  </div>
-                  <div>
-                    <CardTitle className="text-base flex items-center gap-2">
-                      Mapeamento de Campos
-                      <Badge variant="secondary" className="text-[10px] bg-emerald-500/10 text-emerald-600 border-emerald-200">
-                        Auto-captura ativo
-                      </Badge>
+        <div className="space-y-4">
+          {configs.map((config) => (
+            <Card key={config.id} className={`border-border/50 transition-all ${!config.isActive ? "opacity-60" : ""}`}>
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className={`h-2.5 w-2.5 rounded-full shrink-0 ${config.isActive ? "bg-emerald-500" : "bg-muted-foreground/30"}`} />
+                    <CardTitle className="text-base">
+                      {config.name || `Configuração #${config.id}`}
                     </CardTitle>
-                    <CardDescription className="text-xs">
-                      Campos personalizados do RD Station são capturados automaticamente
-                    </CardDescription>
+                    {config.autoWhatsAppEnabled && (
+                      <Badge variant="secondary" className="text-[10px] gap-1">
+                        <MessageSquare className="h-3 w-3" /> Auto-WhatsApp
+                      </Badge>
+                    )}
                   </div>
-                </div>
-                <Button variant="outline" size="sm" onClick={() => setLocation("/settings/rdstation/mappings")}>
-                  Mapeamento avançado
-                  <ExternalLink className="h-3.5 w-3.5 ml-1" />
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="rounded-lg bg-emerald-500/5 border border-emerald-200/30 p-4">
-                <div className="flex items-start gap-3">
-                  <CheckCircle2 className="h-5 w-5 text-emerald-500 shrink-0 mt-0.5" />
-                  <div>
-                    <h4 className="text-sm font-semibold text-foreground mb-1">Zero configuração necessária</h4>
-                    <p className="text-sm text-muted-foreground">
-                      Todos os campos personalizados do RD Station (identificadores que começam com <code className="text-xs bg-muted px-1 py-0.5 rounded">cf_</code>) são capturados automaticamente como texto aberto e exibidos na negociação.
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="rounded-lg border border-border/50 p-3">
-                  <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Mapeamento automático (UTMs)</h4>
-                  <ul className="space-y-1.5 text-sm">
-                    <li className="flex items-center gap-2 text-muted-foreground">
-                      <CheckCircle2 className="h-3 w-3 text-blue-500 shrink-0" />
-                      <span><code className="text-xs bg-muted px-1 rounded">utm_source</code> → Origem</span>
-                    </li>
-                    <li className="flex items-center gap-2 text-muted-foreground">
-                      <CheckCircle2 className="h-3 w-3 text-blue-500 shrink-0" />
-                      <span><code className="text-xs bg-muted px-1 rounded">utm_medium</code> → Mídia</span>
-                    </li>
-                    <li className="flex items-center gap-2 text-muted-foreground">
-                      <CheckCircle2 className="h-3 w-3 text-blue-500 shrink-0" />
-                      <span><code className="text-xs bg-muted px-1 rounded">utm_campaign</code> → Campanha</span>
-                    </li>
-                    <li className="flex items-center gap-2 text-muted-foreground">
-                      <CheckCircle2 className="h-3 w-3 text-blue-500 shrink-0" />
-                      <span><code className="text-xs bg-muted px-1 rounded">utm_term</code> → Termo</span>
-                    </li>
-                    <li className="flex items-center gap-2 text-muted-foreground">
-                      <CheckCircle2 className="h-3 w-3 text-blue-500 shrink-0" />
-                      <span><code className="text-xs bg-muted px-1 rounded">utm_content</code> → Conteúdo</span>
-                    </li>
-                  </ul>
-                </div>
-                <div className="rounded-lg border border-border/50 p-3">
-                  <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Auto-captura (campos cf_)</h4>
-                  <ul className="space-y-1.5 text-sm">
-                    <li className="flex items-center gap-2 text-muted-foreground">
-                      <CheckCircle2 className="h-3 w-3 text-orange-500 shrink-0" />
-                      <span>Todos os campos <code className="text-xs bg-muted px-1 rounded">cf_*</code> capturados como texto</span>
-                    </li>
-                    <li className="flex items-center gap-2 text-muted-foreground">
-                      <CheckCircle2 className="h-3 w-3 text-orange-500 shrink-0" />
-                      <span>Exibidos na sidebar da negociação</span>
-                    </li>
-                    <li className="flex items-center gap-2 text-muted-foreground">
-                      <CheckCircle2 className="h-3 w-3 text-orange-500 shrink-0" />
-                      <span>Nenhuma configuração manual necessária</span>
-                    </li>
-                    <li className="flex items-center gap-2 text-muted-foreground">
-                      <CheckCircle2 className="h-3 w-3 text-orange-500 shrink-0" />
-                      <span>Novos campos detectados automaticamente</span>
-                    </li>
-                  </ul>
-                  <p className="text-xs text-muted-foreground mt-2 italic">
-                    Ex: cf_voce_ja_tem_um_grupo, cf_fbc, cf_fbp...
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Manual de Configuração */}
-          <Card className="mb-6 border-border/50">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <FileText className="h-5 w-5 text-blue-500" />
-                Manual de Configuração — Passo a Passo
-              </CardTitle>
-              <CardDescription>
-                Siga estes passos simples para conectar o RD Station ao seu CRM
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-6">
-                {/* Step 1 */}
-                <div className="flex gap-4">
-                  <div className="flex flex-col items-center">
-                    <div className="h-8 w-8 rounded-full bg-blue-500 text-white flex items-center justify-center text-sm font-bold shrink-0">
-                      1
-                    </div>
-                    <div className="w-0.5 flex-1 bg-border mt-2" />
-                  </div>
-                  <div className="pb-6">
-                    <h3 className="font-semibold text-foreground mb-1">Copie a URL do Webhook</h3>
-                    <p className="text-sm text-muted-foreground mb-3">
-                      Clique no botão de copiar (ícone 📋) ao lado da URL acima. Essa URL é exclusiva da sua conta
-                      e será usada para o RD Station enviar os leads automaticamente.
-                    </p>
-                    <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-3">
-                      <p className="text-xs text-amber-700 dark:text-amber-400 flex items-start gap-2">
-                        <Shield className="h-4 w-4 shrink-0 mt-0.5" />
-                        <span>
-                          <strong>Importante:</strong> Não compartilhe esta URL publicamente. Ela contém um token
-                          de segurança que autentica a conexão.
-                        </span>
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Step 2 */}
-                <div className="flex gap-4">
-                  <div className="flex flex-col items-center">
-                    <div className="h-8 w-8 rounded-full bg-blue-500 text-white flex items-center justify-center text-sm font-bold shrink-0">
-                      2
-                    </div>
-                    <div className="w-0.5 flex-1 bg-border mt-2" />
-                  </div>
-                  <div className="pb-6">
-                    <h3 className="font-semibold text-foreground mb-1">Acesse o RD Station Marketing</h3>
-                    <p className="text-sm text-muted-foreground mb-3">
-                      Entre na sua conta do RD Station Marketing. No canto superior direito, clique no
-                      <strong> nome da sua conta</strong> e depois em <strong>"Integrações"</strong>.
-                    </p>
-                    <a
-                      href="https://app.rdstation.com.br/integrations"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline"
+                  <div className="flex items-center gap-2">
+                    <Switch
+                      checked={config.isActive}
+                      onCheckedChange={(checked) =>
+                        toggleMutation.mutate({ configId: config.id, tenantId: TENANT_ID, isActive: checked })
+                      }
+                    />
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEditForm(config)}>
+                      <Pencil className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-destructive hover:text-destructive"
+                      onClick={() => setDeleteConfirmId(config.id)}
                     >
-                      Abrir RD Station Integrações
-                      <ExternalLink className="h-3.5 w-3.5" />
-                    </a>
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
                   </div>
                 </div>
-
-                {/* Step 3 */}
-                <div className="flex gap-4">
-                  <div className="flex flex-col items-center">
-                    <div className="h-8 w-8 rounded-full bg-blue-500 text-white flex items-center justify-center text-sm font-bold shrink-0">
-                      3
-                    </div>
-                    <div className="w-0.5 flex-1 bg-border mt-2" />
-                  </div>
-                  <div className="pb-6">
-                    <h3 className="font-semibold text-foreground mb-1">Configure o Webhook</h3>
-                    <p className="text-sm text-muted-foreground mb-2">
-                      Na tela de Integrações, procure por <strong>"Webhooks"</strong> e clique em <strong>"Configurar"</strong>.
-                      Depois, clique em <strong>"Criar Webhook"</strong> e preencha:
-                    </p>
-                    <div className="bg-muted/50 rounded-lg p-4 space-y-3 text-sm">
-                      <div className="flex items-start gap-3">
-                        <Circle className="h-2 w-2 mt-2 shrink-0 text-blue-500 fill-blue-500" />
-                        <div>
-                          <strong className="text-foreground">Nome:</strong>{" "}
-                          <span className="text-muted-foreground">
-                            Escolha um nome que identifique a integração (ex: "Enviar para CRM")
-                          </span>
-                        </div>
-                      </div>
-                      <div className="flex items-start gap-3">
-                        <Circle className="h-2 w-2 mt-2 shrink-0 text-blue-500 fill-blue-500" />
-                        <div>
-                          <strong className="text-foreground">URL:</strong>{" "}
-                          <span className="text-muted-foreground">
-                            Cole a URL que você copiou no Passo 1
-                          </span>
-                        </div>
-                      </div>
-                      <div className="flex items-start gap-3">
-                        <Circle className="h-2 w-2 mt-2 shrink-0 text-blue-500 fill-blue-500" />
-                        <div>
-                          <strong className="text-foreground">Gatilho:</strong>{" "}
-                          <span className="text-muted-foreground">
-                            Selecione <strong>"Conversão"</strong>. Deixe o campo de conversões específicas
-                            <strong> em branco</strong> para receber todos os leads, ou selecione apenas as
-                            conversões desejadas.
-                          </span>
-                        </div>
-                      </div>
+                <CardDescription className="ml-5 mt-1">
+                  {config.totalLeadsReceived} leads recebidos
+                  {config.lastLeadReceivedAt && (
+                    <> · Último: {formatFullDateTime(config.lastLeadReceivedAt)}</>
+                  )}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="pt-0 space-y-3">
+                {/* Webhook URL */}
+                <div className="bg-muted/50 rounded-lg p-3">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs font-medium text-muted-foreground">URL do Webhook</span>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 text-xs gap-1"
+                        onClick={() => setShowTokenId(showTokenId === config.id ? null : config.id)}
+                      >
+                        {showTokenId === config.id ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+                        {showTokenId === config.id ? "Ocultar" : "Mostrar"}
+                      </Button>
+                      <Button variant="ghost" size="sm" className="h-6 text-xs gap-1" onClick={() => copyWebhookUrl(config)}>
+                        {copiedId === config.id ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3" />}
+                        {copiedId === config.id ? "Copiado!" : "Copiar"}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 text-xs gap-1"
+                        onClick={() => regenTokenMutation.mutate({ configId: config.id, tenantId: TENANT_ID })}
+                        disabled={regenTokenMutation.isPending}
+                      >
+                        <RefreshCw className={`h-3 w-3 ${regenTokenMutation.isPending ? "animate-spin" : ""}`} />
+                        Regenerar
+                      </Button>
                     </div>
                   </div>
+                  <code className="text-xs text-muted-foreground break-all block">
+                    {showTokenId === config.id
+                      ? `${window.location.origin}/api/webhooks/rdstation?token=${config.webhookToken}`
+                      : `${window.location.origin}/api/webhooks/rdstation?token=${"•".repeat(16)}`}
+                  </code>
                 </div>
 
-                {/* Step 4 */}
-                <div className="flex gap-4">
-                  <div className="flex flex-col items-center">
-                    <div className="h-8 w-8 rounded-full bg-blue-500 text-white flex items-center justify-center text-sm font-bold shrink-0">
-                      4
+                {/* Config Details */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+                  {config.defaultPipelineId && (
+                    <div className="bg-muted/30 rounded px-2 py-1.5">
+                      <span className="text-muted-foreground">Pipeline:</span>{" "}
+                      <span className="text-foreground font-medium">
+                        {pipelinesQuery.data?.find((p) => p.id === config.defaultPipelineId)?.name || `#${config.defaultPipelineId}`}
+                      </span>
                     </div>
-                    <div className="w-0.5 flex-1 bg-border mt-2" />
-                  </div>
-                  <div className="pb-6">
-                    <h3 className="font-semibold text-foreground mb-1">Salve e Verifique</h3>
-                    <p className="text-sm text-muted-foreground mb-3">
-                      Clique em <strong>"Salvar Webhook"</strong>. O RD Station vai mostrar a opção de
-                      <strong> "Verificar"</strong> — clique nela para testar se a conexão está funcionando.
-                      Se aparecer uma mensagem de sucesso, está tudo certo!
-                    </p>
-                    <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-lg p-3">
-                      <p className="text-xs text-emerald-700 dark:text-emerald-400 flex items-start gap-2">
-                        <CheckCircle2 className="h-4 w-4 shrink-0 mt-0.5" />
-                        <span>
-                          <strong>Pronto!</strong> A partir de agora, toda vez que um lead converter no RD Station
-                          (formulário, landing page, pop-up), ele será criado automaticamente no seu CRM com todos
-                          os dados de UTM (fonte, campanha, mídia, conteúdo e termo).
-                        </span>
-                      </p>
+                  )}
+                  {config.defaultSource && (
+                    <div className="bg-muted/30 rounded px-2 py-1.5">
+                      <span className="text-muted-foreground">Origem:</span>{" "}
+                      <span className="text-foreground font-medium">{config.defaultSource}</span>
                     </div>
-                  </div>
-                </div>
-
-                {/* Step 5 - Optional */}
-                <div className="flex gap-4">
-                  <div className="flex flex-col items-center">
-                    <div className="h-8 w-8 rounded-full bg-muted text-muted-foreground flex items-center justify-center text-sm font-bold shrink-0">
-                      5
+                  )}
+                  {config.defaultCampaign && (
+                    <div className="bg-muted/30 rounded px-2 py-1.5">
+                      <span className="text-muted-foreground">Campanha:</span>{" "}
+                      <span className="text-foreground font-medium">{config.defaultCampaign}</span>
                     </div>
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-foreground mb-1">
-                      <span className="text-muted-foreground">(Opcional)</span> Enviar apenas oportunidades
-                    </h3>
-                    <p className="text-sm text-muted-foreground">
-                      Se preferir receber apenas leads qualificados, crie um segundo webhook com o gatilho
-                      <strong> "Oportunidade"</strong>. Assim, só os leads marcados como oportunidade no RD Station
-                      serão enviados ao CRM.
-                    </p>
-                  </div>
+                  )}
+                  {config.defaultOwnerUserId && (
+                    <div className="bg-muted/30 rounded px-2 py-1.5">
+                      <span className="text-muted-foreground">Responsável:</span>{" "}
+                      <span className="text-foreground font-medium">
+                        {teamQuery.data?.find((m) => m.id === config.defaultOwnerUserId)?.name || `#${config.defaultOwnerUserId}`}
+                      </span>
+                    </div>
+                  )}
                 </div>
-              </div>
-            </CardContent>
-          </Card>
 
-          {/* What gets captured */}
-          <Card className="mb-6 border-border/50">
-            <CardHeader>
-              <CardTitle className="text-base">O que é capturado automaticamente?</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <h4 className="text-sm font-semibold text-foreground mb-2">Dados do Lead</h4>
-                  <ul className="space-y-1.5 text-sm text-muted-foreground">
-                    <li className="flex items-center gap-2">
-                      <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0" /> Nome completo
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0" /> E-mail
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0" /> Telefone
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0" /> Empresa
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0" /> Cargo
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0" /> Cidade / Estado
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0" /> Tags do RD Station
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0" /> Campos personalizados
-                    </li>
-                  </ul>
-                </div>
-                <div>
-                  <h4 className="text-sm font-semibold text-foreground mb-2">Dados de Marketing (UTM)</h4>
-                  <ul className="space-y-1.5 text-sm text-muted-foreground">
-                    <li className="flex items-center gap-2">
-                      <CheckCircle2 className="h-3.5 w-3.5 text-blue-500 shrink-0" /> utm_source (fonte)
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <CheckCircle2 className="h-3.5 w-3.5 text-blue-500 shrink-0" /> utm_medium (mídia)
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <CheckCircle2 className="h-3.5 w-3.5 text-blue-500 shrink-0" /> utm_campaign (campanha)
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <CheckCircle2 className="h-3.5 w-3.5 text-blue-500 shrink-0" /> utm_content (conteúdo)
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <CheckCircle2 className="h-3.5 w-3.5 text-blue-500 shrink-0" /> utm_term (termo)
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <CheckCircle2 className="h-3.5 w-3.5 text-blue-500 shrink-0" /> Identificador da conversão
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <CheckCircle2 className="h-3.5 w-3.5 text-blue-500 shrink-0" /> Canal de origem
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <CheckCircle2 className="h-3.5 w-3.5 text-blue-500 shrink-0" /> Estágio do lead no RD
-                    </li>
-                  </ul>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Webhook Logs */}
-          <Card className="mb-6 border-border/50">
-            <CardHeader>
-              <button
-                onClick={() => setShowLogs(!showLogs)}
-                className="flex items-center justify-between w-full"
-              >
-                <div className="text-left">
-                  <CardTitle className="text-base">Histórico de Recebimentos</CardTitle>
-                  <CardDescription>
-                    Veja todos os leads recebidos do RD Station
-                  </CardDescription>
-                </div>
-                {showLogs ? (
-                  <ChevronUp className="h-5 w-5 text-muted-foreground" />
-                ) : (
-                  <ChevronDown className="h-5 w-5 text-muted-foreground" />
-                )}
-              </button>
-            </CardHeader>
-            {showLogs && (
-              <CardContent>
-                {/* Filter */}
-                <div className="flex items-center gap-2 mb-4">
-                  <span className="text-xs text-muted-foreground">Filtrar:</span>
-                  {[
-                    { label: "Todos", value: undefined },
-                    { label: "Sucesso", value: "success" as const },
-                    { label: "Falha", value: "failed" as const },
-                    { label: "Duplicado", value: "duplicate" as const },
-                  ].map((opt) => (
-                    <button
-                      key={opt.label}
-                      onClick={() => setLogFilter(opt.value)}
-                      className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
-                        logFilter === opt.value
-                          ? "bg-primary text-primary-foreground"
-                          : "bg-muted text-muted-foreground hover:bg-accent"
-                      }`}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
+                {/* Logs Toggle */}
+                <button
+                  onClick={() => {
+                    setExpandedLogsId(expandedLogsId === config.id ? null : config.id);
+                    setLogFilter(undefined);
+                  }}
+                  className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors w-full pt-1"
+                >
+                  <BarChart3 className="h-3.5 w-3.5" />
+                  <span>Histórico de recebimentos</span>
+                  {expandedLogsId === config.id ? <ChevronUp className="h-3.5 w-3.5 ml-auto" /> : <ChevronDown className="h-3.5 w-3.5 ml-auto" />}
+                </button>
 
                 {/* Logs Table */}
-                {logsQuery.isLoading ? (
-                  <div className="flex items-center justify-center py-8">
-                    <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-                  </div>
-                ) : logsQuery.data?.logs.length === 0 ? (
-                  <div className="text-center py-8 text-sm text-muted-foreground">
-                    Nenhum lead recebido ainda. Configure o webhook no RD Station para começar.
-                  </div>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b border-border">
-                          <th className="text-left py-2 px-2 text-xs font-medium text-muted-foreground">Status</th>
-                          <th className="text-left py-2 px-2 text-xs font-medium text-muted-foreground">Nome</th>
-                          <th className="text-left py-2 px-2 text-xs font-medium text-muted-foreground">E-mail</th>
-                          <th className="text-left py-2 px-2 text-xs font-medium text-muted-foreground">Conversão</th>
-                          <th className="text-left py-2 px-2 text-xs font-medium text-muted-foreground">UTM Source</th>
-                          <th className="text-left py-2 px-2 text-xs font-medium text-muted-foreground">UTM Campaign</th>
-                          <th className="text-left py-2 px-2 text-xs font-medium text-muted-foreground">Data</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {logsQuery.data?.logs.map((log) => (
-                          <tr key={log.id} className="border-b border-border/50 hover:bg-muted/30">
-                            <td className="py-2 px-2">
-                              {log.status === "success" && (
-                                <Badge variant="default" className="bg-emerald-500/20 text-emerald-600 border-0 text-[10px]">
-                                  OK
-                                </Badge>
-                              )}
-                              {log.status === "failed" && (
-                                <Badge variant="destructive" className="text-[10px]">
-                                  Falha
-                                </Badge>
-                              )}
-                              {log.status === "duplicate" && (
-                                <Badge variant="secondary" className="text-[10px]">
-                                  Dup.
-                                </Badge>
-                              )}
-                            </td>
-                            <td className="py-2 px-2 text-foreground">{log.name || "—"}</td>
-                            <td className="py-2 px-2 text-muted-foreground">{log.email || "—"}</td>
-                            <td className="py-2 px-2 text-muted-foreground text-xs">{log.conversionIdentifier || "—"}</td>
-                            <td className="py-2 px-2 text-muted-foreground text-xs">{log.utmSource || "—"}</td>
-                            <td className="py-2 px-2 text-muted-foreground text-xs">{log.utmCampaign || "—"}</td>
-                            <td className="py-2 px-2 text-muted-foreground text-xs">
-                              {log.createdAt ? formatFullDateTime(log.createdAt) : "—"}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                    {logsQuery.data && logsQuery.data.total > 20 && (
-                      <p className="text-xs text-muted-foreground text-center mt-3">
-                        Exibindo 20 de {logsQuery.data.total} registros
-                      </p>
+                {expandedLogsId === config.id && (
+                  <div className="pt-2">
+                    <div className="flex items-center gap-2 mb-3">
+                      {[
+                        { label: "Todos", value: undefined },
+                        { label: "Sucesso", value: "success" as const },
+                        { label: "Falha", value: "failed" as const },
+                        { label: "Duplicado", value: "duplicate" as const },
+                      ].map((opt) => (
+                        <button
+                          key={opt.label}
+                          onClick={() => setLogFilter(opt.value)}
+                          className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
+                            logFilter === opt.value
+                              ? "bg-primary text-primary-foreground"
+                              : "bg-muted text-muted-foreground hover:bg-accent"
+                          }`}
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    {logsQuery.isLoading ? (
+                      <div className="flex items-center justify-center py-6">
+                        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                      </div>
+                    ) : !logsQuery.data?.logs.length ? (
+                      <div className="text-center py-6 text-xs text-muted-foreground">
+                        Nenhum lead recebido nesta configuração.
+                      </div>
+                    ) : (
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-xs">
+                          <thead>
+                            <tr className="border-b border-border">
+                              <th className="text-left py-1.5 px-2 font-medium text-muted-foreground">Status</th>
+                              <th className="text-left py-1.5 px-2 font-medium text-muted-foreground">Nome</th>
+                              <th className="text-left py-1.5 px-2 font-medium text-muted-foreground">E-mail</th>
+                              <th className="text-left py-1.5 px-2 font-medium text-muted-foreground">WhatsApp</th>
+                              <th className="text-left py-1.5 px-2 font-medium text-muted-foreground">Data</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {logsQuery.data.logs.map((log) => (
+                              <tr key={log.id} className="border-b border-border/50 hover:bg-muted/30">
+                                <td className="py-1.5 px-2">
+                                  {log.status === "success" && (
+                                    <Badge variant="default" className="bg-emerald-500/20 text-emerald-600 border-0 text-[10px]">OK</Badge>
+                                  )}
+                                  {log.status === "failed" && (
+                                    <Badge variant="destructive" className="text-[10px]">Falha</Badge>
+                                  )}
+                                  {log.status === "duplicate" && (
+                                    <Badge variant="secondary" className="text-[10px]">Dup.</Badge>
+                                  )}
+                                </td>
+                                <td className="py-1.5 px-2 text-foreground">{log.name || "—"}</td>
+                                <td className="py-1.5 px-2 text-muted-foreground">{log.email || "—"}</td>
+                                <td className="py-1.5 px-2">
+                                  {log.autoWhatsAppStatus === "sent" && (
+                                    <Badge variant="default" className="bg-emerald-500/20 text-emerald-600 border-0 text-[10px] gap-0.5">
+                                      <Phone className="h-2.5 w-2.5" /> Enviado
+                                    </Badge>
+                                  )}
+                                  {log.autoWhatsAppStatus === "failed" && (
+                                    <Badge variant="destructive" className="text-[10px] gap-0.5">
+                                      <Phone className="h-2.5 w-2.5" /> Falha
+                                    </Badge>
+                                  )}
+                                  {log.autoWhatsAppStatus === "skipped" && (
+                                    <Badge variant="secondary" className="text-[10px]">Pulado</Badge>
+                                  )}
+                                  {!log.autoWhatsAppStatus && (
+                                    <span className="text-muted-foreground/50">—</span>
+                                  )}
+                                </td>
+                                <td className="py-1.5 px-2 text-muted-foreground whitespace-nowrap">
+                                  {formatFullDateTime(log.createdAt)}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
                     )}
                   </div>
                 )}
               </CardContent>
-            )}
-          </Card>
-
-          {/* FAQ */}
-          <Card className="border-border/50">
-            <CardHeader>
-              <CardTitle className="text-base">Perguntas Frequentes</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <h4 className="text-sm font-semibold text-foreground mb-1">
-                  Preciso de algum plano específico do RD Station?
-                </h4>
-                <p className="text-sm text-muted-foreground">
-                  A funcionalidade de Webhooks está disponível nos planos Light, Basic e Pro do RD Station Marketing.
-                </p>
-              </div>
-              <div>
-                <h4 className="text-sm font-semibold text-foreground mb-1">
-                  Os leads existentes serão importados?
-                </h4>
-                <p className="text-sm text-muted-foreground">
-                  Não. O webhook envia apenas leads que converterem <strong>após</strong> a configuração.
-                  Leads importados manualmente ou já existentes no RD Station não ativam o webhook.
-                </p>
-              </div>
-              <div>
-                <h4 className="text-sm font-semibold text-foreground mb-1">
-                  O que acontece se o mesmo lead converter duas vezes?
-                </h4>
-                <p className="text-sm text-muted-foreground">
-                  O sistema detecta duplicatas automaticamente. Se o lead já existir no CRM (mesmo e-mail ou telefone),
-                  o contato existente será atualizado e a nova conversão será registrada no histórico.
-                </p>
-              </div>
-              <div>
-                <h4 className="text-sm font-semibold text-foreground mb-1">
-                  Posso pausar a integração temporariamente?
-                </h4>
-                <p className="text-sm text-muted-foreground">
-                  Sim! Use o botão "Ativo/Inativo" no topo desta página. Quando desativado, o webhook
-                  continuará existindo no RD Station, mas os leads não serão processados.
-                </p>
-              </div>
-              <div>
-                <h4 className="text-sm font-semibold text-foreground mb-1">
-                  Preciso de um desenvolvedor para configurar?
-                </h4>
-                <p className="text-sm text-muted-foreground">
-                  Não! Basta seguir o passo a passo acima. É literalmente copiar a URL e colar no RD Station.
-                  Leva menos de 2 minutos.
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        </>
+            </Card>
+          ))}
+        </div>
       )}
+
+      {/* Setup Guide (always visible below configs) */}
+      <Card className="mt-6 border-border/50">
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <FileText className="h-4 w-4 text-blue-500" />
+            Como configurar no RD Station
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4 text-sm">
+            <div className="flex gap-3">
+              <div className="h-6 w-6 rounded-full bg-blue-500 text-white flex items-center justify-center text-xs font-bold shrink-0">1</div>
+              <p className="text-muted-foreground">
+                Acesse <strong>RD Station → Integrações → Webhooks</strong> e clique em <strong>"Criar Webhook"</strong>.
+              </p>
+            </div>
+            <div className="flex gap-3">
+              <div className="h-6 w-6 rounded-full bg-blue-500 text-white flex items-center justify-center text-xs font-bold shrink-0">2</div>
+              <p className="text-muted-foreground">
+                Cole a <strong>URL do Webhook</strong> copiada acima no campo de URL.
+              </p>
+            </div>
+            <div className="flex gap-3">
+              <div className="h-6 w-6 rounded-full bg-blue-500 text-white flex items-center justify-center text-xs font-bold shrink-0">3</div>
+              <p className="text-muted-foreground">
+                Selecione o gatilho <strong>"Conversão"</strong>. Deixe em branco para receber todos os leads, ou selecione conversões específicas.
+              </p>
+            </div>
+            <div className="flex gap-3">
+              <div className="h-6 w-6 rounded-full bg-blue-500 text-white flex items-center justify-center text-xs font-bold shrink-0">4</div>
+              <p className="text-muted-foreground">
+                Clique em <strong>"Salvar"</strong> e depois <strong>"Verificar"</strong> para testar a conexão.
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Link to Field Mappings */}
+      <div className="mt-4 text-center">
+        <Button variant="link" className="text-sm gap-2" onClick={() => setLocation("/settings/rdstation/mappings")}>
+          <Settings2 className="h-4 w-4" /> Configurar mapeamento de campos
+        </Button>
+      </div>
+
+      {/* ─── Create/Edit Dialog ─────────────────────────── */}
+      <Dialog open={showForm} onOpenChange={(open) => { if (!open) { setShowForm(false); setEditingConfigId(null); } }}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{editingConfigId ? "Editar Configuração" : "Nova Configuração"}</DialogTitle>
+            <DialogDescription>
+              {editingConfigId
+                ? "Atualize os parâmetros desta configuração de webhook."
+                : "Crie uma nova configuração de webhook para receber leads do RD Station."}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            {/* Name */}
+            <div>
+              <Label htmlFor="cfg-name">Nome da configuração *</Label>
+              <Input
+                id="cfg-name"
+                placeholder="Ex: Formulário Landing Page"
+                value={form.name}
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
+              />
+            </div>
+
+            {/* Pipeline */}
+            <div>
+              <Label>Pipeline de destino</Label>
+              <Select
+                value={form.defaultPipelineId ? String(form.defaultPipelineId) : "auto"}
+                onValueChange={(v) => {
+                  const pid = v === "auto" ? null : Number(v);
+                  setForm({ ...form, defaultPipelineId: pid, defaultStageId: null });
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Pipeline padrão (automático)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="auto">Automático (pipeline padrão)</SelectItem>
+                  {pipelinesQuery.data?.map((p) => (
+                    <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Stage (depends on pipeline) */}
+            {form.defaultPipelineId && (
+              <div>
+                <Label>Etapa de destino</Label>
+                <Select
+                  value={form.defaultStageId ? String(form.defaultStageId) : "auto"}
+                  onValueChange={(v) => setForm({ ...form, defaultStageId: v === "auto" ? null : Number(v) })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Primeira etapa (automático)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="auto">Automático (primeira etapa)</SelectItem>
+                    {stagesQuery.data?.map((s) => (
+                      <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {/* Source & Campaign */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label htmlFor="cfg-source">Origem padrão</Label>
+                <Input
+                  id="cfg-source"
+                  placeholder="Ex: rdstation"
+                  value={form.defaultSource}
+                  onChange={(e) => setForm({ ...form, defaultSource: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label htmlFor="cfg-campaign">Campanha padrão</Label>
+                <Input
+                  id="cfg-campaign"
+                  placeholder="Ex: black-friday"
+                  value={form.defaultCampaign}
+                  onChange={(e) => setForm({ ...form, defaultCampaign: e.target.value })}
+                />
+              </div>
+            </div>
+
+            {/* Owner */}
+            <div>
+              <Label>Responsável padrão</Label>
+              <Select
+                value={form.defaultOwnerUserId ? String(form.defaultOwnerUserId) : "auto"}
+                onValueChange={(v) => setForm({ ...form, defaultOwnerUserId: v === "auto" ? null : Number(v) })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Round-robin (automático)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="auto">Automático (round-robin)</SelectItem>
+                  {teamQuery.data?.map((m) => (
+                    <SelectItem key={m.id} value={String(m.id)}>{m.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Auto WhatsApp */}
+            <div className="border border-border/50 rounded-lg p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <MessageSquare className="h-4 w-4 text-emerald-500" />
+                  <Label className="font-medium">Envio automático de WhatsApp</Label>
+                </div>
+                <Switch
+                  checked={form.autoWhatsAppEnabled}
+                  onCheckedChange={(checked) => setForm({ ...form, autoWhatsAppEnabled: checked })}
+                />
+              </div>
+
+              {form.autoWhatsAppEnabled && (
+                <>
+                  {!waStatusQuery.data?.connected && (
+                    <div className="bg-amber-500/10 border border-amber-500/20 rounded p-2 text-xs text-amber-600 dark:text-amber-400 flex items-center gap-2">
+                      <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                      WhatsApp não conectado. Conecte antes de ativar o envio automático.
+                    </div>
+                  )}
+
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <Label htmlFor="cfg-template" className="text-xs">Template da mensagem</Label>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 text-xs gap-1"
+                        onClick={() => setShowPreview(!showPreview)}
+                      >
+                        <Eye className="h-3 w-3" /> {showPreview ? "Ocultar preview" : "Ver preview"}
+                      </Button>
+                    </div>
+                    <Textarea
+                      id="cfg-template"
+                      rows={5}
+                      placeholder="Olá {primeiro_nome}! Recebemos seu cadastro..."
+                      value={form.autoWhatsAppMessageTemplate}
+                      onChange={(e) => setForm({ ...form, autoWhatsAppMessageTemplate: e.target.value })}
+                    />
+                    <p className="text-[10px] text-muted-foreground mt-1">
+                      Variáveis: {"{nome}"} {"{primeiro_nome}"} {"{telefone}"} {"{email}"} {"{origem}"} {"{campanha}"}
+                    </p>
+                  </div>
+
+                  {showPreview && form.autoWhatsAppMessageTemplate && (
+                    <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-lg p-3">
+                      <div className="text-[10px] text-muted-foreground mb-1 font-medium">Preview (dados fictícios):</div>
+                      <div className="text-sm text-foreground whitespace-pre-wrap">{previewMessage}</div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setShowForm(false); setEditingConfigId(null); }}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleSave}
+              disabled={createMutation.isPending || updateMutation.isPending}
+            >
+              {(createMutation.isPending || updateMutation.isPending) && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+              {editingConfigId ? "Salvar" : "Criar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── Delete Confirmation Dialog ─────────────────── */}
+      <Dialog open={!!deleteConfirmId} onOpenChange={(open) => { if (!open) setDeleteConfirmId(null); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Excluir configuração?</DialogTitle>
+            <DialogDescription>
+              Esta ação é irreversível. A URL do webhook deixará de funcionar imediatamente.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteConfirmId(null)}>Cancelar</Button>
+            <Button
+              variant="destructive"
+              onClick={() => deleteConfirmId && deleteMutation.mutate({ configId: deleteConfirmId, tenantId: TENANT_ID })}
+              disabled={deleteMutation.isPending}
+            >
+              {deleteMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+              Excluir
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

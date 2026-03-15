@@ -16,7 +16,7 @@ import {
   type InboundLeadPayload,
 } from "./leadProcessor";
 import { getDb } from "./db";
-import { eventLog, trackingTokens, rdStationConfig, rdStationWebhookLog } from "../drizzle/schema";
+import { eventLog, trackingTokens, rdStationConfig, rdStationWebhookLog, whatsappSessions } from "../drizzle/schema";
 import { eq, and, sql } from "drizzle-orm";
 import { ENV } from "./_core/env";
 import { generateTrackerScript } from "./tracker-script";
@@ -816,10 +816,74 @@ router.post("/api/webhooks/rdstation", async (req: Request, res: Response) => {
           raw: lead,
         };
 
-        // 8. Process the lead
-        const result = await processInboundLead(tenantId, payload);
+        // 8. Process the lead — pass config overrides
+        const result = await processInboundLead(tenantId, payload, {
+          pipelineId: config.defaultPipelineId ?? undefined,
+          stageId: config.defaultStageId ?? undefined,
+          ownerUserId: config.defaultOwnerUserId ?? undefined,
+          source: config.defaultSource || undefined,
+          campaign: config.defaultCampaign || undefined,
+        });
 
-        // 9. Log in rd_station_webhook_log
+        // 9. Auto-WhatsApp sending
+        let autoWhatsAppStatus: string | null = null;
+        let autoWhatsAppError: string | null = null;
+
+        if (config.autoWhatsAppEnabled && result.success && !result.isExisting) {
+          const normalizedPhone = phone ? phone.replace(/\D/g, "") : "";
+          if (!normalizedPhone || normalizedPhone.length < 10) {
+            autoWhatsAppStatus = "skipped";
+            autoWhatsAppError = "Telefone ausente ou inválido";
+          } else {
+            try {
+              // Find connected WhatsApp session for this tenant
+              const sessionRows = await db
+                .select()
+                .from(whatsappSessions)
+                .where(and(eq(whatsappSessions.tenantId, tenantId), eq(whatsappSessions.status, "connected")))
+                .limit(1);
+
+              if (sessionRows.length === 0) {
+                autoWhatsAppStatus = "skipped";
+                autoWhatsAppError = "Nenhuma sessão WhatsApp conectada";
+              } else {
+                const session = sessionRows[0]!;
+                const template = config.autoWhatsAppMessageTemplate || "";
+                if (!template.trim()) {
+                  autoWhatsAppStatus = "skipped";
+                  autoWhatsAppError = "Template de mensagem vazio";
+                } else {
+                  // Interpolate variables
+                  const leadName = name || company || "Lead";
+                  const firstName = leadName.split(" ")[0] || leadName;
+                  const message = template
+                    .replace(/\{nome\}/gi, leadName)
+                    .replace(/\{primeiro_nome\}/gi, firstName)
+                    .replace(/\{telefone\}/gi, phone || "")
+                    .replace(/\{email\}/gi, email || "")
+                    .replace(/\{origem\}/gi, config.defaultSource || directUtmSource || "rdstation")
+                    .replace(/\{campanha\}/gi, config.defaultCampaign || directUtmCampaign || "");
+
+                  // Send via WhatsApp manager
+                  const { whatsappManager } = await import("./whatsappEvolution");
+                  const jid = `${normalizedPhone}@s.whatsapp.net`;
+                  await whatsappManager.sendTextMessage(session.sessionId, jid, message);
+                  autoWhatsAppStatus = "sent";
+                  console.log(`[RD Station Webhook] Auto-WhatsApp sent to ${normalizedPhone} via session ${session.sessionId}`);
+                }
+              }
+            } catch (waErr: any) {
+              autoWhatsAppStatus = "failed";
+              autoWhatsAppError = waErr.message || String(waErr);
+              console.error(`[RD Station Webhook] Auto-WhatsApp failed:`, waErr.message);
+            }
+          }
+        } else if (config.autoWhatsAppEnabled && result.isExisting) {
+          autoWhatsAppStatus = "skipped";
+          autoWhatsAppError = "Lead duplicado — WhatsApp não reenviado";
+        }
+
+        // 10. Log in rd_station_webhook_log
         await db.insert(rdStationWebhookLog).values({
           tenantId,
           rdLeadId,
@@ -835,6 +899,9 @@ router.post("/api/webhooks/rdstation", async (req: Request, res: Response) => {
           status: result.success ? (result.isExisting ? "duplicate" : "success") : "failed",
           dealId: result.dealId ?? null,
           contactId: result.contactId ?? null,
+          configId: config.id,
+          autoWhatsAppStatus,
+          autoWhatsAppError,
           error: result.error || null,
           rawPayload: lead as any,
         });
@@ -860,6 +927,7 @@ router.post("/api/webhooks/rdstation", async (req: Request, res: Response) => {
           email: lead.email || null,
           name: lead.name || null,
           status: "failed",
+          configId: config.id,
           error: leadErr.message,
           rawPayload: lead as any,
         });

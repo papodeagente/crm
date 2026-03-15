@@ -1352,16 +1352,24 @@ export type InsertLossReason = typeof lossReasons.$inferInsert;
 export const rdStationConfig = mysqlTable("rd_station_config", {
   id: int("id").autoincrement().primaryKey(),
   tenantId: int("tenantId").notNull().default(1),
+  name: varchar("name", { length: 255 }),
   webhookToken: varchar("webhookToken", { length: 128 }).notNull(),
   isActive: boolean("isActive").default(true).notNull(),
   autoCreateDeal: boolean("autoCreateDeal").default(true).notNull(),
   defaultPipelineId: int("defaultPipelineId"),
   defaultStageId: int("defaultStageId"),
+  defaultSource: varchar("defaultSource", { length: 255 }),
+  defaultCampaign: varchar("defaultCampaign", { length: 255 }),
+  defaultOwnerUserId: int("defaultOwnerUserId"),
+  autoWhatsAppEnabled: boolean("autoWhatsAppEnabled").default(false).notNull(),
+  autoWhatsAppMessageTemplate: text("autoWhatsAppMessageTemplate"),
   totalLeadsReceived: int("totalLeadsReceived").default(0).notNull(),
   lastLeadReceivedAt: timestamp("lastLeadReceivedAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-});
+}, (t) => [
+  index("rdcfg_tenant_idx").on(t.tenantId),
+]);
 
 export const rdStationWebhookLog = mysqlTable("rd_station_webhook_log", {
   id: int("id").autoincrement().primaryKey(),
@@ -1379,6 +1387,9 @@ export const rdStationWebhookLog = mysqlTable("rd_station_webhook_log", {
   status: mysqlEnum("status", ["success", "failed", "duplicate"]).default("success").notNull(),
   dealId: int("dealId"),
   contactId: int("contactId"),
+  configId: int("configId"),
+  autoWhatsAppStatus: varchar("autoWhatsAppStatus", { length: 32 }),
+  autoWhatsAppError: text("autoWhatsAppError"),
   error: text("error"),
   rawPayload: json("rawPayload"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -1386,6 +1397,7 @@ export const rdStationWebhookLog = mysqlTable("rd_station_webhook_log", {
   index("rdlog_tenant_idx").on(t.tenantId),
   index("rdlog_status_idx").on(t.tenantId, t.status),
   index("rdlog_created_idx").on(t.tenantId, t.createdAt),
+  index("rdlog_config_idx").on(t.configId),
 ]);
 
 export type RdStationConfig = typeof rdStationConfig.$inferSelect;

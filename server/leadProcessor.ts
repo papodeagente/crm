@@ -236,9 +236,18 @@ async function upsertContact(
 
 // ─── Main Processor ──────────────────────────────────────
 
+export interface ProcessInboundLeadOptions {
+  pipelineId?: number;
+  stageId?: number;
+  ownerUserId?: number;
+  source?: string;
+  campaign?: string;
+}
+
 export async function processInboundLead(
   tenantId: number,
-  payload: InboundLeadPayload
+  payload: InboundLeadPayload,
+  options?: ProcessInboundLeadOptions
 ): Promise<ProcessResult> {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
@@ -301,14 +310,31 @@ export async function processInboundLead(
       source: payload.source,
     });
 
-    // 6. Get default pipeline & stage
-    const pipelineInfo = await getDefaultPipelineAndStage(tenantId);
+    // 6. Get pipeline & stage (from options or default)
+    let pipelineInfo: { pipelineId: number; stageId: number } | null = null;
+    if (options?.pipelineId && options?.stageId) {
+      pipelineInfo = { pipelineId: options.pipelineId, stageId: options.stageId };
+    } else if (options?.pipelineId) {
+      // Pipeline specified but no stage — get first stage of that pipeline
+      const stageRows = await db
+        .select()
+        .from(pipelineStages)
+        .where(and(eq(pipelineStages.tenantId, tenantId), eq(pipelineStages.pipelineId, options.pipelineId)))
+        .orderBy(asc(pipelineStages.orderIndex))
+        .limit(1);
+      if (stageRows.length > 0) {
+        pipelineInfo = { pipelineId: options.pipelineId, stageId: stageRows[0]!.id };
+      }
+    }
+    if (!pipelineInfo) {
+      pipelineInfo = await getDefaultPipelineAndStage(tenantId);
+    }
     if (!pipelineInfo) {
       throw new Error("Nenhum pipeline encontrado. Crie um pipeline antes de receber leads.");
     }
 
-    // 7. Round-robin owner
-    const ownerUserId = await getNextOwner(tenantId);
+    // 7. Owner (from options or round-robin)
+    const ownerUserId = options?.ownerUserId ?? await getNextOwner(tenantId);
 
     // 8. Create Deal
     const dealTitle = `${normalizedName} • ${payload.source}`;
@@ -320,11 +346,11 @@ export async function processInboundLead(
       stageId: pipelineInfo.stageId,
       status: "open",
       ownerUserId: ownerUserId ?? undefined,
-      channelOrigin: payload.source,
-      leadSource: payload.source,
+      channelOrigin: options?.source || payload.source,
+      leadSource: options?.source || payload.source,
       utmSource: payload.utm?.source || undefined,
       utmMedium: payload.utm?.medium || undefined,
-      utmCampaign: payload.utm?.campaign || undefined,
+      utmCampaign: options?.campaign || payload.utm?.campaign || undefined,
       utmTerm: payload.utm?.term || undefined,
       utmContent: payload.utm?.content || undefined,
       utmJson: payload.utm ? (payload.utm as any) : undefined,

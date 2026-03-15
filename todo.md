@@ -2969,3 +2969,57 @@
 - [x] Configurar variável REDIS_URL=redis://localhost:6379 via webdev_request_secrets
 - [x] Garantir log "Redis connected - async queue enabled" na inicialização — confirmado nos logs
 - [x] Validar conexão Redis e processamento assíncrono — BullMQ queue criada, worker rodando, 1281/1287 testes passando
+
+## Diagnóstico BullMQ Queue (Mar 15)
+- [x] Verificar se Redis está rodando e acessível
+- [x] Verificar se worker está ativo e processando
+- [x] Contar jobs: waiting, active, completed, failed
+- [x] Verificar backlog e tempo médio de processamento
+- [x] Verificar logs do worker para erros
+
+## Diagnóstico Webhooks Evolution API (Mar 15)
+- [x] Consultar URL de webhook configurada em cada instância da Evolution API
+- [x] Confirmar se aponta para https://crm.acelerador.tur.br/api/webhooks/evolution
+- [x] Testar acessibilidade pública do endpoint
+- [x] Verificar logs de delivery e erros de webhook
+- [x] Mostrar exemplos recentes de tentativas de envio
+
+## Evolução RD Station Marketing — Múltiplos Webhooks (Mar 15)
+- [ ] Auditar código existente: rdStationConfig, webhook endpoint, leadProcessor, envio WhatsApp
+- [ ] Modelar tabela de múltiplas configurações RD Station por tenant
+- [ ] Migrar schema e aplicar SQL
+- [ ] Refatorar webhook para resolver configuração correta por token
+- [ ] Criar deal no pipeline/stage definido na configuração
+- [ ] Implementar envio automático WhatsApp com template de mensagem e variáveis
+- [ ] Implementar fallback seguro (sem WhatsApp, sem telefone, config inativa)
+- [ ] Registrar logs detalhados do processamento
+- [ ] Manter idempotência do webhook
+- [ ] Criar painel UI para gerenciar múltiplas configurações
+- [ ] Testes: múltiplas configs, roteamento, deal, WhatsApp, fallback, idempotência, isolamento tenant
+- [ ] Validar TypeScript 0 erros e zero regressão
+
+## RD Station Multi-Config + Auto-WhatsApp
+
+- [x] Schema: add name, defaultSource, defaultCampaign, defaultOwnerUserId, autoWhatsAppEnabled, autoWhatsAppMessageTemplate to rd_station_config
+- [x] Schema: add configId, autoWhatsAppStatus, autoWhatsAppError to rd_station_webhook_log
+- [x] Run SQL migration for new columns
+- [x] Backend: expand processInboundLead() with optional pipelineId, stageId, ownerUserId, source, campaign
+- [x] Backend: update webhook handler to pass config params to processInboundLead
+- [x] Backend: implement auto-WhatsApp sending after lead creation
+- [x] Backend: implement template variable interpolation
+- [x] tRPC: rdStation.listConfigs endpoint
+- [x] tRPC: rdStation.createConfig endpoint
+- [x] tRPC: rdStation.updateConfig endpoint
+- [x] tRPC: rdStation.deleteConfig endpoint
+- [x] tRPC: rdStation.getConfigLogs endpoint
+- [x] Frontend: evolve RDStationIntegration.tsx to multi-config list with CRUD
+- [x] Frontend: config form with pipeline/stage/source/campaign/owner/autoWhatsApp/template
+- [x] Frontend: message template preview with variable interpolation
+- [x] Frontend: per-config logs view
+- [x] Tests: multiple configs per tenant
+- [x] Tests: pipeline/stage routing
+- [x] Tests: fallback to default behavior
+- [x] Tests: auto-WhatsApp with mock
+- [x] Tests: fallback without connected session
+- [x] Tests: idempotency
+- [x] Tests: multi-tenant isolation

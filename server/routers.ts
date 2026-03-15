@@ -152,9 +152,9 @@ import {
 } from "./leadProcessor";
 import { randomBytes } from "crypto";
 import { getDb } from "./db";
-import { trackingTokens, rdStationConfig, rdStationWebhookLog, rdFieldMappings, customFields, crmUsers as crmUsersSchema } from "../drizzle/schema";
+import { trackingTokens, rdStationConfig, rdStationWebhookLog, rdFieldMappings, customFields, crmUsers as crmUsersSchema, pipelines, pipelineStages, whatsappSessions } from "../drizzle/schema";
 import { generateTrackerScript } from "./tracker-script";
-import { eq, and, desc, sql, lt } from "drizzle-orm";
+import { eq, and, desc, asc, sql, lt } from "drizzle-orm";
 import { generateSuggestion, refineSuggestion, splitTextNaturally, type ResponseStyle } from "./aiSuggestionService";
 
 /** Parse AI suggestion response into parts array. Handles JSON or plain text fallback. */
@@ -2365,6 +2365,237 @@ export const appRouter = router({
           if (row.status === "duplicate") result.duplicate = count;
         }
         return result;
+      }),
+
+    // ─── Multi-Config CRUD ───────────────────────────────
+
+    listConfigs: protectedProcedure
+      .input(z.object({ tenantId: z.number() }))
+      .query(async ({ input }) => {
+        const db = await getDb();
+        if (!db) return [];
+        return db
+          .select()
+          .from(rdStationConfig)
+          .where(eq(rdStationConfig.tenantId, input.tenantId))
+          .orderBy(desc(rdStationConfig.createdAt));
+      }),
+
+    createConfig: protectedProcedure
+      .input(z.object({
+        tenantId: z.number(),
+        name: z.string().min(1).max(255),
+        defaultPipelineId: z.number().optional(),
+        defaultStageId: z.number().optional(),
+        defaultSource: z.string().max(255).optional(),
+        defaultCampaign: z.string().max(255).optional(),
+        defaultOwnerUserId: z.number().optional(),
+        autoWhatsAppEnabled: z.boolean().default(false),
+        autoWhatsAppMessageTemplate: z.string().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const db = await getDb();
+        if (!db) throw new Error("Database not available");
+
+        const token = randomBytes(32).toString("hex");
+        const [result] = await db.insert(rdStationConfig).values({
+          tenantId: input.tenantId,
+          name: input.name,
+          webhookToken: token,
+          defaultPipelineId: input.defaultPipelineId ?? null,
+          defaultStageId: input.defaultStageId ?? null,
+          defaultSource: input.defaultSource ?? null,
+          defaultCampaign: input.defaultCampaign ?? null,
+          defaultOwnerUserId: input.defaultOwnerUserId ?? null,
+          autoWhatsAppEnabled: input.autoWhatsAppEnabled,
+          autoWhatsAppMessageTemplate: input.autoWhatsAppMessageTemplate ?? null,
+        }).$returningId();
+
+        const rows = await db
+          .select()
+          .from(rdStationConfig)
+          .where(eq(rdStationConfig.id, result!.id))
+          .limit(1);
+        return rows[0]!;
+      }),
+
+    updateConfig: protectedProcedure
+      .input(z.object({
+        configId: z.number(),
+        tenantId: z.number(),
+        name: z.string().min(1).max(255).optional(),
+        isActive: z.boolean().optional(),
+        autoCreateDeal: z.boolean().optional(),
+        defaultPipelineId: z.number().nullable().optional(),
+        defaultStageId: z.number().nullable().optional(),
+        defaultSource: z.string().max(255).nullable().optional(),
+        defaultCampaign: z.string().max(255).nullable().optional(),
+        defaultOwnerUserId: z.number().nullable().optional(),
+        autoWhatsAppEnabled: z.boolean().optional(),
+        autoWhatsAppMessageTemplate: z.string().nullable().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const db = await getDb();
+        if (!db) throw new Error("Database not available");
+
+        const { configId, tenantId, ...updates } = input;
+        // Only include defined fields
+        const setObj: Record<string, any> = {};
+        if (updates.name !== undefined) setObj.name = updates.name;
+        if (updates.isActive !== undefined) setObj.isActive = updates.isActive;
+        if (updates.autoCreateDeal !== undefined) setObj.autoCreateDeal = updates.autoCreateDeal;
+        if (updates.defaultPipelineId !== undefined) setObj.defaultPipelineId = updates.defaultPipelineId;
+        if (updates.defaultStageId !== undefined) setObj.defaultStageId = updates.defaultStageId;
+        if (updates.defaultSource !== undefined) setObj.defaultSource = updates.defaultSource;
+        if (updates.defaultCampaign !== undefined) setObj.defaultCampaign = updates.defaultCampaign;
+        if (updates.defaultOwnerUserId !== undefined) setObj.defaultOwnerUserId = updates.defaultOwnerUserId;
+        if (updates.autoWhatsAppEnabled !== undefined) setObj.autoWhatsAppEnabled = updates.autoWhatsAppEnabled;
+        if (updates.autoWhatsAppMessageTemplate !== undefined) setObj.autoWhatsAppMessageTemplate = updates.autoWhatsAppMessageTemplate;
+
+        if (Object.keys(setObj).length > 0) {
+          await db
+            .update(rdStationConfig)
+            .set(setObj)
+            .where(and(eq(rdStationConfig.id, configId), eq(rdStationConfig.tenantId, tenantId)));
+        }
+
+        const rows = await db
+          .select()
+          .from(rdStationConfig)
+          .where(and(eq(rdStationConfig.id, configId), eq(rdStationConfig.tenantId, tenantId)))
+          .limit(1);
+        return rows[0] ?? null;
+      }),
+
+    deleteConfig: protectedProcedure
+      .input(z.object({ configId: z.number(), tenantId: z.number() }))
+      .mutation(async ({ input }) => {
+        const db = await getDb();
+        if (!db) throw new Error("Database not available");
+
+        await db
+          .delete(rdStationConfig)
+          .where(and(eq(rdStationConfig.id, input.configId), eq(rdStationConfig.tenantId, input.tenantId)));
+        return { success: true };
+      }),
+
+    getConfigLogs: protectedProcedure
+      .input(z.object({
+        configId: z.number(),
+        tenantId: z.number(),
+        status: z.enum(["success", "failed", "duplicate"]).optional(),
+        limit: z.number().default(50),
+        beforeId: z.number().optional(),
+      }))
+      .query(async ({ input }) => {
+        const db = await getDb();
+        if (!db) return { logs: [], total: 0 };
+
+        const conditions: any[] = [
+          eq(rdStationWebhookLog.tenantId, input.tenantId),
+          eq(rdStationWebhookLog.configId, input.configId),
+        ];
+        if (input.status) conditions.push(eq(rdStationWebhookLog.status, input.status));
+        if (input.beforeId) conditions.push(lt(rdStationWebhookLog.id, input.beforeId));
+
+        const logs = await db
+          .select()
+          .from(rdStationWebhookLog)
+          .where(and(...conditions))
+          .orderBy(desc(rdStationWebhookLog.createdAt))
+          .limit(input.limit);
+
+        const countConditions: any[] = [
+          eq(rdStationWebhookLog.tenantId, input.tenantId),
+          eq(rdStationWebhookLog.configId, input.configId),
+        ];
+        if (input.status) countConditions.push(eq(rdStationWebhookLog.status, input.status));
+        const countResult = await db
+          .select({ count: sql<number>`count(*)` })
+          .from(rdStationWebhookLog)
+          .where(and(...countConditions));
+
+        return {
+          logs,
+          total: Number(countResult[0]?.count || 0),
+        };
+      }),
+
+    regenerateConfigToken: protectedProcedure
+      .input(z.object({ configId: z.number(), tenantId: z.number() }))
+      .mutation(async ({ input }) => {
+        const db = await getDb();
+        if (!db) throw new Error("Database not available");
+
+        const newToken = randomBytes(32).toString("hex");
+        await db
+          .update(rdStationConfig)
+          .set({ webhookToken: newToken })
+          .where(and(eq(rdStationConfig.id, input.configId), eq(rdStationConfig.tenantId, input.tenantId)));
+
+        const rows = await db
+          .select()
+          .from(rdStationConfig)
+          .where(and(eq(rdStationConfig.id, input.configId), eq(rdStationConfig.tenantId, input.tenantId)))
+          .limit(1);
+        return rows[0] ?? null;
+      }),
+
+    // ─── Helper: list pipelines & stages for config form ───
+    listPipelines: protectedProcedure
+      .input(z.object({ tenantId: z.number() }))
+      .query(async ({ input }) => {
+        const db = await getDb();
+        if (!db) return [];
+        const rows = await db
+          .select()
+          .from(pipelines)
+          .where(eq(pipelines.tenantId, input.tenantId))
+          .orderBy(asc(pipelines.id));
+        return rows;
+      }),
+
+    listStages: protectedProcedure
+      .input(z.object({ tenantId: z.number(), pipelineId: z.number() }))
+      .query(async ({ input }) => {
+        const db = await getDb();
+        if (!db) return [];
+        const rows = await db
+          .select()
+          .from(pipelineStages)
+          .where(and(eq(pipelineStages.tenantId, input.tenantId), eq(pipelineStages.pipelineId, input.pipelineId)))
+          .orderBy(asc(pipelineStages.orderIndex));
+        return rows;
+      }),
+
+    listTeamMembers: protectedProcedure
+      .input(z.object({ tenantId: z.number() }))
+      .query(async ({ input }) => {
+        const db = await getDb();
+        if (!db) return [];
+        const rows = await db
+          .select({ id: crmUsersSchema.id, name: crmUsersSchema.name, email: crmUsersSchema.email, role: crmUsersSchema.role })
+          .from(crmUsersSchema)
+          .where(and(eq(crmUsersSchema.tenantId, input.tenantId), eq(crmUsersSchema.status, "active")))
+          .orderBy(asc(crmUsersSchema.name));
+        return rows;
+      }),
+
+    // ─── Helper: check WhatsApp session status for tenant ───
+    getWhatsAppStatus: protectedProcedure
+      .input(z.object({ tenantId: z.number() }))
+      .query(async ({ input }) => {
+        const db = await getDb();
+        if (!db) return { connected: false, sessionId: null as string | null };
+        const rows = await db
+          .select({ sessionId: whatsappSessions.sessionId })
+          .from(whatsappSessions)
+          .where(and(eq(whatsappSessions.tenantId, input.tenantId), eq(whatsappSessions.status, "connected")))
+          .limit(1);
+        return {
+          connected: rows.length > 0,
+          sessionId: rows[0]?.sessionId ?? null,
+        };
       }),
   }),
 
