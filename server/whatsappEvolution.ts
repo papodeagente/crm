@@ -36,6 +36,7 @@ export interface EvolutionSessionState {
   qrDataUrl: string | null;
   user: { id: string; name: string; imgUrl?: string } | null;
   lastConnectedAt: number | null;
+  connectingStartedAt?: number | null;
 }
 
 // ════════════════════════════════════════════════════════════
@@ -182,6 +183,7 @@ class WhatsAppEvolutionManager extends EventEmitter {
       qrDataUrl: null,
       user: null,
       lastConnectedAt: null,
+      connectingStartedAt: Date.now(),
     };
     this.sessions.set(sessionId, state);
     this.instanceToSession.set(instanceName, sessionId);
@@ -194,6 +196,7 @@ class WhatsAppEvolutionManager extends EventEmitter {
         if (existingInstance.connectionStatus === "open") {
           // Already connected — sync conversations in background
           state.status = "connected";
+          state.connectingStartedAt = null;
           state.user = existingInstance.ownerJid ? {
             id: existingInstance.ownerJid,
             name: existingInstance.profileName || "",
@@ -1271,6 +1274,7 @@ class WhatsAppEvolutionManager extends EventEmitter {
           const state = payload.data?.state || payload.data?.status;
           if (state === "open") {
             session.status = "connected";
+            session.connectingStartedAt = null;
             session.qrCode = null;
             session.qrDataUrl = null;
             session.lastConnectedAt = Date.now();
@@ -2918,9 +2922,35 @@ class WhatsAppEvolutionManager extends EventEmitter {
     const db = await getDb();
     if (!db) return;
 
+    // === TIMEOUT PROTECTION ===
+    // Check in-memory sessions stuck in 'connecting' for more than 5 minutes.
+    // These are instances generating QR codes that nobody scans.
+    const CONNECTING_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
+    const now = Date.now();
+    for (const [sessionId, session] of Array.from(this.sessions.entries())) {
+      if (session.status === 'connecting' && session.connectingStartedAt) {
+        const elapsed = now - session.connectingStartedAt;
+        if (elapsed > CONNECTING_TIMEOUT_MS) {
+          console.log(`[EvoWA Polling] Session ${sessionId} stuck in 'connecting' for ${Math.round(elapsed / 1000)}s (>${CONNECTING_TIMEOUT_MS / 1000}s), marking disconnected`);
+          session.status = 'disconnected';
+          session.connectingStartedAt = null;
+          session.qrCode = null;
+          session.qrDataUrl = null;
+          await db.update(whatsappSessions)
+            .set({ status: 'disconnected' })
+            .where(eq(whatsappSessions.sessionId, sessionId));
+          this.emit('status', { sessionId, status: 'disconnected' });
+        }
+      }
+    }
+
+    // === PERIODIC SYNC ===
+    // Only check sessions that are 'connected' in DB.
+    // Do NOT query disconnected/connecting/deleted sessions — they must
+    // wait for manual user reconnection via Inbox.
     const rows = await db.select()
       .from(whatsappSessions)
-      .where(sql`${whatsappSessions.status} != 'deleted'`);
+      .where(eq(whatsappSessions.status, 'connected'));
 
     for (const row of rows) {
       const instanceName = evo.getInstanceName(row.tenantId, row.userId);
@@ -2928,56 +2958,49 @@ class WhatsAppEvolutionManager extends EventEmitter {
         const inst = await evo.fetchInstance(instanceName);
         if (!inst) continue;
 
-        const session = this.sessions.get(row.sessionId);
-        const wasDisconnected = row.status !== 'connected' || !session || session.status !== 'connected';
-        const isNowConnected = inst.connectionStatus === 'open';
-
-        if (isNowConnected) {
-          // Ensure session is in memory
-          const state: EvolutionSessionState = session || {
-            instanceName,
-            sessionId: row.sessionId,
-            userId: row.userId,
-            tenantId: row.tenantId,
-            status: 'connected',
-            qrCode: null,
-            qrDataUrl: null,
-            user: inst.ownerJid ? {
-              id: inst.ownerJid,
-              name: inst.profileName || '',
-              imgUrl: inst.profilePicUrl || undefined,
-            } : null,
-            lastConnectedAt: Date.now(),
-          };
-          state.status = 'connected';
-          this.sessions.set(row.sessionId, state);
-          this.instanceToSession.set(instanceName, row.sessionId);
-
-          if (wasDisconnected) {
-            console.log(`[EvoWA Polling] Detected reconnection for ${row.sessionId}, triggering full sync`);
-            await db.update(whatsappSessions)
-              .set({ status: 'connected' })
-              .where(eq(whatsappSessions.sessionId, row.sessionId));
-            this.emit('status', { sessionId: row.sessionId, status: 'connected', user: state.user });
-            this.syncConversationsBackground(state, false);
-          } else {
-            // Already connected — sync recent messages periodically
-            const lastSync = this.lastSyncTimestamps.get(row.sessionId) || 0;
-            const now = Date.now();
-            if (now - lastSync > 4 * 60 * 1000) { // At least 4 min since last sync
-              console.log(`[EvoWA Polling] Periodic sync for ${row.sessionId}`);
-              this.syncConversationsBackground(state, false);
-              this.lastSyncTimestamps.set(row.sessionId, now);
-            }
-          }
-        } else if (row.status === 'connected') {
-          // Was connected, now disconnected
-          console.log(`[EvoWA Polling] Detected disconnection for ${row.sessionId}`);
+        // STRICT FILTER: only process instances with connectionStatus = 'open'.
+        // Instances with 'connecting', 'close', or 'qrcode' are NOT reconnected.
+        if (inst.connectionStatus !== 'open') {
+          // Was connected in DB, but Evolution says not open anymore
+          console.log(`[EvoWA Polling] ${row.sessionId} -> Evolution status '${inst.connectionStatus}', marking disconnected`);
           await db.update(whatsappSessions)
             .set({ status: 'disconnected' })
             .where(eq(whatsappSessions.sessionId, row.sessionId));
+          const session = this.sessions.get(row.sessionId);
           if (session) session.status = 'disconnected';
           this.emit('status', { sessionId: row.sessionId, status: 'disconnected' });
+          continue;
+        }
+
+        // Instance is 'open' — ensure session is in memory and sync
+        const session = this.sessions.get(row.sessionId);
+        const state: EvolutionSessionState = session || {
+          instanceName,
+          sessionId: row.sessionId,
+          userId: row.userId,
+          tenantId: row.tenantId,
+          status: 'connected',
+          qrCode: null,
+          qrDataUrl: null,
+          user: inst.ownerJid ? {
+            id: inst.ownerJid,
+            name: inst.profileName || '',
+            imgUrl: inst.profilePicUrl || undefined,
+          } : null,
+          lastConnectedAt: Date.now(),
+          connectingStartedAt: null,
+        };
+        state.status = 'connected';
+        state.connectingStartedAt = null;
+        this.sessions.set(row.sessionId, state);
+        this.instanceToSession.set(instanceName, row.sessionId);
+
+        // Periodic sync for connected sessions
+        const lastSync = this.lastSyncTimestamps.get(row.sessionId) || 0;
+        if (now - lastSync > 4 * 60 * 1000) { // At least 4 min since last sync
+          console.log(`[EvoWA Polling] Periodic sync for ${row.sessionId}`);
+          this.syncConversationsBackground(state, false);
+          this.lastSyncTimestamps.set(row.sessionId, now);
         }
       } catch (e: any) {
         console.warn(`[EvoWA Polling] Error checking ${instanceName}:`, e.message);

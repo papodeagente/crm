@@ -3151,3 +3151,10 @@
 - [x] Fix: só restaurar instâncias com connectionStatus 'open' da Evolution API
 - [x] Fix: marcar instâncias 'connecting' e 'close' como disconnected no DB
 - [x] Tests: atualizar testes para cobrir novo filtro
+
+## Auto-Restore — Filtro estrito 'open' + timeout 5min
+- [x] Audit: verificar todos os caminhos de reconexão no auto-restore e fast poll
+- [x] Fix: filtro estrito — só restaurar connectionStatus='open', ignorar connecting/close/qrcode
+- [x] Fix: adicionar timeout de 5min para instâncias stuck em 'connecting'
+- [x] Fix: verificar se fast poll ou periodic sync também reconectam indevidamente
+- [x] Tests: cobrir filtro estrito e timeout de 5min

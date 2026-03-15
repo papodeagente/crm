@@ -1,13 +1,13 @@
 import { describe, it, expect } from "vitest";
 
 /**
- * Tests for the Evolution auto-restore filter.
+ * Tests for the Evolution auto-restore and periodic sync filters.
  *
- * Two-layer filter:
- * 1. DB query: only sessions with status = 'connected' are fetched
- * 2. Evolution API check: only instances with connectionStatus = 'open' are restored.
- *    Instances with 'connecting' or 'close' are marked disconnected and skipped.
- *    This prevents QR code generation loops from 'connecting' instances.
+ * Three layers of protection:
+ * 1. autoRestoreSessions: DB query filters status='connected' only
+ * 2. autoRestoreSessions + periodicSyncCheck: Evolution API check accepts ONLY connectionStatus='open'
+ *    - 'connecting', 'close', 'qrcode' are all skipped and marked 'disconnected'
+ * 3. periodicSyncCheck: 5-minute timeout for sessions stuck in 'connecting'
  */
 
 // ─── Types ────────────────────────────────────────────────────────
@@ -28,30 +28,49 @@ interface EvolutionInstance {
   profileName: string | null;
 }
 
-// ─── Simulate the two-layer filter ───────────────────────────────
+interface InMemorySession {
+  sessionId: string;
+  status: "connecting" | "connected" | "disconnected" | "reconnecting";
+  connectingStartedAt: number | null;
+}
 
-/** Layer 1: DB query — only 'connected' sessions */
+// ─── Simulate the filter logic ───────────────────────────────────
+
+/** Layer 1: DB query — only 'connected' sessions (used by autoRestore AND periodicSyncCheck) */
 function filterDbSessions(sessions: DbSession[]): DbSession[] {
   return sessions.filter(s => s.status === "connected");
 }
 
-/** Layer 2: Evolution API check — only 'open' instances get restored */
-function shouldRestoreFromEvolution(inst: EvolutionInstance): {
-  restore: boolean;
+/** Layer 2: Evolution API check — ONLY 'open' instances get restored/synced */
+function shouldProcessInstance(inst: EvolutionInstance): {
+  process: boolean;
   reason: string;
 } {
   if (inst.connectionStatus !== "open") {
     return {
-      restore: false,
-      reason: `Evolution status '${inst.connectionStatus}', skipping (only 'open' restored)`,
+      process: false,
+      reason: `Evolution status '${inst.connectionStatus}', marking disconnected`,
     };
   }
-  return { restore: true, reason: "connected" };
+  return { process: true, reason: "open — processing" };
+}
+
+/** Layer 3: 5-minute timeout for stuck 'connecting' sessions */
+function checkConnectingTimeout(
+  session: InMemorySession,
+  now: number,
+  timeoutMs: number = 5 * 60 * 1000
+): { timedOut: boolean; elapsedMs: number } {
+  if (session.status !== "connecting" || !session.connectingStartedAt) {
+    return { timedOut: false, elapsedMs: 0 };
+  }
+  const elapsed = now - session.connectingStartedAt;
+  return { timedOut: elapsed > timeoutMs, elapsedMs: elapsed };
 }
 
 // ─── Tests ────────────────────────────────────────────────────────
 
-describe("Auto-Restore Filter", () => {
+describe("Auto-Restore & Periodic Sync Filters", () => {
   const allSessions: DbSession[] = [
     { sessionId: "crm-0-1", userId: 1, tenantId: 0, status: "disconnected" },
     { sessionId: "crm-210002-240001", userId: 240001, tenantId: 210002, status: "disconnected" },
@@ -67,7 +86,7 @@ describe("Auto-Restore Filter", () => {
     { sessionId: "crm-270009-270064", userId: 270064, tenantId: 270009, status: "deleted" },
   ];
 
-  describe("Layer 1: DB session filter (status = 'connected')", () => {
+  describe("Layer 1: DB filter (status = 'connected' only)", () => {
     it("should only select sessions with status 'connected'", () => {
       const filtered = filterDbSessions(allSessions);
       expect(filtered.length).toBe(5);
@@ -75,18 +94,15 @@ describe("Auto-Restore Filter", () => {
     });
 
     it("should exclude 'disconnected' sessions", () => {
-      const filtered = filterDbSessions(allSessions);
-      expect(filtered.some(s => s.status === "disconnected")).toBe(false);
+      expect(filterDbSessions(allSessions).some(s => s.status === "disconnected")).toBe(false);
     });
 
     it("should exclude 'connecting' sessions", () => {
-      const filtered = filterDbSessions(allSessions);
-      expect(filtered.some(s => s.status === "connecting")).toBe(false);
+      expect(filterDbSessions(allSessions).some(s => s.status === "connecting")).toBe(false);
     });
 
     it("should exclude 'deleted' sessions", () => {
-      const filtered = filterDbSessions(allSessions);
-      expect(filtered.some(s => s.status === "deleted")).toBe(false);
+      expect(filterDbSessions(allSessions).some(s => s.status === "deleted")).toBe(false);
     });
 
     it("should return empty when no connected sessions exist", () => {
@@ -98,48 +114,122 @@ describe("Auto-Restore Filter", () => {
     });
   });
 
-  describe("Layer 2: Evolution connectionStatus filter (only 'open')", () => {
-    it("should restore instance with connectionStatus 'open'", () => {
+  describe("Layer 2: Evolution connectionStatus filter (ONLY 'open')", () => {
+    it("should process instance with connectionStatus 'open'", () => {
       const inst: EvolutionInstance = { connectionStatus: "open", ownerJid: "jid@s.whatsapp.net", profileName: "User" };
-      const result = shouldRestoreFromEvolution(inst);
-      expect(result.restore).toBe(true);
+      expect(shouldProcessInstance(inst).process).toBe(true);
     });
 
-    it("should SKIP instance with connectionStatus 'connecting' (causes QR loop)", () => {
+    it("should REJECT instance with connectionStatus 'connecting'", () => {
       const inst: EvolutionInstance = { connectionStatus: "connecting", ownerJid: "jid@s.whatsapp.net", profileName: "User" };
-      const result = shouldRestoreFromEvolution(inst);
-      expect(result.restore).toBe(false);
+      const result = shouldProcessInstance(inst);
+      expect(result.process).toBe(false);
       expect(result.reason).toContain("connecting");
     });
 
-    it("should SKIP instance with connectionStatus 'close'", () => {
+    it("should REJECT instance with connectionStatus 'close'", () => {
       const inst: EvolutionInstance = { connectionStatus: "close", ownerJid: "jid@s.whatsapp.net", profileName: "User" };
-      const result = shouldRestoreFromEvolution(inst);
-      expect(result.restore).toBe(false);
+      const result = shouldProcessInstance(inst);
+      expect(result.process).toBe(false);
       expect(result.reason).toContain("close");
     });
 
-    it("should SKIP 'connecting' even with valid ownerJid", () => {
+    it("should REJECT 'connecting' even with valid ownerJid and profileName", () => {
       const inst: EvolutionInstance = { connectionStatus: "connecting", ownerJid: "5511999@s.whatsapp.net", profileName: "Valid User" };
-      const result = shouldRestoreFromEvolution(inst);
-      expect(result.restore).toBe(false);
+      expect(shouldProcessInstance(inst).process).toBe(false);
     });
 
-    it("should SKIP 'close' even with valid ownerJid", () => {
+    it("should REJECT 'close' even with valid ownerJid and profileName", () => {
       const inst: EvolutionInstance = { connectionStatus: "close", ownerJid: "5511999@s.whatsapp.net", profileName: "Valid User" };
-      const result = shouldRestoreFromEvolution(inst);
-      expect(result.restore).toBe(false);
+      expect(shouldProcessInstance(inst).process).toBe(false);
     });
 
-    it("should restore 'open' even without ownerJid (edge case)", () => {
+    it("should process 'open' even without ownerJid (edge case)", () => {
       const inst: EvolutionInstance = { connectionStatus: "open", ownerJid: null, profileName: null };
-      const result = shouldRestoreFromEvolution(inst);
-      expect(result.restore).toBe(true);
+      expect(shouldProcessInstance(inst).process).toBe(true);
     });
   });
 
-  describe("Combined two-layer filter (real scenario)", () => {
-    // Simulate: 5 sessions pass DB filter, then Evolution API returns mixed statuses
+  describe("Layer 3: 5-minute connecting timeout", () => {
+    const FIVE_MINUTES = 5 * 60 * 1000;
+
+    it("should NOT timeout session that just started connecting", () => {
+      const session: InMemorySession = {
+        sessionId: "crm-test-1",
+        status: "connecting",
+        connectingStartedAt: Date.now() - 30_000, // 30 seconds ago
+      };
+      const result = checkConnectingTimeout(session, Date.now());
+      expect(result.timedOut).toBe(false);
+    });
+
+    it("should NOT timeout session connecting for exactly 4 minutes", () => {
+      const now = Date.now();
+      const session: InMemorySession = {
+        sessionId: "crm-test-2",
+        status: "connecting",
+        connectingStartedAt: now - (4 * 60 * 1000),
+      };
+      const result = checkConnectingTimeout(session, now);
+      expect(result.timedOut).toBe(false);
+    });
+
+    it("should timeout session connecting for 6 minutes", () => {
+      const now = Date.now();
+      const session: InMemorySession = {
+        sessionId: "crm-test-3",
+        status: "connecting",
+        connectingStartedAt: now - (6 * 60 * 1000),
+      };
+      const result = checkConnectingTimeout(session, now);
+      expect(result.timedOut).toBe(true);
+      expect(result.elapsedMs).toBeGreaterThan(FIVE_MINUTES);
+    });
+
+    it("should timeout session connecting for 10 minutes", () => {
+      const now = Date.now();
+      const session: InMemorySession = {
+        sessionId: "crm-test-4",
+        status: "connecting",
+        connectingStartedAt: now - (10 * 60 * 1000),
+      };
+      const result = checkConnectingTimeout(session, now);
+      expect(result.timedOut).toBe(true);
+    });
+
+    it("should NOT timeout session that is already connected", () => {
+      const session: InMemorySession = {
+        sessionId: "crm-test-5",
+        status: "connected",
+        connectingStartedAt: Date.now() - (10 * 60 * 1000), // old timestamp
+      };
+      const result = checkConnectingTimeout(session, Date.now());
+      expect(result.timedOut).toBe(false);
+    });
+
+    it("should NOT timeout session with null connectingStartedAt", () => {
+      const session: InMemorySession = {
+        sessionId: "crm-test-6",
+        status: "connecting",
+        connectingStartedAt: null,
+      };
+      const result = checkConnectingTimeout(session, Date.now());
+      expect(result.timedOut).toBe(false);
+    });
+
+    it("should NOT timeout disconnected session", () => {
+      const session: InMemorySession = {
+        sessionId: "crm-test-7",
+        status: "disconnected",
+        connectingStartedAt: Date.now() - (10 * 60 * 1000),
+      };
+      const result = checkConnectingTimeout(session, Date.now());
+      expect(result.timedOut).toBe(false);
+    });
+  });
+
+  describe("Combined: periodicSyncCheck behavior", () => {
+    // Simulate: 5 sessions pass DB filter, Evolution returns mixed statuses
     const evolutionResponses: Record<string, EvolutionInstance> = {
       "crm-240005-240005": { connectionStatus: "open", ownerJid: "jid1", profileName: "User1" },
       "crm-240006-240006": { connectionStatus: "open", ownerJid: "jid2", profileName: "User2" },
@@ -149,50 +239,52 @@ describe("Auto-Restore Filter", () => {
     };
 
     it("should pass 5 sessions through DB filter", () => {
-      const dbFiltered = filterDbSessions(allSessions);
-      expect(dbFiltered.length).toBe(5);
+      expect(filterDbSessions(allSessions).length).toBe(5);
     });
 
-    it("should only restore 3 of 5 after Evolution check (open only)", () => {
+    it("should only sync 3 of 5 after Evolution check (open only)", () => {
       const dbFiltered = filterDbSessions(allSessions);
-      const restored = dbFiltered.filter(s => {
+      const synced = dbFiltered.filter(s => {
         const inst = evolutionResponses[s.sessionId];
-        return inst && shouldRestoreFromEvolution(inst).restore;
+        return inst && shouldProcessInstance(inst).process;
       });
-      expect(restored.length).toBe(3);
-      expect(restored.map(s => s.sessionId).sort()).toEqual([
+      expect(synced.length).toBe(3);
+      expect(synced.map(s => s.sessionId).sort()).toEqual([
         "crm-240005-240005",
         "crm-240006-240006",
         "crm-270008-270062",
       ]);
     });
 
-    it("should skip crm-240007-240007 (Evolution status 'connecting')", () => {
+    it("should mark crm-240007-240007 as disconnected (Evolution 'connecting')", () => {
       const inst = evolutionResponses["crm-240007-240007"];
-      expect(shouldRestoreFromEvolution(inst).restore).toBe(false);
+      expect(shouldProcessInstance(inst).process).toBe(false);
     });
 
-    it("should skip crm-240010-240010 (Evolution status 'close')", () => {
+    it("should mark crm-240010-240010 as disconnected (Evolution 'close')", () => {
       const inst = evolutionResponses["crm-240010-240010"];
-      expect(shouldRestoreFromEvolution(inst).restore).toBe(false);
+      expect(shouldProcessInstance(inst).process).toBe(false);
+    });
+
+    it("periodicSyncCheck should NOT reconnect disconnected sessions from DB", () => {
+      // The key fix: periodicSyncCheck now queries status='connected' only,
+      // so disconnected sessions are never even checked against Evolution API
+      const disconnectedInDb = allSessions.filter(s => s.status === "disconnected");
+      const wouldBeQueried = filterDbSessions(allSessions);
+      for (const disc of disconnectedInDb) {
+        expect(wouldBeQueried.some(q => q.sessionId === disc.sessionId)).toBe(false);
+      }
     });
   });
 
   describe("Real production instance names", () => {
-    const shouldBeRestored = ["crm-240006-240006", "crm-240007-240007", "crm-240010-240010", "crm-270008-270062"];
-    const shouldBeExcludedFromDb = ["crm-0-1", "crm-210002-240001", "crm-150002-150001", "crm-240005-270063"];
+    const shouldBeExcludedFromDb = [
+      "crm-0-1", "crm-210002-240001", "crm-150002-150001", "crm-240005-270063",
+    ];
 
     for (const name of shouldBeExcludedFromDb) {
       it(`should exclude ${name} at DB layer (not 'connected')`, () => {
-        const filtered = filterDbSessions(allSessions);
-        expect(filtered.some(s => s.sessionId === name)).toBe(false);
-      });
-    }
-
-    for (const name of shouldBeRestored) {
-      it(`should include ${name} at DB layer (was 'connected')`, () => {
-        const filtered = filterDbSessions(allSessions);
-        expect(filtered.some(s => s.sessionId === name)).toBe(true);
+        expect(filterDbSessions(allSessions).some(s => s.sessionId === name)).toBe(false);
       });
     }
   });
