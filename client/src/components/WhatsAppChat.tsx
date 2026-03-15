@@ -1120,6 +1120,8 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
   const [selectedAiIntegrationId, setSelectedAiIntegrationId] = useState<number | undefined>(undefined);
   const [selectedAiModel, setSelectedAiModel] = useState<string | undefined>(undefined);
   const [showAiSelector, setShowAiSelector] = useState(false);
+  const [editedSuggestion, setEditedSuggestion] = useState<string>("");
+  const [aiLoading, setAiLoading] = useState(false);
   const [transcriptions, setTranscriptions] = useState<Record<number, { text?: string; loading?: boolean; error?: string }>>({});
   const tenantId = useTenantId();
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -1169,11 +1171,14 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
   const aiSuggestMut = trpc.ai.suggest.useMutation({
     onSuccess: (data) => {
       setAiSuggestion(data.suggestion);
+      setEditedSuggestion(data.suggestion);
       setAiSuggestionParts(data.parts || [data.suggestion]);
       setAiSuggestionMeta({ provider: data.provider, model: data.model });
       setShowAiSuggestion(true);
+      setAiLoading(false);
     },
     onError: (err) => {
+      setAiLoading(false);
       if (err.message === "NO_AI_CONFIGURED") {
         toast.error("Nenhuma IA configurada. Vá em Integrações > IA para conectar sua API.", { duration: 5000 });
       } else {
@@ -1184,12 +1189,22 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
 
   const handleAiSuggest = () => {
     if (!tenantId) { toast.error("Tenant não identificado"); return; }
+    const integrations = (aiIntegrationsQ.data || []).filter((i: any) => i.isActive);
+    if (integrations.length === 0) {
+      toast.error("Nenhuma IA configurada. Vá em Integrações > IA para conectar sua API.", { duration: 5000 });
+      return;
+    }
     const msgs = (messagesQ.data || []).filter((m: any) => m.content).map((m: any) => ({
       fromMe: m.fromMe,
       content: m.content || "",
       timestamp: m.timestamp instanceof Date ? m.timestamp.toISOString() : (m.timestamp ? String(m.timestamp) : undefined),
     }));
     if (msgs.length === 0) { toast.error("Sem mensagens para analisar"); return; }
+    setAiLoading(true);
+    setShowAiSuggestion(true);
+    setAiSuggestion(null);
+    setEditedSuggestion("");
+    setShowAiSelector(false);
     aiSuggestMut.mutate({
       tenantId,
       messages: msgs.reverse(),
@@ -1199,31 +1214,40 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
     });
   };
 
-  const useAiSuggestionFull = () => {
-    if (aiSuggestion) {
-      setMessageText(aiSuggestion);
-      setShowAiSuggestion(false);
-      setAiSuggestion(null);
-      setAiSuggestionParts([]);
-    }
+  const closeAiSuggestion = () => {
+    setShowAiSuggestion(false);
+    setShowAiSelector(false);
+    setAiSuggestion(null);
+    setEditedSuggestion("");
+    setAiSuggestionParts([]);
+    setAiSuggestionMeta(null);
+    setAiLoading(false);
   };
 
-  const useAiSuggestionBroken = async () => {
-    if (aiSuggestionParts.length === 0) return;
+  const useSuggestionAsText = () => {
+    const text = editedSuggestion.trim();
+    if (!text) return;
+    setMessageText(text);
+    closeAiSuggestion();
+    textareaRef.current?.focus();
+  };
+
+  const sendSuggestionBroken = async () => {
+    const text = editedSuggestion.trim();
+    if (!text) return;
     const number = contact?.phone?.replace(/\D/g, "") || "";
     if (!number || !sessionId) { toast.error("Sem número ou sessão"); return; }
-    setShowAiSuggestion(false);
-    for (let i = 0; i < aiSuggestionParts.length; i++) {
-      const part = aiSuggestionParts[i].trim();
-      if (!part) continue;
-      sendMessage.mutate({ sessionId, number, message: part });
-      if (i < aiSuggestionParts.length - 1) {
-        await new Promise(r => setTimeout(r, 1200));
+    const parts = text.split(/\n\n+/).map(p => p.trim()).filter(Boolean);
+    if (parts.length <= 1) {
+      sendMessage.mutate({ sessionId, number, message: text });
+    } else {
+      for (let i = 0; i < parts.length; i++) {
+        sendMessage.mutate({ sessionId, number, message: parts[i] });
+        if (i < parts.length - 1) await new Promise(r => setTimeout(r, 1200));
       }
     }
-    setAiSuggestion(null);
-    setAiSuggestionParts([]);
-    toast.success("Mensagens enviadas");
+    closeAiSuggestion();
+    toast.success(parts.length > 1 ? `${parts.length} mensagens enviadas` : "Mensagem enviada");
   };
 
   // AI integrations list (for selector)
@@ -2102,103 +2126,31 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
 
             {/* AI Suggestion button */}
             <div className="relative shrink-0 self-end">
-              <button
-                onClick={() => {
-                  const integrations = (aiIntegrationsQ.data || []).filter((i: any) => i.isActive);
-                  if (integrations.length === 0) {
-                    toast.error("Nenhuma IA configurada. Vá em Integrações > IA para conectar sua API.", { duration: 5000 });
-                    return;
-                  }
-                  if (showAiSelector) {
-                    setShowAiSelector(false);
-                  } else if (showAiSuggestion) {
-                    setShowAiSelector(true);
-                  } else {
-                    handleAiSuggest();
-                  }
-                }}
-                disabled={aiSuggestMut.isPending}
-                className={`w-[42px] h-[42px] flex items-center justify-center rounded-full transition-all duration-200 ${
-                  aiSuggestMut.isPending ? "bg-violet-500/20 text-violet-500" : showAiSuggestion || showAiSelector ? "bg-violet-500/20 text-violet-500" : "hover:bg-wa-hover text-muted-foreground"
-                }`}
-              >
-                {aiSuggestMut.isPending ? <Loader2 className="w-[20px] h-[20px] animate-spin" /> : <Sparkles className="w-[20px] h-[20px]" />}
-              </button>
-
-              {/* AI Selector dropdown */}
-              {showAiSelector && (() => {
-                const activeIntegrations = (aiIntegrationsQ.data || []).filter((i: any) => i.isActive);
-                const providerLabel = (p: string) => p === "openai" ? "OpenAI" : "Anthropic";
-                const modelNames: Record<string, string> = {
-                  "gpt-5.4": "GPT-5.4", "gpt-5-mini": "GPT-5 Mini",
-                  "claude-opus-4-6": "Claude Opus 4.6", "claude-sonnet-4-6": "Claude Sonnet 4.6", "claude-haiku-4-5": "Claude Haiku 4.5",
-                };
-                const modelsForProvider = (p: string) => p === "openai"
-                  ? [{ id: "gpt-5.4", name: "GPT-5.4" }, { id: "gpt-5-mini", name: "GPT-5 Mini" }]
-                  : [{ id: "claude-opus-4-6", name: "Claude Opus 4.6" }, { id: "claude-sonnet-4-6", name: "Claude Sonnet 4.6" }, { id: "claude-haiku-4-5", name: "Claude Haiku 4.5" }];
-                const currentIntegration = activeIntegrations.find((i: any) => i.id === selectedAiIntegrationId) || activeIntegrations[0];
-                return (
-                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-[260px] bg-popover border border-border rounded-lg shadow-xl z-50 overflow-hidden">
-                    <div className="px-3 py-2 border-b border-border/50">
-                      <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Escolher IA e Modelo</span>
-                    </div>
-                    <div className="p-2 space-y-1">
-                      <label className="text-[11px] font-medium text-muted-foreground px-1">Provedor</label>
-                      {activeIntegrations.map((integ: any) => (
-                        <button
-                          key={integ.id}
-                          onClick={() => { setSelectedAiIntegrationId(integ.id); setSelectedAiModel(undefined); }}
-                          className={`w-full text-left px-2.5 py-1.5 rounded-md text-[12px] transition-colors flex items-center gap-2 ${
-                            (selectedAiIntegrationId === integ.id || (!selectedAiIntegrationId && integ.id === currentIntegration?.id))
-                              ? "bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300 font-medium"
-                              : "hover:bg-muted text-foreground"
-                          }`}
-                        >
-                          <span className={`w-2 h-2 rounded-full ${
-                            integ.provider === "openai" ? "bg-emerald-500" : "bg-orange-500"
-                          }`} />
-                          {providerLabel(integ.provider)}
-                          <span className="text-[10px] text-muted-foreground ml-auto">{integ.defaultModel}</span>
-                        </button>
-                      ))}
-                    </div>
-                    {currentIntegration && (
-                      <div className="p-2 border-t border-border/50 space-y-1">
-                        <label className="text-[11px] font-medium text-muted-foreground px-1">Modelo</label>
-                        {modelsForProvider(currentIntegration.provider).map(m => (
-                          <button
-                            key={m.id}
-                            onClick={() => setSelectedAiModel(m.id)}
-                            className={`w-full text-left px-2.5 py-1.5 rounded-md text-[12px] transition-colors ${
-                              (selectedAiModel === m.id || (!selectedAiModel && m.id === currentIntegration.defaultModel))
-                                ? "bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300 font-medium"
-                                : "hover:bg-muted text-foreground"
-                            }`}
-                          >
-                            {m.name}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                    <div className="p-2 border-t border-border/50">
-                      <button
-                        onClick={() => { setShowAiSelector(false); handleAiSuggest(); }}
-                        disabled={aiSuggestMut.isPending}
-                        className="w-full text-[12px] font-medium bg-violet-500 hover:bg-violet-600 text-white rounded-md py-1.5 transition-colors flex items-center justify-center gap-1.5"
-                      >
-                        {aiSuggestMut.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />} Gerar sugestão
-                      </button>
-                    </div>
-                  </div>
-                );
-              })()}
+              <InstantTooltip label="Sugestão IA">
+                <button
+                  onClick={() => {
+                    if (showAiSuggestion) {
+                      closeAiSuggestion();
+                    } else {
+                      handleAiSuggest();
+                    }
+                  }}
+                  disabled={aiLoading}
+                  className={`w-[42px] h-[42px] flex items-center justify-center rounded-full transition-all duration-200 ${
+                    aiLoading ? "bg-violet-500/20 text-violet-500" : showAiSuggestion ? "bg-violet-500/20 text-violet-500" : "hover:bg-wa-hover text-muted-foreground"
+                  }`}
+                >
+                  {aiLoading ? <Loader2 className="w-[20px] h-[20px] animate-spin" /> : <Sparkles className="w-[20px] h-[20px]" />}
+                </button>
+              </InstantTooltip>
             </div>
 
             {/* Text input */}
             <div className="flex-1 relative">
-              {/* AI Suggestion popup */}
-              {showAiSuggestion && aiSuggestion && (
+              {/* AI Suggestion panel */}
+              {showAiSuggestion && (
                 <div className="absolute bottom-full left-0 right-0 mb-1 bg-violet-50 dark:bg-violet-950/30 border border-violet-200 dark:border-violet-800 rounded-lg shadow-xl z-50 overflow-hidden">
+                  {/* Header */}
                   <div className="px-3 py-1.5 flex items-center justify-between border-b border-violet-200 dark:border-violet-800">
                     <div className="flex items-center gap-1.5">
                       <Brain className="h-3.5 w-3.5 text-violet-500" />
@@ -2209,51 +2161,59 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
                         </span>
                       )}
                     </div>
-                    <button onClick={() => { setShowAiSuggestion(false); setAiSuggestion(null); setAiSuggestionParts([]); setAiSuggestionMeta(null); }} className="text-muted-foreground hover:text-foreground">
+                    <button onClick={closeAiSuggestion} className="text-muted-foreground hover:text-foreground">
                       <X className="h-3.5 w-3.5" />
                     </button>
                   </div>
-                  {/* Show parts as separate message bubbles */}
-                  <div className="px-3 py-2 max-h-[200px] overflow-y-auto space-y-1.5">
-                    {aiSuggestionParts.length > 1 ? (
-                      aiSuggestionParts.map((part, i) => (
-                        <div key={i} className="bg-white dark:bg-violet-900/20 rounded-lg px-2.5 py-1.5 text-[13px] text-foreground border border-violet-100 dark:border-violet-800/50">
-                          <span className="text-[10px] text-violet-400 font-medium mr-1.5">{i + 1}.</span>{part}
-                        </div>
-                      ))
-                    ) : (
-                      <div className="text-[13px] text-foreground whitespace-pre-wrap">{aiSuggestion}</div>
-                    )}
-                  </div>
-                  <div className="px-3 py-2 flex flex-wrap gap-2 border-t border-violet-200 dark:border-violet-800">
-                    {aiSuggestionParts.length > 1 && (
-                      <button
-                        onClick={useAiSuggestionBroken}
-                        className="flex-1 text-[12px] font-medium bg-violet-500 hover:bg-violet-600 text-white rounded-md py-1.5 transition-colors flex items-center justify-center gap-1.5"
-                      >
-                        <MessageCircle className="h-3 w-3" /> Enviar quebrada ({aiSuggestionParts.length} msgs)
-                      </button>
-                    )}
-                    <button
-                      onClick={useAiSuggestionFull}
-                      className={`${aiSuggestionParts.length > 1 ? '' : 'flex-1'} text-[12px] font-medium ${aiSuggestionParts.length > 1 ? 'text-violet-600 hover:text-violet-700 dark:text-violet-400 border border-violet-200 dark:border-violet-700 hover:bg-violet-100 dark:hover:bg-violet-900/30' : 'bg-violet-500 hover:bg-violet-600 text-white'} rounded-md px-3 py-1.5 transition-colors flex items-center justify-center gap-1.5`}
-                    >
-                      <Copy className="h-3 w-3" /> {aiSuggestionParts.length > 1 ? 'Copiar completa' : 'Usar sugestão'}
-                    </button>
-                    <button
-                      onClick={() => setShowAiSelector(true)}
-                      className="text-[12px] font-medium text-violet-600 hover:text-violet-700 dark:text-violet-400 rounded-md px-3 py-1.5 transition-colors border border-violet-200 dark:border-violet-700 hover:bg-violet-100 dark:hover:bg-violet-900/30 flex items-center gap-1.5"
-                    >
-                      <Sparkles className="h-3 w-3" /> Trocar IA
-                    </button>
-                    <button
-                      onClick={handleAiSuggest}
-                      disabled={aiSuggestMut.isPending}
-                      className="text-[12px] font-medium text-violet-600 hover:text-violet-700 dark:text-violet-400 rounded-md px-3 py-1.5 transition-colors border border-violet-200 dark:border-violet-700 hover:bg-violet-100 dark:hover:bg-violet-900/30 flex items-center gap-1.5"
-                    >
-                      {aiSuggestMut.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />} Gerar outra
-                    </button>
-                  </div>
+
+                  {/* Loading state */}
+                  {aiLoading && !aiSuggestion && (
+                    <div className="px-4 py-6 flex flex-col items-center gap-2">
+                      <Loader2 className="h-6 w-6 animate-spin text-violet-500" />
+                      <span className="text-[12px] text-muted-foreground">Gerando sugestão de resposta...</span>
+                    </div>
+                  )}
+
+                  {/* Editable suggestion text */}
+                  {aiSuggestion && (
+                    <>
+                      <div className="px-3 py-2">
+                        <textarea
+                          value={editedSuggestion}
+                          onChange={(e) => setEditedSuggestion(e.target.value)}
+                          className="w-full text-[13px] text-foreground bg-white dark:bg-violet-900/20 border border-violet-200 dark:border-violet-700 rounded-md px-2.5 py-2 resize-none focus:outline-none focus:ring-1 focus:ring-violet-400 min-h-[60px] max-h-[180px] overflow-y-auto"
+                          rows={Math.min(6, editedSuggestion.split('\n').length + 1)}
+                          placeholder="Edite a sugestão antes de enviar..."
+                        />
+                        <p className="text-[10px] text-muted-foreground mt-1">Edite o texto acima antes de enviar. Separe parágrafos com Enter duplo para enviar como mensagens separadas.</p>
+                      </div>
+
+                      {/* Action buttons */}
+                      <div className="px-3 py-2 flex flex-wrap gap-2 border-t border-violet-200 dark:border-violet-800">
+                        <button
+                          onClick={useSuggestionAsText}
+                          className="flex-1 text-[12px] font-medium bg-violet-500 hover:bg-violet-600 text-white rounded-md py-1.5 transition-colors flex items-center justify-center gap-1.5"
+                        >
+                          <Copy className="h-3 w-3" /> Usar no campo
+                        </button>
+                        {editedSuggestion.includes('\n\n') && (
+                          <button
+                            onClick={sendSuggestionBroken}
+                            className="flex-1 text-[12px] font-medium bg-emerald-500 hover:bg-emerald-600 text-white rounded-md py-1.5 transition-colors flex items-center justify-center gap-1.5"
+                          >
+                            <MessageCircle className="h-3 w-3" /> Enviar separado ({editedSuggestion.split(/\n\n+/).filter(Boolean).length} msgs)
+                          </button>
+                        )}
+                        <button
+                          onClick={handleAiSuggest}
+                          disabled={aiLoading}
+                          className="text-[12px] font-medium text-violet-600 hover:text-violet-700 dark:text-violet-400 rounded-md px-3 py-1.5 transition-colors border border-violet-200 dark:border-violet-700 hover:bg-violet-100 dark:hover:bg-violet-900/30 flex items-center gap-1.5"
+                        >
+                          {aiLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />} Gerar outra
+                        </button>
+                      </div>
+                    </>
+                  )}
                 </div>
               )}
 

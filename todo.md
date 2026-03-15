@@ -2839,3 +2839,11 @@
 - [x] Frontend: botão "Enviar quebrada (N msgs)" (envia cada parte separada com delay de 1.2s)
 - [x] Preview das partes como bolhas numeradas no popup
 - [x] 28 testes passando
+
+## Bug Fix: Botão sugestão IA bugado + texto editável (Mar 15 - v8.8)
+- [x] Corrigir botão de sugestão IA: simplificado para toggle (clica gera, clica fecha)
+- [x] Melhorar feedback visual: popup abre imediato com spinner "Gerando sugestão de resposta..."
+- [x] Permitir edição do texto: textarea editável com a sugestão gerada
+- [x] Simplificar UX: removido seletor complexo, botões claros (Usar no campo / Enviar separado / Gerar outra)
+- [x] "Enviar separado" só aparece quando há parágrafos duplos no texto editado
+- [x] Dica visual: "Separe parágrafos com Enter duplo para enviar como mensagens separadas"
