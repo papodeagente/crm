@@ -2624,31 +2624,25 @@ export const appRouter = router({
           ? `\n\nContexto do Negócio:\n- Título: ${input.dealTitle}\n- Valor: R$ ${((input.dealValue || 0) / 100).toFixed(2)}\n- Etapa: ${input.dealStage || "N/A"}`
           : "";
 
-        const systemPrompt = `Você é um assistente de vendas especialista em SPIN Selling para uma agência de viagens.
+        const systemPrompt = `Você é um assistente de vendas para uma agência de viagens. Sua função é analisar a conversa entre o agente e o cliente e sugerir a PRÓXIMA resposta que o agente deve enviar.
 
-SPIN Selling:
-S (Situação): Perguntas para entender o contexto atual do cliente (destino desejado, datas, quem viaja, orçamento, experiências anteriores).
-P (Problema): Perguntas para identificar dificuldades, insatisfações ou necessidades não atendidas.
-I (Implicação): Perguntas que mostram as consequências de não resolver o problema.
-N (Necessidade de solução): Perguntas que levam o cliente a perceber o valor da solução.
+INSTRUÇÕES CRÍTICAS:
+1. Leia TODA a conversa com atenção. A última mensagem do cliente é a mais importante — sua resposta DEVE ser uma continuação direta e coerente do que o cliente acabou de dizer.
+2. Se o cliente fez uma pergunta, responda a pergunta. Se o cliente mandou "oi", cumprimente de volta. Se o cliente mandou um link, comente sobre o link. Se o cliente está testando ("teste", "TESTE"), responda de forma natural perguntando como pode ajudar.
+3. A resposta deve soar 100% humana, como se fosse digitada por um atendente real no WhatsApp. Use o mesmo tom e nível de formalidade da conversa.
+4. NUNCA use travessão (—), traço longo (–), asteriscos, bullet points ou formatação markdown. Apenas texto corrido natural.
+5. Use português brasileiro natural e informal.
+6. Responda APENAS com um JSON válido: {"parts": ["mensagem 1", "mensagem 2"]}
+7. Cada "part" é uma mensagem separada no WhatsApp. Use 1 a 3 partes. Cada parte deve ser curta (1-2 frases).
+8. Não inclua explicações, prefixos, comentários ou texto fora do JSON.`;
 
-Regras OBRIGATÓRIAS:
-1. Analise TODA a conversa para entender em qual fase do SPIN o atendimento está.
-2. Sugira UMA resposta natural e empática, adequada ao momento da conversa.
-3. A resposta deve soar humana, não robótica. Use o tom da conversa.
-4. Se o cliente já demonstrou interesse claro, foque em fechar (proposta, valores, próximos passos).
-5. Se o cliente está indeciso, use Implicação ou Necessidade.
-6. NUNCA use travessão (—), traço longo (–), hífen como travessão, asteriscos, bullet points ou formatação markdown. Escreva texto corrido natural.
-7. Use português brasileiro natural e informal.
-8. Responda APENAS em JSON válido no formato: {"parts": ["mensagem 1", "mensagem 2", ...]}
-9. Divida a resposta em "parts" como um humano enviaria no WhatsApp: cada parte é uma mensagem separada, curta e natural. Geralmente 1 a 4 partes.
-10. Cada parte deve ter no máximo 2 frases. Não junte tudo em uma parte só.
-11. Não inclua explicações, prefixos ou comentários. Apenas o JSON.`;
-
-        const userPrompt = `Conversa atual:\n${conversationContext}${dealContext}\n\nSugira a próxima resposta do agente usando SPIN Selling. Responda APENAS em JSON: {"parts": ["msg1", "msg2", ...]}:`;
+        const userPrompt = `Conversa entre o agente e ${input.contactName || "o cliente"}:\n\n${conversationContext}${dealContext}\n\nCom base na conversa acima, qual deve ser a próxima resposta do agente? Responda APENAS em JSON: {"parts": ["msg1", "msg2"]}:`;
 
         try {
           if (integration.provider === "openai") {
+            // Use max_tokens for chat models (gpt-4.1*), max_completion_tokens for reasoning models (gpt-5*, o4*)
+            const isReasoningModel = model.startsWith("gpt-5") || model.startsWith("o4") || model.startsWith("o3");
+            const tokenParam = isReasoningModel ? { max_completion_tokens: 500 } : { max_tokens: 500 };
             const res = await fetch("https://api.openai.com/v1/chat/completions", {
               method: "POST",
               headers: { "Content-Type": "application/json", "Authorization": `Bearer ${integration.apiKey}` },
@@ -2658,7 +2652,7 @@ Regras OBRIGATÓRIAS:
                   { role: "system", content: systemPrompt },
                   { role: "user", content: userPrompt },
                 ],
-                max_completion_tokens: 500,
+                ...tokenParam,
               }),
             });
             if (!res.ok) {
@@ -2754,14 +2748,18 @@ Regras OBRIGATÓRIAS:
       .query(({ input }) => {
         if (input.provider === "openai") {
           return [
-            { id: "gpt-5.4", name: "GPT-5.4", description: "Modelo mais inteligente da OpenAI para raciocínio e código", contextWindow: "1M" },
-            { id: "gpt-5-mini", name: "GPT-5 Mini", description: "Rápido e econômico, ideal para alto volume", contextWindow: "400K" },
+            { id: "gpt-4.1", name: "GPT-4.1", description: "Melhor custo-benefício para chat", contextWindow: "1M" },
+            { id: "gpt-4.1-mini", name: "GPT-4.1 Mini", description: "Rápido e econômico", contextWindow: "128K" },
+            { id: "gpt-4.1-nano", name: "GPT-4.1 Nano", description: "Ultra econômico", contextWindow: "128K" },
+            { id: "gpt-5-mini", name: "GPT-5 Mini", description: "Raciocínio rápido", contextWindow: "400K" },
+            { id: "gpt-5.4", name: "GPT-5.4", description: "Modelo mais inteligente para raciocínio", contextWindow: "1M" },
+            { id: "o4-mini", name: "o4-mini", description: "Raciocínio avançado econômico", contextWindow: "200K" },
           ];
         } else {
           return [
-            { id: "claude-opus-4-6", name: "Claude Opus 4.6", description: "Mais inteligente para agentes e código", contextWindow: "1M" },
-            { id: "claude-sonnet-4-6", name: "Claude Sonnet 4.6", description: "Melhor equilíbrio entre velocidade e inteligência", contextWindow: "1M" },
             { id: "claude-haiku-4-5", name: "Claude Haiku 4.5", description: "Mais rápido e econômico", contextWindow: "200K" },
+            { id: "claude-sonnet-4-6", name: "Claude Sonnet 4.6", description: "Melhor equilíbrio entre velocidade e inteligência", contextWindow: "1M" },
+            { id: "claude-opus-4-6", name: "Claude Opus 4.6", description: "Mais inteligente para agentes e código", contextWindow: "1M" },
           ];
         }
       }),

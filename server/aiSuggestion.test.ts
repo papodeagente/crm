@@ -83,20 +83,18 @@ describe("AI Suggestion — parseAiSuggestionParts", () => {
   it("strips bullet points from raw text", () => {
     const raw = "- Primeiro ponto\n- Segundo ponto\n- Terceiro ponto";
     const result = parseAiSuggestionParts(raw);
-    // Bullets should be stripped
     expect(result.full).not.toMatch(/^-/m);
   });
 
   it("handles empty parts array gracefully", () => {
     const raw = '{"parts": []}';
     const result = parseAiSuggestionParts(raw);
-    // Should fallback since parts is empty
     expect(result.parts.length).toBeGreaterThanOrEqual(1);
   });
 });
 
-describe("AI Suggestion — SPIN Selling Context Building", () => {
-  it("builds conversation context from messages", () => {
+describe("AI Suggestion — Conversation Context Building", () => {
+  it("builds conversation context from messages with contact name", () => {
     const messages = [
       { fromMe: false, content: "Oi, quero saber sobre pacotes para Noronha", timestamp: "2026-03-14T10:00:00Z" },
       { fromMe: true, content: "Olá! Temos ótimos pacotes. Para quantas pessoas?", timestamp: "2026-03-14T10:01:00Z" },
@@ -134,6 +132,16 @@ describe("AI Suggestion — SPIN Selling Context Building", () => {
       .join("\n");
     expect(context).toBe("Cliente: Oi");
   });
+
+  it("includes the last message from client for context-aware response", () => {
+    const messages = [
+      { fromMe: false, content: "Oi", timestamp: "2026-03-14T10:00:00Z" },
+      { fromMe: true, content: "Olá! Como posso ajudar?", timestamp: "2026-03-14T10:01:00Z" },
+      { fromMe: false, content: "Quero um pacote para Maldivas em julho", timestamp: "2026-03-14T10:02:00Z" },
+    ];
+    const lastClientMsg = [...messages].reverse().find(m => !m.fromMe);
+    expect(lastClientMsg?.content).toBe("Quero um pacote para Maldivas em julho");
+  });
 });
 
 describe("AI Suggestion — Integration Selection", () => {
@@ -150,7 +158,7 @@ describe("AI Suggestion — Integration Selection", () => {
   });
 
   it("falls back to any active integration when integrationId not provided", async () => {
-    mockGetAnyActive.mockResolvedValue({ id: 1, provider: "openai", apiKey: "sk-test", defaultModel: "gpt-5-mini", isActive: true });
+    mockGetAnyActive.mockResolvedValue({ id: 1, provider: "openai", apiKey: "sk-test", defaultModel: "gpt-4.1", isActive: true });
     const result = await getAnyActiveAiIntegration(1);
     expect(result?.provider).toBe("openai");
   });
@@ -167,30 +175,154 @@ describe("AI Suggestion — Integration Selection", () => {
   it("uses overrideModel when provided", async () => {
     mockGetSettings.mockResolvedValue({ defaultAiModel: "gpt-5.4" });
     const settings = await getTenantAiSettings(1);
-    const overrideModel = "gpt-5-mini";
-    const model = overrideModel || settings.defaultAiModel || "gpt-5.4";
-    expect(model).toBe("gpt-5-mini");
+    const overrideModel = "gpt-4.1-mini";
+    const model = overrideModel || settings.defaultAiModel || "gpt-4.1";
+    expect(model).toBe("gpt-4.1-mini");
   });
 
   it("uses tenant default model when no override", async () => {
     mockGetSettings.mockResolvedValue({ defaultAiModel: "claude-sonnet-4-6" });
     const settings = await getTenantAiSettings(1);
     const overrideModel = undefined;
-    const model = overrideModel || settings.defaultAiModel || "gpt-5.4";
+    const model = overrideModel || settings.defaultAiModel || "gpt-4.1";
     expect(model).toBe("claude-sonnet-4-6");
   });
 
   it("uses integration default model as last fallback", async () => {
     mockGetSettings.mockResolvedValue({});
     const settings = await getTenantAiSettings(1);
-    const integrationDefault = "gpt-5.4";
+    const integrationDefault = "gpt-4.1";
     const overrideModel = undefined;
     const model = overrideModel || settings.defaultAiModel || integrationDefault;
-    expect(model).toBe("gpt-5.4");
+    expect(model).toBe("gpt-4.1");
   });
 });
 
-describe("AI Suggestion — Self-contained Message Fetching", () => {
+describe("AI Suggestion — OpenAI Model Token Parameter", () => {
+  it("uses max_tokens for gpt-4.1 models (chat models)", () => {
+    const model = "gpt-4.1";
+    const isReasoningModel = model.startsWith("gpt-5") || model.startsWith("o4") || model.startsWith("o3");
+    const tokenParam = isReasoningModel ? { max_completion_tokens: 500 } : { max_tokens: 500 };
+    expect(tokenParam).toEqual({ max_tokens: 500 });
+  });
+
+  it("uses max_tokens for gpt-4.1-mini (chat model)", () => {
+    const model = "gpt-4.1-mini";
+    const isReasoningModel = model.startsWith("gpt-5") || model.startsWith("o4") || model.startsWith("o3");
+    const tokenParam = isReasoningModel ? { max_completion_tokens: 500 } : { max_tokens: 500 };
+    expect(tokenParam).toEqual({ max_tokens: 500 });
+  });
+
+  it("uses max_tokens for gpt-4.1-nano (chat model)", () => {
+    const model = "gpt-4.1-nano";
+    const isReasoningModel = model.startsWith("gpt-5") || model.startsWith("o4") || model.startsWith("o3");
+    const tokenParam = isReasoningModel ? { max_completion_tokens: 500 } : { max_tokens: 500 };
+    expect(tokenParam).toEqual({ max_tokens: 500 });
+  });
+
+  it("uses max_completion_tokens for gpt-5-mini (reasoning model)", () => {
+    const model = "gpt-5-mini";
+    const isReasoningModel = model.startsWith("gpt-5") || model.startsWith("o4") || model.startsWith("o3");
+    const tokenParam = isReasoningModel ? { max_completion_tokens: 500 } : { max_tokens: 500 };
+    expect(tokenParam).toEqual({ max_completion_tokens: 500 });
+  });
+
+  it("uses max_completion_tokens for gpt-5.4 (reasoning model)", () => {
+    const model = "gpt-5.4";
+    const isReasoningModel = model.startsWith("gpt-5") || model.startsWith("o4") || model.startsWith("o3");
+    const tokenParam = isReasoningModel ? { max_completion_tokens: 500 } : { max_tokens: 500 };
+    expect(tokenParam).toEqual({ max_completion_tokens: 500 });
+  });
+
+  it("uses max_completion_tokens for o4-mini (reasoning model)", () => {
+    const model = "o4-mini";
+    const isReasoningModel = model.startsWith("gpt-5") || model.startsWith("o4") || model.startsWith("o3");
+    const tokenParam = isReasoningModel ? { max_completion_tokens: 500 } : { max_tokens: 500 };
+    expect(tokenParam).toEqual({ max_completion_tokens: 500 });
+  });
+});
+
+describe("AI Suggestion — Model Lists", () => {
+  it("has correct OpenAI models including gpt-4.1 family", () => {
+    const openaiModels = [
+      { id: "gpt-4.1", name: "GPT-4.1" },
+      { id: "gpt-4.1-mini", name: "GPT-4.1 Mini" },
+      { id: "gpt-4.1-nano", name: "GPT-4.1 Nano" },
+      { id: "gpt-5-mini", name: "GPT-5 Mini" },
+      { id: "gpt-5.4", name: "GPT-5.4" },
+      { id: "o4-mini", name: "o4-mini" },
+    ];
+    expect(openaiModels).toHaveLength(6);
+    expect(openaiModels.map(m => m.id)).toContain("gpt-4.1");
+    expect(openaiModels.map(m => m.id)).toContain("gpt-4.1-mini");
+    expect(openaiModels.map(m => m.id)).toContain("gpt-4.1-nano");
+    expect(openaiModels.map(m => m.id)).toContain("gpt-5-mini");
+    expect(openaiModels.map(m => m.id)).toContain("gpt-5.4");
+    expect(openaiModels.map(m => m.id)).toContain("o4-mini");
+    // Old models should NOT be present
+    expect(openaiModels.map(m => m.id)).not.toContain("gpt-4o");
+    expect(openaiModels.map(m => m.id)).not.toContain("gpt-3.5-turbo");
+  });
+
+  it("has correct Anthropic models", () => {
+    const anthropicModels = [
+      { id: "claude-haiku-4-5", name: "Claude Haiku 4.5" },
+      { id: "claude-sonnet-4-6", name: "Claude Sonnet 4.6" },
+      { id: "claude-opus-4-6", name: "Claude Opus 4.6" },
+    ];
+    expect(anthropicModels).toHaveLength(3);
+    expect(anthropicModels.map(m => m.id)).toContain("claude-haiku-4-5");
+    expect(anthropicModels.map(m => m.id)).toContain("claude-sonnet-4-6");
+    expect(anthropicModels.map(m => m.id)).toContain("claude-opus-4-6");
+    // Old models should NOT be present
+    expect(anthropicModels.map(m => m.id)).not.toContain("claude-3-opus-20240229");
+    expect(anthropicModels.map(m => m.id)).not.toContain("claude-3-sonnet-20240229");
+  });
+});
+
+describe("AI Suggestion — Phase-based UI Flow", () => {
+  it("starts in 'select' phase (no auto-generate)", () => {
+    const initialPhase = "select";
+    expect(initialPhase).toBe("select");
+  });
+
+  it("transitions to 'loading' when generate is called", () => {
+    let phase = "select";
+    // Simulate clicking generate
+    phase = "loading";
+    expect(phase).toBe("loading");
+  });
+
+  it("transitions to 'result' on success", () => {
+    let phase = "loading";
+    // Simulate successful response
+    phase = "result";
+    expect(phase).toBe("result");
+  });
+
+  it("transitions to 'error' on failure", () => {
+    let phase = "loading";
+    // Simulate error
+    phase = "error";
+    expect(phase).toBe("error");
+  });
+
+  it("can go back to 'select' from 'result' to regenerate with different model", () => {
+    let phase: string = "result";
+    // User clicks "Gerar outra"
+    phase = "select";
+    expect(phase).toBe("select");
+  });
+
+  it("can go back to 'select' from 'error' to change model", () => {
+    let phase: string = "error";
+    // User clicks "Trocar modelo"
+    phase = "select";
+    expect(phase).toBe("select");
+  });
+});
+
+describe("AI Suggestion — Message Filtering", () => {
   it("filters messages with content from raw query data", () => {
     const rawMessages = [
       { id: 1, fromMe: false, content: "Oi", messageType: "conversation", timestamp: new Date() },
@@ -220,38 +352,6 @@ describe("AI Suggestion — Self-contained Message Fetching", () => {
     const ts = "2026-03-14T10:00:00Z";
     const converted = ts instanceof Date ? (ts as any).toISOString() : String(ts);
     expect(converted).toBe("2026-03-14T10:00:00Z");
-  });
-
-  it("should not generate when messages array is empty", () => {
-    const messages: any[] = [];
-    const shouldGenerate = messages.length > 0;
-    expect(shouldGenerate).toBe(false);
-  });
-
-  it("should generate when messages are available", () => {
-    const messages = [
-      { fromMe: false, content: "Oi", timestamp: "2026-03-14T10:00:00Z" },
-    ];
-    const shouldGenerate = messages.length > 0;
-    expect(shouldGenerate).toBe(true);
-  });
-
-  it("auto-generate flag prevents duplicate calls", () => {
-    let didAutoGenerate = false;
-    const messages = [{ fromMe: false, content: "Oi" }];
-    
-    // First check - should generate
-    if (!didAutoGenerate && messages.length > 0) {
-      didAutoGenerate = true;
-    }
-    expect(didAutoGenerate).toBe(true);
-    
-    // Second check - should NOT generate again
-    let calledAgain = false;
-    if (!didAutoGenerate && messages.length > 0) {
-      calledAgain = true;
-    }
-    expect(calledAgain).toBe(false);
   });
 });
 

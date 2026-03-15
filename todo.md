@@ -2875,3 +2875,9 @@
 - [x] Verificado: IDs dos modelos OpenAI (gpt-5.4 e gpt-5-mini) são válidos conforme documentação oficial
 - [x] Verificado: IDs dos modelos Anthropic (claude-opus-4-6, claude-sonnet-4-6, claude-haiku-4-5) são válidos conforme documentação oficial
 - [x] Problema real era o componente não disparar a mutation, não os IDs dos modelos
+
+## Bug Fix: Sugestão IA - 4 problemas (Mar 15 - v8.13)
+- [x] Sugestão não considera contexto da conversa (prompt reescrito para focar na última mensagem do cliente)
+- [x] Ao clicar deve mostrar seletor de IA/modelo PRIMEIRO, sem auto-gerar (UI com fases: select → loading → result)
+- [x] Tooltips dos ícones na barra inferior (adicionado InstantTooltip em Emoji e Anexar)
+- [x] Modelos OpenAI atualizados: gpt-4.1, gpt-4.1-mini, gpt-4.1-nano, gpt-5-mini, gpt-5.4, o4-mini + max_tokens vs max_completion_tokens

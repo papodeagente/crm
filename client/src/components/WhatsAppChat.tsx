@@ -2008,10 +2008,12 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
 
             {/* Emoji picker */}
             <div className="relative shrink-0 self-end" ref={emojiPickerRef}>
+              <InstantTooltip label="Emoji" side="top">
               <button onClick={() => { setShowEmojiPicker(!showEmojiPicker); if (!showEmojiPicker) setShowAttach(false); }}
                 className={`w-[42px] h-[42px] flex items-center justify-center rounded-full transition-all duration-200 ${showEmojiPicker ? "bg-wa-tint/15 text-wa-tint" : "hover:bg-wa-hover text-muted-foreground"}`}>
                 <Smile className="w-[22px] h-[22px]" />
               </button>
+              </InstantTooltip>
               {showEmojiPicker && (
                 <div className="absolute bottom-full left-0 mb-2 z-50 rounded-xl overflow-hidden shadow-xl border border-border/50">
                   <Picker data={data} onEmojiSelect={handleEmojiSelect} theme="light" previewPosition="none" skinTonePosition="none" locale="pt" perLine={8} />
@@ -2021,10 +2023,12 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
 
             {/* Attach menu */}
             <div className="relative shrink-0 self-end" ref={attachMenuRef}>
+              <InstantTooltip label="Anexar arquivo" side="top">
               <button onClick={() => { setShowAttach(!showAttach); if (!showAttach) setShowEmojiPicker(false); }}
                 className={`w-[42px] h-[42px] flex items-center justify-center rounded-full transition-all duration-200 ${showAttach ? "bg-wa-tint/15 text-wa-tint" : "hover:bg-wa-hover text-muted-foreground"}`}>
                 <Paperclip className={`w-[22px] h-[22px] transition-transform duration-200 ${showAttach ? "rotate-[135deg]" : "rotate-45"}`} />
               </button>
+              </InstantTooltip>
               {showAttach && <AttachMenu onSelect={handleAttachSelect} onClose={() => setShowAttach(false)} />}
             </div>
 

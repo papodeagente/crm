@@ -31,15 +31,19 @@ export interface AiCompletionResponse {
 
 // ── OpenAI Models (Março 2026) ────────────────────────────────
 export const OPENAI_MODELS = [
-  { id: "gpt-5.4", name: "GPT-5.4", description: "Modelo mais inteligente da OpenAI para raciocínio e código", contextWindow: "1M" },
-  { id: "gpt-5-mini", name: "GPT-5 Mini", description: "Rápido e econômico, ideal para alto volume", contextWindow: "400K" },
+  { id: "gpt-4.1", name: "GPT-4.1", description: "Melhor custo-benefício para chat", contextWindow: "1M" },
+  { id: "gpt-4.1-mini", name: "GPT-4.1 Mini", description: "Rápido e econômico", contextWindow: "128K" },
+  { id: "gpt-4.1-nano", name: "GPT-4.1 Nano", description: "Ultra econômico", contextWindow: "128K" },
+  { id: "gpt-5-mini", name: "GPT-5 Mini", description: "Raciocínio rápido", contextWindow: "400K" },
+  { id: "gpt-5.4", name: "GPT-5.4", description: "Modelo mais inteligente para raciocínio", contextWindow: "1M" },
+  { id: "o4-mini", name: "o4-mini", description: "Raciocínio avançado econômico", contextWindow: "200K" },
 ] as const;
 
 // ── Anthropic Models (Março 2026) ─────────────────────────────
 export const ANTHROPIC_MODELS = [
-  { id: "claude-opus-4-6", name: "Claude Opus 4.6", description: "Mais inteligente para agentes e código", contextWindow: "1M" },
-  { id: "claude-sonnet-4-6", name: "Claude Sonnet 4.6", description: "Melhor equilíbrio entre velocidade e inteligência", contextWindow: "1M" },
   { id: "claude-haiku-4-5", name: "Claude Haiku 4.5", description: "Mais rápido e econômico", contextWindow: "200K" },
+  { id: "claude-sonnet-4-6", name: "Claude Sonnet 4.6", description: "Melhor equilíbrio entre velocidade e inteligência", contextWindow: "1M" },
+  { id: "claude-opus-4-6", name: "Claude Opus 4.6", description: "Mais inteligente para agentes e código", contextWindow: "1M" },
 ] as const;
 
 /**
