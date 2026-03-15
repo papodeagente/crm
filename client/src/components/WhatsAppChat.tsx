@@ -7,7 +7,7 @@ import {
   Mic, MicOff, Paperclip, Pause, Phone, Play, Search, Send, Smile,
   Video, X, Camera, FileText, ArrowDown, Volume2, Loader2, ChevronDown,
   UserPlus, Briefcase, Users, Reply, Trash2, Pencil, Forward, MapPin,
-  Contact, BarChart3, Copy, Ban, StickyNote, ArrowRightLeft, History, Sparkles, Brain
+  Contact, BarChart3, Copy, Ban, StickyNote, ArrowRightLeft, History, Sparkles, Brain, MessageCircle
 } from "lucide-react";
 import Picker from "@emoji-mart/react";
 import data from "@emoji-mart/data";
@@ -1114,6 +1114,7 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
   const [showQuickReplies, setShowQuickReplies] = useState(false);
   const [quickReplyFilter, setQuickReplyFilter] = useState("");
   const [aiSuggestion, setAiSuggestion] = useState<string | null>(null);
+  const [aiSuggestionParts, setAiSuggestionParts] = useState<string[]>([]);
   const [showAiSuggestion, setShowAiSuggestion] = useState(false);
   const [aiSuggestionMeta, setAiSuggestionMeta] = useState<{ provider: string; model: string } | null>(null);
   const [selectedAiIntegrationId, setSelectedAiIntegrationId] = useState<number | undefined>(undefined);
@@ -1168,6 +1169,7 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
   const aiSuggestMut = trpc.ai.suggest.useMutation({
     onSuccess: (data) => {
       setAiSuggestion(data.suggestion);
+      setAiSuggestionParts(data.parts || [data.suggestion]);
       setAiSuggestionMeta({ provider: data.provider, model: data.model });
       setShowAiSuggestion(true);
     },
@@ -1197,12 +1199,31 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
     });
   };
 
-  const useAiSuggestion = () => {
+  const useAiSuggestionFull = () => {
     if (aiSuggestion) {
       setMessageText(aiSuggestion);
       setShowAiSuggestion(false);
       setAiSuggestion(null);
+      setAiSuggestionParts([]);
     }
+  };
+
+  const useAiSuggestionBroken = async () => {
+    if (aiSuggestionParts.length === 0) return;
+    const number = contact?.phone?.replace(/\D/g, "") || "";
+    if (!number || !sessionId) { toast.error("Sem número ou sessão"); return; }
+    setShowAiSuggestion(false);
+    for (let i = 0; i < aiSuggestionParts.length; i++) {
+      const part = aiSuggestionParts[i].trim();
+      if (!part) continue;
+      sendMessage.mutate({ sessionId, number, message: part });
+      if (i < aiSuggestionParts.length - 1) {
+        await new Promise(r => setTimeout(r, 1200));
+      }
+    }
+    setAiSuggestion(null);
+    setAiSuggestionParts([]);
+    toast.success("Mensagens enviadas");
   };
 
   // AI integrations list (for selector)
@@ -2181,26 +2202,43 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
                   <div className="px-3 py-1.5 flex items-center justify-between border-b border-violet-200 dark:border-violet-800">
                     <div className="flex items-center gap-1.5">
                       <Brain className="h-3.5 w-3.5 text-violet-500" />
-                      <span className="text-[11px] font-medium text-violet-600 dark:text-violet-400 uppercase tracking-wider">Sugestão IA (SPIN Selling)</span>
+                      <span className="text-[11px] font-medium text-violet-600 dark:text-violet-400 uppercase tracking-wider">Sugestão IA</span>
                       {aiSuggestionMeta && (
                         <span className="text-[10px] text-muted-foreground ml-1">
-                          — {aiSuggestionMeta.provider === "openai" ? "OpenAI" : "Anthropic"} · {aiSuggestionMeta.model}
+                          {aiSuggestionMeta.provider === "openai" ? "OpenAI" : "Anthropic"} · {aiSuggestionMeta.model}
                         </span>
                       )}
                     </div>
-                    <button onClick={() => { setShowAiSuggestion(false); setAiSuggestion(null); setAiSuggestionMeta(null); }} className="text-muted-foreground hover:text-foreground">
+                    <button onClick={() => { setShowAiSuggestion(false); setAiSuggestion(null); setAiSuggestionParts([]); setAiSuggestionMeta(null); }} className="text-muted-foreground hover:text-foreground">
                       <X className="h-3.5 w-3.5" />
                     </button>
                   </div>
-                  <div className="px-3 py-2 text-[13px] text-foreground whitespace-pre-wrap max-h-[150px] overflow-y-auto">
-                    {aiSuggestion}
+                  {/* Show parts as separate message bubbles */}
+                  <div className="px-3 py-2 max-h-[200px] overflow-y-auto space-y-1.5">
+                    {aiSuggestionParts.length > 1 ? (
+                      aiSuggestionParts.map((part, i) => (
+                        <div key={i} className="bg-white dark:bg-violet-900/20 rounded-lg px-2.5 py-1.5 text-[13px] text-foreground border border-violet-100 dark:border-violet-800/50">
+                          <span className="text-[10px] text-violet-400 font-medium mr-1.5">{i + 1}.</span>{part}
+                        </div>
+                      ))
+                    ) : (
+                      <div className="text-[13px] text-foreground whitespace-pre-wrap">{aiSuggestion}</div>
+                    )}
                   </div>
-                  <div className="px-3 py-2 flex gap-2 border-t border-violet-200 dark:border-violet-800">
+                  <div className="px-3 py-2 flex flex-wrap gap-2 border-t border-violet-200 dark:border-violet-800">
+                    {aiSuggestionParts.length > 1 && (
+                      <button
+                        onClick={useAiSuggestionBroken}
+                        className="flex-1 text-[12px] font-medium bg-violet-500 hover:bg-violet-600 text-white rounded-md py-1.5 transition-colors flex items-center justify-center gap-1.5"
+                      >
+                        <MessageCircle className="h-3 w-3" /> Enviar quebrada ({aiSuggestionParts.length} msgs)
+                      </button>
+                    )}
                     <button
-                      onClick={useAiSuggestion}
-                      className="flex-1 text-[12px] font-medium bg-violet-500 hover:bg-violet-600 text-white rounded-md py-1.5 transition-colors flex items-center justify-center gap-1.5"
+                      onClick={useAiSuggestionFull}
+                      className={`${aiSuggestionParts.length > 1 ? '' : 'flex-1'} text-[12px] font-medium ${aiSuggestionParts.length > 1 ? 'text-violet-600 hover:text-violet-700 dark:text-violet-400 border border-violet-200 dark:border-violet-700 hover:bg-violet-100 dark:hover:bg-violet-900/30' : 'bg-violet-500 hover:bg-violet-600 text-white'} rounded-md px-3 py-1.5 transition-colors flex items-center justify-center gap-1.5`}
                     >
-                      <Copy className="h-3 w-3" /> Usar esta sugestão
+                      <Copy className="h-3 w-3" /> {aiSuggestionParts.length > 1 ? 'Copiar completa' : 'Usar sugestão'}
                     </button>
                     <button
                       onClick={() => setShowAiSelector(true)}

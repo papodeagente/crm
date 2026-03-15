@@ -156,6 +156,30 @@ import { trackingTokens, rdStationConfig, rdStationWebhookLog, rdFieldMappings, 
 import { generateTrackerScript } from "./tracker-script";
 import { eq, and, desc, sql } from "drizzle-orm";
 
+/** Parse AI suggestion response into parts array. Handles JSON or plain text fallback. */
+function parseAiSuggestionParts(raw: string): { full: string; parts: string[] } {
+  // Strip any dashes used as em-dash or bullet
+  const cleaned = raw.replace(/[\u2014\u2013]/g, ",").replace(/^\s*[-\*]\s+/gm, "");
+  try {
+    // Try to parse JSON from the response
+    const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[0]);
+      if (Array.isArray(parsed.parts) && parsed.parts.length > 0) {
+        const parts = parsed.parts.map((p: string) => p.replace(/[\u2014\u2013]/g, ",").trim()).filter(Boolean);
+        return { full: parts.join("\n\n"), parts };
+      }
+    }
+  } catch {}
+  // Fallback: split by double newline or single newline for multi-part
+  const lines = cleaned.split(/\n\n+/).map(l => l.trim()).filter(Boolean);
+  if (lines.length > 1) {
+    return { full: lines.join("\n\n"), parts: lines };
+  }
+  // Single message fallback
+  return { full: cleaned.trim(), parts: [cleaned.trim()] };
+}
+
 export const appRouter = router({
   system: systemRouter,
   auth: router({
@@ -2603,22 +2627,25 @@ export const appRouter = router({
         const systemPrompt = `Você é um assistente de vendas especialista em SPIN Selling para uma agência de viagens.
 
 SPIN Selling:
-- **S (Situação)**: Perguntas para entender o contexto atual do cliente (destino desejado, datas, quem viaja, orçamento, experiências anteriores).
-- **P (Problema)**: Perguntas para identificar dificuldades, insatisfações ou necessidades não atendidas (medo de viajar sozinho, dificuldade em planejar, experiências ruins anteriores).
-- **I (Implicação)**: Perguntas que mostram as consequências de não resolver o problema (perder a oportunidade, gastar mais por falta de planejamento, stress).
-- **N (Necessidade de solução)**: Perguntas que levam o cliente a perceber o valor da solução (como seria ter tudo organizado, tranquilidade, economia).
+S (Situação): Perguntas para entender o contexto atual do cliente (destino desejado, datas, quem viaja, orçamento, experiências anteriores).
+P (Problema): Perguntas para identificar dificuldades, insatisfações ou necessidades não atendidas.
+I (Implicação): Perguntas que mostram as consequências de não resolver o problema.
+N (Necessidade de solução): Perguntas que levam o cliente a perceber o valor da solução.
 
-Regras:
+Regras OBRIGATÓRIAS:
 1. Analise TODA a conversa para entender em qual fase do SPIN o atendimento está.
 2. Sugira UMA resposta natural e empática, adequada ao momento da conversa.
 3. A resposta deve soar humana, não robótica. Use o tom da conversa.
 4. Se o cliente já demonstrou interesse claro, foque em fechar (proposta, valores, próximos passos).
 5. Se o cliente está indeciso, use Implicação ou Necessidade.
-6. Responda APENAS com o texto da sugestão, sem explicações ou prefixos.
-7. Máximo 3 parágrafos curtos.
-8. Use português brasileiro natural.`;
+6. NUNCA use travessão (—), traço longo (–), hífen como travessão, asteriscos, bullet points ou formatação markdown. Escreva texto corrido natural.
+7. Use português brasileiro natural e informal.
+8. Responda APENAS em JSON válido no formato: {"parts": ["mensagem 1", "mensagem 2", ...]}
+9. Divida a resposta em "parts" como um humano enviaria no WhatsApp: cada parte é uma mensagem separada, curta e natural. Geralmente 1 a 4 partes.
+10. Cada parte deve ter no máximo 2 frases. Não junte tudo em uma parte só.
+11. Não inclua explicações, prefixos ou comentários. Apenas o JSON.`;
 
-        const userPrompt = `Conversa atual:\n${conversationContext}${dealContext}\n\nSugira a próxima resposta do agente usando SPIN Selling:`;
+        const userPrompt = `Conversa atual:\n${conversationContext}${dealContext}\n\nSugira a próxima resposta do agente usando SPIN Selling. Responda APENAS em JSON: {"parts": ["msg1", "msg2", ...]}:`;
 
         try {
           if (integration.provider === "openai") {
@@ -2639,7 +2666,9 @@ Regras:
               throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: body?.error?.message || `OpenAI error: ${res.status}` });
             }
             const data = await res.json();
-            return { suggestion: data.choices?.[0]?.message?.content || "", provider: "openai", model };
+            const raw = data.choices?.[0]?.message?.content || "";
+            const parsed = parseAiSuggestionParts(raw);
+            return { suggestion: parsed.full, parts: parsed.parts, provider: "openai", model };
           } else {
             const res = await fetch("https://api.anthropic.com/v1/messages", {
               method: "POST",
@@ -2656,7 +2685,9 @@ Regras:
               throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: body?.error?.message || `Anthropic error: ${res.status}` });
             }
             const data = await res.json();
-            return { suggestion: data.content?.[0]?.text || "", provider: "anthropic", model };
+            const raw = data.content?.[0]?.text || "";
+            const parsed = parseAiSuggestionParts(raw);
+            return { suggestion: parsed.full, parts: parsed.parts, provider: "anthropic", model };
           }
         } catch (err: any) {
           if (err instanceof TRPCError) throw err;

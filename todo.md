@@ -2831,3 +2831,11 @@
 - [x] Aplicado em todos os botões do header do Inbox (som, sync, nova conversa)
 - [x] Aplicado em todos os botões do header do WhatsAppChat (contato, negociação, transferência, timeline, busca, menu)
 - [x] Aplicado no botão de nota interna
+
+## Melhoria: Sugestão IA sem travessão + envio quebrado (Mar 15 - v8.7)
+- [x] Backend: prompt atualizado para NUNCA usar travessão, retornar JSON {parts: [...]}
+- [x] Backend: parseAiSuggestionParts() parseia JSON ou faz fallback para split por parágrafos
+- [x] Frontend: botão "Copiar completa" (cola no campo de texto como mensagem única)
+- [x] Frontend: botão "Enviar quebrada (N msgs)" (envia cada parte separada com delay de 1.2s)
+- [x] Preview das partes como bolhas numeradas no popup
+- [x] 28 testes passando
