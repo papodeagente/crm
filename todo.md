@@ -3139,3 +3139,10 @@
 - [x] Audit: check for rate limiter, token validation, or auth middleware blocking POST
 - [x] Fix: ensure endpoint accepts unauthenticated POST from Evolution API
 - [x] Tests: verify webhook endpoint accepts POST without auth
+
+## Auto-Restore — Filtrar instâncias sem credenciais
+- [x] Audit: identificar lógica de auto-restore no whatsappEvolution.ts
+- [x] Fix: filtrar auto-restore para só reconectar instâncias com credenciais salvas
+- [x] Fix: instâncias sem credenciais devem esperar conexão manual do usuário
+- [x] Fix: evitar loop de geração de QR Code em instâncias não autenticadas
+- [x] Tests: verificar que auto-restore filtra corretamente

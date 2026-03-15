@@ -2036,11 +2036,15 @@ class WhatsAppEvolutionManager extends EventEmitter {
       const db = await getDb();
       if (!db) return;
 
+      // Only fetch sessions that were 'connected' before restart.
+      // Sessions with status 'disconnected', 'connecting', or 'deleted' are skipped.
+      // This prevents reconnecting instances without saved auth credentials,
+      // which would enter QR code generation loops that nobody scans.
       const rows = await db.select()
         .from(whatsappSessions)
-        .where(sql`${whatsappSessions.status} != 'deleted'`);
+        .where(eq(whatsappSessions.status, "connected"));
 
-      console.log(`[EvoWA AutoRestore] Found ${rows.length} sessions to check`);
+      console.log(`[EvoWA AutoRestore] Found ${rows.length} previously-connected sessions to check`);
 
       // Group sessions by user+tenant to detect duplicates
       const sessionsByUserTenant = new Map<string, typeof rows>();
@@ -2082,10 +2086,11 @@ class WhatsAppEvolutionManager extends EventEmitter {
         }
       }
 
-      // Now restore only non-deleted sessions
+      // Only restore sessions that are still marked as 'connected' after cleanup.
+      // Instances without auth credentials (ownerJid) will be skipped below.
       const activeRows = await db.select()
         .from(whatsappSessions)
-        .where(sql`${whatsappSessions.status} != 'deleted'`);
+        .where(eq(whatsappSessions.status, "connected"));
 
       for (const row of activeRows) {
         const instanceName = evo.getInstanceName(row.tenantId, row.userId);
@@ -2100,6 +2105,17 @@ class WhatsAppEvolutionManager extends EventEmitter {
           }
 
           if (inst) {
+            // Skip instances without ownerJid — they have no saved auth credentials.
+            // Reconnecting them would trigger QR code generation that nobody scans,
+            // creating a loop that overloads the server.
+            if (!inst.ownerJid && inst.connectionStatus !== "open") {
+              console.log(`[EvoWA AutoRestore] ${row.sessionId} -> ${nameToCheck} -> no credentials (ownerJid null), skipping`);
+              await db.update(whatsappSessions)
+                .set({ status: "disconnected" })
+                .where(eq(whatsappSessions.sessionId, row.sessionId));
+              continue;
+            }
+
             const state: EvolutionSessionState = {
               instanceName: nameToCheck,
               sessionId: row.sessionId,
