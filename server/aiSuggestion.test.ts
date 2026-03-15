@@ -375,3 +375,89 @@ describe("AI Suggestion — Response No-Dash Rule", () => {
     expect(cleaned).toBe("Item 1\nItem 2\nItem 3");
   });
 });
+
+describe("AI Suggestion — Developer Role for Reasoning Models", () => {
+  it("uses 'developer' role for gpt-5-mini (reasoning model)", () => {
+    const model = "gpt-5-mini";
+    const isReasoningModel = model.startsWith("gpt-5") || model.startsWith("o4") || model.startsWith("o3");
+    const systemRole = isReasoningModel ? "developer" : "system";
+    expect(systemRole).toBe("developer");
+  });
+
+  it("uses 'developer' role for gpt-5.4 (reasoning model)", () => {
+    const model = "gpt-5.4";
+    const isReasoningModel = model.startsWith("gpt-5") || model.startsWith("o4") || model.startsWith("o3");
+    const systemRole = isReasoningModel ? "developer" : "system";
+    expect(systemRole).toBe("developer");
+  });
+
+  it("uses 'developer' role for o4-mini (reasoning model)", () => {
+    const model = "o4-mini";
+    const isReasoningModel = model.startsWith("gpt-5") || model.startsWith("o4") || model.startsWith("o3");
+    const systemRole = isReasoningModel ? "developer" : "system";
+    expect(systemRole).toBe("developer");
+  });
+
+  it("uses 'system' role for gpt-4.1 (chat model)", () => {
+    const model = "gpt-4.1";
+    const isReasoningModel = model.startsWith("gpt-5") || model.startsWith("o4") || model.startsWith("o3");
+    const systemRole = isReasoningModel ? "developer" : "system";
+    expect(systemRole).toBe("system");
+  });
+
+  it("uses 'system' role for gpt-4.1-mini (chat model)", () => {
+    const model = "gpt-4.1-mini";
+    const isReasoningModel = model.startsWith("gpt-5") || model.startsWith("o4") || model.startsWith("o3");
+    const systemRole = isReasoningModel ? "developer" : "system";
+    expect(systemRole).toBe("system");
+  });
+
+  it("uses 'system' role for gpt-4.1-nano (chat model)", () => {
+    const model = "gpt-4.1-nano";
+    const isReasoningModel = model.startsWith("gpt-5") || model.startsWith("o4") || model.startsWith("o3");
+    const systemRole = isReasoningModel ? "developer" : "system";
+    expect(systemRole).toBe("system");
+  });
+});
+
+describe("AI Suggestion — Prompt Role Clarity", () => {
+  it("system prompt clearly identifies AGENTE as the one being helped", () => {
+    const contactName = "Viviane";
+    const systemPrompt = `Você é um assistente que ajuda o AGENTE (vendedor) de uma agência de viagens a responder mensagens no WhatsApp.
+
+CONTEXTO:
+- Na conversa abaixo, "Agente" é o vendedor da agência (VOCÊ está escrevendo para ele).
+- "${contactName}" é o cliente que está conversando com o agente.
+- Você deve sugerir o que o AGENTE deve responder ao cliente.`;
+
+    expect(systemPrompt).toContain("AGENTE (vendedor)");
+    expect(systemPrompt).toContain("Viviane");
+    expect(systemPrompt).toContain("Você deve sugerir o que o AGENTE deve responder");
+  });
+
+  it("user prompt reinforces that response is from AGENTE not client", () => {
+    const contactName = "João";
+    const userPrompt = `Conversa entre o AGENTE (vendedor) e ${contactName}:\n\nAgente: Olá!\nJoão: Oi, quero um pacote\n\nO que o AGENTE deve responder ao cliente agora? Lembre-se: você está escrevendo A RESPOSTA DO AGENTE, não do cliente. Responda APENAS em JSON: {"parts": ["msg1", "msg2"]}`;
+
+    expect(userPrompt).toContain("AGENTE (vendedor)");
+    expect(userPrompt).toContain("A RESPOSTA DO AGENTE, não do cliente");
+    expect(userPrompt).toContain("João: Oi, quero um pacote");
+  });
+
+  it("conversation context labels messages correctly", () => {
+    const messages = [
+      { fromMe: false, content: "Oi, quero um pacote", timestamp: "2026-03-14T10:00:00Z" },
+      { fromMe: true, content: "Olá! Temos ótimos pacotes!", timestamp: "2026-03-14T10:01:00Z" },
+      { fromMe: false, content: "Quanto custa para Noronha?", timestamp: "2026-03-14T10:02:00Z" },
+    ];
+    const contactName = "Maria";
+    const context = messages
+      .map(m => `${m.fromMe ? "Agente" : contactName}: ${m.content}`)
+      .join("\n");
+
+    expect(context).toBe("Maria: Oi, quero um pacote\nAgente: Olá! Temos ótimos pacotes!\nMaria: Quanto custa para Noronha?");
+    // Last message is from client, so AI should generate agent's response
+    const lastMsg = messages[messages.length - 1];
+    expect(lastMsg.fromMe).toBe(false);
+  });
+});

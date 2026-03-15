@@ -2885,3 +2885,8 @@
 ## Bug Fix: Tooltips cortados na barra inferior (Mar 15 - v8.14)
 - [x] Tooltips da barra inferior aparecem para baixo e são cortados pela borda da tela
 - [x] Corrigir todos os tooltips para side="top" (aparecer acima dos ícones)
+
+## Bug Fix: 3 problemas IA + tooltip (Mar 15 - v8.15)
+- [x] GPT-5 Mini não funciona: corrigido usando role "developer" em vez de "system" para modelos de reasoning (gpt-5*, o4*, o3*)
+- [x] IA confunde papéis: prompt reescrito com instruções claras de que está ajudando o AGENTE a responder ao CLIENTE
+- [x] Tooltip cortado: InstantTooltip agora detecta overflow e reposiciona automaticamente

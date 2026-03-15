@@ -2624,24 +2624,32 @@ export const appRouter = router({
           ? `\n\nContexto do Negócio:\n- Título: ${input.dealTitle}\n- Valor: R$ ${((input.dealValue || 0) / 100).toFixed(2)}\n- Etapa: ${input.dealStage || "N/A"}`
           : "";
 
-        const systemPrompt = `Você é um assistente de vendas para uma agência de viagens. Sua função é analisar a conversa entre o agente e o cliente e sugerir a PRÓXIMA resposta que o agente deve enviar.
+        const systemPrompt = `Você é um assistente que ajuda o AGENTE (vendedor) de uma agência de viagens a responder mensagens no WhatsApp.
 
-INSTRUÇÕES CRÍTICAS:
-1. Leia TODA a conversa com atenção. A última mensagem do cliente é a mais importante — sua resposta DEVE ser uma continuação direta e coerente do que o cliente acabou de dizer.
-2. Se o cliente fez uma pergunta, responda a pergunta. Se o cliente mandou "oi", cumprimente de volta. Se o cliente mandou um link, comente sobre o link. Se o cliente está testando ("teste", "TESTE"), responda de forma natural perguntando como pode ajudar.
-3. A resposta deve soar 100% humana, como se fosse digitada por um atendente real no WhatsApp. Use o mesmo tom e nível de formalidade da conversa.
-4. NUNCA use travessão (—), traço longo (–), asteriscos, bullet points ou formatação markdown. Apenas texto corrido natural.
-5. Use português brasileiro natural e informal.
-6. Responda APENAS com um JSON válido: {"parts": ["mensagem 1", "mensagem 2"]}
-7. Cada "part" é uma mensagem separada no WhatsApp. Use 1 a 3 partes. Cada parte deve ser curta (1-2 frases).
-8. Não inclua explicações, prefixos, comentários ou texto fora do JSON.`;
+CONTEXTO:
+- Na conversa abaixo, "Agente" é o vendedor da agência (VOCÊ está escrevendo para ele).
+- "${input.contactName || "Cliente"}" é o cliente que está conversando com o agente.
+- Você deve sugerir o que o AGENTE deve responder ao cliente.
 
-        const userPrompt = `Conversa entre o agente e ${input.contactName || "o cliente"}:\n\n${conversationContext}${dealContext}\n\nCom base na conversa acima, qual deve ser a próxima resposta do agente? Responda APENAS em JSON: {"parts": ["msg1", "msg2"]}:`;
+REGRAS:
+1. Analise TODA a conversa para entender o contexto completo. Preste atenção especial na ÚLTIMA mensagem do cliente.
+2. Sua resposta é o que o AGENTE vai enviar para o cliente. Você NÃO é o cliente. Você está ajudando o AGENTE a responder.
+3. Se a última mensagem é do cliente dizendo "oi" ou "teste", o agente deve cumprimentar e perguntar como pode ajudar.
+4. Se a última mensagem é do agente, sugira uma mensagem de follow-up ou aguarde (responda algo como "Oi, tudo bem? Posso te ajudar com algo?").
+5. A resposta deve soar 100% humana, natural, como digitada por uma pessoa real no WhatsApp.
+6. NUNCA use travessão, asteriscos, bullet points ou formatação markdown. Apenas texto corrido.
+7. Use português brasileiro informal.
+8. Responda APENAS com JSON válido: {"parts": ["mensagem 1", "mensagem 2"]}
+9. Cada "part" é uma mensagem separada. Use 1 a 3 partes curtas (1-2 frases cada).
+10. Não inclua explicações fora do JSON.`;
+
+        const userPrompt = `Conversa entre o AGENTE (vendedor) e ${input.contactName || "o cliente"}:\n\n${conversationContext}${dealContext}\n\nO que o AGENTE deve responder ao cliente agora? Lembre-se: você está escrevendo A RESPOSTA DO AGENTE, não do cliente. Responda APENAS em JSON: {"parts": ["msg1", "msg2"]}`;
 
         try {
           if (integration.provider === "openai") {
-            // Use max_tokens for chat models (gpt-4.1*), max_completion_tokens for reasoning models (gpt-5*, o4*)
+            // Reasoning models (gpt-5*, o4*, o3*) use "developer" role instead of "system" and max_completion_tokens
             const isReasoningModel = model.startsWith("gpt-5") || model.startsWith("o4") || model.startsWith("o3");
+            const systemRole = isReasoningModel ? "developer" : "system";
             const tokenParam = isReasoningModel ? { max_completion_tokens: 500 } : { max_tokens: 500 };
             const res = await fetch("https://api.openai.com/v1/chat/completions", {
               method: "POST",
@@ -2649,7 +2657,7 @@ INSTRUÇÕES CRÍTICAS:
               body: JSON.stringify({
                 model,
                 messages: [
-                  { role: "system", content: systemPrompt },
+                  { role: systemRole, content: systemPrompt },
                   { role: "user", content: userPrompt },
                 ],
                 ...tokenParam,
