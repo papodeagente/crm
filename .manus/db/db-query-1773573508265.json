@@ -1,0 +1,30 @@
+{
+  "query": "SELECT messageId, COUNT(*) as cnt FROM messages GROUP BY messageId HAVING cnt > 1 LIMIT 5;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute SELECT messageId, COUNT(*) as cnt FROM messages GROUP BY messageId HAVING cnt > 1 LIMIT 5;",
+  "rows": [
+    {
+      "messageId": "A55E73D7CAE77074184CE9480B1D605B",
+      "cnt": "2"
+    },
+    {
+      "messageId": "ACDEE024546DA6E7475156F429491FD4",
+      "cnt": "2"
+    },
+    {
+      "messageId": "3EB0B9E11DF30EAC002B1E",
+      "cnt": "2"
+    },
+    {
+      "messageId": "3EB052FC0241DFFC45D1A0",
+      "cnt": "2"
+    },
+    {
+      "messageId": "A57844221DEEC106EFBAC6C764EEE1CA",
+      "cnt": "2"
+    }
+  ],
+  "messages": [],
+  "stdout": "messageId\tcnt\nA55E73D7CAE77074184CE9480B1D605B\t2\nACDEE024546DA6E7475156F429491FD4\t2\n3EB0B9E11DF30EAC002B1E\t2\n3EB052FC0241DFFC45D1A0\t2\nA57844221DEEC106EFBAC6C764EEE1CA\t2\n",
+  "stderr": "",
+  "execution_time_ms": 140
+}

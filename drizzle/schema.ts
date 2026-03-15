@@ -1,4 +1,4 @@
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, boolean, json, bigint, index, decimal } from "drizzle-orm/mysql-core";
+import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, boolean, json, bigint, index, uniqueIndex, decimal } from "drizzle-orm/mysql-core";
 
 // ════════════════════════════════════════════════════════════
 // EXISTING WHATSAPP API TABLES (preserved)
@@ -56,6 +56,7 @@ export const waMessages = mysqlTable("messages", {
   index("msg_tenant_idx").on(t.tenantId),
   index("msg_session_jid_idx").on(t.sessionId, t.remoteJid, t.timestamp),
   index("idx_msg_wa_conv").on(t.waConversationId),
+  uniqueIndex("idx_unique_msgid_session").on(t.messageId, t.sessionId),
 ]);
 
 export const activityLogs = mysqlTable("activity_logs", {

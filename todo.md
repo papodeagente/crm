@@ -2890,3 +2890,8 @@
 - [x] GPT-5 Mini não funciona: corrigido usando role "developer" em vez de "system" para modelos de reasoning (gpt-5*, o4*, o3*)
 - [x] IA confunde papéis: prompt reescrito com instruções claras de que está ajudando o AGENTE a responder ao CLIENTE
 - [x] Tooltip cortado: InstantTooltip agora detecta overflow e reposiciona automaticamente
+
+## Bug Fix: Mensagens duplicadas no Inbox (Mar 15 - CRÍTICO)
+- [x] Investigar por que mensagens aparecem duplicadas nas conversas (falta de UNIQUE constraint)
+- [x] Corrigir a causa raiz: UNIQUE INDEX em (messageId, sessionId) + onDuplicateKeyUpdate em todos 11 pontos de inserção
+- [x] Limpar duplicatas existentes no banco de dados (655+ removidas)

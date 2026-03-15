@@ -281,6 +281,13 @@
       "when": 1773529807358,
       "tag": "0039_condemned_lady_vermin",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "5",
+      "when": 1773574029059,
+      "tag": "0040_next_fabian_cortez",
+      "breakpoints": true
     }
   ]
 }

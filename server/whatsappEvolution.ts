@@ -355,7 +355,7 @@ class WhatsAppEvolutionManager extends EventEmitter {
             content: text,
             status: "sent",
             timestamp: new Date(result.messageTimestamp ? result.messageTimestamp * 1000 : Date.now()),
-          }).catch(() => { /* duplicate from webhook, ignore */ });
+          }).onDuplicateKeyUpdate({ set: { status: sql`status` } }).catch(() => {});
 
           // Update wa_conversations with the latest message
           try {
@@ -426,7 +426,7 @@ class WhatsAppEvolutionManager extends EventEmitter {
             isVoiceNote: !!(mediaType === "audio" && opts?.ptt),
             status: "sent",
             timestamp: new Date(result.messageTimestamp ? result.messageTimestamp * 1000 : Date.now()),
-          }).catch(() => { /* duplicate from webhook, ignore */ });
+          }).onDuplicateKeyUpdate({ set: { status: sql`status` } }).catch(() => {});
 
           // Update wa_conversations with the latest message
           try {
@@ -517,7 +517,7 @@ class WhatsAppEvolutionManager extends EventEmitter {
             status: "sent",
             timestamp: new Date(result.messageTimestamp ? result.messageTimestamp * 1000 : Date.now()),
             quotedMessageId,
-          }).catch(() => { /* duplicate from webhook, ignore */ });
+          }).onDuplicateKeyUpdate({ set: { status: sql`status` } }).catch(() => {});
 
           // Update wa_conversations with the latest message
           try {
@@ -1159,7 +1159,7 @@ class WhatsAppEvolutionManager extends EventEmitter {
                   pushName: fromMe ? null : (lastMsg.pushName || pushName || null),
                   status: msgStatus,
                   timestamp: msgTimestamp,
-                });
+                }).onDuplicateKeyUpdate({ set: { status: sql`status` } });
               }
             }
 
@@ -1418,7 +1418,7 @@ class WhatsAppEvolutionManager extends EventEmitter {
         mediaDuration: mediaInfo.mediaDuration || null,
         isVoiceNote: mediaInfo.isVoiceNote || false,
         quotedMessageId: mediaInfo.quotedMessageId || null,
-      });
+      }).onDuplicateKeyUpdate({ set: { status: sql`status` } });
 
       // Resolve conversation (update last message, unread count)
       try {
@@ -1593,7 +1593,7 @@ class WhatsAppEvolutionManager extends EventEmitter {
         pushName: null,
         status: "sent",
         timestamp: new Date(timestamp),
-      });
+      }).onDuplicateKeyUpdate({ set: { status: sql`status` } });
 
       try {
         const resolved = await resolveInbound(session.tenantId, session.sessionId, remoteJid, undefined, { skipContactCreation: true });
@@ -2317,9 +2317,9 @@ class WhatsAppEvolutionManager extends EventEmitter {
               try {
                 for (let i = 0; i < insertBatch.length; i += 20) {
                   const subBatch = insertBatch.slice(i, i + 20);
-                  await db.insert(waMessages).values(subBatch).catch(async () => {
+                  await db.insert(waMessages).values(subBatch).onDuplicateKeyUpdate({ set: { status: sql`status` } }).catch(async () => {
                     for (const item of subBatch) {
-                      await db.insert(waMessages).values(item).catch(() => {});
+                      await db.insert(waMessages).values(item).onDuplicateKeyUpdate({ set: { status: sql`status` } }).catch(() => {});
                     }
                   });
                 }
@@ -2550,9 +2550,9 @@ class WhatsAppEvolutionManager extends EventEmitter {
               try {
                 for (let i = 0; i < insertBatch.length; i += 20) {
                   const subBatch = insertBatch.slice(i, i + 20);
-                  await db.insert(waMessages).values(subBatch).catch(async () => {
+                  await db.insert(waMessages).values(subBatch).onDuplicateKeyUpdate({ set: { status: sql`status` } }).catch(async () => {
                     for (const item of subBatch) {
-                      await db.insert(waMessages).values(item).catch(() => {});
+                      await db.insert(waMessages).values(item).onDuplicateKeyUpdate({ set: { status: sql`status` } }).catch(() => {});
                     }
                   });
                 }
@@ -2811,7 +2811,7 @@ class WhatsAppEvolutionManager extends EventEmitter {
               mediaDuration: syncMediaInfo.mediaDuration || null,
               isVoiceNote: syncMediaInfo.isVoiceNote || false,
               quotedMessageId: syncMediaInfo.quotedMessageId || null,
-            });
+            }).onDuplicateKeyUpdate({ set: { status: sql`status` } });
 
             existingMsgIds.add(msgId);
             newMessagesFound++;
