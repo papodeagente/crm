@@ -3023,3 +3023,10 @@
 - [x] Tests: fallback without connected session
 - [x] Tests: idempotency
 - [x] Tests: multi-tenant isolation
+
+## Alterar Funil da Negociação na Página de Detalhe
+
+- [x] Audit: DealDetail page, deal update endpoints, pipeline/stage queries, history logging
+- [x] Backend: mutation to change deal pipeline + stage with validation and history
+- [x] Frontend: pipeline/stage selector in DealDetail page
+- [x] Tests: pipeline change with valid stage, invalid stage blocked, tenant isolation, history logged, persistence

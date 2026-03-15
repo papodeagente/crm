@@ -150,6 +150,16 @@ export default function DealDetail() {
     onSuccess: () => { dealQ.refetch(); historyQ.refetch(); toast.success("Etapa alterada"); },
     onError: () => toast.error("Erro ao mover etapa"),
   });
+  const changePipeline = trpc.crm.deals.changePipeline.useMutation({
+    onSuccess: () => {
+      dealQ.refetch(); historyQ.refetch(); stagesQ.refetch();
+      toast.success("Funil alterado com sucesso");
+      setShowPipelineDialog(false);
+      setSelectedPipelineId(null);
+      setSelectedNewStageId(null);
+    },
+    onError: (err) => toast.error(err.message || "Erro ao alterar funil"),
+  });
   const updateDeal = trpc.crm.deals.update.useMutation({
     onSuccess: () => { dealQ.refetch(); historyQ.refetch(); toast.success("Atualizado"); },
     onError: () => toast.error("Erro ao atualizar"),
@@ -219,6 +229,16 @@ export default function DealDetail() {
   const [showLostDialog, setShowLostDialog] = useState(false);
   const [lostReason, setLostReason] = useState("");
   const [selectedLossReasonId, setSelectedLossReasonId] = useState<number | null>(null);
+
+  /* ─── Pipeline change dialog ─── */
+  const [showPipelineDialog, setShowPipelineDialog] = useState(false);
+  const [selectedPipelineId, setSelectedPipelineId] = useState<number | null>(null);
+  const [selectedNewStageId, setSelectedNewStageId] = useState<number | null>(null);
+  const newPipelineStagesQ = trpc.crm.pipelines.stages.useQuery(
+    { tenantId: TENANT_ID, pipelineId: selectedPipelineId || 0 },
+    { enabled: !!selectedPipelineId && selectedPipelineId !== dealQ.data?.pipelineId }
+  );
+  const newPipelineStages = useMemo(() => (newPipelineStagesQ.data || []).sort((a: any, b: any) => a.orderIndex - b.orderIndex), [newPipelineStagesQ.data]);
 
   /* ─── Loss Reasons query ─── */
   const lossReasonsQ = trpc.crm.lossReasons.list.useQuery({ tenantId: TENANT_ID });
@@ -352,8 +372,18 @@ export default function DealDetail() {
               )}
               <div className="flex items-center gap-2 mt-0.5">
                 {pipeline && (
-                  <Badge variant="outline" className="text-[10px] font-medium uppercase tracking-wider">
+                  <Badge
+                    variant="outline"
+                    className="text-[10px] font-medium uppercase tracking-wider cursor-pointer hover:bg-accent/50 transition-colors gap-1"
+                    onClick={() => {
+                      setSelectedPipelineId(null);
+                      setSelectedNewStageId(null);
+                      setShowPipelineDialog(true);
+                    }}
+                    title="Clique para alterar o funil"
+                  >
                     {pipeline.name}
+                    <Edit2 className="h-2.5 w-2.5 opacity-60" />
                   </Badge>
                 )}
                 {deal.status !== "open" && (
@@ -1074,6 +1104,81 @@ export default function DealDetail() {
               disabled={!selectedLossReasonId}
             >
               Confirmar perda
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ═══ Dialog: Alterar Funil ═══ */}
+      <Dialog open={showPipelineDialog} onOpenChange={(open) => { setShowPipelineDialog(open); if (!open) { setSelectedPipelineId(null); setSelectedNewStageId(null); } }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Flag className="h-5 w-5 text-primary" />
+              Alterar Funil
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label>Funil atual</Label>
+              <p className="text-sm text-muted-foreground font-medium">{pipeline?.name || "—"} &rarr; {currentStage?.name || "—"}</p>
+            </div>
+            <div className="space-y-2">
+              <Label>Novo funil</Label>
+              <Select
+                value={selectedPipelineId ? String(selectedPipelineId) : ""}
+                onValueChange={(val) => { setSelectedPipelineId(Number(val)); setSelectedNewStageId(null); }}
+              >
+                <SelectTrigger><SelectValue placeholder="Selecione o funil" /></SelectTrigger>
+                <SelectContent>
+                  {(pipelinesQ.data || []).filter((p: any) => !p.isArchived && p.id !== deal?.pipelineId).map((p: any) => (
+                    <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {selectedPipelineId && (
+              <div className="space-y-2">
+                <Label>Etapa de destino</Label>
+                {newPipelineStagesQ.isLoading ? (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Carregando etapas...</div>
+                ) : (
+                  <Select
+                    value={selectedNewStageId ? String(selectedNewStageId) : ""}
+                    onValueChange={(val) => setSelectedNewStageId(Number(val))}
+                  >
+                    <SelectTrigger><SelectValue placeholder="Selecione a etapa" /></SelectTrigger>
+                    <SelectContent>
+                      {newPipelineStages.map((s: any) => (
+                        <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setShowPipelineDialog(false)}>Cancelar</Button>
+            <Button
+              disabled={!selectedPipelineId || !selectedNewStageId || changePipeline.isPending}
+              onClick={() => {
+                if (!selectedPipelineId || !selectedNewStageId || !deal) return;
+                const targetPipeline = (pipelinesQ.data || []).find((p: any) => p.id === selectedPipelineId);
+                const targetStage = newPipelineStages.find((s: any) => s.id === selectedNewStageId);
+                if (!targetPipeline || !targetStage) return;
+                changePipeline.mutate({
+                  tenantId: TENANT_ID,
+                  dealId: deal.id,
+                  newPipelineId: selectedPipelineId,
+                  newStageId: selectedNewStageId,
+                  newPipelineName: targetPipeline.name,
+                  newStageName: targetStage.name,
+                });
+              }}
+            >
+              {changePipeline.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
+              Confirmar
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -527,6 +527,95 @@ export const crmRouter = router({
         }
         return { success: true };
       }),
+    changePipeline: protectedProcedure
+      .input(z.object({
+        tenantId: z.number(),
+        dealId: z.number(),
+        newPipelineId: z.number(),
+        newStageId: z.number(),
+        newPipelineName: z.string(),
+        newStageName: z.string(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        // 1. Get current deal
+        const deal = await crm.getDealById(input.tenantId, input.dealId);
+        if (!deal) throw new TRPCError({ code: "NOT_FOUND", message: "Negociação não encontrada" });
+        // 2. Validate pipeline belongs to tenant
+        const pipelines = await crm.listPipelines(input.tenantId);
+        const targetPipeline = pipelines.find((p: any) => p.id === input.newPipelineId);
+        if (!targetPipeline) throw new TRPCError({ code: "BAD_REQUEST", message: "Funil não encontrado neste tenant" });
+        // 3. Validate stage belongs to the target pipeline
+        const stages = await crm.listStages(input.tenantId, input.newPipelineId);
+        const targetStage = stages.find((s: any) => s.id === input.newStageId);
+        if (!targetStage) throw new TRPCError({ code: "BAD_REQUEST", message: "Etapa não pertence ao funil selecionado" });
+        // 4. Get old pipeline/stage names for history
+        const oldPipeline = pipelines.find((p: any) => p.id === deal.pipelineId);
+        const oldStages = await crm.listStages(input.tenantId, deal.pipelineId);
+        const oldStage = oldStages.find((s: any) => s.id === deal.stageId);
+        const oldPipelineName = oldPipeline?.name || `Funil #${deal.pipelineId}`;
+        const oldStageName = oldStage?.name || `Etapa #${deal.stageId}`;
+        // 5. Update deal with new pipelineId and stageId
+        await crm.updateDeal(input.tenantId, input.dealId, {
+          pipelineId: input.newPipelineId,
+          stageId: input.newStageId,
+          updatedBy: ctx.user.id,
+        });
+        // 6. Record pipeline change in history
+        await crm.createDealHistory({
+          tenantId: input.tenantId,
+          dealId: input.dealId,
+          action: "field_changed",
+          description: `Funil alterado de "${oldPipelineName}" para "${input.newPipelineName}"`,
+          fieldChanged: "pipelineId",
+          oldValue: oldPipelineName,
+          newValue: input.newPipelineName,
+          actorUserId: ctx.user.id,
+          actorName: ctx.user.name || "Sistema",
+        });
+        // 7. Record stage change in history
+        await crm.createDealHistory({
+          tenantId: input.tenantId,
+          dealId: input.dealId,
+          action: "stage_moved",
+          description: `Etapa alterada de "${oldStageName}" para "${input.newStageName}"`,
+          fromStageId: deal.stageId,
+          toStageId: input.newStageId,
+          fromStageName: oldStageName,
+          toStageName: input.newStageName,
+          actorUserId: ctx.user.id,
+          actorName: ctx.user.name || "Sistema",
+        });
+        // 8. Emit event
+        await emitEvent({ tenantId: input.tenantId, actorUserId: ctx.user.id, entityType: "deal", entityId: input.dealId, action: "stage_moved" });
+        // 9. Notification
+        await createNotification(input.tenantId, {
+          type: "deal_moved",
+          title: `Negociação movida para funil "${input.newPipelineName}"`,
+          body: `De "${oldPipelineName}" para "${input.newPipelineName}", etapa "${input.newStageName}"`,
+          entityType: "deal",
+          entityId: String(input.dealId),
+        });
+        // 10. Classification + task automations
+        try {
+          if (deal.contactId) {
+            const { onDealMoved } = await import("../classificationEngine");
+            await onDealMoved(input.tenantId, input.dealId, input.newStageId, deal.contactId, input.newPipelineId);
+          }
+          const createdTaskIds = await crm.executeTaskAutomations(
+            input.tenantId,
+            input.dealId,
+            input.newStageId,
+            { ownerUserId: deal.ownerUserId, boardingDate: deal.boardingDate, returnDate: deal.returnDate },
+            ctx.user.id
+          );
+          if (createdTaskIds.length > 0) {
+            console.log(`[TaskAutomation] Created ${createdTaskIds.length} tasks for deal ${input.dealId} at new pipeline stage ${input.newStageId}`);
+          }
+        } catch (e) {
+          console.error("[Classification/TaskAutomation] Error on pipeline change:", e);
+        }
+        return { success: true };
+      }),
     count: protectedProcedure
       .input(z.object({ tenantId: z.number(), status: z.string().optional() }))
       .query(async ({ input }) => {
