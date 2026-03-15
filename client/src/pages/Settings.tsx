@@ -5,7 +5,7 @@ import {
   GraduationCap, Plug, Shield, BookOpen,
   ChevronRight, Users, Tag, GitBranch,
   Megaphone, Target, XCircle, Package,
-  Sparkles, UserPlus, Layers, Database, CalendarClock,
+  Sparkles, UserPlus, Layers, Database, CalendarClock, Zap,
   Lock, Crown, ShieldAlert,
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
@@ -73,8 +73,7 @@ const settingsCategories: SettingsCategory[] = [
     links: [
       { icon: GitBranch, label: "Funis de vendas", path: "/settings/pipelines" },
       { icon: Tag, label: "Campos personalizados", path: "/settings/custom-fields" },
-      { icon: Bot, label: "Automação de vendas", path: "/settings/automations", badge: "Novo" },
-      { icon: CalendarClock, label: "Automações por data", path: "/settings/date-automations", badge: "Novo" },
+      { icon: Zap, label: "Central de Automações", path: "/settings/automation-hub", badge: "Novo" },
       { icon: Target, label: "Classificação estratégica", path: "/settings/classification" },
     ],
   },
@@ -189,7 +188,7 @@ export default function SettingsPage() {
                         {link.badge}
                       </span>
                     )}
-                    {(link.path === "/admin" || link.path === "/settings/agents" || link.path === "/settings/pipelines" || link.path === "/settings/custom-fields" || link.path === "/settings/automations" || link.path === "/settings/date-automations" || link.path === "/settings/classification") && (
+                    {(link.path === "/admin" || link.path === "/settings/agents" || link.path === "/settings/pipelines" || link.path === "/settings/custom-fields" || link.path === "/settings/automation-hub" || link.path === "/settings/classification") && (
                       <span className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-600 uppercase">
                         <Lock className="h-2.5 w-2.5" /> Admin
                       </span>

@@ -45,6 +45,7 @@ const RDCrmImport = lazyWithRetry(() => import("./pages/RDCrmImport"));
 const TaskAutomationSettings = lazyWithRetry(() => import("./pages/TaskAutomationSettings"));
 const ClassificationSettings = lazyWithRetry(() => import("./pages/ClassificationSettings"));
 const DateAutomationSettings = lazyWithRetry(() => import("./pages/DateAutomationSettings"));
+const SalesAutomationHub = lazyWithRetry(() => import("./pages/SalesAutomationHub"));
 const RfvMatrix = lazyWithRetry(() => import("./pages/RfvMatrix"));
 const Campaigns = lazyWithRetry(() => import("./pages/Campaigns"));
 const Profile = lazyWithRetry(() => import("./pages/Profile"));
@@ -126,6 +127,7 @@ function AppRouter() {
                 <Route path="/settings/rdstation/mappings" component={RDFieldMappings} />
                 <Route path="/settings/import-rd-crm" component={RDCrmImport} />
                 <Route path="/supervision" component={Supervision} />
+                <Route path="/settings/automation-hub" component={SalesAutomationHub} />
                 <Route path="/settings/automations" component={TaskAutomationSettings} />
                 <Route path="/settings/date-automations" component={DateAutomationSettings} />
                 <Route path="/settings/classification" component={ClassificationSettings} />

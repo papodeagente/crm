@@ -3054,3 +3054,18 @@
 - [x] Tests: auto-task creation from templates
 - [x] Tests: task templates CRUD (add, list, update, remove)
 - [x] Tests: tenant isolation on task templates
+## Automação de Vendas — Central de Experiência (Fase 1 + Fase 2)
+
+- [x] Audit: map all existing automation features, pages, routes, schemas
+- [x] Design: plan tab structure, card categories, navigation flow
+- [x] Phase 1: create SalesAutomation hub page with Modelos tab (template cards by category)
+- [x] Phase 1: template cards redirect to existing config pages/modals
+- [x] Phase 2: Minhas Automações tab — unified listing of active automations
+- [x] Phase 2: show status, trigger, action, pipeline context per automation
+- [x] Phase 2: link each automation to its existing edit page
+- [x] Navigation: add route in App.tsx
+- [x] Navigation: add sidebar entry in settings/commercial menu
+- [x] Navigation: cross-links from existing automation pages
+- [x] Tests: new page renders without errors
+- [x] Tests: TypeScript clean
+- [x] Verify: no regressions on existing automation flows
