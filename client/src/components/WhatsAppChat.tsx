@@ -1095,7 +1095,7 @@ function EditMessageModal({ currentText, onSave, onClose }: { currentText: strin
 
 export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDeal, onCreateContact, hasCrmContact, assignment, agents, onAssign, onStatusChange, myAvatarUrl, waConversationId }: WhatsAppChatProps) {
   const [showAgentDropdown, setShowAgentDropdown] = useState(false);
-  const { lastMessage, lastStatusUpdate } = useSocket();
+  const { lastMessage, lastStatusUpdate, lastMediaUpdate } = useSocket();
   const [messageText, setMessageText] = useState("");
   const [showAttach, setShowAttach] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
@@ -1394,6 +1394,11 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
   useEffect(() => {
     if (lastMessage && lastMessage.remoteJid === remoteJid) messagesQ.refetch();
   }, [lastMessage, remoteJid]);
+
+  // Refetch messages when media is ready (no notification sound)
+  useEffect(() => {
+    if (lastMediaUpdate && lastMediaUpdate.remoteJid === remoteJid) messagesQ.refetch();
+  }, [lastMediaUpdate, remoteJid]);
 
   // Update message status in real-time via socket
   useEffect(() => {

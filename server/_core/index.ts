@@ -64,6 +64,17 @@ async function startServer() {
     });
   });
 
+  // Forward media update events (no notification sound)
+  whatsappManager.on("media_update", (data) => {
+    io.emit("whatsapp:media_update", {
+      sessionId: data.sessionId,
+      remoteJid: data.remoteJid,
+      messageId: data.messageId,
+      mediaUrl: data.mediaUrl,
+      timestamp: Date.now(),
+    });
+  });
+
   // Forward message status updates to Socket.IO clients (delivered, read, played)
   whatsappManager.on("message:status", (data) => {
     io.emit("whatsapp:message:status", {

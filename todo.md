@@ -2895,3 +2895,8 @@
 - [x] Investigar por que mensagens aparecem duplicadas nas conversas (falta de UNIQUE constraint)
 - [x] Corrigir a causa raiz: UNIQUE INDEX em (messageId, sessionId) + onDuplicateKeyUpdate em todos 11 pontos de inserção
 - [x] Limpar duplicatas existentes no banco de dados (655+ removidas)
+
+## Bug Fix: Som de notificação + GPT-5 Mini (Mar 15)
+- [x] Som de notificação: FastPoll agora usa INSERT IGNORE e só emite socket quando affectedRows > 0 (mensagem genuinamente nova)
+- [x] GPT-5 Mini: adicionado reasoning_effort: "low" para evitar timeout do proxy + role "developer" para modelos de reasoning
+- [x] media_update separado do evento "message" para não tocar som de notificação

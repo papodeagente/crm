@@ -2651,22 +2651,45 @@ REGRAS:
             const isReasoningModel = model.startsWith("gpt-5") || model.startsWith("o4") || model.startsWith("o3");
             const systemRole = isReasoningModel ? "developer" : "system";
             const tokenParam = isReasoningModel ? { max_completion_tokens: 500 } : { max_tokens: 500 };
-            const res = await fetch("https://api.openai.com/v1/chat/completions", {
-              method: "POST",
-              headers: { "Content-Type": "application/json", "Authorization": `Bearer ${integration.apiKey}` },
-              body: JSON.stringify({
+            const requestBody: Record<string, unknown> = {
                 model,
                 messages: [
                   { role: systemRole, content: systemPrompt },
                   { role: "user", content: userPrompt },
                 ],
                 ...tokenParam,
-              }),
-            });
+              };
+            // Add reasoning_effort for reasoning models to speed up response
+            if (isReasoningModel) {
+              requestBody.reasoning_effort = "low";
+            }
+            console.log(`[AI Suggest] Calling OpenAI: model=${model}, systemRole=${systemRole}, reasoning=${isReasoningModel}`);
+            // Use AbortController with 55s timeout to avoid proxy timeout
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 55000);
+            let res: Response;
+            try {
+              res = await fetch("https://api.openai.com/v1/chat/completions", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "Authorization": `Bearer ${integration.apiKey}` },
+                body: JSON.stringify(requestBody),
+                signal: controller.signal,
+              });
+            } catch (fetchErr: any) {
+              clearTimeout(timeout);
+              if (fetchErr.name === 'AbortError') {
+                console.error(`[AI Suggest] OpenAI TIMEOUT: model=${model}`);
+                throw new TRPCError({ code: "TIMEOUT", message: `O modelo ${model} demorou demais para responder. Tente um modelo mais rápido como gpt-4.1-mini.` });
+              }
+              throw fetchErr;
+            }
+            clearTimeout(timeout);
             if (!res.ok) {
               const body = await res.json().catch(() => ({}));
+              console.error(`[AI Suggest] OpenAI ERROR: status=${res.status}, model=${model}, error=`, JSON.stringify(body));
               throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: body?.error?.message || `OpenAI error: ${res.status}` });
             }
+            console.log(`[AI Suggest] OpenAI SUCCESS: model=${model}`);
             const data = await res.json();
             const raw = data.choices?.[0]?.message?.content || "";
             const parsed = parseAiSuggestionParts(raw);

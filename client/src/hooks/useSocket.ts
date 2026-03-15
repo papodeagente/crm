@@ -30,6 +30,14 @@ export interface WhatsAppMessageStatusEvent {
   timestamp: number;
 }
 
+interface WhatsAppMediaUpdateEvent {
+  sessionId: string;
+  remoteJid: string;
+  messageId: string;
+  mediaUrl: string;
+  timestamp: number;
+}
+
 // ─── Singleton Socket Manager ───
 // Ensures only ONE Socket.IO connection exists across all components
 
@@ -41,6 +49,7 @@ class SocketManager {
   private _waStatus: WhatsAppStatusEvent | null = null;
   private _lastMessage: WhatsAppMessageEvent | null = null;
   private _lastStatusUpdate: WhatsAppMessageStatusEvent | null = null;
+  private _lastMediaUpdate: WhatsAppMediaUpdateEvent | null = null;
   private refCount = 0;
 
   subscribe(listener: () => void) {
@@ -107,6 +116,12 @@ class SocketManager {
       this._lastStatusUpdate = data;
       this.notify();
     });
+
+    // Media update — triggers refetch but NOT notification sound
+    socket.on("whatsapp:media_update", (data: WhatsAppMediaUpdateEvent) => {
+      this._lastMediaUpdate = data;
+      this.notify();
+    });
   }
 
   getSnapshot() {
@@ -116,6 +131,7 @@ class SocketManager {
       waStatus: this._waStatus,
       lastMessage: this._lastMessage,
       lastStatusUpdate: this._lastStatusUpdate,
+      lastMediaUpdate: this._lastMediaUpdate,
     };
   }
 
@@ -137,7 +153,8 @@ function getSnapshot() {
     next.qrData !== snapshotCache.qrData ||
     next.waStatus !== snapshotCache.waStatus ||
     next.lastMessage !== snapshotCache.lastMessage ||
-    next.lastStatusUpdate !== snapshotCache.lastStatusUpdate
+    next.lastStatusUpdate !== snapshotCache.lastStatusUpdate ||
+    next.lastMediaUpdate !== snapshotCache.lastMediaUpdate
   ) {
     snapshotCache = next;
   }
@@ -159,6 +176,7 @@ export function useSocket() {
     waStatus: state.waStatus,
     lastMessage: state.lastMessage,
     lastStatusUpdate: state.lastStatusUpdate,
+    lastMediaUpdate: state.lastMediaUpdate,
     clearQr,
   };
 }

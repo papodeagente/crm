@@ -1535,16 +1535,14 @@ class WhatsAppEvolutionManager extends EventEmitter {
             ));
           console.log(`[EvoWA] Media stored for ${messageId}: ${url}`);
 
-          // Emit a second socket event so frontend can refresh and show the media
-          this.emit("message", {
+          // Emit a media-update event so frontend can refresh and show the media
+          // Use a separate event type so it does NOT trigger notification sound
+          this.emit("media_update", {
             sessionId: session.sessionId,
             tenantId: session.tenantId,
-            content: "[media_ready]",
-            fromMe,
             remoteJid,
-            messageType: "media_update",
-            pushName: "",
-            timestamp: Date.now(),
+            messageId,
+            mediaUrl: url,
           });
         }
       }
@@ -2716,17 +2714,9 @@ class WhatsAppEvolutionManager extends EventEmitter {
     const topChats = individualChats.slice(0, 15);
     let newMessagesFound = 0;
 
-    // Get existing messageIds for this session (recent ones only)
+    // Get existing messageIds for this session — query per-chat for accuracy
     const existingMsgIds = new Set<string>();
-    try {
-      const existingRows = await db.execute(
-        sql`SELECT messageId FROM messages WHERE sessionId = ${session.sessionId} AND messageId IS NOT NULL ORDER BY id DESC LIMIT 5000`
-      );
-      const rows = (existingRows as any)[0] || [];
-      for (const r of rows) {
-        if (r.messageId) existingMsgIds.add(r.messageId);
-      }
-    } catch {}
+    // We'll populate per-chat below to avoid LIMIT issues with large sessions
 
     const ownerName = session.user?.name?.trim() || null;
     const isRealName = (name: string | null | undefined): name is string => {
@@ -2743,6 +2733,17 @@ class WhatsAppEvolutionManager extends EventEmitter {
       if (!remoteJid) continue;
 
       try {
+        // Fetch existing messageIds for THIS specific chat
+        try {
+          const chatExisting = await db.execute(
+            sql`SELECT messageId FROM messages WHERE sessionId = ${session.sessionId} AND remoteJid = ${remoteJid} AND messageId IS NOT NULL ORDER BY id DESC LIMIT 100`
+          );
+          const chatRows = (chatExisting as any)[0] || [];
+          for (const r of chatRows) {
+            if (r.messageId) existingMsgIds.add(r.messageId);
+          }
+        } catch {}
+
         // Only fetch page 1 (most recent 20 messages)
         const messages = await evo.findMessages(session.instanceName, remoteJid, {
           limit: 20,
@@ -2794,53 +2795,48 @@ class WhatsAppEvolutionManager extends EventEmitter {
           const permanentMediaUrl = syncMediaInfo.mediaUrl && !syncMediaInfo.mediaUrl.includes('whatsapp.net') ? syncMediaInfo.mediaUrl : null;
 
           try {
-            await db.insert(waMessages).values({
-              sessionId: session.sessionId,
-              tenantId: session.tenantId,
-              messageId: msgId,
-              remoteJid,
-              fromMe,
-              messageType,
-              content: content || null,
-              pushName: fromMe ? null : (pushName || null),
-              status: msgStatus,
-              timestamp,
-              mediaUrl: permanentMediaUrl,
-              mediaMimeType: syncMediaInfo.mediaMimeType || null,
-              mediaFileName: syncMediaInfo.mediaFileName || null,
-              mediaDuration: syncMediaInfo.mediaDuration || null,
-              isVoiceNote: syncMediaInfo.isVoiceNote || false,
-              quotedMessageId: syncMediaInfo.quotedMessageId || null,
-            }).onDuplicateKeyUpdate({ set: { status: sql`status` } });
+            // Use raw SQL INSERT IGNORE to determine if message is truly new
+            // affectedRows = 1 means new insert, affectedRows = 0 means duplicate
+            const insertResult = await db.execute(
+              sql`INSERT IGNORE INTO messages (sessionId, tenantId, messageId, remoteJid, fromMe, messageType, content, pushName, status, timestamp, mediaUrl, mediaMimeType, mediaFileName, mediaDuration, isVoiceNote, quotedMessageId) VALUES (${session.sessionId}, ${session.tenantId}, ${msgId}, ${remoteJid}, ${fromMe}, ${messageType}, ${content || null}, ${fromMe ? null : (pushName || null)}, ${msgStatus}, ${timestamp}, ${permanentMediaUrl}, ${syncMediaInfo.mediaMimeType || null}, ${syncMediaInfo.mediaFileName || null}, ${syncMediaInfo.mediaDuration || null}, ${syncMediaInfo.isVoiceNote || false}, ${syncMediaInfo.quotedMessageId || null})`
+            );
 
             existingMsgIds.add(msgId);
-            newMessagesFound++;
 
-            // Update conversation
-            try {
-              const contactPushName = fromMe ? null : pushName;
-              const resolved = await resolveInbound(session.tenantId, session.sessionId, remoteJid, contactPushName, { skipContactCreation: true });
-              if (resolved) {
-                await updateConversationLastMessage(resolved.conversationId, {
-                  content: content || '',
-                  fromMe,
-                  timestamp,
-                  incrementUnread: !fromMe,
-                });
-              }
-            } catch {}
+            // affectedRows = 1 means genuinely new message, 0 means duplicate was ignored
+            const affectedRows = (insertResult as any)[0]?.affectedRows ?? (insertResult as any).affectedRows ?? 0;
+            const isNew = affectedRows > 0;
 
-            // Emit Socket.IO event for real-time update
-            this.emit('message', {
-              sessionId: session.sessionId,
-              tenantId: session.tenantId,
-              content,
-              fromMe,
-              remoteJid,
-              messageType,
-              pushName: pushName || '',
-              timestamp: timestamp.getTime(),
-            });
+            // Only count and emit if the message is actually NEW
+            if (isNew) {
+              newMessagesFound++;
+
+              // Update conversation
+              try {
+                const contactPushName = fromMe ? null : pushName;
+                const resolved = await resolveInbound(session.tenantId, session.sessionId, remoteJid, contactPushName, { skipContactCreation: true });
+                if (resolved) {
+                  await updateConversationLastMessage(resolved.conversationId, {
+                    content: content || '',
+                    fromMe,
+                    timestamp,
+                    incrementUnread: !fromMe,
+                  });
+                }
+              } catch {}
+
+              // Emit Socket.IO event for real-time update — ONLY for genuinely new messages
+              this.emit('message', {
+                sessionId: session.sessionId,
+                tenantId: session.tenantId,
+                content,
+                fromMe,
+                remoteJid,
+                messageType,
+                pushName: pushName || '',
+                timestamp: timestamp.getTime(),
+              });
+            }
 
             // Download media in background
             const hasMediaType = ['imageMessage', 'videoMessage', 'audioMessage', 'documentMessage', 'stickerMessage', 'pttMessage'].includes(messageType);
