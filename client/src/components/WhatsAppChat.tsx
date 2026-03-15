@@ -16,6 +16,7 @@ import { formatTime, SYSTEM_TIMEZONE, SYSTEM_LOCALE } from "../../../shared/date
 import TransferDialog from "./TransferDialog";
 import { useTenantId } from "@/hooks/useTenantId";
 import InstantTooltip from "@/components/InstantTooltip";
+import AiSuggestionPanel from "@/components/AiSuggestionPanel";
 
 /* ─── Types ─── */
 interface Message {
@@ -1113,15 +1114,7 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
   const [showTransfer, setShowTransfer] = useState(false);
   const [showQuickReplies, setShowQuickReplies] = useState(false);
   const [quickReplyFilter, setQuickReplyFilter] = useState("");
-  const [aiSuggestion, setAiSuggestion] = useState<string | null>(null);
-  const [aiSuggestionParts, setAiSuggestionParts] = useState<string[]>([]);
   const [showAiSuggestion, setShowAiSuggestion] = useState(false);
-  const [aiSuggestionMeta, setAiSuggestionMeta] = useState<{ provider: string; model: string } | null>(null);
-  const [selectedAiIntegrationId, setSelectedAiIntegrationId] = useState<number | undefined>(undefined);
-  const [selectedAiModel, setSelectedAiModel] = useState<string | undefined>(undefined);
-  const [showAiSelector, setShowAiSelector] = useState(false);
-  const [editedSuggestion, setEditedSuggestion] = useState<string>("");
-  // aiLoading is derived from mutation state - no manual state needed
   const [transcriptions, setTranscriptions] = useState<Record<number, { text?: string; loading?: boolean; error?: string }>>({});
   const tenantId = useTenantId();
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -1167,106 +1160,17 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
     onError: (e) => toast.error(e.message || "Erro ao transferir"),
   });
 
-  // AI integrations list (for selector) - MUST be before handleAiSuggest
-  const aiIntegrationsQ = trpc.ai.list.useQuery(
-    { tenantId: tenantId || 0 },
-    { enabled: !!tenantId, staleTime: 60000 }
-  );
-
-  // AI Settings query (for auto-transcription) - MUST be before handleAiSuggest
+  // AI Settings query (for auto-transcription)
   const aiSettingsQ = trpc.ai.getSettings.useQuery(
     { tenantId: tenantId || 0 },
     { enabled: !!tenantId, staleTime: 60000 }
   );
 
-  // Messages query - MUST be before handleAiSuggest
+  // Messages query
   const messagesQ = trpc.whatsapp.messagesByContact.useQuery(
     { sessionId, remoteJid, limit: 100 },
     { enabled: !!sessionId && !!remoteJid, refetchInterval: 8000, staleTime: 3000 }
   );
-
-  // AI Suggestion mutation
-  const aiSuggestMut = trpc.ai.suggest.useMutation({
-    onSuccess: (data) => {
-      setAiSuggestion(data.suggestion);
-      setEditedSuggestion(data.suggestion);
-      setAiSuggestionParts(data.parts || [data.suggestion]);
-      setAiSuggestionMeta({ provider: data.provider, model: data.model });
-      setShowAiSuggestion(true);
-    },
-    onError: (err) => {
-      setShowAiSuggestion(false);
-      setAiSuggestionMeta(null);
-      if (err.message === "NO_AI_CONFIGURED") {
-        toast.error("Nenhuma IA configurada. Vá em Integrações > IA para conectar sua API.", { duration: 5000 });
-      } else {
-        toast.error(err.message || "Erro ao gerar sugestão", { duration: 5000 });
-      }
-    },
-  });
-
-  const handleAiSuggest = () => {
-    if (!tenantId) { toast.error("Tenant não identificado"); return; }
-    const integrations = (aiIntegrationsQ.data || []).filter((i: any) => i.isActive);
-    if (integrations.length === 0) {
-      toast.error("Nenhuma IA configurada. Vá em Integrações > IA para conectar sua API.", { duration: 5000 });
-      return;
-    }
-    const msgs = (messagesQ.data || []).filter((m: any) => m.content).map((m: any) => ({
-      fromMe: m.fromMe,
-      content: m.content || "",
-      timestamp: m.timestamp instanceof Date ? m.timestamp.toISOString() : (m.timestamp ? String(m.timestamp) : undefined),
-    }));
-    if (msgs.length === 0) { toast.error("Sem mensagens para analisar"); return; }
-    setShowAiSuggestion(true);
-    setAiSuggestion(null);
-    setEditedSuggestion("");
-    setAiSuggestionMeta(null);
-    setAiSuggestionParts([]);
-    setShowAiSelector(false);
-    aiSuggestMut.mutate({
-      tenantId,
-      messages: msgs.reverse(),
-      contactName: contact?.name,
-      integrationId: selectedAiIntegrationId,
-      overrideModel: selectedAiModel,
-    });
-  };
-
-  const closeAiSuggestion = () => {
-    setShowAiSuggestion(false);
-    setShowAiSelector(false);
-    setAiSuggestion(null);
-    setEditedSuggestion("");
-    setAiSuggestionParts([]);
-    setAiSuggestionMeta(null);
-  };
-
-  const useSuggestionAsText = () => {
-    const text = editedSuggestion.trim();
-    if (!text) return;
-    setMessageText(text);
-    closeAiSuggestion();
-    textareaRef.current?.focus();
-  };
-
-  const sendSuggestionBroken = async () => {
-    const text = editedSuggestion.trim();
-    if (!text) return;
-    const number = contact?.phone?.replace(/\D/g, "") || "";
-    if (!number || !sessionId) { toast.error("Sem número ou sessão"); return; }
-    const parts = text.split(/\n\n+/).map(p => p.trim()).filter(Boolean);
-    if (parts.length <= 1) {
-      sendMessage.mutate({ sessionId, number, message: text });
-    } else {
-      for (let i = 0; i < parts.length; i++) {
-        sendMessage.mutate({ sessionId, number, message: parts[i] });
-        if (i < parts.length - 1) await new Promise(r => setTimeout(r, 1200));
-      }
-    }
-    closeAiSuggestion();
-    toast.success(parts.length > 1 ? `${parts.length} mensagens enviadas` : "Mensagem enviada");
-  };
 
   // Transcription mutation
   const transcribeMut = trpc.ai.transcribe.useMutation();
@@ -2128,19 +2032,12 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
             <div className="relative shrink-0 self-end">
               <InstantTooltip label="Sugestão IA">
                 <button
-                  onClick={() => {
-                    if (showAiSuggestion) {
-                      closeAiSuggestion();
-                    } else {
-                      handleAiSuggest();
-                    }
-                  }}
-                  disabled={aiSuggestMut.isPending}
-                    className={`p-1.5 rounded-md transition-colors ${
-                    aiSuggestMut.isPending ? "bg-violet-500/20 text-violet-500" : showAiSuggestion ? "bg-violet-500/20 text-violet-500" : "hover:bg-wa-hover text-muted-foreground"
+                  onClick={() => setShowAiSuggestion(prev => !prev)}
+                  className={`p-1.5 rounded-md transition-colors ${
+                    showAiSuggestion ? "bg-violet-500/20 text-violet-500" : "hover:bg-wa-hover text-muted-foreground"
                   }`}
-                  >
-                  {aiSuggestMut.isPending ? <Loader2 className="w-[20px] h-[20px] animate-spin" /> : <Sparkles className="w-[20px] h-[20px]" />}
+                >
+                  <Sparkles className="w-[20px] h-[20px]" />
                 </button>
               </InstantTooltip>
             </div>
@@ -2148,73 +2045,30 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
             {/* Text input */}
             <div className="flex-1 relative">
               {/* AI Suggestion panel */}
-              {showAiSuggestion && (
-                <div className="absolute bottom-full left-0 right-0 mb-1 bg-violet-50 dark:bg-violet-950/30 border border-violet-200 dark:border-violet-800 rounded-lg shadow-xl z-50 overflow-hidden">
-                  {/* Header */}
-                  <div className="px-3 py-1.5 flex items-center justify-between border-b border-violet-200 dark:border-violet-800">
-                    <div className="flex items-center gap-1.5">
-                      <Brain className="h-3.5 w-3.5 text-violet-500" />
-                      <span className="text-[11px] font-medium text-violet-600 dark:text-violet-400 uppercase tracking-wider">Sugestão IA</span>
-                      {aiSuggestionMeta && (
-                        <span className="text-[10px] text-muted-foreground ml-1">
-                          {aiSuggestionMeta.provider === "openai" ? "OpenAI" : "Anthropic"} · {aiSuggestionMeta.model}
-                        </span>
-                      )}
-                    </div>
-                    <button onClick={closeAiSuggestion} className="text-muted-foreground hover:text-foreground">
-                      <X className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-
-                  {/* Loading state */}
-                  {aiSuggestMut.isPending && !aiSuggestion && (
-                    <div className="px-4 py-6 flex flex-col items-center gap-2">
-                      <Loader2 className="h-6 w-6 animate-spin text-violet-500" />
-                      <span className="text-[12px] text-muted-foreground">Gerando sugestão de resposta...</span>
-                    </div>
-                  )}
-
-                  {/* Editable suggestion text */}
-                  {aiSuggestion && (
-                    <>
-                      <div className="px-3 py-2">
-                        <textarea
-                          value={editedSuggestion}
-                          onChange={(e) => setEditedSuggestion(e.target.value)}
-                          className="w-full text-[13px] text-foreground bg-white dark:bg-violet-900/20 border border-violet-200 dark:border-violet-700 rounded-md px-2.5 py-2 resize-none focus:outline-none focus:ring-1 focus:ring-violet-400 min-h-[60px] max-h-[180px] overflow-y-auto"
-                          rows={Math.min(6, editedSuggestion.split('\n').length + 1)}
-                          placeholder="Edite a sugestão antes de enviar..."
-                        />
-                        <p className="text-[10px] text-muted-foreground mt-1">Edite o texto acima antes de enviar. Separe parágrafos com Enter duplo para enviar como mensagens separadas.</p>
-                      </div>
-
-                      {/* Action buttons */}
-                      <div className="px-3 py-2 flex flex-wrap gap-2 border-t border-violet-200 dark:border-violet-800">
-                        <button
-                          onClick={useSuggestionAsText}
-                          className="flex-1 text-[12px] font-medium bg-violet-500 hover:bg-violet-600 text-white rounded-md py-1.5 transition-colors flex items-center justify-center gap-1.5"
-                        >
-                          <Copy className="h-3 w-3" /> Usar no campo
-                        </button>
-                        {editedSuggestion.includes('\n\n') && (
-                          <button
-                            onClick={sendSuggestionBroken}
-                            className="flex-1 text-[12px] font-medium bg-emerald-500 hover:bg-emerald-600 text-white rounded-md py-1.5 transition-colors flex items-center justify-center gap-1.5"
-                          >
-                            <MessageCircle className="h-3 w-3" /> Enviar separado ({editedSuggestion.split(/\n\n+/).filter(Boolean).length} msgs)
-                          </button>
-                        )}
-                        <button
-                          onClick={handleAiSuggest}
-                          disabled={aiSuggestMut.isPending}
-                          className="text-[12px] font-medium text-violet-600 hover:text-violet-700 dark:text-violet-400 rounded-md px-3 py-1.5 transition-colors border border-violet-200 dark:border-violet-700 hover:bg-violet-100 dark:hover:bg-violet-900/30 flex items-center gap-1.5"
-                        >
-                          {aiSuggestMut.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />} Gerar outra
-                        </button>
-                      </div>
-                    </>
-                  )}
-                </div>
+              {showAiSuggestion && tenantId && (
+                <AiSuggestionPanel
+                  tenantId={tenantId}
+                  sessionId={sessionId}
+                  remoteJid={remoteJid}
+                  contactName={contact?.name}
+                  messages={(messagesQ.data || []).filter((m: any) => m.content).map((m: any) => ({ fromMe: m.fromMe, content: m.content || "", timestamp: m.timestamp }))}
+                  onUseText={(text) => {
+                    setMessageText(text);
+                    setShowAiSuggestion(false);
+                    textareaRef.current?.focus();
+                  }}
+                  onSendBroken={async (parts) => {
+                    const number = contact?.phone?.replace(/\D/g, "") || "";
+                    if (!number || !sessionId) { toast.error("Sem número ou sessão"); return; }
+                    for (let i = 0; i < parts.length; i++) {
+                      sendMessage.mutate({ sessionId, number, message: parts[i] });
+                      if (i < parts.length - 1) await new Promise(r => setTimeout(r, 1200));
+                    }
+                    setShowAiSuggestion(false);
+                    toast.success(`${parts.length} mensagens enviadas`);
+                  }}
+                  onClose={() => setShowAiSuggestion(false)}
+                />
               )}
 
               {/* Quick Replies popup */}

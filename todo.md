@@ -2855,3 +2855,13 @@
 - [x] Fix: mover queries (aiIntegrationsQ, aiSettingsQ, messagesQ) para ANTES do handler
 - [x] Fix: usar aiSuggestMut.isPending em vez de estado manual aiLoading (mais confiável)
 - [x] Fix: remover estado aiLoading manual (fonte de bugs de sincronização)
+
+## Bug Fix: Sugestão IA - generate() chamado antes das mensagens carregarem (Mar 15 - v8.10)
+- [x] Raiz do bug: AiSuggestionPanel fazia sua própria query de mensagens (messagesQ) que não estava carregada no mount
+- [x] Fix: refatorar AiSuggestionPanel para receber mensagens como prop (já carregadas pelo WhatsAppChat pai)
+- [x] Fix: useEffect auto-generate agora verifica messages.length > 0 antes de chamar generate()
+- [x] Fix: useRef hasGenerated previne chamadas duplicadas
+- [x] Remover query interna de mensagens do AiSuggestionPanel (eliminando timing race condition)
+- [x] WhatsAppChat passa mensagens filtradas (com content) e mapeadas como prop
+- [x] 24 novos testes (aiSuggestion.test.ts): parseAiSuggestionParts, SPIN context, integration selection, messages prop pattern, no-dash rule
+- [x] 0 erros TypeScript, 52 testes AI passando (28 + 24)
