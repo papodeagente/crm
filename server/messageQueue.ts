@@ -273,8 +273,15 @@ export function startMessageWorker(processor: MessageProcessor): Worker | null {
       console.error(`[Worker] Job ${job?.id} permanently failed:`, err.message);
     });
 
+    let workerErrorCount = 0;
     messageWorker.on("error", (err) => {
-      console.error("[Worker] Worker error:", err.message);
+      workerErrorCount++;
+      if (workerErrorCount <= 3) {
+        console.error("[Worker] Worker error:", err.message);
+        if (workerErrorCount === 3) {
+          console.warn("[Worker] Suppressing further worker errors (Redis unavailable, sync fallback active)");
+        }
+      }
     });
 
     console.log("[Queue] Message worker started (concurrency: 5)");

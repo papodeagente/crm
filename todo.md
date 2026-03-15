@@ -3158,3 +3158,9 @@
 - [x] Fix: adicionar timeout de 5min para instâncias stuck em 'connecting'
 - [x] Fix: verificar se fast poll ou periodic sync também reconectam indevidamente
 - [x] Tests: cobrir filtro estrito e timeout de 5min
+
+## Estabilização Cirúrgica do Inbox WhatsApp
+- [x] Fix: messageType passado em todas as 8 chamadas de updateConversationLastMessage
+- [x] Fix: status regression prevention no handleMessageStatusUpdate (read→delivered bloqueado)
+- [x] Fix: Redis error suppression (máximo 3 erros logados, sem spam)
+- [x] Tests: 26 testes de inbox stabilization passando

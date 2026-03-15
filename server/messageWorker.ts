@@ -326,7 +326,9 @@ async function processNewMessage(session: SessionInfo, data: any): Promise<void>
       if (resolved) {
         await updateConversationLastMessage(resolved.conversationId, {
           content: content || "",
+          messageType,
           fromMe,
+          status: fromMe ? "sent" : "received",
           timestamp: new Date(timestamp),
           incrementUnread: !fromMe,
         });

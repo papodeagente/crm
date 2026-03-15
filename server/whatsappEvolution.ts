@@ -366,7 +366,9 @@ class WhatsAppEvolutionManager extends EventEmitter {
             if (resolved) {
               await updateConversationLastMessage(resolved.conversationId, {
                 content: text,
+                messageType: "conversation",
                 fromMe: true,
+                status: "sent",
                 timestamp: new Date(result.messageTimestamp ? result.messageTimestamp * 1000 : Date.now()),
                 incrementUnread: false,
               });
@@ -437,7 +439,9 @@ class WhatsAppEvolutionManager extends EventEmitter {
             if (resolved) {
               await updateConversationLastMessage(resolved.conversationId, {
                 content: caption || `[Áudio]`,
+                messageType: (mediaType === "audio" && opts?.ptt) ? "pttMessage" : (typeMap[mediaType] || "documentMessage"),
                 fromMe: true,
+                status: "sent",
                 timestamp: new Date(result.messageTimestamp ? result.messageTimestamp * 1000 : Date.now()),
                 incrementUnread: false,
               });
@@ -528,7 +532,9 @@ class WhatsAppEvolutionManager extends EventEmitter {
             if (resolved) {
               await updateConversationLastMessage(resolved.conversationId, {
                 content: text,
+                messageType: "extendedTextMessage",
                 fromMe: true,
+                status: "sent",
                 timestamp: new Date(result.messageTimestamp ? result.messageTimestamp * 1000 : Date.now()),
                 incrementUnread: false,
               });
@@ -1166,9 +1172,23 @@ class WhatsAppEvolutionManager extends EventEmitter {
               }
             }
 
+            // Determine status for conversation update
+            let convStatus = fromMe ? 'sent' : 'received';
+            if (fromMe && lastMsg.status) {
+              const rawSt2 = lastMsg.status;
+              if (typeof rawSt2 === 'number') {
+                const stMap2: Record<number, string> = { 0: 'error', 1: 'pending', 2: 'sent', 3: 'delivered', 4: 'read', 5: 'played' };
+                convStatus = stMap2[rawSt2] || 'sent';
+              } else if (typeof rawSt2 === 'string') {
+                const strMap2: Record<string, string> = { 'ERROR': 'error', 'PENDING': 'pending', 'SENT': 'sent', 'SERVER_ACK': 'sent', 'DELIVERY_ACK': 'delivered', 'DELIVERED': 'delivered', 'READ': 'read', 'PLAYED': 'played' };
+                convStatus = strMap2[rawSt2.toUpperCase()] || rawSt2.toLowerCase();
+              }
+            }
             await updateConversationLastMessage(resolved.conversationId, {
               content: content || "",
+              messageType,
               fromMe,
+              status: convStatus,
               timestamp: msgTimestamp,
               incrementUnread: false,
             });
@@ -1431,7 +1451,9 @@ class WhatsAppEvolutionManager extends EventEmitter {
         if (resolved) {
           await updateConversationLastMessage(resolved.conversationId, {
             content: content || "",
+            messageType,
             fromMe,
+            status: fromMe ? "sent" : "received",
             timestamp: new Date(timestamp),
             incrementUnread: !fromMe,
           });
@@ -1602,7 +1624,9 @@ class WhatsAppEvolutionManager extends EventEmitter {
         if (resolved) {
           await updateConversationLastMessage(resolved.conversationId, {
             content: content || "",
+            messageType,
             fromMe: true,
+            status: "sent",
             timestamp: new Date(timestamp),
             incrementUnread: false,
           });
@@ -1665,12 +1689,24 @@ class WhatsAppEvolutionManager extends EventEmitter {
 
         console.log(`[EvoWA] Status update: ${messageId} -> ${newStatus} (jid: ${remoteJid}, fromMe: ${fromMe})`);
 
-        await db.update(waMessages)
-          .set({ status: newStatus })
-          .where(and(
-            eq(waMessages.sessionId, session.sessionId),
-            eq(waMessages.messageId, messageId)
-          ));
+        // Prevent status regression: only update if new status is higher priority
+        // Priority order: error(0) < pending(1) < sent(2) < delivered(3) < read(4) < played(5)
+        const statusPriority: Record<string, number> = { error: 0, pending: 1, sent: 2, delivered: 3, read: 4, played: 5 };
+        const newPriority = statusPriority[newStatus] ?? -1;
+        if (newPriority >= 0) {
+          // Use SQL FIELD() to only update if new status is strictly higher
+          await db.execute(
+            sql`UPDATE messages SET status = ${newStatus} WHERE sessionId = ${session.sessionId} AND messageId = ${messageId} AND FIELD(status, 'error','pending','sent','delivered','read','played') < FIELD(${newStatus}, 'error','pending','sent','delivered','read','played')`
+          );
+        } else {
+          // Unknown status, update unconditionally
+          await db.update(waMessages)
+            .set({ status: newStatus })
+            .where(and(
+              eq(waMessages.sessionId, session.sessionId),
+              eq(waMessages.messageId, messageId)
+            ));
+        }
 
         // Also update lastStatus in wa_conversations if this is the last message
         if (remoteJid && fromMe) {
@@ -2836,7 +2872,9 @@ class WhatsAppEvolutionManager extends EventEmitter {
                 if (resolved) {
                   await updateConversationLastMessage(resolved.conversationId, {
                     content: content || '',
+                    messageType,
                     fromMe,
+                    status: fromMe ? (msgStatus ?? 'sent') : 'received',
                     timestamp,
                     incrementUnread: !fromMe,
                   });
