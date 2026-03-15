@@ -1632,6 +1632,7 @@ export async function getWaConversationsList(
     unassignedOnly?: boolean;
     limit?: number;
     offset?: number;
+    cursor?: string; // ISO timestamp for cursor-based pagination (preferred over offset)
   }
 ) {
   const db = await getDb();
@@ -1691,9 +1692,10 @@ export async function getWaConversationsList(
     AND wc.mergedIntoId IS NULL
     AND wc.lastMessageAt IS NOT NULL
     ${sql.raw(assignmentFilter)}
+    ${filter?.cursor ? sql`AND wc.lastMessageAt < ${new Date(filter.cursor)}` : sql``}
     ORDER BY wc.lastMessageAt DESC
     LIMIT ${filter?.limit ?? 100}
-    OFFSET ${filter?.offset ?? 0}
+    ${!filter?.cursor && (filter?.offset ?? 0) > 0 ? sql`OFFSET ${filter?.offset ?? 0}` : sql``}
   `);
 
   const rows = (result as any)[0] || [];

@@ -2930,3 +2930,26 @@
 - [x] Registrar provider, modelo, tempo, sucesso/falha, intenção classificada, contexto CRM
 - [x] Escrever testes unitários: classifyIntent (26 testes), parseAiResponse, splitTextNaturally
 - [x] Validar zero regressão: 1259/1262 testes passando (3 falhas pré-existentes em whatsappDailyBackup)
+
+## Análise Técnica de Arquitetura para Alto Volume (Mar 15)
+- [x] Auditar schema atual (tabelas messages, conversations, índices existentes)
+- [x] Auditar queries pesadas (JSON filters, OFFSET, COUNT, subqueries)
+- [x] Pesquisar arquiteturas de SaaS de mensageria de alto volume
+- [x] Produzir documento técnico completo (7 partes: diagnóstico, arquitetura, tabela Message, índices, escala, auditoria, migração)
+- [x] Entregar documento ao usuário
+
+## Refatoração Event-Driven com BullMQ/Redis (Mar 15)
+- [x] Auditar código atual: webhook handler, inbox queries, paginação, contadores
+- [x] Instalar Redis (ioredis) e BullMQ no projeto
+- [x] Criar infraestrutura de filas: messageQueue.ts (conexão Redis, fila, enqueue, fallback)
+- [x] Criar worker de mensagens: messageWorker.ts (validar, dedup, inserir, atualizar conversa, emit socket)
+- [x] Refatorar webhook para apenas validar + enfileirar + retornar 200 (com fallback síncrono)
+- [x] Manter fallback síncrono via feature flag USE_QUEUE + auto-detect Redis
+- [x] Otimizar Inbox: redirecionar endpoints legados para wa_conversations (sem subqueries)
+- [x] Contadores incrementais: unreadCount já atualizado a cada mensagem (verificado)
+- [x] Zerar unreadCount ao abrir conversa: markWaConversationReadDb (verificado)
+- [x] Cursor pagination: adicionado cursor param ao getWaConversationsList + endpoint waConversations
+- [ ] Cursor pagination: substituir OFFSET nos endpoints de contatos e deals (CRM) — futuro
+- [x] Criar 6 índices otimizados: idx_msg_wa_conv_ts, idx_wc_inbox, idx_notif_tenant_created, idx_msg_tenant_ts, idx_wc_assigned_ts
+- [x] Escrever 14 testes para messageQueue, messageWorker, cursor pagination (todos passando)
+- [x] Validar zero regressão: 1273/1276 testes passando (3 falhas pré-existentes em whatsappDailyBackup)

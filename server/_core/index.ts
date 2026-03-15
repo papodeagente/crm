@@ -170,6 +170,13 @@ async function startServer() {
     // Start daily WhatsApp backup scheduler
     startDailyBackupScheduler();
 
+    // Initialize BullMQ message worker (if Redis available)
+    import("../messageWorker").then(m => {
+      m.initMessageWorker();
+    }).catch(e => {
+      console.warn("[Worker] Failed to initialize message worker:", e.message);
+    });
+
     // Start date-based automation scheduler
     import("../dateAutomationScheduler").then(m => m.startDateAutomationScheduler());
 

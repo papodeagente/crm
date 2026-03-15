@@ -17,7 +17,7 @@ import {
   getChatbotRules,
   addChatbotRule,
   removeChatbotRule,
-  getConversationsList,
+  // getConversationsList, // DEPRECATED: redirected to getWaConversationsList
   markConversationRead,
   getDashboardMetrics,
   getPipelineSummary,
@@ -30,7 +30,7 @@ import {
   markNotificationRead,
   markAllNotificationsRead,
   // Multi-agent / SaaS
-  getConversationsListMultiAgent,
+  // getConversationsListMultiAgent, // DEPRECATED: redirected to getWaConversationsList
   assignConversation,
   updateAssignmentStatus,
   finishAttendance,
@@ -633,10 +633,14 @@ export const appRouter = router({
         await removeChatbotRule(input.id);
         return { success: true };
       }),
-    // Conversations list (grouped by remoteJid with last message) — LEGACY
+    // Conversations list — LEGACY (redirects to optimized wa_conversations query)
+    // Kept for backward compatibility; frontend should use waConversations instead
     conversations: sessionProtectedProcedure
       .input(z.object({ sessionId: z.string() }))
-      .query(async ({ input }) => getConversationsList(input.sessionId)),
+      .query(async ({ input }) => {
+        // Redirect to optimized query that reads from wa_conversations (no subqueries)
+        return getWaConversationsList(input.sessionId, 0);
+      }),
     // Conversations list with multi-agent assignment info — LEGACY
     conversationsMultiAgent: sessionProtectedProcedure
       .input(z.object({
@@ -649,7 +653,8 @@ export const appRouter = router({
       }))
       .query(async ({ input }) => {
         const { sessionId, tenantId, ...filter } = input;
-        return getConversationsListMultiAgent(sessionId, tenantId, filter);
+        // Redirect to optimized query that reads from wa_conversations (no subqueries)
+        return getWaConversationsList(sessionId, tenantId, filter);
       }),
     // ─── WA Conversations (canônico — usa wa_conversations) ───
     waConversations: sessionProtectedProcedure
@@ -660,6 +665,7 @@ export const appRouter = router({
         assignedTeamId: z.number().optional(),
         status: z.enum(["open", "pending", "resolved", "closed"]).optional(),
         unassignedOnly: z.boolean().optional(),
+        cursor: z.string().optional(), // ISO timestamp for cursor-based pagination
       }))
       .query(async ({ input }) => {
         const { sessionId, tenantId, ...filter } = input;

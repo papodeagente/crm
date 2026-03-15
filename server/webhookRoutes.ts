@@ -934,12 +934,32 @@ async function handleEvolutionWebhook(req: Request, res: Response) {
       apikey: body.apikey,
     };
 
-    // For message events, process async to respond immediately
+    // For message events, try to enqueue via BullMQ first, fallback to sync
     if (body.event === 'messages.upsert' || body.event === 'send.message') {
+      const { enqueueMessageEvent, isQueueEnabled } = await import("./messageQueue");
+      
+      if (isQueueEnabled()) {
+        // Try to enqueue — if successful, respond immediately
+        const enqueued = await enqueueMessageEvent({
+          tenantId: 0, // Will be resolved by worker from session
+          sessionId: '', // Will be resolved by worker from instanceName
+          instanceName: body.instance,
+          event: body.event,
+          data: body.data,
+          receivedAt: Date.now(),
+        });
+
+        if (enqueued) {
+          console.log(`[Webhook /evolution] Enqueued in ${Date.now() - startTime}ms (queue)`);
+          return res.status(200).json({ received: true, queued: true });
+        }
+      }
+
+      // Fallback: process async in-process (original behavior)
       whatsappManager.handleWebhookEvent(eventPayload).catch(e =>
         console.error(`[Webhook /evolution] Async processing error for ${body.event}:`, e.message)
       );
-      console.log(`[Webhook /evolution] Responded in ${Date.now() - startTime}ms (async processing)`);
+      console.log(`[Webhook /evolution] Responded in ${Date.now() - startTime}ms (sync fallback)`);
       return res.status(200).json({ received: true });
     }
 
