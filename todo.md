@@ -3122,3 +3122,13 @@
 - [x] Tests: deal title generation fallback
 - [x] Tests: CSV template structure and parsing
 - [x] Tests: spreadsheet row validation
+
+## Bug Fix: Busca Global CRM — Navegação Quebrada
+- [x] Audit: find search/command palette component and click handler
+- [x] Audit: check route generation logic for each result type
+- [x] Audit: cross-reference with App.tsx routes
+- [x] Fix: correct route generation for all result types (TopNavLayout.tsx + Notifications.tsx)
+- [x] Tests: click on contact navigates correctly
+- [x] Tests: click on deal navigates correctly
+- [x] Tests: click on task navigates correctly
+- [x] Tests: no invalid routes generated for supported types

@@ -21,7 +21,7 @@ const typeConfig: Record<string, { icon: any; bg: string; iconBg: string; iconCo
     iconBg: "bg-indigo-500/15",
     iconColor: "text-indigo-400",
     label: "Pipeline",
-    route: (id) => `/deals/${id}`,
+    route: (id) => `/deal/${id}`,
   },
   deal_created: {
     icon: Briefcase,
@@ -29,7 +29,7 @@ const typeConfig: Record<string, { icon: any; bg: string; iconBg: string; iconCo
     iconBg: "bg-blue-500/15",
     iconColor: "text-blue-400",
     label: "Negociação",
-    route: (id) => `/deals/${id}`,
+    route: (id) => `/deal/${id}`,
   },
   contact_created: {
     icon: UserPlus,

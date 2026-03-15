@@ -126,7 +126,7 @@ function SearchPalette({ open, onClose }: { open: boolean; onClose: () => void }
         type: "contact",
         label: c.name,
         sublabel: [c.phone, c.email].filter(Boolean).join(" · ") || c.lifecycleStage,
-        path: `/contacts/${c.id}`,
+        path: `/contact/${c.id}`,
         icon: c.type === "company" ? Building2 : User,
         iconColor: "text-emerald-600",
       }));
@@ -134,7 +134,7 @@ function SearchPalette({ open, onClose }: { open: boolean; onClose: () => void }
         type: "deal",
         label: d.title,
         sublabel: [d.stageName, d.valueCents ? formatCurrency(d.valueCents) : null].filter(Boolean).join(" · "),
-        path: `/deals/${d.id}`,
+        path: `/deal/${d.id}`,
         icon: Briefcase,
         iconColor: "text-indigo-600",
       }));
@@ -142,7 +142,7 @@ function SearchPalette({ open, onClose }: { open: boolean; onClose: () => void }
         type: "task",
         label: t.title,
         sublabel: t.priority.charAt(0).toUpperCase() + t.priority.slice(1) + (t.dueAt ? " · " + formatDateShort(t.dueAt) : ""),
-        path: t.entityType === "deal" ? `/deals/${t.entityId}` : "/tasks",
+        path: t.entityType === "deal" ? `/deal/${t.entityId}` : "/tasks",
         icon: ListTodo,
         iconColor: priorityColors[t.priority] || "text-muted-foreground",
       }));
