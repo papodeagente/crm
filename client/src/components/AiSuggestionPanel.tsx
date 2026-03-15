@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { Sparkles, X, Loader2, Copy, Send, RefreshCw, ChevronDown } from "lucide-react";
@@ -8,7 +8,6 @@ interface AiSuggestionPanelProps {
   sessionId: string;
   remoteJid: string;
   contactName?: string;
-  messages: Array<{ fromMe: boolean; content: string; timestamp?: any }>;
   onUseText: (text: string) => void;
   onSendBroken: (parts: string[]) => void;
   onClose: () => void;
@@ -19,7 +18,6 @@ export default function AiSuggestionPanel({
   sessionId,
   remoteJid,
   contactName,
-  messages,
   onUseText,
   onSendBroken,
   onClose,
@@ -30,7 +28,13 @@ export default function AiSuggestionPanel({
   const [showSelector, setShowSelector] = useState(false);
   const [selectedIntegrationId, setSelectedIntegrationId] = useState<number | undefined>();
   const [selectedModel, setSelectedModel] = useState<string | undefined>();
-  const hasGenerated = useRef(false);
+  const didAutoGenerate = useRef(false);
+
+  // Fetch messages directly inside this component - no prop dependency
+  const messagesQ = trpc.whatsapp.messagesByContact.useQuery(
+    { sessionId, remoteJid, limit: 50 },
+    { enabled: !!sessionId && !!remoteJid, staleTime: 30000 }
+  );
 
   // Fetch available AI integrations
   const integrationsQ = trpc.ai.list.useQuery(
@@ -68,17 +72,23 @@ export default function AiSuggestionPanel({
     },
   });
 
-  const generate = (overrideIntegrationId?: number, overrideModelId?: string) => {
-    const msgs = messages
-      .filter((m) => m.content)
-      .map((m) => ({
+  const doGenerate = useCallback((overrideIntegrationId?: number, overrideModelId?: string) => {
+    const rawMsgs = messagesQ.data;
+    if (!rawMsgs || rawMsgs.length === 0) {
+      toast.error("Sem mensagens para analisar.");
+      return;
+    }
+
+    const msgs = rawMsgs
+      .filter((m: any) => m.content)
+      .map((m: any) => ({
         fromMe: m.fromMe,
         content: m.content || "",
         timestamp: m.timestamp instanceof Date ? m.timestamp.toISOString() : m.timestamp ? String(m.timestamp) : undefined,
       }));
 
     if (msgs.length === 0) {
-      toast.error("Sem mensagens para analisar.");
+      toast.error("Sem mensagens com conteúdo para analisar.");
       return;
     }
 
@@ -88,26 +98,27 @@ export default function AiSuggestionPanel({
 
     suggestMut.mutate({
       tenantId,
-      messages: [...msgs].reverse(),
+      messages: msgs,
       contactName,
       integrationId: overrideIntegrationId ?? selectedIntegrationId,
       overrideModel: overrideModelId ?? selectedModel,
     });
-  };
+  }, [messagesQ.data, tenantId, contactName, selectedIntegrationId, selectedModel, suggestMut]);
 
-  // Auto-generate on mount (only once, only if messages are available)
+  // Auto-generate when messages are loaded for the first time
   useEffect(() => {
-    if (!hasGenerated.current && messages.length > 0) {
-      hasGenerated.current = true;
-      generate();
+    if (!didAutoGenerate.current && messagesQ.data && messagesQ.data.length > 0) {
+      didAutoGenerate.current = true;
+      doGenerate();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [messages]);
+  }, [messagesQ.data]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const activeIntegrations = (integrationsQ.data || []).filter((i: any) => i.isActive);
   const parts = editedText.split(/\n\n+/).map((p: string) => p.trim()).filter(Boolean);
   const hasMultipleParts = parts.length > 1;
   const providerLabel = meta?.provider === "openai" ? "OpenAI" : meta?.provider === "anthropic" ? "Anthropic" : "";
+
+  const isLoading = messagesQ.isLoading || suggestMut.isPending;
 
   return (
     <div className="absolute bottom-full left-0 right-0 mb-1 bg-violet-50 dark:bg-violet-950/30 border border-violet-200 dark:border-violet-800 rounded-lg shadow-xl z-50 overflow-hidden">
@@ -180,11 +191,11 @@ export default function AiSuggestionPanel({
           </div>
           {activeIntegrations.length > 0 && (
             <button
-              onClick={() => { setShowSelector(false); generate(); }}
-              disabled={suggestMut.isPending}
+              onClick={() => { setShowSelector(false); doGenerate(selectedIntegrationId, selectedModel); }}
+              disabled={isLoading}
               className="mt-2 text-[11px] font-medium bg-violet-500 hover:bg-violet-600 text-white rounded px-3 py-1 transition-colors flex items-center gap-1"
             >
-              {suggestMut.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+              {isLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
               Gerar com esta IA
             </button>
           )}
@@ -192,10 +203,12 @@ export default function AiSuggestionPanel({
       )}
 
       {/* Loading state */}
-      {suggestMut.isPending && (
+      {isLoading && (
         <div className="px-4 py-6 flex flex-col items-center gap-2">
           <Loader2 className="h-6 w-6 animate-spin text-violet-500" />
-          <span className="text-[12px] text-muted-foreground">Gerando sugestão de resposta...</span>
+          <span className="text-[12px] text-muted-foreground">
+            {messagesQ.isLoading ? "Carregando mensagens..." : "Gerando sugestão de resposta..."}
+          </span>
         </div>
       )}
 
@@ -204,19 +217,11 @@ export default function AiSuggestionPanel({
         <div className="px-4 py-4 flex flex-col items-center gap-2">
           <span className="text-[12px] text-red-500">Erro ao gerar sugestão</span>
           <button
-            onClick={() => generate()}
+            onClick={() => doGenerate()}
             className="text-[11px] font-medium text-violet-600 hover:text-violet-700 flex items-center gap-1"
           >
             <RefreshCw className="h-3 w-3" /> Tentar novamente
           </button>
-        </div>
-      )}
-
-      {/* Initial state - waiting for messages or no action yet */}
-      {!suggestMut.isPending && !suggestMut.isError && !suggestion && (
-        <div className="px-4 py-4 flex flex-col items-center gap-2">
-          <Loader2 className="h-5 w-5 animate-spin text-violet-400" />
-          <span className="text-[11px] text-muted-foreground">Carregando mensagens...</span>
         </div>
       )}
 
@@ -253,7 +258,7 @@ export default function AiSuggestionPanel({
               </button>
             )}
             <button
-              onClick={() => generate()}
+              onClick={() => doGenerate()}
               disabled={suggestMut.isPending}
               className="text-[12px] font-medium text-violet-600 hover:text-violet-700 dark:text-violet-400 rounded-md px-3 py-1.5 transition-colors border border-violet-200 dark:border-violet-700 hover:bg-violet-100 dark:hover:bg-violet-900/30 flex items-center gap-1.5"
             >

@@ -2051,7 +2051,6 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
                   sessionId={sessionId}
                   remoteJid={remoteJid}
                   contactName={contact?.name}
-                  messages={(messagesQ.data || []).filter((m: any) => m.content).map((m: any) => ({ fromMe: m.fromMe, content: m.content || "", timestamp: m.timestamp }))}
                   onUseText={(text) => {
                     setMessageText(text);
                     setShowAiSuggestion(false);

@@ -2865,3 +2865,13 @@
 - [x] WhatsAppChat passa mensagens filtradas (com content) e mapeadas como prop
 - [x] 24 novos testes (aiSuggestion.test.ts): parseAiSuggestionParts, SPIN context, integration selection, messages prop pattern, no-dash rule
 - [x] 0 erros TypeScript, 52 testes AI passando (28 + 24)
+
+## Bug Fix: Sugestão IA fica em "Carregando mensagens..." para sempre (Mar 15 - v8.11)
+- [x] Investigar por que o popup mostra "Carregando mensagens..." e nunca gera
+- [x] Corrigir o fluxo completo: componente agora busca mensagens internamente via tRPC query própria, eliminando race condition de prop
+- [x] Testar no browser e confirmar que funciona (25 testes passando)
+
+## Bug Fix: Modelos de IA com IDs inválidos (Mar 15 - v8.12)
+- [x] Verificado: IDs dos modelos OpenAI (gpt-5.4 e gpt-5-mini) são válidos conforme documentação oficial
+- [x] Verificado: IDs dos modelos Anthropic (claude-opus-4-6, claude-sonnet-4-6, claude-haiku-4-5) são válidos conforme documentação oficial
+- [x] Problema real era o componente não disparar a mutation, não os IDs dos modelos

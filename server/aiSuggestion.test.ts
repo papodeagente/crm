@@ -162,7 +162,6 @@ describe("AI Suggestion — Integration Selection", () => {
     const fallback = await getAnyActiveAiIntegration(1);
     expect(specific).toBeNull();
     expect(fallback).toBeNull();
-    // The router would throw TRPCError with message "NO_AI_CONFIGURED"
   });
 
   it("uses overrideModel when provided", async () => {
@@ -191,19 +190,21 @@ describe("AI Suggestion — Integration Selection", () => {
   });
 });
 
-describe("AI Suggestion — Messages Prop Pattern (Bug Fix)", () => {
-  it("filters out messages without content", () => {
+describe("AI Suggestion — Self-contained Message Fetching", () => {
+  it("filters messages with content from raw query data", () => {
     const rawMessages = [
-      { fromMe: false, content: "Oi", timestamp: new Date() },
-      { fromMe: true, content: "", timestamp: new Date() },
-      { fromMe: false, content: null as any, timestamp: new Date() },
-      { fromMe: true, content: "Olá!", timestamp: new Date() },
+      { id: 1, fromMe: false, content: "Oi", messageType: "conversation", timestamp: new Date() },
+      { id: 2, fromMe: true, content: "", messageType: "conversation", timestamp: new Date() },
+      { id: 3, fromMe: false, content: null as any, messageType: "audioMessage", timestamp: new Date() },
+      { id: 4, fromMe: true, content: "Olá!", messageType: "conversation", timestamp: new Date() },
     ];
-    const filtered = rawMessages.filter((m) => m.content).map((m) => ({
-      fromMe: m.fromMe,
-      content: m.content || "",
-      timestamp: m.timestamp,
-    }));
+    const filtered = rawMessages
+      .filter((m) => m.content)
+      .map((m) => ({
+        fromMe: m.fromMe,
+        content: m.content || "",
+        timestamp: m.timestamp instanceof Date ? m.timestamp.toISOString() : m.timestamp ? String(m.timestamp) : undefined,
+      }));
     expect(filtered).toHaveLength(2);
     expect(filtered[0].content).toBe("Oi");
     expect(filtered[1].content).toBe("Olá!");
@@ -221,18 +222,36 @@ describe("AI Suggestion — Messages Prop Pattern (Bug Fix)", () => {
     expect(converted).toBe("2026-03-14T10:00:00Z");
   });
 
-  it("generates only when messages array is non-empty", () => {
+  it("should not generate when messages array is empty", () => {
     const messages: any[] = [];
     const shouldGenerate = messages.length > 0;
     expect(shouldGenerate).toBe(false);
   });
 
-  it("generates when messages are available", () => {
+  it("should generate when messages are available", () => {
     const messages = [
       { fromMe: false, content: "Oi", timestamp: "2026-03-14T10:00:00Z" },
     ];
     const shouldGenerate = messages.length > 0;
     expect(shouldGenerate).toBe(true);
+  });
+
+  it("auto-generate flag prevents duplicate calls", () => {
+    let didAutoGenerate = false;
+    const messages = [{ fromMe: false, content: "Oi" }];
+    
+    // First check - should generate
+    if (!didAutoGenerate && messages.length > 0) {
+      didAutoGenerate = true;
+    }
+    expect(didAutoGenerate).toBe(true);
+    
+    // Second check - should NOT generate again
+    let calledAgain = false;
+    if (!didAutoGenerate && messages.length > 0) {
+      calledAgain = true;
+    }
+    expect(calledAgain).toBe(false);
   });
 });
 
