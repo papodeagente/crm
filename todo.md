@@ -2847,3 +2847,8 @@
 - [x] Simplificar UX: removido seletor complexo, botões claros (Usar no campo / Enviar separado / Gerar outra)
 - [x] "Enviar separado" só aparece quando há parágrafos duplos no texto editado
 - [x] Dica visual: "Separe parágrafos com Enter duplo para enviar como mensagens separadas"
+
+## Bug Fix: Sugestão IA não gera texto - popup vazio (Mar 15 - v8.9)
+- [x] Investigar: aiSuggestionMeta não era resetado ao clicar novamente, mostrando meta antiga sem loading
+- [x] Fix: resetar aiSuggestionMeta e aiSuggestionParts em handleAiSuggest
+- [x] Fix: onError agora fecha o popup e mostra toast de erro (antes ficava aberto vazio)

@@ -1179,10 +1179,12 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
     },
     onError: (err) => {
       setAiLoading(false);
+      setShowAiSuggestion(false);
+      setAiSuggestionMeta(null);
       if (err.message === "NO_AI_CONFIGURED") {
         toast.error("Nenhuma IA configurada. Vá em Integrações > IA para conectar sua API.", { duration: 5000 });
       } else {
-        toast.error(err.message || "Erro ao gerar sugestão");
+        toast.error(err.message || "Erro ao gerar sugestão", { duration: 5000 });
       }
     },
   });
@@ -1204,6 +1206,8 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
     setShowAiSuggestion(true);
     setAiSuggestion(null);
     setEditedSuggestion("");
+    setAiSuggestionMeta(null);
+    setAiSuggestionParts([]);
     setShowAiSelector(false);
     aiSuggestMut.mutate({
       tenantId,
