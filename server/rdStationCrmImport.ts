@@ -68,6 +68,7 @@ export interface RdDeal {
   }>;
   markup?: string;
   markup_created?: string;
+  deal_lost_reason?: { _id: string; name: string } | null;
   organization?: { _id: string; id?: string; name: string; address?: string | null } | null;
 }
 
@@ -163,6 +164,9 @@ export interface RdCustomField {
 
 // ─── API Helpers ───
 
+const MAX_RETRIES = 3;
+const RETRY_BASE_MS = 2000;
+
 async function rdFetch<T>(endpoint: string, token: string, params: Record<string, string> = {}): Promise<T> {
   const url = new URL(`${RD_CRM_BASE}${endpoint}`);
   url.searchParams.set("token", token);
@@ -170,36 +174,65 @@ async function rdFetch<T>(endpoint: string, token: string, params: Record<string
     url.searchParams.set(k, v);
   }
 
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 60000); // 60s timeout
-
-  try {
-    const res = await fetch(url.toString(), {
-      headers: { accept: "application/json" },
-      signal: controller.signal,
-    });
-
-    const contentType = res.headers.get("content-type") || "";
-
-    if (!res.ok) {
-      const body = await res.text().catch(() => "");
-      throw new Error(`RD Station CRM API error ${res.status}: ${body.substring(0, 200)}`);
-    }
-
-    // Guard against HTML responses (e.g. error pages, rate limits)
-    if (contentType.includes("text/html")) {
-      throw new Error(`RD Station retornou HTML em vez de JSON para ${endpoint}. Pode ser rate limit ou erro temporário.`);
-    }
-
-    const text = await res.text();
+  let lastError: Error | null = null;
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 60000);
     try {
-      return JSON.parse(text) as T;
-    } catch {
-      throw new Error(`Resposta inválida do RD Station para ${endpoint}: ${text.substring(0, 100)}`);
+      const res = await fetch(url.toString(), {
+        headers: { accept: "application/json" },
+        signal: controller.signal,
+      });
+      clearTimeout(timeout);
+
+      // Retry on 429 (rate limit) or 5xx (server error)
+      if (res.status === 429 || res.status >= 500) {
+        const retryAfter = res.headers.get("retry-after");
+        const waitMs = retryAfter ? parseInt(retryAfter, 10) * 1000 : RETRY_BASE_MS * Math.pow(2, attempt);
+        if (attempt < MAX_RETRIES) {
+          console.log(`[RD Retry] ${endpoint} → ${res.status}, tentativa ${attempt + 1}/${MAX_RETRIES}, aguardando ${waitMs}ms...`);
+          await new Promise(r => setTimeout(r, waitMs));
+          continue;
+        }
+        const body = await res.text().catch(() => "");
+        throw new Error(`RD Station CRM API error ${res.status} após ${MAX_RETRIES} tentativas: ${body.substring(0, 200)}`);
+      }
+
+      const contentType = res.headers.get("content-type") || "";
+
+      if (!res.ok) {
+        const body = await res.text().catch(() => "");
+        throw new Error(`RD Station CRM API error ${res.status}: ${body.substring(0, 200)}`);
+      }
+
+      if (contentType.includes("text/html")) {
+        if (attempt < MAX_RETRIES) {
+          console.log(`[RD Retry] ${endpoint} → HTML response, tentativa ${attempt + 1}/${MAX_RETRIES}...`);
+          await new Promise(r => setTimeout(r, RETRY_BASE_MS * Math.pow(2, attempt)));
+          continue;
+        }
+        throw new Error(`RD Station retornou HTML em vez de JSON para ${endpoint}. Pode ser rate limit ou erro temporário.`);
+      }
+
+      const text = await res.text();
+      try {
+        return JSON.parse(text) as T;
+      } catch {
+        throw new Error(`Resposta inválida do RD Station para ${endpoint}: ${text.substring(0, 100)}`);
+      }
+    } catch (err: any) {
+      clearTimeout(timeout);
+      lastError = err;
+      // Retry on network errors (abort, ECONNRESET, etc.)
+      if (attempt < MAX_RETRIES && (err.name === "AbortError" || err.code === "ECONNRESET" || err.code === "ETIMEDOUT" || err.message?.includes("fetch failed"))) {
+        console.log(`[RD Retry] ${endpoint} → ${err.message}, tentativa ${attempt + 1}/${MAX_RETRIES}...`);
+        await new Promise(r => setTimeout(r, RETRY_BASE_MS * Math.pow(2, attempt)));
+        continue;
+      }
+      throw err;
     }
-  } finally {
-    clearTimeout(timeout);
   }
+  throw lastError || new Error(`rdFetch falhou após ${MAX_RETRIES} tentativas`);
 }
 
 async function rdFetchAllPaginated<T extends { _id?: string }>(

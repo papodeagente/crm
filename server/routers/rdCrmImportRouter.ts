@@ -217,6 +217,226 @@ export const rdCrmImportRouter = router({
 
       return { started: true, categories: enabledCategories.length };
     }),
+
+  // ─── Import from Spreadsheet (synchronous, rows already parsed by frontend) ───
+  importSpreadsheet: protectedProcedure
+    .input(z.object({
+      tenantId: z.number(),
+      rows: z.array(z.object({
+        nome: z.string().min(1),
+        email: z.string().optional(),
+        telefone: z.string().optional(),
+        empresa: z.string().optional(),
+        negociacao: z.string().optional(),
+        valor: z.string().optional(),
+        etapa: z.string().optional(),
+        fonte: z.string().optional(),
+        campanha: z.string().optional(),
+        notas: z.string().optional(),
+      })),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const tenantId = (ctx as any).saasUser?.tenantId ?? input.tenantId;
+      const userId = ctx.user.id;
+      const userName = ctx.user.name || "Sistema";
+      const { rows } = input;
+
+      let imported = 0;
+      let skipped = 0;
+      const errors: string[] = [];
+
+      // Ensure rdExternalId columns exist (reuse existing helper)
+      await ensureRdExternalIdColumns();
+
+      // Pre-fetch tenant pipelines and stages for matching
+      const allPipelines = await crm.listPipelines(tenantId);
+      const defaultPipeline = allPipelines.find((p: any) => p.isDefault) || allPipelines[0];
+      if (!defaultPipeline) {
+        throw new Error("Nenhum funil encontrado. Crie um funil antes de importar.");
+      }
+      const allStagesMap = new Map<number, any[]>();
+      for (const p of allPipelines) {
+        const stages = await crm.listStages(tenantId, p.id);
+        allStagesMap.set(p.id, stages);
+      }
+      const defaultStages = allStagesMap.get(defaultPipeline.id) || [];
+      const defaultStage = defaultStages[0];
+      if (!defaultStage) {
+        throw new Error("Nenhuma etapa encontrada no funil padrão.");
+      }
+
+      // Pre-fetch existing sources and campaigns for matching
+      const existingSources = await crm.listLeadSources(tenantId);
+      const existingCampaigns = await crm.listCampaigns(tenantId);
+      const sourceMap = new Map(existingSources.map((s: any) => [s.name.toLowerCase().trim(), s.id]));
+      const campaignMap = new Map(existingCampaigns.map((c: any) => [c.name.toLowerCase().trim(), c.id]));
+
+      // Cache for contacts by email (dedup within batch)
+      const contactByEmail = new Map<string, number>();
+      // Cache for accounts by name (dedup within batch)
+      const accountByName = new Map<string, number>();
+
+      // Pre-fetch existing contacts by email for dedup
+      const db = await getDb();
+      if (db) {
+        try {
+          const [existingContacts]: any = await db.execute(
+            sql.raw(`SELECT id, email FROM contacts WHERE tenantId = ${tenantId} AND email IS NOT NULL AND email != '' AND deletedAt IS NULL`)
+          );
+          if (existingContacts) {
+            for (const c of existingContacts) {
+              if (c.email) contactByEmail.set(c.email.toLowerCase().trim(), c.id);
+            }
+          }
+        } catch {}
+        // Pre-fetch existing accounts by name
+        try {
+          const [existingAccounts]: any = await db.execute(
+            sql.raw(`SELECT id, name FROM accounts WHERE tenantId = ${tenantId} AND deletedAt IS NULL`)
+          );
+          if (existingAccounts) {
+            for (const a of existingAccounts) {
+              if (a.name) accountByName.set(a.name.toLowerCase().trim(), a.id);
+            }
+          }
+        } catch {}
+      }
+
+      for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        try {
+          // 1. Find or create contact
+          let contactId: number | undefined;
+          const emailKey = row.email?.toLowerCase().trim();
+          if (emailKey && contactByEmail.has(emailKey)) {
+            contactId = contactByEmail.get(emailKey);
+          } else {
+            const contact = await crm.createContact({
+              tenantId,
+              name: row.nome.trim(),
+              email: row.email?.trim() || undefined,
+              phone: row.telefone?.trim() || undefined,
+              source: row.fonte?.trim() || "Planilha",
+              createdBy: userId,
+            });
+            if (contact) {
+              contactId = (contact as any).insertId ?? (contact as any).id;
+              if (emailKey && contactId) contactByEmail.set(emailKey, contactId);
+            }
+          }
+
+          // 2. Find or create account (empresa)
+          let accountId: number | undefined;
+          if (row.empresa?.trim()) {
+            const empresaKey = row.empresa.trim().toLowerCase();
+            if (accountByName.has(empresaKey)) {
+              accountId = accountByName.get(empresaKey);
+            } else {
+              const account = await crm.createAccount({
+                tenantId,
+                name: row.empresa.trim(),
+                primaryContactId: contactId,
+                createdBy: userId,
+              });
+              if (account) {
+                accountId = (account as any).insertId ?? (account as any).id;
+                if (accountId) accountByName.set(empresaKey, accountId);
+              }
+            }
+          }
+
+          // 3. Resolve pipeline stage by name
+          let targetPipelineId = defaultPipeline.id;
+          let targetStageId = defaultStage.id;
+          if (row.etapa?.trim()) {
+            const etapaName = row.etapa.trim().toLowerCase();
+            let found = false;
+            for (const [pId, stages] of Array.from(allStagesMap.entries())) {
+              const match = stages.find((s: any) => s.name.toLowerCase() === etapaName);
+              if (match) {
+                targetPipelineId = pId;
+                targetStageId = match.id;
+                found = true;
+                break;
+              }
+            }
+          }
+
+          // 4. Parse value
+          let valueCents: number | undefined;
+          if (row.valor?.trim()) {
+            const cleaned = row.valor.replace(/[R$\s.]/g, "").replace(",", ".");
+            const parsed = parseFloat(cleaned);
+            if (!isNaN(parsed)) valueCents = Math.round(parsed * 100);
+          }
+
+          // 5. Resolve source
+          let leadSource: string | undefined;
+          if (row.fonte?.trim()) {
+            leadSource = row.fonte.trim();
+            if (!sourceMap.has(leadSource.toLowerCase())) {
+              const src = await crm.createLeadSource({ tenantId, name: leadSource });
+              if (src) sourceMap.set(leadSource.toLowerCase(), (src as any).insertId ?? (src as any).id);
+            }
+          }
+
+          // 6. Create deal
+          const dealTitle = row.negociacao?.trim() || `${row.nome.trim()} — Importação Planilha`;
+          const deal = await crm.createDeal({
+            tenantId,
+            title: dealTitle,
+            contactId,
+            accountId,
+            pipelineId: targetPipelineId,
+            stageId: targetStageId,
+            valueCents,
+            ownerUserId: userId,
+            createdBy: userId,
+            leadSource: leadSource || "Planilha",
+          });
+
+          if (deal) {
+            const dealId = (deal as any).insertId ?? (deal as any).id;
+
+            // 7. Set utmCampaign if provided
+            if (row.campanha?.trim()) {
+              await crm.updateDeal(tenantId, dealId, { utmCampaign: row.campanha.trim() });
+              if (!campaignMap.has(row.campanha.trim().toLowerCase())) {
+                const camp = await crm.createCampaign({ tenantId, name: row.campanha.trim() });
+                if (camp) campaignMap.set(row.campanha.trim().toLowerCase(), (camp as any).insertId ?? (camp as any).id);
+              }
+            }
+
+            // 8. Add notes if provided
+            if (row.notas?.trim()) {
+              await crm.createNote({
+                tenantId,
+                entityType: "deal",
+                entityId: dealId,
+                body: row.notas.trim(),
+                createdByUserId: userId,
+              });
+            }
+
+            // 9. History
+            await crm.createDealHistory({
+              tenantId,
+              dealId,
+              action: "created",
+              description: `Negociação importada via planilha por ${userName}`,
+              actorUserId: userId,
+              actorName: userName,
+            });
+          }
+
+          imported++;
+        } catch (e: any) {
+          errors.push(`Linha ${i + 1} (${row.nome}): ${e.message || "Erro desconhecido"}`);
+        }
+      }
+
+      return { imported, skipped, errors };
+    }),
 });
 
 // ─── Background import function ───
@@ -742,6 +962,14 @@ async function runImport(
               }
               entry.imported++;
 
+              // Link contact → account via organization_id
+              if (c.organization_id && rdIdMap.organizations.has(c.organization_id)) {
+                const accountId = rdIdMap.organizations.get(c.organization_id)!;
+                try {
+                  await crm.updateAccount(tenantId, accountId, { primaryContactId: result.id });
+                } catch {}
+              }
+
               // Add notes if present
               if (c.notes) {
                 try {
@@ -940,6 +1168,31 @@ async function runImport(
               ownerUserId = rdIdMap.users.get(d.user._id);
             }
 
+            // ── Resolve deal_source → leadSource name ──
+            let dealSourceName: string | undefined;
+            if (d.deal_source?._id) {
+              dealSourceName = d.deal_source.name || undefined;
+            }
+
+            // ── Resolve campaign → utmCampaign name ──
+            let campaignName: string | undefined;
+            if (d.campaign?._id) {
+              campaignName = d.campaign.name || undefined;
+            }
+
+            // ── Resolve loss reason ──
+            let lossReasonId: number | undefined;
+            if (d.deal_lost_reason?._id && rdIdMap.lossReasons.has(d.deal_lost_reason._id)) {
+              lossReasonId = rdIdMap.lossReasons.get(d.deal_lost_reason._id);
+            }
+
+            // ── Resolve expectedCloseAt from prediction_date ──
+            let expectedCloseAt: Date | undefined;
+            if (d.prediction_date) {
+              const parsed = new Date(d.prediction_date);
+              if (!isNaN(parsed.getTime())) expectedCloseAt = parsed;
+            }
+
             // ── Determine status ──
             let status: "open" | "won" | "lost" = "open";
             if (d.win === true) status = "won";
@@ -958,7 +1211,7 @@ async function runImport(
               valueCents,
               ownerUserId,
               createdBy: userId,
-              leadSource: "rd_station_crm",
+              leadSource: dealSourceName || "rd_station_crm",
             });
 
             if (result) {
@@ -966,12 +1219,15 @@ async function runImport(
               entry.imported++;
               rdIdMap.deals.set(dealRdId, result.id);
 
-              // Update status if won/lost
-              if (status !== "open") {
+              // ── Post-creation update: status, campaign, lossReason, expectedCloseAt ──
+              const postUpdate: Record<string, any> = { updatedBy: userId };
+              if (status !== "open") postUpdate.status = status;
+              if (campaignName) postUpdate.utmCampaign = campaignName;
+              if (lossReasonId) postUpdate.lossReasonId = lossReasonId;
+              if (expectedCloseAt) postUpdate.expectedCloseAt = expectedCloseAt;
+              if (Object.keys(postUpdate).length > 1) {
                 try {
-                  await db.update(deals)
-                    .set({ status, updatedBy: userId })
-                    .where(and(eq(deals.id, result.id), eq(deals.tenantId, tenantId)));
+                  await crm.updateDeal(tenantId, result.id, postUpdate);
                 } catch {}
               }
 
@@ -1121,6 +1377,7 @@ async function runImport(
               entityType,
               entityId,
               title: t.subject || "Tarefa importada",
+              description: t.notes || undefined,
               dueAt: dueAt && !isNaN(dueAt.getTime()) ? dueAt : undefined,
               createdByUserId: userId,
               assignedToUserId,

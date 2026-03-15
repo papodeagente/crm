@@ -3069,3 +3069,56 @@
 - [x] Tests: new page renders without errors
 - [x] Tests: TypeScript clean
 - [x] Verify: no regressions on existing automation flows
+
+## RD Station CRM Import — Clone Operacional + Planilha
+
+### Fase 1 — Auditoria
+- [x] Audit: map all import files, functions, and data flow
+- [x] Audit: identify pagination, dedup, retry, and entity linking issues
+- [x] Audit: document fidelity gaps and slowness causes
+
+### Fase 2 — Evolução da API Import
+- [x] Backend: add retry logic with exponential backoff (3 retries, 429/5xx/network)
+- [x] Backend: link deal_source → leadSource name on deal creation
+- [x] Backend: link campaign → utmCampaign on deal creation
+- [x] Backend: link deal_lost_reason → lossReasonId on deal update
+- [x] Backend: map prediction_date → expectedCloseAt on deal
+- [x] Backend: link contact → account via organization_id (set primaryContactId)
+- [x] Backend: import task notes as description
+- [x] Backend: add utmCampaign/utmSource to updateDeal Partial type
+- [ ] Backend: improve pagination with cursor/has_more pattern (already uses rdFetchAllPaginated)
+- [x] Backend: improve entity linking (contacts-deals, companies-deals, tasks-deals, products-deals)
+- [x] Backend: import loss reasons, sources, campaigns with fidelity (already existed, now linked to deals)
+- [x] Backend: import tasks/activities linked to correct deals (already existed)
+- [x] Backend: import products linked to correct deals (already existed)
+- [x] Backend: improve status mapping (won/lost/open) (already existed, now also sets lossReasonId)
+- [x] Backend: detailed import statistics (already existed per entity)
+- [x] Backend: better logging per import step (already existed)
+
+### Fase 3 — UX da Página de Importação
+- [x] Frontend: improve import page explanation and trust signals
+- [x] Frontend: show what will be imported before starting
+- [x] Frontend: real-time progress with entity-level detail
+- [x] Frontend: final summary with success/failure breakdown
+- [x] Frontend: professional migration confidence design
+
+### Fase 4 — Planilha Secundária
+- [x] Backend: spreadsheet import endpoint (importSpreadsheet mutation)
+- [x] Backend: contact dedup by email, account dedup by name
+- [x] Backend: stage matching by name across all pipelines
+- [x] Backend: source/campaign auto-creation
+- [x] Backend: deal history + notes creation
+- [x] Frontend: spreadsheet import tab in import page
+- [x] Frontend: download template button (.csv)
+- [x] Frontend: upload, parse, validate, preview, and import flow
+
+### Testes
+- [x] Tests: retry logic (429/500/network + gives up after 3 retries)
+- [x] Tests: deal fidelity (source/campaign/prediction_date/lossReason parsing)
+- [x] Tests: contact→account linking via organization
+- [x] Tests: deduplication logic (contacts by email, accounts by name)
+- [x] Tests: currency parsing (Brazilian format)
+- [x] Tests: stage matching across multiple pipelines
+- [x] Tests: deal title generation fallback
+- [x] Tests: CSV template structure and parsing
+- [x] Tests: spreadsheet row validation
