@@ -619,6 +619,7 @@ export async function deleteTenantCompletely(tenantId: number): Promise<{
   const tenantTables = [
     // Leaf tables (no other table references these)
     "ai_conversation_analyses",
+    "ai_integrations",
     "wa_audit_log",
     "wa_identities",
     "wa_conversations",
@@ -641,6 +642,17 @@ export async function deleteTenantCompletely(tenantId: number): Promise<{
     "webhooks",
     "notifications",
     "user_preferences",
+    "quick_replies",
+    "rfv_contacts",
+    "rfv_filter_snapshots",
+    "session_shares",
+    "google_calendar_tokens",
+    "internal_notes",
+    "conversation_events",
+    "contact_action_logs",
+    "bulk_campaign_messages",
+    "bulk_campaigns",
+    "messages",
 
     // Custom fields
     "custom_field_values",

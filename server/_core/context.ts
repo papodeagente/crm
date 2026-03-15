@@ -47,6 +47,7 @@ export async function createContext(
           email: session.email,
           loginMethod: "email",
           role: session.role === "admin" ? "admin" : "user",
+          isSuperAdmin: false,
           createdAt: new Date(),
           updatedAt: new Date(),
           lastSignedIn: new Date(),

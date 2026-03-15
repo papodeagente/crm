@@ -2900,3 +2900,12 @@
 - [x] Som de notificação: FastPoll agora usa INSERT IGNORE e só emite socket quando affectedRows > 0 (mensagem genuinamente nova)
 - [x] GPT-5 Mini: adicionado reasoning_effort: "low" para evitar timeout do proxy + role "developer" para modelos de reasoning
 - [x] media_update separado do evento "message" para não tocar som de notificação
+
+## Super Admin + Excluir Tenant (Mar 15)
+- [x] Investigar estrutura de tenants e relacionamentos no banco
+- [x] Excluir tenant "Teste Turismo" e "Teste 2" do banco de dados (161.707 registros removidos)
+- [x] Implementar role super_admin para bruno@entur.com.br (campo isSuperAdmin adicionado ao schema + DB)
+- [x] Criar UI de gerenciamento de tenants (listar, excluir) acessível apenas ao super admin (já existia, melhorado)
+- [x] Garantir que o email bruno@entur.com.br mantenha acesso intacto após exclusão de qualquer tenant
+- [x] Adicionar tabelas faltantes ao deleteTenantCompletely (12 tabelas: ai_integrations, rfv_contacts, rfv_filter_snapshots, session_shares, quick_replies, google_calendar_tokens, internal_notes, conversation_events, contact_action_logs, bulk_campaign_messages, bulk_campaigns, messages)
+- [x] Testes super admin passando (15/15)

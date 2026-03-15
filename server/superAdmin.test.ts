@@ -71,5 +71,52 @@ describe("Super Admin - Backend", () => {
       const router = mod.saasAuthRouter;
       expect((router as any)._def.procedures.adminToggleTenantStatus).toBeDefined();
     });
+
+    it("should have adminDeleteTenant procedure", async () => {
+      const mod = await import("./routers/saasAuthRouter");
+      const router = mod.saasAuthRouter;
+      expect((router as any)._def.procedures.adminDeleteTenant).toBeDefined();
+    });
+  });
+
+  describe("deleteTenantCompletely - table coverage", () => {
+    it("should include all required tables for cascading delete", async () => {
+      const fs = await import("fs");
+      const source = fs.readFileSync("./server/saasAuth.ts", "utf-8");
+
+      // These tables must be in the delete function
+      const requiredTables = [
+        "ai_conversation_analyses",
+        "ai_integrations",
+        "wa_audit_log",
+        "wa_identities",
+        "wa_conversations",
+        "rfv_contacts",
+        "rfv_filter_snapshots",
+        "session_shares",
+        "quick_replies",
+        "google_calendar_tokens",
+        "internal_notes",
+        "conversation_events",
+        "contact_action_logs",
+        "bulk_campaign_messages",
+        "bulk_campaigns",
+        "messages",
+        "deals",
+        "contacts",
+        "crm_users",
+        "tenants",
+      ];
+
+      for (const table of requiredTables) {
+        expect(source, `Table "${table}" should be in deleteTenantCompletely`).toContain(`"${table}"`);
+      }
+    });
+
+    it("should prevent deleting tenant with ID <= 0", async () => {
+      const { deleteTenantCompletely } = await import("./saasAuth");
+      await expect(deleteTenantCompletely(0)).rejects.toThrow("Invalid tenant ID");
+      await expect(deleteTenantCompletely(-1)).rejects.toThrow("Invalid tenant ID");
+    });
   });
 });
