@@ -1121,7 +1121,7 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
   const [selectedAiModel, setSelectedAiModel] = useState<string | undefined>(undefined);
   const [showAiSelector, setShowAiSelector] = useState(false);
   const [editedSuggestion, setEditedSuggestion] = useState<string>("");
-  const [aiLoading, setAiLoading] = useState(false);
+  // aiLoading is derived from mutation state - no manual state needed
   const [transcriptions, setTranscriptions] = useState<Record<number, { text?: string; loading?: boolean; error?: string }>>({});
   const tenantId = useTenantId();
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -1167,6 +1167,24 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
     onError: (e) => toast.error(e.message || "Erro ao transferir"),
   });
 
+  // AI integrations list (for selector) - MUST be before handleAiSuggest
+  const aiIntegrationsQ = trpc.ai.list.useQuery(
+    { tenantId: tenantId || 0 },
+    { enabled: !!tenantId, staleTime: 60000 }
+  );
+
+  // AI Settings query (for auto-transcription) - MUST be before handleAiSuggest
+  const aiSettingsQ = trpc.ai.getSettings.useQuery(
+    { tenantId: tenantId || 0 },
+    { enabled: !!tenantId, staleTime: 60000 }
+  );
+
+  // Messages query - MUST be before handleAiSuggest
+  const messagesQ = trpc.whatsapp.messagesByContact.useQuery(
+    { sessionId, remoteJid, limit: 100 },
+    { enabled: !!sessionId && !!remoteJid, refetchInterval: 8000, staleTime: 3000 }
+  );
+
   // AI Suggestion mutation
   const aiSuggestMut = trpc.ai.suggest.useMutation({
     onSuccess: (data) => {
@@ -1175,10 +1193,8 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
       setAiSuggestionParts(data.parts || [data.suggestion]);
       setAiSuggestionMeta({ provider: data.provider, model: data.model });
       setShowAiSuggestion(true);
-      setAiLoading(false);
     },
     onError: (err) => {
-      setAiLoading(false);
       setShowAiSuggestion(false);
       setAiSuggestionMeta(null);
       if (err.message === "NO_AI_CONFIGURED") {
@@ -1202,7 +1218,6 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
       timestamp: m.timestamp instanceof Date ? m.timestamp.toISOString() : (m.timestamp ? String(m.timestamp) : undefined),
     }));
     if (msgs.length === 0) { toast.error("Sem mensagens para analisar"); return; }
-    setAiLoading(true);
     setShowAiSuggestion(true);
     setAiSuggestion(null);
     setEditedSuggestion("");
@@ -1225,7 +1240,6 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
     setEditedSuggestion("");
     setAiSuggestionParts([]);
     setAiSuggestionMeta(null);
-    setAiLoading(false);
   };
 
   const useSuggestionAsText = () => {
@@ -1254,18 +1268,6 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
     toast.success(parts.length > 1 ? `${parts.length} mensagens enviadas` : "Mensagem enviada");
   };
 
-  // AI integrations list (for selector)
-  const aiIntegrationsQ = trpc.ai.list.useQuery(
-    { tenantId: tenantId || 0 },
-    { enabled: !!tenantId, staleTime: 60000 }
-  );
-
-  // AI Settings query (for auto-transcription)
-  const aiSettingsQ = trpc.ai.getSettings.useQuery(
-    { tenantId: tenantId || 0 },
-    { enabled: !!tenantId, staleTime: 60000 }
-  );
-
   // Transcription mutation
   const transcribeMut = trpc.ai.transcribe.useMutation();
 
@@ -1288,12 +1290,6 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
       }
     );
   }, [tenantId, transcribeMut]);
-
-  // Queries
-  const messagesQ = trpc.whatsapp.messagesByContact.useQuery(
-    { sessionId, remoteJid, limit: 100 },
-    { enabled: !!sessionId && !!remoteJid, refetchInterval: 8000, staleTime: 3000 }
-  );
 
   const utils = trpc.useUtils();
 
@@ -2139,12 +2135,12 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
                       handleAiSuggest();
                     }
                   }}
-                  disabled={aiLoading}
-                  className={`w-[42px] h-[42px] flex items-center justify-center rounded-full transition-all duration-200 ${
-                    aiLoading ? "bg-violet-500/20 text-violet-500" : showAiSuggestion ? "bg-violet-500/20 text-violet-500" : "hover:bg-wa-hover text-muted-foreground"
+                  disabled={aiSuggestMut.isPending}
+                    className={`p-1.5 rounded-md transition-colors ${
+                    aiSuggestMut.isPending ? "bg-violet-500/20 text-violet-500" : showAiSuggestion ? "bg-violet-500/20 text-violet-500" : "hover:bg-wa-hover text-muted-foreground"
                   }`}
-                >
-                  {aiLoading ? <Loader2 className="w-[20px] h-[20px] animate-spin" /> : <Sparkles className="w-[20px] h-[20px]" />}
+                  >
+                  {aiSuggestMut.isPending ? <Loader2 className="w-[20px] h-[20px] animate-spin" /> : <Sparkles className="w-[20px] h-[20px]" />}
                 </button>
               </InstantTooltip>
             </div>
@@ -2171,7 +2167,7 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
                   </div>
 
                   {/* Loading state */}
-                  {aiLoading && !aiSuggestion && (
+                  {aiSuggestMut.isPending && !aiSuggestion && (
                     <div className="px-4 py-6 flex flex-col items-center gap-2">
                       <Loader2 className="h-6 w-6 animate-spin text-violet-500" />
                       <span className="text-[12px] text-muted-foreground">Gerando sugestão de resposta...</span>
@@ -2210,10 +2206,10 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
                         )}
                         <button
                           onClick={handleAiSuggest}
-                          disabled={aiLoading}
+                          disabled={aiSuggestMut.isPending}
                           className="text-[12px] font-medium text-violet-600 hover:text-violet-700 dark:text-violet-400 rounded-md px-3 py-1.5 transition-colors border border-violet-200 dark:border-violet-700 hover:bg-violet-100 dark:hover:bg-violet-900/30 flex items-center gap-1.5"
                         >
-                          {aiLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />} Gerar outra
+                          {aiSuggestMut.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />} Gerar outra
                         </button>
                       </div>
                     </>

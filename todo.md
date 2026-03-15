@@ -2852,3 +2852,6 @@
 - [x] Investigar: aiSuggestionMeta não era resetado ao clicar novamente, mostrando meta antiga sem loading
 - [x] Fix: resetar aiSuggestionMeta e aiSuggestionParts em handleAiSuggest
 - [x] Fix: onError agora fecha o popup e mostra toast de erro (antes ficava aberto vazio)
+- [x] Fix: mover queries (aiIntegrationsQ, aiSettingsQ, messagesQ) para ANTES do handler
+- [x] Fix: usar aiSuggestMut.isPending em vez de estado manual aiLoading (mais confiável)
+- [x] Fix: remover estado aiLoading manual (fonte de bugs de sincronização)
