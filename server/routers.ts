@@ -2570,9 +2570,17 @@ export const appRouter = router({
         dealTitle: z.string().optional(),
         dealValue: z.number().optional(),
         dealStage: z.string().optional(),
+        integrationId: z.number().optional(),
+        overrideModel: z.string().optional(),
       }))
       .mutation(async ({ input }) => {
-        const integration = await getAnyActiveAiIntegration(input.tenantId);
+        let integration: any = null;
+        if (input.integrationId) {
+          integration = await getAiIntegration(input.tenantId, input.integrationId);
+        }
+        if (!integration) {
+          integration = await getAnyActiveAiIntegration(input.tenantId);
+        }
         if (!integration) {
           throw new TRPCError({
             code: "PRECONDITION_FAILED",
@@ -2580,7 +2588,7 @@ export const appRouter = router({
           });
         }
         const settings = await getTenantAiSettings(input.tenantId);
-        const model = settings.defaultAiModel || integration.defaultModel;
+        const model = input.overrideModel || settings.defaultAiModel || integration.defaultModel;
 
         // Build context from conversation
         const conversationContext = input.messages

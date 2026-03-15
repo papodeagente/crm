@@ -2817,3 +2817,10 @@
 
 ## Bug Fix: timestamp Date → string no ai.suggest (Mar 14 - v8.4)
 - [x] Corrigir tipo do timestamp: frontend envia Date mas Zod espera string (convertido com toISOString)
+
+## UX: Seletor de IA/modelo na sugestão de resposta (Mar 15 - v8.5)
+- [x] Backend: aceitar provider/model opcionais no ai.suggest para override (integrationId + overrideModel)
+- [x] Backend: retornar provider e model usados no response
+- [x] Frontend: seletor de IA e modelo no popup de sugestão (dropdown com integrações ativas)
+- [x] Frontend: exibir qual IA/modelo gerou a sugestão (header do popup)
+- [x] Frontend: permitir trocar IA/modelo e regerar sugestão (botão "Trocar IA")
