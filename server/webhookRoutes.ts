@@ -1086,12 +1086,14 @@ async function handleEvolutionWebhook(req: Request, res: Response) {
       return res.status(400).json({ error: "Invalid webhook payload" });
     }
 
-    // Validate apikey from webhook payload against our configured key
+    // Log apikey mismatch as warning but DO NOT reject with 403.
+    // Evolution API sends its global apikey in the webhook payload, which may differ
+    // from our EVOLUTION_API_KEY (e.g. instance-level key vs global key).
+    // Rejecting here caused 403 for legitimate webhook calls from connected instances.
     const expectedKey = process.env.EVOLUTION_API_KEY;
     const receivedKey = body.apikey || req.headers["apikey"] || req.headers["x-api-key"];
     if (expectedKey && receivedKey && receivedKey !== expectedKey) {
-      console.warn(`[Webhook /evolution] Invalid apikey from ${req.ip} — rejecting`);
-      return res.status(403).json({ error: "Invalid API key" });
+      console.warn(`[Webhook /evolution] API key mismatch from ${req.ip} (received: ${String(receivedKey).substring(0, 8)}...) — accepting anyway`);
     }
 
     // Detailed logging for debugging
@@ -1150,9 +1152,13 @@ async function handleEvolutionWebhook(req: Request, res: Response) {
       return res.status(200).json({ received: true });
     }
 
-    // For other events (connection, qr, etc.), process synchronously
-    await whatsappManager.handleWebhookEvent(eventPayload);
-    console.log(`[Webhook /evolution] Responded in ${Date.now() - startTime}ms`);
+    // For other events (connection, qr, etc.), process async to avoid timeout.
+    // Evolution API has short webhook timeouts (~10s) and will retry/mark as failed
+    // if we take too long. connection.update can take 50s+ due to sync operations.
+    whatsappManager.handleWebhookEvent(eventPayload).catch(e =>
+      console.error(`[Webhook /evolution] Async processing error for ${body.event}:`, e.message)
+    );
+    console.log(`[Webhook /evolution] Responded in ${Date.now() - startTime}ms (async)`);
     return res.status(200).json({ received: true });
   } catch (error: any) {
     console.error(`[Webhook /evolution] Error after ${Date.now() - startTime}ms:`, error.message);

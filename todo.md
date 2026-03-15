@@ -3132,3 +3132,10 @@
 - [x] Tests: click on deal navigates correctly
 - [x] Tests: click on task navigates correctly
 - [x] Tests: no invalid routes generated for supported types
+
+## Webhook 403 Bug — Evolution API
+- [x] Bug: /api/webhooks/evolution returning HTTP 403 for Evolution API webhooks
+- [x] Audit: find webhook route definition and middleware chain
+- [x] Audit: check for rate limiter, token validation, or auth middleware blocking POST
+- [x] Fix: ensure endpoint accepts unauthenticated POST from Evolution API
+- [x] Tests: verify webhook endpoint accepts POST without auth
