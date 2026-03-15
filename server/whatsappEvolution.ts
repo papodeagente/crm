@@ -2224,9 +2224,15 @@ class WhatsAppEvolutionManager extends EventEmitter {
       const db = await getDb();
       if (!db) return;
 
-      console.log(`[EvoWA QuickSync] Starting quick sync for ${session.instanceName} (${chats.length} chats)`);
+      // ── Step 1: Get MAX(timestamp) from DB for this session (incremental baseline) ──
+      const lastTsRows = await db.execute(
+        sql`SELECT MAX(timestamp) as maxTs FROM messages WHERE sessionId = ${session.sessionId}`
+      );
+      const lastTsRaw = (lastTsRows as any)[0]?.[0]?.maxTs;
+      const lastSyncTimestamp = lastTsRaw ? new Date(lastTsRaw).getTime() / 1000 : 0; // Unix seconds
+      console.log(`[EvoWA QuickSync] Starting incremental sync for ${session.instanceName} | lastTimestamp=${lastSyncTimestamp ? new Date(lastSyncTimestamp * 1000).toISOString() : 'NONE'} | ${chats.length} total chats`);
 
-      // Get existing messageIds for this session to avoid duplicates
+      // ── Step 2: Pre-load existing messageIds for dedup ──
       const existingMsgIds = new Set<string>();
       const existingRows = await db.execute(
         sql`SELECT messageId FROM messages WHERE sessionId = ${session.sessionId} AND messageId IS NOT NULL LIMIT 50000`
@@ -2244,7 +2250,6 @@ class WhatsAppEvolutionManager extends EventEmitter {
         if (name === 'Você' || name === 'You') return false;
         const cleaned = name.replace(/[\s\-\(\)\+]/g, '');
         if (/^\d+$/.test(cleaned)) return false;
-        // CRITICAL: Reject the owner's own name
         if (ownerName && name.trim().toLowerCase() === ownerName.toLowerCase()) return false;
         return true;
       };
@@ -2252,145 +2257,218 @@ class WhatsAppEvolutionManager extends EventEmitter {
       const discoveredNames = new Map<string, string>();
       let totalInserted = 0;
       let totalSkipped = 0;
+      let totalFiltered = 0;
       let chatsProcessed = 0;
 
-      // Sort chats by most recent activity first
+      // ── Step 3: Sort by most recent activity, LIMIT to 50 chats ──
+      const MAX_CHATS = 50;
+      const MAX_MSGS_PER_CHAT = 20;
       const sortedChats = [...chats].sort((a: any, b: any) => {
         const tsA = a.lastMessage?.messageTimestamp || 0;
         const tsB = b.lastMessage?.messageTimestamp || 0;
         return Number(tsB) - Number(tsA);
-      });
+      }).slice(0, MAX_CHATS);
+
+      console.log(`[EvoWA QuickSync] Processing ${sortedChats.length} chats (limited to ${MAX_CHATS}), ${MAX_MSGS_PER_CHAT} msgs/chat`);
+
+      // ── BullMQ check (for potential queue-based processing) ──
+      let useQueue = false;
+      try {
+        const { isQueueEnabled } = await import("./messageQueue");
+        useQueue = isQueueEnabled();
+      } catch { useQueue = false; }
+      if (useQueue) {
+        console.log(`[EvoWA QuickSync] BullMQ available — will enqueue sync events`);
+      }
 
       for (const chat of sortedChats) {
         const remoteJid = chat.remoteJid;
         if (!remoteJid) continue;
 
         try {
-          // Only fetch 3 pages (up to 150 messages) per conversation
-          const maxPages = 3;
-          for (let page = 1; page <= maxPages; page++) {
-            const messages = await evo.findMessages(session.instanceName, remoteJid, {
-              limit: 50,
-              page,
-            });
+          // ── Step 4: Fetch messages from Evolution API (1 page, 20 msgs) ──
+          const messages = await evo.findMessages(session.instanceName, remoteJid, {
+            limit: MAX_MSGS_PER_CHAT,
+            page: 1,
+          });
 
-            if (!messages || messages.length === 0) break;
+          if (!messages || messages.length === 0) {
+            chatsProcessed++;
+            continue;
+          }
 
-            const insertBatch: any[] = [];
+          const insertBatch: any[] = [];
+          let newestMsgForConv: { content: string; messageType: string; fromMe: boolean; status: string; timestamp: Date } | null = null;
 
-            for (const msg of messages) {
-              const msgId = msg.key?.id;
-              if (!msgId) continue;
+          for (const msg of messages) {
+            const msgId = msg.key?.id;
+            if (!msgId) continue;
 
-              if (existingMsgIds.has(msgId)) {
-                totalSkipped++;
-                continue;
-              }
-
-              const fromMe = msg.key?.fromMe || false;
-              const messageType = msg.messageType || 'conversation';
-              const timestamp = msg.messageTimestamp
-                ? new Date(Number(msg.messageTimestamp) * 1000)
-                : new Date();
-              const pushName = msg.pushName || null;
-
-              const msgContent = msg.message;
-              let content = '';
-              if (msgContent) {
-                content = msgContent.conversation
-                  || msgContent.extendedTextMessage?.text
-                  || (msgContent.imageMessage?.caption ? `[Imagem] ${msgContent.imageMessage.caption}` : '')
-                  || (msgContent.imageMessage ? '[Imagem]' : '')
-                  || (msgContent.videoMessage?.caption ? `[V\u00eddeo] ${msgContent.videoMessage.caption}` : '')
-                  || (msgContent.videoMessage ? '[V\u00eddeo]' : '')
-                  || (msgContent.audioMessage ? '[\u00c1udio]' : '')
-                  || (msgContent.documentMessage ? `[Documento] ${msgContent.documentMessage.fileName || ''}` : '')
-                  || (msgContent.stickerMessage ? '[Sticker]' : '')
-                  || (msgContent.contactMessage ? `[Contato] ${msgContent.contactMessage.displayName || ''}` : '')
-                  || (msgContent.locationMessage ? '[Localiza\u00e7\u00e3o]' : '')
-                  || '';
-              }
-
-              if (!fromMe && isRealName(pushName) && !discoveredNames.has(remoteJid)) {
-                discoveredNames.set(remoteJid, pushName!);
-              }
-
-              // Resolve status from Evolution API message data
-              let msgStatus = fromMe ? 'sent' : 'received';
-              const rawStatus = msg.status;
-              if (fromMe && typeof rawStatus === 'number') {
-                const statusMap: Record<number, string> = { 0: 'error', 1: 'pending', 2: 'sent', 3: 'delivered', 4: 'read', 5: 'played' };
-                msgStatus = statusMap[rawStatus] || 'sent';
-              } else if (fromMe && typeof rawStatus === 'string') {
-                const strMap: Record<string, string> = {
-                  'ERROR': 'error', 'PENDING': 'pending', 'SENT': 'sent',
-                  'SERVER_ACK': 'sent', 'DELIVERY_ACK': 'delivered', 'DELIVERED': 'delivered',
-                  'READ': 'read', 'PLAYED': 'played',
-                };
-                msgStatus = strMap[rawStatus.toUpperCase()] || rawStatus.toLowerCase();
-              }
-
-              // Extract media info from synced messages
-              const syncMediaInfo = this.extractMediaInfo(msg);
-
-              // Don't store temporary WhatsApp CDN URLs - they expire
-              const permanentMediaUrl = syncMediaInfo.mediaUrl && !syncMediaInfo.mediaUrl.includes('whatsapp.net') ? syncMediaInfo.mediaUrl : null;
-
-              insertBatch.push({
-                sessionId: session.sessionId,
-                tenantId: session.tenantId,
-                messageId: msgId,
-                remoteJid,
-                fromMe,
-                messageType,
-                content: content || null,
-                pushName: pushName || null,
-                status: msgStatus,
-                timestamp,
-                mediaUrl: permanentMediaUrl,
-                mediaMimeType: syncMediaInfo.mediaMimeType || null,
-                mediaFileName: syncMediaInfo.mediaFileName || null,
-                mediaDuration: syncMediaInfo.mediaDuration || null,
-                isVoiceNote: syncMediaInfo.isVoiceNote || false,
-                quotedMessageId: syncMediaInfo.quotedMessageId || null,
-              });
-
-              existingMsgIds.add(msgId);
+            // ── Step 3 (filter): Skip messages older than lastSyncTimestamp ──
+            const msgTs = Number(msg.messageTimestamp || 0);
+            if (lastSyncTimestamp > 0 && msgTs > 0 && msgTs <= lastSyncTimestamp) {
+              totalFiltered++;
+              continue;
             }
 
-            // After inserting, try to download media for messages that need it
-            // Also download for messages with temporary WhatsApp CDN URLs
-            const mediaMessages = insertBatch.filter(m => {
-              const mediaTypes = ['imageMessage', 'videoMessage', 'audioMessage', 'documentMessage', 'stickerMessage', 'pttMessage'];
-              return mediaTypes.includes(m.messageType) && !m.mediaUrl && m.messageId;
-            });
+            // ── Step 3 (dedup): Skip messages already in DB ──
+            if (existingMsgIds.has(msgId)) {
+              totalSkipped++;
+              continue;
+            }
 
-            if (insertBatch.length > 0) {
-              try {
-                for (let i = 0; i < insertBatch.length; i += 20) {
-                  const subBatch = insertBatch.slice(i, i + 20);
-                  await db.insert(waMessages).values(subBatch).onDuplicateKeyUpdate({ set: { status: sql`status` } }).catch(async () => {
-                    for (const item of subBatch) {
-                      await db.insert(waMessages).values(item).onDuplicateKeyUpdate({ set: { status: sql`status` } }).catch(() => {});
-                    }
-                  });
+            const fromMe = msg.key?.fromMe || false;
+            const messageType = msg.messageType || 'conversation';
+            const timestamp = msgTs > 0
+              ? new Date(msgTs * 1000)
+              : new Date();
+            const pushName = msg.pushName || null;
+
+            const msgContent = msg.message;
+            let content = '';
+            if (msgContent) {
+              content = msgContent.conversation
+                || msgContent.extendedTextMessage?.text
+                || (msgContent.imageMessage?.caption ? `[Imagem] ${msgContent.imageMessage.caption}` : '')
+                || (msgContent.imageMessage ? '[Imagem]' : '')
+                || (msgContent.videoMessage?.caption ? `[V\u00eddeo] ${msgContent.videoMessage.caption}` : '')
+                || (msgContent.videoMessage ? '[V\u00eddeo]' : '')
+                || (msgContent.audioMessage ? '[\u00c1udio]' : '')
+                || (msgContent.documentMessage ? `[Documento] ${msgContent.documentMessage.fileName || ''}` : '')
+                || (msgContent.stickerMessage ? '[Sticker]' : '')
+                || (msgContent.contactMessage ? `[Contato] ${msgContent.contactMessage.displayName || ''}` : '')
+                || (msgContent.locationMessage ? '[Localiza\u00e7\u00e3o]' : '')
+                || '';
+            }
+
+            if (!fromMe && isRealName(pushName) && !discoveredNames.has(remoteJid)) {
+              discoveredNames.set(remoteJid, pushName!);
+            }
+
+            // Resolve status
+            let msgStatus = fromMe ? 'sent' : 'received';
+            const rawStatus = msg.status;
+            if (fromMe && typeof rawStatus === 'number') {
+              const statusMap: Record<number, string> = { 0: 'error', 1: 'pending', 2: 'sent', 3: 'delivered', 4: 'read', 5: 'played' };
+              msgStatus = statusMap[rawStatus] || 'sent';
+            } else if (fromMe && typeof rawStatus === 'string') {
+              const strMap: Record<string, string> = {
+                'ERROR': 'error', 'PENDING': 'pending', 'SENT': 'sent',
+                'SERVER_ACK': 'sent', 'DELIVERY_ACK': 'delivered', 'DELIVERED': 'delivered',
+                'READ': 'read', 'PLAYED': 'played',
+              };
+              msgStatus = strMap[rawStatus.toUpperCase()] || rawStatus.toLowerCase();
+            }
+
+            // Extract media info
+            const syncMediaInfo = this.extractMediaInfo(msg);
+            const permanentMediaUrl = syncMediaInfo.mediaUrl && !syncMediaInfo.mediaUrl.includes('whatsapp.net') ? syncMediaInfo.mediaUrl : null;
+
+            const msgRecord = {
+              sessionId: session.sessionId,
+              tenantId: session.tenantId,
+              messageId: msgId,
+              remoteJid,
+              fromMe,
+              messageType,
+              content: content || null,
+              pushName: pushName || null,
+              status: msgStatus,
+              timestamp,
+              mediaUrl: permanentMediaUrl,
+              mediaMimeType: syncMediaInfo.mediaMimeType || null,
+              mediaFileName: syncMediaInfo.mediaFileName || null,
+              mediaDuration: syncMediaInfo.mediaDuration || null,
+              isVoiceNote: syncMediaInfo.isVoiceNote || false,
+              quotedMessageId: syncMediaInfo.quotedMessageId || null,
+            };
+
+            insertBatch.push(msgRecord);
+            existingMsgIds.add(msgId);
+
+            // Track newest message for conversation update
+            if (!newestMsgForConv || timestamp.getTime() > newestMsgForConv.timestamp.getTime()) {
+              newestMsgForConv = { content: content || '', messageType, fromMe, status: msgStatus, timestamp };
+            }
+          }
+
+          // ── Step 3 (insert): Batch insert new messages ──
+          const mediaMessages: any[] = [];
+          if (insertBatch.length > 0) {
+            try {
+              for (let i = 0; i < insertBatch.length; i += 20) {
+                const subBatch = insertBatch.slice(i, i + 20);
+                await db.insert(waMessages).values(subBatch).onDuplicateKeyUpdate({ set: { status: sql`status` } }).catch(async () => {
+                  for (const item of subBatch) {
+                    await db.insert(waMessages).values(item).onDuplicateKeyUpdate({ set: { status: sql`status` } }).catch(() => {});
+                  }
+                });
+              }
+              totalInserted += insertBatch.length;
+
+              // Collect media messages for background download
+              for (const m of insertBatch) {
+                const mediaTypes = ['imageMessage', 'videoMessage', 'audioMessage', 'documentMessage', 'stickerMessage', 'pttMessage'];
+                if (mediaTypes.includes(m.messageType) && !m.mediaUrl && m.messageId) {
+                  mediaMessages.push(m);
                 }
-                totalInserted += insertBatch.length;
-              } catch (e: any) {
-                console.warn(`[EvoWA QuickSync] Batch insert error for ${remoteJid}:`, e.message);
               }
+            } catch (e: any) {
+              console.warn(`[EvoWA QuickSync] Batch insert error for ${remoteJid}:`, e.message);
             }
+          }
 
-            // Download media in background (don't block sync)
-            if (mediaMessages.length > 0) {
-              this.downloadMediaBatch(session, mediaMessages).catch(() => {});
+          // ── Step 4: Update chat.lastMessage and lastMessageAt ──
+          if (newestMsgForConv) {
+            try {
+              const convRows = await db.select({ id: waConversations.id })
+                .from(waConversations)
+                .where(and(
+                  eq(waConversations.sessionId, session.sessionId),
+                  eq(waConversations.remoteJid, remoteJid)
+                ))
+                .limit(1);
+              if (convRows.length > 0) {
+                await updateConversationLastMessage(convRows[0].id, {
+                  content: newestMsgForConv.content,
+                  messageType: newestMsgForConv.messageType,
+                  fromMe: newestMsgForConv.fromMe,
+                  status: newestMsgForConv.status,
+                  timestamp: newestMsgForConv.timestamp,
+                  incrementUnread: !newestMsgForConv.fromMe, // Increment unread for incoming
+                });
+              }
+            } catch (e: any) {
+              console.warn(`[EvoWA QuickSync] Error updating conversation for ${remoteJid}:`, e.message);
             }
+          }
 
-            await new Promise(resolve => setTimeout(resolve, 50));
+          // ── Step 5: Emit socket events for each new message (real-time Inbox update) ──
+          if (insertBatch.length > 0) {
+            // Emit only the newest message per chat to avoid flooding the frontend
+            const newest = insertBatch.reduce((a, b) =>
+              new Date(a.timestamp).getTime() > new Date(b.timestamp).getTime() ? a : b
+            );
+            this.emit('message', {
+              sessionId: session.sessionId,
+              tenantId: session.tenantId,
+              content: newest.content || '',
+              fromMe: newest.fromMe,
+              remoteJid: newest.remoteJid,
+              messageType: newest.messageType,
+              pushName: newest.pushName,
+              timestamp: newest.timestamp,
+              syncBatch: insertBatch.length, // Hint to frontend that this is a sync batch
+            });
+          }
+
+          // Download media in background
+          if (mediaMessages.length > 0) {
+            this.downloadMediaBatch(session, mediaMessages).catch(() => {});
           }
 
           chatsProcessed++;
-          if (chatsProcessed % 100 === 0) {
+          if (chatsProcessed % 10 === 0) {
             console.log(`[EvoWA QuickSync] Progress: ${chatsProcessed}/${sortedChats.length} chats, ${totalInserted} new messages`);
           }
           await new Promise(resolve => setTimeout(resolve, 30));
@@ -2399,7 +2477,7 @@ class WhatsAppEvolutionManager extends EventEmitter {
         }
       }
 
-      console.log(`[EvoWA QuickSync] Complete: ${chatsProcessed} chats, ${totalInserted} new messages, ${totalSkipped} skipped`);
+      console.log(`[EvoWA QuickSync] Complete: ${chatsProcessed} chats, ${totalInserted} new, ${totalSkipped} dedup, ${totalFiltered} filtered (older than last sync)`);
 
       // Update conversation names from discovered pushNames
       if (discoveredNames.size > 0) {

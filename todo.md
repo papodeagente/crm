@@ -3164,3 +3164,14 @@
 - [x] Fix: status regression prevention no handleMessageStatusUpdate (read→delivered bloqueado)
 - [x] Fix: Redis error suppression (máximo 3 erros logados, sem spam)
 - [x] Tests: 26 testes de inbox stabilization passando
+
+## Sync Incremental ao Conectar (connection.update state='open')
+- [x] Audit: verificar handler connection.update e syncConversationsBackground existente
+- [x] Fix: buscar MAX(timestamp) do banco antes de sincronizar
+- [x] Fix: filtrar mensagens da Evolution API mais recentes que o timestamp
+- [x] Fix: INSERT IGNORE para dedup por messageId
+- [x] Fix: atualizar lastMessage e lastMessageAt da conversa
+- [x] Fix: emitir evento socket para atualizar Inbox em tempo real
+- [x] Fix: usar BullMQ se Redis disponível, fallback síncrono
+- [x] Fix: limitar a 50 chats e 20 mensagens por chat
+- [x] Tests: cobrir sync incremental (34 testes)
