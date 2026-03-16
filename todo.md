@@ -3448,3 +3448,10 @@
 - [x] Part 15: Eventual consistency — reconciliation recovers missed events every 5min
 - [x] Part 16: Debug logging — [InboxDebug] logs on server emit + [Inbox] logs on frontend with all required fields
 - [x] 21 unit tests passing (inboxStability.test.ts) + 0 TypeScript errors
+
+## Final Enterprise Inbox Stability Fix v2 (Updated Spec)
+- [x] Part 6 update: Debounce changed from 1500ms to 2000ms (SOUND_DEBOUNCE_MS = 2000)
+- [x] Part 7: Transcription events isolated — whatsapp:transcription is separate from whatsapp:message; Inbox.tsx does NOT use lastTranscriptionUpdate
+- [x] Part 14: Chat scroll — scrollToBottom(false) on remoteJid change + on messagesQ.data.length change; smooth scroll when near bottom on new messages
+- [x] Part 15: Non-inbox events filtered — 13 skipTypes (protocol, calls, reactions, edits, internal_notes, etc.) + @g.us group filter applied to both preview update and notification sound
+- [x] All 16 parts verified — 37 tests passing, 0 TypeScript errors

@@ -19,11 +19,11 @@ import InstantTooltip from "@/components/InstantTooltip";
 
 /* ═══════════════════════════════════════════════════════
    NOTIFICATION SOUND (Web Audio API — WhatsApp style)
-   With debounce: max 1 sound per 1500ms
+ * With debounce: max 1 sound per 2000ms (Part 6 spec)
    ═══════════════════════════════════════════════════════ */
 
 const MUTE_KEY = "entur_inbox_muted";
-const SOUND_DEBOUNCE_MS = 1500;
+const SOUND_DEBOUNCE_MS = 2000; // Part 6: 2000ms debounce per spec
 
 function createNotificationSound(): () => void {
   let audioCtx: AudioContext | null = null;
@@ -1108,6 +1108,24 @@ export default function InboxPage() {
   useEffect(() => {
     if (!lastMessage) return;
 
+    // Part 15: Skip non-inbox event types from preview update
+    const previewSkipTypes = [
+      'protocolMessage', 'senderKeyDistributionMessage', 'messageContextInfo',
+      'ephemeralMessage', 'reactionMessage', 'editedMessage',
+      'deviceSentMessage', 'bcallMessage', 'callLogMesssage',
+      'keepInChatMessage', 'encReactionMessage', 'viewOnceMessageV2Extension',
+    ];
+    if (previewSkipTypes.includes(lastMessage.messageType)) {
+      prevMessageRef.current = lastMessage;
+      return;
+    }
+
+    // Part 15: Skip group messages from preview update
+    if (lastMessage.remoteJid?.endsWith('@g.us')) {
+      prevMessageRef.current = lastMessage;
+      return;
+    }
+
     // Part 8: Update only the affected conversation in cache (no full refetch)
     const queryKey = { sessionId: activeSession?.sessionId || "", tenantId };
     trpcUtils.whatsapp.waConversations.setData(queryKey, (old: any) => {
@@ -1161,7 +1179,7 @@ export default function InboxPage() {
     //   - not a group message
     //   - not muted
     //   - not during hydration (suppressed window)
-    //   - debounce: max 1 sound per 1500ms (handled in createNotificationSound)
+    //   - debounce: max 1 sound per 2000ms (handled in createNotificationSound)
     // ────────────────────────────────────────────────────────────────────────────────
 
     // Create a unique signature for this message to detect duplicates
@@ -1202,8 +1220,15 @@ export default function InboxPage() {
       return;
     }
 
-    // ── Guard 4: Skip non-message types (protocol, status, notes, conversation updates)
-    const skipTypes = ['protocolMessage', 'senderKeyDistributionMessage', 'internal_note', 'messageContextInfo', 'ephemeralMessage'];
+    // ── Guard 4 (Part 15): Skip non-inbox event types
+    // Ignore: protocol, status, notes, conversation updates, presence, typing, calls, transcription, group events
+    const skipTypes = [
+      'protocolMessage', 'senderKeyDistributionMessage', 'messageContextInfo',
+      'ephemeralMessage', 'reactionMessage', 'editedMessage',
+      'internal_note', 'deviceSentMessage', 'bcallMessage',
+      'callLogMesssage', 'keepInChatMessage', 'encReactionMessage',
+      'viewOnceMessageV2Extension',
+    ];
     if (skipTypes.includes(lastMessage.messageType)) {
       prevMessageRef.current = lastMessage;
       return;
@@ -1233,7 +1258,7 @@ export default function InboxPage() {
       return;
     }
 
-    // All guards passed — play notification (Part 5: debounce 1500ms handled inside playNotification)
+    // All guards passed — play notification (Part 6: debounce 2000ms handled inside playNotification)
     console.log('[Inbox] ✅ Playing notification for:', lastMessage.remoteJid?.substring(0, 15));
     playNotification();
     prevMessageRef.current = lastMessage;

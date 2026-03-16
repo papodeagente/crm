@@ -1536,11 +1536,18 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
     return () => container.removeEventListener("scroll", onScroll);
   }, []);
 
+  // Part 14: Scroll to bottom when messages load (initial load or conversation change)
   useEffect(() => {
     if (messagesQ.data && messagesQ.data.length > 0) {
       setTimeout(() => scrollToBottom(false), 50);
     }
   }, [messagesQ.data?.length]);
+
+  // Part 14: Force scroll to bottom when switching conversations
+  useEffect(() => {
+    // When remoteJid changes, we're opening a new conversation
+    setTimeout(() => scrollToBottom(false), 100);
+  }, [remoteJid]);
 
   // Send text (with or without reply)
   const handleSend = useCallback(() => {
