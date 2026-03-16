@@ -1268,11 +1268,19 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
     { enabled: !!tenantId, staleTime: 60000 }
   );
 
-  // Messages query
+  // Messages query — load only last 50 messages for fast opening; older messages load on scroll up
+  const INITIAL_MSG_LIMIT = 50;
+  const [msgLimit, setMsgLimit] = useState(INITIAL_MSG_LIMIT);
+  // Reset limit when switching conversations
+  useEffect(() => { setMsgLimit(INITIAL_MSG_LIMIT); }, [remoteJid]);
   const messagesQ = trpc.whatsapp.messagesByContact.useQuery(
-    { sessionId, remoteJid, limit: 100 },
-    { enabled: !!sessionId && !!remoteJid, refetchInterval: 8000, staleTime: 3000 }
+    { sessionId, remoteJid, limit: msgLimit },
+    { enabled: !!sessionId && !!remoteJid, refetchInterval: 30000, staleTime: 5000 }
   );
+  const hasMoreMessages = (messagesQ.data?.length || 0) >= msgLimit;
+  const loadMoreMessages = useCallback(() => {
+    setMsgLimit(prev => prev + 50);
+  }, []);
 
   // Transcription mutation
   const transcribeMut = trpc.ai.transcribe.useMutation();
@@ -1315,7 +1323,7 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
 
   // Optimistic update helper: add message to cache immediately
   const addOptimisticMessage = useCallback((text: string, quotedId?: string | null) => {
-    const queryKey = { sessionId, remoteJid, limit: 100 };
+    const queryKey = { sessionId, remoteJid, limit: msgLimit };
     const optimistic: Message = {
       id: -Date.now(), // negative ID to avoid collision
       sessionId,
@@ -1338,7 +1346,7 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
       const el = document.querySelector('[data-chat-scroll]');
       if (el) el.scrollTop = el.scrollHeight;
     }, 50);
-  }, [sessionId, remoteJid, utils]);
+  }, [sessionId, remoteJid, utils, msgLimit]);
 
   // Delayed refetch: wait a bit for the DB insert to complete before refetching
   const delayedRefetch = useCallback(() => {
@@ -1350,7 +1358,7 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
     onSuccess: (result) => {
       // Update optimistic message with real messageId so it merges with server data
       if (result.messageId) {
-        const queryKey = { sessionId, remoteJid, limit: 100 };
+        const queryKey = { sessionId, remoteJid, limit: msgLimit };
         utils.whatsapp.messagesByContact.setData(queryKey, (old: any) => {
           if (!old) return old;
           return old.map((m: any) =>
@@ -1362,7 +1370,7 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
     },
     onError: () => {
       // Remove optimistic message on error
-      const queryKey = { sessionId, remoteJid, limit: 100 };
+      const queryKey = { sessionId, remoteJid, limit: msgLimit };
       utils.whatsapp.messagesByContact.setData(queryKey, (old: any) => {
         if (!old) return old;
         return old.filter((m: any) => !m.messageId?.startsWith("opt_"));
@@ -1375,7 +1383,7 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
     onMutate: (vars) => addOptimisticMessage(vars.message, vars.quotedMessageId),
     onSuccess: (result) => {
       if (result.messageId) {
-        const queryKey = { sessionId, remoteJid, limit: 100 };
+        const queryKey = { sessionId, remoteJid, limit: msgLimit };
         utils.whatsapp.messagesByContact.setData(queryKey, (old: any) => {
           if (!old) return old;
           return old.map((m: any) =>
@@ -1387,7 +1395,7 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
       setReplyTarget(null);
     },
     onError: () => {
-      const queryKey = { sessionId, remoteJid, limit: 100 };
+      const queryKey = { sessionId, remoteJid, limit: msgLimit };
       utils.whatsapp.messagesByContact.setData(queryKey, (old: any) => {
         if (!old) return old;
         return old.filter((m: any) => !m.messageId?.startsWith("opt_"));
@@ -2038,6 +2046,17 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
         }} />
 
         <div className="relative z-[1] py-2">
+          {/* Load more messages button */}
+          {hasMoreMessages && !messagesQ.isLoading && (
+            <div className="flex justify-center py-3">
+              <button
+                onClick={loadMoreMessages}
+                className="text-xs text-wa-tint hover:text-wa-tint/80 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm px-4 py-1.5 rounded-full shadow-sm border border-wa-divider transition-colors"
+              >
+                Carregar mensagens anteriores
+              </button>
+            </div>
+          )}
           {messagesQ.isLoading ? (
             <div className="flex items-center justify-center h-64">
               <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />

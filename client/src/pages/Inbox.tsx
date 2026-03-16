@@ -928,7 +928,7 @@ export default function InboxPage() {
     { enabled: !!activeSession?.sessionId, refetchInterval: 15000, staleTime: 10000 }
   );
   const claimMutation = trpc.whatsapp.queue.claim.useMutation({
-    onSuccess: () => { conversationsQ.refetch(); queueQ.refetch(); queueStatsQ.refetch(); toast.success("Conversa atribuída a você"); },
+    onSuccess: () => { queueQ.refetch(); queueStatsQ.refetch(); toast.success("Conversa atribuída a você"); },
     onError: (e) => toast.error(e.message || "Erro ao puxar conversa"),
   });
 
@@ -937,7 +937,7 @@ export default function InboxPage() {
   const [selectedAgentForQueue, setSelectedAgentForQueue] = useState<number | null>(null);
   const assignFromQueueMut = trpc.whatsapp.supervision.assignToAgent.useMutation({
     onSuccess: () => {
-      conversationsQ.refetch(); queueQ.refetch(); queueStatsQ.refetch();
+      queueQ.refetch(); queueStatsQ.refetch();
       toast.success("Conversa atribuída ao agente");
       setAssigningQueueJid(null); setSelectedAgentForQueue(null);
     },
@@ -947,7 +947,7 @@ export default function InboxPage() {
   // Finish attendance mutation
   const finishMut = trpc.whatsapp.finishAttendance.useMutation({
     onSuccess: () => {
-      conversationsQ.refetch(); queueStatsQ.refetch();
+      queueStatsQ.refetch();
       toast.success("Atendimento finalizado");
       setSelectedJid(null);
     },
@@ -980,12 +980,10 @@ export default function InboxPage() {
 
   // Assignment mutations
   const assignMutation = trpc.whatsapp.assignConversation.useMutation({
-    onSuccess: () => { conversationsQ.refetch(); queueQ.refetch(); queueStatsQ.refetch(); toast.success("Conversa atribuída com sucesso"); },
+    onSuccess: () => { queueQ.refetch(); queueStatsQ.refetch(); toast.success("Conversa atribuída com sucesso"); },
     onError: (e) => toast.error(e.message || "Erro ao atribuir conversa"),
   });
-  const updateStatusMutation = trpc.whatsapp.updateAssignmentStatus.useMutation({
-    onSuccess: () => { conversationsQ.refetch(); },
-  });
+  const updateStatusMutation = trpc.whatsapp.updateAssignmentStatus.useMutation({});
 
   const contactsQ = trpc.crm.contacts.list.useQuery(
     { tenantId, limit: 500 },
@@ -1017,7 +1015,6 @@ export default function InboxPage() {
   const syncContactsMut = trpc.whatsapp.syncContacts.useMutation({
     onSuccess: (data: any) => {
       waContactsMapQ.refetch();
-      conversationsQ.refetch();
       const resolvedMsg = data.resolved > 0 ? ` (${data.resolved} LIDs resolvidos)` : "";
       toast.success(`Contatos sincronizados: ${data.synced}/${data.total}${resolvedMsg}`);
     },

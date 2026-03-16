@@ -3495,3 +3495,19 @@
 - [x] 12 new unit tests for fixTimestampFields and preview timestamp consistency
 - [x] TypeScript compiles with 0 errors
 - [x] 1876 tests passing (12 new + 1864 existing)
+
+## Enterprise Inbox Performance and Reliability Refactor
+- [x] Part 1: Inbox loading — already loads only conversation metadata (no full message history)
+- [x] Part 2: Optimistic message sending — addOptimisticMessage() with pending status, rollback on error
+- [x] Part 3: Instant preview update via socket handler — trpcUtils.setData with Date objects
+- [x] Part 4: Remove global refetch — removed 5 unnecessary conversationsQ.refetch() from mutations; remaining refetches are for queue/stats only
+- [x] Part 5: Message event pipeline — socket → chat → preview → unread all in single useEffect
+- [x] Part 6: Message deduplication — uniqueIndex on (messageId, sessionId) + processedMsgRef
+- [x] Part 7: Fast chat opening — reduced from 100 to 50 messages, added "Carregar mensagens anteriores" button
+- [x] Part 8: Scroll to bottom on open and new message — scrollToBottom with isNearBottom check
+- [x] Part 9: Socket event filtering — previewSkipTypes filters protocol, reactions, etc.
+- [x] Part 10: Sound notification — guards for fromMe, isSync, skipTypes, group, muted, active conversation
+- [x] Part 11: Cache consistency — optimistic unreadCount = 0 on conversation select
+- [x] Part 12: Database indexes — msg_session_jid_idx, idx_msg_wa_conv, idx_wc_tenant_session all present
+- [x] Part 13: Reconciliation safety — QuickSync + syncOnOpen already implemented
+- [x] Part 14: Final validation — TypeScript 0 errors, 1876 tests passing, messages refetchInterval reduced to 30s
