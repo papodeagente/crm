@@ -2471,6 +2471,7 @@ class WhatsAppEvolutionManager extends EventEmitter {
               pushName: newest.pushName,
               timestamp: newest.timestamp,
               syncBatch: insertBatch.length, // Hint to frontend that this is a sync batch
+              isSync: true, // Mark as sync so frontend does NOT play notification sound
             });
           }
 
@@ -2981,6 +2982,7 @@ class WhatsAppEvolutionManager extends EventEmitter {
                 messageType,
                 pushName: pushName || '',
                 timestamp: timestamp.getTime(),
+                isSync: true, // Mark as sync/poll so frontend does NOT play notification sound
               });
             }
 

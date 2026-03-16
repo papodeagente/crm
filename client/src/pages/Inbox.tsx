@@ -1146,8 +1146,9 @@ export default function InboxPage() {
       return;
     }
 
-    // ── Guard 3: Skip sync batches (reconciliation/QuickSync)
-    if ((lastMessage as any).isSync) {
+    // ── Guard 3: Skip sync batches (reconciliation/QuickSync/FastPoll)
+    if ((lastMessage as any).isSync || (lastMessage as any).syncBatch) {
+      console.log('[Inbox] Skipped sync message (isSync or syncBatch)');
       prevMessageRef.current = lastMessage;
       return;
     }
