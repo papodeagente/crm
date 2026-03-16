@@ -395,8 +395,10 @@ export async function updateConversationLastMessage(
   const db = await getDb();
   if (!db) return;
 
+  const newTimestamp = data.timestamp || new Date();
+
   const updateData: any = {
-    lastMessageAt: data.timestamp || new Date(),
+    lastMessageAt: newTimestamp,
     lastMessagePreview: data.content ? data.content.substring(0, 300) : null,
     lastMessageType: data.messageType || "text",
     lastFromMe: data.fromMe ?? false,
@@ -407,9 +409,16 @@ export async function updateConversationLastMessage(
     updateData.unreadCount = sql`unreadCount + 1`;
   }
 
+  // Only update preview if this message is newer than the current lastMessageAt
+  // This prevents older reconciliation messages from overwriting the latest preview
   await db.update(waConversations)
     .set(updateData)
-    .where(eq(waConversations.id, conversationId));
+    .where(
+      and(
+        eq(waConversations.id, conversationId),
+        sql`(lastMessageAt IS NULL OR lastMessageAt <= ${newTimestamp})`
+      )
+    );
 }
 
 // ════════════════════════════════════════════════════════════

@@ -777,6 +777,21 @@ export const appRouter = router({
         await markConversationRead(input.sessionId, input.remoteJid);
         return { success: true };
       }),
+    // Sync on conversation open — fetch last 10 messages, insert only missing
+    syncOnOpen: sessionProtectedProcedure
+      .input(z.object({ sessionId: z.string(), remoteJid: z.string(), conversationId: z.number() }))
+      .mutation(async ({ input }) => {
+        const session = whatsappManager.getSession(input.sessionId);
+        if (!session || session.status !== "connected") return { inserted: 0, skipped: 0 };
+        const { syncOnConversationOpen } = await import("./messageReconciliation");
+        return syncOnConversationOpen(
+          input.sessionId,
+          session.tenantId,
+          session.instanceName,
+          input.remoteJid,
+          input.conversationId
+        );
+      }),
     // Get profile picture for a single JID
     profilePicture: sessionProtectedProcedure
       .input(z.object({ sessionId: z.string(), jid: z.string() }))

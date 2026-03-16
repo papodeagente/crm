@@ -1096,20 +1096,33 @@ export default function InboxPage() {
       lastMessage.timestamp !== prevMessageRef.current.timestamp ||
       lastMessage.remoteJid !== prevMessageRef.current.remoteJid ||
       lastMessage.content !== prevMessageRef.current.content;
-    if (isNew && !lastMessage.fromMe && !isMuted) {
+    // Only play notification for real-time incoming messages (not sync, not status, not internal notes)
+    const isRealTimeIncoming = isNew && !lastMessage.fromMe && !isMuted && !(lastMessage as any).isSync;
+    const isSkipType = ['protocolMessage', 'senderKeyDistributionMessage', 'internal_note'].includes(lastMessage.messageType);
+    if (isRealTimeIncoming && !isSkipType) {
       if (selectedJid !== lastMessage.remoteJid) playNotification();
     }
     prevMessageRef.current = lastMessage;
   }, [lastMessage]);
 
   // Select conversation
+  // Sync on conversation open — lightweight fetch of last 10 messages
+  const syncOnOpen = trpc.whatsapp.syncOnOpen.useMutation();
   const handleSelectConv = useCallback((jid: string) => {
     setSelectedJid(jid);
     setShowMobileChat(true);
     if (activeSession?.sessionId) {
       markRead.mutate({ sessionId: activeSession.sessionId, remoteJid: jid });
+      // Find conversationId for this jid
+      const conv = (conversationsQ.data as ConvItem[] || []).find(c => c.remoteJid === jid);
+      if (conv?.conversationId) {
+        syncOnOpen.mutate(
+          { sessionId: activeSession.sessionId, remoteJid: jid, conversationId: conv.conversationId },
+          { onSuccess: (r) => { if (r.inserted > 0) conversationsQ.refetch(); } }
+        );
+      }
     }
-  }, [activeSession?.sessionId, markRead]);
+  }, [activeSession?.sessionId, markRead, conversationsQ.data, syncOnOpen]);
 
   // View queue conversation WITHOUT auto-claiming
   const handleSelectQueueConv = useCallback((jid: string) => {

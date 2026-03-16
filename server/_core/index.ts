@@ -65,6 +65,7 @@ async function startServer() {
       remoteJid: data.remoteJid,
       messageType: data.messageType,
       timestamp: Date.now(),
+      isSync: !!data.syncBatch, // true for reconciliation/sync messages, false for real-time upsert
     });
   });
 
@@ -200,6 +201,17 @@ async function startServer() {
 
       // Start periodic deep sync to catch anything FastPoll missed
       whatsappManager.startPeriodicSync(5 * 60 * 1000); // Every 5 minutes
+
+      // Start safe message reconciliation (every 3 min, max 20 convs, 10 msgs/conv)
+      import("../messageReconciliation").then(({ startReconciliation }) => {
+        startReconciliation(() => {
+          const sessMap = new Map<string, { sessionId: string; tenantId: number; instanceName: string; status: string }>();
+          for (const s of whatsappManager.getAllSessions()) {
+            sessMap.set(s.sessionId, { sessionId: s.sessionId, tenantId: s.tenantId, instanceName: s.instanceName, status: s.status });
+          }
+          return sessMap;
+        });
+      }).catch(e => console.error("[Reconciliation] Failed to start:", e));
     }, 10_000);
   });
 }

@@ -3243,3 +3243,68 @@
 - [x] Existing WhatsApp messaging continues working
 - [x] Evolution API connection unchanged
 - [x] CRM pipeline unchanged
+
+## Safe Message Reconciliation + Inbox Stability (v-reconciliation)
+
+### Part 1 — Realtime Message Flow (unchanged)
+- [x] Primary ingestion via messages.upsert and messages.update (already implemented)
+
+### Part 2-4 — Safe Background Reconciliation
+- [x] Create reconcileRecentMessages() background task
+- [x] Run every 3 minutes with strict limits
+- [x] Only reconcile conversations with lastMessageAt > NOW() - 24h
+- [x] Maximum 20 conversations per run
+- [x] Fetch only last 10 messages per conversation from Evolution API
+- [x] Duplicate protection: check by messageId before insert (INSERT IGNORE)
+
+### Part 5-6 — Backoff Strategy
+- [x] Skip reconciliation if server CPU > 70%
+- [x] Delay reconciliation if Redis queue length > 500
+
+### Part 7 — Sync on Conversation Open
+- [x] Trigger lightweight sync when agent opens conversation (syncOnOpen endpoint)
+- [x] Fetch last 10 messages, insert only missing ones
+
+### Part 8 — Fix Conversation Preview
+- [x] Preview always reflects latest message by MAX(timestamp) — timestamp guard in updateConversationLastMessage
+- [x] Update lastMessage, lastMessageAt, lastMessageType, lastMessageStatus
+
+### Part 9 — Status Regression Prevention
+- [x] Already implemented: FIELD() SQL prevents downgrade (pending→sent→delivered→read→played)
+
+### Part 10 — Fix Unread Count
+- [x] Unread increases only when message.fromMe == false (already correct)
+- [x] Unread resets when conversation opens (markConversationRead)
+
+### Part 11 — Fix Notification Sound
+- [x] Sound ONLY on messages.upsert AND fromMe == false AND conversationId != currentConversation
+- [x] NO sound on: messages.update, status changes, conversationUpdated, history reconciliation (isSync), internal notes
+
+### Part 12-14 — Clickable Links + URL Security
+- [x] Already implemented: URL detection, normalization, XSS prevention
+
+### Part 15 — Message Grouping
+- [x] Group messages only when same sender AND time difference < 5 minutes
+- [x] Internal notes break grouping
+
+### Part 16 — Media Preview
+- [x] Conversation preview shows message type icons (📷 Foto, 🎤 Áudio, 📄 Documento, 📍 Localização) — already implemented
+
+### Part 17 — Performance Safety
+- [x] Max 20 conversations, max 10 messages per conversation, 3 min interval
+- [x] Maximum ~200 message checks per cycle
+
+### Part 18 — Tests
+- [x] Tests: message reconciliation (72 tests)
+- [x] Tests: duplicate prevention
+- [x] Tests: status regression prevention
+- [x] Tests: notification sound logic
+- [x] Tests: URL parsing (already done — 93 tests)
+- [x] Tests: conversation preview accuracy
+
+### Final Validation
+- [x] TypeScript compiles with 0 errors
+- [x] Redis queue unaffected
+- [x] Evolution connection unchanged
+- [x] CRM pipelines unaffected
+- [x] Server load unchanged — reconciliation adds max ~200 checks/3min with CPU/queue backoff

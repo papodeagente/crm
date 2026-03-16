@@ -2101,9 +2101,13 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
 
                   const prev = mi > 0 ? group.messages[mi - 1] : null;
                   const next = mi < group.messages.length - 1 ? group.messages[mi + 1] : null;
-                  // For grouping: treat internal notes as boundary (don't group with regular messages)
-                  const isFirst = !prev || prev.fromMe !== msg.fromMe || prev.messageType === "internal_note";
-                  const isLast = !next || next.fromMe !== msg.fromMe || next.messageType === "internal_note";
+                  // For grouping: treat internal notes as boundary + 5-minute time gap rule
+                  const TIME_GAP_MS = 5 * 60 * 1000; // 5 minutes
+                  const msgTs = new Date(msg.timestamp).getTime();
+                  const prevTs = prev ? new Date(prev.timestamp).getTime() : 0;
+                  const nextTs = next ? new Date(next.timestamp).getTime() : 0;
+                  const isFirst = !prev || prev.fromMe !== msg.fromMe || prev.messageType === "internal_note" || msg.messageType === "internal_note" || (msgTs - prevTs > TIME_GAP_MS);
+                  const isLast = !next || next.fromMe !== msg.fromMe || next.messageType === "internal_note" || msg.messageType === "internal_note" || (nextTs - msgTs > TIME_GAP_MS);
                   // Apply real-time status updates from socket
                   const updatedMsg = msg.messageId && localStatusUpdates[msg.messageId]
                     ? { ...msg, status: localStatusUpdates[msg.messageId] }

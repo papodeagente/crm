@@ -21,6 +21,7 @@ interface WhatsAppMessageEvent {
   remoteJid: string;
   messageType: string;
   timestamp: number;
+  isSync?: boolean;
 }
 
 export interface WhatsAppMessageStatusEvent {
