@@ -19,37 +19,47 @@ import InstantTooltip from "@/components/InstantTooltip";
 
 /* ═══════════════════════════════════════════════════════
    NOTIFICATION SOUND (Web Audio API — WhatsApp style)
+   With debounce: max 1 sound per 1500ms
    ═══════════════════════════════════════════════════════ */
 
 const MUTE_KEY = "entur_inbox_muted";
+const SOUND_DEBOUNCE_MS = 1500;
 
 function createNotificationSound(): () => void {
   let audioCtx: AudioContext | null = null;
+  let lastPlayedAt = 0;
   return () => {
+    const now = Date.now();
+    if (now - lastPlayedAt < SOUND_DEBOUNCE_MS) {
+      console.log('[NotifSound] Debounced — too soon since last sound');
+      return;
+    }
+    lastPlayedAt = now;
     try {
       if (!audioCtx) audioCtx = new AudioContext();
       const ctx = audioCtx;
-      const now = ctx.currentTime;
+      const t = ctx.currentTime;
       const gain = ctx.createGain();
       gain.connect(ctx.destination);
-      gain.gain.setValueAtTime(0.15, now);
-      gain.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
+      gain.gain.setValueAtTime(0.15, t);
+      gain.gain.exponentialRampToValueAtTime(0.01, t + 0.4);
       const osc1 = ctx.createOscillator();
       osc1.type = "sine";
-      osc1.frequency.setValueAtTime(880, now);
+      osc1.frequency.setValueAtTime(880, t);
       osc1.connect(gain);
-      osc1.start(now);
-      osc1.stop(now + 0.12);
+      osc1.start(t);
+      osc1.stop(t + 0.12);
       const gain2 = ctx.createGain();
       gain2.connect(ctx.destination);
-      gain2.gain.setValueAtTime(0.12, now + 0.13);
-      gain2.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
+      gain2.gain.setValueAtTime(0.12, t + 0.13);
+      gain2.gain.exponentialRampToValueAtTime(0.01, t + 0.5);
       const osc2 = ctx.createOscillator();
       osc2.type = "sine";
-      osc2.frequency.setValueAtTime(660, now + 0.13);
+      osc2.frequency.setValueAtTime(660, t + 0.13);
       osc2.connect(gain2);
-      osc2.start(now + 0.13);
-      osc2.stop(now + 0.3);
+      osc2.start(t + 0.13);
+      osc2.stop(t + 0.3);
+      console.log('[NotifSound] Playing notification sound');
     } catch { /* Audio not supported */ }
   };
 }
@@ -857,6 +867,7 @@ type AgentFilter = "all" | "unread" | "mine" | "unassigned";
 
 export default function InboxPage() {
   const tenantId = useTenantId();
+  const trpcUtils = trpc.useUtils();
   const { lastMessage } = useSocket();
   const [selectedJid, setSelectedJid] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -873,6 +884,11 @@ export default function InboxPage() {
     try { return localStorage.getItem(MUTE_KEY) === "true"; } catch { return false; }
   });
   const prevMessageRef = useRef<typeof lastMessage>(null);
+  // Suppress notification sounds temporarily when opening a conversation
+  // This prevents sounds from firing during message hydration/syncOnOpen
+  const soundSuppressedUntilRef = useRef<number>(0);
+  // Track processed message signatures to avoid duplicate sounds
+  const processedMsgRef = useRef<Set<string>>(new Set());
 
   // ─── Data queries ───
   const sessionsQ = trpc.whatsapp.sessions.useQuery();
@@ -1085,23 +1101,86 @@ export default function InboxPage() {
     return formatPhoneNumber(jid);
   }, [getContactForJid, pushNameMap, waContactsMap, isRealName]);
 
-  // Notification sound on new messages
+  // Notification sound on new messages — SINGLE source of truth for all notification sounds
+  // Rules:
+  //   1. NEVER play for fromMe messages
+  //   2. ONLY play for real messages.upsert (not sync, status, notes, reconnect)
+  //   3. NEVER play during conversation open (suppressed for 2s after open)
+  //   4. Debounce: max 1 sound per 1500ms (handled in createNotificationSound)
+  //   5. NEVER play for the conversation currently being viewed
   useEffect(() => {
     if (!lastMessage) return;
-    console.log('[Inbox] Socket message received:', lastMessage.remoteJid, lastMessage.fromMe, lastMessage.content?.substring(0, 30));
+
+    // Always refetch conversation list on any socket message
     conversationsQ.refetch();
     queueQ.refetch();
     queueStatsQ.refetch();
-    const isNew = !prevMessageRef.current ||
-      lastMessage.timestamp !== prevMessageRef.current.timestamp ||
-      lastMessage.remoteJid !== prevMessageRef.current.remoteJid ||
-      lastMessage.content !== prevMessageRef.current.content;
-    // Only play notification for real-time incoming messages (not sync, not status, not internal notes)
-    const isRealTimeIncoming = isNew && !lastMessage.fromMe && !isMuted && !(lastMessage as any).isSync;
-    const isSkipType = ['protocolMessage', 'senderKeyDistributionMessage', 'internal_note'].includes(lastMessage.messageType);
-    if (isRealTimeIncoming && !isSkipType) {
-      if (selectedJid !== lastMessage.remoteJid) playNotification();
+
+    // Create a unique signature for this message to detect duplicates
+    const msgSig = `${lastMessage.remoteJid}:${lastMessage.content}:${lastMessage.timestamp}`;
+
+    // Debug log for investigation
+    console.log('[Inbox] Socket event:', {
+      fromMe: lastMessage.fromMe,
+      isSync: (lastMessage as any).isSync,
+      messageType: lastMessage.messageType,
+      remoteJid: lastMessage.remoteJid?.substring(0, 15),
+      activeConversation: selectedJid?.substring(0, 15) || 'none',
+      isMuted,
+      suppressed: Date.now() < soundSuppressedUntilRef.current,
+      alreadyProcessed: processedMsgRef.current.has(msgSig),
+    });
+
+    // ── Guard 1: Skip if this exact message was already processed
+    if (processedMsgRef.current.has(msgSig)) {
+      prevMessageRef.current = lastMessage;
+      return;
     }
+    // Keep the set bounded (max 50 entries)
+    if (processedMsgRef.current.size > 50) processedMsgRef.current.clear();
+    processedMsgRef.current.add(msgSig);
+
+    // ── Guard 2: NEVER play for fromMe messages
+    if (lastMessage.fromMe) {
+      prevMessageRef.current = lastMessage;
+      return;
+    }
+
+    // ── Guard 3: Skip sync batches (reconciliation/QuickSync)
+    if ((lastMessage as any).isSync) {
+      prevMessageRef.current = lastMessage;
+      return;
+    }
+
+    // ── Guard 4: Skip non-message types (protocol, status, notes)
+    const skipTypes = ['protocolMessage', 'senderKeyDistributionMessage', 'internal_note'];
+    if (skipTypes.includes(lastMessage.messageType)) {
+      prevMessageRef.current = lastMessage;
+      return;
+    }
+
+    // ── Guard 5: Skip if muted
+    if (isMuted) {
+      prevMessageRef.current = lastMessage;
+      return;
+    }
+
+    // ── Guard 6: Skip if sound is suppressed (conversation just opened)
+    if (Date.now() < soundSuppressedUntilRef.current) {
+      console.log('[Inbox] Sound suppressed — conversation was just opened');
+      prevMessageRef.current = lastMessage;
+      return;
+    }
+
+    // ── Guard 7: Skip if this is the currently viewed conversation
+    if (selectedJid === lastMessage.remoteJid) {
+      prevMessageRef.current = lastMessage;
+      return;
+    }
+
+    // All guards passed — play notification (debounce handled inside playNotification)
+    console.log('[Inbox] ✅ Playing notification for:', lastMessage.remoteJid?.substring(0, 15));
+    playNotification();
     prevMessageRef.current = lastMessage;
   }, [lastMessage]);
 
@@ -1111,10 +1190,29 @@ export default function InboxPage() {
   const handleSelectConv = useCallback((jid: string) => {
     setSelectedJid(jid);
     setShowMobileChat(true);
+
+    // ── Suppress notification sounds for 2 seconds while conversation loads ──
+    soundSuppressedUntilRef.current = Date.now() + 2000;
+
+    // ── Optimistic UI: immediately set unreadCount to 0 ──
+    conversationsQ.refetch().then(() => {});
+    // Also optimistically update the local data to avoid delay
+    const currentData = conversationsQ.data as ConvItem[] | undefined;
+    if (currentData) {
+      const updated = currentData.map(c =>
+        c.remoteJid === jid ? { ...c, unreadCount: 0 } : c
+      );
+      // Use queryClient to set data optimistically
+      trpcUtils.whatsapp.waConversations.setData(
+        { sessionId: activeSession?.sessionId || "", tenantId },
+        updated as any
+      );
+    }
+
     if (activeSession?.sessionId) {
       markRead.mutate({ sessionId: activeSession.sessionId, remoteJid: jid });
       // Find conversationId for this jid
-      const conv = (conversationsQ.data as ConvItem[] || []).find(c => c.remoteJid === jid);
+      const conv = (currentData || []).find(c => c.remoteJid === jid);
       if (conv?.conversationId) {
         syncOnOpen.mutate(
           { sessionId: activeSession.sessionId, remoteJid: jid, conversationId: conv.conversationId },
@@ -1122,7 +1220,7 @@ export default function InboxPage() {
         );
       }
     }
-  }, [activeSession?.sessionId, markRead, conversationsQ.data, syncOnOpen]);
+  }, [activeSession?.sessionId, markRead, conversationsQ.data, syncOnOpen, tenantId]);
 
   // View queue conversation WITHOUT auto-claiming
   const handleSelectQueueConv = useCallback((jid: string) => {

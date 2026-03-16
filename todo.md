@@ -3396,3 +3396,11 @@
 - [x] Part 9: Channel Change Safety — detectAndUpsertChannel + channel_change_events logging
 - [x] Part 10: Sound Notification Filter — already filters fromMe, protocolMessage, senderKeyDistribution, internal_note
 - [x] Part 11: Scale Safety — unique index on conversationKey, race condition try/catch, 140 duplicates merged, all indexes verified
+
+## Fix: Inbox Notification System (5 Critical Bugs)
+- [x] Problem 1: Sound plays on sent messages (fromMe) — Guard: `if (lastMessage.fromMe) return`
+- [x] Problem 2: Sound without message — Guards: skip isSync, protocolMessage, senderKeyDistribution, internal_note
+- [x] Problem 3: Multiple sounds when opening chat — soundSuppressedUntilRef (2s) + removed WhatsAppChat.tsx sound trigger
+- [x] Problem 4: Unread counter delay — optimistic update via trpcUtils.whatsapp.waConversations.setData()
+- [x] Problem 5: Sound flood protection — SOUND_DEBOUNCE_MS=1500 + processedMsgRef dedup Set
+- [x] Add debug logs to verify triggers (eventType, fromMe, isSync, conversationId, activeConversation) — console.log with [NOTIF-DEBUG] prefix added

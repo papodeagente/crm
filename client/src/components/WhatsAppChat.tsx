@@ -1409,24 +1409,11 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
   });
 
   // ─── Notification sound ───
-  const notificationAudioRef = useRef<HTMLAudioElement | null>(null);
-  useEffect(() => {
-    notificationAudioRef.current = new Audio("data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgkKuunWI2M1qIo6CWYDg1WIWdmpOBPDhXhZqXkYA+OFeFmZaQgD84V4WZlpCAPzhXhZmWkIA/OFeFmZaQgD84V4WZlpCAPzhX");
-  }, []);
-
-  // ─── Sound on new message ───
-  const prevMsgCountRef = useRef(0);
-  useEffect(() => {
-    if (!messagesQ.data) return;
-    const currentCount = messagesQ.data.length;
-    if (prevMsgCountRef.current > 0 && currentCount > prevMsgCountRef.current) {
-      const lastMsg = messagesQ.data[0]; // newest first
-      if (lastMsg && !lastMsg.fromMe) {
-        notificationAudioRef.current?.play().catch(() => {});
-      }
-    }
-    prevMsgCountRef.current = currentCount;
-  }, [messagesQ.data?.length]);
+  // REMOVED: Sound is now handled ONLY in Inbox.tsx to prevent:
+  //   - Multiple sounds when opening a conversation (message count jump)
+  //   - Sound on sent messages (refetch bringing in new messages)
+  //   - Double sounds (Inbox + Chat both playing)
+  // The single source of truth is the Inbox.tsx useEffect on lastMessage.
 
   // ─── Presence: send "composing" while typing ───
   const sendPresenceComposing = useCallback(() => {
