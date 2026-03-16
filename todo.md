@@ -3520,3 +3520,6 @@
 - [x] No duplicate conversations — fixed SQL JOIN (LIMIT 1 subquery for conversation_assignments) + backend dedup in fixTimestampFields + frontend dedup in dedupedConvs
 - [x] New message moves conversation to top instantly (socket handler re-sorts by lastTimestamp)
 - [x] TypeScript compiles with 0 errors, 16 tests passing (4 new deduplication tests)
+
+## Checkpoint — Inbox Dedup Fix Published
+- [x] All inbox deduplication and ordering fixes applied and verified
