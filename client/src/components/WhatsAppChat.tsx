@@ -1655,7 +1655,7 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
     if (presenceTimerRef.current) clearTimeout(presenceTimerRef.current);
     sendPresenceComposing();
     presenceTimerRef.current = setTimeout(() => sendPresencePaused(), 3000);
-  }, [sendPresenceComposing, sendPresencePaused]);
+  }, [sendPresenceComposing, sendPresencePaused, isNoteMode]);
 
   // Emoji select
   const handleEmojiSelect = useCallback((emoji: any) => {

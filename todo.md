@@ -3345,3 +3345,17 @@
 - [x] Fix: global note globe emoji — wrapped in JSX expression {"\uD83C\uDF10"}
 - [x] Fix: priority emojis (⚠️ ❗) — wrapped in JSX expressions
 - [x] Fix: media attachment labels (Vídeos, Câmera, Localização) — replaced with UTF-8
+
+## Fix Internal Notes Timeline Behavior
+- [x] 1. Unified timeline: notes merged into same array as messages (line 1783: [...msgs, ...noteItems])
+- [x] 2. Normalize notes as message-like objects with messageType="internal_note" (lines 1760-1780)
+- [x] 3. Sort unified timeline by timestamp (line 1783: .sort((a,b) => tA - tB))
+- [x] 4. Render notes inline in timeline loop (line 2025: if msg.messageType === "internal_note"), no separate block
+- [x] 5. Internal notes break message grouping (lines 2109-2110: isFirst/isLast check internal_note + 5min gap)
+- [x] 6. Re-render when messages OR notes change (line 1806: useMemo deps [messagesQ.data, notesQ.data])
+- [x] 7. Safety: notes never trigger send, unread, sound, or preview update (verified all paths)
+- [x] 8. Validate: chronological order guaranteed by sort — notes move naturally with new messages
+- [x] TypeScript compiles with zero errors, 190 tests pass
+
+## Bug: @Mention autocomplete stopped working in internal notes
+- [x] Fixed: isNoteMode was missing from handleTextareaChange useCallback deps, causing stale closure
