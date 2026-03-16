@@ -1,6 +1,6 @@
 import { eq, desc, and, or, like, lt, gt, isNotNull, sql, inArray } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users, whatsappSessions, waMessages as messages, activityLogs, chatbotSettings, chatbotRules, conversationAssignments, crmUsers, teams, teamMembers, distributionRules, customFields, customFieldValues, waConversations, userPreferences, sessionShares, conversationEvents, internalNotes, quickReplies, waContacts, aiIntegrations, tenants } from "../drizzle/schema";
+import { InsertUser, users, whatsappSessions, waMessages as messages, activityLogs, chatbotSettings, chatbotRules, conversationAssignments, crmUsers, teams, teamMembers, distributionRules, customFields, customFieldValues, waConversations, userPreferences, sessionShares, conversationEvents, internalNotes, quickReplies, waContacts, aiIntegrations, tenants, conversationLocks } from "../drizzle/schema";
 import { ENV } from './_core/env';
 import { normalizeJid } from "./phoneUtils";
 
@@ -3028,4 +3028,105 @@ export async function getAnyActiveAiIntegration(tenantId: number) {
     .where(and(eq(aiIntegrations.tenantId, tenantId), eq(aiIntegrations.isActive, true)))
     .limit(1);
   return rows[0] ?? null;
+}
+
+
+// ════════════════════════════════════════════════════════════
+// CONVERSATION LOCKS — Part 8: Agent Collision Prevention
+// ════════════════════════════════════════════════════════════
+
+const LOCK_DURATION_MS = 5 * 60 * 1000; // 5 minutes
+
+/**
+ * Acquire a soft lock on a conversation. Advisory only — doesn't block sending.
+ * Returns the lock info if acquired, or the existing lock holder if someone else has it.
+ */
+export async function acquireConversationLock(
+  tenantId: number,
+  waConversationId: number,
+  agentId: number,
+  agentName?: string,
+): Promise<{ acquired: boolean; lock: { agentId: number; agentName: string | null; expiresAt: Date } }> {
+  const db = await getDb();
+  if (!db) return { acquired: true, lock: { agentId, agentName: agentName || null, expiresAt: new Date(Date.now() + LOCK_DURATION_MS) } };
+
+  // Clean expired locks first
+  await db.delete(conversationLocks)
+    .where(lt(conversationLocks.expiresAt, new Date()));
+
+  // Check for existing active lock
+  const [existing] = await db.select()
+    .from(conversationLocks)
+    .where(and(
+      eq(conversationLocks.tenantId, tenantId),
+      eq(conversationLocks.waConversationId, waConversationId),
+      gt(conversationLocks.expiresAt, new Date()),
+    ))
+    .limit(1);
+
+  if (existing) {
+    if (existing.agentId === agentId) {
+      // Same agent — refresh the lock
+      const newExpiry = new Date(Date.now() + LOCK_DURATION_MS);
+      await db.update(conversationLocks)
+        .set({ expiresAt: newExpiry, lockedAt: new Date() })
+        .where(eq(conversationLocks.id, existing.id));
+      return { acquired: true, lock: { agentId, agentName: existing.agentName, expiresAt: newExpiry } };
+    }
+    // Different agent holds the lock
+    return { acquired: false, lock: { agentId: existing.agentId, agentName: existing.agentName, expiresAt: existing.expiresAt } };
+  }
+
+  // No active lock — create one
+  const expiresAt = new Date(Date.now() + LOCK_DURATION_MS);
+  await db.insert(conversationLocks).values({
+    tenantId,
+    waConversationId,
+    agentId,
+    agentName: agentName || null,
+    expiresAt,
+  });
+
+  return { acquired: true, lock: { agentId, agentName: agentName || null, expiresAt } };
+}
+
+/**
+ * Release a conversation lock (when agent navigates away or explicitly releases).
+ */
+export async function releaseConversationLock(
+  tenantId: number,
+  waConversationId: number,
+  agentId: number,
+): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+
+  await db.delete(conversationLocks)
+    .where(and(
+      eq(conversationLocks.tenantId, tenantId),
+      eq(conversationLocks.waConversationId, waConversationId),
+      eq(conversationLocks.agentId, agentId),
+    ));
+}
+
+/**
+ * Get the current lock holder for a conversation (if any).
+ */
+export async function getConversationLock(
+  tenantId: number,
+  waConversationId: number,
+): Promise<{ agentId: number; agentName: string | null; expiresAt: Date } | null> {
+  const db = await getDb();
+  if (!db) return null;
+
+  const [lock] = await db.select()
+    .from(conversationLocks)
+    .where(and(
+      eq(conversationLocks.tenantId, tenantId),
+      eq(conversationLocks.waConversationId, waConversationId),
+      gt(conversationLocks.expiresAt, new Date()),
+    ))
+    .limit(1);
+
+  return lock ? { agentId: lock.agentId, agentName: lock.agentName, expiresAt: lock.expiresAt } : null;
 }

@@ -14,7 +14,7 @@
 
 import { EventEmitter } from "events";
 import { getDb } from "./db";
-import { whatsappSessions, waMessages, waConversations, waContacts, tenants } from "../drizzle/schema";
+import { whatsappSessions, waMessages, waConversations, waContacts, tenants, waChannels, channelChangeEvents } from "../drizzle/schema";
 import { eq, and, sql, desc } from "drizzle-orm";
 import * as evo from "./evolutionApi";
 import { resolveInbound, updateConversationLastMessage } from "./conversationResolver";
@@ -334,7 +334,7 @@ class WhatsAppEvolutionManager extends EventEmitter {
 
   // ─── SEND MESSAGES ───
 
-  async sendTextMessage(sessionId: string, jid: string, text: string): Promise<any> {
+  async sendTextMessage(sessionId: string, jid: string, text: string, senderAgentId?: number): Promise<any> {
     const session = this.sessions.get(sessionId);
     if (!session) throw new Error(`Sessão não encontrada. Conecte seu WhatsApp primeiro.`);
     if (session.status !== "connected") throw new Error(`WhatsApp não está conectado. Reconecte seu WhatsApp.`);
@@ -356,6 +356,7 @@ class WhatsAppEvolutionManager extends EventEmitter {
             fromMe: true,
             messageType: "conversation",
             content: text,
+            senderAgentId: senderAgentId || null,
             status: "sent",
             timestamp: new Date(result.messageTimestamp ? result.messageTimestamp * 1000 : Date.now()),
           }).onDuplicateKeyUpdate({ set: { status: sql`status` } }).catch(() => {});
@@ -390,7 +391,8 @@ class WhatsAppEvolutionManager extends EventEmitter {
     mediaType: "image" | "audio" | "document" | "video",
     caption?: string,
     fileName?: string,
-    opts?: { ptt?: boolean; mimetype?: string; duration?: number }
+    opts?: { ptt?: boolean; mimetype?: string; duration?: number },
+    senderAgentId?: number
   ): Promise<any> {
     const session = this.sessions.get(sessionId);
     if (!session) throw new Error(`Sessão não encontrada. Conecte seu WhatsApp primeiro.`);
@@ -429,6 +431,7 @@ class WhatsAppEvolutionManager extends EventEmitter {
             mediaFileName: fileName || null,
             mediaDuration: opts?.duration || null,
             isVoiceNote: !!(mediaType === "audio" && opts?.ptt),
+            senderAgentId: senderAgentId || null,
             status: "sent",
             timestamp: new Date(result.messageTimestamp ? result.messageTimestamp * 1000 : Date.now()),
           }).onDuplicateKeyUpdate({ set: { status: sql`status` } }).catch(() => {});
@@ -497,7 +500,7 @@ class WhatsAppEvolutionManager extends EventEmitter {
     return evo.sendPoll(session.instanceName, number, name, values, selectableCount);
   }
 
-  async sendTextWithQuote(sessionId: string, jid: string, text: string, quotedMessageId: string, quotedText: string): Promise<any> {
+  async sendTextWithQuote(sessionId: string, jid: string, text: string, quotedMessageId: string, quotedText: string, senderAgentId?: number): Promise<any> {
     const session = this.sessions.get(sessionId);
     if (!session) throw new Error(`Sessão não encontrada.`);
     if (session.status !== "connected") throw new Error(`WhatsApp não está conectado.`);
@@ -521,6 +524,7 @@ class WhatsAppEvolutionManager extends EventEmitter {
             fromMe: true,
             messageType: "extendedTextMessage",
             content: text,
+            senderAgentId: senderAgentId || null,
             status: "sent",
             timestamp: new Date(result.messageTimestamp ? result.messageTimestamp * 1000 : Date.now()),
             quotedMessageId,
@@ -1312,9 +1316,17 @@ class WhatsAppEvolutionManager extends EventEmitter {
                 if (phoneMatch) {
                   const db = await getDb();
                   if (db) {
+                    const newPhone = phoneMatch[1];
                     await db.update(whatsappSessions)
-                      .set({ phoneNumber: phoneMatch[1], pushName: inst.profileName || undefined })
+                      .set({ phoneNumber: newPhone, pushName: inst.profileName || undefined })
                       .where(eq(whatsappSessions.sessionId, session.sessionId));
+
+                    // ── Part 1+9: Channel Detection & Change Safety ──
+                    try {
+                      await this.detectAndUpsertChannel(session.tenantId, session.sessionId, newPhone);
+                    } catch (chErr) {
+                      console.warn("[EvoWA] Channel detection error:", chErr);
+                    }
                   }
                 }
               }
@@ -3139,6 +3151,82 @@ class WhatsAppEvolutionManager extends EventEmitter {
     this.sessions.clear();
     this.instanceToSession.clear();
     this.removeAllListeners();
+  }
+
+  // ── Part 1+9: Channel Detection & Change Safety ──
+  /**
+   * Detects the current phone number for an instance and creates/updates
+   * wa_channels records. If the phone number changed, marks the previous
+   * channel as inactive and logs a channel_change_event.
+   */
+  private async detectAndUpsertChannel(
+    tenantId: number,
+    instanceId: string,
+    phoneNumber: string,
+  ): Promise<void> {
+    const db = await getDb();
+    if (!db) return;
+
+    // Find the current active channel for this instance
+    const [activeChannel] = await db.select()
+      .from(waChannels)
+      .where(and(
+        eq(waChannels.tenantId, tenantId),
+        eq(waChannels.instanceId, instanceId),
+        eq(waChannels.status, "active"),
+      ))
+      .limit(1);
+
+    if (activeChannel && activeChannel.phoneNumber === phoneNumber) {
+      // Same phone, nothing to do
+      return;
+    }
+
+    if (activeChannel && activeChannel.phoneNumber !== phoneNumber) {
+      // Phone changed! Mark old channel inactive, log event
+      console.log(`[EvoWA Channel] Phone change detected for ${instanceId}: ${activeChannel.phoneNumber} → ${phoneNumber}`);
+
+      await db.update(waChannels)
+        .set({ status: "inactive", disconnectedAt: new Date() })
+        .where(eq(waChannels.id, activeChannel.id));
+
+      // Create new channel
+      const [newChannel] = await db.insert(waChannels).values({
+        tenantId,
+        instanceId,
+        phoneNumber,
+        status: "active",
+        connectedAt: new Date(),
+      }).$returningId();
+
+      // Log channel change event (Part 9)
+      await db.insert(channelChangeEvents).values({
+        tenantId,
+        instanceId,
+        previousPhone: activeChannel.phoneNumber,
+        newPhone: phoneNumber,
+        previousChannelId: activeChannel.id,
+        newChannelId: newChannel?.id || null,
+      });
+
+      // Emit event so frontend can show notification
+      this.emit("channelChange", {
+        tenantId,
+        instanceId,
+        previousPhone: activeChannel.phoneNumber,
+        newPhone: phoneNumber,
+      });
+    } else {
+      // No active channel — first time or all inactive. Create new.
+      await db.insert(waChannels).values({
+        tenantId,
+        instanceId,
+        phoneNumber,
+        status: "active",
+        connectedAt: new Date(),
+      });
+      console.log(`[EvoWA Channel] New channel created for ${instanceId}: ${phoneNumber}`);
+    }
   }
 }
 

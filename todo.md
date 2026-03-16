@@ -3383,3 +3383,16 @@
 - [x] Investigate: server timezone vs database timezone for internal_notes.createdAt
 - [x] Fix: append 'Z' suffix to db.execute string timestamps to treat as UTC (matching Drizzle select().from() behavior)
 - [x] Verify notes interleave correctly with messages in the timeline (31 tests passing)
+
+## CRM Conversation Logic Hardening (Safe, No Breaking Changes)
+- [x] Part 1: Channel Detection — wa_channels table, track phone per instance, handle reconnect with different phone
+- [x] Part 2: Conversation Identity — waChannelId on wa_conversations, unique index on conversationKey
+- [x] Part 3: Shared Inbox — senderAgentId passed from tRPC procedures to send methods
+- [x] Part 4: CRM History View — already implemented via crmDb.ts cross-session aggregation
+- [x] Part 5: Conversation Preview Protection — already has timestamp guard in updateConversationLastMessage
+- [x] Part 6: Internal Notes Timeline — fixed UTC 'Z' suffix for correct chronological ordering
+- [x] Part 7: Message Deduplication — uniqueIndex + onDuplicateKeyUpdate already in place
+- [x] Part 8: Agent Collision Prevention — conversation_locks table + acquire/release/get helpers + tRPC procedures
+- [x] Part 9: Channel Change Safety — detectAndUpsertChannel + channel_change_events logging
+- [x] Part 10: Sound Notification Filter — already filters fromMe, protocolMessage, senderKeyDistribution, internal_note
+- [x] Part 11: Scale Safety — unique index on conversationKey, race condition try/catch, 140 duplicates merged, all indexes verified

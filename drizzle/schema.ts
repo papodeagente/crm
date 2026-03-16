@@ -1163,6 +1163,7 @@ export const waConversations = mysqlTable("wa_conversations", {
   queuedAt: timestamp("queuedAt"),
   firstResponseAt: timestamp("firstResponseAt"),
   slaDeadlineAt: timestamp("slaDeadlineAt"),
+  waChannelId: int("waChannelId"), // Part 2: links to wa_channels for channel-based identity
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 }, (t) => [
@@ -1173,6 +1174,7 @@ export const waConversations = mysqlTable("wa_conversations", {
   index("idx_wc_merged").on(t.mergedIntoId),
   index("idx_wc_assigned_user").on(t.tenantId, t.assignedUserId),
   index("idx_wc_queued").on(t.tenantId, t.queuedAt),
+  uniqueIndex("idx_wc_conv_key").on(t.conversationKey),
 ]);
 
 export const waIdentities = mysqlTable("wa_identities", {
@@ -1927,3 +1929,58 @@ export const aiSuggestionLogs = mysqlTable("ai_suggestion_logs", {
 ]);
 export type AiSuggestionLog = typeof aiSuggestionLogs.$inferSelect;
 export type InsertAiSuggestionLog = typeof aiSuggestionLogs.$inferInsert;
+
+// ════════════════════════════════════════════════════════════
+// CRM HARDENING — Channel Detection (Part 1)
+// ════════════════════════════════════════════════════════════
+export const waChannels = mysqlTable("wa_channels", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  instanceId: varchar("instanceId", { length: 128 }).notNull(), // sessionId / instance name
+  phoneNumber: varchar("phoneNumber", { length: 32 }).notNull(),
+  status: mysqlEnum("channel_status", ["active", "inactive"]).default("active").notNull(),
+  connectedAt: timestamp("connectedAt").defaultNow().notNull(),
+  disconnectedAt: timestamp("disconnectedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (t) => [
+  index("wach_tenant_instance_idx").on(t.tenantId, t.instanceId),
+  index("wach_tenant_phone_idx").on(t.tenantId, t.phoneNumber),
+]);
+export type WaChannel = typeof waChannels.$inferSelect;
+export type InsertWaChannel = typeof waChannels.$inferInsert;
+
+// ════════════════════════════════════════════════════════════
+// CRM HARDENING — Agent Collision Prevention (Part 8)
+// ════════════════════════════════════════════════════════════
+export const conversationLocks = mysqlTable("conversation_locks", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  waConversationId: int("waConversationId").notNull(),
+  agentId: int("agentId").notNull(),
+  agentName: varchar("agentName", { length: 128 }),
+  lockedAt: timestamp("lockedAt").defaultNow().notNull(),
+  expiresAt: timestamp("expiresAt").notNull(),
+}, (t) => [
+  index("cl_tenant_conv_idx").on(t.tenantId, t.waConversationId),
+  index("cl_expires_idx").on(t.expiresAt),
+]);
+export type ConversationLock = typeof conversationLocks.$inferSelect;
+export type InsertConversationLock = typeof conversationLocks.$inferInsert;
+
+// ════════════════════════════════════════════════════════════
+// CRM HARDENING — Channel Change Events (Part 9)
+// ════════════════════════════════════════════════════════════
+export const channelChangeEvents = mysqlTable("channel_change_events", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  instanceId: varchar("instanceId", { length: 128 }).notNull(),
+  previousPhone: varchar("previousPhone", { length: 32 }),
+  newPhone: varchar("newPhone", { length: 32 }).notNull(),
+  detectedAt: timestamp("detectedAt").defaultNow().notNull(),
+  previousChannelId: int("previousChannelId"),
+  newChannelId: int("newChannelId"),
+}, (t) => [
+  index("cce_tenant_instance_idx").on(t.tenantId, t.instanceId),
+]);
+export type ChannelChangeEvent = typeof channelChangeEvents.$inferSelect;
+export type InsertChannelChangeEvent = typeof channelChangeEvents.$inferInsert;

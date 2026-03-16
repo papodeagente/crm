@@ -356,22 +356,40 @@ export async function resolveConversation(
   }
 
   // Criar nova conversa — store the RAW JID, not normalized
-  const result = await db.insert(waConversations).values({
-    tenantId,
-    sessionId,
-    contactId: contactId || null,
-    remoteJid: remoteJid, // RAW JID from WhatsApp — critical for replies
-    conversationKey,
-    phoneE164: phone.valid ? phone.phoneE164 : null,
-    phoneDigits: phone.valid ? phone.digitsOnly : jidDigits,
-    phoneLast11: phone.valid ? phone.last11BR : null,
-    status: "open",
-    contactPushName: pushName || null,
-    unreadCount: 0,
-  });
+  // Wrapped in try/catch for race condition: if two messages arrive simultaneously
+  // for the same new contact, the unique index on conversationKey prevents duplicates.
+  try {
+    const result = await db.insert(waConversations).values({
+      tenantId,
+      sessionId,
+      contactId: contactId || null,
+      remoteJid: remoteJid, // RAW JID from WhatsApp — critical for replies
+      conversationKey,
+      phoneE164: phone.valid ? phone.phoneE164 : null,
+      phoneDigits: phone.valid ? phone.digitsOnly : jidDigits,
+      phoneLast11: phone.valid ? phone.last11BR : null,
+      status: "open",
+      contactPushName: pushName || null,
+      unreadCount: 0,
+    });
 
-  const insertId = (result as any)[0]?.insertId;
-  return { conversationId: insertId, isNew: true, conversationKey };
+    const insertId = (result as any)[0]?.insertId;
+    return { conversationId: insertId, isNew: true, conversationKey };
+  } catch (err: any) {
+    // ER_DUP_ENTRY (1062) — another request created the conversation first.
+    // Re-fetch and return the existing one.
+    if (err?.errno === 1062 || err?.code === "ER_DUP_ENTRY") {
+      console.log(`[ConvResolver] Race condition handled for key ${conversationKey} — re-fetching existing`);
+      const [raceWinner] = await db.select({ id: waConversations.id })
+        .from(waConversations)
+        .where(eq(waConversations.conversationKey, conversationKey))
+        .limit(1);
+      if (raceWinner) {
+        return { conversationId: raceWinner.id, isNew: false, conversationKey };
+      }
+    }
+    throw err; // Re-throw unexpected errors
+  }
 }
 
 // ════════════════════════════════════════════════════════════

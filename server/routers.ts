@@ -125,6 +125,10 @@ import {
   getTenantAiSettings,
   updateTenantAiSettings,
   getAnyActiveAiIntegration,
+  // Conversation locks (Part 8)
+  acquireConversationLock,
+  releaseConversationLock,
+  getConversationLock,
 } from "./db";
 import { storagePut } from "./storage";
 import { nanoid } from "nanoid";
@@ -390,14 +394,16 @@ export const appRouter = router({
       }),
     sendMessage: sessionProtectedProcedure
       .input(z.object({ sessionId: z.string(), number: z.string().min(1), message: z.string().min(1) }))
-      .mutation(async ({ input }) => {
-        const result = await whatsappManager.sendTextMessage(input.sessionId, input.number, input.message);
+      .mutation(async ({ input, ctx }) => {
+        const agentId = ctx.user?.id;
+        const result = await whatsappManager.sendTextMessage(input.sessionId, input.number, input.message, agentId);
         return { success: true, messageId: result?.key?.id, remoteJid: result?.key?.remoteJid };
       }),
     sendMedia: sessionProtectedProcedure
       .input(z.object({ sessionId: z.string(), number: z.string().min(1), mediaUrl: z.string().url(), mediaType: z.enum(["image", "audio", "document", "video"]), caption: z.string().optional(), fileName: z.string().optional(), ptt: z.boolean().optional(), mimetype: z.string().optional(), duration: z.number().optional() }))
-      .mutation(async ({ input }) => {
-        const result = await whatsappManager.sendMediaMessage(input.sessionId, input.number, input.mediaUrl, input.mediaType, input.caption, input.fileName, { ptt: input.ptt, mimetype: input.mimetype, duration: input.duration });
+      .mutation(async ({ input, ctx }) => {
+        const agentId = ctx.user?.id;
+        const result = await whatsappManager.sendMediaMessage(input.sessionId, input.number, input.mediaUrl, input.mediaType, input.caption, input.fileName, { ptt: input.ptt, mimetype: input.mimetype, duration: input.duration }, agentId);
         return { success: true, messageId: result?.key?.id };
       }),
     // ─── REACTIONS & INTERACTIONS ───
@@ -460,8 +466,9 @@ export const appRouter = router({
         quotedMessageId: z.string(),
         quotedText: z.string(),
       }))
-      .mutation(async ({ input }) => {
-        const result = await whatsappManager.sendTextWithQuote(input.sessionId, input.number, input.message, input.quotedMessageId, input.quotedText);
+      .mutation(async ({ input, ctx }) => {
+        const agentId = ctx.user?.id;
+        const result = await whatsappManager.sendTextWithQuote(input.sessionId, input.number, input.message, input.quotedMessageId, input.quotedText, agentId);
         return { success: true, messageId: result?.key?.id };
       }),
     deleteMessage: sessionProtectedProcedure
@@ -504,7 +511,8 @@ export const appRouter = router({
         parts: z.array(z.string().min(1)).min(1).max(10),
         pacing: z.enum(["fast", "normal", "human"]).default("normal"),
       }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
+        const agentId = ctx.user?.id;
         const pacingConfig = {
           fast: { minDelay: 400, maxDelay: 800, composingTime: 300 },
           normal: { minDelay: 1000, maxDelay: 2000, composingTime: 800 },
@@ -527,7 +535,7 @@ export const appRouter = router({
           await new Promise(r => setTimeout(r, composingWait));
 
           // Send the message
-          const result = await whatsappManager.sendTextMessage(input.sessionId, input.number, part);
+          const result = await whatsappManager.sendTextMessage(input.sessionId, input.number, part, agentId);
           results.push({ messageId: result?.key?.id, part: i });
 
           // Delay between parts (not after last)
@@ -577,6 +585,29 @@ export const appRouter = router({
       .input(z.object({ sessionId: z.string(), jid: z.string() }))
       .query(async ({ input }) => {
         return whatsappManager.fetchContactBusinessProfile(input.sessionId, input.jid);
+      }),
+    // ─── CONVERSATION LOCKS (Part 8) ───
+    acquireLock: protectedProcedure
+      .input(z.object({ waConversationId: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        const tenantId = ctx.saasUser?.tenantId || 0;
+        const agentId = ctx.user!.id;
+        const agentName = ctx.saasUser?.name || ctx.user!.name || "Agent";
+        return acquireConversationLock(tenantId, input.waConversationId, agentId, agentName);
+      }),
+    releaseLock: protectedProcedure
+      .input(z.object({ waConversationId: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        const tenantId = ctx.saasUser?.tenantId || 0;
+        const agentId = ctx.user!.id;
+        await releaseConversationLock(tenantId, input.waConversationId, agentId);
+        return { success: true };
+      }),
+    getLock: protectedProcedure
+      .input(z.object({ waConversationId: z.number() }))
+      .query(async ({ input, ctx }) => {
+        const tenantId = ctx.saasUser?.tenantId || 0;
+        return getConversationLock(tenantId, input.waConversationId);
       }),
     // ─── EXISTING QUERIES ───
     messages: sessionProtectedProcedure

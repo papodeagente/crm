@@ -330,6 +330,27 @@
       "when": 1773626852908,
       "tag": "0046_oval_mentor",
       "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "5",
+      "when": 1773637243343,
+      "tag": "0047_clear_lilandra",
+      "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "5",
+      "when": 1773637289724,
+      "tag": "0048_woozy_kitty_pryde",
+      "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "5",
+      "when": 1773638211630,
+      "tag": "0049_damp_leo",
+      "breakpoints": true
     }
   ]
 }
