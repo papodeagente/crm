@@ -138,8 +138,30 @@ describe("Advanced Internal Notes: Category & Priority", () => {
 
 describe("Agent Mentions with Autocomplete", () => {
   describe("Frontend: @mention detection in textarea", () => {
-    it("detects @mention pattern in text input", () => {
-      expect(whatsAppChatFile).toMatch(/@\(\\w\*\)\$/);
+    it("detects @mention pattern in text input with Unicode support", () => {
+      // The regex must support accented characters (Portuguese names: João, Antônio, José)
+      expect(whatsAppChatFile).toContain("\\u00C0-\\u024F");
+      expect(whatsAppChatFile).toMatch(/@.*\$/);
+    });
+
+    it("mention regex matches accented Portuguese names", () => {
+      const mentionRegex = /@([\w\u00C0-\u024F]*)$/;
+      expect(mentionRegex.exec("@João")?.[1]).toBe("João");
+      expect(mentionRegex.exec("@Antônio")?.[1]).toBe("Antônio");
+      expect(mentionRegex.exec("@José")?.[1]).toBe("José");
+      expect(mentionRegex.exec("@Maria")?.[1]).toBe("Maria");
+      expect(mentionRegex.exec("test @Cláudia")?.[1]).toBe("Cláudia");
+      expect(mentionRegex.exec("@")?.[1]).toBe(""); // empty query shows all agents
+    });
+
+    it("mention highlighting regex supports accented characters", () => {
+      const highlightRegex = /(@[\w\u00C0-\u024F][\w\u00C0-\u024F\s]*?)(?=\s@|\s|$)/g;
+      const text = "@João mencionou @Antônio";
+      const parts = text.split(highlightRegex);
+      const mentions = parts.filter(p => p.startsWith("@"));
+      expect(mentions.length).toBeGreaterThanOrEqual(2);
+      expect(mentions).toContain("@João");
+      expect(mentions).toContain("@Antônio");
     });
 
     it("tracks mentionQuery state", () => {

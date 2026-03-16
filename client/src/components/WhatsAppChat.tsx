@@ -1640,7 +1640,7 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
     if (isNoteMode) {
       const cursorPos = e.target.selectionStart || 0;
       const textBeforeCursor = val.substring(0, cursorPos);
-      const mentionMatch = textBeforeCursor.match(/@(\w*)$/);
+      const mentionMatch = textBeforeCursor.match(/@([\w\u00C0-\u024F]*)$/);
       if (mentionMatch) {
         setMentionQuery(mentionMatch[1]);
         setMentionCursorPos(cursorPos);
@@ -2057,7 +2057,7 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
                     const renderNoteContent = (text: string) => {
                       if (!text) return null;
                       // Match @Name patterns
-                      const parts = text.split(/(@\w[\w\s]*?)(?=\s@|\s|$)/g);
+                      const parts = text.split(/(@[\w\u00C0-\u024F][\w\u00C0-\u024F\s]*?)(?=\s@|\s|$)/g);
                       return parts.map((part, i) =>
                         part.startsWith("@") ? <strong key={i} className="text-amber-700 dark:text-amber-200">{part}</strong> : part
                       );

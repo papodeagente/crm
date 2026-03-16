@@ -3308,3 +3308,33 @@
 - [x] Evolution connection unchanged
 - [x] CRM pipelines unaffected
 - [x] Server load unchanged — reconciliation adds max ~200 checks/3min with CPU/queue backoff
+
+## Inbox UX Bug Fix (6 issues)
+
+### Bug 1 — Internal Notes in Timeline
+- [x] Notes must be merged into same timeline array as messages (groupedMessages useMemo)
+- [x] Notes must move naturally when new messages arrive (sorted by timestamp)
+- [x] Remove any separate render block for notes (verified: only comment placeholder remains)
+
+### Bug 2 — Notification Sound Filter
+- [x] Play sound ONLY when: eventType == messages.upsert AND fromMe == false AND isSync == false
+- [x] Never play for: sync, status updates, internal notes, agent-sent messages
+
+### Bug 3 — Preview Status Fix
+- [x] Conversation preview uses wc.lastStatus from wa_conversations (updated by updateConversationLastMessage)
+
+### Bug 4 — Last Message Protection
+- [x] updateConversationLastMessage() has timestamp guard: lastMessageAt IS NULL OR lastMessageAt <= newTimestamp
+- [x] Applied to: upsert, sync, poll, status update
+
+### Bug 5 — User Mentions
+- [x] Mentions reference crmUsers table (agents) via getAgentsForTenant
+- [x] Autocomplete when typing "@" — FIXED: regex now supports accented chars (\u00C0-\u024F)
+- [x] Store mentionedUserId in internal_notes.mentionedUserIds JSON column
+- [x] Does not depend on WhatsApp status
+
+### Bug 6 — Frontend Re-render
+- [x] Timeline re-renders when messages change (useMemo depends on messagesQ.data)
+- [x] Timeline re-renders when notes change (useMemo depends on notesQ.data)
+- [x] Notes move correctly when new messages arrive (sorted by timestamp in merged array)
+- [x] TypeScript compiles with zero errors (verified)
