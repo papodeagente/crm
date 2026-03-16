@@ -469,7 +469,7 @@ export default function Home() {
   const waChartData = useMemo(() => {
     if (!waMetrics?.messagesByDay) return [];
     return waMetrics.messagesByDay.map(d => ({
-      date: new Date(d.date).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }),
+      date: new Date(d.date).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", timeZone: SYSTEM_TIMEZONE }),
       Enviadas: d.sent,
       Recebidas: d.received,
     }));

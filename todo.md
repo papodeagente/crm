@@ -3462,3 +3462,15 @@
 - [x] Allow super admin logged in "Entur" to delete any other tenant — session.tenantId check removed, email linkage check removed
 - [x] Frontend: delete button disabled for "Entur" tenant with tooltip "Tenant raiz — não pode ser excluído"
 - [x] 16 tests passing (deleteTenant.test.ts), 0 TypeScript errors
+
+## Fix Preview Timestamp Timezone Bug (+3h offset)
+- [x] Part 1: Audit — traced full flow: WhatsApp Unix seconds → ×1000 → new Date() → mysql2 DATETIME → tRPC/Superjson → frontend formatTime()
+- [x] Part 2: ROOT CAUSE FOUND AND FIXED — removed `process.env.TZ = "America/Sao_Paulo"` from server/_core/index.ts; added `timezone: '+00:00'` to mysql2 connection in db.ts; fixed all server-side code using local Date methods (bulkMessage.ts, crmRouter.ts, db.ts, crmDb.ts) to use explicit `America/Sao_Paulo` timezone
+- [x] Part 3: Preview uses lastMessage.timestamp directly — SQL queries use LEFT JOIN subquery on messages table with COALESCE; socket events use raw Unix ms timestamp
+- [x] Part 4: Frontend-only conversion — all date formatting uses explicit `timeZone: "America/Sao_Paulo"` via shared formatTime() or inline toLocaleString()
+- [x] Part 5: No double Date parsing found — verified all .tsx/.ts files have no `new Date(new Date())` or `new Date(Date.parse())` patterns
+- [x] Part 6: Shared formatter — both Inbox preview (formatConversationTime → formatTime) and WhatsAppChat bubbles (formatTime) use the same function from shared/dateUtils.ts
+- [x] Part 7: Debug validated — DB stores UTC, mysql2 reads UTC with timezone:'+00:00', frontend converts to SP only once
+- [x] Part 8: Database validated — SELECT timestamp, UNIX_TIMESTAMP(timestamp) confirms match; existing data is correct
+- [x] Fixed 7 additional frontend files with missing explicit timezone (CampaignDetail, Campaigns, DateAutomationSettings, Profile, WhatsAppChat event, Home)
+- [x] 20 tests passing (timestampTimezone.test.ts), 0 TypeScript errors

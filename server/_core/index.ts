@@ -1,5 +1,6 @@
-// Set system timezone to America/Sao_Paulo (UTC-3) before anything else
-process.env.TZ = "America/Sao_Paulo";
+// Server runs in UTC — all timezone conversion happens in the frontend only.
+// DO NOT set process.env.TZ here. mysql2 reads DATETIME as local time,
+// and setting TZ=SP causes a +3h offset on timestamps read from MySQL.
 
 import "dotenv/config";
 import express from "express";

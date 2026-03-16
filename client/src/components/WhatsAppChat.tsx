@@ -2198,7 +2198,7 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
                         {event.eventType === 'queue_claim' && `Puxado da fila por ${event.actorName || 'Agente'}`}
                       </span>
                       <span className="text-blue-400 text-[10px]">
-                        {new Date(event.createdAt).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                        {new Date(event.createdAt).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' })}
                       </span>
                     </div>
                     {event.metadata?.note && (

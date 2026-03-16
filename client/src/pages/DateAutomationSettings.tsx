@@ -311,7 +311,7 @@ export default function DateAutomationSettings() {
                       </div>
                       {auto.lastRunAt && (
                         <p className="text-[10px] text-muted-foreground mt-1">
-                          Última execução: {new Date(auto.lastRunAt).toLocaleString("pt-BR")}
+                          Última execução: {new Date(auto.lastRunAt).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}
                         </p>
                       )}
                     </div>

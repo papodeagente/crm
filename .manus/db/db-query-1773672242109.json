@@ -1,0 +1,45 @@
+{
+  "query": "SELECT \n  id, \n  timestamp AS raw_datetime,\n  UNIX_TIMESTAMP(timestamp) AS unix_ts,\n  UTC_TIMESTAMP() AS utc_now,\n  NOW() AS mysql_now\nFROM messages \nORDER BY id DESC \nLIMIT 5;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute SELECT \n  id, \n  timestamp AS raw_datetime,\n  UNIX_TIMESTAMP(timestamp) AS unix_ts,\n  UTC_TIMESTAMP() AS utc_now,\n  NOW() AS mysql_now\nFROM messages \nORDER BY id DESC \nLIMIT 5;",
+  "rows": [
+    {
+      "id": "606455",
+      "raw_datetime": "2026-03-16 14:43:55",
+      "unix_ts": "1773672235",
+      "utc_now": "2026-03-16 14:44:02",
+      "mysql_now": "2026-03-16 14:44:02"
+    },
+    {
+      "id": "606454",
+      "raw_datetime": "2026-03-16 14:43:40",
+      "unix_ts": "1773672220",
+      "utc_now": "2026-03-16 14:44:02",
+      "mysql_now": "2026-03-16 14:44:02"
+    },
+    {
+      "id": "606453",
+      "raw_datetime": "2026-03-16 14:43:33",
+      "unix_ts": "1773672213",
+      "utc_now": "2026-03-16 14:44:02",
+      "mysql_now": "2026-03-16 14:44:02"
+    },
+    {
+      "id": "606452",
+      "raw_datetime": "2026-03-16 14:43:14",
+      "unix_ts": "1773672194",
+      "utc_now": "2026-03-16 14:44:02",
+      "mysql_now": "2026-03-16 14:44:02"
+    },
+    {
+      "id": "606451",
+      "raw_datetime": "2026-03-16 14:42:46",
+      "unix_ts": "1773672166",
+      "utc_now": "2026-03-16 14:44:02",
+      "mysql_now": "2026-03-16 14:44:02"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\traw_datetime\tunix_ts\tutc_now\tmysql_now\n606455\t2026-03-16 14:43:55\t1773672235\t2026-03-16 14:44:02\t2026-03-16 14:44:02\n606454\t2026-03-16 14:43:40\t1773672220\t2026-03-16 14:44:02\t2026-03-16 14:44:02\n606453\t2026-03-16 14:43:33\t1773672213\t2026-03-16 14:44:02\t2026-03-16 14:44:02\n606452\t2026-03-16 14:43:14\t1773672194\t2026-03-16 14:44:02\t2026-03-16 14:44:02\n606451\t2026-03-16 14:42:46\t1773672166\t2026-03-16 14:44:02\t2026-03-16 14:44:02\n",
+  "stderr": "",
+  "execution_time_ms": 142
+}

@@ -181,7 +181,7 @@ export async function startBulkSend(request: BulkSendRequest): Promise<{ jobId: 
   }
 
   // Generate campaign name if not provided
-  const campaignName = request.campaignName || `Campanha ${new Date().toLocaleDateString("pt-BR")} ${new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`;
+  const campaignName = request.campaignName || `Campanha ${new Date().toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })} ${new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" })}`;
 
   // Create campaign record in DB
   const [campaignResult] = await db.insert(bulkCampaigns).values({

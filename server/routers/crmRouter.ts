@@ -921,7 +921,7 @@ export const crmRouter = router({
         await createNotification(input.tenantId, {
           type: "task_created",
           title: `Nova tarefa: ${input.title}`,
-          body: input.dueAt ? `Vencimento: ${new Date(input.dueAt).toLocaleDateString("pt-BR")}` : undefined,
+          body: input.dueAt ? `Vencimento: ${new Date(input.dueAt).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })}` : undefined,
           entityType: "task",
           entityId: String(result?.id),
         });

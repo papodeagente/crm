@@ -29,7 +29,7 @@ const statusConfig: Record<string, { label: string; color: string; bg: string; i
 
 function formatDate(d: string | Date | null) {
   if (!d) return "—";
-  return new Date(d).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" });
+  return new Date(d).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" });
 }
 
 function formatDuration(start: string | Date, end: string | Date | null) {

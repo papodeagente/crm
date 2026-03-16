@@ -1,5 +1,6 @@
 import { eq, desc, and, or, like, lt, gt, isNotNull, sql, inArray } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
+
 import { InsertUser, users, whatsappSessions, waMessages as messages, activityLogs, chatbotSettings, chatbotRules, conversationAssignments, crmUsers, teams, teamMembers, distributionRules, customFields, customFieldValues, waConversations, userPreferences, sessionShares, conversationEvents, internalNotes, quickReplies, waContacts, aiIntegrations, tenants, conversationLocks } from "../drizzle/schema";
 import { ENV } from './_core/env';
 import { normalizeJid } from "./phoneUtils";
@@ -9,7 +10,12 @@ let _db: ReturnType<typeof drizzle> | null = null;
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
     try {
-      _db = drizzle(process.env.DATABASE_URL);
+      _db = drizzle({
+        connection: {
+          uri: process.env.DATABASE_URL,
+          timezone: '+00:00',
+        },
+      });
     } catch (error) {
       console.warn("[Database] Failed to connect:", error);
       _db = null;
@@ -940,9 +946,10 @@ export async function getUpcomingTasks(tenantId: number, userId?: number, limit 
 
   const assigneeFilter = userId ? sql`AND t.assignedToUserId = ${userId}` : sql``;
 
-  // Get today's start and end for "focus of the day"
+  // Get today's start and end for "focus of the day" in SP timezone
   const now = new Date();
-  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const nowSP = new Date(now.toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
+  const todayStart = new Date(nowSP.getFullYear(), nowSP.getMonth(), nowSP.getDate());
   const todayEnd = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000);
 
   // Tasks that are: (1) due today and open/in_progress, OR (2) overdue (past due, still open)

@@ -1738,8 +1738,8 @@ export async function executeDateAutomation(auto: {
 }) {
   const db = await getDb(); if (!db) return { moved: 0 };
 
-  const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const nowSP = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
+  const today = new Date(nowSP.getFullYear(), nowSP.getMonth(), nowSP.getDate());
 
   // Build the date column reference
   const dateCol = auto.dateField === "boardingDate" ? deals.boardingDate

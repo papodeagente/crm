@@ -576,7 +576,7 @@ export default function Profile() {
 
                 {profile.googleCalendar.connectedAt && (
                   <p className="text-xs text-muted-foreground pt-2">
-                    Conectado em {new Date(profile.googleCalendar.connectedAt).toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" })}
+                    Conectado em {new Date(profile.googleCalendar.connectedAt).toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric", timeZone: "America/Sao_Paulo" })}
                   </p>
                 )}
               </div>
