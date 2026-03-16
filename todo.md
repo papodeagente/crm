@@ -3404,3 +3404,8 @@
 - [x] Problem 4: Unread counter delay — optimistic update via trpcUtils.whatsapp.waConversations.setData()
 - [x] Problem 5: Sound flood protection — SOUND_DEBOUNCE_MS=1500 + processedMsgRef dedup Set
 - [x] Add debug logs to verify triggers (eventType, fromMe, isSync, conversationId, activeConversation) — console.log with [NOTIF-DEBUG] prefix added
+
+## Bug: Sound still plays when agent sends messages from CRM
+- [x] Trace full flow: CRM send -> Evolution API -> webhook -> handleIncomingMessage -> emit -> frontend
+- [x] ROOT CAUSE: server/_core/index.ts was using `isSync: !!data.syncBatch` (ignoring data.isSync) and `timestamp: Date.now()` (overwriting original timestamp)
+- [x] Fix: _core/index.ts now passes `isSync: !!(data.isSync || data.syncBatch)`, original timestamp, pushName, and syncBatch

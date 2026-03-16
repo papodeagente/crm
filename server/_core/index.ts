@@ -64,8 +64,10 @@ async function startServer() {
       fromMe: data.fromMe,
       remoteJid: data.remoteJid,
       messageType: data.messageType,
-      timestamp: Date.now(),
-      isSync: !!data.syncBatch, // true for reconciliation/sync messages, false for real-time upsert
+      pushName: data.pushName || '',
+      timestamp: data.timestamp || Date.now(),
+      isSync: !!(data.isSync || data.syncBatch), // true for sync/poll/reconciliation messages
+      syncBatch: data.syncBatch || 0,
     });
   });
 
