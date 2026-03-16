@@ -3429,3 +3429,22 @@
 - [x] Bug fix: Socket event name aligned (whatsapp:transcription, not whatsapp:messageUpdated)
 - [x] Bug fix: Auto-trigger added in messageWorker.ts for incoming audio messages
 - [x] 38 unit tests passing for transcription system
+
+## Enterprise Inbox Stability Fix (16 Parts)
+- [x] Part 1: Preview is a clone of last message — optimistic cache update uses message data directly
+- [x] Part 2: Preview time correction — uses message.timestamp directly, timezone consistent
+- [x] Part 3: Preview update rule — only updates when message.timestamp > existing; status updates verify message IS the last message via timestamp match
+- [x] Part 4: Notification sound system rebuilt — 8 guards: dedup, fromMe, isSync, skipTypes, groups, muted, suppressed, activeConversation
+- [x] Part 5: Sound flood protection — 1500ms debounce in createNotificationSound()
+- [x] Part 6: Disable sound during chat hydration — 2s suppression window on conversation open
+- [x] Part 7: Message send delay fix — optimistic rendering already implemented (negative ID + pending status)
+- [x] Part 8: Inbox performance — replaced full refetch with optimistic cache update (setData) for messages, markRead, and status updates
+- [x] Part 9: Safe message history reconciliation — lightweight, no Evolution API overload
+- [x] Part 10: Reconciliation process — every 5min, max 10 convs, 15 msgs each, INSERT IGNORE for missing only
+- [x] Part 11: Only reconcile conversations with lastMessageAt > NOW() - 48h
+- [x] Part 12: Sync when opening conversation — fetch last 15 from Evolution, insert missing
+- [x] Part 13: Duplicate message protection — check messageId before insert (INSERT IGNORE + existingMsgIds Set)
+- [x] Part 14: Server load protection — skip reconciliation if CPU > 70% or queue > 500
+- [x] Part 15: Eventual consistency — reconciliation recovers missed events every 5min
+- [x] Part 16: Debug logging — [InboxDebug] logs on server emit + [Inbox] logs on frontend with all required fields
+- [x] 21 unit tests passing (inboxStability.test.ts) + 0 TypeScript errors

@@ -22,12 +22,16 @@ import { resolveInbound, updateConversationLastMessage } from "./conversationRes
 import os from "os";
 
 // ─── CONSTANTS ──────────────────────────────────────────────
-const MAX_CONVERSATIONS_PER_CYCLE = 20;
-const MAX_MESSAGES_PER_CONVERSATION = 10;
-const RECONCILIATION_INTERVAL_MS = 3 * 60 * 1000; // 3 minutes
+// Part 10: max 10 conversations per cycle, 15 messages each
+const MAX_CONVERSATIONS_PER_CYCLE = 10;
+const MAX_MESSAGES_PER_CONVERSATION = 15;
+// Part 10: run every 5 minutes
+const RECONCILIATION_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
+// Part 14: server load protection
 const CPU_THRESHOLD = 0.70; // 70%
 const QUEUE_LENGTH_THRESHOLD = 500;
-const RECENT_WINDOW_HOURS = 24;
+// Part 11: only reconcile conversations with activity in last 48h
+const RECENT_WINDOW_HOURS = 48;
 
 // ─── STATE ──────────────────────────────────────────────────
 let reconciliationInterval: ReturnType<typeof setInterval> | null = null;
@@ -187,7 +191,7 @@ async function reconcileConversation(
     if (r.messageId) existingMsgIds.add(r.messageId);
   }
 
-  // Fetch last 10 messages from Evolution API
+  // Part 10/12: Fetch last MAX_MESSAGES_PER_CONVERSATION messages from Evolution API
   const messages = await evo.findMessages(session.instanceName, conv.remoteJid, {
     limit: MAX_MESSAGES_PER_CONVERSATION,
     page: 1,
@@ -285,8 +289,9 @@ async function reconcileConversation(
 
 // ─── SYNC ON CONVERSATION OPEN ──────────────────────────────
 /**
- * Lightweight sync triggered when an agent opens a conversation.
- * Fetches last 10 messages and inserts only missing ones.
+ * Part 12: Lightweight sync triggered when an agent opens a conversation.
+ * Fetches last 15 messages and inserts only missing ones.
+ * Part 13: Deduplicates by messageId before insert.
  */
 export async function syncOnConversationOpen(
   sessionId: string,

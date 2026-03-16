@@ -1728,15 +1728,23 @@ class WhatsAppEvolutionManager extends EventEmitter {
             ));
         }
 
-        // Also update lastStatus in wa_conversations if this is the last message
-        if (remoteJid && fromMe) {
-          await db.update(waConversations)
-            .set({ lastStatus: newStatus })
+        // Part 3 fix: Only update lastStatus if this message IS the actual last message
+        // We verify by checking that the message's timestamp matches the conversation's lastMessageAt
+        // This prevents status updates for older messages from corrupting the preview
+        if (remoteJid && fromMe && messageId) {
+          // Get the message timestamp to compare with conversation's lastMessageAt
+          const [msgRow] = await db.select({ timestamp: waMessages.timestamp })
+            .from(waMessages)
             .where(and(
-              eq(waConversations.sessionId, session.sessionId),
-              eq(waConversations.remoteJid, remoteJid),
-              eq(waConversations.lastFromMe, true)
-            ));
+              eq(waMessages.sessionId, session.sessionId),
+              eq(waMessages.messageId, messageId)
+            ))
+            .limit(1);
+          if (msgRow?.timestamp) {
+            await db.execute(
+              sql`UPDATE wa_conversations SET lastStatus = ${newStatus} WHERE sessionId = ${session.sessionId} AND remoteJid = ${remoteJid} AND lastFromMe = true AND lastMessageAt = ${msgRow.timestamp}`
+            );
+          }
         }
 
         this.emit("message:status", {

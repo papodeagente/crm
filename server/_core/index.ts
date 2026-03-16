@@ -58,7 +58,7 @@ async function startServer() {
   });
 
   whatsappManager.on("message", (data) => {
-    io.emit("whatsapp:message", {
+    const payload = {
       sessionId: data.sessionId,
       content: data.content,
       fromMe: data.fromMe,
@@ -68,7 +68,18 @@ async function startServer() {
       timestamp: data.timestamp || Date.now(),
       isSync: !!(data.isSync || data.syncBatch), // true for sync/poll/reconciliation messages
       syncBatch: data.syncBatch || 0,
+    };
+    // Part 16: Debug logging
+    console.log('[InboxDebug] emit whatsapp:message', {
+      eventType: 'messages.upsert',
+      messageId: data.messageId || null,
+      remoteJid: data.remoteJid?.substring(0, 15),
+      timestamp: payload.timestamp,
+      fromMe: data.fromMe,
+      isSync: payload.isSync,
+      messageType: data.messageType,
     });
+    io.emit("whatsapp:message", payload);
   });
 
   // Forward media update events (no notification sound)
@@ -84,10 +95,18 @@ async function startServer() {
 
   // Forward message status updates to Socket.IO clients (delivered, read, played)
   whatsappManager.on("message:status", (data) => {
+    // Part 16: Debug logging
+    console.log('[InboxDebug] emit whatsapp:message:status', {
+      eventType: 'messages.update',
+      messageId: data.messageId,
+      status: data.status,
+      remoteJid: data.remoteJid?.substring(0, 15) || null,
+    });
     io.emit("whatsapp:message:status", {
       sessionId: data.sessionId,
       messageId: data.messageId,
       status: data.status,
+      remoteJid: data.remoteJid || null,
       timestamp: Date.now(),
     });
   });
