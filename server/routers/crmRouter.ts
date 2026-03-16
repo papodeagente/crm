@@ -12,7 +12,7 @@ export const crmRouter = router({
   // ─── CONTACTS ───
   contacts: router({
     list: protectedProcedure
-      .input(z.object({ tenantId: z.number(), search: z.string().optional(), stage: z.string().optional(), limit: z.number().default(50), offset: z.number().default(0), dateFrom: z.string().optional(), dateTo: z.string().optional() }))
+      .input(z.object({ tenantId: z.number(), search: z.string().optional(), stage: z.string().optional(), limit: z.number().default(50), offset: z.number().default(0), dateFrom: z.string().optional(), dateTo: z.string().optional(), customFieldFilters: z.array(z.object({ fieldId: z.number(), value: z.string() })).optional() }))
       .query(async ({ ctx, input }) => {
         // Non-admin users only see their own contacts
         const isAdmin = ctx.saasUser?.role === "admin";
@@ -50,6 +50,7 @@ export const crmRouter = router({
         tenantId: z.number(), id: z.number(), name: z.string().optional(), email: z.string().optional(),
         phone: z.string().optional(), lifecycleStage: z.enum(["lead", "prospect", "customer", "churned"]).optional(),
         notes: z.string().optional(), ownerUserId: z.number().optional(),
+        birthDate: z.string().nullable().optional(), weddingDate: z.string().nullable().optional(),
       }))
       .mutation(async ({ ctx, input }) => {
         const { tenantId, id, ...data } = input;

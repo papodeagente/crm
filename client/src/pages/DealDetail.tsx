@@ -143,6 +143,18 @@ export default function DealDetail() {
     { enabled: dealId > 0 }
   );
 
+  // Custom fields for contact and company contexts within the deal
+  const contactCustomFieldsQ = trpc.customFields.list.useQuery({ tenantId: TENANT_ID, entity: "contact" });
+  const companyCustomFieldsQ = trpc.customFields.list.useQuery({ tenantId: TENANT_ID, entity: "company" });
+  const contactCustomValuesQ = trpc.contactProfile.getCustomFieldValues.useQuery(
+    { tenantId: TENANT_ID, entityType: "contact", entityId: dealQ.data?.contactId || 0 },
+    { enabled: !!dealQ.data?.contactId && (dealQ.data?.contactId ?? 0) > 0 }
+  );
+  const companyCustomValuesQ = trpc.contactProfile.getCustomFieldValues.useQuery(
+    { tenantId: TENANT_ID, entityType: "company", entityId: dealQ.data?.accountId || 0 },
+    { enabled: !!dealQ.data?.accountId && (dealQ.data?.accountId ?? 0) > 0 }
+  );
+
   const leadSourcesQ = trpc.crm.leadSources.list.useQuery({ tenantId: TENANT_ID });
   const campaignsQ = trpc.crm.campaigns.list.useQuery({ tenantId: TENANT_ID });
 
@@ -200,7 +212,7 @@ export default function DealDetail() {
 
   /* ─── Sidebar collapsed sections ─── */
   const [sidebarSections, setSidebarSections] = useState({
-    deal: true, travel: true, contact: true, company: true, responsible: true, utm: false, rdFields: false, custom: false,
+    deal: true, travel: true, contact: true, company: true, responsible: true, utm: false, rdFields: false, custom: false, contactCustom: false, companyCustom: false,
   });
   const toggleSection = (key: keyof typeof sidebarSections) =>
     setSidebarSections((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -883,9 +895,9 @@ export default function DealDetail() {
               </>
             )}
 
-            {/* ── Campos Personalizados ── */}
+            {/* ── Campos Personalizados: Negociação ── */}
             <SidebarSection
-              title="Campos personalizados"
+              title="Campos da Negociação"
               open={sidebarSections.custom}
               onToggle={() => toggleSection("custom")}
             >
@@ -893,9 +905,50 @@ export default function DealDetail() {
                 fields={customFieldsQ.data || []}
                 values={customValuesQ.data || []}
                 dealId={dealId}
+                entityType="deal"
                 onRefresh={() => customValuesQ.refetch()}
               />
             </SidebarSection>
+
+            {/* ── Campos Personalizados: Contato ── */}
+            {deal?.contactId && (contactCustomFieldsQ.data as any[])?.length > 0 && (
+              <>
+                <SidebarDivider />
+                <SidebarSection
+                  title="Campos do Contato"
+                  open={sidebarSections.contactCustom || false}
+                  onToggle={() => toggleSection("contactCustom" as any)}
+                >
+                  <CustomFieldsSidebar
+                    fields={contactCustomFieldsQ.data || []}
+                    values={contactCustomValuesQ.data || []}
+                    dealId={deal.contactId}
+                    entityType="contact"
+                    onRefresh={() => contactCustomValuesQ.refetch()}
+                  />
+                </SidebarSection>
+              </>
+            )}
+
+            {/* ── Campos Personalizados: Empresa ── */}
+            {deal?.accountId && (companyCustomFieldsQ.data as any[])?.length > 0 && (
+              <>
+                <SidebarDivider />
+                <SidebarSection
+                  title="Campos da Empresa"
+                  open={sidebarSections.companyCustom || false}
+                  onToggle={() => toggleSection("companyCustom" as any)}
+                >
+                  <CustomFieldsSidebar
+                    fields={companyCustomFieldsQ.data || []}
+                    values={companyCustomValuesQ.data || []}
+                    dealId={deal.accountId}
+                    entityType="company"
+                    onRefresh={() => companyCustomValuesQ.refetch()}
+                  />
+                </SidebarSection>
+              </>
+            )}
           </div>
         </aside>
 
@@ -1499,7 +1552,7 @@ function ContactInfoRow({ icon: Icon, value, copyable, whatsapp }: {
 }
 
 /* ─── Custom Fields Sidebar ─── */
-function CustomFieldsSidebar({ fields, values, dealId, onRefresh }: any) {
+function CustomFieldsSidebar({ fields, values, dealId, entityType = "deal", onRefresh }: any) {
   const TENANT_ID = useTenantId();
   const setValuesM = trpc.contactProfile.setCustomFieldValues.useMutation({
     onSuccess: () => { onRefresh(); toast.success("Campos atualizados"); },
@@ -1533,11 +1586,11 @@ function CustomFieldsSidebar({ fields, values, dealId, onRefresh }: any) {
   function saveEdit() {
     const entries = Object.entries(editValues).map(([fid, val]) => ({
       fieldId: Number(fid),
-      value: val.trim() || null,
+      value: (val as string).trim() || null,
     }));
     setValuesM.mutate({
       tenantId: TENANT_ID,
-      entityType: "deal",
+      entityType: entityType,
       entityId: dealId,
       values: entries,
     });

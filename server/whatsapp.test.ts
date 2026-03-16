@@ -1058,7 +1058,7 @@ describe("customFields", () => {
     });
 
     it("should return custom fields for all entity types", async () => {
-      for (const entity of ["contact", "deal", "account", "trip"] as const) {
+      for (const entity of ["contact", "deal", "company"] as const) {
         const result = await caller.customFields.list({ tenantId: 1, entity });
         expect(Array.isArray(result)).toBe(true);
       }

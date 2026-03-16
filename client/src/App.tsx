@@ -47,6 +47,7 @@ const ClassificationSettings = lazyWithRetry(() => import("./pages/Classificatio
 const DateAutomationSettings = lazyWithRetry(() => import("./pages/DateAutomationSettings"));
 const SalesAutomationHub = lazyWithRetry(() => import("./pages/SalesAutomationHub"));
 const RfvMatrix = lazyWithRetry(() => import("./pages/RfvMatrix"));
+const BirthdayCalendar = lazyWithRetry(() => import("./pages/BirthdayCalendar"));
 const Campaigns = lazyWithRetry(() => import("./pages/Campaigns"));
 const Profile = lazyWithRetry(() => import("./pages/Profile"));
 const CampaignDetail = lazyWithRetry(() => import("./pages/CampaignDetail"));
@@ -109,6 +110,7 @@ function AppRouter() {
                 <Route path="/contact/:id" component={ContactProfile} />
                 <Route path="/inbox" component={InboxPage} />
                 <Route path="/rfv" component={RfvMatrix} />
+                <Route path="/birthdays" component={BirthdayCalendar} />
                 <Route path="/campaigns" component={Campaigns} />
                 <Route path="/campaigns/:id" component={CampaignDetail} />
                 <Route path="/whatsapp" component={WhatsApp} />

@@ -16,6 +16,8 @@ import { useTenantId } from "@/hooks/useTenantId";
 import { useIsAdmin } from "@/components/AdminOnlyGuard";
 import { Inbox as InboxIcon, ListOrdered, Contact2, LayoutGrid, HandMetal, Timer, ArrowRightLeft as Transfer } from "lucide-react";
 import InstantTooltip from "@/components/InstantTooltip";
+import CustomFieldRenderer, { customFieldValuesToArray } from "@/components/CustomFieldRenderer";
+import type { CustomFieldDef } from "@/components/CustomFieldRenderer";
 
 /* ═══════════════════════════════════════════════════════
    NOTIFICATION SOUND (Web Audio API — WhatsApp style)
@@ -425,18 +427,30 @@ function CreateContactDialog({
   const [email, setEmail] = useState("");
   const [notes, setNotes] = useState("");
   const [creating, setCreating] = useState(false);
+  const [customFieldValues, setCustomFieldValues] = useState<Record<number, string>>({});
 
   const formattedPhone = formatPhoneNumber(phone + "@s.whatsapp.net");
+
+  // Load custom fields for contacts
+  const contactCustomFields = trpc.customFields.list.useQuery(
+    { tenantId, entity: "contact" as const },
+    { enabled: open }
+  );
+  const formFields = useMemo(() => {
+    return ((contactCustomFields.data || []) as CustomFieldDef[]).filter(f => f.isVisibleOnForm);
+  }, [contactCustomFields.data]);
 
   useEffect(() => {
     if (open) {
       setName(pushName || "");
       setEmail("");
       setNotes("");
+      setCustomFieldValues({});
     }
   }, [open, pushName]);
 
   const createContact = trpc.crm.contacts.create.useMutation();
+  const setFieldValues = trpc.contactProfile.setCustomFieldValues.useMutation();
 
   const handleCreate = async () => {
     if (!name.trim()) return;
@@ -444,12 +458,22 @@ function CreateContactDialog({
     try {
       const cleaned = phone.replace(/\D/g, "");
       const formatted = cleaned.startsWith("55") ? `+${cleaned}` : `+55${cleaned}`;
-      await createContact.mutateAsync({
+      const result = await createContact.mutateAsync({
         tenantId,
         name: name.trim(),
         phone: formatted,
         email: email.trim() || undefined,
       });
+      // Save custom field values
+      const cfEntries = customFieldValuesToArray(customFieldValues).filter(v => v.value);
+      if (cfEntries.length > 0 && (result as any)?.id) {
+        await setFieldValues.mutateAsync({
+          tenantId,
+          entityType: "contact",
+          entityId: (result as any).id,
+          values: cfEntries,
+        });
+      }
       toast.success(`Contato "${name.trim()}" criado com sucesso`);
       onCreated();
     } catch (e: any) {
@@ -509,6 +533,19 @@ function CreateContactDialog({
               className="w-full px-3 py-2.5 border border-border rounded-xl text-sm text-foreground bg-background focus:outline-none focus:border-wa-tint focus:ring-1 focus:ring-wa-tint/30 resize-none transition-colors"
             />
           </div>
+          {/* Custom Fields */}
+          {formFields.length > 0 && (
+            <div className="border-t border-border pt-3">
+              <p className="text-[13px] text-muted-foreground mb-2 font-medium">Campos Personalizados</p>
+              <CustomFieldRenderer
+                fields={formFields}
+                values={customFieldValues}
+                onChange={(fieldId, value) => setCustomFieldValues(prev => ({ ...prev, [fieldId]: value }))}
+                mode="form"
+                compact
+              />
+            </div>
+          )}
         </div>
         <div className="flex items-center justify-end gap-3 px-5 py-4 border-t border-border">
           <button onClick={onClose} className="px-4 py-2 text-sm text-muted-foreground hover:bg-muted rounded-xl transition-colors">
@@ -541,6 +578,7 @@ function CreateDealDialog({
   const [, navigate] = useLocation();
   const [title, setTitle] = useState(`Negociação - ${contactName}`);
   const [value, setValue] = useState("");
+  const [customFieldValues, setCustomFieldValues] = useState<Record<number, string>>({});
 
   const pipelinesQ = trpc.crm.pipelines.list.useQuery({ tenantId });
   const pipelines = (pipelinesQ.data || []) as any[];
@@ -568,6 +606,16 @@ function CreateDealDialog({
   const createDeal = trpc.crm.deals.create.useMutation();
   const createContact = trpc.crm.contacts.create.useMutation();
   const contactsQ = trpc.crm.contacts.list.useQuery({ tenantId, limit: 500 });
+  const setFieldValues = trpc.contactProfile.setCustomFieldValues.useMutation();
+
+  // Load custom fields for deals
+  const dealCustomFields = trpc.customFields.list.useQuery(
+    { tenantId, entity: "deal" as const },
+    { enabled: open }
+  );
+  const formFields = useMemo(() => {
+    return ((dealCustomFields.data || []) as CustomFieldDef[]).filter(f => f.isVisibleOnForm);
+  }, [dealCustomFields.data]);
 
   const handleCreate = async () => {
     if (!title.trim() || !selectedPipelineId || !selectedStageId) return;
@@ -592,6 +640,16 @@ function CreateDealDialog({
         pipelineId: selectedPipelineId, stageId: selectedStageId,
         contactId: contactId || undefined,
       });
+      // Save custom field values for the deal
+      const cfEntries = customFieldValuesToArray(customFieldValues).filter(v => v.value);
+      if (cfEntries.length > 0 && (deal as any)?.id) {
+        await setFieldValues.mutateAsync({
+          tenantId,
+          entityType: "deal",
+          entityId: (deal as any).id,
+          values: cfEntries,
+        });
+      }
       toast.success("Negociação criada com sucesso!");
       onClose();
       navigate(`/deal/${(deal as any).id}`);
@@ -643,6 +701,19 @@ function CreateDealDialog({
                 className="w-full px-3 py-2.5 border border-border rounded-xl text-sm text-foreground bg-background focus:outline-none focus:border-primary">
                 {stages.map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
               </select>
+            </div>
+          )}
+          {/* Custom Fields */}
+          {formFields.length > 0 && (
+            <div className="border-t border-border pt-3">
+              <p className="text-[13px] text-muted-foreground mb-2 font-medium">Campos Personalizados</p>
+              <CustomFieldRenderer
+                fields={formFields}
+                values={customFieldValues}
+                onChange={(fieldId, value) => setCustomFieldValues(prev => ({ ...prev, [fieldId]: value }))}
+                mode="form"
+                compact
+              />
             </div>
           )}
         </div>

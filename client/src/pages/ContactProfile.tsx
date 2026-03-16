@@ -294,7 +294,7 @@ export default function ContactProfile() {
   const tenantId = useTenantId();
 
   const [isEditing, setIsEditing] = useState(false);
-  const [editData, setEditData] = useState<{ name: string; email: string; phone: string; notes: string }>({ name: "", email: "", phone: "", notes: "" });
+  const [editData, setEditData] = useState<{ name: string; email: string; phone: string; notes: string; birthDate: string; weddingDate: string }>({ name: "", email: "", phone: "", notes: "", birthDate: "", weddingDate: "" });
   const [customFieldEdits, setCustomFieldEdits] = useState<Record<number, string>>({});
   const [isEditingCustom, setIsEditingCustom] = useState(false);
 
@@ -364,6 +364,8 @@ export default function ContactProfile() {
       email: contact.email || "",
       phone: contact.phone || "",
       notes: contact.notes || "",
+      birthDate: contact.birthDate || "",
+      weddingDate: contact.weddingDate || "",
     });
     setIsEditing(true);
   }
@@ -375,6 +377,8 @@ export default function ContactProfile() {
       name: editData.name,
       email: editData.email || undefined,
       phone: editData.phone || undefined,
+      birthDate: editData.birthDate || null,
+      weddingDate: editData.weddingDate || null,
     });
   }
 
@@ -566,6 +570,29 @@ export default function ContactProfile() {
               {isEditing && (
                 <>
                   <Separator />
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs font-medium text-muted-foreground mb-1 block">Aniversário (MM-DD)</label>
+                      <Input
+                        value={editData.birthDate}
+                        onChange={(e) => setEditData({ ...editData, birthDate: e.target.value })}
+                        placeholder="03-15"
+                        className="bg-background/50"
+                        maxLength={5}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-muted-foreground mb-1 block">Casamento (MM-DD)</label>
+                      <Input
+                        value={editData.weddingDate}
+                        onChange={(e) => setEditData({ ...editData, weddingDate: e.target.value })}
+                        placeholder="06-20"
+                        className="bg-background/50"
+                        maxLength={5}
+                      />
+                    </div>
+                  </div>
+                  <Separator />
                   <div>
                     <label className="text-xs font-medium text-muted-foreground mb-1 block">Observações</label>
                     <Textarea
@@ -574,6 +601,33 @@ export default function ContactProfile() {
                       placeholder="Notas sobre o contato..."
                       className="bg-background/50 min-h-[80px]"
                     />
+                  </div>
+                </>
+              )}
+
+              {/* Birthday & Wedding display (view mode) */}
+              {!isEditing && (contact.birthDate || contact.weddingDate) && (
+                <>
+                  <Separator />
+                  <div className="grid grid-cols-2 gap-3 text-xs">
+                    {contact.birthDate && (
+                      <div>
+                        <span className="text-muted-foreground">Aniversário</span>
+                        <p className="text-foreground font-medium flex items-center gap-1">
+                          <Calendar className="h-3 w-3" />
+                          {contact.birthDate}
+                        </p>
+                      </div>
+                    )}
+                    {contact.weddingDate && (
+                      <div>
+                        <span className="text-muted-foreground">Casamento</span>
+                        <p className="text-foreground font-medium flex items-center gap-1">
+                          <Calendar className="h-3 w-3" />
+                          {contact.weddingDate}
+                        </p>
+                      </div>
+                    )}
                   </div>
                 </>
               )}

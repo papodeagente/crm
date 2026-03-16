@@ -4,7 +4,8 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Plus, Search, Users, Mail, Phone, MoreHorizontal, Trash2, Edit, Eye, RotateCcw, AlertTriangle, Archive, RefreshCw } from "lucide-react";
+import { Plus, Search, Users, Mail, Phone, MoreHorizontal, Trash2, Edit, Eye, RotateCcw, AlertTriangle, Archive, RefreshCw, Filter, X } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useState, useMemo } from "react";
 import CustomFieldRenderer, { customFieldValuesToArray, initCustomFieldValues } from "@/components/CustomFieldRenderer";
 import DateRangeFilter, { useDateFilter } from "@/components/DateRangeFilter";
@@ -39,10 +40,14 @@ export default function Contacts() {
   const { user } = useAuth();
   const isAdmin = user?.role === "admin";
   const dateFilter = useDateFilter("all");
+  const [customFieldFilters, setCustomFieldFilters] = useState<{ fieldId: number; value: string }[]>([]);
+  const [showFieldFilter, setShowFieldFilter] = useState(false);
+  const [filterFieldId, setFilterFieldId] = useState<number | null>(null);
+  const [filterValue, setFilterValue] = useState("");
 
   const [page, setPage] = useState(0);
   const pageSize = 50;
-  const contacts = trpc.crm.contacts.list.useQuery({ tenantId: TENANT_ID, search: search || undefined, limit: pageSize, offset: page * pageSize, dateFrom: dateFilter.dates.dateFrom, dateTo: dateFilter.dates.dateTo });
+  const contacts = trpc.crm.contacts.list.useQuery({ tenantId: TENANT_ID, search: search || undefined, limit: pageSize, offset: page * pageSize, dateFrom: dateFilter.dates.dateFrom, dateTo: dateFilter.dates.dateTo, customFieldFilters: customFieldFilters.length > 0 ? customFieldFilters : undefined });
   const deletedContacts = trpc.crm.contacts.listDeleted.useQuery({ tenantId: TENANT_ID, limit: 100 }, { enabled: showTrash });
 
   // Custom fields for contacts
@@ -205,16 +210,87 @@ export default function Contacts() {
         </div>
       </div>
 
-      {/* Search */}
+      {/* Search + Custom Field Filters */}
       {!showTrash && (
-        <div className="relative max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/50" />
-          <Input
-            className="pl-9 h-9 rounded-lg bg-muted/30 border-0 text-[13px] placeholder:text-muted-foreground/50 focus-visible:ring-1 focus-visible:ring-primary/30"
-            placeholder="Buscar contatos..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <div className="relative max-w-sm flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/50" />
+              <Input
+                className="pl-9 h-9 rounded-lg bg-muted/30 border-0 text-[13px] placeholder:text-muted-foreground/50 focus-visible:ring-1 focus-visible:ring-primary/30"
+                placeholder="Buscar contatos..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+            <Button
+              variant={showFieldFilter ? "default" : "outline"}
+              size="sm"
+              className="h-9 gap-1.5 rounded-lg text-[13px]"
+              onClick={() => setShowFieldFilter(!showFieldFilter)}
+            >
+              <Filter className="h-3.5 w-3.5" />
+              Filtrar por campo{customFieldFilters.length > 0 ? ` (${customFieldFilters.length})` : ""}
+            </Button>
+          </div>
+
+          {/* Custom field filter panel */}
+          {showFieldFilter && (contactCustomFields.data as any[])?.length > 0 && (
+            <div className="p-3 bg-muted/30 rounded-xl border border-border/40 space-y-2">
+              <div className="flex items-center gap-2">
+                <Select value={filterFieldId ? String(filterFieldId) : ""} onValueChange={(v) => setFilterFieldId(Number(v))}>
+                  <SelectTrigger className="h-8 text-[12px] w-48">
+                    <SelectValue placeholder="Selecione um campo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(contactCustomFields.data as any[]).map((f: any) => (
+                      <SelectItem key={f.id} value={String(f.id)}>{f.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Input
+                  className="h-8 text-[12px] flex-1 max-w-xs"
+                  placeholder="Valor do filtro..."
+                  value={filterValue}
+                  onChange={(e) => setFilterValue(e.target.value)}
+                />
+                <Button
+                  size="sm"
+                  className="h-8 text-[12px]"
+                  disabled={!filterFieldId || !filterValue.trim()}
+                  onClick={() => {
+                    if (filterFieldId && filterValue.trim()) {
+                      setCustomFieldFilters(prev => [...prev, { fieldId: filterFieldId, value: filterValue.trim() }]);
+                      setFilterFieldId(null);
+                      setFilterValue("");
+                      setPage(0);
+                    }
+                  }}
+                >
+                  Adicionar filtro
+                </Button>
+              </div>
+              {/* Active filters */}
+              {customFieldFilters.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {customFieldFilters.map((cf, idx) => {
+                    const field = (contactCustomFields.data as any[])?.find((f: any) => f.id === cf.fieldId);
+                    return (
+                      <span key={idx} className="inline-flex items-center gap-1 px-2 py-1 bg-primary/10 text-primary rounded-md text-[11px]">
+                        {field?.label || `#${cf.fieldId}`}: {cf.value}
+                        <button onClick={() => { setCustomFieldFilters(prev => prev.filter((_, i) => i !== idx)); setPage(0); }} className="hover:bg-primary/20 rounded-sm p-0.5">
+                          <X className="h-3 w-3" />
+                        </button>
+                      </span>
+                    );
+                  })}
+                  <button onClick={() => { setCustomFieldFilters([]); setPage(0); }} className="text-[11px] text-muted-foreground hover:text-foreground">
+                    Limpar todos
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 

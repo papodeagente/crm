@@ -141,7 +141,7 @@ export async function getContactById(tenantId: number, id: number) {
   const rows = await db.select().from(contacts).where(and(eq(contacts.id, id), eq(contacts.tenantId, tenantId))).limit(1);
   return rows[0] || null;
 }
-export async function listContacts(tenantId: number, opts?: { search?: string; stage?: string; limit?: number; offset?: number; includeDeleted?: boolean; dateFrom?: string; dateTo?: string; ownerUserId?: number }) {
+export async function listContacts(tenantId: number, opts?: { search?: string; stage?: string; limit?: number; offset?: number; includeDeleted?: boolean; dateFrom?: string; dateTo?: string; ownerUserId?: number; customFieldFilters?: { fieldId: number; value: string }[] }) {
   const db = await getDb(); if (!db) return [];
   const conditions: any[] = [eq(contacts.tenantId, tenantId)];
   if (!opts?.includeDeleted) conditions.push(isNull(contacts.deletedAt));
@@ -149,9 +149,17 @@ export async function listContacts(tenantId: number, opts?: { search?: string; s
   if (opts?.dateFrom) conditions.push(gte(contacts.createdAt, new Date(opts.dateFrom + "T00:00:00")));
   if (opts?.dateTo) conditions.push(lte(contacts.createdAt, new Date(opts.dateTo + "T23:59:59")));
   if (opts?.ownerUserId) conditions.push(eq(contacts.ownerUserId, opts.ownerUserId));
+  // Custom field filters: subquery to find matching entity IDs
+  if (opts?.customFieldFilters && opts.customFieldFilters.length > 0) {
+    for (const cf of opts.customFieldFilters) {
+      conditions.push(
+        sql`${contacts.id} IN (SELECT entityId FROM custom_field_values WHERE tenantId = ${tenantId} AND entityType = 'contact' AND fieldId = ${cf.fieldId} AND value LIKE ${'%' + cf.value + '%'})`
+      );
+    }
+  }
   return db.select().from(contacts).where(and(...conditions)).orderBy(desc(contacts.updatedAt)).limit(opts?.limit || 50).offset(opts?.offset || 0);
 }
-export async function updateContact(tenantId: number, id: number, data: Partial<{ name: string; email: string; phone: string; lifecycleStage: "lead" | "prospect" | "customer" | "churned"; notes: string; ownerUserId: number; updatedBy: number }>) {
+export async function updateContact(tenantId: number, id: number, data: Partial<{ name: string; email: string; phone: string; lifecycleStage: "lead" | "prospect" | "customer" | "churned"; notes: string; ownerUserId: number; updatedBy: number; birthDate: string | null; weddingDate: string | null }>) {
   const db = await getDb(); if (!db) return;
   // Normalize phone to canonical Brazilian format (+55DDNNNNNNNNN)
   if (data.phone) {
@@ -187,13 +195,20 @@ export async function listDeletedContacts(tenantId: number, limit = 50) {
   const db = await getDb(); if (!db) return [];
   return db.select().from(contacts).where(and(eq(contacts.tenantId, tenantId), isNotNull(contacts.deletedAt))).orderBy(desc(contacts.deletedAt)).limit(limit);
 }
-export async function countContacts(tenantId: number, opts?: { search?: string; stage?: string; dateFrom?: string; dateTo?: string; ownerUserId?: number }) {
+export async function countContacts(tenantId: number, opts?: { search?: string; stage?: string; dateFrom?: string; dateTo?: string; ownerUserId?: number; customFieldFilters?: { fieldId: number; value: string }[] }) {
   const db = await getDb(); if (!db) return 0;
   const conditions: any[] = [eq(contacts.tenantId, tenantId), isNull(contacts.deletedAt)];
   if (opts?.search) conditions.push(like(contacts.name, `%${opts.search}%`));
   if (opts?.dateFrom) conditions.push(gte(contacts.createdAt, new Date(opts.dateFrom + "T00:00:00")));
   if (opts?.dateTo) conditions.push(lte(contacts.createdAt, new Date(opts.dateTo + "T23:59:59")));
   if (opts?.ownerUserId) conditions.push(eq(contacts.ownerUserId, opts.ownerUserId));
+  if (opts?.customFieldFilters && opts.customFieldFilters.length > 0) {
+    for (const cf of opts.customFieldFilters) {
+      conditions.push(
+        sql`${contacts.id} IN (SELECT entityId FROM custom_field_values WHERE tenantId = ${tenantId} AND entityType = 'contact' AND fieldId = ${cf.fieldId} AND value LIKE ${'%' + cf.value + '%'})`
+      );
+    }
+  }
   const rows = await db.select({ count: sql<number>`count(*)` }).from(contacts).where(and(...conditions));
   return rows[0]?.count || 0;
 }
@@ -1839,4 +1854,59 @@ export async function getWhatsAppUnreadByContact(tenantId: number): Promise<Reco
     if (row.contactId && Number(row.totalUnread) > 0) result[row.contactId] = Number(row.totalUnread);
   }
   return result;
+}
+
+// ═══════════════════════════════════════
+// BIRTHDAY & WEDDING DATE QUERIES
+// ═══════════════════════════════════════
+export async function getContactsWithUpcomingDates(tenantId: number, opts: { daysAhead?: number; dateType: "birthDate" | "weddingDate" }) {
+  const db = await getDb(); if (!db) return [];
+  const daysAhead = opts.daysAhead ?? 7;
+  // Get today's MM-DD and the date daysAhead days from now MM-DD
+  const today = new Date();
+  const dates: string[] = [];
+  for (let i = 0; i <= daysAhead; i++) {
+    const d = new Date(today);
+    d.setDate(d.getDate() + i);
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    dates.push(`${mm}-${dd}`);
+  }
+  const col = opts.dateType === "birthDate" ? contacts.birthDate : contacts.weddingDate;
+  return db.select().from(contacts).where(
+    and(
+      eq(contacts.tenantId, tenantId),
+      isNull(contacts.deletedAt),
+      inArray(col, dates)
+    )
+  ).orderBy(col);
+}
+
+export async function getContactsWithDateToday(tenantId: number, dateType: "birthDate" | "weddingDate") {
+  const db = await getDb(); if (!db) return [];
+  const today = new Date();
+  const mm = String(today.getMonth() + 1).padStart(2, "0");
+  const dd = String(today.getDate()).padStart(2, "0");
+  const todayStr = `${mm}-${dd}`;
+  const col = dateType === "birthDate" ? contacts.birthDate : contacts.weddingDate;
+  return db.select().from(contacts).where(
+    and(
+      eq(contacts.tenantId, tenantId),
+      isNull(contacts.deletedAt),
+      eq(col, todayStr)
+    )
+  );
+}
+
+export async function getContactsWithDateInMonth(tenantId: number, month: number, dateType: "birthDate" | "weddingDate") {
+  const db = await getDb(); if (!db) return [];
+  const mm = String(month).padStart(2, "0");
+  const col = dateType === "birthDate" ? contacts.birthDate : contacts.weddingDate;
+  return db.select().from(contacts).where(
+    and(
+      eq(contacts.tenantId, tenantId),
+      isNull(contacts.deletedAt),
+      like(col, `${mm}-%`)
+    )
+  ).orderBy(col);
 }

@@ -47,8 +47,8 @@ describe("customFields", () => {
     expect(Array.isArray(result)).toBe(true);
   });
 
-  it("lists custom fields for account entity", async () => {
-    const result = await caller.customFields.list({ tenantId: TENANT_ID, entity: "account" });
+  it("lists custom fields for company entity", async () => {
+    const result = await caller.customFields.list({ tenantId: TENANT_ID, entity: "company" });
     expect(Array.isArray(result)).toBe(true);
   });
 
@@ -225,5 +225,144 @@ describe("contactProfile.customFieldValues", () => {
     await caller.customFields.delete({ tenantId: TENANT_ID, id: testFieldId });
     const check = await caller.customFields.get({ tenantId: TENANT_ID, id: testFieldId });
     expect(check).toBeNull();
+  });
+});
+
+describe("dateCelebrations", () => {
+  const ctx = createTestContext();
+  const caller = appRouter.createCaller(ctx);
+
+  it("queries upcoming birthdays without error", async () => {
+    const result = await caller.dateCelebrations.upcoming({
+      tenantId: TENANT_ID,
+      dateType: "birthDate",
+      daysAhead: 7,
+    });
+    expect(Array.isArray(result)).toBe(true);
+  });
+
+  it("queries upcoming weddings without error", async () => {
+    const result = await caller.dateCelebrations.upcoming({
+      tenantId: TENANT_ID,
+      dateType: "weddingDate",
+      daysAhead: 14,
+    });
+    expect(Array.isArray(result)).toBe(true);
+  });
+
+  it("queries today's birthdays without error", async () => {
+    const result = await caller.dateCelebrations.today({
+      tenantId: TENANT_ID,
+      dateType: "birthDate",
+    });
+    expect(Array.isArray(result)).toBe(true);
+  });
+
+  it("queries birthdays in a specific month", async () => {
+    const result = await caller.dateCelebrations.inMonth({
+      tenantId: TENANT_ID,
+      month: 3,
+      dateType: "birthDate",
+    });
+    expect(Array.isArray(result)).toBe(true);
+  });
+
+  it("queries weddings in a specific month", async () => {
+    const result = await caller.dateCelebrations.inMonth({
+      tenantId: TENANT_ID,
+      month: 6,
+      dateType: "weddingDate",
+    });
+    expect(Array.isArray(result)).toBe(true);
+  });
+});
+
+describe("preferences for birthday days ahead", () => {
+  const ctx = createTestContext();
+  const caller = appRouter.createCaller(ctx);
+
+  it("sets and gets birthdayDaysAhead preference", async () => {
+    await caller.preferences.set({
+      tenantId: TENANT_ID,
+      key: "birthdayDaysAhead",
+      value: "14",
+    });
+
+    const result = await caller.preferences.get({
+      tenantId: TENANT_ID,
+      key: "birthdayDaysAhead",
+    });
+    expect(result.value).toBe("14");
+  });
+
+  it("updates birthdayDaysAhead preference", async () => {
+    await caller.preferences.set({
+      tenantId: TENANT_ID,
+      key: "birthdayDaysAhead",
+      value: "30",
+    });
+
+    const result = await caller.preferences.get({
+      tenantId: TENANT_ID,
+      key: "birthdayDaysAhead",
+    });
+    expect(result.value).toBe("30");
+  });
+});
+
+describe("custom fields for company entity", () => {
+  const ctx = createTestContext();
+  const caller = appRouter.createCaller(ctx);
+  let fieldId: number | null = null;
+
+  it("creates a company custom field", async () => {
+    const result = await caller.customFields.create({
+      tenantId: TENANT_ID,
+      entity: "company",
+      name: "test_company_field_vitest",
+      label: "Test Company Field",
+      fieldType: "text",
+      isVisibleOnForm: true,
+      isVisibleOnProfile: true,
+    });
+    expect(result).toBeTruthy();
+    expect(result.entity).toBe("company");
+    fieldId = result.id;
+  });
+
+  it("lists company fields and finds the created one", async () => {
+    const result = await caller.customFields.list({ tenantId: TENANT_ID, entity: "company" });
+    expect(Array.isArray(result)).toBe(true);
+    if (fieldId) {
+      const found = result.find((f: any) => f.id === fieldId);
+      expect(found).toBeTruthy();
+    }
+  });
+
+  it("sets custom field values for a company", async () => {
+    if (!fieldId) return;
+    const result = await caller.contactProfile.setCustomFieldValues({
+      tenantId: TENANT_ID,
+      entityType: "company",
+      entityId: 1,
+      values: [{ fieldId, value: "Company Test Value" }],
+    });
+    expect(result).toEqual({ success: true });
+  });
+
+  it("gets custom field values for a company", async () => {
+    if (!fieldId) return;
+    const result = await caller.contactProfile.getCustomFieldValues({
+      tenantId: TENANT_ID,
+      entityType: "company",
+      entityId: 1,
+    });
+    const found = result.find((v: any) => v.fieldId === fieldId);
+    expect(found?.value).toBe("Company Test Value");
+  });
+
+  it("cleans up company test field", async () => {
+    if (!fieldId) return;
+    await caller.customFields.delete({ tenantId: TENANT_ID, id: fieldId });
   });
 });

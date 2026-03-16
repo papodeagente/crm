@@ -218,6 +218,9 @@ async function startServer() {
     // Start RFV notification scheduler
     import("../rfvNotificationScheduler").then(m => m.startRfvNotificationScheduler());
 
+    // Start birthday/wedding notification scheduler
+    import("../birthdayScheduler").then(m => m.startBirthdayScheduler());
+
     // Auto-restore WhatsApp sessions that were connected before server restart
     // Delayed by 10s to let the server fully initialize first
     setTimeout(() => {

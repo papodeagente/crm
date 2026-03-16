@@ -135,3 +135,159 @@ export async function sendPasswordResetEmail(opts: {
     html,
   });
 }
+
+// ═══════════════════════════════════════
+// BIRTHDAY & WEDDING DATE EMAILS
+// ═══════════════════════════════════════
+
+export async function sendBirthdayNotificationEmail(opts: {
+  to: string;
+  contacts: { name: string; birthDate: string; phone?: string | null }[];
+  daysAhead: number;
+}) {
+  const contactRows = opts.contacts.map(c =>
+    `<tr>
+      <td style="padding:8px 12px;border-bottom:1px solid #f1f5f9;font-size:14px;color:#1e293b;">${c.name}</td>
+      <td style="padding:8px 12px;border-bottom:1px solid #f1f5f9;font-size:14px;color:#64748b;">${c.birthDate}</td>
+      <td style="padding:8px 12px;border-bottom:1px solid #f1f5f9;font-size:14px;color:#64748b;">${c.phone || '-'}</td>
+    </tr>`
+  ).join("");
+
+  const html = baseTemplate(`
+    <h2 style="color:#1e293b;font-size:20px;font-weight:600;margin:0 0 8px;">🎂 Aniversariantes</h2>
+    <p style="color:#64748b;font-size:14px;margin:0 0 20px;line-height:1.5;">
+      ${opts.contacts.length} contato(s) fazem aniversário nos próximos ${opts.daysAhead} dias:
+    </p>
+    <table style="width:100%;border-collapse:collapse;margin-bottom:16px;">
+      <thead>
+        <tr style="background:#f8fafc;">
+          <th style="padding:8px 12px;text-align:left;font-size:12px;color:#94a3b8;font-weight:600;text-transform:uppercase;">Nome</th>
+          <th style="padding:8px 12px;text-align:left;font-size:12px;color:#94a3b8;font-weight:600;text-transform:uppercase;">Data</th>
+          <th style="padding:8px 12px;text-align:left;font-size:12px;color:#94a3b8;font-weight:600;text-transform:uppercase;">Telefone</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${contactRows}
+      </tbody>
+    </table>
+    <p style="color:#94a3b8;font-size:12px;margin:0;line-height:1.5;">
+      Aproveite para enviar uma mensagem especial para seus clientes!
+    </p>
+  `);
+
+  return sendEmail({
+    to: opts.to,
+    subject: `🎂 ${opts.contacts.length} aniversariante(s) nos próximos ${opts.daysAhead} dias — ${APP_NAME}`,
+    html,
+  });
+}
+
+export async function sendWeddingNotificationEmail(opts: {
+  to: string;
+  contacts: { name: string; weddingDate: string; phone?: string | null }[];
+  daysAhead: number;
+}) {
+  const contactRows = opts.contacts.map(c =>
+    `<tr>
+      <td style="padding:8px 12px;border-bottom:1px solid #f1f5f9;font-size:14px;color:#1e293b;">${c.name}</td>
+      <td style="padding:8px 12px;border-bottom:1px solid #f1f5f9;font-size:14px;color:#64748b;">${c.weddingDate}</td>
+      <td style="padding:8px 12px;border-bottom:1px solid #f1f5f9;font-size:14px;color:#64748b;">${c.phone || '-'}</td>
+    </tr>`
+  ).join("");
+
+  const html = baseTemplate(`
+    <h2 style="color:#1e293b;font-size:20px;font-weight:600;margin:0 0 8px;">💍 Aniversários de Casamento</h2>
+    <p style="color:#64748b;font-size:14px;margin:0 0 20px;line-height:1.5;">
+      ${opts.contacts.length} contato(s) celebram aniversário de casamento nos próximos ${opts.daysAhead} dias:
+    </p>
+    <table style="width:100%;border-collapse:collapse;margin-bottom:16px;">
+      <thead>
+        <tr style="background:#f8fafc;">
+          <th style="padding:8px 12px;text-align:left;font-size:12px;color:#94a3b8;font-weight:600;text-transform:uppercase;">Nome</th>
+          <th style="padding:8px 12px;text-align:left;font-size:12px;color:#94a3b8;font-weight:600;text-transform:uppercase;">Data</th>
+          <th style="padding:8px 12px;text-align:left;font-size:12px;color:#94a3b8;font-weight:600;text-transform:uppercase;">Telefone</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${contactRows}
+      </tbody>
+    </table>
+    <p style="color:#94a3b8;font-size:12px;margin:0;line-height:1.5;">
+      Aproveite para parabenizar seus clientes!
+    </p>
+  `);
+
+  return sendEmail({
+    to: opts.to,
+    subject: `💍 ${opts.contacts.length} aniversário(s) de casamento nos próximos ${opts.daysAhead} dias — ${APP_NAME}`,
+    html,
+  });
+}
+
+export async function sendMonthlyBirthdayReport(opts: {
+  to: string;
+  month: number;
+  year: number;
+  birthdayContacts: { name: string; birthDate: string; phone?: string | null }[];
+  weddingContacts: { name: string; weddingDate: string; phone?: string | null }[];
+}) {
+  const monthNames = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+  const monthName = monthNames[opts.month - 1] || `Mês ${opts.month}`;
+
+  const birthdayRows = opts.birthdayContacts.map(c =>
+    `<tr>
+      <td style="padding:6px 12px;border-bottom:1px solid #f1f5f9;font-size:13px;color:#1e293b;">${c.name}</td>
+      <td style="padding:6px 12px;border-bottom:1px solid #f1f5f9;font-size:13px;color:#64748b;">${c.birthDate}</td>
+      <td style="padding:6px 12px;border-bottom:1px solid #f1f5f9;font-size:13px;color:#64748b;">${c.phone || '-'}</td>
+    </tr>`
+  ).join("");
+
+  const weddingRows = opts.weddingContacts.map(c =>
+    `<tr>
+      <td style="padding:6px 12px;border-bottom:1px solid #f1f5f9;font-size:13px;color:#1e293b;">${c.name}</td>
+      <td style="padding:6px 12px;border-bottom:1px solid #f1f5f9;font-size:13px;color:#64748b;">${c.weddingDate}</td>
+      <td style="padding:6px 12px;border-bottom:1px solid #f1f5f9;font-size:13px;color:#64748b;">${c.phone || '-'}</td>
+    </tr>`
+  ).join("");
+
+  const html = baseTemplate(`
+    <h2 style="color:#1e293b;font-size:20px;font-weight:600;margin:0 0 8px;">📅 Relatório Mensal — ${monthName} ${opts.year}</h2>
+    <p style="color:#64748b;font-size:14px;margin:0 0 20px;line-height:1.5;">
+      Confira os aniversariantes e datas de casamento do mês.
+    </p>
+
+    ${opts.birthdayContacts.length > 0 ? `
+    <h3 style="color:#1e293b;font-size:16px;font-weight:600;margin:0 0 8px;">🎂 Aniversariantes (${opts.birthdayContacts.length})</h3>
+    <table style="width:100%;border-collapse:collapse;margin-bottom:20px;">
+      <thead>
+        <tr style="background:#f8fafc;">
+          <th style="padding:6px 12px;text-align:left;font-size:11px;color:#94a3b8;font-weight:600;">Nome</th>
+          <th style="padding:6px 12px;text-align:left;font-size:11px;color:#94a3b8;font-weight:600;">Data</th>
+          <th style="padding:6px 12px;text-align:left;font-size:11px;color:#94a3b8;font-weight:600;">Telefone</th>
+        </tr>
+      </thead>
+      <tbody>${birthdayRows}</tbody>
+    </table>
+    ` : '<p style="color:#94a3b8;font-size:13px;">Nenhum aniversariante neste mês.</p>'}
+
+    ${opts.weddingContacts.length > 0 ? `
+    <h3 style="color:#1e293b;font-size:16px;font-weight:600;margin:0 0 8px;">💍 Aniversários de Casamento (${opts.weddingContacts.length})</h3>
+    <table style="width:100%;border-collapse:collapse;margin-bottom:20px;">
+      <thead>
+        <tr style="background:#f8fafc;">
+          <th style="padding:6px 12px;text-align:left;font-size:11px;color:#94a3b8;font-weight:600;">Nome</th>
+          <th style="padding:6px 12px;text-align:left;font-size:11px;color:#94a3b8;font-weight:600;">Data</th>
+          <th style="padding:6px 12px;text-align:left;font-size:11px;color:#94a3b8;font-weight:600;">Telefone</th>
+        </tr>
+      </thead>
+      <tbody>${weddingRows}</tbody>
+    </table>
+    ` : '<p style="color:#94a3b8;font-size:13px;">Nenhum aniversário de casamento neste mês.</p>'}
+  `);
+
+  return sendEmail({
+    to: opts.to,
+    subject: `📅 Aniversariantes de ${monthName} ${opts.year} — ${APP_NAME}`,
+    html,
+  });
+}

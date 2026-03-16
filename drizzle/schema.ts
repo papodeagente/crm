@@ -311,6 +311,9 @@ export const contacts = mysqlTable("contacts", {
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   createdBy: int("createdBy"),
   updatedBy: int("updatedBy"),
+  // Date fields for birthday/wedding notifications
+  birthDate: varchar("birthDate", { length: 10 }), // MM-DD format
+  weddingDate: varchar("weddingDate", { length: 10 }), // MM-DD format
   deletedAt: timestamp("deletedAt"),
 }, (t) => [
   index("contacts_tenant_idx").on(t.tenantId),
@@ -988,7 +991,7 @@ export const eventLog = mysqlTable("event_log", {
 export const customFields = mysqlTable("custom_fields", {
   id: int("id").autoincrement().primaryKey(),
   tenantId: int("tenantId").notNull(),
-  entity: mysqlEnum("entity", ["contact", "deal", "account", "trip"]).default("contact").notNull(),
+  entity: mysqlEnum("entity", ["contact", "deal", "company"]).default("contact").notNull(),
   name: varchar("name", { length: 128 }).notNull(), // slug/key
   label: varchar("label", { length: 255 }).notNull(), // display label
   fieldType: mysqlEnum("fieldType", ["text", "number", "date", "select", "multiselect", "checkbox", "textarea", "email", "phone", "url", "currency"]).default("text").notNull(),
@@ -1011,7 +1014,7 @@ export const customFieldValues = mysqlTable("custom_field_values", {
   id: int("id").autoincrement().primaryKey(),
   tenantId: int("tenantId").notNull(),
   fieldId: int("fieldId").notNull(),
-  entityType: mysqlEnum("entityType", ["contact", "deal", "account", "trip"]).default("contact").notNull(),
+  entityType: mysqlEnum("entityType", ["contact", "deal", "company"]).default("contact").notNull(),
   entityId: int("entityId").notNull(),
   value: text("value"), // stored as string, parsed by fieldType
   createdAt: timestamp("createdAt").defaultNow().notNull(),

@@ -1714,6 +1714,39 @@ export const appRouter = router({
       }),
   }),
 
+  // ─── Birthday & Wedding Dates ───
+  dateCelebrations: router({
+    upcoming: protectedProcedure
+      .input(z.object({
+        tenantId: z.number(),
+        dateType: z.enum(["birthDate", "weddingDate"]),
+        daysAhead: z.number().default(7),
+      }))
+      .query(async ({ input }) => {
+        const crm = await import("./crmDb");
+        return crm.getContactsWithUpcomingDates(input.tenantId, { daysAhead: input.daysAhead, dateType: input.dateType });
+      }),
+    today: protectedProcedure
+      .input(z.object({
+        tenantId: z.number(),
+        dateType: z.enum(["birthDate", "weddingDate"]),
+      }))
+      .query(async ({ input }) => {
+        const crm = await import("./crmDb");
+        return crm.getContactsWithDateToday(input.tenantId, input.dateType);
+      }),
+    inMonth: protectedProcedure
+      .input(z.object({
+        tenantId: z.number(),
+        month: z.number().min(1).max(12),
+        dateType: z.enum(["birthDate", "weddingDate"]),
+      }))
+      .query(async ({ input }) => {
+        const crm = await import("./crmDb");
+        return crm.getContactsWithDateInMonth(input.tenantId, input.month, input.dateType);
+      }),
+  }),
+
   // ─── Team & Agent Management ───
   teamManagement: router({
     // ── Teams CRUD ──
@@ -1939,14 +1972,14 @@ export const appRouter = router({
         return getContactDeals(input.tenantId, input.contactId);
       }),
     getCustomFieldValues: protectedProcedure
-      .input(z.object({ tenantId: z.number(), entityType: z.enum(["contact", "deal", "account", "trip"]), entityId: z.number() }))
+      .input(z.object({ tenantId: z.number(), entityType: z.enum(["contact", "deal", "company"]), entityId: z.number() }))
       .query(async ({ input }) => {
         return getCustomFieldValues(input.tenantId, input.entityType, input.entityId);
       }),
     setCustomFieldValues: protectedProcedure
       .input(z.object({
         tenantId: z.number(),
-        entityType: z.enum(["contact", "deal", "account", "trip"]),
+        entityType: z.enum(["contact", "deal", "company"]),
         entityId: z.number(),
         values: z.array(z.object({ fieldId: z.number(), value: z.string().nullable() })),
       }))
@@ -1958,7 +1991,7 @@ export const appRouter = router({
 
   customFields: router({
     list: protectedProcedure
-      .input(z.object({ tenantId: z.number(), entity: z.enum(["contact", "deal", "account", "trip"]) }))
+      .input(z.object({ tenantId: z.number(), entity: z.enum(["contact", "deal", "company"]) }))
       .query(async ({ input }) => {
         return listCustomFields(input.tenantId, input.entity);
       }),
@@ -1970,7 +2003,7 @@ export const appRouter = router({
     create: protectedProcedure
       .input(z.object({
         tenantId: z.number(),
-        entity: z.enum(["contact", "deal", "account", "trip"]),
+        entity: z.enum(["contact", "deal", "company"]),
         name: z.string().min(1).max(128),
         label: z.string().min(1).max(255),
         fieldType: z.enum(["text", "number", "date", "select", "multiselect", "checkbox", "textarea", "email", "phone", "url", "currency"]),
@@ -2012,7 +2045,7 @@ export const appRouter = router({
         return { success: true };
       }),
     reorder: protectedProcedure
-      .input(z.object({ tenantId: z.number(), entity: z.enum(["contact", "deal", "account", "trip"]), orderedIds: z.array(z.number()) }))
+      .input(z.object({ tenantId: z.number(), entity: z.enum(["contact", "deal", "company"]), orderedIds: z.array(z.number()) }))
       .mutation(async ({ input }) => {
         await reorderCustomFields(input.tenantId, input.entity, input.orderedIds);
         return { success: true };

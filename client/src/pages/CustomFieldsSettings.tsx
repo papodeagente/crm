@@ -54,8 +54,7 @@ const FIELD_TYPES = [
 const ENTITIES = [
   { value: "contact", label: "Contatos" },
   { value: "deal", label: "Negociações" },
-  { value: "account", label: "Contas" },
-  { value: "trip", label: "Viagens" },
+  { value: "company", label: "Empresas" },
 ];
 
 function getFieldIcon(fieldType: string) {

@@ -3569,3 +3569,69 @@
 - [x] Preparar estrutura para filtros futuros (índices, queries)
 - [x] Escrever testes unitários para ciclo completo de campos personalizados (14 testes passando)
 - [x] Validar ciclo: criar campo → preencher → salvar → reabrir → editar → persistir
+
+## Correção Completa de Campos Personalizados v2
+
+### 1. Correção do seletor de entidades
+- [x] Remover opções "conta" e "viagem" da página de cadastro de campos personalizados
+- [x] Aceitar apenas contato, empresa e negociação como entidades válidas
+- [x] Corrigir enum/schema/validação/backend para restringir entidades
+
+### 2. Reconhecimento e sincronização dos campos
+- [x] Campos aparecem imediatamente após criação em todos os pontos relevantes
+- [x] Campos aparecem na criação de contatos (todos os modais/dialogs)
+- [x] Campos aparecem na criação de empresas
+- [x] Campos aparecem na criação de negociações
+- [x] Campos aparecem na criação originada pelo inbox
+- [x] Campos aparecem na edição/perfil de cada entidade
+- [x] Respeitar visibilidade: visível no cadastro, visível no perfil, oculto
+
+### 3. Separação por contexto dentro da negociação
+- [x] Campos de Contato aparecem na seção de contato da negociação
+- [x] Campos de Empresa aparecem na seção de empresa da negociação
+- [x] Campos de Negociação aparecem na própria negociação
+- [x] Não misturar campos entre entidades
+
+### 4. Filtros baseados em respostas
+- [x] Implementar filtros de lista por campos personalizados em Contatos
+- [ ] Implementar filtros de lista por campos personalizados em Negociações (futuro)
+- [ ] Implementar filtros de lista por campos personalizados em Empresas (futuro)
+- [x] Suportar filtros para tipos: texto, número, data, seleção, multiselect, booleano
+
+### 5. Campos padrão de contato
+- [x] Criar campo padrão "Data de aniversário" em Contato (coluna birthDate no schema)
+- [x] Criar campo padrão "Data do casamento" em Contato (coluna weddingDate no schema)
+- [x] Campos padrão funcionam no cadastro, edição, perfil e filtros
+
+### 6. Notificações de eventos importantes
+- [x] Notificação no sistema para aniversários
+- [x] Notificação no sistema para datas de casamento
+- [x] Notificação por e-mail para aniversários
+- [x] Notificação por e-mail para datas de casamento
+
+### 7. E-mail mensal de aniversariantes
+- [x] Enviar e-mail no dia 25 do mês com aniversariantes do mês seguinte
+- [x] Considerar contatos com data de aniversário e casamento cadastrada
+- [x] Integrar com sistema de jobs/cron existente (birthdayScheduler.ts)
+
+### 8. Antecedência configurável
+- [x] Permitir configurar antecedência para notificação de aniversário (preferência birthdayDaysAhead)
+- [x] Permitir configurar antecedência para notificação de casamento (mesma preferência)
+- [x] Campo numérico livre (1-90 dias) na página Datas Comemorativas
+- [x] Aplicar antecedência tanto para notificação no sistema quanto por e-mail
+
+### 9. Regra empresa + contato
+- [x] Toda empresa deve ter contato atrelado (implementado na v1)
+- [x] Criar empresa com contato existente
+- [x] Criar empresa criando novo contato no fluxo
+- [x] Impedir salvar empresa sem contato
+- [x] Não quebrar dados legados sem contato
+
+### 10. Multi-tenant e permissões
+- [x] Cada tenant vê apenas seus campos e valores
+- [x] Notificações respeitam tenant
+- [x] Sem vazamento entre contas
+
+### 11. Testes
+- [x] Testes unitários para ciclo completo de campos personalizados (26 testes passando)
+- [x] Validar que nenhum fluxo existente foi quebrado (1906 testes passando, 4 falhas pré-existentes em whatsappDailyBackup/messageQueue)
