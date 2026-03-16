@@ -1624,7 +1624,7 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
     "groupInviteMessage", "lottieStickerMessage",
   ]);
 
-  // Group messages by date
+  // Group messages by date (merging internal notes chronologically)
   const groupedMessages = useMemo(() => {
     // Known media types that will render via MediaLoader even without content
     const MEDIA_TYPES = new Set([
@@ -1636,7 +1636,7 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
       "locationMessage", "contactMessage", "contactsArrayMessage",
       "pollCreationMessage", "pollCreationMessageV3",
     ]);
-    const msgs = [...(messagesQ.data || [])].reverse()
+    const msgs: Message[] = [...(messagesQ.data || [])].reverse()
       .filter(m => {
         // Always hide protocol/system messages
         if (HIDDEN_MSG_TYPES.has(m.messageType)) return false;
@@ -1651,9 +1651,35 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
         if (/^\[\w+\]$/.test(content)) return false;
         return true;
       });
+
+    // Merge internal notes as virtual messages with messageType='internal_note'
+    const noteItems: Message[] = ((notesQ.data || []) as any[]).map((note: any) => ({
+      id: -note.id, // negative to avoid collision with real message IDs
+      sessionId: "",
+      messageId: `note_${note.id}`,
+      remoteJid: "",
+      fromMe: true, // notes always appear on the right side
+      messageType: "internal_note",
+      content: note.content,
+      mediaUrl: null,
+      status: null,
+      timestamp: note.createdAt,
+      createdAt: note.createdAt,
+      // Extra note metadata stored in unused fields
+      pushName: note.authorName || "Agente",
+      mediaFileName: note.authorAvatar || null,
+    } as any));
+
+    // Combine and sort chronologically
+    const combined = [...msgs, ...noteItems].sort((a, b) => {
+      const tA = new Date(a.timestamp || a.createdAt).getTime();
+      const tB = new Date(b.timestamp || b.createdAt).getTime();
+      return tA - tB;
+    });
+
     const groups: { date: string; messages: Message[] }[] = [];
     let currentDate = "";
-    for (const msg of msgs) {
+    for (const msg of combined) {
       const d = new Date(msg.timestamp || msg.createdAt);
       const today = new Date();
       const yesterday = new Date(today);
@@ -1668,7 +1694,7 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
       groups[groups.length - 1].messages.push(msg);
     }
     return groups;
-  }, [messagesQ.data]);
+  }, [messagesQ.data, notesQ.data]);
 
   // Flat messages for quote lookup
   const allMessages = useMemo(() => {
@@ -1859,10 +1885,37 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
               <div key={gi}>
                 <DateSeparator date={group.date} />
                 {group.messages.map((msg, mi) => {
+                  // Internal note: render as yellow bubble inline
+                  if (msg.messageType === "internal_note") {
+                    const noteTime = formatTime(msg.timestamp || msg.createdAt);
+                    const authorName = (msg as any).pushName || "Agente";
+                    return (
+                      <div key={msg.id} className="flex justify-end px-[63px] mb-[2px] mt-[6px]">
+                        <div className="relative max-w-[65%]">
+                          <div className="relative px-[9px] pt-[6px] pb-[8px] shadow-sm rounded-[7.5px] bg-amber-100 dark:bg-amber-900/40 border border-amber-200/60 dark:border-amber-700/40" style={{ minWidth: "80px" }}>
+                            {/* Note header with icon and author */}
+                            <div className="flex items-center gap-1.5 mb-1">
+                              <StickyNote className="w-3 h-3 text-amber-600 dark:text-amber-400 shrink-0" />
+                              <span className="text-[11px] font-semibold text-amber-700 dark:text-amber-300">{authorName}</span>
+                              <span className="text-[10px] text-amber-500 dark:text-amber-400/70">• Nota Interna</span>
+                            </div>
+                            {/* Note content */}
+                            <span className="text-[14.2px] leading-[19px] whitespace-pre-wrap break-words text-amber-900 dark:text-amber-100">{msg.content}</span>
+                            {/* Time */}
+                            <span className="float-right ml-2 mt-[3px] flex items-center gap-0.5 relative -bottom-0.5">
+                              <span className="text-[11px] text-amber-500/70 dark:text-amber-400/60 leading-none tabular-nums">{noteTime}</span>
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  }
+
                   const prev = mi > 0 ? group.messages[mi - 1] : null;
                   const next = mi < group.messages.length - 1 ? group.messages[mi + 1] : null;
-                  const isFirst = !prev || prev.fromMe !== msg.fromMe;
-                  const isLast = !next || next.fromMe !== msg.fromMe;
+                  // For grouping: treat internal notes as boundary (don't group with regular messages)
+                  const isFirst = !prev || prev.fromMe !== msg.fromMe || prev.messageType === "internal_note";
+                  const isLast = !next || next.fromMe !== msg.fromMe || next.messageType === "internal_note";
                   // Apply real-time status updates from socket
                   const updatedMsg = msg.messageId && localStatusUpdates[msg.messageId]
                     ? { ...msg, status: localStatusUpdates[msg.messageId] }
@@ -1891,32 +1944,7 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
               </div>
             ))
           )}
-          {/* Internal Notes (displayed inline as yellow bubbles) */}
-          {notesQ.data && (notesQ.data as any[]).length > 0 && (
-            <div className="px-4 py-2">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="h-px flex-1 bg-amber-300/30" />
-                <span className="text-[11px] font-medium text-amber-600 uppercase tracking-wider flex items-center gap-1">
-                  <StickyNote className="w-3 h-3" /> Notas Internas
-                </span>
-                <div className="h-px flex-1 bg-amber-300/30" />
-              </div>
-              {(notesQ.data as any[]).map((note: any) => (
-                <div key={note.id} className="flex justify-end mb-1.5">
-                  <div className="max-w-[75%] bg-amber-100 border border-amber-200 rounded-lg px-3 py-2 shadow-sm">
-                    <div className="flex items-center gap-1.5 mb-1">
-                      <StickyNote className="w-3 h-3 text-amber-600" />
-                      <span className="text-[11px] font-semibold text-amber-700">{note.authorName || 'Agente'}</span>
-                      <span className="text-[10px] text-amber-500">
-                        {new Date(note.createdAt).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
-                      </span>
-                    </div>
-                    <p className="text-[14px] text-amber-900 whitespace-pre-wrap">{note.content}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+          {/* Internal notes are now merged chronologically into groupedMessages above */}
 
           {/* Conversation Events Timeline */}
           {showTimeline && eventsQ.data && (eventsQ.data as any[]).length > 0 && (

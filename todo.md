@@ -3188,3 +3188,14 @@
 - [x] 9. Falha silenciosa: ocultar sugestão em caso de erro, log apenas no backend
 - [x] 10. Cache de sugestões: Redis 30s por messageId
 - [x] 11. Testes: geração async, timeout, cancelamento, debounce, rate limit, streaming, cache (43 testes)
+
+## Notas Internas — Melhorias
+- [x] Fix: notas internas devem seguir fluxo cronológico da conversa (não separadas no final)
+- [ ] Fix: adicionar status 'played' ao fluxo de status de mensagem
+- [ ] Feature: categorias de nota (cliente, financeiro, documentação, operação, urgente)
+- [ ] Feature: prioridade da nota (normal, alta, urgente)
+- [ ] Feature: menção de agente com @nome e notificação
+- [x] Feature: timestamp formatado (15 Mar 2026 — 18:22)
+- [x] Feature: visual melhorado com ícone e fundo amarelo claro
+- [ ] Feature: socket.emit("conversationUpdated") ao criar nota
+- [x] Tests: cobrir notas internas — mesclagem cronológica, ordenação, agrupamento por data, IDs sem colisão (23 testes)
