@@ -1769,10 +1769,9 @@ export async function getWaConversationsList(
     WHERE wc.sessionId = ${sessionId}
     AND wc.tenantId = ${tenantId}
     AND wc.mergedIntoId IS NULL
-    AND lm.timestamp IS NOT NULL
     ${sql.raw(assignmentFilter)}
     ${filter?.cursor ? sql`AND lm.timestamp < ${new Date(filter.cursor)}` : sql``}
-    ORDER BY lm.timestamp DESC
+    ORDER BY COALESCE(lm.timestamp, wc.lastMessageAt, wc.createdAt) DESC
     LIMIT ${filter?.limit ?? 100}
     ${!filter?.cursor && (filter?.offset ?? 0) > 0 ? sql`OFFSET ${filter?.offset ?? 0}` : sql``}
   `);
@@ -2667,11 +2666,10 @@ export async function getQueueConversations(sessionId: string, tenantId: number,
     WHERE wc.sessionId = ${sessionId}
     AND wc.tenantId = ${tenantId}
     AND wc.mergedIntoId IS NULL
-    AND lm.timestamp IS NOT NULL
     AND (wc.assignedUserId IS NULL)
     AND wc.status IN ('open', 'pending')
     AND (wc.unreadCount > 0 OR wc.queuedAt IS NOT NULL)
-    ORDER BY COALESCE(wc.queuedAt, lm.timestamp) DESC
+    ORDER BY COALESCE(wc.queuedAt, lm.timestamp, wc.lastMessageAt, wc.createdAt) DESC
     LIMIT ${limit}
   `);
   return fixTimestampFields((result as any)[0] || []);
@@ -2784,8 +2782,7 @@ export async function getAgentConversations(tenantId: number, sessionId: string,
     AND wc.assignedUserId = ${agentId}
     AND wc.status IN ('open', 'pending')
     AND wc.mergedIntoId IS NULL
-    AND lm.timestamp IS NOT NULL
-    ORDER BY lm.timestamp DESC
+    ORDER BY COALESCE(lm.timestamp, wc.lastMessageAt, wc.createdAt) DESC
     LIMIT ${limit}
   `);
   return fixTimestampFields((result as any)[0] || []);
@@ -2818,7 +2815,6 @@ export async function getQueueStats(tenantId: number, sessionId: string) {
     AND wc.assignedUserId IS NULL
     AND wc.status IN ('open', 'pending')
     AND wc.mergedIntoId IS NULL
-    AND lm.timestamp IS NOT NULL
     AND (wc.unreadCount > 0 OR wc.queuedAt IS NOT NULL)
   `);
   const countRows = (countResult as any)[0] || [];
@@ -2852,9 +2848,8 @@ export async function getQueueStats(tenantId: number, sessionId: string) {
     AND wc.assignedUserId IS NULL
     AND wc.status IN ('open', 'pending')
     AND wc.mergedIntoId IS NULL
-    AND lm.timestamp IS NOT NULL
     AND (wc.unreadCount > 0 OR wc.queuedAt IS NOT NULL)
-    ORDER BY COALESCE(wc.queuedAt, lm.timestamp) ASC
+    ORDER BY COALESCE(wc.queuedAt, lm.timestamp, wc.lastMessageAt, wc.createdAt) ASC
     LIMIT 50
   `);
   // Fix timestamp strings from db.execute for both count and items

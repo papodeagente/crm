@@ -3523,3 +3523,9 @@
 
 ## Checkpoint — Inbox Dedup Fix Published
 - [x] All inbox deduplication and ordering fixes applied and verified
+
+## BUG: Inbox conversations disappeared after deduplication changes
+- [x] Root cause: AND lm.timestamp IS NOT NULL in 5 SQL queries filtered out all conversations without messages in wa_messages table
+- [x] Fix: removed the filter from all 5 queries (getWaConversationsList, getQueueConversations, getAgentConversations, getQueueStats count + items)
+- [x] ORDER BY now uses COALESCE(lm.timestamp, wc.lastMessageAt, wc.createdAt) as fallback for conversations without messages
+- [x] TypeScript 0 errors
