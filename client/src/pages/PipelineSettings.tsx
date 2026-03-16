@@ -3,6 +3,7 @@ import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { AdminOnlyGuard } from "@/components/AdminOnlyGuard";
 import { useAuth } from "@/_core/hooks/useAuth";
+import { useTenantId } from "@/hooks/useTenantId";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -66,7 +67,7 @@ export default function PipelineSettings() {
   const [, setLocation] = useLocation();
   const { user } = useAuth();
   // toast from sonner (imported at top)
-  const tenantId = (user as any)?.tenantId || 1;
+  const tenantId = useTenantId();
 
   const [activeTab, setActiveTab] = useState<"pipelines" | "automations">("pipelines");
   const [selectedPipelineId, setSelectedPipelineId] = useState<number | null>(null);

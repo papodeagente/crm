@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { trpc } from "@/lib/trpc";
+import { useTenantId } from "@/hooks/useTenantId";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -28,7 +29,7 @@ const COLORS = [
 
 export default function SourcesAndCampaigns() {
   const [, setLocation] = useLocation();
-  const tenantId = 1;
+  const tenantId = useTenantId();
   const [activeTab, setActiveTab] = useState<"sources" | "campaigns">("sources");
   const [showDeleted, setShowDeleted] = useState(false);
 

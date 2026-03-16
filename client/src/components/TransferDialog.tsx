@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
+import { useTenantId } from "@/hooks/useTenantId";
 import { toast } from "sonner";
 import { ArrowRightLeft, X, Users, Loader2, StickyNote, Search } from "lucide-react";
 
@@ -35,7 +36,8 @@ export default function TransferDialog({
   });
 
   // Get agents from the tenant
-  const agentsQ = trpc.whatsapp.agents.useQuery({ tenantId: 1 }, { enabled: open });
+  const tenantId = useTenantId();
+  const agentsQ = trpc.whatsapp.agents.useQuery({ tenantId }, { enabled: open });
 
   if (!open) return null;
 

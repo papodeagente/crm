@@ -3682,3 +3682,22 @@
 - [x] Suporte multi-sessão (mesmo JID em sessões diferentes = conversas separadas)
 - [x] 22 testes passando, 0 erros TypeScript
 - [x] Performance < 20ms por update
+
+## Fix: Campos Personalizados de Contato Não Aparecem
+- [ ] Diagnosticar causa raiz: campos de contato não aparecem no perfil nem na negociação
+- [ ] Corrigir visibilidade no perfil do contato (ContactProfile.tsx)
+- [ ] Corrigir visibilidade na negociação (DealDetail.tsx) — seção de contato
+- [ ] Garantir separação entre campos de contato e campos de negociação
+- [ ] Garantir multi-tenant e sortOrder
+- [ ] Testes mínimos obrigatórios
+- [ ] 0 erros TypeScript
+
+## Fix: Campos Personalizados não apareciam no ContactProfile
+- [x] Diagnosticar que customFields.list retornava array vazio no frontend
+- [x] Identificar causa raiz: tenantId hardcoded como 1 em CustomFieldsSettings.tsx (campos criados com tenantId=1, mas usuário tem tenantId=150002)
+- [x] Corrigir registros no banco: UPDATE custom_fields SET tenantId=150002 WHERE tenantId=1
+- [x] Corrigir CustomFieldsSettings.tsx: substituir tenantId=1 por useTenantId()
+- [x] Corrigir PipelineSettings.tsx: substituir tenantId fallback por useTenantId()
+- [x] Corrigir SourcesAndCampaigns.tsx: substituir tenantId=1 por useTenantId()
+- [x] Corrigir TransferDialog.tsx: substituir tenantId=1 por useTenantId()
+- [x] Verificar que campos personalizados aparecem no ContactProfile

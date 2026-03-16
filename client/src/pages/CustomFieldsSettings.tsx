@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { Link } from "wouter";
 import { trpc } from "@/lib/trpc";
+import { useTenantId } from "@/hooks/useTenantId";
 import { AdminOnlyGuard } from "@/components/AdminOnlyGuard";
 import {
   ArrowLeft, Plus, Edit2, Trash2, GripVertical, Eye, EyeOff,
@@ -257,7 +258,7 @@ function FieldFormDialog({
 
 // ─── Main Component ───
 export default function CustomFieldsSettings() {
-  const tenantId = 1;
+  const tenantId = useTenantId();
   const [activeEntity, setActiveEntity] = useState<string>("contact");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingField, setEditingField] = useState<CustomField | null>(null);
