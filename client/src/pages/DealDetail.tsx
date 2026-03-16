@@ -28,6 +28,7 @@ import TaskActionPopover from "@/components/TaskActionPopover";
 import SaleCelebration from "@/components/SaleCelebration";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Pencil } from "lucide-react";
+import CustomFieldRenderer from "@/components/CustomFieldRenderer";
 import { formatDate, formatTime, formatDateTime, SYSTEM_TIMEZONE, SYSTEM_LOCALE, formatFullDateTime} from "../../../shared/dateUtils";
 
 
@@ -1500,15 +1501,15 @@ function ContactInfoRow({ icon: Icon, value, copyable, whatsapp }: {
 /* ─── Custom Fields Sidebar ─── */
 function CustomFieldsSidebar({ fields, values, dealId, onRefresh }: any) {
   const TENANT_ID = useTenantId();
-  const setValues = trpc.contactProfile.setCustomFieldValues.useMutation({
-    onSuccess: () => { onRefresh(); toast.success("Campo atualizado"); },
+  const setValuesM = trpc.contactProfile.setCustomFieldValues.useMutation({
+    onSuccess: () => { onRefresh(); toast.success("Campos atualizados"); },
   });
-  const [editingId, setEditingId] = useState<number | null>(null);
-  const [editVal, setEditVal] = useState("");
+  const [isEditing, setIsEditing] = useState(false);
+  const [editValues, setEditValues] = useState<Record<number, string>>({});
 
-  const visibleFields = (fields || []).filter((f: any) => f.isVisibleOnProfile || f.isVisibleOnForm);
+  const allFields = (fields || []) as any[];
 
-  if (visibleFields.length === 0) {
+  if (allFields.length === 0) {
     return (
       <p className="text-xs text-muted-foreground">
         Nenhum campo personalizado configurado.{" "}
@@ -1517,63 +1518,74 @@ function CustomFieldsSidebar({ fields, values, dealId, onRefresh }: any) {
     );
   }
 
-  const valuesMap = new Map((values || []).map((v: any) => [v.fieldId, v.value]));
+  const valuesMap: Record<number, string> = {};
+  (values || []).forEach((v: any) => { valuesMap[v.fieldId] = v.value || ""; });
+
+  function startEdit() {
+    const map: Record<number, string> = {};
+    allFields.forEach((f: any) => {
+      map[f.id] = valuesMap[f.id] || f.defaultValue || "";
+    });
+    setEditValues(map);
+    setIsEditing(true);
+  }
+
+  function saveEdit() {
+    const entries = Object.entries(editValues).map(([fid, val]) => ({
+      fieldId: Number(fid),
+      value: val.trim() || null,
+    }));
+    setValuesM.mutate({
+      tenantId: TENANT_ID,
+      entityType: "deal",
+      entityId: dealId,
+      values: entries,
+    });
+    setIsEditing(false);
+  }
+
+  if (isEditing) {
+    return (
+      <div className="space-y-3">
+        <CustomFieldRenderer
+          fields={allFields}
+          values={editValues}
+          onChange={(fieldId, val) => setEditValues(prev => ({ ...prev, [fieldId]: val }))}
+          mode="all"
+          compact
+        />
+        <div className="flex gap-1.5 pt-1">
+          <Button size="sm" variant="ghost" onClick={() => setIsEditing(false)} className="h-7 text-xs">
+            <X className="h-3 w-3 mr-1" /> Cancelar
+          </Button>
+          <Button size="sm" onClick={saveEdit} disabled={setValuesM.isPending} className="h-7 text-xs">
+            <Check className="h-3 w-3 mr-1" /> Salvar
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // View mode: show only fields with values or visibleOnProfile
+  const visibleFields = allFields.filter((f: any) => f.isVisibleOnProfile || valuesMap[f.id]);
 
   return (
-    <div className="space-y-2.5">
-      {visibleFields.map((field: any) => {
-        const currentVal: string = String(valuesMap.get(field.id) || "");
-        const isEditing = editingId === field.id;
-
-        return (
-          <div key={field.id} className="flex items-baseline justify-between gap-2 group">
-            <span className="text-xs text-muted-foreground shrink-0 truncate max-w-[120px]">{field.label}</span>
-            {isEditing ? (
-              <div className="flex items-center gap-1">
-                <Input
-                  value={editVal}
-                  onChange={(e) => setEditVal(e.target.value)}
-                  className="h-6 text-xs w-28"
-                  autoFocus
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                  setValues.mutate({
-                    tenantId: TENANT_ID,
-                    entityType: "deal",
-                    entityId: dealId,
-                    values: [{ fieldId: field.id, value: editVal }],
-                  });
-                      setEditingId(null);
-                    }
-                    if (e.key === "Escape") setEditingId(null);
-                  }}
-                />
-                <button
-                  onClick={() => {
-                    setValues.mutate({
-                      tenantId: TENANT_ID,
-                      entityType: "deal",
-                      entityId: dealId,
-                      values: [{ fieldId: field.id, value: editVal }],
-                    });
-                    setEditingId(null);
-                  }}
-                  className="p-0.5"
-                >
-                  <Check className="h-3 w-3 text-primary" />
-                </button>
-              </div>
-            ) : (
-              <button
-                onClick={() => { setEditingId(field.id); setEditVal(String(currentVal)); }}
-                className="text-sm text-foreground text-right truncate hover:text-primary transition-colors"
-              >
-                {currentVal || "—"}
-              </button>
-            )}
-          </div>
-        );
-      })}
+    <div className="space-y-2">
+      {visibleFields.length === 0 ? (
+        <p className="text-xs text-muted-foreground italic">Nenhum valor preenchido</p>
+      ) : (
+        <CustomFieldRenderer
+          fields={visibleFields}
+          values={valuesMap}
+          onChange={() => {}}
+          mode="profile"
+          compact
+          readOnly
+        />
+      )}
+      <Button size="sm" variant="ghost" onClick={startEdit} className="h-7 text-xs w-full">
+        <Edit2 className="h-3 w-3 mr-1" /> Editar campos
+      </Button>
     </div>
   );
 }

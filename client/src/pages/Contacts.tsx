@@ -4,8 +4,9 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Plus, Search, Users, Mail, Phone, MoreHorizontal, Trash2, Edit, Eye, RotateCcw, AlertTriangle, Archive } from "lucide-react";
-import { useState } from "react";
+import { Plus, Search, Users, Mail, Phone, MoreHorizontal, Trash2, Edit, Eye, RotateCcw, AlertTriangle, Archive, RefreshCw } from "lucide-react";
+import { useState, useMemo } from "react";
+import CustomFieldRenderer, { customFieldValuesToArray, initCustomFieldValues } from "@/components/CustomFieldRenderer";
 import DateRangeFilter, { useDateFilter } from "@/components/DateRangeFilter";
 import { formatDate } from "../../../shared/dateUtils";
 import { Link } from "wouter";
@@ -29,6 +30,7 @@ export default function Contacts() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
+  const [customFieldValues, setCustomFieldValues] = useState<Record<number, string>>({});
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [showTrash, setShowTrash] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -43,8 +45,29 @@ export default function Contacts() {
   const contacts = trpc.crm.contacts.list.useQuery({ tenantId: TENANT_ID, search: search || undefined, limit: pageSize, offset: page * pageSize, dateFrom: dateFilter.dates.dateFrom, dateTo: dateFilter.dates.dateTo });
   const deletedContacts = trpc.crm.contacts.listDeleted.useQuery({ tenantId: TENANT_ID, limit: 100 }, { enabled: showTrash });
 
+  // Custom fields for contacts
+  const contactCustomFields = trpc.customFields.list.useQuery({ tenantId: TENANT_ID, entity: "contact" as const });
+  const visibleFormFields = useMemo(() => (contactCustomFields.data || []).filter((f: any) => f.isVisibleOnForm), [contactCustomFields.data]);
+  const setFieldValues = trpc.contactProfile.setCustomFieldValues.useMutation();
+
   const createContact = trpc.crm.contacts.create.useMutation({
-    onSuccess: () => { utils.crm.contacts.list.invalidate(); setOpen(false); setName(""); setEmail(""); setPhone(""); toast.success("Contato criado!"); },
+    onSuccess: async (result) => {
+      // Save custom field values after contact creation
+      const cfEntries = customFieldValuesToArray(customFieldValues).filter(v => v.value);
+      if (result?.id && cfEntries.length > 0) {
+        try {
+          await setFieldValues.mutateAsync({
+            tenantId: TENANT_ID,
+            entityType: "contact",
+            entityId: result.id,
+            values: cfEntries,
+          });
+        } catch (e) { console.error("Error saving custom fields:", e); }
+      }
+      utils.crm.contacts.list.invalidate();
+      setOpen(false); setName(""); setEmail(""); setPhone(""); setCustomFieldValues({});
+      toast.success("Contato criado!");
+    },
   });
   const deleteContact = trpc.crm.contacts.delete.useMutation({
     onSuccess: () => { utils.crm.contacts.list.invalidate(); utils.crm.contacts.listDeleted.invalidate(); toast.success("Contato movido para a lixeira."); },
@@ -154,6 +177,20 @@ export default function Contacts() {
                     <Label className="text-[12px] font-medium text-muted-foreground">Telefone</Label>
                     <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+55 11 99999-9999" className="mt-1.5 h-10 rounded-lg" />
                   </div>
+                  {/* Campos Personalizados */}
+                  {visibleFormFields.length > 0 && (
+                    <div className="border border-border/40 rounded-xl p-4 bg-muted/20 space-y-3">
+                      <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-[0.1em] flex items-center gap-1.5">
+                        <RefreshCw className="h-3.5 w-3.5" /> Campos Personalizados
+                      </p>
+                      <CustomFieldRenderer
+                        fields={visibleFormFields}
+                        values={customFieldValues}
+                        onChange={(fieldId, val) => setCustomFieldValues(prev => ({ ...prev, [fieldId]: val }))}
+                        mode="form"
+                      />
+                    </div>
+                  )}
                   <Button
                     className="w-full h-10 rounded-lg text-[13px] font-medium bg-primary hover:bg-primary/90 shadow-sm transition-colors"
                     disabled={!name || createContact.isPending}

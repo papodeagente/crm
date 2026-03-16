@@ -215,7 +215,7 @@ function CustomFieldInput({ field, value, onChange }: {
         </Select>
       );
     case "multiselect": {
-      const selected = value ? value.split(",").filter(Boolean) : [];
+      const selected = value ? value.split("|||").filter(Boolean) : [];
       return (
         <div className="flex flex-wrap gap-2">
           {options.map((opt) => {
@@ -228,7 +228,7 @@ function CustomFieldInput({ field, value, onChange }: {
                   const next = isSelected
                     ? selected.filter((s) => s !== opt)
                     : [...selected, opt];
-                  onChange(next.join(","));
+                  onChange(next.join("|||"));
                 }}
                 className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
                   isSelected
@@ -270,7 +270,7 @@ function CustomFieldDisplay({ field, value }: { field: CustomFieldDef; value: st
     case "multiselect":
       return (
         <div className="flex flex-wrap gap-1">
-          {value.split(",").filter(Boolean).map((v) => (
+          {value.split("|||").filter(Boolean).map((v) => (
             <Badge key={v} variant="outline" className="text-xs">{v}</Badge>
           ))}
         </div>
@@ -380,7 +380,8 @@ export default function ContactProfile() {
 
   function startEditCustom() {
     const edits: Record<number, string> = {};
-    visibleFields.forEach((f) => {
+    // Show ALL custom fields in edit mode, not just visibleOnProfile
+    customFields.forEach((f) => {
       edits[f.id] = valueMap[f.id] || f.defaultValue || "";
     });
     setCustomFieldEdits(edits);
@@ -627,7 +628,7 @@ export default function ContactProfile() {
                 </div>
               </CardHeader>
               <CardContent>
-                {visibleFields.length === 0 ? (
+                {customFields.length === 0 ? (
                   <div className="text-center py-6">
                     <Tag className="h-8 w-8 text-muted-foreground/50 mx-auto mb-2" />
                     <p className="text-sm text-muted-foreground">Nenhum campo personalizado configurado</p>
@@ -639,31 +640,41 @@ export default function ContactProfile() {
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    {Object.entries(groupedFields).map(([group, fields]) => (
-                      <div key={group}>
-                        {Object.keys(groupedFields).length > 1 && (
-                          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">{group}</p>
-                        )}
-                        <div className="space-y-3">
-                          {fields.map((field) => (
-                            <div key={field.id}>
-                              {field.fieldType !== "checkbox" && (
-                                <label className="text-xs font-medium text-muted-foreground mb-1 block">{field.label}</label>
-                              )}
-                              {isEditingCustom ? (
-                                <CustomFieldInput
-                                  field={field}
-                                  value={customFieldEdits[field.id] || ""}
-                                  onChange={(v) => setCustomFieldEdits({ ...customFieldEdits, [field.id]: v })}
-                                />
-                              ) : (
-                                <CustomFieldDisplay field={field} value={valueMap[field.id] || ""} />
-                              )}
-                            </div>
-                          ))}
+                    {(() => {
+                      // In edit mode show ALL fields, in view mode show only visibleOnProfile
+                      const fieldsToShow = isEditingCustom ? customFields : visibleFields;
+                      const groups: Record<string, typeof fieldsToShow> = {};
+                      fieldsToShow.forEach((f) => {
+                        const g = f.groupName || "Informações Adicionais";
+                        if (!groups[g]) groups[g] = [];
+                        groups[g].push(f);
+                      });
+                      return Object.entries(groups).map(([group, fields]) => (
+                        <div key={group}>
+                          {Object.keys(groups).length > 1 && (
+                            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">{group}</p>
+                          )}
+                          <div className="space-y-3">
+                            {fields.map((field) => (
+                              <div key={field.id}>
+                                {field.fieldType !== "checkbox" && (
+                                  <label className="text-xs font-medium text-muted-foreground mb-1 block">{field.label}</label>
+                                )}
+                                {isEditingCustom ? (
+                                  <CustomFieldInput
+                                    field={field}
+                                    value={customFieldEdits[field.id] || ""}
+                                    onChange={(v) => setCustomFieldEdits({ ...customFieldEdits, [field.id]: v })}
+                                  />
+                                ) : (
+                                  <CustomFieldDisplay field={field} value={valueMap[field.id] || ""} />
+                                )}
+                              </div>
+                            ))}
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      ));
+                    })()}
                   </div>
                 )}
               </CardContent>

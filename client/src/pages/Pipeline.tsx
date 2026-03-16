@@ -26,6 +26,7 @@ import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuIte
 import DealFiltersPanel, { useDealFilters, DealFilterButton } from "@/components/DealFiltersPanel";
 import SaleCelebration from "@/components/SaleCelebration";
 import ClassificationBadge from "@/components/ClassificationBadge";
+import CustomFieldRenderer from "@/components/CustomFieldRenderer";
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
@@ -2049,44 +2050,14 @@ function CreateDealDialog({ open, onOpenChange, pipelineId, stages, contacts, ac
                     {showCustomFields ? "Ocultar" : "Mostrar"}
                   </button>
                 </div>
-                {showCustomFields && visibleFields.map((field: any) => (
-                  <div key={field.id}>
-                    <Label className="text-[12px] font-medium">
-                      {field.label} {field.isRequired && <span className="text-destructive">*</span>}
-                    </Label>
-                    {field.fieldType === "select" ? (
-                      <Select value={customFieldValues[field.id] || ""} onValueChange={(v) => setCustomFieldValues(prev => ({ ...prev, [field.id]: v }))}>
-                        <SelectTrigger className="mt-1.5 h-10 rounded-xl"><SelectValue placeholder={field.placeholder || "Selecionar"} /></SelectTrigger>
-                        <SelectContent className="rounded-xl">
-                          {(field.optionsJson || []).map((opt: string) => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                    ) : field.fieldType === "textarea" ? (
-                      <textarea
-                        value={customFieldValues[field.id] || ""}
-                        onChange={(e) => setCustomFieldValues(prev => ({ ...prev, [field.id]: e.target.value }))}
-                        placeholder={field.placeholder || ""}
-                        className="mt-1.5 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm min-h-[80px] resize-y"
-                      />
-                    ) : field.fieldType === "checkbox" ? (
-                      <div className="mt-1.5 flex items-center gap-2">
-                        <Checkbox
-                          checked={customFieldValues[field.id] === "true"}
-                          onCheckedChange={(checked) => setCustomFieldValues(prev => ({ ...prev, [field.id]: String(!!checked) }))}
-                        />
-                        <span className="text-sm">{field.placeholder || "Sim"}</span>
-                      </div>
-                    ) : (
-                      <Input
-                        value={customFieldValues[field.id] || ""}
-                        onChange={(e) => setCustomFieldValues(prev => ({ ...prev, [field.id]: e.target.value }))}
-                        placeholder={field.placeholder || ""}
-                        type={field.fieldType === "number" || field.fieldType === "currency" ? "number" : field.fieldType === "date" ? "date" : field.fieldType === "email" ? "email" : field.fieldType === "url" ? "url" : "text"}
-                        className="mt-1.5 h-10 rounded-xl"
-                      />
-                    )}
-                  </div>
-                ))}
+                {showCustomFields && (
+                  <CustomFieldRenderer
+                    fields={visibleFields}
+                    values={customFieldValues}
+                    onChange={(fieldId, val) => setCustomFieldValues(prev => ({ ...prev, [fieldId]: val }))}
+                    mode="form"
+                  />
+                )}
               </div>
             )}
 

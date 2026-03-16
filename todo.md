@@ -3553,3 +3553,19 @@
 - [x] Notification sound guard also fixed to use selectedJidRef.current (was also stale)
 - [x] No additional refetch() calls — pure socket-driven cache updates
 - [x] TypeScript compiles with 0 errors
+
+## Correção de Campos Personalizados (Custom Fields) — Completa
+- [x] Diagnosticar falhas no ciclo completo de campos personalizados (backend, frontend, banco)
+- [x] Corrigir backend: persistência, upsert, filtros por entidade, validações
+- [x] Integrar campos personalizados na criação de Contatos (dialog)
+- [x] Integrar campos personalizados na edição/perfil de Contatos (ContactProfile)
+- [x] Integrar campos personalizados na criação de Negociações (Pipeline modal)
+- [x] Integrar campos personalizados na edição/detalhe de Negociações (DealDetail)
+- [x] Corrigir CustomFieldsSidebar na DealDetail para suportar todos os tipos (select, multiselect, date, checkbox, etc.)
+- [x] Integrar campos personalizados na criação de Empresas
+- [x] Integrar campos personalizados na edição/detalhe de Empresas
+- [x] Implementar regra: toda empresa deve ter contato atrelado obrigatoriamente
+- [x] Garantir multi-tenant e permissões nos campos personalizados
+- [x] Preparar estrutura para filtros futuros (índices, queries)
+- [x] Escrever testes unitários para ciclo completo de campos personalizados (14 testes passando)
+- [x] Validar ciclo: criar campo → preencher → salvar → reabrir → editar → persistir
