@@ -902,10 +902,10 @@ DateSeparator.displayName = "DateSeparator";
 /* ─── Attach Menu ─── */
 function AttachMenu({ onSelect, onClose }: { onSelect: (type: string) => void; onClose: () => void }) {
   const items = [
-    { type: "image", icon: ImageIcon, label: "Fotos e V\u00eddeos", color: "#7C3AED" },
-    { type: "camera", icon: Camera, label: "C\u00e2mera", color: "#EC4899" },
+    { type: "image", icon: ImageIcon, label: "Fotos e Vídeos", color: "#7C3AED" },
+    { type: "camera", icon: Camera, label: "Câmera", color: "#EC4899" },
     { type: "document", icon: FileText, label: "Documento", color: "#6366F1" },
-    { type: "location", icon: MapPin, label: "Localiza\u00e7\u00e3o", color: "#10B981" },
+    { type: "location", icon: MapPin, label: "Localização", color: "#10B981" },
     { type: "contact", icon: Contact, label: "Contato", color: "#3B82F6" },
     { type: "poll", icon: BarChart3, label: "Enquete", color: "#F59E0B" },
   ];
@@ -1983,8 +1983,8 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
               const priColor = note.priority === "urgent" ? "text-red-600" : note.priority === "high" ? "text-orange-600" : "text-amber-700";
               return (
                 <div key={note.id} className={`text-[11px] ${priColor} dark:text-amber-200 flex items-start gap-1`}>
-                  {note.priority === "urgent" && <span className="shrink-0">\u26A0\uFE0F</span>}
-                  {note.priority === "high" && <span className="shrink-0">\u2757</span>}
+                  {note.priority === "urgent" && <span className="shrink-0">{"\u26A0\uFE0F"}</span>}
+                  {note.priority === "high" && <span className="shrink-0">{"\u2757"}</span>}
                   <span className="truncate"><strong>{note.authorName}:</strong> {note.content}</span>
                 </div>
               );
@@ -2038,8 +2038,8 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
                     const categoryLabels: Record<string, { label: string; color: string }> = {
                       client: { label: "Cliente", color: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300" },
                       financial: { label: "Financeiro", color: "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300" },
-                      documentation: { label: "Documenta\u00e7\u00e3o", color: "bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300" },
-                      operation: { label: "Opera\u00e7\u00e3o", color: "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/40 dark:text-cyan-300" },
+                      documentation: { label: "Documentação", color: "bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300" },
+                      operation: { label: "Operação", color: "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/40 dark:text-cyan-300" },
                       other: { label: "Geral", color: "bg-gray-100 text-gray-600 dark:bg-gray-800/40 dark:text-gray-400" },
                     };
                     const priorityStyles: Record<string, { label: string; color: string }> = {
@@ -2070,9 +2070,9 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
                             <div className="flex items-center gap-1.5 mb-1 flex-wrap">
                               <StickyNote className="w-3 h-3 text-amber-600 dark:text-amber-400 shrink-0" />
                               <span className="text-[11px] font-semibold text-amber-700 dark:text-amber-300">{authorName}</span>
-                              <span className="text-[10px] text-amber-500 dark:text-amber-400/70">\u2022 Nota Interna</span>
+                              <span className="text-[10px] text-amber-500 dark:text-amber-400/70">{"\u2022"} Nota Interna</span>
                               {noteIsGlobal && (
-                                <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-amber-200/80 dark:bg-amber-700/50 text-amber-800 dark:text-amber-200 font-medium">\uD83C\uDF10 Global</span>
+                                <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-amber-200/80 dark:bg-amber-700/50 text-amber-800 dark:text-amber-200 font-medium">{"\uD83C\uDF10"} Global</span>
                               )}
                               {noteCategory !== "other" && (
                                 <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-medium ${cat.color}`}>{cat.label}</span>
@@ -2216,8 +2216,8 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
               <option value="other">Geral</option>
               <option value="client">Cliente</option>
               <option value="financial">Financeiro</option>
-              <option value="documentation">Documenta\u00e7\u00e3o</option>
-              <option value="operation">Opera\u00e7\u00e3o</option>
+              <option value="documentation">Documentação</option>
+              <option value="operation">Operação</option>
             </select>
             {/* Priority selector */}
             <select
@@ -2241,7 +2241,7 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
                 onChange={(e) => setNoteIsGlobal(e.target.checked)}
                 className="w-3.5 h-3.5 rounded border-amber-400 text-amber-600 focus:ring-amber-500 accent-amber-600"
               />
-              <span className="text-[11px] text-amber-700" title="Nota vis\u00edvel em todas as conversas deste cliente">\uD83C\uDF10 Global</span>
+              <span className="text-[11px] text-amber-700" title="Nota visível em todas as conversas deste cliente">{"\uD83C\uDF10"} Global</span>
             </label>
             {/* Selected mentions */}
             {selectedMentions.length > 0 && agents && (

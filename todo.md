@@ -3338,3 +3338,10 @@
 - [x] Timeline re-renders when notes change (useMemo depends on notesQ.data)
 - [x] Notes move correctly when new messages arrive (sorted by timestamp in merged array)
 - [x] TypeScript compiles with zero errors (verified)
+
+## Unicode Escape Bug in Internal Notes UI
+- [x] Fix: category labels showing raw Unicode escapes — replaced with actual UTF-8 characters
+- [x] Fix: note header bullet — wrapped in JSX expression {"\u2022"}
+- [x] Fix: global note globe emoji — wrapped in JSX expression {"\uD83C\uDF10"}
+- [x] Fix: priority emojis (⚠️ ❗) — wrapped in JSX expressions
+- [x] Fix: media attachment labels (Vídeos, Câmera, Localização) — replaced with UTF-8
