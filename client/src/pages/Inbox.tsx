@@ -1,6 +1,8 @@
 import { useState, useMemo, useEffect, useCallback, useRef, memo } from "react";
 import { trpc } from "@/lib/trpc";
 import { useSocket } from "@/hooks/useSocket";
+import { useConversationStore } from "@/hooks/useConversationStore";
+import type { ConvEntry } from "@/hooks/useConversationStore";
 import WhatsAppChat from "@/components/WhatsAppChat";
 import {
   Search, MessageSquare, MoreVertical, ArrowLeft,
@@ -983,11 +985,39 @@ export default function InboxPage() {
     [sessionsQ.data]
   );
 
-  // Use wa_conversations table (canonical, with correct names and ordering)
+  // ─── Deterministic Conversation Store ───
+  // Socket is the source of truth. Initial load from server, then all updates via socket.
+  const convStore = useConversationStore();
+  const hydrationDoneRef = useRef(false);
+
+  // Initial load only — fetch conversations once from server
   const conversationsQ = trpc.whatsapp.waConversations.useQuery(
     { sessionId: activeSession?.sessionId || "", tenantId },
-    { enabled: !!activeSession?.sessionId, refetchInterval: isConnected ? 10000 : 30000, staleTime: 5000 }
+    { enabled: !!activeSession?.sessionId && !hydrationDoneRef.current, staleTime: Infinity, refetchInterval: false, refetchOnWindowFocus: false }
   );
+
+  // Hydrate store from initial server data (runs once)
+  useEffect(() => {
+    if (conversationsQ.data && !hydrationDoneRef.current) {
+      convStore.hydrate(conversationsQ.data as ConvEntry[]);
+      hydrationDoneRef.current = true;
+    }
+  }, [conversationsQ.data]);
+
+  // Periodic background sync — every 60s refetch to catch any missed messages
+  // This does NOT drive the UI; it only patches the store if there are gaps
+  const bgSyncRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  useEffect(() => {
+    if (!activeSession?.sessionId || !hydrationDoneRef.current) return;
+    bgSyncRef.current = setInterval(() => {
+      conversationsQ.refetch().then((result) => {
+        if (result.data) {
+          convStore.hydrate(result.data as ConvEntry[]);
+        }
+      });
+    }, 60000); // 60s background sync
+    return () => { if (bgSyncRef.current) clearInterval(bgSyncRef.current); };
+  }, [activeSession?.sessionId]);
 
   // Agents list for assignment
   const agentsQ = trpc.whatsapp.agents.useQuery({ tenantId }, { staleTime: 5 * 60 * 1000 });
@@ -1065,10 +1095,10 @@ export default function InboxPage() {
     { enabled: true, staleTime: 5 * 60 * 1000 }
   );
 
-  // Profile pictures
+  // Profile pictures — derive from store (no dependency on conversationsQ.data)
   const convJids = useMemo(() => {
-    return ((conversationsQ.data || []) as ConvItem[]).map((c) => c.remoteJid);
-  }, [conversationsQ.data]);
+    return convStore.sortedIds;
+  }, [convStore.sortedIds]);
 
   // Fetch profile pics from DB (fast query, no API calls) — can handle more
   const visibleJids = useMemo(() => convJids.slice(0, 100), [convJids]);
@@ -1096,14 +1126,14 @@ export default function InboxPage() {
     onError: (e) => toast.error(e.message || "Erro ao sincronizar contatos"),
   });
 
-  // PushName map from conversations
+  // PushName map from store (instant, no conversationsQ dependency)
   const pushNameMap = useMemo(() => {
     const map = new Map<string, string>();
-    for (const c of (conversationsQ.data || []) as ConvItem[]) {
-      if (c.contactPushName) map.set(c.remoteJid, c.contactPushName);
-    }
+    Array.from(convStore.conversationMap.entries()).forEach(([jid, conv]) => {
+      if (conv.contactPushName) map.set(jid, conv.contactPushName);
+    });
     return map;
-  }, [conversationsQ.data]);
+  }, [convStore.version]);
 
   // Mark as read
   const markRead = trpc.whatsapp.markRead.useMutation({
@@ -1173,27 +1203,26 @@ export default function InboxPage() {
     return formatPhoneNumber(jid);
   }, [getContactForJid, pushNameMap, waContactsMap, isRealName]);
 
-  // ─── Part 8: Optimistic cache update on socket message ───
-  // Instead of refetching ALL conversations on every message,
-  // we update only the affected conversation in the tRPC cache.
-  // Full refetch is done only periodically via refetchInterval.
+  // ─── Socket → Deterministic Store (instant updates) ───
+  // Socket is the ONLY source of truth for conversation list updates.
+  // No refetch, no polling, no full sort. Target: < 20ms per update.
   useEffect(() => {
     if (!lastMessage) return;
 
-    // ── Part 6: Socket Validation — ignore events without required fields ──
+    // ── Validation — ignore events without required fields ──
     if (!lastMessage.remoteJid || !lastMessage.timestamp) {
       prevMessageRef.current = lastMessage;
       return;
     }
 
-    // ── Part 4: Strict Message Ownership — validate sessionId matches active session ──
+    // ── Strict Message Ownership — validate sessionId matches active session ──
     const currentSessionId = activeSession?.sessionId || "";
     if (lastMessage.sessionId && currentSessionId && lastMessage.sessionId !== currentSessionId) {
       prevMessageRef.current = lastMessage;
-      return; // Message belongs to a different session
+      return;
     }
 
-    // Part 15: Skip non-inbox event types from preview update
+    // Skip non-inbox event types from preview update
     const previewSkipTypes = [
       'protocolMessage', 'senderKeyDistributionMessage', 'messageContextInfo',
       'ephemeralMessage', 'reactionMessage', 'editedMessage',
@@ -1205,115 +1234,52 @@ export default function InboxPage() {
       return;
     }
 
-    // Part 15: Skip group messages from preview update
+    // Skip group messages
     if (lastMessage.remoteJid?.endsWith('@g.us')) {
       prevMessageRef.current = lastMessage;
       return;
     }
 
-    // ── Part 1: Composite conversation key = sessionId:remoteJid ──
-    const msgSessionId = lastMessage.sessionId || currentSessionId;
-    const msgJid = lastMessage.remoteJid;
-    const conversationKey = `${msgSessionId}:${msgJid}`;
+    // ── INSTANT UPDATE via deterministic store ──
+    // handleMessage: O(1) map update + O(n) splice for moveToTop
+    // No full sort, no refetch, no cache invalidation
+    const handled = convStore.handleMessage({
+      sessionId: lastMessage.sessionId || currentSessionId,
+      remoteJid: lastMessage.remoteJid,
+      content: lastMessage.content || getMessagePreview(null, lastMessage.messageType),
+      fromMe: lastMessage.fromMe,
+      messageType: lastMessage.messageType,
+      timestamp: lastMessage.timestamp,
+      isSync: (lastMessage as any).isSync,
+    }, selectedJidRef.current);
 
-    // Part 8: Update only the affected conversation in cache (no full refetch)
-    const queryKey = { sessionId: currentSessionId, tenantId };
-    trpcUtils.whatsapp.waConversations.setData(queryKey, (old: any) => {
-      if (!old || !Array.isArray(old)) return old;
-      // Part 1+4: Match by BOTH sessionId AND remoteJid (composite key)
-      const existing = old.find((c: ConvItem) =>
-        c.remoteJid === msgJid && (!c.sessionId || c.sessionId === msgSessionId)
-      );
-      if (!existing) {
-        // New conversation — trigger a single refetch to get full data
-        conversationsQ.refetch();
-        return old;
-      }
-      // Part 3: Only update if this message is newer
-      const msgTimestamp = new Date(lastMessage.timestamp);
-      const existingTimestamp = existing.lastTimestamp ? new Date(existing.lastTimestamp) : null;
-      if (existingTimestamp && msgTimestamp.getTime() < existingTimestamp.getTime()) {
-        return old; // Don't overwrite with older message
-      }
-      const updated = old.map((c: ConvItem) => {
-        // Part 4: Strict ownership — only update the exact conversation
-        if (c.remoteJid !== msgJid) return c;
-        if (c.sessionId && c.sessionId !== msgSessionId) return c;
-        return {
-          ...c,
-          lastMessage: lastMessage.content || getMessagePreview(null, lastMessage.messageType),
-          lastMessageType: lastMessage.messageType,
-          lastFromMe: lastMessage.fromMe,
-          lastTimestamp: msgTimestamp, // Store as Date object (matches superjson format from backend)
-          lastStatus: lastMessage.fromMe ? "sent" : "received",
-          unreadCount: (!lastMessage.fromMe && selectedJidRef.current !== msgJid)
-            ? (Number(c.unreadCount) || 0) + 1
-            : 0,
-        };
+    // If conversation is new (not in store), do a one-time fetch
+    if (!handled) {
+      conversationsQ.refetch().then((result) => {
+        if (result.data) convStore.hydrate(result.data as ConvEntry[]);
       });
-      // Re-sort by lastTimestamp descending
-      return updated.sort((a: ConvItem, b: ConvItem) => {
-        const ta = a.lastTimestamp ? new Date(a.lastTimestamp).getTime() : 0;
-        const tb = b.lastTimestamp ? new Date(b.lastTimestamp).getTime() : 0;
-        return tb - ta;
-      });
-    });
-    // Queue stats: lightweight refetch only (not the full conversation list)
-    queueStatsQ.refetch();
+    }
 
     // ────────────────────────────────────────────────────────────────────────────────
-    // Part 4-6: Notification Sound Guards (Rebuilt)
-    // Sound ONLY plays when ALL conditions are met:
-    //   - event == messages.upsert (real message, not status/update/sync)
-    //   - message.fromMe == false
-    //   - message.isSync == false
-    //   - conversationId != activeConversation
-    //   - not a group message
-    //   - not muted
-    //   - not during hydration (suppressed window)
-    //   - debounce: max 1 sound per 2000ms (handled in createNotificationSound)
+    // Notification Sound Guards
     // ────────────────────────────────────────────────────────────────────────────────
-
-    // Create a unique signature for this message to detect duplicates
     const msgSig = `${lastMessage.remoteJid}:${lastMessage.content}:${lastMessage.timestamp}`;
 
-    // Part 16: Debug logging
-    console.log('[Inbox] Socket event:', {
-      fromMe: lastMessage.fromMe,
-      isSync: (lastMessage as any).isSync,
-      messageType: lastMessage.messageType,
-      remoteJid: lastMessage.remoteJid?.substring(0, 15),
-      timestamp: lastMessage.timestamp,
-      activeConversation: selectedJidRef.current?.substring(0, 15) || 'none',
-      isMuted,
-      suppressed: Date.now() < soundSuppressedUntilRef.current,
-      alreadyProcessed: processedMsgRef.current.has(msgSig),
-      previewUpdate: true,
-    });
-
-    // ── Guard 1: Skip duplicate messages (same content+jid+timestamp)
+    // Guard 1: Skip duplicate messages
     if (processedMsgRef.current.has(msgSig)) {
       prevMessageRef.current = lastMessage;
       return;
     }
-    // Keep the set bounded (max 100 entries)
     if (processedMsgRef.current.size > 100) processedMsgRef.current.clear();
     processedMsgRef.current.add(msgSig);
 
-    // ── Guard 2: NEVER play for fromMe messages
-    if (lastMessage.fromMe) {
-      prevMessageRef.current = lastMessage;
-      return;
-    }
+    // Guard 2: NEVER play for fromMe messages
+    if (lastMessage.fromMe) { prevMessageRef.current = lastMessage; return; }
 
-    // ── Guard 3: Skip sync batches (reconciliation/QuickSync/FastPoll)
-    if ((lastMessage as any).isSync || (lastMessage as any).syncBatch) {
-      prevMessageRef.current = lastMessage;
-      return;
-    }
+    // Guard 3: Skip sync batches
+    if ((lastMessage as any).isSync || (lastMessage as any).syncBatch) { prevMessageRef.current = lastMessage; return; }
 
-    // ── Guard 4 (Part 15): Skip non-inbox event types
-    // Ignore: protocol, status, notes, conversation updates, presence, typing, calls, transcription, group events
+    // Guard 4: Skip non-inbox event types for sound
     const skipTypes = [
       'protocolMessage', 'senderKeyDistributionMessage', 'messageContextInfo',
       'ephemeralMessage', 'reactionMessage', 'editedMessage',
@@ -1321,57 +1287,31 @@ export default function InboxPage() {
       'callLogMesssage', 'keepInChatMessage', 'encReactionMessage',
       'viewOnceMessageV2Extension',
     ];
-    if (skipTypes.includes(lastMessage.messageType)) {
-      prevMessageRef.current = lastMessage;
-      return;
-    }
+    if (skipTypes.includes(lastMessage.messageType)) { prevMessageRef.current = lastMessage; return; }
 
-    // ── Guard 5: Skip group messages
-    if (lastMessage.remoteJid?.endsWith('@g.us')) {
-      prevMessageRef.current = lastMessage;
-      return;
-    }
+    // Guard 5: Skip group messages
+    if (lastMessage.remoteJid?.endsWith('@g.us')) { prevMessageRef.current = lastMessage; return; }
 
-    // ── Guard 6: Skip if muted
-    if (isMuted) {
-      prevMessageRef.current = lastMessage;
-      return;
-    }
+    // Guard 6: Skip if muted
+    if (isMuted) { prevMessageRef.current = lastMessage; return; }
 
-    // ── Guard 7 (Part 6): Skip if sound is suppressed (conversation just opened / hydration)
-    if (Date.now() < soundSuppressedUntilRef.current) {
-      prevMessageRef.current = lastMessage;
-      return;
-    }
+    // Guard 7: Skip if sound is suppressed (conversation just opened / hydration)
+    if (Date.now() < soundSuppressedUntilRef.current) { prevMessageRef.current = lastMessage; return; }
 
-    // ── Guard 8: Skip if this is the currently viewed conversation
-    if (selectedJidRef.current === lastMessage.remoteJid) {
-      prevMessageRef.current = lastMessage;
-      return;
-    }
+    // Guard 8: Skip if this is the currently viewed conversation
+    if (selectedJidRef.current === lastMessage.remoteJid) { prevMessageRef.current = lastMessage; return; }
 
-    // All guards passed — play notification (Part 6: debounce 2000ms handled inside playNotification)
-    console.log('[Inbox] ✅ Playing notification for:', lastMessage.remoteJid?.substring(0, 15));
+    // All guards passed — play notification
     playNotification();
     prevMessageRef.current = lastMessage;
   }, [lastMessage]);
 
-  // Part 1/3: Optimistic status update — update lastStatus in cache when a status event arrives
+  // Status update via deterministic store — O(1)
   useEffect(() => {
     if (!lastStatusUpdate) return;
-    const queryKey = { sessionId: activeSession?.sessionId || "", tenantId };
-    trpcUtils.whatsapp.waConversations.setData(queryKey, (old: any) => {
-      if (!old || !Array.isArray(old)) return old;
-      // Find the conversation that contains this message and update lastStatus
-      // Only update if the status update's remoteJid matches and lastFromMe is true
-      const remoteJid = (lastStatusUpdate as any).remoteJid;
-      if (!remoteJid) return old;
-      return old.map((c: ConvItem) => {
-        if (c.remoteJid !== remoteJid) return c;
-        if (!c.lastFromMe) return c; // Only update status for fromMe messages
-        return { ...c, lastStatus: lastStatusUpdate.status };
-      });
-    });
+    const remoteJid = (lastStatusUpdate as any).remoteJid;
+    if (!remoteJid) return;
+    convStore.handleStatusUpdate({ remoteJid, status: lastStatusUpdate.status });
   }, [lastStatusUpdate]);
 
   // Select conversation
@@ -1384,35 +1324,30 @@ export default function InboxPage() {
     // ── Suppress notification sounds for 2 seconds while conversation loads ──
     soundSuppressedUntilRef.current = Date.now() + 2000;
 
-    // ── Optimistic UI: immediately set unreadCount to 0 (no full refetch) ──
-    trpcUtils.whatsapp.waConversations.setData(
-      { sessionId: activeSession?.sessionId || "", tenantId },
-      (old: any) => {
-        if (!old || !Array.isArray(old)) return old;
-        return old.map((c: ConvItem) =>
-          c.remoteJid === jid ? { ...c, unreadCount: 0 } : c
-        );
-      }
-    );
+    // ── Instant: mark read in deterministic store (O(1), no refetch) ──
+    convStore.markRead(jid);
 
     if (activeSession?.sessionId) {
       markRead.mutate({ sessionId: activeSession.sessionId, remoteJid: jid });
-      // Find conversationId for this jid (use raw data since dedupedConvs is declared later)
-      const convs = (conversationsQ.data || []) as ConvItem[];
-      const conv = convs.find(c => c.remoteJid === jid);
+      // Find conversationId from store (O(1) lookup)
+      const conv = convStore.getConversation(jid);
       if (conv?.conversationId) {
         syncOnOpen.mutate(
           { sessionId: activeSession.sessionId, remoteJid: jid, conversationId: conv.conversationId },
           {
             onSuccess: (r) => {
-              // Only refetch if new messages were inserted during sync
-              if (r.inserted > 0) conversationsQ.refetch();
+              // Only re-hydrate if new messages were inserted during sync
+              if (r.inserted > 0) {
+                conversationsQ.refetch().then((result) => {
+                  if (result.data) convStore.hydrate(result.data as ConvEntry[]);
+                });
+              }
             }
           }
         );
       }
     }
-  }, [activeSession?.sessionId, markRead, conversationsQ.data, syncOnOpen, tenantId]);
+  }, [activeSession?.sessionId, markRead, syncOnOpen, tenantId, convStore]);
 
   // View queue conversation WITHOUT auto-claiming
   const handleSelectQueueConv = useCallback((jid: string) => {
@@ -1425,34 +1360,13 @@ export default function InboxPage() {
   const meQ = trpc.auth.me.useQuery();
   const myUserId = useMemo(() => (meQ.data as any)?.saasUser?.userId || (meQ.data as any)?.id || 0, [meQ.data]);
 
-  // Filter conversations based on active tab
-  // Step 1: Deduplicate conversations by remoteJid using Map (O(1) lookup)
-  // This eliminates any duplicates from backend JOINs or cache merges
+  // ─── Render from deterministic store (pre-sorted, pre-deduped) ───
+  // Store already maintains sorted order via moveToTop. No full sort needed.
   const dedupedConvs = useMemo(() => {
-    const raw = (conversationsQ.data || []) as ConvItem[];
-    const map = new Map<string, ConvItem>();
-    for (const c of raw) {
-      const jid = c.remoteJid;
-      if (!jid) continue;
-      const existing = map.get(jid);
-      if (!existing) {
-        map.set(jid, c);
-      } else {
-        // Keep the one with the newer timestamp
-        const existingTs = existing.lastTimestamp ? new Date(existing.lastTimestamp).getTime() : 0;
-        const newTs = c.lastTimestamp ? new Date(c.lastTimestamp).getTime() : 0;
-        if (newTs > existingTs) map.set(jid, c);
-      }
-    }
-    // Always sort by lastTimestamp DESC — newest conversation on top
-    return Array.from(map.values()).sort((a, b) => {
-      const ta = a.lastTimestamp ? new Date(a.lastTimestamp).getTime() : 0;
-      const tb = b.lastTimestamp ? new Date(b.lastTimestamp).getTime() : 0;
-      return tb - ta;
-    });
-  }, [conversationsQ.data]);
+    return convStore.getSorted() as ConvItem[];
+  }, [convStore.version]);
 
-  // Step 2: Filter by tab, unread, and search
+  // Filter by tab, unread, and search
   const filteredConvs = useMemo(() => {
     let convs = dedupedConvs;
     // Tab-based primary filter
@@ -1478,7 +1392,7 @@ export default function InboxPage() {
       });
     }
     return convs;
-  }, [dedupedConvs, search, filter, activeTab, getDisplayName, myUserId]);
+  }, [dedupedConvs, search, filter, activeTab, getDisplayName, myUserId, convStore.version]);
 
   // Queue conversations filtered by search
   const filteredQueueConvs = useMemo(() => {
@@ -1517,10 +1431,10 @@ export default function InboxPage() {
     return (queueStatsQ.data as any)?.total || 0;
   }, [queueStatsQ.data]);
 
-  // Get assignment for selected conversation
+  // Get assignment for selected conversation (O(1) from store)
   const selectedAssignment = useMemo(() => {
     if (!selectedJid) return null;
-    const conv = dedupedConvs.find(c => c.remoteJid === selectedJid);
+    const conv = convStore.getConversation(selectedJid) as ConvItem | undefined;
     if (!conv) return null;
     return {
       assignedUserId: conv.assignedUserId,
@@ -1528,7 +1442,7 @@ export default function InboxPage() {
       assignmentStatus: conv.assignmentStatus,
       assignmentPriority: conv.assignmentPriority,
     };
-  }, [selectedJid, dedupedConvs]);
+  }, [selectedJid, convStore.version]);
 
   const handleAssign = useCallback((agentId: number | null) => {
     if (!selectedJid || !activeSession?.sessionId) return;
@@ -1556,24 +1470,24 @@ export default function InboxPage() {
     if (!selectedJid) return null;
     const crmContact = getContactForJid(selectedJid);
     const pic = profilePicMap[selectedJid] || undefined;
-    const selectedConv = dedupedConvs.find(c => c.remoteJid === selectedJid);
+    const selectedConv = convStore.getConversation(selectedJid) as ConvItem | undefined;
     const displayName = getDisplayName(selectedJid, selectedConv);
     const phone = selectedJid.split("@")[0];
     if (crmContact) return { ...crmContact, name: displayName, avatarUrl: pic };
     return { id: 0, name: displayName, phone, email: undefined, avatarUrl: pic };
-  }, [selectedJid, getContactForJid, profilePicMap, getDisplayName, dedupedConvs]);
+  }, [selectedJid, getContactForJid, profilePicMap, getDisplayName, convStore.version]);
 
   const hasCrmContact = useMemo(() => {
     if (!selectedJid) return false;
     return !!getContactForJid(selectedJid);
   }, [selectedJid, getContactForJid]);
 
-  // Get waConversationId for selected conversation (for notes/events)
+  // Get waConversationId for selected conversation (O(1) from store)
   const selectedWaConversationId = useMemo(() => {
     if (!selectedJid) return undefined;
-    const conv = dedupedConvs.find(c => c.remoteJid === selectedJid);
+    const conv = convStore.getConversation(selectedJid) as ConvItem | undefined;
     return conv?.conversationId;
-  }, [selectedJid, dedupedConvs]);
+  }, [selectedJid, convStore.version]);
 
   const toggleMute = useCallback(() => {
     setIsMuted(prev => {

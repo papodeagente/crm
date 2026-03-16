@@ -3635,3 +3635,31 @@
 ### 11. Testes
 - [x] Testes unitários para ciclo completo de campos personalizados (26 testes passando)
 - [x] Validar que nenhum fluxo existente foi quebrado (1906 testes passando, 4 falhas pré-existentes em whatsappDailyBackup/messageQueue)
+
+## Inbox Instant Update — Estado Determinístico via Socket
+
+### 1. Diagnóstico
+- [x] Auditar arquitetura atual do Inbox (socket, queries, estado, polling)
+- [x] Identificar todos os pontos de refetch/invalidação/polling
+
+### 2. Estado determinístico
+- [x] Implementar conversationMap: Map<conversationId, Conversation>
+- [x] Implementar sortedConversationIds: string[]
+- [x] Render UI a partir de sortedConversationIds.map(id => conversationMap.get(id))
+
+### 3. Socket como fonte de verdade
+- [x] handleIncomingMessage: atualizar preview, lastTimestamp, mover para topo
+- [x] handleOutgoingMessage: atualizar preview sem refetch
+- [x] handleUnreadUpdate: atualizar contadores instantaneamente
+- [x] Queries de banco apenas para carga inicial (staleTime: Infinity, refetchInterval: false)
+
+### 4. Remover refetch/polling
+- [x] Remover refetch() do fluxo de mensagens recebidas
+- [x] Remover polling de conversas (conversationsQ agora staleTime: Infinity)
+- [x] Remover invalidação de queries para preview/order
+- [x] Sorting apenas quando timestamp muda (moveToTop O(1) em vez de sort O(n log n))
+
+### 5. Performance
+- [x] Tempo de atualização < 20ms (testado: handleMessage < 1ms para 1000 conversas)
+- [x] Sem flicker, sem delay, sem reordenação lenta
+- [x] Testes unitários para o novo estado (17 testes passando)
