@@ -9,6 +9,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
+import { DatePicker } from "@/components/ui/date-picker";
 import {
   Plus, CheckCircle2, Circle, Clock, AlertTriangle,
   Phone, Mail, MessageSquare, Video, ClipboardList,
@@ -322,11 +323,11 @@ export default function Tasks() {
           <PopoverContent className="w-[280px] rounded-xl p-4 space-y-3" align="start">
             <div>
               <Label className="text-[11px] font-medium text-muted-foreground">De</Label>
-              <Input type="date" value={dateFrom} onChange={(e) => { setDateFrom(e.target.value); setPage(0); }} className="mt-1 h-9 rounded-lg text-[13px]" />
+              <DatePicker value={dateFrom} onChange={(v) => { setDateFrom(v); setPage(0); }} placeholder="Selecionar" className="mt-1 h-9 rounded-lg text-[13px]" />
             </div>
             <div>
               <Label className="text-[11px] font-medium text-muted-foreground">Até</Label>
-              <Input type="date" value={dateTo} onChange={(e) => { setDateTo(e.target.value); setPage(0); }} className="mt-1 h-9 rounded-lg text-[13px]" />
+              <DatePicker value={dateTo} onChange={(v) => { setDateTo(v); setPage(0); }} placeholder="Selecionar" className="mt-1 h-9 rounded-lg text-[13px]" />
             </div>
             {(dateFrom || dateTo) && (
               <Button variant="ghost" size="sm" className="w-full text-[12px]" onClick={() => { setDateFrom(""); setDateTo(""); }}>

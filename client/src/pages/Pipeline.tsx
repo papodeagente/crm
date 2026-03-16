@@ -27,6 +27,7 @@ import DealFiltersPanel, { useDealFilters, DealFilterButton } from "@/components
 import SaleCelebration from "@/components/SaleCelebration";
 import ClassificationBadge from "@/components/ClassificationBadge";
 import CustomFieldRenderer from "@/components/CustomFieldRenderer";
+import { DatePicker } from "@/components/ui/date-picker";
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
@@ -1808,19 +1809,19 @@ function CreateDealDialog({ open, onOpenChange, pipelineId, stages, contacts, ac
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <Label className="text-[12px] font-medium">Data de Embarque</Label>
-                  <Input
-                    type="date"
+                  <DatePicker
                     value={boardingDate}
-                    onChange={(e) => setBoardingDate(e.target.value)}
+                    onChange={setBoardingDate}
+                    placeholder="Selecionar data"
                     className="mt-1.5 h-10 rounded-xl"
                   />
                 </div>
                 <div>
                   <Label className="text-[12px] font-medium">Data de Retorno</Label>
-                  <Input
-                    type="date"
+                  <DatePicker
                     value={returnDate}
-                    onChange={(e) => setReturnDate(e.target.value)}
+                    onChange={setReturnDate}
+                    placeholder="Selecionar data"
                     className="mt-1.5 h-10 rounded-xl"
                   />
                 </div>

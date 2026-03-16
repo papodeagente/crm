@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { DatePicker } from "@/components/ui/date-picker";
 import {
   X, Phone, Mail, Video, MessageSquare, CheckSquare,
 } from "lucide-react";
@@ -404,10 +405,10 @@ export default function TaskFormDialog({
               <Label className="text-[13px] font-semibold text-foreground">
                 Data do agendamento <span className="text-destructive">*</span>
               </Label>
-              <Input
-                type="date"
+              <DatePicker
                 value={dueDate}
-                onChange={(e) => setDueDate(e.target.value)}
+                onChange={setDueDate}
+                placeholder="Selecionar data"
                 className="h-10 rounded-xl border-border/60"
               />
             </div>

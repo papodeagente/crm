@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import { DatePicker } from "@/components/ui/date-picker";
 import {
   CheckCircle2, Pencil, Clock, ChevronRight, ArrowLeft,
 } from "lucide-react";
@@ -220,10 +221,10 @@ export default function TaskActionPopover({
             </div>
             <div className="space-y-2">
               <Label className="text-[12px] font-medium">Data</Label>
-              <Input
-                type="date"
+              <DatePicker
                 value={customDate}
-                onChange={(e) => setCustomDate(e.target.value)}
+                onChange={setCustomDate}
+                placeholder="Selecionar data"
                 className="h-9 rounded-lg text-[13px]"
               />
             </div>

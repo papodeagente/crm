@@ -2,6 +2,7 @@ import { useState, useMemo, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { DatePicker } from "@/components/ui/date-picker";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -216,19 +217,17 @@ export default function DateRangeFilter({
         </Select>
         {preset === "custom" && (
           <>
-            <Input
-              type="date"
+            <DatePicker
               value={customFrom}
-              onChange={(e) => onCustomFromChange(e.target.value)}
-              className="h-8 w-36 text-xs"
+              onChange={onCustomFromChange}
               placeholder="De"
-            />
-            <Input
-              type="date"
-              value={customTo}
-              onChange={(e) => onCustomToChange(e.target.value)}
               className="h-8 w-36 text-xs"
+            />
+            <DatePicker
+              value={customTo}
+              onChange={onCustomToChange}
               placeholder="Até"
+              className="h-8 w-36 text-xs"
             />
           </>
         )}
@@ -297,19 +296,19 @@ export default function DateRangeFilter({
             <div className="space-y-2 pt-1">
               <div className="space-y-1">
                 <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">De</label>
-                <Input
-                  type="date"
+                <DatePicker
                   value={customFrom}
-                  onChange={(e) => onCustomFromChange(e.target.value)}
+                  onChange={onCustomFromChange}
+                  placeholder="Selecionar"
                   className="h-8 text-xs"
                 />
               </div>
               <div className="space-y-1">
                 <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Até</label>
-                <Input
-                  type="date"
+                <DatePicker
                   value={customTo}
-                  onChange={(e) => onCustomToChange(e.target.value)}
+                  onChange={onCustomToChange}
+                  placeholder="Selecionar"
                   className="h-8 text-xs"
                 />
               </div>

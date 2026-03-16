@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { DatePicker } from "@/components/ui/date-picker";
 import { cn } from "@/lib/utils";
 import { X } from "lucide-react";
 
@@ -259,15 +260,14 @@ function CustomFieldInput({
           </Label>
           {readOnly ? (
             <p className="text-sm mt-1">
-              {value ? new Date(value).toLocaleDateString("pt-BR") : "—"}
+              {value ? new Date(value).toLocaleDateString("pt-BR") : "\u2014"}
             </p>
           ) : (
-            <Input
+            <DatePicker
               value={value}
-              onChange={(e) => onChange(e.target.value)}
-              type="date"
+              onChange={onChange}
+              placeholder={field.placeholder || field.label}
               className={cn("mt-1.5 rounded-xl", inputHeight)}
-              readOnly={readOnly}
             />
           )}
         </div>

@@ -18,6 +18,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
+import { DatePicker } from "@/components/ui/date-picker";
 import { toast } from "sonner";
 
 // ─── Types ───
@@ -174,11 +175,11 @@ function CustomFieldInput({ field, value, onChange }: {
       );
     case "date":
       return (
-        <Input
-          type="date"
+        <DatePicker
           value={value}
-          onChange={(e) => onChange(e.target.value)}
-          className="bg-background/50"
+          onChange={onChange}
+          placeholder={field.placeholder || field.label}
+          className="bg-background/50 h-9"
         />
       );
     case "textarea":
@@ -572,23 +573,23 @@ export default function ContactProfile() {
                   <Separator />
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="text-xs font-medium text-muted-foreground mb-1 block">Aniversário (MM-DD)</label>
-                      <Input
+                      <label className="text-xs font-medium text-muted-foreground mb-1 block">Aniversário</label>
+                      <DatePicker
                         value={editData.birthDate}
-                        onChange={(e) => setEditData({ ...editData, birthDate: e.target.value })}
-                        placeholder="03-15"
-                        className="bg-background/50"
-                        maxLength={5}
+                        onChange={(v) => setEditData({ ...editData, birthDate: v })}
+                        placeholder="Selecionar data"
+                        className="bg-background/50 h-9"
+                        monthDay
                       />
                     </div>
                     <div>
-                      <label className="text-xs font-medium text-muted-foreground mb-1 block">Casamento (MM-DD)</label>
-                      <Input
+                      <label className="text-xs font-medium text-muted-foreground mb-1 block">Casamento</label>
+                      <DatePicker
                         value={editData.weddingDate}
-                        onChange={(e) => setEditData({ ...editData, weddingDate: e.target.value })}
-                        placeholder="06-20"
-                        className="bg-background/50"
-                        maxLength={5}
+                        onChange={(v) => setEditData({ ...editData, weddingDate: v })}
+                        placeholder="Selecionar data"
+                        className="bg-background/50 h-9"
+                        monthDay
                       />
                     </div>
                   </div>

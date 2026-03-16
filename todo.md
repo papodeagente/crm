@@ -3701,3 +3701,13 @@
 - [x] Corrigir SourcesAndCampaigns.tsx: substituir tenantId=1 por useTenantId()
 - [x] Corrigir TransferDialog.tsx: substituir tenantId=1 por useTenantId()
 - [x] Verificar que campos personalizados aparecem no ContactProfile
+
+## Calendário para campos de data
+- [x] Instalar dependências de date picker (react-day-picker ou similar)
+- [x] Criar/configurar componente Calendar e DatePicker com shadcn/ui
+- [x] Substituir input type="date" por DatePicker no ContactProfile (birthDate, weddingDate)
+- [x] Substituir input type="date" por DatePicker nos campos personalizados tipo "date" (CustomFieldInput)
+- [x] Substituir input type="date" por DatePicker na criação de contatos (Contacts.tsx) — não tinha inputs de data
+- [x] Substituir input type="date" por DatePicker na criação/edição de negociações (Pipeline.tsx, DealDetail.tsx)
+- [x] Verificar todos os outros formulários com campos de data (TaskFormDialog, TaskActionPopover, Tasks, DateRangeFilter, CustomFieldRenderer)
+- [x] Testar no navegador e garantir que funciona corretamente
