@@ -3175,3 +3175,16 @@
 - [x] Fix: usar BullMQ se Redis disponível, fallback síncrono
 - [x] Fix: limitar a 50 chats e 20 mensagens por chat
 - [x] Tests: cobrir sync incremental (34 testes)
+
+## Estabilização da Sugestão de Resposta por IA no Inbox
+- [x] 1. IA não bloqueia UI: geração assíncrona via BullMQ + socket emit
+- [x] 2. Streaming da resposta: chunks via socket.emit("aiSuggestionChunk")
+- [x] 3. Timeout de 8 segundos com fallback message
+- [x] 4. Cancelamento automático ao trocar conversa/enviar msg/fechar chat
+- [x] 5. Debounce de 1.5s no frontend para evitar múltiplas chamadas
+- [x] 6. Rate limit: máximo 1 sugestão por conversa a cada 10s (Redis key)
+- [x] 7. Contexto inteligente: enviar apenas últimas 10 mensagens
+- [x] 8. UX: indicador "Gerando sugestão..." + botão "Aceitar sugestão"
+- [x] 9. Falha silenciosa: ocultar sugestão em caso de erro, log apenas no backend
+- [x] 10. Cache de sugestões: Redis 30s por messageId
+- [x] 11. Testes: geração async, timeout, cancelamento, debounce, rate limit, streaming, cache (43 testes)

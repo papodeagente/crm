@@ -156,6 +156,7 @@ import { trackingTokens, rdStationConfig, rdStationWebhookLog, rdFieldMappings, 
 import { generateTrackerScript } from "./tracker-script";
 import { eq, and, desc, asc, sql, lt } from "drizzle-orm";
 import { generateSuggestion, refineSuggestion, splitTextNaturally, type ResponseStyle } from "./aiSuggestionService";
+import { requestSuggestion, cancelSuggestion, cancelChatSuggestions } from "./aiSuggestionWorker";
 
 /** Parse AI suggestion response into parts array. Handles JSON or plain text fallback. */
 function parseAiSuggestionParts(raw: string): { full: string; parts: string[] } {
@@ -3241,6 +3242,50 @@ REGRAS:
       .input(z.object({ text: z.string() }))
       .mutation(({ input }) => {
         return { parts: splitTextNaturally(input.text) };
+      }),
+
+    // ── Async AI Suggestion (non-blocking, streaming via socket) ──
+    suggestAsync: protectedProcedure
+      .input(z.object({
+        requestId: z.string(),
+        tenantId: z.number(),
+        sessionId: z.string(),
+        remoteJid: z.string(),
+        contactName: z.string().optional(),
+        integrationId: z.number().optional(),
+        overrideModel: z.string().optional(),
+        style: z.enum(["default", "shorter", "human", "objective", "consultive"]).optional(),
+        customInstruction: z.string().optional(),
+      }))
+      .mutation(({ input }) => {
+        return requestSuggestion({
+          requestId: input.requestId,
+          tenantId: input.tenantId,
+          sessionId: input.sessionId,
+          remoteJid: input.remoteJid,
+          contactName: input.contactName,
+          integrationId: input.integrationId,
+          overrideModel: input.overrideModel,
+          style: input.style,
+          customInstruction: input.customInstruction,
+        });
+      }),
+
+    // ── Cancel AI Suggestion ──
+    cancel: protectedProcedure
+      .input(z.object({
+        requestId: z.string().optional(),
+        sessionId: z.string().optional(),
+        remoteJid: z.string().optional(),
+      }))
+      .mutation(({ input }) => {
+        if (input.requestId) {
+          return { cancelled: cancelSuggestion(input.requestId) ? 1 : 0 };
+        }
+        if (input.sessionId && input.remoteJid) {
+          return { cancelled: cancelChatSuggestions(input.sessionId, input.remoteJid) };
+        }
+        return { cancelled: 0 };
       }),
 
     // List available models per provider

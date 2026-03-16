@@ -14,6 +14,7 @@ import { serveStatic, setupVite } from "./vite";
 import { whatsappManager } from "../whatsappEvolution";
 import { startDailyBackupScheduler } from "../whatsappDailyBackup";
 import { webhookRouter } from "../webhookRoutes";
+import { setIo } from "../socketSingleton";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -43,6 +44,9 @@ async function startServer() {
     cors: { origin: "*" },
     path: "/api/socket.io",
   });
+
+  // Make io globally accessible for AI suggestion streaming etc.
+  setIo(io);
 
   // Forward WhatsApp events to Socket.IO clients
   whatsappManager.on("qr", (data) => {

@@ -139,6 +139,12 @@ class SocketManager {
     this._qrData = null;
     this.notify();
   }
+
+  /** Get the raw socket instance for direct event listening */
+  getSocket(): Socket | null {
+    this.ensureConnected();
+    return this.socket;
+  }
 }
 
 const socketManager = new SocketManager();
@@ -163,6 +169,11 @@ function getSnapshot() {
 
 function subscribe(listener: () => void) {
   return socketManager.subscribe(listener);
+}
+
+/** Get the raw socket instance for direct event listening (e.g., AI suggestion streaming) */
+export function getSocketInstance(): Socket | null {
+  return socketManager.getSocket();
 }
 
 export function useSocket() {

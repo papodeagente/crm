@@ -173,7 +173,7 @@ export function classifyIntent(lastMessage: string): IntentCategory {
  * Busca mensagens da conversa diretamente do banco de dados.
  * Retorna em ordem cronológica (mais antigas primeiro).
  */
-async function fetchConversationMessages(
+export async function fetchConversationMessages(
   sessionId: string,
   remoteJid: string,
   maxMessages = 80,
@@ -216,7 +216,7 @@ async function fetchConversationMessages(
 /**
  * Busca dados CRM do contato vinculado à conversa.
  */
-async function fetchCrmContext(
+export async function fetchCrmContext(
   tenantId: number,
   sessionId: string,
   remoteJid: string,
@@ -300,7 +300,7 @@ async function fetchCrmContext(
  * - Últimas 40 mensagens: completas com timestamps
  * - Mensagens anteriores (41-80): resumidas em bloco
  */
-function buildStructuredContext(
+export function buildStructuredContext(
   messages: ConversationMessage[],
   contactName: string,
   crmContext: CrmContext,
@@ -405,7 +405,7 @@ const STYLE_INSTRUCTIONS: Record<ResponseStyle, string> = {
   consultive: "Use abordagem consultiva. Faça perguntas estratégicas para entender melhor a necessidade antes de oferecer soluções.",
 };
 
-function buildSystemPrompt(
+export function buildSystemPrompt(
   contactName: string,
   intent: IntentCategory,
   style: ResponseStyle,
@@ -455,7 +455,7 @@ REGRAS OBRIGATÓRIAS:
 10. Se houver dados CRM, use-os naturalmente sem parecer robótico.`;
 }
 
-function buildUserPrompt(
+export function buildUserPrompt(
   contactName: string,
   conversationContext: string,
 ): string {

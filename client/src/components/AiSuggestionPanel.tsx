@@ -1,5 +1,6 @@
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { trpc } from "@/lib/trpc";
+import { getSocketInstance } from "@/hooks/useSocket";
 import { toast } from "sonner";
 import {
   Sparkles, X, Loader2, Copy, Send, RefreshCw,
@@ -50,6 +51,11 @@ const MODELS_BY_PROVIDER: Record<string, { id: string; name: string; desc: strin
   ],
 };
 
+let requestCounter = 0;
+function generateRequestId(sessionId: string, remoteJid: string): string {
+  return `${sessionId}:${remoteJid}:${Date.now()}-${++requestCounter}`;
+}
+
 export default function AiSuggestionPanel({
   tenantId,
   sessionId,
@@ -61,6 +67,7 @@ export default function AiSuggestionPanel({
 }: AiSuggestionPanelProps) {
   // State
   const [suggestion, setSuggestion] = useState("");
+  const [streamingText, setStreamingText] = useState("");
   const [editedText, setEditedText] = useState("");
   const [meta, setMeta] = useState<{
     provider: string; model: string;
@@ -69,11 +76,15 @@ export default function AiSuggestionPanel({
   } | null>(null);
   const [selectedIntegrationId, setSelectedIntegrationId] = useState<number | undefined>();
   const [selectedModel, setSelectedModel] = useState<string | undefined>();
-  const [phase, setPhase] = useState<"idle" | "loading" | "result" | "error" | "sending">("idle");
+  const [phase, setPhase] = useState<"idle" | "loading" | "streaming" | "result" | "error" | "sending">("idle");
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [showModelList, setShowModelList] = useState(false);
   const [pacing, setPacing] = useState<PacingMode>("normal");
   const [sendingProgress, setSendingProgress] = useState({ current: 0, total: 0 });
+
+  // Refs for cleanup
+  const currentRequestId = useRef<string | null>(null);
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Fetch available AI integrations
   const integrationsQ = trpc.ai.list.useQuery(
@@ -81,32 +92,46 @@ export default function AiSuggestionPanel({
     { enabled: !!tenantId }
   );
 
-  // Mutations
-  const suggestMut = trpc.ai.suggest.useMutation({
+  // Async suggestion mutation (non-blocking)
+  const suggestAsyncMut = trpc.ai.suggestAsync.useMutation({
     onSuccess: (data) => {
-      setSuggestion(data.suggestion);
-      setEditedText(data.suggestion);
-      setMeta({
-        provider: data.provider,
-        model: data.model,
-        intentClassified: (data as any).intentClassified,
-        durationMs: (data as any).durationMs,
-        contextMessageCount: (data as any).contextMessageCount,
-        hasCrmContext: (data as any).hasCrmContext,
-      });
-      setPhase("result");
+      if (data.status === "cached" && data.cachedResult) {
+        // Use cached result immediately
+        setSuggestion(data.cachedResult.suggestion);
+        setEditedText(data.cachedResult.suggestion);
+        setStreamingText("");
+        setMeta({
+          provider: data.cachedResult.provider,
+          model: data.cachedResult.model,
+          intentClassified: data.cachedResult.intentClassified,
+          durationMs: data.cachedResult.durationMs,
+          contextMessageCount: data.cachedResult.contextMessageCount,
+          hasCrmContext: data.cachedResult.hasCrmContext,
+        });
+        setPhase("result");
+      } else if (data.status === "rate_limited") {
+        const seconds = Math.ceil((data.retryAfterMs || 10000) / 1000);
+        toast.info(`Aguarde ${seconds}s antes de gerar nova sugestão.`, { duration: 3000 });
+        setPhase("idle");
+      }
+      // status === "queued" — wait for socket events
     },
     onError: (err) => {
       if (err.message === "NO_AI_CONFIGURED") {
         toast.error("Nenhuma IA configurada. Vá em Integrações > IA para conectar sua API.", { duration: 5000 });
         onClose();
       } else {
-        toast.error(err.message || "Erro ao gerar sugestão", { duration: 5000 });
-        setPhase("error");
+        // Silent failure — just hide suggestion (requirement #9)
+        console.error("[AiSuggestion] Error:", err.message);
+        setPhase("idle");
       }
     },
   });
 
+  // Cancel mutation
+  const cancelMut = trpc.ai.cancel.useMutation();
+
+  // Legacy mutations (kept for refine and send broken)
   const refineMut = trpc.ai.refine.useMutation({
     onSuccess: (data) => {
       setSuggestion(data.suggestion);
@@ -115,7 +140,8 @@ export default function AiSuggestionPanel({
       toast.success("Sugestão refinada!");
     },
     onError: (err) => {
-      toast.error(err.message || "Erro ao refinar", { duration: 3000 });
+      // Silent failure (requirement #9)
+      console.error("[AiSuggestion] Refine error:", err.message);
     },
   });
 
@@ -131,6 +157,73 @@ export default function AiSuggestionPanel({
     },
   });
 
+  // ─── Socket.IO listeners for streaming ───
+  useEffect(() => {
+    const socket = getSocketInstance();
+    if (!socket) return;
+
+    const onChunk = (data: { requestId: string; sessionId: string; remoteJid: string; text: string }) => {
+      if (data.requestId === currentRequestId.current) {
+        setStreamingText(data.text);
+        setPhase("streaming");
+      }
+    };
+
+    const onReady = (data: { requestId: string; sessionId: string; remoteJid: string; result: any; timedOut?: boolean }) => {
+      if (data.requestId === currentRequestId.current) {
+        const r = data.result;
+        setSuggestion(r.suggestion);
+        setEditedText(r.suggestion);
+        setStreamingText("");
+        setMeta({
+          provider: r.provider,
+          model: r.model,
+          intentClassified: r.intentClassified,
+          durationMs: r.durationMs,
+          contextMessageCount: r.contextMessageCount,
+          hasCrmContext: r.hasCrmContext,
+        });
+        setPhase("result");
+        currentRequestId.current = null;
+      }
+    };
+
+    const onError = (data: { requestId: string; error: string }) => {
+      if (data.requestId === currentRequestId.current) {
+        // Silent failure — just hide (requirement #9)
+        console.error("[AiSuggestion] Socket error:", data.error);
+        setPhase("idle");
+        setStreamingText("");
+        currentRequestId.current = null;
+      }
+    };
+
+    socket.on("aiSuggestionChunk", onChunk);
+    socket.on("aiSuggestionReady", onReady);
+    socket.on("aiSuggestionError", onError);
+
+    return () => {
+      socket.off("aiSuggestionChunk", onChunk);
+      socket.off("aiSuggestionReady", onReady);
+      socket.off("aiSuggestionError", onError);
+    };
+  }, []);
+
+  // ─── Cancel on unmount or conversation change ───
+  useEffect(() => {
+    return () => {
+      // Cancel any active request when component unmounts (close chat, navigate away)
+      if (currentRequestId.current) {
+        cancelMut.mutate({ sessionId, remoteJid });
+        currentRequestId.current = null;
+      }
+      // Clear debounce timer
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, [sessionId, remoteJid]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const activeIntegrations = useMemo(
     () => (integrationsQ.data || []).filter((i: any) => i.isActive),
     [integrationsQ.data]
@@ -142,14 +235,27 @@ export default function AiSuggestionPanel({
   const effectiveModel = selectedModel || effectiveIntegration?.defaultModel || MODELS_BY_PROVIDER[effectiveProvider]?.[0]?.id;
   const providerModels = MODELS_BY_PROVIDER[effectiveProvider] || [];
 
-  // Generate suggestion using new server-side context
+  // ─── Generate suggestion (async, non-blocking) ───
   const doGenerate = useCallback((style?: ResponseStyle) => {
+    // Cancel any previous request
+    if (currentRequestId.current) {
+      cancelMut.mutate({ sessionId, remoteJid });
+    }
+
+    // Reset state
     setSuggestion("");
     setEditedText("");
+    setStreamingText("");
     setMeta(null);
     setPhase("loading");
 
-    suggestMut.mutate({
+    // Generate unique request ID
+    const reqId = generateRequestId(sessionId, remoteJid);
+    currentRequestId.current = reqId;
+
+    // Fire async request (returns immediately)
+    suggestAsyncMut.mutate({
+      requestId: reqId,
       tenantId,
       sessionId,
       remoteJid,
@@ -158,7 +264,17 @@ export default function AiSuggestionPanel({
       overrideModel: effectiveModel,
       style: style || "default",
     });
-  }, [tenantId, sessionId, remoteJid, contactName, effectiveIntegrationId, effectiveModel, suggestMut]);
+  }, [tenantId, sessionId, remoteJid, contactName, effectiveIntegrationId, effectiveModel, suggestAsyncMut, cancelMut]);
+
+  // ─── Debounced generate (1.5s after last trigger) ───
+  const doGenerateDebounced = useCallback((style?: ResponseStyle) => {
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+    debounceTimerRef.current = setTimeout(() => {
+      doGenerate(style);
+    }, 1500);
+  }, [doGenerate]);
 
   // Refine with a different style
   const doRefine = useCallback((style: ResponseStyle) => {
@@ -175,6 +291,11 @@ export default function AiSuggestionPanel({
   // Server-side broken sending
   const doSendBroken = useCallback((partsToSend: string[]) => {
     if (partsToSend.length === 0) return;
+    // Cancel any active AI generation before sending
+    if (currentRequestId.current) {
+      cancelMut.mutate({ sessionId, remoteJid });
+      currentRequestId.current = null;
+    }
     setPhase("sending");
     setSendingProgress({ current: 0, total: partsToSend.length });
 
@@ -185,7 +306,7 @@ export default function AiSuggestionPanel({
       parts: partsToSend,
       pacing,
     });
-  }, [sessionId, remoteJid, pacing, sendBrokenMut]);
+  }, [sessionId, remoteJid, pacing, sendBrokenMut, cancelMut]);
 
   const parts = useMemo(
     () => editedText.split(/\n\n+/).map((p: string) => p.trim()).filter(Boolean),
@@ -212,7 +333,7 @@ export default function AiSuggestionPanel({
           )}
         </div>
         <div className="flex items-center gap-1">
-          {phase !== "idle" && phase !== "loading" && phase !== "sending" && (
+          {phase !== "idle" && phase !== "loading" && phase !== "streaming" && phase !== "sending" && (
             <button
               onClick={() => setShowAdvanced(!showAdvanced)}
               className={`p-0.5 rounded transition-colors ${showAdvanced ? "text-violet-500" : "text-muted-foreground hover:text-foreground"}`}
@@ -221,7 +342,14 @@ export default function AiSuggestionPanel({
               <Settings2 className="h-3.5 w-3.5" />
             </button>
           )}
-          <button onClick={onClose} className="text-muted-foreground hover:text-foreground p-0.5">
+          <button onClick={() => {
+            // Cancel on close
+            if (currentRequestId.current) {
+              cancelMut.mutate({ sessionId, remoteJid });
+              currentRequestId.current = null;
+            }
+            onClose();
+          }} className="text-muted-foreground hover:text-foreground p-0.5">
             <X className="h-3.5 w-3.5" />
           </button>
         </div>
@@ -333,14 +461,27 @@ export default function AiSuggestionPanel({
         </div>
       )}
 
-      {/* ── PHASE: LOADING ── */}
+      {/* ── PHASE: LOADING ── Waiting for AI to start */}
       {phase === "loading" && (
         <div className="px-4 py-6 flex flex-col items-center gap-2">
           <Loader2 className="h-6 w-6 animate-spin text-violet-500" />
-          <span className="text-[12px] text-muted-foreground">Analisando conversa e gerando sugestão...</span>
+          <span className="text-[12px] text-muted-foreground">Gerando sugestão...</span>
           <span className="text-[10px] text-muted-foreground">
-            Contexto completo do banco + CRM + SPIN Selling
+            Contexto: últimas 10 mensagens + CRM
           </span>
+        </div>
+      )}
+
+      {/* ── PHASE: STREAMING ── Real-time text appearing */}
+      {phase === "streaming" && (
+        <div className="px-3 py-2">
+          <div className="text-[13px] text-foreground bg-white dark:bg-violet-900/20 border border-violet-200 dark:border-violet-700 rounded-md px-2.5 py-2 min-h-[60px] max-h-[180px] overflow-y-auto whitespace-pre-wrap">
+            {streamingText}
+            <span className="inline-block w-1.5 h-4 bg-violet-500 animate-pulse ml-0.5 align-text-bottom" />
+          </div>
+          <p className="text-[10px] text-muted-foreground mt-1 flex items-center gap-1">
+            <Loader2 className="h-3 w-3 animate-spin" /> Recebendo resposta...
+          </p>
         </div>
       )}
 
@@ -463,7 +604,7 @@ export default function AiSuggestionPanel({
               onClick={() => onUseText(editedText.trim())}
               className="flex-1 text-[12px] font-medium bg-violet-500 hover:bg-violet-600 text-white rounded-md py-1.5 transition-colors flex items-center justify-center gap-1.5"
             >
-              <Copy className="h-3 w-3" /> Usar no campo
+              <Copy className="h-3 w-3" /> Aceitar sugestão
             </button>
             {hasMultipleParts && (
               <button
