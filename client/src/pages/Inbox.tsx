@@ -884,6 +884,9 @@ export default function InboxPage() {
   const [isMuted, setIsMuted] = useState(() => {
     try { return localStorage.getItem(MUTE_KEY) === "true"; } catch { return false; }
   });
+  const selectedJidRef = useRef<string | null>(null);
+  // Keep ref in sync with state so socket handler closure always has the latest value
+  selectedJidRef.current = selectedJid;
   const prevMessageRef = useRef<typeof lastMessage>(null);
   // Suppress notification sounds temporarily when opening a conversation
   // This prevents sounds from firing during message hydration/syncOnOpen
@@ -1172,9 +1175,9 @@ export default function InboxPage() {
           lastFromMe: lastMessage.fromMe,
           lastTimestamp: msgTimestamp, // Store as Date object (matches superjson format from backend)
           lastStatus: lastMessage.fromMe ? "sent" : "received",
-          unreadCount: (!lastMessage.fromMe && selectedJid !== msgJid)
+          unreadCount: (!lastMessage.fromMe && selectedJidRef.current !== msgJid)
             ? (Number(c.unreadCount) || 0) + 1
-            : c.unreadCount,
+            : 0,
         };
       });
       // Re-sort by lastTimestamp descending
@@ -1210,7 +1213,7 @@ export default function InboxPage() {
       messageType: lastMessage.messageType,
       remoteJid: lastMessage.remoteJid?.substring(0, 15),
       timestamp: lastMessage.timestamp,
-      activeConversation: selectedJid?.substring(0, 15) || 'none',
+      activeConversation: selectedJidRef.current?.substring(0, 15) || 'none',
       isMuted,
       suppressed: Date.now() < soundSuppressedUntilRef.current,
       alreadyProcessed: processedMsgRef.current.has(msgSig),
@@ -1271,7 +1274,7 @@ export default function InboxPage() {
     }
 
     // ── Guard 8: Skip if this is the currently viewed conversation
-    if (selectedJid === lastMessage.remoteJid) {
+    if (selectedJidRef.current === lastMessage.remoteJid) {
       prevMessageRef.current = lastMessage;
       return;
     }

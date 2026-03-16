@@ -3543,3 +3543,13 @@
 - [x] Part 5: Background reconciliation — already implemented in messageReconciliation.ts (10 convs/cycle, 15 msgs/conv, every 5 min, CPU/queue protection)
 - [x] Part 6: Socket validation — ignore events without remoteJid or timestamp, skip events from different sessions
 - [x] Part 7: Final validation — TypeScript 0 errors, 1880 tests passing, messageId emitted in socket payload, sessionId returned in SQL queries
+
+## Fix Unread Counter Bug When Conversation Is Open
+- [x] Root cause: selectedJid was stale inside useEffect closure (dependency was [lastMessage] only)
+- [x] Fix: added selectedJidRef (useRef) synced with selectedJid state, used in socket handler closure
+- [x] If conversation is open (selectedJidRef.current === msgJid): unreadCount set to 0
+- [x] If conversation is NOT open: increment unreadCount normally
+- [x] On conversation open: handleSelectConv already sets unreadCount = 0 optimistically + calls markRead
+- [x] Notification sound guard also fixed to use selectedJidRef.current (was also stale)
+- [x] No additional refetch() calls — pure socket-driven cache updates
+- [x] TypeScript compiles with 0 errors
