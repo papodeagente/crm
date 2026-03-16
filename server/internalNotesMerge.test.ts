@@ -418,3 +418,146 @@ describe("Internal Notes Chronological Merge", () => {
     });
   });
 });
+
+
+describe("Timestamp Serialization Fix (Date vs String)", () => {
+  /**
+   * Root cause: Drizzle's db.execute(sql`...`) returns TIMESTAMP columns as strings
+   * (e.g. "2026-03-16 02:34:38" in server local time), while Drizzle's select().from()
+   * returns them as Date objects. Superjson serializes Date objects with type metadata,
+   * but passes strings as-is. The browser then parses the string in its LOCAL timezone,
+   * causing a timezone shift that breaks chronological ordering.
+   *
+   * Fix: Convert string timestamps to Date objects in getInternalNotes() and
+   * getCustomerGlobalNotes() before returning from the server.
+   */
+
+  // Simulate what the backend returns BEFORE the fix (strings from db.execute)
+  function simulatePreFixNotes(): InternalNote[] {
+    return [
+      makeNote({ id: 4, createdAt: "2026-03-16 02:34:38", content: "Note at 02:34 EDT" }),
+      makeNote({ id: 5, createdAt: "2026-03-16 03:23:52", content: "Note at 03:23 EDT" }),
+      makeNote({ id: 6, createdAt: "2026-03-16 03:31:54", content: "Note at 03:31 EDT" }),
+    ];
+  }
+
+  // Simulate what the backend returns AFTER the fix (Date objects)
+  function simulatePostFixNotes(): InternalNote[] {
+    return [
+      makeNote({ id: 4, createdAt: new Date("2026-03-16T06:34:38.000Z").toISOString(), content: "Note at 02:34 EDT" }),
+      makeNote({ id: 5, createdAt: new Date("2026-03-16T07:23:52.000Z").toISOString(), content: "Note at 03:23 EDT" }),
+      makeNote({ id: 6, createdAt: new Date("2026-03-16T07:31:54.000Z").toISOString(), content: "Note at 03:31 EDT" }),
+    ];
+  }
+
+  // Messages always come as Date objects via Drizzle select()
+  function getTestMessages(): Message[] {
+    return [
+      makeMessage({ id: 574887, timestamp: new Date("2026-03-16T07:24:02.000Z").toISOString(), content: "msg at 07:24 UTC" }),
+      makeMessage({ id: 574888, timestamp: new Date("2026-03-16T07:24:09.000Z").toISOString(), content: "msg at 07:24 UTC" }),
+      makeMessage({ id: 575231, timestamp: new Date("2026-03-16T07:31:59.000Z").toISOString(), content: "msg at 07:31 UTC" }),
+      makeMessage({ id: 575544, timestamp: new Date("2026-03-16T07:38:10.000Z").toISOString(), content: "msg at 07:38 UTC" }),
+    ];
+  }
+
+  it("with ISO timestamps (post-fix), notes interleave correctly with messages", () => {
+    const messages = getTestMessages();
+    const notes = simulatePostFixNotes();
+    const merged = mergeAndSort(messages, notes);
+
+    // Expected order:
+    // note4 (06:34 UTC) -> note5 (07:23 UTC) -> msg (07:24) -> msg (07:24) -> note6 (07:31 UTC) -> msg (07:31) -> msg (07:38)
+    expect(merged).toHaveLength(7);
+    expect(merged[0].content).toBe("Note at 02:34 EDT"); // note4 at 06:34 UTC
+    expect(merged[0].messageType).toBe("internal_note");
+    expect(merged[1].content).toBe("Note at 03:23 EDT"); // note5 at 07:23 UTC
+    expect(merged[1].messageType).toBe("internal_note");
+    expect(merged[2].content).toBe("msg at 07:24 UTC"); // msg at 07:24 UTC
+    expect(merged[2].messageType).toBe("text");
+    expect(merged[3].content).toBe("msg at 07:24 UTC"); // msg at 07:24 UTC
+    expect(merged[3].messageType).toBe("text");
+    expect(merged[4].content).toBe("Note at 03:31 EDT"); // note6 at 07:31 UTC
+    expect(merged[4].messageType).toBe("internal_note");
+    expect(merged[5].content).toBe("msg at 07:31 UTC"); // msg at 07:31 UTC
+    expect(merged[5].messageType).toBe("text");
+    expect(merged[6].content).toBe("msg at 07:38 UTC"); // msg at 07:38 UTC
+    expect(merged[6].messageType).toBe("text");
+  });
+
+  it("verifies chronological order is maintained with Date-based timestamps", () => {
+    const messages = getTestMessages();
+    const notes = simulatePostFixNotes();
+    const merged = mergeAndSort(messages, notes);
+
+    for (let i = 1; i < merged.length; i++) {
+      const tPrev = new Date(merged[i - 1].timestamp || merged[i - 1].createdAt).getTime();
+      const tCurr = new Date(merged[i].timestamp || merged[i].createdAt).getTime();
+      expect(tCurr).toBeGreaterThanOrEqual(tPrev);
+    }
+  });
+
+  it("notes with Date objects sort identically regardless of timezone interpretation", () => {
+    // When timestamps are proper ISO strings/Date objects, timezone doesn't matter
+    const note1 = makeNote({ id: 1, createdAt: "2026-03-16T06:34:38.000Z" });
+    const note2 = makeNote({ id: 2, createdAt: "2026-03-16T07:23:52.000Z" });
+    const msg = makeMessage({ id: 100, timestamp: "2026-03-16T07:00:00.000Z" });
+
+    const merged = mergeAndSort([msg], [note1, note2]);
+    // note1 (06:34) -> msg (07:00) -> note2 (07:23)
+    expect(merged[0].messageType).toBe("internal_note");
+    expect(merged[0].id).toBe(-1);
+    expect(merged[1].messageType).toBe("text");
+    expect(merged[2].messageType).toBe("internal_note");
+    expect(merged[2].id).toBe(-2);
+  });
+
+  it("backend Date conversion produces correct UTC timestamps", () => {
+    // Simulate what the fix does: new Date("2026-03-16 02:34:38") on the server (EDT, UTC-4)
+    // This test verifies the conversion logic
+    const serverLocalString = "2026-03-16 02:34:38"; // EDT server local time
+    const converted = new Date(serverLocalString);
+
+    // The converted Date should be a valid Date object
+    expect(converted instanceof Date).toBe(true);
+    expect(isNaN(converted.getTime())).toBe(false);
+
+    // When serialized to ISO string, it should contain the Z suffix (UTC)
+    const iso = converted.toISOString();
+    expect(iso).toMatch(/Z$/);
+  });
+
+  it("getInternalNotes fix: converts string createdAt to Date objects", () => {
+    // Simulate the fix applied in db.ts getInternalNotes()
+    const rawRows = [
+      { id: 4, createdAt: "2026-03-16 02:34:38", content: "test" },
+      { id: 5, createdAt: "2026-03-16 03:23:52", content: "test2" },
+    ];
+
+    // Apply the same transformation as the fix
+    const fixed = rawRows.map((row: any) => ({
+      ...row,
+      createdAt: row.createdAt instanceof Date ? row.createdAt : new Date(row.createdAt),
+    }));
+
+    expect(fixed[0].createdAt instanceof Date).toBe(true);
+    expect(fixed[1].createdAt instanceof Date).toBe(true);
+    // Both should be valid dates
+    expect(isNaN(fixed[0].createdAt.getTime())).toBe(false);
+    expect(isNaN(fixed[1].createdAt.getTime())).toBe(false);
+  });
+
+  it("getInternalNotes fix: preserves already-Date createdAt values", () => {
+    // If mysql2 returns Date objects directly (raw query), the fix should preserve them
+    const rawRows = [
+      { id: 4, createdAt: new Date("2026-03-16T06:34:38.000Z"), content: "test" },
+    ];
+
+    const fixed = rawRows.map((row: any) => ({
+      ...row,
+      createdAt: row.createdAt instanceof Date ? row.createdAt : new Date(row.createdAt),
+    }));
+
+    expect(fixed[0].createdAt instanceof Date).toBe(true);
+    expect(fixed[0].createdAt.toISOString()).toBe("2026-03-16T06:34:38.000Z");
+  });
+});

@@ -3359,3 +3359,15 @@
 
 ## Bug: @Mention autocomplete stopped working in internal notes
 - [x] Fixed: isNoteMode was missing from handleTextareaChange useCallback deps, causing stale closure
+
+## Bug: Internal notes stuck at bottom of chat, not flowing with timeline
+- [ ] Investigate timestamp comparison between messages and notes
+- [ ] Fix merge logic so notes interleave chronologically with messages
+- [ ] Verify notes move up when new messages arrive after them
+
+## Fix: Internal Notes Timeline Serialization Bug
+- [x] Root cause: Drizzle db.execute(sql`...`) returns TIMESTAMP columns as strings (e.g. "2026-03-16 02:34:38") in server local time, while Drizzle select().from() returns Date objects. Superjson serializes Date objects with type metadata but passes strings as-is. Browser parses strings in its local timezone, causing notes to sort incorrectly (all grouped at end instead of interleaved).
+- [x] Fix: Convert string createdAt to Date objects in getInternalNotes() and getCustomerGlobalNotes() in server/db.ts before returning from the server
+- [x] Removed debug console.log statements from WhatsAppChat.tsx groupedMessages useMemo
+- [x] Tests: 6 new tests for timestamp serialization fix (29 total in internalNotesMerge.test.ts)
+- [x] All 1724 tests passing (4 pre-existing failures unrelated to this change)

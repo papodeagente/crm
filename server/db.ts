@@ -2433,7 +2433,14 @@ export async function getInternalNotes(tenantId: number, waConversationId: numbe
     AND n.waConversationId = ${waConversationId}
     ORDER BY n.createdAt ASC
   `);
-  return (result as any)[0] || [];
+  // db.execute(sql`...`) returns createdAt as a string (e.g. "2026-03-16 02:34:38")
+  // in the server's local timezone. We must convert to Date objects so that Superjson
+  // serializes them as proper Date types, preserving correct UTC timestamps on the client.
+  const rows = (result as any)[0] || [];
+  return rows.map((row: any) => ({
+    ...row,
+    createdAt: row.createdAt instanceof Date ? row.createdAt : new Date(row.createdAt),
+  }));
 }
 
 // Get customer global notes for a specific remoteJid (across all conversations)
@@ -2457,7 +2464,12 @@ export async function getCustomerGlobalNotes(tenantId: number, remoteJid: string
     AND n.isCustomerGlobalNote = true
     ORDER BY n.createdAt DESC
   `);
-  return (result as any)[0] || [];
+  // Convert string timestamps to Date objects for proper Superjson serialization
+  const rows = (result as any)[0] || [];
+  return rows.map((row: any) => ({
+    ...row,
+    createdAt: row.createdAt instanceof Date ? row.createdAt : new Date(row.createdAt),
+  }));
 }
 
 export async function deleteInternalNote(tenantId: number, noteId: number) {
