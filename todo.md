@@ -3483,3 +3483,15 @@
 - [x] Fix frontend: optimistic cache update already uses message.timestamp directly
 - [ ] Migrate: update corrupted wa_conversations.lastMessageAt values from real wa_messages timestamps (optional — preview no longer reads cached fields)
 - [x] Validate: preview time equals last message time, no +3h offset — TypeScript 0 errors, 1860 tests passing
+
+## Fix Inbox Preview Cache — Socket Message as Source of Truth
+- [x] Analyze current socket handler for whatsapp:message in Inbox.tsx
+- [x] Update socket handler to store Date objects (not ISO strings) in cache — matches superjson format from backend
+- [x] Preview fields updated: lastMessage, lastTimestamp, lastStatus, lastMessageType, lastFromMe
+- [x] previewTimestamp equals message.timestamp exactly — Date object from new Date(unixMs)
+- [x] No full refetch — only affected conversation updated in cache
+- [x] ROOT CAUSE FIX: Added fixTimestampFields() in db.ts to convert mysql2 UTC strings to Date objects
+- [x] Applied fixTimestampFields to all 6 conversation list functions (getConversationsList, getConversationsListMultiAgent, getWaConversationsList, getQueueConversations, getAgentConversations, getQueueStats)
+- [x] 12 new unit tests for fixTimestampFields and preview timestamp consistency
+- [x] TypeScript compiles with 0 errors
+- [x] 1876 tests passing (12 new + 1864 existing)

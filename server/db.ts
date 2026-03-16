@@ -7,6 +7,28 @@ import { normalizeJid } from "./phoneUtils";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
+/**
+ * Convert timestamp strings from db.execute() to Date objects.
+ * mysql2 with timezone: '+00:00' returns TIMESTAMP/DATETIME as strings like "2026-03-16 15:07:00" (UTC).
+ * Without conversion, browsers parse these as local time (missing Z suffix), causing timezone offset.
+ * Converting to Date objects lets superjson serialize them with type metadata,
+ * so the frontend receives proper Date objects that are timezone-aware.
+ */
+function fixTimestampFields(rows: any[]): any[] {
+  const tsFields = ['lastTimestamp', 'lastMessageAt', 'queuedAt', 'firstResponseAt', 'slaDeadlineAt', 'waitingSince', 'oldestEntry'];
+  return rows.map((row: any) => {
+    const fixed = { ...row };
+    for (const field of tsFields) {
+      if (fixed[field] && typeof fixed[field] === 'string') {
+        // Append 'Z' to indicate UTC if not already present, then convert to Date
+        const str = fixed[field];
+        fixed[field] = new Date(str.includes('T') || str.endsWith('Z') ? str : str.replace(' ', 'T') + 'Z');
+      }
+    }
+    return fixed;
+  });
+}
+
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
     try {
@@ -372,7 +394,7 @@ export async function getConversationsList(sessionId: string) {
   `);
   
   const rows = (result as any)[0] || [];
-  return rows;
+  return fixTimestampFields(rows);
 }
 
 // Mark conversation as read (handles both JID variants)
@@ -694,10 +716,9 @@ export async function getConversationsListMultiAgent(sessionId: string, tenantId
     ORDER BY m.timestamp DESC
   `);
   
-  const rows = (result as any)[0] || [];
-  return rows;
+   const rows = (result as any)[0] || [];
+  return fixTimestampFields(rows);
 }
-
 // Round-robin assignment: get next agent for a tenant
 export async function getNextRoundRobinAgent(tenantId: number): Promise<number | null> {
   const db = await getDb();
@@ -1727,7 +1748,7 @@ export async function getWaConversationsList(
   `);
 
   const rows = (result as any)[0] || [];
-  return rows;
+  return fixTimestampFields(rows);
 }
 
 /**
@@ -2623,7 +2644,7 @@ export async function getQueueConversations(sessionId: string, tenantId: number,
     ORDER BY COALESCE(wc.queuedAt, lm.timestamp) DESC
     LIMIT ${limit}
   `);
-  return (result as any)[0] || [];
+  return fixTimestampFields((result as any)[0] || []);
 }
 
 export async function claimConversation(tenantId: number, sessionId: string, remoteJid: string, userId: number) {
@@ -2737,7 +2758,7 @@ export async function getAgentConversations(tenantId: number, sessionId: string,
     ORDER BY lm.timestamp DESC
     LIMIT ${limit}
   `);
-  return (result as any)[0] || [];
+  return fixTimestampFields((result as any)[0] || []);
 }
 
 export async function getQueueStats(tenantId: number, sessionId: string) {
@@ -2806,10 +2827,13 @@ export async function getQueueStats(tenantId: number, sessionId: string) {
     ORDER BY COALESCE(wc.queuedAt, lm.timestamp) ASC
     LIMIT 50
   `);
+  // Fix timestamp strings from db.execute for both count and items
+  const fixedCount = fixTimestampFields(countRows);
+  const fixedItems = fixTimestampFields((itemsResult as any)[0] || []);
   return {
-    total: Number(countRows[0]?.total || 0),
-    oldest: countRows[0]?.oldestEntry || null,
-    items: (itemsResult as any)[0] || [],
+    total: Number(fixedCount[0]?.total || 0),
+    oldest: fixedCount[0]?.oldestEntry || null,
+    items: fixedItems,
   };
 }
 

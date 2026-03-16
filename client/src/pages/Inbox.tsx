@@ -1152,7 +1152,7 @@ export default function InboxPage() {
           lastMessage: lastMessage.content || getMessagePreview(null, lastMessage.messageType),
           lastMessageType: lastMessage.messageType,
           lastFromMe: lastMessage.fromMe,
-          lastTimestamp: msgTimestamp.toISOString(),
+          lastTimestamp: msgTimestamp, // Store as Date object (matches superjson format from backend)
           lastStatus: lastMessage.fromMe ? "sent" : "received",
           unreadCount: (!lastMessage.fromMe && selectedJid !== jid)
             ? (Number(c.unreadCount) || 0) + 1
