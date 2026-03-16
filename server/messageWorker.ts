@@ -399,6 +399,44 @@ async function processNewMessage(session: SessionInfo, data: any): Promise<void>
       }).catch(() => {});
     }
 
+    // 5d. Auto-transcribe audio messages (incoming only)
+    const audioTypes = ["audioMessage", "pttMessage"];
+    if (!fromMe && audioTypes.includes(messageType) && messageId) {
+      // Fetch the inserted row ID for the transcription worker
+      (async () => {
+        try {
+          const [inserted] = await db.select({ id: waMessages.id })
+            .from(waMessages)
+            .where(and(
+              eq(waMessages.sessionId, sessionId),
+              eq(waMessages.messageId, messageId)
+            ))
+            .limit(1);
+          if (!inserted) return;
+
+          // Set initial status
+          await db.update(waMessages)
+            .set({ audioTranscriptionStatus: "pending" })
+            .where(eq(waMessages.id, inserted.id));
+
+          const { enqueueAudioTranscription } = await import("./audioTranscriptionWorker");
+          await enqueueAudioTranscription({
+            messageId: inserted.id,
+            externalMessageId: messageId,
+            sessionId,
+            instanceName: session.instanceName || sessionId,
+            tenantId,
+            remoteJid,
+            fromMe,
+            mediaMimeType: mediaInfo.mediaMimeType || "audio/ogg",
+            mediaDuration: mediaInfo.mediaDuration || null,
+          });
+        } catch (e: any) {
+          console.warn(`[Worker] Auto-transcription enqueue failed for ${messageId}:`, e.message);
+        }
+      })();
+    }
+
   } catch (error) {
     console.error("[Worker] Error processing new message:", error);
     throw error; // Re-throw so BullMQ can retry

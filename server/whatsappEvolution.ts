@@ -1489,6 +1489,14 @@ class WhatsAppEvolutionManager extends EventEmitter {
       });
 
       // *** Background tasks — run in parallel, don't block webhook response ***
+
+      // 0. Trigger audio transcription for audio/ptt messages
+      if ((messageType === "audioMessage" || messageType === "pttMessage") && messageId) {
+        this.triggerAudioTranscription(session, messageId, remoteJid, fromMe, mediaInfo.mediaMimeType, mediaInfo.mediaDuration).catch(e =>
+          console.error(`[EvoWA] Audio transcription trigger failed for ${messageId}:`, e.message)
+        );
+      }
+
       // 1. Download media and upload to S3
       const hasMediaType = ["imageMessage", "videoMessage", "audioMessage", "documentMessage", "stickerMessage", "pttMessage"].includes(messageType);
       const hasPermanentUrl = mediaInfo.mediaUrl && !mediaInfo.mediaUrl.includes('whatsapp.net');
@@ -3157,7 +3165,56 @@ class WhatsAppEvolutionManager extends EventEmitter {
 
   // ── Part 1+9: Channel Detection & Change Safety ──
   /**
-   * Detects the current phone number for an instance and creates/updates
+   * Trigger audio transcription for an audio/ptt message.
+   * Looks up the DB row by messageId, then enqueues for background processing.
+   */
+  private async triggerAudioTranscription(
+    session: EvolutionSessionState,
+    externalMessageId: string,
+    remoteJid: string,
+    fromMe: boolean,
+    mediaMimeType: string | null,
+    mediaDuration: number | null,
+  ): Promise<void> {
+    const db = await getDb();
+    if (!db) return;
+
+    // Find the DB row for this message
+    const [row] = await db.select({ id: waMessages.id })
+      .from(waMessages)
+      .where(and(
+        eq(waMessages.sessionId, session.sessionId),
+        eq(waMessages.messageId, externalMessageId),
+      ))
+      .limit(1);
+
+    if (!row) {
+      console.warn(`[EvoWA] Audio transcription: message not found in DB: ${externalMessageId}`);
+      return;
+    }
+
+    // Mark as pending
+    await db.update(waMessages)
+      .set({ audioTranscriptionStatus: "pending" })
+      .where(eq(waMessages.id, row.id));
+
+    // Enqueue for background processing
+    const { enqueueAudioTranscription } = await import("./audioTranscriptionWorker");
+    await enqueueAudioTranscription({
+      messageId: row.id,
+      externalMessageId,
+      sessionId: session.sessionId,
+      instanceName: session.instanceName,
+      tenantId: session.tenantId,
+      remoteJid,
+      fromMe,
+      mediaMimeType: mediaMimeType || "audio/ogg",
+      mediaDuration,
+    });
+  }
+
+  /**
+   * Detect and upsert the WhatsApp channel (phone number) for a session.
    * wa_channels records. If the phone number changed, marks the previous
    * channel as inactive and logs a channel_change_event.
    */

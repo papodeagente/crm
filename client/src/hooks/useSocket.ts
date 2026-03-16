@@ -39,6 +39,15 @@ interface WhatsAppMediaUpdateEvent {
   timestamp: number;
 }
 
+interface TranscriptionUpdateEvent {
+  sessionId: string;
+  messageId: number;
+  remoteJid: string;
+  status: string;
+  text?: string;
+  error?: string;
+}
+
 interface ConversationUpdatedEvent {
   type: string;
   waConversationId: number;
@@ -62,6 +71,7 @@ class SocketManager {
   private _lastStatusUpdate: WhatsAppMessageStatusEvent | null = null;
   private _lastMediaUpdate: WhatsAppMediaUpdateEvent | null = null;
   private _lastConversationUpdate: ConversationUpdatedEvent | null = null;
+  private _lastTranscriptionUpdate: TranscriptionUpdateEvent | null = null;
   private refCount = 0;
 
   subscribe(listener: () => void) {
@@ -135,6 +145,13 @@ class SocketManager {
       this.notify();
     });
 
+    // Audio transcription completed
+    socket.on("whatsapp:transcription", (data: TranscriptionUpdateEvent) => {
+      console.log("[Socket] Transcription update:", data.messageId, data.status);
+      this._lastTranscriptionUpdate = data;
+      this.notify();
+    });
+
     // Conversation updated (internal notes, assignments, etc.)
     socket.on("conversationUpdated", (data: ConversationUpdatedEvent) => {
       this._lastConversationUpdate = data;
@@ -151,6 +168,7 @@ class SocketManager {
       lastStatusUpdate: this._lastStatusUpdate,
       lastMediaUpdate: this._lastMediaUpdate,
       lastConversationUpdate: this._lastConversationUpdate,
+      lastTranscriptionUpdate: this._lastTranscriptionUpdate,
     };
   }
 
@@ -180,7 +198,8 @@ function getSnapshot() {
     next.lastMessage !== snapshotCache.lastMessage ||
     next.lastStatusUpdate !== snapshotCache.lastStatusUpdate ||
     next.lastMediaUpdate !== snapshotCache.lastMediaUpdate ||
-    next.lastConversationUpdate !== snapshotCache.lastConversationUpdate
+    next.lastConversationUpdate !== snapshotCache.lastConversationUpdate ||
+    next.lastTranscriptionUpdate !== snapshotCache.lastTranscriptionUpdate
   ) {
     snapshotCache = next;
   }
@@ -209,6 +228,7 @@ export function useSocket() {
     lastStatusUpdate: state.lastStatusUpdate,
     lastMediaUpdate: state.lastMediaUpdate,
     lastConversationUpdate: state.lastConversationUpdate,
+    lastTranscriptionUpdate: state.lastTranscriptionUpdate,
     clearQr,
   };
 }

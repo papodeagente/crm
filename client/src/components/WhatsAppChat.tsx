@@ -36,6 +36,8 @@ interface Message {
   timestamp: string | Date;
   createdAt: string | Date;
   quotedMessageId?: string | null;
+  audioTranscription?: string | null;
+  audioTranscriptionStatus?: string | null;
 }
 
 interface AssignmentInfo {
@@ -839,8 +841,32 @@ const MessageBubble = memo(({
           {renderQuotedMessage()}
           {renderMedia()}
 
-          {/* Audio transcription */}
-          {isAudio && msg.mediaUrl && !msg.mediaUrl.includes('whatsapp.net') && (() => {
+          {/* Audio transcription — uses DB fields first, then local state fallback */}
+          {isAudio && (() => {
+            // Priority 1: DB-persisted transcription
+            if (msg.audioTranscriptionStatus === "completed" && msg.audioTranscription) return (
+              <div className="mt-1 px-2 py-1.5 bg-violet-50 dark:bg-violet-950/20 rounded">
+                <div className="flex items-center gap-1 mb-0.5">
+                  <FileText className="h-3 w-3 text-violet-500" />
+                  <span className="text-[10px] font-medium text-violet-500 uppercase">Transcrição</span>
+                </div>
+                <p className="text-[13px] text-foreground leading-[18px]">{msg.audioTranscription}</p>
+              </div>
+            );
+            if (msg.audioTranscriptionStatus === "pending" || msg.audioTranscriptionStatus === "processing") return (
+              <div className="mt-1 px-2 py-1.5 bg-violet-50 dark:bg-violet-950/20 rounded text-[12px] text-violet-600 dark:text-violet-400 flex items-center gap-1.5">
+                <Loader2 className="h-3 w-3 animate-spin" /> Transcrevendo...
+              </div>
+            );
+            if (msg.audioTranscriptionStatus === "failed") return (
+              <div className="mt-1 px-2 py-1 bg-red-50 dark:bg-red-950/20 rounded text-[11px] text-red-500 flex items-center justify-between">
+                <span>Erro na transcrição</span>
+                {onTranscribe && msg.mediaUrl && (
+                  <button onClick={() => onTranscribe(msg.id, msg.mediaUrl!)} className="text-violet-500 hover:text-violet-600 ml-2">Tentar novamente</button>
+                )}
+              </div>
+            );
+            // Priority 2: Local state (frontend-triggered transcription)
             const t = transcriptions?.[msg.id];
             if (t?.loading) return (
               <div className="mt-1 px-2 py-1.5 bg-violet-50 dark:bg-violet-950/20 rounded text-[12px] text-violet-600 dark:text-violet-400 flex items-center gap-1.5">
@@ -858,11 +884,11 @@ const MessageBubble = memo(({
             );
             if (t?.error) return (
               <div className="mt-1 px-2 py-1 bg-red-50 dark:bg-red-950/20 rounded text-[11px] text-red-500">
-                Erro na transcrição: {t.error}
+                Erro: {t.error}
               </div>
             );
-            // Show manual transcribe button if not auto
-            if (!autoTranscribe && onTranscribe) return (
+            // Priority 3: Manual transcribe button (if no auto-transcription)
+            if (!autoTranscribe && onTranscribe && msg.mediaUrl && !msg.mediaUrl.includes('whatsapp.net')) return (
               <button
                 onClick={() => onTranscribe(msg.id, msg.mediaUrl!)}
                 className="mt-1 text-[11px] text-violet-500 hover:text-violet-600 flex items-center gap-1 transition-colors"
@@ -1148,7 +1174,7 @@ function EditMessageModal({ currentText, onSave, onClose }: { currentText: strin
 
 export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDeal, onCreateContact, hasCrmContact, assignment, agents, onAssign, onStatusChange, myAvatarUrl, waConversationId }: WhatsAppChatProps) {
   const [showAgentDropdown, setShowAgentDropdown] = useState(false);
-  const { lastMessage, lastStatusUpdate, lastMediaUpdate, lastConversationUpdate } = useSocket();
+  const { lastMessage, lastStatusUpdate, lastMediaUpdate, lastConversationUpdate, lastTranscriptionUpdate } = useSocket();
   const [messageText, setMessageText] = useState("");
   const [showAttach, setShowAttach] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
@@ -1479,6 +1505,20 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
       }));
     }
   }, [lastStatusUpdate]);
+
+  // Update transcription in real-time via socket
+  useEffect(() => {
+    if (lastTranscriptionUpdate && lastTranscriptionUpdate.remoteJid === remoteJid) {
+      // Refetch messages to get the updated transcription from DB
+      messagesQ.refetch();
+      // Also update local transcriptions state for immediate feedback
+      if (lastTranscriptionUpdate.status === "completed" && lastTranscriptionUpdate.text) {
+        setTranscriptions(prev => ({ ...prev, [lastTranscriptionUpdate.messageId]: { text: lastTranscriptionUpdate.text } }));
+      } else if (lastTranscriptionUpdate.status === "failed") {
+        setTranscriptions(prev => ({ ...prev, [lastTranscriptionUpdate.messageId]: { error: lastTranscriptionUpdate.error || "Falha" } }));
+      }
+    }
+  }, [lastTranscriptionUpdate, remoteJid]);
 
   // Clear local status updates when messages are refetched from server
   useEffect(() => {

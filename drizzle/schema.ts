@@ -52,6 +52,10 @@ export const waMessages = mysqlTable("messages", {
   status: varchar("status", { length: 32 }).default("sent"),
   timestamp: timestamp("timestamp").defaultNow().notNull(),
   waConversationId: int("waConversationId"),
+  audioTranscription: text("audio_transcription"),
+  audioTranscriptionStatus: mysqlEnum("audio_transcription_status", ["pending", "processing", "completed", "failed"]),
+  audioTranscriptionLanguage: varchar("audio_transcription_language", { length: 16 }),
+  audioTranscriptionDuration: int("audio_transcription_duration"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 }, (t) => [
   index("msg_tenant_idx").on(t.tenantId),

@@ -3409,3 +3409,23 @@
 - [x] Trace full flow: CRM send -> Evolution API -> webhook -> handleIncomingMessage -> emit -> frontend
 - [x] ROOT CAUSE: server/_core/index.ts was using `isSync: !!data.syncBatch` (ignoring data.isSync) and `timestamp: Date.now()` (overwriting original timestamp)
 - [x] Fix: _core/index.ts now passes `isSync: !!(data.isSync || data.syncBatch)`, original timestamp, pushName, and syncBatch
+
+## Feature: Professional Audio Transcription System
+- [x] Part 1: Feature overview — detect audio, download, transcribe via Whisper, store, render in CRM only
+- [x] Part 2: Use tenant's OpenAI API key from Integrations → AI; show warning if not configured
+- [x] Part 3: Admin control — audioTranscriptionEnabled in tenant AI settings
+- [x] Part 4: Message detection — auto-trigger for incoming audio/ptt messages in messageWorker.ts
+- [x] Part 5: Background processing — audio-transcription queue with BullMQ worker (sync fallback when no Redis)
+- [x] Part 6: Database — added audioTranscription, audioTranscriptionStatus (pending/processing/completed/failed), audioTranscriptionLanguage, audioTranscriptionDuration to wa_messages
+- [x] Part 7: Transcription flow — pending → processing → completed/failed with 3 retries via BullMQ
+- [x] Part 8: UI — render transcription below audio bubble with "Transcrição" label, loading spinner, error with retry button
+- [x] Part 9: Cost control — max 25MB, max 5 min duration, skip if exceeded
+- [ ] Part 10: Search integration — include transcription text in message search (future)
+- [x] Part 11: Security — never store audio externally, only temporary send to OpenAI
+- [x] Part 12: Performance — max 3 concurrent jobs per tenant
+- [x] Part 13: Socket update — emit whatsapp:transcription event when transcription finishes
+- [x] Part 14: Fail safety — retry 3x, show "Erro na transcrição" with retry button in UI
+- [x] Bug fix: Frontend status values aligned with DB enum (completed/failed, not done/error)
+- [x] Bug fix: Socket event name aligned (whatsapp:transcription, not whatsapp:messageUpdated)
+- [x] Bug fix: Auto-trigger added in messageWorker.ts for incoming audio messages
+- [x] 38 unit tests passing for transcription system

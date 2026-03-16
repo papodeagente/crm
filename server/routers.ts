@@ -3290,6 +3290,45 @@ REGRAS:
         }
       }),
 
+    // ── Retranscribe audio message (manual trigger) ──
+    retranscribeAudio: protectedProcedure
+      .input(z.object({
+        tenantId: z.number(),
+        messageId: z.number(),
+      }))
+      .mutation(async ({ input }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+        const { waMessages } = await import("../drizzle/schema");
+        const [msg] = await db.select()
+          .from(waMessages)
+          .where(and(
+            eq(waMessages.id, input.messageId),
+            eq(waMessages.tenantId, input.tenantId),
+          ))
+          .limit(1);
+        if (!msg) throw new TRPCError({ code: "NOT_FOUND", message: "Message not found" });
+        if (msg.messageType !== "audioMessage" && msg.messageType !== "pttMessage") {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Not an audio message" });
+        }
+        await db.update(waMessages)
+          .set({ audioTranscriptionStatus: "pending", audioTranscription: null })
+          .where(eq(waMessages.id, input.messageId));
+        const { enqueueAudioTranscription } = await import("./audioTranscriptionWorker");
+        await enqueueAudioTranscription({
+          messageId: msg.id,
+          externalMessageId: msg.messageId || "",
+          sessionId: msg.sessionId,
+          instanceName: msg.sessionId,
+          tenantId: msg.tenantId,
+          remoteJid: msg.remoteJid,
+          fromMe: msg.fromMe,
+          mediaMimeType: msg.mediaMimeType || "audio/ogg",
+          mediaDuration: msg.mediaDuration,
+        });
+        return { success: true };
+      }),
+
     // ── Refine existing suggestion with different style ──
     refine: protectedProcedure
       .input(z.object({
