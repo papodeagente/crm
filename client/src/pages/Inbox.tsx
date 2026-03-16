@@ -1302,7 +1302,7 @@ export default function InboxPage() {
 
     if (activeSession?.sessionId) {
       markRead.mutate({ sessionId: activeSession.sessionId, remoteJid: jid });
-      // Find conversationId for this jid
+      // Find conversationId for this jid (use raw data since dedupedConvs is declared later)
       const convs = (conversationsQ.data || []) as ConvItem[];
       const conv = convs.find(c => c.remoteJid === jid);
       if (conv?.conversationId) {
@@ -1331,8 +1331,35 @@ export default function InboxPage() {
   const myUserId = useMemo(() => (meQ.data as any)?.saasUser?.userId || (meQ.data as any)?.id || 0, [meQ.data]);
 
   // Filter conversations based on active tab
+  // Step 1: Deduplicate conversations by remoteJid using Map (O(1) lookup)
+  // This eliminates any duplicates from backend JOINs or cache merges
+  const dedupedConvs = useMemo(() => {
+    const raw = (conversationsQ.data || []) as ConvItem[];
+    const map = new Map<string, ConvItem>();
+    for (const c of raw) {
+      const jid = c.remoteJid;
+      if (!jid) continue;
+      const existing = map.get(jid);
+      if (!existing) {
+        map.set(jid, c);
+      } else {
+        // Keep the one with the newer timestamp
+        const existingTs = existing.lastTimestamp ? new Date(existing.lastTimestamp).getTime() : 0;
+        const newTs = c.lastTimestamp ? new Date(c.lastTimestamp).getTime() : 0;
+        if (newTs > existingTs) map.set(jid, c);
+      }
+    }
+    // Always sort by lastTimestamp DESC — newest conversation on top
+    return Array.from(map.values()).sort((a, b) => {
+      const ta = a.lastTimestamp ? new Date(a.lastTimestamp).getTime() : 0;
+      const tb = b.lastTimestamp ? new Date(b.lastTimestamp).getTime() : 0;
+      return tb - ta;
+    });
+  }, [conversationsQ.data]);
+
+  // Step 2: Filter by tab, unread, and search
   const filteredConvs = useMemo(() => {
-    let convs = (conversationsQ.data || []) as ConvItem[];
+    let convs = dedupedConvs;
     // Tab-based primary filter
     if (activeTab === "mine") {
       convs = convs.filter((c) => c.assignedUserId === myUserId);
@@ -1356,7 +1383,7 @@ export default function InboxPage() {
       });
     }
     return convs;
-  }, [conversationsQ.data, search, filter, activeTab, getDisplayName, myUserId]);
+  }, [dedupedConvs, search, filter, activeTab, getDisplayName, myUserId]);
 
   // Queue conversations filtered by search
   const filteredQueueConvs = useMemo(() => {
@@ -1387,8 +1414,8 @@ export default function InboxPage() {
 
   // My conversations count for badge
   const myConvsCount = useMemo(() => {
-    return ((conversationsQ.data || []) as ConvItem[]).filter((c) => c.assignedUserId === myUserId).length;
-  }, [conversationsQ.data, myUserId]);
+    return dedupedConvs.filter((c) => c.assignedUserId === myUserId).length;
+  }, [dedupedConvs, myUserId]);
 
   // Queue count for badge
   const queueCount = useMemo(() => {
@@ -1398,7 +1425,7 @@ export default function InboxPage() {
   // Get assignment for selected conversation
   const selectedAssignment = useMemo(() => {
     if (!selectedJid) return null;
-    const conv = (conversationsQ.data as ConvItem[] || []).find(c => c.remoteJid === selectedJid);
+    const conv = dedupedConvs.find(c => c.remoteJid === selectedJid);
     if (!conv) return null;
     return {
       assignedUserId: conv.assignedUserId,
@@ -1406,7 +1433,7 @@ export default function InboxPage() {
       assignmentStatus: conv.assignmentStatus,
       assignmentPriority: conv.assignmentPriority,
     };
-  }, [selectedJid, conversationsQ.data]);
+  }, [selectedJid, dedupedConvs]);
 
   const handleAssign = useCallback((agentId: number | null) => {
     if (!selectedJid || !activeSession?.sessionId) return;
@@ -1434,12 +1461,12 @@ export default function InboxPage() {
     if (!selectedJid) return null;
     const crmContact = getContactForJid(selectedJid);
     const pic = profilePicMap[selectedJid] || undefined;
-    const selectedConv = (conversationsQ.data as ConvItem[] || []).find(c => c.remoteJid === selectedJid);
+    const selectedConv = dedupedConvs.find(c => c.remoteJid === selectedJid);
     const displayName = getDisplayName(selectedJid, selectedConv);
     const phone = selectedJid.split("@")[0];
     if (crmContact) return { ...crmContact, name: displayName, avatarUrl: pic };
     return { id: 0, name: displayName, phone, email: undefined, avatarUrl: pic };
-  }, [selectedJid, getContactForJid, profilePicMap, getDisplayName, conversationsQ.data]);
+  }, [selectedJid, getContactForJid, profilePicMap, getDisplayName, dedupedConvs]);
 
   const hasCrmContact = useMemo(() => {
     if (!selectedJid) return false;
@@ -1449,9 +1476,9 @@ export default function InboxPage() {
   // Get waConversationId for selected conversation (for notes/events)
   const selectedWaConversationId = useMemo(() => {
     if (!selectedJid) return undefined;
-    const conv = (conversationsQ.data as ConvItem[] || []).find(c => c.remoteJid === selectedJid);
+    const conv = dedupedConvs.find(c => c.remoteJid === selectedJid);
     return conv?.conversationId;
-  }, [selectedJid, conversationsQ.data]);
+  }, [selectedJid, dedupedConvs]);
 
   const toggleMute = useCallback(() => {
     setIsMuted(prev => {

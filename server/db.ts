@@ -16,17 +16,37 @@ let _db: ReturnType<typeof drizzle> | null = null;
  */
 function fixTimestampFields(rows: any[]): any[] {
   const tsFields = ['lastTimestamp', 'lastMessageAt', 'queuedAt', 'firstResponseAt', 'slaDeadlineAt', 'waitingSince', 'oldestEntry'];
-  return rows.map((row: any) => {
-    const fixed = { ...row };
+  const fixed = rows.map((row: any) => {
+    const r = { ...row };
     for (const field of tsFields) {
-      if (fixed[field] && typeof fixed[field] === 'string') {
+      if (r[field] && typeof r[field] === 'string') {
         // Append 'Z' to indicate UTC if not already present, then convert to Date
-        const str = fixed[field];
-        fixed[field] = new Date(str.includes('T') || str.endsWith('Z') ? str : str.replace(' ', 'T') + 'Z');
+        const str = r[field];
+        r[field] = new Date(str.includes('T') || str.endsWith('Z') ? str : str.replace(' ', 'T') + 'Z');
       }
     }
-    return fixed;
+    return r;
   });
+  // Deduplicate by remoteJid — keep the row with the newest lastTimestamp
+  // This prevents duplicate conversations from appearing in the inbox
+  // when JOINs produce multiple rows per conversation
+  if (fixed.length > 0 && fixed[0]?.remoteJid) {
+    const map = new Map<string, any>();
+    for (const row of fixed) {
+      const jid = row.remoteJid;
+      if (!jid) continue;
+      const existing = map.get(jid);
+      if (!existing) {
+        map.set(jid, row);
+      } else {
+        const existingTs = existing.lastTimestamp ? new Date(existing.lastTimestamp).getTime() : 0;
+        const newTs = row.lastTimestamp ? new Date(row.lastTimestamp).getTime() : 0;
+        if (newTs > existingTs) map.set(jid, row);
+      }
+    }
+    return Array.from(map.values());
+  }
+  return fixed;
 }
 
 export async function getDb() {
@@ -705,9 +725,14 @@ export async function getConversationsListMultiAgent(sessionId: string, tenantId
       GROUP BY remoteJid
     ) latest ON m.remoteJid = latest.remoteJid AND m.id = latest.maxId
     LEFT JOIN conversation_assignments ca 
-      ON ca.sessionId = ${sessionId} 
-      AND ca.remoteJid = m.remoteJid
-      AND ca.tenantId = ${tenantId}
+      ON ca.id = (
+        SELECT ca2.id FROM conversation_assignments ca2
+        WHERE ca2.sessionId = ${sessionId}
+          AND ca2.remoteJid = m.remoteJid
+          AND ca2.tenantId = ${tenantId}
+        ORDER BY ca2.updatedAt DESC
+        LIMIT 1
+      )
     LEFT JOIN crm_users agent ON agent.id = ca.assignedUserId
     WHERE m.sessionId = ${sessionId}
     AND m.remoteJid NOT LIKE '%@g.us'
@@ -1731,9 +1756,14 @@ export async function getWaConversationsList(
       AND m1.messageType NOT IN ('protocolMessage','senderKeyDistributionMessage','messageContextInfo','reactionMessage','ephemeralMessage')
     ) lm ON lm.sessionId = wc.sessionId AND lm.remoteJid = wc.remoteJid
     LEFT JOIN conversation_assignments ca 
-      ON ca.sessionId = wc.sessionId 
-      AND ca.remoteJid = wc.remoteJid
-      AND ca.tenantId = wc.tenantId
+      ON ca.id = (
+        SELECT ca2.id FROM conversation_assignments ca2
+        WHERE ca2.sessionId = wc.sessionId 
+          AND ca2.remoteJid = wc.remoteJid
+          AND ca2.tenantId = wc.tenantId
+        ORDER BY ca2.updatedAt DESC
+        LIMIT 1
+      )
     LEFT JOIN crm_users agent ON agent.id = COALESCE(wc.assignedUserId, ca.assignedUserId)
     LEFT JOIN contacts c ON c.id = wc.contactId
     WHERE wc.sessionId = ${sessionId}

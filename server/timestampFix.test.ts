@@ -9,16 +9,34 @@ import { describe, it, expect } from "vitest";
 // Replicate the fixTimestampFields logic from db.ts for unit testing
 function fixTimestampFields(rows: any[]): any[] {
   const tsFields = ['lastTimestamp', 'lastMessageAt', 'queuedAt', 'firstResponseAt', 'slaDeadlineAt', 'waitingSince', 'oldestEntry'];
-  return rows.map((row: any) => {
-    const fixed = { ...row };
+  const fixed = rows.map((row: any) => {
+    const r = { ...row };
     for (const field of tsFields) {
-      if (fixed[field] && typeof fixed[field] === 'string') {
-        const str = fixed[field];
-        fixed[field] = new Date(str.includes('T') || str.endsWith('Z') ? str : str.replace(' ', 'T') + 'Z');
+      if (r[field] && typeof r[field] === 'string') {
+        const str = r[field];
+        r[field] = new Date(str.includes('T') || str.endsWith('Z') ? str : str.replace(' ', 'T') + 'Z');
       }
     }
-    return fixed;
+    return r;
   });
+  // Deduplicate by remoteJid — keep the row with the newest lastTimestamp
+  if (fixed.length > 0 && fixed[0]?.remoteJid) {
+    const map = new Map<string, any>();
+    for (const row of fixed) {
+      const jid = row.remoteJid;
+      if (!jid) continue;
+      const existing = map.get(jid);
+      if (!existing) {
+        map.set(jid, row);
+      } else {
+        const existingTs = existing.lastTimestamp ? new Date(existing.lastTimestamp).getTime() : 0;
+        const newTs = row.lastTimestamp ? new Date(row.lastTimestamp).getTime() : 0;
+        if (newTs > existingTs) map.set(jid, row);
+      }
+    }
+    return Array.from(map.values());
+  }
+  return fixed;
 }
 
 describe("fixTimestampFields", () => {
@@ -109,6 +127,58 @@ describe("fixTimestampFields", () => {
 
     // Original should still be a string
     expect(typeof original.lastTimestamp).toBe("string");
+  });
+});
+
+describe("Deduplication by remoteJid", () => {
+  it("removes duplicate conversations, keeping the one with newest lastTimestamp", () => {
+    const rows = [
+      { remoteJid: "a@s.whatsapp.net", lastTimestamp: "2026-03-16 12:00:00", lastMessage: "old" },
+      { remoteJid: "a@s.whatsapp.net", lastTimestamp: "2026-03-16 15:00:00", lastMessage: "new" },
+      { remoteJid: "b@s.whatsapp.net", lastTimestamp: "2026-03-16 10:00:00", lastMessage: "only" },
+    ];
+    const fixed = fixTimestampFields(rows);
+
+    expect(fixed).toHaveLength(2);
+    const aConv = fixed.find((r: any) => r.remoteJid === "a@s.whatsapp.net");
+    expect(aConv.lastMessage).toBe("new");
+    expect(aConv.lastTimestamp.toISOString()).toBe("2026-03-16T15:00:00.000Z");
+  });
+
+  it("handles three duplicates of the same conversation", () => {
+    const rows = [
+      { remoteJid: "x@s.whatsapp.net", lastTimestamp: "2026-03-16 10:00:00", lastMessage: "first" },
+      { remoteJid: "x@s.whatsapp.net", lastTimestamp: "2026-03-16 12:00:00", lastMessage: "second" },
+      { remoteJid: "x@s.whatsapp.net", lastTimestamp: "2026-03-16 14:00:00", lastMessage: "third" },
+    ];
+    const fixed = fixTimestampFields(rows);
+
+    expect(fixed).toHaveLength(1);
+    expect(fixed[0].lastMessage).toBe("third");
+  });
+
+  it("does not deduplicate rows without remoteJid", () => {
+    const rows = [
+      { statusGroup: "open", count: 5 },
+      { statusGroup: "closed", count: 3 },
+    ];
+    const fixed = fixTimestampFields(rows);
+    expect(fixed).toHaveLength(2);
+  });
+
+  it("preserves order of unique conversations", () => {
+    const rows = [
+      { remoteJid: "c@s.whatsapp.net", lastTimestamp: "2026-03-16 15:00:00" },
+      { remoteJid: "a@s.whatsapp.net", lastTimestamp: "2026-03-16 12:00:00" },
+      { remoteJid: "b@s.whatsapp.net", lastTimestamp: "2026-03-16 10:00:00" },
+    ];
+    const fixed = fixTimestampFields(rows);
+
+    expect(fixed).toHaveLength(3);
+    // Map preserves insertion order
+    expect(fixed[0].remoteJid).toBe("c@s.whatsapp.net");
+    expect(fixed[1].remoteJid).toBe("a@s.whatsapp.net");
+    expect(fixed[2].remoteJid).toBe("b@s.whatsapp.net");
   });
 });
 

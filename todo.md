@@ -3511,3 +3511,12 @@
 - [x] Part 12: Database indexes — msg_session_jid_idx, idx_msg_wa_conv, idx_wc_tenant_session all present
 - [x] Part 13: Reconciliation safety — QuickSync + syncOnOpen already implemented
 - [x] Part 14: Final validation — TypeScript 0 errors, 1876 tests passing, messages refetchInterval reduced to 30s
+
+## Fix Inbox Conversation List — Map-Based Data Structure
+- [x] Analyze current conversation list data flow (query → useMemo → render)
+- [x] Implement Map-based deduplication using remoteJid as key (backend fixTimestampFields + frontend dedupedConvs useMemo)
+- [x] Ensure sorted array derived from Map is always ordered by lastTimestamp DESC
+- [x] Socket handler updates cache entry directly via trpcUtils.setData with re-sort
+- [x] No duplicate conversations — fixed SQL JOIN (LIMIT 1 subquery for conversation_assignments) + backend dedup in fixTimestampFields + frontend dedup in dedupedConvs
+- [x] New message moves conversation to top instantly (socket handler re-sorts by lastTimestamp)
+- [x] TypeScript compiles with 0 errors, 16 tests passing (4 new deduplication tests)
