@@ -3431,7 +3431,7 @@
 - [x] 38 unit tests passing for transcription system
 
 ## Enterprise Inbox Stability Fix (16 Parts)
-- [x] Part 1: Preview is a clone of last message — optimistic cache update uses message data directly
+- [x] Part 1: Preview is derived from REAL last message in wa_messages — SQL queries rewritten with LEFT JOIN subquery (getWaConversationsList, getQueueConversations, getAgentConversations); COALESCE fallback to cached fields for safety
 - [x] Part 2: Preview time correction — uses message.timestamp directly, timezone consistent
 - [x] Part 3: Preview update rule — only updates when message.timestamp > existing; status updates verify message IS the last message via timestamp match
 - [x] Part 4: Notification sound system rebuilt — 8 guards: dedup, fromMe, isSync, skipTypes, groups, muted, suppressed, activeConversation

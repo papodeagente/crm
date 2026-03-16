@@ -1656,6 +1656,11 @@ export async function getWaConversationsList(
     assignmentFilter += ` AND ca.assignedUserId IS NULL`;
   }
 
+  // Part 1 fix: Derive preview from the REAL last message in wa_messages,
+  // not from cached fields in wa_conversations.
+  // Uses a correlated subquery to get the latest message ID per conversation,
+  // then JOINs to get the full message data.
+  // The index msg_session_jid_idx (sessionId, remoteJid, timestamp) makes this efficient.
   const result = await db.execute(sql`
     SELECT 
       wc.id AS conversationId,
@@ -1663,11 +1668,11 @@ export async function getWaConversationsList(
       wc.phoneE164,
       wc.contactId,
       wc.contactPushName,
-      wc.lastMessagePreview AS lastMessage,
-      wc.lastMessageType,
-      wc.lastFromMe,
-      wc.lastMessageAt AS lastTimestamp,
-      wc.lastStatus,
+      COALESCE(lm.content, wc.lastMessagePreview) AS lastMessage,
+      COALESCE(lm.messageType, wc.lastMessageType) AS lastMessageType,
+      COALESCE(lm.fromMe, wc.lastFromMe) AS lastFromMe,
+      COALESCE(lm.timestamp, wc.lastMessageAt) AS lastTimestamp,
+      COALESCE(lm.status, wc.lastStatus) AS lastStatus,
       wc.unreadCount,
       wc.status AS conversationStatus,
       wc.conversationKey,
@@ -1684,6 +1689,19 @@ export async function getWaConversationsList(
       c.email AS contactEmail,
       c.phone AS contactPhone
     FROM wa_conversations wc
+    LEFT JOIN (
+      SELECT m1.sessionId, m1.remoteJid, m1.content, m1.messageType, m1.fromMe, m1.timestamp, m1.status
+      FROM messages m1
+      INNER JOIN (
+        SELECT sessionId, remoteJid, MAX(timestamp) AS maxTs
+        FROM messages
+        WHERE sessionId = ${sessionId}
+        AND messageType NOT IN ('protocolMessage','senderKeyDistributionMessage','messageContextInfo','reactionMessage','ephemeralMessage')
+        GROUP BY sessionId, remoteJid
+      ) m2 ON m1.sessionId = m2.sessionId AND m1.remoteJid = m2.remoteJid AND m1.timestamp = m2.maxTs
+      WHERE m1.sessionId = ${sessionId}
+      AND m1.messageType NOT IN ('protocolMessage','senderKeyDistributionMessage','messageContextInfo','reactionMessage','ephemeralMessage')
+    ) lm ON lm.sessionId = wc.sessionId AND lm.remoteJid = wc.remoteJid
     LEFT JOIN conversation_assignments ca 
       ON ca.sessionId = wc.sessionId 
       AND ca.remoteJid = wc.remoteJid
@@ -1693,10 +1711,10 @@ export async function getWaConversationsList(
     WHERE wc.sessionId = ${sessionId}
     AND wc.tenantId = ${tenantId}
     AND wc.mergedIntoId IS NULL
-    AND wc.lastMessageAt IS NOT NULL
+    AND COALESCE(lm.timestamp, wc.lastMessageAt) IS NOT NULL
     ${sql.raw(assignmentFilter)}
-    ${filter?.cursor ? sql`AND wc.lastMessageAt < ${new Date(filter.cursor)}` : sql``}
-    ORDER BY wc.lastMessageAt DESC
+    ${filter?.cursor ? sql`AND COALESCE(lm.timestamp, wc.lastMessageAt) < ${new Date(filter.cursor)}` : sql``}
+    ORDER BY COALESCE(lm.timestamp, wc.lastMessageAt) DESC
     LIMIT ${filter?.limit ?? 100}
     ${!filter?.cursor && (filter?.offset ?? 0) > 0 ? sql`OFFSET ${filter?.offset ?? 0}` : sql``}
   `);
@@ -2554,6 +2572,7 @@ export async function logConversationEvent(
 export async function getQueueConversations(sessionId: string, tenantId: number, limit = 100) {
   const db = await getDb();
   if (!db) return [];
+  // Part 1 fix: Derive preview from the REAL last message in wa_messages
   const result = await db.execute(sql`
     SELECT 
       wc.id AS conversationId,
@@ -2561,10 +2580,10 @@ export async function getQueueConversations(sessionId: string, tenantId: number,
       wc.phoneE164,
       wc.contactId,
       wc.contactPushName,
-      wc.lastMessagePreview AS lastMessage,
-      wc.lastMessageType,
-      wc.lastFromMe,
-      wc.lastMessageAt AS lastTimestamp,
+      COALESCE(lm.content, wc.lastMessagePreview) AS lastMessage,
+      COALESCE(lm.messageType, wc.lastMessageType) AS lastMessageType,
+      COALESCE(lm.fromMe, wc.lastFromMe) AS lastFromMe,
+      COALESCE(lm.timestamp, wc.lastMessageAt) AS lastTimestamp,
       wc.unreadCount,
       wc.status AS conversationStatus,
       wc.conversationKey,
@@ -2573,15 +2592,28 @@ export async function getQueueConversations(sessionId: string, tenantId: number,
       c.email AS contactEmail,
       c.phone AS contactPhone
     FROM wa_conversations wc
+    LEFT JOIN (
+      SELECT m1.sessionId, m1.remoteJid, m1.content, m1.messageType, m1.fromMe, m1.timestamp, m1.status
+      FROM messages m1
+      INNER JOIN (
+        SELECT sessionId, remoteJid, MAX(timestamp) AS maxTs
+        FROM messages
+        WHERE sessionId = ${sessionId}
+        AND messageType NOT IN ('protocolMessage','senderKeyDistributionMessage','messageContextInfo','reactionMessage','ephemeralMessage')
+        GROUP BY sessionId, remoteJid
+      ) m2 ON m1.sessionId = m2.sessionId AND m1.remoteJid = m2.remoteJid AND m1.timestamp = m2.maxTs
+      WHERE m1.sessionId = ${sessionId}
+      AND m1.messageType NOT IN ('protocolMessage','senderKeyDistributionMessage','messageContextInfo','reactionMessage','ephemeralMessage')
+    ) lm ON lm.sessionId = wc.sessionId AND lm.remoteJid = wc.remoteJid
     LEFT JOIN contacts c ON c.id = wc.contactId
     WHERE wc.sessionId = ${sessionId}
     AND wc.tenantId = ${tenantId}
     AND wc.mergedIntoId IS NULL
-    AND wc.lastMessageAt IS NOT NULL
+    AND COALESCE(lm.timestamp, wc.lastMessageAt) IS NOT NULL
     AND (wc.assignedUserId IS NULL)
     AND wc.status IN ('open', 'pending')
     AND (wc.unreadCount > 0 OR wc.queuedAt IS NOT NULL)
-    ORDER BY COALESCE(wc.queuedAt, wc.lastMessageAt) DESC
+    ORDER BY COALESCE(wc.queuedAt, COALESCE(lm.timestamp, wc.lastMessageAt)) DESC
     LIMIT ${limit}
   `);
   return (result as any)[0] || [];
@@ -2663,24 +2695,38 @@ export async function getAgentWorkload(tenantId: number, sessionId: string) {
 export async function getAgentConversations(tenantId: number, sessionId: string, agentId: number, limit = 10) {
   const db = await getDb();
   if (!db) return [];
+  // Part 1 fix: Derive preview from the REAL last message in wa_messages
   const result = await db.execute(sql`
     SELECT 
       wc.id AS conversationId,
       wc.remoteJid,
       wc.contactPushName,
-      wc.lastMessagePreview AS lastMessage,
-      wc.lastMessageAt AS lastTimestamp,
+      COALESCE(lm.content, wc.lastMessagePreview) AS lastMessage,
+      COALESCE(lm.timestamp, wc.lastMessageAt) AS lastTimestamp,
       wc.unreadCount,
       wc.status AS conversationStatus,
       c.name AS contactName
     FROM wa_conversations wc
+    LEFT JOIN (
+      SELECT m1.sessionId, m1.remoteJid, m1.content, m1.timestamp
+      FROM messages m1
+      INNER JOIN (
+        SELECT sessionId, remoteJid, MAX(timestamp) AS maxTs
+        FROM messages
+        WHERE sessionId = ${sessionId}
+        AND messageType NOT IN ('protocolMessage','senderKeyDistributionMessage','messageContextInfo','reactionMessage','ephemeralMessage')
+        GROUP BY sessionId, remoteJid
+      ) m2 ON m1.sessionId = m2.sessionId AND m1.remoteJid = m2.remoteJid AND m1.timestamp = m2.maxTs
+      WHERE m1.sessionId = ${sessionId}
+      AND m1.messageType NOT IN ('protocolMessage','senderKeyDistributionMessage','messageContextInfo','reactionMessage','ephemeralMessage')
+    ) lm ON lm.sessionId = wc.sessionId AND lm.remoteJid = wc.remoteJid
     LEFT JOIN contacts c ON c.id = wc.contactId
     WHERE wc.tenantId = ${tenantId}
     AND wc.sessionId = ${sessionId}
     AND wc.assignedUserId = ${agentId}
     AND wc.status IN ('open', 'pending')
     AND wc.mergedIntoId IS NULL
-    ORDER BY wc.lastMessageAt DESC
+    ORDER BY COALESCE(lm.timestamp, wc.lastMessageAt) DESC
     LIMIT ${limit}
   `);
   return (result as any)[0] || [];
