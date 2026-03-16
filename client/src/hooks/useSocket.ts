@@ -38,6 +38,16 @@ interface WhatsAppMediaUpdateEvent {
   timestamp: number;
 }
 
+interface ConversationUpdatedEvent {
+  type: string;
+  waConversationId: number;
+  sessionId: string;
+  remoteJid: string;
+  authorUserId: number;
+  authorName: string;
+  timestamp: number;
+}
+
 // ─── Singleton Socket Manager ───
 // Ensures only ONE Socket.IO connection exists across all components
 
@@ -50,6 +60,7 @@ class SocketManager {
   private _lastMessage: WhatsAppMessageEvent | null = null;
   private _lastStatusUpdate: WhatsAppMessageStatusEvent | null = null;
   private _lastMediaUpdate: WhatsAppMediaUpdateEvent | null = null;
+  private _lastConversationUpdate: ConversationUpdatedEvent | null = null;
   private refCount = 0;
 
   subscribe(listener: () => void) {
@@ -122,6 +133,12 @@ class SocketManager {
       this._lastMediaUpdate = data;
       this.notify();
     });
+
+    // Conversation updated (internal notes, assignments, etc.)
+    socket.on("conversationUpdated", (data: ConversationUpdatedEvent) => {
+      this._lastConversationUpdate = data;
+      this.notify();
+    });
   }
 
   getSnapshot() {
@@ -132,6 +149,7 @@ class SocketManager {
       lastMessage: this._lastMessage,
       lastStatusUpdate: this._lastStatusUpdate,
       lastMediaUpdate: this._lastMediaUpdate,
+      lastConversationUpdate: this._lastConversationUpdate,
     };
   }
 
@@ -160,7 +178,8 @@ function getSnapshot() {
     next.waStatus !== snapshotCache.waStatus ||
     next.lastMessage !== snapshotCache.lastMessage ||
     next.lastStatusUpdate !== snapshotCache.lastStatusUpdate ||
-    next.lastMediaUpdate !== snapshotCache.lastMediaUpdate
+    next.lastMediaUpdate !== snapshotCache.lastMediaUpdate ||
+    next.lastConversationUpdate !== snapshotCache.lastConversationUpdate
   ) {
     snapshotCache = next;
   }
@@ -188,6 +207,7 @@ export function useSocket() {
     lastMessage: state.lastMessage,
     lastStatusUpdate: state.lastStatusUpdate,
     lastMediaUpdate: state.lastMediaUpdate,
+    lastConversationUpdate: state.lastConversationUpdate,
     clearQr,
   };
 }

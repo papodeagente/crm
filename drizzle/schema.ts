@@ -1845,10 +1845,14 @@ export const internalNotes = mysqlTable("internal_notes", {
   authorUserId: int("authorUserId").notNull(),
   content: text("content").notNull(),
   mentionedUserIds: json("mentionedUserIds"),
+  category: varchar("category", { length: 32 }).default("other").notNull(),
+  priority: varchar("priority", { length: 16 }).default("normal").notNull(),
+  isCustomerGlobalNote: boolean("isCustomerGlobalNote").default(false).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 }, (t) => [
   index("in_tenant_conv_idx").on(t.tenantId, t.waConversationId, t.createdAt),
   index("in_author_idx").on(t.tenantId, t.authorUserId),
+  index("in_global_note_idx").on(t.tenantId, t.isCustomerGlobalNote),
 ]);
 export type InternalNote = typeof internalNotes.$inferSelect;
 export type InsertInternalNote = typeof internalNotes.$inferInsert;

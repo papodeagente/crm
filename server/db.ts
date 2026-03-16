@@ -2379,7 +2379,11 @@ export async function hasActiveShareForSession(tenantId: number, targetUserId: n
 // HELPDESK — Internal Notes
 // ════════════════════════════════════════════════════════════
 
-export async function createInternalNote(tenantId: number, waConversationId: number, sessionId: string, remoteJid: string, authorUserId: number, content: string, mentionedUserIds?: number[]) {
+export async function createInternalNote(
+  tenantId: number, waConversationId: number, sessionId: string, remoteJid: string,
+  authorUserId: number, content: string, mentionedUserIds?: number[],
+  category?: string, priority?: string, isCustomerGlobalNote?: boolean
+) {
   const db = await getDb();
   if (!db) return null;
   const [result] = await db.insert(internalNotes).values({
@@ -2390,6 +2394,9 @@ export async function createInternalNote(tenantId: number, waConversationId: num
     authorUserId,
     content,
     mentionedUserIds: mentionedUserIds ? JSON.stringify(mentionedUserIds) : undefined,
+    category: category || "other",
+    priority: priority || "normal",
+    isCustomerGlobalNote: isCustomerGlobalNote || false,
   }).$returningId();
   // Also log as event
   await db.insert(conversationEvents).values({
@@ -2413,6 +2420,9 @@ export async function getInternalNotes(tenantId: number, waConversationId: numbe
       n.waConversationId,
       n.content,
       n.mentionedUserIds,
+      n.category,
+      n.priority,
+      n.isCustomerGlobalNote,
       n.createdAt,
       n.authorUserId,
       u.name AS authorName,
@@ -2422,6 +2432,30 @@ export async function getInternalNotes(tenantId: number, waConversationId: numbe
     WHERE n.tenantId = ${tenantId}
     AND n.waConversationId = ${waConversationId}
     ORDER BY n.createdAt ASC
+  `);
+  return (result as any)[0] || [];
+}
+
+// Get customer global notes for a specific remoteJid (across all conversations)
+export async function getCustomerGlobalNotes(tenantId: number, remoteJid: string) {
+  const db = await getDb();
+  if (!db) return [];
+  const result = await db.execute(sql`
+    SELECT 
+      n.id,
+      n.waConversationId,
+      n.content,
+      n.category,
+      n.priority,
+      n.createdAt,
+      n.authorUserId,
+      u.name AS authorName
+    FROM internal_notes n
+    LEFT JOIN crm_users u ON u.id = n.authorUserId
+    WHERE n.tenantId = ${tenantId}
+    AND n.remoteJid = ${remoteJid}
+    AND n.isCustomerGlobalNote = true
+    ORDER BY n.createdAt DESC
   `);
   return (result as any)[0] || [];
 }

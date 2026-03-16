@@ -5,6 +5,7 @@ import { publicProcedure, protectedProcedure, sessionProtectedProcedure, router 
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { whatsappManager } from "./whatsappEvolution";
+import { getIo } from "./socketSingleton";
 import {
   getSessionsByUser,
   getSessionsByTenant,
@@ -98,6 +99,7 @@ import {
   createInternalNote,
   getInternalNotes,
   deleteInternalNote,
+  getCustomerGlobalNotes,
   getConversationEvents,
   logConversationEvent,
   getQueueConversations,
@@ -1322,14 +1324,32 @@ export const appRouter = router({
         remoteJid: z.string(),
         content: z.string().min(1),
         mentionedUserIds: z.array(z.number()).optional(),
+        category: z.enum(["client", "financial", "documentation", "operation", "other"]).optional(),
+        priority: z.enum(["normal", "high", "urgent"]).optional(),
+        isCustomerGlobalNote: z.boolean().optional(),
       }))
       .mutation(async ({ ctx, input }) => {
         const tenantId = ctx.saasUser?.tenantId || 1;
         const userId = ctx.saasUser?.userId || ctx.user.id;
-        return createInternalNote(
+        const result = await createInternalNote(
           tenantId, input.waConversationId, input.sessionId, input.remoteJid,
-          userId, input.content, input.mentionedUserIds
+          userId, input.content, input.mentionedUserIds,
+          input.category, input.priority, input.isCustomerGlobalNote
         );
+        // Emit socket event for real-time update to all agents
+        const io = getIo();
+        if (io) {
+          io.emit("conversationUpdated", {
+            type: "internal_note",
+            waConversationId: input.waConversationId,
+            sessionId: input.sessionId,
+            remoteJid: input.remoteJid,
+            authorUserId: userId,
+            authorName: ctx.saasUser?.name || ctx.user.name || "Agente",
+            timestamp: Date.now(),
+          });
+        }
+        return result;
       }),
     delete: protectedProcedure
       .input(z.object({ noteId: z.number() }))
@@ -1337,6 +1357,12 @@ export const appRouter = router({
         const tenantId = ctx.saasUser?.tenantId || 1;
         await deleteInternalNote(tenantId, input.noteId);
         return { success: true };
+      }),
+    globalByContact: protectedProcedure
+      .input(z.object({ remoteJid: z.string() }))
+      .query(async ({ ctx, input }) => {
+        const tenantId = ctx.saasUser?.tenantId || 1;
+        return getCustomerGlobalNotes(tenantId, input.remoteJid);
       }),
     }),
 

@@ -3193,9 +3193,53 @@
 - [x] Fix: notas internas devem seguir fluxo cronológico da conversa (não separadas no final)
 - [ ] Fix: adicionar status 'played' ao fluxo de status de mensagem
 - [ ] Feature: categorias de nota (cliente, financeiro, documentação, operação, urgente)
-- [ ] Feature: prioridade da nota (normal, alta, urgente)
-- [ ] Feature: menção de agente com @nome e notificação
+- [x] Feature: prioridade da nota (normal, alta, urgente)
+- [x] Feature: menção de agente com @nome e notificação
 - [x] Feature: timestamp formatado (15 Mar 2026 — 18:22)
 - [x] Feature: visual melhorado com ícone e fundo amarelo claro
-- [ ] Feature: socket.emit("conversationUpdated") ao criar nota
+- [x] Feature: socket.emit("conversationUpdated") ao criar nota
 - [x] Tests: cobrir notas internas — mesclagem cronológica, ordenação, agrupamento por data, IDs sem colisão (23 testes)
+
+## Inbox UX + Internal Notes + Links + Realtime (v-inbox-ux)
+
+### Part 1 — Real-time Internal Notes
+- [x] Emit socket.emit("conversationUpdated") when agent creates a note
+- [x] All agents viewing the conversation see the note instantly (no refresh)
+
+### Part 2 — Advanced Internal Notes Features
+- [x] DB: add category column to internal_notes (client, financial, documentation, operation, other)
+- [x] DB: add priority column to internal_notes (normal, high, urgent)
+- [x] UI: render category badge on note bubble (e.g. [FINANCEIRO])
+- [x] UI: render priority indicator on note bubble (e.g. 🔴 URGENTE)
+- [x] UI: category and priority selectors in note input area
+- [x] Agent mentions: autocomplete @nome in note input
+- [x] Agent mentions: send notification to mentioned agent
+- [x] Customer global notes: add isCustomerGlobalNote flag to internal_notes
+- [x] Customer global notes: show alert banner when opening conversation with customer that has global notes
+
+### Part 3 — Clickable Links in Inbox
+- [x] URL parser: detect https://, http://, www., maps.google.com, wa.me in message text
+- [x] Normalize URLs: www. → https://www.
+- [x] Security: sanitize message content (prevent XSS, HTML injection, script tags)
+- [x] Link visual style: blue (#2563eb), pointer cursor, underline on hover
+- [x] Multiple links support in single message
+- [x] Compatibility: links work in received, sent, history sync, AI suggestions, internal notes
+
+### Part 4 — Inbox Stability
+- [x] Prevent message status regression (pending → sent → delivered → read → played, never downgrade)
+- [x] Conversation preview: always show latest message, never older after sync
+- [x] MessageType consistency: ensure updateConversationLastMessage always passes messageType and status
+
+### Part 6 — Tests
+- [x] Tests: internal note merge + chronological ordering (23 tests)
+- [x] Tests: URL parsing, multiple URL detection, XSS prevention (93 tests)
+- [x] Tests: real-time note update via socket
+- [x] Tests: message status regression prevention
+- [x] Tests: customer global notes
+
+### Part 7 — Final Checks
+- [x] TypeScript compiles with 0 errors
+- [x] Full test suite passes (1640 passed, 8 pre-existing failures from external APIs)
+- [x] Existing WhatsApp messaging continues working
+- [x] Evolution API connection unchanged
+- [x] CRM pipeline unchanged

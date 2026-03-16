@@ -77,8 +77,53 @@ export interface WhatsAppChatProps {
 }
 
 /* ─── WhatsApp Text Formatting ─── */
+// URL regex: matches http(s)://, www., and bare domains like example.com/path
+const URL_REGEX = /(?:https?:\/\/|www\.)[-\w+&@#/%?=~|!:,.;]*[-\w+&@#/%=~|]|(?:[a-zA-Z0-9][-a-zA-Z0-9]*\.)+(?:com|org|net|br|io|dev|app|me|co|info|biz|gov|edu)(?:\/[-\w+&@#/%?=~|!:,.;]*[-\w+&@#/%=~|])?/gi;
+
+/** Normalize a URL: add https:// if missing, strip javascript: */
+function normalizeUrl(raw: string): string | null {
+  const trimmed = raw.trim();
+  // Block dangerous protocols
+  if (/^javascript:/i.test(trimmed) || /^data:/i.test(trimmed) || /^vbscript:/i.test(trimmed)) return null;
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  return `https://${trimmed}`;
+}
+
+/** Render a string segment, replacing URLs with clickable links */
+function linkifyText(text: string, keyBase: number): { nodes: React.ReactNode[]; nextKey: number } {
+  const nodes: React.ReactNode[] = [];
+  let lastIndex = 0;
+  let k = keyBase;
+  URL_REGEX.lastIndex = 0;
+  let m: RegExpExecArray | null;
+  while ((m = URL_REGEX.exec(text)) !== null) {
+    if (m.index > lastIndex) nodes.push(text.substring(lastIndex, m.index));
+    const href = normalizeUrl(m[0]);
+    if (href) {
+      nodes.push(
+        <a
+          key={`link-${k++}`}
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer nofollow"
+          className="text-blue-500 hover:text-blue-600 underline underline-offset-2 break-all"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {m[0]}
+        </a>
+      );
+    } else {
+      nodes.push(m[0]);
+    }
+    lastIndex = m.index + m[0].length;
+  }
+  if (lastIndex < text.length) nodes.push(text.substring(lastIndex));
+  return { nodes, nextKey: k };
+}
+
 function formatWhatsAppText(text: string): React.ReactNode {
   // Process WhatsApp formatting: *bold*, _italic_, ~strikethrough~, ```monospace```
+  // Then linkify plain text segments
   const parts: React.ReactNode[] = [];
   let remaining = text;
   let key = 0;
@@ -105,11 +150,19 @@ function formatWhatsAppText(text: string): React.ReactNode {
     }
 
     if (!earliestMatch || !earliestPattern) {
-      parts.push(remaining);
+      // Linkify the remaining plain text
+      const { nodes, nextKey } = linkifyText(remaining, key);
+      parts.push(...nodes);
+      key = nextKey;
       break;
     }
 
-    if (earliest > 0) parts.push(remaining.substring(0, earliest));
+    if (earliest > 0) {
+      // Linkify the plain text before the formatting match
+      const { nodes, nextKey } = linkifyText(remaining.substring(0, earliest), key);
+      parts.push(...nodes);
+      key = nextKey;
+    }
 
     const inner = earliestMatch[1];
     if (earliestPattern.tag === "b") parts.push(<strong key={key++}>{inner}</strong>);
@@ -1095,7 +1148,7 @@ function EditMessageModal({ currentText, onSave, onClose }: { currentText: strin
 
 export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDeal, onCreateContact, hasCrmContact, assignment, agents, onAssign, onStatusChange, myAvatarUrl, waConversationId }: WhatsAppChatProps) {
   const [showAgentDropdown, setShowAgentDropdown] = useState(false);
-  const { lastMessage, lastStatusUpdate, lastMediaUpdate } = useSocket();
+  const { lastMessage, lastStatusUpdate, lastMediaUpdate, lastConversationUpdate } = useSocket();
   const [messageText, setMessageText] = useState("");
   const [showAttach, setShowAttach] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
@@ -1110,6 +1163,12 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
   const [editTarget, setEditTarget] = useState<{ messageId: string; text: string } | null>(null);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const [isNoteMode, setIsNoteMode] = useState(false);
+  const [noteCategory, setNoteCategory] = useState<string>("other");
+  const [notePriority, setNotePriority] = useState<string>("normal");
+  const [noteIsGlobal, setNoteIsGlobal] = useState(false);
+  const [mentionQuery, setMentionQuery] = useState<string | null>(null);
+  const [mentionCursorPos, setMentionCursorPos] = useState(0);
+  const [selectedMentions, setSelectedMentions] = useState<number[]>([]);
   const [showTimeline, setShowTimeline] = useState(false);
   const [showTransfer, setShowTransfer] = useState(false);
   const [showQuickReplies, setShowQuickReplies] = useState(false);
@@ -1132,9 +1191,26 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
     { enabled: !!waConversationId, refetchInterval: 30000, staleTime: 15000 }
   );
   const createNoteMut = trpc.whatsapp.notes.create.useMutation({
-    onSuccess: () => { notesQ.refetch(); toast.success("Nota interna adicionada"); setMessageText(""); setIsNoteMode(false); },
+    onSuccess: () => {
+      notesQ.refetch();
+      globalNotesQ.refetch();
+      toast.success("Nota interna adicionada");
+      setMessageText("");
+      setIsNoteMode(false);
+      setNoteCategory("other");
+      setNotePriority("normal");
+      setNoteIsGlobal(false);
+      setSelectedMentions([]);
+      setMentionQuery(null);
+    },
     onError: (e) => toast.error(e.message || "Erro ao criar nota"),
   });
+
+  // Customer global notes (across all conversations for this contact)
+  const globalNotesQ = trpc.whatsapp.notes.globalByContact.useQuery(
+    { remoteJid },
+    { enabled: !!remoteJid, staleTime: 30000 }
+  );
 
   // Quick replies
   const quickRepliesQ = trpc.whatsapp.quickReplies.list.useQuery(
@@ -1400,6 +1476,13 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
     if (lastMediaUpdate && lastMediaUpdate.remoteJid === remoteJid) messagesQ.refetch();
   }, [lastMediaUpdate, remoteJid]);
 
+  // Refetch notes when a conversationUpdated event (internal_note) arrives
+  useEffect(() => {
+    if (lastConversationUpdate && lastConversationUpdate.type === "internal_note" && lastConversationUpdate.remoteJid === remoteJid) {
+      notesQ.refetch();
+    }
+  }, [lastConversationUpdate, remoteJid]);
+
   // Update message status in real-time via socket
   useEffect(() => {
     if (lastStatusUpdate && lastStatusUpdate.messageId) {
@@ -1445,8 +1528,14 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
         sessionId,
         remoteJid,
         content: messageText.trim(),
+        category: noteCategory as any,
+        priority: notePriority as any,
+        isCustomerGlobalNote: noteIsGlobal,
+        mentionedUserIds: selectedMentions.length > 0 ? selectedMentions : undefined,
       });
       setMessageText("");
+      setSelectedMentions([]);
+      setMentionQuery(null);
       if (textareaRef.current) textareaRef.current.style.height = "42px";
       return;
     }
@@ -1545,6 +1634,21 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
     } else {
       setShowQuickReplies(false);
       setQuickReplyFilter("");
+    }
+
+    // @mention detection in note mode
+    if (isNoteMode) {
+      const cursorPos = e.target.selectionStart || 0;
+      const textBeforeCursor = val.substring(0, cursorPos);
+      const mentionMatch = textBeforeCursor.match(/@(\w*)$/);
+      if (mentionMatch) {
+        setMentionQuery(mentionMatch[1]);
+        setMentionCursorPos(cursorPos);
+      } else {
+        setMentionQuery(null);
+      }
+    } else {
+      setMentionQuery(null);
     }
 
     // Send composing presence (debounced)
@@ -1665,9 +1769,14 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
       status: null,
       timestamp: note.createdAt,
       createdAt: note.createdAt,
-      // Extra note metadata stored in unused fields
+      // Extra note metadata stored in custom fields
       pushName: note.authorName || "Agente",
       mediaFileName: note.authorAvatar || null,
+      // Note-specific metadata (accessed via (msg as any))
+      _noteCategory: note.category || "other",
+      _notePriority: note.priority || "normal",
+      _noteIsGlobal: !!note.isCustomerGlobalNote,
+      _noteMentionedUserIds: note.mentionedUserIds,
     } as any));
 
     // Combine and sort chronologically
@@ -1860,6 +1969,33 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
         </div>
       </div>
 
+      {/* ─── Global Notes Alert ─── */}
+      {globalNotesQ.data && (globalNotesQ.data as any[]).length > 0 && (
+        <div className="bg-amber-50 dark:bg-amber-950/30 border-b border-amber-200 dark:border-amber-800/40 px-4 py-2 shrink-0 z-10">
+          <div className="flex items-center gap-2">
+            <StickyNote className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+            <span className="text-[12px] font-semibold text-amber-700 dark:text-amber-300">
+              {(globalNotesQ.data as any[]).length} nota{(globalNotesQ.data as any[]).length > 1 ? "s" : ""} global{(globalNotesQ.data as any[]).length > 1 ? "is" : ""} sobre este cliente
+            </span>
+          </div>
+          <div className="mt-1 space-y-1 max-h-[80px] overflow-y-auto">
+            {(globalNotesQ.data as any[]).slice(0, 3).map((note: any) => {
+              const priColor = note.priority === "urgent" ? "text-red-600" : note.priority === "high" ? "text-orange-600" : "text-amber-700";
+              return (
+                <div key={note.id} className={`text-[11px] ${priColor} dark:text-amber-200 flex items-start gap-1`}>
+                  {note.priority === "urgent" && <span className="shrink-0">\u26A0\uFE0F</span>}
+                  {note.priority === "high" && <span className="shrink-0">\u2757</span>}
+                  <span className="truncate"><strong>{note.authorName}:</strong> {note.content}</span>
+                </div>
+              );
+            })}
+            {(globalNotesQ.data as any[]).length > 3 && (
+              <span className="text-[10px] text-amber-500">+{(globalNotesQ.data as any[]).length - 3} mais...</span>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* ─── Messages Area ─── */}
       <div ref={scrollContainerRef} data-chat-scroll className="flex-1 overflow-y-auto relative scrollbar-thin bg-wa-chat-bg" style={{ scrollBehavior: "smooth" }}>
         {/* WhatsApp doodle pattern */}
@@ -1889,21 +2025,73 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
                   if (msg.messageType === "internal_note") {
                     const noteTime = formatTime(msg.timestamp || msg.createdAt);
                     const authorName = (msg as any).pushName || "Agente";
+                    const noteCategory = (msg as any)._noteCategory || "other";
+                    const notePriority = (msg as any)._notePriority || "normal";
+                    const noteIsGlobal = (msg as any)._noteIsGlobal || false;
+                    const noteMentions: any[] = (() => {
+                      try {
+                        const raw = (msg as any)._noteMentionedUserIds;
+                        if (!raw) return [];
+                        return typeof raw === "string" ? JSON.parse(raw) : Array.isArray(raw) ? raw : [];
+                      } catch { return []; }
+                    })();
+                    const categoryLabels: Record<string, { label: string; color: string }> = {
+                      client: { label: "Cliente", color: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300" },
+                      financial: { label: "Financeiro", color: "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300" },
+                      documentation: { label: "Documenta\u00e7\u00e3o", color: "bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300" },
+                      operation: { label: "Opera\u00e7\u00e3o", color: "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/40 dark:text-cyan-300" },
+                      other: { label: "Geral", color: "bg-gray-100 text-gray-600 dark:bg-gray-800/40 dark:text-gray-400" },
+                    };
+                    const priorityStyles: Record<string, { label: string; color: string }> = {
+                      normal: { label: "", color: "" },
+                      high: { label: "Alta", color: "bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300" },
+                      urgent: { label: "Urgente", color: "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300 animate-pulse" },
+                    };
+                    const cat = categoryLabels[noteCategory] || categoryLabels.other;
+                    const pri = priorityStyles[notePriority] || priorityStyles.normal;
+                    // Render mentioned agent names from agents prop
+                    const mentionedNames = noteMentions.length > 0 && agents
+                      ? noteMentions.map(id => agents.find((a: any) => a.id === id)?.name).filter(Boolean)
+                      : [];
+                    // Format content: highlight @mentions in bold
+                    const renderNoteContent = (text: string) => {
+                      if (!text) return null;
+                      // Match @Name patterns
+                      const parts = text.split(/(@\w[\w\s]*?)(?=\s@|\s|$)/g);
+                      return parts.map((part, i) =>
+                        part.startsWith("@") ? <strong key={i} className="text-amber-700 dark:text-amber-200">{part}</strong> : part
+                      );
+                    };
                     return (
                       <div key={msg.id} className="flex justify-end px-[63px] mb-[2px] mt-[6px]">
                         <div className="relative max-w-[65%]">
-                          <div className="relative px-[9px] pt-[6px] pb-[8px] shadow-sm rounded-[7.5px] bg-amber-100 dark:bg-amber-900/40 border border-amber-200/60 dark:border-amber-700/40" style={{ minWidth: "80px" }}>
-                            {/* Note header with icon and author */}
-                            <div className="flex items-center gap-1.5 mb-1">
+                          <div className={`relative px-[9px] pt-[6px] pb-[8px] shadow-sm rounded-[7.5px] border ${notePriority === "urgent" ? "bg-red-50 dark:bg-red-950/30 border-red-300/60 dark:border-red-700/40" : "bg-amber-100 dark:bg-amber-900/40 border-amber-200/60 dark:border-amber-700/40"}`} style={{ minWidth: "80px" }}>
+                            {/* Note header with icon, author, badges */}
+                            <div className="flex items-center gap-1.5 mb-1 flex-wrap">
                               <StickyNote className="w-3 h-3 text-amber-600 dark:text-amber-400 shrink-0" />
                               <span className="text-[11px] font-semibold text-amber-700 dark:text-amber-300">{authorName}</span>
-                              <span className="text-[10px] text-amber-500 dark:text-amber-400/70">• Nota Interna</span>
+                              <span className="text-[10px] text-amber-500 dark:text-amber-400/70">\u2022 Nota Interna</span>
+                              {noteIsGlobal && (
+                                <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-amber-200/80 dark:bg-amber-700/50 text-amber-800 dark:text-amber-200 font-medium">\uD83C\uDF10 Global</span>
+                              )}
+                              {noteCategory !== "other" && (
+                                <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-medium ${cat.color}`}>{cat.label}</span>
+                              )}
+                              {notePriority !== "normal" && pri.label && (
+                                <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-medium ${pri.color}`}>{pri.label}</span>
+                              )}
                             </div>
-                            {/* Note content */}
-                            <span className="text-[14.2px] leading-[19px] whitespace-pre-wrap break-words text-amber-900 dark:text-amber-100">{msg.content}</span>
+                            {/* Note content with @mention highlighting */}
+                            <span className={`text-[14.2px] leading-[19px] whitespace-pre-wrap break-words ${notePriority === "urgent" ? "text-red-900 dark:text-red-100" : "text-amber-900 dark:text-amber-100"}`}>{renderNoteContent(msg.content || "")}</span>
+                            {/* Mentioned agents list */}
+                            {mentionedNames.length > 0 && (
+                              <div className="mt-1 text-[10px] text-amber-600 dark:text-amber-400/80">
+                                Mencionados: {mentionedNames.join(", ")}
+                              </div>
+                            )}
                             {/* Time */}
                             <span className="float-right ml-2 mt-[3px] flex items-center gap-0.5 relative -bottom-0.5">
-                              <span className="text-[11px] text-amber-500/70 dark:text-amber-400/60 leading-none tabular-nums">{noteTime}</span>
+                              <span className={`text-[11px] leading-none tabular-nums ${notePriority === "urgent" ? "text-red-400/70 dark:text-red-400/60" : "text-amber-500/70 dark:text-amber-400/60"}`}>{noteTime}</span>
                             </span>
                           </div>
                         </div>
@@ -2011,13 +2199,66 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
 
       {/* ─── Note Mode Banner ─── */}
       {isNoteMode && (
-        <div className="bg-amber-400/20 border-t border-amber-400/40 px-4 py-2 flex items-center gap-2 z-10 shrink-0">
-          <StickyNote className="w-4 h-4 text-amber-600" />
-          <span className="text-[13px] font-medium text-amber-700">Modo Nota Interna</span>
-          <span className="text-[12px] text-amber-600/80">— Só a equipe verá esta mensagem</span>
-          <button onClick={() => setIsNoteMode(false)} className="ml-auto p-1 hover:bg-amber-400/30 rounded-full transition-colors">
-            <X className="w-4 h-4 text-amber-600" />
-          </button>
+        <div className="bg-amber-400/20 border-t border-amber-400/40 px-3 py-2 z-10 shrink-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <StickyNote className="w-4 h-4 text-amber-600 shrink-0" />
+            <span className="text-[13px] font-medium text-amber-700">Nota Interna</span>
+            {/* Category selector */}
+            <select
+              value={noteCategory}
+              onChange={(e) => setNoteCategory(e.target.value)}
+              className="text-[11px] bg-amber-100 border border-amber-300 rounded-md px-1.5 py-0.5 text-amber-800 outline-none cursor-pointer"
+            >
+              <option value="other">Geral</option>
+              <option value="client">Cliente</option>
+              <option value="financial">Financeiro</option>
+              <option value="documentation">Documenta\u00e7\u00e3o</option>
+              <option value="operation">Opera\u00e7\u00e3o</option>
+            </select>
+            {/* Priority selector */}
+            <select
+              value={notePriority}
+              onChange={(e) => setNotePriority(e.target.value)}
+              className={`text-[11px] border rounded-md px-1.5 py-0.5 outline-none cursor-pointer ${
+                notePriority === "urgent" ? "bg-red-100 border-red-300 text-red-800" :
+                notePriority === "high" ? "bg-orange-100 border-orange-300 text-orange-800" :
+                "bg-amber-100 border-amber-300 text-amber-800"
+              }`}
+            >
+              <option value="normal">Normal</option>
+              <option value="high">Alta</option>
+              <option value="urgent">Urgente</option>
+            </select>
+            {/* Global note toggle */}
+            <label className="flex items-center gap-1 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={noteIsGlobal}
+                onChange={(e) => setNoteIsGlobal(e.target.checked)}
+                className="w-3.5 h-3.5 rounded border-amber-400 text-amber-600 focus:ring-amber-500 accent-amber-600"
+              />
+              <span className="text-[11px] text-amber-700" title="Nota vis\u00edvel em todas as conversas deste cliente">\uD83C\uDF10 Global</span>
+            </label>
+            {/* Selected mentions */}
+            {selectedMentions.length > 0 && agents && (
+              <div className="flex items-center gap-1">
+                {selectedMentions.map(id => {
+                  const agent = agents.find((a: any) => a.id === id);
+                  return agent ? (
+                    <span key={id} className="text-[10px] bg-amber-200 text-amber-800 px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
+                      @{agent.name}
+                      <button onClick={() => setSelectedMentions(prev => prev.filter(m => m !== id))} className="hover:text-red-600">
+                        <X className="w-2.5 h-2.5" />
+                      </button>
+                    </span>
+                  ) : null;
+                })}
+              </div>
+            )}
+            <button onClick={() => { setIsNoteMode(false); setNoteCategory("other"); setNotePriority("normal"); setNoteIsGlobal(false); setSelectedMentions([]); setMentionQuery(null); }} className="ml-auto p-1 hover:bg-amber-400/30 rounded-full transition-colors">
+              <X className="w-4 h-4 text-amber-600" />
+            </button>
+          </div>
         </div>
       )}
 
@@ -2102,6 +2343,47 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
                   onClose={() => setShowAiSuggestion(false)}
                 />
               )}
+
+              {/* @Mention autocomplete popup (note mode) */}
+              {isNoteMode && mentionQuery !== null && agents && agents.length > 0 && (() => {
+                const q = mentionQuery.toLowerCase();
+                const filtered = (agents as any[]).filter((a: any) => a.name?.toLowerCase().includes(q)).slice(0, 6);
+                if (filtered.length === 0) return null;
+                return (
+                  <div className="absolute bottom-full left-0 right-0 mb-1 bg-popover border border-amber-300 rounded-lg shadow-xl max-h-[180px] overflow-y-auto z-50">
+                    <div className="px-3 py-1.5 text-[11px] text-amber-700 font-medium uppercase tracking-wider border-b border-amber-200/50">
+                      Mencionar agente
+                    </div>
+                    {filtered.map((agent: any) => (
+                      <button
+                        key={agent.id}
+                        className="w-full text-left px-3 py-2 hover:bg-amber-50 transition-colors border-b border-amber-100/30 last:border-0 flex items-center gap-2"
+                        onClick={() => {
+                          // Replace @query with @AgentName
+                          const beforeMention = messageText.substring(0, mentionCursorPos - (mentionQuery?.length || 0) - 1);
+                          const afterMention = messageText.substring(mentionCursorPos);
+                          setMessageText(`${beforeMention}@${agent.name} ${afterMention}`);
+                          setMentionQuery(null);
+                          if (!selectedMentions.includes(agent.id)) {
+                            setSelectedMentions(prev => [...prev, agent.id]);
+                          }
+                          textareaRef.current?.focus();
+                        }}
+                      >
+                        {agent.avatarUrl ? (
+                          <img src={agent.avatarUrl} alt="" className="w-6 h-6 rounded-full" />
+                        ) : (
+                          <div className="w-6 h-6 rounded-full bg-amber-200 flex items-center justify-center text-[10px] font-bold text-amber-700">
+                            {(agent.name || "?").charAt(0).toUpperCase()}
+                          </div>
+                        )}
+                        <span className="text-[13px] font-medium text-foreground">{agent.name}</span>
+                        {agent.email && <span className="text-[11px] text-muted-foreground">{agent.email}</span>}
+                      </button>
+                    ))}
+                  </div>
+                );
+              })()}
 
               {/* Quick Replies popup */}
               {showQuickReplies && filteredQuickReplies.length > 0 && (
