@@ -3668,3 +3668,17 @@
 - [x] Diagnosticar causa raiz do preview/ordenação congelados (useSyncExternalStore não detectava mudança porque state era mutado in-place)
 - [x] Corrigir useConversationStore para disparar re-render no React (agora cria novas referências de Map e array a cada mutação)
 - [x] Validar que preview, ordem e unread atualizam instantaneamente via socket (17 testes passando)
+
+## Rebuild Inbox State Architecture — conversationKey (CONCLUÍDO)
+- [x] Migrar chave do store de remoteJid para conversationKey = sessionId:remoteJid
+- [x] Reescrever useConversationStore com chave composta e imutabilidade
+- [x] Atualizar Inbox.tsx: selectedKey como estado principal, selectedJid derivado para APIs
+- [x] Atualizar hydrate para passar sessionId
+- [x] Atualizar socket handler para usar activeKey
+- [x] Atualizar handleSelectConv para usar conversationKey
+- [x] Atualizar convJids/pushNameMap para extrair JIDs das keys
+- [x] Atualizar todas as lookups de store para usar conversationKey
+- [x] Atualizar renderização para usar conversationKey como key/isActive
+- [x] Suporte multi-sessão (mesmo JID em sessões diferentes = conversas separadas)
+- [x] 22 testes passando, 0 erros TypeScript
+- [x] Performance < 20ms por update

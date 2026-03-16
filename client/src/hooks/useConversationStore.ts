@@ -1,15 +1,19 @@
 /**
- * useConversationStore — Deterministic client-side conversation state
+ * useConversationStore — Deterministic client-side conversation state (WhatsApp/Slack style)
  *
  * Architecture:
- *   conversationMap: Map<remoteJid, Conversation>  — O(1) lookup
- *   sortedIds: string[]                             — pre-sorted, render-ready
+ *   conversationMap: Map<conversationKey, Conversation>  — O(1) lookup
+ *   sortedIds: string[]                                   — pre-sorted, render-ready
+ *
+ * conversationKey = sessionId + ":" + remoteJid
+ * Example: "instance1:558499445034@s.whatsapp.net"
  *
  * Update flow (on socket message):
- *   1. Update conversationMap entry (preview, timestamp, unread)
- *   2. Move conversationId to index 0 of sortedIds
- *   3. Create NEW state object so useSyncExternalStore detects the change
- *   4. React re-renders from sortedIds.map(id => conversationMap.get(id))
+ *   1. Build key = sessionId + ":" + remoteJid
+ *   2. Update conversationMap entry (preview, timestamp, unread)
+ *   3. Move conversationKey to index 0 of sortedIds
+ *   4. Create NEW state object so useSyncExternalStore detects the change
+ *   5. React re-renders from sortedIds.map(id => conversationMap.get(id))
  *
  * CRITICAL: useSyncExternalStore uses Object.is to compare snapshots.
  * Every mutation MUST produce a new state object reference.
@@ -21,6 +25,7 @@
 import { useCallback, useRef, useSyncExternalStore } from "react";
 
 export interface ConvEntry {
+  conversationKey?: string;
   sessionId?: string;
   remoteJid: string;
   lastMessage: string | null;
@@ -53,6 +58,23 @@ interface StoreState {
 
 type Listener = () => void;
 
+/** Build conversationKey from sessionId + remoteJid */
+export function makeConvKey(sessionId: string, remoteJid: string): string {
+  return `${sessionId}:${remoteJid}`;
+}
+
+/** Extract remoteJid from conversationKey */
+export function getJidFromKey(key: string): string {
+  const idx = key.indexOf(":");
+  return idx >= 0 ? key.slice(idx + 1) : key;
+}
+
+/** Extract sessionId from conversationKey */
+export function getSessionFromKey(key: string): string {
+  const idx = key.indexOf(":");
+  return idx >= 0 ? key.slice(0, idx) : "";
+}
+
 class ConversationStore {
   private state: StoreState = {
     conversationMap: new Map(),
@@ -76,7 +98,6 @@ class ConversationStore {
       sortedIds: ids,
       version: this.state.version + 1,
     };
-    // Notify all subscribers (triggers useSyncExternalStore re-render)
     this.listeners.forEach((l) => l());
   }
 
@@ -84,27 +105,34 @@ class ConversationStore {
 
   /**
    * Initialize from server data (first load only).
+   * Builds conversationKey from sessionId + remoteJid.
    */
-  hydrate(conversations: ConvEntry[]) {
+  hydrate(conversations: ConvEntry[], defaultSessionId?: string) {
     const map = new Map<string, ConvEntry>();
     const ids: string[] = [];
 
     for (const c of conversations) {
       const jid = c.remoteJid;
       if (!jid) continue;
-      const existing = map.get(jid);
+      const sid = c.sessionId || defaultSessionId || "";
+      const key = makeConvKey(sid, jid);
+      const entry: ConvEntry = { ...c, conversationKey: key, sessionId: sid };
+
+      const existing = map.get(key);
       if (!existing) {
-        map.set(jid, c);
-        ids.push(jid);
+        map.set(key, entry);
+        ids.push(key);
       } else {
+        // Keep the one with the latest timestamp
         const existingTs = existing.lastTimestamp ? new Date(existing.lastTimestamp).getTime() : 0;
         const newTs = c.lastTimestamp ? new Date(c.lastTimestamp).getTime() : 0;
         if (newTs > existingTs) {
-          map.set(jid, c);
+          map.set(key, entry);
         }
       }
     }
 
+    // Sort only during hydration (initial load)
     ids.sort((a, b) => {
       const ta = map.get(a)?.lastTimestamp ? new Date(map.get(a)!.lastTimestamp!).getTime() : 0;
       const tb = map.get(b)?.lastTimestamp ? new Date(map.get(b)!.lastTimestamp!).getTime() : 0;
@@ -117,22 +145,26 @@ class ConversationStore {
   /**
    * Handle incoming socket message.
    * Creates NEW Map and NEW array references to trigger React re-render.
+   *
+   * @param msg - The incoming message (must include sessionId)
+   * @param activeKey - The currently open conversationKey (or null)
+   * @returns true if handled, false if conversation is new (needs server fetch)
    */
   handleMessage(msg: {
-    sessionId?: string;
+    sessionId: string;
     remoteJid: string;
     content: string;
     fromMe: boolean;
     messageType: string;
     timestamp: number;
     isSync?: boolean;
-  }, activeJid: string | null): boolean {
-    const jid = msg.remoteJid;
-    if (!jid) return false;
+  }, activeKey: string | null): boolean {
+    const key = makeConvKey(msg.sessionId, msg.remoteJid);
+    if (!key || !msg.remoteJid) return false;
 
     const oldMap = this.state.conversationMap;
     const oldIds = this.state.sortedIds;
-    const existing = oldMap.get(jid);
+    const existing = oldMap.get(key);
 
     if (!existing) {
       return false; // new conversation — caller should fetch from server
@@ -145,7 +177,17 @@ class ConversationStore {
       return true; // already have newer data
     }
 
-    // Create updated entry
+    // Determine unread count
+    let newUnread: number;
+    if (msg.fromMe) {
+      newUnread = activeKey === key ? 0 : Number(existing.unreadCount) || 0;
+    } else if (activeKey === key) {
+      newUnread = 0;
+    } else {
+      newUnread = (Number(existing.unreadCount) || 0) + 1;
+    }
+
+    // Create updated entry (immutable)
     const updated: ConvEntry = {
       ...existing,
       lastMessage: msg.content || existing.lastMessage,
@@ -153,26 +195,22 @@ class ConversationStore {
       lastFromMe: msg.fromMe,
       lastTimestamp: msgTimestamp,
       lastStatus: msg.fromMe ? "sent" : "received",
-      unreadCount: (!msg.fromMe && activeJid !== jid)
-        ? (Number(existing.unreadCount) || 0) + 1
-        : (activeJid === jid ? 0 : Number(existing.unreadCount) || 0),
+      unreadCount: newUnread,
     };
 
     // NEW Map reference with updated entry
     const newMap = new Map(oldMap);
-    newMap.set(jid, updated);
+    newMap.set(key, updated);
 
     // NEW array reference with conversation moved to top
+    const currentIdx = oldIds.indexOf(key);
     let newIds: string[];
-    const currentIdx = oldIds.indexOf(jid);
-    if (currentIdx > 0) {
-      newIds = oldIds.filter(id => id !== jid);
-      newIds.unshift(jid);
-    } else if (currentIdx === 0) {
-      // Already at top — still need new array ref for React
+    if (currentIdx === 0) {
       newIds = [...oldIds];
+    } else if (currentIdx > 0) {
+      newIds = [key, ...oldIds.slice(0, currentIdx), ...oldIds.slice(currentIdx + 1)];
     } else {
-      newIds = [jid, ...oldIds];
+      newIds = [key, ...oldIds];
     }
 
     this.commit(newMap, newIds);
@@ -180,56 +218,67 @@ class ConversationStore {
   }
 
   /**
-   * Handle status update (delivered, read, played)
+   * Handle status update (delivered, read, played).
+   * Uses conversationKey for lookup.
    */
-  handleStatusUpdate(update: { remoteJid: string; status: string }) {
-    const jid = update.remoteJid;
-    if (!jid) return;
+  handleStatusUpdate(update: { sessionId: string; remoteJid: string; status: string }) {
+    const key = makeConvKey(update.sessionId, update.remoteJid);
+    if (!key) return;
 
-    const existing = this.state.conversationMap.get(jid);
+    const existing = this.state.conversationMap.get(key);
     if (!existing || !existing.lastFromMe) return;
 
     const newMap = new Map(this.state.conversationMap);
-    newMap.set(jid, { ...existing, lastStatus: update.status });
+    newMap.set(key, { ...existing, lastStatus: update.status });
 
     this.commit(newMap, [...this.state.sortedIds]);
   }
 
   /**
-   * Mark conversation as read
+   * Mark conversation as read using conversationKey.
    */
-  markRead(jid: string) {
-    const existing = this.state.conversationMap.get(jid);
+  markRead(conversationKey: string) {
+    const existing = this.state.conversationMap.get(conversationKey);
     if (!existing || Number(existing.unreadCount) === 0) return;
 
     const newMap = new Map(this.state.conversationMap);
-    newMap.set(jid, { ...existing, unreadCount: 0 });
+    newMap.set(conversationKey, { ...existing, unreadCount: 0 });
 
     this.commit(newMap, [...this.state.sortedIds]);
   }
 
   /**
-   * Update assignment fields for a conversation
+   * Update assignment fields for a conversation using conversationKey.
    */
-  updateAssignment(jid: string, fields: Partial<Pick<ConvEntry, 'assignedUserId' | 'assignedAgentName' | 'assignmentStatus' | 'assignmentPriority' | 'assignedAgentAvatar'>>) {
-    const existing = this.state.conversationMap.get(jid);
+  updateAssignment(conversationKey: string, fields: Partial<Pick<ConvEntry, 'assignedUserId' | 'assignedAgentName' | 'assignmentStatus' | 'assignmentPriority' | 'assignedAgentAvatar'>>) {
+    const existing = this.state.conversationMap.get(conversationKey);
     if (!existing) return;
 
     const newMap = new Map(this.state.conversationMap);
-    newMap.set(jid, { ...existing, ...fields });
+    newMap.set(conversationKey, { ...existing, ...fields });
 
     this.commit(newMap, [...this.state.sortedIds]);
   }
 
   /**
-   * Get a single conversation by JID
+   * Get a single conversation by conversationKey (O(1)).
    */
-  get(jid: string): ConvEntry | undefined {
-    return this.state.conversationMap.get(jid);
+  getConversation(key: string): ConvEntry | undefined {
+    return this.state.conversationMap.get(key);
+  }
+
+  /**
+   * Get a conversation by remoteJid (backward compat scan — O(n)).
+   * Use getConversation(key) when possible.
+   */
+  getByJid(remoteJid: string): ConvEntry | undefined {
+    const entries = Array.from(this.state.conversationMap.values());
+    return entries.find(e => e.remoteJid === remoteJid);
   }
 
   /**
    * Get all conversations as sorted array (for rendering).
+   * sortedIds.map(id => conversationMap.get(id))
    */
   getSorted(): ConvEntry[] {
     const { conversationMap, sortedIds } = this.state;
@@ -267,28 +316,32 @@ export function useConversationStore() {
     store.getSnapshot
   );
 
-  const hydrate = useCallback((conversations: ConvEntry[]) => {
-    store.hydrate(conversations);
+  const hydrate = useCallback((conversations: ConvEntry[], defaultSessionId?: string) => {
+    store.hydrate(conversations, defaultSessionId);
   }, [store]);
 
-  const handleMessage = useCallback((msg: Parameters<ConversationStore['handleMessage']>[0], activeJid: string | null) => {
-    return store.handleMessage(msg, activeJid);
+  const handleMessage = useCallback((msg: Parameters<ConversationStore['handleMessage']>[0], activeKey: string | null) => {
+    return store.handleMessage(msg, activeKey);
   }, [store]);
 
-  const handleStatusUpdate = useCallback((update: { remoteJid: string; status: string }) => {
+  const handleStatusUpdate = useCallback((update: { sessionId: string; remoteJid: string; status: string }) => {
     store.handleStatusUpdate(update);
   }, [store]);
 
-  const markRead = useCallback((jid: string) => {
-    store.markRead(jid);
+  const markRead = useCallback((conversationKey: string) => {
+    store.markRead(conversationKey);
   }, [store]);
 
-  const updateAssignment = useCallback((jid: string, fields: Parameters<ConversationStore['updateAssignment']>[1]) => {
-    store.updateAssignment(jid, fields);
+  const updateAssignment = useCallback((conversationKey: string, fields: Parameters<ConversationStore['updateAssignment']>[1]) => {
+    store.updateAssignment(conversationKey, fields);
   }, [store]);
 
-  const getConversation = useCallback((jid: string) => {
-    return store.get(jid);
+  const getConversation = useCallback((key: string) => {
+    return store.getConversation(key);
+  }, [store]);
+
+  const getByJid = useCallback((remoteJid: string) => {
+    return store.getByJid(remoteJid);
   }, [store]);
 
   const getSorted = useCallback(() => {
@@ -308,12 +361,14 @@ export function useConversationStore() {
     handleMessage,
     /** Handle message status update */
     handleStatusUpdate,
-    /** Mark conversation as read */
+    /** Mark conversation as read (by conversationKey) */
     markRead,
-    /** Update assignment fields */
+    /** Update assignment fields (by conversationKey) */
     updateAssignment,
-    /** Get single conversation by JID */
+    /** Get single conversation by conversationKey (O(1)) */
     getConversation,
+    /** Get single conversation by remoteJid (O(n) scan, backward compat) */
+    getByJid,
     /** Get all conversations sorted (for rendering) */
     getSorted,
     /** Direct access to the map for O(1) lookups */

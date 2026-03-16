@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useCallback, useRef, memo } from "react";
 import { trpc } from "@/lib/trpc";
 import { useSocket } from "@/hooks/useSocket";
-import { useConversationStore } from "@/hooks/useConversationStore";
+import { useConversationStore, makeConvKey, getJidFromKey } from "@/hooks/useConversationStore";
 import type { ConvEntry } from "@/hooks/useConversationStore";
 import WhatsAppChat from "@/components/WhatsAppChat";
 import {
@@ -275,6 +275,7 @@ UrgencyTimer.displayName = "UrgencyTimer";
    ═══════════════════════════════════════════════════════ */
 
 interface ConvItem {
+  conversationKey?: string;
   sessionId?: string;
   remoteJid: string;
   lastMessage: string | null;
@@ -943,7 +944,10 @@ export default function InboxPage() {
   const tenantId = useTenantId();
   const trpcUtils = trpc.useUtils();
   const { lastMessage, lastStatusUpdate } = useSocket();
-  const [selectedJid, setSelectedJid] = useState<string | null>(null);
+  // selectedKey = conversationKey (sessionId:remoteJid) — primary selection state
+  const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  // selectedJid = remoteJid only — derived for API calls that need just the JID
+  const selectedJid = selectedKey ? getJidFromKey(selectedKey) : null;
   const [search, setSearch] = useState("");
   const [searchFocused, setSearchFocused] = useState(false);
   const [showMobileChat, setShowMobileChat] = useState(false);
@@ -957,9 +961,9 @@ export default function InboxPage() {
   const [isMuted, setIsMuted] = useState(() => {
     try { return localStorage.getItem(MUTE_KEY) === "true"; } catch { return false; }
   });
-  const selectedJidRef = useRef<string | null>(null);
+  const selectedKeyRef = useRef<string | null>(null);
   // Keep ref in sync with state so socket handler closure always has the latest value
-  selectedJidRef.current = selectedJid;
+  selectedKeyRef.current = selectedKey;
   const prevMessageRef = useRef<typeof lastMessage>(null);
   // Suppress notification sounds temporarily when opening a conversation
   // This prevents sounds from firing during message hydration/syncOnOpen
@@ -1054,7 +1058,7 @@ export default function InboxPage() {
     onSuccess: () => {
       queueStatsQ.refetch();
       toast.success("Atendimento finalizado");
-      setSelectedJid(null);
+      setSelectedKey(null);
     },
     onError: (e: any) => toast.error(e.message || "Erro ao finalizar"),
   });
@@ -1097,7 +1101,7 @@ export default function InboxPage() {
 
   // Profile pictures — derive from store (no dependency on conversationsQ.data)
   const convJids = useMemo(() => {
-    return convStore.sortedIds;
+    return convStore.sortedIds.map(key => getJidFromKey(key));
   }, [convStore.sortedIds]);
 
   // Fetch profile pics from DB (fast query, no API calls) — can handle more
@@ -1129,7 +1133,8 @@ export default function InboxPage() {
   // PushName map from store (instant, no conversationsQ dependency)
   const pushNameMap = useMemo(() => {
     const map = new Map<string, string>();
-    Array.from(convStore.conversationMap.entries()).forEach(([jid, conv]) => {
+    Array.from(convStore.conversationMap.entries()).forEach(([key, conv]) => {
+      const jid = getJidFromKey(key);
       if (conv.contactPushName) map.set(jid, conv.contactPushName);
     });
     return map;
@@ -1251,7 +1256,7 @@ export default function InboxPage() {
       messageType: lastMessage.messageType,
       timestamp: lastMessage.timestamp,
       isSync: (lastMessage as any).isSync,
-    }, selectedJidRef.current);
+    }, selectedKeyRef.current);
 
     // If conversation is new (not in store), do a one-time fetch
     if (!handled) {
@@ -1299,7 +1304,8 @@ export default function InboxPage() {
     if (Date.now() < soundSuppressedUntilRef.current) { prevMessageRef.current = lastMessage; return; }
 
     // Guard 8: Skip if this is the currently viewed conversation
-    if (selectedJidRef.current === lastMessage.remoteJid) { prevMessageRef.current = lastMessage; return; }
+    const currentJid = selectedKeyRef.current ? getJidFromKey(selectedKeyRef.current) : null;
+    if (currentJid === lastMessage.remoteJid) { prevMessageRef.current = lastMessage; return; }
 
     // All guards passed — play notification
     playNotification();
@@ -1311,26 +1317,28 @@ export default function InboxPage() {
     if (!lastStatusUpdate) return;
     const remoteJid = (lastStatusUpdate as any).remoteJid;
     if (!remoteJid) return;
-    convStore.handleStatusUpdate({ remoteJid, status: lastStatusUpdate.status });
+    const sid = activeSession?.sessionId || "";
+    convStore.handleStatusUpdate({ sessionId: sid, remoteJid, status: lastStatusUpdate.status });
   }, [lastStatusUpdate]);
 
   // Select conversation
   // Sync on conversation open — lightweight fetch of last 10 messages
   const syncOnOpen = trpc.whatsapp.syncOnOpen.useMutation();
   const handleSelectConv = useCallback((jid: string) => {
-    setSelectedJid(jid);
+    const key = makeConvKey(activeSession?.sessionId || "", jid);
+    setSelectedKey(key);
     setShowMobileChat(true);
 
     // ── Suppress notification sounds for 2 seconds while conversation loads ──
     soundSuppressedUntilRef.current = Date.now() + 2000;
 
     // ── Instant: mark read in deterministic store (O(1), no refetch) ──
-    convStore.markRead(jid);
+    convStore.markRead(key);
 
     if (activeSession?.sessionId) {
       markRead.mutate({ sessionId: activeSession.sessionId, remoteJid: jid });
       // Find conversationId from store (O(1) lookup)
-      const conv = convStore.getConversation(jid);
+      const conv = convStore.getConversation(key);
       if (conv?.conversationId) {
         syncOnOpen.mutate(
           { sessionId: activeSession.sessionId, remoteJid: jid, conversationId: conv.conversationId },
@@ -1351,7 +1359,8 @@ export default function InboxPage() {
 
   // View queue conversation WITHOUT auto-claiming
   const handleSelectQueueConv = useCallback((jid: string) => {
-    setSelectedJid(jid);
+    const key = makeConvKey(activeSession?.sessionId || "", jid);
+    setSelectedKey(key);
     setShowMobileChat(true);
     // Do NOT auto-claim — user must click "Puxar" or "Atribuir" explicitly
   }, []);
@@ -1433,8 +1442,8 @@ export default function InboxPage() {
 
   // Get assignment for selected conversation (O(1) from store)
   const selectedAssignment = useMemo(() => {
-    if (!selectedJid) return null;
-    const conv = convStore.getConversation(selectedJid) as ConvItem | undefined;
+    if (!selectedKey) return null;
+    const conv = convStore.getConversation(selectedKey) as ConvItem | undefined;
     if (!conv) return null;
     return {
       assignedUserId: conv.assignedUserId,
@@ -1442,7 +1451,7 @@ export default function InboxPage() {
       assignmentStatus: conv.assignmentStatus,
       assignmentPriority: conv.assignmentPriority,
     };
-  }, [selectedJid, convStore.version]);
+  }, [selectedKey, convStore.version]);
 
   const handleAssign = useCallback((agentId: number | null) => {
     if (!selectedJid || !activeSession?.sessionId) return;
@@ -1467,27 +1476,29 @@ export default function InboxPage() {
 
   // Selected contact info
   const selectedContact = useMemo(() => {
-    if (!selectedJid) return null;
-    const crmContact = getContactForJid(selectedJid);
-    const pic = profilePicMap[selectedJid] || undefined;
-    const selectedConv = convStore.getConversation(selectedJid) as ConvItem | undefined;
-    const displayName = getDisplayName(selectedJid, selectedConv);
-    const phone = selectedJid.split("@")[0];
+    if (!selectedKey) return null;
+    const jid = getJidFromKey(selectedKey);
+    const crmContact = getContactForJid(jid);
+    const pic = profilePicMap[jid] || undefined;
+    const selectedConv = convStore.getConversation(selectedKey) as ConvItem | undefined;
+    const displayName = getDisplayName(jid, selectedConv);
+    const phone = jid.split("@")[0];
     if (crmContact) return { ...crmContact, name: displayName, avatarUrl: pic };
     return { id: 0, name: displayName, phone, email: undefined, avatarUrl: pic };
-  }, [selectedJid, getContactForJid, profilePicMap, getDisplayName, convStore.version]);
+  }, [selectedKey, getContactForJid, profilePicMap, getDisplayName, convStore.version]);
 
   const hasCrmContact = useMemo(() => {
-    if (!selectedJid) return false;
-    return !!getContactForJid(selectedJid);
-  }, [selectedJid, getContactForJid]);
+    if (!selectedKey) return false;
+    const jid = getJidFromKey(selectedKey);
+    return !!getContactForJid(jid);
+  }, [selectedKey, getContactForJid]);
 
   // Get waConversationId for selected conversation (O(1) from store)
   const selectedWaConversationId = useMemo(() => {
-    if (!selectedJid) return undefined;
-    const conv = convStore.getConversation(selectedJid) as ConvItem | undefined;
+    if (!selectedKey) return undefined;
+    const conv = convStore.getConversation(selectedKey) as ConvItem | undefined;
     return conv?.conversationId;
-  }, [selectedJid, convStore.version]);
+  }, [selectedKey, convStore.version]);
 
   const toggleMute = useCallback(() => {
     setIsMuted(prev => {
@@ -1670,11 +1681,13 @@ export default function InboxPage() {
                   )}
                 </div>
               ) : (
-                filteredConvs.map((conv) => (
+                filteredConvs.map((conv) => {
+                  const ck = conv.conversationKey || makeConvKey(conv.sessionId || activeSession?.sessionId || "", conv.remoteJid);
+                  return (
                   <ConversationItem
-                    key={conv.remoteJid}
+                    key={ck}
                     conv={conv}
-                    isActive={selectedJid === conv.remoteJid}
+                    isActive={selectedKey === ck}
                     contactName={getDisplayName(conv.remoteJid, conv)}
                     pictureUrl={profilePicMap[conv.remoteJid]}
                     onClick={() => handleSelectConv(conv.remoteJid)}
@@ -1682,7 +1695,8 @@ export default function InboxPage() {
                     showFinish={activeTab === "mine"}
                     onFinish={() => handleFinishAttendance(conv.remoteJid)}
                   />
-                ))
+                  );
+                })
               )}
             </>
           )}
@@ -1711,7 +1725,7 @@ export default function InboxPage() {
                     <div
                       onClick={() => handleSelectQueueConv(conv.remoteJid)}
                       className={`flex items-center px-3 cursor-pointer transition-all duration-100 ${
-                        selectedJid === conv.remoteJid
+                        selectedKey === makeConvKey(conv.sessionId || activeSession?.sessionId || "", conv.remoteJid)
                           ? "bg-primary/8 border-l-2 border-l-primary"
                           : "hover:bg-wa-hover/70 border-l-2 border-l-transparent"
                       }`}
@@ -1859,7 +1873,7 @@ export default function InboxPage() {
 
       {/* ═══ RIGHT PANEL: Chat Area ═══ */}
       <div className={`flex-1 flex flex-col min-w-0 ${!showMobileChat ? "hidden md:flex" : "flex"}`}>
-        {!selectedJid || !activeSession ? (
+        {!selectedKey || !activeSession ? (
           <EmptyChat />
         ) : (
           <div className="flex flex-col h-full w-full relative">
@@ -1874,7 +1888,7 @@ export default function InboxPage() {
             <WhatsAppChat
               contact={selectedContact}
               sessionId={activeSession.sessionId}
-              remoteJid={selectedJid}
+              remoteJid={selectedJid!}
               onCreateDeal={() => setShowCreateDeal(true)}
               onCreateContact={() => setShowCreateContact(true)}
               hasCrmContact={hasCrmContact}
@@ -1890,21 +1904,21 @@ export default function InboxPage() {
       </div>
 
       {/* ═══ DIALOGS ═══ */}
-      {selectedJid && activeSession && (
+      {selectedKey && activeSession && (
         <CreateDealDialog
           open={showCreateDeal}
           onClose={() => setShowCreateDeal(false)}
           contactName={selectedContact?.name || "Contato"}
-          contactPhone={selectedJid.split("@")[0]}
-          contactJid={selectedJid}
+          contactPhone={selectedJid?.split("@")[0] || ""}
+          contactJid={selectedJid || ""}
           sessionId={activeSession.sessionId}
         />
       )}
-      {selectedJid && (
+      {selectedKey && (
         <CreateContactDialog
           open={showCreateContact}
           onClose={() => setShowCreateContact(false)}
-          phone={selectedJid.split("@")[0]}
+          phone={selectedJid?.split("@")[0] || ""}
           pushName={selectedContact?.name || ""}
           onCreated={() => { contactsQ.refetch(); setShowCreateContact(false); }}
         />
