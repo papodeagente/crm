@@ -1675,11 +1675,11 @@ export async function getWaConversationsList(
       wc.phoneE164,
       wc.contactId,
       wc.contactPushName,
-      COALESCE(lm.content, wc.lastMessagePreview) AS lastMessage,
-      COALESCE(lm.messageType, wc.lastMessageType) AS lastMessageType,
-      COALESCE(lm.fromMe, wc.lastFromMe) AS lastFromMe,
-      COALESCE(lm.timestamp, wc.lastMessageAt) AS lastTimestamp,
-      COALESCE(lm.status, wc.lastStatus) AS lastStatus,
+      lm.content AS lastMessage,
+      lm.messageType AS lastMessageType,
+      lm.fromMe AS lastFromMe,
+      lm.timestamp AS lastTimestamp,
+      lm.status AS lastStatus,
       wc.unreadCount,
       wc.status AS conversationStatus,
       wc.conversationKey,
@@ -1718,10 +1718,10 @@ export async function getWaConversationsList(
     WHERE wc.sessionId = ${sessionId}
     AND wc.tenantId = ${tenantId}
     AND wc.mergedIntoId IS NULL
-    AND COALESCE(lm.timestamp, wc.lastMessageAt) IS NOT NULL
+    AND lm.timestamp IS NOT NULL
     ${sql.raw(assignmentFilter)}
-    ${filter?.cursor ? sql`AND COALESCE(lm.timestamp, wc.lastMessageAt) < ${new Date(filter.cursor)}` : sql``}
-    ORDER BY COALESCE(lm.timestamp, wc.lastMessageAt) DESC
+    ${filter?.cursor ? sql`AND lm.timestamp < ${new Date(filter.cursor)}` : sql``}
+    ORDER BY lm.timestamp DESC
     LIMIT ${filter?.limit ?? 100}
     ${!filter?.cursor && (filter?.offset ?? 0) > 0 ? sql`OFFSET ${filter?.offset ?? 0}` : sql``}
   `);
@@ -2587,10 +2587,10 @@ export async function getQueueConversations(sessionId: string, tenantId: number,
       wc.phoneE164,
       wc.contactId,
       wc.contactPushName,
-      COALESCE(lm.content, wc.lastMessagePreview) AS lastMessage,
-      COALESCE(lm.messageType, wc.lastMessageType) AS lastMessageType,
-      COALESCE(lm.fromMe, wc.lastFromMe) AS lastFromMe,
-      COALESCE(lm.timestamp, wc.lastMessageAt) AS lastTimestamp,
+      lm.content AS lastMessage,
+      lm.messageType AS lastMessageType,
+      lm.fromMe AS lastFromMe,
+      lm.timestamp AS lastTimestamp,
       wc.unreadCount,
       wc.status AS conversationStatus,
       wc.conversationKey,
@@ -2616,11 +2616,11 @@ export async function getQueueConversations(sessionId: string, tenantId: number,
     WHERE wc.sessionId = ${sessionId}
     AND wc.tenantId = ${tenantId}
     AND wc.mergedIntoId IS NULL
-    AND COALESCE(lm.timestamp, wc.lastMessageAt) IS NOT NULL
+    AND lm.timestamp IS NOT NULL
     AND (wc.assignedUserId IS NULL)
     AND wc.status IN ('open', 'pending')
     AND (wc.unreadCount > 0 OR wc.queuedAt IS NOT NULL)
-    ORDER BY COALESCE(wc.queuedAt, COALESCE(lm.timestamp, wc.lastMessageAt)) DESC
+    ORDER BY COALESCE(wc.queuedAt, lm.timestamp) DESC
     LIMIT ${limit}
   `);
   return (result as any)[0] || [];
@@ -2708,8 +2708,8 @@ export async function getAgentConversations(tenantId: number, sessionId: string,
       wc.id AS conversationId,
       wc.remoteJid,
       wc.contactPushName,
-      COALESCE(lm.content, wc.lastMessagePreview) AS lastMessage,
-      COALESCE(lm.timestamp, wc.lastMessageAt) AS lastTimestamp,
+      lm.content AS lastMessage,
+      lm.timestamp AS lastTimestamp,
       wc.unreadCount,
       wc.status AS conversationStatus,
       c.name AS contactName
@@ -2733,7 +2733,8 @@ export async function getAgentConversations(tenantId: number, sessionId: string,
     AND wc.assignedUserId = ${agentId}
     AND wc.status IN ('open', 'pending')
     AND wc.mergedIntoId IS NULL
-    ORDER BY COALESCE(lm.timestamp, wc.lastMessageAt) DESC
+    AND lm.timestamp IS NOT NULL
+    ORDER BY lm.timestamp DESC
     LIMIT ${limit}
   `);
   return (result as any)[0] || [];
@@ -2742,41 +2743,67 @@ export async function getAgentConversations(tenantId: number, sessionId: string,
 export async function getQueueStats(tenantId: number, sessionId: string) {
   const db = await getDb();
   if (!db) return { total: 0, oldest: null, items: [] };
-  // Get count + oldest
+  // Get count + oldest — derive from wa_messages, not cached fields
   const countResult = await db.execute(sql`
     SELECT 
       COUNT(*) AS total,
-      MIN(COALESCE(wc.queuedAt, wc.lastMessageAt)) AS oldestEntry
+      MIN(COALESCE(wc.queuedAt, lm.timestamp)) AS oldestEntry
     FROM wa_conversations wc
+    LEFT JOIN (
+      SELECT m1.sessionId, m1.remoteJid, m1.timestamp
+      FROM messages m1
+      INNER JOIN (
+        SELECT sessionId, remoteJid, MAX(timestamp) AS maxTs
+        FROM messages
+        WHERE sessionId = ${sessionId}
+        AND messageType NOT IN ('protocolMessage','senderKeyDistributionMessage','messageContextInfo','reactionMessage','ephemeralMessage')
+        GROUP BY sessionId, remoteJid
+      ) m2 ON m1.sessionId = m2.sessionId AND m1.remoteJid = m2.remoteJid AND m1.timestamp = m2.maxTs
+      WHERE m1.sessionId = ${sessionId}
+      AND m1.messageType NOT IN ('protocolMessage','senderKeyDistributionMessage','messageContextInfo','reactionMessage','ephemeralMessage')
+    ) lm ON lm.sessionId = wc.sessionId AND lm.remoteJid = wc.remoteJid
     WHERE wc.tenantId = ${tenantId}
     AND wc.sessionId = ${sessionId}
     AND wc.assignedUserId IS NULL
     AND wc.status IN ('open', 'pending')
     AND wc.mergedIntoId IS NULL
-    AND wc.lastMessageAt IS NOT NULL
+    AND lm.timestamp IS NOT NULL
     AND (wc.unreadCount > 0 OR wc.queuedAt IS NOT NULL)
   `);
   const countRows = (countResult as any)[0] || [];
-  // Get queue items with details
+  // Get queue items with details — derive preview from wa_messages
   const itemsResult = await db.execute(sql`
     SELECT 
       wc.remoteJid,
       wc.contactPushName,
-      wc.lastMessagePreview AS lastMessage,
-      wc.lastMessageAt,
+      lm.content AS lastMessage,
+      lm.timestamp AS lastMessageAt,
       wc.unreadCount,
-      COALESCE(wc.queuedAt, wc.lastMessageAt) AS waitingSince,
+      COALESCE(wc.queuedAt, lm.timestamp) AS waitingSince,
       c.name AS contactName
     FROM wa_conversations wc
+    LEFT JOIN (
+      SELECT m1.sessionId, m1.remoteJid, m1.content, m1.timestamp
+      FROM messages m1
+      INNER JOIN (
+        SELECT sessionId, remoteJid, MAX(timestamp) AS maxTs
+        FROM messages
+        WHERE sessionId = ${sessionId}
+        AND messageType NOT IN ('protocolMessage','senderKeyDistributionMessage','messageContextInfo','reactionMessage','ephemeralMessage')
+        GROUP BY sessionId, remoteJid
+      ) m2 ON m1.sessionId = m2.sessionId AND m1.remoteJid = m2.remoteJid AND m1.timestamp = m2.maxTs
+      WHERE m1.sessionId = ${sessionId}
+      AND m1.messageType NOT IN ('protocolMessage','senderKeyDistributionMessage','messageContextInfo','reactionMessage','ephemeralMessage')
+    ) lm ON lm.sessionId = wc.sessionId AND lm.remoteJid = wc.remoteJid
     LEFT JOIN contacts c ON c.id = wc.contactId
     WHERE wc.tenantId = ${tenantId}
     AND wc.sessionId = ${sessionId}
     AND wc.assignedUserId IS NULL
     AND wc.status IN ('open', 'pending')
     AND wc.mergedIntoId IS NULL
-    AND wc.lastMessageAt IS NOT NULL
+    AND lm.timestamp IS NOT NULL
     AND (wc.unreadCount > 0 OR wc.queuedAt IS NOT NULL)
-    ORDER BY COALESCE(wc.queuedAt, wc.lastMessageAt) ASC
+    ORDER BY COALESCE(wc.queuedAt, lm.timestamp) ASC
     LIMIT 50
   `);
   return {

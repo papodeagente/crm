@@ -3474,3 +3474,12 @@
 - [x] Part 8: Database validated — SELECT timestamp, UNIX_TIMESTAMP(timestamp) confirms match; existing data is correct
 - [x] Fixed 7 additional frontend files with missing explicit timezone (CampaignDetail, Campaigns, DateAutomationSettings, Profile, WhatsAppChat event, Home)
 - [x] 20 tests passing (timestampTimezone.test.ts), 0 TypeScript errors
+
+## Fix Preview Using Wrong Timestamp Source (cached wa_conversations fields)
+- [x] Audit: identify all COALESCE fallbacks to cached wa_conversations timestamp fields
+- [x] Fix SQL: remove COALESCE fallback to wc.lastMessageAt — use only lm.timestamp from messages JOIN
+- [x] Fix SQL: remove COALESCE fallback to wc.lastMessagePreview, wc.lastMessageType, wc.lastFromMe, wc.lastStatus
+- [x] Fix SQL: getQueueStats count query now uses LEFT JOIN with wa_messages instead of wc.lastMessageAt
+- [x] Fix frontend: optimistic cache update already uses message.timestamp directly
+- [ ] Migrate: update corrupted wa_conversations.lastMessageAt values from real wa_messages timestamps (optional — preview no longer reads cached fields)
+- [x] Validate: preview time equals last message time, no +3h offset — TypeScript 0 errors, 1860 tests passing
