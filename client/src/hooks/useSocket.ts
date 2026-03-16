@@ -16,6 +16,7 @@ interface WhatsAppStatusEvent {
 
 interface WhatsAppMessageEvent {
   sessionId: string;
+  messageId: string | null;
   content: string;
   fromMe: boolean;
   remoteJid: string;

@@ -271,6 +271,7 @@ UrgencyTimer.displayName = "UrgencyTimer";
    ═══════════════════════════════════════════════════════ */
 
 interface ConvItem {
+  sessionId?: string;
   remoteJid: string;
   lastMessage: string | null;
   lastMessageType: string | null;
@@ -1105,6 +1106,19 @@ export default function InboxPage() {
   useEffect(() => {
     if (!lastMessage) return;
 
+    // ── Part 6: Socket Validation — ignore events without required fields ──
+    if (!lastMessage.remoteJid || !lastMessage.timestamp) {
+      prevMessageRef.current = lastMessage;
+      return;
+    }
+
+    // ── Part 4: Strict Message Ownership — validate sessionId matches active session ──
+    const currentSessionId = activeSession?.sessionId || "";
+    if (lastMessage.sessionId && currentSessionId && lastMessage.sessionId !== currentSessionId) {
+      prevMessageRef.current = lastMessage;
+      return; // Message belongs to a different session
+    }
+
     // Part 15: Skip non-inbox event types from preview update
     const previewSkipTypes = [
       'protocolMessage', 'senderKeyDistributionMessage', 'messageContextInfo',
@@ -1123,19 +1137,24 @@ export default function InboxPage() {
       return;
     }
 
+    // ── Part 1: Composite conversation key = sessionId:remoteJid ──
+    const msgSessionId = lastMessage.sessionId || currentSessionId;
+    const msgJid = lastMessage.remoteJid;
+    const conversationKey = `${msgSessionId}:${msgJid}`;
+
     // Part 8: Update only the affected conversation in cache (no full refetch)
-    const queryKey = { sessionId: activeSession?.sessionId || "", tenantId };
+    const queryKey = { sessionId: currentSessionId, tenantId };
     trpcUtils.whatsapp.waConversations.setData(queryKey, (old: any) => {
       if (!old || !Array.isArray(old)) return old;
-      const jid = lastMessage.remoteJid;
-      const existing = old.find((c: ConvItem) => c.remoteJid === jid);
+      // Part 1+4: Match by BOTH sessionId AND remoteJid (composite key)
+      const existing = old.find((c: ConvItem) =>
+        c.remoteJid === msgJid && (!c.sessionId || c.sessionId === msgSessionId)
+      );
       if (!existing) {
         // New conversation — trigger a single refetch to get full data
         conversationsQ.refetch();
         return old;
       }
-      // Part 1: Preview is a clone of the message data
-      // Part 2: Use message timestamp directly
       // Part 3: Only update if this message is newer
       const msgTimestamp = new Date(lastMessage.timestamp);
       const existingTimestamp = existing.lastTimestamp ? new Date(existing.lastTimestamp) : null;
@@ -1143,7 +1162,9 @@ export default function InboxPage() {
         return old; // Don't overwrite with older message
       }
       const updated = old.map((c: ConvItem) => {
-        if (c.remoteJid !== jid) return c;
+        // Part 4: Strict ownership — only update the exact conversation
+        if (c.remoteJid !== msgJid) return c;
+        if (c.sessionId && c.sessionId !== msgSessionId) return c;
         return {
           ...c,
           lastMessage: lastMessage.content || getMessagePreview(null, lastMessage.messageType),
@@ -1151,7 +1172,7 @@ export default function InboxPage() {
           lastFromMe: lastMessage.fromMe,
           lastTimestamp: msgTimestamp, // Store as Date object (matches superjson format from backend)
           lastStatus: lastMessage.fromMe ? "sent" : "received",
-          unreadCount: (!lastMessage.fromMe && selectedJid !== jid)
+          unreadCount: (!lastMessage.fromMe && selectedJid !== msgJid)
             ? (Number(c.unreadCount) || 0) + 1
             : c.unreadCount,
         };

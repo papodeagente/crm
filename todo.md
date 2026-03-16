@@ -3534,3 +3534,12 @@
 - [x] Root cause: conversation_assignments LIMIT 1 subquery in ON clause caused SQL error 500 on TiDB
 - [x] Fix: reverted to simple LEFT JOIN for conversation_assignments (dedup handled by dedupConversations function)
 - [x] Verified: HTTP 200 OK, query returns data, TypeScript 0 errors
+
+## Fix Message Mixing, Message Loss and History Sync
+- [x] Part 1: Fix conversation identifier — composite key sessionId:remoteJid in socket handler, ConvItem interface, SQL queries, and dedupedConvs
+- [x] Part 2: Dual message IDs — unique clientMessageId (opt_timestamp_counter) per optimistic message, matched precisely on server confirm
+- [x] Part 3: Prevent message disappearing — match/remove ONLY the specific optimistic message by clientMessageId, never remove all opt_* messages
+- [x] Part 4: Strict message ownership — socket handler validates sessionId matches active session, conversation update checks both sessionId AND remoteJid
+- [x] Part 5: Background reconciliation — already implemented in messageReconciliation.ts (10 convs/cycle, 15 msgs/conv, every 5 min, CPU/queue protection)
+- [x] Part 6: Socket validation — ignore events without remoteJid or timestamp, skip events from different sessions
+- [x] Part 7: Final validation — TypeScript 0 errors, 1880 tests passing, messageId emitted in socket payload, sessionId returned in SQL queries

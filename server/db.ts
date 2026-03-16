@@ -1710,6 +1710,7 @@ export async function getWaConversationsList(
   const result = await db.execute(sql`
     SELECT 
       wc.id AS conversationId,
+      wc.sessionId,
       wc.remoteJid,
       wc.phoneE164,
       wc.contactId,
@@ -2621,6 +2622,7 @@ export async function getQueueConversations(sessionId: string, tenantId: number,
   const result = await db.execute(sql`
     SELECT 
       wc.id AS conversationId,
+      wc.sessionId,
       wc.remoteJid,
       wc.phoneE164,
       wc.contactId,
@@ -2743,6 +2745,7 @@ export async function getAgentConversations(tenantId: number, sessionId: string,
   const result = await db.execute(sql`
     SELECT 
       wc.id AS conversationId,
+      wc.sessionId,
       wc.remoteJid,
       wc.contactPushName,
       lm.content AS lastMessage,

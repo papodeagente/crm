@@ -61,6 +61,7 @@ async function startServer() {
   whatsappManager.on("message", (data) => {
     const payload = {
       sessionId: data.sessionId,
+      messageId: data.messageId || null,
       content: data.content,
       fromMe: data.fromMe,
       remoteJid: data.remoteJid,

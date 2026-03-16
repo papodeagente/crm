@@ -1321,13 +1321,17 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
     }
   }, [messagesQ.data, aiSettingsQ.data?.audioTranscriptionEnabled, tenantId, handleTranscribe, transcriptions]);
 
-  // Optimistic update helper: add message to cache immediately
-  const addOptimisticMessage = useCallback((text: string, quotedId?: string | null) => {
+  // Part 2: Optimistic update helper with unique clientMessageId
+  // Each optimistic message gets a unique ID so we can match it precisely on server confirm
+  const optimisticIdCounter = useRef(0);
+  const addOptimisticMessage = useCallback((text: string, quotedId?: string | null): string => {
     const queryKey = { sessionId, remoteJid, limit: msgLimit };
+    // Part 2: Generate unique clientMessageId before sending
+    const clientMsgId = `opt_${Date.now()}_${++optimisticIdCounter.current}`;
     const optimistic: Message = {
-      id: -Date.now(), // negative ID to avoid collision
+      id: -Date.now() - optimisticIdCounter.current, // negative ID to avoid collision
       sessionId,
-      messageId: `opt_${Date.now()}`,
+      messageId: clientMsgId,
       remoteJid,
       fromMe: true,
       messageType: "conversation",
@@ -1346,6 +1350,7 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
       const el = document.querySelector('[data-chat-scroll]');
       if (el) el.scrollTop = el.scrollHeight;
     }, 50);
+    return clientMsgId;
   }, [sessionId, remoteJid, utils, msgLimit]);
 
   // Delayed refetch: wait a bit for the DB insert to complete before refetching
@@ -1353,41 +1358,58 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
     setTimeout(() => messagesQ.refetch(), 400);
   }, [messagesQ]);
 
+  // Part 2-3: Track the clientMessageId of the last sent message for precise matching
+  const lastClientMsgIdRef = useRef<string | null>(null);
+
   const sendMessage = trpc.whatsapp.sendMessage.useMutation({
-    onMutate: (vars) => addOptimisticMessage(vars.message),
+    onMutate: (vars) => {
+      const clientMsgId = addOptimisticMessage(vars.message);
+      lastClientMsgIdRef.current = clientMsgId;
+    },
     onSuccess: (result) => {
-      // Update optimistic message with real messageId so it merges with server data
-      if (result.messageId) {
+      // Part 3: Match ONLY the specific optimistic message by clientMessageId
+      const clientMsgId = lastClientMsgIdRef.current;
+      if (result.messageId && clientMsgId) {
         const queryKey = { sessionId, remoteJid, limit: msgLimit };
         utils.whatsapp.messagesByContact.setData(queryKey, (old: any) => {
           if (!old) return old;
           return old.map((m: any) =>
-            m.messageId?.startsWith("opt_") ? { ...m, messageId: result.messageId, status: "sent" } : m
+            m.messageId === clientMsgId ? { ...m, messageId: result.messageId, status: "sent" } : m
           );
         });
       }
       delayedRefetch();
     },
     onError: () => {
-      // Remove optimistic message on error
+      // Part 3: Remove ONLY the specific failed optimistic message
+      const clientMsgId = lastClientMsgIdRef.current;
       const queryKey = { sessionId, remoteJid, limit: msgLimit };
       utils.whatsapp.messagesByContact.setData(queryKey, (old: any) => {
         if (!old) return old;
-        return old.filter((m: any) => !m.messageId?.startsWith("opt_"));
+        return clientMsgId
+          ? old.filter((m: any) => m.messageId !== clientMsgId)
+          : old.filter((m: any) => !m.messageId?.startsWith("opt_"));
       });
       toast.error("Erro ao enviar mensagem");
     },
   });
 
+  // Part 2-3: Track quote message clientId separately
+  const lastQuoteClientMsgIdRef = useRef<string | null>(null);
+
   const sendTextWithQuote = trpc.whatsapp.sendTextWithQuote.useMutation({
-    onMutate: (vars) => addOptimisticMessage(vars.message, vars.quotedMessageId),
+    onMutate: (vars) => {
+      const clientMsgId = addOptimisticMessage(vars.message, vars.quotedMessageId);
+      lastQuoteClientMsgIdRef.current = clientMsgId;
+    },
     onSuccess: (result) => {
-      if (result.messageId) {
+      const clientMsgId = lastQuoteClientMsgIdRef.current;
+      if (result.messageId && clientMsgId) {
         const queryKey = { sessionId, remoteJid, limit: msgLimit };
         utils.whatsapp.messagesByContact.setData(queryKey, (old: any) => {
           if (!old) return old;
           return old.map((m: any) =>
-            m.messageId?.startsWith("opt_") ? { ...m, messageId: result.messageId, status: "sent" } : m
+            m.messageId === clientMsgId ? { ...m, messageId: result.messageId, status: "sent" } : m
           );
         });
       }
@@ -1395,10 +1417,13 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
       setReplyTarget(null);
     },
     onError: () => {
+      const clientMsgId = lastQuoteClientMsgIdRef.current;
       const queryKey = { sessionId, remoteJid, limit: msgLimit };
       utils.whatsapp.messagesByContact.setData(queryKey, (old: any) => {
         if (!old) return old;
-        return old.filter((m: any) => !m.messageId?.startsWith("opt_"));
+        return clientMsgId
+          ? old.filter((m: any) => m.messageId !== clientMsgId)
+          : old.filter((m: any) => !m.messageId?.startsWith("opt_"));
       });
       toast.error("Erro ao enviar resposta");
     },
