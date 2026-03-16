@@ -8,7 +8,11 @@
  * Update flow (on socket message):
  *   1. Update conversationMap entry (preview, timestamp, unread)
  *   2. Move conversationId to index 0 of sortedIds
- *   3. React re-renders from sortedIds.map(id => conversationMap.get(id))
+ *   3. Create NEW state object so useSyncExternalStore detects the change
+ *   4. React re-renders from sortedIds.map(id => conversationMap.get(id))
+ *
+ * CRITICAL: useSyncExternalStore uses Object.is to compare snapshots.
+ * Every mutation MUST produce a new state object reference.
  *
  * NO refetch. NO polling. NO full sort.
  * Target: < 20ms per update.
@@ -44,7 +48,7 @@ export interface ConvEntry {
 interface StoreState {
   conversationMap: Map<string, ConvEntry>;
   sortedIds: string[];
-  version: number; // bump to trigger re-render
+  version: number;
 }
 
 type Listener = () => void;
@@ -62,8 +66,17 @@ class ConversationStore {
     return () => { this.listeners.delete(listener); };
   };
 
-  private notify() {
-    this.state.version++;
+  /**
+   * CRITICAL: Create a new state object reference so useSyncExternalStore
+   * detects the change via Object.is comparison.
+   */
+  private commit(map: Map<string, ConvEntry>, ids: string[]) {
+    this.state = {
+      conversationMap: map,
+      sortedIds: ids,
+      version: this.state.version + 1,
+    };
+    // Notify all subscribers (triggers useSyncExternalStore re-render)
     this.listeners.forEach((l) => l());
   }
 
@@ -71,13 +84,11 @@ class ConversationStore {
 
   /**
    * Initialize from server data (first load only).
-   * Data arrives pre-sorted by lastTimestamp DESC from the backend.
    */
   hydrate(conversations: ConvEntry[]) {
     const map = new Map<string, ConvEntry>();
     const ids: string[] = [];
 
-    // Deduplicate by remoteJid, keeping the newest
     for (const c of conversations) {
       const jid = c.remoteJid;
       if (!jid) continue;
@@ -90,25 +101,22 @@ class ConversationStore {
         const newTs = c.lastTimestamp ? new Date(c.lastTimestamp).getTime() : 0;
         if (newTs > existingTs) {
           map.set(jid, c);
-          // id already in list, no need to add again
         }
       }
     }
 
-    // Sort once during hydration
     ids.sort((a, b) => {
       const ta = map.get(a)?.lastTimestamp ? new Date(map.get(a)!.lastTimestamp!).getTime() : 0;
       const tb = map.get(b)?.lastTimestamp ? new Date(map.get(b)!.lastTimestamp!).getTime() : 0;
       return tb - ta;
     });
 
-    this.state = { conversationMap: map, sortedIds: ids, version: this.state.version + 1 };
-    this.listeners.forEach((l) => l());
+    this.commit(map, ids);
   }
 
   /**
-   * Handle incoming socket message — O(n) worst case for splice, typically O(1) for top items.
-   * Updates preview, timestamp, unread, and moves conversation to top.
+   * Handle incoming socket message.
+   * Creates NEW Map and NEW array references to trigger React re-render.
    */
   handleMessage(msg: {
     sessionId?: string;
@@ -122,23 +130,22 @@ class ConversationStore {
     const jid = msg.remoteJid;
     if (!jid) return false;
 
-    const map = this.state.conversationMap;
-    const ids = this.state.sortedIds;
-    const existing = map.get(jid);
+    const oldMap = this.state.conversationMap;
+    const oldIds = this.state.sortedIds;
+    const existing = oldMap.get(jid);
 
     if (!existing) {
-      // New conversation — we need a server fetch to get full data
-      return false; // signal caller to do a one-time fetch
+      return false; // new conversation — caller should fetch from server
     }
 
     // Only update if this message is newer
     const msgTimestamp = new Date(msg.timestamp);
     const existingTimestamp = existing.lastTimestamp ? new Date(existing.lastTimestamp).getTime() : 0;
     if (msgTimestamp.getTime() < existingTimestamp) {
-      return true; // already have newer data, no update needed
+      return true; // already have newer data
     }
 
-    // Update the conversation entry in-place (O(1))
+    // Create updated entry
     const updated: ConvEntry = {
       ...existing,
       lastMessage: msg.content || existing.lastMessage,
@@ -150,24 +157,30 @@ class ConversationStore {
         ? (Number(existing.unreadCount) || 0) + 1
         : (activeJid === jid ? 0 : Number(existing.unreadCount) || 0),
     };
-    map.set(jid, updated);
 
-    // Move to top — O(n) splice + unshift, but n is typically small
-    // and this is much faster than sorting the entire array
-    const currentIdx = ids.indexOf(jid);
+    // NEW Map reference with updated entry
+    const newMap = new Map(oldMap);
+    newMap.set(jid, updated);
+
+    // NEW array reference with conversation moved to top
+    let newIds: string[];
+    const currentIdx = oldIds.indexOf(jid);
     if (currentIdx > 0) {
-      ids.splice(currentIdx, 1);
-      ids.unshift(jid);
+      newIds = oldIds.filter(id => id !== jid);
+      newIds.unshift(jid);
+    } else if (currentIdx === 0) {
+      // Already at top — still need new array ref for React
+      newIds = [...oldIds];
+    } else {
+      newIds = [jid, ...oldIds];
     }
-    // If currentIdx === 0, already at top — no-op
-    // If currentIdx === -1, shouldn't happen since we checked existing
 
-    this.notify();
+    this.commit(newMap, newIds);
     return true;
   }
 
   /**
-   * Handle status update (delivered, read, played) — O(1)
+   * Handle status update (delivered, read, played)
    */
   handleStatusUpdate(update: { remoteJid: string; status: string }) {
     const jid = update.remoteJid;
@@ -176,40 +189,40 @@ class ConversationStore {
     const existing = this.state.conversationMap.get(jid);
     if (!existing || !existing.lastFromMe) return;
 
-    this.state.conversationMap.set(jid, {
-      ...existing,
-      lastStatus: update.status,
-    });
-    this.notify();
+    const newMap = new Map(this.state.conversationMap);
+    newMap.set(jid, { ...existing, lastStatus: update.status });
+
+    this.commit(newMap, [...this.state.sortedIds]);
   }
 
   /**
-   * Mark conversation as read — O(1)
+   * Mark conversation as read
    */
   markRead(jid: string) {
     const existing = this.state.conversationMap.get(jid);
     if (!existing || Number(existing.unreadCount) === 0) return;
 
-    this.state.conversationMap.set(jid, {
-      ...existing,
-      unreadCount: 0,
-    });
-    this.notify();
+    const newMap = new Map(this.state.conversationMap);
+    newMap.set(jid, { ...existing, unreadCount: 0 });
+
+    this.commit(newMap, [...this.state.sortedIds]);
   }
 
   /**
-   * Update assignment fields for a conversation — O(1)
+   * Update assignment fields for a conversation
    */
   updateAssignment(jid: string, fields: Partial<Pick<ConvEntry, 'assignedUserId' | 'assignedAgentName' | 'assignmentStatus' | 'assignmentPriority' | 'assignedAgentAvatar'>>) {
     const existing = this.state.conversationMap.get(jid);
     if (!existing) return;
 
-    this.state.conversationMap.set(jid, { ...existing, ...fields });
-    this.notify();
+    const newMap = new Map(this.state.conversationMap);
+    newMap.set(jid, { ...existing, ...fields });
+
+    this.commit(newMap, [...this.state.sortedIds]);
   }
 
   /**
-   * Get a single conversation by JID — O(1)
+   * Get a single conversation by JID
    */
   get(jid: string): ConvEntry | undefined {
     return this.state.conversationMap.get(jid);
@@ -217,7 +230,6 @@ class ConversationStore {
 
   /**
    * Get all conversations as sorted array (for rendering).
-   * Returns references from the map — no copy needed.
    */
   getSorted(): ConvEntry[] {
     const { conversationMap, sortedIds } = this.state;
@@ -229,9 +241,6 @@ class ConversationStore {
     return result;
   }
 
-  /**
-   * Check if store has been hydrated with initial data
-   */
   get isHydrated(): boolean {
     return this.state.conversationMap.size > 0;
   }

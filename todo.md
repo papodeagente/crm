@@ -3663,3 +3663,8 @@
 - [x] Tempo de atualização < 20ms (testado: handleMessage < 1ms para 1000 conversas)
 - [x] Sem flicker, sem delay, sem reordenação lenta
 - [x] Testes unitários para o novo estado (17 testes passando)
+
+## Bug Fix: Inbox Preview e Ordenação Não Atualizam
+- [x] Diagnosticar causa raiz do preview/ordenação congelados (useSyncExternalStore não detectava mudança porque state era mutado in-place)
+- [x] Corrigir useConversationStore para disparar re-render no React (agora cria novas referências de Map e array a cada mutação)
+- [x] Validar que preview, ordem e unread atualizam instantaneamente via socket (17 testes passando)
