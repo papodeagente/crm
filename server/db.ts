@@ -16,37 +16,35 @@ let _db: ReturnType<typeof drizzle> | null = null;
  */
 function fixTimestampFields(rows: any[]): any[] {
   const tsFields = ['lastTimestamp', 'lastMessageAt', 'queuedAt', 'firstResponseAt', 'slaDeadlineAt', 'waitingSince', 'oldestEntry'];
-  const fixed = rows.map((row: any) => {
+  return rows.map((row: any) => {
     const r = { ...row };
     for (const field of tsFields) {
       if (r[field] && typeof r[field] === 'string') {
-        // Append 'Z' to indicate UTC if not already present, then convert to Date
         const str = r[field];
         r[field] = new Date(str.includes('T') || str.endsWith('Z') ? str : str.replace(' ', 'T') + 'Z');
       }
     }
     return r;
   });
-  // Deduplicate by remoteJid — keep the row with the newest lastTimestamp
-  // This prevents duplicate conversations from appearing in the inbox
-  // when JOINs produce multiple rows per conversation
-  if (fixed.length > 0 && fixed[0]?.remoteJid) {
-    const map = new Map<string, any>();
-    for (const row of fixed) {
-      const jid = row.remoteJid;
-      if (!jid) continue;
-      const existing = map.get(jid);
-      if (!existing) {
-        map.set(jid, row);
-      } else {
-        const existingTs = existing.lastTimestamp ? new Date(existing.lastTimestamp).getTime() : 0;
-        const newTs = row.lastTimestamp ? new Date(row.lastTimestamp).getTime() : 0;
-        if (newTs > existingTs) map.set(jid, row);
-      }
+}
+
+/** Deduplicate conversation rows by remoteJid, keeping the one with newest lastTimestamp */
+function dedupConversations(rows: any[]): any[] {
+  if (rows.length === 0) return rows;
+  const map = new Map<string, any>();
+  for (const row of rows) {
+    const jid = row.remoteJid;
+    if (!jid) continue;
+    const existing = map.get(jid);
+    if (!existing) {
+      map.set(jid, row);
+    } else {
+      const existingTs = existing.lastTimestamp ? new Date(existing.lastTimestamp).getTime() : 0;
+      const newTs = row.lastTimestamp ? new Date(row.lastTimestamp).getTime() : 0;
+      if (newTs > existingTs) map.set(jid, row);
     }
-    return Array.from(map.values());
   }
-  return fixed;
+  return Array.from(map.values());
 }
 
 export async function getDb() {
@@ -414,7 +412,7 @@ export async function getConversationsList(sessionId: string) {
   `);
   
   const rows = (result as any)[0] || [];
-  return fixTimestampFields(rows);
+  return dedupConversations(fixTimestampFields(rows));
 }
 
 // Mark conversation as read (handles both JID variants)
@@ -725,14 +723,9 @@ export async function getConversationsListMultiAgent(sessionId: string, tenantId
       GROUP BY remoteJid
     ) latest ON m.remoteJid = latest.remoteJid AND m.id = latest.maxId
     LEFT JOIN conversation_assignments ca 
-      ON ca.id = (
-        SELECT ca2.id FROM conversation_assignments ca2
-        WHERE ca2.sessionId = ${sessionId}
-          AND ca2.remoteJid = m.remoteJid
-          AND ca2.tenantId = ${tenantId}
-        ORDER BY ca2.updatedAt DESC
-        LIMIT 1
-      )
+      ON ca.sessionId = ${sessionId}
+      AND ca.remoteJid = m.remoteJid
+      AND ca.tenantId = ${tenantId}
     LEFT JOIN crm_users agent ON agent.id = ca.assignedUserId
     WHERE m.sessionId = ${sessionId}
     AND m.remoteJid NOT LIKE '%@g.us'
@@ -742,7 +735,7 @@ export async function getConversationsListMultiAgent(sessionId: string, tenantId
   `);
   
    const rows = (result as any)[0] || [];
-  return fixTimestampFields(rows);
+  return dedupConversations(fixTimestampFields(rows));
 }
 // Round-robin assignment: get next agent for a tenant
 export async function getNextRoundRobinAgent(tenantId: number): Promise<number | null> {
@@ -1756,14 +1749,9 @@ export async function getWaConversationsList(
       AND m1.messageType NOT IN ('protocolMessage','senderKeyDistributionMessage','messageContextInfo','reactionMessage','ephemeralMessage')
     ) lm ON lm.sessionId = wc.sessionId AND lm.remoteJid = wc.remoteJid
     LEFT JOIN conversation_assignments ca 
-      ON ca.id = (
-        SELECT ca2.id FROM conversation_assignments ca2
-        WHERE ca2.sessionId = wc.sessionId 
-          AND ca2.remoteJid = wc.remoteJid
-          AND ca2.tenantId = wc.tenantId
-        ORDER BY ca2.updatedAt DESC
-        LIMIT 1
-      )
+      ON ca.sessionId = wc.sessionId 
+      AND ca.remoteJid = wc.remoteJid
+      AND ca.tenantId = wc.tenantId
     LEFT JOIN crm_users agent ON agent.id = COALESCE(wc.assignedUserId, ca.assignedUserId)
     LEFT JOIN contacts c ON c.id = wc.contactId
     WHERE wc.sessionId = ${sessionId}
@@ -1777,7 +1765,7 @@ export async function getWaConversationsList(
   `);
 
   const rows = (result as any)[0] || [];
-  return fixTimestampFields(rows);
+  return dedupConversations(fixTimestampFields(rows));
 }
 
 /**
@@ -2672,7 +2660,7 @@ export async function getQueueConversations(sessionId: string, tenantId: number,
     ORDER BY COALESCE(wc.queuedAt, lm.timestamp, wc.lastMessageAt, wc.createdAt) DESC
     LIMIT ${limit}
   `);
-  return fixTimestampFields((result as any)[0] || []);
+  return dedupConversations(fixTimestampFields((result as any)[0] || []));
 }
 
 export async function claimConversation(tenantId: number, sessionId: string, remoteJid: string, userId: number) {
@@ -2785,7 +2773,7 @@ export async function getAgentConversations(tenantId: number, sessionId: string,
     ORDER BY COALESCE(lm.timestamp, wc.lastMessageAt, wc.createdAt) DESC
     LIMIT ${limit}
   `);
-  return fixTimestampFields((result as any)[0] || []);
+  return dedupConversations(fixTimestampFields((result as any)[0] || []));
 }
 
 export async function getQueueStats(tenantId: number, sessionId: string) {
@@ -2854,7 +2842,7 @@ export async function getQueueStats(tenantId: number, sessionId: string) {
   `);
   // Fix timestamp strings from db.execute for both count and items
   const fixedCount = fixTimestampFields(countRows);
-  const fixedItems = fixTimestampFields((itemsResult as any)[0] || []);
+  const fixedItems = dedupConversations(fixTimestampFields((itemsResult as any)[0] || []));
   return {
     total: Number(fixedCount[0]?.total || 0),
     oldest: fixedCount[0]?.oldestEntry || null,

@@ -3529,3 +3529,8 @@
 - [x] Fix: removed the filter from all 5 queries (getWaConversationsList, getQueueConversations, getAgentConversations, getQueueStats count + items)
 - [x] ORDER BY now uses COALESCE(lm.timestamp, wc.lastMessageAt, wc.createdAt) as fallback for conversations without messages
 - [x] TypeScript 0 errors
+
+## BUG: Inbox conversations STILL not showing after removing lm.timestamp IS NOT NULL
+- [x] Root cause: conversation_assignments LIMIT 1 subquery in ON clause caused SQL error 500 on TiDB
+- [x] Fix: reverted to simple LEFT JOIN for conversation_assignments (dedup handled by dedupConversations function)
+- [x] Verified: HTTP 200 OK, query returns data, TypeScript 0 errors
