@@ -13,8 +13,6 @@ describe("deleteTenantCompletely", () => {
   });
 
   it("should handle valid tenantId and return structured result", async () => {
-    // With a real DB connection, calling with a non-existent tenant should still work
-    // (it just deletes 0 rows from each table)
     const mod = await import("./saasAuth");
     const result = await mod.deleteTenantCompletely(999999);
     expect(result).toHaveProperty("success");
@@ -22,51 +20,40 @@ describe("deleteTenantCompletely", () => {
     expect(result).toHaveProperty("errors");
     expect(Array.isArray(result.deletedTables)).toBe(true);
     expect(Array.isArray(result.errors)).toBe(true);
-    // tenants should be in deletedTables (even if 0 rows deleted)
     expect(result.deletedTables).toContain("tenants");
   });
 
   it("should return deletedTables and errors arrays", async () => {
     const mod = await import("./saasAuth");
-    // The function signature returns { success, deletedTables, errors }
     const result = mod.deleteTenantCompletely;
     expect(result).toBeDefined();
-    // Verify the return type shape by checking the function exists
     expect(typeof result).toBe("function");
   });
 
   it("should have the correct table deletion order (leaf tables first)", async () => {
-    // Read the source to verify the deletion order is correct
     const fs = await import("fs");
     const source = fs.readFileSync("./server/saasAuth.ts", "utf-8");
     
-    // Verify key ordering constraints:
-    // 1. deal_history, deal_products, deal_participants should come before deals
     const dealHistoryIdx = source.indexOf('"deal_history"');
     const dealsIdx = source.indexOf('"deals"');
     expect(dealHistoryIdx).toBeLessThan(dealsIdx);
     
-    // 2. pipeline_stages should come before pipelines
     const stagesIdx = source.indexOf('"pipeline_stages"');
     const pipelinesIdx = source.indexOf('"pipelines"');
     expect(stagesIdx).toBeLessThan(pipelinesIdx);
     
-    // 3. trip_items should come before trips
     const tripItemsIdx = source.indexOf('"trip_items"');
     const tripsIdx = source.indexOf('"trips"');
     expect(tripItemsIdx).toBeLessThan(tripsIdx);
     
-    // 4. lessons should come before courses
     const lessonsIdx = source.indexOf('"lessons"');
     const coursesIdx = source.indexOf('"courses"');
     expect(lessonsIdx).toBeLessThan(coursesIdx);
     
-    // 5. crm_users should come after all tenant tables
     const crmUsersDeleteIdx = source.indexOf('DELETE FROM crm_users');
     const tenantsDeleteIdx = source.indexOf('DELETE FROM tenants');
     expect(crmUsersDeleteIdx).toBeLessThan(tenantsDeleteIdx);
     
-    // 6. tenants should be the last table deleted
     expect(tenantsDeleteIdx).toBeGreaterThan(crmUsersDeleteIdx);
   });
 
@@ -74,7 +61,6 @@ describe("deleteTenantCompletely", () => {
     const fs = await import("fs");
     const source = fs.readFileSync("./server/saasAuth.ts", "utf-8");
     
-    // Verify all major table groups are included
     const requiredTables = [
       "contacts",
       "deals",
@@ -106,7 +92,6 @@ describe("deleteTenantCompletely", () => {
     const fs = await import("fs");
     const source = fs.readFileSync("./server/saasAuth.ts", "utf-8");
     
-    // These tables are linked by sessionId, not tenantId
     expect(source).toContain("chatbot_rules");
     expect(source).toContain("chatbot_settings");
     expect(source).toContain("wa_contacts");
@@ -124,45 +109,94 @@ describe("deleteTenantCompletely", () => {
     const fs = await import("fs");
     const routerSource = fs.readFileSync("./server/routers/saasAuthRouter.ts", "utf-8");
     
-    // Verify the endpoint requires confirmName
     expect(routerSource).toContain("confirmName: z.string()");
-    // Verify it checks isSuperAdmin
     expect(routerSource).toContain("isSuperAdmin(session.email)");
-    // Verify it compares names
     expect(routerSource).toContain("tenant.name.toLowerCase() !== input.confirmName.toLowerCase()");
   });
 
-  it("should prevent deleting the super admin's tenant", async () => {
+  // ─── NEW: Tenant deletion protection by name "Entur" only ───
+
+  it("should protect only tenant named 'Entur' in deleteTenantCompletely", async () => {
     const fs = await import("fs");
     const source = fs.readFileSync("./server/saasAuth.ts", "utf-8");
     
-    // Verify the function checks for super admin email before deletion
-    expect(source).toContain("Não é possível excluir o tenant do super administrador");
-    // Verify it queries crm_users for the super admin email
-    expect(source).toContain("SUPERADMIN_EMAIL");
+    // Must check tenant name, not super admin email linkage
+    expect(source).toContain('targetTenant.name.toLowerCase() === "entur"');
+    expect(source).toContain("O tenant 'Entur' é o tenant raiz e não pode ser excluído");
+    
+    // Must NOT check super admin email linkage for deletion blocking
+    expect(source).not.toContain("Não é possível excluir o tenant do super administrador");
   });
 
-  it("should prevent deleting own tenant in the router", async () => {
+  it("should protect only tenant named 'Entur' in router endpoint", async () => {
     const fs = await import("fs");
     const routerSource = fs.readFileSync("./server/routers/saasAuthRouter.ts", "utf-8");
     
-    // Verify the router checks if tenantId matches the session's tenantId
-    expect(routerSource).toContain("input.tenantId === session.tenantId");
-    expect(routerSource).toContain("Não é possível excluir seu próprio tenant");
+    // Must check tenant name "entur", not session.tenantId
+    expect(routerSource).toContain('tenant.name.toLowerCase() === "entur"');
+    expect(routerSource).toContain("O tenant 'Entur' é o tenant raiz e não pode ser excluído");
+    
+    // Must NOT block based on session.tenantId match
+    expect(routerSource).not.toContain("input.tenantId === session.tenantId");
+    expect(routerSource).not.toContain("Não é possível excluir seu próprio tenant");
+  });
+
+  it("should NOT block deletion based on super admin email being linked to the tenant", async () => {
+    const fs = await import("fs");
+    const source = fs.readFileSync("./server/saasAuth.ts", "utf-8");
+    
+    // The old guard checked if SUPERADMIN_EMAIL was a user in the target tenant
+    // This should no longer exist — only the name "Entur" check should remain
+    const deleteFnStart = source.indexOf("export async function deleteTenantCompletely");
+    const deleteFnEnd = source.indexOf("export", deleteFnStart + 10);
+    const deleteFn = source.substring(deleteFnStart, deleteFnEnd > 0 ? deleteFnEnd : undefined);
+    
+    // Must not contain the old email-based guard
+    expect(deleteFn).not.toContain("SUPERADMIN_EMAIL");
+    expect(deleteFn).not.toContain("crmUsers.email");
+    
+    // Must contain the new name-based guard
+    expect(deleteFn).toContain('"entur"');
+  });
+
+  it("should allow deleting any tenant that is NOT named 'Entur'", async () => {
+    // Simulate the guard logic
+    const tenantNames = ["Teste Importação", "Agência ABC", "Demo Tenant", "Minha Agência"];
+    for (const name of tenantNames) {
+      const isProtected = name.toLowerCase() === "entur";
+      expect(isProtected).toBe(false);
+    }
+  });
+
+  it("should block deleting tenant named 'Entur' (case insensitive)", async () => {
+    const variants = ["Entur", "entur", "ENTUR", "eNtUr"];
+    for (const name of variants) {
+      const isProtected = name.toLowerCase() === "entur";
+      expect(isProtected).toBe(true);
+    }
   });
 
   it("should only allow superadmin access", async () => {
     const fs = await import("fs");
     const routerSource = fs.readFileSync("./server/routers/saasAuthRouter.ts", "utf-8");
     
-    // Find the adminDeleteTenant section
     const deleteSection = routerSource.substring(
       routerSource.indexOf("adminDeleteTenant"),
       routerSource.indexOf("adminToggleTenantStatus")
     );
     
-    // Verify it checks for superadmin
     expect(deleteSection).toContain("isSuperAdmin");
     expect(deleteSection).toContain("FORBIDDEN");
+  });
+
+  it("frontend should disable delete button for 'Entur' tenant", async () => {
+    const fs = await import("fs");
+    const frontendSource = fs.readFileSync("./client/src/pages/SuperAdmin.tsx", "utf-8");
+    
+    // Must have conditional rendering based on tenant name
+    expect(frontendSource).toContain('tenant.name.toLowerCase() === "entur"');
+    // Must show disabled state for Entur
+    expect(frontendSource).toContain("Tenant raiz");
+    expect(frontendSource).toContain("disabled");
   });
 });

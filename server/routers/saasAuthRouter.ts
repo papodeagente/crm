@@ -326,9 +326,9 @@ export const saasAuthRouter = router({
       if (tenant.name.toLowerCase() !== input.confirmName.toLowerCase()) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "Nome da agência não confere. Exclusão cancelada." });
       }
-      // Prevent deleting the super admin's own tenant
-      if (input.tenantId === session.tenantId) {
-        throw new TRPCError({ code: "BAD_REQUEST", message: "Não é possível excluir seu próprio tenant. Operação cancelada." });
+      // Prevent deleting the root tenant "Entur" — the only protected tenant
+      if (tenant.name.toLowerCase() === "entur") {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "O tenant 'Entur' é o tenant raiz e não pode ser excluído." });
       }
       const result = await deleteTenantCompletely(input.tenantId);
       if (!result.success) {

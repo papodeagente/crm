@@ -310,20 +310,32 @@ export default function SuperAdmin() {
                               >
                                 <Ban className="w-4 h-4" />
                               </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-8 w-8 p-0 text-red-400 hover:text-red-300 hover:bg-red-500/10"
-                                title="Excluir agência permanentemente"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setDeleteDialog({ tenantId: tenant.id, tenantName: tenant.name });
-                                  setDeleteConfirmName("");
-                                  setDeleteStep(1);
-                                }}
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
+                              {tenant.name.toLowerCase() === "entur" ? (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-8 w-8 p-0 text-muted-foreground/30 cursor-not-allowed"
+                                  title="Tenant raiz — não pode ser excluído"
+                                  disabled
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              ) : (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-8 w-8 p-0 text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                                  title="Excluir agência permanentemente"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setDeleteDialog({ tenantId: tenant.id, tenantName: tenant.name });
+                                    setDeleteConfirmName("");
+                                    setDeleteStep(1);
+                                  }}
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              )}
                             </div>
                           </td>
                         </tr>

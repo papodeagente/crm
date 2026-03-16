@@ -3455,3 +3455,10 @@
 - [x] Part 14: Chat scroll — scrollToBottom(false) on remoteJid change + on messagesQ.data.length change; smooth scroll when near bottom on new messages
 - [x] Part 15: Non-inbox events filtered — 13 skipTypes (protocol, calls, reactions, edits, internal_notes, etc.) + @g.us group filter applied to both preview update and notification sound
 - [x] All 16 parts verified — 37 tests passing, 0 TypeScript errors
+
+## Fix Tenant Deletion Rule
+- [x] Investigate current tenant deletion blocking logic — found 2 guards: (1) saasAuthRouter.ts:330 checked session.tenantId match, (2) saasAuth.ts:580-589 checked if SUPERADMIN_EMAIL was linked to the target tenant
+- [x] Fix rule: only protect tenant named "Entur" from deletion — both guards replaced with tenant.name.toLowerCase() === "entur" check
+- [x] Allow super admin logged in "Entur" to delete any other tenant — session.tenantId check removed, email linkage check removed
+- [x] Frontend: delete button disabled for "Entur" tenant with tooltip "Tenant raiz — não pode ser excluído"
+- [x] 16 tests passing (deleteTenant.test.ts), 0 TypeScript errors
