@@ -2433,13 +2433,18 @@ export async function getInternalNotes(tenantId: number, waConversationId: numbe
     AND n.waConversationId = ${waConversationId}
     ORDER BY n.createdAt ASC
   `);
-  // db.execute(sql`...`) returns createdAt as a string (e.g. "2026-03-16 02:34:38")
-  // in the server's local timezone. We must convert to Date objects so that Superjson
-  // serializes them as proper Date types, preserving correct UTC timestamps on the client.
+  // db.execute(sql`...`) returns createdAt as a string (e.g. "2026-03-16 04:18:05")
+  // WITHOUT timezone info. Drizzle select().from() treats these as UTC, so we must do
+  // the same: append 'Z' to force UTC interpretation, matching how messages are handled.
+  // Without 'Z', new Date(str) interprets as server local time (EDT), causing a 4h shift.
   const rows = (result as any)[0] || [];
   return rows.map((row: any) => ({
     ...row,
-    createdAt: row.createdAt instanceof Date ? row.createdAt : new Date(row.createdAt),
+    createdAt: row.createdAt instanceof Date
+      ? row.createdAt
+      : new Date(typeof row.createdAt === 'string' && !row.createdAt.endsWith('Z')
+          ? row.createdAt.replace(' ', 'T') + 'Z'
+          : row.createdAt),
   }));
 }
 
@@ -2464,11 +2469,16 @@ export async function getCustomerGlobalNotes(tenantId: number, remoteJid: string
     AND n.isCustomerGlobalNote = true
     ORDER BY n.createdAt DESC
   `);
-  // Convert string timestamps to Date objects for proper Superjson serialization
+  // Convert string timestamps to Date objects for proper Superjson serialization.
+  // Append 'Z' to treat as UTC (matching Drizzle select().from() behavior for messages).
   const rows = (result as any)[0] || [];
   return rows.map((row: any) => ({
     ...row,
-    createdAt: row.createdAt instanceof Date ? row.createdAt : new Date(row.createdAt),
+    createdAt: row.createdAt instanceof Date
+      ? row.createdAt
+      : new Date(typeof row.createdAt === 'string' && !row.createdAt.endsWith('Z')
+          ? row.createdAt.replace(' ', 'T') + 'Z'
+          : row.createdAt),
   }));
 }
 

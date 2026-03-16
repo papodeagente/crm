@@ -3371,3 +3371,15 @@
 - [x] Removed debug console.log statements from WhatsAppChat.tsx groupedMessages useMemo
 - [x] Tests: 6 new tests for timestamp serialization fix (29 total in internalNotesMerge.test.ts)
 - [x] All 1724 tests passing (4 pre-existing failures unrelated to this change)
+
+## Fix: Remove Separate NOTAS INTERNAS Block — Inline Only
+- [x] Find and remove the separate "NOTAS INTERNAS" section/block in WhatsAppChat.tsx rendering (confirmed: no separate block exists, notes already render inline only)
+- [x] Ensure notes render ONLY inside the main message timeline loop (inline with messages)
+- [x] Verify unified timeline merge (messages + notes sorted chronologically)
+- [x] Verify notes break message grouping (isFirst/isLast)
+- [x] Run tests and confirm 0 TypeScript errors (29 tests passing, 0 TS errors)
+
+## Bug: Internal notes still showing wrong time and appearing after messages
+- [x] Investigate: server timezone vs database timezone for internal_notes.createdAt
+- [x] Fix: append 'Z' suffix to db.execute string timestamps to treat as UTC (matching Drizzle select().from() behavior)
+- [x] Verify notes interleave correctly with messages in the timeline (31 tests passing)
