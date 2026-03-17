@@ -3711,3 +3711,19 @@
 - [x] Substituir input type="date" por DatePicker na criação/edição de negociações (Pipeline.tsx, DealDetail.tsx)
 - [x] Verificar todos os outros formulários com campos de data (TaskFormDialog, TaskActionPopover, Tasks, DateRangeFilter, CustomFieldRenderer)
 - [x] Testar no navegador e garantir que funciona corretamente
+
+## Mover menu Datas para Configurações > Comunicação
+- [x] Remover item "Datas" do menu principal da sidebar (TopNavLayout)
+- [x] Adicionar aba/seção "Datas Comemorativas" dentro de Configurações > Comunicação
+- [x] Garantir que a rota /birthdays continue funcionando, acessível via Configurações > Comunicação
+
+## Análise de causa raiz: erro "Rate exceeded"
+- [x] Identificar onde o erro "Rate exceeded" é gerado no código (proxy Manus, não no app)
+- [x] Analisar taxa de requisições nos webhooks da Evolution
+- [x] Verificar saúde do event loop do backend
+- [x] Analisar performance do banco de dados
+- [x] Detectar tempestade de eventos socket
+- [x] Verificar chamadas de automação/IA
+- [x] Verificar limites de recursos da plataforma Manus
+- [x] Detectar filas ou backlogs internos
+- [x] Produzir relatório técnico de causa raiz (RATE_EXCEEDED_ANALYSIS.md)

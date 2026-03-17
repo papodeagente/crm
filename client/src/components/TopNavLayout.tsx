@@ -12,7 +12,7 @@ import { getLoginUrl } from "@/const";
 import {
   Home, Briefcase, Users, CheckSquare, BarChart3,
   Bell, Settings, Search, ChevronRight, LogOut, Menu, X,
-  Loader2, User, Building2, ListTodo, Phone, Mail, Sun, Moon, MessageSquare, Shield, TrendingUp, Headphones, Cake,
+  Loader2, User, Building2, ListTodo, Phone, Mail, Sun, Moon, MessageSquare, Shield, TrendingUp, Headphones,
 } from "lucide-react";
 import { formatDateShort } from "../../../shared/dateUtils";
 import { useState, useEffect, useRef, useCallback } from "react";
@@ -38,7 +38,6 @@ const navItems: NavItem[] = [
   { icon: MessageSquare, label: "Inbox", path: "/inbox", matchPaths: ["/inbox"] },
   { icon: Headphones, label: "Supervisão", path: "/supervision", matchPaths: ["/supervision"] },
   { icon: TrendingUp, label: "RFV", path: "/rfv", matchPaths: ["/rfv", "/campaigns"] },
-  { icon: Cake, label: "Datas", path: "/birthdays", matchPaths: ["/birthdays"] },
   { icon: BarChart3, label: "Análises", path: "/insights", matchPaths: ["/insights", "/goals"] },
 ];
 
@@ -51,7 +50,6 @@ const quickNavPages = [
   { icon: MessageSquare, label: "Inbox", path: "/inbox" },
   { icon: Headphones, label: "Supervisão", path: "/supervision" },
   { icon: TrendingUp, label: "RFV", path: "/rfv" },
-  { icon: Cake, label: "Datas", path: "/birthdays" },
   { icon: BarChart3, label: "Análises", path: "/insights" },
   { icon: Bell, label: "Notificações", path: "/notifications" },
   { icon: Settings, label: "Configurações", path: "/settings" },

@@ -6,7 +6,7 @@ import {
   ChevronRight, Users, Tag, GitBranch,
   Megaphone, Target, XCircle, Package,
   Sparkles, UserPlus, Layers, Database, CalendarClock, Zap,
-  Lock, Crown, ShieldAlert,
+  Lock, Crown, ShieldAlert, Cake,
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 
@@ -83,6 +83,7 @@ const settingsCategories: SettingsCategory[] = [
       { icon: Inbox, label: "Inbox", path: "/inbox" },
       { icon: MessageSquare, label: "WhatsApp", path: "/whatsapp" },
       { icon: Bot, label: "Chatbot IA", path: "/chatbot" },
+      { icon: Cake, label: "Datas Comemorativas", path: "/birthdays" },
     ],
   },
   {
