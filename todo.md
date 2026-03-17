@@ -3727,3 +3727,13 @@
 - [x] Verificar limites de recursos da plataforma Manus
 - [x] Detectar filas ou backlogs internos
 - [x] Produzir relatório técnico de causa raiz (RATE_EXCEEDED_ANALYSIS.md)
+
+## Análise Arquitetural: Evolution API (VPS) vs Z-API
+- [x] Pesquisar documentação Z-API (webhook, pricing, rate limits, throughput)
+- [x] Analisar arquitetura atual (pipeline, webhook, retry, concorrência)
+- [x] Comparar performance (latência, throughput, escalabilidade)
+- [x] Analisar cenários de falha
+- [x] Comparar custos de infraestrutura
+- [x] Avaliar escalabilidade a longo prazo
+- [x] Analisar impacto de migração
+- [x] Produzir relatório técnico completo com recomendação final (ANALISE_EVOLUTION_VS_ZAPI.md)
