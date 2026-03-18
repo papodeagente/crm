@@ -3917,3 +3917,12 @@
 - [x] Also works for images, videos, and documents (all media types get optimistic messages)
 - [x] Socket reconciliation updated to match media optimistic messages by messageType
 - [x] Error handling: failed media sends remove the optimistic message
+
+## Audio Sent from Inbox Not Transcribing
+- [x] BUG: Audio messages sent via inbox (fromMe) are not being transcribed
+  - Root cause: Both frontend auto-transcribe and backend messageWorker had `!fromMe` filter
+  - Fix: Removed `!m.fromMe` filter from frontend auto-transcribe useEffect
+  - Fix: Removed `!fromMe` condition from backend messageWorker auto-transcribe (line 446)
+  - Now all audio messages (sent and received) are transcribed automatically
+- [x] Auto-transcribe filters out fromMe messages — fixed to include inbox-sent audio
+- [x] Tests updated: 71 passing

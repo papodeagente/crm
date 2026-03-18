@@ -144,21 +144,23 @@ describe("Audio Transcription System", () => {
   // ── Auto-Transcription Trigger ─────────────────────────────────
 
   describe("Auto-Transcription Trigger (messageWorker)", () => {
-    it("should only trigger for incoming audio messages (fromMe=false)", () => {
+    it("should trigger for both incoming and sent audio messages", () => {
       const incomingAudio = { fromMe: false, messageType: "audioMessage" };
       const outgoingAudio = { fromMe: true, messageType: "audioMessage" };
 
       const audioTypes = ["audioMessage", "pttMessage"];
-      const shouldTrigger = (msg: any) => !msg.fromMe && audioTypes.includes(msg.messageType);
+      const shouldTrigger = (msg: any) => audioTypes.includes(msg.messageType);
 
       expect(shouldTrigger(incomingAudio)).toBe(true);
-      expect(shouldTrigger(outgoingAudio)).toBe(false);
+      expect(shouldTrigger(outgoingAudio)).toBe(true);
     });
 
-    it("should trigger for pttMessage (voice note)", () => {
-      const voiceNote = { fromMe: false, messageType: "pttMessage" };
+    it("should trigger for pttMessage (voice note) regardless of fromMe", () => {
+      const incomingVoice = { fromMe: false, messageType: "pttMessage" };
+      const outgoingVoice = { fromMe: true, messageType: "pttMessage" };
       const audioTypes = ["audioMessage", "pttMessage"];
-      expect(!voiceNote.fromMe && audioTypes.includes(voiceNote.messageType)).toBe(true);
+      expect(audioTypes.includes(incomingVoice.messageType)).toBe(true);
+      expect(audioTypes.includes(outgoingVoice.messageType)).toBe(true);
     });
 
     it("should NOT trigger for image messages", () => {
@@ -717,7 +719,7 @@ describe("Retry Button & Auto-Transcribe — BullMQ Worker Flow", () => {
       for (const m of messages) {
         const isAudio = audioTypes.includes(m.messageType);
         const hasTranscription = m.audioTranscriptionStatus === "completed" || m.audioTranscriptionStatus === "pending" || m.audioTranscriptionStatus === "processing";
-        if (isAudio && !m.fromMe && !hasTranscription && !autoTranscribedIds.has(m.id)) {
+        if (isAudio && !hasTranscription && !autoTranscribedIds.has(m.id)) {
           autoTranscribedIds.add(m.id);
         }
       }
@@ -731,7 +733,7 @@ describe("Retry Button & Auto-Transcribe — BullMQ Worker Flow", () => {
       expect(autoTranscribedIds.has(3)).toBe(false); // completed → done
     });
 
-    it("auto-transcribe should skip fromMe messages", () => {
+    it("auto-transcribe should include fromMe messages (sent from inbox)", () => {
       const messages = [
         { id: 1, messageType: "audioMessage", fromMe: true, audioTranscriptionStatus: null },
         { id: 2, messageType: "pttMessage", fromMe: false, audioTranscriptionStatus: null },
@@ -743,14 +745,14 @@ describe("Retry Button & Auto-Transcribe — BullMQ Worker Flow", () => {
       for (const m of messages) {
         const isAudio = audioTypes.includes(m.messageType);
         const hasTranscription = m.audioTranscriptionStatus === "completed" || m.audioTranscriptionStatus === "pending" || m.audioTranscriptionStatus === "processing";
-        if (isAudio && !m.fromMe && !hasTranscription) {
+        if (isAudio && !hasTranscription) {
           autoTranscribedIds.add(m.id);
         }
       }
 
-      expect(autoTranscribedIds.size).toBe(1);
-      expect(autoTranscribedIds.has(1)).toBe(false); // fromMe=true
-      expect(autoTranscribedIds.has(2)).toBe(true);  // fromMe=false
+      expect(autoTranscribedIds.size).toBe(2);
+      expect(autoTranscribedIds.has(1)).toBe(true);  // fromMe=true → should be transcribed
+      expect(autoTranscribedIds.has(2)).toBe(true);   // fromMe=false → should be transcribed
     });
   });
 

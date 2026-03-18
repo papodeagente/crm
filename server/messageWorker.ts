@@ -441,9 +441,9 @@ async function processNewMessage(session: SessionInfo, data: any, workerStartTim
       }).catch(() => {});
     }
 
-    // 5d. Auto-transcribe audio messages (incoming only)
+    // 5d. Auto-transcribe audio messages (both incoming and sent from inbox)
     const audioTypes = ["audioMessage", "pttMessage"];
-    if (!fromMe && audioTypes.includes(messageType) && messageId) {
+    if (audioTypes.includes(messageType) && messageId) {
       // Check AI settings before enqueuing to avoid unnecessary jobs
       (async () => {
         try {

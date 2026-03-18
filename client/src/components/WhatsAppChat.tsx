@@ -1352,9 +1352,9 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
     const msgs = messagesQ.data || [];
     for (const m of msgs) {
       const isAudio = m.messageType === "audioMessage" || m.messageType === "pttMessage" || m.messageType === "audio" || m.mediaMimeType?.startsWith("audio/");
-      // Skip if: not audio, already transcribed/pending/processing, from me, or already triggered
+      // Skip if: not audio, already transcribed/pending/processing, or already triggered
       const hasTranscription = m.audioTranscriptionStatus === "completed" || m.audioTranscriptionStatus === "pending" || m.audioTranscriptionStatus === "processing";
-      if (isAudio && !m.fromMe && !hasTranscription && !autoTranscribedRef.current.has(m.id) && !transcriptions[m.id]) {
+      if (isAudio && !hasTranscription && !autoTranscribedRef.current.has(m.id) && !transcriptions[m.id]) {
         autoTranscribedRef.current.add(m.id);
         handleRetranscribe(m.id);
       }
