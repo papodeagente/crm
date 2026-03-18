@@ -943,7 +943,7 @@ type AgentFilter = "all" | "unread" | "mine" | "unassigned";
 export default function InboxPage() {
   const tenantId = useTenantId();
   const trpcUtils = trpc.useUtils();
-  const { lastMessage, lastStatusUpdate } = useSocket();
+  const { lastMessage, lastStatusUpdate, isConnected: socketConnected } = useSocket();
   // selectedKey = conversationKey (sessionId:remoteJid) — primary selection state
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   // selectedJid = remoteJid only — derived for API calls that need just the JID
@@ -1008,20 +1008,25 @@ export default function InboxPage() {
     }
   }, [conversationsQ.data]);
 
-  // Periodic background sync — every 60s refetch to catch any missed messages
-  // This does NOT drive the UI; it only patches the store if there are gaps
+  // Periodic background sync — only when socket is DISCONNECTED (fallback)
+  // When socket is connected, the store is updated in real-time via socket events.
   const bgSyncRef = useRef<ReturnType<typeof setInterval> | null>(null);
   useEffect(() => {
     if (!activeSession?.sessionId || !hydrationDoneRef.current) return;
-    bgSyncRef.current = setInterval(() => {
-      conversationsQ.refetch().then((result) => {
-        if (result.data) {
-          convStore.hydrate(result.data as ConvEntry[]);
-        }
-      });
-    }, 60000); // 60s background sync
+    // Clear any existing interval
+    if (bgSyncRef.current) clearInterval(bgSyncRef.current);
+    // Only poll when socket is disconnected
+    if (!socketConnected) {
+      bgSyncRef.current = setInterval(() => {
+        conversationsQ.refetch().then((result) => {
+          if (result.data) {
+            convStore.hydrate(result.data as ConvEntry[]);
+          }
+        });
+      }, 30000); // 30s fallback when socket is down
+    }
     return () => { if (bgSyncRef.current) clearInterval(bgSyncRef.current); };
-  }, [activeSession?.sessionId]);
+  }, [activeSession?.sessionId, socketConnected]);
 
   // Agents list for assignment
   const agentsQ = trpc.whatsapp.agents.useQuery({ tenantId }, { staleTime: 5 * 60 * 1000 });
@@ -1030,11 +1035,11 @@ export default function InboxPage() {
   // Queue conversations
   const queueQ = trpc.whatsapp.queue.list.useQuery(
     { sessionId: activeSession?.sessionId || "", limit: 100 },
-    { enabled: !!activeSession?.sessionId && (activeTab === "queue" || activeTab === "all"), refetchInterval: isConnected ? 10000 : 30000, staleTime: 5000 }
+    { enabled: !!activeSession?.sessionId && (activeTab === "queue" || activeTab === "all"), refetchInterval: socketConnected ? 30000 : 10000, staleTime: 5000 }
   );
   const queueStatsQ = trpc.whatsapp.queue.stats.useQuery(
     { sessionId: activeSession?.sessionId || "" },
-    { enabled: !!activeSession?.sessionId, refetchInterval: 15000, staleTime: 10000 }
+    { enabled: !!activeSession?.sessionId, refetchInterval: socketConnected ? 60000 : 15000, staleTime: 10000 }
   );
   const claimMutation = trpc.whatsapp.queue.claim.useMutation({
     onSuccess: () => { queueQ.refetch(); queueStatsQ.refetch(); toast.success("Conversa atribuída a você"); },

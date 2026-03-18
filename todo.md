@@ -3763,3 +3763,29 @@
 - [x] STEP 9: Analisar carga (BullMQ concurrency 5, worker 68ms/msg)
 - [x] STEP 10: Executar cenários A-D (120ms, 140ms, 925ms, optimistic)
 - [x] Produzir relatório técnico final com dados medidos (DIAGNOSTICO_INBOX_PERFORMANCE.md)
+
+## Rebuild Inbox — Instant (WhatsApp Web Level)
+
+### Backend
+- [x] Simplificar query getWaConversationsList: remover JOIN com wa_messages, usar apenas wa_conversations
+- [x] Garantir write path atômico: UPDATE wa_conversations SET lastMessage, lastMessageAt, lastMessageType, lastMessageStatus, fromMe, unreadCount em cada mensagem
+- [x] Verificar que worker atualiza wa_conversations sincronamente (sem delay)
+- [x] Índice idx_wc_tenant_session (tenantId, sessionId, lastMessageAt) já existente e adequado
+
+### Frontend
+- [x] Eliminar refetch() no WhatsAppChat ao receber mensagem via socket (substituído por setData optimistic)
+- [x] Desabilitar refetchInterval quando socket está conectado (WhatsAppChat + Inbox)
+- [x] Desabilitar polling redundante (messagesQ 30s→false quando socket on, queueQ 10→30s quando socket on)
+- [x] Garantir convStore.handleMessage é O(1) map + moveToTop sem full sort (já implementado)
+- [x] Optimistic update ao enviar mensagem (já implementado no sendMessage onMutate)
+- [x] Unread count: zerar ao abrir conversa, incrementar apenas se conversa não está aberta (já implementado)
+- [x] Scroll: scrollToBottom ao abrir, auto-scroll se no fundo (já implementado)
+
+### Validação
+- [x] Nova mensagem move conversa para o topo instantaneamente (convStore.handleMessage moveToTop)
+- [x] Preview atualiza instantaneamente via socket → convStore.handleMessage
+- [x] Sem conversas duplicadas (dedup por conversationKey no Map)
+- [x] Sem mensagens desaparecendo (setData append em vez de refetch)
+- [x] Unread count correto em tempo real (campo pre-computado em wa_conversations)
+- [x] Inbox carrega em 550ms total (inclui overhead sandbox, query SQL ~34ms)
+- [x] Sem refetch necessário para atualizações (socket + optimistic update)

@@ -1687,26 +1687,28 @@ export async function getWaConversationsList(
   const db = await getDb();
   if (!db) return [];
 
-  // Build WHERE clause for assignment filters
-  let assignmentFilter = '';
+  // ═══════════════════════════════════════════════════════════════════════
+  // INSTANT INBOX: Single-table query — NO JOIN with wa_messages.
+  // All preview data is pre-computed in wa_conversations at write time.
+  // Target latency: < 15ms.
+  // ═══════════════════════════════════════════════════════════════════════
+
+  // Build assignment filter referencing wa_conversations directly (wc.assignedUserId)
+  // since helpdesk fields are denormalized into wa_conversations
+  let assignmentFilterWc = '';
   if (filter?.assignedUserId) {
-    assignmentFilter += ` AND ca.assignedUserId = ${filter.assignedUserId}`;
+    assignmentFilterWc += ` AND wc.assignedUserId = ${filter.assignedUserId}`;
   }
   if (filter?.assignedTeamId) {
-    assignmentFilter += ` AND ca.assignedTeamId = ${filter.assignedTeamId}`;
+    assignmentFilterWc += ` AND wc.assignedTeamId = ${filter.assignedTeamId}`;
   }
   if (filter?.status) {
-    assignmentFilter += ` AND ca.status = '${filter.status}'`;
+    assignmentFilterWc += ` AND wc.status = '${filter.status}'`;
   }
   if (filter?.unassignedOnly) {
-    assignmentFilter += ` AND ca.assignedUserId IS NULL`;
+    assignmentFilterWc += ` AND wc.assignedUserId IS NULL`;
   }
 
-  // Part 1 fix: Derive preview from the REAL last message in wa_messages,
-  // not from cached fields in wa_conversations.
-  // Uses a correlated subquery to get the latest message ID per conversation,
-  // then JOINs to get the full message data.
-  // The index msg_session_jid_idx (sessionId, remoteJid, timestamp) makes this efficient.
   const result = await db.execute(sql`
     SELECT 
       wc.id AS conversationId,
@@ -1715,19 +1717,19 @@ export async function getWaConversationsList(
       wc.phoneE164,
       wc.contactId,
       wc.contactPushName,
-      lm.content AS lastMessage,
-      lm.messageType AS lastMessageType,
-      lm.fromMe AS lastFromMe,
-      lm.timestamp AS lastTimestamp,
-      lm.status AS lastStatus,
+      wc.lastMessagePreview AS lastMessage,
+      wc.lastMessageType AS lastMessageType,
+      wc.lastFromMe AS lastFromMe,
+      wc.lastMessageAt AS lastTimestamp,
+      wc.lastStatus AS lastStatus,
       wc.unreadCount,
       wc.status AS conversationStatus,
       wc.conversationKey,
       wc.queuedAt,
       wc.firstResponseAt,
       wc.slaDeadlineAt,
-      COALESCE(wc.assignedUserId, ca.assignedUserId) AS assignedUserId,
-      COALESCE(wc.assignedTeamId, ca.assignedTeamId) AS assignedTeamId,
+      wc.assignedUserId AS assignedUserId,
+      wc.assignedTeamId AS assignedTeamId,
       ca.status AS assignmentStatus,
       ca.priority AS assignmentPriority,
       agent.name AS assignedAgentName,
@@ -1736,31 +1738,18 @@ export async function getWaConversationsList(
       c.email AS contactEmail,
       c.phone AS contactPhone
     FROM wa_conversations wc
-    LEFT JOIN (
-      SELECT m1.sessionId, m1.remoteJid, m1.content, m1.messageType, m1.fromMe, m1.timestamp, m1.status
-      FROM messages m1
-      INNER JOIN (
-        SELECT sessionId, remoteJid, MAX(timestamp) AS maxTs
-        FROM messages
-        WHERE sessionId = ${sessionId}
-        AND messageType NOT IN ('protocolMessage','senderKeyDistributionMessage','messageContextInfo','reactionMessage','ephemeralMessage')
-        GROUP BY sessionId, remoteJid
-      ) m2 ON m1.sessionId = m2.sessionId AND m1.remoteJid = m2.remoteJid AND m1.timestamp = m2.maxTs
-      WHERE m1.sessionId = ${sessionId}
-      AND m1.messageType NOT IN ('protocolMessage','senderKeyDistributionMessage','messageContextInfo','reactionMessage','ephemeralMessage')
-    ) lm ON lm.sessionId = wc.sessionId AND lm.remoteJid = wc.remoteJid
     LEFT JOIN conversation_assignments ca 
       ON ca.sessionId = wc.sessionId 
       AND ca.remoteJid = wc.remoteJid
       AND ca.tenantId = wc.tenantId
-    LEFT JOIN crm_users agent ON agent.id = COALESCE(wc.assignedUserId, ca.assignedUserId)
+    LEFT JOIN crm_users agent ON agent.id = wc.assignedUserId
     LEFT JOIN contacts c ON c.id = wc.contactId
     WHERE wc.sessionId = ${sessionId}
     AND wc.tenantId = ${tenantId}
     AND wc.mergedIntoId IS NULL
-    ${sql.raw(assignmentFilter)}
-    ${filter?.cursor ? sql`AND lm.timestamp < ${new Date(filter.cursor)}` : sql``}
-    ORDER BY COALESCE(lm.timestamp, wc.lastMessageAt, wc.createdAt) DESC
+    ${sql.raw(assignmentFilterWc)}
+    ${filter?.cursor ? sql`AND wc.lastMessageAt < ${new Date(filter.cursor)}` : sql``}
+    ORDER BY wc.lastMessageAt DESC
     LIMIT ${filter?.limit ?? 100}
     ${!filter?.cursor && (filter?.offset ?? 0) > 0 ? sql`OFFSET ${filter?.offset ?? 0}` : sql``}
   `);

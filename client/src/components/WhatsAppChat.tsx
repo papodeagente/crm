@@ -1174,7 +1174,7 @@ function EditMessageModal({ currentText, onSave, onClose }: { currentText: strin
 
 export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDeal, onCreateContact, hasCrmContact, assignment, agents, onAssign, onStatusChange, myAvatarUrl, waConversationId }: WhatsAppChatProps) {
   const [showAgentDropdown, setShowAgentDropdown] = useState(false);
-  const { lastMessage, lastStatusUpdate, lastMediaUpdate, lastConversationUpdate, lastTranscriptionUpdate } = useSocket();
+  const { lastMessage, lastStatusUpdate, lastMediaUpdate, lastConversationUpdate, lastTranscriptionUpdate, isConnected: socketConnected } = useSocket();
   const [messageText, setMessageText] = useState("");
   const [showAttach, setShowAttach] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
@@ -1214,7 +1214,7 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
   // Internal notes queries
   const notesQ = trpc.whatsapp.notes.list.useQuery(
     { waConversationId: waConversationId || 0 },
-    { enabled: !!waConversationId, refetchInterval: 30000, staleTime: 15000 }
+    { enabled: !!waConversationId, refetchInterval: socketConnected ? false : 30000, staleTime: 15000 }
   );
   const createNoteMut = trpc.whatsapp.notes.create.useMutation({
     onSuccess: () => {
@@ -1275,7 +1275,7 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
   useEffect(() => { setMsgLimit(INITIAL_MSG_LIMIT); }, [remoteJid]);
   const messagesQ = trpc.whatsapp.messagesByContact.useQuery(
     { sessionId, remoteJid, limit: msgLimit },
-    { enabled: !!sessionId && !!remoteJid, refetchInterval: 30000, staleTime: 5000 }
+    { enabled: !!sessionId && !!remoteJid, refetchInterval: socketConnected ? false : 30000, staleTime: 5000 }
   );
   const hasMoreMessages = (messagesQ.data?.length || 0) >= msgLimit;
   const loadMoreMessages = useCallback(() => {
@@ -1353,10 +1353,10 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
     return clientMsgId;
   }, [sessionId, remoteJid, utils, msgLimit]);
 
-  // Delayed refetch: wait a bit for the DB insert to complete before refetching
+  // Delayed refetch: only used as fallback for operations that don't trigger socket events
   const delayedRefetch = useCallback(() => {
-    setTimeout(() => messagesQ.refetch(), 400);
-  }, [messagesQ]);
+    if (!socketConnected) setTimeout(() => messagesQ.refetch(), 400);
+  }, [messagesQ, socketConnected]);
 
   // Part 2-3: Track the clientMessageId of the last sent message for precise matching
   const lastClientMsgIdRef = useRef<string | null>(null);
@@ -1513,9 +1513,32 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
     if (isNearBottom) scrollToBottom(true);
   }, [messagesQ.data, lastMessage]);
 
+  // Socket message → optimistic cache update (no refetch)
   useEffect(() => {
-    if (lastMessage && lastMessage.remoteJid === remoteJid) messagesQ.refetch();
-  }, [lastMessage, remoteJid]);
+    if (!lastMessage || lastMessage.remoteJid !== remoteJid) return;
+    // Build a lightweight message object from the socket event
+    const socketMsg = {
+      id: (lastMessage as any).id || -Date.now(),
+      sessionId: lastMessage.sessionId || sessionId,
+      messageId: lastMessage.messageId || `socket_${Date.now()}`,
+      remoteJid: lastMessage.remoteJid,
+      fromMe: lastMessage.fromMe,
+      messageType: lastMessage.messageType || 'conversation',
+      content: lastMessage.content || '',
+      status: lastMessage.fromMe ? 'sent' : 'received',
+      timestamp: lastMessage.timestamp ? new Date(lastMessage.timestamp).toISOString() : new Date().toISOString(),
+      createdAt: new Date().toISOString(),
+      quotedMessageId: null,
+    };
+    const queryKey = { sessionId, remoteJid, limit: msgLimit };
+    utils.whatsapp.messagesByContact.setData(queryKey, (old: any) => {
+      if (!old) return [socketMsg];
+      // Deduplicate: skip if messageId already exists
+      if (old.some((m: any) => m.messageId === socketMsg.messageId)) return old;
+      // Insert at beginning (newest first) and trim to limit
+      return [socketMsg, ...old].slice(0, msgLimit + 20);
+    });
+  }, [lastMessage, remoteJid, sessionId, msgLimit, utils]);
 
   // Refetch messages when media is ready (no notification sound)
   useEffect(() => {
