@@ -624,7 +624,7 @@ function ImageWithFallback({ msg, fromMe, myAvatarUrl, contactAvatarUrl, onImage
 const MessageBubble = memo(({
   msg, isFirst, isLast, allMessages,
   onReply, onReact, onDelete, onEdit, onForward, contactAvatarUrl, myAvatarUrl, onImageClick,
-  autoTranscribe, onTranscribe, transcriptions
+  autoTranscribe, onTranscribe, onRetranscribe, transcriptions
 }: {
   msg: Message; isFirst: boolean; isLast: boolean; allMessages: Message[];
   onReply: (target: ReplyTarget) => void;
@@ -637,6 +637,7 @@ const MessageBubble = memo(({
   onImageClick?: (url: string) => void;
   autoTranscribe?: boolean;
   onTranscribe?: (msgId: number, audioUrl: string) => void;
+  onRetranscribe?: (msgId: number) => void;
   transcriptions?: Record<number, { text?: string; loading?: boolean; error?: string }>;
 }) => {
   const [showMenu, setShowMenu] = useState(false);
@@ -865,8 +866,8 @@ const MessageBubble = memo(({
             if (msg.audioTranscriptionStatus === "failed") return (
               <div className="mt-1 px-2 py-1 bg-red-50 dark:bg-red-950/20 rounded text-[11px] text-red-500 flex items-center justify-between">
                 <span>Erro na transcrição</span>
-                {onTranscribe && msg.mediaUrl && (
-                  <button onClick={() => onTranscribe(msg.id, msg.mediaUrl!)} className="text-violet-500 hover:text-violet-600 ml-2">Tentar novamente</button>
+                {onRetranscribe && (
+                  <button onClick={() => onRetranscribe(msg.id)} className="text-violet-500 hover:text-violet-600 ml-2">Tentar novamente</button>
                 )}
               </div>
             );
@@ -892,9 +893,10 @@ const MessageBubble = memo(({
               </div>
             );
             // Priority 3: Manual transcribe button (if no auto-transcription)
-            if (!autoTranscribe && onTranscribe && msg.mediaUrl && !msg.mediaUrl.includes('whatsapp.net')) return (
+            // Uses BullMQ worker via onRetranscribe — works for all messages including expired WhatsApp URLs
+            if (!autoTranscribe && onRetranscribe) return (
               <button
-                onClick={() => onTranscribe(msg.id, msg.mediaUrl!)}
+                onClick={() => onRetranscribe(msg.id)}
                 className="mt-1 text-[11px] text-violet-500 hover:text-violet-600 flex items-center gap-1 transition-colors"
               >
                 <FileText className="h-3 w-3" /> Transcrever áudio
@@ -1289,8 +1291,11 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
     setMsgLimit(prev => prev + 50);
   }, []);
 
-  // Transcription mutation
+  // Transcription mutations
+  // 1. Frontend-triggered (direct download + Whisper) — fallback for messages with S3 URLs
   const transcribeMut = trpc.ai.transcribe.useMutation();
+  // 2. BullMQ worker (Evolution API base64 download + Whisper) — primary, works for all messages
+  const retranscribeMut = trpc.ai.retranscribeAudio.useMutation();
 
   const handleTranscribe = useCallback((msgId: number, audioUrl: string) => {
     if (!tenantId) return;
@@ -1312,21 +1317,44 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
     );
   }, [tenantId, transcribeMut]);
 
+  // Retry transcription via BullMQ worker (uses Evolution API to download audio, no URL dependency)
+  const handleRetranscribe = useCallback((msgId: number) => {
+    if (!tenantId) return;
+    retranscribeMut.mutate(
+      { tenantId, messageId: msgId },
+      {
+        onSuccess: () => {
+          // Worker will process async and emit socket event — refetch messages to get updated status
+          setTimeout(() => messagesQ.refetch(), 2000);
+          setTimeout(() => messagesQ.refetch(), 5000);
+          setTimeout(() => messagesQ.refetch(), 10000);
+        },
+        onError: (err) => {
+          setTranscriptions(prev => ({ ...prev, [msgId]: { error: err.message || "Falha ao re-enfileirar" } }));
+        },
+      }
+    );
+  }, [tenantId, retranscribeMut, messagesQ]);
+
   const utils = trpc.useUtils();
 
-  // Auto-transcribe new audio messages
+  // Auto-transcribe new audio messages via BullMQ worker
+  // Uses handleRetranscribe (Evolution API base64 download) — works for ALL audio messages
+  // including those with expired WhatsApp CDN URLs
   const autoTranscribedRef = useRef<Set<number>>(new Set());
   useEffect(() => {
     if (!aiSettingsQ.data?.audioTranscriptionEnabled || !tenantId) return;
     const msgs = messagesQ.data || [];
     for (const m of msgs) {
       const isAudio = m.messageType === "audioMessage" || m.messageType === "pttMessage" || m.messageType === "audio" || m.mediaMimeType?.startsWith("audio/");
-      if (isAudio && m.mediaUrl && !m.mediaUrl.includes('whatsapp.net') && !m.fromMe && !autoTranscribedRef.current.has(m.id) && !transcriptions[m.id]) {
+      // Skip if: not audio, already transcribed/pending/processing, from me, or already triggered
+      const hasTranscription = m.audioTranscriptionStatus === "completed" || m.audioTranscriptionStatus === "pending" || m.audioTranscriptionStatus === "processing";
+      if (isAudio && !m.fromMe && !hasTranscription && !autoTranscribedRef.current.has(m.id) && !transcriptions[m.id]) {
         autoTranscribedRef.current.add(m.id);
-        handleTranscribe(m.id, m.mediaUrl);
+        handleRetranscribe(m.id);
       }
     }
-  }, [messagesQ.data, aiSettingsQ.data?.audioTranscriptionEnabled, tenantId, handleTranscribe, transcriptions]);
+  }, [messagesQ.data, aiSettingsQ.data?.audioTranscriptionEnabled, tenantId, handleRetranscribe, transcriptions]);
 
   // Part 2: Optimistic update helper with unique clientMessageId
   // Each optimistic message gets a unique ID so we can match it precisely on server confirm
@@ -2304,6 +2332,7 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
                       onImageClick={setLightboxUrl}
                       autoTranscribe={aiSettingsQ.data?.audioTranscriptionEnabled}
                       onTranscribe={handleTranscribe}
+                      onRetranscribe={handleRetranscribe}
                       transcriptions={transcriptions}
                     />
                   );

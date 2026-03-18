@@ -17,7 +17,7 @@
  * This worker is started from server/_core/index.ts alongside the Express server.
  */
 
-import { getDb } from "./db";
+import { getDb, getTenantAiSettings } from "./db";
 import { and, eq, sql } from "drizzle-orm";
 import { waMessages, waContacts, waConversations } from "../drizzle/schema";
 import { resolveInbound, updateConversationLastMessage, propagateLatestMessageToConversation, getConversationByJid } from "./conversationResolver";
@@ -444,9 +444,15 @@ async function processNewMessage(session: SessionInfo, data: any, workerStartTim
     // 5d. Auto-transcribe audio messages (incoming only)
     const audioTypes = ["audioMessage", "pttMessage"];
     if (!fromMe && audioTypes.includes(messageType) && messageId) {
-      // Fetch the inserted row ID for the transcription worker
+      // Check AI settings before enqueuing to avoid unnecessary jobs
       (async () => {
         try {
+          const aiSettings = await getTenantAiSettings(tenantId);
+          if (!aiSettings.audioTranscriptionEnabled) {
+            console.log(`[Worker] Auto-transcription skipped for ${messageId}: disabled for tenant ${tenantId}`);
+            return;
+          }
+
           const [inserted] = await db.select({ id: waMessages.id })
             .from(waMessages)
             .where(and(

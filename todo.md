@@ -3870,3 +3870,19 @@
 - [x] STEP 8: Status model — monotonic transitions enforced (pending→processing→completed/failed)
 - [x] STEP 9: messageQueue.ts also fixed — same shared connection bug, now uses separate connections
 - [x] STEP 10: 61 vitest tests passing for transcription pipeline
+
+## Audio Transcription Still Not Working (Post-Fix)
+- [x] BUG: "Erro na transcrição" + "Tentar novamente" button does nothing
+  - Root cause: Retry button called `ai.transcribe` (frontend direct download) instead of `retranscribeAudio` (BullMQ worker)
+  - Fix: Changed retry button to call `handleRetranscribe(msgId)` → `trpc.ai.retranscribeAudio.useMutation()`
+  - BullMQ worker uses Evolution API base64 download, no URL dependency
+- [x] BUG: New audio messages stuck on "Transcrevendo..." indefinitely
+  - Root cause 1: Frontend auto-transcribe filtered out `whatsapp.net` URLs (most audio messages)
+  - Root cause 2: Frontend auto-transcribe used `ai.transcribe` (direct URL download) which fails on expired URLs
+  - Fix: Changed auto-transcribe to use `handleRetranscribe(msgId)` → BullMQ worker flow
+  - Removed `!m.mediaUrl.includes('whatsapp.net')` filter — worker downloads via Evolution API
+  - Added status check: skip messages already in pending/processing/completed
+- [x] Backend messageWorker now checks `getTenantAiSettings()` before enqueuing transcription jobs
+- [x] Manual "Transcrever áudio" button also uses BullMQ worker (no URL dependency)
+- [x] Debug server logs for transcription worker errors — comprehensive logging already in place
+- [x] 71 vitest tests passing for transcription pipeline (10 new tests for retry/auto-transcribe flow)

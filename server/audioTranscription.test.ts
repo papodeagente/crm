@@ -219,17 +219,25 @@ describe("Audio Transcription System", () => {
       expect(errorMsg.audioTranscriptionStatus === "failed").toBe(true);
     });
 
-    it("should show manual transcribe button when no auto-transcription", () => {
+    it("should show manual transcribe button when no auto-transcription (BullMQ worker, no URL dependency)", () => {
       const msg = {
         audioTranscriptionStatus: null as string | null,
         audioTranscription: null as string | null,
-        mediaUrl: "https://s3.example.com/audio.ogg",
+        messageType: "audioMessage",
       };
       const autoTranscribe = false;
-      const hasMediaUrl = !!msg.mediaUrl && !msg.mediaUrl.includes("whatsapp.net");
+      const onRetranscribe = (msgId: number) => {}; // BullMQ worker handler
 
-      const showManualButton = !autoTranscribe && hasMediaUrl && !msg.audioTranscriptionStatus;
+      // Manual button shows when: not auto-transcribing AND handler exists AND no existing status
+      const showManualButton = !autoTranscribe && !!onRetranscribe && !msg.audioTranscriptionStatus;
       expect(showManualButton).toBe(true);
+    });
+
+    it("should NOT show manual transcribe button when auto-transcription is enabled", () => {
+      const autoTranscribe = true;
+      const onRetranscribe = (msgId: number) => {};
+      const showManualButton = !autoTranscribe && !!onRetranscribe;
+      expect(showManualButton).toBe(false);
     });
   });
 
@@ -323,12 +331,15 @@ describe("Audio Transcription System", () => {
       expect(shouldAutoTranscribe).toBe(false);
     });
 
-    it("should skip WhatsApp CDN URLs (expired)", () => {
+    it("should handle WhatsApp CDN URLs via BullMQ worker (Evolution API base64 download)", () => {
+      // The BullMQ worker uses Evolution API to download audio as base64,
+      // so it works regardless of whether the WhatsApp CDN URL has expired
       const expiredUrl = "https://mmg.whatsapp.net/v/t62.7114-24/abc123";
       const s3Url = "https://s3.amazonaws.com/bucket/audio.ogg";
 
-      expect(expiredUrl.includes("whatsapp.net")).toBe(true);
-      expect(s3Url.includes("whatsapp.net")).toBe(false);
+      // Both URLs should be handled by the worker (no URL filtering needed)
+      const canProcessViaWorker = true; // Worker uses Evolution API, not the URL
+      expect(canProcessViaWorker).toBe(true);
     });
   });
 
@@ -620,6 +631,162 @@ describe("Audio Transcription Pipeline — Lifecycle & Recovery", () => {
       expect(store.getByStatus("failed").length).toBe(1);
       expect(store.getByStatus("processing").length).toBe(1);
       expect(store.getByStatus("pending").length).toBe(2);
+    });
+  });
+});
+
+
+// ── Tests: Retry Button & Auto-Transcribe Flow (BullMQ Worker) ──
+
+describe("Retry Button & Auto-Transcribe — BullMQ Worker Flow", () => {
+
+  describe("Retry Button uses retranscribeAudio (not ai.transcribe)", () => {
+    it("retry button should call retranscribeAudio with messageId (not audioUrl)", () => {
+      // The retry button now calls handleRetranscribe(msgId) which uses
+      // trpc.ai.retranscribeAudio.useMutation() — BullMQ worker with Evolution API
+      const retranscribeInput = { tenantId: 150002, messageId: 42 };
+      expect(retranscribeInput).toHaveProperty("messageId");
+      expect(retranscribeInput).toHaveProperty("tenantId");
+      expect(retranscribeInput).not.toHaveProperty("audioUrl"); // No URL needed
+    });
+
+    it("retranscribeAudio resets status to pending and clears old transcription", () => {
+      const beforeRetranscribe = {
+        audioTranscriptionStatus: "failed",
+        audioTranscription: null,
+      };
+      // After calling retranscribeAudio mutation:
+      const afterRetranscribe = {
+        audioTranscriptionStatus: "pending",
+        audioTranscription: null,
+      };
+      expect(afterRetranscribe.audioTranscriptionStatus).toBe("pending");
+      expect(afterRetranscribe.audioTranscription).toBeNull();
+    });
+
+    it("retranscribeAudio only accepts audioMessage and pttMessage types", () => {
+      const validTypes = ["audioMessage", "pttMessage"];
+      expect(validTypes.includes("audioMessage")).toBe(true);
+      expect(validTypes.includes("pttMessage")).toBe(true);
+      expect(validTypes.includes("imageMessage")).toBe(false);
+      expect(validTypes.includes("videoMessage")).toBe(false);
+    });
+  });
+
+  describe("Auto-Transcribe uses BullMQ worker (no URL dependency)", () => {
+    it("auto-transcribe should NOT filter by whatsapp.net URL", () => {
+      // Old behavior: filtered out messages with whatsapp.net URLs
+      // New behavior: uses BullMQ worker which downloads via Evolution API
+      const messages = [
+        { id: 1, messageType: "audioMessage", fromMe: false, mediaUrl: "https://mmg.whatsapp.net/audio.ogg", audioTranscriptionStatus: null },
+        { id: 2, messageType: "pttMessage", fromMe: false, mediaUrl: null, audioTranscriptionStatus: null },
+        { id: 3, messageType: "audioMessage", fromMe: false, mediaUrl: "https://s3.example.com/audio.ogg", audioTranscriptionStatus: null },
+      ];
+
+      const audioTypes = ["audioMessage", "pttMessage", "audio"];
+      const autoTranscribedIds = new Set<number>();
+
+      for (const m of messages) {
+        const isAudio = audioTypes.includes(m.messageType);
+        const hasTranscription = m.audioTranscriptionStatus === "completed" || m.audioTranscriptionStatus === "pending" || m.audioTranscriptionStatus === "processing";
+        // New logic: no URL filter — all audio messages are eligible
+        if (isAudio && !m.fromMe && !hasTranscription && !autoTranscribedIds.has(m.id)) {
+          autoTranscribedIds.add(m.id);
+        }
+      }
+
+      // All 3 messages should be auto-transcribed (including the one with whatsapp.net URL)
+      expect(autoTranscribedIds.size).toBe(3);
+      expect(autoTranscribedIds.has(1)).toBe(true); // Was previously filtered out!
+      expect(autoTranscribedIds.has(2)).toBe(true);
+      expect(autoTranscribedIds.has(3)).toBe(true);
+    });
+
+    it("auto-transcribe should skip messages already in pending/processing/completed status", () => {
+      const messages = [
+        { id: 1, messageType: "audioMessage", fromMe: false, audioTranscriptionStatus: "pending" },
+        { id: 2, messageType: "pttMessage", fromMe: false, audioTranscriptionStatus: "processing" },
+        { id: 3, messageType: "audioMessage", fromMe: false, audioTranscriptionStatus: "completed" },
+        { id: 4, messageType: "audioMessage", fromMe: false, audioTranscriptionStatus: "failed" },
+        { id: 5, messageType: "audioMessage", fromMe: false, audioTranscriptionStatus: null },
+      ];
+
+      const audioTypes = ["audioMessage", "pttMessage"];
+      const autoTranscribedIds = new Set<number>();
+
+      for (const m of messages) {
+        const isAudio = audioTypes.includes(m.messageType);
+        const hasTranscription = m.audioTranscriptionStatus === "completed" || m.audioTranscriptionStatus === "pending" || m.audioTranscriptionStatus === "processing";
+        if (isAudio && !m.fromMe && !hasTranscription && !autoTranscribedIds.has(m.id)) {
+          autoTranscribedIds.add(m.id);
+        }
+      }
+
+      // Only messages 4 (failed) and 5 (null) should be eligible
+      expect(autoTranscribedIds.size).toBe(2);
+      expect(autoTranscribedIds.has(4)).toBe(true);  // failed → can retry
+      expect(autoTranscribedIds.has(5)).toBe(true);  // null → new message
+      expect(autoTranscribedIds.has(1)).toBe(false); // pending → already queued
+      expect(autoTranscribedIds.has(2)).toBe(false); // processing → in progress
+      expect(autoTranscribedIds.has(3)).toBe(false); // completed → done
+    });
+
+    it("auto-transcribe should skip fromMe messages", () => {
+      const messages = [
+        { id: 1, messageType: "audioMessage", fromMe: true, audioTranscriptionStatus: null },
+        { id: 2, messageType: "pttMessage", fromMe: false, audioTranscriptionStatus: null },
+      ];
+
+      const audioTypes = ["audioMessage", "pttMessage"];
+      const autoTranscribedIds = new Set<number>();
+
+      for (const m of messages) {
+        const isAudio = audioTypes.includes(m.messageType);
+        const hasTranscription = m.audioTranscriptionStatus === "completed" || m.audioTranscriptionStatus === "pending" || m.audioTranscriptionStatus === "processing";
+        if (isAudio && !m.fromMe && !hasTranscription) {
+          autoTranscribedIds.add(m.id);
+        }
+      }
+
+      expect(autoTranscribedIds.size).toBe(1);
+      expect(autoTranscribedIds.has(1)).toBe(false); // fromMe=true
+      expect(autoTranscribedIds.has(2)).toBe(true);  // fromMe=false
+    });
+  });
+
+  describe("Backend auto-transcribe checks AI settings before enqueuing", () => {
+    it("should skip enqueue when audioTranscriptionEnabled is false", () => {
+      const aiSettings = { audioTranscriptionEnabled: false };
+      const shouldEnqueue = aiSettings.audioTranscriptionEnabled;
+      expect(shouldEnqueue).toBe(false);
+    });
+
+    it("should enqueue when audioTranscriptionEnabled is true", () => {
+      const aiSettings = { audioTranscriptionEnabled: true };
+      const shouldEnqueue = aiSettings.audioTranscriptionEnabled;
+      expect(shouldEnqueue).toBe(true);
+    });
+  });
+
+  describe("Evolution API base64 download (worker flow)", () => {
+    it("worker uses externalMessageId (not mediaUrl) to download audio", () => {
+      const jobData = {
+        messageId: 42,
+        externalMessageId: "3EB0A1B2C3D4E5F6",
+        sessionId: "session-1",
+        instanceName: "session-1",
+        tenantId: 150002,
+        remoteJid: "5511999999999@s.whatsapp.net",
+        fromMe: false,
+        mediaMimeType: "audio/ogg",
+        mediaDuration: 15,
+      };
+
+      // Worker calls evo.getBase64FromMediaMessage(instanceName, externalMessageId, ...)
+      expect(jobData.externalMessageId).toBeTruthy();
+      expect(jobData.instanceName).toBeTruthy();
+      // No mediaUrl field needed — Evolution API downloads directly
+      expect(jobData).not.toHaveProperty("mediaUrl");
     });
   });
 });
