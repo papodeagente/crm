@@ -1438,7 +1438,19 @@ class WhatsAppEvolutionManager extends EventEmitter {
         if (existing.length > 0) return;
       }
 
-      // Insert message into DB immediately (without waiting for media download)
+      // Resolve conversation FIRST so we can link the message to it
+      let resolvedConversationId: number | null = null;
+      try {
+        const contactPushName = fromMe ? null : pushName;
+        const resolved = await resolveInbound(session.tenantId, session.sessionId, remoteJid, contactPushName, { skipContactCreation: true });
+        if (resolved) {
+          resolvedConversationId = resolved.conversationId;
+        }
+      } catch (e) {
+        console.warn("[EvoWA] Conversation resolver error:", e);
+      }
+
+      // Insert message into DB immediately (with waConversationId linked)
       // Media will be downloaded in background and the row updated later
       await db.insert(waMessages).values({
         sessionId: session.sessionId,
@@ -1449,6 +1461,7 @@ class WhatsAppEvolutionManager extends EventEmitter {
         messageType,
         content: content || null,
         pushName: fromMe ? null : (pushName || null),
+        sentVia: fromMe ? "other_device" : undefined,
         status: fromMe ? "sent" : "received",
         timestamp: new Date(timestamp),
         mediaUrl: mediaInfo.mediaUrl || null,
@@ -1457,14 +1470,13 @@ class WhatsAppEvolutionManager extends EventEmitter {
         mediaDuration: mediaInfo.mediaDuration || null,
         isVoiceNote: mediaInfo.isVoiceNote || false,
         quotedMessageId: mediaInfo.quotedMessageId || null,
+        waConversationId: resolvedConversationId,
       }).onDuplicateKeyUpdate({ set: { status: sql`status` } });
 
-      // Resolve conversation (update last message, unread count)
-      try {
-        const contactPushName = fromMe ? null : pushName;
-        const resolved = await resolveInbound(session.tenantId, session.sessionId, remoteJid, contactPushName, { skipContactCreation: true });
-        if (resolved) {
-          await updateConversationLastMessage(resolved.conversationId, {
+      // Update conversation preview (last message, unread count)
+      if (resolvedConversationId) {
+        try {
+          await updateConversationLastMessage(resolvedConversationId, {
             content: content || "",
             messageType,
             fromMe,
@@ -1472,9 +1484,9 @@ class WhatsAppEvolutionManager extends EventEmitter {
             timestamp: new Date(timestamp),
             incrementUnread: !fromMe,
           });
+        } catch (e) {
+          console.warn("[EvoWA] updateConversationLastMessage error:", e);
         }
-      } catch (e) {
-        console.warn("[EvoWA] Conversation resolver error:", e);
       }
 
       // *** EMIT Socket.IO event IMMEDIATELY — before media download ***

@@ -469,7 +469,7 @@ export async function propagateLatestMessageToConversation(
   // 1. timestamp DESC
   // 2. createdAt DESC
   // 3. id DESC (auto-increment serves as tie-breaker)
-  const [latestMsg] = await db
+  let [latestMsg] = await db
     .select({
       content: waMessages.content,
       messageType: waMessages.messageType,
@@ -485,6 +485,40 @@ export async function propagateLatestMessageToConversation(
       sql`${waMessages.id} DESC`
     )
     .limit(1);
+
+  // FALLBACK: If no messages found by waConversationId (many messages have NULL FK),
+  // try to find by sessionId + remoteJid from the conversation record
+  if (!latestMsg) {
+    const [conv] = await db
+      .select({ sessionId: waConversations.sessionId, remoteJid: waConversations.remoteJid })
+      .from(waConversations)
+      .where(eq(waConversations.id, conversationId))
+      .limit(1);
+
+    if (conv?.sessionId && conv?.remoteJid) {
+      [latestMsg] = await db
+        .select({
+          content: waMessages.content,
+          messageType: waMessages.messageType,
+          fromMe: waMessages.fromMe,
+          status: waMessages.status,
+          timestamp: waMessages.timestamp,
+        })
+        .from(waMessages)
+        .where(
+          and(
+            eq(waMessages.sessionId, conv.sessionId),
+            eq(waMessages.remoteJid, conv.remoteJid)
+          )
+        )
+        .orderBy(
+          sql`${waMessages.timestamp} DESC`,
+          sql`${waMessages.createdAt} DESC`,
+          sql`${waMessages.id} DESC`
+        )
+        .limit(1);
+    }
+  }
 
   if (!latestMsg) return null;
 

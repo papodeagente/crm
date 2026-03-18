@@ -1,0 +1,73 @@
+{
+  "query": "-- Check conversation 330620 messages breakdown\nSELECT messageType, content, fromMe, timestamp\nFROM messages\nWHERE waConversationId = 330620\nORDER BY timestamp DESC\nLIMIT 10;\n\n-- Check if there are any non-template messages\nSELECT messageType, COUNT(*) as cnt\nFROM messages\nWHERE waConversationId = 330620\nGROUP BY messageType;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute -- Check conversation 330620 messages breakdown\nSELECT messageType, content, fromMe, timestamp\nFROM messages\nWHERE waConversationId = 330620\nORDER BY timestamp DESC\nLIMIT 10;\n\n-- Check if there are any non-template messages\nSELECT messageType, COUNT(*) as cnt\nFROM messages\nWHERE waConversationId = 330620\nGROUP BY messageType;",
+  "rows": [
+    {
+      "messageType": "templateMessage",
+      "content": "[Template]",
+      "fromMe": "0",
+      "timestamp": "2026-03-18 12:31:10"
+    },
+    {
+      "messageType": "templateMessage",
+      "content": "[Template]",
+      "fromMe": "0",
+      "timestamp": "2026-03-16 12:31:09"
+    },
+    {
+      "messageType": "templateMessage",
+      "content": "NULL",
+      "fromMe": "0",
+      "timestamp": "2026-03-14 12:31:08"
+    },
+    {
+      "messageType": "templateMessage",
+      "content": "NULL",
+      "fromMe": "0",
+      "timestamp": "2026-03-13 12:31:06"
+    },
+    {
+      "messageType": "templateMessage",
+      "content": "NULL",
+      "fromMe": "0",
+      "timestamp": "2026-03-12 12:31:08"
+    },
+    {
+      "messageType": "templateMessage",
+      "content": "NULL",
+      "fromMe": "0",
+      "timestamp": "2026-03-10 12:31:07"
+    },
+    {
+      "messageType": "templateMessage",
+      "content": "NULL",
+      "fromMe": "0",
+      "timestamp": "2026-03-09 12:31:06"
+    },
+    {
+      "messageType": "templateMessage",
+      "content": "NULL",
+      "fromMe": "0",
+      "timestamp": "2026-03-08 12:31:05"
+    },
+    {
+      "messageType": "templateMessage",
+      "content": "NULL",
+      "fromMe": "0",
+      "timestamp": "2026-03-07 12:31:08"
+    },
+    {
+      "messageType": "templateMessage",
+      "content": "NULL",
+      "fromMe": "0",
+      "timestamp": "2026-03-06 12:31:09"
+    }
+  ],
+  "messages": [
+    "messageType\tcnt",
+    "templateMessage\t52"
+  ],
+  "stdout": "messageType\tcontent\tfromMe\ttimestamp\ntemplateMessage\t[Template]\t0\t2026-03-18 12:31:10\ntemplateMessage\t[Template]\t0\t2026-03-16 12:31:09\ntemplateMessage\tNULL\t0\t2026-03-14 12:31:08\ntemplateMessage\tNULL\t0\t2026-03-13 12:31:06\ntemplateMessage\tNULL\t0\t2026-03-12 12:31:08\ntemplateMessage\tNULL\t0\t2026-03-10 12:31:07\ntemplateMessage\tNULL\t0\t2026-03-09 12:31:06\ntemplateMessage\tNULL\t0\t2026-03-08 12:31:05\ntemplateMessage\tNULL\t0\t2026-03-07 12:31:08\ntemplateMessage\tNULL\t0\t2026-03-06 12:31:09\nmessageType\tcnt\ntemplateMessage\t52\n",
+  "stderr": "",
+  "execution_time_ms": 80
+}

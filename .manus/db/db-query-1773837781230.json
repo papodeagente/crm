@@ -1,0 +1,31 @@
+{
+  "query": "-- Fix the 6 conversations where [Template] is shown but a newer non-template message exists\n-- Update wa_conversations with the true latest message (considering ALL message types)\nUPDATE wa_conversations wc\nINNER JOIN (\n  SELECT m.waConversationId, m.content, m.messageType, m.fromMe, m.status, m.timestamp\n  FROM messages m\n  INNER JOIN (\n    SELECT waConversationId, MAX(timestamp) as max_ts\n    FROM messages\n    WHERE waConversationId IN (\n      SELECT wc2.id FROM wa_conversations wc2\n      WHERE wc2.lastMessagePreview LIKE '%Template%'\n      AND EXISTS (\n        SELECT 1 FROM messages m2 \n        WHERE m2.waConversationId = wc2.id \n        AND m2.messageType != 'templateMessage'\n      )\n    )\n    GROUP BY waConversationId\n  ) latest ON m.waConversationId = latest.waConversationId AND m.timestamp = latest.max_ts\n) lm ON wc.id = lm.waConversationId\nSET \n  wc.lastMessagePreview = COALESCE(lm.content, wc.lastMessagePreview),\n  wc.lastMessageType = lm.messageType,\n  wc.lastFromMe = lm.fromMe,\n  wc.lastStatus = lm.status,\n  wc.lastMessageAt = lm.timestamp;\n\n-- Verify: how many [Template] conversations remain?\nSELECT COUNT(*) as remaining_template_convs FROM wa_conversations WHERE lastMessagePreview LIKE '%Template%';\n\n-- Check if the 6 were fixed\nSELECT wc.id, wc.lastMessagePreview, wc.lastMessageType, wc.lastMessageAt\nFROM wa_conversations wc\nWHERE wc.lastMessagePreview LIKE '%Template%'\nAND EXISTS (\n  SELECT 1 FROM messages m WHERE m.waConversationId = wc.id AND m.messageType != 'templateMessage'\n);",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute -- Fix the 6 conversations where [Template] is shown but a newer non-template message exists\n-- Update wa_conversations with the true latest message (considering ALL message types)\nUPDATE wa_conversations wc\nINNER JOIN (\n  SELECT m.waConversationId, m.content, m.messageType, m.fromMe, m.status, m.timestamp\n  FROM messages m\n  INNER JOIN (\n    SELECT waConversationId, MAX(timestamp) as max_ts\n    FROM messages\n    WHERE waConversationId IN (\n      SELECT wc2.id FROM wa_conversations wc2\n      WHERE wc2.lastMessagePreview LIKE '%Template%'\n      AND EXISTS (\n        SELECT 1 FROM messages m2 \n        WHERE m2.waConversationId = wc2.id \n        AND m2.messageType != 'templateMessage'\n      )\n    )\n    GROUP BY waConversationId\n  ) latest ON m.waConversationId = latest.waConversationId AND m.timestamp = latest.max_ts\n) lm ON wc.id = lm.waConversationId\nSET \n  wc.lastMessagePreview = COALESCE(lm.content, wc.lastMessagePreview),\n  wc.lastMessageType = lm.messageType,\n  wc.lastFromMe = lm.fromMe,\n  wc.lastStatus = lm.status,\n  wc.lastMessageAt = lm.timestamp;\n\n-- Verify: how many [Template] conversations remain?\nSELECT COUNT(*) as remaining_template_convs FROM wa_conversations WHERE lastMessagePreview LIKE '%Template%';\n\n-- Check if the 6 were fixed\nSELECT wc.id, wc.lastMessagePreview, wc.lastMessageType, wc.lastMessageAt\nFROM wa_conversations wc\nWHERE wc.lastMessagePreview LIKE '%Template%'\nAND EXISTS (\n  SELECT 1 FROM messages m WHERE m.waConversationId = wc.id AND m.messageType != 'templateMessage'\n);",
+  "rows": [
+    {
+      "remaining_template_convs": "13"
+    },
+    {
+      "remaining_template_convs": "id\tlastMessagePreview\tlastMessageType\tlastMessageAt"
+    },
+    {
+      "remaining_template_convs": "300044\t[Template]\ttemplateMessage\t2026-03-16 16:33:35"
+    },
+    {
+      "remaining_template_convs": "300275\t[Template]\ttemplateMessage\t2026-03-16 21:21:52"
+    },
+    {
+      "remaining_template_convs": "330626\t[Template]\ttemplateMessage\t2026-03-16 20:02:26"
+    },
+    {
+      "remaining_template_convs": "330646\t[Template]\ttemplateMessage\t2026-03-18 11:08:06"
+    },
+    {
+      "remaining_template_convs": "330653\t[Template]\ttemplateMessage\t2026-03-17 10:42:28"
+    }
+  ],
+  "messages": [],
+  "stdout": "remaining_template_convs\n13\nid\tlastMessagePreview\tlastMessageType\tlastMessageAt\n300044\t[Template]\ttemplateMessage\t2026-03-16 16:33:35\n300275\t[Template]\ttemplateMessage\t2026-03-16 21:21:52\n330626\t[Template]\ttemplateMessage\t2026-03-16 20:02:26\n330646\t[Template]\ttemplateMessage\t2026-03-18 11:08:06\n330653\t[Template]\ttemplateMessage\t2026-03-17 10:42:28\n",
+  "stderr": "",
+  "execution_time_ms": 228
+}

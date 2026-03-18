@@ -3836,3 +3836,11 @@
 - [x] PART 9: Validation report — 0 regressed statuses, all wa_conversations have valid lastStatus
 - [x] PART 10: Vitest tests — 54 tests passing (13 new for monotonicity + hydration normalization)
 - [x] PART 11: Manual verification — TypeScript clean, full test suite passing
+
+## Fix Inbox Preview Not Replacing [Template] With Real Message
+- [x] PART 1: Root cause analysis — 98.8% messages had NULL waConversationId, propagate couldn't find latest msg
+- [x] PART 2: Fix server-side — resolve conversation BEFORE insert, link waConversationId; propagate uses sessionId+remoteJid fallback
+- [x] PART 3: Template fallback rule — [Template] only shown if truly latest; newer real messages always replace
+- [x] PART 4: Database repair — 51,620 messages backfilled with waConversationId; 6 stale [Template] conversations fixed
+- [x] PART 5: Socket/frontend cache — handleMessage + handleConversationPreview already handle template→real transitions
+- [x] PART 6: Validation — 60 vitest tests passing (6 new for template→real transitions)

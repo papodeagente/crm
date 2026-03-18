@@ -1360,3 +1360,154 @@ describe("PART 9: Hydration normalizes invalid fromMe statuses", () => {
     expect(store.getConversation(KEY_A)!.lastStatus).toBe("received");
   });
 });
+
+
+// ════════════════════════════════════════════════════════════
+// PART 10: TEMPLATE → REAL MESSAGE TRANSITION
+// ════════════════════════════════════════════════════════════
+
+describe("PART 10: Template → Real Message Transition", () => {
+  const SESSION = "s1";
+  const JID_A = "5511999@s.whatsapp.net";
+  const KEY_A = makeConvKey(SESSION, JID_A);
+  let store: ConversationStore;
+
+  beforeEach(() => {
+    store = new ConversationStore();
+  });
+
+  it("should replace [Template] preview with newer real message", () => {
+    const templateTs = new Date("2026-03-16T16:33:35Z").toISOString();
+    store.hydrate([
+      { remoteJid: JID_A, sessionId: SESSION, lastMessage: "[Template]", lastMessageType: "templateMessage", lastFromMe: false, lastTimestamp: templateTs, lastStatus: "received", contactPushName: "User A", unreadCount: 0 },
+    ]);
+    expect(store.getConversation(KEY_A)!.lastMessage).toBe("[Template]");
+
+    // Real message arrives with newer timestamp
+    const realTs = new Date("2026-03-16T17:00:00Z").getTime();
+    store.handleMessage({
+      sessionId: SESSION,
+      remoteJid: JID_A,
+      content: "Olá, tudo bem?",
+      fromMe: false,
+      messageType: "conversation",
+      timestamp: realTs,
+    }, null);
+
+    const conv = store.getConversation(KEY_A)!;
+    expect(conv.lastMessage).toBe("Olá, tudo bem?");
+    expect(conv.lastStatus).toBe("received");
+  });
+
+  it("should keep [Template] if it is truly the latest message", () => {
+    const templateTs = new Date("2026-03-16T17:00:00Z").toISOString();
+    store.hydrate([
+      { remoteJid: JID_A, sessionId: SESSION, lastMessage: "[Template]", lastMessageType: "templateMessage", lastFromMe: false, lastTimestamp: templateTs, lastStatus: "received", contactPushName: "User A", unreadCount: 0 },
+    ]);
+
+    // Older real message arrives (should NOT replace template)
+    const olderTs = new Date("2026-03-16T15:00:00Z").getTime();
+    store.handleMessage({
+      sessionId: SESSION,
+      remoteJid: JID_A,
+      content: "Old message",
+      fromMe: false,
+      messageType: "conversation",
+      timestamp: olderTs,
+    }, null);
+
+    expect(store.getConversation(KEY_A)!.lastMessage).toBe("[Template]");
+  });
+
+  it("should replace [Template] with outbound CRM message", () => {
+    const templateTs = new Date("2026-03-16T16:33:35Z").toISOString();
+    store.hydrate([
+      { remoteJid: JID_A, sessionId: SESSION, lastMessage: "[Template]", lastMessageType: "templateMessage", lastFromMe: false, lastTimestamp: templateTs, lastStatus: "received", contactPushName: "User A", unreadCount: 0 },
+    ]);
+
+    // Optimistic send from CRM
+    store.handleOptimisticSend({ sessionId: SESSION, remoteJid: JID_A, content: "Oi! Posso ajudar?" });
+
+    const conv = store.getConversation(KEY_A)!;
+    expect(conv.lastMessage).toBe("Oi! Posso ajudar?");
+    expect(conv.lastStatus).toBe("sending");
+  });
+
+  it("should move conversation to top when real message replaces template", () => {
+    const now = Date.now();
+    store.hydrate([
+      { remoteJid: "5511888@s.whatsapp.net", sessionId: SESSION, lastMessage: "Recent msg", lastMessageType: "conversation", lastFromMe: false, lastTimestamp: new Date(now).toISOString(), lastStatus: "received", contactPushName: "User B", unreadCount: 0 },
+      { remoteJid: JID_A, sessionId: SESSION, lastMessage: "[Template]", lastMessageType: "templateMessage", lastFromMe: false, lastTimestamp: new Date(now - 10000).toISOString(), lastStatus: "received", contactPushName: "User A", unreadCount: 0 },
+    ]);
+
+    // User A's conversation is second
+    expect(store.state.sortedIds[0]).toBe(makeConvKey(SESSION, "5511888@s.whatsapp.net"));
+    expect(store.state.sortedIds[1]).toBe(KEY_A);
+
+    // Real message arrives for User A (newer than User B)
+    store.handleMessage({
+      sessionId: SESSION,
+      remoteJid: JID_A,
+      content: "Olá!",
+      fromMe: false,
+      messageType: "conversation",
+      timestamp: now + 1000,
+    }, null);
+
+    // User A should now be at top
+    expect(store.state.sortedIds[0]).toBe(KEY_A);
+    expect(store.getConversation(KEY_A)!.lastMessage).toBe("Olá!");
+  });
+
+  it("should handle conversation preview update replacing [Template]", () => {
+    const templateTs = new Date("2026-03-16T16:33:35Z").toISOString();
+    store.hydrate([
+      { remoteJid: JID_A, sessionId: SESSION, lastMessage: "[Template]", lastMessageType: "templateMessage", lastFromMe: false, lastTimestamp: templateTs, lastStatus: "received", contactPushName: "User A", unreadCount: 0 },
+    ]);
+
+    // Server sends authoritative preview update
+    store.handleConversationPreview({
+      sessionId: SESSION,
+      remoteJid: JID_A,
+      lastMessage: "Mensagem real",
+      lastMessageAt: new Date("2026-03-16T17:00:00Z"),
+      lastMessageStatus: "received",
+      lastMessageType: "conversation",
+      lastFromMe: false,
+    });
+
+    const conv = store.getConversation(KEY_A)!;
+    expect(conv.lastMessage).toBe("Mensagem real");
+  });
+
+  it("should handle multiple template→real→template→real transitions", () => {
+    const t1 = new Date("2026-03-16T10:00:00Z");
+    store.hydrate([
+      { remoteJid: JID_A, sessionId: SESSION, lastMessage: "[Template]", lastMessageType: "templateMessage", lastFromMe: false, lastTimestamp: t1.toISOString(), lastStatus: "received", contactPushName: "User A", unreadCount: 0 },
+    ]);
+
+    // Real message replaces template
+    store.handleMessage({
+      sessionId: SESSION, remoteJid: JID_A, content: "Real 1",
+      fromMe: false, messageType: "conversation",
+      timestamp: new Date("2026-03-16T11:00:00Z").getTime(),
+    }, null);
+    expect(store.getConversation(KEY_A)!.lastMessage).toBe("Real 1");
+
+    // New template arrives (newer)
+    store.handleMessage({
+      sessionId: SESSION, remoteJid: JID_A, content: "[Template]",
+      fromMe: false, messageType: "templateMessage",
+      timestamp: new Date("2026-03-16T12:00:00Z").getTime(),
+    }, null);
+    expect(store.getConversation(KEY_A)!.lastMessage).toBe("[Template]");
+
+    // Another real message replaces template again
+    store.handleMessage({
+      sessionId: SESSION, remoteJid: JID_A, content: "Real 2",
+      fromMe: false, messageType: "conversation",
+      timestamp: new Date("2026-03-16T13:00:00Z").getTime(),
+    }, null);
+    expect(store.getConversation(KEY_A)!.lastMessage).toBe("Real 2");
+  });
+});
