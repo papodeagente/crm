@@ -611,6 +611,16 @@ async function processMessageDelete(session: SessionInfo, data: any): Promise<vo
     const db = await getDb();
     if (!db) return;
 
+    // Get the message before marking as deleted (to check if it's the last message)
+    const [deletedMsg] = await db.select({
+      id: waMessages.id,
+      conversationId: waMessages.conversationId,
+      content: waMessages.content,
+    }).from(waMessages).where(and(
+      eq(waMessages.sessionId, sessionId),
+      eq(waMessages.messageId, messageId)
+    )).limit(1);
+
     // Mark message as deleted in DB
     await db.update(waMessages)
       .set({ content: "[Mensagem apagada]", messageType: "protocolMessage" })
@@ -618,6 +628,22 @@ async function processMessageDelete(session: SessionInfo, data: any): Promise<vo
         eq(waMessages.sessionId, sessionId),
         eq(waMessages.messageId, messageId)
       ));
+
+    // If this message was in a conversation, check if it was the last message
+    // and update the preview to "[Mensagem apagada]" if so
+    if (deletedMsg?.conversationId) {
+      const convId = deletedMsg.conversationId;
+      // Check if the conversation's lastMessagePreview matches the deleted message content
+      const [conv] = await db.select({
+        lastMessagePreview: waConversations.lastMessagePreview,
+      }).from(waConversations).where(eq(waConversations.id, convId)).limit(1);
+
+      if (conv && conv.lastMessagePreview === deletedMsg.content) {
+        await db.update(waConversations)
+          .set({ lastMessagePreview: "[Mensagem apagada]", lastMessageType: "protocolMessage" })
+          .where(eq(waConversations.id, convId));
+      }
+    }
 
     // Emit Socket.IO event
     const { whatsappManager } = await import("./whatsappEvolution");

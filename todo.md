@@ -3857,3 +3857,45 @@
   - server/inboxAudit.test.ts: 47 tests covering all audit fixes
   - Status monotonic, preview filtering, assignment events, store updates, fromMe fix, optimistic media
   - All 2016 tests passing (6 pre-existing failures in messageQueue + whatsappDailyBackup)
+
+## REALTIME CONSISTENCY ENFORCEMENT — Inbox Must Be Instant
+- [x] PART 1: Audit all entry points through full pipeline
+  - Traced 7 entry points: inbound, outbound, status, reaction, template, assignment, message delete
+  - All entry points: DB update → socket emit (correct order)
+  - Message delete now updates wa_conversations preview when deleted msg was last message
+- [x] PART 2: wa_conversations is SOLE preview source
+  - Backend: updateConversationLastMessage is the single writer for preview data
+  - Frontend: ConversationStore is hydrated from wa_conversations, then updated via socket events
+  - No frontend derivation from wa_messages for sidebar preview
+- [x] PART 3: Synchronous update — wa_conversations updated BEFORE socket emit
+  - Verified in messageWorker: DB insert → updateConversationLastMessage → socket emit (sequential)
+  - No defer/queue/background for preview updates
+- [x] PART 4: Socket guarantee — every entry point emits socket event
+  - messages.upsert → whatsapp:message ✅
+  - send.message → whatsapp:message ✅
+  - messages.update → whatsapp:message:status ✅
+  - messages.delete → message:deleted ✅ (now also updates wa_conversations)
+  - All assignment mutations → conversationUpdated ✅
+- [x] PART 5: Frontend hard rule — immutable replace, no refetch to fix state
+  - ConversationStore uses new Map() + new array for every update
+  - useSyncExternalStore detects changes via Object.is on state reference
+  - Refetch only used for: (1) new conversations not in store, (2) socket disconnection recovery, (3) syncOnOpen
+- [x] PART 6: Force reorder on every update
+  - handleMessage() moves conversation to index 0 of sortedIds on every message
+  - handleOptimisticSend() also moves to index 0
+  - handleStatusUpdate() does NOT reorder (correct — status doesn't change message order)
+- [x] PART 7: Status sync guarantee — preview tick matches chat bubble
+  - Backend: STATUS_ORDER map with monotonic enforcement (ERROR→PENDING→SERVER_ACK→DELIVERY_ACK→READ→PLAYED)
+  - Frontend: statusOrder map (sending→sent→delivered→read→played) with monotonic check
+  - wa_conversations.lastStatus also enforced monotonically in SQL
+- [x] PART 8: Detect silent failures — trace logging in place
+  - [TRACE] logs on socket emit, socket receive, store update with timestamps and deltas
+  - Console logs for filter drops, session mismatches, new conversation refetches
+- [x] PART 9: Remove hidden fallbacks — audit complete
+  - conversationsQ has staleTime: Infinity, refetchInterval: false, refetchOnWindowFocus: false
+  - bgSync only activates when socket is disconnected (legitimate recovery)
+  - No polling for sidebar preview data during normal operation
+- [x] PART 10: Hard validation tests — 91 tests passing
+  - Status monotonic, preview filtering, pipeline completeness, store immutability
+  - Assignment events, timestamp guards, webhook echo detection, message delete preview
+- [x] PART 11: Final output report — REALTIME_AUDIT.md generated with full pipeline trace
