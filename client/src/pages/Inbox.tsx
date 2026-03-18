@@ -135,6 +135,7 @@ function getMessagePreview(content: string | null, messageType: string | null): 
 const StatusTick = memo(({ status, fromMe }: { status: string | null; fromMe: boolean }) => {
   if (!fromMe) return null;
   switch (status) {
+    case "sending": return <Clock className="w-[14px] h-[14px] text-muted-foreground/40 shrink-0 animate-pulse" />;
     case "pending": return <Clock className="w-[14px] h-[14px] text-muted-foreground/60 shrink-0" />;
     case "sent": return <Check className="w-[15px] h-[15px] text-muted-foreground/60 shrink-0" />;
     case "delivered": return <CheckCheck className="w-[15px] h-[15px] text-muted-foreground/60 shrink-0" />;
@@ -1915,6 +1916,15 @@ export default function InboxPage() {
               onStatusChange={handleStatusChange}
               myAvatarUrl={activeSession.user?.imgUrl}
               waConversationId={selectedWaConversationId}
+              onOptimisticSend={(msg) => {
+                if (!activeSession?.sessionId || !selectedJid) return;
+                convStore.handleOptimisticSend({
+                  sessionId: activeSession.sessionId,
+                  remoteJid: selectedJid,
+                  content: msg.content,
+                  messageType: msg.messageType,
+                });
+              }}
             />
           </div>
         )}

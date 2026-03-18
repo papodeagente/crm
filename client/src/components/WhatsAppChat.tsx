@@ -76,6 +76,8 @@ export interface WhatsAppChatProps {
   myAvatarUrl?: string;
   // Helpdesk
   waConversationId?: number;
+  /** Called immediately when user sends a message — updates conversation store optimistically */
+  onOptimisticSend?: (msg: { content: string; messageType?: string }) => void;
 }
 
 /* ─── WhatsApp Text Formatting ─── */
@@ -182,6 +184,7 @@ function formatWhatsAppText(text: string): React.ReactNode {
 const MessageStatus = memo(({ status, isFromMe }: { status: string | null | undefined; isFromMe: boolean }) => {
   if (!isFromMe) return null;
   switch (status) {
+    case "sending": return <Clock className="w-[13px] h-[13px] text-muted-foreground/40 inline-block ml-1 animate-pulse" />;
     case "pending": return <Clock className="w-[13px] h-[13px] text-muted-foreground/60 inline-block ml-1" />;
     case "sent": return <Check className="w-[14px] h-[14px] text-muted-foreground/60 inline-block ml-1" />;
     case "delivered": return <CheckCheck className="w-[14px] h-[14px] text-muted-foreground/60 inline-block ml-1" />;
@@ -1172,7 +1175,7 @@ function EditMessageModal({ currentText, onSave, onClose }: { currentText: strin
    MAIN CHAT COMPONENT
    ═══════════════════════════════════════════════════════ */
 
-export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDeal, onCreateContact, hasCrmContact, assignment, agents, onAssign, onStatusChange, myAvatarUrl, waConversationId }: WhatsAppChatProps) {
+export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDeal, onCreateContact, hasCrmContact, assignment, agents, onAssign, onStatusChange, myAvatarUrl, waConversationId, onOptimisticSend }: WhatsAppChatProps) {
   const [showAgentDropdown, setShowAgentDropdown] = useState(false);
   const { lastMessage, lastStatusUpdate, lastMediaUpdate, lastConversationUpdate, lastTranscriptionUpdate, isConnected: socketConnected } = useSocket();
   const [messageText, setMessageText] = useState("");
@@ -1365,6 +1368,8 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
     onMutate: (vars) => {
       const clientMsgId = addOptimisticMessage(vars.message);
       lastClientMsgIdRef.current = clientMsgId;
+      // OPTIMISTIC SEND: instantly update conversation sidebar
+      onOptimisticSend?.({ content: vars.message, messageType: "conversation" });
     },
     onSuccess: (result) => {
       // Part 3: Match ONLY the specific optimistic message by clientMessageId
@@ -1401,6 +1406,8 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
     onMutate: (vars) => {
       const clientMsgId = addOptimisticMessage(vars.message, vars.quotedMessageId);
       lastQuoteClientMsgIdRef.current = clientMsgId;
+      // OPTIMISTIC SEND: instantly update conversation sidebar
+      onOptimisticSend?.({ content: vars.message, messageType: "conversation" });
     },
     onSuccess: (result) => {
       const clientMsgId = lastQuoteClientMsgIdRef.current;
@@ -1431,6 +1438,11 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
 
   const uploadMedia = trpc.whatsapp.uploadMedia.useMutation();
   const sendMedia = trpc.whatsapp.sendMedia.useMutation({
+    onMutate: (vars) => {
+      // OPTIMISTIC SEND: instantly update conversation sidebar for media
+      const mediaLabel = vars.mediaType === "image" ? "📷 Imagem" : vars.mediaType === "video" ? "🎥 Vídeo" : vars.mediaType === "audio" ? "🎤 Áudio" : "📄 Documento";
+      onOptimisticSend?.({ content: mediaLabel, messageType: vars.mediaType || "document" });
+    },
     onSuccess: () => delayedRefetch(),
     onError: () => toast.error("Erro ao enviar mídia"),
   });
@@ -1453,16 +1465,25 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
   const sendPresenceMut = trpc.whatsapp.sendPresence.useMutation();
 
   const sendLocationMut = trpc.whatsapp.sendLocation.useMutation({
+    onMutate: () => {
+      onOptimisticSend?.({ content: "📍 Localização", messageType: "locationMessage" });
+    },
     onSuccess: () => { messagesQ.refetch(); toast.success("Localização enviada"); },
     onError: () => toast.error("Erro ao enviar localização"),
   });
 
   const sendContactMut = trpc.whatsapp.sendContact.useMutation({
+    onMutate: () => {
+      onOptimisticSend?.({ content: "👤 Contato", messageType: "contactMessage" });
+    },
     onSuccess: () => { messagesQ.refetch(); toast.success("Contato enviado"); },
     onError: () => toast.error("Erro ao enviar contato"),
   });
 
   const sendPollMut = trpc.whatsapp.sendPoll.useMutation({
+    onMutate: () => {
+      onOptimisticSend?.({ content: "📊 Enquete", messageType: "pollCreationMessage" });
+    },
     onSuccess: () => { messagesQ.refetch(); toast.success("Enquete enviada"); },
     onError: () => toast.error("Erro ao enviar enquete"),
   });
@@ -1514,33 +1535,78 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
   }, [messagesQ.data, lastMessage]);
 
   // Socket message → optimistic cache update (no refetch)
+  // RECONCILIATION: When a fromMe socket message arrives, it may be the webhook echo
+  // of an optimistic message. We reconcile by updating status instead of duplicating.
   useEffect(() => {
     if (!lastMessage || lastMessage.remoteJid !== remoteJid) return;
     const _chatTraceStart = Date.now();
     const _chatTraceMsgId = (lastMessage as any).messageId || 'N/A';
     console.log(`[TRACE][CHAT_SOCKET_RECEIVED] timestamp: ${_chatTraceStart} | msgId: ${_chatTraceMsgId} | remoteJid: ${remoteJid?.substring(0, 15)}`);
-    // Build a lightweight message object from the socket event
-    const socketMsg = {
-      id: (lastMessage as any).id || -Date.now(),
-      sessionId: lastMessage.sessionId || sessionId,
-      messageId: lastMessage.messageId || `socket_${Date.now()}`,
-      remoteJid: lastMessage.remoteJid,
-      fromMe: lastMessage.fromMe,
-      messageType: lastMessage.messageType || 'conversation',
-      content: lastMessage.content || '',
-      status: lastMessage.fromMe ? 'sent' : 'received',
-      timestamp: lastMessage.timestamp ? new Date(lastMessage.timestamp).toISOString() : new Date().toISOString(),
-      createdAt: new Date().toISOString(),
-      quotedMessageId: null,
-    };
+
     const queryKey = { sessionId, remoteJid, limit: msgLimit };
-    utils.whatsapp.messagesByContact.setData(queryKey, (old: any) => {
-      if (!old) return [socketMsg];
-      // Deduplicate: skip if messageId already exists
-      if (old.some((m: any) => m.messageId === socketMsg.messageId)) return old;
-      // Insert at beginning (newest first) and trim to limit
-      return [socketMsg, ...old].slice(0, msgLimit + 20);
-    });
+
+    // RECONCILIATION for fromMe messages: check if this is a webhook echo of an optimistic message
+    if (lastMessage.fromMe) {
+      utils.whatsapp.messagesByContact.setData(queryKey, (old: any) => {
+        if (!old) return old;
+        // Find the oldest unconfirmed optimistic message (status "pending") with matching content
+        const optIdx = old.findIndex((m: any) =>
+          m.messageId?.startsWith("opt_") && m.status === "pending" && m.content === lastMessage.content
+        );
+        if (optIdx >= 0) {
+          // RECONCILE: update the optimistic message with server data (real messageId, status "sent")
+          const reconciled = {
+            ...old[optIdx],
+            messageId: lastMessage.messageId || old[optIdx].messageId,
+            status: "sent",
+            id: (lastMessage as any).id || old[optIdx].id,
+          };
+          const updated = [...old];
+          updated[optIdx] = reconciled;
+          console.log(`[TRACE][CHAT_RECONCILED] optimistic msg reconciled | optId: ${old[optIdx].messageId} → ${reconciled.messageId}`);
+          return updated;
+        }
+        // No optimistic match — check for duplicate by messageId
+        if (old.some((m: any) => m.messageId === lastMessage.messageId)) return old;
+        // New fromMe message from another device/tab — add it
+        const socketMsg = {
+          id: (lastMessage as any).id || -Date.now(),
+          sessionId: lastMessage.sessionId || sessionId,
+          messageId: lastMessage.messageId || `socket_${Date.now()}`,
+          remoteJid: lastMessage.remoteJid,
+          fromMe: true,
+          messageType: lastMessage.messageType || 'conversation',
+          content: lastMessage.content || '',
+          status: 'sent',
+          timestamp: lastMessage.timestamp ? new Date(lastMessage.timestamp).toISOString() : new Date().toISOString(),
+          createdAt: new Date().toISOString(),
+          quotedMessageId: null,
+        };
+        return [socketMsg, ...old].slice(0, msgLimit + 20);
+      });
+    } else {
+      // Incoming message from contact — add to cache
+      const socketMsg = {
+        id: (lastMessage as any).id || -Date.now(),
+        sessionId: lastMessage.sessionId || sessionId,
+        messageId: lastMessage.messageId || `socket_${Date.now()}`,
+        remoteJid: lastMessage.remoteJid,
+        fromMe: false,
+        messageType: lastMessage.messageType || 'conversation',
+        content: lastMessage.content || '',
+        status: 'received',
+        timestamp: lastMessage.timestamp ? new Date(lastMessage.timestamp).toISOString() : new Date().toISOString(),
+        createdAt: new Date().toISOString(),
+        quotedMessageId: null,
+      };
+      utils.whatsapp.messagesByContact.setData(queryKey, (old: any) => {
+        if (!old) return [socketMsg];
+        // Deduplicate: skip if messageId already exists
+        if (old.some((m: any) => m.messageId === socketMsg.messageId)) return old;
+        // Insert at beginning (newest first) and trim to limit
+        return [socketMsg, ...old].slice(0, msgLimit + 20);
+      });
+    }
     console.log(`[TRACE][CHAT_CACHE_UPDATED] timestamp: ${Date.now()} | delta: ${Date.now() - _chatTraceStart}ms | msgId: ${_chatTraceMsgId}`);
   }, [lastMessage, remoteJid, sessionId, msgLimit, utils]);
 

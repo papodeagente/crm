@@ -15,6 +15,18 @@
  *   4. Create NEW state object so useSyncExternalStore detects the change
  *   5. React re-renders from sortedIds.map(id => conversationMap.get(id))
  *
+ * OPTIMISTIC SEND:
+ *   When user sends a message, handleOptimisticSend() immediately:
+ *   1. Updates lastMessage, lastTimestamp, lastFromMe, lastStatus="sending"
+ *   2. Moves conversation to top of sortedIds
+ *   3. Does NOT wait for webhook/socket confirmation
+ *   4. Webhook reconciliation only updates status (sent/delivered/read)
+ *
+ * STABLE ORDERING:
+ *   - Local timestamps (from optimistic sends) take priority
+ *   - Webhook timestamps only update if strictly newer than local
+ *   - handleMessage() will NOT re-sort if conversation is already at correct position
+ *
  * CRITICAL: useSyncExternalStore uses Object.is to compare snapshots.
  * Every mutation MUST produce a new state object reference.
  *
@@ -48,6 +60,10 @@ export interface ConvEntry {
   contactEmail?: string | null;
   contactPhone?: string | null;
   queuedAt?: string | Date | null;
+  /** Tracks if the last update was from an optimistic send (local, not yet confirmed) */
+  _optimistic?: boolean;
+  /** Local timestamp from optimistic send — takes priority over webhook timestamps */
+  _localTimestamp?: number;
 }
 
 interface StoreState {
@@ -143,8 +159,71 @@ class ConversationStore {
   }
 
   /**
+   * OPTIMISTIC SEND — called immediately when user sends a message.
+   * Updates conversation preview, timestamp, and moves to top.
+   * Does NOT wait for Evolution API or webhook.
+   *
+   * @param msg - The message being sent
+   * @returns true if conversation was found and updated
+   */
+  handleOptimisticSend(msg: {
+    sessionId: string;
+    remoteJid: string;
+    content: string;
+    messageType?: string;
+  }): boolean {
+    const key = makeConvKey(msg.sessionId, msg.remoteJid);
+    if (!key || !msg.remoteJid) return false;
+
+    const oldMap = this.state.conversationMap;
+    const oldIds = this.state.sortedIds;
+    const existing = oldMap.get(key);
+
+    if (!existing) {
+      return false; // conversation not in store
+    }
+
+    const now = Date.now();
+    const nowISO = new Date(now).toISOString();
+
+    // Create updated entry with optimistic data
+    const updated: ConvEntry = {
+      ...existing,
+      lastMessage: msg.content,
+      lastMessageType: msg.messageType || "conversation",
+      lastFromMe: true,
+      lastTimestamp: nowISO,
+      lastStatus: "sending",
+      _optimistic: true,
+      _localTimestamp: now,
+    };
+
+    // NEW Map reference with updated entry
+    const newMap = new Map(oldMap);
+    newMap.set(key, updated);
+
+    // Move conversation to top (index 0)
+    const currentIdx = oldIds.indexOf(key);
+    let newIds: string[];
+    if (currentIdx === 0) {
+      newIds = [...oldIds]; // already at top, just create new reference
+    } else if (currentIdx > 0) {
+      newIds = [key, ...oldIds.slice(0, currentIdx), ...oldIds.slice(currentIdx + 1)];
+    } else {
+      newIds = [key, ...oldIds]; // not found, add to top
+    }
+
+    this.commit(newMap, newIds);
+    return true;
+  }
+
+  /**
    * Handle incoming socket message.
    * Creates NEW Map and NEW array references to trigger React re-render.
+   *
+   * STABLE ORDERING: If the conversation already has a _localTimestamp that is
+   * newer than the incoming message, we update content but do NOT re-sort.
+   * This prevents webhook echoes from causing jumps.
    *
    * @param msg - The incoming message (must include sessionId)
    * @param activeKey - The currently open conversationKey (or null)
@@ -170,11 +249,32 @@ class ConversationStore {
       return false; // new conversation — caller should fetch from server
     }
 
-    // Only update if this message is newer
-    const msgTimestamp = new Date(msg.timestamp);
+    const msgTimestamp = new Date(msg.timestamp).getTime();
     const existingTimestamp = existing.lastTimestamp ? new Date(existing.lastTimestamp).getTime() : 0;
-    if (msgTimestamp.getTime() < existingTimestamp) {
-      return true; // already have newer data
+
+    // STABLE ORDERING: If this is a fromMe message and we already have a local
+    // optimistic timestamp that is >= this message's timestamp, this is the webhook
+    // echo of our own sent message. Only update status, do NOT re-sort.
+    const isWebhookEcho = msg.fromMe && existing._optimistic && existing._localTimestamp && existing._localTimestamp >= msgTimestamp;
+
+    if (isWebhookEcho) {
+      // Webhook echo: update status from "sending" to "sent", keep position
+      const updated: ConvEntry = {
+        ...existing,
+        lastStatus: "sent",
+        _optimistic: false, // confirmed by server
+      };
+      const newMap = new Map(oldMap);
+      newMap.set(key, updated);
+      // Do NOT change sortedIds — keep current position
+      this.commit(newMap, [...oldIds]);
+      return true;
+    }
+
+    // For non-echo messages, check if this message is older than what we have
+    if (msgTimestamp < existingTimestamp && !msg.fromMe) {
+      // Old message arriving late — don't update preview or reorder
+      return true;
     }
 
     // Determine unread count
@@ -193,9 +293,11 @@ class ConversationStore {
       lastMessage: msg.content || existing.lastMessage,
       lastMessageType: msg.messageType,
       lastFromMe: msg.fromMe,
-      lastTimestamp: msgTimestamp,
+      lastTimestamp: new Date(msgTimestamp),
       lastStatus: msg.fromMe ? "sent" : "received",
       unreadCount: newUnread,
+      _optimistic: false,
+      _localTimestamp: undefined,
     };
 
     // NEW Map reference with updated entry
@@ -220,6 +322,7 @@ class ConversationStore {
   /**
    * Handle status update (delivered, read, played).
    * Uses conversationKey for lookup.
+   * RECONCILIATION: Only updates status field, never re-sorts.
    */
   handleStatusUpdate(update: { sessionId: string; remoteJid: string; status: string }) {
     const key = makeConvKey(update.sessionId, update.remoteJid);
@@ -228,9 +331,21 @@ class ConversationStore {
     const existing = this.state.conversationMap.get(key);
     if (!existing || !existing.lastFromMe) return;
 
-    const newMap = new Map(this.state.conversationMap);
-    newMap.set(key, { ...existing, lastStatus: update.status });
+    // Status progression: sending → sent → delivered → read
+    // Never go backwards
+    const statusOrder: Record<string, number> = { sending: 0, sent: 1, delivered: 2, read: 3, played: 4 };
+    const currentOrder = statusOrder[existing.lastStatus || ""] ?? -1;
+    const newOrder = statusOrder[update.status] ?? -1;
+    if (newOrder <= currentOrder) return; // don't go backwards
 
+    const newMap = new Map(this.state.conversationMap);
+    newMap.set(key, {
+      ...existing,
+      lastStatus: update.status,
+      _optimistic: false, // confirmed by server
+    });
+
+    // Do NOT change sortedIds — status updates never re-sort
     this.commit(newMap, [...this.state.sortedIds]);
   }
 
@@ -320,6 +435,10 @@ export function useConversationStore() {
     store.hydrate(conversations, defaultSessionId);
   }, [store]);
 
+  const handleOptimisticSend = useCallback((msg: Parameters<ConversationStore['handleOptimisticSend']>[0]) => {
+    return store.handleOptimisticSend(msg);
+  }, [store]);
+
   const handleMessage = useCallback((msg: Parameters<ConversationStore['handleMessage']>[0], activeKey: string | null) => {
     return store.handleMessage(msg, activeKey);
   }, [store]);
@@ -357,9 +476,11 @@ export function useConversationStore() {
     isHydrated: store.isHydrated,
     /** Initialize from server data */
     hydrate,
+    /** Optimistic send: instantly update conversation preview and move to top */
+    handleOptimisticSend,
     /** Handle incoming socket message. Returns false if conversation is new (needs server fetch). */
     handleMessage,
-    /** Handle message status update */
+    /** Handle message status update (only updates status, never re-sorts) */
     handleStatusUpdate,
     /** Mark conversation as read (by conversationKey) */
     markRead,

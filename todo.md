@@ -3800,3 +3800,12 @@
 - [x] STAGE 7: Calcular latência entre cada estágio
 - [x] STAGE 8: Identificar o maior gargalo com prova medida
 - [x] Produzir relatório: "O atraso é causado por: latência EXTERNA ao CRM (Evolution API → CRM)" (PIPELINE_LATENCY_DIAGNOSIS.md)
+
+## Optimistic Realtime Inbox — Eliminar dependência de webhook timing
+- [x] PART 1: Optimistic Send — mensagem aparece instantaneamente no chat e sidebar ao enviar
+- [x] PART 2: Socket como driver primário — inbox atualiza APENAS via optimistic + socket
+- [x] PART 3: Webhook como reconciliação secundária — apenas atualiza status, não reordena
+- [x] PART 4: Prevenir mensagem desaparecendo — status "sending" → "sent" sem remover/reinserir
+- [x] PART 5: Ordenação estável — lastTimestamp local tem prioridade sobre webhook
+- [x] PART 6: Remover dependência de webhook — inbox funciona mesmo com webhook atrasado/falho
+- [x] PART 7: Validação — testes vitest para todos os cenários (24/24 passando)
