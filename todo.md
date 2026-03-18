@@ -3886,3 +3886,21 @@
 - [x] Manual "Transcrever áudio" button also uses BullMQ worker (no URL dependency)
 - [x] Debug server logs for transcription worker errors — comprehensive logging already in place
 - [x] 71 vitest tests passing for transcription pipeline (10 new tests for retry/auto-transcribe flow)
+
+## Audio Transcription STILL Not Working (Post-Fix v2)
+- [x] BUG: Transcription worker not processing jobs — stays in "Transcrevendo..." forever
+  - Root cause: audioTranscriptionWorker.ts used `enableReadyCheck: false` + `lazyConnect: false` for Redis connections
+  - BullMQ requires `enableReadyCheck: true` + `lazyConnect: true` + explicit `conn.connect()` + "ready" event tracking
+  - Without enableReadyCheck, BullMQ Worker was created on a TCP-connected but not-ready Redis connection → never consumed jobs
+  - Fix: Aligned Redis connection pattern with messageQueue.ts (which works correctly)
+  - Added connectionReady/connectionFailed flags, "ready" event listeners, and sync fallback when Redis not ready
+- [x] BUG: Retry button click does nothing visible (only shows "Transcrevendo..." after page reload)
+  - Root cause: handleRetranscribe did not set optimistic loading state before calling mutation
+  - Fix: Added `setTranscriptions(prev => ({ ...prev, [msgId]: { loading: true } }))` before mutate call
+  - Now shows spinner immediately when user clicks "Tentar novamente" or "Transcrever áudio"
+- [x] Added sync fallback: if Redis connection is not ready, enqueueAudioTranscription falls back to synchronous processing
+- [x] Added sync fallback: if BullMQ enqueue fails, falls back to synchronous processing
+- [x] Worker now waits for Redis "ready" event before creating BullMQ Worker instance
+- [x] Added more refetch intervals (20s, 30s) for longer transcription jobs
+- [x] DB status: 413 failed, 4 pending, 4905 NULL, 0 completed — confirms worker never processed any jobs before this fix
+- [x] 71 vitest tests passing

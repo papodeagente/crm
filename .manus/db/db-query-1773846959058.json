@@ -1,0 +1,42 @@
+{
+  "query": "SHOW COLUMNS FROM messages LIKE '%audio%'",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute SHOW COLUMNS FROM messages LIKE '%audio%'",
+  "rows": [
+    {
+      "Field": "audio_transcription",
+      "Type": "text",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "audio_transcription_status",
+      "Type": "enum('pending','processing','completed','failed')",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "audio_transcription_language",
+      "Type": "varchar(16)",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "audio_transcription_duration",
+      "Type": "int",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    }
+  ],
+  "messages": [],
+  "stdout": "Field\tType\tNull\tKey\tDefault\tExtra\naudio_transcription\ttext\tYES\t\tNULL\t\naudio_transcription_status\tenum('pending','processing','completed','failed')\tYES\t\tNULL\t\naudio_transcription_language\tvarchar(16)\tYES\t\tNULL\t\naudio_transcription_duration\tint\tYES\t\tNULL\t\n",
+  "stderr": "",
+  "execution_time_ms": 60
+}

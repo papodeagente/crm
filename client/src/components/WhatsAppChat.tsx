@@ -1320,14 +1320,19 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
   // Retry transcription via BullMQ worker (uses Evolution API to download audio, no URL dependency)
   const handleRetranscribe = useCallback((msgId: number) => {
     if (!tenantId) return;
+    // Optimistic UI: show loading spinner immediately
+    setTranscriptions(prev => ({ ...prev, [msgId]: { loading: true } }));
     retranscribeMut.mutate(
       { tenantId, messageId: msgId },
       {
         onSuccess: () => {
           // Worker will process async and emit socket event — refetch messages to get updated status
+          // Keep loading state until refetch brings back the DB status
           setTimeout(() => messagesQ.refetch(), 2000);
           setTimeout(() => messagesQ.refetch(), 5000);
           setTimeout(() => messagesQ.refetch(), 10000);
+          setTimeout(() => messagesQ.refetch(), 20000);
+          setTimeout(() => messagesQ.refetch(), 30000);
         },
         onError: (err) => {
           setTranscriptions(prev => ({ ...prev, [msgId]: { error: err.message || "Falha ao re-enfileirar" } }));

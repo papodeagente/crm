@@ -18,6 +18,13 @@
  * 
  * IMPORTANT: BullMQ requires SEPARATE Redis connections for Queue and Worker.
  * Sharing a single connection causes deadlock where the worker never consumes jobs.
+ * 
+ * Redis connection pattern aligned with messageQueue.ts:
+ * - enableReadyCheck: true
+ * - lazyConnect: true
+ * - explicit conn.connect()
+ * - "ready" event tracking (not "connect")
+ * - connectionReady/connectionFailed flags
  */
 
 import { Queue, Worker, Job } from "bullmq";
@@ -52,48 +59,103 @@ const MAX_RETRIES = 3;
 const PROCESSING_TIMEOUT_MS = 3 * 60 * 1000; // 3 minutes — mark as failed if stuck
 
 // ── Redis Connections (SEPARATE for Queue and Worker) ─────────
+// Pattern aligned with messageQueue.ts: enableReadyCheck, lazyConnect, ready event
 
 let queueRedis: IORedis | null = null;
 let workerRedis: IORedis | null = null;
 let transcriptionQueue: Queue | null = null;
 let transcriptionWorker: Worker | null = null;
 
+let queueConnectionReady = false;
+let queueConnectionFailed = false;
+let workerConnectionReady = false;
+let workerConnectionFailed = false;
+
 function getRedisUrl(): string | null {
   return process.env.REDIS_URL || null;
 }
 
-function createRedisConnection(label: string): IORedis | null {
+function createRedisConnection(label: string, onReady: () => void, onFailed: () => void): IORedis | null {
   const url = getRedisUrl();
   if (!url) return null;
+
   try {
+    let firstErrorLogged = false;
+
     const conn = new IORedis(url, {
-      maxRetriesPerRequest: null,
-      enableReadyCheck: false,
-      retryStrategy: (times) => Math.min(times * 500, 5000),
-      lazyConnect: false,
+      maxRetriesPerRequest: null, // Required by BullMQ
+      enableReadyCheck: true,
+      connectTimeout: 10000,
+      retryStrategy(times) {
+        if (times > 5) {
+          if (!firstErrorLogged) {
+            console.warn(`[AudioTranscription] Redis ${label} connection failed after 5 retries`);
+            firstErrorLogged = true;
+          }
+          onFailed();
+          return null; // Stop retrying
+        }
+        return Math.min(times * 500, 3000);
+      },
+      lazyConnect: true,
     });
+
+    conn.on("ready", () => {
+      onReady();
+      console.log(`[AudioTranscription] Redis ${label} ready`);
+    });
+
     conn.on("error", (err) => {
-      console.error(`[AudioTranscription] Redis ${label} error:`, err.message);
+      if (!firstErrorLogged) {
+        console.warn(`[AudioTranscription] Redis ${label} error:`, err.message);
+        firstErrorLogged = true;
+      }
     });
-    conn.on("connect", () => {
-      console.log(`[AudioTranscription] Redis ${label} connected`);
+
+    conn.on("close", () => {
+      // Silent close
     });
+
+    conn.on("reconnecting", () => {
+      // Silent reconnection
+    });
+
+    // Initiate connection explicitly
+    conn.connect().catch((err) => {
+      if (!firstErrorLogged) {
+        console.warn(`[AudioTranscription] Redis ${label} connect failed:`, err.message);
+        firstErrorLogged = true;
+      }
+      onFailed();
+    });
+
     return conn;
   } catch (err: any) {
     console.error(`[AudioTranscription] Redis ${label} creation failed:`, err.message);
+    onFailed();
     return null;
   }
 }
 
 function getQueueRedis(): IORedis | null {
+  if (queueConnectionFailed) return null;
   if (queueRedis) return queueRedis;
-  queueRedis = createRedisConnection("queue");
+  queueRedis = createRedisConnection(
+    "queue",
+    () => { queueConnectionReady = true; queueConnectionFailed = false; },
+    () => { queueConnectionFailed = true; }
+  );
   return queueRedis;
 }
 
 function getWorkerRedis(): IORedis | null {
+  if (workerConnectionFailed) return null;
   if (workerRedis) return workerRedis;
-  workerRedis = createRedisConnection("worker");
+  workerRedis = createRedisConnection(
+    "worker",
+    () => { workerConnectionReady = true; workerConnectionFailed = false; },
+    () => { workerConnectionFailed = true; }
+  );
   return workerRedis;
 }
 
@@ -117,14 +179,24 @@ export function getTranscriptionQueue(): Queue | null {
 
 /**
  * Enqueue an audio message for transcription.
- * Returns true if enqueued, false if queue unavailable.
+ * If Redis/BullMQ is unavailable, falls back to synchronous processing.
  */
 export async function enqueueAudioTranscription(job: AudioTranscriptionJob): Promise<boolean> {
   const t0 = Date.now();
   const queue = getTranscriptionQueue();
+
+  // If queue is null (no Redis URL or connection failed), use sync fallback
   if (!queue) {
-    // No Redis — process synchronously as fallback
     console.log(`[TRANSCRIPTION_JOB_CREATED] msgId=${job.messageId} mode=sync_fallback (no Redis)`);
+    processTranscriptionJob(job).catch(err => {
+      console.error(`[TRANSCRIPTION_FAILED] msgId=${job.messageId} stage=sync_fallback error="${err.message}"`);
+    });
+    return true;
+  }
+
+  // If queue exists but Redis connection is not ready yet, also use sync fallback
+  if (!queueConnectionReady) {
+    console.log(`[TRANSCRIPTION_JOB_CREATED] msgId=${job.messageId} mode=sync_fallback (Redis not ready)`);
     processTranscriptionJob(job).catch(err => {
       console.error(`[TRANSCRIPTION_FAILED] msgId=${job.messageId} stage=sync_fallback error="${err.message}"`);
     });
@@ -138,8 +210,12 @@ export async function enqueueAudioTranscription(job: AudioTranscriptionJob): Pro
     console.log(`[TRANSCRIPTION_JOB_CREATED] msgId=${job.messageId} tenant=${job.tenantId} session=${job.sessionId} mode=bullmq enqueueMs=${Date.now() - t0}`);
     return true;
   } catch (err: any) {
-    console.error(`[TRANSCRIPTION_FAILED] msgId=${job.messageId} stage=enqueue error="${err.message}" enqueueMs=${Date.now() - t0}`);
-    return false;
+    // BullMQ enqueue failed — fall back to sync processing
+    console.error(`[TRANSCRIPTION_ENQUEUE_FAILED] msgId=${job.messageId} error="${err.message}" — falling back to sync`);
+    processTranscriptionJob(job).catch(syncErr => {
+      console.error(`[TRANSCRIPTION_FAILED] msgId=${job.messageId} stage=sync_fallback error="${syncErr.message}"`);
+    });
+    return true;
   }
 }
 
@@ -208,7 +284,7 @@ async function processTranscriptionJob(data: AudioTranscriptionJob): Promise<voi
     await db.update(waMessages)
       .set({ audioTranscriptionStatus: "failed" })
       .where(eq(waMessages.id, messageId));
-    throw err; // Let BullMQ retry
+    throw err; // Let BullMQ retry (or propagate in sync mode)
   }
 
   // ── Step 5: Check size limit ──
@@ -345,38 +421,67 @@ export function initAudioTranscriptionWorker(): void {
     return;
   }
 
-  transcriptionWorker = new Worker(
-    QUEUE_NAME,
-    async (job: Job<AudioTranscriptionJob>) => {
-      console.log(`[AudioTranscription] Worker picked up job ${job.id} (msgId=${job.data.messageId})`);
-      await processTranscriptionJob(job.data);
-    },
-    {
-      connection: conn,
-      concurrency: MAX_CONCURRENT_PER_TENANT,
-      limiter: {
-        max: MAX_CONCURRENT_PER_TENANT,
-        duration: 1000,
+  // Wait for Redis to be ready before creating the worker
+  // BullMQ needs a fully ready connection to start consuming
+  const startWorker = () => {
+    if (transcriptionWorker) return; // Already started
+
+    transcriptionWorker = new Worker(
+      QUEUE_NAME,
+      async (job: Job<AudioTranscriptionJob>) => {
+        console.log(`[AudioTranscription] Worker picked up job ${job.id} (msgId=${job.data.messageId})`);
+        await processTranscriptionJob(job.data);
       },
-    }
-  );
+      {
+        connection: conn,
+        concurrency: MAX_CONCURRENT_PER_TENANT,
+        limiter: {
+          max: MAX_CONCURRENT_PER_TENANT,
+          duration: 1000,
+        },
+      }
+    );
 
-  transcriptionWorker.on("completed", (job) => {
-    console.log(`[AudioTranscription] Job ${job.id} completed successfully`);
-  });
+    transcriptionWorker.on("completed", (job) => {
+      console.log(`[AudioTranscription] Job ${job.id} completed successfully`);
+    });
 
-  transcriptionWorker.on("failed", (job, err) => {
-    console.error(`[AudioTranscription] Job ${job?.id} failed (attempt ${job?.attemptsMade}/${MAX_RETRIES}): ${err.message}`);
-  });
+    transcriptionWorker.on("failed", (job, err) => {
+      console.error(`[AudioTranscription] Job ${job?.id} failed (attempt ${job?.attemptsMade}/${MAX_RETRIES}): ${err.message}`);
+    });
 
-  transcriptionWorker.on("error", (err) => {
-    console.error(`[AudioTranscription] Worker error:`, err.message);
-  });
+    transcriptionWorker.on("error", (err) => {
+      console.error(`[AudioTranscription] Worker error:`, err.message);
+    });
 
-  console.log("[AudioTranscription] Worker started (separate Redis connections for queue and worker)");
+    transcriptionWorker.on("active", (job) => {
+      console.log(`[AudioTranscription] Job ${job.id} now active`);
+    });
 
-  // ── Timeout Safety: recover stuck "processing" jobs ──
-  startStuckJobRecovery();
+    console.log("[AudioTranscription] Worker started (separate Redis connections for queue and worker)");
+
+    // ── Timeout Safety: recover stuck "processing" jobs ──
+    startStuckJobRecovery();
+  };
+
+  // If already ready, start immediately
+  if (workerConnectionReady) {
+    startWorker();
+  } else {
+    // Wait for the ready event
+    conn.once("ready", () => {
+      startWorker();
+    });
+
+    // Also handle case where connection fails
+    const failTimeout = setTimeout(() => {
+      if (!workerConnectionReady && !transcriptionWorker) {
+        console.warn("[AudioTranscription] Redis worker connection timed out after 15s — sync fallback active");
+      }
+    }, 15000);
+
+    conn.once("ready", () => clearTimeout(failTimeout));
+  }
 }
 
 // ── Stuck Job Recovery ─────────────────────────────────────────
