@@ -623,7 +623,7 @@ function ImageWithFallback({ msg, fromMe, myAvatarUrl, contactAvatarUrl, onImage
 const MessageBubble = memo(({
   msg, isFirst, isLast, allMessages,
   onReply, onReact, onDelete, onEdit, onForward, contactAvatarUrl, myAvatarUrl, onImageClick,
-  autoTranscribe, onTranscribe, transcriptions
+  autoTranscribe, onTranscribe, transcriptions, onRetranscribe, reactions
 }: {
   msg: Message; isFirst: boolean; isLast: boolean; allMessages: Message[];
   onReply: (target: ReplyTarget) => void;
@@ -637,6 +637,8 @@ const MessageBubble = memo(({
   autoTranscribe?: boolean;
   onTranscribe?: (msgId: number, audioUrl: string) => void;
   transcriptions?: Record<number, { text?: string; loading?: boolean; error?: string }>;
+  onRetranscribe?: (msgId: number) => void;
+  reactions?: Array<{ emoji: string; senderJid: string; fromMe: boolean }>;
 }) => {
   const [showMenu, setShowMenu] = useState(false);
   const fromMe = msg.fromMe;
@@ -912,6 +914,35 @@ const MessageBubble = memo(({
             <MessageStatus status={msg.status} isFromMe={fromMe} />
           </span>
         </div>
+
+        {/* Reactions */}
+        {reactions && reactions.length > 0 && (
+          <div className={`flex flex-wrap gap-1 mt-[-4px] mb-1 ${fromMe ? 'justify-end' : 'justify-start'}`}>
+            {(() => {
+              // Group reactions by emoji
+              const grouped = reactions.reduce<Record<string, { count: number; fromMe: boolean }>>((acc, r) => {
+                if (!acc[r.emoji]) acc[r.emoji] = { count: 0, fromMe: false };
+                acc[r.emoji].count++;
+                if (r.fromMe) acc[r.emoji].fromMe = true;
+                return acc;
+              }, {});
+              return Object.entries(grouped).map(([emoji, info]) => (
+                <span
+                  key={emoji}
+                  className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs border ${
+                    info.fromMe
+                      ? 'bg-blue-50 border-blue-200 dark:bg-blue-900/30 dark:border-blue-700'
+                      : 'bg-muted/50 border-border'
+                  }`}
+                  title={info.fromMe ? 'Você reagiu' : ''}
+                >
+                  <span className="text-sm">{emoji}</span>
+                  {info.count > 1 && <span className="text-[10px] text-muted-foreground">{info.count}</span>}
+                </span>
+              ));
+            })()}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -1177,7 +1208,7 @@ function EditMessageModal({ currentText, onSave, onClose }: { currentText: strin
 
 export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDeal, onCreateContact, hasCrmContact, assignment, agents, onAssign, onStatusChange, myAvatarUrl, waConversationId, onOptimisticSend }: WhatsAppChatProps) {
   const [showAgentDropdown, setShowAgentDropdown] = useState(false);
-  const { lastMessage, lastStatusUpdate, lastMediaUpdate, lastConversationUpdate, lastTranscriptionUpdate, isConnected: socketConnected } = useSocket();
+  const { lastMessage, lastStatusUpdate, lastMediaUpdate, lastConversationUpdate, lastTranscriptionUpdate, lastReaction, isConnected: socketConnected } = useSocket();
   const [messageText, setMessageText] = useState("");
   const [showAttach, setShowAttach] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
@@ -1285,6 +1316,48 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
     setMsgLimit(prev => prev + 50);
   }, []);
 
+  // ─── Reactions ───
+  // Local reactions cache: { [targetMessageId]: { emoji, senderJid, fromMe }[] }
+  const [reactionsMap, setReactionsMap] = useState<Record<string, Array<{ emoji: string; senderJid: string; fromMe: boolean }>>>({});
+
+  // Fetch reactions for visible messages
+  const messageIds = useMemo(() => {
+    return (messagesQ.data || []).map(m => m.messageId).filter((id): id is string => !!id);
+  }, [messagesQ.data]);
+
+  const reactionsQ = trpc.whatsapp.reactions.useQuery(
+    { sessionId, messageIds },
+    { enabled: !!sessionId && messageIds.length > 0, staleTime: 30000 }
+  );
+
+  // Hydrate reactionsMap from query
+  useEffect(() => {
+    if (!reactionsQ.data) return;
+    const map: Record<string, Array<{ emoji: string; senderJid: string; fromMe: boolean }>> = {};
+    for (const r of reactionsQ.data) {
+      if (!r.emoji) continue; // empty emoji = reaction removed
+      if (!map[r.targetMessageId]) map[r.targetMessageId] = [];
+      map[r.targetMessageId].push({ emoji: r.emoji, senderJid: r.senderJid, fromMe: r.fromMe });
+    }
+    setReactionsMap(map);
+  }, [reactionsQ.data]);
+
+  // Handle realtime reaction socket events
+  useEffect(() => {
+    if (!lastReaction || lastReaction.remoteJid !== remoteJid) return;
+    setReactionsMap(prev => {
+      const targetId = lastReaction.targetMessageId;
+      const existing = [...(prev[targetId] || [])];
+      // Remove any previous reaction from the same sender
+      const filtered = existing.filter(r => r.senderJid !== lastReaction.senderJid);
+      // If emoji is not empty, add the new reaction
+      if (lastReaction.emoji) {
+        filtered.push({ emoji: lastReaction.emoji, senderJid: lastReaction.senderJid, fromMe: lastReaction.fromMe });
+      }
+      return { ...prev, [targetId]: filtered };
+    });
+  }, [lastReaction, remoteJid]);
+
   // Transcription mutation
   const transcribeMut = trpc.ai.transcribe.useMutation();
 
@@ -1310,6 +1383,28 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
 
   const utils = trpc.useUtils();
 
+  // Retranscribe via BullMQ worker (for retry button and auto-transcribe)
+  const retranscribeMut = trpc.ai.retranscribeAudio.useMutation();
+  const handleRetranscribe = useCallback((msgId: number) => {
+    if (!tenantId) return;
+    setTranscriptions(prev => ({ ...prev, [msgId]: { loading: true } }));
+    retranscribeMut.mutate(
+      { tenantId, messageId: msgId },
+      {
+        onSuccess: () => {
+          // Worker will process async and emit socket event — poll for result
+          const pollInterval = setInterval(() => {
+            utils.whatsapp.messagesByContact.invalidate();
+          }, 5000);
+          setTimeout(() => clearInterval(pollInterval), 60000);
+        },
+        onError: (err) => {
+          setTranscriptions(prev => ({ ...prev, [msgId]: { error: err.message || "Falha na transcrição" } }));
+        },
+      }
+    );
+  }, [tenantId, retranscribeMut, utils]);
+
   // Auto-transcribe new audio messages
   const autoTranscribedRef = useRef<Set<number>>(new Set());
   useEffect(() => {
@@ -1317,12 +1412,15 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
     const msgs = messagesQ.data || [];
     for (const m of msgs) {
       const isAudio = m.messageType === "audioMessage" || m.messageType === "pttMessage" || m.messageType === "audio" || m.mediaMimeType?.startsWith("audio/");
-      if (isAudio && m.mediaUrl && !m.mediaUrl.includes('whatsapp.net') && !m.fromMe && !autoTranscribedRef.current.has(m.id) && !transcriptions[m.id]) {
+      // Skip if already transcribed, already in progress, or already has transcription text in DB
+      const hasDbTranscription = m.audioTranscription && m.audioTranscriptionStatus === "completed";
+      const isPendingOrProcessing = m.audioTranscriptionStatus === "pending" || m.audioTranscriptionStatus === "processing";
+      if (isAudio && !hasDbTranscription && !isPendingOrProcessing && !autoTranscribedRef.current.has(m.id) && !transcriptions[m.id]) {
         autoTranscribedRef.current.add(m.id);
-        handleTranscribe(m.id, m.mediaUrl);
+        handleRetranscribe(m.id);
       }
     }
-  }, [messagesQ.data, aiSettingsQ.data?.audioTranscriptionEnabled, tenantId, handleTranscribe, transcriptions]);
+  }, [messagesQ.data, aiSettingsQ.data?.audioTranscriptionEnabled, tenantId, handleRetranscribe, transcriptions]);
 
   // Part 2: Optimistic update helper with unique clientMessageId
   // Each optimistic message gets a unique ID so we can match it precisely on server confirm
@@ -2301,6 +2399,8 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
                       autoTranscribe={aiSettingsQ.data?.audioTranscriptionEnabled}
                       onTranscribe={handleTranscribe}
                       transcriptions={transcriptions}
+                      onRetranscribe={handleRetranscribe}
+                      reactions={msg.messageId ? reactionsMap[msg.messageId] : undefined}
                     />
                   );
                 })}

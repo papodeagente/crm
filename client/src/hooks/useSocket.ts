@@ -49,6 +49,16 @@ interface TranscriptionUpdateEvent {
   error?: string;
 }
 
+interface ReactionEvent {
+  sessionId: string;
+  targetMessageId: string;
+  senderJid: string;
+  emoji: string;
+  fromMe: boolean;
+  remoteJid: string;
+  tenantId?: number;
+}
+
 interface ConversationUpdatedEvent {
   type: string;
   waConversationId: number;
@@ -73,6 +83,7 @@ class SocketManager {
   private _lastMediaUpdate: WhatsAppMediaUpdateEvent | null = null;
   private _lastConversationUpdate: ConversationUpdatedEvent | null = null;
   private _lastTranscriptionUpdate: TranscriptionUpdateEvent | null = null;
+  private _lastReaction: ReactionEvent | null = null;
   private refCount = 0;
 
   subscribe(listener: () => void) {
@@ -156,6 +167,13 @@ class SocketManager {
       this.notify();
     });
 
+    // Reaction on a message
+    socket.on("whatsapp:reaction", (data: ReactionEvent) => {
+      console.log("[Socket] Reaction received:", data.emoji, "on", data.targetMessageId);
+      this._lastReaction = data;
+      this.notify();
+    });
+
     // Conversation updated (internal notes, assignments, etc.)
     socket.on("conversationUpdated", (data: ConversationUpdatedEvent) => {
       this._lastConversationUpdate = data;
@@ -173,6 +191,7 @@ class SocketManager {
       lastMediaUpdate: this._lastMediaUpdate,
       lastConversationUpdate: this._lastConversationUpdate,
       lastTranscriptionUpdate: this._lastTranscriptionUpdate,
+      lastReaction: this._lastReaction,
     };
   }
 
@@ -203,7 +222,8 @@ function getSnapshot() {
     next.lastStatusUpdate !== snapshotCache.lastStatusUpdate ||
     next.lastMediaUpdate !== snapshotCache.lastMediaUpdate ||
     next.lastConversationUpdate !== snapshotCache.lastConversationUpdate ||
-    next.lastTranscriptionUpdate !== snapshotCache.lastTranscriptionUpdate
+    next.lastTranscriptionUpdate !== snapshotCache.lastTranscriptionUpdate ||
+    next.lastReaction !== snapshotCache.lastReaction
   ) {
     snapshotCache = next;
   }
@@ -233,6 +253,7 @@ export function useSocket() {
     lastMediaUpdate: state.lastMediaUpdate,
     lastConversationUpdate: state.lastConversationUpdate,
     lastTranscriptionUpdate: state.lastTranscriptionUpdate,
+    lastReaction: state.lastReaction,
     clearQr,
   };
 }

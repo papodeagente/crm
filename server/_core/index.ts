@@ -88,6 +88,18 @@ async function startServer() {
     });
   });
 
+  // Forward reaction events to Socket.IO clients
+  whatsappManager.on("reaction", (data) => {
+    io.emit("whatsapp:reaction", {
+      sessionId: data.sessionId,
+      targetMessageId: data.targetMessageId,
+      senderJid: data.senderJid,
+      emoji: data.emoji,
+      fromMe: data.fromMe,
+      remoteJid: data.remoteJid,
+    });
+  });
+
   // Forward message status updates to Socket.IO clients (delivered, read, played)
   whatsappManager.on("message:status", (data) => {
     // Part 16: Debug logging

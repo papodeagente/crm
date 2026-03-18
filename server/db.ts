@@ -1,7 +1,7 @@
 import { eq, desc, and, or, like, lt, gt, isNotNull, sql, inArray } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 
-import { InsertUser, users, whatsappSessions, waMessages as messages, activityLogs, chatbotSettings, chatbotRules, conversationAssignments, crmUsers, teams, teamMembers, distributionRules, customFields, customFieldValues, waConversations, userPreferences, sessionShares, conversationEvents, internalNotes, quickReplies, waContacts, aiIntegrations, tenants, conversationLocks } from "../drizzle/schema";
+import { InsertUser, users, whatsappSessions, waMessages as messages, activityLogs, chatbotSettings, chatbotRules, conversationAssignments, crmUsers, teams, teamMembers, distributionRules, customFields, customFieldValues, waConversations, userPreferences, sessionShares, conversationEvents, internalNotes, quickReplies, waContacts, aiIntegrations, tenants, conversationLocks, waReactions } from "../drizzle/schema";
 import { ENV } from './_core/env';
 import { normalizeJid } from "./phoneUtils";
 
@@ -252,6 +252,19 @@ export async function getMessagesByContact(sessionId: string, remoteJid: string,
     .where(and(...conditions))
     .orderBy(desc(messages.timestamp))
     .limit(limit);
+}
+
+// Reactions
+export async function getReactionsForMessages(sessionId: string, messageIds: string[]) {
+  const db = await getDb();
+  if (!db || messageIds.length === 0) return [];
+  return db
+    .select()
+    .from(waReactions)
+    .where(and(
+      eq(waReactions.sessionId, sessionId),
+      inArray(waReactions.targetMessageId, messageIds),
+    ));
 }
 
 // Activity Logs

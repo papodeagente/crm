@@ -3899,3 +3899,21 @@
   - Status monotonic, preview filtering, pipeline completeness, store immutability
   - Assignment events, timestamp guards, webhook echo detection, message delete preview
 - [x] PART 11: Final output report — REALTIME_AUDIT.md generated with full pipeline trace
+
+## CRITICAL FIX: Inbox Preview + Reactions + Quoted Replies
+- [x] BUG 1: Inbox preview status wrong — shows 1 tick while chat bubble shows 2/read
+- [x] BUG 1: Preview text/timestamp can lag behind latest chat message
+- [x] BUG 1: Status monotonicity enforced in wa_messages + wa_conversations + frontend
+- [x] BUG 2: Reactions not attached to target message in chat UI
+- [x] BUG 2: Reactions pollute inbox preview as [React] / [Reação]
+- [x] BUG 2: Reactions data model — store as separate entity linked to target message
+- [x] BUG 2: Reaction UI — render attached to target message bubble
+- [x] BUG 2: Reactions must persist after reload
+- [x] BUG 3: Quoted/reply messages not rendered like WhatsApp Web
+- [x] BUG 3: Quoted reply data model — store repliedTo metadata
+- [x] BUG 3: Quoted reply UI — show snippet above reply bubble
+- [x] BUG 3: Support WhatsApp and Instagram reply events
+- [x] Socket payloads carry complete data for preview, reactions, replies
+- [x] Frontend cache enforcement — immutable updates, no refresh required
+- [x] DB repair scripts for preview, reactions, replies
+- [x] Comprehensive tests for all 3 bugs

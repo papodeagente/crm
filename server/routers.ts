@@ -11,6 +11,7 @@ import {
   getSessionsByTenant,
   getMessages,
   getMessagesByContact,
+  getReactionsForMessages,
   getLogs,
   getAllLogs,
   getChatbotSettings,
@@ -616,6 +617,9 @@ export const appRouter = router({
     messagesByContact: sessionProtectedProcedure
       .input(z.object({ sessionId: z.string(), remoteJid: z.string(), limit: z.number().min(1).max(200).default(50), beforeId: z.number().optional() }))
       .query(async ({ input }) => getMessagesByContact(input.sessionId, input.remoteJid, input.limit, input.beforeId)),
+    reactions: sessionProtectedProcedure
+      .input(z.object({ sessionId: z.string(), messageIds: z.array(z.string()).max(200) }))
+      .query(async ({ input }) => getReactionsForMessages(input.sessionId, input.messageIds)),
     logs: sessionProtectedProcedure
       .input(z.object({ sessionId: z.string().optional(), limit: z.number().min(1).max(500).default(100) }))
       .query(async ({ input }) => input.sessionId ? getLogs(input.sessionId, input.limit) : getAllLogs(input.limit)),

@@ -19,7 +19,7 @@
 
 import { getDb } from "./db";
 import { and, eq, sql } from "drizzle-orm";
-import { waMessages, waContacts, waConversations } from "../drizzle/schema";
+import { waMessages, waContacts, waConversations, waReactions } from "../drizzle/schema";
 import { resolveInbound, updateConversationLastMessage } from "./conversationResolver";
 import { storagePut } from "./storage";
 import { createNotification } from "./db";
@@ -264,6 +264,55 @@ async function processNewMessage(session: SessionInfo, data: any, workerStartTim
     // protocolMessage can be a delete notification — but those come via messages.delete event
     const skipTypes = ["senderKeyDistributionMessage", "messageContextInfo", "ephemeralMessage"];
     if (skipTypes.includes(messageType)) return;
+
+    // reactionMessage: store in wa_reactions table and emit socket event
+    if (messageType === "reactionMessage") {
+      const reactionMsg = data?.message?.reactionMessage;
+      const targetMsgId = reactionMsg?.key?.id;
+      const emoji = reactionMsg?.text || "";
+      const senderJid = key.fromMe ? (sessionId + "@s.whatsapp.net") : key.remoteJid;
+      
+      if (targetMsgId) {
+        const db = await getDb();
+        if (db) {
+          if (emoji) {
+            // Upsert reaction (replace existing reaction from same sender on same message)
+            await db.insert(waReactions).values({
+              sessionId,
+              targetMessageId: targetMsgId,
+              senderJid,
+              emoji,
+              fromMe: key.fromMe || false,
+              timestamp: new Date(),
+            }).onDuplicateKeyUpdate({
+              set: { emoji, timestamp: new Date() },
+            });
+            console.log(`[Worker] Reaction stored: ${emoji} on ${targetMsgId} from ${senderJid}`);
+          } else {
+            // Empty emoji = reaction removed
+            await db.delete(waReactions).where(and(
+              eq(waReactions.sessionId, sessionId),
+              eq(waReactions.targetMessageId, targetMsgId),
+              eq(waReactions.senderJid, senderJid),
+            ));
+            console.log(`[Worker] Reaction removed on ${targetMsgId} from ${senderJid}`);
+          }
+          
+          // Emit socket event for real-time UI update
+          const { whatsappManager } = await import("./whatsappEvolution");
+          whatsappManager.emit("reaction", {
+            sessionId,
+            tenantId,
+            targetMessageId: targetMsgId,
+            senderJid,
+            emoji,
+            fromMe: key.fromMe || false,
+            remoteJid: key.remoteJid,
+          });
+        }
+      }
+      return; // Don't insert reaction as a regular message
+    }
 
     // protocolMessage: check if it contains a delete notification
     if (messageType === "protocolMessage") {
@@ -614,7 +663,7 @@ async function processMessageDelete(session: SessionInfo, data: any): Promise<vo
     // Get the message before marking as deleted (to check if it's the last message)
     const [deletedMsg] = await db.select({
       id: waMessages.id,
-      conversationId: waMessages.conversationId,
+      waConversationId: waMessages.waConversationId,
       content: waMessages.content,
     }).from(waMessages).where(and(
       eq(waMessages.sessionId, sessionId),
@@ -631,8 +680,8 @@ async function processMessageDelete(session: SessionInfo, data: any): Promise<vo
 
     // If this message was in a conversation, check if it was the last message
     // and update the preview to "[Mensagem apagada]" if so
-    if (deletedMsg?.conversationId) {
-      const convId = deletedMsg.conversationId;
+    if (deletedMsg?.waConversationId) {
+      const convId = deletedMsg.waConversationId;
       // Check if the conversation's lastMessagePreview matches the deleted message content
       const [conv] = await db.select({
         lastMessagePreview: waConversations.lastMessagePreview,

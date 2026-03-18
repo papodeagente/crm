@@ -64,6 +64,25 @@ export const waMessages = mysqlTable("messages", {
   uniqueIndex("idx_unique_msgid_session").on(t.messageId, t.sessionId),
 ]);
 
+/**
+ * Reactions on messages.
+ * Each reaction is a separate row linked to the target message by targetMessageId (the WhatsApp messageId).
+ * When a user sends a new reaction on the same message, the old one is replaced (upsert by senderJid + targetMessageId).
+ * An empty emoji ("") means the reaction was removed.
+ */
+export const waReactions = mysqlTable("wa_reactions", {
+  id: int("id").autoincrement().primaryKey(),
+  sessionId: varchar("sessionId", { length: 128 }).notNull(),
+  targetMessageId: varchar("targetMessageId", { length: 256 }).notNull(),
+  senderJid: varchar("senderJid", { length: 128 }).notNull(),
+  emoji: varchar("emoji", { length: 32 }).notNull(),
+  fromMe: boolean("fromMe").default(false).notNull(),
+  timestamp: timestamp("timestamp").defaultNow().notNull(),
+}, (t) => [
+  index("idx_react_target").on(t.sessionId, t.targetMessageId),
+  uniqueIndex("idx_react_unique").on(t.sessionId, t.targetMessageId, t.senderJid),
+]);
+
 export const activityLogs = mysqlTable("activity_logs", {
   id: int("id").autoincrement().primaryKey(),
   sessionId: varchar("sessionId", { length: 128 }),
