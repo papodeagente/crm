@@ -358,13 +358,6 @@
       "when": 1773665860582,
       "tag": "0050_grey_silver_surfer",
       "breakpoints": true
-    },
-    {
-      "idx": 51,
-      "version": "5",
-      "when": 1773836251403,
-      "tag": "0051_motionless_scorpion",
-      "breakpoints": true
     }
   ]
 }

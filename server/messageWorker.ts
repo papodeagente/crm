@@ -17,10 +17,10 @@
  * This worker is started from server/_core/index.ts alongside the Express server.
  */
 
-import { getDb, getTenantAiSettings } from "./db";
+import { getDb } from "./db";
 import { and, eq, sql } from "drizzle-orm";
 import { waMessages, waContacts, waConversations } from "../drizzle/schema";
-import { resolveInbound, updateConversationLastMessage, propagateLatestMessageToConversation, getConversationByJid } from "./conversationResolver";
+import { resolveInbound, updateConversationLastMessage } from "./conversationResolver";
 import { storagePut } from "./storage";
 import { createNotification } from "./db";
 import * as evo from "./evolutionApi";
@@ -193,19 +193,6 @@ const STRING_STATUS_MAP: Record<string, string> = {
   "READ": "read", "PLAYED": "played", "DELETED": "deleted",
 };
 
-// ── MONOTONIC STATUS PRECEDENCE ──────────────────────────────
-// Status must NEVER go backwards. Higher number = higher precedence.
-const STATUS_PRECEDENCE: Record<string, number> = {
-  error: 0, pending: 1, sent: 2, delivered: 3, read: 4, played: 5, deleted: 6,
-};
-
-/** Returns true if newStatus has higher precedence than currentStatus */
-function isStatusUpgrade(currentStatus: string | null | undefined, newStatus: string): boolean {
-  const current = STATUS_PRECEDENCE[currentStatus || ""] ?? -1;
-  const incoming = STATUS_PRECEDENCE[newStatus] ?? -1;
-  return incoming > current;
-}
-
 // ── Core Event Processor ──────────────────────────────────────
 
 /**
@@ -324,12 +311,6 @@ async function processNewMessage(session: SessionInfo, data: any, workerStartTim
     console.log(`[TRACE][DEDUP_CHECK] timestamp: ${Date.now()} | delta: ${Date.now() - dedupStart}ms | msgId: ${messageId}`);
 
     // ── Step 2: Insert message ──
-    // Determine sentVia: if fromMe and coming via webhook (not CRM send flow),
-    // it was sent from another device (WhatsApp mobile/web).
-    // CRM send flow sets sentVia='crm' explicitly in the router.
-    // Webhook-originated fromMe messages default to 'other_device'.
-    const sentVia = fromMe ? "other_device" : null;
-
     const insertStart = Date.now();
     await db.insert(waMessages).values({
       sessionId,
@@ -340,7 +321,6 @@ async function processNewMessage(session: SessionInfo, data: any, workerStartTim
       messageType,
       content: content || null,
       pushName: fromMe ? null : (pushName || null),
-      sentVia,
       status: fromMe ? "sent" : "received",
       timestamp: new Date(timestamp),
       mediaUrl: mediaInfo.mediaUrl || null,
@@ -354,13 +334,24 @@ async function processNewMessage(session: SessionInfo, data: any, workerStartTim
     console.log(`[TRACE][DB_INSERT] timestamp: ${insertEnd} | delta: ${insertEnd - insertStart}ms | msgId: ${messageId}`);
 
     // ── Step 3: Resolve conversation + update last message ──
+    // Non-preview message types must NOT overwrite the conversation preview.
+    // Reactions, protocol messages, etc. should be stored in wa_messages but
+    // should never become the "last message" shown in the inbox sidebar.
+    const NON_PREVIEW_TYPES = new Set([
+      'reactionMessage', 'protocolMessage', 'senderKeyDistributionMessage',
+      'messageContextInfo', 'ephemeralMessage', 'editedMessage',
+      'deviceSentMessage', 'bcallMessage', 'callLogMesssage',
+      'keepInChatMessage', 'encReactionMessage', 'viewOnceMessageV2Extension',
+    ]);
+    const isPreviewWorthy = !NON_PREVIEW_TYPES.has(messageType);
+
     try {
       const resolveStart = Date.now();
       const contactPushName = fromMe ? null : pushName;
       const resolved = await resolveInbound(tenantId, sessionId, remoteJid, contactPushName, { skipContactCreation: true });
       const resolveEnd = Date.now();
       console.log(`[TRACE][RESOLVE_INBOUND] timestamp: ${resolveEnd} | delta: ${resolveEnd - resolveStart}ms | msgId: ${messageId}`);
-      if (resolved) {
+      if (resolved && isPreviewWorthy) {
         const updateStart = Date.now();
         await updateConversationLastMessage(resolved.conversationId, {
           content: content || "",
@@ -372,6 +363,14 @@ async function processNewMessage(session: SessionInfo, data: any, workerStartTim
         });
         const updateEnd = Date.now();
         console.log(`[TRACE][CONVERSATION_UPDATED] timestamp: ${updateEnd} | delta: ${updateEnd - updateStart}ms | msgId: ${messageId}`);
+      } else if (resolved && !isPreviewWorthy) {
+        console.log(`[TRACE][SKIP_PREVIEW_UPDATE] msgType: ${messageType} | msgId: ${messageId} — non-preview type, conversation preview not updated`);
+        // Still increment unread for incoming non-preview messages
+        if (!fromMe) {
+          await updateConversationLastMessage(resolved.conversationId, {
+            incrementUnread: true,
+          });
+        }
       }
     } catch (e) {
       console.warn("[Worker] Conversation resolver error:", e);
@@ -444,15 +443,9 @@ async function processNewMessage(session: SessionInfo, data: any, workerStartTim
     // 5d. Auto-transcribe audio messages (both incoming and sent from inbox)
     const audioTypes = ["audioMessage", "pttMessage"];
     if (audioTypes.includes(messageType) && messageId) {
-      // Check AI settings before enqueuing to avoid unnecessary jobs
+      // Fetch the inserted row ID for the transcription worker
       (async () => {
         try {
-          const aiSettings = await getTenantAiSettings(tenantId);
-          if (!aiSettings.audioTranscriptionEnabled) {
-            console.log(`[Worker] Auto-transcription skipped for ${messageId}: disabled for tenant ${tenantId}`);
-            return;
-          }
-
           const [inserted] = await db.select({ id: waMessages.id })
             .from(waMessages)
             .where(and(
@@ -529,9 +522,16 @@ async function processStatusUpdate(session: SessionInfo, data: any): Promise<voi
 
       console.log(`[Worker] Status update: ${messageId} -> ${newStatus} (jid: ${remoteJid}, fromMe: ${fromMe})`);
 
-      // ── MONOTONIC STATUS UPDATE: only allow upgrades, never regression ──
-      // First, read the current status from DB
-      const [existingMsg] = await db.select({ status: waMessages.status })
+      // ── Monotonic status enforcement ──
+      // Status must only progress forward: error(0) < pending(1) < sent(2) < delivered(3) < read(4) < played(5)
+      // Never allow regression (e.g., delivered → sent)
+      const STATUS_ORDER: Record<string, number> = {
+        error: 0, pending: 1, sent: 2, delivered: 3, read: 4, played: 5,
+      };
+      const newStatusOrder = STATUS_ORDER[newStatus] ?? -1;
+
+      // Check current status of the message before updating
+      const [currentMsg] = await db.select({ status: waMessages.status })
         .from(waMessages)
         .where(and(
           eq(waMessages.sessionId, sessionId),
@@ -539,18 +539,15 @@ async function processStatusUpdate(session: SessionInfo, data: any): Promise<voi
         ))
         .limit(1);
 
-      if (!existingMsg) {
-        console.log(`[Worker] Status update skipped - message not found: ${messageId}`);
-        continue;
+      if (currentMsg) {
+        const currentOrder = STATUS_ORDER[currentMsg.status || ""] ?? -1;
+        if (newStatusOrder <= currentOrder) {
+          console.log(`[Worker] Status update SKIPPED (monotonic): ${messageId} ${currentMsg.status}(${currentOrder}) -> ${newStatus}(${newStatusOrder}) — would regress`);
+          continue;
+        }
       }
 
-      // Only apply if new status has higher precedence
-      if (!isStatusUpgrade(existingMsg.status, newStatus)) {
-        console.log(`[Worker] Status update BLOCKED (monotonic): ${messageId} ${existingMsg.status} -> ${newStatus} (would regress)`);
-        continue;
-      }
-
-      // Update message status in DB (monotonic — only upgrades reach here)
+      // Update message status in DB (only forward progression)
       await db.update(waMessages)
         .set({ status: newStatus })
         .where(and(
@@ -558,47 +555,31 @@ async function processStatusUpdate(session: SessionInfo, data: any): Promise<voi
           eq(waMessages.messageId, messageId)
         ));
 
-      // ── PART 3: Propagate status to wa_conversations if this is the latest message ──
-      // Instead of blindly updating lastStatus, we find the conversation and check
-      // whether the updated message is actually the latest one.
-      let previewPayload: any = null;
-      if (remoteJid) {
-        try {
-          // Find the conversation for this message
-          const conv = await getConversationByJid(
-            session.tenantId,
-            sessionId,
-            remoteJid
-          );
-          if (conv) {
-            // Propagate from the TRUE latest message (single source of truth)
-            previewPayload = await propagateLatestMessageToConversation(conv.conversationId);
-          }
-        } catch (e: any) {
-          console.warn(`[Worker] Failed to propagate status to conversation:`, e.message);
-          // Fallback: monotonic update lastStatus directly if propagation fails
-          if (fromMe) {
-            // Only upgrade, never regress — use SQL CASE to enforce monotonicity
-            await db.execute(sql`
-              UPDATE wa_conversations
-              SET lastStatus = CASE
-                WHEN FIELD(${newStatus}, 'error','pending','sent','delivered','read','played','deleted')
-                   > FIELD(COALESCE(lastStatus,''), 'error','pending','sent','delivered','read','played','deleted')
-                THEN ${newStatus}
-                ELSE lastStatus
-              END
-              WHERE sessionId = ${sessionId}
-                AND remoteJid = ${remoteJid}
-                AND lastFromMe = 1
-            `);
-          }
-        }
+      // Also update lastStatus in wa_conversations if this is the last message from us
+      // AND the new status is higher than the current lastStatus (monotonic)
+      if (remoteJid && fromMe) {
+        // Use SQL-level comparison to ensure atomicity
+        const statusCase = sql`CASE 
+          WHEN lastStatus = 'error' THEN 0
+          WHEN lastStatus = 'pending' THEN 1  
+          WHEN lastStatus = 'sent' THEN 2
+          WHEN lastStatus = 'delivered' THEN 3
+          WHEN lastStatus = 'read' THEN 4
+          WHEN lastStatus = 'played' THEN 5
+          ELSE -1
+        END`;
+        await db.update(waConversations)
+          .set({ lastStatus: newStatus })
+          .where(and(
+            eq(waConversations.sessionId, sessionId),
+            eq(waConversations.remoteJid, remoteJid),
+            eq(waConversations.lastFromMe, true),
+            sql`${statusCase} < ${newStatusOrder}`
+          ));
       }
 
-      // Emit Socket.IO events for real-time UI update
+      // Emit Socket.IO event for real-time UI update
       const { whatsappManager } = await import("./whatsappEvolution");
-
-      // 1. Original message:status event (for chat bubble status updates)
       whatsappManager.emit("message:status", {
         sessionId,
         messageId,
@@ -606,21 +587,6 @@ async function processStatusUpdate(session: SessionInfo, data: any): Promise<voi
         remoteJid: remoteJid || null,
         timestamp: Date.now(),
       });
-
-      // 2. PART 5: New conversation:preview event with full payload
-      // This ensures the sidebar preview is ALWAYS in sync with the latest message
-      if (previewPayload && remoteJid) {
-        whatsappManager.emit("conversation:preview", {
-          sessionId,
-          remoteJid,
-          conversationId: previewPayload.conversationId,
-          lastMessage: previewPayload.lastMessage,
-          lastMessageAt: previewPayload.lastMessageAt?.getTime() || Date.now(),
-          lastMessageStatus: previewPayload.lastMessageStatus,
-          lastMessageType: previewPayload.lastMessageType,
-          lastFromMe: previewPayload.lastFromMe,
-        });
-      }
     }
   } catch (error) {
     console.error("[Worker] Error processing status update:", error);

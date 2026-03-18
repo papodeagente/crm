@@ -944,7 +944,7 @@ type AgentFilter = "all" | "unread" | "mine" | "unassigned";
 export default function InboxPage() {
   const tenantId = useTenantId();
   const trpcUtils = trpc.useUtils();
-  const { lastMessage, lastStatusUpdate, lastConversationPreview, lastConversationOwnership, isConnected: socketConnected } = useSocket();
+  const { lastMessage, lastStatusUpdate, lastConversationUpdate, isConnected: socketConnected } = useSocket();
   // selectedKey = conversationKey (sessionId:remoteJid) — primary selection state
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   // selectedJid = remoteJid only — derived for API calls that need just the JID
@@ -1043,29 +1043,6 @@ export default function InboxPage() {
     { enabled: !!activeSession?.sessionId, refetchInterval: socketConnected ? 60000 : 15000, staleTime: 10000 }
   );
   const claimMutation = trpc.whatsapp.queue.claim.useMutation({
-    onMutate: (vars) => {
-      // Optimistic: immediately move conversation from queue to myChats
-      const queueData = queueQ.data as any[];
-      const queueConv = queueData?.find((c: any) => c.remoteJid === vars.remoteJid);
-      if (queueConv) {
-        convStore.handleOwnershipChange({
-          sessionId: vars.sessionId,
-          remoteJid: vars.remoteJid,
-          assignedUserId: myUserId,
-          assignedAgentName: (meQ.data as any)?.saasUser?.name || (meQ.data as any)?.name || "Eu",
-          assignmentStatus: "open",
-          queuedAt: null,
-          lastMessage: queueConv.lastMessagePreview || queueConv.lastMessage,
-          lastMessageType: queueConv.lastMessageType,
-          lastFromMe: queueConv.lastFromMe,
-          lastTimestamp: queueConv.lastMessageAt,
-          lastStatus: queueConv.lastStatus,
-          contactPushName: queueConv.contactPushName,
-          unreadCount: queueConv.unreadCount || 0,
-          conversationId: queueConv.id || queueConv.conversationId,
-        });
-      }
-    },
     onSuccess: () => { queueQ.refetch(); queueStatsQ.refetch(); toast.success("Conversa atribuída a você"); },
     onError: (e) => toast.error(e.message || "Erro ao puxar conversa"),
   });
@@ -1084,17 +1061,6 @@ export default function InboxPage() {
 
   // Finish attendance mutation
   const finishMut = trpc.whatsapp.finishAttendance.useMutation({
-    onMutate: (vars) => {
-      // Optimistic: immediately remove from myChats (resolved, unassigned)
-      const key = makeConvKey(vars.sessionId, vars.remoteJid);
-      convStore.handleOwnershipChange({
-        sessionId: vars.sessionId,
-        remoteJid: vars.remoteJid,
-        assignedUserId: null,
-        assignmentStatus: "resolved",
-        queuedAt: null,
-      });
-    },
     onSuccess: () => {
       queueStatsQ.refetch();
       toast.success("Atendimento finalizado");
@@ -1373,49 +1339,39 @@ export default function InboxPage() {
     convStore.handleStatusUpdate({ sessionId: sid, remoteJid, status: lastStatusUpdate.status });
   }, [lastStatusUpdate]);
 
-  // PART 5: Conversation preview update from server (authoritative, single source of truth)
-  // This fires when the server propagates the TRUE latest message preview to wa_conversations.
-  // It replaces any stale/optimistic data in the sidebar with the real values.
+  // ── Assignment/ownership changes via socket — instant tab movement ──
   useEffect(() => {
-    if (!lastConversationPreview) return;
-    const sid = lastConversationPreview.sessionId || activeSession?.sessionId || "";
-    convStore.handleConversationPreview({
-      sessionId: sid,
-      remoteJid: lastConversationPreview.remoteJid,
-      lastMessage: lastConversationPreview.lastMessage,
-      lastMessageAt: lastConversationPreview.lastMessageAt,
-      lastMessageStatus: lastConversationPreview.lastMessageStatus,
-      lastMessageType: lastConversationPreview.lastMessageType,
-      lastFromMe: lastConversationPreview.lastFromMe,
-    });
-  }, [lastConversationPreview]);
+    if (!lastConversationUpdate) return;
+    const { type, sessionId: evtSessionId, remoteJid, assignedUserId, status } = lastConversationUpdate as any;
+    if (!remoteJid) return;
+    const sid = evtSessionId || activeSession?.sessionId || "";
+    const key = makeConvKey(sid, remoteJid);
 
-  // Conversation ownership change (claim, assign, transfer, enqueue, finish)
-  // Updates assignment fields instantly so tab views (myChats/queue/all) react without refetch.
-  useEffect(() => {
-    if (!lastConversationOwnership) return;
-    const sid = lastConversationOwnership.sessionId || activeSession?.sessionId || "";
-    convStore.handleOwnershipChange({
-      sessionId: sid,
-      remoteJid: lastConversationOwnership.remoteJid,
-      assignedUserId: lastConversationOwnership.assignedUserId,
-      assignedAgentName: lastConversationOwnership.assignedAgentName,
-      assignedAgentAvatar: lastConversationOwnership.assignedAgentAvatar,
-      assignmentStatus: lastConversationOwnership.assignmentStatus,
-      queuedAt: lastConversationOwnership.queuedAt,
-      lastMessage: lastConversationOwnership.lastMessage,
-      lastMessageType: lastConversationOwnership.lastMessageType,
-      lastFromMe: lastConversationOwnership.lastFromMe,
-      lastTimestamp: lastConversationOwnership.lastMessageAt ? new Date(lastConversationOwnership.lastMessageAt).toISOString() : null,
-      lastStatus: lastConversationOwnership.lastStatus,
-      contactPushName: lastConversationOwnership.contactPushName,
-      unreadCount: lastConversationOwnership.unreadCount,
-      conversationId: lastConversationOwnership.conversationId,
-    });
-    // Also invalidate queue list so counts update
-    trpcUtils.whatsapp.queue.list.invalidate();
-    trpcUtils.whatsapp.queue.stats.invalidate();
-  }, [lastConversationOwnership]);
+    // Update the conversation store with new assignment data
+    if (type === "assignment" || type === "claimed" || type === "transfer") {
+      convStore.updateAssignment(key, {
+        assignedUserId: assignedUserId ?? null,
+        assignmentStatus: "open",
+      });
+    } else if (type === "enqueued") {
+      convStore.updateAssignment(key, {
+        assignedUserId: null,
+        assignmentStatus: "open",
+      });
+    } else if (type === "finished") {
+      convStore.updateAssignment(key, {
+        assignedUserId: null,
+        assignmentStatus: status || "resolved",
+      });
+    } else if (type === "status_change") {
+      convStore.updateAssignment(key, {
+        assignmentStatus: status || null,
+      });
+    }
+
+    // Invalidate queue stats for instant badge update
+    queueStatsQ.refetch();
+  }, [lastConversationUpdate]);
 
   // Select conversation
   // Sync on conversation open — lightweight fetch of last 10 messages

@@ -1337,7 +1337,6 @@ class WhatsAppManager extends EventEmitter {
           fromMe: true,
           messageType: "text",
           content: text,
-          sentVia: "crm",
           waConversationId: waConversationId || undefined,
           status: "sent",
         });
@@ -1412,7 +1411,6 @@ class WhatsAppManager extends EventEmitter {
           mediaFileName: fileName,
           mediaDuration: opts?.duration,
           isVoiceNote: opts?.ptt || false,
-          sentVia: "crm",
           waConversationId: waConversationId || undefined,
           status: "sent",
         });

@@ -32,7 +32,6 @@ interface Message {
   mediaFileName?: string | null;
   mediaDuration?: number | null;
   isVoiceNote?: boolean | null;
-  sentVia?: string | null;
   status?: string | null;
   timestamp: string | Date;
   createdAt: string | Date;
@@ -624,7 +623,7 @@ function ImageWithFallback({ msg, fromMe, myAvatarUrl, contactAvatarUrl, onImage
 const MessageBubble = memo(({
   msg, isFirst, isLast, allMessages,
   onReply, onReact, onDelete, onEdit, onForward, contactAvatarUrl, myAvatarUrl, onImageClick,
-  autoTranscribe, onTranscribe, onRetranscribe, transcriptions
+  autoTranscribe, onTranscribe, transcriptions
 }: {
   msg: Message; isFirst: boolean; isLast: boolean; allMessages: Message[];
   onReply: (target: ReplyTarget) => void;
@@ -637,7 +636,6 @@ const MessageBubble = memo(({
   onImageClick?: (url: string) => void;
   autoTranscribe?: boolean;
   onTranscribe?: (msgId: number, audioUrl: string) => void;
-  onRetranscribe?: (msgId: number) => void;
   transcriptions?: Record<number, { text?: string; loading?: boolean; error?: string }>;
 }) => {
   const [showMenu, setShowMenu] = useState(false);
@@ -866,8 +864,8 @@ const MessageBubble = memo(({
             if (msg.audioTranscriptionStatus === "failed") return (
               <div className="mt-1 px-2 py-1 bg-red-50 dark:bg-red-950/20 rounded text-[11px] text-red-500 flex items-center justify-between">
                 <span>Erro na transcrição</span>
-                {onRetranscribe && (
-                  <button onClick={() => onRetranscribe(msg.id)} className="text-violet-500 hover:text-violet-600 ml-2">Tentar novamente</button>
+                {onTranscribe && msg.mediaUrl && (
+                  <button onClick={() => onTranscribe(msg.id, msg.mediaUrl!)} className="text-violet-500 hover:text-violet-600 ml-2">Tentar novamente</button>
                 )}
               </div>
             );
@@ -893,10 +891,9 @@ const MessageBubble = memo(({
               </div>
             );
             // Priority 3: Manual transcribe button (if no auto-transcription)
-            // Uses BullMQ worker via onRetranscribe — works for all messages including expired WhatsApp URLs
-            if (!autoTranscribe && onRetranscribe) return (
+            if (!autoTranscribe && onTranscribe && msg.mediaUrl && !msg.mediaUrl.includes('whatsapp.net')) return (
               <button
-                onClick={() => onRetranscribe(msg.id)}
+                onClick={() => onTranscribe(msg.id, msg.mediaUrl!)}
                 className="mt-1 text-[11px] text-violet-500 hover:text-violet-600 flex items-center gap-1 transition-colors"
               >
                 <FileText className="h-3 w-3" /> Transcrever áudio
@@ -911,9 +908,6 @@ const MessageBubble = memo(({
 
           {/* Time + Status */}
           <span className="float-right ml-2 mt-[3px] flex items-center gap-0.5 relative -bottom-0.5">
-            {fromMe && msg.sentVia && msg.sentVia !== "crm" && (
-              <span className="text-[10px] text-muted-foreground/50 leading-none italic mr-0.5" title="Enviado de outro dispositivo">ext</span>
-            )}
             <span className="text-[11px] text-muted-foreground/70 leading-none tabular-nums">{time}</span>
             <MessageStatus status={msg.status} isFromMe={fromMe} />
           </span>
@@ -1291,11 +1285,8 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
     setMsgLimit(prev => prev + 50);
   }, []);
 
-  // Transcription mutations
-  // 1. Frontend-triggered (direct download + Whisper) — fallback for messages with S3 URLs
+  // Transcription mutation
   const transcribeMut = trpc.ai.transcribe.useMutation();
-  // 2. BullMQ worker (Evolution API base64 download + Whisper) — primary, works for all messages
-  const retranscribeMut = trpc.ai.retranscribeAudio.useMutation();
 
   const handleTranscribe = useCallback((msgId: number, audioUrl: string) => {
     if (!tenantId) return;
@@ -1317,49 +1308,21 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
     );
   }, [tenantId, transcribeMut]);
 
-  // Retry transcription via BullMQ worker (uses Evolution API to download audio, no URL dependency)
-  const handleRetranscribe = useCallback((msgId: number) => {
-    if (!tenantId) return;
-    // Optimistic UI: show loading spinner immediately
-    setTranscriptions(prev => ({ ...prev, [msgId]: { loading: true } }));
-    retranscribeMut.mutate(
-      { tenantId, messageId: msgId },
-      {
-        onSuccess: () => {
-          // Worker will process async and emit socket event — refetch messages to get updated status
-          // Keep loading state until refetch brings back the DB status
-          setTimeout(() => messagesQ.refetch(), 2000);
-          setTimeout(() => messagesQ.refetch(), 5000);
-          setTimeout(() => messagesQ.refetch(), 10000);
-          setTimeout(() => messagesQ.refetch(), 20000);
-          setTimeout(() => messagesQ.refetch(), 30000);
-        },
-        onError: (err) => {
-          setTranscriptions(prev => ({ ...prev, [msgId]: { error: err.message || "Falha ao re-enfileirar" } }));
-        },
-      }
-    );
-  }, [tenantId, retranscribeMut, messagesQ]);
-
   const utils = trpc.useUtils();
 
-  // Auto-transcribe new audio messages via BullMQ worker
-  // Uses handleRetranscribe (Evolution API base64 download) — works for ALL audio messages
-  // including those with expired WhatsApp CDN URLs
+  // Auto-transcribe new audio messages
   const autoTranscribedRef = useRef<Set<number>>(new Set());
   useEffect(() => {
     if (!aiSettingsQ.data?.audioTranscriptionEnabled || !tenantId) return;
     const msgs = messagesQ.data || [];
     for (const m of msgs) {
       const isAudio = m.messageType === "audioMessage" || m.messageType === "pttMessage" || m.messageType === "audio" || m.mediaMimeType?.startsWith("audio/");
-      // Skip if: not audio, already transcribed/pending/processing, or already triggered
-      const hasTranscription = m.audioTranscriptionStatus === "completed" || m.audioTranscriptionStatus === "pending" || m.audioTranscriptionStatus === "processing";
-      if (isAudio && !hasTranscription && !autoTranscribedRef.current.has(m.id) && !transcriptions[m.id]) {
+      if (isAudio && m.mediaUrl && !m.mediaUrl.includes('whatsapp.net') && !m.fromMe && !autoTranscribedRef.current.has(m.id) && !transcriptions[m.id]) {
         autoTranscribedRef.current.add(m.id);
-        handleRetranscribe(m.id);
+        handleTranscribe(m.id, m.mediaUrl);
       }
     }
-  }, [messagesQ.data, aiSettingsQ.data?.audioTranscriptionEnabled, tenantId, handleRetranscribe, transcriptions]);
+  }, [messagesQ.data, aiSettingsQ.data?.audioTranscriptionEnabled, tenantId, handleTranscribe, transcriptions]);
 
   // Part 2: Optimistic update helper with unique clientMessageId
   // Each optimistic message gets a unique ID so we can match it precisely on server confirm
@@ -1474,65 +1437,14 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
   });
 
   const uploadMedia = trpc.whatsapp.uploadMedia.useMutation();
-  const lastMediaClientMsgIdRef = useRef<string | null>(null);
   const sendMedia = trpc.whatsapp.sendMedia.useMutation({
     onMutate: (vars) => {
       // OPTIMISTIC SEND: instantly update conversation sidebar for media
       const mediaLabel = vars.mediaType === "image" ? "📷 Imagem" : vars.mediaType === "video" ? "🎥 Vídeo" : vars.mediaType === "audio" ? "🎤 Áudio" : "📄 Documento";
       onOptimisticSend?.({ content: mediaLabel, messageType: vars.mediaType || "document" });
-
-      // OPTIMISTIC MESSAGE: add media message to chat immediately so player/preview shows
-      const clientMsgId = `opt_media_${Date.now()}_${++optimisticIdCounter.current}`;
-      lastMediaClientMsgIdRef.current = clientMsgId;
-      const optimistic: Message = {
-        id: -Date.now() - optimisticIdCounter.current,
-        sessionId: vars.sessionId,
-        messageId: clientMsgId,
-        remoteJid,
-        fromMe: true,
-        messageType: vars.mediaType === "audio" ? "audioMessage" : vars.mediaType === "image" ? "imageMessage" : vars.mediaType === "video" ? "videoMessage" : "documentMessage",
-        content: vars.caption || null,
-        mediaUrl: vars.mediaUrl,
-        mediaMimeType: vars.mimetype || null,
-        mediaFileName: vars.fileName || null,
-        mediaDuration: vars.duration || null,
-        isVoiceNote: vars.ptt || false,
-        status: "pending",
-        timestamp: new Date().toISOString(),
-        createdAt: new Date().toISOString(),
-      };
-      const queryKey = { sessionId, remoteJid, limit: msgLimit };
-      utils.whatsapp.messagesByContact.setData(queryKey, (old: any) => {
-        if (!old) return [optimistic];
-        return [optimistic, ...old];
-      });
     },
-    onSuccess: (result) => {
-      // Reconcile optimistic media message with server response
-      const clientMsgId = lastMediaClientMsgIdRef.current;
-      if (result?.messageId && clientMsgId) {
-        const queryKey = { sessionId, remoteJid, limit: msgLimit };
-        utils.whatsapp.messagesByContact.setData(queryKey, (old: any) => {
-          if (!old) return old;
-          return old.map((m: any) =>
-            m.messageId === clientMsgId ? { ...m, messageId: result.messageId, status: "sent" } : m
-          );
-        });
-      }
-      delayedRefetch();
-    },
-    onError: () => {
-      // Remove failed optimistic media message
-      const clientMsgId = lastMediaClientMsgIdRef.current;
-      if (clientMsgId) {
-        const queryKey = { sessionId, remoteJid, limit: msgLimit };
-        utils.whatsapp.messagesByContact.setData(queryKey, (old: any) => {
-          if (!old) return old;
-          return old.filter((m: any) => m.messageId !== clientMsgId);
-        });
-      }
-      toast.error("Erro ao enviar mídia");
-    },
+    onSuccess: () => delayedRefetch(),
+    onError: () => toast.error("Erro ao enviar mídia"),
   });
 
   const sendReaction = trpc.whatsapp.sendReaction.useMutation({
@@ -1637,23 +1549,10 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
     if (lastMessage.fromMe) {
       utils.whatsapp.messagesByContact.setData(queryKey, (old: any) => {
         if (!old) return old;
-        // Find the oldest unconfirmed optimistic message (status "pending") with matching content or media type
-        const optIdx = old.findIndex((m: any) => {
-          if (!m.messageId?.startsWith("opt_") || m.status !== "pending") return false;
-          // Text messages: match by content
-          if (m.messageId.startsWith("opt_media_")) {
-            // Media messages: match by messageType (audio→audio, image→image, etc.)
-            const typeMap: Record<string, string[]> = {
-              audioMessage: ["audioMessage", "pttMessage"],
-              imageMessage: ["imageMessage"],
-              videoMessage: ["videoMessage"],
-              documentMessage: ["documentMessage"],
-            };
-            const matchTypes = typeMap[m.messageType] || [m.messageType];
-            return matchTypes.includes(lastMessage.messageType || "");
-          }
-          return m.content === lastMessage.content;
-        });
+        // Find the oldest unconfirmed optimistic message (status "pending") with matching content
+        const optIdx = old.findIndex((m: any) =>
+          m.messageId?.startsWith("opt_") && m.status === "pending" && m.content === lastMessage.content
+        );
         if (optIdx >= 0) {
           // RECONCILE: update the optimistic message with server data (real messageId, status "sent")
           const reconciled = {
@@ -2401,7 +2300,6 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
                       onImageClick={setLightboxUrl}
                       autoTranscribe={aiSettingsQ.data?.audioTranscriptionEnabled}
                       onTranscribe={handleTranscribe}
-                      onRetranscribe={handleRetranscribe}
                       transcriptions={transcriptions}
                     />
                   );

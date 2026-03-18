@@ -144,23 +144,21 @@ describe("Audio Transcription System", () => {
   // ── Auto-Transcription Trigger ─────────────────────────────────
 
   describe("Auto-Transcription Trigger (messageWorker)", () => {
-    it("should trigger for both incoming and sent audio messages", () => {
+    it("should only trigger for incoming audio messages (fromMe=false)", () => {
       const incomingAudio = { fromMe: false, messageType: "audioMessage" };
       const outgoingAudio = { fromMe: true, messageType: "audioMessage" };
 
       const audioTypes = ["audioMessage", "pttMessage"];
-      const shouldTrigger = (msg: any) => audioTypes.includes(msg.messageType);
+      const shouldTrigger = (msg: any) => !msg.fromMe && audioTypes.includes(msg.messageType);
 
       expect(shouldTrigger(incomingAudio)).toBe(true);
-      expect(shouldTrigger(outgoingAudio)).toBe(true);
+      expect(shouldTrigger(outgoingAudio)).toBe(false);
     });
 
-    it("should trigger for pttMessage (voice note) regardless of fromMe", () => {
-      const incomingVoice = { fromMe: false, messageType: "pttMessage" };
-      const outgoingVoice = { fromMe: true, messageType: "pttMessage" };
+    it("should trigger for pttMessage (voice note)", () => {
+      const voiceNote = { fromMe: false, messageType: "pttMessage" };
       const audioTypes = ["audioMessage", "pttMessage"];
-      expect(audioTypes.includes(incomingVoice.messageType)).toBe(true);
-      expect(audioTypes.includes(outgoingVoice.messageType)).toBe(true);
+      expect(!voiceNote.fromMe && audioTypes.includes(voiceNote.messageType)).toBe(true);
     });
 
     it("should NOT trigger for image messages", () => {
@@ -221,25 +219,17 @@ describe("Audio Transcription System", () => {
       expect(errorMsg.audioTranscriptionStatus === "failed").toBe(true);
     });
 
-    it("should show manual transcribe button when no auto-transcription (BullMQ worker, no URL dependency)", () => {
+    it("should show manual transcribe button when no auto-transcription", () => {
       const msg = {
         audioTranscriptionStatus: null as string | null,
         audioTranscription: null as string | null,
-        messageType: "audioMessage",
+        mediaUrl: "https://s3.example.com/audio.ogg",
       };
       const autoTranscribe = false;
-      const onRetranscribe = (msgId: number) => {}; // BullMQ worker handler
+      const hasMediaUrl = !!msg.mediaUrl && !msg.mediaUrl.includes("whatsapp.net");
 
-      // Manual button shows when: not auto-transcribing AND handler exists AND no existing status
-      const showManualButton = !autoTranscribe && !!onRetranscribe && !msg.audioTranscriptionStatus;
+      const showManualButton = !autoTranscribe && hasMediaUrl && !msg.audioTranscriptionStatus;
       expect(showManualButton).toBe(true);
-    });
-
-    it("should NOT show manual transcribe button when auto-transcription is enabled", () => {
-      const autoTranscribe = true;
-      const onRetranscribe = (msgId: number) => {};
-      const showManualButton = !autoTranscribe && !!onRetranscribe;
-      expect(showManualButton).toBe(false);
     });
   });
 
@@ -333,15 +323,12 @@ describe("Audio Transcription System", () => {
       expect(shouldAutoTranscribe).toBe(false);
     });
 
-    it("should handle WhatsApp CDN URLs via BullMQ worker (Evolution API base64 download)", () => {
-      // The BullMQ worker uses Evolution API to download audio as base64,
-      // so it works regardless of whether the WhatsApp CDN URL has expired
+    it("should skip WhatsApp CDN URLs (expired)", () => {
       const expiredUrl = "https://mmg.whatsapp.net/v/t62.7114-24/abc123";
       const s3Url = "https://s3.amazonaws.com/bucket/audio.ogg";
 
-      // Both URLs should be handled by the worker (no URL filtering needed)
-      const canProcessViaWorker = true; // Worker uses Evolution API, not the URL
-      expect(canProcessViaWorker).toBe(true);
+      expect(expiredUrl.includes("whatsapp.net")).toBe(true);
+      expect(s3Url.includes("whatsapp.net")).toBe(false);
     });
   });
 
@@ -376,419 +363,6 @@ describe("Audio Transcription System", () => {
       const redisAvailable = true;
       const processingMode = redisAvailable ? "queued" : "sync-fallback";
       expect(processingMode).toBe("queued");
-    });
-  });
-});
-
-
-// ── Additional Tests: Pipeline Lifecycle, Recovery, Redis Connections ──
-
-describe("Audio Transcription Pipeline — Lifecycle & Recovery", () => {
-  // ── Status Order Map (mirrors audioTranscriptionWorker.ts) ──────
-
-  const STATUS_ORDER: Record<string, number> = {
-    pending: 0,
-    processing: 1,
-    completed: 2,
-    failed: 2, // terminal states are equal rank
-  };
-
-  function isStatusAdvance(current: string | null, next: string): boolean {
-    const currentRank = current ? (STATUS_ORDER[current] ?? -1) : -1;
-    const nextRank = STATUS_ORDER[next] ?? -1;
-    return nextRank > currentRank;
-  }
-
-  function canTransition(current: string | null, next: string): boolean {
-    if (!current && next === "pending") return true;
-    if (current === "pending" && next === "processing") return true;
-    if (current === "processing" && next === "completed") return true;
-    if (current === "processing" && next === "failed") return true;
-    if (current === "pending" && next === "failed") return true; // timeout recovery
-    return false;
-  }
-
-  // ── Simulated Store ──────────────────────────────────────────
-
-  interface TranscriptionJob {
-    messageId: number;
-    status: string | null;
-    transcription: string | null;
-    enqueuedAt: number | null;
-    processedAt: number | null;
-    completedAt: number | null;
-    failReason: string | null;
-  }
-
-  class TranscriptionStore {
-    jobs = new Map<number, TranscriptionJob>();
-
-    enqueue(messageId: number): boolean {
-      const existing = this.jobs.get(messageId);
-      if (existing && existing.status !== null) return false;
-      this.jobs.set(messageId, {
-        messageId, status: "pending", transcription: null,
-        enqueuedAt: Date.now(), processedAt: null, completedAt: null, failReason: null,
-      });
-      return true;
-    }
-
-    startProcessing(messageId: number): boolean {
-      const job = this.jobs.get(messageId);
-      if (!job || !canTransition(job.status, "processing")) return false;
-      job.status = "processing";
-      job.processedAt = Date.now();
-      return true;
-    }
-
-    complete(messageId: number, transcription: string): boolean {
-      const job = this.jobs.get(messageId);
-      if (!job || !canTransition(job.status, "completed")) return false;
-      job.status = "completed";
-      job.transcription = transcription;
-      job.completedAt = Date.now();
-      return true;
-    }
-
-    fail(messageId: number, reason: string): boolean {
-      const job = this.jobs.get(messageId);
-      if (!job || !canTransition(job.status, "failed")) return false;
-      job.status = "failed";
-      job.failReason = reason;
-      job.completedAt = Date.now();
-      return true;
-    }
-
-    recoverStuckPending(maxAgeMs: number): number {
-      let recovered = 0;
-      const now = Date.now();
-      for (const [, job] of this.jobs) {
-        if (job.status === "pending" && job.enqueuedAt && (now - job.enqueuedAt) > maxAgeMs) {
-          job.status = "failed";
-          job.failReason = "timeout_recovery";
-          job.completedAt = now;
-          recovered++;
-        }
-      }
-      return recovered;
-    }
-
-    getByStatus(status: string): TranscriptionJob[] {
-      return Array.from(this.jobs.values()).filter(j => j.status === status);
-    }
-  }
-
-  // ── Tests ──────────────────────────────────────────────────────
-
-  describe("Happy Path Lifecycle", () => {
-    it("null → pending → processing → completed", () => {
-      const store = new TranscriptionStore();
-      expect(store.enqueue(1)).toBe(true);
-      expect(store.jobs.get(1)?.status).toBe("pending");
-      expect(store.startProcessing(1)).toBe(true);
-      expect(store.jobs.get(1)?.status).toBe("processing");
-      expect(store.complete(1, "Hello world")).toBe(true);
-      expect(store.jobs.get(1)?.status).toBe("completed");
-      expect(store.jobs.get(1)?.transcription).toBe("Hello world");
-    });
-
-    it("null → pending → processing → failed", () => {
-      const store = new TranscriptionStore();
-      store.enqueue(1);
-      store.startProcessing(1);
-      expect(store.fail(1, "OpenAI API error")).toBe(true);
-      expect(store.jobs.get(1)?.status).toBe("failed");
-      expect(store.jobs.get(1)?.failReason).toBe("OpenAI API error");
-    });
-
-    it("pending → failed (timeout recovery)", () => {
-      const store = new TranscriptionStore();
-      store.enqueue(1);
-      expect(store.fail(1, "timeout_recovery")).toBe(true);
-      expect(store.jobs.get(1)?.status).toBe("failed");
-    });
-  });
-
-  describe("Monotonic Status — No Regression", () => {
-    it("completed → pending is blocked", () => {
-      const store = new TranscriptionStore();
-      store.enqueue(1); store.startProcessing(1); store.complete(1, "text");
-      expect(store.enqueue(1)).toBe(false);
-      expect(store.jobs.get(1)?.status).toBe("completed");
-    });
-
-    it("completed → processing is blocked", () => {
-      const store = new TranscriptionStore();
-      store.enqueue(1); store.startProcessing(1); store.complete(1, "text");
-      expect(store.startProcessing(1)).toBe(false);
-    });
-
-    it("failed → pending is blocked", () => {
-      const store = new TranscriptionStore();
-      store.enqueue(1); store.startProcessing(1); store.fail(1, "err");
-      expect(store.enqueue(1)).toBe(false);
-    });
-
-    it("processing → pending is blocked", () => {
-      const store = new TranscriptionStore();
-      store.enqueue(1); store.startProcessing(1);
-      expect(store.enqueue(1)).toBe(false);
-      expect(store.jobs.get(1)?.status).toBe("processing");
-    });
-
-    it("pending → completed (skip processing) is blocked", () => {
-      const store = new TranscriptionStore();
-      store.enqueue(1);
-      expect(store.complete(1, "text")).toBe(false);
-      expect(store.jobs.get(1)?.status).toBe("pending");
-    });
-  });
-
-  describe("isStatusAdvance", () => {
-    it("null → pending is advance", () => expect(isStatusAdvance(null, "pending")).toBe(true));
-    it("pending → processing is advance", () => expect(isStatusAdvance("pending", "processing")).toBe(true));
-    it("processing → completed is advance", () => expect(isStatusAdvance("processing", "completed")).toBe(true));
-    it("processing → failed is advance", () => expect(isStatusAdvance("processing", "failed")).toBe(true));
-    it("completed → pending is NOT advance", () => expect(isStatusAdvance("completed", "pending")).toBe(false));
-    it("completed → processing is NOT advance", () => expect(isStatusAdvance("completed", "processing")).toBe(false));
-    it("failed → pending is NOT advance", () => expect(isStatusAdvance("failed", "pending")).toBe(false));
-  });
-
-  describe("Timeout Recovery", () => {
-    it("recovers stuck pending jobs older than maxAge", () => {
-      const store = new TranscriptionStore();
-      store.enqueue(1); store.enqueue(2); store.enqueue(3);
-      store.jobs.get(1)!.enqueuedAt = Date.now() - 120_000;
-      store.jobs.get(2)!.enqueuedAt = Date.now() - 90_000;
-      store.jobs.get(3)!.enqueuedAt = Date.now() - 10_000;
-      const recovered = store.recoverStuckPending(60_000);
-      expect(recovered).toBe(2);
-      expect(store.jobs.get(1)?.status).toBe("failed");
-      expect(store.jobs.get(2)?.status).toBe("failed");
-      expect(store.jobs.get(3)?.status).toBe("pending");
-    });
-
-    it("does NOT recover processing or completed jobs", () => {
-      const store = new TranscriptionStore();
-      store.enqueue(1); store.enqueue(2); store.enqueue(3);
-      store.jobs.get(1)!.enqueuedAt = Date.now() - 120_000;
-      store.jobs.get(2)!.enqueuedAt = Date.now() - 120_000;
-      store.jobs.get(3)!.enqueuedAt = Date.now() - 120_000;
-      store.startProcessing(2);
-      store.startProcessing(3); store.complete(3, "text");
-      const recovered = store.recoverStuckPending(60_000);
-      expect(recovered).toBe(1);
-      expect(store.jobs.get(2)?.status).toBe("processing");
-      expect(store.jobs.get(3)?.status).toBe("completed");
-    });
-
-    it("returns 0 when no stuck jobs", () => {
-      const store = new TranscriptionStore();
-      store.enqueue(1);
-      store.jobs.get(1)!.enqueuedAt = Date.now() - 5_000;
-      expect(store.recoverStuckPending(60_000)).toBe(0);
-    });
-  });
-
-  describe("Duplicate Prevention", () => {
-    it("same message cannot be enqueued twice", () => {
-      const store = new TranscriptionStore();
-      expect(store.enqueue(1)).toBe(true);
-      expect(store.enqueue(1)).toBe(false);
-      expect(store.getByStatus("pending").length).toBe(1);
-    });
-
-    it("cannot re-enqueue after completion", () => {
-      const store = new TranscriptionStore();
-      store.enqueue(1); store.startProcessing(1); store.complete(1, "text");
-      expect(store.enqueue(1)).toBe(false);
-    });
-  });
-
-  describe("Separate Redis Connections (Architecture)", () => {
-    it("queue and worker must use different connection objects", () => {
-      const queueConn = { id: "queue-conn", label: "audio-transcription-queue" };
-      const workerConn = { id: "worker-conn", label: "audio-transcription-worker" };
-      expect(queueConn).not.toBe(workerConn);
-      expect(queueConn.id).not.toBe(workerConn.id);
-    });
-
-    it("message queue and message worker must also use different connections", () => {
-      const queueConn = { id: "msg-queue-conn", label: "message-queue" };
-      const workerConn = { id: "msg-worker-conn", label: "message-worker" };
-      expect(queueConn).not.toBe(workerConn);
-    });
-  });
-
-  describe("Batch Concurrent Processing", () => {
-    it("handles 5 concurrent jobs without interference", () => {
-      const store = new TranscriptionStore();
-      for (let i = 1; i <= 5; i++) store.enqueue(i);
-      expect(store.getByStatus("pending").length).toBe(5);
-      store.startProcessing(1); store.startProcessing(2); store.startProcessing(3);
-      expect(store.getByStatus("processing").length).toBe(3);
-      expect(store.getByStatus("pending").length).toBe(2);
-      store.complete(1, "text1"); store.fail(2, "error");
-      expect(store.getByStatus("completed").length).toBe(1);
-      expect(store.getByStatus("failed").length).toBe(1);
-      expect(store.getByStatus("processing").length).toBe(1);
-      expect(store.getByStatus("pending").length).toBe(2);
-    });
-  });
-});
-
-
-// ── Tests: Retry Button & Auto-Transcribe Flow (BullMQ Worker) ──
-
-describe("Retry Button & Auto-Transcribe — BullMQ Worker Flow", () => {
-
-  describe("Retry Button uses retranscribeAudio (not ai.transcribe)", () => {
-    it("retry button should call retranscribeAudio with messageId (not audioUrl)", () => {
-      // The retry button now calls handleRetranscribe(msgId) which uses
-      // trpc.ai.retranscribeAudio.useMutation() — BullMQ worker with Evolution API
-      const retranscribeInput = { tenantId: 150002, messageId: 42 };
-      expect(retranscribeInput).toHaveProperty("messageId");
-      expect(retranscribeInput).toHaveProperty("tenantId");
-      expect(retranscribeInput).not.toHaveProperty("audioUrl"); // No URL needed
-    });
-
-    it("retranscribeAudio resets status to pending and clears old transcription", () => {
-      const beforeRetranscribe = {
-        audioTranscriptionStatus: "failed",
-        audioTranscription: null,
-      };
-      // After calling retranscribeAudio mutation:
-      const afterRetranscribe = {
-        audioTranscriptionStatus: "pending",
-        audioTranscription: null,
-      };
-      expect(afterRetranscribe.audioTranscriptionStatus).toBe("pending");
-      expect(afterRetranscribe.audioTranscription).toBeNull();
-    });
-
-    it("retranscribeAudio only accepts audioMessage and pttMessage types", () => {
-      const validTypes = ["audioMessage", "pttMessage"];
-      expect(validTypes.includes("audioMessage")).toBe(true);
-      expect(validTypes.includes("pttMessage")).toBe(true);
-      expect(validTypes.includes("imageMessage")).toBe(false);
-      expect(validTypes.includes("videoMessage")).toBe(false);
-    });
-  });
-
-  describe("Auto-Transcribe uses BullMQ worker (no URL dependency)", () => {
-    it("auto-transcribe should NOT filter by whatsapp.net URL", () => {
-      // Old behavior: filtered out messages with whatsapp.net URLs
-      // New behavior: uses BullMQ worker which downloads via Evolution API
-      const messages = [
-        { id: 1, messageType: "audioMessage", fromMe: false, mediaUrl: "https://mmg.whatsapp.net/audio.ogg", audioTranscriptionStatus: null },
-        { id: 2, messageType: "pttMessage", fromMe: false, mediaUrl: null, audioTranscriptionStatus: null },
-        { id: 3, messageType: "audioMessage", fromMe: false, mediaUrl: "https://s3.example.com/audio.ogg", audioTranscriptionStatus: null },
-      ];
-
-      const audioTypes = ["audioMessage", "pttMessage", "audio"];
-      const autoTranscribedIds = new Set<number>();
-
-      for (const m of messages) {
-        const isAudio = audioTypes.includes(m.messageType);
-        const hasTranscription = m.audioTranscriptionStatus === "completed" || m.audioTranscriptionStatus === "pending" || m.audioTranscriptionStatus === "processing";
-        // New logic: no URL filter — all audio messages are eligible
-        if (isAudio && !m.fromMe && !hasTranscription && !autoTranscribedIds.has(m.id)) {
-          autoTranscribedIds.add(m.id);
-        }
-      }
-
-      // All 3 messages should be auto-transcribed (including the one with whatsapp.net URL)
-      expect(autoTranscribedIds.size).toBe(3);
-      expect(autoTranscribedIds.has(1)).toBe(true); // Was previously filtered out!
-      expect(autoTranscribedIds.has(2)).toBe(true);
-      expect(autoTranscribedIds.has(3)).toBe(true);
-    });
-
-    it("auto-transcribe should skip messages already in pending/processing/completed status", () => {
-      const messages = [
-        { id: 1, messageType: "audioMessage", fromMe: false, audioTranscriptionStatus: "pending" },
-        { id: 2, messageType: "pttMessage", fromMe: false, audioTranscriptionStatus: "processing" },
-        { id: 3, messageType: "audioMessage", fromMe: false, audioTranscriptionStatus: "completed" },
-        { id: 4, messageType: "audioMessage", fromMe: false, audioTranscriptionStatus: "failed" },
-        { id: 5, messageType: "audioMessage", fromMe: false, audioTranscriptionStatus: null },
-      ];
-
-      const audioTypes = ["audioMessage", "pttMessage"];
-      const autoTranscribedIds = new Set<number>();
-
-      for (const m of messages) {
-        const isAudio = audioTypes.includes(m.messageType);
-        const hasTranscription = m.audioTranscriptionStatus === "completed" || m.audioTranscriptionStatus === "pending" || m.audioTranscriptionStatus === "processing";
-        if (isAudio && !hasTranscription && !autoTranscribedIds.has(m.id)) {
-          autoTranscribedIds.add(m.id);
-        }
-      }
-
-      // Only messages 4 (failed) and 5 (null) should be eligible
-      expect(autoTranscribedIds.size).toBe(2);
-      expect(autoTranscribedIds.has(4)).toBe(true);  // failed → can retry
-      expect(autoTranscribedIds.has(5)).toBe(true);  // null → new message
-      expect(autoTranscribedIds.has(1)).toBe(false); // pending → already queued
-      expect(autoTranscribedIds.has(2)).toBe(false); // processing → in progress
-      expect(autoTranscribedIds.has(3)).toBe(false); // completed → done
-    });
-
-    it("auto-transcribe should include fromMe messages (sent from inbox)", () => {
-      const messages = [
-        { id: 1, messageType: "audioMessage", fromMe: true, audioTranscriptionStatus: null },
-        { id: 2, messageType: "pttMessage", fromMe: false, audioTranscriptionStatus: null },
-      ];
-
-      const audioTypes = ["audioMessage", "pttMessage"];
-      const autoTranscribedIds = new Set<number>();
-
-      for (const m of messages) {
-        const isAudio = audioTypes.includes(m.messageType);
-        const hasTranscription = m.audioTranscriptionStatus === "completed" || m.audioTranscriptionStatus === "pending" || m.audioTranscriptionStatus === "processing";
-        if (isAudio && !hasTranscription) {
-          autoTranscribedIds.add(m.id);
-        }
-      }
-
-      expect(autoTranscribedIds.size).toBe(2);
-      expect(autoTranscribedIds.has(1)).toBe(true);  // fromMe=true → should be transcribed
-      expect(autoTranscribedIds.has(2)).toBe(true);   // fromMe=false → should be transcribed
-    });
-  });
-
-  describe("Backend auto-transcribe checks AI settings before enqueuing", () => {
-    it("should skip enqueue when audioTranscriptionEnabled is false", () => {
-      const aiSettings = { audioTranscriptionEnabled: false };
-      const shouldEnqueue = aiSettings.audioTranscriptionEnabled;
-      expect(shouldEnqueue).toBe(false);
-    });
-
-    it("should enqueue when audioTranscriptionEnabled is true", () => {
-      const aiSettings = { audioTranscriptionEnabled: true };
-      const shouldEnqueue = aiSettings.audioTranscriptionEnabled;
-      expect(shouldEnqueue).toBe(true);
-    });
-  });
-
-  describe("Evolution API base64 download (worker flow)", () => {
-    it("worker uses externalMessageId (not mediaUrl) to download audio", () => {
-      const jobData = {
-        messageId: 42,
-        externalMessageId: "3EB0A1B2C3D4E5F6",
-        sessionId: "session-1",
-        instanceName: "session-1",
-        tenantId: 150002,
-        remoteJid: "5511999999999@s.whatsapp.net",
-        fromMe: false,
-        mediaMimeType: "audio/ogg",
-        mediaDuration: 15,
-      };
-
-      // Worker calls evo.getBase64FromMediaMessage(instanceName, externalMessageId, ...)
-      expect(jobData.externalMessageId).toBeTruthy();
-      expect(jobData.instanceName).toBeTruthy();
-      // No mediaUrl field needed — Evolution API downloads directly
-      expect(jobData).not.toHaveProperty("mediaUrl");
     });
   });
 });

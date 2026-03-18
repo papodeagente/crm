@@ -1,8 +1,0 @@
-{
-  "query": "ALTER TABLE `custom_field_values` MODIFY COLUMN `entityType` enum('contact','deal','company') NOT NULL DEFAULT 'contact';\nALTER TABLE `custom_fields` MODIFY COLUMN `entity` enum('contact','deal','company') NOT NULL DEFAULT 'contact';\nALTER TABLE `contacts` ADD `birthDate` varchar(10);\nALTER TABLE `contacts` ADD `weddingDate` varchar(10);\nALTER TABLE `messages` ADD `sent_via` varchar(32);",
-  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute ALTER TABLE `custom_field_values` MODIFY COLUMN `entityType` enum('contact','deal','company') NOT NULL DEFAULT 'contact';\nALTER TABLE `custom_fields` MODIFY COLUMN `entity` enum('contact','deal','company') NOT NULL DEFAULT 'contact';\nALTER TABLE `contacts` ADD `birthDate` varchar(10);\nALTER TABLE `contacts` ADD `weddingDate` varchar(10);\nALTER TABLE `messages` ADD `sent_via` varchar(32);",
-  "returncode": 1,
-  "logs": [
-    "ERROR 1060 (42S21) at line 3: Duplicate column name 'birthDate'"
-  ]
-}

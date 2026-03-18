@@ -49,7 +49,6 @@ export const waMessages = mysqlTable("messages", {
   mediaDuration: int("media_duration"),
   isVoiceNote: boolean("is_voice_note").default(false),
   quotedMessageId: varchar("quoted_message_id", { length: 256 }),
-  sentVia: varchar("sent_via", { length: 32 }),
   status: varchar("status", { length: 32 }).default("sent"),
   timestamp: timestamp("timestamp").defaultNow().notNull(),
   waConversationId: int("waConversationId"),

@@ -4,6 +4,7 @@ import { TRPCError } from "@trpc/server";
 import * as crm from "../crmDb";
 import { emitEvent } from "../middleware/eventLog";
 import { inviteUserToTenant } from "../saasAuth";
+import { runDbRepair } from "../dbRepair";
 
 export const adminRouter = router({
   // ─── TENANTS ───
@@ -169,4 +170,14 @@ export const adminRouter = router({
         return crm.listEventLog(input.tenantId, input);
       }),
   }),
+
+  // ─── DB REPAIR ───
+  dbRepair: protectedProcedure
+    .mutation(async ({ ctx }) => {
+      // Only allow owner (admin) to run repair
+      if (ctx.saasUser?.role !== "admin" && ctx.user.openId !== process.env.OWNER_OPEN_ID) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Apenas administradores podem executar reparos" });
+      }
+      return runDbRepair();
+    }),
 });

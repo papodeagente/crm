@@ -365,42 +365,6 @@ class ConversationStore {
   }
 
   /**
-   * PART 5: Handle full conversation preview update from server.
-   * This is the AUTHORITATIVE update — it replaces cached preview fields
-   * with the server's single source of truth (derived from wa_messages).
-   * Does NOT re-sort — the conversation stays in its current position.
-   */
-  handleConversationPreview(preview: {
-    sessionId: string;
-    remoteJid: string;
-    lastMessage: string | null;
-    lastMessageAt: number;
-    lastMessageStatus: string | null;
-    lastMessageType: string | null;
-    lastFromMe: boolean;
-  }) {
-    const key = makeConvKey(preview.sessionId, preview.remoteJid);
-    if (!key) return;
-
-    const existing = this.state.conversationMap.get(key);
-    if (!existing) return;
-
-    const newMap = new Map(this.state.conversationMap);
-    newMap.set(key, {
-      ...existing,
-      lastMessage: preview.lastMessage ?? existing.lastMessage,
-      lastMessageType: preview.lastMessageType ?? existing.lastMessageType,
-      lastFromMe: preview.lastFromMe,
-      lastStatus: preview.lastMessageStatus ?? existing.lastStatus,
-      lastTimestamp: new Date(preview.lastMessageAt),
-      _optimistic: false, // confirmed by server
-    });
-
-    // Do NOT change sortedIds — preview updates never re-sort
-    this.commit(newMap, [...this.state.sortedIds]);
-  }
-
-  /**
    * Mark conversation as read using conversationKey.
    */
   markRead(conversationKey: string) {
@@ -424,96 +388,6 @@ class ConversationStore {
     newMap.set(conversationKey, { ...existing, ...fields });
 
     this.commit(newMap, [...this.state.sortedIds]);
-  }
-
-  /**
-   * Handle ownership change (claim, assign, transfer, finish).
-   * Updates assignment fields and triggers re-render so derived tab views
-   * (myChats/queue/all) update instantly without refetch.
-   *
-   * If the conversation is not in the store, it will be added (upserted)
-   * so that queue→myChats transitions are instant.
-   */
-  handleOwnershipChange(payload: {
-    sessionId: string;
-    remoteJid: string;
-    assignedUserId?: number | null;
-    assignedAgentName?: string | null;
-    assignedAgentAvatar?: string | null;
-    assignmentStatus?: string | null;
-    assignmentPriority?: string | null;
-    queuedAt?: string | Date | null;
-    // Optional preview fields for upsert
-    lastMessage?: string | null;
-    lastMessageType?: string | null;
-    lastFromMe?: boolean | number;
-    lastTimestamp?: string | Date | null;
-    lastStatus?: string | null;
-    contactPushName?: string | null;
-    unreadCount?: number;
-    conversationId?: number;
-  }): boolean {
-    const key = makeConvKey(payload.sessionId, payload.remoteJid);
-    if (!key || !payload.remoteJid) return false;
-
-    const oldMap = this.state.conversationMap;
-    const oldIds = this.state.sortedIds;
-    const existing = oldMap.get(key);
-
-    const newMap = new Map(oldMap);
-
-    if (existing) {
-      // Update existing conversation's ownership fields
-      newMap.set(key, {
-        ...existing,
-        assignedUserId: payload.assignedUserId !== undefined ? payload.assignedUserId : existing.assignedUserId,
-        assignedAgentName: payload.assignedAgentName !== undefined ? payload.assignedAgentName : existing.assignedAgentName,
-        assignedAgentAvatar: payload.assignedAgentAvatar !== undefined ? payload.assignedAgentAvatar : existing.assignedAgentAvatar,
-        assignmentStatus: payload.assignmentStatus !== undefined ? payload.assignmentStatus : existing.assignmentStatus,
-        assignmentPriority: payload.assignmentPriority !== undefined ? payload.assignmentPriority : existing.assignmentPriority,
-        queuedAt: payload.queuedAt !== undefined ? payload.queuedAt : existing.queuedAt,
-      });
-      this.commit(newMap, [...oldIds]);
-    } else {
-      // Upsert: conversation not in store (e.g., coming from queue)
-      const entry: ConvEntry = {
-        conversationKey: key,
-        sessionId: payload.sessionId,
-        remoteJid: payload.remoteJid,
-        lastMessage: payload.lastMessage || null,
-        lastMessageType: payload.lastMessageType || null,
-        lastFromMe: payload.lastFromMe ?? false,
-        lastTimestamp: payload.lastTimestamp || new Date().toISOString(),
-        lastStatus: payload.lastStatus || "received",
-        contactPushName: payload.contactPushName || null,
-        unreadCount: payload.unreadCount ?? 0,
-        assignedUserId: payload.assignedUserId ?? null,
-        assignedAgentName: payload.assignedAgentName ?? null,
-        assignedAgentAvatar: payload.assignedAgentAvatar ?? null,
-        assignmentStatus: payload.assignmentStatus ?? null,
-        assignmentPriority: payload.assignmentPriority ?? null,
-        queuedAt: payload.queuedAt ?? null,
-        conversationId: payload.conversationId,
-      };
-      newMap.set(key, entry);
-      // Add to top of sorted list
-      this.commit(newMap, [key, ...oldIds]);
-    }
-    return true;
-  }
-
-  /**
-   * Remove a conversation from the store (e.g., when it's transferred away).
-   */
-  removeConversation(key: string): boolean {
-    const oldMap = this.state.conversationMap;
-    if (!oldMap.has(key)) return false;
-
-    const newMap = new Map(oldMap);
-    newMap.delete(key);
-    const newIds = this.state.sortedIds.filter(id => id !== key);
-    this.commit(newMap, newIds);
-    return true;
   }
 
   /**
@@ -588,24 +462,12 @@ export function useConversationStore() {
     store.handleStatusUpdate(update);
   }, [store]);
 
-  const handleConversationPreview = useCallback((preview: Parameters<ConversationStore['handleConversationPreview']>[0]) => {
-    store.handleConversationPreview(preview);
-  }, [store]);
-
   const markRead = useCallback((conversationKey: string) => {
     store.markRead(conversationKey);
   }, [store]);
 
   const updateAssignment = useCallback((conversationKey: string, fields: Parameters<ConversationStore['updateAssignment']>[1]) => {
     store.updateAssignment(conversationKey, fields);
-  }, [store]);
-
-  const handleOwnershipChange = useCallback((payload: Parameters<ConversationStore['handleOwnershipChange']>[0]) => {
-    return store.handleOwnershipChange(payload);
-  }, [store]);
-
-  const removeConversation = useCallback((key: string) => {
-    return store.removeConversation(key);
   }, [store]);
 
   const getConversation = useCallback((key: string) => {
@@ -635,16 +497,10 @@ export function useConversationStore() {
     handleMessage,
     /** Handle message status update (only updates status, never re-sorts) */
     handleStatusUpdate,
-    /** PART 5: Handle full conversation preview from server (authoritative) */
-    handleConversationPreview,
     /** Mark conversation as read (by conversationKey) */
     markRead,
     /** Update assignment fields (by conversationKey) */
     updateAssignment,
-    /** Handle ownership change (claim/assign/transfer) — instant tab movement */
-    handleOwnershipChange,
-    /** Remove conversation from store (e.g., transferred away) */
-    removeConversation,
     /** Get single conversation by conversationKey (O(1)) */
     getConversation,
     /** Get single conversation by remoteJid (O(n) scan, backward compat) */

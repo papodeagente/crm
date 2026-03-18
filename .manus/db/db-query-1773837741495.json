@@ -1,9 +1,0 @@
-{
-  "query": "-- Step 1: Backfill waConversationId for messages that have NULL FK\n-- Match by sessionId + remoteJid\nUPDATE messages m\nINNER JOIN wa_conversations wc ON m.sessionId = wc.sessionId AND m.remoteJid = wc.remoteJid\nSET m.waConversationId = wc.id\nWHERE m.waConversationId IS NULL;",
-  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute -- Step 1: Backfill waConversationId for messages that have NULL FK\n-- Match by sessionId + remoteJid\nUPDATE messages m\nINNER JOIN wa_conversations wc ON m.sessionId = wc.sessionId AND m.remoteJid = wc.remoteJid\nSET m.waConversationId = wc.id\nWHERE m.waConversationId IS NULL;",
-  "rows": [],
-  "messages": [],
-  "stdout": "",
-  "stderr": "",
-  "execution_time_ms": 3179
-}

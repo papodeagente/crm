@@ -1,8 +1,0 @@
-{
-  "query": "\nSELECT \n  audio_transcription_status AS status,\n  COUNT(*) AS cnt\nFROM messages\nWHERE message_type IN ('audioMessage', 'pttMessage')\nGROUP BY audio_transcription_status\nORDER BY cnt DESC;\n",
-  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute \nSELECT \n  audio_transcription_status AS status,\n  COUNT(*) AS cnt\nFROM messages\nWHERE message_type IN ('audioMessage', 'pttMessage')\nGROUP BY audio_transcription_status\nORDER BY cnt DESC;\n",
-  "returncode": 1,
-  "logs": [
-    "ERROR 1054 (42S22) at line 2: Unknown column 'message_type' in 'where clause'"
-  ]
-}

@@ -106,27 +106,6 @@ async function startServer() {
     });
   });
 
-  // Forward conversation preview updates to Socket.IO clients
-  // PART 5: Full preview payload so frontend can update sidebar without refresh
-  whatsappManager.on("conversation:preview", (data) => {
-    console.log('[InboxDebug] emit whatsapp:conversation:preview', {
-      conversationId: data.conversationId,
-      remoteJid: data.remoteJid?.substring(0, 15) || null,
-      lastMessageStatus: data.lastMessageStatus,
-      lastFromMe: data.lastFromMe,
-    });
-    io.emit("whatsapp:conversation:preview", {
-      sessionId: data.sessionId,
-      remoteJid: data.remoteJid,
-      conversationId: data.conversationId,
-      lastMessage: data.lastMessage,
-      lastMessageAt: data.lastMessageAt,
-      lastMessageStatus: data.lastMessageStatus,
-      lastMessageType: data.lastMessageType,
-      lastFromMe: data.lastFromMe,
-    });
-  });
-
   io.on("connection", (socket) => {
     console.log("Socket.IO client connected:", socket.id);
     socket.on("disconnect", () => {
@@ -220,13 +199,8 @@ async function startServer() {
     });
 
     // Initialize audio transcription worker (if Redis available)
-    import("../audioTranscriptionWorker").then(async (m) => {
+    import("../audioTranscriptionWorker").then(m => {
       m.initAudioTranscriptionWorker();
-      // Recover any jobs stuck in "pending" from previous runs
-      const recovered = await m.recoverPendingJobs();
-      if (recovered > 0) {
-        console.log(`[AudioTranscription] Recovered ${recovered} stuck pending jobs (marked as failed)`);
-      }
     }).catch(e => {
       console.warn("[AudioTranscription] Failed to initialize worker:", e.message);
     });
