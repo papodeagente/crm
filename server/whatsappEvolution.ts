@@ -357,6 +357,7 @@ class WhatsAppEvolutionManager extends EventEmitter {
             messageType: "conversation",
             content: text,
             senderAgentId: senderAgentId || null,
+            sentVia: "crm",
             status: "sent",
             timestamp: new Date(result.messageTimestamp ? result.messageTimestamp * 1000 : Date.now()),
           }).onDuplicateKeyUpdate({ set: { status: sql`status` } }).catch(() => {});
@@ -432,6 +433,7 @@ class WhatsAppEvolutionManager extends EventEmitter {
             mediaDuration: opts?.duration || null,
             isVoiceNote: !!(mediaType === "audio" && opts?.ptt),
             senderAgentId: senderAgentId || null,
+            sentVia: "crm",
             status: "sent",
             timestamp: new Date(result.messageTimestamp ? result.messageTimestamp * 1000 : Date.now()),
           }).onDuplicateKeyUpdate({ set: { status: sql`status` } }).catch(() => {});
@@ -525,6 +527,7 @@ class WhatsAppEvolutionManager extends EventEmitter {
             messageType: "extendedTextMessage",
             content: text,
             senderAgentId: senderAgentId || null,
+            sentVia: "crm",
             status: "sent",
             timestamp: new Date(result.messageTimestamp ? result.messageTimestamp * 1000 : Date.now()),
             quotedMessageId,

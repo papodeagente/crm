@@ -32,6 +32,7 @@ interface Message {
   mediaFileName?: string | null;
   mediaDuration?: number | null;
   isVoiceNote?: boolean | null;
+  sentVia?: string | null;
   status?: string | null;
   timestamp: string | Date;
   createdAt: string | Date;
@@ -908,6 +909,9 @@ const MessageBubble = memo(({
 
           {/* Time + Status */}
           <span className="float-right ml-2 mt-[3px] flex items-center gap-0.5 relative -bottom-0.5">
+            {fromMe && msg.sentVia && msg.sentVia !== "crm" && (
+              <span className="text-[10px] text-muted-foreground/50 leading-none italic mr-0.5" title="Enviado de outro dispositivo">ext</span>
+            )}
             <span className="text-[11px] text-muted-foreground/70 leading-none tabular-nums">{time}</span>
             <MessageStatus status={msg.status} isFromMe={fromMe} />
           </span>

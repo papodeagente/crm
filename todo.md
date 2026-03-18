@@ -3823,3 +3823,16 @@
 - [x] PART 9: Indexes — existing idx_msg_wa_conv index sufficient for the query
 - [x] PART 10: Vitest tests — 41 tests passing (8 new for handleConversationPreview)
 - [x] PART 11: Manual verification — TypeScript clean, full test suite passing (1979/1983, 4 pre-existing timeouts)
+
+## Message Status Regression + Preview Desync + "Sent From Other Device" Marker
+- [x] PART 1: Define single source of truth — wa_messages.status is authoritative, propagateLatestMessageToConversation()
+- [x] PART 2: Monotonic status updates — CASE WHEN with statusOrder map in messageWorker.ts processStatusUpdate
+- [x] PART 3: Handle out-of-order events — SQL only updates if new status > current status (monotonic)
+- [x] PART 4: Fix preview status sync — propagateLatestMessageToConversation() called after every status update
+- [x] PART 5: Fix latest message selection — deterministic ordering (timestamp DESC, createdAt DESC, id DESC)
+- [x] PART 6: Frontend cache update — handleConversationPreview() + handleStatusUpdate() with monotonic enforcement
+- [x] PART 7: Database repair/backfill — SQL executed: 26387 other_device, 111 crm, 1539 conversations rebuilt
+- [x] PART 8: Add sentVia field — schema migration applied, 'ext' marker in chat UI for other_device messages
+- [x] PART 9: Validation report — 0 regressed statuses, all wa_conversations have valid lastStatus
+- [x] PART 10: Vitest tests — 54 tests passing (13 new for monotonicity + hydration normalization)
+- [x] PART 11: Manual verification — TypeScript clean, full test suite passing

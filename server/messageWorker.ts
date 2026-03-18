@@ -193,6 +193,19 @@ const STRING_STATUS_MAP: Record<string, string> = {
   "READ": "read", "PLAYED": "played", "DELETED": "deleted",
 };
 
+// ── MONOTONIC STATUS PRECEDENCE ──────────────────────────────
+// Status must NEVER go backwards. Higher number = higher precedence.
+const STATUS_PRECEDENCE: Record<string, number> = {
+  error: 0, pending: 1, sent: 2, delivered: 3, read: 4, played: 5, deleted: 6,
+};
+
+/** Returns true if newStatus has higher precedence than currentStatus */
+function isStatusUpgrade(currentStatus: string | null | undefined, newStatus: string): boolean {
+  const current = STATUS_PRECEDENCE[currentStatus || ""] ?? -1;
+  const incoming = STATUS_PRECEDENCE[newStatus] ?? -1;
+  return incoming > current;
+}
+
 // ── Core Event Processor ──────────────────────────────────────
 
 /**
@@ -311,6 +324,12 @@ async function processNewMessage(session: SessionInfo, data: any, workerStartTim
     console.log(`[TRACE][DEDUP_CHECK] timestamp: ${Date.now()} | delta: ${Date.now() - dedupStart}ms | msgId: ${messageId}`);
 
     // ── Step 2: Insert message ──
+    // Determine sentVia: if fromMe and coming via webhook (not CRM send flow),
+    // it was sent from another device (WhatsApp mobile/web).
+    // CRM send flow sets sentVia='crm' explicitly in the router.
+    // Webhook-originated fromMe messages default to 'other_device'.
+    const sentVia = fromMe ? "other_device" : null;
+
     const insertStart = Date.now();
     await db.insert(waMessages).values({
       sessionId,
@@ -321,6 +340,7 @@ async function processNewMessage(session: SessionInfo, data: any, workerStartTim
       messageType,
       content: content || null,
       pushName: fromMe ? null : (pushName || null),
+      sentVia,
       status: fromMe ? "sent" : "received",
       timestamp: new Date(timestamp),
       mediaUrl: mediaInfo.mediaUrl || null,
@@ -503,7 +523,28 @@ async function processStatusUpdate(session: SessionInfo, data: any): Promise<voi
 
       console.log(`[Worker] Status update: ${messageId} -> ${newStatus} (jid: ${remoteJid}, fromMe: ${fromMe})`);
 
-      // Update message status in DB
+      // ── MONOTONIC STATUS UPDATE: only allow upgrades, never regression ──
+      // First, read the current status from DB
+      const [existingMsg] = await db.select({ status: waMessages.status })
+        .from(waMessages)
+        .where(and(
+          eq(waMessages.sessionId, sessionId),
+          eq(waMessages.messageId, messageId)
+        ))
+        .limit(1);
+
+      if (!existingMsg) {
+        console.log(`[Worker] Status update skipped - message not found: ${messageId}`);
+        continue;
+      }
+
+      // Only apply if new status has higher precedence
+      if (!isStatusUpgrade(existingMsg.status, newStatus)) {
+        console.log(`[Worker] Status update BLOCKED (monotonic): ${messageId} ${existingMsg.status} -> ${newStatus} (would regress)`);
+        continue;
+      }
+
+      // Update message status in DB (monotonic — only upgrades reach here)
       await db.update(waMessages)
         .set({ status: newStatus })
         .where(and(
@@ -529,15 +570,21 @@ async function processStatusUpdate(session: SessionInfo, data: any): Promise<voi
           }
         } catch (e: any) {
           console.warn(`[Worker] Failed to propagate status to conversation:`, e.message);
-          // Fallback: update lastStatus directly if propagation fails
+          // Fallback: monotonic update lastStatus directly if propagation fails
           if (fromMe) {
-            await db.update(waConversations)
-              .set({ lastStatus: newStatus })
-              .where(and(
-                eq(waConversations.sessionId, sessionId),
-                eq(waConversations.remoteJid, remoteJid),
-                eq(waConversations.lastFromMe, true)
-              ));
+            // Only upgrade, never regress — use SQL CASE to enforce monotonicity
+            await db.execute(sql`
+              UPDATE wa_conversations
+              SET lastStatus = CASE
+                WHEN FIELD(${newStatus}, 'error','pending','sent','delivered','read','played','deleted')
+                   > FIELD(COALESCE(lastStatus,''), 'error','pending','sent','delivered','read','played','deleted')
+                THEN ${newStatus}
+                ELSE lastStatus
+              END
+              WHERE sessionId = ${sessionId}
+                AND remoteJid = ${remoteJid}
+                AND lastFromMe = 1
+            `);
           }
         }
       }

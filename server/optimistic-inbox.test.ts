@@ -1215,3 +1215,148 @@ describe("PART 5 (NEW): handleConversationPreview — Authoritative Server Updat
     expect(conv.lastStatus).toBe("delivered");
   });
 });
+
+
+// ════════════════════════════════════════════════════════════
+// PART 8: MONOTONIC STATUS — Never allow status regression
+// ════════════════════════════════════════════════════════════
+
+describe("PART 8: Monotonic Status Enforcement", () => {
+  const SESSION = "s1";
+  const JID_A = "5511999@s.whatsapp.net";
+  const KEY_A = makeConvKey(SESSION, JID_A);
+  let store: ConversationStore;
+
+  beforeEach(() => {
+    store = new ConversationStore();
+    store.hydrate([
+      { remoteJid: JID_A, sessionId: SESSION, lastMessage: "Hello", lastMessageType: "conversation", lastFromMe: true, lastTimestamp: new Date().toISOString(), lastStatus: "delivered", contactPushName: "User A", unreadCount: 0 },
+    ]);
+  });
+
+  it("should NOT regress from delivered to sent", () => {
+    store.handleStatusUpdate({ sessionId: SESSION, remoteJid: JID_A, status: "sent" });
+    expect(store.getConversation(KEY_A)!.lastStatus).toBe("delivered"); // unchanged
+  });
+
+  it("should NOT regress from read to delivered", () => {
+    // First advance to read
+    store.handleStatusUpdate({ sessionId: SESSION, remoteJid: JID_A, status: "read" });
+    expect(store.getConversation(KEY_A)!.lastStatus).toBe("read");
+    // Try to regress
+    store.handleStatusUpdate({ sessionId: SESSION, remoteJid: JID_A, status: "delivered" });
+    expect(store.getConversation(KEY_A)!.lastStatus).toBe("read"); // unchanged
+  });
+
+  it("should NOT regress from read to sending", () => {
+    store.handleStatusUpdate({ sessionId: SESSION, remoteJid: JID_A, status: "read" });
+    store.handleStatusUpdate({ sessionId: SESSION, remoteJid: JID_A, status: "sending" });
+    expect(store.getConversation(KEY_A)!.lastStatus).toBe("read"); // unchanged
+  });
+
+  it("should advance from sent → delivered → read → played", () => {
+    store.hydrate([
+      { remoteJid: JID_A, sessionId: SESSION, lastMessage: "Hello", lastMessageType: "conversation", lastFromMe: true, lastTimestamp: new Date().toISOString(), lastStatus: "sent", contactPushName: "User A", unreadCount: 0 },
+    ]);
+    
+    store.handleStatusUpdate({ sessionId: SESSION, remoteJid: JID_A, status: "delivered" });
+    expect(store.getConversation(KEY_A)!.lastStatus).toBe("delivered");
+    
+    store.handleStatusUpdate({ sessionId: SESSION, remoteJid: JID_A, status: "read" });
+    expect(store.getConversation(KEY_A)!.lastStatus).toBe("read");
+    
+    store.handleStatusUpdate({ sessionId: SESSION, remoteJid: JID_A, status: "played" });
+    expect(store.getConversation(KEY_A)!.lastStatus).toBe("played");
+  });
+
+  it("should advance from sending → sent (optimistic → confirmed)", () => {
+    // Simulate optimistic send
+    store.handleOptimisticSend({ sessionId: SESSION, remoteJid: JID_A, content: "New msg" });
+    expect(store.getConversation(KEY_A)!.lastStatus).toBe("sending");
+    
+    // Webhook confirms sent
+    store.handleStatusUpdate({ sessionId: SESSION, remoteJid: JID_A, status: "sent" });
+    expect(store.getConversation(KEY_A)!.lastStatus).toBe("sent");
+  });
+
+  it("should ignore status update for non-fromMe conversations", () => {
+    store.hydrate([
+      { remoteJid: JID_A, sessionId: SESSION, lastMessage: "Hello", lastMessageType: "conversation", lastFromMe: false, lastTimestamp: new Date().toISOString(), lastStatus: "received", contactPushName: "User A", unreadCount: 1 },
+    ]);
+    
+    store.handleStatusUpdate({ sessionId: SESSION, remoteJid: JID_A, status: "delivered" });
+    expect(store.getConversation(KEY_A)!.lastStatus).toBe("received"); // unchanged
+  });
+
+  it("should handle rapid status updates without regression", () => {
+    store.hydrate([
+      { remoteJid: JID_A, sessionId: SESSION, lastMessage: "Hello", lastMessageType: "conversation", lastFromMe: true, lastTimestamp: new Date().toISOString(), lastStatus: "sending", contactPushName: "User A", unreadCount: 0 },
+    ]);
+    
+    // Simulate rapid webhook updates arriving out of order
+    store.handleStatusUpdate({ sessionId: SESSION, remoteJid: JID_A, status: "delivered" });
+    store.handleStatusUpdate({ sessionId: SESSION, remoteJid: JID_A, status: "sent" }); // late arrival
+    store.handleStatusUpdate({ sessionId: SESSION, remoteJid: JID_A, status: "read" });
+    store.handleStatusUpdate({ sessionId: SESSION, remoteJid: JID_A, status: "delivered" }); // late arrival
+    
+    expect(store.getConversation(KEY_A)!.lastStatus).toBe("read"); // highest status wins
+  });
+});
+
+// ════════════════════════════════════════════════════════════
+// PART 9: HYDRATION STATUS NORMALIZATION
+// ════════════════════════════════════════════════════════════
+
+describe("PART 9: Hydration normalizes invalid fromMe statuses", () => {
+  const SESSION = "s1";
+  const JID_A = "5511999@s.whatsapp.net";
+  const KEY_A = makeConvKey(SESSION, JID_A);
+
+  it("should normalize null status to 'sent' for fromMe messages", () => {
+    const store = new ConversationStore();
+    store.hydrate([
+      { remoteJid: JID_A, sessionId: SESSION, lastMessage: "Hello", lastMessageType: "conversation", lastFromMe: true, lastTimestamp: new Date().toISOString(), lastStatus: null, contactPushName: "User A", unreadCount: 0 },
+    ]);
+    expect(store.getConversation(KEY_A)!.lastStatus).toBe("sent");
+  });
+
+  it("should normalize 'pending' status to 'sent' for fromMe messages", () => {
+    const store = new ConversationStore();
+    store.hydrate([
+      { remoteJid: JID_A, sessionId: SESSION, lastMessage: "Hello", lastMessageType: "conversation", lastFromMe: true, lastTimestamp: new Date().toISOString(), lastStatus: "pending", contactPushName: "User A", unreadCount: 0 },
+    ]);
+    expect(store.getConversation(KEY_A)!.lastStatus).toBe("sent");
+  });
+
+  it("should normalize 'received' status to 'sent' for fromMe messages", () => {
+    const store = new ConversationStore();
+    store.hydrate([
+      { remoteJid: JID_A, sessionId: SESSION, lastMessage: "Hello", lastMessageType: "conversation", lastFromMe: true, lastTimestamp: new Date().toISOString(), lastStatus: "received", contactPushName: "User A", unreadCount: 0 },
+    ]);
+    expect(store.getConversation(KEY_A)!.lastStatus).toBe("sent");
+  });
+
+  it("should NOT normalize valid statuses for fromMe messages", () => {
+    const store = new ConversationStore();
+    store.hydrate([
+      { remoteJid: JID_A, sessionId: SESSION, lastMessage: "Hello", lastMessageType: "conversation", lastFromMe: true, lastTimestamp: new Date().toISOString(), lastStatus: "delivered", contactPushName: "User A", unreadCount: 0 },
+    ]);
+    expect(store.getConversation(KEY_A)!.lastStatus).toBe("delivered");
+  });
+
+  it("should handle lastFromMe as number 1 (MySQL tinyint)", () => {
+    const store = new ConversationStore();
+    store.hydrate([
+      { remoteJid: JID_A, sessionId: SESSION, lastMessage: "Hello", lastMessageType: "conversation", lastFromMe: 1, lastTimestamp: new Date().toISOString(), lastStatus: "pending", contactPushName: "User A", unreadCount: 0 },
+    ]);
+    expect(store.getConversation(KEY_A)!.lastStatus).toBe("sent");
+  });
+
+  it("should NOT normalize status for non-fromMe messages", () => {
+    const store = new ConversationStore();
+    store.hydrate([
+      { remoteJid: JID_A, sessionId: SESSION, lastMessage: "Hello", lastMessageType: "conversation", lastFromMe: false, lastTimestamp: new Date().toISOString(), lastStatus: "received", contactPushName: "User A", unreadCount: 0 },
+    ]);
+    expect(store.getConversation(KEY_A)!.lastStatus).toBe("received");
+  });
+});

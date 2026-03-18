@@ -1,0 +1,50 @@
+{
+  "query": "-- Validation 1: sentVia distribution\nSELECT sent_via, COUNT(*) as cnt FROM messages WHERE fromMe = 1 GROUP BY sent_via;\n\n-- Validation 2: Check for any remaining regressed statuses (fromMe with pending/error)\nSELECT status, COUNT(*) as cnt FROM messages WHERE fromMe = 1 AND status IN ('pending', 'error') GROUP BY status;\n\n-- Validation 3: Check wa_conversations preview status distribution for fromMe\nSELECT lastStatus, COUNT(*) as cnt FROM wa_conversations WHERE lastFromMe = 1 GROUP BY lastStatus;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute -- Validation 1: sentVia distribution\nSELECT sent_via, COUNT(*) as cnt FROM messages WHERE fromMe = 1 GROUP BY sent_via;\n\n-- Validation 2: Check for any remaining regressed statuses (fromMe with pending/error)\nSELECT status, COUNT(*) as cnt FROM messages WHERE fromMe = 1 AND status IN ('pending', 'error') GROUP BY status;\n\n-- Validation 3: Check wa_conversations preview status distribution for fromMe\nSELECT lastStatus, COUNT(*) as cnt FROM wa_conversations WHERE lastFromMe = 1 GROUP BY lastStatus;",
+  "rows": [
+    {
+      "sent_via": "other_device",
+      "cnt": "26387"
+    },
+    {
+      "sent_via": "crm",
+      "cnt": "111"
+    },
+    {
+      "sent_via": "lastStatus",
+      "cnt": "cnt"
+    },
+    {
+      "sent_via": "sent",
+      "cnt": "268"
+    },
+    {
+      "sent_via": "pending",
+      "cnt": "6"
+    },
+    {
+      "sent_via": "delivered",
+      "cnt": "256"
+    },
+    {
+      "sent_via": "read",
+      "cnt": "195"
+    },
+    {
+      "sent_via": "played",
+      "cnt": "29"
+    },
+    {
+      "sent_via": "edited",
+      "cnt": "3"
+    },
+    {
+      "sent_via": "received",
+      "cnt": "782"
+    }
+  ],
+  "messages": [],
+  "stdout": "sent_via\tcnt\nother_device\t26387\ncrm\t111\nlastStatus\tcnt\nsent\t268\npending\t6\ndelivered\t256\nread\t195\nplayed\t29\nedited\t3\nreceived\t782\n",
+  "stderr": "",
+  "execution_time_ms": 143
+}
