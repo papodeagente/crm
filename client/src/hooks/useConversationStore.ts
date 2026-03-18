@@ -365,6 +365,42 @@ class ConversationStore {
   }
 
   /**
+   * PART 5: Handle full conversation preview update from server.
+   * This is the AUTHORITATIVE update — it replaces cached preview fields
+   * with the server's single source of truth (derived from wa_messages).
+   * Does NOT re-sort — the conversation stays in its current position.
+   */
+  handleConversationPreview(preview: {
+    sessionId: string;
+    remoteJid: string;
+    lastMessage: string | null;
+    lastMessageAt: number;
+    lastMessageStatus: string | null;
+    lastMessageType: string | null;
+    lastFromMe: boolean;
+  }) {
+    const key = makeConvKey(preview.sessionId, preview.remoteJid);
+    if (!key) return;
+
+    const existing = this.state.conversationMap.get(key);
+    if (!existing) return;
+
+    const newMap = new Map(this.state.conversationMap);
+    newMap.set(key, {
+      ...existing,
+      lastMessage: preview.lastMessage ?? existing.lastMessage,
+      lastMessageType: preview.lastMessageType ?? existing.lastMessageType,
+      lastFromMe: preview.lastFromMe,
+      lastStatus: preview.lastMessageStatus ?? existing.lastStatus,
+      lastTimestamp: new Date(preview.lastMessageAt),
+      _optimistic: false, // confirmed by server
+    });
+
+    // Do NOT change sortedIds — preview updates never re-sort
+    this.commit(newMap, [...this.state.sortedIds]);
+  }
+
+  /**
    * Mark conversation as read using conversationKey.
    */
   markRead(conversationKey: string) {
@@ -462,6 +498,10 @@ export function useConversationStore() {
     store.handleStatusUpdate(update);
   }, [store]);
 
+  const handleConversationPreview = useCallback((preview: Parameters<ConversationStore['handleConversationPreview']>[0]) => {
+    store.handleConversationPreview(preview);
+  }, [store]);
+
   const markRead = useCallback((conversationKey: string) => {
     store.markRead(conversationKey);
   }, [store]);
@@ -497,6 +537,8 @@ export function useConversationStore() {
     handleMessage,
     /** Handle message status update (only updates status, never re-sorts) */
     handleStatusUpdate,
+    /** PART 5: Handle full conversation preview from server (authoritative) */
+    handleConversationPreview,
     /** Mark conversation as read (by conversationKey) */
     markRead,
     /** Update assignment fields (by conversationKey) */

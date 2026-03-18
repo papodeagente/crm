@@ -59,6 +59,18 @@ interface ConversationUpdatedEvent {
   timestamp: number;
 }
 
+/** PART 5: Full conversation preview update from server (single source of truth) */
+export interface ConversationPreviewEvent {
+  sessionId: string;
+  remoteJid: string;
+  conversationId: number;
+  lastMessage: string | null;
+  lastMessageAt: number;
+  lastMessageStatus: string | null;
+  lastMessageType: string | null;
+  lastFromMe: boolean;
+}
+
 // ─── Singleton Socket Manager ───
 // Ensures only ONE Socket.IO connection exists across all components
 
@@ -73,6 +85,7 @@ class SocketManager {
   private _lastMediaUpdate: WhatsAppMediaUpdateEvent | null = null;
   private _lastConversationUpdate: ConversationUpdatedEvent | null = null;
   private _lastTranscriptionUpdate: TranscriptionUpdateEvent | null = null;
+  private _lastConversationPreview: ConversationPreviewEvent | null = null;
   private refCount = 0;
 
   subscribe(listener: () => void) {
@@ -161,6 +174,13 @@ class SocketManager {
       this._lastConversationUpdate = data;
       this.notify();
     });
+
+    // PART 5: Conversation preview update (full payload from server)
+    socket.on("whatsapp:conversation:preview", (data: ConversationPreviewEvent) => {
+      console.log("[Socket] Conversation preview update:", data.remoteJid?.substring(0, 15), data.lastMessageStatus);
+      this._lastConversationPreview = data;
+      this.notify();
+    });
   }
 
   getSnapshot() {
@@ -173,6 +193,7 @@ class SocketManager {
       lastMediaUpdate: this._lastMediaUpdate,
       lastConversationUpdate: this._lastConversationUpdate,
       lastTranscriptionUpdate: this._lastTranscriptionUpdate,
+      lastConversationPreview: this._lastConversationPreview,
     };
   }
 
@@ -203,7 +224,8 @@ function getSnapshot() {
     next.lastStatusUpdate !== snapshotCache.lastStatusUpdate ||
     next.lastMediaUpdate !== snapshotCache.lastMediaUpdate ||
     next.lastConversationUpdate !== snapshotCache.lastConversationUpdate ||
-    next.lastTranscriptionUpdate !== snapshotCache.lastTranscriptionUpdate
+    next.lastTranscriptionUpdate !== snapshotCache.lastTranscriptionUpdate ||
+    next.lastConversationPreview !== snapshotCache.lastConversationPreview
   ) {
     snapshotCache = next;
   }
@@ -233,6 +255,7 @@ export function useSocket() {
     lastMediaUpdate: state.lastMediaUpdate,
     lastConversationUpdate: state.lastConversationUpdate,
     lastTranscriptionUpdate: state.lastTranscriptionUpdate,
+    lastConversationPreview: state.lastConversationPreview,
     clearQr,
   };
 }

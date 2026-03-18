@@ -187,6 +187,32 @@ class ConversationStore {
     this.commit(newMap, [...this.state.sortedIds]);
   }
 
+  handleConversationPreview(preview: {
+    sessionId: string;
+    remoteJid: string;
+    lastMessage: string | null;
+    lastMessageAt: number;
+    lastMessageStatus: string | null;
+    lastMessageType: string | null;
+    lastFromMe: boolean;
+  }) {
+    const key = makeConvKey(preview.sessionId, preview.remoteJid);
+    if (!key) return;
+    const existing = this.state.conversationMap.get(key);
+    if (!existing) return;
+    const newMap = new Map(this.state.conversationMap);
+    newMap.set(key, {
+      ...existing,
+      lastMessage: preview.lastMessage ?? existing.lastMessage,
+      lastMessageType: preview.lastMessageType ?? existing.lastMessageType,
+      lastFromMe: preview.lastFromMe,
+      lastStatus: preview.lastMessageStatus ?? existing.lastStatus,
+      lastTimestamp: new Date(preview.lastMessageAt),
+      _optimistic: false,
+    });
+    this.commit(newMap, [...this.state.sortedIds]);
+  }
+
   getConversation(key: string): ConvEntry | undefined {
     return this.state.conversationMap.get(key);
   }
@@ -994,5 +1020,198 @@ describe("PART 9: handleStatusUpdate with numeric lastFromMe", () => {
 
     store.handleStatusUpdate({ sessionId: SESSION, remoteJid: JID_A, status: "delivered" });
     expect(store.getConversation(KEY_A)!.lastStatus).toBe("received"); // unchanged
+  });
+});
+
+
+// ═══════════════════════════════════════════════════════════════════════
+// PART 5 (NEW): Conversation Preview — Authoritative Server Updates
+// ═══════════════════════════════════════════════════════════════════════
+
+describe("PART 5 (NEW): handleConversationPreview — Authoritative Server Updates", () => {
+  let store: ConversationStore;
+  const now = Date.now();
+
+  beforeEach(() => {
+    store = new ConversationStore();
+    store.hydrate([
+      makeConv(JID_A, "Hello", now - 5000, true),
+      makeConv(JID_B, "Hi there", now - 3000),
+      makeConv(JID_C, "Latest msg", now - 1000),
+    ]);
+  });
+
+  it("should update lastStatus from server preview (sending → delivered)", () => {
+    // Simulate optimistic send (status = "sending")
+    store.handleOptimisticSend({
+      sessionId: SESSION,
+      remoteJid: JID_A,
+      content: "New message",
+    });
+    expect(store.getConversation(KEY_A)!.lastStatus).toBe("sending");
+
+    // Server sends authoritative preview with "delivered" status
+    store.handleConversationPreview({
+      sessionId: SESSION,
+      remoteJid: JID_A,
+      lastMessage: "New message",
+      lastMessageAt: now,
+      lastMessageStatus: "delivered",
+      lastMessageType: "conversation",
+      lastFromMe: true,
+    });
+
+    const conv = store.getConversation(KEY_A)!;
+    expect(conv.lastStatus).toBe("delivered");
+    expect(conv._optimistic).toBe(false);
+  });
+
+  it("should NOT re-sort conversations on preview update", () => {
+    const sortedBefore = [...store.state.sortedIds];
+
+    store.handleConversationPreview({
+      sessionId: SESSION,
+      remoteJid: JID_A,
+      lastMessage: "Updated preview",
+      lastMessageAt: now + 10000, // much newer timestamp
+      lastMessageStatus: "read",
+      lastMessageType: "conversation",
+      lastFromMe: true,
+    });
+
+    // Order must NOT change — preview updates never re-sort
+    expect(store.state.sortedIds).toEqual(sortedBefore);
+  });
+
+  it("should update lastMessage content from server preview", () => {
+    store.handleConversationPreview({
+      sessionId: SESSION,
+      remoteJid: JID_B,
+      lastMessage: "Server says this is the real latest message",
+      lastMessageAt: now,
+      lastMessageStatus: "received",
+      lastMessageType: "imageMessage",
+      lastFromMe: false,
+    });
+
+    const conv = store.getConversation(KEY_B)!;
+    expect(conv.lastMessage).toBe("Server says this is the real latest message");
+    expect(conv.lastMessageType).toBe("imageMessage");
+    expect(conv.lastFromMe).toBe(false);
+    expect(conv.lastStatus).toBe("received");
+  });
+
+  it("should clear _optimistic flag on preview update", () => {
+    // Set up optimistic state
+    store.handleOptimisticSend({
+      sessionId: SESSION,
+      remoteJid: JID_A,
+      content: "Optimistic msg",
+    });
+    expect(store.getConversation(KEY_A)!._optimistic).toBe(true);
+
+    // Server preview arrives
+    store.handleConversationPreview({
+      sessionId: SESSION,
+      remoteJid: JID_A,
+      lastMessage: "Optimistic msg",
+      lastMessageAt: now,
+      lastMessageStatus: "sent",
+      lastMessageType: "conversation",
+      lastFromMe: true,
+    });
+
+    expect(store.getConversation(KEY_A)!._optimistic).toBe(false);
+  });
+
+  it("should handle preview for non-existent conversation gracefully", () => {
+    const versionBefore = store.state.version;
+
+    store.handleConversationPreview({
+      sessionId: SESSION,
+      remoteJid: "nonexistent@s.whatsapp.net",
+      lastMessage: "Ghost message",
+      lastMessageAt: now,
+      lastMessageStatus: "sent",
+      lastMessageType: "conversation",
+      lastFromMe: true,
+    });
+
+    // Version should NOT change — no update was made
+    expect(store.state.version).toBe(versionBefore);
+  });
+
+  it("should fix stale sidebar status: optimistic 'sending' → server 'read'", () => {
+    // This is the exact bug scenario from the screenshot:
+    // 1. User sends message → sidebar shows "sending" (clock icon)
+    // 2. Webhook confirms delivery → chat shows "read" (blue checks)
+    // 3. But sidebar was stuck on "sending" because handleStatusUpdate
+    //    only worked with the old status update event
+    // 4. NOW: handleConversationPreview fixes it with authoritative data
+
+    store.handleOptimisticSend({
+      sessionId: SESSION,
+      remoteJid: JID_A,
+      content: "e vc?",
+    });
+    expect(store.getConversation(KEY_A)!.lastStatus).toBe("sending");
+
+    // Server propagates the TRUE latest message status
+    store.handleConversationPreview({
+      sessionId: SESSION,
+      remoteJid: JID_A,
+      lastMessage: "e vc?",
+      lastMessageAt: now,
+      lastMessageStatus: "read",
+      lastMessageType: "conversation",
+      lastFromMe: true,
+    });
+
+    expect(store.getConversation(KEY_A)!.lastStatus).toBe("read");
+    expect(store.getConversation(KEY_A)!._optimistic).toBe(false);
+  });
+
+  it("should update lastFromMe correctly when latest message is incoming", () => {
+    // Scenario: user sent a message (lastFromMe=true), then received a reply
+    // Server preview should reflect the incoming message as latest
+    store.handleOptimisticSend({
+      sessionId: SESSION,
+      remoteJid: JID_A,
+      content: "My question",
+    });
+
+    // Server says the latest message is actually an incoming one
+    store.handleConversationPreview({
+      sessionId: SESSION,
+      remoteJid: JID_A,
+      lastMessage: "Their reply",
+      lastMessageAt: now + 5000,
+      lastMessageStatus: "received",
+      lastMessageType: "conversation",
+      lastFromMe: false,
+    });
+
+    const conv = store.getConversation(KEY_A)!;
+    expect(conv.lastFromMe).toBe(false);
+    expect(conv.lastMessage).toBe("Their reply");
+    expect(conv.lastStatus).toBe("received");
+  });
+
+  it("should handle null lastMessage in preview (keep existing)", () => {
+    store.handleConversationPreview({
+      sessionId: SESSION,
+      remoteJid: JID_A,
+      lastMessage: null,
+      lastMessageAt: now,
+      lastMessageStatus: "delivered",
+      lastMessageType: null,
+      lastFromMe: true,
+    });
+
+    const conv = store.getConversation(KEY_A)!;
+    // lastMessage should keep existing value since preview sent null
+    expect(conv.lastMessage).toBe("Hello");
+    // But status should be updated
+    expect(conv.lastStatus).toBe("delivered");
   });
 });

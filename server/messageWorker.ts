@@ -20,7 +20,7 @@
 import { getDb } from "./db";
 import { and, eq, sql } from "drizzle-orm";
 import { waMessages, waContacts, waConversations } from "../drizzle/schema";
-import { resolveInbound, updateConversationLastMessage } from "./conversationResolver";
+import { resolveInbound, updateConversationLastMessage, propagateLatestMessageToConversation, getConversationByJid } from "./conversationResolver";
 import { storagePut } from "./storage";
 import { createNotification } from "./db";
 import * as evo from "./evolutionApi";
@@ -511,19 +511,41 @@ async function processStatusUpdate(session: SessionInfo, data: any): Promise<voi
           eq(waMessages.messageId, messageId)
         ));
 
-      // Also update lastStatus in wa_conversations if this is the last message from us
-      if (remoteJid && fromMe) {
-        await db.update(waConversations)
-          .set({ lastStatus: newStatus })
-          .where(and(
-            eq(waConversations.sessionId, sessionId),
-            eq(waConversations.remoteJid, remoteJid),
-            eq(waConversations.lastFromMe, true)
-          ));
+      // ── PART 3: Propagate status to wa_conversations if this is the latest message ──
+      // Instead of blindly updating lastStatus, we find the conversation and check
+      // whether the updated message is actually the latest one.
+      let previewPayload: any = null;
+      if (remoteJid) {
+        try {
+          // Find the conversation for this message
+          const conv = await getConversationByJid(
+            session.tenantId,
+            sessionId,
+            remoteJid
+          );
+          if (conv) {
+            // Propagate from the TRUE latest message (single source of truth)
+            previewPayload = await propagateLatestMessageToConversation(conv.conversationId);
+          }
+        } catch (e: any) {
+          console.warn(`[Worker] Failed to propagate status to conversation:`, e.message);
+          // Fallback: update lastStatus directly if propagation fails
+          if (fromMe) {
+            await db.update(waConversations)
+              .set({ lastStatus: newStatus })
+              .where(and(
+                eq(waConversations.sessionId, sessionId),
+                eq(waConversations.remoteJid, remoteJid),
+                eq(waConversations.lastFromMe, true)
+              ));
+          }
+        }
       }
 
-      // Emit Socket.IO event for real-time UI update
+      // Emit Socket.IO events for real-time UI update
       const { whatsappManager } = await import("./whatsappEvolution");
+
+      // 1. Original message:status event (for chat bubble status updates)
       whatsappManager.emit("message:status", {
         sessionId,
         messageId,
@@ -531,6 +553,21 @@ async function processStatusUpdate(session: SessionInfo, data: any): Promise<voi
         remoteJid: remoteJid || null,
         timestamp: Date.now(),
       });
+
+      // 2. PART 5: New conversation:preview event with full payload
+      // This ensures the sidebar preview is ALWAYS in sync with the latest message
+      if (previewPayload && remoteJid) {
+        whatsappManager.emit("conversation:preview", {
+          sessionId,
+          remoteJid,
+          conversationId: previewPayload.conversationId,
+          lastMessage: previewPayload.lastMessage,
+          lastMessageAt: previewPayload.lastMessageAt?.getTime() || Date.now(),
+          lastMessageStatus: previewPayload.lastMessageStatus,
+          lastMessageType: previewPayload.lastMessageType,
+          lastFromMe: previewPayload.lastFromMe,
+        });
+      }
     }
   } catch (error) {
     console.error("[Worker] Error processing status update:", error);

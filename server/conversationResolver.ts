@@ -14,7 +14,7 @@
  */
 
 import { getDb } from "./db";
-import { waConversations, waIdentities, waAuditLog, contacts } from "../drizzle/schema";
+import { waConversations, waIdentities, waAuditLog, contacts, waMessages } from "../drizzle/schema";
 import { eq, and, sql, or, inArray } from "drizzle-orm";
 import { normalizeBrazilianPhone, getAllJidVariants } from "./phoneUtils";
 
@@ -437,6 +437,77 @@ export async function updateConversationLastMessage(
         sql`(lastMessageAt IS NULL OR lastMessageAt <= ${newTimestamp})`
       )
     );
+}
+
+// ════════════════════════════════════════════════════════════
+// propagateLatestMessageToConversation
+// ════════════════════════════════════════════════════════════
+
+/**
+ * Derive wa_conversations preview fields from the ACTUAL latest message in wa_messages.
+ * This is the single source of truth for conversation preview.
+ *
+ * Used after status updates to ensure wa_conversations.lastStatus matches the
+ * latest message's real status, not a stale cached value.
+ *
+ * Returns the updated preview data (for socket emission) or null if no messages found.
+ */
+export async function propagateLatestMessageToConversation(
+  conversationId: number,
+): Promise<{
+  conversationId: number;
+  lastMessage: string | null;
+  lastMessageAt: Date | null;
+  lastMessageStatus: string | null;
+  lastMessageType: string | null;
+  lastFromMe: boolean;
+} | null> {
+  const db = await getDb();
+  if (!db) return null;
+
+  // Find the TRUE latest message for this conversation using deterministic ordering:
+  // 1. timestamp DESC
+  // 2. createdAt DESC
+  // 3. id DESC (auto-increment serves as tie-breaker)
+  const [latestMsg] = await db
+    .select({
+      content: waMessages.content,
+      messageType: waMessages.messageType,
+      fromMe: waMessages.fromMe,
+      status: waMessages.status,
+      timestamp: waMessages.timestamp,
+    })
+    .from(waMessages)
+    .where(eq(waMessages.waConversationId, conversationId))
+    .orderBy(
+      sql`${waMessages.timestamp} DESC`,
+      sql`${waMessages.createdAt} DESC`,
+      sql`${waMessages.id} DESC`
+    )
+    .limit(1);
+
+  if (!latestMsg) return null;
+
+  const updateData = {
+    lastMessagePreview: latestMsg.content ? latestMsg.content.substring(0, 300) : null,
+    lastMessageType: latestMsg.messageType || "text",
+    lastFromMe: latestMsg.fromMe,
+    lastStatus: latestMsg.status || "received",
+    lastMessageAt: latestMsg.timestamp,
+  };
+
+  await db.update(waConversations)
+    .set(updateData)
+    .where(eq(waConversations.id, conversationId));
+
+  return {
+    conversationId,
+    lastMessage: updateData.lastMessagePreview,
+    lastMessageAt: latestMsg.timestamp,
+    lastMessageStatus: updateData.lastStatus,
+    lastMessageType: updateData.lastMessageType,
+    lastFromMe: latestMsg.fromMe,
+  };
 }
 
 // ════════════════════════════════════════════════════════════

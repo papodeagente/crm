@@ -3810,3 +3810,16 @@
 - [x] PART 6: Remover dependência de webhook — inbox funciona mesmo com webhook atrasado/falho
 - [x] PART 7: Validação — testes vitest para todos os cenários (24/24 passando)
 - [x] BUG FIX: Status da sidebar fica preso em "sending" (relógio) mesmo quando mensagem já foi entregue — corrigido: normalização na hidratação + suporte a lastFromMe numérico (MySQL)
+
+## Inbox Preview Status/Timestamp Desync Fix
+- [x] PART 1: Define single source of truth — propagateLatestMessageToConversation() in conversationResolver.ts
+- [x] PART 2: Fix write path — processStatusUpdate now calls propagateLatestMessageToConversation()
+- [x] PART 3: Fix status propagation — finds the TRUE latest message and propagates its status
+- [x] PART 4: Fix preview last message selection — deterministic ordering (timestamp DESC, createdAt DESC, id DESC)
+- [x] PART 5: Fix socket payload — new whatsapp:conversation:preview event with full payload
+- [x] PART 6: Fix frontend cache update — handleConversationPreview() in useConversationStore
+- [x] PART 7: Database repair/backfill script — SQL UPDATE JOIN executed, all conversations repaired
+- [x] PART 8: Validation query — 3614 conversations validated, 0 stale statuses remaining
+- [x] PART 9: Indexes — existing idx_msg_wa_conv index sufficient for the query
+- [x] PART 10: Vitest tests — 41 tests passing (8 new for handleConversationPreview)
+- [x] PART 11: Manual verification — TypeScript clean, full test suite passing (1979/1983, 4 pre-existing timeouts)

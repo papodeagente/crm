@@ -944,7 +944,7 @@ type AgentFilter = "all" | "unread" | "mine" | "unassigned";
 export default function InboxPage() {
   const tenantId = useTenantId();
   const trpcUtils = trpc.useUtils();
-  const { lastMessage, lastStatusUpdate, isConnected: socketConnected } = useSocket();
+  const { lastMessage, lastStatusUpdate, lastConversationPreview, isConnected: socketConnected } = useSocket();
   // selectedKey = conversationKey (sessionId:remoteJid) — primary selection state
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   // selectedJid = remoteJid only — derived for API calls that need just the JID
@@ -1338,6 +1338,23 @@ export default function InboxPage() {
     const sid = activeSession?.sessionId || "";
     convStore.handleStatusUpdate({ sessionId: sid, remoteJid, status: lastStatusUpdate.status });
   }, [lastStatusUpdate]);
+
+  // PART 5: Conversation preview update from server (authoritative, single source of truth)
+  // This fires when the server propagates the TRUE latest message preview to wa_conversations.
+  // It replaces any stale/optimistic data in the sidebar with the real values.
+  useEffect(() => {
+    if (!lastConversationPreview) return;
+    const sid = lastConversationPreview.sessionId || activeSession?.sessionId || "";
+    convStore.handleConversationPreview({
+      sessionId: sid,
+      remoteJid: lastConversationPreview.remoteJid,
+      lastMessage: lastConversationPreview.lastMessage,
+      lastMessageAt: lastConversationPreview.lastMessageAt,
+      lastMessageStatus: lastConversationPreview.lastMessageStatus,
+      lastMessageType: lastConversationPreview.lastMessageType,
+      lastFromMe: lastConversationPreview.lastFromMe,
+    });
+  }, [lastConversationPreview]);
 
   // Select conversation
   // Sync on conversation open — lightweight fetch of last 10 messages
