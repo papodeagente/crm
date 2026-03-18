@@ -1474,14 +1474,65 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
   });
 
   const uploadMedia = trpc.whatsapp.uploadMedia.useMutation();
+  const lastMediaClientMsgIdRef = useRef<string | null>(null);
   const sendMedia = trpc.whatsapp.sendMedia.useMutation({
     onMutate: (vars) => {
       // OPTIMISTIC SEND: instantly update conversation sidebar for media
       const mediaLabel = vars.mediaType === "image" ? "📷 Imagem" : vars.mediaType === "video" ? "🎥 Vídeo" : vars.mediaType === "audio" ? "🎤 Áudio" : "📄 Documento";
       onOptimisticSend?.({ content: mediaLabel, messageType: vars.mediaType || "document" });
+
+      // OPTIMISTIC MESSAGE: add media message to chat immediately so player/preview shows
+      const clientMsgId = `opt_media_${Date.now()}_${++optimisticIdCounter.current}`;
+      lastMediaClientMsgIdRef.current = clientMsgId;
+      const optimistic: Message = {
+        id: -Date.now() - optimisticIdCounter.current,
+        sessionId: vars.sessionId,
+        messageId: clientMsgId,
+        remoteJid,
+        fromMe: true,
+        messageType: vars.mediaType === "audio" ? "audioMessage" : vars.mediaType === "image" ? "imageMessage" : vars.mediaType === "video" ? "videoMessage" : "documentMessage",
+        content: vars.caption || null,
+        mediaUrl: vars.mediaUrl,
+        mediaMimeType: vars.mimetype || null,
+        mediaFileName: vars.fileName || null,
+        mediaDuration: vars.duration || null,
+        isVoiceNote: vars.ptt || false,
+        status: "pending",
+        timestamp: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
+      };
+      const queryKey = { sessionId, remoteJid, limit: msgLimit };
+      utils.whatsapp.messagesByContact.setData(queryKey, (old: any) => {
+        if (!old) return [optimistic];
+        return [optimistic, ...old];
+      });
     },
-    onSuccess: () => delayedRefetch(),
-    onError: () => toast.error("Erro ao enviar mídia"),
+    onSuccess: (result) => {
+      // Reconcile optimistic media message with server response
+      const clientMsgId = lastMediaClientMsgIdRef.current;
+      if (result?.messageId && clientMsgId) {
+        const queryKey = { sessionId, remoteJid, limit: msgLimit };
+        utils.whatsapp.messagesByContact.setData(queryKey, (old: any) => {
+          if (!old) return old;
+          return old.map((m: any) =>
+            m.messageId === clientMsgId ? { ...m, messageId: result.messageId, status: "sent" } : m
+          );
+        });
+      }
+      delayedRefetch();
+    },
+    onError: () => {
+      // Remove failed optimistic media message
+      const clientMsgId = lastMediaClientMsgIdRef.current;
+      if (clientMsgId) {
+        const queryKey = { sessionId, remoteJid, limit: msgLimit };
+        utils.whatsapp.messagesByContact.setData(queryKey, (old: any) => {
+          if (!old) return old;
+          return old.filter((m: any) => m.messageId !== clientMsgId);
+        });
+      }
+      toast.error("Erro ao enviar mídia");
+    },
   });
 
   const sendReaction = trpc.whatsapp.sendReaction.useMutation({
@@ -1586,10 +1637,23 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
     if (lastMessage.fromMe) {
       utils.whatsapp.messagesByContact.setData(queryKey, (old: any) => {
         if (!old) return old;
-        // Find the oldest unconfirmed optimistic message (status "pending") with matching content
-        const optIdx = old.findIndex((m: any) =>
-          m.messageId?.startsWith("opt_") && m.status === "pending" && m.content === lastMessage.content
-        );
+        // Find the oldest unconfirmed optimistic message (status "pending") with matching content or media type
+        const optIdx = old.findIndex((m: any) => {
+          if (!m.messageId?.startsWith("opt_") || m.status !== "pending") return false;
+          // Text messages: match by content
+          if (m.messageId.startsWith("opt_media_")) {
+            // Media messages: match by messageType (audio→audio, image→image, etc.)
+            const typeMap: Record<string, string[]> = {
+              audioMessage: ["audioMessage", "pttMessage"],
+              imageMessage: ["imageMessage"],
+              videoMessage: ["videoMessage"],
+              documentMessage: ["documentMessage"],
+            };
+            const matchTypes = typeMap[m.messageType] || [m.messageType];
+            return matchTypes.includes(lastMessage.messageType || "");
+          }
+          return m.content === lastMessage.content;
+        });
         if (optIdx >= 0) {
           // RECONCILE: update the optimistic message with server data (real messageId, status "sent")
           const reconciled = {

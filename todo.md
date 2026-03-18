@@ -3904,3 +3904,16 @@
 - [x] Added more refetch intervals (20s, 30s) for longer transcription jobs
 - [x] DB status: 413 failed, 4 pending, 4905 NULL, 0 completed — confirms worker never processed any jobs before this fix
 - [x] 71 vitest tests passing
+
+## Audio Player Not Showing Immediately After Sending
+- [x] BUG: Sent audio message only appears in inbox after transcription completes
+  - Root cause: sendMedia.onMutate only updated sidebar preview, not the message list
+  - Fix: Added optimistic media message with full fields (mediaUrl, messageType, mediaMimeType, etc.)
+  - Audio player now renders immediately using the S3 URL from upload
+- [x] Audio player should appear immediately after sending (like WhatsApp)
+  - Optimistic message includes mediaUrl, mediaDuration, isVoiceNote, mediaMimeType
+  - AudioPlayer component renders from the S3 URL before server confirms
+- [x] Transcription should happen in background while audio is already visible
+- [x] Also works for images, videos, and documents (all media types get optimistic messages)
+- [x] Socket reconciliation updated to match media optimistic messages by messageType
+- [x] Error handling: failed media sends remove the optimistic message
