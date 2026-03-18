@@ -3737,3 +3737,16 @@
 - [x] Avaliar escalabilidade a longo prazo
 - [x] Analisar impacto de migração
 - [x] Produzir relatório técnico completo com recomendação final (ANALISE_EVOLUTION_VS_ZAPI.md)
+
+## Ativação Redis Queue para Webhooks
+- [x] Instalar e iniciar Redis no sandbox (v6.0.16, porta 6379)
+- [x] Verificar conexão Redis (PING/PONG, porta 6379)
+- [x] Configurar REDIS_URL no backend via webdev_request_secrets (redis://localhost:6379)
+- [x] Verificar que BullMQ ativa a fila ao detectar Redis (confirmado nos logs)
+- [x] Verificar que webhooks enfileiram jobs em vez de processar inline (queue whatsapp-messages criada)
+- [x] Verificar que worker processa jobs da fila (concurrency: 5, worker initialized)
+- [x] Medir latência do webhook (single: 39ms, burst 5: avg 7.58ms)
+- [x] Testar com simulação de webhook real (6/6 queued+processed)
+- [x] Stress test com 50 eventos em burst (50/50 queued, 50/50 processed, 0 failed)
+- [x] Verificar métricas da fila (50 completed, 0 failed, processados em 2s)
+- [x] Produzir relatório final com resultados (REDIS_QUEUE_REPORT.md)

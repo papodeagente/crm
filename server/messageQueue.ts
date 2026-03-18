@@ -191,20 +191,20 @@ export async function enqueueMessageEvent(payload: MessageEventPayload): Promise
   if (!queue) return false;
 
   try {
-    // For messages.update, use a different job ID pattern since there's no key.id
+    // BullMQ does not allow colons (:) in custom job IDs — use dashes instead
     let jobId: string | undefined;
     if (payload.event === "messages.upsert" || payload.event === "send.message") {
       jobId = payload.data?.key?.id
-        ? `${payload.instanceName}:${payload.data.key.id}`
+        ? `${payload.instanceName}-${payload.data.key.id}`.replace(/:/g, "-")
         : undefined;
     } else if (payload.event === "messages.update") {
       // For status updates, allow multiple updates for the same message
       const updateId = payload.data?.key?.id || payload.data?.keyId || payload.data?.messageId;
       const status = payload.data?.update?.status ?? payload.data?.status;
-      jobId = updateId ? `status:${payload.instanceName}:${updateId}:${status}` : undefined;
+      jobId = updateId ? `status-${payload.instanceName}-${updateId}-${status}`.replace(/:/g, "-") : undefined;
     } else if (payload.event === "messages.delete") {
       const deleteId = payload.data?.key?.id || payload.data?.id;
-      jobId = deleteId ? `delete:${payload.instanceName}:${deleteId}` : undefined;
+      jobId = deleteId ? `delete-${payload.instanceName}-${deleteId}`.replace(/:/g, "-") : undefined;
     }
 
     // Priority: status updates are lower priority than new messages
