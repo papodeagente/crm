@@ -3750,3 +3750,16 @@
 - [x] Stress test com 50 eventos em burst (50/50 queued, 50/50 processed, 0 failed)
 - [x] Verificar métricas da fila (50 completed, 0 failed, processados em 2s)
 - [x] Produzir relatório final com resultados (REDIS_QUEUE_REPORT.md)
+
+## Diagnóstico Completo de Performance da Inbox
+- [x] STEP 1: Instrumentar pipeline de mensagens (webhook → DB → socket → frontend)
+- [x] STEP 2: Medir performance do webhook (enqueue 7-15ms, worker 68ms)
+- [x] STEP 3: Medir performance do banco (inbox 34-70ms, msgs 7-16ms, resolve 33ms)
+- [x] STEP 4: Medir performance do socket (emit <1ms, 50 msgs em 925ms)
+- [x] STEP 5: Medir atualização de estado (convStore.handleMessage O(1) map + O(n) splice)
+- [x] STEP 6: Analisar render patterns (refetch cascata, polling redundante)
+- [x] STEP 7: Verificar duplicação (dedup por messageId, staleTime 5s no tRPC)
+- [x] STEP 8: Medir latência de rede (webhook→tela ~120ms msg única)
+- [x] STEP 9: Analisar carga (BullMQ concurrency 5, worker 68ms/msg)
+- [x] STEP 10: Executar cenários A-D (120ms, 140ms, 925ms, optimistic)
+- [x] Produzir relatório técnico final com dados medidos (DIAGNOSTICO_INBOX_PERFORMANCE.md)
