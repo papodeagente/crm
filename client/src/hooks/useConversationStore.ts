@@ -127,12 +127,25 @@ class ConversationStore {
     const map = new Map<string, ConvEntry>();
     const ids: string[] = [];
 
+    // Valid statuses for fromMe messages
+    const validFromMeStatuses = new Set(["sent", "delivered", "read", "played"]);
+
     for (const c of conversations) {
       const jid = c.remoteJid;
       if (!jid) continue;
       const sid = c.sessionId || defaultSessionId || "";
       const key = makeConvKey(sid, jid);
-      const entry: ConvEntry = { ...c, conversationKey: key, sessionId: sid };
+      const isFromMe = c.lastFromMe === true || c.lastFromMe === 1;
+
+      // Normalize lastStatus on hydration:
+      // If the last message is fromMe and status is not a valid delivery status,
+      // default to "sent" (the message is already in the DB, so it was sent).
+      let normalizedStatus = c.lastStatus;
+      if (isFromMe && (!normalizedStatus || !validFromMeStatuses.has(normalizedStatus))) {
+        normalizedStatus = "sent";
+      }
+
+      const entry: ConvEntry = { ...c, conversationKey: key, sessionId: sid, lastStatus: normalizedStatus };
 
       const existing = map.get(key);
       if (!existing) {
@@ -329,7 +342,9 @@ class ConversationStore {
     if (!key) return;
 
     const existing = this.state.conversationMap.get(key);
-    if (!existing || !existing.lastFromMe) return;
+    // lastFromMe can be boolean (true) or number (1) from MySQL
+    const isFromMe = existing?.lastFromMe === true || existing?.lastFromMe === 1;
+    if (!existing || !isFromMe) return;
 
     // Status progression: sending → sent → delivered → read
     // Never go backwards

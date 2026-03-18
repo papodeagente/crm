@@ -3809,3 +3809,4 @@
 - [x] PART 5: Ordenação estável — lastTimestamp local tem prioridade sobre webhook
 - [x] PART 6: Remover dependência de webhook — inbox funciona mesmo com webhook atrasado/falho
 - [x] PART 7: Validação — testes vitest para todos os cenários (24/24 passando)
+- [x] BUG FIX: Status da sidebar fica preso em "sending" (relógio) mesmo quando mensagem já foi entregue — corrigido: normalização na hidratação + suporte a lastFromMe numérico (MySQL)

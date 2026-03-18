@@ -49,12 +49,18 @@ class ConversationStore {
   hydrate(conversations: ConvEntry[], defaultSessionId?: string) {
     const map = new Map<string, ConvEntry>();
     const ids: string[] = [];
+    const validFromMeStatuses = new Set(["sent", "delivered", "read", "played"]);
     for (const c of conversations) {
       const jid = c.remoteJid;
       if (!jid) continue;
       const sid = c.sessionId || defaultSessionId || "";
       const key = makeConvKey(sid, jid);
-      const entry: ConvEntry = { ...c, conversationKey: key, sessionId: sid };
+      const isFromMe = c.lastFromMe === true || c.lastFromMe === 1;
+      let normalizedStatus = c.lastStatus;
+      if (isFromMe && (!normalizedStatus || !validFromMeStatuses.has(normalizedStatus))) {
+        normalizedStatus = "sent";
+      }
+      const entry: ConvEntry = { ...c, conversationKey: key, sessionId: sid, lastStatus: normalizedStatus };
       const existing = map.get(key);
       if (!existing) {
         map.set(key, entry);
@@ -162,7 +168,8 @@ class ConversationStore {
     const key = makeConvKey(update.sessionId, update.remoteJid);
     if (!key) return;
     const existing = this.state.conversationMap.get(key);
-    if (!existing || !existing.lastFromMe) return;
+    const isFromMe = existing?.lastFromMe === true || existing?.lastFromMe === 1;
+    if (!existing || !isFromMe) return;
     const statusOrder: Record<string, number> = { sending: 0, sent: 1, delivered: 2, read: 3, played: 4 };
     const currentOrder = statusOrder[existing.lastStatus || ""] ?? -1;
     const newOrder = statusOrder[update.status] ?? -1;
@@ -829,5 +836,163 @@ describe("PART 7: End-to-End Validation", () => {
     // Still at top, no duplicates
     expect(store.state.sortedIds[0]).toBe(KEY_A);
     expect(store.state.sortedIds.length).toBe(3);
+  });
+});
+
+describe("PART 8: Hydration Status Normalization", () => {
+  it("should normalize null lastStatus to 'sent' for fromMe=true conversations", () => {
+    const store = new ConversationStore();
+    const conv: ConvEntry = {
+      remoteJid: JID_A,
+      sessionId: SESSION,
+      lastMessage: "test msg",
+      lastMessageType: "conversation",
+      lastFromMe: true,
+      lastTimestamp: new Date().toISOString(),
+      lastStatus: null, // DB returns null
+      contactPushName: "Sara Monte",
+      unreadCount: 0,
+    };
+    store.hydrate([conv]);
+    expect(store.getConversation(KEY_A)!.lastStatus).toBe("sent");
+  });
+
+  it("should normalize 'pending' lastStatus to 'sent' for fromMe=true conversations", () => {
+    const store = new ConversationStore();
+    const conv: ConvEntry = {
+      remoteJid: JID_A,
+      sessionId: SESSION,
+      lastMessage: "test msg",
+      lastMessageType: "conversation",
+      lastFromMe: true,
+      lastTimestamp: new Date().toISOString(),
+      lastStatus: "pending", // invalid for sidebar display
+      contactPushName: "Sara Monte",
+      unreadCount: 0,
+    };
+    store.hydrate([conv]);
+    expect(store.getConversation(KEY_A)!.lastStatus).toBe("sent");
+  });
+
+  it("should normalize empty string lastStatus to 'sent' for fromMe=true conversations", () => {
+    const store = new ConversationStore();
+    const conv: ConvEntry = {
+      remoteJid: JID_A,
+      sessionId: SESSION,
+      lastMessage: "test msg",
+      lastMessageType: "conversation",
+      lastFromMe: true,
+      lastTimestamp: new Date().toISOString(),
+      lastStatus: "", // empty string
+      contactPushName: "Sara Monte",
+      unreadCount: 0,
+    };
+    store.hydrate([conv]);
+    expect(store.getConversation(KEY_A)!.lastStatus).toBe("sent");
+  });
+
+  it("should keep valid statuses (delivered, read) unchanged on hydration", () => {
+    const store = new ConversationStore();
+    store.hydrate([
+      { remoteJid: JID_A, sessionId: SESSION, lastMessage: "a", lastMessageType: "conversation", lastFromMe: true, lastTimestamp: new Date().toISOString(), lastStatus: "delivered", contactPushName: "A", unreadCount: 0 },
+      { remoteJid: JID_B, sessionId: SESSION, lastMessage: "b", lastMessageType: "conversation", lastFromMe: true, lastTimestamp: new Date().toISOString(), lastStatus: "read", contactPushName: "B", unreadCount: 0 },
+    ]);
+    expect(store.getConversation(KEY_A)!.lastStatus).toBe("delivered");
+    expect(store.getConversation(KEY_B)!.lastStatus).toBe("read");
+  });
+
+  it("should NOT normalize status for fromMe=false (received) conversations", () => {
+    const store = new ConversationStore();
+    const conv: ConvEntry = {
+      remoteJid: JID_A,
+      sessionId: SESSION,
+      lastMessage: "incoming",
+      lastMessageType: "conversation",
+      lastFromMe: false,
+      lastTimestamp: new Date().toISOString(),
+      lastStatus: null,
+      contactPushName: "Sara Monte",
+      unreadCount: 1,
+    };
+    store.hydrate([conv]);
+    // Should stay null — no normalization for received messages
+    expect(store.getConversation(KEY_A)!.lastStatus).toBeNull();
+  });
+
+  it("should handle lastFromMe as number 1 (MySQL boolean) on hydration", () => {
+    const store = new ConversationStore();
+    const conv: ConvEntry = {
+      remoteJid: JID_A,
+      sessionId: SESSION,
+      lastMessage: "test",
+      lastMessageType: "conversation",
+      lastFromMe: 1, // MySQL returns 1 instead of true
+      lastTimestamp: new Date().toISOString(),
+      lastStatus: null,
+      contactPushName: "Sara Monte",
+      unreadCount: 0,
+    };
+    store.hydrate([conv]);
+    expect(store.getConversation(KEY_A)!.lastStatus).toBe("sent");
+  });
+
+  it("should handle lastFromMe as number 0 (MySQL boolean false) — no normalization", () => {
+    const store = new ConversationStore();
+    const conv: ConvEntry = {
+      remoteJid: JID_A,
+      sessionId: SESSION,
+      lastMessage: "test",
+      lastMessageType: "conversation",
+      lastFromMe: 0 as any, // MySQL returns 0 instead of false
+      lastTimestamp: new Date().toISOString(),
+      lastStatus: null,
+      contactPushName: "Sara Monte",
+      unreadCount: 1,
+    };
+    store.hydrate([conv]);
+    expect(store.getConversation(KEY_A)!.lastStatus).toBeNull();
+  });
+});
+
+describe("PART 9: handleStatusUpdate with numeric lastFromMe", () => {
+  it("should update status when lastFromMe is 1 (MySQL boolean)", () => {
+    const store = new ConversationStore();
+    const conv: ConvEntry = {
+      remoteJid: JID_A,
+      sessionId: SESSION,
+      lastMessage: "test",
+      lastMessageType: "conversation",
+      lastFromMe: 1, // MySQL boolean
+      lastTimestamp: new Date().toISOString(),
+      lastStatus: "sent",
+      contactPushName: "Sara Monte",
+      unreadCount: 0,
+    };
+    store.hydrate([conv]);
+
+    store.handleStatusUpdate({ sessionId: SESSION, remoteJid: JID_A, status: "delivered" });
+    expect(store.getConversation(KEY_A)!.lastStatus).toBe("delivered");
+
+    store.handleStatusUpdate({ sessionId: SESSION, remoteJid: JID_A, status: "read" });
+    expect(store.getConversation(KEY_A)!.lastStatus).toBe("read");
+  });
+
+  it("should NOT update status when lastFromMe is 0 (MySQL boolean false)", () => {
+    const store = new ConversationStore();
+    const conv: ConvEntry = {
+      remoteJid: JID_A,
+      sessionId: SESSION,
+      lastMessage: "incoming",
+      lastMessageType: "conversation",
+      lastFromMe: 0 as any,
+      lastTimestamp: new Date().toISOString(),
+      lastStatus: "received",
+      contactPushName: "Sara Monte",
+      unreadCount: 1,
+    };
+    store.hydrate([conv]);
+
+    store.handleStatusUpdate({ sessionId: SESSION, remoteJid: JID_A, status: "delivered" });
+    expect(store.getConversation(KEY_A)!.lastStatus).toBe("received"); // unchanged
   });
 });
