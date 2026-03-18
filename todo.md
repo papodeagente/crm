@@ -3789,3 +3789,14 @@
 - [x] Unread count correto em tempo real (campo pre-computado em wa_conversations)
 - [x] Inbox carrega em 550ms total (inclui overhead sandbox, query SQL ~34ms)
 - [x] Sem refetch necessário para atualizações (socket + optimistic update)
+
+## Diagnóstico de Latência — Tracing Completo do Pipeline
+- [x] STAGE 1: Instrumentar webhookRoutes.ts (webhook received timestamp)
+- [x] STAGE 2: Instrumentar messageQueue.ts (enqueue timestamp)
+- [x] STAGE 3: Instrumentar messageWorker.ts (worker start, DB save, conversation update, socket emit)
+- [x] STAGE 4: Instrumentar frontend socket receive (useSocket/Inbox/WhatsAppChat)
+- [x] STAGE 5: Instrumentar frontend UI update (convStore.handleMessage, React render)
+- [x] STAGE 6: Simular mensagem e coletar todos os timestamps
+- [x] STAGE 7: Calcular latência entre cada estágio
+- [x] STAGE 8: Identificar o maior gargalo com prova medida
+- [x] Produzir relatório: "O atraso é causado por: latência EXTERNA ao CRM (Evolution API → CRM)" (PIPELINE_LATENCY_DIAGNOSIS.md)

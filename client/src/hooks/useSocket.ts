@@ -130,6 +130,9 @@ class SocketManager {
     });
 
     socket.on("whatsapp:message", (data: WhatsAppMessageEvent) => {
+      const _socketIoReceiveTime = Date.now();
+      const _emitAt = (data as any)._traceEmitAt;
+      console.log(`[TRACE][SOCKETIO_DELIVER] timestamp: ${_socketIoReceiveTime} | transport_latency: ${_emitAt ? _socketIoReceiveTime - _emitAt : 'N/A'}ms | msgId: ${(data as any).messageId || 'N/A'} | remoteJid: ${data.remoteJid?.substring(0, 15)}`);
       console.log("[Socket] Message received:", data.remoteJid, data.fromMe, data.content?.substring(0, 30));
       this._lastMessage = data;
       this.notify();

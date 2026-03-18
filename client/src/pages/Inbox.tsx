@@ -1218,9 +1218,14 @@ export default function InboxPage() {
   // No refetch, no polling, no full sort. Target: < 20ms per update.
   useEffect(() => {
     if (!lastMessage) return;
+    const _traceReceiveTime = Date.now();
+    const _traceEmitAt = (lastMessage as any)._traceEmitAt;
+    const _traceMsgId = (lastMessage as any).messageId || 'N/A';
+    console.log(`[TRACE][FRONTEND_SOCKET_RECEIVED] timestamp: ${_traceReceiveTime} | delta_from_emit: ${_traceEmitAt ? _traceReceiveTime - _traceEmitAt : 'N/A'}ms | msgId: ${_traceMsgId} | remoteJid: ${lastMessage.remoteJid?.substring(0, 15)}`);
 
     // ── Validation — ignore events without required fields ──
     if (!lastMessage.remoteJid || !lastMessage.timestamp) {
+      console.log(`[TRACE][FILTER_DROPPED] reason: missing_fields | remoteJid: ${lastMessage.remoteJid} | timestamp: ${lastMessage.timestamp} | msgId: ${_traceMsgId}`);
       prevMessageRef.current = lastMessage;
       return;
     }
@@ -1228,6 +1233,7 @@ export default function InboxPage() {
     // ── Strict Message Ownership — validate sessionId matches active session ──
     const currentSessionId = activeSession?.sessionId || "";
     if (lastMessage.sessionId && currentSessionId && lastMessage.sessionId !== currentSessionId) {
+      console.log(`[TRACE][FILTER_DROPPED] reason: session_mismatch | msg_session: ${lastMessage.sessionId} | active_session: ${currentSessionId} | msgId: ${_traceMsgId}`);
       prevMessageRef.current = lastMessage;
       return;
     }
@@ -1253,6 +1259,7 @@ export default function InboxPage() {
     // ── INSTANT UPDATE via deterministic store ──
     // handleMessage: O(1) map update + O(n) splice for moveToTop
     // No full sort, no refetch, no cache invalidation
+    const _traceStoreStart = Date.now();
     const handled = convStore.handleMessage({
       sessionId: lastMessage.sessionId || currentSessionId,
       remoteJid: lastMessage.remoteJid,
@@ -1262,11 +1269,16 @@ export default function InboxPage() {
       timestamp: lastMessage.timestamp,
       isSync: (lastMessage as any).isSync,
     }, selectedKeyRef.current);
+    const _traceStoreEnd = Date.now();
+    console.log(`[TRACE][STORE_UPDATED] timestamp: ${_traceStoreEnd} | delta: ${_traceStoreEnd - _traceStoreStart}ms | handled: ${handled} | msgId: ${_traceMsgId}`);
+    console.log(`[TRACE][TOTAL_FRONTEND] timestamp: ${_traceStoreEnd} | total_frontend_processing: ${_traceStoreEnd - _traceReceiveTime}ms | total_from_emit: ${_traceEmitAt ? _traceStoreEnd - _traceEmitAt : 'N/A'}ms | msgId: ${_traceMsgId}`);
 
     // If conversation is new (not in store), do a one-time fetch
     if (!handled) {
+      console.log(`[TRACE][NEW_CONV_REFETCH] timestamp: ${Date.now()} | msgId: ${_traceMsgId} — conversation not in store, triggering refetch`);
       conversationsQ.refetch().then((result) => {
         if (result.data) convStore.hydrate(result.data as ConvEntry[]);
+        console.log(`[TRACE][NEW_CONV_REFETCH_DONE] timestamp: ${Date.now()} | msgId: ${_traceMsgId}`);
       });
     }
 

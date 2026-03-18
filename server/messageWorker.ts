@@ -200,10 +200,15 @@ const STRING_STATUS_MAP: Record<string, string> = {
  * Routes to the appropriate handler based on event type.
  */
 export async function processMessageEvent(payload: MessageEventPayload): Promise<void> {
-  const { event, data, sessionId: payloadSessionId, instanceName } = payload;
+  const workerStartTime = Date.now();
+  const { event, data, sessionId: payloadSessionId, instanceName, receivedAt } = payload;
+  const msgId = data?.key?.id || 'N/A';
+  console.log(`[TRACE][WORKER_START] timestamp: ${workerStartTime} | delta_from_webhook: ${receivedAt ? workerStartTime - receivedAt : 'N/A'}ms | event: ${event} | msgId: ${msgId}`);
 
   // Resolve session for all event types
   const session = await getSessionInfo(instanceName, payloadSessionId);
+  const sessionResolveTime = Date.now();
+  console.log(`[TRACE][SESSION_RESOLVED] timestamp: ${sessionResolveTime} | delta: ${sessionResolveTime - workerStartTime}ms | msgId: ${msgId}`);
   if (!session) {
     console.warn(`[Worker] No session found for instance: ${instanceName} (event: ${event})`);
     return;
@@ -212,7 +217,7 @@ export async function processMessageEvent(payload: MessageEventPayload): Promise
   switch (event) {
     case "messages.upsert":
     case "send.message":
-      await processNewMessage(session, data);
+      await processNewMessage(session, data, workerStartTime);
       break;
 
     case "messages.update":
@@ -237,8 +242,9 @@ export async function processMessageEvent(payload: MessageEventPayload): Promise
 
 // ── New Message Handler ───────────────────────────────────────
 
-async function processNewMessage(session: SessionInfo, data: any): Promise<void> {
+async function processNewMessage(session: SessionInfo, data: any, workerStartTime?: number): Promise<void> {
   const { sessionId, tenantId } = session;
+  const _traceStart = workerStartTime || Date.now();
 
   try {
     const key = data?.key;
@@ -287,6 +293,7 @@ async function processNewMessage(session: SessionInfo, data: any): Promise<void>
     if (!db) return;
 
     // ── Step 1: Dedup ──
+    const dedupStart = Date.now();
     if (messageId) {
       const existing = await db.select({ id: waMessages.id })
         .from(waMessages)
@@ -296,10 +303,15 @@ async function processNewMessage(session: SessionInfo, data: any): Promise<void>
         ))
         .limit(1);
 
-      if (existing.length > 0) return;
+      if (existing.length > 0) {
+        console.log(`[TRACE][DEDUP_HIT] timestamp: ${Date.now()} | delta: ${Date.now() - dedupStart}ms | msgId: ${messageId} — skipped (duplicate)`);
+        return;
+      }
     }
+    console.log(`[TRACE][DEDUP_CHECK] timestamp: ${Date.now()} | delta: ${Date.now() - dedupStart}ms | msgId: ${messageId}`);
 
     // ── Step 2: Insert message ──
+    const insertStart = Date.now();
     await db.insert(waMessages).values({
       sessionId,
       tenantId,
@@ -318,12 +330,18 @@ async function processNewMessage(session: SessionInfo, data: any): Promise<void>
       isVoiceNote: mediaInfo.isVoiceNote || false,
       quotedMessageId: mediaInfo.quotedMessageId || null,
     }).onDuplicateKeyUpdate({ set: { status: sql`status` } });
+    const insertEnd = Date.now();
+    console.log(`[TRACE][DB_INSERT] timestamp: ${insertEnd} | delta: ${insertEnd - insertStart}ms | msgId: ${messageId}`);
 
     // ── Step 3: Resolve conversation + update last message ──
     try {
+      const resolveStart = Date.now();
       const contactPushName = fromMe ? null : pushName;
       const resolved = await resolveInbound(tenantId, sessionId, remoteJid, contactPushName, { skipContactCreation: true });
+      const resolveEnd = Date.now();
+      console.log(`[TRACE][RESOLVE_INBOUND] timestamp: ${resolveEnd} | delta: ${resolveEnd - resolveStart}ms | msgId: ${messageId}`);
       if (resolved) {
+        const updateStart = Date.now();
         await updateConversationLastMessage(resolved.conversationId, {
           content: content || "",
           messageType,
@@ -332,12 +350,16 @@ async function processNewMessage(session: SessionInfo, data: any): Promise<void>
           timestamp: new Date(timestamp),
           incrementUnread: !fromMe,
         });
+        const updateEnd = Date.now();
+        console.log(`[TRACE][CONVERSATION_UPDATED] timestamp: ${updateEnd} | delta: ${updateEnd - updateStart}ms | msgId: ${messageId}`);
       }
     } catch (e) {
       console.warn("[Worker] Conversation resolver error:", e);
     }
 
     // ── Step 4: Emit Socket.IO event ──
+    const socketEmitStart = Date.now();
+    console.log(`[TRACE][PRE_SOCKET_EMIT] timestamp: ${socketEmitStart} | total_worker_so_far: ${socketEmitStart - _traceStart}ms | msgId: ${messageId}`);
     const { whatsappManager } = await import("./whatsappEvolution");
     whatsappManager.emit("message", {
       sessionId,

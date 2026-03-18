@@ -1081,6 +1081,7 @@ async function handleEvolutionWebhook(req: Request, res: Response) {
   const startTime = Date.now();
   try {
     const body = req.body;
+    console.log(`[TRACE][WEBHOOK_RECEIVED] timestamp: ${startTime} | event: ${body?.event} | instance: ${body?.instance} | msgId: ${body?.data?.key?.id || 'N/A'}`);
     if (!body || !body.event) {
       console.warn("[Webhook /evolution] Invalid payload:", JSON.stringify(body)?.substring(0, 200));
       return res.status(400).json({ error: "Invalid webhook payload" });
@@ -1139,7 +1140,9 @@ async function handleEvolutionWebhook(req: Request, res: Response) {
         });
 
         if (enqueued) {
-          console.log(`[Webhook /evolution] Enqueued ${body.event} in ${Date.now() - startTime}ms (queue)`);
+          const enqueueTime = Date.now();
+          console.log(`[TRACE][ENQUEUED] timestamp: ${enqueueTime} | delta_from_receive: ${enqueueTime - startTime}ms | event: ${body.event} | msgId: ${body?.data?.key?.id || 'N/A'}`);
+          console.log(`[Webhook /evolution] Enqueued ${body.event} in ${enqueueTime - startTime}ms (queue)`);
           return res.status(200).json({ received: true, queued: true });
         }
       }

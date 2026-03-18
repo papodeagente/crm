@@ -1516,6 +1516,9 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
   // Socket message → optimistic cache update (no refetch)
   useEffect(() => {
     if (!lastMessage || lastMessage.remoteJid !== remoteJid) return;
+    const _chatTraceStart = Date.now();
+    const _chatTraceMsgId = (lastMessage as any).messageId || 'N/A';
+    console.log(`[TRACE][CHAT_SOCKET_RECEIVED] timestamp: ${_chatTraceStart} | msgId: ${_chatTraceMsgId} | remoteJid: ${remoteJid?.substring(0, 15)}`);
     // Build a lightweight message object from the socket event
     const socketMsg = {
       id: (lastMessage as any).id || -Date.now(),
@@ -1538,6 +1541,7 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
       // Insert at beginning (newest first) and trim to limit
       return [socketMsg, ...old].slice(0, msgLimit + 20);
     });
+    console.log(`[TRACE][CHAT_CACHE_UPDATED] timestamp: ${Date.now()} | delta: ${Date.now() - _chatTraceStart}ms | msgId: ${_chatTraceMsgId}`);
   }, [lastMessage, remoteJid, sessionId, msgLimit, utils]);
 
   // Refetch messages when media is ready (no notification sound)

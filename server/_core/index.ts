@@ -59,6 +59,7 @@ async function startServer() {
   });
 
   whatsappManager.on("message", (data) => {
+    const socketEmitTime = Date.now();
     const payload = {
       sessionId: data.sessionId,
       messageId: data.messageId || null,
@@ -70,17 +71,9 @@ async function startServer() {
       timestamp: data.timestamp || Date.now(),
       isSync: !!(data.isSync || data.syncBatch), // true for sync/poll/reconciliation messages
       syncBatch: data.syncBatch || 0,
+      _traceEmitAt: socketEmitTime, // TRACE: timestamp when socket.io emit happens
     };
-    // Part 16: Debug logging
-    console.log('[InboxDebug] emit whatsapp:message', {
-      eventType: 'messages.upsert',
-      messageId: data.messageId || null,
-      remoteJid: data.remoteJid?.substring(0, 15),
-      timestamp: payload.timestamp,
-      fromMe: data.fromMe,
-      isSync: payload.isSync,
-      messageType: data.messageType,
-    });
+    console.log(`[TRACE][SOCKET_EMIT] timestamp: ${socketEmitTime} | remoteJid: ${data.remoteJid?.substring(0, 15)} | msgId: ${data.messageId || 'N/A'} | fromMe: ${data.fromMe}`);
     io.emit("whatsapp:message", payload);
   });
 
