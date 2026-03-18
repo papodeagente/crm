@@ -1,0 +1,18 @@
+{
+  "query": "\nSELECT \n  audio_transcription_status AS status,\n  COUNT(*) AS cnt\nFROM messages\nWHERE messageType IN ('audioMessage', 'pttMessage')\nGROUP BY audio_transcription_status\nORDER BY cnt DESC;\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute \nSELECT \n  audio_transcription_status AS status,\n  COUNT(*) AS cnt\nFROM messages\nWHERE messageType IN ('audioMessage', 'pttMessage')\nGROUP BY audio_transcription_status\nORDER BY cnt DESC;\n",
+  "rows": [
+    {
+      "status": "NULL",
+      "cnt": "4905"
+    },
+    {
+      "status": "pending",
+      "cnt": "393"
+    }
+  ],
+  "messages": [],
+  "stdout": "status\tcnt\nNULL\t4905\npending\t393\n",
+  "stderr": "",
+  "execution_time_ms": 101
+}

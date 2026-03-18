@@ -220,8 +220,13 @@ async function startServer() {
     });
 
     // Initialize audio transcription worker (if Redis available)
-    import("../audioTranscriptionWorker").then(m => {
+    import("../audioTranscriptionWorker").then(async (m) => {
       m.initAudioTranscriptionWorker();
+      // Recover any jobs stuck in "pending" from previous runs
+      const recovered = await m.recoverPendingJobs();
+      if (recovered > 0) {
+        console.log(`[AudioTranscription] Recovered ${recovered} stuck pending jobs (marked as failed)`);
+      }
     }).catch(e => {
       console.warn("[AudioTranscription] Failed to initialize worker:", e.message);
     });

@@ -3858,3 +3858,15 @@
 - [x] PART 10: Database repair — 3630 conversations rebuilt, 0 stale fromMe statuses, 583 null preview (no messages)
 - [x] PART 11: Vitest tests — 71 tests passing (11 new for queue movement, ownership, derived views, removeConversation)
 - [x] PART 12: Manual verification — TypeScript clean, all tests passing
+
+## Audio Transcription Stuck on "Transcribing..." — Root Cause Analysis
+- [x] STEP 1: Trace full pipeline — instrumented logging added at every stage with timestamps/durations
+- [x] STEP 2: Identify stuck jobs — 397 pending, 0 processing, 0 completed, 0 failed = NEVER processed
+- [x] STEP 3: ROOT CAUSE FOUND — BullMQ Queue+Worker shared same Redis connection = DEADLOCK
+- [x] STEP 4: Fix applied — separate Redis connections for Queue and Worker (both audio + message queues)
+- [x] STEP 5: Timeout safety — 60s job timeout, 5min pending recovery, recoverPendingJobs() on startup
+- [x] STEP 6: DB repair — 397 stuck pending jobs will be recovered on next server restart
+- [x] STEP 7: Frontend update — socket emit already correct, no changes needed
+- [x] STEP 8: Status model — monotonic transitions enforced (pending→processing→completed/failed)
+- [x] STEP 9: messageQueue.ts also fixed — same shared connection bug, now uses separate connections
+- [x] STEP 10: 61 vitest tests passing for transcription pipeline

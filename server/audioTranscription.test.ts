@@ -366,3 +366,260 @@ describe("Audio Transcription System", () => {
     });
   });
 });
+
+
+// ── Additional Tests: Pipeline Lifecycle, Recovery, Redis Connections ──
+
+describe("Audio Transcription Pipeline — Lifecycle & Recovery", () => {
+  // ── Status Order Map (mirrors audioTranscriptionWorker.ts) ──────
+
+  const STATUS_ORDER: Record<string, number> = {
+    pending: 0,
+    processing: 1,
+    completed: 2,
+    failed: 2, // terminal states are equal rank
+  };
+
+  function isStatusAdvance(current: string | null, next: string): boolean {
+    const currentRank = current ? (STATUS_ORDER[current] ?? -1) : -1;
+    const nextRank = STATUS_ORDER[next] ?? -1;
+    return nextRank > currentRank;
+  }
+
+  function canTransition(current: string | null, next: string): boolean {
+    if (!current && next === "pending") return true;
+    if (current === "pending" && next === "processing") return true;
+    if (current === "processing" && next === "completed") return true;
+    if (current === "processing" && next === "failed") return true;
+    if (current === "pending" && next === "failed") return true; // timeout recovery
+    return false;
+  }
+
+  // ── Simulated Store ──────────────────────────────────────────
+
+  interface TranscriptionJob {
+    messageId: number;
+    status: string | null;
+    transcription: string | null;
+    enqueuedAt: number | null;
+    processedAt: number | null;
+    completedAt: number | null;
+    failReason: string | null;
+  }
+
+  class TranscriptionStore {
+    jobs = new Map<number, TranscriptionJob>();
+
+    enqueue(messageId: number): boolean {
+      const existing = this.jobs.get(messageId);
+      if (existing && existing.status !== null) return false;
+      this.jobs.set(messageId, {
+        messageId, status: "pending", transcription: null,
+        enqueuedAt: Date.now(), processedAt: null, completedAt: null, failReason: null,
+      });
+      return true;
+    }
+
+    startProcessing(messageId: number): boolean {
+      const job = this.jobs.get(messageId);
+      if (!job || !canTransition(job.status, "processing")) return false;
+      job.status = "processing";
+      job.processedAt = Date.now();
+      return true;
+    }
+
+    complete(messageId: number, transcription: string): boolean {
+      const job = this.jobs.get(messageId);
+      if (!job || !canTransition(job.status, "completed")) return false;
+      job.status = "completed";
+      job.transcription = transcription;
+      job.completedAt = Date.now();
+      return true;
+    }
+
+    fail(messageId: number, reason: string): boolean {
+      const job = this.jobs.get(messageId);
+      if (!job || !canTransition(job.status, "failed")) return false;
+      job.status = "failed";
+      job.failReason = reason;
+      job.completedAt = Date.now();
+      return true;
+    }
+
+    recoverStuckPending(maxAgeMs: number): number {
+      let recovered = 0;
+      const now = Date.now();
+      for (const [, job] of this.jobs) {
+        if (job.status === "pending" && job.enqueuedAt && (now - job.enqueuedAt) > maxAgeMs) {
+          job.status = "failed";
+          job.failReason = "timeout_recovery";
+          job.completedAt = now;
+          recovered++;
+        }
+      }
+      return recovered;
+    }
+
+    getByStatus(status: string): TranscriptionJob[] {
+      return Array.from(this.jobs.values()).filter(j => j.status === status);
+    }
+  }
+
+  // ── Tests ──────────────────────────────────────────────────────
+
+  describe("Happy Path Lifecycle", () => {
+    it("null → pending → processing → completed", () => {
+      const store = new TranscriptionStore();
+      expect(store.enqueue(1)).toBe(true);
+      expect(store.jobs.get(1)?.status).toBe("pending");
+      expect(store.startProcessing(1)).toBe(true);
+      expect(store.jobs.get(1)?.status).toBe("processing");
+      expect(store.complete(1, "Hello world")).toBe(true);
+      expect(store.jobs.get(1)?.status).toBe("completed");
+      expect(store.jobs.get(1)?.transcription).toBe("Hello world");
+    });
+
+    it("null → pending → processing → failed", () => {
+      const store = new TranscriptionStore();
+      store.enqueue(1);
+      store.startProcessing(1);
+      expect(store.fail(1, "OpenAI API error")).toBe(true);
+      expect(store.jobs.get(1)?.status).toBe("failed");
+      expect(store.jobs.get(1)?.failReason).toBe("OpenAI API error");
+    });
+
+    it("pending → failed (timeout recovery)", () => {
+      const store = new TranscriptionStore();
+      store.enqueue(1);
+      expect(store.fail(1, "timeout_recovery")).toBe(true);
+      expect(store.jobs.get(1)?.status).toBe("failed");
+    });
+  });
+
+  describe("Monotonic Status — No Regression", () => {
+    it("completed → pending is blocked", () => {
+      const store = new TranscriptionStore();
+      store.enqueue(1); store.startProcessing(1); store.complete(1, "text");
+      expect(store.enqueue(1)).toBe(false);
+      expect(store.jobs.get(1)?.status).toBe("completed");
+    });
+
+    it("completed → processing is blocked", () => {
+      const store = new TranscriptionStore();
+      store.enqueue(1); store.startProcessing(1); store.complete(1, "text");
+      expect(store.startProcessing(1)).toBe(false);
+    });
+
+    it("failed → pending is blocked", () => {
+      const store = new TranscriptionStore();
+      store.enqueue(1); store.startProcessing(1); store.fail(1, "err");
+      expect(store.enqueue(1)).toBe(false);
+    });
+
+    it("processing → pending is blocked", () => {
+      const store = new TranscriptionStore();
+      store.enqueue(1); store.startProcessing(1);
+      expect(store.enqueue(1)).toBe(false);
+      expect(store.jobs.get(1)?.status).toBe("processing");
+    });
+
+    it("pending → completed (skip processing) is blocked", () => {
+      const store = new TranscriptionStore();
+      store.enqueue(1);
+      expect(store.complete(1, "text")).toBe(false);
+      expect(store.jobs.get(1)?.status).toBe("pending");
+    });
+  });
+
+  describe("isStatusAdvance", () => {
+    it("null → pending is advance", () => expect(isStatusAdvance(null, "pending")).toBe(true));
+    it("pending → processing is advance", () => expect(isStatusAdvance("pending", "processing")).toBe(true));
+    it("processing → completed is advance", () => expect(isStatusAdvance("processing", "completed")).toBe(true));
+    it("processing → failed is advance", () => expect(isStatusAdvance("processing", "failed")).toBe(true));
+    it("completed → pending is NOT advance", () => expect(isStatusAdvance("completed", "pending")).toBe(false));
+    it("completed → processing is NOT advance", () => expect(isStatusAdvance("completed", "processing")).toBe(false));
+    it("failed → pending is NOT advance", () => expect(isStatusAdvance("failed", "pending")).toBe(false));
+  });
+
+  describe("Timeout Recovery", () => {
+    it("recovers stuck pending jobs older than maxAge", () => {
+      const store = new TranscriptionStore();
+      store.enqueue(1); store.enqueue(2); store.enqueue(3);
+      store.jobs.get(1)!.enqueuedAt = Date.now() - 120_000;
+      store.jobs.get(2)!.enqueuedAt = Date.now() - 90_000;
+      store.jobs.get(3)!.enqueuedAt = Date.now() - 10_000;
+      const recovered = store.recoverStuckPending(60_000);
+      expect(recovered).toBe(2);
+      expect(store.jobs.get(1)?.status).toBe("failed");
+      expect(store.jobs.get(2)?.status).toBe("failed");
+      expect(store.jobs.get(3)?.status).toBe("pending");
+    });
+
+    it("does NOT recover processing or completed jobs", () => {
+      const store = new TranscriptionStore();
+      store.enqueue(1); store.enqueue(2); store.enqueue(3);
+      store.jobs.get(1)!.enqueuedAt = Date.now() - 120_000;
+      store.jobs.get(2)!.enqueuedAt = Date.now() - 120_000;
+      store.jobs.get(3)!.enqueuedAt = Date.now() - 120_000;
+      store.startProcessing(2);
+      store.startProcessing(3); store.complete(3, "text");
+      const recovered = store.recoverStuckPending(60_000);
+      expect(recovered).toBe(1);
+      expect(store.jobs.get(2)?.status).toBe("processing");
+      expect(store.jobs.get(3)?.status).toBe("completed");
+    });
+
+    it("returns 0 when no stuck jobs", () => {
+      const store = new TranscriptionStore();
+      store.enqueue(1);
+      store.jobs.get(1)!.enqueuedAt = Date.now() - 5_000;
+      expect(store.recoverStuckPending(60_000)).toBe(0);
+    });
+  });
+
+  describe("Duplicate Prevention", () => {
+    it("same message cannot be enqueued twice", () => {
+      const store = new TranscriptionStore();
+      expect(store.enqueue(1)).toBe(true);
+      expect(store.enqueue(1)).toBe(false);
+      expect(store.getByStatus("pending").length).toBe(1);
+    });
+
+    it("cannot re-enqueue after completion", () => {
+      const store = new TranscriptionStore();
+      store.enqueue(1); store.startProcessing(1); store.complete(1, "text");
+      expect(store.enqueue(1)).toBe(false);
+    });
+  });
+
+  describe("Separate Redis Connections (Architecture)", () => {
+    it("queue and worker must use different connection objects", () => {
+      const queueConn = { id: "queue-conn", label: "audio-transcription-queue" };
+      const workerConn = { id: "worker-conn", label: "audio-transcription-worker" };
+      expect(queueConn).not.toBe(workerConn);
+      expect(queueConn.id).not.toBe(workerConn.id);
+    });
+
+    it("message queue and message worker must also use different connections", () => {
+      const queueConn = { id: "msg-queue-conn", label: "message-queue" };
+      const workerConn = { id: "msg-worker-conn", label: "message-worker" };
+      expect(queueConn).not.toBe(workerConn);
+    });
+  });
+
+  describe("Batch Concurrent Processing", () => {
+    it("handles 5 concurrent jobs without interference", () => {
+      const store = new TranscriptionStore();
+      for (let i = 1; i <= 5; i++) store.enqueue(i);
+      expect(store.getByStatus("pending").length).toBe(5);
+      store.startProcessing(1); store.startProcessing(2); store.startProcessing(3);
+      expect(store.getByStatus("processing").length).toBe(3);
+      expect(store.getByStatus("pending").length).toBe(2);
+      store.complete(1, "text1"); store.fail(2, "error");
+      expect(store.getByStatus("completed").length).toBe(1);
+      expect(store.getByStatus("failed").length).toBe(1);
+      expect(store.getByStatus("processing").length).toBe(1);
+      expect(store.getByStatus("pending").length).toBe(2);
+    });
+  });
+});

@@ -1,0 +1,16 @@
+{
+  "query": "\nSELECT \n  audio_transcription_status,\n  MIN(createdAt) AS earliest,\n  MAX(createdAt) AS latest,\n  COUNT(*) AS cnt\nFROM messages\nWHERE messageType IN ('audioMessage', 'pttMessage')\n  AND audio_transcription_status = 'pending'\nGROUP BY audio_transcription_status;\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute \nSELECT \n  audio_transcription_status,\n  MIN(createdAt) AS earliest,\n  MAX(createdAt) AS latest,\n  COUNT(*) AS cnt\nFROM messages\nWHERE messageType IN ('audioMessage', 'pttMessage')\n  AND audio_transcription_status = 'pending'\nGROUP BY audio_transcription_status;\n",
+  "rows": [
+    {
+      "audio_transcription_status": "pending",
+      "earliest": "2026-03-16 13:28:21",
+      "latest": "2026-03-18 14:12:14",
+      "cnt": "396"
+    }
+  ],
+  "messages": [],
+  "stdout": "audio_transcription_status\tearliest\tlatest\tcnt\npending\t2026-03-16 13:28:21\t2026-03-18 14:12:14\t396\n",
+  "stderr": "",
+  "execution_time_ms": 350
+}

@@ -8,6 +8,9 @@
  * - Retry with exponential backoff
  * - Graceful fallback to synchronous processing if Redis unavailable
  * 
+ * IMPORTANT: BullMQ requires SEPARATE Redis connections for Queue and Worker.
+ * Sharing a single connection can cause deadlock where the worker stops consuming.
+ * 
  * Requires: REDIS_URL environment variable (e.g., redis://host:6379)
  * Optional: USE_QUEUE=false to force synchronous processing
  */
@@ -34,9 +37,10 @@ export interface QueueStats {
   delayed: number;
 }
 
-// ── Redis Connection ───────────────────────────────────────────
+// ── Redis Connections (SEPARATE for Queue and Worker) ──────────
 
-let redisConnection: IORedis | null = null;
+let queueRedis: IORedis | null = null;
+let workerRedis: IORedis | null = null;
 let connectionReady = false;
 let connectionFailed = false;
 let initAttempted = false;
@@ -46,36 +50,25 @@ function getRedisUrl(): string | null {
 }
 
 /**
- * Get or create the Redis connection.
- * Returns null if REDIS_URL is not configured or connection failed.
+ * Create a new Redis connection with the given label for logging.
  */
-export function getRedisConnection(): IORedis | null {
-  if (connectionFailed) return null;
-  if (redisConnection && connectionReady) return redisConnection;
-  if (redisConnection) return redisConnection; // Connection in progress
-  if (initAttempted) return null; // Already tried and failed
-
+function createRedisConnection(label: string): IORedis | null {
   const redisUrl = getRedisUrl();
   if (!redisUrl) {
-    connectionFailed = true;
-    initAttempted = true;
-    console.log("[Queue] No REDIS_URL configured — using synchronous message processing");
     return null;
   }
-
-  initAttempted = true;
 
   try {
     let firstErrorLogged = false;
 
-    redisConnection = new IORedis(redisUrl, {
+    const conn = new IORedis(redisUrl, {
       maxRetriesPerRequest: null, // Required by BullMQ
       enableReadyCheck: true,
       connectTimeout: 10000,
       retryStrategy(times) {
         if (times > 5) {
           if (!firstErrorLogged) {
-            console.warn("[Queue] Redis connection failed after 5 retries — falling back to sync processing");
+            console.warn(`[Queue] Redis ${label} connection failed after 5 retries`);
             firstErrorLogged = true;
           }
           connectionFailed = true;
@@ -86,43 +79,73 @@ export function getRedisConnection(): IORedis | null {
       lazyConnect: true,
     });
 
-    redisConnection.on("ready", () => {
+    conn.on("ready", () => {
       connectionReady = true;
       connectionFailed = false;
-      console.log("Redis connected - async queue enabled");
+      console.log(`[Queue] Redis ${label} connected`);
     });
 
-    redisConnection.on("error", (err) => {
+    conn.on("error", (err) => {
       if (!firstErrorLogged) {
-        console.warn("[Queue] Redis error:", err.message);
+        console.warn(`[Queue] Redis ${label} error:`, err.message);
         firstErrorLogged = true;
       }
     });
 
-    redisConnection.on("close", () => {
-      connectionReady = false;
+    conn.on("close", () => {
+      // Silent close
     });
 
-    redisConnection.on("reconnecting", () => {
+    conn.on("reconnecting", () => {
       // Silent reconnection
     });
 
     // Initiate connection
-    redisConnection.connect().catch((err) => {
+    conn.connect().catch((err) => {
       if (!firstErrorLogged) {
-        console.warn("[Queue] Redis connect failed:", err.message);
+        console.warn(`[Queue] Redis ${label} connect failed:`, err.message);
         firstErrorLogged = true;
       }
       connectionFailed = true;
-      redisConnection = null;
     });
 
-    return redisConnection;
+    return conn;
   } catch (e: any) {
-    console.warn("[Queue] Failed to create Redis connection:", e.message);
-    connectionFailed = true;
+    console.warn(`[Queue] Failed to create Redis ${label} connection:`, e.message);
     return null;
   }
+}
+
+/**
+ * Get or create the Redis connection for the Queue (producer).
+ */
+export function getRedisConnection(): IORedis | null {
+  if (connectionFailed) return null;
+  if (queueRedis) return queueRedis;
+  if (initAttempted && !queueRedis) return null;
+
+  const redisUrl = getRedisUrl();
+  if (!redisUrl) {
+    connectionFailed = true;
+    initAttempted = true;
+    console.log("[Queue] No REDIS_URL configured — using synchronous message processing");
+    return null;
+  }
+
+  initAttempted = true;
+  queueRedis = createRedisConnection("queue");
+  return queueRedis;
+}
+
+/**
+ * Get or create a SEPARATE Redis connection for the Worker (consumer).
+ */
+function getWorkerRedisConnection(): IORedis | null {
+  if (connectionFailed) return null;
+  if (workerRedis) return workerRedis;
+
+  workerRedis = createRedisConnection("worker");
+  return workerRedis;
 }
 
 /**
@@ -228,12 +251,13 @@ type MessageProcessor = (payload: MessageEventPayload) => Promise<void>;
 
 /**
  * Start the message processing worker.
- * The processor function should handle the actual message processing logic.
+ * Uses a SEPARATE Redis connection from the Queue to prevent BullMQ deadlock.
  */
 export function startMessageWorker(processor: MessageProcessor): Worker | null {
   if (messageWorker) return messageWorker;
 
-  const redis = getRedisConnection();
+  // IMPORTANT: Use separate Redis connection for worker
+  const redis = getWorkerRedisConnection();
   if (!redis) return null;
 
   try {
@@ -284,7 +308,7 @@ export function startMessageWorker(processor: MessageProcessor): Worker | null {
       }
     });
 
-    console.log("[Queue] Message worker started (concurrency: 5)");
+    console.log("[Queue] Message worker started (concurrency: 5, separate Redis connections)");
     return messageWorker;
   } catch (e: any) {
     console.warn("[Queue] Failed to start worker:", e.message);
@@ -325,9 +349,13 @@ export async function shutdownQueue(): Promise<void> {
       await messageQueue.close();
       messageQueue = null;
     }
-    if (redisConnection) {
-      redisConnection.disconnect();
-      redisConnection = null;
+    if (queueRedis) {
+      queueRedis.disconnect();
+      queueRedis = null;
+    }
+    if (workerRedis) {
+      workerRedis.disconnect();
+      workerRedis = null;
     }
     connectionReady = false;
     console.log("[Queue] Graceful shutdown complete");
