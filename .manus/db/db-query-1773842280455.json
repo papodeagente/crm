@@ -1,0 +1,9 @@
+{
+  "query": "\nUPDATE wa_conversations wc\nJOIN (\n  SELECT \n    m.sessionId,\n    m.remoteJid,\n    m.content AS lastMessage,\n    m.messageType AS lastMessageType,\n    m.fromMe AS lastFromMe,\n    m.timestamp AS lastMessageAt,\n    m.status AS lastStatus\n  FROM messages m\n  INNER JOIN (\n    SELECT sessionId, remoteJid, MAX(timestamp) AS maxTs\n    FROM messages\n    GROUP BY sessionId, remoteJid\n  ) latest ON m.sessionId = latest.sessionId AND m.remoteJid = latest.remoteJid AND m.timestamp = latest.maxTs\n) sub ON wc.sessionId = sub.sessionId AND wc.remoteJid = sub.remoteJid\nSET \n  wc.lastMessagePreview = LEFT(sub.lastMessage, 500),\n  wc.lastMessageType = sub.lastMessageType,\n  wc.lastFromMe = sub.lastFromMe,\n  wc.lastMessageAt = sub.lastMessageAt,\n  wc.lastStatus = sub.lastStatus;\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute \nUPDATE wa_conversations wc\nJOIN (\n  SELECT \n    m.sessionId,\n    m.remoteJid,\n    m.content AS lastMessage,\n    m.messageType AS lastMessageType,\n    m.fromMe AS lastFromMe,\n    m.timestamp AS lastMessageAt,\n    m.status AS lastStatus\n  FROM messages m\n  INNER JOIN (\n    SELECT sessionId, remoteJid, MAX(timestamp) AS maxTs\n    FROM messages\n    GROUP BY sessionId, remoteJid\n  ) latest ON m.sessionId = latest.sessionId AND m.remoteJid = latest.remoteJid AND m.timestamp = latest.maxTs\n) sub ON wc.sessionId = sub.sessionId AND wc.remoteJid = sub.remoteJid\nSET \n  wc.lastMessagePreview = LEFT(sub.lastMessage, 500),\n  wc.lastMessageType = sub.lastMessageType,\n  wc.lastFromMe = sub.lastFromMe,\n  wc.lastMessageAt = sub.lastMessageAt,\n  wc.lastStatus = sub.lastStatus;\n",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 319
+}

@@ -29,6 +29,13 @@ interface ConvEntry {
   _optimistic?: boolean;
   _localTimestamp?: number;
   conversationId?: number;
+  assignedUserId?: number | null;
+  assignedTeamId?: number | null;
+  assignedAgentName?: string | null;
+  assignedAgentAvatar?: string | null;
+  assignmentStatus?: string | null;
+  assignmentPriority?: string | null;
+  queuedAt?: string | Date | null;
 }
 
 function makeConvKey(sessionId: string, remoteJid: string): string {
@@ -213,8 +220,83 @@ class ConversationStore {
     this.commit(newMap, [...this.state.sortedIds]);
   }
 
+  handleOwnershipChange(payload: {
+    sessionId: string;
+    remoteJid: string;
+    assignedUserId?: number | null;
+    assignedAgentName?: string | null;
+    assignedAgentAvatar?: string | null;
+    assignmentStatus?: string | null;
+    assignmentPriority?: string | null;
+    queuedAt?: string | Date | null;
+    lastMessage?: string | null;
+    lastMessageType?: string | null;
+    lastFromMe?: boolean | number;
+    lastTimestamp?: string | Date | null;
+    lastStatus?: string | null;
+    contactPushName?: string | null;
+    unreadCount?: number;
+    conversationId?: number;
+  }): boolean {
+    const key = makeConvKey(payload.sessionId, payload.remoteJid);
+    if (!key || !payload.remoteJid) return false;
+    const oldMap = this.state.conversationMap;
+    const oldIds = this.state.sortedIds;
+    const existing = oldMap.get(key);
+    const newMap = new Map(oldMap);
+    if (existing) {
+      newMap.set(key, {
+        ...existing,
+        assignedUserId: payload.assignedUserId !== undefined ? payload.assignedUserId : existing.assignedUserId,
+        assignedAgentName: payload.assignedAgentName !== undefined ? payload.assignedAgentName : existing.assignedAgentName,
+        assignedAgentAvatar: payload.assignedAgentAvatar !== undefined ? payload.assignedAgentAvatar : existing.assignedAgentAvatar,
+        assignmentStatus: payload.assignmentStatus !== undefined ? payload.assignmentStatus : existing.assignmentStatus,
+        assignmentPriority: payload.assignmentPriority !== undefined ? payload.assignmentPriority : existing.assignmentPriority,
+        queuedAt: payload.queuedAt !== undefined ? payload.queuedAt : existing.queuedAt,
+      });
+      this.commit(newMap, [...oldIds]);
+    } else {
+      const entry: ConvEntry = {
+        conversationKey: key,
+        sessionId: payload.sessionId,
+        remoteJid: payload.remoteJid,
+        lastMessage: payload.lastMessage || null,
+        lastMessageType: payload.lastMessageType || null,
+        lastFromMe: payload.lastFromMe ?? false,
+        lastTimestamp: payload.lastTimestamp || new Date().toISOString(),
+        lastStatus: payload.lastStatus || "received",
+        contactPushName: payload.contactPushName || null,
+        unreadCount: payload.unreadCount ?? 0,
+        assignedUserId: payload.assignedUserId ?? null,
+        assignedAgentName: payload.assignedAgentName ?? null,
+        assignedAgentAvatar: payload.assignedAgentAvatar ?? null,
+        assignmentStatus: payload.assignmentStatus ?? null,
+        assignmentPriority: payload.assignmentPriority ?? null,
+        queuedAt: payload.queuedAt ?? null,
+        conversationId: payload.conversationId,
+      };
+      newMap.set(key, entry);
+      this.commit(newMap, [key, ...oldIds]);
+    }
+    return true;
+  }
+
+  removeConversation(key: string): boolean {
+    const oldMap = this.state.conversationMap;
+    if (!oldMap.has(key)) return false;
+    const newMap = new Map(oldMap);
+    newMap.delete(key);
+    const newIds = this.state.sortedIds.filter(id => id !== key);
+    this.commit(newMap, newIds);
+    return true;
+  }
+
   getConversation(key: string): ConvEntry | undefined {
     return this.state.conversationMap.get(key);
+  }
+
+  get size(): number {
+    return this.state.conversationMap.size;
   }
 
   getSorted(): ConvEntry[] {
@@ -1509,5 +1591,246 @@ describe("PART 10: Template → Real Message Transition", () => {
       timestamp: new Date("2026-03-16T13:00:00Z").getTime(),
     }, null);
     expect(store.getConversation(KEY_A)!.lastMessage).toBe("Real 2");
+  });
+});
+
+
+// ─── QUEUE MOVEMENT & OWNERSHIP CHANGE TESTS ───
+
+function createStore() {
+  return new ConversationStore();
+}
+
+describe("handleOwnershipChange — queue/claim/transfer/finish", () => {
+  it("should update assignedUserId when conversation is claimed", () => {
+    const store = createStore();
+    store.hydrate([
+      { remoteJid: "jid1@s.whatsapp.net", sessionId: "s1", lastMessage: "Oi", lastFromMe: false, lastTimestamp: "2024-01-01T10:00:00Z", lastStatus: "received", lastMessageType: "conversation", contactPushName: "Alice", unreadCount: 1, assignedUserId: null, assignmentStatus: "queued" },
+    ]);
+
+    const result = store.handleOwnershipChange({
+      sessionId: "s1",
+      remoteJid: "jid1@s.whatsapp.net",
+      assignedUserId: 42,
+      assignedAgentName: "Agent Smith",
+      assignmentStatus: "open",
+      queuedAt: null,
+    });
+
+    expect(result).toBe(true);
+    const conv = store.getConversation("s1:jid1@s.whatsapp.net");
+    expect(conv?.assignedUserId).toBe(42);
+    expect(conv?.assignedAgentName).toBe("Agent Smith");
+    expect(conv?.assignmentStatus).toBe("open");
+    expect(conv?.queuedAt).toBeNull();
+    // Preview should NOT be changed
+    expect(conv?.lastMessage).toBe("Oi");
+  });
+
+  it("should upsert conversation when claimed from queue (not in store)", () => {
+    const store = createStore();
+    store.hydrate([
+      { remoteJid: "existing@s.whatsapp.net", sessionId: "s1", lastMessage: "Existing", lastFromMe: false, lastTimestamp: "2024-01-01T10:00:00Z", lastStatus: "received", lastMessageType: "conversation", contactPushName: "Bob", unreadCount: 0 },
+    ]);
+
+    const result = store.handleOwnershipChange({
+      sessionId: "s1",
+      remoteJid: "new-from-queue@s.whatsapp.net",
+      assignedUserId: 42,
+      assignedAgentName: "Agent Smith",
+      assignmentStatus: "open",
+      queuedAt: null,
+      lastMessage: "Help me",
+      lastMessageType: "conversation",
+      lastFromMe: false,
+      lastTimestamp: "2024-01-01T12:00:00Z",
+      lastStatus: "received",
+      contactPushName: "Charlie",
+      unreadCount: 3,
+      conversationId: 999,
+    });
+
+    expect(result).toBe(true);
+    expect(store.size).toBe(2);
+    const conv = store.getConversation("s1:new-from-queue@s.whatsapp.net");
+    expect(conv).toBeDefined();
+    expect(conv?.assignedUserId).toBe(42);
+    expect(conv?.lastMessage).toBe("Help me");
+    expect(conv?.contactPushName).toBe("Charlie");
+    expect(conv?.unreadCount).toBe(3);
+    // Should be at top of sorted list
+    const sorted = store.getSorted();
+    expect(sorted[0].remoteJid).toBe("new-from-queue@s.whatsapp.net");
+  });
+
+  it("should handle transfer: update assignedUserId to new agent", () => {
+    const store = createStore();
+    store.hydrate([
+      { remoteJid: "jid1@s.whatsapp.net", sessionId: "s1", lastMessage: "Oi", lastFromMe: false, lastTimestamp: "2024-01-01T10:00:00Z", lastStatus: "received", lastMessageType: "conversation", contactPushName: "Alice", unreadCount: 1, assignedUserId: 42, assignedAgentName: "Agent Smith", assignmentStatus: "open" },
+    ]);
+
+    store.handleOwnershipChange({
+      sessionId: "s1",
+      remoteJid: "jid1@s.whatsapp.net",
+      assignedUserId: 99,
+      assignedAgentName: "Agent Jones",
+      assignmentStatus: "open",
+    });
+
+    const conv = store.getConversation("s1:jid1@s.whatsapp.net");
+    expect(conv?.assignedUserId).toBe(99);
+    expect(conv?.assignedAgentName).toBe("Agent Jones");
+    expect(conv?.assignmentStatus).toBe("open");
+  });
+
+  it("should handle finish attendance: set assignedUserId to null, status to resolved", () => {
+    const store = createStore();
+    store.hydrate([
+      { remoteJid: "jid1@s.whatsapp.net", sessionId: "s1", lastMessage: "Oi", lastFromMe: false, lastTimestamp: "2024-01-01T10:00:00Z", lastStatus: "received", lastMessageType: "conversation", contactPushName: "Alice", unreadCount: 0, assignedUserId: 42, assignedAgentName: "Agent Smith", assignmentStatus: "open" },
+    ]);
+
+    store.handleOwnershipChange({
+      sessionId: "s1",
+      remoteJid: "jid1@s.whatsapp.net",
+      assignedUserId: null,
+      assignmentStatus: "resolved",
+      queuedAt: null,
+    });
+
+    const conv = store.getConversation("s1:jid1@s.whatsapp.net");
+    expect(conv?.assignedUserId).toBeNull();
+    expect(conv?.assignmentStatus).toBe("resolved");
+  });
+
+  it("should handle enqueue: set assignedUserId to null, status to queued", () => {
+    const store = createStore();
+    store.hydrate([
+      { remoteJid: "jid1@s.whatsapp.net", sessionId: "s1", lastMessage: "Oi", lastFromMe: false, lastTimestamp: "2024-01-01T10:00:00Z", lastStatus: "received", lastMessageType: "conversation", contactPushName: "Alice", unreadCount: 0, assignedUserId: 42, assignmentStatus: "open" },
+    ]);
+
+    const now = new Date().toISOString();
+    store.handleOwnershipChange({
+      sessionId: "s1",
+      remoteJid: "jid1@s.whatsapp.net",
+      assignedUserId: null,
+      assignmentStatus: "queued",
+      queuedAt: now,
+    });
+
+    const conv = store.getConversation("s1:jid1@s.whatsapp.net");
+    expect(conv?.assignedUserId).toBeNull();
+    expect(conv?.assignmentStatus).toBe("queued");
+    expect(conv?.queuedAt).toBe(now);
+  });
+
+  it("should upsert with defaults for non-existent conversation without preview data", () => {
+    const store = createStore();
+    store.hydrate([]);
+
+    const result = store.handleOwnershipChange({
+      sessionId: "s1",
+      remoteJid: "nonexistent@s.whatsapp.net",
+      assignedUserId: 42,
+      assignmentStatus: "open",
+    });
+
+    expect(result).toBe(true);
+    expect(store.size).toBe(1);
+    const conv = store.getConversation("s1:nonexistent@s.whatsapp.net");
+    expect(conv?.assignedUserId).toBe(42);
+    expect(conv?.lastMessage).toBeNull();
+  });
+});
+
+describe("Derived tab views from convStore", () => {
+  it("mine tab: filters by assignedUserId", () => {
+    const store = createStore();
+    store.hydrate([
+      { remoteJid: "mine1@s.whatsapp.net", sessionId: "s1", lastMessage: "A", lastFromMe: false, lastTimestamp: "2024-01-01T12:00:00Z", lastStatus: "received", lastMessageType: "conversation", contactPushName: "A", unreadCount: 0, assignedUserId: 42, assignmentStatus: "open" },
+      { remoteJid: "other@s.whatsapp.net", sessionId: "s1", lastMessage: "B", lastFromMe: false, lastTimestamp: "2024-01-01T11:00:00Z", lastStatus: "received", lastMessageType: "conversation", contactPushName: "B", unreadCount: 0, assignedUserId: 99, assignmentStatus: "open" },
+      { remoteJid: "mine2@s.whatsapp.net", sessionId: "s1", lastMessage: "C", lastFromMe: false, lastTimestamp: "2024-01-01T10:00:00Z", lastStatus: "received", lastMessageType: "conversation", contactPushName: "C", unreadCount: 0, assignedUserId: 42, assignmentStatus: "open" },
+    ]);
+
+    const myUserId = 42;
+    const mineConvs = store.getSorted().filter(c => c.assignedUserId === myUserId);
+    expect(mineConvs).toHaveLength(2);
+    expect(mineConvs[0].remoteJid).toBe("mine1@s.whatsapp.net");
+    expect(mineConvs[1].remoteJid).toBe("mine2@s.whatsapp.net");
+  });
+
+  it("claim moves conversation from queue filter to mine filter", () => {
+    const store = createStore();
+    store.hydrate([
+      { remoteJid: "queued@s.whatsapp.net", sessionId: "s1", lastMessage: "Help", lastFromMe: false, lastTimestamp: "2024-01-01T10:00:00Z", lastStatus: "received", lastMessageType: "conversation", contactPushName: "Q", unreadCount: 1, assignedUserId: null, assignmentStatus: "queued" },
+      { remoteJid: "mine@s.whatsapp.net", sessionId: "s1", lastMessage: "Hi", lastFromMe: false, lastTimestamp: "2024-01-01T09:00:00Z", lastStatus: "received", lastMessageType: "conversation", contactPushName: "M", unreadCount: 0, assignedUserId: 42, assignmentStatus: "open" },
+    ]);
+
+    const myUserId = 42;
+
+    // Before claim
+    let mineConvs = store.getSorted().filter(c => c.assignedUserId === myUserId);
+    let queueConvs = store.getSorted().filter(c => c.assignmentStatus === "queued");
+    expect(mineConvs).toHaveLength(1);
+    expect(queueConvs).toHaveLength(1);
+
+    // Claim
+    store.handleOwnershipChange({
+      sessionId: "s1",
+      remoteJid: "queued@s.whatsapp.net",
+      assignedUserId: 42,
+      assignedAgentName: "Me",
+      assignmentStatus: "open",
+      queuedAt: null,
+    });
+
+    // After claim
+    mineConvs = store.getSorted().filter(c => c.assignedUserId === myUserId);
+    queueConvs = store.getSorted().filter(c => c.assignmentStatus === "queued");
+    expect(mineConvs).toHaveLength(2);
+    expect(queueConvs).toHaveLength(0);
+  });
+
+  it("finish moves conversation out of mine filter", () => {
+    const store = createStore();
+    store.hydrate([
+      { remoteJid: "mine@s.whatsapp.net", sessionId: "s1", lastMessage: "Done", lastFromMe: true, lastTimestamp: "2024-01-01T10:00:00Z", lastStatus: "sent", lastMessageType: "conversation", contactPushName: "M", unreadCount: 0, assignedUserId: 42, assignmentStatus: "open" },
+    ]);
+
+    const myUserId = 42;
+    expect(store.getSorted().filter(c => c.assignedUserId === myUserId)).toHaveLength(1);
+
+    store.handleOwnershipChange({
+      sessionId: "s1",
+      remoteJid: "mine@s.whatsapp.net",
+      assignedUserId: null,
+      assignmentStatus: "resolved",
+      queuedAt: null,
+    });
+
+    expect(store.getSorted().filter(c => c.assignedUserId === myUserId)).toHaveLength(0);
+    expect(store.getSorted().filter(c => c.assignmentStatus === "resolved")).toHaveLength(1);
+  });
+});
+
+describe("removeConversation", () => {
+  it("should remove a conversation from the store", () => {
+    const store = createStore();
+    store.hydrate([
+      { remoteJid: "jid1@s.whatsapp.net", sessionId: "s1", lastMessage: "A", lastFromMe: false, lastTimestamp: "2024-01-01T10:00:00Z", lastStatus: "received", lastMessageType: "conversation", contactPushName: "A", unreadCount: 0 },
+      { remoteJid: "jid2@s.whatsapp.net", sessionId: "s1", lastMessage: "B", lastFromMe: false, lastTimestamp: "2024-01-01T09:00:00Z", lastStatus: "received", lastMessageType: "conversation", contactPushName: "B", unreadCount: 0 },
+    ]);
+
+    expect(store.size).toBe(2);
+    const result = store.removeConversation("s1:jid1@s.whatsapp.net");
+    expect(result).toBe(true);
+    expect(store.size).toBe(1);
+    expect(store.getConversation("s1:jid1@s.whatsapp.net")).toBeUndefined();
+    expect(store.getSorted()[0].remoteJid).toBe("jid2@s.whatsapp.net");
+  });
+
+  it("should return false for non-existent key", () => {
+    const store = createStore();
+    store.hydrate([]);
+    expect(store.removeConversation("nonexistent")).toBe(false);
   });
 });

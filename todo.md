@@ -3844,3 +3844,17 @@
 - [x] PART 4: Database repair — 51,620 messages backfilled with waConversationId; 6 stale [Template] conversations fixed
 - [x] PART 5: Socket/frontend cache — handleMessage + handleConversationPreview already handle template→real transitions
 - [x] PART 6: Validation — 60 vitest tests passing (6 new for template→real transitions)
+
+## Fix Realtime Inbox State for Queue Transfers + Perfect Preview Sync
+- [x] PART 1: Single frontend source of truth — convStore.getSorted() + filter by assignedUserId/assignmentStatus
+- [x] PART 2: Instant queue/ownership movement — handleOwnershipChange() with upsert support
+- [x] PART 3: Optimistic cache update — claimMutation.onMutate adds to convStore instantly
+- [x] PART 4: Perfect preview source of truth — propagateLatestMessageToConversation() with sessionId+remoteJid fallback
+- [x] PART 5: Status monotonicity — CASE WHEN statusOrder in server + statusOrder check in frontend store
+- [x] PART 6: Only latest message controls preview — propagate function finds TRUE latest by timestamp DESC
+- [x] PART 7: Latest message determinism — ORDER BY timestamp DESC, createdAt DESC, id DESC
+- [x] PART 8: Socket payload complete — whatsapp:conversation:ownership event with getConversationSnapshot()
+- [x] PART 9: Frontend cache update — handleOwnershipChange + handleConversationPreview + immutable Map updates
+- [x] PART 10: Database repair — 3630 conversations rebuilt, 0 stale fromMe statuses, 583 null preview (no messages)
+- [x] PART 11: Vitest tests — 71 tests passing (11 new for queue movement, ownership, derived views, removeConversation)
+- [x] PART 12: Manual verification — TypeScript clean, all tests passing

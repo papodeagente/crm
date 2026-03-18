@@ -129,6 +129,8 @@ import {
   acquireConversationLock,
   releaseConversationLock,
   getConversationLock,
+  // Conversation snapshot for socket events
+  getConversationSnapshot,
 } from "./db";
 import { storagePut } from "./storage";
 import { nanoid } from "nanoid";
@@ -731,6 +733,12 @@ export const appRouter = router({
       }))
       .mutation(async ({ input }) => {
         const result = await assignConversation(input.tenantId, input.sessionId, input.remoteJid, input.assignedUserId, input.assignedTeamId);
+        // Emit ownership change socket event
+        const snapshot = await getConversationSnapshot(input.sessionId, input.remoteJid, input.tenantId);
+        if (snapshot) {
+          const io = getIo();
+          if (io) io.emit("whatsapp:conversation:ownership", snapshot);
+        }
         return result;
       }),
     // Transfer conversation to another agent
@@ -744,6 +752,12 @@ export const appRouter = router({
       }))
       .mutation(async ({ input }) => {
         const result = await assignConversation(input.tenantId, input.sessionId, input.remoteJid, input.toUserId, input.toTeamId);
+        // Emit ownership change socket event
+        const snapshot = await getConversationSnapshot(input.sessionId, input.remoteJid, input.tenantId);
+        if (snapshot) {
+          const io = getIo();
+          if (io) io.emit("whatsapp:conversation:ownership", snapshot);
+        }
         return result;
       }),
     // Update conversation assignment status
@@ -768,6 +782,12 @@ export const appRouter = router({
       .mutation(async ({ input, ctx }) => {
         const userId = (ctx as any).user?.saasUser?.userId || (ctx as any).user?.id || 0;
         await finishAttendance(input.tenantId, input.sessionId, input.remoteJid, userId);
+        // Emit ownership change socket event
+        const snapshot = await getConversationSnapshot(input.sessionId, input.remoteJid, input.tenantId);
+        if (snapshot) {
+          const io = getIo();
+          if (io) io.emit("whatsapp:conversation:ownership", snapshot);
+        }
         return { success: true };
       }),
     // Get assignment for a specific conversation
@@ -1435,13 +1455,26 @@ export const appRouter = router({
       .mutation(async ({ ctx, input }) => {
         const tenantId = ctx.saasUser?.tenantId || 1;
         const userId = ctx.saasUser?.userId || ctx.user.id;
-        return claimConversation(tenantId, input.sessionId, input.remoteJid, userId);
+        const result = await claimConversation(tenantId, input.sessionId, input.remoteJid, userId);
+        // Emit ownership change socket event
+        const snapshot = await getConversationSnapshot(input.sessionId, input.remoteJid, tenantId);
+        if (snapshot) {
+          const io = getIo();
+          if (io) io.emit("whatsapp:conversation:ownership", snapshot);
+        }
+        return result;
       }),
     enqueue: sessionProtectedProcedure
       .input(z.object({ sessionId: z.string(), remoteJid: z.string() }))
       .mutation(async ({ ctx, input }) => {
         const tenantId = ctx.saasUser?.tenantId || 1;
         await enqueueConversation(tenantId, input.sessionId, input.remoteJid);
+        // Emit ownership change socket event
+        const snapshot = await getConversationSnapshot(input.sessionId, input.remoteJid, tenantId);
+        if (snapshot) {
+          const io = getIo();
+          if (io) io.emit("whatsapp:conversation:ownership", snapshot);
+        }
         return { success: true };
       }),
     stats: sessionProtectedProcedure
@@ -1501,7 +1534,14 @@ export const appRouter = router({
       }))
       .mutation(async ({ ctx, input }) => {
         const tenantId = ctx.saasUser?.tenantId || 1;
-        return assignConversation(tenantId, input.sessionId, input.remoteJid, input.agentId);
+        const result = await assignConversation(tenantId, input.sessionId, input.remoteJid, input.agentId);
+        // Emit ownership change socket event
+        const snapshot = await getConversationSnapshot(input.sessionId, input.remoteJid, tenantId);
+        if (snapshot) {
+          const io = getIo();
+          if (io) io.emit("whatsapp:conversation:ownership", snapshot);
+        }
+        return result;
       }),
     // Return a conversation from an agent back to the queue
     returnToQueue: sessionProtectedProcedure
@@ -1512,6 +1552,12 @@ export const appRouter = router({
       .mutation(async ({ ctx, input }) => {
         const tenantId = ctx.saasUser?.tenantId || 1;
         await enqueueConversation(tenantId, input.sessionId, input.remoteJid);
+        // Emit ownership change socket event
+        const snapshot = await getConversationSnapshot(input.sessionId, input.remoteJid, tenantId);
+        if (snapshot) {
+          const io = getIo();
+          if (io) io.emit("whatsapp:conversation:ownership", snapshot);
+        }
         return { success: true };
       }),
     }),
