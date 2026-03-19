@@ -3917,3 +3917,46 @@
 - [x] Frontend cache enforcement — immutable updates, no refresh required
 - [x] DB repair scripts for preview, reactions, replies
 - [x] Comprehensive tests for all 3 bugs
+
+## REBUILD: Inbox idêntico ao WhatsApp Web
+- [x] Analisar referência visual do WhatsApp Web (cores, layout, tipografia, espaçamentos)
+- [x] Auditar código atual do inbox (Inbox.tsx, WhatsAppChat.tsx, MessageBubble.tsx, store)
+- [x] Redesign sidebar: lista de conversas idêntica ao WhatsApp Web
+  - [x] Avatar circular com foto do contato
+  - [x] Nome do contato em negrito
+  - [x] Preview da última mensagem com ícones de tipo (câmera, microfone, documento)
+  - [x] Timestamp relativo (ontem, 10:30, etc.)
+  - [x] Badge de não lidas (círculo verde com número)
+  - [x] Status ticks na preview (✓, ✓✓, ✓✓ azul)
+  - [x] Hover state sutil
+  - [x] Barra de busca no topo
+  - [x] Filtros (Todas, Não lidas, Grupos)
+- [x] Redesign chat area: bolhas de mensagem idênticas ao WhatsApp Web
+  - [x] Bolhas com cantos arredondados e "tail" (pontinha)
+  - [x] Cores corretas: #d9fdd3 (enviada), #ffffff (recebida) no light mode
+  - [x] Timestamp dentro da bolha (canto inferior direito)
+  - [x] Status ticks dentro da bolha
+  - [x] Fundo com padrão do WhatsApp (doodle pattern)
+  - [x] Header do chat com avatar, nome, status online
+  - [x] Input bar com ícones (emoji, anexo, microfone)
+  - [x] Separadores de data entre mensagens
+  - [x] Scroll to bottom button
+  - [x] Typing indicator
+- [x] Redesign media messages
+  - [x] Imagens com cantos arredondados e preview inline
+  - [x] Áudio com player estilo WhatsApp (waveform, duração, play/pause)
+  - [x] Vídeo com thumbnail e play button
+  - [x] Documentos com ícone e nome do arquivo
+  - [x] Stickers sem bolha (fundo transparente)
+- [x] Fix realtime sync
+  - [x] Sidebar preview atualiza instantaneamente com nova mensagem
+  - [x] Status ticks sincronizados entre sidebar e chat
+  - [x] Reordenação instantânea da sidebar ao receber mensagem
+  - [x] Zero flickering ou delays visíveis
+  - [x] Contagem de não lidas atualiza em tempo real
+- [x] Performance
+  - [x] Virtualização da lista de mensagens
+  - [x] Lazy loading de mídia
+  - [x] Transições suaves sem jank
+  - [x] Skeleton loading enquanto carrega
+- [x] Testes abrangentes para o novo inbox (55 testes novos, 2154 total passando)

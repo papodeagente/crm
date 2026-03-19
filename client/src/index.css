@@ -53,6 +53,12 @@
   --color-wa-tint: var(--wa-tint);
   --color-wa-divider: var(--wa-divider);
   --color-wa-input-bg: var(--wa-input-bg);
+  --color-wa-tick-read: var(--wa-tick-read);
+  --color-wa-text-primary: var(--wa-text-primary);
+  --color-wa-text-secondary: var(--wa-text-secondary);
+  --color-wa-date-pill: var(--wa-date-pill);
+  --color-wa-date-pill-text: var(--wa-date-pill-text);
+  --color-wa-chat-compose-bg: var(--wa-chat-compose-bg);
   /* ENTUR Brand Colors */
   --color-entur-bg: #06091A;
   --color-entur-roxo: #600FED;
@@ -110,19 +116,28 @@
   --sidebar-border: oklch(0.88 0.006 250);
   --sidebar-ring: oklch(0.55 0.22 290);
 
-  /* WhatsApp Inbox — Light */
-  --wa-panel: oklch(1.0 0 0);
-  --wa-panel-header: oklch(0.96 0.003 250);
-  --wa-search-bg: oklch(0.955 0.005 250);
-  --wa-chat-bg: oklch(0.93 0.008 80);
-  --wa-bubble-out: oklch(0.90 0.04 155);
-  --wa-bubble-in: oklch(1.0 0 0);
-  --wa-active: oklch(0.945 0.015 290);
-  --wa-hover: oklch(0.96 0.005 250);
-  --wa-unread: oklch(0.55 0.18 155);
-  --wa-tint: oklch(0.55 0.18 155);
-  --wa-divider: oklch(0.92 0.003 250);
-  --wa-input-bg: oklch(1.0 0 0);
+  /* WhatsApp Inbox — Light (WhatsApp Web exact) */
+  --wa-panel: #ffffff;
+  --wa-panel-header: #f0f2f5;
+  --wa-search-bg: #f0f2f5;
+  --wa-chat-bg: #efeae2;
+  --wa-bubble-out: #d9fdd3;
+  --wa-bubble-in: #ffffff;
+  --wa-active: #f0f2f5;
+  --wa-hover: #f5f6f6;
+  --wa-unread: #25d366;
+  --wa-tint: #00a884;
+  --wa-divider: #e9edef;
+  --wa-input-bg: #ffffff;
+  --wa-tick-read: #53bdeb;
+  --wa-text-primary: #111b21;
+  --wa-text-secondary: #667781;
+  --wa-doodle-opacity: 0.04;
+  --wa-date-pill: #ffffff;
+  --wa-date-pill-text: #54656f;
+  --wa-msg-shadow: rgba(0,0,0,0.06);
+  --wa-chat-compose-bg: #f0f2f5;
+  --wa-doodle-url: url('https://d2xsxph8kpxj0f.cloudfront.net/310519663249817763/EKvcVicuVoUxTnzjSKzgdk/wa-bg-light_474b376c.png');
 }
 
 /* ─── ENTUR OS — Dark Theme (Brand Colors) ─── */
@@ -170,19 +185,28 @@
   --sidebar-border: #1A1F45;
   --sidebar-ring: #600FED;
 
-  /* WhatsApp Inbox — Dark */
-  --wa-panel: #0D1129;
-  --wa-panel-header: #111535;
-  --wa-search-bg: #0A0E24;
-  --wa-chat-bg: #06091A;
-  --wa-bubble-out: #1A2E1E;
-  --wa-bubble-in: #121736;
-  --wa-active: #1A1F45;
-  --wa-hover: #111535;
-  --wa-unread: #C4ED0F;
-  --wa-tint: #C4ED0F;
-  --wa-divider: #1A1F45;
-  --wa-input-bg: #111535;
+  /* WhatsApp Inbox — Dark (WhatsApp Web exact) */
+  --wa-panel: #111b21;
+  --wa-panel-header: #202c33;
+  --wa-search-bg: #202c33;
+  --wa-chat-bg: #0b141a;
+  --wa-bubble-out: #005c4b;
+  --wa-bubble-in: #202c33;
+  --wa-active: #2a3942;
+  --wa-hover: #202c33;
+  --wa-unread: #00a884;
+  --wa-tint: #00a884;
+  --wa-divider: #222d34;
+  --wa-input-bg: #2a3942;
+  --wa-tick-read: #53bdeb;
+  --wa-text-primary: #e9edef;
+  --wa-text-secondary: #8696a0;
+  --wa-doodle-opacity: 0.06;
+  --wa-date-pill: #182229;
+  --wa-date-pill-text: #8696a0;
+  --wa-msg-shadow: rgba(0,0,0,0.13);
+  --wa-chat-compose-bg: #202c33;
+  --wa-doodle-url: url('https://d2xsxph8kpxj0f.cloudfront.net/310519663249817763/EKvcVicuVoUxTnzjSKzgdk/wa-bg-light_474b376c.png');
 }
 
 @layer base {

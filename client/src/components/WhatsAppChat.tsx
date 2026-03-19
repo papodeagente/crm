@@ -676,9 +676,13 @@ const MessageBubble = memo(({
     if (!quotedMsg) return null;
     const quotedContent = quotedMsg.content || (quotedMsg.mediaUrl ? "[Mídia]" : "");
     return (
-      <div className="bg-foreground/5 border-l-4 border-wa-tint rounded-md px-2.5 py-1.5 mb-1 -mx-0.5 cursor-pointer hover:bg-foreground/8 transition-colors">
-        <p className="text-[11px] font-semibold text-wa-tint">{quotedMsg.fromMe ? "Você" : "Contato"}</p>
-        <p className="text-[12px] text-muted-foreground truncate max-w-[250px]">{quotedContent}</p>
+      <div className="rounded-[7.5px] mb-[3px] -mx-[1px] cursor-pointer overflow-hidden" style={{
+        backgroundColor: fromMe ? 'rgba(0,0,0,0.06)' : 'rgba(0,0,0,0.06)',
+        borderLeft: '4px solid var(--wa-tint)',
+        padding: '5px 12px 7px 8px',
+      }}>
+        <p className="text-[12.5px] font-medium" style={{ color: 'var(--wa-tint)' }}>{quotedMsg.fromMe ? "Você" : "Contato"}</p>
+        <p className="text-[12.5px] truncate max-w-[300px]" style={{ color: 'var(--wa-text-secondary)' }}>{quotedContent}</p>
       </div>
     );
   };
@@ -786,14 +790,15 @@ const MessageBubble = memo(({
   })();
 
   return (
-    <div className={`group flex ${fromMe ? "justify-end" : "justify-start"} px-[63px] mb-[2px] ${isFirst ? "mt-[12px]" : ""}`}>
+    <div className={`group flex ${fromMe ? "justify-end" : "justify-start"} px-[63px] mb-[2px] ${isFirst ? "mt-[2px]" : ""}`}>
       <div className="relative max-w-[65%]">
-        {/* Hover action button */}
+        {/* Hover dropdown arrow (WhatsApp Web style) */}
         <button
           onClick={() => setShowMenu(!showMenu)}
-          className={`absolute top-1 ${fromMe ? "left-0 -translate-x-full -ml-1" : "right-0 translate-x-full ml-1"} w-7 h-7 rounded-full bg-card/80 shadow border border-border flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10 hover:bg-card`}
+          className={`absolute top-[2px] ${fromMe ? "right-[4px]" : "right-[4px]"} w-[24px] h-[24px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10 rounded-full`}
+          style={{ background: fromMe ? 'linear-gradient(135deg, transparent 30%, var(--wa-bubble-out))' : 'linear-gradient(135deg, transparent 30%, var(--wa-bubble-in))' }}
         >
-          <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />
+          <ChevronDown className="w-[18px] h-[18px]" style={{ color: 'var(--wa-text-secondary)' }} />
         </button>
 
         {/* Context menu */}
@@ -829,15 +834,15 @@ const MessageBubble = memo(({
           />
         )}
 
-        <div className={`relative px-[9px] pt-[6px] pb-[8px] shadow-sm ${bubbleBase} ${bubbleRadius}`} style={{ minWidth: "80px" }}>
+        <div className={`relative px-[9px] pt-[6px] pb-[8px] ${bubbleBase} ${bubbleRadius}`} style={{ minWidth: "80px", boxShadow: '0 1px 0.5px var(--wa-msg-shadow)' }}>
           {/* Tail SVG */}
           {isFirst && (
-            <div className={`absolute top-0 w-[8px] h-[13px] ${fromMe ? "-right-[8px]" : "-left-[8px]"}`}>
+            <div className={`absolute top-0 ${fromMe ? "-right-[8px]" : "-left-[8px]"}`} style={{ width: 8, height: 13 }}>
               <svg viewBox="0 0 8 13" width="8" height="13">
                 {fromMe ? (
-                  <path className="fill-wa-bubble-out" d="M5.188 1H0v11.193l6.467-8.625C7.526 2.156 6.958 1 5.188 1z" />
+                  <path fill="var(--wa-bubble-out)" d="M5.188 1H0v11.193l6.467-8.625C7.526 2.156 6.958 1 5.188 1z" />
                 ) : (
-                  <path className="fill-wa-bubble-in" d="M2.812 1H8v11.193L1.533 3.568C.474 2.156 1.042 1 2.812 1z" />
+                  <path fill="var(--wa-bubble-in)" d="M2.812 1H8v11.193L1.533 3.568C.474 2.156 1.042 1 2.812 1z" />
                 )}
               </svg>
             </div>
@@ -908,18 +913,17 @@ const MessageBubble = memo(({
             <span className="text-[14.2px] leading-[19px] whitespace-pre-wrap break-words">{formatWhatsAppText(textContent)}</span>
           )}
 
-          {/* Time + Status */}
-          <span className="float-right ml-2 mt-[3px] flex items-center gap-0.5 relative -bottom-0.5">
-            <span className="text-[11px] text-muted-foreground/70 leading-none tabular-nums">{time}</span>
+          {/* Time + Status (WhatsApp Web style) */}
+          <span className="float-right ml-[4px] mt-[3px] flex items-center gap-[3px] relative -bottom-[1px]">
+            <span className="text-[11px] leading-none tabular-nums" style={{ color: fromMe ? 'rgba(0,0,0,0.45)' : 'var(--wa-text-secondary)', fontSize: '11px' }}>{time}</span>
             <MessageStatus status={msg.status} isFromMe={fromMe} />
           </span>
         </div>
 
-        {/* Reactions */}
+        {/* Reactions (WhatsApp Web style) */}
         {reactions && reactions.length > 0 && (
-          <div className={`flex flex-wrap gap-1 mt-[-4px] mb-1 ${fromMe ? 'justify-end' : 'justify-start'}`}>
+          <div className={`flex flex-wrap gap-[2px] mt-[-6px] mb-[2px] relative z-[1] ${fromMe ? 'justify-end' : 'justify-start'}`}>
             {(() => {
-              // Group reactions by emoji
               const grouped = reactions.reduce<Record<string, { count: number; fromMe: boolean }>>((acc, r) => {
                 if (!acc[r.emoji]) acc[r.emoji] = { count: 0, fromMe: false };
                 acc[r.emoji].count++;
@@ -929,15 +933,17 @@ const MessageBubble = memo(({
               return Object.entries(grouped).map(([emoji, info]) => (
                 <span
                   key={emoji}
-                  className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs border ${
-                    info.fromMe
-                      ? 'bg-blue-50 border-blue-200 dark:bg-blue-900/30 dark:border-blue-700'
-                      : 'bg-muted/50 border-border'
-                  }`}
-                  title={info.fromMe ? 'Você reagiu' : ''}
+                  className="inline-flex items-center gap-[2px] rounded-full text-xs cursor-pointer"
+                  style={{
+                    padding: '1px 6px',
+                    backgroundColor: 'var(--wa-panel)',
+                    boxShadow: '0 1px 3px var(--wa-msg-shadow)',
+                    border: info.fromMe ? '1px solid var(--wa-tint)' : '1px solid transparent',
+                  }}
+                  title={info.fromMe ? 'Voc\u00ea reagiu' : ''}
                 >
-                  <span className="text-sm">{emoji}</span>
-                  {info.count > 1 && <span className="text-[10px] text-muted-foreground">{info.count}</span>}
+                  <span className="text-[16px] leading-[22px]">{emoji}</span>
+                  {info.count > 1 && <span className="text-[11px]" style={{ color: 'var(--wa-text-secondary)' }}>{info.count}</span>}
                 </span>
               ));
             })()}
@@ -952,7 +958,11 @@ MessageBubble.displayName = "MessageBubble";
 /* ─── Date Separator ─── */
 const DateSeparator = memo(({ date }: { date: string }) => (
   <div className="flex justify-center my-[12px]">
-    <span className="bg-wa-bubble-in text-muted-foreground text-[12.5px] px-3 py-[5px] rounded-[7.5px] shadow-sm font-medium">
+    <span className="text-[12.5px] px-[12px] py-[5px] rounded-[7.5px] font-normal uppercase tracking-[0.3px]" style={{
+      backgroundColor: 'var(--wa-date-pill)',
+      color: 'var(--wa-date-pill-text)',
+      boxShadow: '0 1px 0.5px var(--wa-msg-shadow)',
+    }}>
       {date}
     </span>
   </div>
@@ -2070,23 +2080,23 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
 
   return (
     <div className="flex flex-col h-full overflow-hidden relative">
-      {/* ─── Header ─── */}
-      <div className="flex items-center gap-3 px-4 h-[59px] shrink-0 bg-wa-panel-header border-b border-wa-divider z-10">
-        <div className="w-[40px] h-[40px] rounded-full bg-muted shrink-0 overflow-hidden">
+      {/* ─── Header (WhatsApp Web style) ─── */}
+      <div className="flex items-center gap-[15px] px-[16px] h-[59px] shrink-0 z-10" style={{ backgroundColor: 'var(--wa-panel-header)', borderBottom: '1px solid var(--wa-divider)' }}>
+        <div className="w-[40px] h-[40px] rounded-full shrink-0 overflow-hidden cursor-pointer">
           {contact?.avatarUrl ? (
             <img src={contact.avatarUrl} alt="" className="w-full h-full object-cover" />
           ) : (
             <svg viewBox="0 0 212 212" width="40" height="40">
-              <path className="fill-muted" d="M106 0C47.5 0 0 47.5 0 106s47.5 106 106 106 106-47.5 106-106S164.5 0 106 0z" />
-              <path className="fill-muted-foreground/30" d="M106 45c-20.7 0-37.5 16.8-37.5 37.5S85.3 120 106 120s37.5-16.8 37.5-37.5S126.7 45 106 45zm0 105c-28.3 0-52.5 14.3-52.5 32v10h105v-10c0-17.7-24.2-32-52.5-32z" />
+              <path fill="var(--wa-search-bg)" d="M106 0C47.5 0 0 47.5 0 106s47.5 106 106 106 106-47.5 106-106S164.5 0 106 0z" />
+              <path fill="var(--wa-text-secondary)" opacity="0.3" d="M106 45c-20.7 0-37.5 16.8-37.5 37.5S85.3 120 106 120s37.5-16.8 37.5-37.5S126.7 45 106 45zm0 105c-28.3 0-52.5 14.3-52.5 32v10h105v-10c0-17.7-24.2-32-52.5-32z" />
             </svg>
           )}
         </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-[16px] font-medium text-foreground truncate leading-[21px]">{contact?.name || "Contato"}</p>
-          <p className="text-[13px] text-muted-foreground truncate leading-[18px]">{contact?.phone || ""}</p>
+        <div className="flex-1 min-w-0 cursor-pointer">
+          <p className="text-[16px] font-normal truncate leading-[21px]" style={{ color: 'var(--wa-text-primary)' }}>{contact?.name || "Contato"}</p>
+          <p className="text-[13px] truncate leading-[20px]" style={{ color: 'var(--wa-text-secondary)' }}>{contact?.phone || ""}</p>
         </div>
-        <div className="flex items-center gap-0.5">
+        <div className="flex items-center gap-[2px]">
           {/* Assignment badge */}
           {assignment && (
             <div className="relative">
@@ -2187,8 +2197,8 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
           {onCreateDeal && (
             <InstantTooltip label="Criar negociação">
               <button onClick={onCreateDeal}
-                className="w-[34px] h-[34px] flex items-center justify-center hover:bg-wa-hover rounded-full transition-colors">
-                <Briefcase className="w-[18px] h-[18px] text-muted-foreground" />
+                className="w-[40px] h-[40px] flex items-center justify-center hover:bg-[var(--wa-hover)] rounded-full transition-colors">
+                <Briefcase className="w-[20px] h-[20px]" style={{ color: 'var(--wa-text-secondary)' }} />
               </button>
             </InstantTooltip>
           )}
@@ -2197,9 +2207,9 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
             <InstantTooltip label="Transferir conversa">
               <button
                 onClick={() => setShowTransfer(true)}
-                className="w-[34px] h-[34px] flex items-center justify-center hover:bg-wa-hover rounded-full transition-colors text-muted-foreground"
+                className="w-[40px] h-[40px] flex items-center justify-center hover:bg-[var(--wa-hover)] rounded-full transition-colors"
               >
-                <ArrowRightLeft className="w-[18px] h-[18px]" />
+                <ArrowRightLeft className="w-[20px] h-[20px]" style={{ color: 'var(--wa-text-secondary)' }} />
               </button>
             </InstantTooltip>
           )}
@@ -2207,21 +2217,21 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
           <InstantTooltip label="Timeline de eventos">
             <button
               onClick={() => setShowTimeline(!showTimeline)}
-              className={`w-[34px] h-[34px] flex items-center justify-center rounded-full transition-colors ${
-                showTimeline ? "bg-blue-500/15 text-blue-500" : "hover:bg-wa-hover text-muted-foreground"
+              className={`w-[40px] h-[40px] flex items-center justify-center rounded-full transition-colors ${
+                showTimeline ? "bg-[var(--wa-tint)]/15 text-[var(--wa-tint)]" : "hover:bg-[var(--wa-hover)]"
               }`}
             >
-              <History className="w-[18px] h-[18px]" />
+              <History className="w-[20px] h-[20px]" style={showTimeline ? { color: 'var(--wa-tint)' } : { color: 'var(--wa-text-secondary)' }} />
             </button>
           </InstantTooltip>
           <InstantTooltip label="Buscar na conversa">
-            <button className="w-[34px] h-[34px] flex items-center justify-center hover:bg-wa-hover rounded-full transition-colors">
-              <Search className="w-[18px] h-[18px] text-muted-foreground" />
+            <button className="w-[40px] h-[40px] flex items-center justify-center hover:bg-[var(--wa-hover)] rounded-full transition-colors">
+              <Search className="w-[20px] h-[20px]" style={{ color: 'var(--wa-text-secondary)' }} />
             </button>
           </InstantTooltip>
           <InstantTooltip label="Menu">
-            <button className="w-[34px] h-[34px] flex items-center justify-center hover:bg-wa-hover rounded-full transition-colors">
-              <ChevronDown className="w-[18px] h-[18px] text-muted-foreground" />
+            <button className="w-[40px] h-[40px] flex items-center justify-center hover:bg-[var(--wa-hover)] rounded-full transition-colors">
+              <ChevronDown className="w-[20px] h-[20px]" style={{ color: 'var(--wa-text-secondary)' }} />
             </button>
           </InstantTooltip>
         </div>
@@ -2255,10 +2265,12 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
       )}
 
       {/* ─── Messages Area ─── */}
-      <div ref={scrollContainerRef} data-chat-scroll className="flex-1 overflow-y-auto relative scrollbar-thin bg-wa-chat-bg" style={{ scrollBehavior: "smooth" }}>
-        {/* WhatsApp doodle pattern */}
-        <div className="absolute inset-0 opacity-[0.04] pointer-events-none" style={{
-          backgroundImage: `url("data:image/svg+xml,%3Csvg width='300' height='300' xmlns='http://www.w3.org/2000/svg'%3E%3Cdefs%3E%3Cpattern id='p' width='60' height='60' patternUnits='userSpaceOnUse'%3E%3Cpath d='M30 10 L35 20 L25 20Z M10 40 L15 50 L5 50Z M50 35 L55 45 L45 45Z' fill='%23888' opacity='0.3'/%3E%3Ccircle cx='45' cy='15' r='3' fill='%23888' opacity='0.2'/%3E%3Ccircle cx='15' cy='30' r='2' fill='%23888' opacity='0.2'/%3E%3C/pattern%3E%3C/defs%3E%3Crect width='300' height='300' fill='url(%23p)'/%3E%3C/svg%3E")`,
+      <div ref={scrollContainerRef} data-chat-scroll className="flex-1 overflow-y-auto relative scrollbar-thin" style={{ scrollBehavior: "smooth", backgroundColor: 'var(--wa-chat-bg)' }}>
+        {/* WhatsApp doodle background */}
+        <div className="absolute inset-0 pointer-events-none" style={{
+          backgroundImage: 'var(--wa-doodle-url)',
+          backgroundRepeat: 'repeat',
+          opacity: 'var(--wa-doodle-opacity)',
         }} />
 
         <div className="relative z-[1] py-2">
@@ -2459,16 +2471,19 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
         )}
       </div>
 
-      {/* ─── Reply Preview ─── */}
+      {/* ─── Reply Bar (WhatsApp Web style) ─── */}
       {replyTarget && (
-        <div className="bg-wa-panel-header border-t border-wa-divider px-4 py-2 flex items-center gap-3 z-10 shrink-0">
-          <div className="flex-1 bg-foreground/5 border-l-4 border-wa-tint rounded-md px-3 py-2">
-            <p className="text-[11px] font-semibold text-wa-tint">{replyTarget.fromMe ? "Você" : contact?.name || "Contato"}</p>
-            <p className="text-[12px] text-muted-foreground truncate">{replyTarget.content}</p>
+        <div className="px-[16px] py-[5px] z-10 shrink-0" style={{ backgroundColor: 'var(--wa-chat-compose-bg)' }}>
+          <div className="rounded-[8px] overflow-hidden flex items-stretch" style={{ backgroundColor: 'var(--wa-input-bg)' }}>
+            <div style={{ width: 4, backgroundColor: 'var(--wa-tint)', flexShrink: 0 }} />
+            <div className="flex-1 px-[12px] py-[7px] min-w-0">
+              <p className="text-[12.5px] font-medium" style={{ color: 'var(--wa-tint)' }}>{replyTarget.fromMe ? "Voc\u00ea" : contact?.name || "Contato"}</p>
+              <p className="text-[13px] truncate" style={{ color: 'var(--wa-text-secondary)' }}>{replyTarget.content}</p>
+            </div>
+            <button onClick={() => setReplyTarget(null)} className="px-[12px] flex items-center justify-center hover:opacity-70 transition-opacity">
+              <X className="w-[20px] h-[20px]" style={{ color: 'var(--wa-text-secondary)' }} />
+            </button>
           </div>
-          <button onClick={() => setReplyTarget(null)} className="p-1 hover:bg-muted rounded-full transition-colors">
-            <X className="w-4 h-4 text-muted-foreground" />
-          </button>
         </div>
       )}
 
@@ -2537,8 +2552,8 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
         </div>
       )}
 
-      {/* ─── Input Area ─── */}
-      <div className={`border-t px-3 py-[5px] z-10 shrink-0 transition-colors ${isNoteMode ? "bg-amber-50 border-amber-300" : "bg-wa-panel-header border-wa-divider"}`}>
+      {/* ─── Input Area (WhatsApp Web style) ─── */}
+      <div className={`px-[10px] py-[5px] z-10 shrink-0 transition-colors ${isNoteMode ? "bg-amber-50" : ""}`} style={isNoteMode ? {} : { backgroundColor: 'var(--wa-chat-compose-bg)' }}>
         {isRecording ? (
           <VoiceRecorder onSend={handleVoiceSend} onCancel={() => setIsRecording(false)} />
         ) : (
@@ -2547,11 +2562,10 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
             <InstantTooltip label={isNoteMode ? "Voltar para mensagem" : "Nota interna (só equipe vê)"} side="top">
               <button
                 onClick={() => setIsNoteMode(!isNoteMode)}
-                className={`w-[42px] h-[42px] flex items-center justify-center rounded-full transition-all duration-200 shrink-0 self-end ${
-                  isNoteMode ? "bg-amber-400/30 text-amber-600" : "hover:bg-wa-hover text-muted-foreground"
-                }`}
+                className="w-[42px] h-[42px] flex items-center justify-center rounded-full transition-all duration-200 shrink-0 self-end"
+                style={{ color: isNoteMode ? '#d97706' : 'var(--wa-text-secondary)' }}
               >
-                <StickyNote className="w-[20px] h-[20px]" />
+                <StickyNote className="w-[22px] h-[22px]" />
               </button>
             </InstantTooltip>
 
@@ -2559,8 +2573,9 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
             <div className="relative shrink-0 self-end" ref={emojiPickerRef}>
               <InstantTooltip label="Emoji" side="top">
               <button onClick={() => { setShowEmojiPicker(!showEmojiPicker); if (!showEmojiPicker) setShowAttach(false); }}
-                className={`w-[42px] h-[42px] flex items-center justify-center rounded-full transition-all duration-200 ${showEmojiPicker ? "bg-wa-tint/15 text-wa-tint" : "hover:bg-wa-hover text-muted-foreground"}`}>
-                <Smile className="w-[22px] h-[22px]" />
+                className="w-[42px] h-[42px] flex items-center justify-center rounded-full transition-all duration-200"
+                style={{ color: showEmojiPicker ? 'var(--wa-tint)' : 'var(--wa-text-secondary)' }}>
+                <Smile className="w-[24px] h-[24px]" />
               </button>
               </InstantTooltip>
               {showEmojiPicker && (
@@ -2574,8 +2589,9 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
             <div className="relative shrink-0 self-end" ref={attachMenuRef}>
               <InstantTooltip label="Anexar arquivo" side="top">
               <button onClick={() => { setShowAttach(!showAttach); if (!showAttach) setShowEmojiPicker(false); }}
-                className={`w-[42px] h-[42px] flex items-center justify-center rounded-full transition-all duration-200 ${showAttach ? "bg-wa-tint/15 text-wa-tint" : "hover:bg-wa-hover text-muted-foreground"}`}>
-                <Paperclip className={`w-[22px] h-[22px] transition-transform duration-200 ${showAttach ? "rotate-[135deg]" : "rotate-45"}`} />
+                className="w-[42px] h-[42px] flex items-center justify-center rounded-full transition-all duration-200"
+                style={{ color: showAttach ? 'var(--wa-tint)' : 'var(--wa-text-secondary)' }}>
+                <Paperclip className={`w-[24px] h-[24px] transition-transform duration-200 ${showAttach ? "rotate-[135deg]" : "rotate-45"}`} />
               </button>
               </InstantTooltip>
               {showAttach && <AttachMenu onSelect={handleAttachSelect} onClose={() => setShowAttach(false)} />}
@@ -2586,11 +2602,10 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
               <InstantTooltip label="Sugestão IA" side="top">
                 <button
                   onClick={() => setShowAiSuggestion(prev => !prev)}
-                  className={`p-1.5 rounded-md transition-colors ${
-                    showAiSuggestion ? "bg-violet-500/20 text-violet-500" : "hover:bg-wa-hover text-muted-foreground"
-                  }`}
+                  className="w-[42px] h-[42px] flex items-center justify-center rounded-full transition-colors"
+                  style={{ color: showAiSuggestion ? '#8b5cf6' : 'var(--wa-text-secondary)' }}
                 >
-                  <Sparkles className="w-[20px] h-[20px]" />
+                  <Sparkles className="w-[22px] h-[22px]" />
                 </button>
               </InstantTooltip>
             </div>
@@ -2688,13 +2703,13 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
               )}
               <textarea
                 ref={textareaRef} value={messageText} onChange={handleTextareaChange}
-                placeholder={isNoteMode ? "Escreva uma nota interna (só a equipe vê)..." : "Mensagem (digite / para respostas rápidas)"} rows={1}
-                className={`w-full rounded-lg px-3 py-2.5 text-[15px] placeholder:text-muted-foreground outline-none resize-none leading-[20px] transition-colors ${
+                placeholder={isNoteMode ? "Escreva uma nota interna (só a equipe vê)..." : "Mensagem"} rows={1}
+                className={`w-full rounded-[8px] px-[12px] py-[9px] text-[15px] outline-none resize-none leading-[20px] transition-colors ${
                   isNoteMode
-                    ? "bg-amber-100 border-amber-300 text-amber-900 focus:border-amber-400"
-                    : "bg-wa-input-bg border-wa-divider text-foreground focus:border-wa-tint/50"
-                } border`}
-                style={{ height: "42px", maxHeight: "140px" }}
+                    ? "bg-amber-100 border-amber-300 text-amber-900 focus:border-amber-400 border placeholder:text-amber-600/50"
+                    : "border-none"
+                }`}
+                style={isNoteMode ? { height: "42px", maxHeight: "140px" } : { height: "42px", maxHeight: "140px", backgroundColor: 'var(--wa-input-bg)', color: 'var(--wa-text-primary)' }}
                 onKeyDown={(e) => {
                   if (e.key === "Escape" && showQuickReplies) { setShowQuickReplies(false); return; }
                   if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); if (showQuickReplies) { setShowQuickReplies(false); } else { handleSend(); } }
@@ -2702,12 +2717,11 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
               />
             </div>
 
-            {/* Send / Mic button */}
+            {/* Send / Mic button (WhatsApp Web style) */}
             {messageText.trim() ? (
               <button onClick={handleSend} disabled={sendMessage.isPending || sendTextWithQuote.isPending || isSending || createNoteMut.isPending}
-                className={`w-[42px] h-[42px] flex items-center justify-center hover:opacity-90 rounded-full transition-all shrink-0 self-end disabled:opacity-50 ${
-                  isNoteMode ? "bg-amber-500" : "bg-wa-tint"
-                }`}>
+                className="w-[42px] h-[42px] flex items-center justify-center rounded-full transition-all shrink-0 self-end disabled:opacity-50 hover:opacity-90"
+                style={{ backgroundColor: isNoteMode ? '#f59e0b' : 'var(--wa-tint)' }}>
                 {sendMessage.isPending || sendTextWithQuote.isPending || isSending || createNoteMut.isPending
                   ? <Loader2 className="w-5 h-5 text-white animate-spin" />
                   : isNoteMode
@@ -2716,8 +2730,8 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
               </button>
             ) : (
               <button onClick={() => { setIsRecording(true); sendPresenceMut.mutate({ sessionId, number: contact?.phone?.replace(/\D/g, "") || "", presence: "recording" }); }}
-                className="w-[42px] h-[42px] flex items-center justify-center hover:bg-wa-hover rounded-full transition-colors shrink-0 self-end">
-                <Mic className="w-[24px] h-[24px] text-muted-foreground" />
+                className="w-[42px] h-[42px] flex items-center justify-center hover:bg-[var(--wa-hover)] rounded-full transition-colors shrink-0 self-end">
+                <Mic className="w-[24px] h-[24px]" style={{ color: 'var(--wa-text-secondary)' }} />
               </button>
             )}
           </div>

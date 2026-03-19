@@ -135,12 +135,12 @@ function getMessagePreview(content: string | null, messageType: string | null): 
 const StatusTick = memo(({ status, fromMe }: { status: string | null; fromMe: boolean }) => {
   if (!fromMe) return null;
   switch (status) {
-    case "sending": return <Clock className="w-[14px] h-[14px] text-muted-foreground/40 shrink-0 animate-pulse" />;
-    case "pending": return <Clock className="w-[14px] h-[14px] text-muted-foreground/60 shrink-0" />;
-    case "sent": return <Check className="w-[15px] h-[15px] text-muted-foreground/60 shrink-0" />;
-    case "delivered": return <CheckCheck className="w-[15px] h-[15px] text-muted-foreground/60 shrink-0" />;
-    case "read": case "played": return <CheckCheck className="w-[15px] h-[15px] text-wa-tint shrink-0" />;
-    default: return <Check className="w-[15px] h-[15px] text-muted-foreground/60 shrink-0" />;
+    case "sending": return <Clock className="w-[16px] h-[16px] shrink-0 animate-pulse" style={{ color: 'var(--wa-text-secondary)' }} />;
+    case "pending": return <Clock className="w-[16px] h-[16px] shrink-0" style={{ color: 'var(--wa-text-secondary)' }} />;
+    case "sent": return <Check className="w-[16px] h-[16px] shrink-0" style={{ color: 'var(--wa-text-secondary)' }} />;
+    case "delivered": return <CheckCheck className="w-[16px] h-[16px] shrink-0" style={{ color: 'var(--wa-text-secondary)' }} />;
+    case "read": case "played": return <CheckCheck className="w-[16px] h-[16px] shrink-0" style={{ color: 'var(--wa-tick-read)' }} />;
+    default: return <Check className="w-[16px] h-[16px] shrink-0" style={{ color: 'var(--wa-text-secondary)' }} />;
   }
 });
 StatusTick.displayName = "StatusTick";
@@ -186,7 +186,7 @@ const WaAvatar = memo(({ name, size = 49, pictureUrl }: { name: string; size?: n
 
   if (pictureUrl && !imgError) {
     return (
-      <div className="rounded-full shrink-0 overflow-hidden ring-1 ring-white/10" style={{ width: size, height: size }}>
+      <div className="rounded-full shrink-0 overflow-hidden" style={{ width: size, height: size }}>
         <img
           src={pictureUrl}
           alt={name}
@@ -198,13 +198,13 @@ const WaAvatar = memo(({ name, size = 49, pictureUrl }: { name: string; size?: n
     );
   }
 
-  // Colored initials avatar
+  // WhatsApp Web default avatar — gray circle with white silhouette
   const gradient = getAvatarGradient(name);
   const initials = getInitials(name);
   return (
     <div
-      className={`rounded-full shrink-0 flex items-center justify-center bg-gradient-to-br ${gradient} ring-1 ring-white/10`}
-      style={{ width: size, height: size }}
+      className="rounded-full shrink-0 flex items-center justify-center"
+      style={{ width: size, height: size, background: `linear-gradient(135deg, ${gradient === 'from-violet-500 to-purple-600' ? '#7c3aed, #9333ea' : gradient === 'from-blue-500 to-cyan-500' ? '#3b82f6, #06b6d4' : gradient === 'from-emerald-500 to-teal-500' ? '#10b981, #14b8a6' : gradient === 'from-rose-500 to-pink-500' ? '#f43f5e, #ec4899' : gradient === 'from-amber-500 to-orange-500' ? '#f59e0b, #f97316' : '#6b7280, #9ca3af'})` }}
     >
       <span className="text-white font-semibold select-none leading-none" style={{ fontSize }}>
         {initials}
@@ -341,67 +341,69 @@ const ConversationItem = memo(({
   const unread = Number(conv.unreadCount) || 0;
   const preview = getMessagePreview(conv.lastMessage, conv.lastMessageType);
   const time = formatConversationTime(conv.lastTimestamp);
-  // "Aguardando resposta" timer: show when last message is NOT from me (client is waiting)
   const isWaitingResponse = showTimer && !fromMe && conv.lastTimestamp;
 
   return (
     <div
       onClick={onClick}
-      className={`group/conv flex items-center px-3 cursor-pointer transition-all duration-100 ${
+      className={`group/conv flex items-center cursor-pointer transition-colors duration-150 ${
         isActive
-          ? "bg-primary/8 border-l-2 border-l-primary"
-          : "hover:bg-wa-hover/70 border-l-2 border-l-transparent"
+          ? "bg-[var(--wa-active)]"
+          : "hover:bg-[var(--wa-hover)]"
       }`}
+      style={{ paddingLeft: 13, paddingRight: 15 }}
     >
-      <div className="py-2 pr-3 relative">
-        <WaAvatar name={contactName} size={46} pictureUrl={pictureUrl} />
-        {/* Assignment status dot */}
+      {/* Avatar */}
+      <div className="py-[10px] pr-[13px] relative shrink-0">
+        <WaAvatar name={contactName} size={49} pictureUrl={pictureUrl} />
         {conv.assignmentStatus && conv.assignmentStatus !== "open" && (
-          <div className="absolute bottom-2 right-2.5">
+          <div className="absolute bottom-[10px] right-[12px]">
             <StatusDot status={conv.assignmentStatus} />
           </div>
         )}
       </div>
-      <div className="flex-1 min-w-0 py-2.5 border-b border-wa-divider/50">
-        <div className="flex items-center justify-between mb-0.5 gap-1">
-          <span className={`text-[14px] truncate leading-5 flex-1 min-w-0 ${
-            unread > 0 ? "text-foreground font-semibold" : "text-foreground font-normal"
+      {/* Content */}
+      <div className="flex-1 min-w-0 py-[10px] border-b" style={{ borderColor: 'var(--wa-divider)' }}>
+        {/* Row 1: Name + Time */}
+        <div className="flex items-baseline justify-between gap-2">
+          <span className={`text-[17px] truncate flex-1 min-w-0 leading-[21px] ${
+            unread > 0 ? "text-[var(--wa-text-primary)] font-normal" : "text-[var(--wa-text-primary)] font-normal"
           }`}>
             {contactName}
           </span>
-          <div className="flex items-center gap-1.5 shrink-0">
-            <AgentBadge name={conv.assignedAgentName} avatarUrl={conv.assignedAgentAvatar} />
-            {/* Urgency timer for queue items */}
-            {waitLabel && !showTimer && (
-              <span className="text-[10px] text-amber-400 bg-amber-400/10 px-1.5 py-0.5 rounded-md font-medium flex items-center gap-0.5">
-                <Timer className="w-2.5 h-2.5" />
-                {waitLabel}
-              </span>
-            )}
-            <span className={`text-[11px] leading-[14px] ${
-              unread > 0 ? "text-primary font-semibold" : "text-muted-foreground/70"
-            }`}>
-              {time}
-            </span>
-          </div>
+          <span className={`text-[12px] leading-[14px] shrink-0 ${
+            unread > 0 ? "text-[var(--wa-unread)]" : "text-[var(--wa-text-secondary)]"
+          }`}>
+            {time}
+          </span>
         </div>
-        <div className="flex items-center gap-1">
+        {/* Row 2: Ticks + Preview + Badge */}
+        <div className="flex items-center gap-[3px] mt-[2px]">
           <StatusTick status={conv.lastStatus} fromMe={fromMe} />
-          <span className={`text-[13px] truncate flex-1 leading-5 ${
-            unread > 0 ? "text-foreground/70" : "text-muted-foreground/60"
+          <span className={`text-[14px] truncate flex-1 leading-[20px] ${
+            unread > 0 ? "text-[var(--wa-text-secondary)]" : "text-[var(--wa-text-secondary)]"
           }`}>
             {preview || "Sem mensagens"}
           </span>
-          {/* Waiting response timer — only when client sent last message */}
+          {/* Agent badge */}
+          <AgentBadge name={conv.assignedAgentName} avatarUrl={conv.assignedAgentAvatar} />
+          {/* Waiting response timer */}
           {isWaitingResponse && (
             <UrgencyTimer since={conv.lastTimestamp!} compact />
           )}
+          {/* Urgency timer for queue items */}
+          {waitLabel && !showTimer && (
+            <span className="text-[10px] text-amber-400 bg-amber-400/10 px-1.5 py-0.5 rounded-md font-medium flex items-center gap-0.5 shrink-0">
+              <Timer className="w-2.5 h-2.5" />
+              {waitLabel}
+            </span>
+          )}
           {unread > 0 && (
-            <span className="bg-primary text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1 shrink-0">
+            <span className="bg-[var(--wa-unread)] text-white text-[12px] font-medium rounded-full min-w-[20px] h-[20px] flex items-center justify-center px-[6px] shrink-0">
               {unread > 99 ? "99+" : unread}
             </span>
           )}
-          {/* Finish attendance button — visible on hover */}
+          {/* Finish attendance button */}
           {showFinish && onFinish && (
             <button
               onClick={(e) => { e.stopPropagation(); onFinish(); }}
@@ -883,25 +885,23 @@ function NewChatPanel({
 
 function EmptyChat() {
   return (
-    <div className="flex-1 flex flex-col items-center justify-center bg-wa-chat-bg">
-      <div className="text-center max-w-[420px] px-8">
-        <div className="mb-6">
-          <div className="w-20 h-20 mx-auto rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center shadow-lg shadow-primary/5">
-            <MessageSquare className="w-9 h-9 text-primary" />
-          </div>
+    <div className="flex-1 flex flex-col items-center justify-center" style={{ backgroundColor: 'var(--wa-search-bg)' }}>
+      <div className="text-center max-w-[500px] px-8">
+        <div className="w-[320px] h-[188px] mx-auto mb-[28px] rounded-full bg-[var(--wa-tint)]/5 flex items-center justify-center">
+          <MessageSquare className="w-16 h-16" style={{ color: 'var(--wa-tint)', opacity: 0.4 }} />
         </div>
-        <h1 className="text-2xl font-semibold text-foreground/90 leading-tight mb-2 tracking-tight">
-          Selecione uma conversa
+        <h1 className="text-[32px] font-light leading-tight mb-[14px]" style={{ color: 'var(--wa-text-primary)' }}>
+          Entur WhatsApp
         </h1>
-        <p className="text-[13px] text-muted-foreground/70 leading-relaxed">
-          Escolha uma conversa ao lado para começar a atender.
+        <p className="text-[14px] leading-[20px]" style={{ color: 'var(--wa-text-secondary)' }}>
+          Envie e receba mensagens sem precisar manter o celular conectado.
           <br />
-          Mensagens são sincronizadas automaticamente.
+          Use em até 4 aparelhos vinculados e 1 celular ao mesmo tempo.
         </p>
-        <div className="mt-8 pt-4 border-t border-wa-divider/30">
-          <p className="text-[12px] text-muted-foreground/40 flex items-center justify-center gap-1.5">
-            <Lock className="w-3 h-3" />
-            Criptografia de ponta a ponta
+        <div className="mt-[40px] pt-[16px]">
+          <p className="text-[13px] flex items-center justify-center gap-[6px]" style={{ color: 'var(--wa-text-secondary)', opacity: 0.6 }}>
+            <Lock className="w-[13px] h-[13px]" />
+            Suas mensagens pessoais são protegidas com criptografia de ponta a ponta
           </p>
         </div>
       </div>
@@ -1566,15 +1566,15 @@ export default function InboxPage() {
   }
 
   return (
-    <div className="flex flex-col h-full overflow-hidden bg-wa-chat-bg">
+    <div className="flex flex-col h-full overflow-hidden" style={{ backgroundColor: 'var(--wa-chat-bg)' }}>
       {/* ═══ RECONNECTION BANNER ═══ */}
       {!isConnected && activeSession && (
-        <div className="shrink-0 flex items-center justify-between px-4 py-2 bg-amber-500/90 text-white text-sm">
+        <div className="shrink-0 flex items-center justify-between px-4 py-[6px]" style={{ backgroundColor: '#ffc107', color: '#3b3a32' }}>
           <div className="flex items-center gap-2">
             <WifiOff className="w-4 h-4" />
-            <span>WhatsApp desconectado — visualizando histórico. Reconecte para enviar mensagens.</span>
+            <span className="text-[14px]">Computador não conectado — certifique-se de que o celular está com internet.</span>
           </div>
-          <a href="/whatsapp" className="px-3 py-1 bg-white/20 hover:bg-white/30 rounded-lg text-xs font-medium transition-colors">
+          <a href="/whatsapp" className="px-3 py-1 bg-white/30 hover:bg-white/50 rounded text-[13px] font-medium transition-colors">
             Reconectar
           </a>
         </div>
@@ -1582,13 +1582,14 @@ export default function InboxPage() {
       <div className="flex flex-1 overflow-hidden">
       {/* ═══ LEFT PANEL: Conversations List ═══ */}
       <div
-        className={`flex flex-col bg-wa-panel ${showMobileChat ? "hidden md:flex" : "flex"}`}
+        className={`flex flex-col ${showMobileChat ? "hidden md:flex" : "flex"}`}
         style={{
           width: "100%",
           maxWidth: "420px",
           minWidth: "320px",
-          borderRight: "1px solid color-mix(in srgb, var(--wa-divider) 60%, transparent)",
+          borderRight: '1px solid var(--wa-divider)',
           position: "relative",
+          backgroundColor: 'var(--wa-panel)',
         }}
       >
         {/* New Chat Panel (slide-over) */}
@@ -1599,19 +1600,19 @@ export default function InboxPage() {
           sessionId={activeSession?.sessionId || ""}
         />
 
-        {/* ── Header ── */}
-        <div className="flex items-center justify-between shrink-0 h-[56px] px-4 bg-wa-panel-header/80 backdrop-blur-md border-b border-wa-divider">
-          <div className="flex items-center gap-3">
-            <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" style={{ display: isConnected ? 'block' : 'none' }} />
-            <h2 className="text-[15px] font-semibold text-foreground tracking-tight">Conversas</h2>
+        {/* ── Header (WhatsApp Web style) ── */}
+        <div className="flex items-center justify-between shrink-0 h-[59px] px-4" style={{ backgroundColor: 'var(--wa-panel-header)' }}>
+          <div className="flex items-center gap-2">
+            {isConnected && <div className="w-[10px] h-[10px] rounded-full bg-[var(--wa-tint)]" />}
+            {!isConnected && <div className="w-[10px] h-[10px] rounded-full bg-amber-400 animate-pulse" />}
           </div>
-          <div className="flex items-center gap-0.5">
+          <div className="flex items-center gap-[2px]">
             <InstantTooltip label={isMuted ? "Som desativado" : "Som ativado"}>
               <button
                 onClick={toggleMute}
-                className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-wa-hover transition-colors"
+                className="w-[40px] h-[40px] flex items-center justify-center rounded-full hover:bg-[var(--wa-hover)] transition-colors"
               >
-                {isMuted ? <VolumeX className="w-[18px] h-[18px] text-destructive/80" /> : <Volume2 className="w-[18px] h-[18px] text-muted-foreground" />}
+                {isMuted ? <VolumeX className="w-[20px] h-[20px]" style={{ color: 'var(--wa-text-secondary)' }} /> : <Volume2 className="w-[20px] h-[20px]" style={{ color: 'var(--wa-text-secondary)' }} />}
               </button>
             </InstantTooltip>
             <InstantTooltip label={syncContactsMut.isPending ? "Sincronizando..." : "Sincronizar contatos"}>
@@ -1621,69 +1622,68 @@ export default function InboxPage() {
                   syncContactsMut.mutate({ sessionId: activeSession.sessionId });
                 }}
                 disabled={syncContactsMut.isPending}
-                className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-wa-hover transition-colors"
+                className="w-[40px] h-[40px] flex items-center justify-center rounded-full hover:bg-[var(--wa-hover)] transition-colors"
               >
-                <RefreshCw className={`w-[18px] h-[18px] text-muted-foreground ${syncContactsMut.isPending ? "animate-spin" : ""}`} />
+                <RefreshCw className={`w-[20px] h-[20px] ${syncContactsMut.isPending ? "animate-spin" : ""}`} style={{ color: 'var(--wa-text-secondary)' }} />
               </button>
             </InstantTooltip>
             <InstantTooltip label="Nova conversa">
-              <button onClick={() => setShowNewChat(true)} className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-wa-hover transition-colors">
-                <MessageCircle className="w-[18px] h-[18px] text-muted-foreground" />
+              <button onClick={() => setShowNewChat(true)} className="w-[40px] h-[40px] flex items-center justify-center rounded-full hover:bg-[var(--wa-hover)] transition-colors">
+                <MessageCircle className="w-[20px] h-[20px]" style={{ color: 'var(--wa-text-secondary)' }} />
               </button>
             </InstantTooltip>
-            <button className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-wa-hover transition-colors">
-              <MoreVertical className="w-[18px] h-[18px] text-muted-foreground" />
+            <button className="w-[40px] h-[40px] flex items-center justify-center rounded-full hover:bg-[var(--wa-hover)] transition-colors">
+              <MoreVertical className="w-[20px] h-[20px]" style={{ color: 'var(--wa-text-secondary)' }} />
             </button>
           </div>
         </div>
 
-        {/* ── Search Bar ── */}
-        <div className="shrink-0 px-3 py-2 bg-wa-panel">
-          <div className={`flex items-center rounded-xl h-[36px] px-3 transition-all duration-200 ${searchFocused ? 'bg-wa-search-bg ring-1 ring-primary/30' : 'bg-wa-search-bg'}`}>
+        {/* ── Search Bar (WhatsApp Web style) ── */}
+        <div className="shrink-0 py-[6px] px-[12px]" style={{ backgroundColor: 'var(--wa-panel)' }}>
+          <div className="flex items-center rounded-lg h-[35px] px-[8px]" style={{ backgroundColor: 'var(--wa-search-bg)' }}>
             <Search
               className="shrink-0 transition-colors duration-200"
-              style={{ width: "15px", height: "15px" }}
-              color={searchFocused ? "var(--wa-tint)" : undefined}
+              style={{ width: 16, height: 16, color: searchFocused ? 'var(--wa-tint)' : 'var(--wa-text-secondary)' }}
             />
             <input
-              type="text" placeholder="Pesquisar conversa..." value={search}
+              type="text" placeholder="Pesquisar" value={search}
               onChange={(e) => setSearch(e.target.value)}
               onFocus={() => setSearchFocused(true)}
               onBlur={() => setSearchFocused(false)}
-              className="flex-1 bg-transparent border-none outline-none text-[13px] text-foreground placeholder:text-muted-foreground/60 pl-3 h-full"
+              className="flex-1 bg-transparent border-none outline-none text-[14px] placeholder:text-[var(--wa-text-secondary)] pl-[24px] h-full"
+              style={{ color: 'var(--wa-text-primary)' }}
             />
             {search && (
-              <button onClick={() => setSearch("")} className="p-0.5 rounded-full hover:bg-muted transition-colors">
-                <X className="w-3.5 h-3.5 text-muted-foreground" />
+              <button onClick={() => setSearch("")} className="p-0.5 rounded-full hover:bg-[var(--wa-hover)] transition-colors">
+                <X className="w-[18px] h-[18px]" style={{ color: 'var(--wa-text-secondary)' }} />
               </button>
             )}
           </div>
         </div>
 
-        {/* ── Main Tabs (Meus Chats | Fila | Contatos WA | Todas) ── */}
-        <div className="flex items-center shrink-0 px-2 gap-1 py-1.5 bg-wa-panel">
+        {/* ── Filter Tabs (WhatsApp Web pill style) ── */}
+        <div className="flex items-center shrink-0 px-[10px] gap-[6px] py-[8px]" style={{ backgroundColor: 'var(--wa-panel)' }}>
           {([
-            { id: "mine" as InboxTab, label: "Meus Chats", icon: <InboxIcon className="w-[14px] h-[14px]" />, badge: myConvsCount },
-            { id: "queue" as InboxTab, label: "Fila", icon: <Timer className="w-[14px] h-[14px]" />, badge: queueCount },
-            { id: "contacts" as InboxTab, label: "Contatos", icon: <Contact2 className="w-[14px] h-[14px]" />, badge: 0 },
-            ...(isAdmin ? [{ id: "all" as InboxTab, label: "Todas", icon: <LayoutGrid className="w-[14px] h-[14px]" />, badge: 0 }] : []),
+            { id: "mine" as InboxTab, label: "Meus Chats", badge: myConvsCount },
+            { id: "queue" as InboxTab, label: "Fila", badge: queueCount },
+            { id: "contacts" as InboxTab, label: "Contatos", badge: 0 },
+            ...(isAdmin ? [{ id: "all" as InboxTab, label: "Todas", badge: 0 }] : []),
           ]).map((tab) => {
             const active = activeTab === tab.id;
             return (
               <button
                 key={tab.id}
                 onClick={() => { setActiveTab(tab.id); setFilter("all"); }}
-                className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-[12px] font-semibold tracking-wide uppercase transition-all duration-200 rounded-lg ${
+                className={`flex items-center justify-center gap-[5px] px-[12px] py-[6px] text-[13px] transition-all duration-150 rounded-full whitespace-nowrap ${
                   active
-                    ? "bg-primary/10 text-primary shadow-sm"
-                    : "text-muted-foreground hover:text-foreground hover:bg-wa-hover"
+                    ? "bg-[var(--wa-tint)]/15 text-[var(--wa-tint)] font-medium"
+                    : "text-[var(--wa-text-secondary)] hover:bg-[var(--wa-hover)]"
                 }`}
               >
-                {tab.icon}
                 <span>{tab.label}</span>
                 {tab.badge > 0 && (
-                  <span className={`text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-[4px] ${
-                    active ? "bg-primary text-white" : "bg-muted text-muted-foreground"
+                  <span className={`text-[11px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-[4px] ${
+                    active ? "bg-[var(--wa-tint)] text-white" : "bg-[var(--wa-search-bg)] text-[var(--wa-text-secondary)]"
                   }`}>
                     {tab.badge > 99 ? "99+" : tab.badge}
                   </span>
@@ -1691,27 +1691,20 @@ export default function InboxPage() {
               </button>
             );
           })}
+          {/* Unread filter — only for mine/all tabs */}
+          {(activeTab === "mine" || activeTab === "all") && (
+            <button
+              onClick={() => setFilter(filter === "unread" ? "all" : "unread")}
+              className={`flex items-center gap-[5px] px-[12px] py-[6px] text-[13px] transition-all duration-150 rounded-full whitespace-nowrap ml-auto ${
+                filter === "unread"
+                  ? "bg-[var(--wa-tint)]/15 text-[var(--wa-tint)] font-medium"
+                  : "text-[var(--wa-text-secondary)] hover:bg-[var(--wa-hover)]"
+              }`}
+            >
+              Não lidas
+            </button>
+          )}
         </div>
-        <div className="h-px bg-wa-divider" />
-        {/* ── Secondary Filter (only for mine/all tabs) ── */}
-        {(activeTab === "mine" || activeTab === "all") && (
-          <div className="flex items-center gap-1.5 shrink-0 px-3 py-1.5 overflow-x-auto scrollbar-none">
-            {(["all", "unread"] as const).map((f) => {
-              const labels: Record<string, string> = { all: "Todas", unread: "Não lidas" };
-              const active = filter === f;
-              return (
-                <button
-                  key={f} onClick={() => setFilter(f)}
-                  className={`rounded-lg text-[11px] font-medium transition-all duration-150 px-3 py-1.5 shrink-0 ${
-                    active ? "bg-primary/10 text-primary" : "bg-transparent text-muted-foreground hover:bg-wa-hover hover:text-foreground"
-                  }`}
-                >
-                  {labels[f]}
-                </button>
-              );
-            })}
-          </div>
-        )}
 
         {/* ── Content List (depends on active tab) ── */}
         <div className="flex-1 overflow-y-auto scrollbar-thin" style={{ overscrollBehavior: "contain" }}>
@@ -1776,30 +1769,32 @@ export default function InboxPage() {
                   <div key={conv.remoteJid} className="group/q relative">
                     <div
                       onClick={() => handleSelectQueueConv(conv.remoteJid)}
-                      className={`flex items-center px-3 cursor-pointer transition-all duration-100 ${
-                        selectedKey === makeConvKey(conv.sessionId || activeSession?.sessionId || "", conv.remoteJid)
-                          ? "bg-primary/8 border-l-2 border-l-primary"
-                          : "hover:bg-wa-hover/70 border-l-2 border-l-transparent"
-                      }`}
+                      className="flex items-center px-[10px] cursor-pointer transition-all duration-100"
+                      style={{
+                        backgroundColor: selectedKey === makeConvKey(conv.sessionId || activeSession?.sessionId || "", conv.remoteJid)
+                          ? 'var(--wa-active)' : undefined,
+                      }}
+                      onMouseEnter={(e) => { if (selectedKey !== makeConvKey(conv.sessionId || activeSession?.sessionId || "", conv.remoteJid)) (e.currentTarget as HTMLElement).style.backgroundColor = 'var(--wa-hover)'; }}
+                      onMouseLeave={(e) => { if (selectedKey !== makeConvKey(conv.sessionId || activeSession?.sessionId || "", conv.remoteJid)) (e.currentTarget as HTMLElement).style.backgroundColor = ''; }}
                     >
-                      <div className="py-2 pr-3">
-                        <WaAvatar name={getDisplayName(conv.remoteJid, conv)} size={46} pictureUrl={profilePicMap[conv.remoteJid]} />
+                      <div className="py-[6px] pr-[13px]">
+                        <WaAvatar name={getDisplayName(conv.remoteJid, conv)} size={49} pictureUrl={profilePicMap[conv.remoteJid]} />
                       </div>
-                      <div className="flex-1 min-w-0 py-2.5 border-b border-wa-divider/50">
-                        <div className="flex items-center justify-between mb-0.5 gap-1">
-                          <span className="text-[14px] truncate leading-5 flex-1 min-w-0 text-foreground font-medium">
+                      <div className="flex-1 min-w-0 py-[10px]" style={{ borderBottom: '1px solid var(--wa-divider)' }}>
+                        <div className="flex items-center justify-between gap-[4px]">
+                          <span className="text-[17px] truncate leading-[21px] flex-1 min-w-0" style={{ color: 'var(--wa-text-primary)' }}>
                             {getDisplayName(conv.remoteJid, conv)}
                           </span>
-                          <div className="flex items-center gap-1.5 shrink-0">
+                          <div className="flex items-center gap-[6px] shrink-0">
                             {waitTime && <UrgencyTimer since={waitTime} compact />}
                           </div>
                         </div>
-                        <div className="flex items-center gap-1">
-                          <span className="text-[13px] truncate flex-1 leading-5 text-muted-foreground/60">
+                        <div className="flex items-center gap-[4px] mt-[2px]">
+                          <span className="text-[14px] truncate flex-1 leading-[20px]" style={{ color: 'var(--wa-text-secondary)' }}>
                             {getMessagePreview(conv.lastMessage, conv.lastMessageType) || "Sem mensagens"}
                           </span>
                           {Number(conv.unreadCount) > 0 && (
-                            <span className="bg-primary text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1 shrink-0">
+                            <span className="text-[12px] font-bold rounded-full min-w-[20px] h-[20px] flex items-center justify-center px-[5px] shrink-0" style={{ backgroundColor: 'var(--wa-unread)', color: '#fff' }}>
                               {Number(conv.unreadCount) > 99 ? "99+" : conv.unreadCount}
                             </span>
                           )}
@@ -1903,14 +1898,14 @@ export default function InboxPage() {
                     <button
                       key={contact.jid}
                       onClick={() => handleSelectConv(contact.jid)}
-                      className="w-full flex items-center gap-3 px-3 hover:bg-wa-hover/70 transition-all duration-100 text-left border-l-2 border-l-transparent hover:border-l-primary/30"
+                      className="w-full flex items-center px-[10px] hover:bg-[var(--wa-hover)] transition-all duration-100 text-left"
                     >
-                      <div className="py-2">
-                        <WaAvatar name={contact.displayName} size={42} pictureUrl={profilePicMap[contact.jid]} />
+                      <div className="py-[6px] pr-[13px]">
+                        <WaAvatar name={contact.displayName} size={49} pictureUrl={profilePicMap[contact.jid]} />
                       </div>
-                      <div className="flex-1 min-w-0 py-2.5 border-b border-wa-divider/50">
-                        <p className="text-[14px] text-foreground truncate">{contact.displayName}</p>
-                        <p className="text-[12px] text-muted-foreground/60 truncate">
+                      <div className="flex-1 min-w-0 py-[10px]" style={{ borderBottom: '1px solid var(--wa-divider)' }}>
+                        <p className="text-[17px] truncate leading-[21px]" style={{ color: 'var(--wa-text-primary)' }}>{contact.displayName}</p>
+                        <p className="text-[14px] truncate leading-[20px] mt-[2px]" style={{ color: 'var(--wa-text-secondary)' }}>
                           {contact.phoneNumber ? formatPhoneNumber(contact.phoneNumber) : formatPhoneNumber(contact.jid)}
                         </p>
                       </div>
@@ -1932,9 +1927,10 @@ export default function InboxPage() {
             {/* Mobile back button */}
             <button
               onClick={() => setShowMobileChat(false)}
-              className="md:hidden absolute top-[10px] left-[6px] z-30 p-[6px] rounded-full bg-card/85 shadow-sm backdrop-blur-sm"
+              className="md:hidden absolute top-[14px] left-[8px] z-30 p-[6px] rounded-full backdrop-blur-sm"
+              style={{ backgroundColor: 'rgba(0,0,0,0.15)' }}
             >
-              <ArrowLeft className="w-5 h-5 text-foreground" />
+              <ArrowLeft className="w-5 h-5 text-white" />
             </button>
 
             <WhatsAppChat
