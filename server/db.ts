@@ -2548,6 +2548,25 @@ export async function getCustomerGlobalNotes(tenantId: number, remoteJid: string
   }));
 }
 
+export async function updateInternalNote(
+  tenantId: number, noteId: number,
+  data: { content?: string; category?: string; priority?: string }
+) {
+  const db = await getDb();
+  if (!db) return;
+  const updates: Record<string, any> = {};
+  if (data.content !== undefined) updates.content = data.content;
+  if (data.category !== undefined) updates.category = data.category;
+  if (data.priority !== undefined) updates.priority = data.priority;
+  if (Object.keys(updates).length === 0) return;
+  await db.update(internalNotes)
+    .set(updates)
+    .where(and(
+      eq(internalNotes.tenantId, tenantId),
+      eq(internalNotes.id, noteId),
+    ));
+}
+
 export async function deleteInternalNote(tenantId: number, noteId: number) {
   const db = await getDb();
   if (!db) return;

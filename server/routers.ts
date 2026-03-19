@@ -100,6 +100,7 @@ import {
   createInternalNote,
   getInternalNotes,
   deleteInternalNote,
+  updateInternalNote,
   getCustomerGlobalNotes,
   getConversationEvents,
   logConversationEvent,
@@ -1443,6 +1444,22 @@ export const appRouter = router({
           });
         }
         return result;
+      }),
+    update: protectedProcedure
+      .input(z.object({
+        noteId: z.number(),
+        content: z.string().min(1).optional(),
+        category: z.string().optional(),
+        priority: z.string().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const tenantId = ctx.saasUser?.tenantId || 1;
+        await updateInternalNote(tenantId, input.noteId, {
+          content: input.content,
+          category: input.category,
+          priority: input.priority,
+        });
+        return { success: true };
       }),
     delete: protectedProcedure
       .input(z.object({ noteId: z.number() }))

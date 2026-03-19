@@ -145,13 +145,49 @@ export default function AiSuggestionPanel({
     },
   });
 
+  const utils = trpc.useUtils();
   const sendBrokenMut = trpc.whatsapp.sendBrokenMessage.useMutation({
+    onMutate: (vars) => {
+      // Add optimistic messages for each part so they appear instantly in the chat
+      const queryKey = { sessionId, remoteJid, limit: 80 };
+      const optimisticMsgs = vars.parts.map((part, i) => ({
+        id: -(Date.now() + i),
+        sessionId,
+        messageId: `ai_opt_${Date.now()}_${i}`,
+        remoteJid,
+        fromMe: true,
+        messageType: "conversation",
+        content: part,
+        status: "pending",
+        timestamp: new Date(Date.now() + i * 100).toISOString(),
+        createdAt: new Date(Date.now() + i * 100).toISOString(),
+        quotedMessageId: null,
+      }));
+      utils.whatsapp.messagesByContact.setData(queryKey, (old: any) => {
+        if (!old) return optimisticMsgs;
+        return [...optimisticMsgs, ...old];
+      });
+      // Scroll to bottom
+      setTimeout(() => {
+        const el = document.querySelector('[data-chat-scroll]');
+        if (el) el.scrollTop = el.scrollHeight;
+      }, 50);
+    },
     onSuccess: (data) => {
       toast.success(`${data.sentParts} mensagens enviadas!`);
       setPhase("idle");
+      // Refetch messages to reconcile optimistic with real ones
+      setTimeout(() => utils.whatsapp.messagesByContact.invalidate({ sessionId, remoteJid }), 1500);
+      onSendBroken([]);
       onClose();
     },
     onError: (err) => {
+      // Remove optimistic messages on error
+      const queryKey = { sessionId, remoteJid, limit: 80 };
+      utils.whatsapp.messagesByContact.setData(queryKey, (old: any) => {
+        if (!old) return old;
+        return old.filter((m: any) => !m.messageId?.startsWith("ai_opt_"));
+      });
       toast.error(err.message || "Erro ao enviar", { duration: 3000 });
       setPhase("result");
     },

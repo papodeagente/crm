@@ -1073,7 +1073,18 @@ export default function InboxPage() {
     { enabled: !!activeSession?.sessionId, refetchInterval: socketConnected ? 60000 : 15000, staleTime: 10000 }
   );
   const claimMutation = trpc.whatsapp.queue.claim.useMutation({
-    onSuccess: () => { queueQ.refetch(); queueStatsQ.refetch(); toast.success("Conversa atribuída a você"); },
+    onSuccess: (_data, variables) => {
+      queueQ.refetch(); queueStatsQ.refetch();
+      // Optimistically update convStore so the conversation appears in "mine" tab immediately
+      const key = makeConvKey(variables.sessionId, variables.remoteJid);
+      convStore.updateAssignment(key, {
+        assignedUserId: myUserId,
+        assignmentStatus: "open",
+      });
+      // Also refetch conversations to get full data if not in store yet
+      conversationsQ.refetch();
+      toast.success("Conversa atribuída a você");
+    },
     onError: (e) => toast.error(e.message || "Erro ao puxar conversa"),
   });
 
@@ -1091,8 +1102,14 @@ export default function InboxPage() {
 
   // Finish attendance mutation
   const finishMut = trpc.whatsapp.finishAttendance.useMutation({
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       queueStatsQ.refetch();
+      // Optimistically update convStore so the conversation disappears from "mine" tab immediately
+      const key = makeConvKey(variables.sessionId, variables.remoteJid);
+      convStore.updateAssignment(key, {
+        assignedUserId: null,
+        assignmentStatus: "resolved",
+      });
       toast.success("Atendimento finalizado");
       setSelectedKey(null);
     },

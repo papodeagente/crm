@@ -4105,3 +4105,11 @@
 - [x] Corrigir createDeal com pick explícito de campos + try/catch com mensagens amigáveis
 - [x] Centralizar processInboundLead para usar createDeal em vez de db.insert direto
 - [x] Testes de ownership passando (16/16)
+
+## Correções Inbox (v8)
+- [x] Bug 1: Mensagem enviada via sugestão IA agora aparece imediatamente (onSendBroken callback + refetch)
+- [x] Bug 2: Contexto da sugestão IA usa conversa toda (80 msgs em vez de 10)
+- [x] Bug 3: Notas internas com botões de editar e excluir (hover) + backend update/delete
+- [x] Bug 4: Finalizar atendimento atualiza convStore otimisticamente (assignedUserId=null, status=resolved)
+- [x] Bug 5: Puxar atendimento atualiza convStore otimisticamente (assignedUserId=myUserId) + refetch
+- [x] 8 testes vitest passando para todos os 5 bugs

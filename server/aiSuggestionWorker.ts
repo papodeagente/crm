@@ -360,8 +360,8 @@ async function processGenerationAsync(
     const settings = await getTenantAiSettings(req.tenantId);
     const model = req.overrideModel || settings.defaultAiModel || integration.defaultModel;
 
-    // 2. Fetch last 10 messages (smart context limit)
-    const messages = await fetchConversationMessages(req.sessionId, req.remoteJid, 10);
+    // 2. Fetch full conversation context (up to 200 messages for comprehensive AI response)
+    const messages = await fetchConversationMessages(req.sessionId, req.remoteJid, 200);
     if (messages.length === 0) {
       emitError(io, req, "NO_MESSAGES");
       return;

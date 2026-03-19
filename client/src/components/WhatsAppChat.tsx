@@ -1298,6 +1298,17 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
     onError: (e) => toast.error(e.message || "Erro ao criar nota"),
   });
 
+  const deleteNoteMut = trpc.whatsapp.notes.delete.useMutation({
+    onSuccess: () => { notesQ.refetch(); globalNotesQ.refetch(); toast.success("Nota excluída"); },
+    onError: (e) => toast.error(e.message || "Erro ao excluir nota"),
+  });
+  const updateNoteMut = trpc.whatsapp.notes.update.useMutation({
+    onSuccess: () => { notesQ.refetch(); globalNotesQ.refetch(); toast.success("Nota atualizada"); setEditingNoteId(null); },
+    onError: (e) => toast.error(e.message || "Erro ao atualizar nota"),
+  });
+  const [editingNoteId, setEditingNoteId] = useState<number | null>(null);
+  const [editingNoteText, setEditingNoteText] = useState("");
+
   // Customer global notes (across all conversations for this contact)
   const globalNotesQ = trpc.whatsapp.notes.globalByContact.useQuery(
     { remoteJid },
@@ -2400,9 +2411,28 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
                         part.startsWith("@") ? <strong key={i} className="text-amber-700 dark:text-amber-200">{part}</strong> : part
                       );
                     };
+                    const realNoteId = Math.abs(msg.id);
+                    const isEditing = editingNoteId === realNoteId;
                     return (
-                      <div key={msg.id} className="flex justify-end px-[63px] mb-[2px] mt-[6px]">
+                      <div key={msg.id} className="flex justify-end px-[63px] mb-[2px] mt-[6px] group/note">
                         <div className="relative max-w-[65%]">
+                          {/* Edit/Delete action buttons - appear on hover */}
+                          <div className="absolute -left-16 top-1/2 -translate-y-1/2 hidden group-hover/note:flex items-center gap-1 z-10">
+                            <button
+                              onClick={() => { setEditingNoteId(realNoteId); setEditingNoteText(msg.content || ""); }}
+                              className="p-1 rounded-full bg-white dark:bg-zinc-800 shadow-sm border border-gray-200 dark:border-zinc-700 hover:bg-amber-50 dark:hover:bg-amber-900/30 transition-colors"
+                              title="Editar nota"
+                            >
+                              <Pencil className="w-3 h-3 text-amber-600 dark:text-amber-400" />
+                            </button>
+                            <button
+                              onClick={() => { if (confirm("Excluir esta nota interna?")) deleteNoteMut.mutate({ noteId: realNoteId }); }}
+                              className="p-1 rounded-full bg-white dark:bg-zinc-800 shadow-sm border border-gray-200 dark:border-zinc-700 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors"
+                              title="Excluir nota"
+                            >
+                              <Trash2 className="w-3 h-3 text-red-500 dark:text-red-400" />
+                            </button>
+                          </div>
                           <div className={`relative px-[9px] pt-[6px] pb-[8px] shadow-sm rounded-[7.5px] border ${notePriority === "urgent" ? "bg-red-50 dark:bg-red-950/30 border-red-300/60 dark:border-red-700/40" : "bg-amber-100 dark:bg-amber-900/40 border-amber-200/60 dark:border-amber-700/40"}`} style={{ minWidth: "80px" }}>
                             {/* Note header with icon, author, badges */}
                             <div className="flex items-center gap-1.5 mb-1 flex-wrap">
@@ -2419,8 +2449,28 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
                                 <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-medium ${pri.color}`}>{pri.label}</span>
                               )}
                             </div>
-                            {/* Note content with @mention highlighting */}
-                            <span className={`text-[14.2px] leading-[19px] whitespace-pre-wrap break-words ${notePriority === "urgent" ? "text-red-900 dark:text-red-100" : "text-amber-900 dark:text-amber-100"}`}>{renderNoteContent(msg.content || "")}</span>
+                            {/* Note content - editable or display */}
+                            {isEditing ? (
+                              <div className="flex flex-col gap-1">
+                                <textarea
+                                  className="w-full text-[14px] bg-white dark:bg-zinc-900 border border-amber-300 dark:border-amber-600 rounded px-2 py-1 text-amber-900 dark:text-amber-100 resize-none focus:outline-none focus:ring-1 focus:ring-amber-400"
+                                  value={editingNoteText}
+                                  onChange={(e) => setEditingNoteText(e.target.value)}
+                                  rows={3}
+                                  autoFocus
+                                />
+                                <div className="flex gap-1 justify-end">
+                                  <button onClick={() => setEditingNoteId(null)} className="text-[11px] px-2 py-0.5 rounded bg-gray-200 dark:bg-zinc-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300">Cancelar</button>
+                                  <button
+                                    onClick={() => updateNoteMut.mutate({ noteId: realNoteId, content: editingNoteText })}
+                                    disabled={!editingNoteText.trim() || updateNoteMut.isPending}
+                                    className="text-[11px] px-2 py-0.5 rounded bg-amber-500 text-white hover:bg-amber-600 disabled:opacity-50"
+                                  >Salvar</button>
+                                </div>
+                              </div>
+                            ) : (
+                              <span className={`text-[14.2px] leading-[19px] whitespace-pre-wrap break-words ${notePriority === "urgent" ? "text-red-900 dark:text-red-100" : "text-amber-900 dark:text-amber-100"}`}>{renderNoteContent(msg.content || "")}</span>
+                            )}
                             {/* Mentioned agents list */}
                             {mentionedNames.length > 0 && (
                               <div className="mt-1 text-[10px] text-amber-600 dark:text-amber-400/80">
