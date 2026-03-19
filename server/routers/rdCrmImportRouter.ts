@@ -218,22 +218,18 @@ export const rdCrmImportRouter = router({
       return { started: true, categories: enabledCategories.length };
     }),
 
-  // ─── Import from Spreadsheet (synchronous, rows already parsed by frontend) ───
+  // ─── Get Spreadsheet Import Progress ───
+  getSpreadsheetProgress: protectedProcedure.query(({ ctx }) => {
+    const key = `spreadsheet_${ctx.user.id}`;
+    return progressStore.get(key) || null;
+  }),
+
+  // ─── Import from RD Station CSV (comprehensive, all 48 columns) ───
   importSpreadsheet: protectedProcedure
     .input(z.object({
       tenantId: z.number(),
-      rows: z.array(z.object({
-        nome: z.string().min(1),
-        email: z.string().optional(),
-        telefone: z.string().optional(),
-        empresa: z.string().optional(),
-        negociacao: z.string().optional(),
-        valor: z.string().optional(),
-        etapa: z.string().optional(),
-        fonte: z.string().optional(),
-        campanha: z.string().optional(),
-        notas: z.string().optional(),
-      })),
+      rows: z.array(z.record(z.string(), z.string().nullable().optional())),
+      columnMapping: z.record(z.string(), z.string()).optional(), // csvHeader → internalKey
     }))
     .mutation(async ({ ctx, input }) => {
       const tenantId = (ctx as any).saasUser?.tenantId ?? input.tenantId;
@@ -241,203 +237,637 @@ export const rdCrmImportRouter = router({
       const userName = ctx.user.name || "Sistema";
       const { rows } = input;
 
+      // Initialize progress and start background processing
+      const progressKey = `spreadsheet_${userId}`;
+      const ssProgress: any = {
+        status: "importing",
+        phase: "Iniciando importação...",
+        totalRows: rows.length,
+        processedRows: 0,
+        imported: 0,
+        skipped: 0,
+        errors: 0,
+        errorDetails: [] as string[],
+        contactsCreated: 0,
+        accountsCreated: 0,
+        productsCreated: 0,
+        customFieldsDetected: 0,
+      };
+      progressStore.set(progressKey, ssProgress);
+
+      // Start background processing (don't await)
+      runSpreadsheetImport(userId, tenantId, userName, rows, input.columnMapping, ssProgress, progressKey).catch((err) => {
+        console.error("[RD CSV Import] FATAL ERROR:", err);
+        ssProgress.status = "error";
+        ssProgress.phase = `Erro fatal: ${err.message}`;
+      });
+
+      return { started: true, totalRows: rows.length };
+    }),
+});
+
+// ─── Background spreadsheet import function ───
+async function runSpreadsheetImport(
+  userId: number,
+  tenantId: number,
+  userName: string,
+  rows: Record<string, string | null | undefined>[],
+  columnMapping: Record<string, string> | undefined,
+  ssProgress: any,
+  progressKey: string,
+) {
+
       let imported = 0;
       let skipped = 0;
+      let contactsCreated = 0;
+      let accountsCreated = 0;
+      let productsCreated = 0;
       const errors: string[] = [];
 
-      // Ensure rdExternalId columns exist (reuse existing helper)
       await ensureRdExternalIdColumns();
 
-      // Pre-fetch tenant pipelines and stages for matching
+      // ─── Auto-detect RD Station CSV column mapping ───
+      const RD_COLUMN_MAP: Record<string, string> = {
+        "Nome": "nome", "Empresa": "empresa", "Qualificação": "qualificacao",
+        "Funil de vendas": "funil", "Etapa": "etapa", "Estado": "estado",
+        "Motivo de Perda": "motivoPerda", "Valor Único": "valorUnico",
+        "Valor Recorrente": "valorRecorrente", "Pausada": "pausada",
+        "Data de criação": "dataCriacao", "Hora de criação": "horaCriacao",
+        "Data do primeiro contato": "dataPrimeiroContato", "Hora do primeiro contato": "horaPrimeiroContato",
+        "Data do último contato": "dataUltimoContato", "Hora do último contato": "horaUltimoContato",
+        "Data da próxima tarefa": "dataProximaTarefa", "Hora da próxima tarefa": "horaProximaTarefa",
+        "Previsão de fechamento": "previsaoFechamento", "Data de fechamento": "dataFechamento",
+        "Hora de fechamento": "horaFechamento", "Fonte": "fonte", "Campanha": "campanha",
+        "Responsável": "responsavel", "Produtos": "produtos",
+        "Equipes do responsável": "equipes", "Anotação do motivo de perda": "anotacaoPerda",
+        "utm_campaign": "utmCampaign", "utm_term": "utmTerm", "utm_content": "utmContent",
+        "utm_source": "utmSource", "utm_medium": "utmMedium",
+        "Contatos": "contatos", "Cargo": "cargo", "Email": "email", "Telefone": "telefone",
+        // Legacy simple format support
+        "nome": "nome", "email": "email", "telefone": "telefone", "empresa": "empresa",
+        "negociacao": "nome", "valor": "valorUnico", "etapa": "etapa",
+        "fonte": "fonte", "campanha": "campanha", "notas": "anotacaoPerda",
+      };
+
+      function getVal(row: Record<string, string | null | undefined>, key: string): string {
+        // Try mapped key first, then try original header
+        const v = row[key];
+        if (v != null && v.trim()) return v.trim();
+        // Try reverse lookup from RD_COLUMN_MAP
+        for (const [csvHeader, internalKey] of Object.entries(RD_COLUMN_MAP)) {
+          if (internalKey === key) {
+            const v2 = row[csvHeader];
+            if (v2 != null && v2.trim()) return v2.trim();
+          }
+        }
+        return "";
+      }
+
+      // Normalize row keys using the column mapping
+      function normalizeRow(raw: Record<string, string | null | undefined>): Record<string, string> {
+        const result: Record<string, string> = {};
+        for (const [csvHeader, value] of Object.entries(raw)) {
+          const mapped = RD_COLUMN_MAP[csvHeader.trim()] || columnMapping?.[csvHeader.trim()];
+          const key = mapped || csvHeader.trim();
+          result[key] = (value ?? "").trim();
+          // Also keep original header for custom fields
+          result[csvHeader.trim()] = (value ?? "").trim();
+        }
+        return result;
+      }
+
+      // ─── Parse Brazilian date (DD/MM/YYYY) to Date ───
+      function parseBrDate(dateStr: string, timeStr?: string): Date | null {
+        if (!dateStr) return null;
+        const parts = dateStr.split("/");
+        if (parts.length !== 3) return null;
+        const [day, month, year] = parts.map(Number);
+        if (!day || !month || !year) return null;
+        let hours = 0, minutes = 0;
+        if (timeStr) {
+          const tp = timeStr.split(":");
+          hours = parseInt(tp[0]) || 0;
+          minutes = parseInt(tp[1]) || 0;
+        }
+        return new Date(year, month - 1, day, hours, minutes);
+      }
+
+      // ─── Parse monetary value ("4997.0" or "R$ 4.997,00") ───
+      function parseMoneyToCents(val: string): number {
+        if (!val) return 0;
+        // RD exports as "4997.0" (dot decimal, no thousands separator)
+        let cleaned = val.replace(/[R$\s]/g, "");
+        // If it has both . and , → Brazilian format (1.234,56)
+        if (cleaned.includes(".") && cleaned.includes(",")) {
+          cleaned = cleaned.replace(/\./g, "").replace(",", ".");
+        } else if (cleaned.includes(",") && !cleaned.includes(".")) {
+          cleaned = cleaned.replace(",", ".");
+        }
+        const parsed = parseFloat(cleaned);
+        return isNaN(parsed) ? 0 : Math.round(parsed * 100);
+      }
+
+      // ─── Pre-fetch all reference data ───
       const allPipelines = await crm.listPipelines(tenantId);
       const defaultPipeline = allPipelines.find((p: any) => p.isDefault) || allPipelines[0];
-      if (!defaultPipeline) {
-        throw new Error("Nenhum funil encontrado. Crie um funil antes de importar.");
-      }
+      if (!defaultPipeline) throw new Error("Nenhum funil encontrado. Crie um funil antes de importar.");
+
+      // Build pipeline name → id map
+      const pipelineByName = new Map<string, number>();
+      for (const p of allPipelines) pipelineByName.set(p.name.toLowerCase().trim(), p.id);
+
+      // Build stage maps per pipeline
       const allStagesMap = new Map<number, any[]>();
+      const stageByNameGlobal = new Map<string, { pipelineId: number; stageId: number }>();
       for (const p of allPipelines) {
         const stages = await crm.listStages(tenantId, p.id);
         allStagesMap.set(p.id, stages);
+        for (const s of stages) {
+          stageByNameGlobal.set(s.name.toLowerCase().trim(), { pipelineId: p.id, stageId: s.id });
+        }
       }
       const defaultStages = allStagesMap.get(defaultPipeline.id) || [];
       const defaultStage = defaultStages[0];
-      if (!defaultStage) {
-        throw new Error("Nenhuma etapa encontrada no funil padrão.");
+      if (!defaultStage) throw new Error("Nenhuma etapa encontrada no funil padrão.");
+
+      // Find won/lost stages
+      const wonStageMap = new Map<number, number>(); // pipelineId → wonStageId
+      const lostStageMap = new Map<number, number>();
+      for (const [pId, stages] of Array.from(allStagesMap.entries())) {
+        const won = stages.find((s: any) => s.isWon);
+        const lost = stages.find((s: any) => s.isLost);
+        if (won) wonStageMap.set(pId, won.id);
+        if (lost) lostStageMap.set(pId, lost.id);
       }
 
-      // Pre-fetch existing sources and campaigns for matching
+      // Sources, campaigns, loss reasons
       const existingSources = await crm.listLeadSources(tenantId);
       const existingCampaigns = await crm.listCampaigns(tenantId);
+      const existingLossReasons = await crm.listLossReasons(tenantId);
       const sourceMap = new Map(existingSources.map((s: any) => [s.name.toLowerCase().trim(), s.id]));
       const campaignMap = new Map(existingCampaigns.map((c: any) => [c.name.toLowerCase().trim(), c.id]));
+      const lossReasonMap = new Map(existingLossReasons.map((r: any) => [r.name.toLowerCase().trim(), r.id]));
 
-      // Cache for contacts by email (dedup within batch)
+      // CRM users (responsáveis)
+      const existingCrmUsers = await crm.listCrmUsers(tenantId);
+      const crmUserByName = new Map<string, number>();
+      for (const u of existingCrmUsers) {
+        crmUserByName.set(u.name.toLowerCase().trim(), u.id);
+      }
+
+      // Product catalog
+      const existingProducts = await crm.listCatalogProducts(tenantId, {});
+      const productByName = new Map<string, number>();
+      for (const p of existingProducts) {
+        productByName.set(p.name.toLowerCase().trim(), p.id);
+      }
+
+      // Contact/account dedup caches
       const contactByEmail = new Map<string, number>();
-      // Cache for accounts by name (dedup within batch)
+      const contactByPhone = new Map<string, number>();
+      const contactByName = new Map<string, number>();
       const accountByName = new Map<string, number>();
 
-      // Pre-fetch existing contacts by email for dedup
       const db = await getDb();
       if (db) {
         try {
-          const [existingContacts]: any = await db.execute(
-            sql.raw(`SELECT id, email FROM contacts WHERE tenantId = ${tenantId} AND email IS NOT NULL AND email != '' AND deletedAt IS NULL`)
+          const [ec]: any = await db.execute(
+            sql.raw(`SELECT id, email, phone, name FROM contacts WHERE tenantId = ${tenantId} AND deletedAt IS NULL`)
           );
-          if (existingContacts) {
-            for (const c of existingContacts) {
-              if (c.email) contactByEmail.set(c.email.toLowerCase().trim(), c.id);
-            }
+          if (ec) for (const c of ec) {
+            if (c.email) contactByEmail.set(c.email.toLowerCase().trim(), c.id);
+            if (c.phone) contactByPhone.set(c.phone.replace(/\D/g, "").slice(-11), c.id);
+            if (c.name) contactByName.set(c.name.toLowerCase().trim(), c.id);
           }
         } catch {}
-        // Pre-fetch existing accounts by name
         try {
-          const [existingAccounts]: any = await db.execute(
+          const [ea]: any = await db.execute(
             sql.raw(`SELECT id, name FROM accounts WHERE tenantId = ${tenantId} AND deletedAt IS NULL`)
           );
-          if (existingAccounts) {
-            for (const a of existingAccounts) {
-              if (a.name) accountByName.set(a.name.toLowerCase().trim(), a.id);
-            }
+          if (ea) for (const a of ea) {
+            if (a.name) accountByName.set(a.name.toLowerCase().trim(), a.id);
           }
         } catch {}
       }
 
-      for (let i = 0; i < rows.length; i++) {
-        const row = rows[i];
+      // ─── Helper: find or create contact by email/phone/name ───
+      async function findOrCreateContact(name: string, email?: string, phone?: string, cargo?: string, source?: string): Promise<number | undefined> {
+        // Dedup by email first
+        const emailKey = email?.toLowerCase().trim();
+        if (emailKey && contactByEmail.has(emailKey)) return contactByEmail.get(emailKey);
+        // Dedup by phone (last 11 digits)
+        if (phone) {
+          const phoneKey = phone.replace(/\D/g, "").slice(-11);
+          if (phoneKey.length >= 10 && contactByPhone.has(phoneKey)) return contactByPhone.get(phoneKey);
+        }
+        // Dedup by exact name
+        const nameKey = name.toLowerCase().trim();
+        if (contactByName.has(nameKey)) return contactByName.get(nameKey);
+
+        const contact = await crm.createContact({
+          tenantId, name: name.trim(),
+          email: email?.trim() || undefined,
+          phone: phone?.trim() || undefined,
+          source: source || "Importação RD",
+          createdBy: userId,
+        });
+        if (contact) {
+          const id = (contact as any).insertId ?? (contact as any).id;
+          if (id) {
+            if (emailKey) contactByEmail.set(emailKey, id);
+            if (phone) contactByPhone.set(phone.replace(/\D/g, "").slice(-11), id);
+            contactByName.set(nameKey, id);
+            contactsCreated++;
+            // Set cargo as custom field if provided
+            if (cargo && db) {
+              try {
+                // Ensure "Cargo" custom field exists
+                let cargoFieldId: number | undefined;
+                const [cfRows]: any = await db.execute(
+                  sql.raw(`SELECT id FROM custom_fields WHERE tenantId = ${tenantId} AND name = 'cargo' AND entity = 'contact' LIMIT 1`)
+                );
+                if (cfRows && cfRows.length > 0) {
+                  cargoFieldId = cfRows[0].id;
+                } else {
+                  const [ins]: any = await db.execute(
+                    sql.raw(`INSERT INTO custom_fields (tenantId, entity, name, label, fieldType, sortOrder) VALUES (${tenantId}, 'contact', 'cargo', 'Cargo', 'text', 0)`)
+                  );
+                  cargoFieldId = ins?.insertId;
+                }
+                if (cargoFieldId) {
+                  await db.execute(
+                    sql.raw(`INSERT INTO custom_field_values (tenantId, fieldId, entityType, entityId, value) VALUES (${tenantId}, ${cargoFieldId}, 'contact', ${id}, '${cargo.replace(/'/g, "''")}')`)
+                  );
+                }
+              } catch {}
+            }
+          }
+          return id;
+        }
+        return undefined;
+      }
+
+      // ─── Helper: find or create account ───
+      async function findOrCreateAccount(name: string, contactId?: number): Promise<number | undefined> {
+        const key = name.toLowerCase().trim();
+        if (accountByName.has(key)) return accountByName.get(key);
+        const account = await crm.createAccount({
+          tenantId, name: name.trim(), primaryContactId: contactId, createdBy: userId,
+        });
+        if (account) {
+          const id = (account as any).insertId ?? (account as any).id;
+          if (id) { accountByName.set(key, id); accountsCreated++; }
+          return id;
+        }
+        return undefined;
+      }
+
+      // ─── Helper: find or create CRM user (responsável) ───
+      async function findOrCreateCrmUser(name: string): Promise<number | undefined> {
+        const key = name.toLowerCase().trim();
+        if (crmUserByName.has(key)) return crmUserByName.get(key);
         try {
-          // 1. Find or create contact
-          let contactId: number | undefined;
-          const emailKey = row.email?.toLowerCase().trim();
-          if (emailKey && contactByEmail.has(emailKey)) {
-            contactId = contactByEmail.get(emailKey);
-          } else {
-            const contact = await crm.createContact({
-              tenantId,
-              name: row.nome.trim(),
-              email: row.email?.trim() || undefined,
-              phone: row.telefone?.trim() || undefined,
-              source: row.fonte?.trim() || "Planilha",
-              createdBy: userId,
-            });
-            if (contact) {
-              contactId = (contact as any).insertId ?? (contact as any).id;
-              if (emailKey && contactId) contactByEmail.set(emailKey, contactId);
-            }
+          const user = await crm.createCrmUser({
+            tenantId, name: name.trim(), email: `${key.replace(/\s+/g, ".")}@importado.rd`,
+          });
+          if (user) {
+            const id = (user as any).insertId ?? (user as any).id;
+            if (id) crmUserByName.set(key, id);
+            return id;
           }
+        } catch {}
+        return undefined;
+      }
 
-          // 2. Find or create account (empresa)
-          let accountId: number | undefined;
-          if (row.empresa?.trim()) {
-            const empresaKey = row.empresa.trim().toLowerCase();
-            if (accountByName.has(empresaKey)) {
-              accountId = accountByName.get(empresaKey);
+      // ─── Helper: find or create product ───
+      async function findOrCreateProduct(name: string): Promise<number | undefined> {
+        const key = name.toLowerCase().trim();
+        if (productByName.has(key)) return productByName.get(key);
+        try {
+          const prod = await crm.createCatalogProduct({
+            tenantId, name: name.trim(), basePriceCents: 0, productType: "other",
+          });
+          if (prod) {
+            const id = (prod as any).insertId ?? (prod as any).id;
+            if (id) { productByName.set(key, id); productsCreated++; }
+            return id;
+          }
+        } catch {}
+        return undefined;
+      }
+
+      // ─── Helper: find or create source ───
+      async function findOrCreateSource(name: string): Promise<number | undefined> {
+        const key = name.toLowerCase().trim();
+        if (sourceMap.has(key)) return sourceMap.get(key);
+        try {
+          const src = await crm.createLeadSource({ tenantId, name: name.trim() });
+          if (src) {
+            const id = (src as any).insertId ?? (src as any).id;
+            if (id) sourceMap.set(key, id);
+            return id;
+          }
+        } catch {}
+        return undefined;
+      }
+
+      // ─── Helper: find or create campaign ───
+      async function findOrCreateCampaign(name: string): Promise<number | undefined> {
+        const key = name.toLowerCase().trim();
+        if (campaignMap.has(key)) return campaignMap.get(key);
+        try {
+          const camp = await crm.createCampaign({ tenantId, name: name.trim() });
+          if (camp) {
+            const id = (camp as any).insertId ?? (camp as any).id;
+            if (id) campaignMap.set(key, id);
+            return id;
+          }
+        } catch {}
+        return undefined;
+      }
+
+      // ─── Helper: find or create loss reason ───
+      async function findOrCreateLossReason(name: string): Promise<number | undefined> {
+        const key = name.toLowerCase().trim();
+        if (lossReasonMap.has(key)) return lossReasonMap.get(key);
+        try {
+          const lr = await crm.createLossReason({ tenantId, name: name.trim() });
+          if (lr) {
+            const id = (lr as any).insertId ?? (lr as any).id;
+            if (id) lossReasonMap.set(key, id);
+            return id;
+          }
+        } catch {}
+        return undefined;
+      }
+
+      // ─── Detect custom field columns (not in RD_COLUMN_MAP) ───
+      const knownKeys = new Set(Object.keys(RD_COLUMN_MAP));
+      const customFieldColumns: string[] = [];
+      if (rows.length > 0) {
+        for (const key of Object.keys(rows[0])) {
+          if (!knownKeys.has(key.trim()) && key.trim()) {
+            customFieldColumns.push(key.trim());
+          }
+        }
+      }
+
+      // Ensure custom fields exist in DB for detected columns
+      const customFieldIdMap = new Map<string, number>(); // columnName → fieldId
+      if (customFieldColumns.length > 0 && db) {
+        for (const col of customFieldColumns) {
+          try {
+            const slug = col.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
+            const [existing]: any = await db.execute(
+              sql.raw(`SELECT id FROM custom_fields WHERE tenantId = ${tenantId} AND name = '${slug}' AND entity = 'deal' LIMIT 1`)
+            );
+            if (existing && existing.length > 0) {
+              customFieldIdMap.set(col, existing[0].id);
             } else {
-              const account = await crm.createAccount({
-                tenantId,
-                name: row.empresa.trim(),
-                primaryContactId: contactId,
-                createdBy: userId,
-              });
-              if (account) {
-                accountId = (account as any).insertId ?? (account as any).id;
-                if (accountId) accountByName.set(empresaKey, accountId);
-              }
+              const [ins]: any = await db.execute(
+                sql.raw(`INSERT INTO custom_fields (tenantId, entity, name, label, fieldType, sortOrder, groupName) VALUES (${tenantId}, 'deal', '${slug}', '${col.replace(/'/g, "''")}', 'text', 0, 'Importação RD')`)
+              );
+              if (ins?.insertId) customFieldIdMap.set(col, ins.insertId);
             }
-          }
+          } catch {}
+        }
+      }
 
-          // 3. Resolve pipeline stage by name
+      // ─── Process each row ───
+      for (let i = 0; i < rows.length; i++) {
+        const raw = rows[i];
+        const row = normalizeRow(raw);
+
+        // Update progress every 10 rows
+        if (i % 10 === 0) {
+          ssProgress.processedRows = i;
+          ssProgress.imported = imported;
+          ssProgress.skipped = skipped;
+          ssProgress.errors = errors.length;
+          ssProgress.errorDetails = errors.slice(-20); // Keep last 20 errors
+          ssProgress.contactsCreated = contactsCreated;
+          ssProgress.accountsCreated = accountsCreated;
+          ssProgress.productsCreated = productsCreated;
+          ssProgress.phase = `Processando linha ${i + 1} de ${rows.length}...`;
+        }
+
+        try {
+          // 1. Parse contacts (may be multiple separated by ;)
+          const contactNames = (row.contatos || row.nome || "").split(";").map(s => s.trim()).filter(Boolean);
+          const emails = (row.email || "").split(";").map(s => s.trim()).filter(Boolean);
+          const phones = (row.telefone || "").split(";").map(s => s.trim()).filter(Boolean);
+          const cargo = row.cargo || "";
+          const fonte = row.fonte || "";
+
+          // Primary contact = first contact name
+          const primaryName = contactNames[0] || row.nome || `Linha ${i + 1}`;
+          const primaryEmail = emails[0] || undefined;
+          const primaryPhone = phones[0] || undefined;
+          const primaryContactId = await findOrCreateContact(primaryName, primaryEmail, primaryPhone, cargo, fonte || "Importação RD");
+
+          // Additional contacts as deal participants (created later)
+          const additionalContactIds: number[] = [];
+          for (let j = 1; j < contactNames.length; j++) {
+            const cId = await findOrCreateContact(
+              contactNames[j], emails[j] || undefined, phones[j] || undefined, undefined, fonte || "Importação RD"
+            );
+            if (cId) additionalContactIds.push(cId);
+          }
+          // Additional phones/emails without matching contact name → attach to primary
+          // (already handled by primary contact creation)
+
+          // 2. Account (empresa)
+          let accountId: number | undefined;
+          if (row.empresa) accountId = await findOrCreateAccount(row.empresa, primaryContactId);
+
+          // 3. Resolve pipeline + stage
           let targetPipelineId = defaultPipeline.id;
           let targetStageId = defaultStage.id;
-          if (row.etapa?.trim()) {
-            const etapaName = row.etapa.trim().toLowerCase();
-            let found = false;
-            for (const [pId, stages] of Array.from(allStagesMap.entries())) {
-              const match = stages.find((s: any) => s.name.toLowerCase() === etapaName);
-              if (match) {
-                targetPipelineId = pId;
-                targetStageId = match.id;
-                found = true;
-                break;
-              }
+          // Try to match pipeline by name
+          if (row.funil) {
+            const pId = pipelineByName.get(row.funil.toLowerCase().trim());
+            if (pId) targetPipelineId = pId;
+          }
+          // Try to match stage by name
+          if (row.etapa) {
+            const stageMatch = stageByNameGlobal.get(row.etapa.toLowerCase().trim());
+            if (stageMatch) {
+              targetPipelineId = stageMatch.pipelineId;
+              targetStageId = stageMatch.stageId;
             }
           }
 
-          // 4. Parse value
-          let valueCents: number | undefined;
-          if (row.valor?.trim()) {
-            const cleaned = row.valor.replace(/[R$\s.]/g, "").replace(",", ".");
-            const parsed = parseFloat(cleaned);
-            if (!isNaN(parsed)) valueCents = Math.round(parsed * 100);
+          // 4. Determine deal status
+          let dealStatus: "open" | "won" | "lost" = "open";
+          const estado = (row.estado || "").toLowerCase();
+          if (estado === "vendida" || estado === "won" || estado === "ganha") {
+            dealStatus = "won";
+            const wonStage = wonStageMap.get(targetPipelineId);
+            if (wonStage) targetStageId = wonStage;
+          } else if (estado === "perdida" || estado === "lost") {
+            dealStatus = "lost";
+            const lostStage = lostStageMap.get(targetPipelineId);
+            if (lostStage) targetStageId = lostStage;
           }
 
-          // 5. Resolve source
-          let leadSource: string | undefined;
-          if (row.fonte?.trim()) {
-            leadSource = row.fonte.trim();
-            if (!sourceMap.has(leadSource.toLowerCase())) {
-              const src = await crm.createLeadSource({ tenantId, name: leadSource });
-              if (src) sourceMap.set(leadSource.toLowerCase(), (src as any).insertId ?? (src as any).id);
-            }
+          // 5. Parse values
+          const valorUnico = parseMoneyToCents(row.valorUnico || row["Valor Único"] || "");
+          const valorRecorrente = parseMoneyToCents(row.valorRecorrente || row["Valor Recorrente"] || "");
+          const valueCents = valorUnico + valorRecorrente;
+
+          // 6. Source + Campaign
+          if (fonte) await findOrCreateSource(fonte);
+          const campanha = row.campanha || row.utmCampaign || "";
+          if (campanha) await findOrCreateCampaign(campanha);
+
+          // 7. Loss reason
+          let lossReasonId: number | undefined;
+          if (dealStatus === "lost" && row.motivoPerda) {
+            lossReasonId = await findOrCreateLossReason(row.motivoPerda);
           }
 
-          // 6. Create deal
-          const dealTitle = row.negociacao?.trim() || `${row.nome.trim()} — Importação Planilha`;
+          // 8. Responsável (owner)
+          let ownerUserId: number | undefined;
+          if (row.responsavel) ownerUserId = await findOrCreateCrmUser(row.responsavel);
+
+          // 9. Dates
+          const createdAt = parseBrDate(row.dataCriacao || "", row.horaCriacao || "");
+          const closedAt = parseBrDate(row.dataFechamento || "", row.horaFechamento || "");
+          const expectedCloseAt = parseBrDate(row.previsaoFechamento || "");
+
+          // 10. Create deal
+          const dealTitle = row.nome || primaryName;
           const deal = await crm.createDeal({
             tenantId,
             title: dealTitle,
-            contactId,
+            contactId: primaryContactId,
             accountId,
             pipelineId: targetPipelineId,
             stageId: targetStageId,
-            valueCents,
-            ownerUserId: userId,
+            valueCents: valueCents || undefined,
+            ownerUserId: ownerUserId || userId,
             createdBy: userId,
-            leadSource: leadSource || "Planilha",
+            leadSource: fonte || "Importação RD",
           });
 
           if (deal) {
             const dealId = (deal as any).insertId ?? (deal as any).id;
 
-            // 7. Set utmCampaign if provided
-            if (row.campanha?.trim()) {
-              await crm.updateDeal(tenantId, dealId, { utmCampaign: row.campanha.trim() });
-              if (!campaignMap.has(row.campanha.trim().toLowerCase())) {
-                const camp = await crm.createCampaign({ tenantId, name: row.campanha.trim() });
-                if (camp) campaignMap.set(row.campanha.trim().toLowerCase(), (camp as any).insertId ?? (camp as any).id);
+            // 11. Update deal with additional fields
+            const updateData: any = {};
+            if (dealStatus !== "open") updateData.status = dealStatus;
+            if (lossReasonId) updateData.lossReasonId = lossReasonId;
+            if (row.anotacaoPerda) updateData.lossNotes = row.anotacaoPerda;
+            if (row.utmCampaign || campanha) updateData.utmCampaign = row.utmCampaign || campanha;
+            if (row.utmSource) updateData.utmSource = row.utmSource;
+            if (row.utmMedium) updateData.utmMedium = row.utmMedium;
+            if (row.utmTerm) updateData.utmTerm = row.utmTerm;
+            if (row.utmContent) updateData.utmContent = row.utmContent;
+            if (expectedCloseAt) updateData.expectedCloseAt = expectedCloseAt;
+            if (Object.keys(updateData).length > 0) {
+              await crm.updateDeal(tenantId, dealId, updateData);
+            }
+
+            // 12. Set createdAt and closedAt via raw SQL (Drizzle doesn't allow setting createdAt)
+            if (db && (createdAt || closedAt)) {
+              try {
+                const sets: string[] = [];
+                if (createdAt) sets.push(`createdAt = '${createdAt.toISOString().slice(0, 19).replace("T", " ")}'`);
+                if (closedAt) sets.push(`updatedAt = '${closedAt.toISOString().slice(0, 19).replace("T", " ")}'`);
+                if (sets.length > 0) {
+                  await db.execute(sql.raw(`UPDATE deals SET ${sets.join(", ")} WHERE id = ${dealId}`));
+                }
+              } catch {}
+            }
+
+            // 13. Products (comma-separated)
+            if (row.produtos) {
+              const productNames = row.produtos.split(",").map((s: string) => s.trim()).filter(Boolean);
+              for (const pName of productNames) {
+                const productId = await findOrCreateProduct(pName);
+                if (productId) {
+                  try {
+                    await crm.createDealProduct({
+                      tenantId, dealId, productId, name: pName.trim(),
+                      quantity: 1, unitPriceCents: 0, finalPriceCents: 0,
+                    });
+                  } catch {}
+                }
               }
             }
 
-            // 8. Add notes if provided
-            if (row.notas?.trim()) {
-              await crm.createNote({
-                tenantId,
-                entityType: "deal",
-                entityId: dealId,
-                body: row.notas.trim(),
-                createdByUserId: userId,
-              });
+            // 14. Additional contacts as deal participants
+            for (const cId of additionalContactIds) {
+              try {
+                await crm.addDealParticipant({ tenantId, dealId, contactId: cId, role: "other" });
+              } catch {}
             }
 
-            // 9. History
+            // 15. Custom field values
+            if (db && customFieldIdMap.size > 0) {
+              for (const [col, fieldId] of Array.from(customFieldIdMap.entries())) {
+                const val = raw[col];
+                if (val != null && val.trim()) {
+                  try {
+                    await db.execute(
+                      sql.raw(`INSERT INTO custom_field_values (tenantId, fieldId, entityType, entityId, value) VALUES (${tenantId}, ${fieldId}, 'deal', ${dealId}, '${val.trim().replace(/'/g, "''")}')`)
+                    );
+                  } catch {}
+                }
+              }
+            }
+
+            // 16. Store RD custom fields in deal JSON column
+            const rdCustomFields: Record<string, string> = {};
+            if (row.qualificacao) rdCustomFields.qualificacao = row.qualificacao;
+            if (row.pausada) rdCustomFields.pausada = row.pausada;
+            for (const col of customFieldColumns) {
+              const val = raw[col];
+              if (val != null && val.trim()) rdCustomFields[col] = val.trim();
+            }
+            if (Object.keys(rdCustomFields).length > 0 && db) {
+              try {
+                await db.execute(
+                  sql.raw(`UPDATE deals SET rdCustomFields = '${JSON.stringify(rdCustomFields).replace(/'/g, "''")}' WHERE id = ${dealId}`)
+                );
+              } catch {}
+            }
+
+            // 17. History
             await crm.createDealHistory({
-              tenantId,
-              dealId,
-              action: "created",
-              description: `Negociação importada via planilha por ${userName}`,
-              actorUserId: userId,
-              actorName: userName,
+              tenantId, dealId, action: "created",
+              description: `Negociação importada via planilha RD Station por ${userName}`,
+              actorUserId: userId, actorName: userName,
             });
           }
 
           imported++;
         } catch (e: any) {
-          errors.push(`Linha ${i + 1} (${row.nome}): ${e.message || "Erro desconhecido"}`);
+          const rowName = raw["Nome"] || raw["nome"] || `Linha ${i + 1}`;
+          errors.push(`Linha ${i + 1} (${rowName}): ${e.message || "Erro desconhecido"}`);
         }
       }
 
-      return { imported, skipped, errors };
-    }),
-});
+      // Update final progress (don't delete - let frontend read the final state)
+      ssProgress.status = "done";
+      ssProgress.processedRows = rows.length;
+      ssProgress.imported = imported;
+      ssProgress.skipped = skipped;
+      ssProgress.errors = errors.length;
+      ssProgress.errorDetails = errors.slice(-50); // Keep last 50 errors
+      ssProgress.contactsCreated = contactsCreated;
+      ssProgress.accountsCreated = accountsCreated;
+      ssProgress.productsCreated = productsCreated;
+      ssProgress.customFieldsDetected = customFieldColumns.length;
+      ssProgress.phase = "Importação concluída!";
+
+      console.log(`[RD CSV Import] Completed: ${imported} imported, ${skipped} skipped, ${errors.length} errors, ${contactsCreated} contacts, ${accountsCreated} accounts, ${productsCreated} products`);
+
+      // Auto-cleanup after 5 minutes
+      setTimeout(() => {
+        progressStore.delete(progressKey);
+      }, 5 * 60 * 1000);
+}
 
 // ─── Background import function ───
 async function runImport(

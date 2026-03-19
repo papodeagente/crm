@@ -106,7 +106,8 @@ export default function RDCrmImport() {
   const [ssRows, setSsRows] = useState<SpreadsheetRow[]>([]);
   const [ssErrors, setSsErrors] = useState<string[]>([]);
   const [ssImporting, setSsImporting] = useState(false);
-  const [ssResult, setSsResult] = useState<{ imported: number; skipped: number; errors: string[] } | null>(null);
+  const [ssResult, setSsResult] = useState<{ imported: number; skipped: number; errors: string[]; contactsCreated?: number; accountsCreated?: number; productsCreated?: number; customFieldsDetected?: number; totalRows?: number } | null>(null);
+  const [ssProgressStarted, setSsProgressStarted] = useState(false);
 
   const validateMutation = trpc.rdCrmImport.validateToken.useMutation();
   const summaryMutation = trpc.rdCrmImport.fetchSummary.useMutation();
@@ -116,6 +117,11 @@ export default function RDCrmImport() {
     enabled: step === "importing",
     refetchInterval: step === "importing" ? 1500 : false,
   });
+  const ssProgressQuery = trpc.rdCrmImport.getSpreadsheetProgress?.useQuery?.(undefined, {
+    enabled: ssProgressStarted && ssStep === "importing",
+    refetchInterval: ssProgressStarted && ssStep === "importing" ? 1500 : false,
+  });
+  const ssProgressData = ssProgressQuery?.data as any;
 
   const progress = progressQuery.data;
 
@@ -217,6 +223,39 @@ export default function RDCrmImport() {
     toast.success("Planilha modelo baixada!");
   }, []);
 
+  // ─── Proper CSV parser that handles quoted fields with commas/newlines ───
+  function parseCsvLine(line: string, sep: string): string[] {
+    const result: string[] = [];
+    let current = "";
+    let inQuotes = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (inQuotes) {
+        if (ch === '"') {
+          if (i + 1 < line.length && line[i + 1] === '"') {
+            current += '"';
+            i++; // skip escaped quote
+          } else {
+            inQuotes = false;
+          }
+        } else {
+          current += ch;
+        }
+      } else {
+        if (ch === '"') {
+          inQuotes = true;
+        } else if (ch === sep) {
+          result.push(current.trim());
+          current = "";
+        } else {
+          current += ch;
+        }
+      }
+    }
+    result.push(current.trim());
+    return result;
+  }
+
   const handleFileUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -227,19 +266,30 @@ export default function RDCrmImport() {
     reader.onload = (ev) => {
       try {
         const text = ev.target?.result as string;
-        const lines = text.split(/\r?\n/).filter(l => l.trim());
+        let lines = text.split(/\r?\n/).filter(l => l.trim());
         if (lines.length < 2) {
           setSsErrors(["A planilha precisa ter pelo menos um cabeçalho e uma linha de dados."]);
           return;
         }
 
+        // RD Station CSV starts with "sep=," — skip it
+        if (lines[0].trim().toLowerCase().startsWith("sep=")) {
+          lines = lines.slice(1);
+        }
+
         // Detect separator (semicolon or comma)
         const sep = lines[0].includes(";") ? ";" : ",";
-        const headers = lines[0].split(sep).map(h => h.trim().toLowerCase().replace(/^"/, "").replace(/"$/, ""));
+        // Keep original case for RD Station headers ("Nome", "Empresa", etc.)
+        const headers = parseCsvLine(lines[0], sep);
+        // Also create lowercase version for validation
+        const headersLower = headers.map(h => h.toLowerCase());
+
+        // Detect if this is an RD Station export (has "Nome" and "Estado" columns)
+        const isRdExport = headersLower.includes("nome") && (headersLower.includes("estado") || headersLower.includes("funil de vendas"));
 
         // Validate required columns
         const requiredCols = ["nome"];
-        const missing = requiredCols.filter(c => !headers.includes(c));
+        const missing = requiredCols.filter(c => !headersLower.includes(c));
         if (missing.length > 0) {
           setSsErrors([`Colunas obrigatórias não encontradas: ${missing.join(", ")}. Baixe o modelo para referência.`]);
           return;
@@ -249,14 +299,18 @@ export default function RDCrmImport() {
         const parseErrors: string[] = [];
 
         for (let i = 1; i < lines.length; i++) {
-          const values = lines[i].split(sep).map(v => v.trim().replace(/^"/, "").replace(/"$/, ""));
+          const values = parseCsvLine(lines[i], sep);
           const row: SpreadsheetRow = { nome: "" };
+          // Use ORIGINAL headers (preserving case) as keys
           headers.forEach((h, idx) => {
             row[h] = values[idx] || "";
           });
+          // Also set lowercase "nome" for validation
+          const nomeIdx = headersLower.indexOf("nome");
+          if (nomeIdx >= 0) row.nome = values[nomeIdx] || "";
 
           if (!row.nome?.trim()) {
-            parseErrors.push(`Linha ${i + 1}: campo "nome" vazio — será ignorada.`);
+            parseErrors.push(`Linha ${i + 1}: campo "Nome" vazio — será ignorada.`);
             continue;
           }
           rows.push(row);
@@ -265,13 +319,46 @@ export default function RDCrmImport() {
         setSsRows(rows);
         setSsErrors(parseErrors);
         setSsStep("preview");
-        toast.success(`${rows.length} registros encontrados na planilha.`);
+
+        if (isRdExport) {
+          const colCount = headers.length;
+          toast.success(`CSV do RD Station detectado! ${rows.length} negociações com ${colCount} colunas.`);
+        } else {
+          toast.success(`${rows.length} registros encontrados na planilha.`);
+        }
       } catch (err: any) {
         setSsErrors([`Erro ao ler arquivo: ${err.message}`]);
       }
     };
     reader.readAsText(file, "utf-8");
   }, []);
+
+  // Watch spreadsheet progress and transition to done when complete
+  useEffect(() => {
+    if (ssProgressData && ssStep === "importing") {
+      if (ssProgressData.status === "done") {
+        setSsResult({
+          imported: ssProgressData.imported || 0,
+          skipped: ssProgressData.skipped || 0,
+          errors: ssProgressData.errorDetails || [],
+          contactsCreated: ssProgressData.contactsCreated,
+          accountsCreated: ssProgressData.accountsCreated,
+          productsCreated: ssProgressData.productsCreated,
+          customFieldsDetected: ssProgressData.customFieldsDetected,
+          totalRows: ssProgressData.totalRows,
+        });
+        setSsStep("done");
+        setSsImporting(false);
+        setSsProgressStarted(false);
+        toast.success("Importação por planilha concluída!");
+      } else if (ssProgressData.status === "error") {
+        toast.error(`Erro na importação: ${ssProgressData.phase}`);
+        setSsStep("preview");
+        setSsImporting(false);
+        setSsProgressStarted(false);
+      }
+    }
+  }, [ssProgressData, ssStep]);
 
   const handleSpreadsheetImport = useCallback(async () => {
     if (ssRows.length === 0) return;
@@ -280,35 +367,23 @@ export default function RDCrmImport() {
 
     try {
       if (spreadsheetImportMutation) {
-        const result = await spreadsheetImportMutation.mutateAsync({
+        // Send ALL columns as Record<string, string> — the backend handles mapping
+        // This returns immediately, the import runs in background
+        await spreadsheetImportMutation.mutateAsync({
           tenantId: TENANT_ID,
-          rows: ssRows.map(r => ({
-            nome: r.nome || "",
-            email: r.email || undefined,
-            telefone: r.telefone || undefined,
-            empresa: r.empresa || undefined,
-            negociacao: r.negociacao || undefined,
-            valor: r.valor || undefined,
-            etapa: r.etapa || undefined,
-            fonte: r.fonte || undefined,
-            campanha: r.campanha || undefined,
-            notas: r.notas || undefined,
-          })),
+          rows: ssRows as any, // rows already have all CSV columns as keys
         });
-        setSsResult(result);
+        // Start polling for progress
+        setSsProgressStarted(true);
       } else {
-        // Fallback: simulate import not available
         toast.error("Endpoint de importação por planilha não disponível. Será implementado em breve.");
         setSsStep("upload");
         setSsImporting(false);
         return;
       }
-      setSsStep("done");
-      toast.success("Importação por planilha concluída!");
     } catch (e: any) {
       toast.error(`Erro na importação: ${e.message}`);
       setSsStep("preview");
-    } finally {
       setSsImporting(false);
     }
   }, [ssRows, TENANT_ID, spreadsheetImportMutation]);
@@ -1035,7 +1110,11 @@ export default function RDCrmImport() {
                     <CheckCircle2 className="h-5 w-5 text-green-500 shrink-0" />
                     <div>
                       <p className="text-sm font-medium text-foreground">
-                        {ssRows.length} registros encontrados em "{ssFile?.name}"
+                        {ssRows.length} negociações encontradas em "{ssFile?.name}"
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {Object.keys(ssRows[0] || {}).length} colunas detectadas
+                        {ssRows[0]?.["Estado"] && " · CSV do RD Station CRM"}
                       </p>
                       {ssErrors.length > 0 && (
                         <p className="text-xs text-yellow-500">{ssErrors.length} linhas ignoradas (campos obrigatórios vazios)</p>
@@ -1044,6 +1123,65 @@ export default function RDCrmImport() {
                   </div>
                 </CardContent>
               </Card>
+
+              {/* Summary of detected data */}
+              {ssRows.length > 0 && ssRows[0]?.["Estado"] && (
+                <Card className="border-border/50">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <BarChart3 className="h-4 w-4 text-primary" />
+                      Resumo do CSV
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                      {(() => {
+                        const stats = {
+                          vendidas: ssRows.filter(r => r["Estado"] === "Vendida").length,
+                          perdidas: ssRows.filter(r => r["Estado"] === "Perdida").length,
+                          emAndamento: ssRows.filter(r => r["Estado"] === "Em Andamento").length,
+                          comProdutos: ssRows.filter(r => (r["Produtos"] || "").trim()).length,
+                          comEmail: ssRows.filter(r => (r["Email"] || r["email"] || "").trim()).length,
+                          comTelefone: ssRows.filter(r => (r["Telefone"] || r["telefone"] || "").trim()).length,
+                          multiTelefone: ssRows.filter(r => (r["Telefone"] || "").includes(";")).length,
+                        };
+                        return (
+                          <>
+                            <div className="p-2 rounded-lg bg-green-500/10 text-center">
+                              <p className="text-lg font-bold text-green-500">{stats.vendidas}</p>
+                              <p className="text-[10px] text-muted-foreground">Vendidas</p>
+                            </div>
+                            <div className="p-2 rounded-lg bg-red-500/10 text-center">
+                              <p className="text-lg font-bold text-red-500">{stats.perdidas}</p>
+                              <p className="text-[10px] text-muted-foreground">Perdidas</p>
+                            </div>
+                            <div className="p-2 rounded-lg bg-blue-500/10 text-center">
+                              <p className="text-lg font-bold text-blue-500">{stats.emAndamento}</p>
+                              <p className="text-[10px] text-muted-foreground">Em Andamento</p>
+                            </div>
+                            <div className="p-2 rounded-lg bg-purple-500/10 text-center">
+                              <p className="text-lg font-bold text-purple-500">{stats.comProdutos}</p>
+                              <p className="text-[10px] text-muted-foreground">Com Produtos</p>
+                            </div>
+                            <div className="p-2 rounded-lg bg-muted/50 text-center">
+                              <p className="text-lg font-bold text-foreground">{stats.comEmail}</p>
+                              <p className="text-[10px] text-muted-foreground">Com Email</p>
+                            </div>
+                            <div className="p-2 rounded-lg bg-muted/50 text-center">
+                              <p className="text-lg font-bold text-foreground">{stats.comTelefone}</p>
+                              <p className="text-[10px] text-muted-foreground">Com Telefone</p>
+                            </div>
+                            <div className="p-2 rounded-lg bg-orange-500/10 text-center">
+                              <p className="text-lg font-bold text-orange-500">{stats.multiTelefone}</p>
+                              <p className="text-[10px] text-muted-foreground">Multi-Telefone</p>
+                            </div>
+                          </>
+                        );
+                      })()}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
 
               <Card className="border-border/50">
                 <CardHeader>
@@ -1055,25 +1193,37 @@ export default function RDCrmImport() {
                     <table className="w-full text-xs">
                       <thead>
                         <tr className="border-b border-border/30">
-                          <th className="text-left py-2 px-2 font-medium text-muted-foreground">#</th>
-                          <th className="text-left py-2 px-2 font-medium text-muted-foreground">Nome</th>
-                          <th className="text-left py-2 px-2 font-medium text-muted-foreground">Email</th>
-                          <th className="text-left py-2 px-2 font-medium text-muted-foreground">Telefone</th>
-                          <th className="text-left py-2 px-2 font-medium text-muted-foreground">Empresa</th>
-                          <th className="text-left py-2 px-2 font-medium text-muted-foreground">Negociação</th>
-                          <th className="text-left py-2 px-2 font-medium text-muted-foreground">Valor</th>
+                          <th className="text-left py-2 px-2 font-medium text-muted-foreground whitespace-nowrap">#</th>
+                          <th className="text-left py-2 px-2 font-medium text-muted-foreground whitespace-nowrap">Nome</th>
+                          <th className="text-left py-2 px-2 font-medium text-muted-foreground whitespace-nowrap">Contato</th>
+                          <th className="text-left py-2 px-2 font-medium text-muted-foreground whitespace-nowrap">Telefone</th>
+                          <th className="text-left py-2 px-2 font-medium text-muted-foreground whitespace-nowrap">Empresa</th>
+                          <th className="text-left py-2 px-2 font-medium text-muted-foreground whitespace-nowrap">Etapa</th>
+                          <th className="text-left py-2 px-2 font-medium text-muted-foreground whitespace-nowrap">Estado</th>
+                          <th className="text-left py-2 px-2 font-medium text-muted-foreground whitespace-nowrap">Valor</th>
+                          <th className="text-left py-2 px-2 font-medium text-muted-foreground whitespace-nowrap">Produtos</th>
                         </tr>
                       </thead>
                       <tbody>
                         {ssRows.slice(0, 10).map((row, i) => (
                           <tr key={i} className="border-b border-border/20">
                             <td className="py-2 px-2 text-muted-foreground">{i + 1}</td>
-                            <td className="py-2 px-2 text-foreground font-medium">{row.nome}</td>
-                            <td className="py-2 px-2 text-muted-foreground">{row.email || "—"}</td>
-                            <td className="py-2 px-2 text-muted-foreground">{row.telefone || "—"}</td>
-                            <td className="py-2 px-2 text-muted-foreground">{row.empresa || "—"}</td>
-                            <td className="py-2 px-2 text-muted-foreground">{row.negociacao || "—"}</td>
-                            <td className="py-2 px-2 text-muted-foreground">{row.valor || "—"}</td>
+                            <td className="py-2 px-2 text-foreground font-medium whitespace-nowrap max-w-[200px] truncate">{row["Nome"] || row.nome || "—"}</td>
+                            <td className="py-2 px-2 text-muted-foreground whitespace-nowrap max-w-[150px] truncate">{row["Contatos"] || row["Email"] || row.email || "—"}</td>
+                            <td className="py-2 px-2 text-muted-foreground whitespace-nowrap max-w-[150px] truncate">{row["Telefone"] || row.telefone || "—"}</td>
+                            <td className="py-2 px-2 text-muted-foreground whitespace-nowrap max-w-[120px] truncate">{row["Empresa"] || row.empresa || "—"}</td>
+                            <td className="py-2 px-2 text-muted-foreground whitespace-nowrap">{row["Etapa"] || row.etapa || "—"}</td>
+                            <td className="py-2 px-2 whitespace-nowrap">
+                              {row["Estado"] === "Vendida" ? (
+                                <Badge variant="outline" className="text-[9px] bg-green-500/10 text-green-500 border-green-500/30">Vendida</Badge>
+                              ) : row["Estado"] === "Perdida" ? (
+                                <Badge variant="outline" className="text-[9px] bg-red-500/10 text-red-500 border-red-500/30">Perdida</Badge>
+                              ) : (
+                                <Badge variant="outline" className="text-[9px]">{row["Estado"] || "—"}</Badge>
+                              )}
+                            </td>
+                            <td className="py-2 px-2 text-muted-foreground whitespace-nowrap">{row["Valor Único"] || row.valor || "—"}</td>
+                            <td className="py-2 px-2 text-muted-foreground whitespace-nowrap max-w-[150px] truncate">{row["Produtos"] || "—"}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -1125,13 +1275,55 @@ export default function RDCrmImport() {
             </div>
           )}
 
-          {/* Importing step */}
+          {/* Importing step with live progress */}
           {ssStep === "importing" && (
             <Card className="border-border/50">
-              <CardContent className="py-10 flex flex-col items-center text-center">
-                <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
-                <h3 className="text-lg font-semibold text-foreground mb-1">Importando dados da planilha...</h3>
-                <p className="text-sm text-muted-foreground">Processando {ssRows.length} registros. Aguarde.</p>
+              <CardContent className="py-8">
+                <div className="flex flex-col items-center text-center mb-6">
+                  <Loader2 className="h-10 w-10 animate-spin text-primary mb-3" />
+                  <h3 className="text-lg font-semibold text-foreground mb-1">Importando dados da planilha...</h3>
+                  <p className="text-sm text-muted-foreground">
+                    {ssProgressData?.phase || `Processando ${ssRows.length} registros. Aguarde.`}
+                  </p>
+                </div>
+
+                {ssProgressData && ssProgressData.totalRows > 0 && (
+                  <div className="space-y-4">
+                    {/* Progress bar */}
+                    <div className="w-full">
+                      <div className="flex justify-between text-xs text-muted-foreground mb-1">
+                        <span>{ssProgressData.processedRows || 0} de {ssProgressData.totalRows}</span>
+                        <span>{Math.round(((ssProgressData.processedRows || 0) / ssProgressData.totalRows) * 100)}%</span>
+                      </div>
+                      <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-primary rounded-full transition-all duration-500"
+                          style={{ width: `${Math.round(((ssProgressData.processedRows || 0) / ssProgressData.totalRows) * 100)}%` }}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Live stats */}
+                    <div className="grid grid-cols-3 gap-3">
+                      <div className="p-3 rounded-lg bg-green-500/10 text-center">
+                        <p className="text-xl font-bold text-green-500">{ssProgressData.imported || 0}</p>
+                        <p className="text-[10px] text-muted-foreground">Importadas</p>
+                      </div>
+                      <div className="p-3 rounded-lg bg-blue-500/10 text-center">
+                        <p className="text-xl font-bold text-blue-500">{ssProgressData.contactsCreated || 0}</p>
+                        <p className="text-[10px] text-muted-foreground">Contatos</p>
+                      </div>
+                      <div className="p-3 rounded-lg bg-red-500/10 text-center">
+                        <p className="text-xl font-bold text-red-500">{ssProgressData.errors || 0}</p>
+                        <p className="text-[10px] text-muted-foreground">Erros</p>
+                      </div>
+                    </div>
+
+                    <p className="text-[10px] text-muted-foreground text-center">
+                      Tempo estimado: ~{Math.max(1, Math.round(((ssProgressData.totalRows - (ssProgressData.processedRows || 0)) / Math.max(1, ssProgressData.processedRows || 1)) * ((Date.now() - (ssProgressData.startedAt || Date.now())) / 1000 / 60)))} min restantes
+                    </p>
+                  </div>
+                )}
               </CardContent>
             </Card>
           )}
@@ -1146,10 +1338,18 @@ export default function RDCrmImport() {
                   </div>
                   <h3 className="text-lg font-semibold text-foreground mb-1">Importação por planilha concluída!</h3>
                   <p className="text-sm text-muted-foreground">
-                    <strong className="text-foreground">{ssResult.imported}</strong> importados
+                    <strong className="text-foreground">{ssResult.imported}</strong> negociações importadas
                     {ssResult.skipped > 0 && <span> · {ssResult.skipped} já existiam</span>}
                     {ssResult.errors.length > 0 && <span className="text-red-400"> · {ssResult.errors.length} erros</span>}
                   </p>
+                  {(ssResult.contactsCreated || ssResult.accountsCreated || ssResult.productsCreated || ssResult.customFieldsDetected) && (
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {ssResult.contactsCreated ? <Badge variant="outline" className="text-[10px]"><Users className="h-3 w-3 mr-1" />{ssResult.contactsCreated} contatos</Badge> : null}
+                      {ssResult.accountsCreated ? <Badge variant="outline" className="text-[10px]"><Building2 className="h-3 w-3 mr-1" />{ssResult.accountsCreated} empresas</Badge> : null}
+                      {ssResult.productsCreated ? <Badge variant="outline" className="text-[10px]"><Package className="h-3 w-3 mr-1" />{ssResult.productsCreated} produtos</Badge> : null}
+                      {ssResult.customFieldsDetected ? <Badge variant="outline" className="text-[10px]"><Sparkles className="h-3 w-3 mr-1" />{ssResult.customFieldsDetected} campos personalizados</Badge> : null}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 

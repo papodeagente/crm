@@ -4025,3 +4025,66 @@
   - [x] STATUS_ORDER_MAP movido para module-level (não recriado a cada render)
 - [x] Sidebar: StatusTick usa lastStatus do store (que é monotônico)
 - [x] Testes exaustivos: 49 testes de monotonic enforcement (2286 total passando)
+
+## Importação RD Station CRM — Definitiva
+### Auditoria
+- [ ] Auditar código existente de importação via API
+- [ ] Auditar schema do CRM (contacts, accounts, deals, custom_fields)
+- [ ] Analisar formato CSV real do RD Station CRM (9409 linhas, 48 colunas)
+- [ ] Mapear todos os campos do RD para entidades do CRM
+
+### Importação via API
+- [ ] Revisar autenticação/token da API RD Station
+- [ ] Corrigir paginação da API
+- [ ] Corrigir mapeamento de campos
+- [ ] Corrigir relacionamentos entre entidades
+- [ ] Implementar deduplicação segura
+- [ ] Testar importação via API
+
+### Importação via CSV
+- [ ] Implementar parser CSV robusto (sep=, , cabeçalho, campos vazios, múltiplos telefones)
+- [ ] Mapear todas as 48 colunas do CSV para entidades do CRM
+- [ ] Criar/atualizar contatos com deduplicação por email/telefone
+- [ ] Criar/atualizar empresas com deduplicação por nome
+- [ ] Criar/atualizar negociações com deduplicação
+- [ ] Preservar relacionamentos (deal↔contact, deal↔account, account↔contact)
+- [ ] Importar campos personalizados
+- [ ] Importar valores monetários, datas, UTMs, fonte, campanha
+- [ ] Importar responsável, produtos, equipes
+- [ ] Importar motivo de perda e anotações
+- [ ] Testar importação via CSV
+
+### Frontend
+- [ ] UI para importação via API (configurar token, iniciar, progresso)
+- [ ] UI para importação via CSV (upload, preview, mapeamento, progresso)
+- [ ] Relatório de resultados (criados, atualizados, erros)
+
+### Validação
+- [ ] Criar conta de teste dedicada
+- [ ] Executar importação real na conta de teste
+- [ ] Validar resultado com evidência objetiva
+- [ ] Testes automatizados para ambos os métodos
+- [ ] Garantir multi-tenant e segurança
+
+## Importação por Planilha CSV do RD Station CRM (48 colunas)
+- [x] Backend: converter importSpreadsheet para processamento em background (evitar timeout HTTP)
+- [x] Backend: mapear todas as 48 colunas do CSV do RD Station (Nome, Empresa, Qualificação, Funil, Etapa, Estado, Motivo de Perda, Valor Único, Valor Recorrente, Pausada, datas, UTMs, Contatos, Cargo, Email, Telefone, Produtos, etc.)
+- [x] Backend: parsing de datas brasileiras (DD/MM/YYYY) com hora
+- [x] Backend: parsing de valores monetários (formato RD Station e brasileiro)
+- [x] Backend: detecção automática de campos personalizados (colunas não-padrão)
+- [x] Backend: criação automática de funis, etapas, fontes, campanhas, motivos de perda, produtos
+- [x] Backend: criação de contatos com deduplicação por email/telefone/nome
+- [x] Backend: criação de empresas com deduplicação por nome
+- [x] Backend: suporte a múltiplos contatos por deal (separados por ;)
+- [x] Backend: suporte a múltiplos produtos por deal (separados por ,)
+- [x] Backend: gravar UTMs (source, medium, campaign, term, content) nos campos dedicados
+- [x] Backend: gravar campos personalizados como rdCustomFields JSON
+- [x] Backend: endpoint getSpreadsheetProgress para polling de progresso
+- [x] Backend: progresso em tempo real com fase, processedRows, imported, errors, contacts, accounts, products
+- [x] Frontend: parser de CSV inteligente (detecta sep=, e formato RD Station automaticamente)
+- [x] Frontend: preview com resumo estatístico (vendidas, perdidas, em andamento, com email, com telefone, multi-telefone)
+- [x] Frontend: tabela de preview com colunas dinâmicas do RD Station
+- [x] Frontend: polling de progresso com barra visual e contadores em tempo real
+- [x] Frontend: tela de resultado com badges de contatos, empresas, produtos, campos personalizados
+- [x] Teste com CSV real: 9.389 linhas → 9.306 importadas, 3.077 contatos, 2.720 empresas, 58 produtos, 12 campos personalizados (83 erros = 0.88%)
+- [x] Vitest: 18 testes para importação por planilha (column mapping, date parsing, money parsing, background processing, progress tracking)
