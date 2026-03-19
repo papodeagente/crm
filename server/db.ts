@@ -578,25 +578,86 @@ export async function updateAssignmentStatus(tenantId: number, sessionId: string
 export async function finishAttendance(tenantId: number, sessionId: string, remoteJid: string, userId: number) {
   const db = await getDb();
   if (!db) return;
-  // Set assignment status to resolved
-  await db.update(conversationAssignments)
-    .set({ status: "resolved", resolvedAt: new Date() })
-    .where(and(
-      eq(conversationAssignments.tenantId, tenantId),
-      eq(conversationAssignments.sessionId, sessionId),
-      eq(conversationAssignments.remoteJid, remoteJid)
-    ));
+  console.log(`[finishAttendance] START tenantId=${tenantId} sessionId=${sessionId} remoteJid=${remoteJid} userId=${userId}`);
+  
+  // Normalize the JID to match what's stored in the DB
+  const normalizedJid = normalizeJid(remoteJid);
+  // Try both the raw JID and normalized JID
+  const jidVariants = [remoteJid];
+  if (normalizedJid !== remoteJid) jidVariants.push(normalizedJid);
+  
+  // Set assignment status to resolved (try all JID variants)
+  for (const jid of jidVariants) {
+    const caResult = await db.update(conversationAssignments)
+      .set({ status: "resolved", resolvedAt: new Date() })
+      .where(and(
+        eq(conversationAssignments.tenantId, tenantId),
+        eq(conversationAssignments.sessionId, sessionId),
+        eq(conversationAssignments.remoteJid, jid)
+      ));
+    const caAffected = (caResult as any)[0]?.affectedRows ?? 0;
+    if (caAffected > 0) {
+      console.log(`[finishAttendance] conversation_assignments resolved: ${caAffected} rows (jid: ${jid})`);
+      break;
+    }
+  }
+  
   // Clear assignedUserId and set status on wa_conversations so it leaves "Meus Chats"
-  await db.update(waConversations)
-    .set({ assignedUserId: null, assignedTeamId: null, status: "resolved", queuedAt: null })
+  let wcAffected = 0;
+  for (const jid of jidVariants) {
+    const wcResult = await db.update(waConversations)
+      .set({ assignedUserId: null, assignedTeamId: null, status: "resolved", queuedAt: null })
+      .where(and(
+        eq(waConversations.tenantId, tenantId),
+        eq(waConversations.sessionId, sessionId),
+        eq(waConversations.remoteJid, jid)
+      ));
+    wcAffected = (wcResult as any)[0]?.affectedRows ?? 0;
+    if (wcAffected > 0) {
+      console.log(`[finishAttendance] wa_conversations resolved: ${wcAffected} rows (jid: ${jid})`);
+      break;
+    }
+  }
+  
+  // Fallback: if no rows matched by exact JID, try by phone digits
+  if (wcAffected === 0) {
+    const jidDigits = remoteJid.replace(/@.*$/, '').replace(/\D/g, '');
+    console.log(`[finishAttendance] WARNING: 0 rows matched by exact JID, trying digits fallback: ${jidDigits}`);
+    if (jidDigits) {
+      // Find the conversation by phone digits
+      const matchByDigits = await db.select({ id: waConversations.id, remoteJid: waConversations.remoteJid })
+        .from(waConversations)
+        .where(and(
+          eq(waConversations.tenantId, tenantId),
+          eq(waConversations.sessionId, sessionId),
+          sql`(phoneDigits = ${jidDigits} OR phoneLast11 = ${jidDigits.slice(-11)})`
+        ))
+        .limit(1);
+      if (matchByDigits.length > 0) {
+        const matchedJid = matchByDigits[0].remoteJid;
+        console.log(`[finishAttendance] Found by digits: id=${matchByDigits[0].id} jid=${matchedJid}`);
+        await db.update(waConversations)
+          .set({ assignedUserId: null, assignedTeamId: null, status: "resolved", queuedAt: null })
+          .where(eq(waConversations.id, matchByDigits[0].id));
+        // Also update assignment
+        await db.update(conversationAssignments)
+          .set({ status: "resolved", resolvedAt: new Date() })
+          .where(and(
+            eq(conversationAssignments.tenantId, tenantId),
+            eq(conversationAssignments.sessionId, sessionId),
+            eq(conversationAssignments.remoteJid, matchedJid)
+          ));
+      }
+    }
+  }
+  
+  // Log event
+  const waConv = await db.select({ id: waConversations.id }).from(waConversations)
     .where(and(
       eq(waConversations.tenantId, tenantId),
       eq(waConversations.sessionId, sessionId),
-      eq(waConversations.remoteJid, remoteJid)
-    ));
-  // Log event
-  const waConv = await db.select({ id: waConversations.id }).from(waConversations)
-    .where(and(eq(waConversations.tenantId, tenantId), eq(waConversations.sessionId, sessionId), eq(waConversations.remoteJid, remoteJid)))
+      or(...jidVariants.map(jid => eq(waConversations.remoteJid, jid)))
+    ))
     .limit(1);
   if (waConv.length > 0) {
     await db.insert(conversationEvents).values({
@@ -609,6 +670,7 @@ export async function finishAttendance(tenantId: number, sessionId: string, remo
       metadata: { action: "finish_attendance" },
     });
   }
+  console.log(`[finishAttendance] DONE for ${remoteJid}`);
 }
 
 export async function getAssignmentsForSession(tenantId: number, sessionId: string) {

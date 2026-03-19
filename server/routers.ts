@@ -734,8 +734,9 @@ export const appRouter = router({
         assignedUserId: z.number().nullable(),
         assignedTeamId: z.number().nullable().optional(),
       }))
-      .mutation(async ({ input }) => {
-        const result = await assignConversation(input.tenantId, input.sessionId, input.remoteJid, input.assignedUserId, input.assignedTeamId);
+      .mutation(async ({ input, ctx }) => {
+        const tenantId = (ctx as any).saasUser?.tenantId || input.tenantId || 1;
+        const result = await assignConversation(tenantId, input.sessionId, input.remoteJid, input.assignedUserId, input.assignedTeamId);
         const io = getIo();
         if (io) {
           io.emit("conversationUpdated", {
@@ -758,8 +759,9 @@ export const appRouter = router({
         toUserId: z.number(),
         toTeamId: z.number().nullable().optional(),
       }))
-      .mutation(async ({ input }) => {
-        const result = await assignConversation(input.tenantId, input.sessionId, input.remoteJid, input.toUserId, input.toTeamId);
+      .mutation(async ({ input, ctx }) => {
+        const tenantId = (ctx as any).saasUser?.tenantId || input.tenantId || 1;
+        const result = await assignConversation(tenantId, input.sessionId, input.remoteJid, input.toUserId, input.toTeamId);
         const io = getIo();
         if (io) {
           io.emit("conversationUpdated", {
@@ -781,8 +783,9 @@ export const appRouter = router({
         remoteJid: z.string(),
         status: z.enum(["open", "pending", "resolved", "closed"]),
       }))
-      .mutation(async ({ input }) => {
-        await updateAssignmentStatus(input.tenantId, input.sessionId, input.remoteJid, input.status);
+      .mutation(async ({ input, ctx }) => {
+        const tenantId = (ctx as any).saasUser?.tenantId || input.tenantId || 1;
+        await updateAssignmentStatus(tenantId, input.sessionId, input.remoteJid, input.status);
         const io = getIo();
         if (io) {
           io.emit("conversationUpdated", {
@@ -804,7 +807,10 @@ export const appRouter = router({
       }))
       .mutation(async ({ input, ctx }) => {
         const userId = (ctx as any).user?.saasUser?.userId || (ctx as any).user?.id || 0;
-        await finishAttendance(input.tenantId, input.sessionId, input.remoteJid, userId);
+        // Use tenantId from ctx (SaaS user) first, then input, then default to 1
+        const tenantId = (ctx as any).saasUser?.tenantId || input.tenantId || 1;
+        console.log(`[finishAttendance RPC] userId=${userId} tenantId=${tenantId} (ctx=${(ctx as any).saasUser?.tenantId}, input=${input.tenantId})`);
+        await finishAttendance(tenantId, input.sessionId, input.remoteJid, userId);
         const io = getIo();
         if (io) {
           io.emit("conversationUpdated", {
@@ -825,17 +831,18 @@ export const appRouter = router({
         sessionId: z.string(),
         remoteJid: z.string(),
       }))
-      .query(async ({ input }) => {
-        return getAssignmentForConversation(input.tenantId, input.sessionId, input.remoteJid);
+      .query(async ({ input, ctx }) => {
+        const tenantId = (ctx as any).saasUser?.tenantId || input.tenantId || 1;
+        return getAssignmentForConversation(tenantId, input.sessionId, input.remoteJid);
       }),
     // Get available agents for a tenant
     agents: protectedProcedure
       .input(z.object({ tenantId: z.number().default(1) }))
-      .query(async ({ input }) => getAgentsForTenant(input.tenantId)),
+      .query(async ({ input, ctx }) => getAgentsForTenant((ctx as any).saasUser?.tenantId || input.tenantId || 1)),
     // Get teams for a tenant
     teams: protectedProcedure
       .input(z.object({ tenantId: z.number().default(1) }))
-      .query(async ({ input }) => getTeamsForTenant(input.tenantId)),
+      .query(async ({ input, ctx }) => getTeamsForTenant((ctx as any).saasUser?.tenantId || input.tenantId || 1)),
     // Auto-assign via round-robin
     autoAssign: sessionProtectedProcedure
       .input(z.object({
@@ -843,10 +850,11 @@ export const appRouter = router({
         sessionId: z.string(),
         remoteJid: z.string(),
       }))
-      .mutation(async ({ input }) => {
-        const agentId = await getNextRoundRobinAgent(input.tenantId);
+      .mutation(async ({ input, ctx }) => {
+        const tenantId = (ctx as any).saasUser?.tenantId || input.tenantId || 1;
+        const agentId = await getNextRoundRobinAgent(tenantId);
         if (!agentId) return { assigned: false, reason: "Nenhum agente disponível" };
-        const result = await assignConversation(input.tenantId, input.sessionId, input.remoteJid, agentId);
+        const result = await assignConversation(tenantId, input.sessionId, input.remoteJid, agentId);
         return { assigned: true, assignment: result };
       }),
     // Mark conversation as read

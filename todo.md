@@ -4122,3 +4122,15 @@
 - [x] Fallback sync quando Redis indisponível ou enqueue falhar
 - [x] Endpoint admin para reprocessar mensagens travadas em pending
 - [x] Testes vitest atualizados (37 testes passando)
+
+## Bug: Atendimento Finalizado não persiste após refresh (CORRIGIDO)
+- [x] Investigar botão "Atendimento finalizado" — frontend mutation e backend procedure
+- [x] Investigar query de listagem de chats — filtro por status da conversa
+- [x] Causa raiz: frontend não enviava tenantId → backend usava default(1) → UPDATE não encontrava nenhuma linha
+- [x] Corrigir frontend para enviar tenantId na mutation finishAttendance
+- [x] Corrigir backend para derivar tenantId de ctx.saasUser.tenantId (como claim faz)
+- [x] Corrigir mesma falha em assignConversation, transferConversation, updateAssignmentStatus, getAssignment, agents, teams, autoAssign
+- [x] Adicionar logging no finishAttendance para debug futuro
+- [x] Adicionar fallback por normalizeJid e digits no finishAttendance
+- [x] Testes vitest (7 testes passando)
+- [x] Garantir que conversa finalizada não volte na lista após refresh

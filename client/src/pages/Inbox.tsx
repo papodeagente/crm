@@ -1118,8 +1118,8 @@ export default function InboxPage() {
 
   const handleFinishAttendance = useCallback((remoteJid: string) => {
     if (!activeSession?.sessionId) return;
-    finishMut.mutate({ sessionId: activeSession.sessionId, remoteJid });
-  }, [activeSession?.sessionId, finishMut]);
+    finishMut.mutate({ sessionId: activeSession.sessionId, remoteJid, tenantId });
+  }, [activeSession?.sessionId, finishMut, tenantId]);
 
   // WA Contacts for Contacts tab (reuse waContactsMap but as a list)
   const waContactsForTabQ = trpc.whatsapp.waContactsMap.useQuery(
