@@ -1016,16 +1016,20 @@ export default function InboxPage() {
     if (!activeSession?.sessionId || !hydrationDoneRef.current) return;
     // Clear any existing interval
     if (bgSyncRef.current) clearInterval(bgSyncRef.current);
-    // Only poll when socket is disconnected
-    if (!socketConnected) {
-      bgSyncRef.current = setInterval(() => {
-        conversationsQ.refetch().then((result) => {
-          if (result.data) {
-            convStore.hydrate(result.data as ConvEntry[]);
-          }
-        });
-      }, 30000); // 30s fallback when socket is down
-    }
+    
+    // RECONCILIATION STRATEGY:
+    // - Socket disconnected: aggressive polling every 15s to catch up
+    // - Socket connected: lightweight reconciliation every 60s to fix any drift
+    //   (e.g., missed socket events, race conditions, stale preview/status)
+    const interval = socketConnected ? 60000 : 15000;
+    bgSyncRef.current = setInterval(() => {
+      conversationsQ.refetch().then((result) => {
+        if (result.data) {
+          convStore.hydrate(result.data as ConvEntry[]);
+        }
+      });
+    }, interval);
+    
     return () => { if (bgSyncRef.current) clearInterval(bgSyncRef.current); };
   }, [activeSession?.sessionId, socketConnected]);
 
@@ -1261,6 +1265,8 @@ export default function InboxPage() {
     // handleMessage: O(1) map update + O(n) splice for moveToTop
     // No full sort, no refetch, no cache invalidation
     const _traceStoreStart = Date.now();
+    // CRITICAL: Use content directly from socket event — backend guarantees it matches DB preview.
+    // No more frontend-side preview generation that could diverge from the DB.
     const handled = convStore.handleMessage({
       sessionId: lastMessage.sessionId || currentSessionId,
       remoteJid: lastMessage.remoteJid,
@@ -1268,6 +1274,7 @@ export default function InboxPage() {
       fromMe: lastMessage.fromMe,
       messageType: lastMessage.messageType,
       timestamp: lastMessage.timestamp,
+      status: (lastMessage as any).status,  // Backend now sends status in socket event
       isSync: (lastMessage as any).isSync,
     }, selectedKeyRef.current);
     const _traceStoreEnd = Date.now();
@@ -1333,9 +1340,9 @@ export default function InboxPage() {
   // Status update via deterministic store — O(1)
   useEffect(() => {
     if (!lastStatusUpdate) return;
-    const remoteJid = (lastStatusUpdate as any).remoteJid;
+    const remoteJid = lastStatusUpdate.remoteJid;
     if (!remoteJid) return;
-    const sid = activeSession?.sessionId || "";
+    const sid = lastStatusUpdate.sessionId || activeSession?.sessionId || "";
     convStore.handleStatusUpdate({ sessionId: sid, remoteJid, status: lastStatusUpdate.status });
   }, [lastStatusUpdate]);
 

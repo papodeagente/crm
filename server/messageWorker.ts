@@ -193,6 +193,33 @@ const STRING_STATUS_MAP: Record<string, string> = {
   "READ": "read", "PLAYED": "played", "DELETED": "deleted",
 };
 
+// ── Preview Text Generator ────────────────────────────────────
+
+/**
+ * Generate a descriptive preview text for message types that don't have text content.
+ * This is used when extractMessageContent returns null (e.g., media without caption).
+ * MUST match the frontend's getMessagePreview() function for consistency.
+ */
+function getPreviewForType(messageType: string): string | null {
+  const previews: Record<string, string> = {
+    imageMessage: "\ud83d\udcf7 Imagem",
+    videoMessage: "\ud83c\udfa5 V\u00eddeo",
+    audioMessage: "\ud83c\udfa7 \u00c1udio",
+    pttMessage: "\ud83c\udfa4 \u00c1udio",
+    documentMessage: "\ud83d\udcc4 Documento",
+    stickerMessage: "\ud83c\udff7\ufe0f Figurinha",
+    contactMessage: "\ud83d\udc64 Contato",
+    locationMessage: "\ud83d\udccd Localiza\u00e7\u00e3o",
+    liveLocationMessage: "\ud83d\udccd Localiza\u00e7\u00e3o ao vivo",
+    contactsArrayMessage: "\ud83d\udc65 Contatos",
+    listMessage: "\ud83d\udccb Lista",
+    buttonsMessage: "\ud83d\udd18 Bot\u00f5es",
+    templateMessage: "\ud83d\udcdd Template",
+    viewOnceMessageV2: "\ud83d\udcf7 Visualiza\u00e7\u00e3o \u00fanica",
+  };
+  return previews[messageType] || null;
+}
+
 // ── Core Event Processor ──────────────────────────────────────
 
 /**
@@ -335,8 +362,13 @@ async function processNewMessage(session: SessionInfo, data: any, workerStartTim
     const pushName = data?.pushName || "";
     const timestamp = data?.messageTimestamp ? Number(data.messageTimestamp) * 1000 : Date.now();
 
-    const content = extractMessageContent(data);
+    const rawContent = extractMessageContent(data);
     const mediaInfo = extractMediaInfo(data);
+
+    // ── Compute preview text ONCE — used for BOTH DB and socket emit ──
+    // This ensures the sidebar preview is always identical to what's stored in the DB.
+    // For media messages without caption, generate a descriptive preview.
+    const content = rawContent || getPreviewForType(messageType) || "";
 
     const db = await getDb();
     if (!db) return;
@@ -426,18 +458,22 @@ async function processNewMessage(session: SessionInfo, data: any, workerStartTim
     }
 
     // ── Step 4: Emit Socket.IO event ──
+    // CRITICAL: The socket payload MUST carry the same preview text that was stored in the DB.
+    // This ensures the frontend store and the DB are always in sync.
     const socketEmitStart = Date.now();
     console.log(`[TRACE][PRE_SOCKET_EMIT] timestamp: ${socketEmitStart} | total_worker_so_far: ${socketEmitStart - _traceStart}ms | msgId: ${messageId}`);
     const { whatsappManager } = await import("./whatsappEvolution");
     whatsappManager.emit("message", {
       sessionId,
       tenantId,
-      content,
+      content,       // Same preview text stored in DB (never null)
+      messageId,     // Include messageId for dedup and reconciliation
       fromMe,
       remoteJid,
       messageType,
       pushName,
       timestamp,
+      status: fromMe ? "sent" : "received",  // Include status for frontend store
     });
 
     // ── Step 5: Background tasks (non-blocking) ──

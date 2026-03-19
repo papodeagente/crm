@@ -3960,3 +3960,20 @@
   - [x] Transições suaves sem jank
   - [x] Skeleton loading enquanto carrega
 - [x] Testes abrangentes para o novo inbox (55 testes novos, 2154 total passando)
+
+## BUG FIX: Preview e Status do Inbox dessincronizados
+- [x] Auditar fluxo completo: webhook → DB → socket → store → sidebar
+- [x] Backend: garantir que preview e status são atualizados atomicamente com mensagens
+  - [x] Computar preview uma única vez (rawContent || getPreviewForType || "") e enviar mesmo valor no socket e DB
+  - [x] Incluir messageId no socket emit (antes era undefined)
+  - [x] Incluir status no socket emit (antes era hardcoded)
+  - [x] Fix updateConversationLastMessage: empty string "" não é mais tratado como null
+- [x] Frontend store: garantir que handleMessage atualiza preview/status corretamente
+  - [x] Usar content do socket diretamente (nunca fallback para stale data)
+  - [x] Usar status do socket em vez de hardcoded "sent"/"received"
+- [x] Frontend sidebar: garantir que ConversationItem renderiza preview/status mais recente
+  - [x] StatusTick usa lastStatus com monotonic enforcement
+  - [x] remoteJid adicionado à interface WhatsAppMessageStatusEvent
+- [x] Status ticks sincronizados entre sidebar e bolhas do chat
+  - [x] Reconciliação periódica: 60s com socket conectado, 15s sem socket
+- [x] Testes para validar sincronização preview/status (25 testes novos, 2177 total passando)

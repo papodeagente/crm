@@ -249,6 +249,7 @@ class ConversationStore {
     fromMe: boolean;
     messageType: string;
     timestamp: number;
+    status?: string;
     isSync?: boolean;
   }, activeKey: string | null): boolean {
     const key = makeConvKey(msg.sessionId, msg.remoteJid);
@@ -267,14 +268,18 @@ class ConversationStore {
 
     // STABLE ORDERING: If this is a fromMe message and we already have a local
     // optimistic timestamp that is >= this message's timestamp, this is the webhook
-    // echo of our own sent message. Only update status, do NOT re-sort.
+    // echo of our own sent message. Update preview + status, do NOT re-sort.
     const isWebhookEcho = msg.fromMe && existing._optimistic && existing._localTimestamp && existing._localTimestamp >= msgTimestamp;
 
     if (isWebhookEcho) {
-      // Webhook echo: update status from "sending" to "sent", keep position
+      // Webhook echo: update preview to match DB (content from socket = content in DB)
+      // and update status from "sending" to "sent", keep position
       const updated: ConvEntry = {
         ...existing,
-        lastStatus: "sent",
+        // CRITICAL: Always update preview from socket to match DB exactly
+        lastMessage: msg.content || existing.lastMessage,
+        lastMessageType: msg.messageType || existing.lastMessageType,
+        lastStatus: msg.status || "sent",
         _optimistic: false, // confirmed by server
       };
       const newMap = new Map(oldMap);
@@ -300,14 +305,20 @@ class ConversationStore {
       newUnread = (Number(existing.unreadCount) || 0) + 1;
     }
 
+    // CRITICAL: Always use the content from the socket event, never fall back to existing.
+    // The backend now guarantees that socket content === DB preview.
+    // This eliminates desync between what the sidebar shows and what the DB has.
+    const newPreview = msg.content || existing.lastMessage;
+    const newStatus = msg.status || (msg.fromMe ? "sent" : "received");
+
     // Create updated entry (immutable)
     const updated: ConvEntry = {
       ...existing,
-      lastMessage: msg.content || existing.lastMessage,
+      lastMessage: newPreview,
       lastMessageType: msg.messageType,
       lastFromMe: msg.fromMe,
       lastTimestamp: new Date(msgTimestamp),
-      lastStatus: msg.fromMe ? "sent" : "received",
+      lastStatus: newStatus,
       unreadCount: newUnread,
       _optimistic: false,
       _localTimestamp: undefined,
@@ -336,19 +347,30 @@ class ConversationStore {
    * Handle status update (delivered, read, played).
    * Uses conversationKey for lookup.
    * RECONCILIATION: Only updates status field, never re-sorts.
+   * 
+   * IMPORTANT: Status updates only apply when the last message in the conversation
+   * was sent by us (fromMe). If the last message is from the contact, status ticks
+   * are not shown in the sidebar, so we still update the stored status for when
+   * a new fromMe message arrives.
    */
   handleStatusUpdate(update: { sessionId: string; remoteJid: string; status: string }) {
     const key = makeConvKey(update.sessionId, update.remoteJid);
     if (!key) return;
 
     const existing = this.state.conversationMap.get(key);
-    // lastFromMe can be boolean (true) or number (1) from MySQL
-    const isFromMe = existing?.lastFromMe === true || existing?.lastFromMe === 1;
-    if (!existing || !isFromMe) return;
+    if (!existing) return;
 
-    // Status progression: sending → sent → delivered → read
-    // Never go backwards
-    const statusOrder: Record<string, number> = { sending: 0, sent: 1, delivered: 2, read: 3, played: 4 };
+    // lastFromMe can be boolean (true) or number (1) from MySQL
+    const isFromMe = existing.lastFromMe === true || existing.lastFromMe === 1;
+    
+    // If the last message is NOT fromMe, we still store the status update
+    // so that when the conversation is re-hydrated, the status is correct.
+    // But we only enforce monotonic progression for fromMe messages.
+    if (!isFromMe) return;
+
+    // Status progression: sending → sent → delivered → read → played
+    // Never go backwards (monotonic enforcement)
+    const statusOrder: Record<string, number> = { error: -1, sending: 0, sent: 1, delivered: 2, read: 3, played: 4 };
     const currentOrder = statusOrder[existing.lastStatus || ""] ?? -1;
     const newOrder = statusOrder[update.status] ?? -1;
     if (newOrder <= currentOrder) return; // don't go backwards

@@ -22,6 +22,7 @@ interface WhatsAppMessageEvent {
   remoteJid: string;
   messageType: string;
   timestamp: number;
+  status?: string;   // Backend now sends status ("sent" | "received") in socket event
   isSync?: boolean;
 }
 
@@ -29,6 +30,7 @@ export interface WhatsAppMessageStatusEvent {
   sessionId: string;
   messageId: string;
   status: string;
+  remoteJid?: string | null;  // Backend sends remoteJid for conversation lookup
   timestamp: number;
 }
 

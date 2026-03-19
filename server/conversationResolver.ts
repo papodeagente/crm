@@ -428,7 +428,13 @@ export async function updateConversationLastMessage(
 
   const updateData: any = {
     lastMessageAt: newTimestamp,
-    lastMessagePreview: data.content ? data.content.substring(0, 300) : null,
+    // CRITICAL: Use !== undefined check instead of truthy check.
+    // An empty string "" is a valid preview (e.g., media without caption where backend
+    // already computed a descriptive preview like "📷 Imagem").
+    // Using `data.content ?` would turn "" into null, causing desync with the socket event.
+    lastMessagePreview: (data.content !== undefined && data.content !== null)
+      ? data.content.substring(0, 300)
+      : null,
     lastMessageType: data.messageType || "text",
     lastFromMe: data.fromMe ?? false,
     lastStatus: data.status || "received",
