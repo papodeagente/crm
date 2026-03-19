@@ -1319,6 +1319,7 @@ export default function InboxPage() {
       timestamp: lastMessage.timestamp,
       status: (lastMessage as any).status,  // Backend now sends status in socket event
       isSync: (lastMessage as any).isSync,
+      messageId: lastMessage.messageId || undefined,  // Track which message the lastStatus belongs to
     }, selectedKeyRef.current);
     const _traceStoreEnd = Date.now();
     console.log(`[TRACE][STORE_UPDATED] timestamp: ${_traceStoreEnd} | delta: ${_traceStoreEnd - _traceStoreStart}ms | handled: ${handled} | msgId: ${_traceMsgId}`);
@@ -1386,7 +1387,7 @@ export default function InboxPage() {
     const remoteJid = lastStatusUpdate.remoteJid;
     if (!remoteJid) return;
     const sid = lastStatusUpdate.sessionId || activeSession?.sessionId || "";
-    convStore.handleStatusUpdate({ sessionId: sid, remoteJid, status: lastStatusUpdate.status });
+    convStore.handleStatusUpdate({ sessionId: sid, remoteJid, status: lastStatusUpdate.status, messageId: lastStatusUpdate.messageId });
   }, [lastStatusUpdate]);
 
   // ── Assignment/ownership changes via socket — instant tab movement ──

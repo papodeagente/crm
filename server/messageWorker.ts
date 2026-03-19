@@ -1038,27 +1038,33 @@ async function processStatusUpdate(session: SessionInfo, data: any): Promise<voi
           eq(waMessages.messageId, messageId)
         ));
 
-      // Also update lastStatus in wa_conversations if this is the last message from us
-      // AND the new status is higher than the current lastStatus (monotonic)
-      if (remoteJid && fromMe) {
-        // Use SQL-level comparison to ensure atomicity
-        const statusCase = sql`CASE 
-          WHEN lastStatus = 'error' THEN 0
-          WHEN lastStatus = 'pending' THEN 1  
-          WHEN lastStatus = 'sent' THEN 2
-          WHEN lastStatus = 'delivered' THEN 3
-          WHEN lastStatus = 'read' THEN 4
-          WHEN lastStatus = 'played' THEN 5
-          ELSE -1
-        END`;
-        await db.update(waConversations)
-          .set({ lastStatus: newStatus })
-          .where(and(
-            eq(waConversations.sessionId, sessionId),
-            eq(waConversations.remoteJid, remoteJid),
-            eq(waConversations.lastFromMe, true),
-            sql`${statusCase} < ${newStatusOrder}`
-          ));
+      // Update lastStatus in wa_conversations ONLY if this message is the LAST outgoing message.
+      // This prevents status updates for older messages from corrupting the preview.
+      // We verify by checking that the message's id matches the MAX(id) for that conversation+fromMe=1.
+      if (remoteJid && fromMe && messageId) {
+        const result = await db.execute(
+          sql`UPDATE wa_conversations SET lastStatus = ${newStatus}
+              WHERE sessionId = ${sessionId}
+              AND remoteJid = ${remoteJid}
+              AND lastFromMe = 1
+              AND EXISTS (
+                SELECT 1 FROM messages m
+                WHERE m.sessionId = ${sessionId}
+                AND m.remoteJid = ${remoteJid}
+                AND m.messageId = ${messageId}
+                AND m.fromMe = 1
+                AND m.id = (
+                  SELECT MAX(m2.id) FROM messages m2
+                  WHERE m2.sessionId = ${sessionId}
+                  AND m2.remoteJid = ${remoteJid}
+                  AND m2.fromMe = 1
+                )
+              )`
+        );
+        const affected = (result as any)[0]?.affectedRows ?? 0;
+        if (affected > 0) {
+          console.log(`[Worker] wa_conversations.lastStatus updated: ${remoteJid} -> ${newStatus}`);
+        }
       }
 
       // Emit Socket.IO event for real-time UI update

@@ -1728,22 +1728,31 @@ class WhatsAppEvolutionManager extends EventEmitter {
             ));
         }
 
-        // Part 3 fix: Only update lastStatus if this message IS the actual last message
-        // We verify by checking that the message's timestamp matches the conversation's lastMessageAt
-        // This prevents status updates for older messages from corrupting the preview
+        // Update lastStatus in wa_conversations ONLY if this message is the LAST outgoing message.
+        // This prevents status updates for older messages from corrupting the preview.
         if (remoteJid && fromMe && messageId) {
-          // Get the message timestamp to compare with conversation's lastMessageAt
-          const [msgRow] = await db.select({ timestamp: waMessages.timestamp })
-            .from(waMessages)
-            .where(and(
-              eq(waMessages.sessionId, session.sessionId),
-              eq(waMessages.messageId, messageId)
-            ))
-            .limit(1);
-          if (msgRow?.timestamp) {
-            await db.execute(
-              sql`UPDATE wa_conversations SET lastStatus = ${newStatus} WHERE sessionId = ${session.sessionId} AND remoteJid = ${remoteJid} AND lastFromMe = true AND lastMessageAt = ${msgRow.timestamp}`
-            );
+          const result = await db.execute(
+            sql`UPDATE wa_conversations SET lastStatus = ${newStatus}
+                WHERE sessionId = ${session.sessionId}
+                AND remoteJid = ${remoteJid}
+                AND lastFromMe = 1
+                AND EXISTS (
+                  SELECT 1 FROM messages m
+                  WHERE m.sessionId = ${session.sessionId}
+                  AND m.remoteJid = ${remoteJid}
+                  AND m.messageId = ${messageId}
+                  AND m.fromMe = 1
+                  AND m.id = (
+                    SELECT MAX(m2.id) FROM messages m2
+                    WHERE m2.sessionId = ${session.sessionId}
+                    AND m2.remoteJid = ${remoteJid}
+                    AND m2.fromMe = 1
+                  )
+                )`
+          );
+          const affected = (result as any)[0]?.affectedRows ?? 0;
+          if (affected > 0) {
+            console.log(`[EvoWA] wa_conversations.lastStatus updated: ${remoteJid} -> ${newStatus}`);
           }
         }
 

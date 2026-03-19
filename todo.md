@@ -4134,3 +4134,19 @@
 - [x] Adicionar fallback por normalizeJid e digits no finishAttendance
 - [x] Testes vitest (7 testes passando)
 - [x] Garantir que conversa finalizada não volte na lista após refresh
+
+## Bug: Ticks de status no preview da lista de conversas incorretos (CORRIGIDO)
+- [x] Preview na sidebar mostra apenas 1 tick ou "enviando" mesmo quando mensagem foi lida (deveria ser 2 ticks azuis)
+- [x] Investigar como wa_conversations armazena o status da última mensagem
+- [x] Investigar como o frontend renderiza os ticks no preview
+- [x] Causa raiz: frontend usava maxStatus() para novas mensagens, mantendo status de mensagem anterior
+- [x] Backend: EXISTS check em messageWorker.ts e whatsappEvolution.ts para verificar se status update é da última mensagem
+- [x] Backend: raw SQL com FIELD() e lastFromMe = 1 (integer) para comparação monotônica
+- [x] Frontend: handleMessage reseta lastStatus para msg.status em novas mensagens (não maxStatus)
+- [x] Frontend: _lastOutgoingMessageId para rastrear qual mensagem o lastStatus pertence
+- [x] Frontend: handleStatusUpdate verifica messageId antes de aplicar atualização
+- [x] Inbox.tsx: passa messageId nos eventos de socket
+- [x] Dados do banco 100% consistentes (verificado: 498 delivered, 403 read, 22 played)
+- [x] Corrigir para que o preview reflita o status real da última mensagem enviada
+- [x] Ticks verdes/azuis quando cliente lê a mensagem
+- [x] Testes vitest (19 testes passando)

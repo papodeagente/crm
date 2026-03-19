@@ -83,6 +83,8 @@ export interface ConvEntry {
   contactEmail?: string | null;
   contactPhone?: string | null;
   queuedAt?: string | Date | null;
+  /** The messageId of the last outgoing message — used to verify status updates belong to this message */
+  _lastOutgoingMessageId?: string;
   /** Tracks if the last update was from an optimistic send (local, not yet confirmed) */
   _optimistic?: boolean;
   /** Local timestamp from optimistic send — takes priority over webhook timestamps */
@@ -311,6 +313,7 @@ class ConversationStore {
     timestamp: number;
     status?: string;
     isSync?: boolean;
+    messageId?: string;
   }, activeKey: string | null): boolean {
     const key = makeConvKey(msg.sessionId, msg.remoteJid);
     if (!key || !msg.remoteJid) return false;
@@ -343,6 +346,8 @@ class ConversationStore {
         lastMessage: msg.content || existing.lastMessage,
         lastMessageType: msg.messageType || existing.lastMessageType,
         lastStatus: resolvedStatus,
+        // Track the messageId for status update verification
+        _lastOutgoingMessageId: msg.messageId || existing._lastOutgoingMessageId,
         _optimistic: false, // confirmed by server
       };
       const newMap = new Map(oldMap);
@@ -367,13 +372,15 @@ class ConversationStore {
     }
 
     // CRITICAL: Determine the status for this conversation update.
-    // For fromMe messages: use the message's status, but NEVER go below the existing status.
-    // For received messages: the status is "received" (not comparable with outgoing statuses).
+    // For fromMe messages: this is a NEW outgoing message, so RESET lastStatus
+    // to the message's actual status (typically "sent"). Do NOT use maxStatus here
+    // because the previous lastStatus belongs to a DIFFERENT (older) message.
+    // maxStatus is only used for webhook echoes (same message, faster status update).
+    // For received messages: the status is "received" (not a delivery status).
     let newStatus: string | null;
     if (msg.fromMe) {
-      const msgStatus = msg.status || "sent";
-      // MONOTONIC: Keep the higher of existing and new status
-      newStatus = maxStatus(existing.lastStatus, msgStatus);
+      // NEW outgoing message — reset to its actual status
+      newStatus = msg.status || "sent";
     } else {
       // Incoming message — status is "received", not a delivery status
       newStatus = "received";
@@ -390,6 +397,8 @@ class ConversationStore {
       lastTimestamp: new Date(msgTimestamp),
       lastStatus: newStatus,
       unreadCount: newUnread,
+      // Track the messageId of the last outgoing message for status update verification
+      _lastOutgoingMessageId: msg.fromMe && msg.messageId ? msg.messageId : existing._lastOutgoingMessageId,
       _optimistic: false,
       _localTimestamp: undefined,
     };
@@ -434,6 +443,16 @@ class ConversationStore {
     // If the last message is NOT fromMe, we don't update the conversation status.
     // Status ticks only apply to outgoing messages.
     if (!isFromMe) return;
+
+    // CRITICAL: If we know the last outgoing messageId, only accept status updates
+    // for THAT specific message. This prevents status updates for older messages
+    // from corrupting the sidebar preview (e.g., old message's "read" overwriting
+    // new message's "sent").
+    if (existing._lastOutgoingMessageId && update.messageId && 
+        existing._lastOutgoingMessageId !== update.messageId) {
+      // Status update is for a DIFFERENT (older) message — ignore it
+      return;
+    }
 
     // MONOTONIC ENFORCEMENT — the core rule
     // Status can ONLY go forward: error → pending → sending → sent → delivered → read → played
