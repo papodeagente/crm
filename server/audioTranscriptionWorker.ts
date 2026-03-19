@@ -1,18 +1,22 @@
 /**
  * Audio Transcription Worker — Background processing for WhatsApp audio messages
  * 
- * Uses BullMQ + Redis for async processing:
- * 1. Audio message detected → job enqueued
+ * Uses ONLY the tenant's OpenAI Whisper API key — each client pays their own credits.
+ * No built-in/Forge API is used.
+ * 
+ * Flow:
+ * 1. Audio message detected → job enqueued to BullMQ
  * 2. Worker downloads audio from Evolution API (base64)
  * 3. Worker sends audio to OpenAI Whisper API using tenant's API key
  * 4. Transcription saved to wa_messages
- * 5. Socket event emitted to update CRM UI
+ * 5. Socket event emitted to update CRM UI in real-time
  * 
  * Safety:
  * - Max 3 concurrent jobs per tenant
  * - Max 25MB audio size
  * - Max 5 min audio duration
- * - 3 retries on failure
+ * - 3 retries on failure with exponential backoff
+ * - Sync fallback when Redis is unavailable or enqueue fails
  * - Never sends transcription to WhatsApp
  */
 
@@ -48,7 +52,8 @@ const MAX_RETRIES = 3;
 
 // ── Redis Connection ───────────────────────────────────────────
 
-let redisConnection: IORedis | null = null;
+let queueRedisConnection: IORedis | null = null;
+let workerRedisConnection: IORedis | null = null;
 let transcriptionQueue: Queue | null = null;
 let transcriptionWorker: Worker | null = null;
 
@@ -56,27 +61,62 @@ function getRedisUrl(): string | null {
   return process.env.REDIS_URL || null;
 }
 
-function getRedisConnection(): IORedis | null {
-  if (redisConnection) return redisConnection;
+/** Create a NEW Redis connection for BullMQ with robust error handling */
+function createRedisConnection(name: string): IORedis | null {
   const url = getRedisUrl();
   if (!url) return null;
   try {
-    redisConnection = new IORedis(url, {
-      maxRetriesPerRequest: null,
-      enableReadyCheck: false,
-      retryStrategy: (times) => Math.min(times * 500, 5000),
+    const conn = new IORedis(url, {
+      maxRetriesPerRequest: null, // Required by BullMQ
+      enableReadyCheck: true,
+      connectTimeout: 10000,
+      lazyConnect: true,
+      retryStrategy: (times) => {
+        if (times > 5) return null; // Stop retrying after 5 attempts
+        return Math.min(times * 500, 5000);
+      },
     });
-    return redisConnection;
-  } catch {
+    let errorLogged = false;
+    conn.on("ready", () => {
+      console.log(`[AudioTranscription] Redis ${name} connection ready`);
+    });
+    conn.on("error", (err) => {
+      if (!errorLogged) {
+        console.error(`[AudioTranscription] Redis ${name} error:`, err.message);
+        errorLogged = true;
+      }
+    });
+    conn.on("close", () => {
+      console.log(`[AudioTranscription] Redis ${name} connection closed`);
+    });
+    // Initiate connection
+    conn.connect().catch((err) => {
+      console.error(`[AudioTranscription] Redis ${name} connect failed:`, err.message);
+    });
+    return conn;
+  } catch (err: any) {
+    console.error(`[AudioTranscription] Failed to create Redis ${name} connection:`, err.message);
     return null;
   }
+}
+
+function getQueueRedisConnection(): IORedis | null {
+  if (queueRedisConnection) return queueRedisConnection;
+  queueRedisConnection = createRedisConnection("queue");
+  return queueRedisConnection;
+}
+
+function getWorkerRedisConnection(): IORedis | null {
+  if (workerRedisConnection) return workerRedisConnection;
+  workerRedisConnection = createRedisConnection("worker");
+  return workerRedisConnection;
 }
 
 // ── Queue ──────────────────────────────────────────────────────
 
 export function getTranscriptionQueue(): Queue | null {
   if (transcriptionQueue) return transcriptionQueue;
-  const conn = getRedisConnection();
+  const conn = getQueueRedisConnection();
   if (!conn) return null;
   transcriptionQueue = new Queue(QUEUE_NAME, {
     connection: conn,
@@ -92,7 +132,7 @@ export function getTranscriptionQueue(): Queue | null {
 
 /**
  * Enqueue an audio message for transcription.
- * Returns true if enqueued, false if queue unavailable.
+ * Returns true if enqueued/processing, false if completely failed.
  */
 export async function enqueueAudioTranscription(job: AudioTranscriptionJob): Promise<boolean> {
   const queue = getTranscriptionQueue();
@@ -108,13 +148,17 @@ export async function enqueueAudioTranscription(job: AudioTranscriptionJob): Pro
   try {
     await queue.add("transcribe", job, {
       jobId: `transcribe-${job.messageId}`,
-      // Group by tenant for concurrency control
     });
     console.log(`[AudioTranscription] Enqueued msg ${job.messageId} (tenant ${job.tenantId})`);
     return true;
   } catch (err: any) {
     console.error(`[AudioTranscription] Failed to enqueue msg ${job.messageId}:`, err.message);
-    return false;
+    // Fallback to sync processing
+    console.log(`[AudioTranscription] Falling back to sync processing for msg ${job.messageId}`);
+    processTranscriptionJob(job).catch(syncErr => {
+      console.error(`[AudioTranscription] Sync fallback also failed for msg ${job.messageId}:`, syncErr.message);
+    });
+    return true;
   }
 }
 
@@ -132,9 +176,13 @@ async function processTranscriptionJob(data: AudioTranscriptionJob): Promise<voi
   const aiSettings = await getTenantAiSettings(tenantId);
   if (!aiSettings.audioTranscriptionEnabled) {
     console.log(`[AudioTranscription] Transcription disabled for tenant ${tenantId}, skipping`);
+    await db.update(waMessages)
+      .set({ audioTranscriptionStatus: "failed" })
+      .where(eq(waMessages.id, messageId));
     return;
   }
 
+  // ── Step 2: Check tenant has OpenAI API key ──
   const aiIntegration = await getActiveAiIntegration(tenantId, "openai");
   if (!aiIntegration || !aiIntegration.apiKey) {
     console.log(`[AudioTranscription] No OpenAI API key for tenant ${tenantId}, skipping`);
@@ -144,7 +192,7 @@ async function processTranscriptionJob(data: AudioTranscriptionJob): Promise<voi
     return;
   }
 
-  // ── Step 2: Check duration limit ──
+  // ── Step 3: Check duration limit ──
   if (mediaDuration && mediaDuration > MAX_AUDIO_DURATION_SEC) {
     console.log(`[AudioTranscription] Audio too long (${mediaDuration}s > ${MAX_AUDIO_DURATION_SEC}s), skipping msg ${messageId}`);
     await db.update(waMessages)
@@ -153,12 +201,12 @@ async function processTranscriptionJob(data: AudioTranscriptionJob): Promise<voi
     return;
   }
 
-  // ── Step 3: Set status to processing ──
+  // ── Step 4: Set status to processing ──
   await db.update(waMessages)
     .set({ audioTranscriptionStatus: "processing" })
     .where(eq(waMessages.id, messageId));
 
-  // ── Step 4: Download audio from Evolution API ──
+  // ── Step 5: Download audio from Evolution API ──
   let base64Data: string;
   let mimeType: string;
   try {
@@ -179,9 +227,9 @@ async function processTranscriptionJob(data: AudioTranscriptionJob): Promise<voi
     throw err; // Let BullMQ retry
   }
 
-  // ── Step 5: Check size limit ──
-  const sizeBytes = Buffer.from(base64Data, "base64").length;
-  const sizeMB = sizeBytes / (1024 * 1024);
+  // ── Step 6: Check size limit ──
+  const audioBuffer = Buffer.from(base64Data, "base64");
+  const sizeMB = audioBuffer.length / (1024 * 1024);
   if (sizeMB > MAX_AUDIO_SIZE_MB) {
     console.log(`[AudioTranscription] Audio too large (${sizeMB.toFixed(1)}MB > ${MAX_AUDIO_SIZE_MB}MB), skipping msg ${messageId}`);
     await db.update(waMessages)
@@ -190,9 +238,8 @@ async function processTranscriptionJob(data: AudioTranscriptionJob): Promise<voi
     return;
   }
 
-  // ── Step 6: Call OpenAI Whisper API with tenant's API key ──
+  // ── Step 7: Call OpenAI Whisper API with tenant's API key ──
   try {
-    const audioBuffer = Buffer.from(base64Data, "base64");
     const ext = getFileExtension(mimeType);
     const filename = `audio.${ext}`;
 
@@ -227,7 +274,7 @@ async function processTranscriptionJob(data: AudioTranscriptionJob): Promise<voi
       throw new Error("Invalid Whisper API response: no text field");
     }
 
-    // ── Step 7: Save transcription ──
+    // ── Step 8: Save transcription ──
     await db.update(waMessages)
       .set({
         audioTranscription: result.text,
@@ -239,7 +286,7 @@ async function processTranscriptionJob(data: AudioTranscriptionJob): Promise<voi
 
     console.log(`[AudioTranscription] Completed msg ${messageId}: "${result.text.substring(0, 80)}..." (${result.language}, ${result.duration?.toFixed(1)}s)`);
 
-    // ── Step 8: Emit socket event to update CRM UI ──
+    // ── Step 9: Emit socket event to update CRM UI ──
     emitTranscriptionUpdate(tenantId, sessionId, messageId, {
       transcription: result.text,
       status: "completed",
@@ -288,7 +335,7 @@ function emitTranscriptionUpdate(
 // ── Worker Initialization ──────────────────────────────────────
 
 export function initAudioTranscriptionWorker(): void {
-  const conn = getRedisConnection();
+  const conn = getWorkerRedisConnection();
   if (!conn) {
     console.log("[AudioTranscription] No Redis URL, worker not started (sync fallback active)");
     return;
@@ -297,7 +344,12 @@ export function initAudioTranscriptionWorker(): void {
   transcriptionWorker = new Worker(
     QUEUE_NAME,
     async (job: Job<AudioTranscriptionJob>) => {
-      await processTranscriptionJob(job.data);
+      try {
+        await processTranscriptionJob(job.data);
+      } catch (err: any) {
+        console.error(`[AudioTranscription] Job ${job.id} processing error:`, err.message);
+        throw err; // Re-throw for BullMQ retry
+      }
     },
     {
       connection: conn,
@@ -310,14 +362,81 @@ export function initAudioTranscriptionWorker(): void {
   );
 
   transcriptionWorker.on("completed", (job) => {
-    console.log(`[AudioTranscription] Job ${job.id} completed`);
+    console.log(`[AudioTranscription] Job ${job.id} completed successfully`);
   });
 
   transcriptionWorker.on("failed", (job, err) => {
     console.error(`[AudioTranscription] Job ${job?.id} failed (attempt ${job?.attemptsMade}/${MAX_RETRIES}):`, err.message);
   });
 
+  transcriptionWorker.on("error", (err) => {
+    console.error("[AudioTranscription] Worker error:", err.message);
+  });
+
+  transcriptionWorker.on("ready", () => {
+    console.log("[AudioTranscription] Worker ready and listening for jobs");
+  });
+
   console.log("[AudioTranscription] Worker started");
+}
+
+// ── Reprocess Stuck Messages ───────────────────────────────────
+
+/**
+ * Reprocess messages stuck in "pending" status.
+ * Called from admin endpoint to recover stuck transcriptions.
+ */
+export async function reprocessStuckTranscriptions(tenantId?: number): Promise<{ requeued: number; errors: number }> {
+  const db = await getDb();
+  if (!db) return { requeued: 0, errors: 0 };
+
+  const conditions: any[] = [
+    eq(waMessages.audioTranscriptionStatus, "pending"),
+  ];
+  if (tenantId) {
+    conditions.push(eq(waMessages.tenantId, tenantId));
+  }
+
+  // Find stuck messages in pending status
+  const stuckMessages = await db.select({
+    id: waMessages.id,
+    messageId: waMessages.messageId,
+    sessionId: waMessages.sessionId,
+    tenantId: waMessages.tenantId,
+    remoteJid: waMessages.remoteJid,
+    fromMe: waMessages.fromMe,
+    mediaMimeType: waMessages.mediaMimeType,
+    mediaDuration: waMessages.mediaDuration,
+  })
+    .from(waMessages)
+    .where(and(...conditions))
+    .limit(200);
+
+  let requeued = 0;
+  let errors = 0;
+
+  for (const msg of stuckMessages) {
+    try {
+      const success = await enqueueAudioTranscription({
+        messageId: msg.id,
+        externalMessageId: msg.messageId || "",
+        sessionId: msg.sessionId,
+        instanceName: msg.sessionId,
+        tenantId: msg.tenantId,
+        remoteJid: msg.remoteJid,
+        fromMe: msg.fromMe,
+        mediaMimeType: msg.mediaMimeType || "audio/ogg",
+        mediaDuration: msg.mediaDuration,
+      });
+      if (success) requeued++;
+      else errors++;
+    } catch {
+      errors++;
+    }
+  }
+
+  console.log(`[AudioTranscription] Reprocessed stuck: ${requeued} requeued, ${errors} errors (total found: ${stuckMessages.length})`);
+  return { requeued, errors };
 }
 
 // ── Helpers ────────────────────────────────────────────────────
@@ -337,4 +456,30 @@ function getFileExtension(mimeType: string): string {
     "audio/ogg; codecs=opus": "ogg",
   };
   return mimeToExt[mimeType] || "ogg";
+}
+
+// ── Graceful Shutdown ──────────────────────────────────────────
+
+export async function shutdownAudioTranscriptionWorker(): Promise<void> {
+  try {
+    if (transcriptionWorker) {
+      await transcriptionWorker.close();
+      transcriptionWorker = null;
+    }
+    if (transcriptionQueue) {
+      await transcriptionQueue.close();
+      transcriptionQueue = null;
+    }
+    if (queueRedisConnection) {
+      queueRedisConnection.disconnect();
+      queueRedisConnection = null;
+    }
+    if (workerRedisConnection) {
+      workerRedisConnection.disconnect();
+      workerRedisConnection = null;
+    }
+    console.log("[AudioTranscription] Graceful shutdown complete");
+  } catch (err: any) {
+    console.error("[AudioTranscription] Shutdown error:", err.message);
+  }
 }

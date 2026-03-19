@@ -4113,3 +4113,12 @@
 - [x] Bug 4: Finalizar atendimento atualiza convStore otimisticamente (assignedUserId=null, status=resolved)
 - [x] Bug 5: Puxar atendimento atualiza convStore otimisticamente (assignedUserId=myUserId) + refetch
 - [x] 8 testes vitest passando para todos os 5 bugs
+
+## Bug: Transcrição de áudio travada
+- [x] Transcrição de áudio fica em "Transcrevendo..." infinitamente sem retornar resultado
+- [x] Investigar backend (voiceTranscription) e frontend (botão transcrever)
+- [x] Usar exclusivamente API OpenAI Whisper do tenant (cada cliente paga seus próprios créditos)
+- [x] Melhorar robustez do worker: conexões Redis separadas, enableReadyCheck, lazyConnect, error/ready events
+- [x] Fallback sync quando Redis indisponível ou enqueue falhar
+- [x] Endpoint admin para reprocessar mensagens travadas em pending
+- [x] Testes vitest atualizados (37 testes passando)

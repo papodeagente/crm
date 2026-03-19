@@ -5,6 +5,7 @@ import * as crm from "../crmDb";
 import { emitEvent } from "../middleware/eventLog";
 import { inviteUserToTenant } from "../saasAuth";
 import { runDbRepair } from "../dbRepair";
+import { reprocessStuckTranscriptions } from "../audioTranscriptionWorker";
 
 export const adminRouter = router({
   // ─── TENANTS ───
@@ -179,5 +180,14 @@ export const adminRouter = router({
         throw new TRPCError({ code: "FORBIDDEN", message: "Apenas administradores podem executar reparos" });
       }
       return runDbRepair();
+    }),
+  // ─── REPROCESS STUCK TRANSCRIPTIONS ───
+  reprocessTranscriptions: protectedProcedure
+    .input(z.object({ tenantId: z.number().optional() }).optional())
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.saasUser?.role !== "admin" && ctx.user.openId !== process.env.OWNER_OPEN_ID) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Apenas administradores podem reprocessar transcrições" });
+      }
+      return reprocessStuckTranscriptions(input?.tenantId);
     }),
 });
