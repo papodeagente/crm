@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { router, protectedProcedure } from "../_core/trpc";
+import { router, tenantProcedure, getTenantId } from "../_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { invokeLLM } from "../_core/llm";
 import {
@@ -14,29 +14,29 @@ import {
 
 export const aiAnalysisRouter = router({
   // Get latest analysis for a deal
-  getLatest: protectedProcedure
+  getLatest: tenantProcedure
     .input(z.object({ dealId: z.number() }))
     .query(async ({ ctx, input }) => {
-      const tenantId = (ctx.user as any).tenantId ?? 1;
+      const tenantId = getTenantId(ctx);
       return getLatestAnalysis(tenantId, input.dealId);
     }),
 
   // Get analysis history for a deal
-  getHistory: protectedProcedure
+  getHistory: tenantProcedure
     .input(z.object({ dealId: z.number() }))
     .query(async ({ ctx, input }) => {
-      const tenantId = (ctx.user as any).tenantId ?? 1;
+      const tenantId = getTenantId(ctx);
       return getAnalysisHistory(tenantId, input.dealId);
     }),
 
   // Analyze conversation with AI
-  analyze: protectedProcedure
+  analyze: tenantProcedure
     .input(z.object({
       dealId: z.number(),
       forceNew: z.boolean().optional().default(false),
     }))
     .mutation(async ({ ctx, input }) => {
-      const tenantId = (ctx.user as any).tenantId ?? 1;
+      const tenantId = getTenantId(ctx);
       const userId = ctx.user.id;
 
       // Check if there's a recent analysis (less than 1 hour old) unless forced

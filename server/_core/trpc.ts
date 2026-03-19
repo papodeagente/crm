@@ -111,3 +111,134 @@ const validateSessionMiddleware = t.middleware(async opts => {
 });
 
 export const sessionProtectedProcedure = t.procedure.use(validateSessionMiddleware);
+
+// ═══════════════════════════════════════════════════════════════════
+// TENANT ISOLATION — Guard Rail Central
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * tenantProcedure: middleware obrigatório para TODOS os endpoints que
+ * acessam dados de tenant. Garante que:
+ * 1. ctx.saasUser existe (throw UNAUTHORIZED se não)
+ * 2. ctx.tenantId é injetado automaticamente a partir do JWT
+ * 3. Qualquer input.tenantId do cliente é IGNORADO
+ * 4. Log de segurança se input.tenantId divergir do JWT
+ */
+const requireTenant = t.middleware(async opts => {
+  const { ctx, next } = opts;
+
+  if (!ctx.user) {
+    throw new TRPCError({ code: "UNAUTHORIZED", message: UNAUTHED_ERR_MSG });
+  }
+
+  if (!ctx.saasUser || !ctx.saasUser.tenantId) {
+    throw new TRPCError({
+      code: "UNAUTHORIZED",
+      message: "Sessão de tenant não encontrada. Faça login novamente.",
+    });
+  }
+
+  const tenantId = ctx.saasUser.tenantId;
+
+  // Security log: detect if client tried to send a different tenantId
+  const rawInput = (opts as any).rawInput as Record<string, unknown> | undefined;
+  if (rawInput?.tenantId && rawInput.tenantId !== tenantId) {
+    console.warn(
+      `[SECURITY] Tenant mismatch blocked: user=${ctx.saasUser.userId} ` +
+      `jwt_tenant=${tenantId} input_tenant=${rawInput.tenantId} ` +
+      `path=${(opts as any).path || 'unknown'}`
+    );
+  }
+
+  // Track presence
+  touchPresence(ctx.saasUser.userId).catch(() => {});
+
+  return next({
+    ctx: {
+      ...ctx,
+      user: ctx.user,
+      saasUser: ctx.saasUser,
+      tenantId,
+    },
+  });
+});
+
+export const tenantProcedure = t.procedure.use(requireTenant);
+
+/**
+ * tenantAdminProcedure: like tenantProcedure but also requires admin role
+ */
+const requireTenantAdmin = t.middleware(async opts => {
+  const { ctx, next } = opts;
+
+  if (!ctx.user) {
+    throw new TRPCError({ code: "UNAUTHORIZED", message: UNAUTHED_ERR_MSG });
+  }
+
+  if (!ctx.saasUser || !ctx.saasUser.tenantId) {
+    throw new TRPCError({
+      code: "UNAUTHORIZED",
+      message: "Sessão de tenant não encontrada. Faça login novamente.",
+    });
+  }
+
+  if (ctx.saasUser.role !== "admin") {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "Apenas administradores podem executar esta ação.",
+    });
+  }
+
+  const tenantId = ctx.saasUser.tenantId;
+  touchPresence(ctx.saasUser.userId).catch(() => {});
+
+  return next({
+    ctx: {
+      ...ctx,
+      user: ctx.user,
+      saasUser: ctx.saasUser,
+      tenantId,
+    },
+  });
+});
+
+export const tenantAdminProcedure = t.procedure.use(requireTenantAdmin);
+
+/**
+ * Helper: extract tenantId safely from context.
+ * Use in procedures that already use tenantProcedure.
+ * Throws if tenantId is missing (should never happen with tenantProcedure).
+ */
+export function getTenantId(ctx: any): number {
+  const tid = ctx.tenantId ?? ctx.saasUser?.tenantId;
+  if (!tid || tid <= 0) {
+    throw new TRPCError({
+      code: "UNAUTHORIZED",
+      message: "Tenant não identificado.",
+    });
+  }
+  return tid;
+}
+
+/**
+ * Helper: assert that an entity belongs to the expected tenant.
+ * Use after fetching an entity to verify ownership before update/delete.
+ */
+export function assertTenantOwnership(
+  entityTenantId: number | null | undefined,
+  expectedTenantId: number,
+  entityType: string = "entity",
+  entityId?: number | string
+): void {
+  if (!entityTenantId || entityTenantId !== expectedTenantId) {
+    console.warn(
+      `[SECURITY] Cross-tenant access blocked: ` +
+      `expected_tenant=${expectedTenantId} entity_tenant=${entityTenantId} ` +
+      `type=${entityType} id=${entityId || 'unknown'}`
+    );
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: `Acesso negado: ${entityType} não pertence ao seu tenant.`,
+    });
+  }
+}

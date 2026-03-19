@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { protectedProcedure, router } from "../_core/trpc";
+import { tenantProcedure, getTenantId, router } from "../_core/trpc";
 import { TRPCError } from "@trpc/server";
 import * as crm from "../crmDb";
 import { emitEvent } from "../middleware/eventLog";
@@ -10,16 +10,16 @@ import { reprocessStuckTranscriptions } from "../audioTranscriptionWorker";
 export const adminRouter = router({
   // ─── TENANTS ───
   tenants: router({
-    list: protectedProcedure.query(async () => {
+    list: tenantProcedure.query(async () => {
       return crm.listTenants();
     }),
-    create: protectedProcedure
+    create: tenantProcedure
       .input(z.object({ name: z.string().min(1), plan: z.enum(["free", "pro", "enterprise"]).optional() }))
       .mutation(async ({ input }) => {
         const result = await crm.createTenant(input);
         return result;
       }),
-    get: protectedProcedure
+    get: tenantProcedure
       .input(z.object({ id: z.number() }))
       .query(async ({ input }) => {
         return crm.getTenantById(input.id);
@@ -28,13 +28,13 @@ export const adminRouter = router({
 
   // ─── CRM USERS ───
   users: router({
-    list: protectedProcedure
-      .input(z.object({ tenantId: z.number() }))
-      .query(async ({ input }) => {
-        return crm.listCrmUsers(input.tenantId);
+    list: tenantProcedure
+      
+      .query(async ({ input, ctx }) => {
+        return crm.listCrmUsers(getTenantId(ctx));
       }),
-    create: protectedProcedure
-      .input(z.object({ tenantId: z.number(), name: z.string().min(1), email: z.string().email(), phone: z.string().optional(), role: z.enum(["admin", "user"]).default("user"), origin: z.string().optional() }))
+    create: tenantProcedure
+      .input(z.object({ name: z.string().min(1), email: z.string().email(), phone: z.string().optional(), role: z.enum(["admin", "user"]).default("user"), origin: z.string().optional() }))
       .mutation(async ({ ctx, input }) => {
         // Only admins can create users
         if (ctx.saasUser?.role !== "admin") {
@@ -44,7 +44,7 @@ export const adminRouter = router({
         try {
           // inviteUserToTenant imported statically at top of file
           const result = await inviteUserToTenant({
-            tenantId: input.tenantId,
+            tenantId: getTenantId(ctx),
             name: input.name,
             email: input.email,
             phone: input.phone,
@@ -52,7 +52,7 @@ export const adminRouter = router({
             inviterName: ctx.user.name || "Administrador",
             origin: input.origin || "https://crm.acelerador.tur.br",
           });
-          await emitEvent({ tenantId: input.tenantId, actorUserId: ctx.user.id, entityType: "crm_user", entityId: result?.userId, action: "create" });
+          await emitEvent({ tenantId: getTenantId(ctx), actorUserId: ctx.user.id, entityType: "crm_user", entityId: result?.userId, action: "create" });
           return { id: result.userId };
         } catch (error: any) {
           if (error.message === "EMAIL_EXISTS_IN_TENANT") {
@@ -60,23 +60,23 @@ export const adminRouter = router({
           }
           // Fallback: create without email if email service fails
           const result = await crm.createCrmUser({ ...input, createdBy: ctx.user.id });
-          await emitEvent({ tenantId: input.tenantId, actorUserId: ctx.user.id, entityType: "crm_user", entityId: result?.id, action: "create" });
+          await emitEvent({ tenantId: getTenantId(ctx), actorUserId: ctx.user.id, entityType: "crm_user", entityId: result?.id, action: "create" });
           return result;
         }
       }),
-    get: protectedProcedure
-      .input(z.object({ tenantId: z.number(), id: z.number() }))
-      .query(async ({ input }) => {
-        return crm.getCrmUserById(input.tenantId, input.id);
+    get: tenantProcedure
+      .input(z.object({ id: z.number() }))
+      .query(async ({ input, ctx }) => {
+        return crm.getCrmUserById(getTenantId(ctx), input.id);
       }),
-    update: protectedProcedure
-      .input(z.object({ tenantId: z.number(), id: z.number(), name: z.string().optional(), email: z.string().email().optional(), phone: z.string().optional(), role: z.enum(["admin", "user"]).optional(), status: z.enum(["active", "inactive", "invited"]).optional() }))
+    update: tenantProcedure
+      .input(z.object({ id: z.number(), name: z.string().optional(), email: z.string().email().optional(), phone: z.string().optional(), role: z.enum(["admin", "user"]).optional(), status: z.enum(["active", "inactive", "invited"]).optional() }))
       .mutation(async ({ ctx, input }) => {
         // Only admins can update users
         if (ctx.saasUser?.role !== "admin") {
           throw new TRPCError({ code: "FORBIDDEN", message: "Apenas administradores podem editar usuários" });
         }
-        const { tenantId, id, role, ...data } = input;
+const tenantId = getTenantId(ctx); const { id, role, ...data } = input;
         // Update user fields
         await crm.updateCrmUser(tenantId, id, { ...data, updatedBy: ctx.user.id });
         // Update role if provided (via direct SQL since crmDb may not support it)
@@ -92,71 +92,71 @@ export const adminRouter = router({
         await emitEvent({ tenantId, actorUserId: ctx.user.id, entityType: "crm_user", entityId: id, action: "update" });
         return { success: true };
       }),
-    delete: protectedProcedure
-      .input(z.object({ tenantId: z.number(), id: z.number() }))
+    delete: tenantProcedure
+      .input(z.object({ id: z.number() }))
       .mutation(async ({ ctx, input }) => {
-        await crm.deleteCrmUser(input.tenantId, input.id);
-        await emitEvent({ tenantId: input.tenantId, actorUserId: ctx.user.id, entityType: "crm_user", entityId: input.id, action: "delete" });
+        await crm.deleteCrmUser(getTenantId(ctx), input.id);
+        await emitEvent({ tenantId: getTenantId(ctx), actorUserId: ctx.user.id, entityType: "crm_user", entityId: input.id, action: "delete" });
         return { success: true };
       }),
   }),
 
   // ─── TEAMS ───
   teams: router({
-    list: protectedProcedure
-      .input(z.object({ tenantId: z.number() }))
-      .query(async ({ input }) => {
-        return crm.listTeams(input.tenantId);
+    list: tenantProcedure
+      
+      .query(async ({ input, ctx }) => {
+        return crm.listTeams(getTenantId(ctx));
       }),
-    create: protectedProcedure
-      .input(z.object({ tenantId: z.number(), name: z.string().min(1) }))
+    create: tenantProcedure
+      .input(z.object({ name: z.string().min(1) }))
       .mutation(async ({ ctx, input }) => {
         const result = await crm.createTeam(input);
-        await emitEvent({ tenantId: input.tenantId, actorUserId: ctx.user.id, entityType: "team", entityId: result?.id, action: "create" });
+        await emitEvent({ tenantId: getTenantId(ctx), actorUserId: ctx.user.id, entityType: "team", entityId: result?.id, action: "create" });
         return result;
       }),
-    members: protectedProcedure
-      .input(z.object({ tenantId: z.number(), teamId: z.number() }))
-      .query(async ({ input }) => {
-        return crm.getTeamMembers(input.tenantId, input.teamId);
+    members: tenantProcedure
+      .input(z.object({ teamId: z.number() }))
+      .query(async ({ input, ctx }) => {
+        return crm.getTeamMembers(getTenantId(ctx), input.teamId);
       }),
-    addMember: protectedProcedure
-      .input(z.object({ tenantId: z.number(), teamId: z.number(), userId: z.number() }))
+    addMember: tenantProcedure
+      .input(z.object({ teamId: z.number(), userId: z.number() }))
       .mutation(async ({ input }) => {
         await crm.addTeamMember(input);
         return { success: true };
       }),
-    removeMember: protectedProcedure
-      .input(z.object({ tenantId: z.number(), teamId: z.number(), userId: z.number() }))
-      .mutation(async ({ input }) => {
-        await crm.removeTeamMember(input.tenantId, input.userId, input.teamId);
+    removeMember: tenantProcedure
+      .input(z.object({ teamId: z.number(), userId: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        await crm.removeTeamMember(getTenantId(ctx), input.userId, input.teamId);
         return { success: true };
       }),
   }),
 
   // ─── ROLES & PERMISSIONS ───
   roles: router({
-    list: protectedProcedure
-      .input(z.object({ tenantId: z.number() }))
-      .query(async ({ input }) => {
-        return crm.listRoles(input.tenantId);
+    list: tenantProcedure
+      
+      .query(async ({ input, ctx }) => {
+        return crm.listRoles(getTenantId(ctx));
       }),
-    create: protectedProcedure
-      .input(z.object({ tenantId: z.number(), slug: z.string(), name: z.string(), description: z.string().optional() }))
+    create: tenantProcedure
+      .input(z.object({ slug: z.string(), name: z.string(), description: z.string().optional() }))
       .mutation(async ({ input }) => {
         return crm.createRole(input);
       }),
-    assign: protectedProcedure
-      .input(z.object({ tenantId: z.number(), userId: z.number(), roleId: z.number() }))
+    assign: tenantProcedure
+      .input(z.object({ userId: z.number(), roleId: z.number() }))
       .mutation(async ({ input }) => {
         await crm.assignRole(input);
         return { success: true };
       }),
-    permissions: protectedProcedure.query(async () => {
+    permissions: tenantProcedure.query(async () => {
       return crm.listPermissions();
     }),
-    assignPermission: protectedProcedure
-      .input(z.object({ tenantId: z.number(), roleId: z.number(), permissionId: z.number() }))
+    assignPermission: tenantProcedure
+      .input(z.object({ roleId: z.number(), permissionId: z.number() }))
       .mutation(async ({ input }) => {
         await crm.assignPermissionToRole(input);
         return { success: true };
@@ -165,15 +165,15 @@ export const adminRouter = router({
 
   // ─── EVENT LOG / AUDITORIA ───
   eventLog: router({
-    list: protectedProcedure
-      .input(z.object({ tenantId: z.number(), entityType: z.string().optional(), entityId: z.number().optional(), limit: z.number().default(50), offset: z.number().default(0) }))
-      .query(async ({ input }) => {
-        return crm.listEventLog(input.tenantId, input);
+    list: tenantProcedure
+      .input(z.object({ entityType: z.string().optional(), entityId: z.number().optional(), limit: z.number().default(50), offset: z.number().default(0) }))
+      .query(async ({ input, ctx }) => {
+        return crm.listEventLog(getTenantId(ctx), input);
       }),
   }),
 
   // ─── DB REPAIR ───
-  dbRepair: protectedProcedure
+  dbRepair: tenantProcedure
     .mutation(async ({ ctx }) => {
       // Only allow owner (admin) to run repair
       if (ctx.saasUser?.role !== "admin" && ctx.user.openId !== process.env.OWNER_OPEN_ID) {
@@ -182,12 +182,11 @@ export const adminRouter = router({
       return runDbRepair();
     }),
   // ─── REPROCESS STUCK TRANSCRIPTIONS ───
-  reprocessTranscriptions: protectedProcedure
-    .input(z.object({ tenantId: z.number().optional() }).optional())
-    .mutation(async ({ ctx, input }) => {
+  reprocessTranscriptions: tenantProcedure
+    .mutation(async ({ ctx }) => {
       if (ctx.saasUser?.role !== "admin" && ctx.user.openId !== process.env.OWNER_OPEN_ID) {
         throw new TRPCError({ code: "FORBIDDEN", message: "Apenas administradores podem reprocessar transcrições" });
       }
-      return reprocessStuckTranscriptions(input?.tenantId);
+      return reprocessStuckTranscriptions(getTenantId(ctx));
     }),
 });

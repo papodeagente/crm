@@ -11,7 +11,7 @@
  * 7. Detailed logging throughout
  */
 import { z } from "zod";
-import { protectedProcedure, router } from "../_core/trpc";
+import { tenantProcedure, getTenantId, router } from "../_core/trpc";
 import * as rdCrm from "../rdStationCrmImport";
 import * as crm from "../crmDb";
 import { getDb } from "../db";
@@ -148,29 +148,28 @@ async function setRdExternalId(table: string, id: number, rdExternalId: string) 
 
 export const rdCrmImportRouter = router({
   // ─── Validate Token ───
-  validateToken: protectedProcedure
+  validateToken: tenantProcedure
     .input(z.object({ token: z.string().min(10) }))
     .mutation(async ({ input }) => {
       return rdCrm.validateRdCrmToken(input.token);
     }),
 
   // ─── Fetch Summary (preview before import) ───
-  fetchSummary: protectedProcedure
+  fetchSummary: tenantProcedure
     .input(z.object({ token: z.string().min(10) }))
     .mutation(async ({ input }) => {
       return rdCrm.fetchRdCrmSummary(input.token);
     }),
 
   // ─── Get Import Progress ───
-  getProgress: protectedProcedure.query(({ ctx }) => {
+  getProgress: tenantProcedure.query(({ ctx }) => {
     const key = getProgressKey(ctx.user.id);
     return progressStore.get(key) || null;
   }),
 
   // ─── Import All Data (runs in background, progress via polling) ───
-  importAll: protectedProcedure
+  importAll: tenantProcedure
     .input(z.object({
-      tenantId: z.number(),
       token: z.string().min(10),
       importContacts: z.boolean().default(true),
       importDeals: z.boolean().default(true),
@@ -185,7 +184,7 @@ export const rdCrmImportRouter = router({
       cleanBeforeImport: z.boolean().default(false),
     }))
     .mutation(async ({ ctx, input }) => {
-      const tenantId = (ctx as any).saasUser?.tenantId ?? input.tenantId;
+      const tenantId = (ctx as any).saasUser?.tenantId ?? getTenantId(ctx);
       const { token } = input;
       const userId = ctx.user.id;
       const userName = ctx.user.name || "Sistema";
@@ -219,20 +218,19 @@ export const rdCrmImportRouter = router({
     }),
 
   // ─── Get Spreadsheet Import Progress ───
-  getSpreadsheetProgress: protectedProcedure.query(({ ctx }) => {
+  getSpreadsheetProgress: tenantProcedure.query(({ ctx }) => {
     const key = `spreadsheet_${ctx.user.id}`;
     return progressStore.get(key) || null;
   }),
 
   // ─── Import from RD Station CSV (comprehensive, all 48 columns) ───
-  importSpreadsheet: protectedProcedure
+  importSpreadsheet: tenantProcedure
     .input(z.object({
-      tenantId: z.number(),
       rows: z.array(z.record(z.string(), z.string().nullable().optional())),
       columnMapping: z.record(z.string(), z.string()).optional(), // csvHeader → internalKey
     }))
     .mutation(async ({ ctx, input }) => {
-      const tenantId = (ctx as any).saasUser?.tenantId ?? input.tenantId;
+      const tenantId = (ctx as any).saasUser?.tenantId ?? getTenantId(ctx);
       const userId = ctx.user.id;
       const userName = ctx.user.name || "Sistema";
       const { rows } = input;

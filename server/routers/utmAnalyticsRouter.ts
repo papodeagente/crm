@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { protectedProcedure, router } from "../_core/trpc";
+import { tenantProcedure, getTenantId, router } from "../_core/trpc";
 import { getDb } from "../db";
 import { deals, dealHistory, leadSources, campaigns, pipelineStages, lossReasons } from "../../drizzle/schema";
 import { eq, and, sql, isNull, gte, lt, isNotNull, desc, asc } from "drizzle-orm";
@@ -11,7 +11,6 @@ import { eq, and, sql, isNull, gte, lt, isNotNull, desc, asc } from "drizzle-orm
 // ═══════════════════════════════════════════════════════════════
 
 const dateFilterSchema = z.object({
-  tenantId: z.number().default(1),
   dateFrom: z.string().optional(), // ISO date string
   dateTo: z.string().optional(),   // ISO date string
   pipelineId: z.number().optional(),
@@ -40,12 +39,12 @@ function buildDateConditions(tenantId: number, dateFrom?: string, dateTo?: strin
 export const utmAnalyticsRouter = router({
   // ─── Overview KPIs ───────────────────────────────────────
   // Retorna métricas gerais: total de deals, ganhos, perdidos, abertos, valor total, taxa de conversão
-  overview: protectedProcedure
+  overview: tenantProcedure
     .input(dateFilterSchema)
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
       const db = await getDb();
       if (!db) return null;
-      const conditions = buildDateConditions(input.tenantId, input.dateFrom, input.dateTo, input.pipelineId);
+      const conditions = buildDateConditions(getTenantId(ctx), input.dateFrom, input.dateTo, input.pipelineId);
 
       const [result] = await db.select({
         totalDeals: sql<number>`COUNT(*)`,
@@ -79,14 +78,14 @@ export const utmAnalyticsRouter = router({
 
   // ─── Breakdown by UTM dimension ──────────────────────────
   // Retorna dados agrupados por qualquer dimensão UTM
-  byDimension: protectedProcedure
+  byDimension: tenantProcedure
     .input(dateFilterSchema.extend({
       dimension: z.enum(["utmSource", "utmMedium", "utmCampaign", "utmTerm", "utmContent", "leadSource", "channelOrigin"]),
     }))
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
       const db = await getDb();
       if (!db) return [];
-      const conditions = buildDateConditions(input.tenantId, input.dateFrom, input.dateTo, input.pipelineId);
+      const conditions = buildDateConditions(getTenantId(ctx), input.dateFrom, input.dateTo, input.pipelineId);
 
       // Map dimension to column
       const dimCol = {
@@ -129,12 +128,12 @@ export const utmAnalyticsRouter = router({
 
   // ─── Cross-tabulation: Source × Medium ───────────────────
   // Retorna tabela cruzada de Source × Medium para análise detalhada
-  crossTable: protectedProcedure
+  crossTable: tenantProcedure
     .input(dateFilterSchema)
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
       const db = await getDb();
       if (!db) return [];
-      const conditions = buildDateConditions(input.tenantId, input.dateFrom, input.dateTo, input.pipelineId);
+      const conditions = buildDateConditions(getTenantId(ctx), input.dateFrom, input.dateTo, input.pipelineId);
 
       const srcExpr = sql`COALESCE(${deals.utmSource}, '(não informado)')`;
       const medExpr = sql`COALESCE(${deals.utmMedium}, '(não informado)')`;
@@ -172,12 +171,12 @@ export const utmAnalyticsRouter = router({
 
   // ─── Timeline: deals over time by status ─────────────────
   // Retorna dados agrupados por mês para gráfico de evolução
-  timeline: protectedProcedure
+  timeline: tenantProcedure
     .input(dateFilterSchema)
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
       const db = await getDb();
       if (!db) return [];
-      const conditions = buildDateConditions(input.tenantId, input.dateFrom, input.dateTo, input.pipelineId);
+      const conditions = buildDateConditions(getTenantId(ctx), input.dateFrom, input.dateTo, input.pipelineId);
 
       const monthExpr = sql`DATE_FORMAT(${deals.createdAt}, '%Y-%m')`;
       const rows = await db.select({
@@ -206,13 +205,13 @@ export const utmAnalyticsRouter = router({
 
   // ─── Available filter values ─────────────────────────────
   // Retorna todos os valores distintos de UTMs para popular filtros
-  filterValues: protectedProcedure
-    .input(z.object({ tenantId: z.number().default(1) }))
-    .query(async ({ input }) => {
+  filterValues: tenantProcedure
+    
+    .query(async ({ input, ctx }) => {
       const db = await getDb();
       if (!db) return { sources: [], mediums: [], campaigns: [], terms: [], contents: [], leadSources: [], channels: [] };
 
-      const baseConditions = [eq(deals.tenantId, input.tenantId), isNull(deals.deletedAt)];
+      const baseConditions = [eq(deals.tenantId, getTenantId(ctx)), isNull(deals.deletedAt)];
 
       const [sources, mediums, campaignsData, terms, contents, leadSourcesData, channels] = await Promise.all([
         db.selectDistinct({ value: deals.utmSource })
@@ -258,7 +257,7 @@ export const utmAnalyticsRouter = router({
 
   // ─── Deal list with UTM data ─────────────────────────────
   // Lista deals com dados UTM para tabela detalhada
-  dealList: protectedProcedure
+  dealList: tenantProcedure
     .input(dateFilterSchema.extend({
       status: z.enum(["all", "open", "won", "lost"]).default("all"),
       utmSource: z.string().optional(),
@@ -267,10 +266,10 @@ export const utmAnalyticsRouter = router({
       limit: z.number().default(50),
       offset: z.number().default(0),
     }))
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
       const db = await getDb();
       if (!db) return { deals: [], total: 0 };
-      const conditions = buildDateConditions(input.tenantId, input.dateFrom, input.dateTo, input.pipelineId);
+      const conditions = buildDateConditions(getTenantId(ctx), input.dateFrom, input.dateTo, input.pipelineId);
 
       if (input.status !== "all") {
         conditions.push(eq(deals.status, input.status as any));
@@ -318,12 +317,12 @@ export const utmAnalyticsRouter = router({
       };
     }),  // ─── Loss Reasons Analytics ──────────────────────────────
   // Retorna contagem e valor de deals perdidos agrupados por motivo de perda
-  lossReasonsAnalytics: protectedProcedure
+  lossReasonsAnalytics: tenantProcedure
     .input(dateFilterSchema)
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
       const db = await getDb();
       if (!db) return [];
-      const conditions = buildDateConditions(input.tenantId, input.dateFrom, input.dateTo, input.pipelineId);
+      const conditions = buildDateConditions(getTenantId(ctx), input.dateFrom, input.dateTo, input.pipelineId);
       conditions.push(eq(deals.status, "lost" as any));
       conditions.push(isNotNull(deals.lossReasonId));
 
@@ -339,7 +338,7 @@ export const utmAnalyticsRouter = router({
         .orderBy(sql`COUNT(*) DESC`);
 
       // Also get deals lost without a reason (legacy)
-      const legacyConditions = buildDateConditions(input.tenantId, input.dateFrom, input.dateTo, input.pipelineId);
+      const legacyConditions = buildDateConditions(getTenantId(ctx), input.dateFrom, input.dateTo, input.pipelineId);
       legacyConditions.push(eq(deals.status, "lost" as any));
       legacyConditions.push(isNull(deals.lossReasonId));
       const [legacyResult] = await db.select({
@@ -368,9 +367,8 @@ export const utmAnalyticsRouter = router({
     }),
 
   // ─── Stage time analytics (for tooltip) ────────────────────── // Calcula tempo médio de permanência em cada etapa do pipeline
-  stageTime: protectedProcedure
+  stageTime: tenantProcedure
     .input(z.object({
-      tenantId: z.number().default(1),
       dealId: z.number(),
     }))
     .query(async ({ input }) => {
@@ -388,7 +386,7 @@ export const utmAnalyticsRouter = router({
         createdAt: dealHistory.createdAt,
       }).from(dealHistory)
         .where(and(
-          eq(dealHistory.tenantId, input.tenantId),
+          eq(dealHistory.tenantId, getTenantId(ctx)),
           eq(dealHistory.dealId, input.dealId),
         ))
         .orderBy(asc(dealHistory.createdAt));
@@ -398,7 +396,7 @@ export const utmAnalyticsRouter = router({
         stageId: deals.stageId,
         createdAt: deals.createdAt,
       }).from(deals)
-        .where(and(eq(deals.id, input.dealId), eq(deals.tenantId, input.tenantId)))
+        .where(and(eq(deals.id, input.dealId), eq(deals.tenantId, getTenantId(ctx))))
         .limit(1);
 
       if (!deal) return [];
@@ -415,7 +413,7 @@ export const utmAnalyticsRouter = router({
         name: pipelineStages.name,
         orderIndex: pipelineStages.orderIndex,
       }).from(pipelineStages)
-        .where(eq(pipelineStages.tenantId, input.tenantId))
+        .where(eq(pipelineStages.tenantId, getTenantId(ctx)))
         .orderBy(asc(pipelineStages.orderIndex));
 
       // Calculate time in each stage

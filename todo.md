@@ -4158,3 +4158,91 @@
 - [x] Criar endpoint tRPC adminTenantMetrics no saasAuthRouter
 - [x] Atualizar frontend: 4 novas colunas (Neg., Contatos, WhatsApp, Vendido) + 2 cards globais (Negociações em Andamento, Vendido este Mês)
 - [x] Testes vitest (12 testes passando: agregação, conversão de tipos, formatCurrency, formatCompact)
+
+## Blindagem de Isolamento por Tenant
+### Fase 1 — Auditoria
+- [ ] Auditar routers tRPC (routers.ts, adminRouter, saasAuthRouter, etc.)
+- [ ] Auditar db.ts helpers (queries, updates, deletes)
+- [ ] Auditar workers BullMQ (messageWorker, audioTranscriptionWorker)
+- [ ] Auditar webhooks (Evolution API, RD Station, Meta, WordPress, tracking)
+- [ ] Auditar importadores (RD Station CRM, planilha CSV)
+- [ ] Auditar sockets/realtime
+- [ ] Auditar syncs WhatsApp (EvoWA, QuickSync, reconciliation)
+- [ ] Auditar conversationResolver
+- [ ] Auditar campanhas em massa / RFV
+- [ ] Auditar dashboards e busca global
+- [ ] Auditar painel Super Admin
+### Fase 2 — Blindagem backend
+- [ ] Filtros obrigatórios por tenant em todas queries
+- [ ] Validações cruzadas de tenant nas mutações
+- [ ] Remoção de fallbacks inseguros (tenantId default(1))
+- [ ] Proteção contra joins cruzados
+- [ ] Proteção contra upserts cruzados
+### Fase 3 — Guard rails permanentes
+- [ ] Helper central de validação de ownership por tenant
+- [ ] Asserts antes de vincular entidades relacionadas
+- [ ] Logs de segurança para tentativas bloqueadas
+### Fase 4 — Verificação especial de importação
+- [ ] Revisão fluxo importação RD Station CRM
+- [ ] Revisão importação por planilha
+- [ ] Revisão webhooks externos (RD, Meta, WP)
+- [ ] Dedupe/upsert não cruza tenants
+### Testes
+- [ ] Testes leitura: tenant A não vê dados de tenant B
+- [ ] Testes mutação: tenant A não atualiza entidade de tenant B
+- [ ] Testes importação: import não cruza tenants
+- [ ] Testes WhatsApp: sessão/conversa não cruza tenants
+- [ ] Testes dashboard/busca: métricas isoladas por tenant
+- [ ] Testes webhook: resolve tenant correta
+
+## Blindagem de Tenant — Isolamento Multi-Tenant
+
+### Auditoria
+- [x] Grep de padrões vulneráveis em todos os arquivos server/
+- [x] Catalogação de vulnerabilidades (AUDIT_FINDINGS.md)
+- [x] Identificação de 241+ padrões inseguros em routers.ts
+- [x] Identificação de 719+ padrões inseguros em routers/ (módulos)
+- [x] Identificação de 4 webhooks com tenantId = 1 hardcoded
+
+### Guard Rails Centrais
+- [x] Middleware tenantProcedure: valida saasUser + tenantId do JWT
+- [x] Middleware tenantAdminProcedure: tenantProcedure + admin role
+- [x] Helper getTenantId(ctx): extrai tenantId seguro do contexto
+- [x] Helper assertTenantOwnership(): valida ownership de entidades
+- [x] Log de segurança para tentativas de cross-tenant access
+
+### Correções — routers.ts (arquivo principal)
+- [x] Substituir todos input.tenantId por getTenantId(ctx) (153 ocorrências)
+- [x] Remover todos tenantId: z.number() de input schemas (92 ocorrências)
+- [x] Remover todos tenantId: z.number().default(1) (32 ocorrências)
+- [x] Remover todos || 1 fallbacks de tenantId (25 ocorrências)
+- [x] Corrigir handlers duplicados gerados pela migração (37 padrões)
+- [x] Corrigir handlers quebrados com .query/.mutation dentro de outro handler (6 padrões)
+- [x] Adicionar ctx a handler signatures onde faltava (15 handlers)
+
+### Correções — Módulos de Router
+- [x] crmRouter.ts: 336 correções (input.tenantId → getTenantId, schemas limpos)
+- [x] featureRouters.ts: 89 correções
+- [x] productCatalogRouter.ts: 68 correções
+- [x] rfvRouter.ts: 63 correções
+- [x] adminRouter.ts: 60 correções
+- [x] inboxRouter.ts: 34 correções
+- [x] utmAnalyticsRouter.ts: 30 correções (dateFilterSchema limpo)
+- [x] saasAuthRouter.ts: 17 correções
+- [x] rdCrmImportRouter.ts: 14 correções
+- [x] aiAnalysisRouter.ts: 8 correções
+
+### Correções — Webhooks
+- [x] /api/webhooks/wp-leads: resolveWpTenantId() via webhook config
+- [x] /api/webhooks/leads: resolveLeadsTenantId() via Bearer token
+- [x] /api/webhooks/meta GET: resolveMetaTenantByVerifyToken()
+- [x] /api/webhooks/meta POST: resolveMetaTenantFromBody() via signature
+
+### Testes de Blindagem
+- [x] getTenantId(): 6 testes (positivos + negativos)
+- [x] assertTenantOwnership(): 5 testes (match, mismatch, null, undefined, 0)
+- [x] tenantProcedure middleware: 3 testes (anônimo, sem tenant, com tenant)
+- [x] Eliminação de input.tenantId: 7 testes (grep em todos os arquivos)
+- [x] Uso de getTenantId(ctx): 9 testes (verificação em cada router)
+- [x] Import de tenantProcedure: 7 testes (verificação em cada módulo)
+- [x] Total: 37 testes passando

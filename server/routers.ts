@@ -1,7 +1,7 @@
 import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
-import { publicProcedure, protectedProcedure, sessionProtectedProcedure, router } from "./_core/trpc";
+import { publicProcedure, protectedProcedure, sessionProtectedProcedure, tenantProcedure, getTenantId, router } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { whatsappManager } from "./whatsappEvolution";
@@ -237,7 +237,7 @@ export const appRouter = router({
       .mutation(async ({ ctx }) => {
         // Each CRM user gets exactly ONE WhatsApp instance
         // No sessionId needed — system generates it automatically
-        const tenantId = ctx.saasUser?.tenantId || 0;
+        const tenantId = getTenantId(ctx);
         const userId = ctx.saasUser?.userId || ctx.user.id;
 
         // Block connection if user has an active session share
@@ -324,7 +324,7 @@ export const appRouter = router({
       // Each user has their own WhatsApp instance (Evolution API)
       // Filter by the CRM userId (saasUser.id) so users only see their own sessions
       const saasUserId = ctx.saasUser?.userId;
-      const tenantId = ctx.saasUser?.tenantId || 0;
+      const tenantId = getTenantId(ctx);
       const userId = saasUserId || ctx.user.id;
 
       // 1. Get user's own sessions
@@ -592,7 +592,7 @@ export const appRouter = router({
     acquireLock: protectedProcedure
       .input(z.object({ waConversationId: z.number() }))
       .mutation(async ({ input, ctx }) => {
-        const tenantId = ctx.saasUser?.tenantId || 0;
+        const tenantId = getTenantId(ctx);
         const agentId = ctx.user!.id;
         const agentName = ctx.saasUser?.name || ctx.user!.name || "Agent";
         return acquireConversationLock(tenantId, input.waConversationId, agentId, agentName);
@@ -600,7 +600,7 @@ export const appRouter = router({
     releaseLock: protectedProcedure
       .input(z.object({ waConversationId: z.number() }))
       .mutation(async ({ input, ctx }) => {
-        const tenantId = ctx.saasUser?.tenantId || 0;
+        const tenantId = getTenantId(ctx);
         const agentId = ctx.user!.id;
         await releaseConversationLock(tenantId, input.waConversationId, agentId);
         return { success: true };
@@ -608,7 +608,7 @@ export const appRouter = router({
     getLock: protectedProcedure
       .input(z.object({ waConversationId: z.number() }))
       .query(async ({ input, ctx }) => {
-        const tenantId = ctx.saasUser?.tenantId || 0;
+        const tenantId = getTenantId(ctx);
         return getConversationLock(tenantId, input.waConversationId);
       }),
     // ─── EXISTING QUERIES ───
@@ -684,7 +684,6 @@ export const appRouter = router({
     conversationsMultiAgent: sessionProtectedProcedure
       .input(z.object({
         sessionId: z.string(),
-        tenantId: z.number().default(1),
         assignedUserId: z.number().optional(),
         assignedTeamId: z.number().optional(),
         status: z.enum(["open", "pending", "resolved", "closed"]).optional(),
@@ -699,7 +698,6 @@ export const appRouter = router({
     waConversations: sessionProtectedProcedure
       .input(z.object({
         sessionId: z.string(),
-        tenantId: z.number().default(1),
         assignedUserId: z.number().optional(),
         assignedTeamId: z.number().optional(),
         status: z.enum(["open", "pending", "resolved", "closed"]).optional(),
@@ -728,14 +726,13 @@ export const appRouter = router({
     // Assign conversation to an agent
     assignConversation: sessionProtectedProcedure
       .input(z.object({
-        tenantId: z.number().default(1),
         sessionId: z.string(),
         remoteJid: z.string(),
         assignedUserId: z.number().nullable(),
         assignedTeamId: z.number().nullable().optional(),
       }))
       .mutation(async ({ input, ctx }) => {
-        const tenantId = (ctx as any).saasUser?.tenantId || input.tenantId || 1;
+        const tenantId = getTenantId(ctx);
         const result = await assignConversation(tenantId, input.sessionId, input.remoteJid, input.assignedUserId, input.assignedTeamId);
         const io = getIo();
         if (io) {
@@ -753,14 +750,13 @@ export const appRouter = router({
     // Transfer conversation to another agent
     transferConversation: sessionProtectedProcedure
       .input(z.object({
-        tenantId: z.number().default(1),
         sessionId: z.string(),
         remoteJid: z.string(),
         toUserId: z.number(),
         toTeamId: z.number().nullable().optional(),
       }))
       .mutation(async ({ input, ctx }) => {
-        const tenantId = (ctx as any).saasUser?.tenantId || input.tenantId || 1;
+        const tenantId = getTenantId(ctx);
         const result = await assignConversation(tenantId, input.sessionId, input.remoteJid, input.toUserId, input.toTeamId);
         const io = getIo();
         if (io) {
@@ -778,13 +774,12 @@ export const appRouter = router({
     // Update conversation assignment status
     updateAssignmentStatus: sessionProtectedProcedure
       .input(z.object({
-        tenantId: z.number().default(1),
         sessionId: z.string(),
         remoteJid: z.string(),
         status: z.enum(["open", "pending", "resolved", "closed"]),
       }))
       .mutation(async ({ input, ctx }) => {
-        const tenantId = (ctx as any).saasUser?.tenantId || input.tenantId || 1;
+        const tenantId = getTenantId(ctx);
         await updateAssignmentStatus(tenantId, input.sessionId, input.remoteJid, input.status);
         const io = getIo();
         if (io) {
@@ -801,15 +796,14 @@ export const appRouter = router({
     // Finish attendance — resolve and unassign from agent
     finishAttendance: sessionProtectedProcedure
       .input(z.object({
-        tenantId: z.number().default(1),
         sessionId: z.string(),
         remoteJid: z.string(),
       }))
       .mutation(async ({ input, ctx }) => {
         const userId = (ctx as any).user?.saasUser?.userId || (ctx as any).user?.id || 0;
         // Use tenantId from ctx (SaaS user) first, then input, then default to 1
-        const tenantId = (ctx as any).saasUser?.tenantId || input.tenantId || 1;
-        console.log(`[finishAttendance RPC] userId=${userId} tenantId=${tenantId} (ctx=${(ctx as any).saasUser?.tenantId}, input=${input.tenantId})`);
+        const tenantId = getTenantId(ctx);
+        console.log(`[finishAttendance RPC] userId=${userId} tenantId=${tenantId} (ctx=${(ctx as any).saasUser?.tenantId}, input=${getTenantId(ctx)})`);
         await finishAttendance(tenantId, input.sessionId, input.remoteJid, userId);
         const io = getIo();
         if (io) {
@@ -827,31 +821,27 @@ export const appRouter = router({
     // Get assignment for a specific conversation
     getAssignment: sessionProtectedProcedure
       .input(z.object({
-        tenantId: z.number().default(1),
         sessionId: z.string(),
         remoteJid: z.string(),
       }))
       .query(async ({ input, ctx }) => {
-        const tenantId = (ctx as any).saasUser?.tenantId || input.tenantId || 1;
+        const tenantId = getTenantId(ctx);
         return getAssignmentForConversation(tenantId, input.sessionId, input.remoteJid);
       }),
     // Get available agents for a tenant
     agents: protectedProcedure
-      .input(z.object({ tenantId: z.number().default(1) }))
-      .query(async ({ input, ctx }) => getAgentsForTenant((ctx as any).saasUser?.tenantId || input.tenantId || 1)),
+      .query(async ({ input, ctx }) => getAgentsForTenant(getTenantId(ctx))),
     // Get teams for a tenant
     teams: protectedProcedure
-      .input(z.object({ tenantId: z.number().default(1) }))
-      .query(async ({ input, ctx }) => getTeamsForTenant((ctx as any).saasUser?.tenantId || input.tenantId || 1)),
+      .query(async ({ input, ctx }) => getTeamsForTenant(getTenantId(ctx))),
     // Auto-assign via round-robin
     autoAssign: sessionProtectedProcedure
       .input(z.object({
-        tenantId: z.number().default(1),
         sessionId: z.string(),
         remoteJid: z.string(),
       }))
       .mutation(async ({ input, ctx }) => {
-        const tenantId = (ctx as any).saasUser?.tenantId || input.tenantId || 1;
+        const tenantId = getTenantId(ctx);
         const agentId = await getNextRoundRobinAgent(tenantId);
         if (!agentId) return { assigned: false, reason: "Nenhum agente disponível" };
         const result = await assignConversation(tenantId, input.sessionId, input.remoteJid, agentId);
@@ -1004,16 +994,15 @@ export const appRouter = router({
       }),
     // ─── Conversation Identity Resolver: Migration & Reconciliation ───
     migrateConversations: protectedProcedure
-      .input(z.object({ tenantId: z.number().default(1) }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         const { migrateExistingData } = await import("./conversationResolver");
-        return migrateExistingData(input.tenantId);
+        return migrateExistingData(getTenantId(ctx));
       }),
     reconcileGhosts: sessionProtectedProcedure
-      .input(z.object({ tenantId: z.number().default(1), sessionId: z.string() }))
-      .mutation(async ({ input }) => {
+      .input(z.object({ sessionId: z.string() }))
+      .mutation(async ({ input, ctx }) => {
         const { reconcileGhostThreads } = await import("./conversationResolver");
-        return reconcileGhostThreads(input.tenantId, input.sessionId);
+        return reconcileGhostThreads(getTenantId(ctx), input.sessionId);
       }),
     // Repair contact names contaminated by owner's name
     repairContactNames: protectedProcedure
@@ -1154,34 +1143,33 @@ export const appRouter = router({
       }),
     // WhatsApp contact import settings
     getContactImportSettings: protectedProcedure
-      .input(z.object({ tenantId: z.number() }))
-      .query(async ({ input }) => {
+      .query(async ({ input, ctx }) => {
         const db = await (await import("./db")).getDb();
         if (!db) return { importContactsFromAgenda: false };
         const { tenants } = await import("../drizzle/schema");
         const { eq } = await import("drizzle-orm");
-        const rows = await db.select({ settingsJson: tenants.settingsJson }).from(tenants).where(eq(tenants.id, input.tenantId)).limit(1);
+        const rows = await db.select({ settingsJson: tenants.settingsJson }).from(tenants).where(eq(tenants.id, getTenantId(ctx))).limit(1);
         const settings = (rows[0]?.settingsJson as any) || {};
         return { importContactsFromAgenda: settings.whatsapp?.importContactsFromAgenda ?? false };
       }),
     saveContactImportSettings: protectedProcedure
-      .input(z.object({ tenantId: z.number(), importContactsFromAgenda: z.boolean() }))
-      .mutation(async ({ input }) => {
+      .input(z.object({ importContactsFromAgenda: z.boolean() }))
+      .mutation(async ({ input, ctx }) => {
         const db = await (await import("./db")).getDb();
         if (!db) return { success: false };
         const { tenants } = await import("../drizzle/schema");
         const { eq } = await import("drizzle-orm");
-        const rows = await db.select({ settingsJson: tenants.settingsJson }).from(tenants).where(eq(tenants.id, input.tenantId)).limit(1);
+        const rows = await db.select({ settingsJson: tenants.settingsJson }).from(tenants).where(eq(tenants.id, getTenantId(ctx))).limit(1);
         const currentSettings = (rows[0]?.settingsJson as any) || {};
         if (!currentSettings.whatsapp) currentSettings.whatsapp = {};
         currentSettings.whatsapp.importContactsFromAgenda = input.importContactsFromAgenda;
-        await db.update(tenants).set({ settingsJson: currentSettings }).where(eq(tenants.id, input.tenantId));
+        await db.update(tenants).set({ settingsJson: currentSettings }).where(eq(tenants.id, getTenantId(ctx)));
         return { success: true };
       }),
     // Cleanup synced contacts: remove contacts with source="whatsapp" that have NO deals and were NOT manually created
     cleanupSyncedContacts: protectedProcedure
-      .input(z.object({ tenantId: z.number(), dryRun: z.boolean().default(true) }))
-      .mutation(async ({ input }) => {
+      .input(z.object({ dryRun: z.boolean().default(true) }))
+      .mutation(async ({ input, ctx }) => {
         const db = await (await import("./db")).getDb();
         if (!db) throw new Error("Database not available");
         const { contacts, deals } = await import("../drizzle/schema");
@@ -1192,10 +1180,10 @@ export const appRouter = router({
         const syncedContacts = await db.execute(
           sql`SELECT c.id, c.name, c.phone, c.phoneE164, c.source, c.createdAt
               FROM contacts c
-              WHERE c.tenantId = ${input.tenantId}
+              WHERE c.tenantId = ${getTenantId(ctx)}
                 AND c.source = 'whatsapp'
                 AND c.id NOT IN (
-                  SELECT DISTINCT d.contactId FROM deals d WHERE d.tenantId = ${input.tenantId} AND d.contactId IS NOT NULL
+                  SELECT DISTINCT d.contactId FROM deals d WHERE d.tenantId = ${getTenantId(ctx)} AND d.contactId IS NOT NULL
                 )`
         );
 
@@ -1229,19 +1217,19 @@ export const appRouter = router({
       }),
     // Get wa_conversations debug info
     debugConversations: sessionProtectedProcedure
-      .input(z.object({ tenantId: z.number().default(1), sessionId: z.string() }))
-      .query(async ({ input }) => {
+      .input(z.object({ sessionId: z.string() }))
+      .query(async ({ input, ctx }) => {
         const db = (await import("./db")).getDb;
         const dbInst = await db();
         if (!dbInst) return { conversations: [], identities: [] };
         const { waConversations, waIdentities } = await import("../drizzle/schema");
         const { eq, and, desc } = await import("drizzle-orm");
         const convs = await dbInst.select().from(waConversations)
-          .where(and(eq(waConversations.tenantId, input.tenantId), eq(waConversations.sessionId, input.sessionId)))
+          .where(and(eq(waConversations.tenantId, getTenantId(ctx)), eq(waConversations.sessionId, input.sessionId)))
           .orderBy(desc(waConversations.lastMessageAt))
           .limit(100);
         const ids = await dbInst.select().from(waIdentities)
-          .where(and(eq(waIdentities.tenantId, input.tenantId), eq(waIdentities.sessionId, input.sessionId)))
+          .where(and(eq(waIdentities.tenantId, getTenantId(ctx)), eq(waIdentities.sessionId, input.sessionId)))
           .orderBy(desc(waIdentities.lastSeenAt))
           .limit(100);
         return { conversations: convs, identities: ids };
@@ -1250,13 +1238,12 @@ export const appRouter = router({
     // ─── SESSION SHARING (Admin) ───
     // List all shares for the tenant
     listShares: protectedProcedure
-      .input(z.object({ tenantId: z.number() }))
       .query(async ({ ctx, input }) => {
         const role = ctx.saasUser?.role;
         if (role !== "admin" && ctx.saasUser) {
           throw new TRPCError({ code: "FORBIDDEN", message: "Apenas administradores podem gerenciar compartilhamentos." });
         }
-        const shares = await getAllSharesForTenant(input.tenantId);
+        const shares = await getAllSharesForTenant(getTenantId(ctx));
         // Enrich with user names
         const db = await getDb();
         if (!db) return shares.map(s => ({ ...s, targetUserName: null, sourceUserName: null, sharedByName: null }));
@@ -1276,7 +1263,6 @@ export const appRouter = router({
     // Share a session with a user
     shareSession: protectedProcedure
       .input(z.object({
-        tenantId: z.number(),
         sourceSessionId: z.string(),
         targetUserIds: z.array(z.number()).min(1),
       }))
@@ -1289,7 +1275,7 @@ export const appRouter = router({
 
         // Verify the session exists and belongs to this tenant
         const session = await getSessionBySessionId(input.sourceSessionId);
-        if (!session || session.tenantId !== input.tenantId) {
+        if (!session || session.tenantId !== getTenantId(ctx)) {
           throw new TRPCError({ code: "NOT_FOUND", message: "Sessão não encontrada." });
         }
 
@@ -1303,7 +1289,7 @@ export const appRouter = router({
         const results = [];
         for (const targetUserId of filteredTargets) {
           // Disconnect target user's own session if connected
-          const targetCanonical = `crm-${input.tenantId}-${targetUserId}`;
+          const targetCanonical = `crm-${getTenantId(ctx)}-${targetUserId}`;
           try {
             const targetSession = await getSessionBySessionId(targetCanonical);
             if (targetSession) {
@@ -1318,7 +1304,7 @@ export const appRouter = router({
           }
 
           const result = await createSessionShare(
-            input.tenantId,
+            getTenantId(ctx),
             input.sourceSessionId,
             session.userId,
             targetUserId,
@@ -1332,37 +1318,36 @@ export const appRouter = router({
 
     // Revoke a specific share
     revokeShare: protectedProcedure
-      .input(z.object({ tenantId: z.number(), shareId: z.number() }))
+      .input(z.object({ shareId: z.number() }))
       .mutation(async ({ ctx, input }) => {
         const role = ctx.saasUser?.role;
         if (role !== "admin" && ctx.saasUser) {
           throw new TRPCError({ code: "FORBIDDEN", message: "Apenas administradores podem revogar compartilhamentos." });
         }
-        await revokeSessionShare(input.shareId, input.tenantId);
+        await revokeSessionShare(input.shareId, getTenantId(ctx));
         return { success: true };
       }),
 
     // Revoke all shares for a session
     revokeAllShares: protectedProcedure
-      .input(z.object({ tenantId: z.number(), sourceSessionId: z.string() }))
+      .input(z.object({ sourceSessionId: z.string() }))
       .mutation(async ({ ctx, input }) => {
         const role = ctx.saasUser?.role;
         if (role !== "admin" && ctx.saasUser) {
           throw new TRPCError({ code: "FORBIDDEN", message: "Apenas administradores podem revogar compartilhamentos." });
         }
-        await revokeAllSharesForSession(input.tenantId, input.sourceSessionId);
+        await revokeAllSharesForSession(getTenantId(ctx), input.sourceSessionId);
         return { success: true };
       }),
 
     // Get all tenant sessions (for admin to choose which to share)
     tenantSessions: protectedProcedure
-      .input(z.object({ tenantId: z.number() }))
       .query(async ({ ctx, input }) => {
         const role = ctx.saasUser?.role;
         if (role !== "admin" && ctx.saasUser) {
           throw new TRPCError({ code: "FORBIDDEN", message: "Apenas administradores podem ver todas as sessões." });
         }
-        const sessions = await getSessionsByTenant(input.tenantId);
+        const sessions = await getSessionsByTenant(getTenantId(ctx));
         // Enrich with live status and owner name
         const db = await getDb();
         const enriched = await Promise.all(sessions.map(async (s) => {
@@ -1387,10 +1372,9 @@ export const appRouter = router({
 
     // Get active share for current user (used by frontend to show banner)
     myActiveShare: protectedProcedure
-      .input(z.object({ tenantId: z.number() }))
       .query(async ({ ctx, input }) => {
         const userId = ctx.saasUser?.userId || ctx.user.id;
-        const share = await getActiveShareForUser(input.tenantId, userId);
+        const share = await getActiveShareForUser(getTenantId(ctx), userId);
         if (!share) return null;
         // Enrich with owner name and phone
         const session = await getSessionBySessionId(share.sourceSessionId);
@@ -1416,7 +1400,7 @@ export const appRouter = router({
     list: protectedProcedure
       .input(z.object({ waConversationId: z.number() }))
       .query(async ({ ctx, input }) => {
-        const tenantId = ctx.saasUser?.tenantId || 1;
+        const tenantId = getTenantId(ctx);
         return getInternalNotes(tenantId, input.waConversationId);
       }),
     create: sessionProtectedProcedure
@@ -1431,7 +1415,7 @@ export const appRouter = router({
         isCustomerGlobalNote: z.boolean().optional(),
       }))
       .mutation(async ({ ctx, input }) => {
-        const tenantId = ctx.saasUser?.tenantId || 1;
+        const tenantId = getTenantId(ctx);
         const userId = ctx.saasUser?.userId || ctx.user.id;
         const result = await createInternalNote(
           tenantId, input.waConversationId, input.sessionId, input.remoteJid,
@@ -1461,7 +1445,7 @@ export const appRouter = router({
         priority: z.string().optional(),
       }))
       .mutation(async ({ ctx, input }) => {
-        const tenantId = ctx.saasUser?.tenantId || 1;
+        const tenantId = getTenantId(ctx);
         await updateInternalNote(tenantId, input.noteId, {
           content: input.content,
           category: input.category,
@@ -1472,14 +1456,14 @@ export const appRouter = router({
     delete: protectedProcedure
       .input(z.object({ noteId: z.number() }))
       .mutation(async ({ ctx, input }) => {
-        const tenantId = ctx.saasUser?.tenantId || 1;
+        const tenantId = getTenantId(ctx);
         await deleteInternalNote(tenantId, input.noteId);
         return { success: true };
       }),
     globalByContact: protectedProcedure
       .input(z.object({ remoteJid: z.string() }))
       .query(async ({ ctx, input }) => {
-        const tenantId = ctx.saasUser?.tenantId || 1;
+        const tenantId = getTenantId(ctx);
         return getCustomerGlobalNotes(tenantId, input.remoteJid);
       }),
     }),
@@ -1489,7 +1473,7 @@ export const appRouter = router({
     list: protectedProcedure
       .input(z.object({ waConversationId: z.number() }))
       .query(async ({ ctx, input }) => {
-        const tenantId = ctx.saasUser?.tenantId || 1;
+        const tenantId = getTenantId(ctx);
         return getConversationEvents(tenantId, input.waConversationId);
       }),
     }),
@@ -1499,13 +1483,13 @@ export const appRouter = router({
     list: sessionProtectedProcedure
       .input(z.object({ sessionId: z.string(), limit: z.number().max(200).default(100) }))
       .query(async ({ ctx, input }) => {
-        const tenantId = ctx.saasUser?.tenantId || 1;
+        const tenantId = getTenantId(ctx);
         return getQueueConversations(input.sessionId, tenantId, input.limit);
       }),
     claim: sessionProtectedProcedure
       .input(z.object({ sessionId: z.string(), remoteJid: z.string() }))
       .mutation(async ({ ctx, input }) => {
-        const tenantId = ctx.saasUser?.tenantId || 1;
+        const tenantId = getTenantId(ctx);
         const userId = ctx.saasUser?.userId || ctx.user.id;
         const result = claimConversation(tenantId, input.sessionId, input.remoteJid, userId);
         const io = getIo();
@@ -1523,7 +1507,7 @@ export const appRouter = router({
     enqueue: sessionProtectedProcedure
       .input(z.object({ sessionId: z.string(), remoteJid: z.string() }))
       .mutation(async ({ ctx, input }) => {
-        const tenantId = ctx.saasUser?.tenantId || 1;
+        const tenantId = getTenantId(ctx);
         await enqueueConversation(tenantId, input.sessionId, input.remoteJid);
         const io = getIo();
         if (io) {
@@ -1540,7 +1524,7 @@ export const appRouter = router({
     stats: sessionProtectedProcedure
       .input(z.object({ sessionId: z.string() }))
       .query(async ({ ctx, input }) => {
-        const tenantId = ctx.saasUser?.tenantId || 1;
+        const tenantId = getTenantId(ctx);
         return getQueueStats(tenantId, input.sessionId);
       }),
     }),
@@ -1556,7 +1540,7 @@ export const appRouter = router({
         note: z.string().optional(),
       }))
       .mutation(async ({ ctx, input }) => {
-        const tenantId = ctx.saasUser?.tenantId || 1;
+        const tenantId = getTenantId(ctx);
         const fromUserId = ctx.saasUser?.userId || ctx.user.id;
         return transferConversationWithNote(
           tenantId, input.sessionId, input.remoteJid,
@@ -1570,19 +1554,19 @@ export const appRouter = router({
     agentWorkload: sessionProtectedProcedure
       .input(z.object({ sessionId: z.string() }))
       .query(async ({ ctx, input }) => {
-        const tenantId = ctx.saasUser?.tenantId || 1;
+        const tenantId = getTenantId(ctx);
         return getAgentWorkload(tenantId, input.sessionId);
       }),
     agentConversations: sessionProtectedProcedure
       .input(z.object({ sessionId: z.string(), agentId: z.number(), limit: z.number().max(50).default(10) }))
       .query(async ({ ctx, input }) => {
-        const tenantId = ctx.saasUser?.tenantId || 1;
+        const tenantId = getTenantId(ctx);
         return getAgentConversations(tenantId, input.sessionId, input.agentId, input.limit);
       }),
     queueStats: sessionProtectedProcedure
       .input(z.object({ sessionId: z.string() }))
       .query(async ({ ctx, input }) => {
-        const tenantId = ctx.saasUser?.tenantId || 1;
+        const tenantId = getTenantId(ctx);
         return getQueueStats(tenantId, input.sessionId);
       }),
     // Assign a queue conversation to a specific agent (admin action)
@@ -1593,7 +1577,7 @@ export const appRouter = router({
         agentId: z.number(),
       }))
       .mutation(async ({ ctx, input }) => {
-        const tenantId = ctx.saasUser?.tenantId || 1;
+        const tenantId = getTenantId(ctx);
         const result = await assignConversation(tenantId, input.sessionId, input.remoteJid, input.agentId);
         const io = getIo();
         if (io) {
@@ -1614,7 +1598,7 @@ export const appRouter = router({
         remoteJid: z.string(),
       }))
       .mutation(async ({ ctx, input }) => {
-        const tenantId = ctx.saasUser?.tenantId || 1;
+        const tenantId = getTenantId(ctx);
         await enqueueConversation(tenantId, input.sessionId, input.remoteJid);
         const io = getIo();
         if (io) {
@@ -1635,7 +1619,7 @@ export const appRouter = router({
     list: protectedProcedure
       .input(z.object({ teamId: z.number().optional() }))
       .query(async ({ ctx, input }) => {
-        const tenantId = ctx.saasUser?.tenantId || 1;
+        const tenantId = getTenantId(ctx);
         return getQuickReplies(tenantId, input.teamId);
       }),
     create: protectedProcedure
@@ -1647,14 +1631,14 @@ export const appRouter = router({
         category: z.string().optional(),
       }))
       .mutation(async ({ ctx, input }) => {
-        const tenantId = ctx.saasUser?.tenantId || 1;
+        const tenantId = getTenantId(ctx);
         const userId = ctx.saasUser?.userId || ctx.user.id;
         return createQuickReply(tenantId, { ...input, createdBy: userId });
       }),
     delete: protectedProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ ctx, input }) => {
-        const tenantId = ctx.saasUser?.tenantId || 1;
+        const tenantId = getTenantId(ctx);
         await deleteQuickReply(tenantId, input.id);
         return { success: true };
       }),
@@ -1714,120 +1698,113 @@ export const appRouter = router({
 
   // ─── Dashboard ───
   dashboard: router({
-    metrics: protectedProcedure
-      .input(z.object({ tenantId: z.number(), pipelineId: z.number().optional(), dealStatus: z.enum(['open', 'won', 'lost', 'all']).optional() }))
+    metrics: tenantProcedure
+      .input(z.object({ pipelineId: z.number().optional(), dealStatus: z.enum(['open', 'won', 'lost', 'all']).optional() }))
       .query(async ({ ctx, input }) => {
         // Non-admin users see only their own deal metrics
         const isAdmin = ctx.saasUser?.role === "admin";
         const ownerFilter = isAdmin ? undefined : ctx.saasUser?.userId;
-        return getDashboardMetrics(input.tenantId, ownerFilter, input.pipelineId, input.dealStatus);
+        return getDashboardMetrics(getTenantId(ctx), ownerFilter, input.pipelineId, input.dealStatus);
       }),
-    pipelineSummary: protectedProcedure
-      .input(z.object({ tenantId: z.number(), pipelineId: z.number().optional(), dealStatus: z.enum(['open', 'won', 'lost', 'all']).optional() }))
+    pipelineSummary: tenantProcedure
+      .input(z.object({ pipelineId: z.number().optional(), dealStatus: z.enum(['open', 'won', 'lost', 'all']).optional() }))
       .query(async ({ ctx, input }) => {
         // Non-admin users see only their own pipeline summary
         const isAdmin = ctx.saasUser?.role === "admin";
         const ownerFilter = isAdmin ? undefined : ctx.saasUser?.userId;
-        return getPipelineSummary(input.tenantId, ownerFilter, input.pipelineId, input.dealStatus);
+        return getPipelineSummary(getTenantId(ctx), ownerFilter, input.pipelineId, input.dealStatus);
       }),
-    recentActivity: protectedProcedure
-      .input(z.object({ tenantId: z.number(), limit: z.number().optional(), dateFrom: z.string().optional(), dateTo: z.string().optional() }))
-      .query(async ({ input }) => {
-        return getRecentActivity(input.tenantId, input.limit, input.dateFrom, input.dateTo);
-      }),
-    upcomingTasks: protectedProcedure
-      .input(z.object({ tenantId: z.number(), limit: z.number().optional() }))
+    recentActivity: tenantProcedure
+      .input(z.object({ limit: z.number().optional(), dateFrom: z.string().optional(), dateTo: z.string().optional() }))
       .query(async ({ input, ctx }) => {
-        return getUpcomingTasks(input.tenantId, ctx.user?.id, input.limit);
+        return getRecentActivity(getTenantId(ctx), input.limit, input.dateFrom, input.dateTo);
       }),
-    whatsappMetrics: protectedProcedure
-      .input(z.object({ tenantId: z.number() }))
-      .query(async ({ input }) => {
-        return getDashboardWhatsAppMetrics(input.tenantId);
+    upcomingTasks: tenantProcedure
+      .input(z.object({ limit: z.number().optional() }))
+      .query(async ({ input, ctx }) => {
+        return getUpcomingTasks(getTenantId(ctx), ctx.user?.id, input.limit);
       }),
-    dealsTimeline: protectedProcedure
-      .input(z.object({ tenantId: z.number(), days: z.number().optional() }))
-      .query(async ({ input }) => {
-        return getDashboardDealsTimeline(input.tenantId, input.days);
+    whatsappMetrics: tenantProcedure
+      .query(async ({ input, ctx }) => {
+        return getDashboardWhatsAppMetrics(getTenantId(ctx));
       }),
-    conversionRates: protectedProcedure
-      .input(z.object({ tenantId: z.number() }))
-      .query(async ({ input }) => {
-        return getDashboardConversionRates(input.tenantId);
+    dealsTimeline: tenantProcedure
+      .input(z.object({ days: z.number().optional() }))
+      .query(async ({ input, ctx }) => {
+        return getDashboardDealsTimeline(getTenantId(ctx), input.days);
       }),
-    funnelData: protectedProcedure
-      .input(z.object({ tenantId: z.number(), pipelineId: z.number().optional() }))
-      .query(async ({ input }) => {
-        return getDashboardFunnelData(input.tenantId, input.pipelineId);
+    conversionRates: tenantProcedure
+      .query(async ({ input, ctx }) => {
+        return getDashboardConversionRates(getTenantId(ctx));
       }),
-    allPipelines: protectedProcedure
-      .input(z.object({ tenantId: z.number() }))
-      .query(async ({ input }) => {
-        return getDashboardAllPipelines(input.tenantId);
+    funnelData: tenantProcedure
+      .input(z.object({ pipelineId: z.number().optional() }))
+      .query(async ({ input, ctx }) => {
+        return getDashboardFunnelData(getTenantId(ctx), input.pipelineId);
+      }),
+    allPipelines: tenantProcedure
+      .query(async ({ input, ctx }) => {
+        return getDashboardAllPipelines(getTenantId(ctx));
       }),
   }),
 
   // ─── User Preferences ───
   preferences: router({
-    get: protectedProcedure
-      .input(z.object({ tenantId: z.number(), key: z.string() }))
+    get: tenantProcedure
+      .input(z.object({ key: z.string() }))
       .query(async ({ input, ctx }) => {
-        const val = await getUserPreference(ctx.user!.id, input.tenantId, input.key);
+        const val = await getUserPreference(ctx.user!.id, getTenantId(ctx), input.key);
         return { key: input.key, value: val };
       }),
-    set: protectedProcedure
-      .input(z.object({ tenantId: z.number(), key: z.string(), value: z.string() }))
+    set: tenantProcedure
+      .input(z.object({ key: z.string(), value: z.string() }))
       .mutation(async ({ input, ctx }) => {
-        await setUserPreference(ctx.user!.id, input.tenantId, input.key, input.value);
+        await setUserPreference(ctx.user!.id, getTenantId(ctx), input.key, input.value);
         return { success: true };
       }),
-    getAll: protectedProcedure
-      .input(z.object({ tenantId: z.number() }))
+    getAll: tenantProcedure
       .query(async ({ input, ctx }) => {
-        return getAllUserPreferences(ctx.user!.id, input.tenantId);
+        return getAllUserPreferences(ctx.user!.id, getTenantId(ctx));
       }),
   }),
 
   // ─── Global Search ───
   search: router({
-    global: protectedProcedure
-      .input(z.object({ tenantId: z.number(), query: z.string().min(1).max(100), limit: z.number().optional() }))
-      .query(async ({ input }) => {
-        return globalSearch(input.tenantId, input.query, input.limit);
+    global: tenantProcedure
+      .input(z.object({ query: z.string().min(1).max(100), limit: z.number().optional() }))
+      .query(async ({ input, ctx }) => {
+        return globalSearch(getTenantId(ctx), input.query, input.limit);
       }),
   }),
 
   // ─── Notifications ───
   notifications: router({
-    list: protectedProcedure
+    list: tenantProcedure
       .input(z.object({
-        tenantId: z.number(),
         onlyUnread: z.boolean().optional(),
         limit: z.number().optional(),
         beforeId: z.number().optional(),
       }))
-      .query(async ({ input }) => {
-        return getNotifications(input.tenantId, {
+      .query(async ({ input, ctx }) => {
+        return getNotifications(getTenantId(ctx), {
           onlyUnread: input.onlyUnread,
           limit: input.limit,
           beforeId: input.beforeId,
         });
       }),
-    unreadCount: protectedProcedure
-      .input(z.object({ tenantId: z.number() }))
-      .query(async ({ input }) => {
-        return getUnreadNotificationCount(input.tenantId);
+    unreadCount: tenantProcedure
+      .query(async ({ input, ctx }) => {
+        return getUnreadNotificationCount(getTenantId(ctx));
       }),
-    markRead: protectedProcedure
+    markRead: tenantProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ input }) => {
         await markNotificationRead(input.id);
         return { success: true };
       }),
-    markAllRead: protectedProcedure
-      .input(z.object({ tenantId: z.number() }))
-      .mutation(async ({ input }) => {
-        await markAllNotificationsRead(input.tenantId);
+    markAllRead: tenantProcedure
+      .mutation(async ({ input, ctx }) => {
+        await markAllNotificationsRead(getTenantId(ctx));
         return { success: true };
       }),
   }),
@@ -1836,32 +1813,29 @@ export const appRouter = router({
   dateCelebrations: router({
     upcoming: protectedProcedure
       .input(z.object({
-        tenantId: z.number(),
         dateType: z.enum(["birthDate", "weddingDate"]),
         daysAhead: z.number().default(7),
       }))
-      .query(async ({ input }) => {
+      .query(async ({ input, ctx }) => {
         const crm = await import("./crmDb");
-        return crm.getContactsWithUpcomingDates(input.tenantId, { daysAhead: input.daysAhead, dateType: input.dateType });
+        return crm.getContactsWithUpcomingDates(getTenantId(ctx), { daysAhead: input.daysAhead, dateType: input.dateType });
       }),
     today: protectedProcedure
       .input(z.object({
-        tenantId: z.number(),
         dateType: z.enum(["birthDate", "weddingDate"]),
       }))
-      .query(async ({ input }) => {
+      .query(async ({ input, ctx }) => {
         const crm = await import("./crmDb");
-        return crm.getContactsWithDateToday(input.tenantId, input.dateType);
+        return crm.getContactsWithDateToday(getTenantId(ctx), input.dateType);
       }),
     inMonth: protectedProcedure
       .input(z.object({
-        tenantId: z.number(),
         month: z.number().min(1).max(12),
         dateType: z.enum(["birthDate", "weddingDate"]),
       }))
-      .query(async ({ input }) => {
+      .query(async ({ input, ctx }) => {
         const crm = await import("./crmDb");
-        return crm.getContactsWithDateInMonth(input.tenantId, input.month, input.dateType);
+        return crm.getContactsWithDateInMonth(getTenantId(ctx), input.month, input.dateType);
       }),
   }),
 
@@ -1869,76 +1843,70 @@ export const appRouter = router({
   teamManagement: router({
     // ── Teams CRUD ──
     listTeams: protectedProcedure
-      .input(z.object({ tenantId: z.number().default(1) }))
-      .query(async ({ input }) => getTeamsForTenant(input.tenantId)),
+      .query(async ({ ctx }) => getTeamsForTenant(getTenantId(ctx))),
     getTeam: protectedProcedure
-      .input(z.object({ tenantId: z.number().default(1), teamId: z.number() }))
-      .query(async ({ input }) => getTeamWithMembers(input.teamId, input.tenantId)),
+      .input(z.object({ teamId: z.number() }))
+      .query(async ({ input, ctx }) => getTeamWithMembers(input.teamId, getTenantId(ctx))),
     createTeam: protectedProcedure
       .input(z.object({
-        tenantId: z.number().default(1),
         name: z.string().min(1).max(255),
         description: z.string().optional(),
         color: z.string().optional(),
         maxMembers: z.number().optional(),
       }))
-      .mutation(async ({ input }) => {
-        const { tenantId, ...data } = input;
+      .mutation(async ({ input, ctx }) => {
+        const tenantId = getTenantId(ctx);
+        const { ...data } = input;
         return createTeam(tenantId, data);
       }),
     updateTeam: protectedProcedure
       .input(z.object({
-        tenantId: z.number().default(1),
         id: z.number(),
         name: z.string().min(1).max(255).optional(),
         description: z.string().optional(),
         color: z.string().optional(),
         maxMembers: z.number().optional(),
       }))
-      .mutation(async ({ input }) => {
-        const { tenantId, id, ...data } = input;
+      .mutation(async ({ input, ctx }) => {
+const tenantId = getTenantId(ctx); const { id, ...data } = input;
         return updateTeam(id, tenantId, data);
       }),
     deleteTeam: protectedProcedure
-      .input(z.object({ tenantId: z.number().default(1), id: z.number() }))
-      .mutation(async ({ input }) => {
-        await deleteTeam(input.id, input.tenantId);
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        await deleteTeam(input.id, getTenantId(ctx));
         return { success: true };
       }),
     // ── Team Members ──
     addMember: protectedProcedure
       .input(z.object({
-        tenantId: z.number().default(1),
         teamId: z.number(),
         userId: z.number(),
         role: z.enum(["member", "leader"]).default("member"),
       }))
-      .mutation(async ({ input }) => addTeamMember(input.tenantId, input.teamId, input.userId, input.role)),
+      .mutation(async ({ input }) => addTeamMember(getTenantId(ctx), input.teamId, input.userId, input.role)),
     removeMember: protectedProcedure
       .input(z.object({
-        tenantId: z.number().default(1),
         teamId: z.number(),
         userId: z.number(),
       }))
-      .mutation(async ({ input }) => {
-        await removeTeamMember(input.tenantId, input.teamId, input.userId);
+      .mutation(async ({ input, ctx }) => {
+        await removeTeamMember(getTenantId(ctx), input.teamId, input.userId);
         return { success: true };
       }),
     updateMemberRole: protectedProcedure
       .input(z.object({
-        tenantId: z.number().default(1),
         teamId: z.number(),
         userId: z.number(),
         role: z.enum(["member", "leader"]),
       }))
-      .mutation(async ({ input }) => {
-        await updateTeamMemberRole(input.tenantId, input.teamId, input.userId, input.role);
+      .mutation(async ({ input, ctx }) => {
+        await updateTeamMemberRole(getTenantId(ctx), input.teamId, input.userId, input.role);
         return { success: true };
       }),
     // ── Agents ──
     inviteAgent: protectedProcedure
       .input(z.object({
-        tenantId: z.number(),
         name: z.string().min(1),
         email: z.string().email(),
         phone: z.string().optional(),
@@ -1953,7 +1921,7 @@ export const appRouter = router({
         try {
           // inviteUserToTenant imported statically at top of file
           const result = await inviteUserToTenant({
-            tenantId: input.tenantId,
+            tenantId: getTenantId(ctx),
             name: input.name,
             email: input.email,
             phone: input.phone,
@@ -1970,11 +1938,9 @@ export const appRouter = router({
         }
       }),
     listAgents: protectedProcedure
-      .input(z.object({ tenantId: z.number().default(1) }))
-      .query(async ({ input }) => getAgentsWithTeams(input.tenantId)),
+      .query(async ({ input }) => getAgentsWithTeams(getTenantId(ctx))),
     updateAgentStatus: protectedProcedure
       .input(z.object({
-        tenantId: z.number().default(1),
         userId: z.number(),
         status: z.enum(["active", "inactive", "invited"]),
       }))
@@ -1983,12 +1949,11 @@ export const appRouter = router({
         if (ctx.saasUser?.role !== "admin") {
           throw new TRPCError({ code: "FORBIDDEN", message: "Apenas administradores podem alterar status de agentes" });
         }
-        await updateAgentStatus(input.tenantId, input.userId, input.status);
+        await updateAgentStatus(getTenantId(ctx), input.userId, input.status);
         return { success: true };
       }),
     updateAgentRole: protectedProcedure
       .input(z.object({
-        tenantId: z.number(),
         userId: z.number(),
         role: z.enum(["admin", "user"]),
       }))
@@ -2005,16 +1970,14 @@ export const appRouter = router({
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
         const { crmUsers: crmUsersTable } = await import("../drizzle/schema");
         const { eq: eqOp, and: andOp } = await import("drizzle-orm");
-        await db.update(crmUsersTable).set({ role: input.role }).where(andOp(eqOp(crmUsersTable.id, input.userId), eqOp(crmUsersTable.tenantId, input.tenantId)));
+        await db.update(crmUsersTable).set({ role: input.role }).where(andOp(eqOp(crmUsersTable.id, input.userId), eqOp(crmUsersTable.tenantId, getTenantId(ctx))));
         return { success: true };
       }),
     // ── Distribution Rules ──
     listRules: protectedProcedure
-      .input(z.object({ tenantId: z.number().default(1) }))
-      .query(async ({ input }) => getDistributionRules(input.tenantId)),
+      .query(async ({ input }) => getDistributionRules(getTenantId(ctx))),
     createRule: protectedProcedure
       .input(z.object({
-        tenantId: z.number().default(1),
         name: z.string().min(1).max(255),
         description: z.string().optional(),
         strategy: z.enum(["round_robin", "least_busy", "manual", "team_round_robin"]),
@@ -2024,13 +1987,12 @@ export const appRouter = router({
         priority: z.number().optional(),
         configJson: z.any().optional(),
       }))
-      .mutation(async ({ input }) => {
-        const { tenantId, ...data } = input;
+      .mutation(async ({ input, ctx }) => {
+const tenantId = getTenantId(ctx); const { ...data } = input;
         return createDistributionRule(tenantId, data);
       }),
     updateRule: protectedProcedure
       .input(z.object({
-        tenantId: z.number().default(1),
         id: z.number(),
         name: z.string().min(1).max(255).optional(),
         description: z.string().optional(),
@@ -2041,20 +2003,20 @@ export const appRouter = router({
         priority: z.number().optional(),
         configJson: z.any().optional(),
       }))
-      .mutation(async ({ input }) => {
-        const { tenantId, id, ...data } = input;
+      .mutation(async ({ input, ctx }) => {
+const tenantId = getTenantId(ctx); const { id, ...data } = input;
         return updateDistributionRule(id, tenantId, data);
       }),
     deleteRule: protectedProcedure
-      .input(z.object({ tenantId: z.number().default(1), id: z.number() }))
-      .mutation(async ({ input }) => {
-        await deleteDistributionRule(input.id, input.tenantId);
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        await deleteDistributionRule(input.id, getTenantId(ctx));
         return { success: true };
       }),
     toggleRule: protectedProcedure
-      .input(z.object({ tenantId: z.number().default(1), id: z.number(), isActive: z.boolean() }))
-      .mutation(async ({ input }) => {
-        await toggleDistributionRule(input.id, input.tenantId, input.isActive);
+      .input(z.object({ id: z.number(), isActive: z.boolean() }))
+      .mutation(async ({ input, ctx }) => {
+        await toggleDistributionRule(input.id, getTenantId(ctx), input.isActive);
         return { success: true };
       }),
   }),
@@ -2080,47 +2042,45 @@ export const appRouter = router({
   // ─── Contact Profile & Custom Fields ───
   contactProfile: router({
     getMetrics: protectedProcedure
-      .input(z.object({ tenantId: z.number(), contactId: z.number() }))
-      .query(async ({ input }) => {
-        return getContactMetrics(input.tenantId, input.contactId);
+      .input(z.object({ contactId: z.number() }))
+      .query(async ({ input, ctx }) => {
+        return getContactMetrics(getTenantId(ctx), input.contactId);
       }),
     getDeals: protectedProcedure
-      .input(z.object({ tenantId: z.number(), contactId: z.number() }))
-      .query(async ({ input }) => {
-        return getContactDeals(input.tenantId, input.contactId);
+      .input(z.object({ contactId: z.number() }))
+      .query(async ({ input, ctx }) => {
+        return getContactDeals(getTenantId(ctx), input.contactId);
       }),
     getCustomFieldValues: protectedProcedure
-      .input(z.object({ tenantId: z.number(), entityType: z.enum(["contact", "deal", "company"]), entityId: z.number() }))
-      .query(async ({ input }) => {
-        return getCustomFieldValues(input.tenantId, input.entityType, input.entityId);
+      .input(z.object({ entityType: z.enum(["contact", "deal", "company"]), entityId: z.number() }))
+      .query(async ({ input, ctx }) => {
+        return getCustomFieldValues(getTenantId(ctx), input.entityType, input.entityId);
       }),
     setCustomFieldValues: protectedProcedure
       .input(z.object({
-        tenantId: z.number(),
         entityType: z.enum(["contact", "deal", "company"]),
         entityId: z.number(),
         values: z.array(z.object({ fieldId: z.number(), value: z.string().nullable() })),
       }))
-      .mutation(async ({ input }) => {
-        await setCustomFieldValues(input.tenantId, input.entityType, input.entityId, input.values);
+      .mutation(async ({ input, ctx }) => {
+        await setCustomFieldValues(getTenantId(ctx), input.entityType, input.entityId, input.values);
         return { success: true };
       }),
   }),
 
   customFields: router({
     list: protectedProcedure
-      .input(z.object({ tenantId: z.number(), entity: z.enum(["contact", "deal", "company"]) }))
-      .query(async ({ input }) => {
-        return listCustomFields(input.tenantId, input.entity);
+      .input(z.object({ entity: z.enum(["contact", "deal", "company"]) }))
+      .query(async ({ input, ctx }) => {
+        return listCustomFields(getTenantId(ctx), input.entity);
       }),
     get: protectedProcedure
-      .input(z.object({ tenantId: z.number(), id: z.number() }))
-      .query(async ({ input }) => {
-        return getCustomFieldById(input.tenantId, input.id);
+      .input(z.object({ id: z.number() }))
+      .query(async ({ input, ctx }) => {
+        return getCustomFieldById(getTenantId(ctx), input.id);
       }),
     create: protectedProcedure
       .input(z.object({
-        tenantId: z.number(),
         entity: z.enum(["contact", "deal", "company"]),
         name: z.string().min(1).max(128),
         label: z.string().min(1).max(255),
@@ -2139,7 +2099,6 @@ export const appRouter = router({
       }),
     update: protectedProcedure
       .input(z.object({
-        tenantId: z.number(),
         id: z.number(),
         label: z.string().optional(),
         fieldType: z.string().optional(),
@@ -2152,20 +2111,20 @@ export const appRouter = router({
         sortOrder: z.number().optional(),
         groupName: z.string().optional(),
       }))
-      .mutation(async ({ input }) => {
-        const { tenantId, id, ...data } = input;
+      .mutation(async ({ input, ctx }) => {
+const tenantId = getTenantId(ctx); const { id, ...data } = input;
         return updateCustomField(tenantId, id, data);
       }),
     delete: protectedProcedure
-      .input(z.object({ tenantId: z.number(), id: z.number() }))
-      .mutation(async ({ input }) => {
-        await deleteCustomField(input.tenantId, input.id);
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        await deleteCustomField(getTenantId(ctx), input.id);
         return { success: true };
       }),
     reorder: protectedProcedure
-      .input(z.object({ tenantId: z.number(), entity: z.enum(["contact", "deal", "company"]), orderedIds: z.array(z.number()) }))
-      .mutation(async ({ input }) => {
-        await reorderCustomFields(input.tenantId, input.entity, input.orderedIds);
+      .input(z.object({ entity: z.enum(["contact", "deal", "company"]), orderedIds: z.array(z.number()) }))
+      .mutation(async ({ input, ctx }) => {
+        await reorderCustomFields(getTenantId(ctx), input.entity, input.orderedIds);
         return { success: true };
       }),
   }),
@@ -2176,24 +2135,21 @@ export const appRouter = router({
   leadCapture: router({
     // Webhook config
     getWebhookConfig: protectedProcedure
-      .input(z.object({ tenantId: z.number() }))
-      .query(async ({ input }) => {
-        const config = await getWebhookConfig(input.tenantId);
+      .query(async ({ input, ctx }) => {
+        const config = await getWebhookConfig(getTenantId(ctx));
         return config;
       }),
     generateWebhookToken: protectedProcedure
-      .input(z.object({ tenantId: z.number() }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         const secret = randomBytes(32).toString("hex");
-        const config = await upsertWebhookConfig(input.tenantId, secret);
+        const config = await upsertWebhookConfig(getTenantId(ctx), secret);
         return config;
       }),
 
     // Meta integration
     getMetaConfig: protectedProcedure
-      .input(z.object({ tenantId: z.number() }))
-      .query(async ({ input }) => {
-        const config = await getMetaConfig(input.tenantId);
+      .query(async ({ input, ctx }) => {
+        const config = await getMetaConfig(getTenantId(ctx));
         // Don't expose full access token to frontend
         if (config?.accessToken) {
           return { ...config, accessToken: "••••" + config.accessToken.slice(-8) };
@@ -2202,16 +2158,15 @@ export const appRouter = router({
       }),
     connectMeta: protectedProcedure
       .input(z.object({
-        tenantId: z.number(),
         pageId: z.string(),
         pageName: z.string().optional(),
         accessToken: z.string(),
         appSecret: z.string().optional(),
         verifyToken: z.string().optional(),
       }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         const verifyToken = input.verifyToken || randomBytes(16).toString("hex");
-        const config = await upsertMetaConfig(input.tenantId, {
+        const config = await upsertMetaConfig(getTenantId(ctx), {
           pageId: input.pageId,
           pageName: input.pageName,
           accessToken: input.accessToken,
@@ -2222,59 +2177,55 @@ export const appRouter = router({
         return config;
       }),
     disconnectMeta: protectedProcedure
-      .input(z.object({ tenantId: z.number() }))
-      .mutation(async ({ input }) => {
-        await disconnectMeta(input.tenantId);
+      .mutation(async ({ input, ctx }) => {
+        await disconnectMeta(getTenantId(ctx));
         return { success: true };
       }),
 
     // Event logs
     listEvents: protectedProcedure
       .input(z.object({
-        tenantId: z.number(),
         source: z.string().optional(),
         status: z.string().optional(),
         limit: z.number().optional(),
         beforeId: z.number().optional(),
       }))
-      .query(async ({ input }) => {
+      .query(async ({ input, ctx }) => {
         const [events, total] = await Promise.all([
-          listLeadEvents(input.tenantId, input),
-          countLeadEvents(input.tenantId, input),
+          listLeadEvents(getTenantId(ctx), input),
+          countLeadEvents(getTenantId(ctx), input),
         ]);
         return { events, total };
       }),
     reprocessEvent: protectedProcedure
-      .input(z.object({ tenantId: z.number(), eventId: z.number() }))
-      .mutation(async ({ input }) => {
-        return reprocessLeadEvent(input.tenantId, input.eventId);
+      .input(z.object({ eventId: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        return reprocessLeadEvent(getTenantId(ctx), input.eventId);
       }),
 
     // ─── Tracking Script Tokens ────────────────────────
     listTrackingTokens: protectedProcedure
-      .input(z.object({ tenantId: z.number() }))
-      .query(async ({ input }) => {
+      .query(async ({ input, ctx }) => {
         const db = await getDb();
         if (!db) return [];
         return db
           .select()
           .from(trackingTokens)
-          .where(eq(trackingTokens.tenantId, input.tenantId))
+          .where(eq(trackingTokens.tenantId, getTenantId(ctx)))
           .orderBy(desc(trackingTokens.createdAt));
       }),
 
     createTrackingToken: protectedProcedure
       .input(z.object({
-        tenantId: z.number(),
         name: z.string().min(1).max(255),
         allowedDomains: z.array(z.string()).optional(),
       }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         const db = await getDb();
         if (!db) throw new Error("Database not available");
         const token = randomBytes(32).toString("hex");
         const [result] = await db.insert(trackingTokens).values({
-          tenantId: input.tenantId,
+          tenantId: getTenantId(ctx),
           token,
           name: input.name,
           allowedDomains: input.allowedDomains || null,
@@ -2284,13 +2235,12 @@ export const appRouter = router({
 
     updateTrackingToken: protectedProcedure
       .input(z.object({
-        tenantId: z.number(),
         tokenId: z.number(),
         name: z.string().min(1).max(255).optional(),
         allowedDomains: z.array(z.string()).optional(),
         isActive: z.boolean().optional(),
       }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         const db = await getDb();
         if (!db) throw new Error("Database not available");
         const updates: Record<string, any> = {};
@@ -2301,34 +2251,33 @@ export const appRouter = router({
         await db
           .update(trackingTokens)
           .set(updates)
-          .where(and(eq(trackingTokens.id, input.tokenId), eq(trackingTokens.tenantId, input.tenantId)));
+          .where(and(eq(trackingTokens.id, input.tokenId), eq(trackingTokens.tenantId, getTenantId(ctx))));
         return { success: true };
       }),
 
     deleteTrackingToken: protectedProcedure
-      .input(z.object({ tenantId: z.number(), tokenId: z.number() }))
-      .mutation(async ({ input }) => {
+      .input(z.object({ tokenId: z.number() }))
+      .mutation(async ({ input, ctx }) => {
         const db = await getDb();
         if (!db) throw new Error("Database not available");
         await db
           .delete(trackingTokens)
-          .where(and(eq(trackingTokens.id, input.tokenId), eq(trackingTokens.tenantId, input.tenantId)));
+          .where(and(eq(trackingTokens.id, input.tokenId), eq(trackingTokens.tenantId, getTenantId(ctx))));
         return { success: true };
       }),
 
     getTrackingSnippet: protectedProcedure
       .input(z.object({
-        tenantId: z.number(),
         tokenId: z.number(),
         collectUrl: z.string().url(),
       }))
-      .query(async ({ input }) => {
+      .query(async ({ input, ctx }) => {
         const db = await getDb();
         if (!db) throw new Error("Database not available");
         const rows = await db
           .select()
           .from(trackingTokens)
-          .where(and(eq(trackingTokens.id, input.tokenId), eq(trackingTokens.tenantId, input.tenantId)))
+          .where(and(eq(trackingTokens.id, input.tokenId), eq(trackingTokens.tenantId, getTenantId(ctx))))
           .limit(1);
         if (rows.length === 0) throw new Error("Token not found");
         const tokenRow = rows[0]!;
@@ -2345,10 +2294,9 @@ export const appRouter = router({
 
     verifyTrackingInstallation: protectedProcedure
       .input(z.object({
-        tenantId: z.number(),
         url: z.string().url(),
       }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         const db = await getDb();
         if (!db) throw new Error("Database not available");
 
@@ -2356,7 +2304,7 @@ export const appRouter = router({
         const tenantTokens = await db
           .select()
           .from(trackingTokens)
-          .where(eq(trackingTokens.tenantId, input.tenantId));
+          .where(eq(trackingTokens.tenantId, getTenantId(ctx)));
 
         if (!tenantTokens.length) {
           return {
@@ -2448,21 +2396,19 @@ export const appRouter = router({
   // ─── RD Station Marketing Integration ───
   rdStation: router({
     getConfig: protectedProcedure
-      .input(z.object({ tenantId: z.number() }))
-      .query(async ({ input }) => {
+      .query(async ({ input, ctx }) => {
         const db = await getDb();
         if (!db) return null;
         const rows = await db
           .select()
           .from(rdStationConfig)
-          .where(eq(rdStationConfig.tenantId, input.tenantId))
+          .where(eq(rdStationConfig.tenantId, getTenantId(ctx)))
           .limit(1);
         return rows[0] || null;
       }),
 
     setupIntegration: protectedProcedure
-      .input(z.object({ tenantId: z.number() }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         const db = await getDb();
         if (!db) throw new Error("Database not available");
 
@@ -2470,7 +2416,7 @@ export const appRouter = router({
         const existing = await db
           .select()
           .from(rdStationConfig)
-          .where(eq(rdStationConfig.tenantId, input.tenantId))
+          .where(eq(rdStationConfig.tenantId, getTenantId(ctx)))
           .limit(1);
 
         if (existing.length > 0) {
@@ -2480,7 +2426,7 @@ export const appRouter = router({
         // Generate a unique webhook token
         const token = randomBytes(32).toString("hex");
         const [result] = await db.insert(rdStationConfig).values({
-          tenantId: input.tenantId,
+          tenantId: getTenantId(ctx),
           webhookToken: token,
         }).$returningId();
 
@@ -2493,8 +2439,7 @@ export const appRouter = router({
       }),
 
     regenerateToken: protectedProcedure
-      .input(z.object({ tenantId: z.number() }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         const db = await getDb();
         if (!db) throw new Error("Database not available");
 
@@ -2502,40 +2447,39 @@ export const appRouter = router({
         await db
           .update(rdStationConfig)
           .set({ webhookToken: newToken })
-          .where(eq(rdStationConfig.tenantId, input.tenantId));
+          .where(eq(rdStationConfig.tenantId, getTenantId(ctx)));
 
         const rows = await db
           .select()
           .from(rdStationConfig)
-          .where(eq(rdStationConfig.tenantId, input.tenantId))
+          .where(eq(rdStationConfig.tenantId, getTenantId(ctx)))
           .limit(1);
         return rows[0]!;
       }),
 
     toggleActive: protectedProcedure
-      .input(z.object({ tenantId: z.number(), isActive: z.boolean() }))
-      .mutation(async ({ input }) => {
+      .input(z.object({ isActive: z.boolean() }))
+      .mutation(async ({ input, ctx }) => {
         const db = await getDb();
         if (!db) throw new Error("Database not available");
         await db
           .update(rdStationConfig)
           .set({ isActive: input.isActive })
-          .where(eq(rdStationConfig.tenantId, input.tenantId));
+          .where(eq(rdStationConfig.tenantId, getTenantId(ctx)));
         return { success: true };
       }),
 
     getWebhookLogs: protectedProcedure
       .input(z.object({
-        tenantId: z.number(),
         status: z.enum(["success", "failed", "duplicate"]).optional(),
         limit: z.number().default(50),
         beforeId: z.number().optional(),
       }))
-      .query(async ({ input }) => {
+      .query(async ({ input, ctx }) => {
         const db = await getDb();
         if (!db) return { logs: [], total: 0 };
 
-        const conditions: any[] = [eq(rdStationWebhookLog.tenantId, input.tenantId)];
+        const conditions: any[] = [eq(rdStationWebhookLog.tenantId, getTenantId(ctx))];
         if (input.status) {
           conditions.push(eq(rdStationWebhookLog.status, input.status));
         }
@@ -2550,7 +2494,7 @@ export const appRouter = router({
           .orderBy(desc(rdStationWebhookLog.createdAt))
           .limit(input.limit);
 
-        const countConditions: any[] = [eq(rdStationWebhookLog.tenantId, input.tenantId)];
+        const countConditions: any[] = [eq(rdStationWebhookLog.tenantId, getTenantId(ctx))];
         if (input.status) {
           countConditions.push(eq(rdStationWebhookLog.status, input.status));
         }
@@ -2566,8 +2510,7 @@ export const appRouter = router({
       }),
 
     getStats: protectedProcedure
-      .input(z.object({ tenantId: z.number() }))
-      .query(async ({ input }) => {
+      .query(async ({ input, ctx }) => {
         const db = await getDb();
         if (!db) return { total: 0, success: 0, failed: 0, duplicate: 0 };
 
@@ -2577,7 +2520,7 @@ export const appRouter = router({
             count: sql<number>`count(*)`,
           })
           .from(rdStationWebhookLog)
-          .where(eq(rdStationWebhookLog.tenantId, input.tenantId))
+          .where(eq(rdStationWebhookLog.tenantId, getTenantId(ctx)))
           .groupBy(rdStationWebhookLog.status);
 
         const result = { total: 0, success: 0, failed: 0, duplicate: 0 };
@@ -2594,20 +2537,18 @@ export const appRouter = router({
     // ─── Multi-Config CRUD ───────────────────────────────
 
     listConfigs: protectedProcedure
-      .input(z.object({ tenantId: z.number() }))
-      .query(async ({ input }) => {
+      .query(async ({ input, ctx }) => {
         const db = await getDb();
         if (!db) return [];
         return db
           .select()
           .from(rdStationConfig)
-          .where(eq(rdStationConfig.tenantId, input.tenantId))
+          .where(eq(rdStationConfig.tenantId, getTenantId(ctx)))
           .orderBy(desc(rdStationConfig.createdAt));
       }),
 
     createConfig: protectedProcedure
       .input(z.object({
-        tenantId: z.number(),
         name: z.string().min(1).max(255),
         defaultPipelineId: z.number().optional(),
         defaultStageId: z.number().optional(),
@@ -2619,13 +2560,13 @@ export const appRouter = router({
         dealNameTemplate: z.string().optional(),
         autoProductId: z.number().nullable().optional(),
       }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         const db = await getDb();
         if (!db) throw new Error("Database not available");
 
         const token = randomBytes(32).toString("hex");
         const [result] = await db.insert(rdStationConfig).values({
-          tenantId: input.tenantId,
+          tenantId: getTenantId(ctx),
           name: input.name,
           webhookToken: token,
           defaultPipelineId: input.defaultPipelineId ?? null,
@@ -2650,7 +2591,6 @@ export const appRouter = router({
     updateConfig: protectedProcedure
       .input(z.object({
         configId: z.number(),
-        tenantId: z.number(),
         name: z.string().min(1).max(255).optional(),
         isActive: z.boolean().optional(),
         autoCreateDeal: z.boolean().optional(),
@@ -2700,31 +2640,30 @@ export const appRouter = router({
       }),
 
     deleteConfig: protectedProcedure
-      .input(z.object({ configId: z.number(), tenantId: z.number() }))
-      .mutation(async ({ input }) => {
+      .input(z.object({ configId: z.number(), }))
+      .mutation(async ({ input, ctx }) => {
         const db = await getDb();
         if (!db) throw new Error("Database not available");
 
         await db
           .delete(rdStationConfig)
-          .where(and(eq(rdStationConfig.id, input.configId), eq(rdStationConfig.tenantId, input.tenantId)));
+          .where(and(eq(rdStationConfig.id, input.configId), eq(rdStationConfig.tenantId, getTenantId(ctx))));
         return { success: true };
       }),
 
     getConfigLogs: protectedProcedure
       .input(z.object({
         configId: z.number(),
-        tenantId: z.number(),
         status: z.enum(["success", "failed", "duplicate"]).optional(),
         limit: z.number().default(50),
         beforeId: z.number().optional(),
       }))
-      .query(async ({ input }) => {
+      .query(async ({ input, ctx }) => {
         const db = await getDb();
         if (!db) return { logs: [], total: 0 };
 
         const conditions: any[] = [
-          eq(rdStationWebhookLog.tenantId, input.tenantId),
+          eq(rdStationWebhookLog.tenantId, getTenantId(ctx)),
           eq(rdStationWebhookLog.configId, input.configId),
         ];
         if (input.status) conditions.push(eq(rdStationWebhookLog.status, input.status));
@@ -2738,7 +2677,7 @@ export const appRouter = router({
           .limit(input.limit);
 
         const countConditions: any[] = [
-          eq(rdStationWebhookLog.tenantId, input.tenantId),
+          eq(rdStationWebhookLog.tenantId, getTenantId(ctx)),
           eq(rdStationWebhookLog.configId, input.configId),
         ];
         if (input.status) countConditions.push(eq(rdStationWebhookLog.status, input.status));
@@ -2754,8 +2693,8 @@ export const appRouter = router({
       }),
 
     regenerateConfigToken: protectedProcedure
-      .input(z.object({ configId: z.number(), tenantId: z.number() }))
-      .mutation(async ({ input }) => {
+      .input(z.object({ configId: z.number(), }))
+      .mutation(async ({ input, ctx }) => {
         const db = await getDb();
         if (!db) throw new Error("Database not available");
 
@@ -2763,73 +2702,70 @@ export const appRouter = router({
         await db
           .update(rdStationConfig)
           .set({ webhookToken: newToken })
-          .where(and(eq(rdStationConfig.id, input.configId), eq(rdStationConfig.tenantId, input.tenantId)));
+          .where(and(eq(rdStationConfig.id, input.configId), eq(rdStationConfig.tenantId, getTenantId(ctx))));
 
         const rows = await db
           .select()
           .from(rdStationConfig)
-          .where(and(eq(rdStationConfig.id, input.configId), eq(rdStationConfig.tenantId, input.tenantId)))
+          .where(and(eq(rdStationConfig.id, input.configId), eq(rdStationConfig.tenantId, getTenantId(ctx))))
           .limit(1);
         return rows[0] ?? null;
       }),
 
     // ─── Helper: list pipelines & stages for config form ───
     listPipelines: protectedProcedure
-      .input(z.object({ tenantId: z.number() }))
-      .query(async ({ input }) => {
+      .query(async ({ input, ctx }) => {
         const db = await getDb();
         if (!db) return [];
         const rows = await db
           .select()
           .from(pipelines)
-          .where(eq(pipelines.tenantId, input.tenantId))
+          .where(eq(pipelines.tenantId, getTenantId(ctx)))
           .orderBy(asc(pipelines.id));
         return rows;
       }),
 
     listStages: protectedProcedure
-      .input(z.object({ tenantId: z.number(), pipelineId: z.number() }))
-      .query(async ({ input }) => {
+      .input(z.object({ pipelineId: z.number() }))
+      .query(async ({ input, ctx }) => {
         const db = await getDb();
         if (!db) return [];
         const rows = await db
           .select()
           .from(pipelineStages)
-          .where(and(eq(pipelineStages.tenantId, input.tenantId), eq(pipelineStages.pipelineId, input.pipelineId)))
+          .where(and(eq(pipelineStages.tenantId, getTenantId(ctx)), eq(pipelineStages.pipelineId, input.pipelineId)))
           .orderBy(asc(pipelineStages.orderIndex));
         return rows;
       }),
 
     listTeamMembers: protectedProcedure
-      .input(z.object({ tenantId: z.number() }))
-      .query(async ({ input }) => {
+      .query(async ({ input, ctx }) => {
         const db = await getDb();
         if (!db) return [];
         const rows = await db
           .select({ id: crmUsersSchema.id, name: crmUsersSchema.name, email: crmUsersSchema.email, role: crmUsersSchema.role })
           .from(crmUsersSchema)
-          .where(and(eq(crmUsersSchema.tenantId, input.tenantId), eq(crmUsersSchema.status, "active")))
+          .where(and(eq(crmUsersSchema.tenantId, getTenantId(ctx)), eq(crmUsersSchema.status, "active")))
           .orderBy(asc(crmUsersSchema.name));
         return rows;
       }),
 
     // ─── Config Task Templates CRUD ───
     listConfigTasks: protectedProcedure
-      .input(z.object({ configId: z.number(), tenantId: z.number() }))
-      .query(async ({ input }) => {
+      .input(z.object({ configId: z.number(), }))
+      .query(async ({ input, ctx }) => {
         const db = await getDb();
         if (!db) return [];
         return db
           .select()
           .from(rdStationConfigTasks)
-          .where(and(eq(rdStationConfigTasks.configId, input.configId), eq(rdStationConfigTasks.tenantId, input.tenantId)))
+          .where(and(eq(rdStationConfigTasks.configId, input.configId), eq(rdStationConfigTasks.tenantId, getTenantId(ctx))))
           .orderBy(asc(rdStationConfigTasks.orderIndex));
       }),
 
     addConfigTask: protectedProcedure
       .input(z.object({
         configId: z.number(),
-        tenantId: z.number(),
         title: z.string().min(1).max(255),
         description: z.string().optional(),
         taskType: z.string().max(32).default("task"),
@@ -2838,7 +2774,7 @@ export const appRouter = router({
         dueTime: z.string().max(5).optional(),
         priority: z.enum(["low", "medium", "high", "urgent"]).default("medium"),
       }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         const db = await getDb();
         if (!db) throw new Error("Database not available");
 
@@ -2846,12 +2782,12 @@ export const appRouter = router({
         const existing = await db
           .select({ maxOrder: sql<number>`COALESCE(MAX(${rdStationConfigTasks.orderIndex}), -1)` })
           .from(rdStationConfigTasks)
-          .where(and(eq(rdStationConfigTasks.configId, input.configId), eq(rdStationConfigTasks.tenantId, input.tenantId)));
+          .where(and(eq(rdStationConfigTasks.configId, input.configId), eq(rdStationConfigTasks.tenantId, getTenantId(ctx))));
         const nextOrder = (existing[0]?.maxOrder ?? -1) + 1;
 
         const [result] = await db.insert(rdStationConfigTasks).values({
           configId: input.configId,
-          tenantId: input.tenantId,
+          tenantId: getTenantId(ctx),
           title: input.title,
           description: input.description ?? null,
           taskType: input.taskType,
@@ -2869,7 +2805,6 @@ export const appRouter = router({
     updateConfigTask: protectedProcedure
       .input(z.object({
         taskId: z.number(),
-        tenantId: z.number(),
         title: z.string().min(1).max(255).optional(),
         description: z.string().nullable().optional(),
         taskType: z.string().max(32).optional(),
@@ -2902,38 +2837,37 @@ export const appRouter = router({
       }),
 
     removeConfigTask: protectedProcedure
-      .input(z.object({ taskId: z.number(), tenantId: z.number() }))
-      .mutation(async ({ input }) => {
+      .input(z.object({ taskId: z.number(), }))
+      .mutation(async ({ input, ctx }) => {
         const db = await getDb();
         if (!db) throw new Error("Database not available");
         await db.delete(rdStationConfigTasks)
-          .where(and(eq(rdStationConfigTasks.id, input.taskId), eq(rdStationConfigTasks.tenantId, input.tenantId)));
+          .where(and(eq(rdStationConfigTasks.id, input.taskId), eq(rdStationConfigTasks.tenantId, getTenantId(ctx))));
         return { success: true };
       }),
 
     // ─── Helper: list active products for auto-product selector ───
     listProducts: protectedProcedure
-      .input(z.object({ tenantId: z.number() }))
-      .query(async ({ input }) => {
+      .query(async ({ input, ctx }) => {
         const db = await getDb();
         if (!db) return [];
         return db
           .select({ id: productCatalog.id, name: productCatalog.name, productType: productCatalog.productType, basePriceCents: productCatalog.basePriceCents })
           .from(productCatalog)
-          .where(and(eq(productCatalog.tenantId, input.tenantId), eq(productCatalog.isActive, true)))
+
+          .where(and(eq(productCatalog.tenantId, getTenantId(ctx)), eq(productCatalog.isActive, true)))
           .orderBy(asc(productCatalog.name));
       }),
 
     // ─── Helper: check WhatsApp session status for tenant ───
     getWhatsAppStatus: protectedProcedure
-      .input(z.object({ tenantId: z.number() }))
-      .query(async ({ input }) => {
+      .query(async ({ input, ctx }) => {
         const db = await getDb();
         if (!db) return { connected: false, sessionId: null as string | null };
         const rows = await db
           .select({ sessionId: whatsappSessions.sessionId })
           .from(whatsappSessions)
-          .where(and(eq(whatsappSessions.tenantId, input.tenantId), eq(whatsappSessions.status, "connected")))
+          .where(and(eq(whatsappSessions.tenantId, getTenantId(ctx)), eq(whatsappSessions.status, "connected")))
           .limit(1);
         return {
           connected: rows.length > 0,
@@ -2945,30 +2879,28 @@ export const appRouter = router({
   // ── Field Mappings (RD Station ↔ Entur OS) ──
   fieldMappings: router({
     list: protectedProcedure
-      .input(z.object({ tenantId: z.number() }))
-      .query(async ({ input }) => {
+      .query(async ({ input, ctx }) => {
         const db = await getDb();
         if (!db) return [];
         const mappings = await db.select().from(rdFieldMappings)
-          .where(eq(rdFieldMappings.tenantId, input.tenantId))
+          .where(eq(rdFieldMappings.tenantId, getTenantId(ctx)))
           .orderBy(rdFieldMappings.createdAt);
         return mappings;
       }),
 
     create: protectedProcedure
       .input(z.object({
-        tenantId: z.number(),
         rdFieldKey: z.string().min(1),
         rdFieldLabel: z.string().min(1),
         enturFieldType: z.enum(["standard", "custom"]),
         enturFieldKey: z.string().optional(),
         enturCustomFieldId: z.number().optional(),
       }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         const db = await getDb();
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
         const [result] = await db.insert(rdFieldMappings).values({
-          tenantId: input.tenantId,
+          tenantId: getTenantId(ctx),
           rdFieldKey: input.rdFieldKey,
           rdFieldLabel: input.rdFieldLabel,
           enturFieldType: input.enturFieldType,
@@ -2981,7 +2913,6 @@ export const appRouter = router({
     update: protectedProcedure
       .input(z.object({
         id: z.number(),
-        tenantId: z.number(),
         rdFieldKey: z.string().min(1).optional(),
         rdFieldLabel: z.string().min(1).optional(),
         enturFieldType: z.enum(["standard", "custom"]).optional(),
@@ -2999,12 +2930,12 @@ export const appRouter = router({
       }),
 
     delete: protectedProcedure
-      .input(z.object({ id: z.number(), tenantId: z.number() }))
-      .mutation(async ({ input }) => {
+      .input(z.object({ id: z.number(), }))
+      .mutation(async ({ input, ctx }) => {
         const db = await getDb();
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
         await db.delete(rdFieldMappings)
-          .where(and(eq(rdFieldMappings.id, input.id), eq(rdFieldMappings.tenantId, input.tenantId)));
+          .where(and(eq(rdFieldMappings.id, input.id), eq(rdFieldMappings.tenantId, getTenantId(ctx))));
         return { success: true };
       }),
 
@@ -3030,12 +2961,11 @@ export const appRouter = router({
 
     // Lista campos personalizados do Entur OS disponíveis para mapeamento
     enturCustomFields: protectedProcedure
-      .input(z.object({ tenantId: z.number() }))
-      .query(async ({ input }) => {
+      .query(async ({ input, ctx }) => {
         const db = await getDb();
         if (!db) return [];
         const fields = await db.select().from(customFields)
-          .where(eq(customFields.tenantId, input.tenantId))
+          .where(eq(customFields.tenantId, getTenantId(ctx)))
           .orderBy(customFields.entity, customFields.sortOrder);
         return fields.map(f => ({
           id: f.id,
@@ -3052,9 +2982,8 @@ export const appRouter = router({
   // ════════════════════════════════════════════════════════════
   ai: router({
     list: protectedProcedure
-      .input(z.object({ tenantId: z.number() }))
-      .query(async ({ input }) => {
-        const integrations = await listAiIntegrations(input.tenantId);
+      .query(async ({ input, ctx }) => {
+        const integrations = await listAiIntegrations(getTenantId(ctx));
         // Mask API keys for security
         return integrations.map(i => ({
           ...i,
@@ -3063,9 +2992,9 @@ export const appRouter = router({
       }),
 
     get: protectedProcedure
-      .input(z.object({ tenantId: z.number(), id: z.number() }))
-      .query(async ({ input }) => {
-        const integration = await getAiIntegration(input.tenantId, input.id);
+      .input(z.object({ id: z.number() }))
+      .query(async ({ input, ctx }) => {
+        const integration = await getAiIntegration(getTenantId(ctx), input.id);
         if (!integration) throw new TRPCError({ code: "NOT_FOUND", message: "Integration not found" });
         return {
           ...integration,
@@ -3075,7 +3004,6 @@ export const appRouter = router({
 
     create: protectedProcedure
       .input(z.object({
-        tenantId: z.number(),
         provider: z.enum(["openai", "anthropic"]),
         apiKey: z.string().min(10),
         defaultModel: z.string().min(1),
@@ -3088,22 +3016,21 @@ export const appRouter = router({
 
     update: protectedProcedure
       .input(z.object({
-        tenantId: z.number(),
         id: z.number(),
         apiKey: z.string().min(10).optional(),
         defaultModel: z.string().min(1).optional(),
         isActive: z.boolean().optional(),
       }))
-      .mutation(async ({ input }) => {
-        const { tenantId, id, ...data } = input;
+      .mutation(async ({ input, ctx }) => {
+const tenantId = getTenantId(ctx); const { id, ...data } = input;
         await updateAiIntegration(tenantId, id, data);
         return { success: true };
       }),
 
     delete: protectedProcedure
-      .input(z.object({ tenantId: z.number(), id: z.number() }))
-      .mutation(async ({ input }) => {
-        await deleteAiIntegration(input.tenantId, input.id);
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        await deleteAiIntegration(getTenantId(ctx), input.id);
         return { success: true };
       }),
 
@@ -3120,7 +3047,6 @@ export const appRouter = router({
     // Invoke AI completion (generic endpoint for both providers)
     invoke: protectedProcedure
       .input(z.object({
-        tenantId: z.number(),
         provider: z.enum(["openai", "anthropic"]),
         messages: z.array(z.object({
           role: z.enum(["system", "user", "assistant"]),
@@ -3129,8 +3055,8 @@ export const appRouter = router({
         maxTokens: z.number().optional(),
         model: z.string().optional(),
       }))
-      .mutation(async ({ input }) => {
-        const integration = await getActiveAiIntegration(input.tenantId, input.provider);
+      .mutation(async ({ input, ctx }) => {
+        const integration = await getActiveAiIntegration(getTenantId(ctx), input.provider);
         if (!integration) {
           throw new TRPCError({ code: "NOT_FOUND", message: `No active ${input.provider} integration found` });
         }
@@ -3199,20 +3125,18 @@ export const appRouter = router({
 
     // ── Tenant AI Settings ──
     getSettings: protectedProcedure
-      .input(z.object({ tenantId: z.number() }))
-      .query(async ({ input }) => {
-        return getTenantAiSettings(input.tenantId);
+      .query(async ({ input, ctx }) => {
+        return getTenantAiSettings(getTenantId(ctx));
       }),
 
     updateSettings: protectedProcedure
       .input(z.object({
-        tenantId: z.number(),
         defaultAiProvider: z.enum(["openai", "anthropic"]).optional(),
         defaultAiModel: z.string().optional(),
         audioTranscriptionEnabled: z.boolean().optional(),
       }))
-      .mutation(async ({ input }) => {
-        const { tenantId, ...patch } = input;
+      .mutation(async ({ input, ctx }) => {
+const tenantId = getTenantId(ctx); const { ...patch } = input;
         await updateTenantAiSettings(tenantId, patch);
         return { success: true };
       }),
@@ -3220,7 +3144,6 @@ export const appRouter = router({
     // ── AI Suggestion (SPIN Selling) — uses isolated service ──
     suggest: protectedProcedure
       .input(z.object({
-        tenantId: z.number(),
         // Legacy: messages from frontend (kept for backward compat, ignored when sessionId+remoteJid present)
         messages: z.array(z.object({
           fromMe: z.boolean(),
@@ -3239,11 +3162,11 @@ export const appRouter = router({
         style: z.enum(["default", "shorter", "human", "objective", "consultive"]).optional(),
         customInstruction: z.string().optional(),
       }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         // New path: use isolated service when sessionId + remoteJid are provided
         if (input.sessionId && input.remoteJid) {
           const result = await generateSuggestion({
-            tenantId: input.tenantId,
+            tenantId: getTenantId(ctx),
             sessionId: input.sessionId,
             remoteJid: input.remoteJid,
             contactName: input.contactName,
@@ -3267,10 +3190,10 @@ export const appRouter = router({
         // Legacy fallback: use messages from frontend
         let integration: any = null;
         if (input.integrationId) {
-          integration = await getAiIntegration(input.tenantId, input.integrationId);
+          integration = await getAiIntegration(getTenantId(ctx), input.integrationId);
         }
         if (!integration) {
-          integration = await getAnyActiveAiIntegration(input.tenantId);
+          integration = await getAnyActiveAiIntegration(getTenantId(ctx));
         }
         if (!integration) {
           throw new TRPCError({
@@ -3278,7 +3201,7 @@ export const appRouter = router({
             message: "NO_AI_CONFIGURED",
           });
         }
-        const settings = await getTenantAiSettings(input.tenantId);
+        const settings = await getTenantAiSettings(getTenantId(ctx));
         const model = input.overrideModel || settings.defaultAiModel || integration.defaultModel;
 
         // Build context from conversation
@@ -3391,12 +3314,11 @@ REGRAS:
     // ── Audio Transcription via OpenAI Whisper ──
     transcribe: protectedProcedure
       .input(z.object({
-        tenantId: z.number(),
         audioUrl: z.string(),
       }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         // Check if tenant has OpenAI integration
-        const integration = await getActiveAiIntegration(input.tenantId, "openai");
+        const integration = await getActiveAiIntegration(getTenantId(ctx), "openai");
         if (!integration) {
           throw new TRPCError({
             code: "PRECONDITION_FAILED",
@@ -3444,10 +3366,9 @@ REGRAS:
     // ── Retranscribe audio message (manual trigger) ──
     retranscribeAudio: protectedProcedure
       .input(z.object({
-        tenantId: z.number(),
         messageId: z.number(),
       }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         const db = await getDb();
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
         const { waMessages } = await import("../drizzle/schema");
@@ -3455,7 +3376,7 @@ REGRAS:
           .from(waMessages)
           .where(and(
             eq(waMessages.id, input.messageId),
-            eq(waMessages.tenantId, input.tenantId),
+            eq(waMessages.tenantId, getTenantId(ctx)),
           ))
           .limit(1);
         if (!msg) throw new TRPCError({ code: "NOT_FOUND", message: "Message not found" });
@@ -3483,15 +3404,14 @@ REGRAS:
     // ── Refine existing suggestion with different style ──
     refine: protectedProcedure
       .input(z.object({
-        tenantId: z.number(),
         originalText: z.string(),
         style: z.enum(["default", "shorter", "human", "objective", "consultive"]),
         integrationId: z.number().optional(),
         overrideModel: z.string().optional(),
       }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         return refineSuggestion({
-          tenantId: input.tenantId,
+          tenantId: getTenantId(ctx),
           originalText: input.originalText,
           style: input.style as ResponseStyle,
           integrationId: input.integrationId,
@@ -3510,7 +3430,6 @@ REGRAS:
     suggestAsync: protectedProcedure
       .input(z.object({
         requestId: z.string(),
-        tenantId: z.number(),
         sessionId: z.string(),
         remoteJid: z.string(),
         contactName: z.string().optional(),
@@ -3522,7 +3441,7 @@ REGRAS:
       .mutation(({ input }) => {
         return requestSuggestion({
           requestId: input.requestId,
-          tenantId: input.tenantId,
+          tenantId: getTenantId(ctx),
           sessionId: input.sessionId,
           remoteJid: input.remoteJid,
           contactName: input.contactName,

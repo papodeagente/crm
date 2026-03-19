@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { protectedProcedure, router } from "../_core/trpc";
+import { tenantProcedure, getTenantId, router } from "../_core/trpc";
 import { TRPCError } from "@trpc/server";
 import * as crm from "../crmDb";
 import { emitEvent } from "../middleware/eventLog";
@@ -11,32 +11,32 @@ import { eq } from "drizzle-orm";
 export const crmRouter = router({
   // ─── CONTACTS ───
   contacts: router({
-    list: protectedProcedure
-      .input(z.object({ tenantId: z.number(), search: z.string().optional(), stage: z.string().optional(), limit: z.number().default(50), offset: z.number().default(0), dateFrom: z.string().optional(), dateTo: z.string().optional(), customFieldFilters: z.array(z.object({ fieldId: z.number(), value: z.string() })).optional() }))
+    list: tenantProcedure
+      .input(z.object({ search: z.string().optional(), stage: z.string().optional(), limit: z.number().default(50), offset: z.number().default(0), dateFrom: z.string().optional(), dateTo: z.string().optional(), customFieldFilters: z.array(z.object({ fieldId: z.number(), value: z.string() })).optional() }))
       .query(async ({ ctx, input }) => {
         // Non-admin users only see their own contacts
         const isAdmin = ctx.saasUser?.role === "admin";
         const ownerUserId = isAdmin ? undefined : ctx.saasUser?.userId;
-        const items = await crm.listContacts(input.tenantId, { ...input, ownerUserId });
-        const totalCount = await crm.countContacts(input.tenantId, { ...input, ownerUserId });
+        const items = await crm.listContacts(getTenantId(ctx), { ...input, ownerUserId });
+        const totalCount = await crm.countContacts(getTenantId(ctx), { ...input, ownerUserId });
         return { items, totalCount };
       }),
-    get: protectedProcedure
-      .input(z.object({ tenantId: z.number(), id: z.number() }))
-      .query(async ({ input }) => {
-        return crm.getContactById(input.tenantId, input.id);
+    get: tenantProcedure
+      .input(z.object({ id: z.number() }))
+      .query(async ({ input, ctx }) => {
+        return crm.getContactById(getTenantId(ctx), input.id);
       }),
-    create: protectedProcedure
+    create: tenantProcedure
       .input(z.object({
-        tenantId: z.number(), name: z.string().min(1), type: z.enum(["person", "company"]).optional(),
+        name: z.string().min(1), type: z.enum(["person", "company"]).optional(),
         email: z.string().optional(), phone: z.string().optional(), source: z.string().optional(),
         ownerUserId: z.number().optional(), teamId: z.number().optional(),
       }))
       .mutation(async ({ ctx, input }) => {
         const result = await crm.createContact({ ...input, createdBy: ctx.user.id });
-        await emitEvent({ tenantId: input.tenantId, actorUserId: ctx.user.id, entityType: "contact", entityId: result?.id, action: "create" });
+        await emitEvent({ tenantId: getTenantId(ctx), actorUserId: ctx.user.id, entityType: "contact", entityId: result?.id, action: "create" });
         // In-app notification
-        await createNotification(input.tenantId, {
+        await createNotification(getTenantId(ctx), {
           type: "contact_created",
           title: `Novo contato: ${input.name}`,
           body: input.email || input.phone || undefined,
@@ -45,177 +45,177 @@ export const crmRouter = router({
         });
         return result;
       }),
-    update: protectedProcedure
+    update: tenantProcedure
       .input(z.object({
-        tenantId: z.number(), id: z.number(), name: z.string().optional(), email: z.string().optional(),
+        id: z.number(), name: z.string().optional(), email: z.string().optional(),
         phone: z.string().optional(), lifecycleStage: z.enum(["lead", "prospect", "customer", "churned"]).optional(),
         notes: z.string().optional(), ownerUserId: z.number().optional(),
         birthDate: z.string().nullable().optional(), weddingDate: z.string().nullable().optional(),
       }))
       .mutation(async ({ ctx, input }) => {
-        const { tenantId, id, ...data } = input;
+const tenantId = getTenantId(ctx); const { id, ...data } = input;
         await crm.updateContact(tenantId, id, { ...data, updatedBy: ctx.user.id });
         await emitEvent({ tenantId, actorUserId: ctx.user.id, entityType: "contact", entityId: id, action: "update" });
         return { success: true };
       }),
-    delete: protectedProcedure
-      .input(z.object({ tenantId: z.number(), id: z.number() }))
+    delete: tenantProcedure
+      .input(z.object({ id: z.number() }))
       .mutation(async ({ ctx, input }) => {
-        await crm.deleteContact(input.tenantId, input.id);
-        await emitEvent({ tenantId: input.tenantId, actorUserId: ctx.user.id, entityType: "contact", entityId: input.id, action: "delete" });
+        await crm.deleteContact(getTenantId(ctx), input.id);
+        await emitEvent({ tenantId: getTenantId(ctx), actorUserId: ctx.user.id, entityType: "contact", entityId: input.id, action: "delete" });
         return { success: true };
       }),
-    count: protectedProcedure
-      .input(z.object({ tenantId: z.number() }))
-      .query(async ({ input }) => {
-        return crm.countContacts(input.tenantId);
+    count: tenantProcedure
+      
+      .query(async ({ input, ctx }) => {
+        return crm.countContacts(getTenantId(ctx));
       }),
-    bulkDelete: protectedProcedure
-      .input(z.object({ tenantId: z.number(), ids: z.array(z.number()).min(1).max(500) }))
+    bulkDelete: tenantProcedure
+      .input(z.object({ ids: z.array(z.number()).min(1).max(500) }))
       .mutation(async ({ ctx, input }) => {
-        const count = await crm.bulkSoftDeleteContacts(input.tenantId, input.ids);
+        const count = await crm.bulkSoftDeleteContacts(getTenantId(ctx), input.ids);
         for (const id of input.ids) {
-          await emitEvent({ tenantId: input.tenantId, actorUserId: ctx.user.id, entityType: "contact", entityId: id, action: "delete" });
+          await emitEvent({ tenantId: getTenantId(ctx), actorUserId: ctx.user.id, entityType: "contact", entityId: id, action: "delete" });
         }
         return { success: true, count };
       }),
-    listDeleted: protectedProcedure
-      .input(z.object({ tenantId: z.number(), limit: z.number().default(50) }))
-      .query(async ({ input }) => {
-        return crm.listDeletedContacts(input.tenantId, input.limit);
+    listDeleted: tenantProcedure
+      .input(z.object({ limit: z.number().default(50) }))
+      .query(async ({ input, ctx }) => {
+        return crm.listDeletedContacts(getTenantId(ctx), input.limit);
       }),
-    restore: protectedProcedure
-      .input(z.object({ tenantId: z.number(), ids: z.array(z.number()).min(1).max(500) }))
+    restore: tenantProcedure
+      .input(z.object({ ids: z.array(z.number()).min(1).max(500) }))
       .mutation(async ({ ctx, input }) => {
-        const count = await crm.restoreContacts(input.tenantId, input.ids);
+        const count = await crm.restoreContacts(getTenantId(ctx), input.ids);
         for (const id of input.ids) {
-          await emitEvent({ tenantId: input.tenantId, actorUserId: ctx.user.id, entityType: "contact", entityId: id, action: "restore" });
+          await emitEvent({ tenantId: getTenantId(ctx), actorUserId: ctx.user.id, entityType: "contact", entityId: id, action: "restore" });
         }
         return { success: true, count };
       }),
-    hardDelete: protectedProcedure
-      .input(z.object({ tenantId: z.number(), ids: z.array(z.number()).min(1).max(500) }))
+    hardDelete: tenantProcedure
+      .input(z.object({ ids: z.array(z.number()).min(1).max(500) }))
       .mutation(async ({ ctx, input }) => {
         if (ctx.user.role !== "admin") throw new Error("Apenas administradores podem excluir permanentemente.");
-        const count = await crm.hardDeleteContacts(input.tenantId, input.ids);
+        const count = await crm.hardDeleteContacts(getTenantId(ctx), input.ids);
         return { success: true, count };
       }),
   }),
 
   // ─── ACCOUNTS ───
   accounts: router({
-    list: protectedProcedure
-      .input(z.object({ tenantId: z.number() }))
+    list: tenantProcedure
+      
       .query(async ({ ctx, input }) => {
         const isAdmin = ctx.saasUser?.role === "admin";
         const ownerUserId = isAdmin ? undefined : ctx.saasUser?.userId;
-        return crm.listAccounts(input.tenantId, { ownerUserId });
+        return crm.listAccounts(getTenantId(ctx), { ownerUserId });
       }),
-    get: protectedProcedure
-      .input(z.object({ tenantId: z.number(), id: z.number() }))
-      .query(async ({ input }) => {
-        return crm.getAccountById(input.tenantId, input.id);
+    get: tenantProcedure
+      .input(z.object({ id: z.number() }))
+      .query(async ({ input, ctx }) => {
+        return crm.getAccountById(getTenantId(ctx), input.id);
       }),
-    create: protectedProcedure
+    create: tenantProcedure
       .input(z.object({
-        tenantId: z.number(), name: z.string().min(1),
+        name: z.string().min(1),
         primaryContactId: z.number().optional(), ownerUserId: z.number().optional(), teamId: z.number().optional(),
       }))
       .mutation(async ({ ctx, input }) => {
         const result = await crm.createAccount({ ...input, createdBy: ctx.user.id });
-        await emitEvent({ tenantId: input.tenantId, actorUserId: ctx.user.id, entityType: "account", entityId: result?.id, action: "create" });
+        await emitEvent({ tenantId: getTenantId(ctx), actorUserId: ctx.user.id, entityType: "account", entityId: result?.id, action: "create" });
         return result;
       }),
-    update: protectedProcedure
+    update: tenantProcedure
       .input(z.object({
-        tenantId: z.number(), id: z.number(), name: z.string().optional(),
+        id: z.number(), name: z.string().optional(),
       }))
       .mutation(async ({ ctx, input }) => {
-        const { tenantId, id, ...data } = input;
+const tenantId = getTenantId(ctx); const { id, ...data } = input;
         await crm.updateAccount(tenantId, id, { ...data, updatedBy: ctx.user.id });
         await emitEvent({ tenantId, actorUserId: ctx.user.id, entityType: "account", entityId: id, action: "update" });
         return { success: true };
       }),
-    search: protectedProcedure
-      .input(z.object({ tenantId: z.number(), search: z.string() }))
-      .query(async ({ input }) => {
-        return crm.searchAccounts(input.tenantId, input.search);
+    search: tenantProcedure
+      .input(z.object({ search: z.string() }))
+      .query(async ({ input, ctx }) => {
+        return crm.searchAccounts(getTenantId(ctx), input.search);
       }),
   }),
 
   // ─── PIPELINES & STAGES ───
   pipelines: router({
-    list: protectedProcedure
-      .input(z.object({ tenantId: z.number(), includeArchived: z.boolean().optional() }))
-      .query(async ({ input }) => {
-        return crm.listPipelines(input.tenantId, input.includeArchived ?? false);
+    list: tenantProcedure
+      .input(z.object({ includeArchived: z.boolean().optional() }))
+      .query(async ({ input, ctx }) => {
+        return crm.listPipelines(getTenantId(ctx), input.includeArchived ?? false);
       }),
-    get: protectedProcedure
-      .input(z.object({ tenantId: z.number(), id: z.number() }))
-      .query(async ({ input }) => {
-        return crm.getPipelineById(input.tenantId, input.id);
+    get: tenantProcedure
+      .input(z.object({ id: z.number() }))
+      .query(async ({ input, ctx }) => {
+        return crm.getPipelineById(getTenantId(ctx), input.id);
       }),
-    create: protectedProcedure
-      .input(z.object({ tenantId: z.number(), name: z.string().min(1), description: z.string().optional(), color: z.string().optional(), pipelineType: z.enum(["sales", "post_sale", "support", "custom"]).optional(), isDefault: z.boolean().optional() }))
+    create: tenantProcedure
+      .input(z.object({ name: z.string().min(1), description: z.string().optional(), color: z.string().optional(), pipelineType: z.enum(["sales", "post_sale", "support", "custom"]).optional(), isDefault: z.boolean().optional() }))
       .mutation(async ({ input }) => {
         return crm.createPipeline(input);
       }),
-    update: protectedProcedure
-      .input(z.object({ tenantId: z.number(), id: z.number(), name: z.string().optional(), description: z.string().optional(), color: z.string().optional(), pipelineType: z.string().optional(), isDefault: z.boolean().optional(), isArchived: z.boolean().optional() }))
+    update: tenantProcedure
+      .input(z.object({ id: z.number(), name: z.string().optional(), description: z.string().optional(), color: z.string().optional(), pipelineType: z.string().optional(), isDefault: z.boolean().optional(), isArchived: z.boolean().optional() }))
       .mutation(async ({ input }) => {
-        const { tenantId, id, ...data } = input;
+const tenantId = getTenantId(ctx); const { id, ...data } = input;
         return crm.updatePipeline(tenantId, id, data);
       }),
-    delete: protectedProcedure
-      .input(z.object({ tenantId: z.number(), id: z.number() }))
-      .mutation(async ({ input }) => {
-        return crm.deletePipeline(input.tenantId, input.id);
+    delete: tenantProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        return crm.deletePipeline(getTenantId(ctx), input.id);
       }),
-    stages: protectedProcedure
-      .input(z.object({ tenantId: z.number(), pipelineId: z.number() }))
-      .query(async ({ input }) => {
-        return crm.listStages(input.tenantId, input.pipelineId);
+    stages: tenantProcedure
+      .input(z.object({ pipelineId: z.number() }))
+      .query(async ({ input, ctx }) => {
+        return crm.listStages(getTenantId(ctx), input.pipelineId);
       }),
-    createStage: protectedProcedure
-      .input(z.object({ tenantId: z.number(), pipelineId: z.number(), name: z.string(), color: z.string().optional(), orderIndex: z.number(), probabilityDefault: z.number().optional(), isWon: z.boolean().optional(), isLost: z.boolean().optional() }))
+    createStage: tenantProcedure
+      .input(z.object({ pipelineId: z.number(), name: z.string(), color: z.string().optional(), orderIndex: z.number(), probabilityDefault: z.number().optional(), isWon: z.boolean().optional(), isLost: z.boolean().optional() }))
       .mutation(async ({ input }) => {
         return crm.createStage(input);
       }),
-    updateStage: protectedProcedure
-      .input(z.object({ tenantId: z.number(), id: z.number(), name: z.string().optional(), color: z.string().optional(), orderIndex: z.number().optional(), probabilityDefault: z.number().optional(), isWon: z.boolean().optional(), isLost: z.boolean().optional(), coolingEnabled: z.boolean().optional(), coolingDays: z.number().optional() }))
+    updateStage: tenantProcedure
+      .input(z.object({ id: z.number(), name: z.string().optional(), color: z.string().optional(), orderIndex: z.number().optional(), probabilityDefault: z.number().optional(), isWon: z.boolean().optional(), isLost: z.boolean().optional(), coolingEnabled: z.boolean().optional(), coolingDays: z.number().optional() }))
       .mutation(async ({ input }) => {
-        const { tenantId, id, ...data } = input;
+const tenantId = getTenantId(ctx); const { id, ...data } = input;
         return crm.updateStage(tenantId, id, data);
       }),
-    deleteStage: protectedProcedure
-      .input(z.object({ tenantId: z.number(), id: z.number() }))
+    deleteStage: tenantProcedure
+      .input(z.object({ id: z.number() }))
       .mutation(async ({ ctx, input }) => {
-        const count = await crm.countDealsInStage(input.tenantId, input.id);
+        const count = await crm.countDealsInStage(getTenantId(ctx), input.id);
         if (count > 0) throw new Error(`Não é possível excluir: ${count} negociação(ões) ativa(s) nesta etapa. Mova-as primeiro.`);
-        return crm.deleteStage(input.tenantId, input.id);
+        return crm.deleteStage(getTenantId(ctx), input.id);
       }),
-    reorderStages: protectedProcedure
-      .input(z.object({ tenantId: z.number(), pipelineId: z.number(), stageOrders: z.array(z.object({ id: z.number(), orderIndex: z.number() })) }))
-      .mutation(async ({ input }) => {
-        return crm.reorderStages(input.tenantId, input.pipelineId, input.stageOrders);
+    reorderStages: tenantProcedure
+      .input(z.object({ pipelineId: z.number(), stageOrders: z.array(z.object({ id: z.number(), orderIndex: z.number() })) }))
+      .mutation(async ({ input, ctx }) => {
+        return crm.reorderStages(getTenantId(ctx), input.pipelineId, input.stageOrders);
       }),
-    countDealsInStage: protectedProcedure
-      .input(z.object({ tenantId: z.number(), stageId: z.number() }))
-      .query(async ({ input }) => {
-        return crm.countDealsInStage(input.tenantId, input.stageId);
+    countDealsInStage: tenantProcedure
+      .input(z.object({ stageId: z.number() }))
+      .query(async ({ input, ctx }) => {
+        return crm.countDealsInStage(getTenantId(ctx), input.stageId);
       }),
   }),
 
   // ─── PIPELINE AUTOMATIONS ───
   pipelineAutomations: router({
-    list: protectedProcedure
-      .input(z.object({ tenantId: z.number(), sourcePipelineId: z.number().optional() }))
-      .query(async ({ input }) => {
-        return crm.listPipelineAutomations(input.tenantId, input.sourcePipelineId);
+    list: tenantProcedure
+      .input(z.object({ sourcePipelineId: z.number().optional() }))
+      .query(async ({ input, ctx }) => {
+        return crm.listPipelineAutomations(getTenantId(ctx), input.sourcePipelineId);
       }),
-    create: protectedProcedure
+    create: tenantProcedure
       .input(z.object({
-        tenantId: z.number(), name: z.string().min(1), sourcePipelineId: z.number(),
+        name: z.string().min(1), sourcePipelineId: z.number(),
         triggerEvent: z.enum(["deal_won", "deal_lost", "stage_reached"]),
         triggerStageId: z.number().optional(), targetPipelineId: z.number(), targetStageId: z.number(),
         copyProducts: z.boolean().optional(), copyParticipants: z.boolean().optional(), copyCustomFields: z.boolean().optional(),
@@ -223,30 +223,29 @@ export const crmRouter = router({
       .mutation(async ({ input }) => {
         return crm.createPipelineAutomation(input);
       }),
-    update: protectedProcedure
+    update: tenantProcedure
       .input(z.object({
-        tenantId: z.number(), id: z.number(), name: z.string().optional(),
+        id: z.number(), name: z.string().optional(),
         triggerEvent: z.string().optional(), triggerStageId: z.number().optional(),
         targetPipelineId: z.number().optional(), targetStageId: z.number().optional(),
         copyProducts: z.boolean().optional(), copyParticipants: z.boolean().optional(),
         copyCustomFields: z.boolean().optional(), isActive: z.boolean().optional(),
       }))
       .mutation(async ({ input }) => {
-        const { tenantId, id, ...data } = input;
+const tenantId = getTenantId(ctx); const { id, ...data } = input;
         return crm.updatePipelineAutomation(tenantId, id, data);
       }),
-    delete: protectedProcedure
-      .input(z.object({ tenantId: z.number(), id: z.number() }))
-      .mutation(async ({ input }) => {
-        return crm.deletePipelineAutomation(input.tenantId, input.id);
+    delete: tenantProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        return crm.deletePipelineAutomation(getTenantId(ctx), input.id);
       }),
   }),
 
   // ─── DEALS ───
   deals: router({
-    list: protectedProcedure
+    list: tenantProcedure
       .input(z.object({
-        tenantId: z.number(),
         pipelineId: z.number().optional(),
         stageId: z.number().optional(),
         status: z.string().optional(),
@@ -277,14 +276,14 @@ export const crmRouter = router({
         // Non-admin users ONLY see their own deals (enforced, cannot override)
         const isAdmin = ctx.saasUser?.role === "admin";
         const ownerFilter = isAdmin ? input.ownerUserId : ctx.saasUser?.userId;
-        const items = await crm.listDeals(input.tenantId, { ...input, ownerUserId: ownerFilter });
-        const totalCount = await crm.countDeals(input.tenantId, input.status, { ...input, ownerUserId: ownerFilter });
+        const items = await crm.listDeals(getTenantId(ctx), { ...input, ownerUserId: ownerFilter });
+        const totalCount = await crm.countDeals(getTenantId(ctx), input.status, { ...input, ownerUserId: ownerFilter });
         return { items, totalCount };
       }),
-    get: protectedProcedure
-      .input(z.object({ tenantId: z.number(), id: z.number() }))
+    get: tenantProcedure
+      .input(z.object({ id: z.number() }))
       .query(async ({ ctx, input }) => {
-        const deal = await crm.getDealById(input.tenantId, input.id);
+        const deal = await crm.getDealById(getTenantId(ctx), input.id);
         // Non-admin users can only view their own deals
         const isAdmin = ctx.saasUser?.role === "admin";
         if (!isAdmin && deal && deal.ownerUserId !== ctx.saasUser?.userId) {
@@ -292,9 +291,9 @@ export const crmRouter = router({
         }
         return deal;
       }),
-    create: protectedProcedure
+    create: tenantProcedure
       .input(z.object({
-        tenantId: z.number(), title: z.string().min(1), contactId: z.number().optional(),
+        title: z.string().min(1), contactId: z.number().optional(),
         accountId: z.number().optional(),
         pipelineId: z.number(), stageId: z.number(),
         ownerUserId: z.number().optional(), teamId: z.number().optional(),
@@ -321,7 +320,7 @@ export const crmRouter = router({
         // Log creation in deal history
         if (result?.id) {
           await crm.createDealHistory({
-            tenantId: input.tenantId,
+            tenantId: getTenantId(ctx),
             dealId: result.id,
             action: "created",
             description: `Negociação "${input.title}" criada`,
@@ -333,13 +332,13 @@ export const crmRouter = router({
           // 5. Add products if provided and recalc value
           if (productItems && productItems.length > 0) {
             for (const item of productItems) {
-              const catalogProduct = await crm.getCatalogProductById(input.tenantId, item.productId);
+              const catalogProduct = await crm.getCatalogProductById(getTenantId(ctx), item.productId);
               if (!catalogProduct || !catalogProduct.isActive) continue;
               const unitPrice = item.unitPriceCents ?? catalogProduct.basePriceCents;
               const discount = item.discountCents || 0;
               const finalPrice = item.quantity * unitPrice - discount;
               await crm.createDealProduct({
-                tenantId: input.tenantId,
+                tenantId: getTenantId(ctx),
                 dealId: result.id,
                 productId: item.productId,
                 name: catalogProduct.name,
@@ -352,12 +351,12 @@ export const crmRouter = router({
                 supplier: catalogProduct.supplier || undefined,
               });
             }
-            await crm.recalcDealValue(input.tenantId, result.id);
+            await crm.recalcDealValue(getTenantId(ctx), result.id);
           }
         }
-        await emitEvent({ tenantId: input.tenantId, actorUserId: ctx.user.id, entityType: "deal", entityId: result?.id, action: "create" });
+        await emitEvent({ tenantId: getTenantId(ctx), actorUserId: ctx.user.id, entityType: "deal", entityId: result?.id, action: "create" });
         // In-app notification
-        await createNotification(input.tenantId, {
+        await createNotification(getTenantId(ctx), {
           type: "deal_created",
           title: `Nova negociação: "${input.title}"`,
           body: undefined,
@@ -366,9 +365,9 @@ export const crmRouter = router({
         });
         return result;
       }),
-    update: protectedProcedure
+    update: tenantProcedure
       .input(z.object({
-        tenantId: z.number(), id: z.number(), title: z.string().optional(),
+        id: z.number(), title: z.string().optional(),
         contactId: z.number().nullable().optional(), accountId: z.number().nullable().optional(),
         stageId: z.number().optional(), status: z.enum(["open", "won", "lost"]).optional(),
         probability: z.number().optional(), ownerUserId: z.number().optional(),
@@ -380,7 +379,7 @@ export const crmRouter = router({
         returnDate: z.string().nullable().optional(),
       }))
       .mutation(async ({ ctx, input }) => {
-        const { tenantId, id, ...data } = input;
+const tenantId = getTenantId(ctx); const { id, ...data } = input;
         // Non-admin users can only update their own deals
         const isAdminUser = ctx.saasUser?.role === "admin";
         if (!isAdminUser) {
@@ -494,9 +493,9 @@ export const crmRouter = router({
         await emitEvent({ tenantId, actorUserId: ctx.user.id, entityType: "deal", entityId: id, action: "update" });
         return { success: true };
       }),
-    moveStage: protectedProcedure
+    moveStage: tenantProcedure
       .input(z.object({
-        tenantId: z.number(), dealId: z.number(),
+        dealId: z.number(),
         fromStageId: z.number(), toStageId: z.number(),
         fromStageName: z.string(), toStageName: z.string(),
       }))
@@ -504,16 +503,16 @@ export const crmRouter = router({
         // Non-admin users can only move their own deals
         const isAdmin = ctx.saasUser?.role === "admin";
         if (!isAdmin) {
-          const deal = await crm.getDealById(input.tenantId, input.dealId);
+          const deal = await crm.getDealById(getTenantId(ctx), input.dealId);
           if (deal && deal.ownerUserId !== ctx.saasUser?.userId) {
             throw new TRPCError({ code: "FORBIDDEN", message: "Voc\u00ea n\u00e3o tem permiss\u00e3o para mover esta negocia\u00e7\u00e3o" });
           }
         }
         // Update the deal's stage
-        await crm.updateDeal(input.tenantId, input.dealId, { stageId: input.toStageId, updatedBy: ctx.user.id });
+        await crm.updateDeal(getTenantId(ctx), input.dealId, { stageId: input.toStageId, updatedBy: ctx.user.id });
         // Record in deal history
         await crm.createDealHistory({
-          tenantId: input.tenantId,
+          tenantId: getTenantId(ctx),
           dealId: input.dealId,
           action: "stage_moved",
           description: `Movido de "${input.fromStageName}" para "${input.toStageName}"`,
@@ -524,9 +523,9 @@ export const crmRouter = router({
           actorUserId: ctx.user.id,
           actorName: ctx.user.name || "Sistema",
         });
-        await emitEvent({ tenantId: input.tenantId, actorUserId: ctx.user.id, entityType: "deal", entityId: input.dealId, action: "stage_moved" });
+        await emitEvent({ tenantId: getTenantId(ctx), actorUserId: ctx.user.id, entityType: "deal", entityId: input.dealId, action: "stage_moved" });
         // In-app notification
-        await createNotification(input.tenantId, {
+        await createNotification(getTenantId(ctx), {
           type: "deal_moved",
           title: `Negociação movida para "${input.toStageName}"`,
           body: `De "${input.fromStageName}" para "${input.toStageName}"`,
@@ -536,15 +535,15 @@ export const crmRouter = router({
         // Classification engine: auto-classify contact on stage move
         // + Task automation engine: create tasks when deal enters a stage
         try {
-          const deal = await crm.getDealById(input.tenantId, input.dealId);
+          const deal = await crm.getDealById(getTenantId(ctx), input.dealId);
           if (deal?.contactId) {
             const { onDealMoved } = await import("../classificationEngine");
-            await onDealMoved(input.tenantId, input.dealId, input.toStageId, deal.contactId, deal.pipelineId);
+            await onDealMoved(getTenantId(ctx), input.dealId, input.toStageId, deal.contactId, deal.pipelineId);
           }
           // Execute task automations for the new stage
           if (deal) {
             const createdTaskIds = await crm.executeTaskAutomations(
-              input.tenantId,
+              getTenantId(ctx),
               input.dealId,
               input.toStageId,
               { ownerUserId: deal.ownerUserId, boardingDate: deal.boardingDate, returnDate: deal.returnDate },
@@ -559,9 +558,8 @@ export const crmRouter = router({
         }
         return { success: true };
       }),
-    changePipeline: protectedProcedure
+    changePipeline: tenantProcedure
       .input(z.object({
-        tenantId: z.number(),
         dealId: z.number(),
         newPipelineId: z.number(),
         newStageId: z.number(),
@@ -570,31 +568,31 @@ export const crmRouter = router({
       }))
       .mutation(async ({ ctx, input }) => {
         // 1. Get current deal
-        const deal = await crm.getDealById(input.tenantId, input.dealId);
+        const deal = await crm.getDealById(getTenantId(ctx), input.dealId);
         if (!deal) throw new TRPCError({ code: "NOT_FOUND", message: "Negociação não encontrada" });
         // 2. Validate pipeline belongs to tenant
-        const pipelines = await crm.listPipelines(input.tenantId);
+        const pipelines = await crm.listPipelines(getTenantId(ctx));
         const targetPipeline = pipelines.find((p: any) => p.id === input.newPipelineId);
         if (!targetPipeline) throw new TRPCError({ code: "BAD_REQUEST", message: "Funil não encontrado neste tenant" });
         // 3. Validate stage belongs to the target pipeline
-        const stages = await crm.listStages(input.tenantId, input.newPipelineId);
+        const stages = await crm.listStages(getTenantId(ctx), input.newPipelineId);
         const targetStage = stages.find((s: any) => s.id === input.newStageId);
         if (!targetStage) throw new TRPCError({ code: "BAD_REQUEST", message: "Etapa não pertence ao funil selecionado" });
         // 4. Get old pipeline/stage names for history
         const oldPipeline = pipelines.find((p: any) => p.id === deal.pipelineId);
-        const oldStages = await crm.listStages(input.tenantId, deal.pipelineId);
+        const oldStages = await crm.listStages(getTenantId(ctx), deal.pipelineId);
         const oldStage = oldStages.find((s: any) => s.id === deal.stageId);
         const oldPipelineName = oldPipeline?.name || `Funil #${deal.pipelineId}`;
         const oldStageName = oldStage?.name || `Etapa #${deal.stageId}`;
         // 5. Update deal with new pipelineId and stageId
-        await crm.updateDeal(input.tenantId, input.dealId, {
+        await crm.updateDeal(getTenantId(ctx), input.dealId, {
           pipelineId: input.newPipelineId,
           stageId: input.newStageId,
           updatedBy: ctx.user.id,
         });
         // 6. Record pipeline change in history
         await crm.createDealHistory({
-          tenantId: input.tenantId,
+          tenantId: getTenantId(ctx),
           dealId: input.dealId,
           action: "field_changed",
           description: `Funil alterado de "${oldPipelineName}" para "${input.newPipelineName}"`,
@@ -606,7 +604,7 @@ export const crmRouter = router({
         });
         // 7. Record stage change in history
         await crm.createDealHistory({
-          tenantId: input.tenantId,
+          tenantId: getTenantId(ctx),
           dealId: input.dealId,
           action: "stage_moved",
           description: `Etapa alterada de "${oldStageName}" para "${input.newStageName}"`,
@@ -618,9 +616,9 @@ export const crmRouter = router({
           actorName: ctx.user.name || "Sistema",
         });
         // 8. Emit event
-        await emitEvent({ tenantId: input.tenantId, actorUserId: ctx.user.id, entityType: "deal", entityId: input.dealId, action: "stage_moved" });
+        await emitEvent({ tenantId: getTenantId(ctx), actorUserId: ctx.user.id, entityType: "deal", entityId: input.dealId, action: "stage_moved" });
         // 9. Notification
-        await createNotification(input.tenantId, {
+        await createNotification(getTenantId(ctx), {
           type: "deal_moved",
           title: `Negociação movida para funil "${input.newPipelineName}"`,
           body: `De "${oldPipelineName}" para "${input.newPipelineName}", etapa "${input.newStageName}"`,
@@ -631,10 +629,10 @@ export const crmRouter = router({
         try {
           if (deal.contactId) {
             const { onDealMoved } = await import("../classificationEngine");
-            await onDealMoved(input.tenantId, input.dealId, input.newStageId, deal.contactId, input.newPipelineId);
+            await onDealMoved(getTenantId(ctx), input.dealId, input.newStageId, deal.contactId, input.newPipelineId);
           }
           const createdTaskIds = await crm.executeTaskAutomations(
-            input.tenantId,
+            getTenantId(ctx),
             input.dealId,
             input.newStageId,
             { ownerUserId: deal.ownerUserId, boardingDate: deal.boardingDate, returnDate: deal.returnDate },
@@ -648,67 +646,67 @@ export const crmRouter = router({
         }
         return { success: true };
       }),
-    count: protectedProcedure
-      .input(z.object({ tenantId: z.number(), status: z.string().optional() }))
-      .query(async ({ input }) => {
-        return crm.countDeals(input.tenantId, input.status);
+    count: tenantProcedure
+      .input(z.object({ status: z.string().optional() }))
+      .query(async ({ input, ctx }) => {
+        return crm.countDeals(getTenantId(ctx), input.status);
       }),
-    bulkDelete: protectedProcedure
-      .input(z.object({ tenantId: z.number(), ids: z.array(z.number()).min(1).max(500) }))
+    bulkDelete: tenantProcedure
+      .input(z.object({ ids: z.array(z.number()).min(1).max(500) }))
       .mutation(async ({ ctx, input }) => {
-        const count = await crm.bulkSoftDeleteDeals(input.tenantId, input.ids);
+        const count = await crm.bulkSoftDeleteDeals(getTenantId(ctx), input.ids);
         for (const id of input.ids) {
           await crm.createDealHistory({
-            tenantId: input.tenantId, dealId: id, action: "deleted",
+            tenantId: getTenantId(ctx), dealId: id, action: "deleted",
             description: "Negociação movida para lixeira",
             actorUserId: ctx.user.id, actorName: ctx.user.name || "Sistema",
           });
-          await emitEvent({ tenantId: input.tenantId, actorUserId: ctx.user.id, entityType: "deal", entityId: id, action: "delete" });
+          await emitEvent({ tenantId: getTenantId(ctx), actorUserId: ctx.user.id, entityType: "deal", entityId: id, action: "delete" });
         }
         return { success: true, count };
       }),
-    listDeleted: protectedProcedure
-      .input(z.object({ tenantId: z.number(), limit: z.number().default(50) }))
-      .query(async ({ input }) => {
-        return crm.listDeletedDeals(input.tenantId, input.limit);
+    listDeleted: tenantProcedure
+      .input(z.object({ limit: z.number().default(50) }))
+      .query(async ({ input, ctx }) => {
+        return crm.listDeletedDeals(getTenantId(ctx), input.limit);
       }),
-    restore: protectedProcedure
-      .input(z.object({ tenantId: z.number(), ids: z.array(z.number()).min(1).max(500) }))
+    restore: tenantProcedure
+      .input(z.object({ ids: z.array(z.number()).min(1).max(500) }))
       .mutation(async ({ ctx, input }) => {
-        const count = await crm.restoreDeals(input.tenantId, input.ids);
+        const count = await crm.restoreDeals(getTenantId(ctx), input.ids);
         for (const id of input.ids) {
           await crm.createDealHistory({
-            tenantId: input.tenantId, dealId: id, action: "restored",
+            tenantId: getTenantId(ctx), dealId: id, action: "restored",
             description: "Negociação restaurada da lixeira",
             actorUserId: ctx.user.id, actorName: ctx.user.name || "Sistema",
           });
-          await emitEvent({ tenantId: input.tenantId, actorUserId: ctx.user.id, entityType: "deal", entityId: id, action: "restore" });
+          await emitEvent({ tenantId: getTenantId(ctx), actorUserId: ctx.user.id, entityType: "deal", entityId: id, action: "restore" });
         }
         return { success: true, count };
       }),
-    hardDelete: protectedProcedure
-      .input(z.object({ tenantId: z.number(), ids: z.array(z.number()).min(1).max(500) }))
+    hardDelete: tenantProcedure
+      .input(z.object({ ids: z.array(z.number()).min(1).max(500) }))
       .mutation(async ({ ctx, input }) => {
         if (ctx.user.role !== "admin") throw new Error("Apenas administradores podem excluir permanentemente.");
-        const count = await crm.hardDeleteDeals(input.tenantId, input.ids);
+        const count = await crm.hardDeleteDeals(getTenantId(ctx), input.ids);
         return { success: true, count };
       }),
-    totalValue: protectedProcedure
-      .input(z.object({ tenantId: z.number(), status: z.string().optional() }))
-      .query(async ({ input }) => {
-        return crm.sumDealValue(input.tenantId, input.status);
+    totalValue: tenantProcedure
+      .input(z.object({ status: z.string().optional() }))
+      .query(async ({ input, ctx }) => {
+        return crm.sumDealValue(getTenantId(ctx), input.status);
       }),
 
     // ─── DEAL PRODUCTS (Orçamento) ───
     products: router({
-      list: protectedProcedure
-        .input(z.object({ tenantId: z.number(), dealId: z.number() }))
-        .query(async ({ input }) => {
-          return crm.listDealProducts(input.tenantId, input.dealId);
+      list: tenantProcedure
+        .input(z.object({ dealId: z.number() }))
+        .query(async ({ input, ctx }) => {
+          return crm.listDealProducts(getTenantId(ctx), input.dealId);
         }),
-      create: protectedProcedure
+      create: tenantProcedure
         .input(z.object({
-          tenantId: z.number(), dealId: z.number(), productId: z.number(),
+          dealId: z.number(), productId: z.number(),
           quantity: z.number().default(1),
           unitPriceCents: z.number().optional(),  // override do preço (se não informado, usa base do catálogo)
           discountCents: z.number().optional(),
@@ -717,7 +715,7 @@ export const crmRouter = router({
         }))
         .mutation(async ({ ctx, input }) => {
           // Buscar produto do catálogo para snapshot
-          const catalogProduct = await crm.getCatalogProductById(input.tenantId, input.productId);
+          const catalogProduct = await crm.getCatalogProductById(getTenantId(ctx), input.productId);
           if (!catalogProduct) throw new TRPCError({ code: "NOT_FOUND", message: "Produto não encontrado no catálogo" });
           if (!catalogProduct.isActive) throw new TRPCError({ code: "BAD_REQUEST", message: "Produto desativado. Não é possível adicionar a novas negociações." });
           
@@ -726,7 +724,7 @@ export const crmRouter = router({
           const finalPrice = input.quantity * unitPrice - discount;
           
           const result = await crm.createDealProduct({
-            tenantId: input.tenantId,
+            tenantId: getTenantId(ctx),
             dealId: input.dealId,
             productId: input.productId,
             name: catalogProduct.name,
@@ -742,23 +740,23 @@ export const crmRouter = router({
             notes: input.notes,
           });
           await crm.createDealHistory({
-            tenantId: input.tenantId, dealId: input.dealId, action: "product_added",
+            tenantId: getTenantId(ctx), dealId: input.dealId, action: "product_added",
             description: `Produto "${catalogProduct.name}" adicionado ao orçamento (${(unitPrice / 100).toFixed(2)})`,
             actorUserId: ctx.user.id, actorName: ctx.user.name || "Sistema",
           });
           // Recalcular valor total da negociação
-          await crm.recalcDealValue(input.tenantId, input.dealId);
+          await crm.recalcDealValue(getTenantId(ctx), input.dealId);
           return result;
         }),
-      update: protectedProcedure
+      update: tenantProcedure
         .input(z.object({
-          tenantId: z.number(), id: z.number(), dealId: z.number(),
+          id: z.number(), dealId: z.number(),
           quantity: z.number().optional(), unitPriceCents: z.number().optional(),
           discountCents: z.number().optional(), supplier: z.string().optional(),
           checkIn: z.string().optional(), checkOut: z.string().optional(), notes: z.string().optional(),
         }))
         .mutation(async ({ ctx, input }) => {
-          const { tenantId, id, dealId, checkIn, checkOut, ...data } = input;
+const tenantId = getTenantId(ctx); const { id, dealId, checkIn, checkOut, ...data } = input;
           // Recalcular finalPriceCents se quantidade ou preço mudou
           const existing = await crm.getDealProduct(tenantId, id);
           const qty = data.quantity ?? existing?.quantity ?? 1;
@@ -781,57 +779,57 @@ export const crmRouter = router({
           await crm.recalcDealValue(tenantId, dealId);
           return { success: true };
         }),
-      delete: protectedProcedure
-        .input(z.object({ tenantId: z.number(), id: z.number(), dealId: z.number(), productName: z.string() }))
+      delete: tenantProcedure
+        .input(z.object({ id: z.number(), dealId: z.number(), productName: z.string() }))
         .mutation(async ({ ctx, input }) => {
-          await crm.deleteDealProduct(input.tenantId, input.id);
+          await crm.deleteDealProduct(getTenantId(ctx), input.id);
           await crm.createDealHistory({
-            tenantId: input.tenantId, dealId: input.dealId, action: "product_removed",
+            tenantId: getTenantId(ctx), dealId: input.dealId, action: "product_removed",
             description: `Produto "${input.productName}" removido do orçamento`,
             actorUserId: ctx.user.id, actorName: ctx.user.name || "Sistema",
           });
           // Recalcular valor total da negociação
-          await crm.recalcDealValue(input.tenantId, input.dealId);
+          await crm.recalcDealValue(getTenantId(ctx), input.dealId);
           return { success: true };
         }),
     }),
 
     // ─── DEAL HISTORY ───
     history: router({
-      list: protectedProcedure
-        .input(z.object({ tenantId: z.number(), dealId: z.number() }))
-        .query(async ({ input }) => {
-          return crm.listDealHistory(input.tenantId, input.dealId);
+      list: tenantProcedure
+        .input(z.object({ dealId: z.number() }))
+        .query(async ({ input, ctx }) => {
+          return crm.listDealHistory(getTenantId(ctx), input.dealId);
         }),
     }),
 
     // ─── DEAL PARTICIPANTS ───
     participants: router({
-      list: protectedProcedure
-        .input(z.object({ tenantId: z.number(), dealId: z.number() }))
-        .query(async ({ input }) => {
-          return crm.listDealParticipants(input.tenantId, input.dealId);
+      list: tenantProcedure
+        .input(z.object({ dealId: z.number() }))
+        .query(async ({ input, ctx }) => {
+          return crm.listDealParticipants(getTenantId(ctx), input.dealId);
         }),
-      add: protectedProcedure
+      add: tenantProcedure
         .input(z.object({
-          tenantId: z.number(), dealId: z.number(), contactId: z.number(),
+          dealId: z.number(), contactId: z.number(),
           role: z.enum(["decision_maker", "traveler", "payer", "companion", "other"]).optional(),
         }))
         .mutation(async ({ ctx, input }) => {
           const result = await crm.addDealParticipant(input);
           await crm.createDealHistory({
-            tenantId: input.tenantId, dealId: input.dealId, action: "participant_added",
+            tenantId: getTenantId(ctx), dealId: input.dealId, action: "participant_added",
             description: `Participante adicionado à negociação`,
             actorUserId: ctx.user.id, actorName: ctx.user.name || "Sistema",
           });
           return result;
         }),
-      remove: protectedProcedure
-        .input(z.object({ tenantId: z.number(), id: z.number(), dealId: z.number() }))
+      remove: tenantProcedure
+        .input(z.object({ id: z.number(), dealId: z.number() }))
         .mutation(async ({ ctx, input }) => {
-          await crm.removeDealParticipant(input.tenantId, input.id);
+          await crm.removeDealParticipant(getTenantId(ctx), input.id);
           await crm.createDealHistory({
-            tenantId: input.tenantId, dealId: input.dealId, action: "participant_removed",
+            tenantId: getTenantId(ctx), dealId: input.dealId, action: "participant_removed",
             description: `Participante removido da negociação`,
             actorUserId: ctx.user.id, actorName: ctx.user.name || "Sistema",
           });
@@ -842,19 +840,19 @@ export const crmRouter = router({
 
   // ─── TRIPS ───
   trips: router({
-    list: protectedProcedure
-      .input(z.object({ tenantId: z.number() }))
-      .query(async ({ input }) => {
-        return crm.listTrips(input.tenantId);
+    list: tenantProcedure
+      
+      .query(async ({ input, ctx }) => {
+        return crm.listTrips(getTenantId(ctx));
       }),
-    get: protectedProcedure
-      .input(z.object({ tenantId: z.number(), id: z.number() }))
-      .query(async ({ input }) => {
-        return crm.getTripById(input.tenantId, input.id);
+    get: tenantProcedure
+      .input(z.object({ id: z.number() }))
+      .query(async ({ input, ctx }) => {
+        return crm.getTripById(getTenantId(ctx), input.id);
       }),
-    create: protectedProcedure
+    create: tenantProcedure
       .input(z.object({
-        tenantId: z.number(), dealId: z.number().optional(), destinationSummary: z.string().optional(),
+        dealId: z.number().optional(), destinationSummary: z.string().optional(),
         startDate: z.string().optional(), endDate: z.string().optional(), ownerUserId: z.number().optional(),
       }))
       .mutation(async ({ ctx, input }) => {
@@ -864,16 +862,15 @@ export const crmRouter = router({
           endDate: input.endDate ? new Date(input.endDate) : undefined,
           createdBy: ctx.user.id,
         });
-        await emitEvent({ tenantId: input.tenantId, actorUserId: ctx.user.id, entityType: "trip", entityId: result?.id, action: "create" });
+        await emitEvent({ tenantId: getTenantId(ctx), actorUserId: ctx.user.id, entityType: "trip", entityId: result?.id, action: "create" });
         return result;
       }),
   }),
 
   // ─── TASKS ───
   tasks: router({
-    list: protectedProcedure
+    list: tenantProcedure
       .input(z.object({
-        tenantId: z.number(),
         entityType: z.string().optional(),
         entityId: z.number().optional(),
         status: z.string().optional(),
@@ -888,11 +885,11 @@ export const crmRouter = router({
         // Non-admin users only see tasks they created or are assigned to
         const isAdmin = ctx.saasUser?.role === "admin";
         const createdByUserId = isAdmin ? undefined : ctx.saasUser?.userId;
-        return crm.listTasksEnriched(input.tenantId, { ...input, createdByUserId });
+        return crm.listTasksEnriched(getTenantId(ctx), { ...input, createdByUserId });
       }),
-    create: protectedProcedure
+    create: tenantProcedure
       .input(z.object({
-        tenantId: z.number(), entityType: z.string(), entityId: z.number(), title: z.string().min(1),
+        entityType: z.string(), entityId: z.number(), title: z.string().min(1),
         taskType: z.string().optional(),
         dueAt: z.string().optional(), assignedToUserId: z.number().optional(),
         priority: z.enum(["low", "medium", "high", "urgent"]).optional(),
@@ -909,12 +906,12 @@ export const crmRouter = router({
         });
         // Mark as done if requested
         if (markAsDone && result?.id) {
-          await crm.updateTask(input.tenantId, result.id, { status: "done" });
+          await crm.updateTask(getTenantId(ctx), result.id, { status: "done" });
         }
         // Add assignees
         if (result?.id && assigneeUserIds && assigneeUserIds.length > 0) {
           for (const userId of assigneeUserIds) {
-            await crm.addTaskAssignee(result.id, userId, input.tenantId);
+            await crm.addTaskAssignee(result.id, userId, getTenantId(ctx));
           }
         }
         // Auto-sync to Google Calendar (fire-and-forget)
@@ -950,7 +947,7 @@ export const crmRouter = router({
           });
         }
         // In-app notification
-        await createNotification(input.tenantId, {
+        await createNotification(getTenantId(ctx), {
           type: "task_created",
           title: `Nova tarefa: ${input.title}`,
           body: input.dueAt ? `Vencimento: ${new Date(input.dueAt).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })}` : undefined,
@@ -959,9 +956,9 @@ export const crmRouter = router({
         });
         return result;
       }),
-    update: protectedProcedure
+    update: tenantProcedure
       .input(z.object({
-        tenantId: z.number(), id: z.number(), title: z.string().optional(),
+        id: z.number(), title: z.string().optional(),
         status: z.enum(["pending", "in_progress", "done", "cancelled"]).optional(),
         priority: z.enum(["low", "medium", "high", "urgent"]).optional(),
         taskType: z.string().optional(),
@@ -969,7 +966,7 @@ export const crmRouter = router({
         description: z.string().optional(),
       }))
       .mutation(async ({ input }) => {
-        const { tenantId, id, dueAt, ...data } = input;
+const tenantId = getTenantId(ctx); const { id, dueAt, ...data } = input;
         await crm.updateTask(tenantId, id, { ...data, dueAt: dueAt ? new Date(dueAt) : undefined });
 
         // Auto-sync to Google Calendar (fire-and-forget)
@@ -1013,39 +1010,39 @@ export const crmRouter = router({
 
         return { success: true };
       }),
-    addAssignee: protectedProcedure
-      .input(z.object({ tenantId: z.number(), taskId: z.number(), userId: z.number() }))
-      .mutation(async ({ input }) => {
-        await crm.addTaskAssignee(input.taskId, input.userId, input.tenantId);
+    addAssignee: tenantProcedure
+      .input(z.object({ taskId: z.number(), userId: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        await crm.addTaskAssignee(input.taskId, input.userId, getTenantId(ctx));
         return { success: true };
       }),
-    removeAssignee: protectedProcedure
-      .input(z.object({ tenantId: z.number(), taskId: z.number(), userId: z.number() }))
-      .mutation(async ({ input }) => {
-        await crm.removeTaskAssignee(input.taskId, input.userId, input.tenantId);
+    removeAssignee: tenantProcedure
+      .input(z.object({ taskId: z.number(), userId: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        await crm.removeTaskAssignee(input.taskId, input.userId, getTenantId(ctx));
         return { success: true };
       }),
-    overdueSummary: protectedProcedure
-      .input(z.object({ tenantId: z.number(), dealIds: z.array(z.number()).optional() }))
-      .query(async ({ input }) => {
-        return crm.getOverdueTasksByDeal(input.tenantId, input.dealIds);
+    overdueSummary: tenantProcedure
+      .input(z.object({ dealIds: z.array(z.number()).optional() }))
+      .query(async ({ input, ctx }) => {
+        return crm.getOverdueTasksByDeal(getTenantId(ctx), input.dealIds);
       }),
-    pendingCounts: protectedProcedure
-      .input(z.object({ tenantId: z.number() }))
-      .query(async ({ input }) => {
-        return crm.getPendingTaskCountsByDeal(input.tenantId);
+    pendingCounts: tenantProcedure
+      
+      .query(async ({ input, ctx }) => {
+        return crm.getPendingTaskCountsByDeal(getTenantId(ctx));
       }),
   }),
 
   // ─── NOTES ───
   notes: router({
-    list: protectedProcedure
-      .input(z.object({ tenantId: z.number(), entityType: z.string(), entityId: z.number() }))
-      .query(async ({ input }) => {
-        return crm.listNotes(input.tenantId, input.entityType, input.entityId);
+    list: tenantProcedure
+      .input(z.object({ entityType: z.string(), entityId: z.number() }))
+      .query(async ({ input, ctx }) => {
+        return crm.listNotes(getTenantId(ctx), input.entityType, input.entityId);
       }),
-    create: protectedProcedure
-      .input(z.object({ tenantId: z.number(), entityType: z.string(), entityId: z.number(), body: z.string().min(1) }))
+    create: tenantProcedure
+      .input(z.object({ entityType: z.string(), entityId: z.number(), body: z.string().min(1) }))
       .mutation(async ({ ctx, input }) => {
         return crm.createNote({ ...input, createdByUserId: ctx.user.id });
       }),
@@ -1053,54 +1050,54 @@ export const crmRouter = router({
 
   // ─── WHATSAPP MESSAGES BY DEAL ───
   dealWhatsApp: router({
-    messages: protectedProcedure
-      .input(z.object({ dealId: z.number(), tenantId: z.number(), limit: z.number().optional(), beforeId: z.number().optional() }))
-      .query(async ({ input }) => {
-        return crm.getWhatsAppMessagesByDeal(input.dealId, input.tenantId, { limit: input.limit, beforeId: input.beforeId });
+    messages: tenantProcedure
+      .input(z.object({ dealId: z.number(), limit: z.number().optional(), beforeId: z.number().optional() }))
+      .query(async ({ input, ctx }) => {
+        return crm.getWhatsAppMessagesByDeal(input.dealId, getTenantId(ctx), { limit: input.limit, beforeId: input.beforeId });
       }),
-    count: protectedProcedure
-      .input(z.object({ dealId: z.number(), tenantId: z.number() }))
-      .query(async ({ input }) => {
-        return crm.countWhatsAppMessagesByDeal(input.dealId, input.tenantId);
+    count: tenantProcedure
+      .input(z.object({ dealId: z.number(), }))
+      .query(async ({ input, ctx }) => {
+        return crm.countWhatsAppMessagesByDeal(input.dealId, getTenantId(ctx));
       }),
-    unreadByContact: protectedProcedure
-      .input(z.object({ tenantId: z.number() }))
-      .query(async ({ input }) => {
-        return crm.getWhatsAppUnreadByContact(input.tenantId);
+    unreadByContact: tenantProcedure
+      
+      .query(async ({ input, ctx }) => {
+        return crm.getWhatsAppUnreadByContact(getTenantId(ctx));
       }),
   }),
 
   // ─── LEAD SOURCES ───
   leadSources: router({
-    list: protectedProcedure
-      .input(z.object({ tenantId: z.number(), includeDeleted: z.boolean().optional() }))
-      .query(async ({ input }) => {
-        return crm.listLeadSources(input.tenantId, input.includeDeleted);
+    list: tenantProcedure
+      .input(z.object({ includeDeleted: z.boolean().optional() }))
+      .query(async ({ input, ctx }) => {
+        return crm.listLeadSources(getTenantId(ctx), input.includeDeleted);
       }),
-    create: protectedProcedure
-      .input(z.object({ tenantId: z.number(), name: z.string().min(1), color: z.string().optional() }))
+    create: tenantProcedure
+      .input(z.object({ name: z.string().min(1), color: z.string().optional() }))
       .mutation(async ({ ctx, input }) => {
         const result = await crm.createLeadSource(input);
-        await emitEvent({ tenantId: input.tenantId, actorUserId: ctx.user.id, entityType: "lead_source", entityId: result?.id, action: "create" });
+        await emitEvent({ tenantId: getTenantId(ctx), actorUserId: ctx.user.id, entityType: "lead_source", entityId: result?.id, action: "create" });
         return result;
       }),
-    update: protectedProcedure
+    update: tenantProcedure
       .input(z.object({ id: z.number(), name: z.string().min(1).optional(), color: z.string().optional(), isActive: z.boolean().optional() }))
       .mutation(async ({ input }) => {
         const { id, ...data } = input;
         return crm.updateLeadSource(id, data);
       }),
-    delete: protectedProcedure
+    delete: tenantProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ input }) => {
         return crm.softDeleteLeadSource(input.id);
       }),
-    restore: protectedProcedure
+    restore: tenantProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ input }) => {
         return crm.restoreLeadSource(input.id);
       }),
-    hardDelete: protectedProcedure
+    hardDelete: tenantProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ input }) => {
         return crm.hardDeleteLeadSource(input.id);
@@ -1109,35 +1106,35 @@ export const crmRouter = router({
 
   // ─── CAMPAIGNS ───
   campaigns: router({
-    list: protectedProcedure
-      .input(z.object({ tenantId: z.number(), sourceId: z.number().optional(), includeDeleted: z.boolean().optional() }))
-      .query(async ({ input }) => {
-        return crm.listCampaigns(input.tenantId, input.sourceId, input.includeDeleted);
+    list: tenantProcedure
+      .input(z.object({ sourceId: z.number().optional(), includeDeleted: z.boolean().optional() }))
+      .query(async ({ input, ctx }) => {
+        return crm.listCampaigns(getTenantId(ctx), input.sourceId, input.includeDeleted);
       }),
-    create: protectedProcedure
-      .input(z.object({ tenantId: z.number(), sourceId: z.number().optional(), name: z.string().min(1), color: z.string().optional() }))
+    create: tenantProcedure
+      .input(z.object({ sourceId: z.number().optional(), name: z.string().min(1), color: z.string().optional() }))
       .mutation(async ({ ctx, input }) => {
         const result = await crm.createCampaign(input);
-        await emitEvent({ tenantId: input.tenantId, actorUserId: ctx.user.id, entityType: "campaign", entityId: result?.id, action: "create" });
+        await emitEvent({ tenantId: getTenantId(ctx), actorUserId: ctx.user.id, entityType: "campaign", entityId: result?.id, action: "create" });
         return result;
       }),
-    update: protectedProcedure
+    update: tenantProcedure
       .input(z.object({ id: z.number(), name: z.string().min(1).optional(), color: z.string().optional(), sourceId: z.number().nullish(), isActive: z.boolean().optional() }))
       .mutation(async ({ input }) => {
         const { id, ...data } = input;
         return crm.updateCampaign(id, data);
       }),
-    delete: protectedProcedure
+    delete: tenantProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ input }) => {
         return crm.softDeleteCampaign(input.id);
       }),
-    restore: protectedProcedure
+    restore: tenantProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ input }) => {
         return crm.restoreCampaign(input.id);
       }),
-    hardDelete: protectedProcedure
+    hardDelete: tenantProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ input }) => {
         return crm.hardDeleteCampaign(input.id);
@@ -1146,35 +1143,35 @@ export const crmRouter = router({
 
   // ─── LOSS REASONS ───
   lossReasons: router({
-    list: protectedProcedure
-      .input(z.object({ tenantId: z.number(), includeDeleted: z.boolean().optional() }))
-      .query(async ({ input }) => {
-        return crm.listLossReasons(input.tenantId, input.includeDeleted);
+    list: tenantProcedure
+      .input(z.object({ includeDeleted: z.boolean().optional() }))
+      .query(async ({ input, ctx }) => {
+        return crm.listLossReasons(getTenantId(ctx), input.includeDeleted);
       }),
-    create: protectedProcedure
-      .input(z.object({ tenantId: z.number(), name: z.string().min(1), description: z.string().optional() }))
+    create: tenantProcedure
+      .input(z.object({ name: z.string().min(1), description: z.string().optional() }))
       .mutation(async ({ ctx, input }) => {
         const result = await crm.createLossReason(input);
-        await emitEvent({ tenantId: input.tenantId, actorUserId: ctx.user.id, entityType: "loss_reason", entityId: result?.id, action: "create" });
+        await emitEvent({ tenantId: getTenantId(ctx), actorUserId: ctx.user.id, entityType: "loss_reason", entityId: result?.id, action: "create" });
         return result;
       }),
-    update: protectedProcedure
+    update: tenantProcedure
       .input(z.object({ id: z.number(), name: z.string().min(1).optional(), description: z.string().optional(), isActive: z.boolean().optional() }))
       .mutation(async ({ input }) => {
         const { id, ...data } = input;
         return crm.updateLossReason(id, data);
       }),
-    delete: protectedProcedure
+    delete: tenantProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ input }) => {
         return crm.softDeleteLossReason(input.id);
       }),
-    restore: protectedProcedure
+    restore: tenantProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ input }) => {
         return crm.restoreLossReason(input.id);
       }),
-    hardDelete: protectedProcedure
+    hardDelete: tenantProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ input }) => {
         return crm.hardDeleteLossReason(input.id);
@@ -1182,18 +1179,18 @@ export const crmRouter = router({
   }),
   // ─── CLASSIFICATION ENGINE ───
   classification: router({
-    getConfig: protectedProcedure
-      .input(z.object({ tenantId: z.number() }))
+    getConfig: tenantProcedure
+      
       .query(async () => {
         const { STAGE_CLASSIFICATIONS, CLASSIFICATION_CONFIG } = await import("../classificationEngine");
         return { classifications: STAGE_CLASSIFICATIONS, config: CLASSIFICATION_CONFIG };
       }),
-    getSettings: protectedProcedure
-      .input(z.object({ tenantId: z.number() }))
-      .query(async ({ input }) => {
+    getSettings: tenantProcedure
+      
+      .query(async ({ input, ctx }) => {
         const db = await getDb();
         if (!db) return { inactivityDays: 360, referralWindowDays: 90, autoClassifyOnMove: true, autoClassifyOnWon: true, autoClassifyOnLost: true, autoCreatePostSaleDeal: true };
-        const rows = await db.select({ settingsJson: tenants.settingsJson }).from(tenants).where(eq(tenants.id, input.tenantId)).limit(1);
+        const rows = await db.select({ settingsJson: tenants.settingsJson }).from(tenants).where(eq(tenants.id, getTenantId(ctx))).limit(1);
         const settings = (rows[0]?.settingsJson as any) || {};
         const cls = settings.classificationEngine || {};
         return {
@@ -1205,9 +1202,8 @@ export const crmRouter = router({
           autoCreatePostSaleDeal: cls.autoCreatePostSaleDeal ?? true,
         };
       }),
-    saveSettings: protectedProcedure
+    saveSettings: tenantProcedure
       .input(z.object({
-        tenantId: z.number(),
         inactivityDays: z.number().min(30).max(3650),
         referralWindowDays: z.number().min(7).max(365),
         autoClassifyOnMove: z.boolean(),
@@ -1215,10 +1211,10 @@ export const crmRouter = router({
         autoClassifyOnLost: z.boolean(),
         autoCreatePostSaleDeal: z.boolean(),
       }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         const db = await getDb();
         if (!db) return { success: false };
-        const rows = await db.select({ settingsJson: tenants.settingsJson }).from(tenants).where(eq(tenants.id, input.tenantId)).limit(1);
+        const rows = await db.select({ settingsJson: tenants.settingsJson }).from(tenants).where(eq(tenants.id, getTenantId(ctx))).limit(1);
         const currentSettings = (rows[0]?.settingsJson as any) || {};
         currentSettings.classificationEngine = {
           inactivityDays: input.inactivityDays,
@@ -1228,50 +1224,49 @@ export const crmRouter = router({
           autoClassifyOnLost: input.autoClassifyOnLost,
           autoCreatePostSaleDeal: input.autoCreatePostSaleDeal,
         };
-        await db.update(tenants).set({ settingsJson: currentSettings }).where(eq(tenants.id, input.tenantId));
+        await db.update(tenants).set({ settingsJson: currentSettings }).where(eq(tenants.id, getTenantId(ctx)));
         return { success: true };
       }),
-    updateContact: protectedProcedure
-      .input(z.object({ tenantId: z.number(), contactId: z.number(), classification: z.string() }))
-      .mutation(async ({ input }) => {
+    updateContact: tenantProcedure
+      .input(z.object({ contactId: z.number(), classification: z.string() }))
+      .mutation(async ({ input, ctx }) => {
         const { updateContactClassification } = await import("../classificationEngine");
-        await updateContactClassification(input.tenantId, input.contactId, input.classification as any);
+        await updateContactClassification(getTenantId(ctx), input.contactId, input.classification as any);
         return { success: true };
       }),
-    confirmReferral: protectedProcedure
-      .input(z.object({ tenantId: z.number(), referrerContactId: z.number() }))
-      .mutation(async ({ input }) => {
+    confirmReferral: tenantProcedure
+      .input(z.object({ referrerContactId: z.number() }))
+      .mutation(async ({ input, ctx }) => {
         const { onReferralConfirmed } = await import("../classificationEngine");
-        await onReferralConfirmed(input.tenantId, input.referrerContactId);
+        await onReferralConfirmed(getTenantId(ctx), input.referrerContactId);
         return { success: true };
       }),
-    processInactive: protectedProcedure
-      .input(z.object({ tenantId: z.number(), inactivityDays: z.number().default(360) }))
-      .mutation(async ({ input }) => {
+    processInactive: tenantProcedure
+      .input(z.object({ inactivityDays: z.number().default(360) }))
+      .mutation(async ({ input, ctx }) => {
         const { processInactiveClients, processReferralWindows } = await import("../classificationEngine");
-        await processInactiveClients(input.tenantId, input.inactivityDays);
-        await processReferralWindows(input.tenantId);
+        await processInactiveClients(getTenantId(ctx), input.inactivityDays);
+        await processReferralWindows(getTenantId(ctx));
         return { success: true };
       }),
-    seedDefaultPipelines: protectedProcedure
-      .input(z.object({ tenantId: z.number() }))
-      .mutation(async ({ input }) => {
+    seedDefaultPipelines: tenantProcedure
+      
+      .mutation(async ({ input, ctx }) => {
         const { createDefaultPipelines } = await import("../classificationEngine");
-        const result = await createDefaultPipelines(input.tenantId);
+        const result = await createDefaultPipelines(getTenantId(ctx));
         return result;
       }),
   }),
 
   // ─── TASK AUTOMATIONS ───
   taskAutomations: router({
-    list: protectedProcedure
-      .input(z.object({ tenantId: z.number(), pipelineId: z.number().optional() }))
-      .query(async ({ input }) => {
-        return crm.listTaskAutomations(input.tenantId, input.pipelineId);
+    list: tenantProcedure
+      .input(z.object({ pipelineId: z.number().optional() }))
+      .query(async ({ input, ctx }) => {
+        return crm.listTaskAutomations(getTenantId(ctx), input.pipelineId);
       }),
-    create: protectedProcedure
+    create: tenantProcedure
       .input(z.object({
-        tenantId: z.number(),
         pipelineId: z.number(),
         stageId: z.number(),
         taskTitle: z.string().min(1),
@@ -1288,10 +1283,9 @@ export const crmRouter = router({
       .mutation(async ({ input }) => {
         return crm.createTaskAutomation(input);
       }),
-    update: protectedProcedure
+    update: tenantProcedure
       .input(z.object({
         id: z.number(),
-        tenantId: z.number(),
         taskTitle: z.string().min(1).optional(),
         taskDescription: z.string().nullable().optional(),
         taskType: z.enum(["whatsapp", "phone", "email", "video", "task"]).optional(),
@@ -1309,23 +1303,23 @@ export const crmRouter = router({
         const { id, tenantId, ...data } = input;
         return crm.updateTaskAutomation(id, tenantId, data);
       }),
-    delete: protectedProcedure
-      .input(z.object({ id: z.number(), tenantId: z.number() }))
-      .mutation(async ({ input }) => {
-        return crm.deleteTaskAutomation(input.id, input.tenantId);
+    delete: tenantProcedure
+      .input(z.object({ id: z.number(), }))
+      .mutation(async ({ input, ctx }) => {
+        return crm.deleteTaskAutomation(input.id, getTenantId(ctx));
       }),
   }),
 
   // ─── DATE-BASED AUTOMATIONS ───
   dateAutomations: router({
-    list: protectedProcedure
-      .input(z.object({ tenantId: z.number(), pipelineId: z.number().optional() }))
-      .query(async ({ input }) => {
-        return crm.listDateAutomations(input.tenantId, input.pipelineId);
+    list: tenantProcedure
+      .input(z.object({ pipelineId: z.number().optional() }))
+      .query(async ({ input, ctx }) => {
+        return crm.listDateAutomations(getTenantId(ctx), input.pipelineId);
       }),
-    create: protectedProcedure
+    create: tenantProcedure
       .input(z.object({
-        tenantId: z.number(), name: z.string().min(1), description: z.string().optional(),
+        name: z.string().min(1), description: z.string().optional(),
         pipelineId: z.number(),
         dateField: z.enum(["boardingDate", "returnDate", "expectedCloseAt", "createdAt"]),
         condition: z.enum(["days_before", "days_after", "on_date"]),
@@ -1338,9 +1332,9 @@ export const crmRouter = router({
       .mutation(async ({ input }) => {
         return crm.createDateAutomation(input);
       }),
-    update: protectedProcedure
+    update: tenantProcedure
       .input(z.object({
-        tenantId: z.number(), id: z.number(),
+        id: z.number(),
         name: z.string().optional(), description: z.string().optional(),
         dateField: z.enum(["boardingDate", "returnDate", "expectedCloseAt", "createdAt"]).optional(),
         condition: z.enum(["days_before", "days_after", "on_date"]).optional(),
@@ -1351,19 +1345,19 @@ export const crmRouter = router({
         isActive: z.boolean().optional(),
       }))
       .mutation(async ({ input }) => {
-        const { tenantId, id, ...data } = input;
+const tenantId = getTenantId(ctx); const { id, ...data } = input;
         return crm.updateDateAutomation(tenantId, id, data);
       }),
-    delete: protectedProcedure
-      .input(z.object({ tenantId: z.number(), id: z.number() }))
-      .mutation(async ({ input }) => {
-        return crm.deleteDateAutomation(input.tenantId, input.id);
+    delete: tenantProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        return crm.deleteDateAutomation(getTenantId(ctx), input.id);
       }),
-    runNow: protectedProcedure
-      .input(z.object({ tenantId: z.number() }))
-      .mutation(async ({ input }) => {
+    runNow: tenantProcedure
+      
+      .mutation(async ({ input, ctx }) => {
         const { runDateAutomationsForTenant } = await import("../dateAutomationScheduler");
-        return runDateAutomationsForTenant(input.tenantId);
+        return runDateAutomationsForTenant(getTenantId(ctx));
       }),
   }),
 });

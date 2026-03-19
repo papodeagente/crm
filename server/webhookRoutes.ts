@@ -16,11 +16,62 @@ import {
   type InboundLeadPayload,
 } from "./leadProcessor";
 import { getDb } from "./db";
-import { eventLog, trackingTokens, rdStationConfig, rdStationWebhookLog, whatsappSessions, rdStationConfigTasks, productCatalog, dealProducts, tasks } from "../drizzle/schema";
+import { eventLog, trackingTokens, rdStationConfig, rdStationWebhookLog, whatsappSessions, rdStationConfigTasks, productCatalog, dealProducts, tasks, webhookConfig, metaIntegrationConfig } from "../drizzle/schema";
 import { createDealProduct, createTask } from "./crmDb";
 import { eq, and, sql } from "drizzle-orm";
 import { ENV } from "./_core/env";
 import { generateTrackerScript } from "./tracker-script";
+
+
+// ─── Tenant Resolution Helpers for Webhooks ───────────────
+
+async function resolveWpTenantId(): Promise<number> {
+  // WP_SECRET is global — resolve to the first active tenant that has a webhook config
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const configs = await db.select().from(webhookConfig).limit(1);
+  if (configs.length === 0) throw new Error("No webhook config found for WP tenant");
+  return configs[0].tenantId;
+}
+
+async function resolveLeadsTenantId(bearerToken: string): Promise<{ tenantId: number; config: any } | null> {
+  const db = await getDb();
+  if (!db) return null;
+  const configs = await db.select().from(webhookConfig);
+  const match = configs.find(c => c.webhookSecret === bearerToken);
+  if (!match) return null;
+  return { tenantId: match.tenantId, config: match };
+}
+
+async function resolveMetaTenantByVerifyToken(token: string): Promise<{ tenantId: number; config: any } | null> {
+  const db = await getDb();
+  if (!db) return null;
+  const configs = await db.select().from(metaIntegrationConfig);
+  const match = configs.find(c => c.verifyToken === token);
+  if (!match) return null;
+  return { tenantId: match.tenantId, config: match };
+}
+
+async function resolveMetaTenantFromBody(req: Request): Promise<{ tenantId: number; config: any } | null> {
+  const db = await getDb();
+  if (!db) return null;
+  // Get all active meta configs and try to validate signature against each
+  const configs = await db.select().from(metaIntegrationConfig).where(eq(metaIntegrationConfig.status, "connected"));
+  for (const config of configs) {
+    if (config.appSecret) {
+      const signature = req.headers["x-hub-signature-256"] as string;
+      if (signature) {
+        const expectedSig = "sha256=" + createHmac("sha256", config.appSecret).update(JSON.stringify(req.body)).digest("hex");
+        if (signature === expectedSig) {
+          return { tenantId: config.tenantId, config };
+        }
+      }
+    }
+  }
+  // Fallback: if only one config exists, use it
+  if (configs.length === 1) return { tenantId: configs[0].tenantId, config: configs[0] };
+  return null;
+}
 
 const router = Router();
 
@@ -102,46 +153,31 @@ function isValidEmail(email: string): boolean {
 // ─── WordPress Elementor Webhook ────────────────────────
 
 router.post("/api/webhooks/wp-leads", async (req: Request, res: Response) => {
-  const tenantId = 1; // Single-tenant for now
   const clientIp = req.ip || req.socket.remoteAddress || "unknown";
 
   try {
     // 1. Rate limiting
     const rateCheck = checkRateLimit(clientIp);
     if (!rateCheck.allowed) {
-      await logEvent({
-        tenantId,
-        actorType: "webhook",
-        entityType: "lead",
-        action: "rate_limited",
-        metadataJson: { ip: clientIp, origin: "elementor_webhook" },
-      });
       return res.status(429).json({ error: "Rate limit exceeded. Try again later." });
     }
 
     // 2. Validate api_key
     const { api_key } = req.body || {};
     if (!api_key || typeof api_key !== "string") {
-      await logEvent({
-        tenantId,
-        actorType: "webhook",
-        entityType: "lead",
-        action: "auth_failed",
-        metadataJson: { ip: clientIp, reason: "missing_api_key", origin: "elementor_webhook" },
-      });
       return res.status(401).json({ error: "Unauthorized" });
     }
 
     const wpSecret = ENV.wpSecret;
     if (!wpSecret || api_key !== wpSecret) {
-      await logEvent({
-        tenantId,
-        actorType: "webhook",
-        entityType: "lead",
-        action: "auth_failed",
-        metadataJson: { ip: clientIp, reason: "invalid_api_key", origin: "elementor_webhook" },
-      });
       return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    // 3. Resolve tenantId from webhook config (NOT hardcoded)
+    const tenantId = await resolveWpTenantId();
+    if (!tenantId) {
+      console.error("[Webhook /wp-leads] Could not resolve tenantId");
+      return res.status(500).json({ error: "Tenant resolution failed" });
     }
 
     // 3. Validate required fields
@@ -238,20 +274,20 @@ router.post("/api/webhooks/wp-leads", async (req: Request, res: Response) => {
 // ─── Landing Page Webhook ────────────────────────────────
 
 router.post("/api/webhooks/leads", async (req: Request, res: Response) => {
-  const tenantId = 1; // Single-tenant for now
-
   try {
-    // Auth: Bearer token
+    // Auth: Bearer token → resolve tenantId from token
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
       return res.status(401).json({ error: "Missing or invalid Authorization header" });
     }
 
     const token = authHeader.substring(7);
-    const config = await getWebhookConfig(tenantId);
-    if (!config || config.webhookSecret !== token) {
+    const resolved = await resolveLeadsTenantId(token);
+    if (!resolved) {
       return res.status(403).json({ error: "Invalid webhook token" });
     }
+    const tenantId = resolved.tenantId;
+    const config = resolved.config;
 
     if (!config.isActive) {
       return res.status(503).json({ error: "Webhook is disabled" });
@@ -296,50 +332,35 @@ router.post("/api/webhooks/leads", async (req: Request, res: Response) => {
 // ─── Meta Lead Ads: Verification Challenge ───────────────
 
 router.get("/api/webhooks/meta", async (req: Request, res: Response) => {
-  const tenantId = 1;
-
   const mode = req.query["hub.mode"];
-  const token = req.query["hub.verify_token"];
+  const token = req.query["hub.verify_token"] as string;
   const challenge = req.query["hub.challenge"];
 
   if (mode !== "subscribe") {
     return res.status(400).json({ error: "Invalid mode" });
   }
 
-  const config = await getMetaConfig(tenantId);
-  if (!config || config.verifyToken !== token) {
+  // Resolve tenantId from verify_token (NOT hardcoded)
+  const resolved = await resolveMetaTenantByVerifyToken(token);
+  if (!resolved) {
     return res.status(403).json({ error: "Invalid verify token" });
   }
 
-  console.log("[Meta Webhook] Verification challenge accepted");
+  console.log(`[Meta Webhook] Verification challenge accepted for tenantId=${resolved.tenantId}`);
   return res.status(200).send(challenge);
 });
 
 // ─── Meta Lead Ads: Receive Notifications ────────────────
 
 router.post("/api/webhooks/meta", async (req: Request, res: Response) => {
-  const tenantId = 1;
-
   try {
-    // Validate X-Hub-Signature-256
-    const config = await getMetaConfig(tenantId);
-    if (!config || config.status !== "connected") {
-      return res.status(503).json({ error: "Meta integration not configured" });
+    // Resolve tenantId from X-Hub-Signature (NOT hardcoded)
+    const resolved = await resolveMetaTenantFromBody(req);
+    if (!resolved) {
+      return res.status(503).json({ error: "Meta integration not configured or signature mismatch" });
     }
-
-    if (config.appSecret) {
-      const signature = req.headers["x-hub-signature-256"] as string;
-      if (signature) {
-        const expectedSig = "sha256=" + createHmac("sha256", config.appSecret)
-          .update(JSON.stringify(req.body))
-          .digest("hex");
-
-        if (signature !== expectedSig) {
-          console.warn("[Meta Webhook] Invalid signature");
-          return res.status(403).json({ error: "Invalid signature" });
-        }
-      }
-    }
+    const tenantId = resolved.tenantId;
+    const config = resolved.config;
 
     const body = req.body;
 

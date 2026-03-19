@@ -2,7 +2,7 @@
  * RFV Router — tRPC endpoints for Matriz RFV + Campaign Registry
  */
 import { z } from "zod";
-import { protectedProcedure, sessionProtectedProcedure, router } from "../_core/trpc";
+import { tenantProcedure, getTenantId, sessionProtectedProcedure, router } from "../_core/trpc";
 import { TRPCError } from "@trpc/server";
 import {
   getRfvContacts,
@@ -32,16 +32,15 @@ import {
 
 export const rfvRouter = router({
   // ─── Dashboard KPIs ───
-  dashboard: protectedProcedure
-    .input(z.object({ tenantId: z.number() }))
-    .query(async ({ input }) => {
-      return getRfvDashboard(input.tenantId);
+  dashboard: tenantProcedure
+    
+    .query(async ({ input, ctx }) => {
+      return getRfvDashboard(getTenantId(ctx));
     }),
 
   // ─── List contacts with pagination, search, filters ───
-  list: protectedProcedure
+  list: tenantProcedure
     .input(z.object({
-      tenantId: z.number(),
       page: z.number().optional().default(1),
       pageSize: z.number().optional().default(50),
       search: z.string().optional(),
@@ -50,8 +49,8 @@ export const rfvRouter = router({
       sortBy: z.string().optional(),
       sortDir: z.enum(["asc", "desc"]).optional().default("desc"),
     }))
-    .query(async ({ input }) => {
-      return getRfvContacts(input.tenantId, {
+    .query(async ({ input, ctx }) => {
+      return getRfvContacts(getTenantId(ctx), {
         page: input.page,
         pageSize: input.pageSize,
         search: input.search,
@@ -63,52 +62,51 @@ export const rfvRouter = router({
     }),
 
   // ─── Smart Filter Counts ───
-  smartFilterCounts: protectedProcedure
-    .input(z.object({ tenantId: z.number() }))
-    .query(async ({ input }) => {
-      return getSmartFilterCounts(input.tenantId);
+  smartFilterCounts: tenantProcedure
+    
+    .query(async ({ input, ctx }) => {
+      return getSmartFilterCounts(getTenantId(ctx));
     }),
 
   // ─── Smart Filter Config ───
-  smartFilterConfig: protectedProcedure
+  smartFilterConfig: tenantProcedure
     .query(() => {
       return { filters: SMART_FILTERS, config: SMART_FILTER_CONFIG };
     }),
 
   // ─── Alerta Dinheiro Parado ───
-  alertaDinheiroParado: protectedProcedure
-    .input(z.object({ tenantId: z.number() }))
-    .query(async ({ input }) => {
-      return getAlertaDinheiroParado(input.tenantId);
+  alertaDinheiroParado: tenantProcedure
+    
+    .query(async ({ input, ctx }) => {
+      return getAlertaDinheiroParado(getTenantId(ctx));
     }),
 
   // ─── Recalculate RFV from existing deals ───
-  recalculate: protectedProcedure
-    .input(z.object({ tenantId: z.number() }))
-    .mutation(async ({ input }) => {
-      return recalculateRfvFromDeals(input.tenantId);
+  recalculate: tenantProcedure
+    
+    .mutation(async ({ input, ctx }) => {
+      return recalculateRfvFromDeals(getTenantId(ctx));
     }),
 
   // ─── Import CSV ───
-  importCsv: protectedProcedure
+  importCsv: tenantProcedure
     .input(z.object({
-      tenantId: z.number(),
       csvText: z.string(),
     }))
     .mutation(async ({ input, ctx }) => {
       const userId = ctx.user?.id;
-      return importCsvAndRecalculate(input.tenantId, input.csvText, userId);
+      return importCsvAndRecalculate(getTenantId(ctx), input.csvText, userId);
     }),
 
   // ─── Reset agency RFV data ───
-  resetData: protectedProcedure
-    .input(z.object({ tenantId: z.number() }))
-    .mutation(async ({ input }) => {
-      return resetAgencyRfvData(input.tenantId);
+  resetData: tenantProcedure
+    
+    .mutation(async ({ input, ctx }) => {
+      return resetAgencyRfvData(getTenantId(ctx));
     }),
 
   // ─── Get audience types ───
-  audienceTypes: protectedProcedure
+  audienceTypes: tenantProcedure
     .query(() => {
       return AUDIENCE_TYPES;
     }),
@@ -116,7 +114,6 @@ export const rfvRouter = router({
   // ─── Bulk Send WhatsApp Messages ───
   bulkSend: sessionProtectedProcedure
     .input(z.object({
-      tenantId: z.number(),
       contactIds: z.array(z.number()).min(1).max(5000),
       messageTemplate: z.string().min(1).max(4096),
       sessionId: z.string().min(1),
@@ -137,42 +134,42 @@ export const rfvRouter = router({
     }),
 
   // ─── Get Bulk Send Progress ───
-  bulkSendProgress: protectedProcedure
-    .input(z.object({ tenantId: z.number() }))
-    .query(async ({ input }) => {
-      return getBulkSendProgress(input.tenantId);
+  bulkSendProgress: tenantProcedure
+    
+    .query(async ({ input, ctx }) => {
+      return getBulkSendProgress(getTenantId(ctx));
     }),
 
   // ─── Cancel Bulk Send ───
-  cancelBulkSend: protectedProcedure
-    .input(z.object({ tenantId: z.number() }))
-    .mutation(async ({ input }) => {
-      const cancelled = cancelBulkSend(input.tenantId);
+  cancelBulkSend: tenantProcedure
+    
+    .mutation(async ({ input, ctx }) => {
+      const cancelled = cancelBulkSend(getTenantId(ctx));
       if (!cancelled) throw new TRPCError({ code: "NOT_FOUND", message: "Nenhum envio em andamento" });
       return { cancelled: true };
     }),
 
   // ─── Get Active WhatsApp Session for User ───
-  activeSession: protectedProcedure
-    .input(z.object({ tenantId: z.number() }))
+  activeSession: tenantProcedure
+    
     .query(async ({ input, ctx }) => {
       // Use the logged-in user's CRM userId to find THEIR session, not any tenant session
       const userId = ctx.saasUser?.userId || ctx.user?.id;
-      return getActiveSessionForTenant(input.tenantId, userId);
+      return getActiveSessionForTenant(getTenantId(ctx), userId);
     }),
 
   // ─── Run RFV Notification Check (manual trigger) ───
-  checkNotifications: protectedProcedure
-    .input(z.object({ tenantId: z.number() }))
-    .mutation(async ({ input }) => {
-      return runRfvNotificationCheck(input.tenantId);
+  checkNotifications: tenantProcedure
+    
+    .mutation(async ({ input, ctx }) => {
+      return runRfvNotificationCheck(getTenantId(ctx));
     }),
 
   // ─── Get Filter Snapshots ───
-  filterSnapshots: protectedProcedure
-    .input(z.object({ tenantId: z.number() }))
-    .query(async ({ input }) => {
-      return getRfvFilterSnapshots(input.tenantId);
+  filterSnapshots: tenantProcedure
+    
+    .query(async ({ input, ctx }) => {
+      return getRfvFilterSnapshots(getTenantId(ctx));
     }),
 
   // ═══════════════════════════════════════════════════════
@@ -180,15 +177,14 @@ export const rfvRouter = router({
   // ═══════════════════════════════════════════════════════
 
   // ─── List Campaigns ───
-  campaigns: protectedProcedure
+  campaigns: tenantProcedure
     .input(z.object({
-      tenantId: z.number(),
       page: z.number().optional().default(1),
       pageSize: z.number().optional().default(20),
       status: z.string().optional(),
     }))
-    .query(async ({ input }) => {
-      return listCampaigns(input.tenantId, {
+    .query(async ({ input, ctx }) => {
+      return listCampaigns(getTenantId(ctx), {
         page: input.page,
         pageSize: input.pageSize,
         status: input.status,
@@ -196,28 +192,26 @@ export const rfvRouter = router({
     }),
 
   // ─── Campaign Detail ───
-  campaignDetail: protectedProcedure
+  campaignDetail: tenantProcedure
     .input(z.object({
       campaignId: z.number(),
-      tenantId: z.number(),
     }))
-    .query(async ({ input }) => {
-      const detail = await getCampaignDetail(input.campaignId, input.tenantId);
+    .query(async ({ input, ctx }) => {
+      const detail = await getCampaignDetail(input.campaignId, getTenantId(ctx));
       if (!detail) throw new TRPCError({ code: "NOT_FOUND", message: "Campanha não encontrada" });
       return detail;
     }),
 
   // ─── Campaign Messages ───
-  campaignMessages: protectedProcedure
+  campaignMessages: tenantProcedure
     .input(z.object({
       campaignId: z.number(),
-      tenantId: z.number(),
       page: z.number().optional().default(1),
       pageSize: z.number().optional().default(50),
       status: z.string().optional(),
     }))
-    .query(async ({ input }) => {
-      return getCampaignMessages(input.campaignId, input.tenantId, {
+    .query(async ({ input, ctx }) => {
+      return getCampaignMessages(input.campaignId, getTenantId(ctx), {
         page: input.page,
         pageSize: input.pageSize,
         status: input.status,

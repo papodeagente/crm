@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { protectedProcedure, router } from "../_core/trpc";
+import { tenantProcedure, getTenantId, router } from "../_core/trpc";
 import * as crm from "../crmDb";
 
 const productTypeEnum = z.enum(["flight", "hotel", "tour", "transfer", "insurance", "cruise", "visa", "package", "other"]);
@@ -7,19 +7,18 @@ const productTypeEnum = z.enum(["flight", "hotel", "tour", "transfer", "insuranc
 export const productCatalogRouter = router({
   // ─── CATEGORIES ───
   categories: router({
-    list: protectedProcedure
-      .input(z.object({ tenantId: z.number() }))
-      .query(async ({ input }) => {
-        return crm.listProductCategories(input.tenantId);
+    list: tenantProcedure
+      
+      .query(async ({ input, ctx }) => {
+        return crm.listProductCategories(getTenantId(ctx));
       }),
-    get: protectedProcedure
-      .input(z.object({ tenantId: z.number(), id: z.number() }))
-      .query(async ({ input }) => {
-        return crm.getProductCategoryById(input.tenantId, input.id);
+    get: tenantProcedure
+      .input(z.object({ id: z.number() }))
+      .query(async ({ input, ctx }) => {
+        return crm.getProductCategoryById(getTenantId(ctx), input.id);
       }),
-    create: protectedProcedure
+    create: tenantProcedure
       .input(z.object({
-        tenantId: z.number(),
         name: z.string().min(1).max(128),
         icon: z.string().max(64).optional(),
         color: z.string().max(32).optional(),
@@ -30,9 +29,8 @@ export const productCatalogRouter = router({
         const { parentId, ...rest } = input;
         return crm.createProductCategory({ ...rest, parentId: parentId ?? undefined });
       }),
-    update: protectedProcedure
+    update: tenantProcedure
       .input(z.object({
-        tenantId: z.number(),
         id: z.number(),
         name: z.string().min(1).max(128).optional(),
         icon: z.string().max(64).optional(),
@@ -41,23 +39,22 @@ export const productCatalogRouter = router({
         sortOrder: z.number().optional(),
       }))
       .mutation(async ({ input }) => {
-        const { tenantId, id, ...data } = input;
+const tenantId = getTenantId(ctx); const { id, ...data } = input;
         await crm.updateProductCategory(tenantId, id, data);
         return { success: true };
       }),
-    delete: protectedProcedure
-      .input(z.object({ tenantId: z.number(), id: z.number() }))
-      .mutation(async ({ input }) => {
-        await crm.deleteProductCategory(input.tenantId, input.id);
+    delete: tenantProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        await crm.deleteProductCategory(getTenantId(ctx), input.id);
         return { success: true };
       }),
   }),
 
   // ─── PRODUCTS ───
   products: router({
-    list: protectedProcedure
+    list: tenantProcedure
       .input(z.object({
-        tenantId: z.number(),
         search: z.string().optional(),
         productType: z.string().optional(),
         categoryId: z.number().optional(),
@@ -65,17 +62,16 @@ export const productCatalogRouter = router({
         limit: z.number().default(100),
         offset: z.number().default(0),
       }))
-      .query(async ({ input }) => {
-        return crm.listCatalogProducts(input.tenantId, input);
+      .query(async ({ input, ctx }) => {
+        return crm.listCatalogProducts(getTenantId(ctx), input);
       }),
-    get: protectedProcedure
-      .input(z.object({ tenantId: z.number(), id: z.number() }))
-      .query(async ({ input }) => {
-        return crm.getCatalogProductById(input.tenantId, input.id);
+    get: tenantProcedure
+      .input(z.object({ id: z.number() }))
+      .query(async ({ input, ctx }) => {
+        return crm.getCatalogProductById(getTenantId(ctx), input.id);
       }),
-    create: protectedProcedure
+    create: tenantProcedure
       .input(z.object({
-        tenantId: z.number(),
         name: z.string().min(1).max(255),
         description: z.string().optional(),
         categoryId: z.number().nullable().optional(),
@@ -95,9 +91,8 @@ export const productCatalogRouter = router({
         const { categoryId, ...rest } = input;
         return crm.createCatalogProduct({ ...rest, categoryId: categoryId ?? undefined });
       }),
-    update: protectedProcedure
+    update: tenantProcedure
       .input(z.object({
-        tenantId: z.number(),
         id: z.number(),
         name: z.string().min(1).max(255).optional(),
         description: z.string().optional(),
@@ -115,59 +110,59 @@ export const productCatalogRouter = router({
         detailsJson: z.any().optional(),
       }))
       .mutation(async ({ input }) => {
-        const { tenantId, id, ...data } = input;
+const tenantId = getTenantId(ctx); const { id, ...data } = input;
         await crm.updateCatalogProduct(tenantId, id, data);
         return { success: true };
       }),
-    delete: protectedProcedure
-      .input(z.object({ tenantId: z.number(), id: z.number() }))
-      .mutation(async ({ input }) => {
-        await crm.deleteCatalogProduct(input.tenantId, input.id);
+    delete: tenantProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        await crm.deleteCatalogProduct(getTenantId(ctx), input.id);
         return { success: true };
       }),
-    count: protectedProcedure
-      .input(z.object({ tenantId: z.number(), isActive: z.boolean().optional() }))
-      .query(async ({ input }) => {
-        return crm.countCatalogProducts(input.tenantId, input.isActive);
+    count: tenantProcedure
+      .input(z.object({ isActive: z.boolean().optional() }))
+      .query(async ({ input, ctx }) => {
+        return crm.countCatalogProducts(getTenantId(ctx), input.isActive);
       }),
   }),
 
   // ─── ANALYTICS ───
   analytics: router({
-    summary: protectedProcedure
-      .input(z.object({ tenantId: z.number() }))
-      .query(async ({ input }) => {
-        return crm.getProductAnalyticsSummary(input.tenantId);
+    summary: tenantProcedure
+      
+      .query(async ({ input, ctx }) => {
+        return crm.getProductAnalyticsSummary(getTenantId(ctx));
       }),
-    mostSold: protectedProcedure
-      .input(z.object({ tenantId: z.number(), limit: z.number().default(10) }))
-      .query(async ({ input }) => {
-        return crm.getProductAnalyticsMostSold(input.tenantId, input.limit);
+    mostSold: tenantProcedure
+      .input(z.object({ limit: z.number().default(10) }))
+      .query(async ({ input, ctx }) => {
+        return crm.getProductAnalyticsMostSold(getTenantId(ctx), input.limit);
       }),
-    mostLost: protectedProcedure
-      .input(z.object({ tenantId: z.number(), limit: z.number().default(10) }))
-      .query(async ({ input }) => {
-        return crm.getProductAnalyticsMostLost(input.tenantId, input.limit);
+    mostLost: tenantProcedure
+      .input(z.object({ limit: z.number().default(10) }))
+      .query(async ({ input, ctx }) => {
+        return crm.getProductAnalyticsMostLost(getTenantId(ctx), input.limit);
       }),
-    mostRequested: protectedProcedure
-      .input(z.object({ tenantId: z.number(), limit: z.number().default(10) }))
-      .query(async ({ input }) => {
-        return crm.getProductAnalyticsMostRequested(input.tenantId, input.limit);
+    mostRequested: tenantProcedure
+      .input(z.object({ limit: z.number().default(10) }))
+      .query(async ({ input, ctx }) => {
+        return crm.getProductAnalyticsMostRequested(getTenantId(ctx), input.limit);
       }),
-    revenueByType: protectedProcedure
-      .input(z.object({ tenantId: z.number() }))
-      .query(async ({ input }) => {
-        return crm.getProductAnalyticsRevenueByType(input.tenantId);
+    revenueByType: tenantProcedure
+      
+      .query(async ({ input, ctx }) => {
+        return crm.getProductAnalyticsRevenueByType(getTenantId(ctx));
       }),
-    conversionRate: protectedProcedure
-      .input(z.object({ tenantId: z.number(), limit: z.number().default(10) }))
-      .query(async ({ input }) => {
-        return crm.getProductAnalyticsConversionRate(input.tenantId, input.limit);
+    conversionRate: tenantProcedure
+      .input(z.object({ limit: z.number().default(10) }))
+      .query(async ({ input, ctx }) => {
+        return crm.getProductAnalyticsConversionRate(getTenantId(ctx), input.limit);
       }),
-    topDestinations: protectedProcedure
-      .input(z.object({ tenantId: z.number(), limit: z.number().default(10) }))
-      .query(async ({ input }) => {
-        return crm.getProductAnalyticsTopDestinations(input.tenantId, input.limit);
+    topDestinations: tenantProcedure
+      .input(z.object({ limit: z.number().default(10) }))
+      .query(async ({ input, ctx }) => {
+        return crm.getProductAnalyticsTopDestinations(getTenantId(ctx), input.limit);
       }),
   }),
 });
