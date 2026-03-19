@@ -1,0 +1,185 @@
+{
+  "query": "SELECT t.id, t.name, t.status, t.plan, (SELECT COUNT(*) FROM crm_users WHERE tenantId = t.id) as userCount FROM tenants t ORDER BY t.id;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute SELECT t.id, t.name, t.status, t.plan, (SELECT COUNT(*) FROM crm_users WHERE tenantId = t.id) as userCount FROM tenants t ORDER BY t.id;",
+  "rows": [
+    {
+      "id": "150002",
+      "name": "Entur",
+      "status": "active",
+      "plan": "enterprise",
+      "userCount": "1"
+    },
+    {
+      "id": "210002",
+      "name": "Boxtour",
+      "status": "active",
+      "plan": "free",
+      "userCount": "13"
+    },
+    {
+      "id": "240002",
+      "name": "Viaje Com Ludi",
+      "status": "active",
+      "plan": "free",
+      "userCount": "1"
+    },
+    {
+      "id": "240003",
+      "name": "Cais 3800 Travel",
+      "status": "active",
+      "plan": "free",
+      "userCount": "1"
+    },
+    {
+      "id": "240004",
+      "name": "Misp viagens",
+      "status": "active",
+      "plan": "free",
+      "userCount": "1"
+    },
+    {
+      "id": "240005",
+      "name": "CASSINO Travel",
+      "status": "active",
+      "plan": "free",
+      "userCount": "2"
+    },
+    {
+      "id": "240006",
+      "name": "FDS VIAGENS",
+      "status": "active",
+      "plan": "free",
+      "userCount": "3"
+    },
+    {
+      "id": "240008",
+      "name": "QUINTELA TURISMO",
+      "status": "active",
+      "plan": "free",
+      "userCount": "1"
+    },
+    {
+      "id": "240009",
+      "name": "De Férias Pelo Mundo ",
+      "status": "active",
+      "plan": "free",
+      "userCount": "1"
+    },
+    {
+      "id": "240010",
+      "name": "Apolo Turismo ",
+      "status": "active",
+      "plan": "free",
+      "userCount": "1"
+    },
+    {
+      "id": "240011",
+      "name": "ELEVETOUR VIAGENS E TURISMO",
+      "status": "active",
+      "plan": "free",
+      "userCount": "1"
+    },
+    {
+      "id": "270002",
+      "name": "Destino dos Sonhos Turismo ",
+      "status": "active",
+      "plan": "free",
+      "userCount": "1"
+    },
+    {
+      "id": "270003",
+      "name": "Vipfly Agência de Viagens",
+      "status": "active",
+      "plan": "free",
+      "userCount": "1"
+    },
+    {
+      "id": "270004",
+      "name": "AVA Trip",
+      "status": "active",
+      "plan": "free",
+      "userCount": "1"
+    },
+    {
+      "id": "270005",
+      "name": "VP Dreams",
+      "status": "active",
+      "plan": "free",
+      "userCount": "1"
+    },
+    {
+      "id": "270008",
+      "name": "Viagem Aqui ",
+      "status": "active",
+      "plan": "free",
+      "userCount": "1"
+    },
+    {
+      "id": "270010",
+      "name": "Sinta Travel",
+      "status": "active",
+      "plan": "free",
+      "userCount": "1"
+    },
+    {
+      "id": "270011",
+      "name": "Ktwtour turismo ",
+      "status": "active",
+      "plan": "free",
+      "userCount": "1"
+    },
+    {
+      "id": "270012",
+      "name": "Bella Renda e Viagens",
+      "status": "active",
+      "plan": "free",
+      "userCount": "1"
+    },
+    {
+      "id": "300002",
+      "name": "Alma Aventureira Turismo",
+      "status": "active",
+      "plan": "free",
+      "userCount": "1"
+    },
+    {
+      "id": "300003",
+      "name": "Pontatur",
+      "status": "active",
+      "plan": "free",
+      "userCount": "2"
+    },
+    {
+      "id": "300004",
+      "name": "Bella Renda e Viagens",
+      "status": "active",
+      "plan": "free",
+      "userCount": "1"
+    },
+    {
+      "id": "300005",
+      "name": "Aceleradora",
+      "status": "active",
+      "plan": "free",
+      "userCount": "5"
+    },
+    {
+      "id": "300006",
+      "name": "INA GO TOUR",
+      "status": "active",
+      "plan": "free",
+      "userCount": "1"
+    },
+    {
+      "id": "300007",
+      "name": "Legu Tour",
+      "status": "active",
+      "plan": "free",
+      "userCount": "4"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tname\tstatus\tplan\tuserCount\n150002\tEntur\tactive\tenterprise\t1\n210002\tBoxtour\tactive\tfree\t13\n240002\tViaje Com Ludi\tactive\tfree\t1\n240003\tCais 3800 Travel\tactive\tfree\t1\n240004\tMisp viagens\tactive\tfree\t1\n240005\tCASSINO Travel\tactive\tfree\t2\n240006\tFDS VIAGENS\tactive\tfree\t3\n240008\tQUINTELA TURISMO\tactive\tfree\t1\n240009\tDe Férias Pelo Mundo \tactive\tfree\t1\n240010\tApolo Turismo \tactive\tfree\t1\n240011\tELEVETOUR VIAGENS E TURISMO\tactive\tfree\t1\n270002\tDestino dos Sonhos Turismo \tactive\tfree\t1\n270003\tVipfly Agência de Viagens\tactive\tfree\t1\n270004\tAVA Trip\tactive\tfree\t1\n270005\tVP Dreams\tactive\tfree\t1\n270008\tViagem Aqui \tactive\tfree\t1\n270010\tSinta Travel\tactive\tfree\t1\n270011\tKtwtour turismo \tactive\tfree\t1\n270012\tBella Renda e Viagens\tactive\tfree\t1\n300002\tAlma Aventureira Turismo\tactive\tfree\t1\n300003\tPontatur\tactive\tfree\t2\n300004\tBella Renda e Viagens\tactive\tfree\t1\n300005\tAceleradora\tactive\tfree\t5\n300006\tINA GO TOUR\tactive\tfree\t1\n300007\tLegu Tour\tactive\tfree\t4\n",
+  "stderr": "",
+  "execution_time_ms": 57
+}

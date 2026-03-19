@@ -4246,3 +4246,8 @@
 - [x] Uso de getTenantId(ctx): 9 testes (verificação em cada router)
 - [x] Import de tenantProcedure: 7 testes (verificação em cada módulo)
 - [x] Total: 37 testes passando
+
+## Bug: Email bruno@entur.com.br aparece em todas as tenants no painel super admin
+- [x] Investigar query do painel super admin que lista usuários por tenant
+- [x] Corrigir para que cada tenant mostre apenas seus próprios usuários
+- [x] Restaurar input.tenantId em 6 endpoints super admin (exceção legítima à blindagem)
