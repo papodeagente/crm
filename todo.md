@@ -4003,3 +4003,25 @@
 - [x] DB repair: 2123 mensagens com content NULL/placeholder corrigidas
 - [x] DB repair: previews de conversas atualizados para tipos ricos
 - [x] Testes para todos os renderers de mensagem (60 testes novos, 2237 total passando)
+
+## DEFINITIVO: Corrigir Status Ticks (✓, ✓✓, ✓✓ azul) de uma vez por todas
+- [x] Auditar fluxo completo: webhook status → DB update → socket emit → store update → rendering
+- [x] Identificar TODOS os pontos onde status pode regredir (2 ticks → 1 tick)
+  - [x] Bug 1: hydrate() sobrescrevia status mais alto com status mais baixo do DB
+  - [x] Bug 2: Chat bubbles limpavam localStatusUpdates no refetch (setLocalStatusUpdates({}))
+  - [x] Bug 3: handleMessage podia regredir lastStatus da conversa
+  - [x] Bug 4: Reconciliação periódica fazia replace total em vez de merge monotônico
+- [x] Backend: processStatusUpdate já tinha enforcement monotônico correto (SQL-level comparison)
+- [x] Backend: status no DB NUNCA regride (CASE WHEN no SQL garante)
+- [x] Frontend store: useConversationStore reescrito com STATUS_ORDER rigoroso
+  - [x] hydrate() agora faz merge monotônico (max entre store e DB)
+  - [x] handleMessage() usa maxStatus para lastStatus
+  - [x] handleStatusUpdate() só aceita status mais alto
+  - [x] handleOptimisticSend() preserva status existente se mais alto
+- [x] Frontend WhatsAppChat: localStatusUpdates com enforcement monotônico
+  - [x] Socket status update só aceita se > current
+  - [x] Refetch merge: mantém override se socket > server, dropa se server >= socket
+  - [x] Render merge: só aplica override se socket > msg.status
+  - [x] STATUS_ORDER_MAP movido para module-level (não recriado a cada render)
+- [x] Sidebar: StatusTick usa lastStatus do store (que é monotônico)
+- [x] Testes exaustivos: 49 testes de monotonic enforcement (2286 total passando)

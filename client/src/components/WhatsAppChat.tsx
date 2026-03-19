@@ -182,6 +182,12 @@ function formatWhatsAppText(text: string): React.ReactNode {
   return parts.length === 1 && typeof parts[0] === "string" ? parts[0] : <>{parts}</>;
 }
 
+/* ─── Status Order Map — Single source of truth for monotonic enforcement ─── */
+const STATUS_ORDER_MAP: Record<string, number> = {
+  error: 0, pending: 1, sending: 2, sent: 3, server_ack: 3,
+  delivered: 4, delivery_ack: 4, read: 5, played: 6,
+};
+
 /* ─── Status Ticks ─── */
 const MessageStatus = memo(({ status, isFromMe }: { status: string | null | undefined; isFromMe: boolean }) => {
   if (!isFromMe) return null;
@@ -1747,12 +1753,19 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
   }, [lastConversationUpdate, remoteJid]);
 
   // Update message status in real-time via socket
+  // CRITICAL: Only update if the new status is HIGHER than the current one (monotonic)
   useEffect(() => {
     if (lastStatusUpdate && lastStatusUpdate.messageId) {
-      setLocalStatusUpdates(prev => ({
-        ...prev,
-        [lastStatusUpdate.messageId]: lastStatusUpdate.status,
-      }));
+      setLocalStatusUpdates(prev => {
+        const currentStatus = prev[lastStatusUpdate.messageId];
+        const currentOrder = currentStatus ? (STATUS_ORDER_MAP[currentStatus] ?? -1) : -1;
+        const newOrder = STATUS_ORDER_MAP[lastStatusUpdate.status] ?? -1;
+        // MONOTONIC: Only update if new status is strictly higher
+        if (newOrder > currentOrder) {
+          return { ...prev, [lastStatusUpdate.messageId]: lastStatusUpdate.status };
+        }
+        return prev; // Don't create new reference if nothing changed
+      });
     }
   }, [lastStatusUpdate]);
 
@@ -1770,9 +1783,37 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
     }
   }, [lastTranscriptionUpdate, remoteJid]);
 
-  // Clear local status updates when messages are refetched from server
+  // MERGE local status updates with server data on refetch.
+  // CRITICAL: Do NOT clear localStatusUpdates blindly — the server data may have LOWER
+  // status than what we received via socket. Instead, keep only the overrides that are
+  // still higher than the server data.
   useEffect(() => {
-    if (messagesQ.data) setLocalStatusUpdates({});
+    if (messagesQ.data) {
+      setLocalStatusUpdates(prev => {
+        if (Object.keys(prev).length === 0) return prev; // nothing to merge
+        const newOverrides: Record<string, string> = {};
+        let hasOverrides = false;
+        for (const [msgId, socketStatus] of Object.entries(prev)) {
+          // Find this message in the server data
+          const serverMsg = messagesQ.data.find((m: any) => m.messageId === msgId);
+          if (serverMsg) {
+            const serverOrder = serverMsg.status ? (STATUS_ORDER_MAP[serverMsg.status] ?? -1) : -1;
+            const socketOrder = STATUS_ORDER_MAP[socketStatus] ?? -1;
+            // Keep the override only if socket status is still higher than server
+            if (socketOrder > serverOrder) {
+              newOverrides[msgId] = socketStatus;
+              hasOverrides = true;
+            }
+            // If server caught up or surpassed, drop the override
+          } else {
+            // Message not in current page — keep the override
+            newOverrides[msgId] = socketStatus;
+            hasOverrides = true;
+          }
+        }
+        return hasOverrides ? newOverrides : {};
+      });
+    }
   }, [messagesQ.dataUpdatedAt]);
 
   useEffect(() => {
@@ -2405,10 +2446,17 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
                   const nextTs = next ? new Date(next.timestamp).getTime() : 0;
                   const isFirst = !prev || prev.fromMe !== msg.fromMe || prev.messageType === "internal_note" || msg.messageType === "internal_note" || (msgTs - prevTs > TIME_GAP_MS);
                   const isLast = !next || next.fromMe !== msg.fromMe || next.messageType === "internal_note" || msg.messageType === "internal_note" || (nextTs - msgTs > TIME_GAP_MS);
-                  // Apply real-time status updates from socket
-                  const updatedMsg = msg.messageId && localStatusUpdates[msg.messageId]
-                    ? { ...msg, status: localStatusUpdates[msg.messageId] }
-                    : msg;
+                  // Apply real-time status updates from socket (monotonic merge)
+                   const socketStatus = msg.messageId ? localStatusUpdates[msg.messageId] : undefined;
+                   let updatedMsg = msg;
+                   if (socketStatus) {
+                     const msgOrder = msg.status ? (STATUS_ORDER_MAP[msg.status] ?? -1) : -1;
+                     const socketOrder = STATUS_ORDER_MAP[socketStatus] ?? -1;
+                     // MONOTONIC: Only apply socket override if it's higher than the message's status
+                     if (socketOrder > msgOrder) {
+                       updatedMsg = { ...msg, status: socketStatus };
+                     }
+                   }
                   return (
                     <MessageBubble
                       key={msg.id}
