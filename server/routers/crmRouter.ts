@@ -274,17 +274,23 @@ export const crmRouter = router({
         ownerUserId: z.number().optional(),
       }))
       .query(async ({ ctx, input }) => {
-        // Non-admin users only see their own deals (unless they explicitly filter by another owner)
+        // Non-admin users ONLY see their own deals (enforced, cannot override)
         const isAdmin = ctx.saasUser?.role === "admin";
-        const ownerFilter = isAdmin ? input.ownerUserId : (input.ownerUserId || ctx.saasUser?.userId);
+        const ownerFilter = isAdmin ? input.ownerUserId : ctx.saasUser?.userId;
         const items = await crm.listDeals(input.tenantId, { ...input, ownerUserId: ownerFilter });
         const totalCount = await crm.countDeals(input.tenantId, input.status, { ...input, ownerUserId: ownerFilter });
         return { items, totalCount };
       }),
     get: protectedProcedure
       .input(z.object({ tenantId: z.number(), id: z.number() }))
-      .query(async ({ input }) => {
-        return crm.getDealById(input.tenantId, input.id);
+      .query(async ({ ctx, input }) => {
+        const deal = await crm.getDealById(input.tenantId, input.id);
+        // Non-admin users can only view their own deals
+        const isAdmin = ctx.saasUser?.role === "admin";
+        if (!isAdmin && deal && deal.ownerUserId !== ctx.saasUser?.userId) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Você não tem permissão para visualizar esta negociação" });
+        }
+        return deal;
       }),
     create: protectedProcedure
       .input(z.object({
@@ -304,8 +310,10 @@ export const crmRouter = router({
       }))
       .mutation(async ({ ctx, input }) => {
         const { products: productItems, boardingDate, returnDate, ...dealInput } = input;
+        // REGRA 1: Auto-assign owner to the creating user if not specified
         const result = await crm.createDeal({
           ...dealInput,
+          ownerUserId: dealInput.ownerUserId || ctx.saasUser?.userId || ctx.user.id,
           createdBy: ctx.user.id,
           boardingDate: boardingDate ? new Date(boardingDate) : null,
           returnDate: returnDate ? new Date(returnDate) : null,
@@ -373,6 +381,14 @@ export const crmRouter = router({
       }))
       .mutation(async ({ ctx, input }) => {
         const { tenantId, id, ...data } = input;
+        // Non-admin users can only update their own deals
+        const isAdminUser = ctx.saasUser?.role === "admin";
+        if (!isAdminUser) {
+          const currentOwnerCheck = await crm.getDealById(tenantId, id);
+          if (currentOwnerCheck && currentOwnerCheck.ownerUserId !== ctx.saasUser?.userId) {
+            throw new TRPCError({ code: "FORBIDDEN", message: "Voc\u00ea n\u00e3o tem permiss\u00e3o para editar esta negocia\u00e7\u00e3o" });
+          }
+        }
         // Validate lossReasonId is required when marking as lost
         if (data.status === "lost" && !data.lossReasonId) {
           throw new TRPCError({ code: "BAD_REQUEST", message: "Motivo de perda é obrigatório ao marcar como perdida" });
@@ -453,6 +469,13 @@ export const crmRouter = router({
               }
             }
           }
+          if (data.ownerUserId !== undefined && data.ownerUserId !== currentDeal.ownerUserId) {
+            await crm.createDealHistory({
+              tenantId, dealId: id, action: "field_changed", description: `Responsável alterado`,
+              fieldChanged: "ownerUserId", oldValue: String(currentDeal.ownerUserId || ""), newValue: String(data.ownerUserId || ""),
+              actorUserId: ctx.user.id, actorName: ctx.user.name || "Sistema",
+            });
+          }
           if (data.contactId !== undefined && data.contactId !== currentDeal.contactId) {
             await crm.createDealHistory({
               tenantId, dealId: id, action: "field_changed", description: data.contactId ? `Contato associado` : `Contato desvinculado`,
@@ -478,6 +501,14 @@ export const crmRouter = router({
         fromStageName: z.string(), toStageName: z.string(),
       }))
       .mutation(async ({ ctx, input }) => {
+        // Non-admin users can only move their own deals
+        const isAdmin = ctx.saasUser?.role === "admin";
+        if (!isAdmin) {
+          const deal = await crm.getDealById(input.tenantId, input.dealId);
+          if (deal && deal.ownerUserId !== ctx.saasUser?.userId) {
+            throw new TRPCError({ code: "FORBIDDEN", message: "Voc\u00ea n\u00e3o tem permiss\u00e3o para mover esta negocia\u00e7\u00e3o" });
+          }
+        }
         // Update the deal's stage
         await crm.updateDeal(input.tenantId, input.dealId, { stageId: input.toStageId, updatedBy: ctx.user.id });
         // Record in deal history

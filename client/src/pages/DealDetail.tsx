@@ -104,6 +104,7 @@ export default function DealDetail() {
 
   /* ─── Queries ─── */
   const dealQ = trpc.crm.deals.get.useQuery({ tenantId: TENANT_ID, id: dealId }, { enabled: dealId > 0 });
+  const crmUsersQ = trpc.admin.users.list.useQuery({ tenantId: TENANT_ID });
   const pipelinesQ = trpc.crm.pipelines.list.useQuery({ tenantId: TENANT_ID });
   const stagesQ = trpc.crm.pipelines.stages.useQuery(
     { tenantId: TENANT_ID, pipelineId: dealQ.data?.pipelineId || 0 },
@@ -809,10 +810,36 @@ export default function DealDetail() {
               open={sidebarSections.responsible}
               onToggle={() => toggleSection("responsible")}
             >
-              <SidebarField
-                label="Responsável"
-                value={user?.name || "Não atribuído"}
-              />
+              {(() => {
+                const ownerUser = crmUsersQ.data?.find((u: any) => u.id === deal.ownerUserId);
+                return (
+                  <div className="space-y-2">
+                    <Select
+                      value={deal.ownerUserId ? String(deal.ownerUserId) : "none"}
+                      onValueChange={(val) => {
+                        if (val === "none") return;
+                        const newOwnerId = Number(val);
+                        if (newOwnerId === deal.ownerUserId) return;
+                        updateDeal.mutate(
+                          { tenantId: TENANT_ID, id: deal.id, ownerUserId: newOwnerId },
+                          { onSuccess: () => { dealQ.refetch(); toast.success("Responsável alterado"); } }
+                        );
+                      }}
+                    >
+                      <SelectTrigger className="h-8 text-xs">
+                        <SelectValue placeholder="Selecionar responsável">
+                          {ownerUser ? ownerUser.name : "Não atribuído"}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {(crmUsersQ.data || []).filter((u: any) => u.status === "active").map((u: any) => (
+                          <SelectItem key={u.id} value={String(u.id)}>{u.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                );
+              })()}
             </SidebarSection>
 
             <SidebarDivider />

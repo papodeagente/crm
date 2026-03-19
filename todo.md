@@ -4088,3 +4088,14 @@
 - [x] Frontend: tela de resultado com badges de contatos, empresas, produtos, campos personalizados
 - [x] Teste com CSV real: 9.389 linhas → 9.306 importadas, 3.077 contatos, 2.720 empresas, 58 produtos, 12 campos personalizados (83 erros = 0.88%)
 - [x] Vitest: 18 testes para importação por planilha (column mapping, date parsing, money parsing, background processing, progress tracking)
+
+## Ownership e Visibilidade de Negociações
+- [x] Regra 1: Dono automático na criação — usuário criador é definido como ownerUserId
+- [x] Regra 2: Alterar dono da negociação — permitir edição do ownerUserId no CRM (dropdown no DealDetail)
+- [x] Regra 3: Visibilidade para role "usuário" — só vê próprias negociações (backend + frontend)
+- [x] Regra 4: Preservar comportamento de admin — admin continua vendo tudo
+- [x] Testes vitest para as regras de ownership e visibilidade (16 testes passando)
+- [x] Mudança de dono registrada no histórico do deal
+- [x] Dashboard metrics filtrado por ownership para non-admin
+- [x] Pipeline.tsx: filtro de responsável desabilitado para non-admin
+- [x] Proteção em moveStage e update para non-admin

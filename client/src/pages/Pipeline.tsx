@@ -84,6 +84,10 @@ export default function Pipeline() {
   const [listTab, setListTab] = useState<"active" | "trash">("active");
   const dealFilters = useDealFilters();
   const [ownerFilter, setOwnerFilter] = useState<number | "all">("all");
+  const saasMe = trpc.saasAuth.me.useQuery(undefined, { retry: 1, refetchOnWindowFocus: false, staleTime: 5 * 60 * 1000 });
+  const isAdmin = saasMe.data?.role === "admin" || saasMe.data?.isSuperAdmin;
+  // Non-admin users: force filter to their own userId
+  const effectiveOwnerFilter = isAdmin ? ownerFilter : (saasMe.data?.userId || ownerFilter);
   const [showIndicators, setShowIndicators] = useState(false);
   const [celebration, setCelebration] = useState<{ open: boolean; title?: string; value?: string }>({ open: false });
   const [showTaskCalendar, setShowTaskCalendar] = useState(false);
@@ -148,7 +152,7 @@ export default function Pipeline() {
       limit: 5000,
       status: statusFilter !== "all" ? statusFilter : undefined,
       ...dealFilters.filters,
-      ...(ownerFilter !== "all" ? { ownerUserId: ownerFilter } : {}),
+      ...(effectiveOwnerFilter !== "all" ? { ownerUserId: effectiveOwnerFilter as number } : {}),
     },
     { enabled: !!activePipeline }
   );
@@ -426,7 +430,7 @@ export default function Pipeline() {
           </div>
 
           {/* User filter */}
-          <Select value={String(ownerFilter)} onValueChange={(v) => setOwnerFilter(v === "all" ? "all" : Number(v))}>
+          <Select value={String(effectiveOwnerFilter)} onValueChange={(v) => isAdmin && setOwnerFilter(v === "all" ? "all" : Number(v))} disabled={!isAdmin}>
             <SelectTrigger className="flex-1 h-10 text-[13px] rounded-xl border-border/50 bg-background">
               <User className="h-3.5 w-3.5 mr-1.5 text-muted-foreground flex-shrink-0" />
               <SelectValue placeholder="Todas as negociações" />
