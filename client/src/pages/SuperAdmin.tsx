@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,7 +13,7 @@ import {
   Shield, Users, Building2, Calendar, CreditCard, Search,
   Plane, ArrowLeft, Loader2, Edit, Ban, CheckCircle, Clock,
   ChevronDown, ChevronRight, User, Mail, Phone, UserCheck, UserX,
-  Trash2, AlertTriangle
+  Trash2, AlertTriangle, Handshake, Contact, Wifi, WifiOff, DollarSign, TrendingUp
 } from "lucide-react";
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "@/components/ui/alert-dialog";
 import { formatDate } from "../../../shared/dateUtils";
@@ -24,6 +24,29 @@ export default function SuperAdmin() {
   const tenantsQuery = trpc.saasAuth.adminListTenants.useQuery(undefined, {
     enabled: !!meQuery.data?.isSuperAdmin,
   });
+  const metricsQuery = trpc.saasAuth.adminTenantMetrics.useQuery(undefined, {
+    enabled: !!meQuery.data?.isSuperAdmin,
+  });
+
+  // Build a map tenantId -> metrics for O(1) lookup
+  const metricsMap = useMemo(() => {
+    const map = new Map<number, { dealsOpen: number; dealsTotal: number; contactsTotal: number; whatsappConnected: boolean; wonThisMonthCents: number }>();
+    if (metricsQuery.data) {
+      for (const m of metricsQuery.data) {
+        map.set(m.tenantId, m);
+      }
+    }
+    return map;
+  }, [metricsQuery.data]);
+
+  const formatCurrency = (cents: number) => {
+    return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(cents / 100);
+  };
+
+  const formatCompact = (n: number) => {
+    if (n >= 1000) return `${(n / 1000).toFixed(1).replace(/\.0$/, "")}k`;
+    return String(n);
+  };
 
   const [search, setSearch] = useState("");
   const [editDialog, setEditDialog] = useState<{ tenantId: number; type: "freemium" | "plan" | "status" } | null>(null);
@@ -177,8 +200,8 @@ export default function SuperAdmin() {
           {[
             { icon: <Building2 className="w-5 h-5" />, label: "Total de Agências", value: filteredTenants.length, color: "text-purple-400 bg-purple-500/10" },
             { icon: <Users className="w-5 h-5" />, label: "Total de Usuários", value: filteredTenants.reduce((acc: number, t: any) => acc + t.userCount, 0), color: "text-blue-400 bg-blue-500/10" },
-            { icon: <CheckCircle className="w-5 h-5" />, label: "Agências Ativas", value: filteredTenants.filter((t: any) => t.status === "active").length, color: "text-emerald-400 bg-emerald-500/10" },
-            { icon: <CreditCard className="w-5 h-5" />, label: "Plano Pro", value: filteredTenants.filter((t: any) => t.plan === "pro").length, color: "text-amber-400 bg-amber-500/10" },
+            { icon: <Handshake className="w-5 h-5" />, label: "Negociações em Andamento", value: Array.from(metricsMap.values()).reduce((s, m) => s + m.dealsOpen, 0), color: "text-orange-400 bg-orange-500/10" },
+            { icon: <TrendingUp className="w-5 h-5" />, label: "Vendido este Mês", value: formatCurrency(Array.from(metricsMap.values()).reduce((s, m) => s + m.wonThisMonthCents, 0)), color: "text-emerald-400 bg-emerald-500/10" },
           ].map((stat, i) => (
             <Card key={i} className="border-border bg-card">
               <CardContent className="p-4 flex items-center gap-3">
@@ -227,6 +250,10 @@ export default function SuperAdmin() {
                     <th className="text-left p-4 font-medium">Status</th>
                     <th className="text-left p-4 font-medium">Freemium</th>
                     <th className="text-left p-4 font-medium">Usuários</th>
+                    <th className="text-center p-4 font-medium" title="Negociações em andamento / total"><Handshake className="w-4 h-4 mx-auto text-muted-foreground" /></th>
+                    <th className="text-center p-4 font-medium" title="Contatos"><Contact className="w-4 h-4 mx-auto text-muted-foreground" /></th>
+                    <th className="text-center p-4 font-medium" title="WhatsApp conectado"><Wifi className="w-4 h-4 mx-auto text-muted-foreground" /></th>
+                    <th className="text-right p-4 font-medium" title="Vendido no mês"><DollarSign className="w-4 h-4 ml-auto text-muted-foreground" /></th>
                     <th className="text-left p-4 font-medium">Criado em</th>
                     <th className="text-right p-4 font-medium">Ações</th>
                   </tr>
@@ -266,6 +293,48 @@ export default function SuperAdmin() {
                             )}
                           </td>
                           <td className="p-4 text-muted-foreground">{tenant.userCount}</td>
+                          {(() => {
+                            const m = metricsMap.get(tenant.id);
+                            return (
+                              <>
+                                <td className="p-4 text-center">
+                                  {m ? (
+                                    <span className="text-sm" title={`${m.dealsOpen} em andamento / ${m.dealsTotal} total`}>
+                                      <span className="font-medium text-orange-400">{formatCompact(m.dealsOpen)}</span>
+                                      <span className="text-muted-foreground">/{formatCompact(m.dealsTotal)}</span>
+                                    </span>
+                                  ) : (
+                                    <span className="text-muted-foreground">—</span>
+                                  )}
+                                </td>
+                                <td className="p-4 text-center">
+                                  {m ? (
+                                    <span className="text-sm font-medium text-blue-400">{formatCompact(m.contactsTotal)}</span>
+                                  ) : (
+                                    <span className="text-muted-foreground">—</span>
+                                  )}
+                                </td>
+                                <td className="p-4 text-center">
+                                  {m ? (
+                                    m.whatsappConnected ? (
+                                      <Wifi className="w-4 h-4 text-emerald-400 mx-auto" title="Conectado" />
+                                    ) : (
+                                      <WifiOff className="w-4 h-4 text-red-400 mx-auto" title="Desconectado" />
+                                    )
+                                  ) : (
+                                    <span className="text-muted-foreground">—</span>
+                                  )}
+                                </td>
+                                <td className="p-4 text-right">
+                                  {m && m.wonThisMonthCents > 0 ? (
+                                    <span className="text-sm font-medium text-emerald-400">{formatCurrency(m.wonThisMonthCents)}</span>
+                                  ) : (
+                                    <span className="text-muted-foreground text-sm">—</span>
+                                  )}
+                                </td>
+                              </>
+                            );
+                          })()}
                           <td className="p-4 text-muted-foreground">
                             {formatDate(tenant.createdAt)}
                           </td>
@@ -341,7 +410,7 @@ export default function SuperAdmin() {
                         </tr>
                         {isExpanded && (
                           <tr key={`${tenant.id}-users`}>
-                            <td colSpan={9} className="p-0">
+                            <td colSpan={13} className="p-0">
                               <TenantUsersPanel
                                 tenantId={tenant.id}
                                 tenantName={tenant.name}
@@ -356,7 +425,7 @@ export default function SuperAdmin() {
                   })}
                   {filteredTenants.length === 0 && (
                     <tr>
-                      <td colSpan={9} className="p-8 text-center text-muted-foreground">
+                      <td colSpan={13} className="p-8 text-center text-muted-foreground">
                         Nenhuma agência encontrada
                       </td>
                     </tr>

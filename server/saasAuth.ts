@@ -556,6 +556,73 @@ export async function inviteUserToTenant(data: {
 
 
 // ═══════════════════════════════════════
+// TENANT METRICS (SUPERADMIN)
+// ═══════════════════════════════════════
+
+export interface TenantMetrics {
+  tenantId: number;
+  dealsOpen: number;
+  dealsTotal: number;
+  contactsTotal: number;
+  whatsappConnected: boolean;
+  wonThisMonthCents: number;
+}
+
+/**
+ * Single aggregated query that returns operational metrics per tenant.
+ * Uses LEFT JOINs and conditional aggregation to avoid N+1.
+ */
+export async function getTenantMetricsAdmin(): Promise<TenantMetrics[]> {
+  const db = await getDb();
+  if (!db) return [];
+
+  // Get first day of current month in UTC
+  const now = new Date();
+  const monthStart = new Date(Date.UTC(now.getFullYear(), now.getMonth(), 1));
+
+  const rows: any[][] = await db.execute(sql`
+    SELECT
+      t.id AS tenantId,
+      COALESCE(d.dealsOpen, 0)         AS dealsOpen,
+      COALESCE(d.dealsTotal, 0)        AS dealsTotal,
+      COALESCE(c.contactsTotal, 0)     AS contactsTotal,
+      COALESCE(w.connectedCount, 0)    AS connectedCount,
+      COALESCE(d.wonThisMonthCents, 0) AS wonThisMonthCents
+    FROM tenants t
+    LEFT JOIN (
+      SELECT
+        tenantId,
+        SUM(CASE WHEN status = 'open' AND deletedAt IS NULL THEN 1 ELSE 0 END) AS dealsOpen,
+        SUM(CASE WHEN deletedAt IS NULL THEN 1 ELSE 0 END) AS dealsTotal,
+        SUM(CASE WHEN status = 'won' AND deletedAt IS NULL AND updatedAt >= ${monthStart} THEN COALESCE(valueCents, 0) ELSE 0 END) AS wonThisMonthCents
+      FROM deals
+      GROUP BY tenantId
+    ) d ON d.tenantId = t.id
+    LEFT JOIN (
+      SELECT tenantId, COUNT(*) AS contactsTotal
+      FROM contacts
+      WHERE deletedAt IS NULL
+      GROUP BY tenantId
+    ) c ON c.tenantId = t.id
+    LEFT JOIN (
+      SELECT tenantId, SUM(CASE WHEN status = 'connected' THEN 1 ELSE 0 END) AS connectedCount
+      FROM whatsapp_sessions
+      GROUP BY tenantId
+    ) w ON w.tenantId = t.id
+  `) as unknown as any[][];
+
+  const resultRows = rows[0] || [];
+  return resultRows.map((r: any) => ({
+    tenantId: Number(r.tenantId),
+    dealsOpen: Number(r.dealsOpen),
+    dealsTotal: Number(r.dealsTotal),
+    contactsTotal: Number(r.contactsTotal),
+    whatsappConnected: Number(r.connectedCount) > 0,
+    wonThisMonthCents: Number(r.wonThisMonthCents),
+  }));
+}
+
+// ═══════════════════════════════════════
 // DELETE TENANT COMPLETELY (SUPERADMIN)
 // ═══════════════════════════════════════
 

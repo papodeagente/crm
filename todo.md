@@ -4150,3 +4150,11 @@
 - [x] Corrigir para que o preview reflita o status real da última mensagem enviada
 - [x] Ticks verdes/azuis quando cliente lê a mensagem
 - [x] Testes vitest (19 testes passando)
+
+## Evolução Super Admin — Métricas por Tenant (CONCLUÍDO)
+- [x] Auditar painel Super Admin atual (frontend + backend)
+- [x] Auditar tabelas: deals, contacts, wa_sessions, pipelines
+- [x] Criar query agregada no backend (negociações em andamento, totais, contatos, WhatsApp, valor vendido mês)
+- [x] Criar endpoint tRPC adminTenantMetrics no saasAuthRouter
+- [x] Atualizar frontend: 4 novas colunas (Neg., Contatos, WhatsApp, Vendido) + 2 cards globais (Negociações em Andamento, Vendido este Mês)
+- [x] Testes vitest (12 testes passando: agregação, conversão de tipos, formatCurrency, formatCompact)

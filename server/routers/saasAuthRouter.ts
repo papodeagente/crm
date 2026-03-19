@@ -337,6 +337,19 @@ export const saasAuthRouter = router({
       return result;
     }),
 
+  // Tenant metrics (superadmin only)
+  adminTenantMetrics: publicProcedure
+    .query(async ({ ctx }) => {
+      const cookies = parseCookies(ctx.req.headers.cookie);
+      const token = cookies.get(SAAS_COOKIE);
+      const session = await verifySaasSession(token);
+      if (!session || !isSuperAdmin(session.email)) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Acesso negado" });
+      }
+      const { getTenantMetricsAdmin } = await import("../saasAuth");
+      return getTenantMetricsAdmin();
+    }),
+
   // Suspend/Activate tenant (superadmin only)
   adminToggleTenantStatus: publicProcedure
     .input(z.object({
