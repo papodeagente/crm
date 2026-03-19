@@ -17,6 +17,7 @@
  */
 
 import { getDb, createNotification } from "./db";
+import { createDeal } from "./crmDb";
 import { createHash } from "crypto";
 import {
   contacts, deals, pipelines, pipelineStages,
@@ -337,9 +338,9 @@ export async function processInboundLead(
     // 7. Owner (from options or round-robin)
     const ownerUserId = options?.ownerUserId ?? await getNextOwner(tenantId);
 
-    // 8. Create Deal
-    const dealTitle = options?.dealTitle || `${normalizedName} • ${payload.source}`;
-    const [dealResult] = await db.insert(deals).values({
+    // 8. Create Deal (using centralized createDeal for clean field handling + error messages)
+    const dealTitle = options?.dealTitle || `${normalizedName} \u2022 ${payload.source}`;
+    const dealResult = await createDeal({
       tenantId,
       title: dealTitle,
       contactId: contact.id,
@@ -359,9 +360,9 @@ export async function processInboundLead(
       metaJson: payload.meta ? (payload.meta as any) : undefined,
       rawPayloadJson: payload.raw ? (payload.raw as any) : (payload as any),
       dedupeKey,
-    }).$returningId();
-
-    const dealId = dealResult!.id;
+    });
+    if (!dealResult) throw new Error('Falha ao criar negocia\u00e7\u00e3o - banco de dados indispon\u00edvel');
+    const dealId = dealResult.id;
 
     // 9. Update event log → success
     await db

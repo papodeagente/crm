@@ -4099,3 +4099,9 @@
 - [x] Dashboard metrics filtrado por ownership para non-admin
 - [x] Pipeline.tsx: filtro de responsável desabilitado para non-admin
 - [x] Proteção em moveStage e update para non-admin
+
+## Bug: Erro ao criar negociação no CRM
+- [x] Investigar "Failed query: insert into deals" — causa: Drizzle recebia campos extras via spread, gerando INSERT com valores inválidos
+- [x] Corrigir createDeal com pick explícito de campos + try/catch com mensagens amigáveis
+- [x] Centralizar processInboundLead para usar createDeal em vez de db.insert direto
+- [x] Testes de ownership passando (16/16)

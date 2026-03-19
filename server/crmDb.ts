@@ -241,10 +241,44 @@ export async function listStages(tenantId: number, pipelineId: number) {
 // ═══════════════════════════════════════
 // DEALS
 // ═══════════════════════════════════════
-export async function createDeal(data: { tenantId: number; title: string; contactId?: number; accountId?: number; pipelineId: number; stageId: number; valueCents?: number; ownerUserId?: number; teamId?: number; createdBy?: number; leadSource?: string; channelOrigin?: string; boardingDate?: Date | null; returnDate?: Date | null }) {
+export async function createDeal(data: { tenantId: number; title: string; contactId?: number; accountId?: number; pipelineId: number; stageId: number; valueCents?: number; ownerUserId?: number; teamId?: number; createdBy?: number; leadSource?: string; channelOrigin?: string; boardingDate?: Date | null; returnDate?: Date | null; utmSource?: string; utmMedium?: string; utmCampaign?: string; utmTerm?: string; utmContent?: string; utmJson?: any; rdCustomFields?: any; metaJson?: any; rawPayloadJson?: any; dedupeKey?: string; status?: string }) {
   const db = await getDb(); if (!db) return null;
-  const [result] = await db.insert(deals).values(data).$returningId();
-  return result;
+  // Explicitly pick only known deal columns to prevent extra fields from leaking into the INSERT
+  const cleanData: Record<string, any> = {
+    tenantId: data.tenantId,
+    title: data.title,
+    pipelineId: data.pipelineId,
+    stageId: data.stageId,
+  };
+  // Optional fields - only include if defined (not undefined)
+  if (data.contactId !== undefined) cleanData.contactId = data.contactId;
+  if (data.accountId !== undefined) cleanData.accountId = data.accountId;
+  if (data.valueCents !== undefined) cleanData.valueCents = data.valueCents;
+  if (data.ownerUserId !== undefined) cleanData.ownerUserId = data.ownerUserId;
+  if (data.teamId !== undefined) cleanData.teamId = data.teamId;
+  if (data.createdBy !== undefined) cleanData.createdBy = data.createdBy;
+  if (data.leadSource !== undefined) cleanData.leadSource = data.leadSource;
+  if (data.channelOrigin !== undefined) cleanData.channelOrigin = data.channelOrigin;
+  if (data.boardingDate !== undefined) cleanData.boardingDate = data.boardingDate;
+  if (data.returnDate !== undefined) cleanData.returnDate = data.returnDate;
+  if (data.utmSource !== undefined) cleanData.utmSource = data.utmSource;
+  if (data.utmMedium !== undefined) cleanData.utmMedium = data.utmMedium;
+  if (data.utmCampaign !== undefined) cleanData.utmCampaign = data.utmCampaign;
+  if (data.utmTerm !== undefined) cleanData.utmTerm = data.utmTerm;
+  if (data.utmContent !== undefined) cleanData.utmContent = data.utmContent;
+  if (data.utmJson !== undefined) cleanData.utmJson = data.utmJson;
+  if (data.rdCustomFields !== undefined) cleanData.rdCustomFields = data.rdCustomFields;
+  if (data.metaJson !== undefined) cleanData.metaJson = data.metaJson;
+  if (data.rawPayloadJson !== undefined) cleanData.rawPayloadJson = data.rawPayloadJson;
+  if (data.dedupeKey !== undefined) cleanData.dedupeKey = data.dedupeKey;
+  if (data.status !== undefined) cleanData.status = data.status;
+  try {
+    const [result] = await db.insert(deals).values(cleanData).$returningId();
+    return result;
+  } catch (error: any) {
+    console.error('[createDeal] Failed to insert deal:', error?.message || error);
+    throw new Error(`Erro ao criar negociação: ${error?.code === 'ER_DUP_ENTRY' ? 'Registro duplicado' : error?.code === 'ER_DATA_TOO_LONG' ? 'Dados muito longos para um dos campos' : 'Erro no banco de dados. Tente novamente.'}`);
+  }
 }
 export async function getDealById(tenantId: number, id: number) {
   const db = await getDb(); if (!db) return null;

@@ -1,0 +1,13 @@
+{
+  "query": "SELECT GROUP_CONCAT(COLUMN_NAME ORDER BY ORDINAL_POSITION SEPARATOR ', ') as all_columns FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'deals';",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute SELECT GROUP_CONCAT(COLUMN_NAME ORDER BY ORDINAL_POSITION SEPARATOR ', ') as all_columns FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'deals';",
+  "rows": [
+    {
+      "all_columns": "id, tenantId, title, contactId, accountId, pipelineId, stageId, valueCents, currency, probability, status, expectedCloseAt, ownerUserId, teamId, visibilityScope, channelOrigin, leadSource, utmJson, metaJson, rawPayloadJson, dedupeKey, lastActivityAt, createdAt, updatedAt, createdBy, updatedBy, waConversationId, deletedAt, utmSource, utmMedium, utmCampaign, utmTerm, utmContent, rdCustomFields, lossReasonId, lossNotes, boardingDate, returnDate, rdExternalId"
+    }
+  ],
+  "messages": [],
+  "stdout": "all_columns\nid, tenantId, title, contactId, accountId, pipelineId, stageId, valueCents, currency, probability, status, expectedCloseAt, ownerUserId, teamId, visibilityScope, channelOrigin, leadSource, utmJson, metaJson, rawPayloadJson, dedupeKey, lastActivityAt, createdAt, updatedAt, createdBy, updatedBy, waConversationId, deletedAt, utmSource, utmMedium, utmCampaign, utmTerm, utmContent, rdCustomFields, lossReasonId, lossNotes, boardingDate, returnDate, rdExternalId\n",
+  "stderr": "",
+  "execution_time_ms": 52
+}
