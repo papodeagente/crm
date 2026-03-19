@@ -1,0 +1,1 @@
+ALTER TABLE `messages` ADD `structured_data` json;

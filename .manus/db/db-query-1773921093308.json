@@ -1,0 +1,40 @@
+{
+  "query": "SELECT id, messageType, content, mediaUrl FROM messages WHERE messageType = 'templateMessage' ORDER BY id DESC LIMIT 5;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute SELECT id, messageType, content, mediaUrl FROM messages WHERE messageType = 'templateMessage' ORDER BY id DESC LIMIT 5;",
+  "rows": [
+    {
+      "id": "1005620",
+      "messageType": "templateMessage",
+      "content": "[Template]",
+      "mediaUrl": "NULL"
+    },
+    {
+      "id": "1005619",
+      "messageType": "templateMessage",
+      "content": "[Template]",
+      "mediaUrl": "NULL"
+    },
+    {
+      "id": "997383",
+      "messageType": "templateMessage",
+      "content": "[Template]",
+      "mediaUrl": "NULL"
+    },
+    {
+      "id": "927997",
+      "messageType": "templateMessage",
+      "content": "[Template]",
+      "mediaUrl": "NULL"
+    },
+    {
+      "id": "924467",
+      "messageType": "templateMessage",
+      "content": "[Template]",
+      "mediaUrl": "NULL"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tmessageType\tcontent\tmediaUrl\n1005620\ttemplateMessage\t[Template]\tNULL\n1005619\ttemplateMessage\t[Template]\tNULL\n997383\ttemplateMessage\t[Template]\tNULL\n927997\ttemplateMessage\t[Template]\tNULL\n924467\ttemplateMessage\t[Template]\tNULL\n",
+  "stderr": "",
+  "execution_time_ms": 51
+}

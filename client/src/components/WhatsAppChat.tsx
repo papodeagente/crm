@@ -17,6 +17,7 @@ import TransferDialog from "./TransferDialog";
 import { useTenantId } from "@/hooks/useTenantId";
 import InstantTooltip from "@/components/InstantTooltip";
 import AiSuggestionPanel from "@/components/AiSuggestionPanel";
+import RichMessageRenderer, { isRichMessageType } from "@/components/RichMessageRenderer";
 
 /* ─── Types ─── */
 interface Message {
@@ -36,6 +37,7 @@ interface Message {
   timestamp: string | Date;
   createdAt: string | Date;
   quotedMessageId?: string | null;
+  structuredData?: any | null;
   audioTranscription?: string | null;
   audioTranscriptionStatus?: string | null;
 }
@@ -774,11 +776,15 @@ const MessageBubble = memo(({
     return null;
   };
 
+  // Check if this is a rich message type that has a dedicated renderer
+  const isRichType = isRichMessageType(msg.messageType);
+
   // Show text content: hide placeholder text like "[Imagem]", "[Áudio]" for media messages
   // But show captions for images/videos (e.g. "[Imagem] Beautiful sunset" -> "Beautiful sunset")
   const textContent = (() => {
     if (!msg.content) return null;
-    if (isLocation || isContact || isPoll) return null; // These have their own rendering
+    if (isLocation || isContact || isPoll) return null; // These have their own rendering via RichMessageRenderer
+    if (isRichType) return null; // Rich types handle their own content rendering
     if (isMediaType || isPtv) {
       // Strip placeholder prefixes like "[Imagem] ", "[Vídeo] ", etc.
       const stripped = msg.content
@@ -850,6 +856,16 @@ const MessageBubble = memo(({
 
           {renderQuotedMessage()}
           {renderMedia()}
+
+          {/* Rich message types (template, interactive, buttons, list, poll, etc.) */}
+          {isRichType && (
+            <RichMessageRenderer
+              messageType={msg.messageType}
+              content={msg.content}
+              structuredData={msg.structuredData}
+              fromMe={fromMe}
+            />
+          )}
 
           {/* Audio transcription — uses DB fields first, then local state fallback */}
           {isAudio && (() => {

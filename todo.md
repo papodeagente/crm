@@ -3977,3 +3977,29 @@
 - [x] Status ticks sincronizados entre sidebar e bolhas do chat
   - [x] Reconciliação periódica: 60s com socket conectado, 15s sem socket
 - [x] Testes para validar sincronização preview/status (25 testes novos, 2177 total passando)
+
+## Suporte a Todos os Formatos de Mensagem WhatsApp
+- [x] Auditar tipos de mensagem não suportados no chat (32 tipos encontrados, 2123 msgs com content NULL/placeholder)
+- [x] Backend: armazenar dados estruturados (JSON) para mensagens complexas (coluna structuredData adicionada)
+- [x] Backend: extractMessageContent reescrito para extrair texto de TODOS os tipos
+- [x] Backend: extractStructuredData extrai botões, seções, opções, etc. em JSON
+- [x] Backend: resolveMessageType detecta todos os tipos corretamente
+- [x] Backend: getPreviewForType atualizado com 30+ tipos
+- [x] Frontend: RichMessageRenderer.tsx criado com renderers para todos os tipos
+- [x] Frontend: renderizar templateMessage (header, body, footer, botões URL/call/reply)
+- [x] Frontend: renderizar listMessage (título, seções, itens com descrição)
+- [x] Frontend: renderizar buttonsMessage / buttonsResponseMessage
+- [x] Frontend: renderizar interactiveMessage (nativeFlow buttons, header, footer)
+- [x] Frontend: renderizar pollCreationMessage (pergunta, opções, barra de votos)
+- [x] Frontend: renderizar orderMessage (ID, título, itens)
+- [x] Frontend: renderizar productMessage (título, preço, moeda)
+- [x] Frontend: renderizar contactMessage / contactsArrayMessage (nome, telefone do vCard)
+- [x] Frontend: renderizar locationMessage / liveLocationMessage (mapa estático, nome, endereço)
+- [x] Frontend: renderizar protocolMessage (mensagens de sistema)
+- [x] Frontend: renderizar groupInviteMessage (nome do grupo, link)
+- [x] Frontend: renderizar viewOnceMessage (ícone de visualização única)
+- [x] Frontend: fallback genérico para tipos desconhecidos
+- [x] Frontend: getMessagePreview atualizado para preview descritivo na sidebar
+- [x] DB repair: 2123 mensagens com content NULL/placeholder corrigidas
+- [x] DB repair: previews de conversas atualizados para tipos ricos
+- [x] Testes para todos os renderers de mensagem (60 testes novos, 2237 total passando)

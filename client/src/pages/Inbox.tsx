@@ -118,11 +118,37 @@ function getMessagePreview(content: string | null, messageType: string | null): 
     locationMessage: "📍 Localização", liveLocationMessage: "📍 Localização ao vivo",
     viewOnceMessage: "📷 Visualização única", viewOnceMessageV2: "📷 Visualização única",
     pollCreationMessage: "📊 Enquete", pollCreationMessageV3: "📊 Enquete",
+    pollUpdateMessage: "📊 Voto na enquete",
     eventMessage: "📅 Evento",
+    // Rich message types from WhatsApp Business API
+    templateMessage: "📝 Template",
+    interactiveMessage: "🔘 Mensagem interativa",
+    buttonsMessage: "🔘 Botões",
+    listMessage: "📋 Lista",
+    listResponseMessage: "✅ Resposta da lista",
+    buttonsResponseMessage: "✅ Resposta do botão",
+    templateButtonReplyMessage: "✅ Resposta do template",
+    interactiveResponseMessage: "✅ Resposta interativa",
+    orderMessage: "🛒 Pedido",
+    productMessage: "🛍️ Produto",
+    groupInviteMessage: "👥 Convite de grupo",
+    albumMessage: "📷 Álbum",
+    associatedChildMessage: "📷 Foto do álbum",
+    lottieStickerMessage: "🏷️ Figurinha animada",
+    editedMessage: "✏️ Editada",
+    placeholderMessage: "💬 Mensagem",
+    ptvMessage: "🎥 Vídeo circular",
   };
+  // If we have real content (not a bracket placeholder), prefer showing it
   if (content && content.length > 0 && !content.startsWith("[")) {
-    const mapped = typeMap[messageType];
-    if (mapped && content.startsWith("[")) return mapped;
+    // For rich types, show the type icon + content for better context
+    const prefix = typeMap[messageType];
+    if (prefix && (messageType === "templateMessage" || messageType === "interactiveMessage" || 
+        messageType === "buttonsMessage" || messageType === "listMessage")) {
+      // Show icon + first part of content for these types
+      const emoji = prefix.split(" ")[0];
+      return `${emoji} ${content}`;
+    }
     return content;
   }
   return typeMap[messageType] || content || "";

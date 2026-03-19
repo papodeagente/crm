@@ -79,23 +79,123 @@ function extractMessageContent(data: any): string | null {
 
   const msg = data.message;
   
+  // ── Text messages ──
   if (msg.conversation) return msg.conversation;
   if (msg.extendedTextMessage?.text) return msg.extendedTextMessage.text;
+  
+  // ── Media with captions ──
   if (msg.imageMessage?.caption) return msg.imageMessage.caption;
   if (msg.videoMessage?.caption) return msg.videoMessage.caption;
   if (msg.documentMessage?.caption) return msg.documentMessage.caption;
   if (msg.documentMessage?.fileName) return `📄 ${msg.documentMessage.fileName}`;
-  if (msg.stickerMessage) return "🏷️ Figurinha";
-  if (msg.audioMessage || msg.pttMessage) return "🎵 Áudio";
-  if (msg.imageMessage) return "📷 Imagem";
-  if (msg.videoMessage) return "🎥 Vídeo";
-  if (msg.contactMessage) return `👤 ${msg.contactMessage.displayName || "Contato"}`;
-  if (msg.locationMessage) return "📍 Localização";
+  
+  // ── Template messages (WhatsApp Business API) ──
+  if (msg.templateMessage) {
+    const tpl = msg.templateMessage;
+    // hydratedTemplate is the most common format
+    const hydrated = tpl.hydratedTemplate || tpl.hydratedFourRowTemplate;
+    if (hydrated) {
+      return hydrated.hydratedContentText || hydrated.hydratedTitleText || null;
+    }
+    // fourRowTemplate
+    const fourRow = tpl.fourRowTemplate;
+    if (fourRow) {
+      return fourRow.content?.text || null;
+    }
+    return null;
+  }
+  
+  // ── Interactive messages (WhatsApp Business API) ──
+  if (msg.interactiveMessage) {
+    const interactive = msg.interactiveMessage;
+    return interactive.body?.text || interactive.header?.title || null;
+  }
+  
+  // ── Buttons message ──
+  if (msg.buttonsMessage) {
+    return msg.buttonsMessage.contentText || msg.buttonsMessage.text || null;
+  }
+  
+  // ── List message ──
+  if (msg.listMessage) {
+    return msg.listMessage.description || msg.listMessage.title || null;
+  }
+  
+  // ── Response messages (user selections) ──
   if (msg.listResponseMessage?.title) return msg.listResponseMessage.title;
   if (msg.buttonsResponseMessage?.selectedDisplayText) return msg.buttonsResponseMessage.selectedDisplayText;
   if (msg.templateButtonReplyMessage?.selectedDisplayText) return msg.templateButtonReplyMessage.selectedDisplayText;
+  if (msg.interactiveResponseMessage) {
+    const resp = msg.interactiveResponseMessage;
+    return resp.body?.text || resp.nativeFlowResponseMessage?.paramsJson || null;
+  }
+  
+  // ── Contact messages ──
+  if (msg.contactMessage) return `👤 ${msg.contactMessage.displayName || "Contato"}`;
+  if (msg.contactsArrayMessage) {
+    const contacts = msg.contactsArrayMessage.contacts || [];
+    const names = contacts.map((c: any) => c.displayName).filter(Boolean).join(", ");
+    return names ? `👥 ${names}` : "👥 Contatos";
+  }
+  
+  // ── Location ──
+  if (msg.locationMessage) {
+    return msg.locationMessage.name || msg.locationMessage.address || "📍 Localização";
+  }
+  if (msg.liveLocationMessage) return "📍 Localização ao vivo";
+  
+  // ── Poll ──
+  if (msg.pollCreationMessage || msg.pollCreationMessageV2 || msg.pollCreationMessageV3) {
+    const poll = msg.pollCreationMessage || msg.pollCreationMessageV2 || msg.pollCreationMessageV3;
+    return `📊 ${poll.name || "Enquete"}`;
+  }
+  if (msg.pollUpdateMessage) return "📊 Voto na enquete";
+  
+  // ── Order / Product (WhatsApp Commerce) ──
+  if (msg.orderMessage) {
+    return `🛒 Pedido${msg.orderMessage.orderTitle ? `: ${msg.orderMessage.orderTitle}` : ""}`;
+  }
+  if (msg.productMessage) {
+    const product = msg.productMessage.product;
+    return product?.title ? `🛍️ ${product.title}` : "🛍️ Produto";
+  }
+  
+  // ── Group invite ──
+  if (msg.groupInviteMessage) {
+    return `👥 Convite: ${msg.groupInviteMessage.groupName || "Grupo"}`;
+  }
+  
+  // ── Edited message (wrapper) ──
+  if (msg.editedMessage?.message) {
+    return extractMessageContent({ message: msg.editedMessage.message });
+  }
+  
+  // ── View once ──
+  if (msg.viewOnceMessage?.message) {
+    return extractMessageContent({ message: msg.viewOnceMessage.message });
+  }
+  if (msg.viewOnceMessageV2?.message) {
+    return extractMessageContent({ message: msg.viewOnceMessageV2.message });
+  }
+  
+  // ── Media without caption (fallback) ──
+  if (msg.stickerMessage) return null;
+  if (msg.audioMessage || msg.pttMessage) return null;
+  if (msg.imageMessage) return null;
+  if (msg.videoMessage) return null;
+  
+  // ── Reaction ──
   if (msg.reactionMessage?.text) return `${msg.reactionMessage.text}`;
-
+  
+  // ── Album / associated child ──
+  if (msg.albumMessage) return null; // Album is a container, children have the content
+  if (msg.associatedChildMessage?.message) {
+    return extractMessageContent({ message: msg.associatedChildMessage.message });
+  }
+  
+  // ── Placeholder ──
+  if (msg.placeholderMessage) return null;
+  
   return data?.body || null;
 }
 
@@ -162,23 +262,299 @@ function resolveMessageType(data: any): string {
   
   if (!msg) return reportedType;
   
-  // Check actual message content to determine type
+  // Check actual message content to determine type — order matters!
+  // Template & interactive first (they may contain media sub-messages)
+  if (msg.templateMessage) return "templateMessage";
+  if (msg.interactiveMessage) return "interactiveMessage";
+  if (msg.buttonsMessage) return "buttonsMessage";
+  if (msg.listMessage) return "listMessage";
+  
+  // Response messages (user selections)
+  if (msg.listResponseMessage) return "listResponseMessage";
+  if (msg.buttonsResponseMessage) return "buttonsResponseMessage";
+  if (msg.templateButtonReplyMessage) return "templateButtonReplyMessage";
+  if (msg.interactiveResponseMessage) return "interactiveResponseMessage";
+  
+  // Media types
   if (msg.stickerMessage) return "stickerMessage";
+  if (msg.lottieStickerMessage) return "lottieStickerMessage";
   if (msg.imageMessage) return "imageMessage";
   if (msg.videoMessage) return "videoMessage";
   if (msg.audioMessage) return "audioMessage";
   if (msg.pttMessage) return "pttMessage";
   if (msg.documentMessage) return "documentMessage";
+  if (msg.ptvMessage) return "ptvMessage";
+  
+  // Text types
   if (msg.extendedTextMessage) return "extendedTextMessage";
-  if (msg.conversation) return "conversation";
+  if (msg.conversation !== undefined) return "conversation";
+  
+  // Contact types
   if (msg.contactMessage) return "contactMessage";
+  if (msg.contactsArrayMessage) return "contactsArrayMessage";
+  
+  // Location
   if (msg.locationMessage) return "locationMessage";
-  if (msg.listResponseMessage) return "listResponseMessage";
-  if (msg.buttonsResponseMessage) return "buttonsResponseMessage";
-  if (msg.templateButtonReplyMessage) return "templateButtonReplyMessage";
+  if (msg.liveLocationMessage) return "liveLocationMessage";
+  
+  // Poll
+  if (msg.pollCreationMessage || msg.pollCreationMessageV2 || msg.pollCreationMessageV3) return "pollCreationMessageV3";
+  if (msg.pollUpdateMessage) return "pollUpdateMessage";
+  
+  // Commerce
+  if (msg.orderMessage) return "orderMessage";
+  if (msg.productMessage) return "productMessage";
+  
+  // Group invite
+  if (msg.groupInviteMessage) return "groupInviteMessage";
+  
+  // Album / associated child
+  if (msg.albumMessage) return "albumMessage";
+  if (msg.associatedChildMessage) return "associatedChildMessage";
+  
+  // Edited message wrapper
+  if (msg.editedMessage) return "editedMessage";
+  
+  // View once
+  if (msg.viewOnceMessage) return "viewOnceMessage";
+  if (msg.viewOnceMessageV2) return "viewOnceMessageV2";
+  
+  // Placeholder
+  if (msg.placeholderMessage) return "placeholderMessage";
+  
+  // Protocol & system
   if (msg.reactionMessage) return "reactionMessage";
+  if (msg.protocolMessage) return "protocolMessage";
   
   return reportedType;
+}
+
+// ── Structured Data Extractor ────────────────────────────────
+
+/**
+ * Extract structured data (buttons, sections, template details, etc.) from the raw message.
+ * This is stored as JSON in the structured_data column so the frontend can render rich UIs.
+ * Returns null for simple text/media messages that don't need structured rendering.
+ */
+function extractStructuredData(data: any): any | null {
+  const msg = data?.message;
+  if (!msg) return null;
+  
+  // ── Template messages ──
+  if (msg.templateMessage) {
+    const tpl = msg.templateMessage;
+    const hydrated = tpl.hydratedTemplate || tpl.hydratedFourRowTemplate;
+    if (hydrated) {
+      return {
+        type: "template",
+        title: hydrated.hydratedTitleText || null,
+        body: hydrated.hydratedContentText || null,
+        footer: hydrated.hydratedFooterText || null,
+        buttons: (hydrated.hydratedButtons || []).map((btn: any) => {
+          if (btn.urlButton) return { type: "url", text: btn.urlButton.displayText, url: btn.urlButton.url };
+          if (btn.callButton) return { type: "call", text: btn.callButton.displayText, phone: btn.callButton.phoneNumber };
+          if (btn.quickReplyButton) return { type: "reply", text: btn.quickReplyButton.displayText, id: btn.quickReplyButton.id };
+          return { type: "unknown", text: JSON.stringify(btn) };
+        }),
+        hasImage: !!hydrated.imageMessage,
+        hasVideo: !!hydrated.videoMessage,
+        hasDocument: !!hydrated.documentMessage,
+      };
+    }
+    const fourRow = tpl.fourRowTemplate;
+    if (fourRow) {
+      return {
+        type: "template",
+        title: fourRow.content?.text || null,
+        body: fourRow.content?.text || null,
+        footer: fourRow.footer?.text || null,
+        buttons: (fourRow.buttons || []).map((btn: any) => {
+          if (btn.urlButton) return { type: "url", text: btn.urlButton?.displayText?.text, url: btn.urlButton?.url?.url };
+          if (btn.callButton) return { type: "call", text: btn.callButton?.displayText?.text, phone: btn.callButton?.phoneNumber?.phoneNumber };
+          if (btn.quickReplyButton) return { type: "reply", text: btn.quickReplyButton?.displayText?.text, id: btn.quickReplyButton?.id };
+          return { type: "unknown", text: JSON.stringify(btn) };
+        }),
+      };
+    }
+    return { type: "template" };
+  }
+  
+  // ── Interactive messages ──
+  if (msg.interactiveMessage) {
+    const im = msg.interactiveMessage;
+    const buttons: any[] = [];
+    
+    // nativeFlowMessage buttons
+    if (im.nativeFlowMessage?.buttons) {
+      for (const btn of im.nativeFlowMessage.buttons) {
+        try {
+          const params = btn.buttonParamsJson ? JSON.parse(btn.buttonParamsJson) : {};
+          buttons.push({
+            type: btn.name || "unknown",
+            text: params.display_text || params.title || btn.name || "Botão",
+            url: params.url || null,
+            id: params.id || null,
+            copyCode: params.copy_code || null,
+          });
+        } catch {
+          buttons.push({ type: btn.name || "unknown", text: btn.name || "Botão" });
+        }
+      }
+    }
+    
+    return {
+      type: "interactive",
+      header: im.header?.title || null,
+      body: im.body?.text || null,
+      footer: im.footer?.text || null,
+      buttons,
+      hasImage: !!im.header?.imageMessage,
+      hasVideo: !!im.header?.videoMessage,
+      hasDocument: !!im.header?.documentMessage,
+    };
+  }
+  
+  // ── Buttons message ──
+  if (msg.buttonsMessage) {
+    const bm = msg.buttonsMessage;
+    return {
+      type: "buttons",
+      text: bm.contentText || bm.text || null,
+      footer: bm.footerText || null,
+      buttons: (bm.buttons || []).map((btn: any) => ({
+        type: "reply",
+        text: btn.buttonText?.displayText || "Botão",
+        id: btn.buttonId || null,
+      })),
+      hasImage: !!bm.imageMessage,
+      hasDocument: !!bm.documentMessage,
+    };
+  }
+  
+  // ── List message ──
+  if (msg.listMessage) {
+    const lm = msg.listMessage;
+    return {
+      type: "list",
+      title: lm.title || null,
+      description: lm.description || null,
+      buttonText: lm.buttonText || "Ver opções",
+      footer: lm.footerText || null,
+      sections: (lm.sections || []).map((s: any) => ({
+        title: s.title || null,
+        rows: (s.rows || []).map((r: any) => ({
+          title: r.title || null,
+          description: r.description || null,
+          id: r.rowId || null,
+        })),
+      })),
+    };
+  }
+  
+  // ── List response ──
+  if (msg.listResponseMessage) {
+    return {
+      type: "listResponse",
+      title: msg.listResponseMessage.title || null,
+      description: msg.listResponseMessage.description || null,
+      selectedRowId: msg.listResponseMessage.singleSelectReply?.selectedRowId || null,
+    };
+  }
+  
+  // ── Buttons response ──
+  if (msg.buttonsResponseMessage) {
+    return {
+      type: "buttonsResponse",
+      selectedText: msg.buttonsResponseMessage.selectedDisplayText || null,
+      selectedId: msg.buttonsResponseMessage.selectedButtonId || null,
+    };
+  }
+  
+  // ── Template button reply ──
+  if (msg.templateButtonReplyMessage) {
+    return {
+      type: "templateButtonReply",
+      selectedText: msg.templateButtonReplyMessage.selectedDisplayText || null,
+      selectedId: msg.templateButtonReplyMessage.selectedId || null,
+    };
+  }
+  
+  // ── Poll creation ──
+  if (msg.pollCreationMessage || msg.pollCreationMessageV2 || msg.pollCreationMessageV3) {
+    const poll = msg.pollCreationMessage || msg.pollCreationMessageV2 || msg.pollCreationMessageV3;
+    return {
+      type: "poll",
+      question: poll.name || null,
+      options: (poll.options || []).map((o: any) => o.optionName || ""),
+      selectableCount: poll.selectableOptionsCount || 1,
+    };
+  }
+  
+  // ── Order ──
+  if (msg.orderMessage) {
+    return {
+      type: "order",
+      orderId: msg.orderMessage.orderId || null,
+      title: msg.orderMessage.orderTitle || null,
+      itemCount: msg.orderMessage.itemCount || null,
+      message: msg.orderMessage.message || null,
+    };
+  }
+  
+  // ── Product ──
+  if (msg.productMessage) {
+    const p = msg.productMessage.product;
+    return {
+      type: "product",
+      title: p?.title || null,
+      description: p?.description || null,
+      price: p?.priceAmount1000 ? (p.priceAmount1000 / 1000) : null,
+      currency: p?.currencyCode || "BRL",
+      productId: p?.productId || null,
+    };
+  }
+  
+  // ── Group invite ──
+  if (msg.groupInviteMessage) {
+    return {
+      type: "groupInvite",
+      groupName: msg.groupInviteMessage.groupName || null,
+      inviteCode: msg.groupInviteMessage.inviteCode || null,
+      caption: msg.groupInviteMessage.caption || null,
+    };
+  }
+  
+  // ── Contact ──
+  if (msg.contactMessage) {
+    return {
+      type: "contact",
+      displayName: msg.contactMessage.displayName || null,
+      vcard: msg.contactMessage.vcard || null,
+    };
+  }
+  if (msg.contactsArrayMessage) {
+    return {
+      type: "contactsArray",
+      contacts: (msg.contactsArrayMessage.contacts || []).map((c: any) => ({
+        displayName: c.displayName || null,
+        vcard: c.vcard || null,
+      })),
+    };
+  }
+  
+  // ── Location ──
+  if (msg.locationMessage) {
+    return {
+      type: "location",
+      latitude: msg.locationMessage.degreesLatitude || null,
+      longitude: msg.locationMessage.degreesLongitude || null,
+      name: msg.locationMessage.name || null,
+      address: msg.locationMessage.address || null,
+      url: msg.locationMessage.url || null,
+    };
+  }
+  
+  return null;
 }
 
 // ── Status Maps ───────────────────────────────────────────────
@@ -216,6 +592,25 @@ function getPreviewForType(messageType: string): string | null {
     buttonsMessage: "\ud83d\udd18 Bot\u00f5es",
     templateMessage: "\ud83d\udcdd Template",
     viewOnceMessageV2: "\ud83d\udcf7 Visualiza\u00e7\u00e3o \u00fanica",
+    // Rich message types (WhatsApp Business API)
+    interactiveMessage: "\ud83d\udd18 Mensagem interativa",
+    listResponseMessage: "\u2705 Resposta da lista",
+    buttonsResponseMessage: "\u2705 Resposta do bot\u00e3o",
+    templateButtonReplyMessage: "\u2705 Resposta do template",
+    interactiveResponseMessage: "\u2705 Resposta interativa",
+    orderMessage: "\ud83d\uded2 Pedido",
+    productMessage: "\ud83d\udecd\ufe0f Produto",
+    groupInviteMessage: "\ud83d\udc65 Convite de grupo",
+    pollCreationMessage: "\ud83d\udcca Enquete",
+    pollCreationMessageV3: "\ud83d\udcca Enquete",
+    pollUpdateMessage: "\ud83d\udcca Voto na enquete",
+    viewOnceMessage: "\ud83d\udcf7 Visualiza\u00e7\u00e3o \u00fanica",
+    albumMessage: "\ud83d\udcf7 \u00c1lbum",
+    associatedChildMessage: "\ud83d\udcf7 Foto do \u00e1lbum",
+    lottieStickerMessage: "\ud83c\udff7\ufe0f Figurinha animada",
+    editedMessage: "\u270f\ufe0f Editada",
+    placeholderMessage: "\ud83d\udcac Mensagem",
+    ptvMessage: "\ud83c\udfa5 V\u00eddeo circular",
   };
   return previews[messageType] || null;
 }
@@ -364,6 +759,7 @@ async function processNewMessage(session: SessionInfo, data: any, workerStartTim
 
     const rawContent = extractMessageContent(data);
     const mediaInfo = extractMediaInfo(data);
+    const structuredData = extractStructuredData(data);
 
     // ── Compute preview text ONCE — used for BOTH DB and socket emit ──
     // This ensures the sidebar preview is always identical to what's stored in the DB.
@@ -410,6 +806,7 @@ async function processNewMessage(session: SessionInfo, data: any, workerStartTim
       mediaDuration: mediaInfo.mediaDuration || null,
       isVoiceNote: mediaInfo.isVoiceNote || false,
       quotedMessageId: mediaInfo.quotedMessageId || null,
+      structuredData: structuredData || null,
     }).onDuplicateKeyUpdate({ set: { status: sql`status` } });
     const insertEnd = Date.now();
     console.log(`[TRACE][DB_INSERT] timestamp: ${insertEnd} | delta: ${insertEnd - insertStart}ms | msgId: ${messageId}`);
@@ -474,6 +871,7 @@ async function processNewMessage(session: SessionInfo, data: any, workerStartTim
       pushName,
       timestamp,
       status: fromMe ? "sent" : "received",  // Include status for frontend store
+      structuredData: structuredData || undefined,  // Rich message data for frontend rendering
     });
 
     // ── Step 5: Background tasks (non-blocking) ──
