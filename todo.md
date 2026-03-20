@@ -4404,3 +4404,11 @@
 - [x] Remover 55 migrações SQL antigas (manter apenas a última)
 - [x] Remover meta.json (metadados de build)
 - [x] Reduzir de 1027 arquivos/22MB para 857 arquivos/8.8MB
+
+## Incidente Crítico: Tenants exibindo apenas criador + super admin
+- [x] Diagnóstico: dados no banco íntegros (crm_users com vínculos corretos)
+- [x] Causa raiz: saasAuthRouter.ts usava getTenantId(ctx) em vez de input.tenantId nos endpoints super admin
+- [x] Correção cirúrgica: 6 endpoints corrigidos em saasAuthRouter.ts
+- [x] Restauração de dados: NÃO necessária (banco íntegro, problema era apenas de query)
+- [x] Guard rails: 17 testes vitest em tenantIsolation.test.ts
+- [x] Validação: 44 testes passando (17 tenant isolation + 27 chat bugfixes)

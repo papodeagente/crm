@@ -1,0 +1,114 @@
+{
+  "query": "SELECT tenantId, COUNT(*) as user_count FROM crm_users GROUP BY tenantId ORDER BY tenantId;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute SELECT tenantId, COUNT(*) as user_count FROM crm_users GROUP BY tenantId ORDER BY tenantId;",
+  "rows": [
+    {
+      "tenantId": "99",
+      "user_count": "2"
+    },
+    {
+      "tenantId": "150002",
+      "user_count": "1"
+    },
+    {
+      "tenantId": "210002",
+      "user_count": "13"
+    },
+    {
+      "tenantId": "240002",
+      "user_count": "1"
+    },
+    {
+      "tenantId": "240003",
+      "user_count": "1"
+    },
+    {
+      "tenantId": "240004",
+      "user_count": "1"
+    },
+    {
+      "tenantId": "240005",
+      "user_count": "2"
+    },
+    {
+      "tenantId": "240006",
+      "user_count": "3"
+    },
+    {
+      "tenantId": "240008",
+      "user_count": "1"
+    },
+    {
+      "tenantId": "240009",
+      "user_count": "1"
+    },
+    {
+      "tenantId": "240010",
+      "user_count": "1"
+    },
+    {
+      "tenantId": "240011",
+      "user_count": "1"
+    },
+    {
+      "tenantId": "270002",
+      "user_count": "1"
+    },
+    {
+      "tenantId": "270003",
+      "user_count": "1"
+    },
+    {
+      "tenantId": "270004",
+      "user_count": "1"
+    },
+    {
+      "tenantId": "270005",
+      "user_count": "1"
+    },
+    {
+      "tenantId": "270008",
+      "user_count": "1"
+    },
+    {
+      "tenantId": "270010",
+      "user_count": "1"
+    },
+    {
+      "tenantId": "270011",
+      "user_count": "1"
+    },
+    {
+      "tenantId": "270012",
+      "user_count": "1"
+    },
+    {
+      "tenantId": "300002",
+      "user_count": "1"
+    },
+    {
+      "tenantId": "300003",
+      "user_count": "2"
+    },
+    {
+      "tenantId": "300004",
+      "user_count": "1"
+    },
+    {
+      "tenantId": "300005",
+      "user_count": "5"
+    },
+    {
+      "tenantId": "300006",
+      "user_count": "1"
+    },
+    {
+      "tenantId": "300007",
+      "user_count": "4"
+    }
+  ],
+  "messages": [],
+  "stdout": "tenantId\tuser_count\n99\t2\n150002\t1\n210002\t13\n240002\t1\n240003\t1\n240004\t1\n240005\t2\n240006\t3\n240008\t1\n240009\t1\n240010\t1\n240011\t1\n270002\t1\n270003\t1\n270004\t1\n270005\t1\n270008\t1\n270010\t1\n270011\t1\n270012\t1\n300002\t1\n300003\t2\n300004\t1\n300005\t5\n300006\t1\n300007\t4\n",
+  "stderr": "",
+  "execution_time_ms": 58
+}
