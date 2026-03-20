@@ -141,14 +141,23 @@ export const insightsRouter = router({
       .mutation(async ({ input, ctx }) => crm.createAlert({ ...input, tenantId: getTenantId(ctx) })),
   }),
   dashboard: tenantProcedure
-    
+    .input(z.object({ dateFrom: z.string().optional(), dateTo: z.string().optional(), userId: z.number().optional() }).optional())
     .query(async ({ input, ctx }) => {
+      const dateOpts: any = {};
+      if (input?.dateFrom) dateOpts.dateFrom = input.dateFrom;
+      if (input?.dateTo) dateOpts.dateTo = input.dateTo;
+      if (input?.userId) { dateOpts.ownerUserId = input.userId; dateOpts.assignedToUserId = input.userId; }
+      const hasOpts = Object.keys(dateOpts).length > 0;
+      const contactOpts = hasOpts ? { dateFrom: dateOpts.dateFrom, dateTo: dateOpts.dateTo, ownerUserId: dateOpts.ownerUserId } : undefined;
+      const dealOpts = hasOpts ? { dateFrom: dateOpts.dateFrom, dateTo: dateOpts.dateTo, ownerUserId: dateOpts.ownerUserId } : undefined;
+      const convOpts = hasOpts ? { dateFrom: dateOpts.dateFrom, dateTo: dateOpts.dateTo, assignedToUserId: dateOpts.assignedToUserId } : undefined;
+      const valOpts = hasOpts ? { dateFrom: dateOpts.dateFrom, dateTo: dateOpts.dateTo, ownerUserId: dateOpts.ownerUserId } : undefined;
       const [totalContacts, openDeals, wonDeals, openConversations, dealValue] = await Promise.all([
-        crm.countContacts(getTenantId(ctx)),
-        crm.countDeals(getTenantId(ctx), "open"),
-        crm.countDeals(getTenantId(ctx), "won"),
-        crm.countConversations(getTenantId(ctx), "open"),
-        crm.sumDealValue(getTenantId(ctx), "open"),
+        crm.countContacts(getTenantId(ctx), contactOpts),
+        crm.countDeals(getTenantId(ctx), "open", dealOpts),
+        crm.countDeals(getTenantId(ctx), "won", dealOpts),
+        crm.countConversations(getTenantId(ctx), "open", convOpts),
+        crm.sumDealValue(getTenantId(ctx), "open", valOpts),
       ]);
       return { totalContacts, openDeals, wonDeals, openConversations, pipelineValueCents: dealValue };
     }),

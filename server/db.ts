@@ -839,7 +839,7 @@ export async function getNextRoundRobinAgent(tenantId: number): Promise<number |
 
 // ─── Dashboard Metrics ───
 
-export async function getDashboardMetrics(tenantId: number, userId?: number, pipelineId?: number, dealStatus?: string) {
+export async function getDashboardMetrics(tenantId: number, userId?: number, pipelineId?: number, dealStatus?: string, dateFrom?: string, dateTo?: string) {
   const db = await getDb();
   if (!db) {
     return {
@@ -858,6 +858,17 @@ export async function getDashboardMetrics(tenantId: number, userId?: number, pip
   const now = new Date();
   const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
   const sixtyDaysAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
+
+  // Date range filter for deals, contacts, trips, tasks
+  const dealDateFilter = dateFrom || dateTo
+    ? sql`${dateFrom ? sql`AND d_inner.createdAt >= ${new Date(dateFrom + "T00:00:00")}` : sql``} ${dateTo ? sql`AND d_inner.createdAt <= ${new Date(dateTo + "T23:59:59")}` : sql``}`
+    : sql``;
+  const contactDateFilter = dateFrom || dateTo
+    ? sql`${dateFrom ? sql`AND c.createdAt >= ${new Date(dateFrom + "T00:00:00")}` : sql``} ${dateTo ? sql`AND c.createdAt <= ${new Date(dateTo + "T23:59:59")}` : sql``}`
+    : sql``;
+  const taskDateFilter = dateFrom || dateTo
+    ? sql`${dateFrom ? sql`AND createdAt >= ${new Date(dateFrom + "T00:00:00")}` : sql``} ${dateTo ? sql`AND createdAt <= ${new Date(dateTo + "T23:59:59")}` : sql``}`
+    : sql``;
 
   // Owner filter: if userId provided, filter deals/contacts/tasks by owner
   const ownerFilter = userId ? sql`AND d_inner.ownerUserId = ${userId}` : sql``;
@@ -884,28 +895,28 @@ export async function getDashboardMetrics(tenantId: number, userId?: number, pip
       -- Deals filtered by status
       (SELECT COUNT(*) FROM deals d_inner
         ${pipelineJoin}
-        WHERE d_inner.tenantId = ${tenantId} AND d_inner.deletedAt IS NULL ${statusFilter} ${pipelineFilter} ${ownerFilter}) AS activeDeals,
+        WHERE d_inner.tenantId = ${tenantId} AND d_inner.deletedAt IS NULL ${statusFilter} ${pipelineFilter} ${ownerFilter} ${dealDateFilter}) AS activeDeals,
       -- Deals created last 30 days
       (SELECT COUNT(*) FROM deals d_inner
         ${pipelineJoin}
-        WHERE d_inner.tenantId = ${tenantId} AND d_inner.deletedAt IS NULL ${statusFilter} ${pipelineFilter} ${ownerFilter}
+        WHERE d_inner.tenantId = ${tenantId} AND d_inner.deletedAt IS NULL ${statusFilter} ${pipelineFilter} ${ownerFilter} ${dealDateFilter}
         AND d_inner.createdAt >= ${thirtyDaysAgo}) AS dealsLast30,
       -- Deals created previous 30 days
       (SELECT COUNT(*) FROM deals d_inner
         ${pipelineJoin}
-        WHERE d_inner.tenantId = ${tenantId} AND d_inner.deletedAt IS NULL ${statusFilter} ${pipelineFilter} ${ownerFilter}
+        WHERE d_inner.tenantId = ${tenantId} AND d_inner.deletedAt IS NULL ${statusFilter} ${pipelineFilter} ${ownerFilter} ${dealDateFilter}
         AND d_inner.createdAt >= ${sixtyDaysAgo} AND d_inner.createdAt < ${thirtyDaysAgo}) AS dealsPrev30,
 
       -- Total unique contacts in user's portfolio
       (SELECT COUNT(DISTINCT c.id) FROM contacts c
-        WHERE c.tenantId = ${tenantId} AND c.deletedAt IS NULL ${contactOwnerFilter}) AS totalContacts,
+        WHERE c.tenantId = ${tenantId} AND c.deletedAt IS NULL ${contactOwnerFilter} ${contactDateFilter}) AS totalContacts,
       -- Contacts added last 30 days
       (SELECT COUNT(DISTINCT c.id) FROM contacts c
-        WHERE c.tenantId = ${tenantId} AND c.deletedAt IS NULL ${contactOwnerFilter}
+        WHERE c.tenantId = ${tenantId} AND c.deletedAt IS NULL ${contactOwnerFilter} ${contactDateFilter}
         AND c.createdAt >= ${thirtyDaysAgo}) AS contactsLast30,
       -- Contacts added previous 30 days
       (SELECT COUNT(DISTINCT c.id) FROM contacts c
-        WHERE c.tenantId = ${tenantId} AND c.deletedAt IS NULL ${contactOwnerFilter}
+        WHERE c.tenantId = ${tenantId} AND c.deletedAt IS NULL ${contactOwnerFilter} ${contactDateFilter}
         AND c.createdAt >= ${sixtyDaysAgo} AND c.createdAt < ${thirtyDaysAgo}) AS contactsPrev30,
 
       -- Active trips: deals in post_sale pipeline EXCEPT stages where name contains 'finalizada' or isWon=true
@@ -915,7 +926,7 @@ export async function getDashboardMetrics(tenantId: number, userId?: number, pip
         WHERE d_inner.tenantId = ${tenantId} AND d_inner.status = 'open' AND d_inner.deletedAt IS NULL
         AND ps.isWon = 0 AND ps.isLost = 0
         AND LOWER(ps.name) NOT LIKE '%finalizada%'
-        ${ownerFilter}) AS activeTrips,
+        ${ownerFilter} ${dealDateFilter}) AS activeTrips,
       -- Trips last 30 days
       (SELECT COUNT(*) FROM deals d_inner
         JOIN pipelines p ON p.id = d_inner.pipelineId AND p.pipelineType = 'post_sale'
@@ -923,7 +934,7 @@ export async function getDashboardMetrics(tenantId: number, userId?: number, pip
         WHERE d_inner.tenantId = ${tenantId} AND d_inner.status = 'open' AND d_inner.deletedAt IS NULL
         AND ps.isWon = 0 AND ps.isLost = 0
         AND LOWER(ps.name) NOT LIKE '%finalizada%'
-        ${ownerFilter}
+        ${ownerFilter} ${dealDateFilter}
         AND d_inner.createdAt >= ${thirtyDaysAgo}) AS tripsLast30,
       -- Trips previous 30 days
       (SELECT COUNT(*) FROM deals d_inner
@@ -932,22 +943,22 @@ export async function getDashboardMetrics(tenantId: number, userId?: number, pip
         WHERE d_inner.tenantId = ${tenantId} AND d_inner.status = 'open' AND d_inner.deletedAt IS NULL
         AND ps.isWon = 0 AND ps.isLost = 0
         AND LOWER(ps.name) NOT LIKE '%finalizada%'
-        ${ownerFilter}
+        ${ownerFilter} ${dealDateFilter}
         AND d_inner.createdAt >= ${sixtyDaysAgo} AND d_inner.createdAt < ${thirtyDaysAgo}) AS tripsPrev30,
 
       -- Pending tasks for user
-      (SELECT COUNT(*) FROM crm_tasks WHERE tenantId = ${tenantId} AND status IN ('pending', 'in_progress') ${taskAssigneeFilter}) AS pendingTasks,
+      (SELECT COUNT(*) FROM crm_tasks WHERE tenantId = ${tenantId} AND status IN ('pending', 'in_progress') ${taskAssigneeFilter} ${taskDateFilter}) AS pendingTasks,
       -- Tasks last 30 days
-      (SELECT COUNT(*) FROM crm_tasks WHERE tenantId = ${tenantId} AND status IN ('pending', 'in_progress') ${taskAssigneeFilter}
+      (SELECT COUNT(*) FROM crm_tasks WHERE tenantId = ${tenantId} AND status IN ('pending', 'in_progress') ${taskAssigneeFilter} ${taskDateFilter}
         AND createdAt >= ${thirtyDaysAgo}) AS tasksLast30,
       -- Tasks previous 30 days
-      (SELECT COUNT(*) FROM crm_tasks WHERE tenantId = ${tenantId} AND status IN ('pending', 'in_progress') ${taskAssigneeFilter}
+      (SELECT COUNT(*) FROM crm_tasks WHERE tenantId = ${tenantId} AND status IN ('pending', 'in_progress') ${taskAssigneeFilter} ${taskDateFilter}
         AND createdAt >= ${sixtyDaysAgo} AND createdAt < ${thirtyDaysAgo}) AS tasksPrev30,
 
       -- Total deal value filtered by status
       (SELECT COALESCE(SUM(d_inner.valueCents), 0) FROM deals d_inner
         ${pipelineJoin}
-        WHERE d_inner.tenantId = ${tenantId} AND d_inner.deletedAt IS NULL ${statusFilter} ${pipelineFilter} ${ownerFilter}) AS totalDealValueCents
+        WHERE d_inner.tenantId = ${tenantId} AND d_inner.deletedAt IS NULL ${statusFilter} ${pipelineFilter} ${ownerFilter} ${dealDateFilter}) AS totalDealValueCents
   `);
 
   const row = (result as any)[0] || {};
@@ -972,11 +983,14 @@ export async function getDashboardMetrics(tenantId: number, userId?: number, pip
 
 // ─── Pipeline Summary for Dashboard ───
 
-export async function getPipelineSummary(tenantId: number, userId?: number, pipelineId?: number, dealStatus?: string) {
+export async function getPipelineSummary(tenantId: number, userId?: number, pipelineId?: number, dealStatus?: string, dateFrom?: string, dateTo?: string) {
   const db = await getDb();
   if (!db) return [];
 
   const ownerFilter = userId ? sql`AND d.ownerUserId = ${userId}` : sql``;
+  const dateFilter = dateFrom || dateTo
+    ? sql`${dateFrom ? sql`AND d.createdAt >= ${new Date(dateFrom + "T00:00:00")}` : sql``} ${dateTo ? sql`AND d.createdAt <= ${new Date(dateTo + "T23:59:59")}` : sql``}`
+    : sql``;
   // If pipelineId provided, filter by specific pipeline; otherwise by type 'sales'
   const pipelineCondition = pipelineId
     ? sql`AND p.id = ${pipelineId}`
@@ -1002,7 +1016,7 @@ export async function getPipelineSummary(tenantId: number, userId?: number, pipe
       COALESCE(SUM(d.valueCents), 0) AS totalValueCents
     FROM pipeline_stages ps
     JOIN pipelines p ON p.id = ps.pipelineId ${pipelineCondition}
-    LEFT JOIN deals d ON d.stageId = ps.id AND d.tenantId = ${tenantId} AND d.deletedAt IS NULL ${statusFilter} ${ownerFilter}
+    LEFT JOIN deals d ON d.stageId = ps.id AND d.tenantId = ${tenantId} AND d.deletedAt IS NULL ${statusFilter} ${ownerFilter} ${dateFilter}
     WHERE ps.tenantId = ${tenantId}
     GROUP BY ps.id, ps.name, ps.color, ps.orderIndex, ps.isWon, ps.isLost
     ORDER BY ps.orderIndex ASC
@@ -1890,9 +1904,13 @@ export async function markWaConversationReadDb(conversationId: number) {
  * Get message status distribution for a given period.
  * Returns counts for each status: sent, delivered, read, played, received, failed.
  */
-export async function getMessageStatusMetrics(sessionId: string, periodDays: number = 7) {
+export async function getMessageStatusMetrics(sessionId: string, periodDays: number = 7, dateFrom?: string, dateTo?: string) {
   const db = await getDb();
   if (!db) return [];
+
+  const dateCondition = dateFrom || dateTo
+    ? sql`${dateFrom ? sql`AND timestamp >= ${new Date(dateFrom + "T00:00:00")}` : sql``} ${dateTo ? sql`AND timestamp <= ${new Date(dateTo + "T23:59:59")}` : sql``}`
+    : sql`AND timestamp >= DATE_SUB(NOW(), INTERVAL ${periodDays} DAY)`;
 
   const result = await db.execute(sql`
     SELECT 
@@ -1903,7 +1921,7 @@ export async function getMessageStatusMetrics(sessionId: string, periodDays: num
       COUNT(*) AS count
     FROM messages
     WHERE sessionId = ${sessionId}
-      AND timestamp >= DATE_SUB(NOW(), INTERVAL ${periodDays} DAY)
+      ${dateCondition}
       AND remoteJid NOT LIKE '%@g.us'
       AND remoteJid != 'status@broadcast'
       AND messageType NOT IN ('protocolMessage','senderKeyDistributionMessage','messageContextInfo','reactionMessage','ephemeralMessage','deviceSentMessage','bcallMessage','callLogMesssage','keepInChatMessage','encReactionMessage','editedMessage','viewOnceMessageV2Extension')
@@ -1917,11 +1935,14 @@ export async function getMessageStatusMetrics(sessionId: string, periodDays: num
  * Get message volume over time (hourly or daily buckets).
  * Returns sent/received counts per time bucket.
  */
-export async function getMessageVolumeOverTime(sessionId: string, periodDays: number = 7, granularity: "hour" | "day" = "day") {
+export async function getMessageVolumeOverTime(sessionId: string, periodDays: number = 7, granularity: "hour" | "day" = "day", dateFrom?: string, dateTo?: string) {
   const db = await getDb();
   if (!db) return [];
 
   const dateFormat = granularity === "hour" ? "%Y-%m-%d %H:00" : "%Y-%m-%d";
+  const dateCondition = dateFrom || dateTo
+    ? sql`${dateFrom ? sql`AND timestamp >= ${new Date(dateFrom + "T00:00:00")}` : sql``} ${dateTo ? sql`AND timestamp <= ${new Date(dateTo + "T23:59:59")}` : sql``}`
+    : sql`AND timestamp >= DATE_SUB(NOW(), INTERVAL ${periodDays} DAY)`;
 
   const result = await db.execute(sql`
     SELECT 
@@ -1931,7 +1952,7 @@ export async function getMessageVolumeOverTime(sessionId: string, periodDays: nu
       COUNT(*) AS total
     FROM messages
     WHERE sessionId = ${sessionId}
-      AND timestamp >= DATE_SUB(NOW(), INTERVAL ${periodDays} DAY)
+      ${dateCondition}
       AND remoteJid NOT LIKE '%@g.us'
       AND remoteJid != 'status@broadcast'
       AND messageType NOT IN ('protocolMessage','senderKeyDistributionMessage','messageContextInfo','reactionMessage','ephemeralMessage','deviceSentMessage','bcallMessage','callLogMesssage','keepInChatMessage','encReactionMessage','editedMessage','viewOnceMessageV2Extension')
@@ -1944,9 +1965,13 @@ export async function getMessageVolumeOverTime(sessionId: string, periodDays: nu
 /**
  * Get delivery rate metrics: percentage of sent messages that were delivered/read.
  */
-export async function getDeliveryRateMetrics(sessionId: string, periodDays: number = 7) {
+export async function getDeliveryRateMetrics(sessionId: string, periodDays: number = 7, dateFrom?: string, dateTo?: string) {
   const db = await getDb();
   if (!db) return null;
+
+  const dateCondition = dateFrom || dateTo
+    ? sql`${dateFrom ? sql`AND timestamp >= ${new Date(dateFrom + "T00:00:00")}` : sql``} ${dateTo ? sql`AND timestamp <= ${new Date(dateTo + "T23:59:59")}` : sql``}`
+    : sql`AND timestamp >= DATE_SUB(NOW(), INTERVAL ${periodDays} DAY)`;
 
   const result = await db.execute(sql`
     SELECT 
@@ -1959,7 +1984,7 @@ export async function getDeliveryRateMetrics(sessionId: string, periodDays: numb
     FROM messages
     WHERE sessionId = ${sessionId}
       AND fromMe = 1
-      AND timestamp >= DATE_SUB(NOW(), INTERVAL ${periodDays} DAY)
+      ${dateCondition}
       AND remoteJid NOT LIKE '%@g.us'
       AND remoteJid != 'status@broadcast'
       AND messageType NOT IN ('protocolMessage','senderKeyDistributionMessage','messageContextInfo','reactionMessage','ephemeralMessage','deviceSentMessage','bcallMessage','callLogMesssage','keepInChatMessage','encReactionMessage','editedMessage','viewOnceMessageV2Extension')
@@ -2001,9 +2026,13 @@ export async function getRecentMessageActivity(sessionId: string, limit: number 
 /**
  * Get message type distribution for the period.
  */
-export async function getMessageTypeDistribution(sessionId: string, periodDays: number = 7) {
+export async function getMessageTypeDistribution(sessionId: string, periodDays: number = 7, dateFrom?: string, dateTo?: string) {
   const db = await getDb();
   if (!db) return [];
+
+  const dateCondition = dateFrom || dateTo
+    ? sql`${dateFrom ? sql`AND timestamp >= ${new Date(dateFrom + "T00:00:00")}` : sql``} ${dateTo ? sql`AND timestamp <= ${new Date(dateTo + "T23:59:59")}` : sql``}`
+    : sql`AND timestamp >= DATE_SUB(NOW(), INTERVAL ${periodDays} DAY)`;
 
   const result = await db.execute(sql`
     SELECT 
@@ -2013,7 +2042,7 @@ export async function getMessageTypeDistribution(sessionId: string, periodDays: 
       SUM(CASE WHEN fromMe = 0 THEN 1 ELSE 0 END) AS receivedCount
     FROM messages
     WHERE sessionId = ${sessionId}
-      AND timestamp >= DATE_SUB(NOW(), INTERVAL ${periodDays} DAY)
+      ${dateCondition}
       AND remoteJid NOT LIKE '%@g.us'
       AND remoteJid != 'status@broadcast'
       AND messageType NOT IN ('protocolMessage','senderKeyDistributionMessage','messageContextInfo','reactionMessage','ephemeralMessage','deviceSentMessage','bcallMessage','callLogMesssage','keepInChatMessage','encReactionMessage','editedMessage','viewOnceMessageV2Extension')
@@ -2026,9 +2055,13 @@ export async function getMessageTypeDistribution(sessionId: string, periodDays: 
 /**
  * Get top contacts by message volume.
  */
-export async function getTopContactsByVolume(sessionId: string, periodDays: number = 7, limit: number = 10) {
+export async function getTopContactsByVolume(sessionId: string, periodDays: number = 7, limit: number = 10, dateFrom?: string, dateTo?: string) {
   const db = await getDb();
   if (!db) return [];
+
+  const dateCondition = dateFrom || dateTo
+    ? sql`${dateFrom ? sql`AND m.timestamp >= ${new Date(dateFrom + "T00:00:00")}` : sql``} ${dateTo ? sql`AND m.timestamp <= ${new Date(dateTo + "T23:59:59")}` : sql``}`
+    : sql`AND m.timestamp >= DATE_SUB(NOW(), INTERVAL ${periodDays} DAY)`;
 
   const result = await db.execute(sql`
     SELECT 
@@ -2048,7 +2081,7 @@ export async function getTopContactsByVolume(sessionId: string, periodDays: numb
       MAX(m.timestamp) AS lastActivity
     FROM messages m
     WHERE m.sessionId = ${sessionId}
-      AND m.timestamp >= DATE_SUB(NOW(), INTERVAL ${periodDays} DAY)
+      ${dateCondition}
       AND m.remoteJid NOT LIKE '%@g.us'
       AND m.remoteJid != 'status@broadcast'
       AND m.messageType NOT IN ('protocolMessage','senderKeyDistributionMessage','messageContextInfo','reactionMessage','ephemeralMessage','deviceSentMessage','bcallMessage','callLogMesssage','keepInChatMessage','encReactionMessage','editedMessage','viewOnceMessageV2Extension')
@@ -2062,9 +2095,13 @@ export async function getTopContactsByVolume(sessionId: string, periodDays: numb
 /**
  * Get response time metrics (average time between received and first reply).
  */
-export async function getResponseTimeMetrics(sessionId: string, periodDays: number = 7) {
+export async function getResponseTimeMetrics(sessionId: string, periodDays: number = 7, dateFrom?: string, dateTo?: string) {
   const db = await getDb();
   if (!db) return null;
+
+  const inDateCondition = dateFrom || dateTo
+    ? sql`${dateFrom ? sql`AND m_in.timestamp >= ${new Date(dateFrom + "T00:00:00")}` : sql``} ${dateTo ? sql`AND m_in.timestamp <= ${new Date(dateTo + "T23:59:59")}` : sql``}`
+    : sql`AND m_in.timestamp >= DATE_SUB(NOW(), INTERVAL ${periodDays} DAY)`;
 
   const result = await db.execute(sql`
     SELECT 
@@ -2088,7 +2125,7 @@ export async function getResponseTimeMetrics(sessionId: string, periodDays: numb
         AND m_out.timestamp <= DATE_ADD(m_in.timestamp, INTERVAL 24 HOUR)
       WHERE m_in.sessionId = ${sessionId}
         AND m_in.fromMe = 0
-        AND m_in.timestamp >= DATE_SUB(NOW(), INTERVAL ${periodDays} DAY)
+        ${inDateCondition}
         AND m_in.remoteJid NOT LIKE '%@g.us'
         AND m_in.remoteJid != 'status@broadcast'
       GROUP BY m_in.remoteJid, m_in.id, m_in.timestamp

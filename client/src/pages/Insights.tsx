@@ -87,10 +87,19 @@ function StatusBadge({ status }: { status: string }) {
 
 // ─── CRM Dashboard ───
 function CRMDashboard() {
+  const { user } = useAuth();
   const dateFilter = useDateFilter("all");
-  const dashboard = trpc.insights.dashboard.useQuery();
-  const homeData = trpc.dashboard.metrics.useQuery({}, { refetchInterval: 60000 });
-  const pipelineSummary = trpc.dashboard.pipelineSummary.useQuery({}, { refetchInterval: 60000 });
+  const [selectedUserId, setSelectedUserId] = useState<string>("all");
+  const teamMembers = trpc.rdStation.listTeamMembers.useQuery();
+  const isAdmin = (user as any)?.role === "admin";
+
+  const userIdNum = selectedUserId !== "all" ? Number(selectedUserId) : undefined;
+  const insightsInput = (dateFilter.dates.dateFrom || dateFilter.dates.dateTo || userIdNum)
+    ? { dateFrom: dateFilter.dates.dateFrom, dateTo: dateFilter.dates.dateTo, userId: userIdNum }
+    : undefined;
+  const dashboard = trpc.insights.dashboard.useQuery(insightsInput);
+  const homeData = trpc.dashboard.metrics.useQuery({ dateFrom: dateFilter.dates.dateFrom, dateTo: dateFilter.dates.dateTo, userId: userIdNum }, { refetchInterval: 60000 });
+  const pipelineSummary = trpc.dashboard.pipelineSummary.useQuery({ dateFrom: dateFilter.dates.dateFrom, dateTo: dateFilter.dates.dateTo, userId: userIdNum }, { refetchInterval: 60000 });
   const d = dashboard.data;
   const h = homeData.data;
 
@@ -112,8 +121,8 @@ function CRMDashboard() {
 
   return (
     <div className="space-y-5">
-      {/* Date filter */}
-      <div className="flex items-center gap-3">
+      {/* Filters */}
+      <div className="flex flex-wrap items-center gap-3">
         <DateRangeFilter
           preset={dateFilter.preset}
           onPresetChange={dateFilter.setPreset}
@@ -123,6 +132,21 @@ function CRMDashboard() {
           onCustomToChange={dateFilter.setCustomTo}
           onReset={dateFilter.reset}
         />
+
+        {isAdmin && (teamMembers.data || []).length > 0 && (
+          <Select value={selectedUserId} onValueChange={setSelectedUserId}>
+            <SelectTrigger className="h-8 w-auto min-w-[160px] text-xs gap-1.5">
+              <Users className="h-3 w-3 text-muted-foreground shrink-0" />
+              <SelectValue placeholder="Usuário" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos os usuários</SelectItem>
+              {(teamMembers.data || []).map((m: any) => (
+                <SelectItem key={m.id} value={String(m.id)}>{m.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
       </div>
 
       {/* Metric cards */}
@@ -265,6 +289,9 @@ function MessagesDashboard() {
   const { user } = useAuth();
   const { lastMessage, lastStatusUpdate, isConnected } = useSocket();
   const dateFilter = useDateFilter("last7");
+  const [selectedMsgUserId, setSelectedMsgUserId] = useState<string>("all");
+  const teamMembersMsg = trpc.rdStation.listTeamMembers.useQuery();
+  const isAdminMsg = (user as any)?.role === "admin";
   const periodDays = useMemo(() => {
     if (dateFilter.preset === "all") return 365;
     if (dateFilter.preset === "custom") {
@@ -280,8 +307,18 @@ function MessagesDashboard() {
   const [msgTab, setMsgTab] = useState("overview");
   const [liveEvents, setLiveEvents] = useState<Array<{ type: string; data: any; ts: number }>>([]);
 
-  const sessionsQuery = trpc.whatsapp.sessions.useQuery(undefined, { enabled: !!user });
-  const sessions = sessionsQuery.data || [];
+  // Admin can see all tenant sessions; non-admin sees only their own
+  const allTenantSessions = trpc.whatsapp.tenantSessions.useQuery(undefined, { enabled: !!user && isAdminMsg });
+  const ownSessions = trpc.whatsapp.sessions.useQuery(undefined, { enabled: !!user });
+  const sessions = useMemo(() => {
+    if (isAdminMsg && selectedMsgUserId !== "all" && allTenantSessions.data) {
+      return allTenantSessions.data.filter((s: any) => String(s.userId) === selectedMsgUserId);
+    }
+    if (isAdminMsg && selectedMsgUserId === "all" && allTenantSessions.data) {
+      return allTenantSessions.data;
+    }
+    return ownSessions.data || [];
+  }, [isAdminMsg, selectedMsgUserId, allTenantSessions.data, ownSessions.data]);
   const [selectedSession, setSelectedSession] = useState("");
 
   useEffect(() => {
@@ -290,18 +327,30 @@ function MessagesDashboard() {
     }
   }, [sessions, selectedSession]);
 
+  // When user filter changes, auto-select first session of that user
+  useEffect(() => {
+    if (sessions.length > 0) {
+      setSelectedSession(sessions[0].sessionId);
+    } else {
+      setSelectedSession("");
+    }
+  }, [selectedMsgUserId]);
+
   const queryEnabled = !!selectedSession && !!user;
 
+  const dateFrom = dateFilter.dates.dateFrom;
+  const dateTo = dateFilter.dates.dateTo;
+
   const statusMetrics = trpc.monitoring.statusMetrics.useQuery(
-    { sessionId: selectedSession, periodDays },
+    { sessionId: selectedSession, periodDays, dateFrom, dateTo },
     { enabled: queryEnabled, refetchInterval: 30000 }
   );
   const volumeOverTime = trpc.monitoring.volumeOverTime.useQuery(
-    { sessionId: selectedSession, periodDays, granularity: periodDays <= 2 ? "hour" : "day" },
+    { sessionId: selectedSession, periodDays, granularity: periodDays <= 2 ? "hour" : "day", dateFrom, dateTo },
     { enabled: queryEnabled, refetchInterval: 30000 }
   );
   const deliveryRate = trpc.monitoring.deliveryRate.useQuery(
-    { sessionId: selectedSession, periodDays },
+    { sessionId: selectedSession, periodDays, dateFrom, dateTo },
     { enabled: queryEnabled, refetchInterval: 30000 }
   );
   const recentActivity = trpc.monitoring.recentActivity.useQuery(
@@ -309,15 +358,15 @@ function MessagesDashboard() {
     { enabled: queryEnabled, refetchInterval: 15000 }
   );
   const typeDistribution = trpc.monitoring.typeDistribution.useQuery(
-    { sessionId: selectedSession, periodDays },
+    { sessionId: selectedSession, periodDays, dateFrom, dateTo },
     { enabled: queryEnabled, refetchInterval: 60000 }
   );
   const topContacts = trpc.monitoring.topContacts.useQuery(
-    { sessionId: selectedSession, periodDays, limit: 10 },
+    { sessionId: selectedSession, periodDays, limit: 10, dateFrom, dateTo },
     { enabled: queryEnabled, refetchInterval: 60000 }
   );
   const responseTime = trpc.monitoring.responseTime.useQuery(
-    { sessionId: selectedSession, periodDays },
+    { sessionId: selectedSession, periodDays, dateFrom, dateTo },
     { enabled: queryEnabled, refetchInterval: 60000 }
   );
 
@@ -397,6 +446,21 @@ function MessagesDashboard() {
           <TooltipContent>Socket.IO {isConnected ? "ativo" : "inativo"} — atualizações em tempo real</TooltipContent>
         </Tooltip>
 
+        {isAdminMsg && (teamMembersMsg.data || []).length > 0 && (
+          <Select value={selectedMsgUserId} onValueChange={setSelectedMsgUserId}>
+            <SelectTrigger className="h-8 w-auto min-w-[160px] text-xs gap-1.5">
+              <Users className="h-3 w-3 text-muted-foreground shrink-0" />
+              <SelectValue placeholder="Usuário" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos os usuários</SelectItem>
+              {(teamMembersMsg.data || []).map((m: any) => (
+                <SelectItem key={m.id} value={String(m.id)}>{m.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+
         {sessions.length > 1 && (
           <Select value={selectedSession} onValueChange={setSelectedSession}>
             <SelectTrigger className="w-[180px] h-8 text-xs">
@@ -404,7 +468,9 @@ function MessagesDashboard() {
             </SelectTrigger>
             <SelectContent>
               {sessions.map((s: any) => (
-                <SelectItem key={s.sessionId} value={s.sessionId}>{s.sessionId}</SelectItem>
+                <SelectItem key={s.sessionId} value={s.sessionId}>
+                  {s.ownerName ? `${s.ownerName} (${s.sessionId})` : s.sessionId}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>

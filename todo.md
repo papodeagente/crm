@@ -4324,3 +4324,20 @@
 - [x] Atualizar frontend para exibir progresso real calculado
 - [x] Testes vitest para validar os 3 tipos de meta com progresso automático (28 testes passando)
 - [x] Validar que nenhuma outra parte do sistema foi alterada
+
+## Correção: Filtros de Data na Análise de Dados
+- [x] Diagnosticar causa raiz: filtro de data não aplicado nos indicadores
+- [x] Corrigir backend: queries/procedures para filtrar por período selecionado
+- [x] Corrigir frontend: garantir envio correto do período ao backend
+- [x] Testes vitest para validar filtros de data nos indicadores
+- [x] Validar que nenhuma outra parte do sistema foi alterada
+
+## Filtro por Usuário nas Análises
+- [x] Diagnosticar como listar usuários do tenant e quais endpoints já suportam filtro por userId
+- [x] Backend: garantir que insights.dashboard, dashboard.metrics, dashboard.pipelineSummary aceitem userId
+- [x] Backend: monitoring.* filtra por sessão WhatsApp do usuário selecionado (via tenantSessions)
+- [x] Frontend CRM: adicionar seletor de usuário na aba CRM do Insights
+- [x] Frontend Mensagens: adicionar seletor de usuário na aba Mensagens do Insights
+- [x] Garantir que filtro por usuário funcione em conjunto com filtro por data
+- [x] Testes vitest para validar filtros combinados (data + usuário) — 13 testes passando
+- [x] Nenhuma outra área do sistema alterada

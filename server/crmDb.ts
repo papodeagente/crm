@@ -391,10 +391,13 @@ export async function countDeals(tenantId: number, status?: string, opts?: { pip
   const rows = await db.select({ count: sql<number>`count(*)` }).from(deals).where(and(...conditions));
   return rows[0]?.count || 0;
 }
-export async function sumDealValue(tenantId: number, status?: string) {
+export async function sumDealValue(tenantId: number, status?: string, opts?: { dateFrom?: string; dateTo?: string; ownerUserId?: number }) {
   const db = await getDb(); if (!db) return 0;
   const conditions: any[] = [eq(deals.tenantId, tenantId), isNull(deals.deletedAt)];
   if (status) conditions.push(eq(deals.status, status as any));
+  if (opts?.ownerUserId) conditions.push(eq(deals.ownerUserId, opts.ownerUserId));
+  if (opts?.dateFrom) conditions.push(gte(deals.createdAt, new Date(opts.dateFrom + "T00:00:00")));
+  if (opts?.dateTo) conditions.push(lte(deals.createdAt, new Date(opts.dateTo + "T23:59:59")));
   const rows = await db.select({ total: sql<number>`COALESCE(SUM(valueCents), 0)` }).from(deals).where(and(...conditions));
   return rows[0]?.total || 0;
 }
@@ -737,10 +740,13 @@ export async function listInboxMessages(tenantId: number, conversationId: number
   const db = await getDb(); if (!db) return [];
   return db.select().from(inboxMessages).where(and(eq(inboxMessages.tenantId, tenantId), eq(inboxMessages.conversationId, conversationId))).orderBy(asc(inboxMessages.sentAt)).limit(opts?.limit || 100).offset(opts?.offset || 0);
 }
-export async function countConversations(tenantId: number, status?: string) {
+export async function countConversations(tenantId: number, status?: string, opts?: { dateFrom?: string; dateTo?: string; assignedToUserId?: number }) {
   const db = await getDb(); if (!db) return 0;
-  const conditions = [eq(conversations.tenantId, tenantId)];
+  const conditions: any[] = [eq(conversations.tenantId, tenantId)];
   if (status) conditions.push(eq(conversations.status, status as any));
+  if (opts?.assignedToUserId) conditions.push(eq(conversations.assignedToUserId, opts.assignedToUserId));
+  if (opts?.dateFrom) conditions.push(gte(conversations.createdAt, new Date(opts.dateFrom + "T00:00:00")));
+  if (opts?.dateTo) conditions.push(lte(conversations.createdAt, new Date(opts.dateTo + "T23:59:59")));
   const rows = await db.select({ count: sql<number>`count(*)` }).from(conversations).where(and(...conditions));
   return rows[0]?.count || 0;
 }

@@ -1648,19 +1648,19 @@ export const appRouter = router({
   // ─── Message Monitoring ───
   monitoring: router({
     statusMetrics: sessionTenantProcedure
-      .input(z.object({ sessionId: z.string(), periodDays: z.number().min(1).max(365).default(7) }))
+      .input(z.object({ sessionId: z.string(), periodDays: z.number().min(1).max(365).default(7), dateFrom: z.string().optional(), dateTo: z.string().optional() }))
       .query(async ({ input, ctx }) => {
-        return getMessageStatusMetrics(input.sessionId, input.periodDays);
+        return getMessageStatusMetrics(input.sessionId, input.periodDays, input.dateFrom, input.dateTo);
       }),
     volumeOverTime: sessionTenantProcedure
-      .input(z.object({ sessionId: z.string(), periodDays: z.number().min(1).max(365).default(7), granularity: z.enum(["hour", "day"]).default("day") }))
+      .input(z.object({ sessionId: z.string(), periodDays: z.number().min(1).max(365).default(7), granularity: z.enum(["hour", "day"]).default("day"), dateFrom: z.string().optional(), dateTo: z.string().optional() }))
       .query(async ({ input, ctx }) => {
-        return getMessageVolumeOverTime(input.sessionId, input.periodDays, input.granularity);
+        return getMessageVolumeOverTime(input.sessionId, input.periodDays, input.granularity, input.dateFrom, input.dateTo);
       }),
     deliveryRate: sessionTenantProcedure
-      .input(z.object({ sessionId: z.string(), periodDays: z.number().min(1).max(365).default(7) }))
+      .input(z.object({ sessionId: z.string(), periodDays: z.number().min(1).max(365).default(7), dateFrom: z.string().optional(), dateTo: z.string().optional() }))
       .query(async ({ input, ctx }) => {
-        return getDeliveryRateMetrics(input.sessionId, input.periodDays);
+        return getDeliveryRateMetrics(input.sessionId, input.periodDays, input.dateFrom, input.dateTo);
       }),
     recentActivity: sessionTenantProcedure
       .input(z.object({ sessionId: z.string(), limit: z.number().min(1).max(200).default(50) }))
@@ -1668,19 +1668,19 @@ export const appRouter = router({
         return getRecentMessageActivity(input.sessionId, input.limit);
       }),
     typeDistribution: sessionTenantProcedure
-      .input(z.object({ sessionId: z.string(), periodDays: z.number().min(1).max(365).default(7) }))
+      .input(z.object({ sessionId: z.string(), periodDays: z.number().min(1).max(365).default(7), dateFrom: z.string().optional(), dateTo: z.string().optional() }))
       .query(async ({ input, ctx }) => {
-        return getMessageTypeDistribution(input.sessionId, input.periodDays);
+        return getMessageTypeDistribution(input.sessionId, input.periodDays, input.dateFrom, input.dateTo);
       }),
     topContacts: sessionTenantProcedure
-      .input(z.object({ sessionId: z.string(), periodDays: z.number().min(1).max(365).default(7), limit: z.number().min(1).max(50).default(10) }))
+      .input(z.object({ sessionId: z.string(), periodDays: z.number().min(1).max(365).default(7), limit: z.number().min(1).max(50).default(10), dateFrom: z.string().optional(), dateTo: z.string().optional() }))
       .query(async ({ input, ctx }) => {
-        return getTopContactsByVolume(input.sessionId, input.periodDays, input.limit);
+        return getTopContactsByVolume(input.sessionId, input.periodDays, input.limit, input.dateFrom, input.dateTo);
       }),
     responseTime: sessionTenantProcedure
-      .input(z.object({ sessionId: z.string(), periodDays: z.number().min(1).max(365).default(7) }))
+      .input(z.object({ sessionId: z.string(), periodDays: z.number().min(1).max(365).default(7), dateFrom: z.string().optional(), dateTo: z.string().optional() }))
       .query(async ({ input, ctx }) => {
-        return getResponseTimeMetrics(input.sessionId, input.periodDays);
+        return getResponseTimeMetrics(input.sessionId, input.periodDays, input.dateFrom, input.dateTo);
       }),
     fixWebhooks: tenantProcedure
       .mutation(async () => {
@@ -1699,20 +1699,20 @@ export const appRouter = router({
   // ─── Dashboard ───
   dashboard: router({
     metrics: tenantProcedure
-      .input(z.object({ pipelineId: z.number().optional(), dealStatus: z.enum(['open', 'won', 'lost', 'all']).optional() }))
+      .input(z.object({ pipelineId: z.number().optional(), dealStatus: z.enum(['open', 'won', 'lost', 'all']).optional(), dateFrom: z.string().optional(), dateTo: z.string().optional(), userId: z.number().optional() }))
       .query(async ({ ctx, input }) => {
-        // Non-admin users see only their own deal metrics
+        // Non-admin users see only their own deal metrics; admin can filter by specific user
         const isAdmin = ctx.saasUser?.role === "admin";
-        const ownerFilter = isAdmin ? undefined : ctx.saasUser?.userId;
-        return getDashboardMetrics(getTenantId(ctx), ownerFilter, input.pipelineId, input.dealStatus);
+        const ownerFilter = input.userId ? input.userId : (isAdmin ? undefined : ctx.saasUser?.userId);
+        return getDashboardMetrics(getTenantId(ctx), ownerFilter, input.pipelineId, input.dealStatus, input.dateFrom, input.dateTo);
       }),
     pipelineSummary: tenantProcedure
-      .input(z.object({ pipelineId: z.number().optional(), dealStatus: z.enum(['open', 'won', 'lost', 'all']).optional() }))
+      .input(z.object({ pipelineId: z.number().optional(), dealStatus: z.enum(['open', 'won', 'lost', 'all']).optional(), dateFrom: z.string().optional(), dateTo: z.string().optional(), userId: z.number().optional() }))
       .query(async ({ ctx, input }) => {
-        // Non-admin users see only their own pipeline summary
+        // Non-admin users see only their own pipeline summary; admin can filter by specific user
         const isAdmin = ctx.saasUser?.role === "admin";
-        const ownerFilter = isAdmin ? undefined : ctx.saasUser?.userId;
-        return getPipelineSummary(getTenantId(ctx), ownerFilter, input.pipelineId, input.dealStatus);
+        const ownerFilter = input.userId ? input.userId : (isAdmin ? undefined : ctx.saasUser?.userId);
+        return getPipelineSummary(getTenantId(ctx), ownerFilter, input.pipelineId, input.dealStatus, input.dateFrom, input.dateTo);
       }),
     recentActivity: tenantProcedure
       .input(z.object({ limit: z.number().optional(), dateFrom: z.string().optional(), dateTo: z.string().optional() }))
