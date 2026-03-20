@@ -1,0 +1,140 @@
+{
+  "query": "\nSELECT messageType, \n  CASE WHEN content IS NULL THEN 'NULL' WHEN content = '' THEN 'EMPTY' ELSE LEFT(content, 30) END as content_preview, \n  COUNT(*) as cnt \nFROM messages \nWHERE messageType IN ('templateMessage', 'interactiveMessage', 'buttonsMessage', 'listMessage', 'listResponseMessage', 'buttonsResponseMessage', 'templateButtonReplyMessage', 'interactiveResponseMessage', 'orderMessage', 'productMessage', 'groupInviteMessage', 'pollCreationMessageV3', 'albumMessage', 'associatedChildMessage', 'editedMessage', 'viewOnceMessage', 'viewOnceMessageV2', 'placeholderMessage', 'lottieStickerMessage', 'pollUpdateMessage')\nAND (content IS NULL OR content = '' OR content LIKE '[%]')\nGROUP BY messageType, content_preview\nORDER BY cnt DESC\nLIMIT 30;\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute \nSELECT messageType, \n  CASE WHEN content IS NULL THEN 'NULL' WHEN content = '' THEN 'EMPTY' ELSE LEFT(content, 30) END as content_preview, \n  COUNT(*) as cnt \nFROM messages \nWHERE messageType IN ('templateMessage', 'interactiveMessage', 'buttonsMessage', 'listMessage', 'listResponseMessage', 'buttonsResponseMessage', 'templateButtonReplyMessage', 'interactiveResponseMessage', 'orderMessage', 'productMessage', 'groupInviteMessage', 'pollCreationMessageV3', 'albumMessage', 'associatedChildMessage', 'editedMessage', 'viewOnceMessage', 'viewOnceMessageV2', 'placeholderMessage', 'lottieStickerMessage', 'pollUpdateMessage')\nAND (content IS NULL OR content = '' OR content LIKE '[%]')\nGROUP BY messageType, content_preview\nORDER BY cnt DESC\nLIMIT 30;\n",
+  "rows": [
+    {
+      "messageType": "templateMessage",
+      "content_preview": "NULL",
+      "cnt": "970"
+    },
+    {
+      "messageType": "interactiveMessage",
+      "content_preview": "NULL",
+      "cnt": "356"
+    },
+    {
+      "messageType": "templateMessage",
+      "content_preview": "[Template]",
+      "cnt": "203"
+    },
+    {
+      "messageType": "listMessage",
+      "content_preview": "NULL",
+      "cnt": "135"
+    },
+    {
+      "messageType": "albumMessage",
+      "content_preview": "NULL",
+      "cnt": "99"
+    },
+    {
+      "messageType": "associatedChildMessage",
+      "content_preview": "NULL",
+      "cnt": "65"
+    },
+    {
+      "messageType": "listResponseMessage",
+      "content_preview": "NULL",
+      "cnt": "55"
+    },
+    {
+      "messageType": "buttonsMessage",
+      "content_preview": "NULL",
+      "cnt": "55"
+    },
+    {
+      "messageType": "placeholderMessage",
+      "content_preview": "NULL",
+      "cnt": "40"
+    },
+    {
+      "messageType": "buttonsResponseMessage",
+      "content_preview": "NULL",
+      "cnt": "35"
+    },
+    {
+      "messageType": "associatedChildMessage",
+      "content_preview": "[associatedChildMessage]",
+      "cnt": "34"
+    },
+    {
+      "messageType": "interactiveMessage",
+      "content_preview": "[interactiveMessage]",
+      "cnt": "30"
+    },
+    {
+      "messageType": "templateButtonReplyMessage",
+      "content_preview": "NULL",
+      "cnt": "13"
+    },
+    {
+      "messageType": "templateMessage",
+      "content_preview": "EMPTY",
+      "cnt": "7"
+    },
+    {
+      "messageType": "placeholderMessage",
+      "content_preview": "[placeholderMessage]",
+      "cnt": "7"
+    },
+    {
+      "messageType": "groupInviteMessage",
+      "content_preview": "NULL",
+      "cnt": "6"
+    },
+    {
+      "messageType": "albumMessage",
+      "content_preview": "[albumMessage]",
+      "cnt": "5"
+    },
+    {
+      "messageType": "orderMessage",
+      "content_preview": "NULL",
+      "cnt": "3"
+    },
+    {
+      "messageType": "pollUpdateMessage",
+      "content_preview": "EMPTY",
+      "cnt": "3"
+    },
+    {
+      "messageType": "lottieStickerMessage",
+      "content_preview": "NULL",
+      "cnt": "2"
+    },
+    {
+      "messageType": "albumMessage",
+      "content_preview": "EMPTY",
+      "cnt": "2"
+    },
+    {
+      "messageType": "pollCreationMessageV3",
+      "content_preview": "NULL",
+      "cnt": "2"
+    },
+    {
+      "messageType": "productMessage",
+      "content_preview": "NULL",
+      "cnt": "1"
+    },
+    {
+      "messageType": "listResponseMessage",
+      "content_preview": "[listResponseMessage]",
+      "cnt": "1"
+    },
+    {
+      "messageType": "groupInviteMessage",
+      "content_preview": "[groupInviteMessage]",
+      "cnt": "1"
+    },
+    {
+      "messageType": "editedMessage",
+      "content_preview": "NULL",
+      "cnt": "1"
+    }
+  ],
+  "messages": [],
+  "stdout": "messageType\tcontent_preview\tcnt\ntemplateMessage\tNULL\t970\ninteractiveMessage\tNULL\t356\ntemplateMessage\t[Template]\t203\nlistMessage\tNULL\t135\nalbumMessage\tNULL\t99\nassociatedChildMessage\tNULL\t65\nlistResponseMessage\tNULL\t55\nbuttonsMessage\tNULL\t55\nplaceholderMessage\tNULL\t40\nbuttonsResponseMessage\tNULL\t35\nassociatedChildMessage\t[associatedChildMessage]\t34\ninteractiveMessage\t[interactiveMessage]\t30\ntemplateButtonReplyMessage\tNULL\t13\ntemplateMessage\tEMPTY\t7\nplaceholderMessage\t[placeholderMessage]\t7\ngroupInviteMessage\tNULL\t6\nalbumMessage\t[albumMessage]\t5\norderMessage\tNULL\t3\npollUpdateMessage\tEMPTY\t3\nlottieStickerMessage\tNULL\t2\nalbumMessage\tEMPTY\t2\npollCreationMessageV3\tNULL\t2\nproductMessage\tNULL\t1\nlistResponseMessage\t[listResponseMessage]\t1\ngroupInviteMessage\t[groupInviteMessage]\t1\neditedMessage\tNULL\t1\n",
+  "stderr": "",
+  "execution_time_ms": 139
+}

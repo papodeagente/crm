@@ -1,0 +1,52 @@
+{
+  "query": "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'tenants' ORDER BY ORDINAL_POSITION;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'tenants' ORDER BY ORDINAL_POSITION;",
+  "rows": [
+    {
+      "COLUMN_NAME": "id"
+    },
+    {
+      "COLUMN_NAME": "name"
+    },
+    {
+      "COLUMN_NAME": "plan"
+    },
+    {
+      "COLUMN_NAME": "status"
+    },
+    {
+      "COLUMN_NAME": "billingCustomerId"
+    },
+    {
+      "COLUMN_NAME": "settingsJson"
+    },
+    {
+      "COLUMN_NAME": "createdAt"
+    },
+    {
+      "COLUMN_NAME": "updatedAt"
+    },
+    {
+      "COLUMN_NAME": "slug"
+    },
+    {
+      "COLUMN_NAME": "ownerUserId"
+    },
+    {
+      "COLUMN_NAME": "hotmartEmail"
+    },
+    {
+      "COLUMN_NAME": "freemiumDays"
+    },
+    {
+      "COLUMN_NAME": "freemiumExpiresAt"
+    },
+    {
+      "COLUMN_NAME": "logoUrl"
+    }
+  ],
+  "messages": [],
+  "stdout": "COLUMN_NAME\nid\nname\nplan\nstatus\nbillingCustomerId\nsettingsJson\ncreatedAt\nupdatedAt\nslug\nownerUserId\nhotmartEmail\nfreemiumDays\nfreemiumExpiresAt\nlogoUrl\n",
+  "stderr": "",
+  "execution_time_ms": 66
+}

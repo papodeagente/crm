@@ -1,0 +1,52 @@
+{
+  "query": "SELECT p.id, p.name, p.pipelineType, (SELECT COUNT(*) FROM deals d WHERE d.pipelineId = p.id AND d.status = 'open' AND d.deletedAt IS NULL) as openDeals FROM pipelines p WHERE p.tenantId = 1 ORDER BY p.id;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute SELECT p.id, p.name, p.pipelineType, (SELECT COUNT(*) FROM deals d WHERE d.pipelineId = p.id AND d.status = 'open' AND d.deletedAt IS NULL) as openDeals FROM pipelines p WHERE p.tenantId = 1 ORDER BY p.id;",
+  "rows": [
+    {
+      "id": "150037",
+      "name": "Funil de Vendas ",
+      "pipelineType": "sales",
+      "openDeals": "100"
+    },
+    {
+      "id": "150038",
+      "name": "Sucesso do Cliente",
+      "pipelineType": "post_sale",
+      "openDeals": "1836"
+    },
+    {
+      "id": "150039",
+      "name": "Funil de Vendas 2",
+      "pipelineType": "sales",
+      "openDeals": "64"
+    },
+    {
+      "id": "150040",
+      "name": "Funil de Patrocínios",
+      "pipelineType": "sales",
+      "openDeals": "3"
+    },
+    {
+      "id": "150041",
+      "name": "Recuperação Workshop",
+      "pipelineType": "sales",
+      "openDeals": "2"
+    },
+    {
+      "id": "150042",
+      "name": "Funil de Vendas Simulação",
+      "pipelineType": "sales",
+      "openDeals": "8"
+    },
+    {
+      "id": "150043",
+      "name": "Funil de Avaliação de Atendimento ENTUR",
+      "pipelineType": "sales",
+      "openDeals": "3"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tname\tpipelineType\topenDeals\n150037\tFunil de Vendas \tsales\t100\n150038\tSucesso do Cliente\tpost_sale\t1836\n150039\tFunil de Vendas 2\tsales\t64\n150040\tFunil de Patrocínios\tsales\t3\n150041\tRecuperação Workshop\tsales\t2\n150042\tFunil de Vendas Simulação\tsales\t8\n150043\tFunil de Avaliação de Atendimento ENTUR\tsales\t3\n",
+  "stderr": "",
+  "execution_time_ms": 400
+}

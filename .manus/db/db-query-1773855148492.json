@@ -1,0 +1,31 @@
+{
+  "query": "SELECT DISTINCT INDEX_NAME FROM information_schema.STATISTICS WHERE TABLE_NAME = 'messages' AND TABLE_SCHEMA = DATABASE();",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute SELECT DISTINCT INDEX_NAME FROM information_schema.STATISTICS WHERE TABLE_NAME = 'messages' AND TABLE_SCHEMA = DATABASE();",
+  "rows": [
+    {
+      "INDEX_NAME": "PRIMARY"
+    },
+    {
+      "INDEX_NAME": "msg_tenant_idx"
+    },
+    {
+      "INDEX_NAME": "idx_msg_tenant_ts"
+    },
+    {
+      "INDEX_NAME": "idx_msg_wa_conv"
+    },
+    {
+      "INDEX_NAME": "msg_session_jid_idx"
+    },
+    {
+      "INDEX_NAME": "idx_unique_msgid_session"
+    },
+    {
+      "INDEX_NAME": "idx_msg_wa_conv_ts"
+    }
+  ],
+  "messages": [],
+  "stdout": "INDEX_NAME\n\nPRIMARY\nmsg_tenant_idx\nidx_msg_tenant_ts\nidx_msg_wa_conv\nmsg_session_jid_idx\nidx_unique_msgid_session\nidx_msg_wa_conv_ts\n",
+  "stderr": "",
+  "execution_time_ms": 56
+}

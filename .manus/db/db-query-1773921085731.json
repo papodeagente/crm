@@ -1,0 +1,58 @@
+{
+  "query": "SELECT messageType, COUNT(*) as cnt FROM messages GROUP BY messageType ORDER BY cnt DESC LIMIT 20 OFFSET 20;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute SELECT messageType, COUNT(*) as cnt FROM messages GROUP BY messageType ORDER BY cnt DESC LIMIT 20 OFFSET 20;",
+  "rows": [
+    {
+      "messageType": "text",
+      "cnt": "19"
+    },
+    {
+      "messageType": "templateButtonReplyMessage",
+      "cnt": "13"
+    },
+    {
+      "messageType": "ptvMessage",
+      "cnt": "8"
+    },
+    {
+      "messageType": "groupInviteMessage",
+      "cnt": "7"
+    },
+    {
+      "messageType": "contactsArrayMessage",
+      "cnt": "3"
+    },
+    {
+      "messageType": "pollUpdateMessage",
+      "cnt": "3"
+    },
+    {
+      "messageType": "orderMessage",
+      "cnt": "3"
+    },
+    {
+      "messageType": "pollCreationMessageV3",
+      "cnt": "2"
+    },
+    {
+      "messageType": "lottieStickerMessage",
+      "cnt": "2"
+    },
+    {
+      "messageType": "pttMessage",
+      "cnt": "2"
+    },
+    {
+      "messageType": "editedMessage",
+      "cnt": "1"
+    },
+    {
+      "messageType": "productMessage",
+      "cnt": "1"
+    }
+  ],
+  "messages": [],
+  "stdout": "messageType\tcnt\ntext\t19\ntemplateButtonReplyMessage\t13\nptvMessage\t8\ngroupInviteMessage\t7\ncontactsArrayMessage\t3\npollUpdateMessage\t3\norderMessage\t3\npollCreationMessageV3\t2\nlottieStickerMessage\t2\npttMessage\t2\neditedMessage\t1\nproductMessage\t1\n",
+  "stderr": "",
+  "execution_time_ms": 85
+}

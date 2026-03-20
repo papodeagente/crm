@@ -1,0 +1,18 @@
+{
+  "query": "SELECT lastMessageType, COUNT(*) as cnt FROM wa_conversations WHERE lastMessageType IN ('protocolMessage', 'reactionMessage') GROUP BY lastMessageType;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute SELECT lastMessageType, COUNT(*) as cnt FROM wa_conversations WHERE lastMessageType IN ('protocolMessage', 'reactionMessage') GROUP BY lastMessageType;",
+  "rows": [
+    {
+      "lastMessageType": "protocolMessage",
+      "cnt": "38"
+    },
+    {
+      "lastMessageType": "reactionMessage",
+      "cnt": "4"
+    }
+  ],
+  "messages": [],
+  "stdout": "lastMessageType\tcnt\nprotocolMessage\t38\nreactionMessage\t4\n",
+  "stderr": "",
+  "execution_time_ms": 65
+}

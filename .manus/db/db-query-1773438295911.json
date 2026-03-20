@@ -1,0 +1,14 @@
+{
+  "query": "\nSELECT 'pipelines' as entity, COUNT(*) as total FROM pipelines WHERE tenantId = 1\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute \nSELECT 'pipelines' as entity, COUNT(*) as total FROM pipelines WHERE tenantId = 1\n",
+  "rows": [
+    {
+      "entity": "pipelines",
+      "total": "0"
+    }
+  ],
+  "messages": [],
+  "stdout": "entity\ttotal\npipelines\t0\n",
+  "stderr": "",
+  "execution_time_ms": 64
+}

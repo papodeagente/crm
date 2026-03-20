@@ -1,0 +1,80 @@
+{
+  "query": "SELECT 'msg' as type, id, SUBSTRING(content, 1, 20) as text, `timestamp`, fromMe FROM messages WHERE remoteJid LIKE '%558499445034%' ORDER BY `timestamp` DESC LIMIT 10;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute SELECT 'msg' as type, id, SUBSTRING(content, 1, 20) as text, `timestamp`, fromMe FROM messages WHERE remoteJid LIKE '%558499445034%' ORDER BY `timestamp` DESC LIMIT 10;",
+  "rows": [
+    {
+      "type": "msg",
+      "id": "575544",
+      "text": "teste",
+      "timestamp": "2026-03-16 03:38:10",
+      "fromMe": "1"
+    },
+    {
+      "type": "msg",
+      "id": "575231",
+      "text": "teste",
+      "timestamp": "2026-03-16 03:31:59",
+      "fromMe": "1"
+    },
+    {
+      "type": "msg",
+      "id": "574888",
+      "text": "teste",
+      "timestamp": "2026-03-16 03:24:09",
+      "fromMe": "1"
+    },
+    {
+      "type": "msg",
+      "id": "574887",
+      "text": "teste",
+      "timestamp": "2026-03-16 03:24:02",
+      "fromMe": "1"
+    },
+    {
+      "type": "msg",
+      "id": "555684",
+      "text": "teste 2",
+      "timestamp": "2026-03-14 19:26:31",
+      "fromMe": "1"
+    },
+    {
+      "type": "msg",
+      "id": "541328",
+      "text": "teste1",
+      "timestamp": "2026-03-14 18:54:45",
+      "fromMe": "0"
+    },
+    {
+      "type": "msg",
+      "id": "567617",
+      "text": "https://zoom.us/j/98",
+      "timestamp": "2026-03-13 14:46:44",
+      "fromMe": "0"
+    },
+    {
+      "type": "msg",
+      "id": "540276",
+      "text": "https://zoom.us/j/98",
+      "timestamp": "2026-03-13 14:46:44",
+      "fromMe": "0"
+    },
+    {
+      "type": "msg",
+      "id": "540274",
+      "text": "esta confirmado",
+      "timestamp": "2026-03-13 14:34:17",
+      "fromMe": "1"
+    },
+    {
+      "type": "msg",
+      "id": "540270",
+      "text": "https://fathom.video",
+      "timestamp": "2026-03-13 14:34:09",
+      "fromMe": "1"
+    }
+  ],
+  "messages": [],
+  "stdout": "type\tid\ttext\ttimestamp\tfromMe\nmsg\t575544\tteste\t2026-03-16 03:38:10\t1\nmsg\t575231\tteste\t2026-03-16 03:31:59\t1\nmsg\t574888\tteste\t2026-03-16 03:24:09\t1\nmsg\t574887\tteste\t2026-03-16 03:24:02\t1\nmsg\t555684\tteste 2\t2026-03-14 19:26:31\t1\nmsg\t541328\tteste1\t2026-03-14 18:54:45\t0\nmsg\t567617\thttps://zoom.us/j/98\t2026-03-13 14:46:44\t0\nmsg\t540276\thttps://zoom.us/j/98\t2026-03-13 14:46:44\t0\nmsg\t540274\testa confirmado\t2026-03-13 14:34:17\t1\nmsg\t540270\thttps://fathom.video\t2026-03-13 14:34:09\t1\n",
+  "stderr": "",
+  "execution_time_ms": 104
+}

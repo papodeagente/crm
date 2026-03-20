@@ -1,0 +1,13 @@
+{
+  "query": "SELECT id FROM pipelines WHERE tenantId = 30002 AND pipelineType = 'post_sale' ORDER BY id DESC LIMIT 1;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute SELECT id FROM pipelines WHERE tenantId = 30002 AND pipelineType = 'post_sale' ORDER BY id DESC LIMIT 1;",
+  "rows": [
+    {
+      "id": "180003"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\n180003\n",
+  "stderr": "",
+  "execution_time_ms": 371
+}

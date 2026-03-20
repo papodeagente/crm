@@ -1,0 +1,14 @@
+{
+  "query": "SELECT 'remaining_test_deals' as check_type, COUNT(*) as cnt FROM deals \nWHERE title LIKE '%Test Lead • %' \n   OR title LIKE '%Idempotent Lead • %' \n   OR title LIKE '%Meta Lead • %' \n   OR title LIKE '%Notification Test Lead • %' \n   OR title LIKE '%No Dup Notif • %'\n   OR title LIKE '%Meta Notif Lead • %';",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute SELECT 'remaining_test_deals' as check_type, COUNT(*) as cnt FROM deals \nWHERE title LIKE '%Test Lead • %' \n   OR title LIKE '%Idempotent Lead • %' \n   OR title LIKE '%Meta Lead • %' \n   OR title LIKE '%Notification Test Lead • %' \n   OR title LIKE '%No Dup Notif • %'\n   OR title LIKE '%Meta Notif Lead • %';",
+  "rows": [
+    {
+      "check_type": "remaining_test_deals",
+      "cnt": "0"
+    }
+  ],
+  "messages": [],
+  "stdout": "check_type\tcnt\nremaining_test_deals\t0\n",
+  "stderr": "",
+  "execution_time_ms": 349
+}

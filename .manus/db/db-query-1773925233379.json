@@ -1,0 +1,82 @@
+{
+  "query": "SHOW COLUMNS FROM deals WHERE Field IN ('utmSource', 'utmMedium', 'utmCampaign', 'utmTerm', 'utmContent', 'rdCustomFields', 'lossNotes', 'lossReasonId', 'expectedCloseAt');",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute SHOW COLUMNS FROM deals WHERE Field IN ('utmSource', 'utmMedium', 'utmCampaign', 'utmTerm', 'utmContent', 'rdCustomFields', 'lossNotes', 'lossReasonId', 'expectedCloseAt');",
+  "rows": [
+    {
+      "Field": "expectedCloseAt",
+      "Type": "timestamp",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "utmSource",
+      "Type": "varchar(255)",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "utmMedium",
+      "Type": "varchar(255)",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "utmCampaign",
+      "Type": "varchar(255)",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "utmTerm",
+      "Type": "varchar(255)",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "utmContent",
+      "Type": "varchar(255)",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "rdCustomFields",
+      "Type": "json",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "lossReasonId",
+      "Type": "int",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "lossNotes",
+      "Type": "text",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    }
+  ],
+  "messages": [],
+  "stdout": "Field\tType\tNull\tKey\tDefault\tExtra\nexpectedCloseAt\ttimestamp\tYES\t\tNULL\t\nutmSource\tvarchar(255)\tYES\t\tNULL\t\nutmMedium\tvarchar(255)\tYES\t\tNULL\t\nutmCampaign\tvarchar(255)\tYES\t\tNULL\t\nutmTerm\tvarchar(255)\tYES\t\tNULL\t\nutmContent\tvarchar(255)\tYES\t\tNULL\t\nrdCustomFields\tjson\tYES\t\tNULL\t\nlossReasonId\tint\tYES\t\tNULL\t\nlossNotes\ttext\tYES\t\tNULL\t\n",
+  "stderr": "",
+  "execution_time_ms": 77
+}

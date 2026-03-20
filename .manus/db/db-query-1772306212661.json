@@ -1,0 +1,16 @@
+{
+  "query": "SELECT id, name, email, status FROM crm_users LIMIT 10;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute SELECT id, name, email, status FROM crm_users LIMIT 10;",
+  "rows": [
+    {
+      "id": "1",
+      "name": "Bruno teste",
+      "email": "financeiro@entur.com.br",
+      "status": "invited"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tname\temail\tstatus\n1\tBruno teste\tfinanceiro@entur.com.br\tinvited\n",
+  "stderr": "",
+  "execution_time_ms": 346
+}

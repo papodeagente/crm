@@ -1,0 +1,50 @@
+{
+  "query": "SELECT remoteJid, LENGTH(REPLACE(remoteJid, '@s.whatsapp.net', '')) as digits_len FROM messages WHERE sessionId IS NOT NULL AND remoteJid LIKE '%@s.whatsapp.net' AND LENGTH(REPLACE(remoteJid, '@s.whatsapp.net', '')) = 12 GROUP BY remoteJid LIMIT 10;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute SELECT remoteJid, LENGTH(REPLACE(remoteJid, '@s.whatsapp.net', '')) as digits_len FROM messages WHERE sessionId IS NOT NULL AND remoteJid LIKE '%@s.whatsapp.net' AND LENGTH(REPLACE(remoteJid, '@s.whatsapp.net', '')) = 12 GROUP BY remoteJid LIMIT 10;",
+  "rows": [
+    {
+      "remoteJid": "558491341947@s.whatsapp.net",
+      "digits_len": "12"
+    },
+    {
+      "remoteJid": "447380851634@s.whatsapp.net",
+      "digits_len": "12"
+    },
+    {
+      "remoteJid": "554792921005@s.whatsapp.net",
+      "digits_len": "12"
+    },
+    {
+      "remoteJid": "558498982543@s.whatsapp.net",
+      "digits_len": "12"
+    },
+    {
+      "remoteJid": "559292844003@s.whatsapp.net",
+      "digits_len": "12"
+    },
+    {
+      "remoteJid": "554199914003@s.whatsapp.net",
+      "digits_len": "12"
+    },
+    {
+      "remoteJid": "558494656772@s.whatsapp.net",
+      "digits_len": "12"
+    },
+    {
+      "remoteJid": "558496377234@s.whatsapp.net",
+      "digits_len": "12"
+    },
+    {
+      "remoteJid": "558496935888@s.whatsapp.net",
+      "digits_len": "12"
+    },
+    {
+      "remoteJid": "558494246237@s.whatsapp.net",
+      "digits_len": "12"
+    }
+  ],
+  "messages": [],
+  "stdout": "remoteJid\tdigits_len\n558491341947@s.whatsapp.net\t12\n447380851634@s.whatsapp.net\t12\n554792921005@s.whatsapp.net\t12\n558498982543@s.whatsapp.net\t12\n559292844003@s.whatsapp.net\t12\n554199914003@s.whatsapp.net\t12\n558494656772@s.whatsapp.net\t12\n558496377234@s.whatsapp.net\t12\n558496935888@s.whatsapp.net\t12\n558494246237@s.whatsapp.net\t12\n",
+  "stderr": "",
+  "execution_time_ms": 404
+}

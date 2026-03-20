@@ -1,0 +1,108 @@
+{
+  "query": "SELECT 'msg' as t, id, SUBSTRING(content, 1, 15) as txt, `timestamp` as ts, fromMe as fm FROM messages WHERE remoteJid LIKE '%558499445034%' ORDER BY `timestamp` DESC LIMIT 10;\nSELECT 'note' as t, id, SUBSTRING(content, 1, 15) as txt, createdAt as ts, authorUserId as author FROM internal_notes WHERE remoteJid LIKE '%558499445034%' ORDER BY createdAt DESC LIMIT 10;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute SELECT 'msg' as t, id, SUBSTRING(content, 1, 15) as txt, `timestamp` as ts, fromMe as fm FROM messages WHERE remoteJid LIKE '%558499445034%' ORDER BY `timestamp` DESC LIMIT 10;\nSELECT 'note' as t, id, SUBSTRING(content, 1, 15) as txt, createdAt as ts, authorUserId as author FROM internal_notes WHERE remoteJid LIKE '%558499445034%' ORDER BY createdAt DESC LIMIT 10;",
+  "rows": [
+    {
+      "t": "msg",
+      "id": "575544",
+      "txt": "teste",
+      "ts": "2026-03-16 03:38:10",
+      "fm": "1"
+    },
+    {
+      "t": "msg",
+      "id": "575231",
+      "txt": "teste",
+      "ts": "2026-03-16 03:31:59",
+      "fm": "1"
+    },
+    {
+      "t": "msg",
+      "id": "574888",
+      "txt": "teste",
+      "ts": "2026-03-16 03:24:09",
+      "fm": "1"
+    },
+    {
+      "t": "msg",
+      "id": "574887",
+      "txt": "teste",
+      "ts": "2026-03-16 03:24:02",
+      "fm": "1"
+    },
+    {
+      "t": "msg",
+      "id": "555684",
+      "txt": "teste 2",
+      "ts": "2026-03-14 19:26:31",
+      "fm": "1"
+    },
+    {
+      "t": "msg",
+      "id": "541328",
+      "txt": "teste1",
+      "ts": "2026-03-14 18:54:45",
+      "fm": "0"
+    },
+    {
+      "t": "msg",
+      "id": "567617",
+      "txt": "https://zoom.us",
+      "ts": "2026-03-13 14:46:44",
+      "fm": "0"
+    },
+    {
+      "t": "msg",
+      "id": "540276",
+      "txt": "https://zoom.us",
+      "ts": "2026-03-13 14:46:44",
+      "fm": "0"
+    },
+    {
+      "t": "msg",
+      "id": "540274",
+      "txt": "esta confirmado",
+      "ts": "2026-03-13 14:34:17",
+      "fm": "1"
+    },
+    {
+      "t": "msg",
+      "id": "540270",
+      "txt": "https://fathom.",
+      "ts": "2026-03-13 14:34:09",
+      "fm": "1"
+    },
+    {
+      "t": "t",
+      "id": "id",
+      "txt": "txt",
+      "ts": "ts",
+      "fm": "author"
+    },
+    {
+      "t": "note",
+      "id": "6",
+      "txt": "teste",
+      "ts": "2026-03-16 03:31:54",
+      "fm": "240001"
+    },
+    {
+      "t": "note",
+      "id": "5",
+      "txt": "@Bruno Barbosa ",
+      "ts": "2026-03-16 03:23:52",
+      "fm": "240001"
+    },
+    {
+      "t": "note",
+      "id": "4",
+      "txt": "teste",
+      "ts": "2026-03-16 02:34:38",
+      "fm": "240001"
+    }
+  ],
+  "messages": [],
+  "stdout": "t\tid\ttxt\tts\tfm\nmsg\t575544\tteste\t2026-03-16 03:38:10\t1\nmsg\t575231\tteste\t2026-03-16 03:31:59\t1\nmsg\t574888\tteste\t2026-03-16 03:24:09\t1\nmsg\t574887\tteste\t2026-03-16 03:24:02\t1\nmsg\t555684\tteste 2\t2026-03-14 19:26:31\t1\nmsg\t541328\tteste1\t2026-03-14 18:54:45\t0\nmsg\t567617\thttps://zoom.us\t2026-03-13 14:46:44\t0\nmsg\t540276\thttps://zoom.us\t2026-03-13 14:46:44\t0\nmsg\t540274\testa confirmado\t2026-03-13 14:34:17\t1\nmsg\t540270\thttps://fathom.\t2026-03-13 14:34:09\t1\nt\tid\ttxt\tts\tauthor\nnote\t6\tteste\t2026-03-16 03:31:54\t240001\nnote\t5\t@Bruno Barbosa \t2026-03-16 03:23:52\t240001\nnote\t4\tteste\t2026-03-16 02:34:38\t240001\n",
+  "stderr": "",
+  "execution_time_ms": 114
+}

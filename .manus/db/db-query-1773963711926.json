@@ -1,0 +1,24 @@
+{
+  "query": "SELECT cu.tenantId, t.name as tenantName, cu.email, cu.name, cu.status FROM crm_users cu JOIN tenants t ON cu.tenantId = t.id WHERE cu.email = 'bruno@entur.com.br' ORDER BY cu.tenantId;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute SELECT cu.tenantId, t.name as tenantName, cu.email, cu.name, cu.status FROM crm_users cu JOIN tenants t ON cu.tenantId = t.id WHERE cu.email = 'bruno@entur.com.br' ORDER BY cu.tenantId;",
+  "rows": [
+    {
+      "tenantId": "150002",
+      "tenantName": "Entur",
+      "email": "bruno@entur.com.br",
+      "name": "Bruno",
+      "status": "active"
+    },
+    {
+      "tenantId": "300005",
+      "tenantName": "Aceleradora",
+      "email": "bruno@entur.com.br",
+      "name": "Bruno  Barbosa da Silva",
+      "status": "invited"
+    }
+  ],
+  "messages": [],
+  "stdout": "tenantId\ttenantName\temail\tname\tstatus\n150002\tEntur\tbruno@entur.com.br\tBruno\tactive\n300005\tAceleradora\tbruno@entur.com.br\tBruno  Barbosa da Silva\tinvited\n",
+  "stderr": "",
+  "execution_time_ms": 63
+}

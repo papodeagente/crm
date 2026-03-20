@@ -1,0 +1,18 @@
+{
+  "query": "SELECT utmSource, utmMedium, utmCampaign, utmTerm, utmContent, rdCustomFields FROM deals LIMIT 1;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute SELECT utmSource, utmMedium, utmCampaign, utmTerm, utmContent, rdCustomFields FROM deals LIMIT 1;",
+  "rows": [
+    {
+      "utmSource": "NULL",
+      "utmMedium": "NULL",
+      "utmCampaign": "NULL",
+      "utmTerm": "NULL",
+      "utmContent": "NULL",
+      "rdCustomFields": "NULL"
+    }
+  ],
+  "messages": [],
+  "stdout": "utmSource\tutmMedium\tutmCampaign\tutmTerm\tutmContent\trdCustomFields\nNULL\tNULL\tNULL\tNULL\tNULL\tNULL\n",
+  "stderr": "",
+  "execution_time_ms": 56
+}

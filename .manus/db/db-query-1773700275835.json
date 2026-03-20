@@ -1,0 +1,30 @@
+{
+  "query": "SELECT id, entity, name, label, fieldType, isVisibleOnForm, isVisibleOnProfile, sortOrder FROM custom_fields WHERE entity = 'contact' LIMIT 20;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute SELECT id, entity, name, label, fieldType, isVisibleOnForm, isVisibleOnProfile, sortOrder FROM custom_fields WHERE entity = 'contact' LIMIT 20;",
+  "rows": [
+    {
+      "id": "120001",
+      "entity": "contact",
+      "name": "data_de_aniversario",
+      "label": "Data de aniversário",
+      "fieldType": "date",
+      "isVisibleOnForm": "1",
+      "isVisibleOnProfile": "1",
+      "sortOrder": "0"
+    },
+    {
+      "id": "120025",
+      "entity": "contact",
+      "name": "perfil_de_cliente",
+      "label": "Perfil de cliente",
+      "fieldType": "multiselect",
+      "isVisibleOnForm": "1",
+      "isVisibleOnProfile": "1",
+      "sortOrder": "0"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tentity\tname\tlabel\tfieldType\tisVisibleOnForm\tisVisibleOnProfile\tsortOrder\n120001\tcontact\tdata_de_aniversario\tData de aniversário\tdate\t1\t1\t0\n120025\tcontact\tperfil_de_cliente\tPerfil de cliente\tmultiselect\t1\t1\t0\n",
+  "stderr": "",
+  "execution_time_ms": 98
+}

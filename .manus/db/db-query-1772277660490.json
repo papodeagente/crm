@@ -1,0 +1,25 @@
+{
+  "query": "SHOW TABLES LIKE 'lead_sources'; SHOW TABLES LIKE 'campaigns'; SHOW TABLES LIKE 'loss_reasons';",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute SHOW TABLES LIKE 'lead_sources'; SHOW TABLES LIKE 'campaigns'; SHOW TABLES LIKE 'loss_reasons';",
+  "rows": [
+    {
+      "Tables_in_EKvcVicuVoUxTnzjSKzgdk (lead_sources)": "lead_sources"
+    },
+    {
+      "Tables_in_EKvcVicuVoUxTnzjSKzgdk (lead_sources)": "Tables_in_EKvcVicuVoUxTnzjSKzgdk (campaigns)"
+    },
+    {
+      "Tables_in_EKvcVicuVoUxTnzjSKzgdk (lead_sources)": "campaigns"
+    },
+    {
+      "Tables_in_EKvcVicuVoUxTnzjSKzgdk (lead_sources)": "Tables_in_EKvcVicuVoUxTnzjSKzgdk (loss_reasons)"
+    },
+    {
+      "Tables_in_EKvcVicuVoUxTnzjSKzgdk (lead_sources)": "loss_reasons"
+    }
+  ],
+  "messages": [],
+  "stdout": "Tables_in_EKvcVicuVoUxTnzjSKzgdk (lead_sources)\nlead_sources\nTables_in_EKvcVicuVoUxTnzjSKzgdk (campaigns)\ncampaigns\nTables_in_EKvcVicuVoUxTnzjSKzgdk (loss_reasons)\nloss_reasons\n",
+  "stderr": "",
+  "execution_time_ms": 455
+}

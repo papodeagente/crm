@@ -1,0 +1,8 @@
+{
+  "query": "\nSELECT message_type, content, COUNT(*) as cnt \nFROM messages \nWHERE message_type IN ('templateMessage', 'interactiveMessage', 'buttonsMessage', 'listMessage', 'listResponseMessage', 'buttonsResponseMessage', 'templateButtonReplyMessage', 'interactiveResponseMessage', 'orderMessage', 'productMessage', 'groupInviteMessage', 'pollCreationMessageV3', 'albumMessage', 'associatedChildMessage', 'editedMessage', 'viewOnceMessage', 'viewOnceMessageV2', 'placeholderMessage', 'lottieStickerMessage', 'pollUpdateMessage')\nAND (content IS NULL OR content = '' OR content = '[Template]' OR content LIKE '[%]')\nGROUP BY message_type, content\nORDER BY cnt DESC\nLIMIT 30;\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute \nSELECT message_type, content, COUNT(*) as cnt \nFROM messages \nWHERE message_type IN ('templateMessage', 'interactiveMessage', 'buttonsMessage', 'listMessage', 'listResponseMessage', 'buttonsResponseMessage', 'templateButtonReplyMessage', 'interactiveResponseMessage', 'orderMessage', 'productMessage', 'groupInviteMessage', 'pollCreationMessageV3', 'albumMessage', 'associatedChildMessage', 'editedMessage', 'viewOnceMessage', 'viewOnceMessageV2', 'placeholderMessage', 'lottieStickerMessage', 'pollUpdateMessage')\nAND (content IS NULL OR content = '' OR content = '[Template]' OR content LIKE '[%]')\nGROUP BY message_type, content\nORDER BY cnt DESC\nLIMIT 30;\n",
+  "returncode": 1,
+  "logs": [
+    "ERROR 1054 (42S22) at line 2: Unknown column 'message_type' in 'group statement'"
+  ]
+}

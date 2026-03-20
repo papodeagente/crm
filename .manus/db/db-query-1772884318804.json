@@ -1,0 +1,9 @@
+{
+  "query": "CREATE TABLE `wa_contacts` (\n\t`id` int AUTO_INCREMENT NOT NULL,\n\t`sessionId` varchar(100) NOT NULL,\n\t`jid` varchar(100) NOT NULL,\n\t`lid` varchar(100),\n\t`phoneNumber` varchar(100),\n\t`pushName` varchar(255),\n\t`savedName` varchar(255),\n\t`verifiedName` varchar(255),\n\t`profilePictureUrl` text,\n\t`updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,\n\tCONSTRAINT `wa_contacts_id` PRIMARY KEY(`id`)\n);\nCREATE INDEX `wac_session_jid_idx` ON `wa_contacts` (`sessionId`,`jid`);\nCREATE INDEX `wac_session_lid_idx` ON `wa_contacts` (`sessionId`,`lid`);\nCREATE INDEX `wac_session_phone_idx` ON `wa_contacts` (`sessionId`,`phoneNumber`);",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute CREATE TABLE `wa_contacts` (\n\t`id` int AUTO_INCREMENT NOT NULL,\n\t`sessionId` varchar(100) NOT NULL,\n\t`jid` varchar(100) NOT NULL,\n\t`lid` varchar(100),\n\t`phoneNumber` varchar(100),\n\t`pushName` varchar(255),\n\t`savedName` varchar(255),\n\t`verifiedName` varchar(255),\n\t`profilePictureUrl` text,\n\t`updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,\n\tCONSTRAINT `wa_contacts_id` PRIMARY KEY(`id`)\n);\nCREATE INDEX `wac_session_jid_idx` ON `wa_contacts` (`sessionId`,`jid`);\nCREATE INDEX `wac_session_lid_idx` ON `wa_contacts` (`sessionId`,`lid`);\nCREATE INDEX `wac_session_phone_idx` ON `wa_contacts` (`sessionId`,`phoneNumber`);",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 1203
+}

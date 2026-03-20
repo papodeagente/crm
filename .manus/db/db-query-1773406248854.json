@@ -1,0 +1,25 @@
+{
+  "query": "SELECT CONCAT(id, '|', IFNULL(LEFT(mediaUrl, 80), 'NULL'), '|', IFNULL(media_mime_type, 'NULL'), '|', IFNULL(media_file_name, 'NULL')) as info FROM messages WHERE messageType IN ('imageMessage', 'image') AND mediaUrl IS NOT NULL AND mediaUrl != '' AND mediaUrl NOT LIKE '%whatsapp.net%' ORDER BY id DESC LIMIT 5",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute SELECT CONCAT(id, '|', IFNULL(LEFT(mediaUrl, 80), 'NULL'), '|', IFNULL(media_mime_type, 'NULL'), '|', IFNULL(media_file_name, 'NULL')) as info FROM messages WHERE messageType IN ('imageMessage', 'image') AND mediaUrl IS NOT NULL AND mediaUrl != '' AND mediaUrl NOT LIKE '%whatsapp.net%' ORDER BY id DESC LIMIT 5",
+  "rows": [
+    {
+      "info": "540167|https://d2xsxph8kpxj0f.cloudfront.net/310519663249817763/EKvcVicuVoUxTnzjSKzgdk/|image/jpeg|4A2A3611FCB43A1952F3.jpeg"
+    },
+    {
+      "info": "540135|https://d2xsxph8kpxj0f.cloudfront.net/310519663249817763/EKvcVicuVoUxTnzjSKzgdk/|image/jpeg|3EB0546AB28DBD56C3374F.jpeg"
+    },
+    {
+      "info": "540120|https://d2xsxph8kpxj0f.cloudfront.net/310519663249817763/EKvcVicuVoUxTnzjSKzgdk/|image/jpeg|CFA196644AF3BB1E2A.jpeg"
+    },
+    {
+      "info": "540119|https://d2xsxph8kpxj0f.cloudfront.net/310519663249817763/EKvcVicuVoUxTnzjSKzgdk/|image/jpeg|D86F39CB19725573B4.jpeg"
+    },
+    {
+      "info": "540080|https://d2xsxph8kpxj0f.cloudfront.net/310519663249817763/EKvcVicuVoUxTnzjSKzgdk/|image/jpeg|4A033D76CA3749D48CCE.jpeg"
+    }
+  ],
+  "messages": [],
+  "stdout": "info\n540167|https://d2xsxph8kpxj0f.cloudfront.net/310519663249817763/EKvcVicuVoUxTnzjSKzgdk/|image/jpeg|4A2A3611FCB43A1952F3.jpeg\n540135|https://d2xsxph8kpxj0f.cloudfront.net/310519663249817763/EKvcVicuVoUxTnzjSKzgdk/|image/jpeg|3EB0546AB28DBD56C3374F.jpeg\n540120|https://d2xsxph8kpxj0f.cloudfront.net/310519663249817763/EKvcVicuVoUxTnzjSKzgdk/|image/jpeg|CFA196644AF3BB1E2A.jpeg\n540119|https://d2xsxph8kpxj0f.cloudfront.net/310519663249817763/EKvcVicuVoUxTnzjSKzgdk/|image/jpeg|D86F39CB19725573B4.jpeg\n540080|https://d2xsxph8kpxj0f.cloudfront.net/310519663249817763/EKvcVicuVoUxTnzjSKzgdk/|image/jpeg|4A033D76CA3749D48CCE.jpeg\n",
+  "stderr": "",
+  "execution_time_ms": 84
+}
