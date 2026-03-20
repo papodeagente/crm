@@ -1,1 +1,0 @@
-ALTER TABLE `crm_users` ADD `lastActiveAt` timestamp;

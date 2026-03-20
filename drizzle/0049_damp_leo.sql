@@ -1,1 +1,0 @@
-ALTER TABLE `wa_conversations` ADD CONSTRAINT `idx_wc_conv_key` UNIQUE(`conversationKey`);

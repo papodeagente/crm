@@ -4396,3 +4396,11 @@
 - [x] Mensagens de template não aparecem no inbox
 - [x] Testes vitest para validar as correções (27 testes passando)
 - [x] Nenhuma outra área do sistema alterada
+
+## Fix: Deployment Heartbeat Timeout
+- [x] Remover 33 arquivos de debug/diagnóstico (.md, .txt) do repositório
+- [x] Remover 26 scripts .mjs de teste/migração não essenciais
+- [x] Remover 55 snapshots antigos do Drizzle (manter apenas o último)
+- [x] Remover 55 migrações SQL antigas (manter apenas a última)
+- [x] Remover meta.json (metadados de build)
+- [x] Reduzir de 1027 arquivos/22MB para 857 arquivos/8.8MB
