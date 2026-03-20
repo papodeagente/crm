@@ -1,9 +1,0 @@
-{
-  "query": "\nUPDATE contacts c\nSET c.deletedAt = NOW()\nWHERE c.deletedAt IS NULL\n  AND c.source = 'whatsapp'\n  AND c.createdBy IS NULL\n  AND NOT EXISTS (\n    SELECT 1 FROM deals d WHERE d.contactId = c.id AND d.deletedAt IS NULL\n  );\n",
-  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute \nUPDATE contacts c\nSET c.deletedAt = NOW()\nWHERE c.deletedAt IS NULL\n  AND c.source = 'whatsapp'\n  AND c.createdBy IS NULL\n  AND NOT EXISTS (\n    SELECT 1 FROM deals d WHERE d.contactId = c.id AND d.deletedAt IS NULL\n  );\n",
-  "rows": [],
-  "messages": [],
-  "stdout": "",
-  "stderr": "",
-  "execution_time_ms": 197
-}

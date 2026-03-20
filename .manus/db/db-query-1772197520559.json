@@ -1,9 +1,0 @@
-{
-  "query": "\n-- Step 1: Migrate messages with 12-digit JIDs (without 9th digit) to 13-digit format\n-- Pattern: 55DD + 8 digits → 55DD9 + 8 digits (Brazilian mobile numbers)\nUPDATE messages \nSET remoteJid = CONCAT(\n  SUBSTRING(remoteJid, 1, 4),\n  '9',\n  SUBSTRING(remoteJid, 5)\n)\nWHERE remoteJid LIKE '55%@s.whatsapp.net'\n  AND LENGTH(REPLACE(remoteJid, '@s.whatsapp.net', '')) = 12\n  AND SUBSTRING(remoteJid, 5, 1) != '9';\n",
-  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute \n-- Step 1: Migrate messages with 12-digit JIDs (without 9th digit) to 13-digit format\n-- Pattern: 55DD + 8 digits → 55DD9 + 8 digits (Brazilian mobile numbers)\nUPDATE messages \nSET remoteJid = CONCAT(\n  SUBSTRING(remoteJid, 1, 4),\n  '9',\n  SUBSTRING(remoteJid, 5)\n)\nWHERE remoteJid LIKE '55%@s.whatsapp.net'\n  AND LENGTH(REPLACE(remoteJid, '@s.whatsapp.net', '')) = 12\n  AND SUBSTRING(remoteJid, 5, 1) != '9';\n",
-  "rows": [],
-  "messages": [],
-  "stdout": "",
-  "stderr": "",
-  "execution_time_ms": 756
-}

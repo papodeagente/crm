@@ -1,9 +1,0 @@
-{
-  "query": "ALTER TABLE `users` ADD `isSuperAdmin` boolean DEFAULT false NOT NULL;",
-  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute ALTER TABLE `users` ADD `isSuperAdmin` boolean DEFAULT false NOT NULL;",
-  "rows": [],
-  "messages": [],
-  "stdout": "",
-  "stderr": "",
-  "execution_time_ms": 321
-}

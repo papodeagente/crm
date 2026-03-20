@@ -1,8 +1,0 @@
-{
-  "query": "\nDELETE FROM deal_products WHERE tenantId = 1;\nDELETE FROM deal_history WHERE tenantId = 1;\nDELETE FROM crm_tasks WHERE tenantId = 1;\nDELETE FROM notes WHERE tenantId = 1;\nDELETE FROM deals WHERE tenantId = 1;\nDELETE FROM contacts WHERE tenantId = 1;\nDELETE FROM accounts WHERE tenantId = 1;\nDELETE FROM pipeline_stages WHERE tenantId = 1;\nDELETE FROM pipelines WHERE tenantId = 1;\nDELETE FROM catalog_products WHERE tenantId = 1;\nDELETE FROM lead_sources WHERE tenantId = 1;\nDELETE FROM campaigns WHERE tenantId = 1;\nDELETE FROM loss_reasons WHERE tenantId = 1;\n",
-  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute \nDELETE FROM deal_products WHERE tenantId = 1;\nDELETE FROM deal_history WHERE tenantId = 1;\nDELETE FROM crm_tasks WHERE tenantId = 1;\nDELETE FROM notes WHERE tenantId = 1;\nDELETE FROM deals WHERE tenantId = 1;\nDELETE FROM contacts WHERE tenantId = 1;\nDELETE FROM accounts WHERE tenantId = 1;\nDELETE FROM pipeline_stages WHERE tenantId = 1;\nDELETE FROM pipelines WHERE tenantId = 1;\nDELETE FROM catalog_products WHERE tenantId = 1;\nDELETE FROM lead_sources WHERE tenantId = 1;\nDELETE FROM campaigns WHERE tenantId = 1;\nDELETE FROM loss_reasons WHERE tenantId = 1;\n",
-  "returncode": 1,
-  "logs": [
-    "ERROR 1146 (42S02) at line 5: Table 'ekvcvicuvouxtnzjskzgdk.notes' doesn't exist"
-  ]
-}

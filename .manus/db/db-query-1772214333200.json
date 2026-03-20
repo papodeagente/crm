@@ -1,9 +1,0 @@
-{
-  "query": "ALTER TABLE deals ADD COLUMN deletedAt DATETIME DEFAULT NULL;\nALTER TABLE contacts ADD COLUMN deletedAt DATETIME DEFAULT NULL;\nCREATE INDEX idx_deals_deleted ON deals(deletedAt);\nCREATE INDEX idx_contacts_deleted ON contacts(deletedAt);",
-  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute ALTER TABLE deals ADD COLUMN deletedAt DATETIME DEFAULT NULL;\nALTER TABLE contacts ADD COLUMN deletedAt DATETIME DEFAULT NULL;\nCREATE INDEX idx_deals_deleted ON deals(deletedAt);\nCREATE INDEX idx_contacts_deleted ON contacts(deletedAt);",
-  "rows": [],
-  "messages": [],
-  "stdout": "",
-  "stderr": "",
-  "execution_time_ms": 3597
-}

@@ -1,9 +1,0 @@
-{
-  "query": "CREATE TABLE `google_calendar_tokens` (\n\t`id` int AUTO_INCREMENT NOT NULL,\n\t`userId` int NOT NULL,\n\t`tenantId` int NOT NULL,\n\t`accessToken` text NOT NULL,\n\t`refreshToken` text,\n\t`tokenType` varchar(32) DEFAULT 'Bearer',\n\t`expiresAt` timestamp,\n\t`scope` text,\n\t`calendarEmail` varchar(320),\n\t`isActive` boolean NOT NULL DEFAULT true,\n\t`createdAt` timestamp NOT NULL DEFAULT (now()),\n\t`updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,\n\tCONSTRAINT `google_calendar_tokens_id` PRIMARY KEY(`id`)\n);\nCREATE INDEX `gct_user_tenant_idx` ON `google_calendar_tokens` (`userId`,`tenantId`);\nCREATE INDEX `gct_tenant_idx` ON `google_calendar_tokens` (`tenantId`);",
-  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute CREATE TABLE `google_calendar_tokens` (\n\t`id` int AUTO_INCREMENT NOT NULL,\n\t`userId` int NOT NULL,\n\t`tenantId` int NOT NULL,\n\t`accessToken` text NOT NULL,\n\t`refreshToken` text,\n\t`tokenType` varchar(32) DEFAULT 'Bearer',\n\t`expiresAt` timestamp,\n\t`scope` text,\n\t`calendarEmail` varchar(320),\n\t`isActive` boolean NOT NULL DEFAULT true,\n\t`createdAt` timestamp NOT NULL DEFAULT (now()),\n\t`updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,\n\tCONSTRAINT `google_calendar_tokens_id` PRIMARY KEY(`id`)\n);\nCREATE INDEX `gct_user_tenant_idx` ON `google_calendar_tokens` (`userId`,`tenantId`);\nCREATE INDEX `gct_tenant_idx` ON `google_calendar_tokens` (`tenantId`);",
-  "rows": [],
-  "messages": [],
-  "stdout": "",
-  "stderr": "",
-  "execution_time_ms": 1051
-}

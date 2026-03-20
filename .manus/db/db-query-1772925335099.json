@@ -1,9 +1,0 @@
-{
-  "query": "INSERT INTO subscriptions (tenantId, plan, status, trialStartedAt, trialEndsAt, createdAt, updatedAt) VALUES (150002, 'enterprise', 'active', NOW(), DATE_ADD(NOW(), INTERVAL 365 DAY), NOW(), NOW())",
-  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute INSERT INTO subscriptions (tenantId, plan, status, trialStartedAt, trialEndsAt, createdAt, updatedAt) VALUES (150002, 'enterprise', 'active', NOW(), DATE_ADD(NOW(), INTERVAL 365 DAY), NOW(), NOW())",
-  "rows": [],
-  "messages": [],
-  "stdout": "",
-  "stderr": "",
-  "execution_time_ms": 363
-}
