@@ -4390,3 +4390,9 @@
 - [x] Otimizar componentes pesados: refetchInterval aumentado em Messages 5s→15s, Logs 5s→15s, MessageMonitoring 15-30s→30-120s, Supervision 10s→30s, WhatsApp QR 2s→5s
 - [x] Validar zero regressão funcional: 66 testes passando em 7 suites
 - [x] Confirmar que nenhuma regra de negócio, layout ou comportamento foi alterado
+
+## Bug Fix: Reações e Templates no Inbox
+- [x] Reações enviadas não aparecem visualmente embaixo do balão da mensagem
+- [x] Mensagens de template não aparecem no inbox
+- [x] Testes vitest para validar as correções (27 testes passando)
+- [x] Nenhuma outra área do sistema alterada
