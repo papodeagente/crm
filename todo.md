@@ -4270,3 +4270,14 @@
 - [x] 280 testes falhando por tenant: corrigidos (saasUser adicionado a todos os mock contexts)
 - [x] String assertions atualizadas: protectedProcedure → tenantProcedure, sessionProtectedProcedure → sessionTenantProcedure
 - [x] Build limpo: 0 erros TS, 2413 testes passando (15 falhas pré-existentes não relacionadas a tenant)
+
+## Substituir campo Valor por Seleção de Produto no Inbox
+- [x] Localizar formulário de criação de negociação no inbox WhatsApp (CreateDealDialog em Inbox.tsx)
+- [x] Identificar campo "Valor da negociação" e como é persistido (campo visual, não era enviado no mutateAsync)
+- [x] Identificar estrutura de produtos e relacionamento deal-produto no CRM (product_catalog + deal_products)
+- [x] Remover campo "Valor (R$)" do formulário do inbox
+- [x] Adicionar seletor de produto com busca, quantidade, total e remoção
+- [x] Ajustar persistência: products[] enviado no createDeal.mutateAsync
+- [x] Testes vitest validando o novo fluxo (6 testes passando)
+- [x] Confirmar que nenhuma regra do WhatsApp foi alterada (apenas Inbox.tsx modificado)
+- [x] Confirmar que nenhuma outra parte do sistema foi modificada
