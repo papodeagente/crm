@@ -1,9 +1,0 @@
-{
-  "query": "CREATE TABLE `ai_integrations` (\n\t`id` int AUTO_INCREMENT NOT NULL,\n\t`tenantId` int NOT NULL,\n\t`provider` enum('openai','anthropic') NOT NULL,\n\t`apiKey` text NOT NULL,\n\t`defaultModel` varchar(128) NOT NULL,\n\t`isActive` boolean NOT NULL DEFAULT true,\n\t`label` varchar(128),\n\t`maxTokens` int DEFAULT 1024,\n\t`temperature` varchar(8) DEFAULT '0.7',\n\t`createdBy` int NOT NULL,\n\t`createdAt` timestamp NOT NULL DEFAULT (now()),\n\t`updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,\n\tCONSTRAINT `ai_integrations_id` PRIMARY KEY(`id`)\n);\nCREATE INDEX `ai_tenant_idx` ON `ai_integrations` (`tenantId`);\nCREATE INDEX `ai_tenant_provider_idx` ON `ai_integrations` (`tenantId`,`provider`);",
-  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute CREATE TABLE `ai_integrations` (\n\t`id` int AUTO_INCREMENT NOT NULL,\n\t`tenantId` int NOT NULL,\n\t`provider` enum('openai','anthropic') NOT NULL,\n\t`apiKey` text NOT NULL,\n\t`defaultModel` varchar(128) NOT NULL,\n\t`isActive` boolean NOT NULL DEFAULT true,\n\t`label` varchar(128),\n\t`maxTokens` int DEFAULT 1024,\n\t`temperature` varchar(8) DEFAULT '0.7',\n\t`createdBy` int NOT NULL,\n\t`createdAt` timestamp NOT NULL DEFAULT (now()),\n\t`updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,\n\tCONSTRAINT `ai_integrations_id` PRIMARY KEY(`id`)\n);\nCREATE INDEX `ai_tenant_idx` ON `ai_integrations` (`tenantId`);\nCREATE INDEX `ai_tenant_provider_idx` ON `ai_integrations` (`tenantId`,`provider`);",
-  "rows": [],
-  "messages": [],
-  "stdout": "",
-  "stderr": "",
-  "execution_time_ms": 975
-}

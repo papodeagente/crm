@@ -4380,3 +4380,15 @@
 - [x] Validar separação preço padrão do produto vs preço editado na negociação
 - [x] Testes vitest para todos os cenários de criação (9 testes passando)
 - [x] Nenhuma outra área do sistema alterada
+
+## Incidente: Contaminação de Tenants + Reaplicação de Correções
+- [x] Diagnóstico: banco íntegro, problema era query (getTenantId(ctx) em vez de input.tenantId)
+- [x] bruno@entur.com.br: removido da Aceleradora (300005), agora só existe na Entur (150002)
+- [x] Reaplicar saasAuthRouter.ts: 7 ocorrências de getTenantId(ctx) → input.tenantId
+- [x] Reaplicar saasAuth.ts: loginWithEmail e requestPasswordReset multi-tenant
+- [x] fernando@entur.com.br e viviane@entur.com.br: removidos da Aceleradora
+- [x] Tenant Aceleradora (300005): excluído completamente (users, contacts, deals, tenant)
+- [x] WhatsAppChat.tsx: RICH_TYPES para templates + optimistic reactions
+- [x] 10 testes passando em tenantContamination.test.ts
+- [x] TypeScript compila sem erros
+- [x] Repo não inflado (apenas 1 arquivo de teste adicionado)

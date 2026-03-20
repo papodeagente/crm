@@ -1,9 +1,0 @@
-{
-  "query": "CREATE TABLE `rd_field_mappings` (\n\t`id` int AUTO_INCREMENT NOT NULL,\n\t`tenantId` int NOT NULL,\n\t`rdFieldKey` varchar(255) NOT NULL,\n\t`rdFieldLabel` varchar(255) NOT NULL,\n\t`enturFieldType` enum('standard','custom') NOT NULL DEFAULT 'custom',\n\t`enturFieldKey` varchar(255),\n\t`enturCustomFieldId` int,\n\t`isActive` boolean NOT NULL DEFAULT true,\n\t`createdAt` timestamp NOT NULL DEFAULT (now()),\n\t`updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,\n\tCONSTRAINT `rd_field_mappings_id` PRIMARY KEY(`id`)\n);\nCREATE INDEX `rdfm_tenant_idx` ON `rd_field_mappings` (`tenantId`);\nCREATE INDEX `rdfm_rd_key_idx` ON `rd_field_mappings` (`tenantId`,`rdFieldKey`);",
-  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute CREATE TABLE `rd_field_mappings` (\n\t`id` int AUTO_INCREMENT NOT NULL,\n\t`tenantId` int NOT NULL,\n\t`rdFieldKey` varchar(255) NOT NULL,\n\t`rdFieldLabel` varchar(255) NOT NULL,\n\t`enturFieldType` enum('standard','custom') NOT NULL DEFAULT 'custom',\n\t`enturFieldKey` varchar(255),\n\t`enturCustomFieldId` int,\n\t`isActive` boolean NOT NULL DEFAULT true,\n\t`createdAt` timestamp NOT NULL DEFAULT (now()),\n\t`updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,\n\tCONSTRAINT `rd_field_mappings_id` PRIMARY KEY(`id`)\n);\nCREATE INDEX `rdfm_tenant_idx` ON `rd_field_mappings` (`tenantId`);\nCREATE INDEX `rdfm_rd_key_idx` ON `rd_field_mappings` (`tenantId`,`rdFieldKey`);",
-  "rows": [],
-  "messages": [],
-  "stdout": "",
-  "stderr": "",
-  "execution_time_ms": 1519
-}

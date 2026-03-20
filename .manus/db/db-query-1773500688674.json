@@ -1,9 +1,0 @@
-{
-  "query": "SHOW COLUMNS FROM wa_conversations LIKE 'assigned%';",
-  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute SHOW COLUMNS FROM wa_conversations LIKE 'assigned%';",
-  "rows": [],
-  "messages": [],
-  "stdout": "",
-  "stderr": "",
-  "execution_time_ms": 51
-}

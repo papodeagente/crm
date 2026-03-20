@@ -1998,6 +1998,22 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
 
   // Reaction handler
   const handleReact = useCallback((key: { remoteJid: string; fromMe: boolean; id: string }, emoji: string) => {
+    // Optimistic update: show reaction immediately under the message bubble
+    // Update the message cache optimistically (uses 'utils' from component scope)
+    utils.wa.messages.setData(
+      { sessionId, remoteJid: key.remoteJid, limit: 100 },
+      (old: any) => {
+        if (!old) return old;
+        return old.map((m: any) => {
+          if (m.messageId === key.id) {
+            const existing = m.reactions || [];
+            const filtered = existing.filter((r: any) => r.senderJid !== "me");
+            return { ...m, reactions: [...filtered, { senderJid: "me", emoji, timestamp: Date.now() }] };
+          }
+          return m;
+        });
+      }
+    );
     sendReaction.mutate({ sessionId, key, reaction: emoji });
   }, [sessionId]);
 
@@ -2072,6 +2088,12 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
       "locationMessage", "contactMessage", "contactsArrayMessage",
       "pollCreationMessage", "pollCreationMessageV3",
     ]);
+    // Rich message types that have their own renderer (RichMessageRenderer)
+    const RICH_TYPES = new Set([
+      "templateMessage", "interactiveMessage", "buttonsMessage",
+      "listMessage", "buttonsResponseMessage", "listResponseMessage",
+      "highlyStructuredMessage", "productMessage", "orderMessage",
+    ]);
     const msgs: Message[] = [...(messagesQ.data || [])].reverse()
       .filter(m => {
         // Always hide protocol/system messages
@@ -2080,6 +2102,8 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
         if (MEDIA_TYPES.has(m.messageType)) return true;
         // Special types with their own rendering
         if (SPECIAL_TYPES.has(m.messageType)) return true;
+        // Rich message types (templates, interactive, etc.) always shown
+        if (RICH_TYPES.has(m.messageType)) return true;
         // For other types: hide if content is empty or just a placeholder like "[Template]"
         const content = m.content?.trim();
         if (!content) return false;

@@ -1,9 +1,0 @@
-{
-  "query": "ALTER TABLE `deals` ADD `utmSource` varchar(255);\nALTER TABLE `deals` ADD `utmMedium` varchar(255);\nALTER TABLE `deals` ADD `utmCampaign` varchar(255);\nALTER TABLE `deals` ADD `utmTerm` varchar(255);\nALTER TABLE `deals` ADD `utmContent` varchar(255);",
-  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute ALTER TABLE `deals` ADD `utmSource` varchar(255);\nALTER TABLE `deals` ADD `utmMedium` varchar(255);\nALTER TABLE `deals` ADD `utmCampaign` varchar(255);\nALTER TABLE `deals` ADD `utmTerm` varchar(255);\nALTER TABLE `deals` ADD `utmContent` varchar(255);",
-  "rows": [],
-  "messages": [],
-  "stdout": "",
-  "stderr": "",
-  "execution_time_ms": 4237
-}

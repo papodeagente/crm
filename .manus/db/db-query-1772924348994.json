@@ -1,9 +1,0 @@
-{
-  "query": "CREATE TABLE `rfv_filter_snapshots` (\n\t`id` int AUTO_INCREMENT NOT NULL,\n\t`tenantId` int NOT NULL,\n\t`filterKey` varchar(64) NOT NULL,\n\t`previousCount` int NOT NULL DEFAULT 0,\n\t`currentCount` int NOT NULL DEFAULT 0,\n\t`lastCheckedAt` timestamp NOT NULL DEFAULT (now()),\n\t`createdAt` timestamp NOT NULL DEFAULT (now()),\n\tCONSTRAINT `rfv_filter_snapshots_id` PRIMARY KEY(`id`)\n);\nCREATE INDEX `rfv_snap_tenant_idx` ON `rfv_filter_snapshots` (`tenantId`);\nCREATE INDEX `rfv_snap_tenant_filter_idx` ON `rfv_filter_snapshots` (`tenantId`,`filterKey`);",
-  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute CREATE TABLE `rfv_filter_snapshots` (\n\t`id` int AUTO_INCREMENT NOT NULL,\n\t`tenantId` int NOT NULL,\n\t`filterKey` varchar(64) NOT NULL,\n\t`previousCount` int NOT NULL DEFAULT 0,\n\t`currentCount` int NOT NULL DEFAULT 0,\n\t`lastCheckedAt` timestamp NOT NULL DEFAULT (now()),\n\t`createdAt` timestamp NOT NULL DEFAULT (now()),\n\tCONSTRAINT `rfv_filter_snapshots_id` PRIMARY KEY(`id`)\n);\nCREATE INDEX `rfv_snap_tenant_idx` ON `rfv_filter_snapshots` (`tenantId`);\nCREATE INDEX `rfv_snap_tenant_filter_idx` ON `rfv_filter_snapshots` (`tenantId`,`filterKey`);",
-  "rows": [],
-  "messages": [],
-  "stdout": "",
-  "stderr": "",
-  "execution_time_ms": 1071
-}

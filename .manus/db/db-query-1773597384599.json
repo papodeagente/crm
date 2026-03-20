@@ -1,9 +1,0 @@
-{
-  "query": "ALTER TABLE `rd_station_config` ADD `name` varchar(255);\nALTER TABLE `rd_station_config` ADD `defaultSource` varchar(255);\nALTER TABLE `rd_station_config` ADD `defaultCampaign` varchar(255);\nALTER TABLE `rd_station_config` ADD `defaultOwnerUserId` int;\nALTER TABLE `rd_station_config` ADD `autoWhatsAppEnabled` boolean DEFAULT false NOT NULL;\nALTER TABLE `rd_station_config` ADD `autoWhatsAppMessageTemplate` text;\nALTER TABLE `rd_station_webhook_log` ADD `configId` int;\nALTER TABLE `rd_station_webhook_log` ADD `autoWhatsAppStatus` varchar(32);\nALTER TABLE `rd_station_webhook_log` ADD `autoWhatsAppError` text;\nCREATE INDEX `rdcfg_tenant_idx` ON `rd_station_config` (`tenantId`);\nCREATE INDEX `rdlog_config_idx` ON `rd_station_webhook_log` (`configId`);",
-  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute ALTER TABLE `rd_station_config` ADD `name` varchar(255);\nALTER TABLE `rd_station_config` ADD `defaultSource` varchar(255);\nALTER TABLE `rd_station_config` ADD `defaultCampaign` varchar(255);\nALTER TABLE `rd_station_config` ADD `defaultOwnerUserId` int;\nALTER TABLE `rd_station_config` ADD `autoWhatsAppEnabled` boolean DEFAULT false NOT NULL;\nALTER TABLE `rd_station_config` ADD `autoWhatsAppMessageTemplate` text;\nALTER TABLE `rd_station_webhook_log` ADD `configId` int;\nALTER TABLE `rd_station_webhook_log` ADD `autoWhatsAppStatus` varchar(32);\nALTER TABLE `rd_station_webhook_log` ADD `autoWhatsAppError` text;\nCREATE INDEX `rdcfg_tenant_idx` ON `rd_station_config` (`tenantId`);\nCREATE INDEX `rdlog_config_idx` ON `rd_station_webhook_log` (`configId`);",
-  "rows": [],
-  "messages": [],
-  "stdout": "",
-  "stderr": "",
-  "execution_time_ms": 2047
-}

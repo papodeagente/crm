@@ -1,9 +1,0 @@
-{
-  "query": "ALTER TABLE `internal_notes` ADD `category` varchar(32) DEFAULT 'other' NOT NULL;\nALTER TABLE `internal_notes` ADD `priority` varchar(16) DEFAULT 'normal' NOT NULL;\nALTER TABLE `internal_notes` ADD `isCustomerGlobalNote` boolean DEFAULT false NOT NULL;\nCREATE INDEX `in_global_note_idx` ON `internal_notes` (`tenantId`,`isCustomerGlobalNote`);",
-  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute ALTER TABLE `internal_notes` ADD `category` varchar(32) DEFAULT 'other' NOT NULL;\nALTER TABLE `internal_notes` ADD `priority` varchar(16) DEFAULT 'normal' NOT NULL;\nALTER TABLE `internal_notes` ADD `isCustomerGlobalNote` boolean DEFAULT false NOT NULL;\nCREATE INDEX `in_global_note_idx` ON `internal_notes` (`tenantId`,`isCustomerGlobalNote`);",
-  "rows": [],
-  "messages": [],
-  "stdout": "",
-  "stderr": "",
-  "execution_time_ms": 1034
-}
