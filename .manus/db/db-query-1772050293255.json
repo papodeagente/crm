@@ -1,9 +1,0 @@
-{
-  "query": "\nINSERT IGNORE INTO pipeline_stages (id, pipelineId, tenantId, name, orderIndex, probabilityDefault) VALUES\n(1, 1, 1, 'Novo Lead', 1, 10),\n(2, 1, 1, 'Qualificação', 2, 25),\n(3, 1, 1, 'Proposta Enviada', 3, 50),\n(4, 1, 1, 'Negociação', 4, 75),\n(5, 1, 1, 'Fechamento', 5, 90);\n",
-  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute \nINSERT IGNORE INTO pipeline_stages (id, pipelineId, tenantId, name, orderIndex, probabilityDefault) VALUES\n(1, 1, 1, 'Novo Lead', 1, 10),\n(2, 1, 1, 'Qualificação', 2, 25),\n(3, 1, 1, 'Proposta Enviada', 3, 50),\n(4, 1, 1, 'Negociação', 4, 75),\n(5, 1, 1, 'Fechamento', 5, 90);\n",
-  "rows": [],
-  "messages": [],
-  "stdout": "",
-  "stderr": "",
-  "execution_time_ms": 375
-}

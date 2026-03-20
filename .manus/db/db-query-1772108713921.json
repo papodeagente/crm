@@ -1,9 +1,0 @@
-{
-  "query": "ALTER TABLE messages ADD COLUMN media_file_name VARCHAR(512) DEFAULT NULL;\nALTER TABLE messages ADD COLUMN media_duration INT DEFAULT NULL;\nALTER TABLE messages ADD COLUMN is_voice_note TINYINT(1) DEFAULT 0;\nALTER TABLE messages ADD COLUMN quoted_message_id VARCHAR(256) DEFAULT NULL;\n",
-  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute ALTER TABLE messages ADD COLUMN media_file_name VARCHAR(512) DEFAULT NULL;\nALTER TABLE messages ADD COLUMN media_duration INT DEFAULT NULL;\nALTER TABLE messages ADD COLUMN is_voice_note TINYINT(1) DEFAULT 0;\nALTER TABLE messages ADD COLUMN quoted_message_id VARCHAR(256) DEFAULT NULL;\n",
-  "rows": [],
-  "messages": [],
-  "stdout": "",
-  "stderr": "",
-  "execution_time_ms": 3306
-}

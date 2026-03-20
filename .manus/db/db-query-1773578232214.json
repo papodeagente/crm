@@ -1,9 +1,0 @@
-{
-  "query": "CREATE TABLE `ai_suggestion_logs` (\n\t`id` int AUTO_INCREMENT NOT NULL,\n\t`tenantId` int NOT NULL,\n\t`userId` int,\n\t`provider` varchar(32) NOT NULL,\n\t`model` varchar(128) NOT NULL,\n\t`intentClassified` varchar(32),\n\t`style` varchar(32) DEFAULT 'default',\n\t`durationMs` int,\n\t`contextMessageCount` int,\n\t`hasCrmContext` boolean DEFAULT false,\n\t`success` boolean NOT NULL DEFAULT true,\n\t`errorMessage` text,\n\t`wasEdited` boolean,\n\t`wasSent` boolean,\n\t`sendMethod` varchar(32),\n\t`partsCount` int,\n\t`createdAt` timestamp NOT NULL DEFAULT (now()),\n\tCONSTRAINT `ai_suggestion_logs_id` PRIMARY KEY(`id`)\n);\nCREATE INDEX `aisl_tenant_idx` ON `ai_suggestion_logs` (`tenantId`);\nCREATE INDEX `aisl_tenant_created_idx` ON `ai_suggestion_logs` (`tenantId`,`createdAt`);",
-  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute CREATE TABLE `ai_suggestion_logs` (\n\t`id` int AUTO_INCREMENT NOT NULL,\n\t`tenantId` int NOT NULL,\n\t`userId` int,\n\t`provider` varchar(32) NOT NULL,\n\t`model` varchar(128) NOT NULL,\n\t`intentClassified` varchar(32),\n\t`style` varchar(32) DEFAULT 'default',\n\t`durationMs` int,\n\t`contextMessageCount` int,\n\t`hasCrmContext` boolean DEFAULT false,\n\t`success` boolean NOT NULL DEFAULT true,\n\t`errorMessage` text,\n\t`wasEdited` boolean,\n\t`wasSent` boolean,\n\t`sendMethod` varchar(32),\n\t`partsCount` int,\n\t`createdAt` timestamp NOT NULL DEFAULT (now()),\n\tCONSTRAINT `ai_suggestion_logs_id` PRIMARY KEY(`id`)\n);\nCREATE INDEX `aisl_tenant_idx` ON `ai_suggestion_logs` (`tenantId`);\nCREATE INDEX `aisl_tenant_created_idx` ON `ai_suggestion_logs` (`tenantId`,`createdAt`);",
-  "rows": [],
-  "messages": [],
-  "stdout": "",
-  "stderr": "",
-  "execution_time_ms": 655
-}

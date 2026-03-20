@@ -1,8 +1,0 @@
-{
-  "query": "SELECT id, messageId, sessionId, messageType, mediaUrl, mediaMimeType, mediaFileName, LEFT(content, 100) as content_preview FROM messages WHERE mediaFileName LIKE '%branca%' OR content LIKE '%branca%' LIMIT 5",
-  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute SELECT id, messageId, sessionId, messageType, mediaUrl, mediaMimeType, mediaFileName, LEFT(content, 100) as content_preview FROM messages WHERE mediaFileName LIKE '%branca%' OR content LIKE '%branca%' LIMIT 5",
-  "returncode": 1,
-  "logs": [
-    "ERROR 1054 (42S22) at line 1: Unknown column 'mediafilename' in 'where clause'"
-  ]
-}

@@ -1,9 +1,0 @@
-{
-  "query": "CREATE TABLE IF NOT EXISTS `wa_reactions` (\n  `id` int AUTO_INCREMENT NOT NULL,\n  `sessionId` varchar(128) NOT NULL,\n  `targetMessageId` varchar(256) NOT NULL,\n  `senderJid` varchar(128) NOT NULL,\n  `emoji` varchar(32) NOT NULL,\n  `fromMe` boolean NOT NULL DEFAULT false,\n  `timestamp` timestamp NOT NULL DEFAULT (now()),\n  CONSTRAINT `wa_reactions_id` PRIMARY KEY(`id`),\n  CONSTRAINT `idx_react_unique` UNIQUE(`sessionId`,`targetMessageId`,`senderJid`)\n);\nCREATE INDEX `idx_react_target` ON `wa_reactions` (`sessionId`,`targetMessageId`);",
-  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute CREATE TABLE IF NOT EXISTS `wa_reactions` (\n  `id` int AUTO_INCREMENT NOT NULL,\n  `sessionId` varchar(128) NOT NULL,\n  `targetMessageId` varchar(256) NOT NULL,\n  `senderJid` varchar(128) NOT NULL,\n  `emoji` varchar(32) NOT NULL,\n  `fromMe` boolean NOT NULL DEFAULT false,\n  `timestamp` timestamp NOT NULL DEFAULT (now()),\n  CONSTRAINT `wa_reactions_id` PRIMARY KEY(`id`),\n  CONSTRAINT `idx_react_unique` UNIQUE(`sessionId`,`targetMessageId`,`senderJid`)\n);\nCREATE INDEX `idx_react_target` ON `wa_reactions` (`sessionId`,`targetMessageId`);",
-  "rows": [],
-  "messages": [],
-  "stdout": "",
-  "stderr": "",
-  "execution_time_ms": 337
-}

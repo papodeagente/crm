@@ -1,9 +1,0 @@
-{
-  "query": "ALTER TABLE `deal_products` ADD `productId` int NOT NULL DEFAULT 0;\nALTER TABLE `deal_products` ADD `finalPriceCents` bigint DEFAULT 0;\nCREATE INDEX `dp_prod_product_idx` ON `deal_products` (`productId`);",
-  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute ALTER TABLE `deal_products` ADD `productId` int NOT NULL DEFAULT 0;\nALTER TABLE `deal_products` ADD `finalPriceCents` bigint DEFAULT 0;\nCREATE INDEX `dp_prod_product_idx` ON `deal_products` (`productId`);",
-  "rows": [],
-  "messages": [],
-  "stdout": "",
-  "stderr": "",
-  "execution_time_ms": 1747
-}

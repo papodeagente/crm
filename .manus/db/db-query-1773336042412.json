@@ -1,9 +1,0 @@
-{
-  "query": "\nUPDATE wa_conversations wc\nJOIN (\n  SELECT remoteJid, pushName\n  FROM (\n    SELECT remoteJid, pushName, \n           ROW_NUMBER() OVER (PARTITION BY remoteJid ORDER BY timestamp DESC) as rn\n    FROM messages \n    WHERE sessionId = 'crm-210002-240001' \n      AND fromMe = 0 \n      AND pushName IS NOT NULL \n      AND pushName != ''\n      AND pushName NOT REGEXP '^[0-9+ ()-]+$'\n      AND pushName != 'Você'\n      AND pushName != 'You'\n  ) ranked\n  WHERE rn = 1\n) m ON wc.remoteJid = m.remoteJid\nSET wc.contactPushName = m.pushName\nWHERE wc.sessionId = 'crm-210002-240001'\n  AND (wc.contactPushName IS NULL OR wc.contactPushName = '' OR wc.contactPushName REGEXP '^[0-9+ ()-]+$');\n",
-  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute \nUPDATE wa_conversations wc\nJOIN (\n  SELECT remoteJid, pushName\n  FROM (\n    SELECT remoteJid, pushName, \n           ROW_NUMBER() OVER (PARTITION BY remoteJid ORDER BY timestamp DESC) as rn\n    FROM messages \n    WHERE sessionId = 'crm-210002-240001' \n      AND fromMe = 0 \n      AND pushName IS NOT NULL \n      AND pushName != ''\n      AND pushName NOT REGEXP '^[0-9+ ()-]+$'\n      AND pushName != 'Você'\n      AND pushName != 'You'\n  ) ranked\n  WHERE rn = 1\n) m ON wc.remoteJid = m.remoteJid\nSET wc.contactPushName = m.pushName\nWHERE wc.sessionId = 'crm-210002-240001'\n  AND (wc.contactPushName IS NULL OR wc.contactPushName = '' OR wc.contactPushName REGEXP '^[0-9+ ()-]+$');\n",
-  "rows": [],
-  "messages": [],
-  "stdout": "",
-  "stderr": "",
-  "execution_time_ms": 197
-}

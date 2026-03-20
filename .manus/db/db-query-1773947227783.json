@@ -1,9 +1,0 @@
-{
-  "query": "\nUPDATE wa_conversations wc\nINNER JOIN (\n  SELECT m.sessionId, m.remoteJid, m.status\n  FROM messages m\n  INNER JOIN (\n    SELECT sessionId, remoteJid, MAX(id) AS maxId\n    FROM messages\n    WHERE fromMe = 1\n    GROUP BY sessionId, remoteJid\n  ) latest ON m.id = latest.maxId\n) lm ON wc.sessionId = lm.sessionId AND wc.remoteJid = lm.remoteJid\nSET wc.lastStatus = lm.status\nWHERE wc.lastFromMe = 1\nAND wc.lastStatus != lm.status\n",
-  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute \nUPDATE wa_conversations wc\nINNER JOIN (\n  SELECT m.sessionId, m.remoteJid, m.status\n  FROM messages m\n  INNER JOIN (\n    SELECT sessionId, remoteJid, MAX(id) AS maxId\n    FROM messages\n    WHERE fromMe = 1\n    GROUP BY sessionId, remoteJid\n  ) latest ON m.id = latest.maxId\n) lm ON wc.sessionId = lm.sessionId AND wc.remoteJid = lm.remoteJid\nSET wc.lastStatus = lm.status\nWHERE wc.lastFromMe = 1\nAND wc.lastStatus != lm.status\n",
-  "rows": [],
-  "messages": [],
-  "stdout": "",
-  "stderr": "",
-  "execution_time_ms": 160
-}
