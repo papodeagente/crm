@@ -4359,3 +4359,13 @@
 - [x] Corrigir apenas o ponto necessário para valor refletir o produto importado
 - [x] Testes vitest para validar correção sem regressão (8 testes passando)
 - [x] Confirmar que nenhuma outra área foi alterada
+
+## Distribuição de Leads por Equipe (RD Station)
+- [x] Diagnosticar lógica atual de distribuição de leads no RD Station (backend + frontend)
+- [x] Backend: adicionar opção team_random na configuração e lógica de distribuição
+- [x] Backend: buscar membros da equipe e sortear aleatoriamente
+- [x] Frontend: adicionar opção "Distribuir entre membros da equipe" na interface
+- [x] Frontend: exibir seletor de equipe quando opção team_random for escolhida
+- [x] Preservar opções existentes (usuário específico e aleatória)
+- [x] Testes vitest para validar as 3 opções de distribuição (7 testes passando)
+- [x] Nenhuma outra área do sistema alterada (57 testes totais passando)

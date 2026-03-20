@@ -19,7 +19,7 @@ import {
   ArrowLeft, Copy, Check, RefreshCw, Plus, Pencil, Trash2,
   CheckCircle2, Circle, AlertTriangle, Megaphone, Zap, Shield,
   ChevronDown, ChevronUp, Eye, EyeOff, Loader2, MessageSquare,
-  Phone, XCircle, BarChart3, Settings2, FileText,
+  Phone, XCircle, BarChart3, Settings2, FileText, Users,
 } from "lucide-react";
 import { formatFullDateTime } from "../../../shared/dateUtils";
 // ─── Types ───────────────────────────────────────────────
@@ -31,6 +31,7 @@ interface ConfigFormData {
   defaultSource: string;
   defaultCampaign: string;
   defaultOwnerUserId: number | null;
+  assignmentTeamId: number | null;
   autoWhatsAppEnabled: boolean;
   autoWhatsAppMessageTemplate: string;
   dealNameTemplate: string;
@@ -44,6 +45,7 @@ const DEFAULT_FORM: ConfigFormData = {
   defaultSource: "",
   defaultCampaign: "",
   defaultOwnerUserId: null,
+  assignmentTeamId: null,
   autoWhatsAppEnabled: false,
   autoWhatsAppMessageTemplate: "",
   dealNameTemplate: "",
@@ -96,6 +98,7 @@ export default function RDStationIntegration() {
   const statsQuery = trpc.rdStation.getStats.useQuery();
   const pipelinesQuery = trpc.rdStation.listPipelines.useQuery();
   const teamQuery = trpc.rdStation.listTeamMembers.useQuery();
+  const teamsQuery = trpc.rdStation.listTeamsForAssignment.useQuery();
   const waStatusQuery = trpc.rdStation.getWhatsAppStatus.useQuery();
   const productsQuery = trpc.rdStation.listProducts.useQuery();
 
@@ -204,6 +207,7 @@ export default function RDStationIntegration() {
       defaultSource: config.defaultSource || "",
       defaultCampaign: config.defaultCampaign || "",
       defaultOwnerUserId: config.defaultOwnerUserId ?? null,
+      assignmentTeamId: config.assignmentTeamId ?? null,
       autoWhatsAppEnabled: config.autoWhatsAppEnabled ?? false,
       autoWhatsAppMessageTemplate: config.autoWhatsAppMessageTemplate || DEFAULT_TEMPLATE,
       dealNameTemplate: config.dealNameTemplate || "",
@@ -226,6 +230,7 @@ export default function RDStationIntegration() {
         defaultSource: form.defaultSource || null,
         defaultCampaign: form.defaultCampaign || null,
         defaultOwnerUserId: form.defaultOwnerUserId,
+        assignmentTeamId: form.assignmentTeamId,
         autoWhatsAppEnabled: form.autoWhatsAppEnabled,
         autoWhatsAppMessageTemplate: form.autoWhatsAppMessageTemplate || null,
         dealNameTemplate: form.dealNameTemplate || null,
@@ -239,6 +244,7 @@ export default function RDStationIntegration() {
         defaultSource: form.defaultSource || undefined,
         defaultCampaign: form.defaultCampaign || undefined,
         defaultOwnerUserId: form.defaultOwnerUserId ?? undefined,
+        assignmentTeamId: form.assignmentTeamId ?? undefined,
         autoWhatsAppEnabled: form.autoWhatsAppEnabled,
         autoWhatsAppMessageTemplate: form.autoWhatsAppMessageTemplate || undefined,
         dealNameTemplate: form.dealNameTemplate || undefined,
@@ -446,6 +452,22 @@ export default function RDStationIntegration() {
                       <span className="text-foreground font-medium">
                         {teamQuery.data?.find((m) => m.id === config.defaultOwnerUserId)?.name || `#${config.defaultOwnerUserId}`}
                       </span>
+                    </div>
+                  )}
+                  {config.assignmentTeamId && !config.defaultOwnerUserId && (
+                    <div className="bg-violet-500/10 rounded px-2 py-1.5">
+                      <span className="text-muted-foreground">Distribuição:</span>{" "}
+                      <span className="text-violet-400 font-medium">
+                        <Users className="h-3 w-3 inline mr-1" />
+                        {teamsQuery.data?.find((t: any) => t.id === config.assignmentTeamId)?.name || `Equipe #${config.assignmentTeamId}`}
+                        {" "}(aleatório)
+                      </span>
+                    </div>
+                  )}
+                  {!config.defaultOwnerUserId && !config.assignmentTeamId && (
+                    <div className="bg-muted/30 rounded px-2 py-1.5">
+                      <span className="text-muted-foreground">Distribuição:</span>{" "}
+                      <span className="text-foreground font-medium">Automático (round-robin)</span>
                     </div>
                   )}
                 </div>
@@ -692,23 +714,80 @@ export default function RDStationIntegration() {
               </div>
             </div>
 
-            {/* Owner */}
-            <div>
-              <Label>Responsável padrão</Label>
-              <Select
-                value={form.defaultOwnerUserId ? String(form.defaultOwnerUserId) : "auto"}
-                onValueChange={(v) => setForm({ ...form, defaultOwnerUserId: v === "auto" ? null : Number(v) })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Round-robin (automático)" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="auto">Automático (round-robin)</SelectItem>
-                  {teamQuery.data?.map((m) => (
-                    <SelectItem key={m.id} value={String(m.id)}>{m.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            {/* Assignment Mode */}
+            <div className="border border-border/50 rounded-lg p-4 space-y-3">
+              <div className="flex items-center gap-2">
+                <Users className="h-4 w-4 text-violet-500" />
+                <Label className="font-medium">Distribuição de leads</Label>
+              </div>
+              <div>
+                <Label className="text-xs">Modo de atribuição</Label>
+                <Select
+                  value={
+                    form.defaultOwnerUserId ? "user" :
+                    form.assignmentTeamId ? "team" : "auto"
+                  }
+                  onValueChange={(v) => {
+                    if (v === "auto") {
+                      setForm({ ...form, defaultOwnerUserId: null, assignmentTeamId: null });
+                    } else if (v === "user") {
+                      setForm({ ...form, assignmentTeamId: null });
+                    } else if (v === "team") {
+                      setForm({ ...form, defaultOwnerUserId: null });
+                    }
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o modo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="auto">Automático (round-robin geral)</SelectItem>
+                    <SelectItem value="user">Usuário específico</SelectItem>
+                    <SelectItem value="team">Aleatório por equipe</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Show user selector when mode is "user" */}
+              {(form.defaultOwnerUserId !== null && form.assignmentTeamId === null) && (
+                <div>
+                  <Label className="text-xs">Responsável</Label>
+                  <Select
+                    value={form.defaultOwnerUserId ? String(form.defaultOwnerUserId) : ""}
+                    onValueChange={(v) => setForm({ ...form, defaultOwnerUserId: v ? Number(v) : null })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione o usuário" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {teamQuery.data?.map((m) => (
+                        <SelectItem key={m.id} value={String(m.id)}>{m.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {/* Show team selector when mode is "team" */}
+              {form.assignmentTeamId !== null ? (
+                <div>
+                  <Label className="text-xs">Equipe</Label>
+                  <Select
+                    value={form.assignmentTeamId ? String(form.assignmentTeamId) : ""}
+                    onValueChange={(v) => setForm({ ...form, assignmentTeamId: v ? Number(v) : null })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione a equipe" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {teamsQuery.data?.map((t: any) => (
+                        <SelectItem key={t.id} value={String(t.id)}>{t.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground mt-1">Os leads serão distribuídos aleatoriamente entre os membros ativos desta equipe.</p>
+                </div>
+              ) : null}
             </div>
 
             {/* Deal Name Template */}

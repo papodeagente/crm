@@ -16,7 +16,7 @@ import {
   type InboundLeadPayload,
 } from "./leadProcessor";
 import { getDb } from "./db";
-import { eventLog, trackingTokens, rdStationConfig, rdStationWebhookLog, whatsappSessions, rdStationConfigTasks, productCatalog, dealProducts, tasks, webhookConfig, metaIntegrationConfig } from "../drizzle/schema";
+import { eventLog, trackingTokens, rdStationConfig, rdStationWebhookLog, whatsappSessions, rdStationConfigTasks, productCatalog, dealProducts, tasks, webhookConfig, metaIntegrationConfig, teamMembers, crmUsers } from "../drizzle/schema";
 import { createDealProduct, createTask, recalcDealValue } from "./crmDb";
 import { eq, and, sql } from "drizzle-orm";
 import { ENV } from "./_core/env";
@@ -855,11 +855,44 @@ router.post("/api/webhooks/rdstation", async (req: Request, res: Response) => {
           if (!customDealTitle) customDealTitle = undefined;
         }
 
-        // 8. Process the lead — pass config overrides
+        // 8. Resolve ownerUserId based on assignment mode
+        let resolvedOwnerUserId = config.defaultOwnerUserId ?? undefined;
+
+        // If assignmentTeamId is set, pick a random active member from that team
+        if (config.assignmentTeamId && !config.defaultOwnerUserId) {
+          try {
+            const db = await getDb();
+            if (db) {
+              const members = await db
+                .select({ userId: teamMembers.userId })
+                .from(teamMembers)
+                .innerJoin(crmUsers, and(
+                  eq(crmUsers.id, teamMembers.userId),
+                  eq(crmUsers.tenantId, tenantId),
+                  eq(crmUsers.status, "active")
+                ))
+                .where(and(
+                  eq(teamMembers.teamId, config.assignmentTeamId),
+                  eq(teamMembers.tenantId, tenantId)
+                ));
+              if (members.length > 0) {
+                const randomIndex = Math.floor(Math.random() * members.length);
+                resolvedOwnerUserId = members[randomIndex]!.userId;
+                console.log(`[RD Station Webhook] Team random assignment: team #${config.assignmentTeamId}, picked user #${resolvedOwnerUserId} from ${members.length} members`);
+              } else {
+                console.warn(`[RD Station Webhook] Team #${config.assignmentTeamId} has no active members, falling back to round-robin`);
+              }
+            }
+          } catch (teamErr: any) {
+            console.error(`[RD Station Webhook] Team assignment error: ${teamErr.message}, falling back to round-robin`);
+          }
+        }
+
+        // 8b. Process the lead — pass config overrides
         const result = await processInboundLead(tenantId, payload, {
           pipelineId: config.defaultPipelineId ?? undefined,
           stageId: config.defaultStageId ?? undefined,
-          ownerUserId: config.defaultOwnerUserId ?? undefined,
+          ownerUserId: resolvedOwnerUserId,
           source: config.defaultSource || undefined,
           campaign: config.defaultCampaign || undefined,
           dealTitle: customDealTitle,

@@ -1393,6 +1393,7 @@ export const rdStationConfig = mysqlTable("rd_station_config", {
   defaultSource: varchar("defaultSource", { length: 255 }),
   defaultCampaign: varchar("defaultCampaign", { length: 255 }),
   defaultOwnerUserId: int("defaultOwnerUserId"),
+  assignmentTeamId: int("assignmentTeamId"),
   autoWhatsAppEnabled: boolean("autoWhatsAppEnabled").default(false).notNull(),
   autoWhatsAppMessageTemplate: text("autoWhatsAppMessageTemplate"),
   dealNameTemplate: text("dealNameTemplate"),

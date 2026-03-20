@@ -379,6 +379,13 @@
       "when": 1773973385310,
       "tag": "0053_lush_exodus",
       "breakpoints": true
+    },
+    {
+      "idx": 54,
+      "version": "5",
+      "when": 1774014110894,
+      "tag": "0054_futuristic_nomad",
+      "breakpoints": true
     }
   ]
 }
