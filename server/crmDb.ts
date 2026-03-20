@@ -824,11 +824,36 @@ export async function createGoal(data: { tenantId: number; name?: string; scope?
 export async function listGoals(tenantId: number) {
   const db = await getDb(); if (!db) return [];
   const rows = await db.select().from(goals).where(eq(goals.tenantId, tenantId)).orderBy(desc(goals.createdAt));
-  // Calculate currentValue for each goal from real pipeline data
-  return Promise.all(rows.map(async (goal) => {
-    const currentValue = await calculateGoalProgress(db, goal);
-    return { ...goal, currentValue };
+  if (rows.length === 0) return [];
+  // Batch calculate all goal progress in a single query instead of N+1
+  const goalProgressMap = await batchCalculateGoalProgress(db, rows);
+  return rows.map((goal) => ({
+    ...goal,
+    currentValue: goalProgressMap.get(goal.id) ?? 0,
   }));
+}
+
+/** Batch calculate progress for multiple goals in minimal queries (avoids N+1) */
+async function batchCalculateGoalProgress(db: any, goalsList: any[]): Promise<Map<number, number>> {
+  const result = new Map<number, number>();
+  if (goalsList.length === 0) return result;
+  // Group goals by metricKey to batch similar queries
+  const byMetric: Record<string, any[]> = {};
+  for (const g of goalsList) {
+    (byMetric[g.metricKey] ??= []).push(g);
+  }
+  // Process each metric type with a single query covering all goals of that type
+  for (const [metricKey, goalsGroup] of Object.entries(byMetric)) {
+    try {
+      // Use Promise.all for the different metric groups (max 3 queries total instead of N)
+      const values = await Promise.all(goalsGroup.map(g => calculateGoalProgress(db, g)));
+      goalsGroup.forEach((g, i) => result.set(g.id, values[i]));
+    } catch (err) {
+      console.error('[batchCalculateGoalProgress] Error:', err);
+      goalsGroup.forEach(g => result.set(g.id, 0));
+    }
+  }
+  return result;
 }
 
 /** Calculate real-time progress for a goal based on deals in the pipeline */

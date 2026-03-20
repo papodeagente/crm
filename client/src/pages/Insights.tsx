@@ -90,16 +90,16 @@ function CRMDashboard() {
   const { user } = useAuth();
   const dateFilter = useDateFilter("all");
   const [selectedUserId, setSelectedUserId] = useState<string>("all");
-  const teamMembers = trpc.rdStation.listTeamMembers.useQuery();
+  const teamMembers = trpc.rdStation.listTeamMembers.useQuery(undefined, { staleTime: 5 * 60 * 1000 });
   const isAdmin = (user as any)?.role === "admin";
 
   const userIdNum = selectedUserId !== "all" ? Number(selectedUserId) : undefined;
   const insightsInput = (dateFilter.dates.dateFrom || dateFilter.dates.dateTo || userIdNum)
     ? { dateFrom: dateFilter.dates.dateFrom, dateTo: dateFilter.dates.dateTo, userId: userIdNum }
     : undefined;
-  const dashboard = trpc.insights.dashboard.useQuery(insightsInput);
-  const homeData = trpc.dashboard.metrics.useQuery({ dateFrom: dateFilter.dates.dateFrom, dateTo: dateFilter.dates.dateTo, userId: userIdNum }, { refetchInterval: 60000 });
-  const pipelineSummary = trpc.dashboard.pipelineSummary.useQuery({ dateFrom: dateFilter.dates.dateFrom, dateTo: dateFilter.dates.dateTo, userId: userIdNum }, { refetchInterval: 60000 });
+  const dashboard = trpc.insights.dashboard.useQuery(insightsInput, { staleTime: 30000 });
+  const homeData = trpc.dashboard.metrics.useQuery({ dateFrom: dateFilter.dates.dateFrom, dateTo: dateFilter.dates.dateTo, userId: userIdNum }, { refetchInterval: 60000, staleTime: 30000 });
+  const pipelineSummary = trpc.dashboard.pipelineSummary.useQuery({ dateFrom: dateFilter.dates.dateFrom, dateTo: dateFilter.dates.dateTo, userId: userIdNum }, { refetchInterval: 60000, staleTime: 30000 });
   const d = dashboard.data;
   const h = homeData.data;
 
@@ -290,7 +290,7 @@ function MessagesDashboard() {
   const { lastMessage, lastStatusUpdate, isConnected } = useSocket();
   const dateFilter = useDateFilter("last7");
   const [selectedMsgUserId, setSelectedMsgUserId] = useState<string>("all");
-  const teamMembersMsg = trpc.rdStation.listTeamMembers.useQuery();
+  const teamMembersMsg = trpc.rdStation.listTeamMembers.useQuery(undefined, { staleTime: 5 * 60 * 1000 });
   const isAdminMsg = (user as any)?.role === "admin";
   const periodDays = useMemo(() => {
     if (dateFilter.preset === "all") return 365;
@@ -308,8 +308,8 @@ function MessagesDashboard() {
   const [liveEvents, setLiveEvents] = useState<Array<{ type: string; data: any; ts: number }>>([]);
 
   // Admin can see all tenant sessions; non-admin sees only their own
-  const allTenantSessions = trpc.whatsapp.tenantSessions.useQuery(undefined, { enabled: !!user && isAdminMsg });
-  const ownSessions = trpc.whatsapp.sessions.useQuery(undefined, { enabled: !!user });
+  const allTenantSessions = trpc.whatsapp.tenantSessions.useQuery(undefined, { enabled: !!user && isAdminMsg, staleTime: 60000 });
+  const ownSessions = trpc.whatsapp.sessions.useQuery(undefined, { enabled: !!user, staleTime: 60000 });
   const sessions = useMemo(() => {
     if (isAdminMsg && selectedMsgUserId !== "all" && allTenantSessions.data) {
       return allTenantSessions.data.filter((s: any) => String(s.userId) === selectedMsgUserId);
@@ -343,31 +343,31 @@ function MessagesDashboard() {
 
   const statusMetrics = trpc.monitoring.statusMetrics.useQuery(
     { sessionId: selectedSession, periodDays, dateFrom, dateTo },
-    { enabled: queryEnabled, refetchInterval: 30000 }
+    { enabled: queryEnabled, refetchInterval: 60000, staleTime: 30000 }
   );
   const volumeOverTime = trpc.monitoring.volumeOverTime.useQuery(
     { sessionId: selectedSession, periodDays, granularity: periodDays <= 2 ? "hour" : "day", dateFrom, dateTo },
-    { enabled: queryEnabled, refetchInterval: 30000 }
+    { enabled: queryEnabled, refetchInterval: 60000, staleTime: 30000 }
   );
   const deliveryRate = trpc.monitoring.deliveryRate.useQuery(
     { sessionId: selectedSession, periodDays, dateFrom, dateTo },
-    { enabled: queryEnabled, refetchInterval: 30000 }
+    { enabled: queryEnabled, refetchInterval: 60000, staleTime: 30000 }
   );
   const recentActivity = trpc.monitoring.recentActivity.useQuery(
     { sessionId: selectedSession, limit: 50 },
-    { enabled: queryEnabled, refetchInterval: 15000 }
+    { enabled: queryEnabled, refetchInterval: 30000, staleTime: 15000 }
   );
   const typeDistribution = trpc.monitoring.typeDistribution.useQuery(
     { sessionId: selectedSession, periodDays, dateFrom, dateTo },
-    { enabled: queryEnabled, refetchInterval: 60000 }
+    { enabled: queryEnabled, refetchInterval: 120000, staleTime: 60000 }
   );
   const topContacts = trpc.monitoring.topContacts.useQuery(
     { sessionId: selectedSession, periodDays, limit: 10, dateFrom, dateTo },
-    { enabled: queryEnabled, refetchInterval: 60000 }
+    { enabled: queryEnabled, refetchInterval: 120000, staleTime: 60000 }
   );
   const responseTime = trpc.monitoring.responseTime.useQuery(
     { sessionId: selectedSession, periodDays, dateFrom, dateTo },
-    { enabled: queryEnabled, refetchInterval: 60000 }
+    { enabled: queryEnabled, refetchInterval: 120000, staleTime: 60000 }
   );
 
   useEffect(() => {

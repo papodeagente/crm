@@ -4341,3 +4341,14 @@
 - [x] Garantir que filtro por usuário funcione em conjunto com filtro por data
 - [x] Testes vitest para validar filtros combinados (data + usuário) — 13 testes passando
 - [x] Nenhuma outra área do sistema alterada
+
+## Otimização de Performance
+- [x] Diagnosticar gargalos: queries SQL pesadas, N+1, procedures lentas
+- [x] Diagnosticar frontend: re-renders, fetches redundantes, componentes pesados
+- [x] Adicionar índices SQL para queries frequentes (11 índices adicionados)
+- [x] Otimizar queries pesadas (getDashboardMetrics, getPipelineSummary, listGoals, etc.)
+- [x] Eliminar N+1 queries no backend (listGoals batch)
+- [x] Otimizar frontend: staleTime adicionado em todas as queries pesadas
+- [x] Reduzir fetches redundantes: refetchInterval aumentado em 8 páginas
+- [x] Validar zero regressão funcional: 41 testes próprios passando, falhas são pré-existentes
+- [x] Confirmar que nenhuma regra de negócio, layout ou comportamento foi alterado

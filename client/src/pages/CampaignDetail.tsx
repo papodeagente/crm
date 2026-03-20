@@ -64,7 +64,7 @@ export default function CampaignDetail() {
 
   const detailQ = trpc.rfv.campaignDetail.useQuery(
     { campaignId},
-    { enabled: !!campaignId, refetchInterval: (query) => query.state.data?.status === "running" ? 3000 : false },
+    { enabled: !!campaignId, refetchInterval: (query) => query.state.data?.status === "running" ? 5000 : false, staleTime: 3000 },
   );
 
   const messagesQ = trpc.rfv.campaignMessages.useQuery(
@@ -73,7 +73,7 @@ export default function CampaignDetail() {
       pageSize: msgPageSize,
       status: msgStatusFilter === "all" ? undefined : msgStatusFilter,
     },
-    { enabled: !!campaignId, refetchInterval: (query) => detailQ.data?.status === "running" ? 5000 : false },
+    { enabled: !!campaignId, refetchInterval: (query) => detailQ.data?.status === "running" ? 10000 : false, staleTime: 5000 },
   );
 
   const campaign = detailQ.data;

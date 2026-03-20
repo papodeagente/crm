@@ -16,8 +16,8 @@ import {
   ResponsiveContainer, PieChart, Pie, Cell,
 } from "recharts";
 
-/* ─── Polling interval for real-time sync (15 seconds) ─── */
-const REFETCH_INTERVAL = 15_000;
+/* ─── Polling interval for real-time sync (60 seconds) ─── */
+const REFETCH_INTERVAL = 60_000;
 
 /* ─── ENTUR Brand Colors ─── */
 const ENTUR = {
@@ -428,25 +428,25 @@ export default function Home() {
   // All queries with refetchInterval for real-time sync
   const metricsQ = trpc.dashboard.metrics.useQuery(
     { pipelineId: defaultPipelineId, dealStatus },
-    { refetchInterval: REFETCH_INTERVAL }
+    { refetchInterval: REFETCH_INTERVAL, staleTime: 30000 }
   );
   const pipelineQ = trpc.dashboard.pipelineSummary.useQuery(
     { pipelineId: defaultPipelineId, dealStatus },
-    { refetchInterval: REFETCH_INTERVAL }
+    { refetchInterval: REFETCH_INTERVAL, staleTime: 30000 }
   );
   const tasksQ = trpc.dashboard.upcomingTasks.useQuery(
     { limit: 6 },
-    { refetchInterval: REFETCH_INTERVAL }
+    { refetchInterval: REFETCH_INTERVAL, staleTime: 30000 }
   );
   const waMetricsQ = trpc.dashboard.whatsappMetrics.useQuery(undefined,
-    { refetchInterval: REFETCH_INTERVAL }
+    { refetchInterval: REFETCH_INTERVAL, staleTime: 30000 }
   );
   const conversionQ = trpc.dashboard.conversionRates.useQuery(undefined,
-    { refetchInterval: REFETCH_INTERVAL }
+    { refetchInterval: REFETCH_INTERVAL, staleTime: 30000 }
   );
   const funnelQ = trpc.dashboard.funnelData.useQuery(
     { pipelineId: defaultPipelineId },
-    { refetchInterval: REFETCH_INTERVAL }
+    { refetchInterval: REFETCH_INTERVAL, staleTime: 30000 }
   );
 
   const metrics = metricsQ.data;

@@ -1174,11 +1174,11 @@ export default function InboxPage() {
   // Queue conversations
   const queueQ = trpc.whatsapp.queue.list.useQuery(
     { sessionId: activeSession?.sessionId || "", limit: 100 },
-    { enabled: !!activeSession?.sessionId && (activeTab === "queue" || activeTab === "all"), refetchInterval: socketConnected ? 30000 : 10000, staleTime: 5000 }
+    { enabled: !!activeSession?.sessionId && (activeTab === "queue" || activeTab === "all"), refetchInterval: socketConnected ? 30000 : 20000, staleTime: 10000 }
   );
   const queueStatsQ = trpc.whatsapp.queue.stats.useQuery(
     { sessionId: activeSession?.sessionId || "" },
-    { enabled: !!activeSession?.sessionId, refetchInterval: socketConnected ? 60000 : 15000, staleTime: 10000 }
+    { enabled: !!activeSession?.sessionId, refetchInterval: socketConnected ? 60000 : 30000, staleTime: 15000 }
   );
   const claimMutation = trpc.whatsapp.queue.claim.useMutation({
     onSuccess: (_data, variables) => {

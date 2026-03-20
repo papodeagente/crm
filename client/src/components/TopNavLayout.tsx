@@ -358,7 +358,7 @@ function TopBar({ onSearchOpen, mobileMenuOpen, onToggleMobile }: {
   const [location, setLocation] = useLocation();
   const themeCtx = useTheme();
   const unreadCount = trpc.notifications.unreadCount.useQuery(undefined,
-    { refetchInterval: 30000 }
+    { refetchInterval: 30000, staleTime: 15000 }
   );
   const saasMe = trpc.saasAuth.me.useQuery(undefined, {
     retry: false,
