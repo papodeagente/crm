@@ -1,0 +1,9 @@
+{
+  "query": "UPDATE wa_conversations c\nSET c.contactPushName = (\n  SELECT wc.savedName\n  FROM wa_contacts wc \n  WHERE wc.jid = c.remoteJid \n  AND wc.savedName IS NOT NULL AND wc.savedName != ''\n  AND wc.savedName NOT REGEXP '^[0-9+\\\\-\\\\s\\\\(\\\\)]+$'\n  LIMIT 1\n)\nWHERE (c.contactPushName IS NULL OR c.contactPushName = '' OR c.contactPushName REGEXP '^[0-9+\\\\-\\\\s\\\\(\\\\)]+$')\nAND EXISTS (\n  SELECT 1 FROM wa_contacts wc2 \n  WHERE wc2.jid = c.remoteJid \n  AND wc2.savedName IS NOT NULL AND wc2.savedName != ''\n  AND wc2.savedName NOT REGEXP '^[0-9+\\\\-\\\\s\\\\(\\\\)]+$'\n)",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute UPDATE wa_conversations c\nSET c.contactPushName = (\n  SELECT wc.savedName\n  FROM wa_contacts wc \n  WHERE wc.jid = c.remoteJid \n  AND wc.savedName IS NOT NULL AND wc.savedName != ''\n  AND wc.savedName NOT REGEXP '^[0-9+\\\\-\\\\s\\\\(\\\\)]+$'\n  LIMIT 1\n)\nWHERE (c.contactPushName IS NULL OR c.contactPushName = '' OR c.contactPushName REGEXP '^[0-9+\\\\-\\\\s\\\\(\\\\)]+$')\nAND EXISTS (\n  SELECT 1 FROM wa_contacts wc2 \n  WHERE wc2.jid = c.remoteJid \n  AND wc2.savedName IS NOT NULL AND wc2.savedName != ''\n  AND wc2.savedName NOT REGEXP '^[0-9+\\\\-\\\\s\\\\(\\\\)]+$'\n)",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 154
+}

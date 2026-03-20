@@ -1,0 +1,37 @@
+{
+  "query": "SELECT id, sessionId, status, tenantId, userId, phoneNumber, pushName FROM whatsapp_sessions ORDER BY id",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute SELECT id, sessionId, status, tenantId, userId, phoneNumber, pushName FROM whatsapp_sessions ORDER BY id",
+  "rows": [
+    {
+      "id": "120001",
+      "sessionId": "Whatsapp",
+      "status": "connected",
+      "tenantId": "150002",
+      "userId": "150001",
+      "phoneNumber": "558499838420",
+      "pushName": "Bruno Barbosa"
+    },
+    {
+      "id": "180001",
+      "sessionId": "Boxtour",
+      "status": "disconnected",
+      "tenantId": "210002",
+      "userId": "210001",
+      "phoneNumber": "558499838420",
+      "pushName": "Bruno Barbosa"
+    },
+    {
+      "id": "210001",
+      "sessionId": "Boxtour 2",
+      "status": "disconnected",
+      "tenantId": "210002",
+      "userId": "210001",
+      "phoneNumber": "NULL",
+      "pushName": "NULL"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tsessionId\tstatus\ttenantId\tuserId\tphoneNumber\tpushName\n120001\tWhatsapp\tconnected\t150002\t150001\t558499838420\tBruno Barbosa\n180001\tBoxtour\tdisconnected\t210002\t210001\t558499838420\tBruno Barbosa\n210001\tBoxtour 2\tdisconnected\t210002\t210001\tNULL\tNULL\n",
+  "stderr": "",
+  "execution_time_ms": 553
+}

@@ -1,0 +1,16 @@
+{
+  "query": "SHOW TABLES LIKE 'custom_field%';",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute SHOW TABLES LIKE 'custom_field%';",
+  "rows": [
+    {
+      "Tables_in_EKvcVicuVoUxTnzjSKzgdk (custom_field%)": "custom_field_values"
+    },
+    {
+      "Tables_in_EKvcVicuVoUxTnzjSKzgdk (custom_field%)": "custom_fields"
+    }
+  ],
+  "messages": [],
+  "stdout": "Tables_in_EKvcVicuVoUxTnzjSKzgdk (custom_field%)\ncustom_field_values\ncustom_fields\n",
+  "stderr": "",
+  "execution_time_ms": 56
+}

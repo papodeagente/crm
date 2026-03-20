@@ -1,0 +1,16 @@
+{
+  "query": "SELECT id, name, color, isActive FROM lead_sources WHERE tenantId = 1 AND isDeleted = 0 ORDER BY name;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute SELECT id, name, color, isActive FROM lead_sources WHERE tenantId = 1 AND isDeleted = 0 ORDER BY name;",
+  "rows": [
+    {
+      "id": "1",
+      "name": "Anúncio X",
+      "color": "#6366f1",
+      "isActive": "1"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tname\tcolor\tisActive\n1\tAnúncio X\t#6366f1\t1\n",
+  "stderr": "",
+  "execution_time_ms": 346
+}

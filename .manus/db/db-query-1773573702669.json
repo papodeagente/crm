@@ -1,0 +1,15 @@
+{
+  "query": "SELECT \n  (SELECT COUNT(*) FROM messages) as total_messages,\n  (SELECT COUNT(*) FROM (SELECT messageId, sessionId FROM messages WHERE messageId IS NOT NULL GROUP BY messageId, sessionId HAVING COUNT(*) > 1) t) as duplicate_groups,\n  (SELECT SUM(cnt - 1) FROM (SELECT messageId, sessionId, COUNT(*) as cnt FROM messages WHERE messageId IS NOT NULL GROUP BY messageId, sessionId HAVING cnt > 1) t) as extra_duplicates;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute SELECT \n  (SELECT COUNT(*) FROM messages) as total_messages,\n  (SELECT COUNT(*) FROM (SELECT messageId, sessionId FROM messages WHERE messageId IS NOT NULL GROUP BY messageId, sessionId HAVING COUNT(*) > 1) t) as duplicate_groups,\n  (SELECT SUM(cnt - 1) FROM (SELECT messageId, sessionId, COUNT(*) as cnt FROM messages WHERE messageId IS NOT NULL GROUP BY messageId, sessionId HAVING cnt > 1) t) as extra_duplicates;",
+  "rows": [
+    {
+      "total_messages": "56598",
+      "duplicate_groups": "9367",
+      "extra_duplicates": "10316"
+    }
+  ],
+  "messages": [],
+  "stdout": "total_messages\tduplicate_groups\textra_duplicates\n56598\t9367\t10316\n",
+  "stderr": "",
+  "execution_time_ms": 204
+}

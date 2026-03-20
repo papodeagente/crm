@@ -1,0 +1,8 @@
+{
+  "query": "\nDELETE FROM deal_products WHERE tenant_id = 1;\nDELETE FROM deal_history WHERE tenant_id = 1;\nDELETE FROM crm_tasks WHERE tenant_id = 1;\nDELETE FROM notes WHERE tenant_id = 1;\nDELETE FROM deals WHERE tenant_id = 1;\nDELETE FROM contacts WHERE tenant_id = 1;\nDELETE FROM accounts WHERE tenant_id = 1;\nDELETE FROM pipeline_stages WHERE tenant_id = 1;\nDELETE FROM pipelines WHERE tenant_id = 1;\nDELETE FROM catalog_products WHERE tenant_id = 1;\nDELETE FROM lead_sources WHERE tenant_id = 1;\nDELETE FROM campaigns WHERE tenant_id = 1;\nDELETE FROM loss_reasons WHERE tenant_id = 1;\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute \nDELETE FROM deal_products WHERE tenant_id = 1;\nDELETE FROM deal_history WHERE tenant_id = 1;\nDELETE FROM crm_tasks WHERE tenant_id = 1;\nDELETE FROM notes WHERE tenant_id = 1;\nDELETE FROM deals WHERE tenant_id = 1;\nDELETE FROM contacts WHERE tenant_id = 1;\nDELETE FROM accounts WHERE tenant_id = 1;\nDELETE FROM pipeline_stages WHERE tenant_id = 1;\nDELETE FROM pipelines WHERE tenant_id = 1;\nDELETE FROM catalog_products WHERE tenant_id = 1;\nDELETE FROM lead_sources WHERE tenant_id = 1;\nDELETE FROM campaigns WHERE tenant_id = 1;\nDELETE FROM loss_reasons WHERE tenant_id = 1;\n",
+  "returncode": 1,
+  "logs": [
+    "ERROR 1054 (42S22) at line 2: Unknown column 'tenant_id' in 'where clause'"
+  ]
+}

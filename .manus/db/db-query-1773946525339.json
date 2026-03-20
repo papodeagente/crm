@@ -1,0 +1,40 @@
+{
+  "query": "\nSELECT lastFromMe, lastStatus, COUNT(*) as cnt\nFROM wa_conversations\nWHERE lastFromMe = 1\nGROUP BY lastFromMe, lastStatus\nORDER BY cnt DESC\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute \nSELECT lastFromMe, lastStatus, COUNT(*) as cnt\nFROM wa_conversations\nWHERE lastFromMe = 1\nGROUP BY lastFromMe, lastStatus\nORDER BY cnt DESC\n",
+  "rows": [
+    {
+      "lastFromMe": "1",
+      "lastStatus": "read",
+      "cnt": "666"
+    },
+    {
+      "lastFromMe": "1",
+      "lastStatus": "delivered",
+      "cnt": "622"
+    },
+    {
+      "lastFromMe": "1",
+      "lastStatus": "sent",
+      "cnt": "505"
+    },
+    {
+      "lastFromMe": "1",
+      "lastStatus": "played",
+      "cnt": "48"
+    },
+    {
+      "lastFromMe": "1",
+      "lastStatus": "pending",
+      "cnt": "7"
+    },
+    {
+      "lastFromMe": "1",
+      "lastStatus": "edited",
+      "cnt": "1"
+    }
+  ],
+  "messages": [],
+  "stdout": "lastFromMe\tlastStatus\tcnt\n1\tread\t666\n1\tdelivered\t622\n1\tsent\t505\n1\tplayed\t48\n1\tpending\t7\n1\tedited\t1\n",
+  "stderr": "",
+  "execution_time_ms": 60
+}

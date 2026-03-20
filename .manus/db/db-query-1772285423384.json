@@ -1,0 +1,9 @@
+{
+  "query": "UPDATE deals \nSET utmSource = JSON_UNQUOTE(JSON_EXTRACT(utmJson, '$.source')),\n    utmMedium = JSON_UNQUOTE(JSON_EXTRACT(utmJson, '$.medium')),\n    utmCampaign = JSON_UNQUOTE(JSON_EXTRACT(utmJson, '$.campaign')),\n    utmTerm = JSON_UNQUOTE(JSON_EXTRACT(utmJson, '$.term')),\n    utmContent = JSON_UNQUOTE(JSON_EXTRACT(utmJson, '$.content'))\nWHERE utmJson IS NOT NULL AND utmJson != 'null';",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute UPDATE deals \nSET utmSource = JSON_UNQUOTE(JSON_EXTRACT(utmJson, '$.source')),\n    utmMedium = JSON_UNQUOTE(JSON_EXTRACT(utmJson, '$.medium')),\n    utmCampaign = JSON_UNQUOTE(JSON_EXTRACT(utmJson, '$.campaign')),\n    utmTerm = JSON_UNQUOTE(JSON_EXTRACT(utmJson, '$.term')),\n    utmContent = JSON_UNQUOTE(JSON_EXTRACT(utmJson, '$.content'))\nWHERE utmJson IS NOT NULL AND utmJson != 'null';",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 373
+}

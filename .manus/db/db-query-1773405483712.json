@@ -1,0 +1,60 @@
+{
+  "query": "SELECT id, name, settingsJson FROM tenants LIMIT 10",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute SELECT id, name, settingsJson FROM tenants LIMIT 10",
+  "rows": [
+    {
+      "id": "150002",
+      "name": "Entur",
+      "settingsJson": "NULL"
+    },
+    {
+      "id": "210002",
+      "name": "Boxtour",
+      "settingsJson": "NULL"
+    },
+    {
+      "id": "240002",
+      "name": "Viaje Com Ludi",
+      "settingsJson": "NULL"
+    },
+    {
+      "id": "240003",
+      "name": "Cais 3800 Travel",
+      "settingsJson": "NULL"
+    },
+    {
+      "id": "240004",
+      "name": "Misp viagens",
+      "settingsJson": "NULL"
+    },
+    {
+      "id": "240005",
+      "name": "CASSINO Travel",
+      "settingsJson": "NULL"
+    },
+    {
+      "id": "240006",
+      "name": "FDS VIAGENS",
+      "settingsJson": "NULL"
+    },
+    {
+      "id": "240007",
+      "name": "Legu Tour",
+      "settingsJson": "NULL"
+    },
+    {
+      "id": "240008",
+      "name": "QUINTELA TURISMO",
+      "settingsJson": "NULL"
+    },
+    {
+      "id": "240009",
+      "name": "De Férias Pelo Mundo ",
+      "settingsJson": "NULL"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tname\tsettingsJson\n150002\tEntur\tNULL\n210002\tBoxtour\tNULL\n240002\tViaje Com Ludi\tNULL\n240003\tCais 3800 Travel\tNULL\n240004\tMisp viagens\tNULL\n240005\tCASSINO Travel\tNULL\n240006\tFDS VIAGENS\tNULL\n240007\tLegu Tour\tNULL\n240008\tQUINTELA TURISMO\tNULL\n240009\tDe Férias Pelo Mundo \tNULL\n",
+  "stderr": "",
+  "execution_time_ms": 50
+}

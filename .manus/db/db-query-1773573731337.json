@@ -1,0 +1,9 @@
+{
+  "query": "DELETE m1 FROM messages m1\nINNER JOIN messages m2\nON m1.messageId = m2.messageId \nAND m1.sessionId = m2.sessionId \nAND m1.id > m2.id\nWHERE m1.messageId IS NOT NULL;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute DELETE m1 FROM messages m1\nINNER JOIN messages m2\nON m1.messageId = m2.messageId \nAND m1.sessionId = m2.sessionId \nAND m1.id > m2.id\nWHERE m1.messageId IS NOT NULL;",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 645
+}

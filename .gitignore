@@ -108,6 +108,3 @@ temp/
 
 # Webdev artifacts (checkpoint zips, migrations, etc.)
 .webdev/
-
-# Manus internal files (DB query logs, etc.)
-.manus/

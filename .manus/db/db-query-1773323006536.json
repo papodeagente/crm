@@ -1,0 +1,42 @@
+{
+  "query": "SELECT * FROM tenants ORDER BY id;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute SELECT * FROM tenants ORDER BY id;",
+  "rows": [
+    {
+      "id": "150002",
+      "name": "Entur",
+      "plan": "enterprise",
+      "status": "active",
+      "billingCustomerId": "NULL",
+      "settingsJson": "NULL",
+      "createdAt": "2026-03-07 23:15:13",
+      "updatedAt": "2026-03-07 23:15:31",
+      "slug": "entur",
+      "ownerUserId": "150001",
+      "hotmartEmail": "bruno@entur.com.br",
+      "freemiumDays": "365",
+      "freemiumExpiresAt": "2027-03-07 23:15:13",
+      "logoUrl": "NULL"
+    },
+    {
+      "id": "210002",
+      "name": "Boxtour",
+      "plan": "free",
+      "status": "active",
+      "billingCustomerId": "NULL",
+      "settingsJson": "NULL",
+      "createdAt": "2026-03-10 19:08:07",
+      "updatedAt": "2026-03-10 19:08:08",
+      "slug": "boxtour",
+      "ownerUserId": "210001",
+      "hotmartEmail": "bruno@boxtour.com.br",
+      "freemiumDays": "365",
+      "freemiumExpiresAt": "2027-03-10 19:08:08",
+      "logoUrl": "NULL"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tname\tplan\tstatus\tbillingCustomerId\tsettingsJson\tcreatedAt\tupdatedAt\tslug\townerUserId\thotmartEmail\tfreemiumDays\tfreemiumExpiresAt\tlogoUrl\n150002\tEntur\tenterprise\tactive\tNULL\tNULL\t2026-03-07 23:15:13\t2026-03-07 23:15:31\tentur\t150001\tbruno@entur.com.br\t365\t2027-03-07 23:15:13\tNULL\n210002\tBoxtour\tfree\tactive\tNULL\tNULL\t2026-03-10 19:08:07\t2026-03-10 19:08:08\tboxtour\t210001\tbruno@boxtour.com.br\t365\t2027-03-10 19:08:08\tNULL\n",
+  "stderr": "",
+  "execution_time_ms": 439
+}

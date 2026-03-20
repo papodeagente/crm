@@ -1,0 +1,20 @@
+{
+  "query": "\nSELECT \n  wc.sessionId AS wc_sessionId, \n  wc.remoteJid AS wc_remoteJid,\n  wc.lastStatus AS wc_lastStatus,\n  wc.lastFromMe,\n  m.sessionId AS msg_sessionId,\n  m.remoteJid AS msg_remoteJid,\n  m.status AS msg_status,\n  m.fromMe AS msg_fromMe\nFROM wa_conversations wc\nLEFT JOIN (\n  SELECT m.sessionId, m.remoteJid, m.status, m.fromMe\n  FROM messages m\n  INNER JOIN (\n    SELECT sessionId, remoteJid, MAX(id) AS maxId\n    FROM messages\n    WHERE fromMe = 1\n    GROUP BY sessionId, remoteJid\n  ) latest ON m.id = latest.maxId\n) m ON wc.sessionId = m.sessionId AND wc.remoteJid = m.remoteJid\nWHERE wc.lastFromMe = 1\nAND wc.remoteJid = '5521992797523@s.whatsapp.net'\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute \nSELECT \n  wc.sessionId AS wc_sessionId, \n  wc.remoteJid AS wc_remoteJid,\n  wc.lastStatus AS wc_lastStatus,\n  wc.lastFromMe,\n  m.sessionId AS msg_sessionId,\n  m.remoteJid AS msg_remoteJid,\n  m.status AS msg_status,\n  m.fromMe AS msg_fromMe\nFROM wa_conversations wc\nLEFT JOIN (\n  SELECT m.sessionId, m.remoteJid, m.status, m.fromMe\n  FROM messages m\n  INNER JOIN (\n    SELECT sessionId, remoteJid, MAX(id) AS maxId\n    FROM messages\n    WHERE fromMe = 1\n    GROUP BY sessionId, remoteJid\n  ) latest ON m.id = latest.maxId\n) m ON wc.sessionId = m.sessionId AND wc.remoteJid = m.remoteJid\nWHERE wc.lastFromMe = 1\nAND wc.remoteJid = '5521992797523@s.whatsapp.net'\n",
+  "rows": [
+    {
+      "wc_sessionId": "crm-240007-240007",
+      "wc_remoteJid": "5521992797523@s.whatsapp.net",
+      "wc_lastStatus": "delivered",
+      "lastFromMe": "1",
+      "msg_sessionId": "crm-240007-240007",
+      "msg_remoteJid": "5521992797523@s.whatsapp.net",
+      "msg_status": "delivered",
+      "msg_fromMe": "1"
+    }
+  ],
+  "messages": [],
+  "stdout": "wc_sessionId\twc_remoteJid\twc_lastStatus\tlastFromMe\tmsg_sessionId\tmsg_remoteJid\tmsg_status\tmsg_fromMe\ncrm-240007-240007\t5521992797523@s.whatsapp.net\tdelivered\t1\tcrm-240007-240007\t5521992797523@s.whatsapp.net\tdelivered\t1\n",
+  "stderr": "",
+  "execution_time_ms": 135
+}

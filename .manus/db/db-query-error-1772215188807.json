@@ -1,0 +1,8 @@
+{
+  "query": "DELETE FROM pipeline_stages WHERE pipelineId NOT IN (1, 2); DELETE FROM pipeline_automations WHERE pipelineId NOT IN (1, 2) OR targetPipelineId NOT IN (1, 2); DELETE FROM pipelines WHERE id NOT IN (1, 2);",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute DELETE FROM pipeline_stages WHERE pipelineId NOT IN (1, 2); DELETE FROM pipeline_automations WHERE pipelineId NOT IN (1, 2) OR targetPipelineId NOT IN (1, 2); DELETE FROM pipelines WHERE id NOT IN (1, 2);",
+  "returncode": 1,
+  "logs": [
+    "ERROR 1054 (42S22) at line 1: Unknown column 'pipelineid' in 'where clause'"
+  ]
+}

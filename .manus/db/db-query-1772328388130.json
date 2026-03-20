@@ -1,0 +1,32 @@
+{
+  "query": "SELECT id, email, name, tenantId FROM crm_users WHERE email = 'bruno@boxtour.com.br'; SELECT id, name FROM tenants; SELECT id, openId, name, email FROM users;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute SELECT id, email, name, tenantId FROM crm_users WHERE email = 'bruno@boxtour.com.br'; SELECT id, name FROM tenants; SELECT id, openId, name, email FROM users;",
+  "rows": [
+    {
+      "id": "30001",
+      "email": "bruno@boxtour.com.br",
+      "name": "Bruno Boxtour",
+      "tenantId": "30002"
+    },
+    {
+      "id": "id",
+      "email": "openId",
+      "name": "name",
+      "tenantId": "email"
+    },
+    {
+      "id": "1",
+      "email": "hgYWG6ptis7eduSYGvEWGU",
+      "name": "Bruno Barbosa",
+      "tenantId": "bruno@entur.com.br"
+    }
+  ],
+  "messages": [
+    "id\tname",
+    "1\tMinha Agência",
+    "30002\tBoxtour"
+  ],
+  "stdout": "id\temail\tname\ttenantId\n30001\tbruno@boxtour.com.br\tBruno Boxtour\t30002\nid\tname\n1\tMinha Agência\n30002\tBoxtour\nid\topenId\tname\temail\n1\thgYWG6ptis7eduSYGvEWGU\tBruno Barbosa\tbruno@entur.com.br\n",
+  "stderr": "",
+  "execution_time_ms": 457
+}

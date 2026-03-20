@@ -1,0 +1,16 @@
+{
+  "query": "SELECT CONCAT(id, ' | ', name, ' | ', COALESCE(slug, 'null'), ' | ', COALESCE(plan, 'null')) as info FROM tenants WHERE name LIKE '%Teste%' OR name LIKE '%teste%';",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute SELECT CONCAT(id, ' | ', name, ' | ', COALESCE(slug, 'null'), ' | ', COALESCE(plan, 'null')) as info FROM tenants WHERE name LIKE '%Teste%' OR name LIKE '%teste%';",
+  "rows": [
+    {
+      "info": "270006 | Teste Turismo | teste-turismo | free"
+    },
+    {
+      "info": "270007 | Teste 2 | teste-2 | free"
+    }
+  ],
+  "messages": [],
+  "stdout": "info\n270006 | Teste Turismo | teste-turismo | free\n270007 | Teste 2 | teste-2 | free\n",
+  "stderr": "",
+  "execution_time_ms": 50
+}

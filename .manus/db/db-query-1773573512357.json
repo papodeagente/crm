@@ -1,0 +1,50 @@
+{
+  "query": "SELECT messageId, COUNT(*) as cnt FROM messages GROUP BY messageId HAVING cnt > 1 ORDER BY cnt DESC LIMIT 10;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute SELECT messageId, COUNT(*) as cnt FROM messages GROUP BY messageId HAVING cnt > 1 ORDER BY cnt DESC LIMIT 10;",
+  "rows": [
+    {
+      "messageId": "26788010434135272-1",
+      "cnt": "8"
+    },
+    {
+      "messageId": "745092738639382-1",
+      "cnt": "8"
+    },
+    {
+      "messageId": "744222575205849-1",
+      "cnt": "8"
+    },
+    {
+      "messageId": "3AAD2EC5E4A49D10AA9E",
+      "cnt": "4"
+    },
+    {
+      "messageId": "3EB09AD97039781395C384",
+      "cnt": "4"
+    },
+    {
+      "messageId": "3AF6863CFECE09FB9BB5",
+      "cnt": "4"
+    },
+    {
+      "messageId": "3A758C33A2A7B36FAD57",
+      "cnt": "4"
+    },
+    {
+      "messageId": "3A448D3F95A801D39AAB",
+      "cnt": "4"
+    },
+    {
+      "messageId": "3EB0CEF5F86EC70885AAF0",
+      "cnt": "4"
+    },
+    {
+      "messageId": "3AB89556676DA7FCC3BC",
+      "cnt": "4"
+    }
+  ],
+  "messages": [],
+  "stdout": "messageId\tcnt\n26788010434135272-1\t8\n745092738639382-1\t8\n744222575205849-1\t8\n3AAD2EC5E4A49D10AA9E\t4\n3EB09AD97039781395C384\t4\n3AF6863CFECE09FB9BB5\t4\n3A758C33A2A7B36FAD57\t4\n3A448D3F95A801D39AAB\t4\n3EB0CEF5F86EC70885AAF0\t4\n3AB89556676DA7FCC3BC\t4\n",
+  "stderr": "",
+  "execution_time_ms": 113
+}

@@ -1,0 +1,9 @@
+{
+  "query": "DELETE FROM pipeline_stages WHERE `pipelineId` NOT IN (1, 2); DELETE FROM pipeline_automations WHERE `sourcePipelineId` NOT IN (1, 2) OR `targetPipelineId` NOT IN (1, 2); DELETE FROM pipelines WHERE id NOT IN (1, 2);",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute DELETE FROM pipeline_stages WHERE `pipelineId` NOT IN (1, 2); DELETE FROM pipeline_automations WHERE `sourcePipelineId` NOT IN (1, 2) OR `targetPipelineId` NOT IN (1, 2); DELETE FROM pipelines WHERE id NOT IN (1, 2);",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 458
+}

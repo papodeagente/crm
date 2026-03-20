@@ -1,0 +1,9 @@
+{
+  "query": "UPDATE crm_users SET passwordHash = '$2b$10$VycIvPPXe/FGiCOU6C0bE.oyba508KLvekBwkzj7oOjFIXlMPUYoO' WHERE email = 'bruno@entur.com.br';",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute UPDATE crm_users SET passwordHash = '$2b$10$VycIvPPXe/FGiCOU6C0bE.oyba508KLvekBwkzj7oOjFIXlMPUYoO' WHERE email = 'bruno@entur.com.br';",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 364
+}

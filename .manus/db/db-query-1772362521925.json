@@ -1,0 +1,9 @@
+{
+  "query": "UPDATE pipelines SET pipelineType = 'post_sale' WHERE id = 150038 AND tenantId = 1;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute UPDATE pipelines SET pipelineType = 'post_sale' WHERE id = 150038 AND tenantId = 1;",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 347
+}

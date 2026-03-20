@@ -1,0 +1,58 @@
+{
+  "query": "SELECT id, tenantId, name, pipelineType FROM pipelines ORDER BY tenantId, id;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute SELECT id, tenantId, name, pipelineType FROM pipelines ORDER BY tenantId, id;",
+  "rows": [
+    {
+      "id": "150037",
+      "tenantId": "1",
+      "name": "Funil de Vendas ",
+      "pipelineType": "sales"
+    },
+    {
+      "id": "150038",
+      "tenantId": "1",
+      "name": "Sucesso do Cliente",
+      "pipelineType": "post_sale"
+    },
+    {
+      "id": "150039",
+      "tenantId": "1",
+      "name": "Funil de Vendas 2",
+      "pipelineType": "sales"
+    },
+    {
+      "id": "150040",
+      "tenantId": "1",
+      "name": "Funil de Patrocínios",
+      "pipelineType": "sales"
+    },
+    {
+      "id": "150041",
+      "tenantId": "1",
+      "name": "Recuperação Workshop",
+      "pipelineType": "sales"
+    },
+    {
+      "id": "150042",
+      "tenantId": "1",
+      "name": "Funil de Vendas Simulação",
+      "pipelineType": "sales"
+    },
+    {
+      "id": "150043",
+      "tenantId": "1",
+      "name": "Funil de Avaliação de Atendimento ENTUR",
+      "pipelineType": "sales"
+    },
+    {
+      "id": "180002",
+      "tenantId": "30002",
+      "name": "Funil de Vendas",
+      "pipelineType": "sales"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\ttenantId\tname\tpipelineType\n150037\t1\tFunil de Vendas \tsales\n150038\t1\tSucesso do Cliente\tpost_sale\n150039\t1\tFunil de Vendas 2\tsales\n150040\t1\tFunil de Patrocínios\tsales\n150041\t1\tRecuperação Workshop\tsales\n150042\t1\tFunil de Vendas Simulação\tsales\n150043\t1\tFunil de Avaliação de Atendimento ENTUR\tsales\n180002\t30002\tFunil de Vendas\tsales\n",
+  "stderr": "",
+  "execution_time_ms": 362
+}

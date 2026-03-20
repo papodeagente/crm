@@ -1,0 +1,49 @@
+{
+  "query": "SELECT d.id AS deal_id, d.title AS deal_title, d.contactId, d.pipelineId, d.stageId, d.createdAt AS deal_created,\n       c.name, c.email, c.phone,\n       ps.name AS stage_name, p.name AS pipeline_name\nFROM deals d\nJOIN contacts c ON c.id = d.contactId\nJOIN pipeline_stages ps ON ps.id = d.stageId\nJOIN pipelines p ON p.id = d.pipelineId\nORDER BY d.id DESC\nLIMIT 3;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute SELECT d.id AS deal_id, d.title AS deal_title, d.contactId, d.pipelineId, d.stageId, d.createdAt AS deal_created,\n       c.name, c.email, c.phone,\n       ps.name AS stage_name, p.name AS pipeline_name\nFROM deals d\nJOIN contacts c ON c.id = d.contactId\nJOIN pipeline_stages ps ON ps.id = d.stageId\nJOIN pipelines p ON p.id = d.pipelineId\nORDER BY d.id DESC\nLIMIT 3;",
+  "rows": [
+    {
+      "deal_id": "90025",
+      "deal_title": "Lead Teste Elementor • wordpress",
+      "contactId": "90001",
+      "pipelineId": "1",
+      "stageId": "1",
+      "deal_created": "2026-02-27 19:23:26",
+      "name": "Lead Teste Elementor",
+      "email": "teste.elementor@exemplo.com",
+      "phone": "+5584999887766",
+      "stage_name": "Novo Lead",
+      "pipeline_name": "Funil de Vendas"
+    },
+    {
+      "deal_id": "60003",
+      "deal_title": "Roteiro Nordeste",
+      "contactId": "60048",
+      "pipelineId": "1",
+      "stageId": "2",
+      "deal_created": "2026-02-27 15:00:11",
+      "name": "Bruno Dias",
+      "email": "NULL",
+      "phone": "+5521967300697",
+      "stage_name": "Primeiro contato",
+      "pipeline_name": "Funil de Vendas"
+    },
+    {
+      "deal_id": "60001",
+      "deal_title": "Pacote Bonito – Bonito",
+      "contactId": "60001",
+      "pipelineId": "1",
+      "stageId": "4",
+      "deal_created": "2026-02-27 10:57:06",
+      "name": "Drica Bonito Way",
+      "email": "adriana@bonitoway.com.br",
+      "phone": "+556784691185",
+      "stage_name": "Apresentação da proposta",
+      "pipeline_name": "Funil de Vendas"
+    }
+  ],
+  "messages": [],
+  "stdout": "deal_id\tdeal_title\tcontactId\tpipelineId\tstageId\tdeal_created\tname\temail\tphone\tstage_name\tpipeline_name\n90025\tLead Teste Elementor • wordpress\t90001\t1\t1\t2026-02-27 19:23:26\tLead Teste Elementor\tteste.elementor@exemplo.com\t+5584999887766\tNovo Lead\tFunil de Vendas\n60003\tRoteiro Nordeste\t60048\t1\t2\t2026-02-27 15:00:11\tBruno Dias\tNULL\t+5521967300697\tPrimeiro contato\tFunil de Vendas\n60001\tPacote Bonito – Bonito\t60001\t1\t4\t2026-02-27 10:57:06\tDrica Bonito Way\tadriana@bonitoway.com.br\t+556784691185\tApresentação da proposta\tFunil de Vendas\n",
+  "stderr": "",
+  "execution_time_ms": 354
+}

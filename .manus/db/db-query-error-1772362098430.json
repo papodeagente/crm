@@ -1,0 +1,12 @@
+{
+  "query": "SELECT id, name FROM tenants; SELECT id, tenantId, name, pipeline_type FROM pipelines;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute SELECT id, name FROM tenants; SELECT id, tenantId, name, pipeline_type FROM pipelines;",
+  "returncode": 1,
+  "logs": [
+    "id\tname",
+    "1\tMinha Agência",
+    "30002\tBoxtour",
+    "60002\tAceleradora",
+    "ERROR 1054 (42S22) at line 1: Unknown column 'pipeline_type' in 'field list'"
+  ]
+}

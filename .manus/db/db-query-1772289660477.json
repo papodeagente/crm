@@ -1,0 +1,23 @@
+{
+  "query": "SELECT \n  COUNT(*) as total_deals,\n  COUNT(CASE WHEN status = 'won' THEN 1 END) as won_deals,\n  COUNT(CASE WHEN status = 'lost' THEN 1 END) as lost_deals,\n  COUNT(CASE WHEN status = 'open' THEN 1 END) as open_deals,\n  COUNT(CASE WHEN utmSource IS NOT NULL AND utmSource != '' THEN 1 END) as with_utm_source,\n  COUNT(CASE WHEN utmMedium IS NOT NULL AND utmMedium != '' THEN 1 END) as with_utm_medium,\n  COUNT(CASE WHEN utmCampaign IS NOT NULL AND utmCampaign != '' THEN 1 END) as with_utm_campaign,\n  COUNT(CASE WHEN utmTerm IS NOT NULL AND utmTerm != '' THEN 1 END) as with_utm_term,\n  COUNT(CASE WHEN utmContent IS NOT NULL AND utmContent != '' THEN 1 END) as with_utm_content,\n  COUNT(CASE WHEN leadSource IS NOT NULL AND leadSource != '' THEN 1 END) as with_lead_source,\n  COUNT(CASE WHEN channelOrigin IS NOT NULL AND channelOrigin != '' THEN 1 END) as with_channel_origin\nFROM deals WHERE deletedAt IS NULL AND tenantId = 1;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute SELECT \n  COUNT(*) as total_deals,\n  COUNT(CASE WHEN status = 'won' THEN 1 END) as won_deals,\n  COUNT(CASE WHEN status = 'lost' THEN 1 END) as lost_deals,\n  COUNT(CASE WHEN status = 'open' THEN 1 END) as open_deals,\n  COUNT(CASE WHEN utmSource IS NOT NULL AND utmSource != '' THEN 1 END) as with_utm_source,\n  COUNT(CASE WHEN utmMedium IS NOT NULL AND utmMedium != '' THEN 1 END) as with_utm_medium,\n  COUNT(CASE WHEN utmCampaign IS NOT NULL AND utmCampaign != '' THEN 1 END) as with_utm_campaign,\n  COUNT(CASE WHEN utmTerm IS NOT NULL AND utmTerm != '' THEN 1 END) as with_utm_term,\n  COUNT(CASE WHEN utmContent IS NOT NULL AND utmContent != '' THEN 1 END) as with_utm_content,\n  COUNT(CASE WHEN leadSource IS NOT NULL AND leadSource != '' THEN 1 END) as with_lead_source,\n  COUNT(CASE WHEN channelOrigin IS NOT NULL AND channelOrigin != '' THEN 1 END) as with_channel_origin\nFROM deals WHERE deletedAt IS NULL AND tenantId = 1;",
+  "rows": [
+    {
+      "total_deals": "8",
+      "won_deals": "0",
+      "lost_deals": "0",
+      "open_deals": "8",
+      "with_utm_source": "4",
+      "with_utm_medium": "4",
+      "with_utm_campaign": "4",
+      "with_utm_term": "1",
+      "with_utm_content": "1",
+      "with_lead_source": "6",
+      "with_channel_origin": "7"
+    }
+  ],
+  "messages": [],
+  "stdout": "total_deals\twon_deals\tlost_deals\topen_deals\twith_utm_source\twith_utm_medium\twith_utm_campaign\twith_utm_term\twith_utm_content\twith_lead_source\twith_channel_origin\n8\t0\t0\t8\t4\t4\t4\t1\t1\t6\t7\n",
+  "stderr": "",
+  "execution_time_ms": 396
+}

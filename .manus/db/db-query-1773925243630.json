@@ -1,0 +1,25 @@
+{
+  "query": "SELECT COUNT(*) as total_deals FROM deals; SELECT COUNT(*) as total_contacts FROM contacts; SELECT COUNT(*) as total_accounts FROM accounts;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute SELECT COUNT(*) as total_deals FROM deals; SELECT COUNT(*) as total_contacts FROM contacts; SELECT COUNT(*) as total_accounts FROM accounts;",
+  "rows": [
+    {
+      "total_deals": "1549"
+    },
+    {
+      "total_deals": "total_contacts"
+    },
+    {
+      "total_deals": "7292"
+    },
+    {
+      "total_deals": "total_accounts"
+    },
+    {
+      "total_deals": "2620"
+    }
+  ],
+  "messages": [],
+  "stdout": "total_deals\n1549\ntotal_contacts\n7292\ntotal_accounts\n2620\n",
+  "stderr": "",
+  "execution_time_ms": 98
+}

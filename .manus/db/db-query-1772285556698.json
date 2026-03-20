@@ -1,0 +1,15 @@
+{
+  "query": "SELECT COUNT(*) as total, \n       SUM(CASE WHEN catalogProductId IS NULL THEN 1 ELSE 0 END) as sem_catalog,\n       SUM(CASE WHEN catalogProductId IS NOT NULL THEN 1 ELSE 0 END) as com_catalog\nFROM deal_products;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute SELECT COUNT(*) as total, \n       SUM(CASE WHEN catalogProductId IS NULL THEN 1 ELSE 0 END) as sem_catalog,\n       SUM(CASE WHEN catalogProductId IS NOT NULL THEN 1 ELSE 0 END) as com_catalog\nFROM deal_products;",
+  "rows": [
+    {
+      "total": "0",
+      "sem_catalog": "NULL",
+      "com_catalog": "NULL"
+    }
+  ],
+  "messages": [],
+  "stdout": "total\tsem_catalog\tcom_catalog\n0\tNULL\tNULL\n",
+  "stderr": "",
+  "execution_time_ms": 356
+}

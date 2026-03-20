@@ -1,0 +1,22 @@
+{
+  "query": "SELECT * FROM tracking_tokens ORDER BY id DESC LIMIT 5;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute SELECT * FROM tracking_tokens ORDER BY id DESC LIMIT 5;",
+  "rows": [
+    {
+      "id": "1",
+      "tenantId": "1",
+      "token": "105b7a1f5cc4abde0f6407e8d74096a42257e8f1573f013ea791a00146569600",
+      "name": "Crie Natal",
+      "allowedDomains": "[\"crienatal.com.br\"]",
+      "isActive": "1",
+      "lastSeenAt": "NULL",
+      "totalLeads": "0",
+      "createdAt": "2026-02-27 19:56:28",
+      "updatedAt": "2026-02-27 22:13:47"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\ttenantId\ttoken\tname\tallowedDomains\tisActive\tlastSeenAt\ttotalLeads\tcreatedAt\tupdatedAt\n1\t1\t105b7a1f5cc4abde0f6407e8d74096a42257e8f1573f013ea791a00146569600\tCrie Natal\t[\"crienatal.com.br\"]\t1\tNULL\t0\t2026-02-27 19:56:28\t2026-02-27 22:13:47\n",
+  "stderr": "",
+  "execution_time_ms": 350
+}

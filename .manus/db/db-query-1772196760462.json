@@ -1,0 +1,190 @@
+{
+  "query": "SELECT remoteJid, COUNT(*) as msg_count, MIN(timestamp) as first_msg, MAX(timestamp) as last_msg FROM messages GROUP BY remoteJid ORDER BY msg_count DESC LIMIT 30;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute SELECT remoteJid, COUNT(*) as msg_count, MIN(timestamp) as first_msg, MAX(timestamp) as last_msg FROM messages GROUP BY remoteJid ORDER BY msg_count DESC LIMIT 30;",
+  "rows": [
+    {
+      "remoteJid": "558496051655@s.whatsapp.net",
+      "msg_count": "8041",
+      "first_msg": "2025-02-26 19:39:04",
+      "last_msg": "2026-02-27 12:23:34"
+    },
+    {
+      "remoteJid": "120363169562297510@g.us",
+      "msg_count": "5256",
+      "first_msg": "2025-11-28 13:24:07",
+      "last_msg": "2026-02-26 18:43:13"
+    },
+    {
+      "remoteJid": "554892118034@s.whatsapp.net",
+      "msg_count": "4353",
+      "first_msg": "2025-02-28 19:15:22",
+      "last_msg": "2026-02-26 00:05:16"
+    },
+    {
+      "remoteJid": "5521964872409-1546605980@g.us",
+      "msg_count": "1716",
+      "first_msg": "2025-11-29 14:21:30",
+      "last_msg": "2026-02-26 15:38:35"
+    },
+    {
+      "remoteJid": "556784691185@s.whatsapp.net",
+      "msg_count": "1477",
+      "first_msg": "2025-02-28 20:56:56",
+      "last_msg": "2026-02-27 12:01:37"
+    },
+    {
+      "remoteJid": "558499445034@s.whatsapp.net",
+      "msg_count": "1174",
+      "first_msg": "2025-03-06 20:02:20",
+      "last_msg": "2026-02-26 14:25:45"
+    },
+    {
+      "remoteJid": "556740427650@s.whatsapp.net",
+      "msg_count": "992",
+      "first_msg": "2025-02-28 22:57:17",
+      "last_msg": "2026-02-22 17:00:52"
+    },
+    {
+      "remoteJid": "120363179289090558@g.us",
+      "msg_count": "915",
+      "first_msg": "2025-11-28 22:35:01",
+      "last_msg": "2026-02-26 15:12:16"
+    },
+    {
+      "remoteJid": "558499380266@s.whatsapp.net",
+      "msg_count": "858",
+      "first_msg": "2025-03-26 19:19:21",
+      "last_msg": "2026-02-19 20:21:29"
+    },
+    {
+      "remoteJid": "558496441702@s.whatsapp.net",
+      "msg_count": "850",
+      "first_msg": "2025-03-06 20:05:45",
+      "last_msg": "2026-02-26 18:39:54"
+    },
+    {
+      "remoteJid": "120363053488032155@g.us",
+      "msg_count": "846",
+      "first_msg": "2025-11-28 16:33:19",
+      "last_msg": "2026-02-26 12:05:12"
+    },
+    {
+      "remoteJid": "120363144331949936@g.us",
+      "msg_count": "807",
+      "first_msg": "2025-11-28 18:06:57",
+      "last_msg": "2026-02-26 11:34:26"
+    },
+    {
+      "remoteJid": "120363342203506701@g.us",
+      "msg_count": "793",
+      "first_msg": "2025-11-28 18:22:17",
+      "last_msg": "2026-02-26 12:31:27"
+    },
+    {
+      "remoteJid": "120363424923124772@g.us",
+      "msg_count": "671",
+      "first_msg": "2026-01-29 14:08:53",
+      "last_msg": "2026-02-09 13:44:08"
+    },
+    {
+      "remoteJid": "551151982627@s.whatsapp.net",
+      "msg_count": "615",
+      "first_msg": "2025-02-28 16:48:09",
+      "last_msg": "2026-02-24 18:34:16"
+    },
+    {
+      "remoteJid": "558494120000@s.whatsapp.net",
+      "msg_count": "601",
+      "first_msg": "2025-03-19 12:56:33",
+      "last_msg": "2026-02-26 14:25:11"
+    },
+    {
+      "remoteJid": "555193337027@s.whatsapp.net",
+      "msg_count": "582",
+      "first_msg": "2025-03-07 16:05:20",
+      "last_msg": "2026-02-11 09:52:46"
+    },
+    {
+      "remoteJid": "558486023735@s.whatsapp.net",
+      "msg_count": "581",
+      "first_msg": "2025-02-28 12:21:39",
+      "last_msg": "2026-02-27 11:29:08"
+    },
+    {
+      "remoteJid": "120363296675015574@g.us",
+      "msg_count": "572",
+      "first_msg": "2025-12-01 18:54:32",
+      "last_msg": "2026-02-26 11:21:47"
+    },
+    {
+      "remoteJid": "554199811717@s.whatsapp.net",
+      "msg_count": "569",
+      "first_msg": "2025-06-23 13:12:41",
+      "last_msg": "2025-08-15 15:37:05"
+    },
+    {
+      "remoteJid": "558431902438@s.whatsapp.net",
+      "msg_count": "529",
+      "first_msg": "2025-09-15 19:15:20",
+      "last_msg": "2026-02-26 20:38:51"
+    },
+    {
+      "remoteJid": "558498282118-1553213523@g.us",
+      "msg_count": "489",
+      "first_msg": "2025-11-29 09:48:55",
+      "last_msg": "2026-02-26 13:00:06"
+    },
+    {
+      "remoteJid": "120363318017041950@g.us",
+      "msg_count": "475",
+      "first_msg": "2025-12-05 07:39:42",
+      "last_msg": "2026-02-25 22:11:37"
+    },
+    {
+      "remoteJid": "5511958040334@s.whatsapp.net",
+      "msg_count": "441",
+      "first_msg": "2025-02-27 18:27:29",
+      "last_msg": "2026-02-24 13:18:38"
+    },
+    {
+      "remoteJid": "558498282118@s.whatsapp.net",
+      "msg_count": "435",
+      "first_msg": "2025-02-27 12:42:17",
+      "last_msg": "2026-02-27 09:25:47"
+    },
+    {
+      "remoteJid": "558491812894@s.whatsapp.net",
+      "msg_count": "415",
+      "first_msg": "2025-02-27 14:33:12",
+      "last_msg": "2025-10-14 12:29:34"
+    },
+    {
+      "remoteJid": "120363416674132642@g.us",
+      "msg_count": "368",
+      "first_msg": "2025-11-29 09:48:55",
+      "last_msg": "2026-02-26 08:36:34"
+    },
+    {
+      "remoteJid": "5511930812692@s.whatsapp.net",
+      "msg_count": "359",
+      "first_msg": "2025-02-27 12:34:54",
+      "last_msg": "2026-02-25 12:31:07"
+    },
+    {
+      "remoteJid": "558494569566@s.whatsapp.net",
+      "msg_count": "348",
+      "first_msg": "2025-10-07 16:49:30",
+      "last_msg": "2025-12-09 14:46:52"
+    },
+    {
+      "remoteJid": "120363418565580090@g.us",
+      "msg_count": "317",
+      "first_msg": "2026-01-16 11:45:47",
+      "last_msg": "2026-02-16 14:22:19"
+    }
+  ],
+  "messages": [],
+  "stdout": "remoteJid\tmsg_count\tfirst_msg\tlast_msg\n558496051655@s.whatsapp.net\t8041\t2025-02-26 19:39:04\t2026-02-27 12:23:34\n120363169562297510@g.us\t5256\t2025-11-28 13:24:07\t2026-02-26 18:43:13\n554892118034@s.whatsapp.net\t4353\t2025-02-28 19:15:22\t2026-02-26 00:05:16\n5521964872409-1546605980@g.us\t1716\t2025-11-29 14:21:30\t2026-02-26 15:38:35\n556784691185@s.whatsapp.net\t1477\t2025-02-28 20:56:56\t2026-02-27 12:01:37\n558499445034@s.whatsapp.net\t1174\t2025-03-06 20:02:20\t2026-02-26 14:25:45\n556740427650@s.whatsapp.net\t992\t2025-02-28 22:57:17\t2026-02-22 17:00:52\n120363179289090558@g.us\t915\t2025-11-28 22:35:01\t2026-02-26 15:12:16\n558499380266@s.whatsapp.net\t858\t2025-03-26 19:19:21\t2026-02-19 20:21:29\n558496441702@s.whatsapp.net\t850\t2025-03-06 20:05:45\t2026-02-26 18:39:54\n120363053488032155@g.us\t846\t2025-11-28 16:33:19\t2026-02-26 12:05:12\n120363144331949936@g.us\t807\t2025-11-28 18:06:57\t2026-02-26 11:34:26\n120363342203506701@g.us\t793\t2025-11-28 18:22:17\t2026-02-26 12:31:27\n120363424923124772@g.us\t671\t2026-01-29 14:08:53\t2026-02-09 13:44:08\n551151982627@s.whatsapp.net\t615\t2025-02-28 16:48:09\t2026-02-24 18:34:16\n558494120000@s.whatsapp.net\t601\t2025-03-19 12:56:33\t2026-02-26 14:25:11\n555193337027@s.whatsapp.net\t582\t2025-03-07 16:05:20\t2026-02-11 09:52:46\n558486023735@s.whatsapp.net\t581\t2025-02-28 12:21:39\t2026-02-27 11:29:08\n120363296675015574@g.us\t572\t2025-12-01 18:54:32\t2026-02-26 11:21:47\n554199811717@s.whatsapp.net\t569\t2025-06-23 13:12:41\t2025-08-15 15:37:05\n558431902438@s.whatsapp.net\t529\t2025-09-15 19:15:20\t2026-02-26 20:38:51\n558498282118-1553213523@g.us\t489\t2025-11-29 09:48:55\t2026-02-26 13:00:06\n120363318017041950@g.us\t475\t2025-12-05 07:39:42\t2026-02-25 22:11:37\n5511958040334@s.whatsapp.net\t441\t2025-02-27 18:27:29\t2026-02-24 13:18:38\n558498282118@s.whatsapp.net\t435\t2025-02-27 12:42:17\t2026-02-27 09:25:47\n558491812894@s.whatsapp.net\t415\t2025-02-27 14:33:12\t2025-10-14 12:29:34\n120363416674132642@g.us\t368\t2025-11-29 09:48:55\t2026-02-26 08:36:34\n5511930812692@s.whatsapp.net\t359\t2025-02-27 12:34:54\t2026-02-25 12:31:07\n558494569566@s.whatsapp.net\t348\t2025-10-07 16:49:30\t2025-12-09 14:46:52\n120363418565580090@g.us\t317\t2026-01-16 11:45:47\t2026-02-16 14:22:19\n",
+  "stderr": "",
+  "execution_time_ms": 407
+}

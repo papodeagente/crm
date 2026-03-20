@@ -1,0 +1,19 @@
+{
+  "query": "SELECT COUNT(*) as overdue FROM crm_tasks WHERE tenantId = 1 AND entityType = 'deal' AND status != 'done' AND status != 'cancelled' AND dueAt < NOW(); SELECT COUNT(*) as pending FROM crm_tasks WHERE tenantId = 1 AND entityType = 'deal' AND status NOT IN ('done', 'cancelled');",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute SELECT COUNT(*) as overdue FROM crm_tasks WHERE tenantId = 1 AND entityType = 'deal' AND status != 'done' AND status != 'cancelled' AND dueAt < NOW(); SELECT COUNT(*) as pending FROM crm_tasks WHERE tenantId = 1 AND entityType = 'deal' AND status NOT IN ('done', 'cancelled');",
+  "rows": [
+    {
+      "overdue": "19"
+    },
+    {
+      "overdue": "pending"
+    },
+    {
+      "overdue": "185"
+    }
+  ],
+  "messages": [],
+  "stdout": "overdue\n19\npending\n185\n",
+  "stderr": "",
+  "execution_time_ms": 435
+}

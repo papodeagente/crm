@@ -1,0 +1,14 @@
+{
+  "query": "SELECT COUNT(DISTINCT remoteJid) as total_conversations, COUNT(*) as total_messages FROM messages WHERE remoteJid NOT LIKE '%@g.us' AND remoteJid != 'status@broadcast';",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute SELECT COUNT(DISTINCT remoteJid) as total_conversations, COUNT(*) as total_messages FROM messages WHERE remoteJid NOT LIKE '%@g.us' AND remoteJid != 'status@broadcast';",
+  "rows": [
+    {
+      "total_conversations": "843",
+      "total_messages": "37132"
+    }
+  ],
+  "messages": [],
+  "stdout": "total_conversations\ttotal_messages\n843\t37132\n",
+  "stderr": "",
+  "execution_time_ms": 435
+}

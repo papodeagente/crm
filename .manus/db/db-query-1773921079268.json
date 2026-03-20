@@ -1,0 +1,138 @@
+{
+  "query": "SELECT messageType, COUNT(*) as cnt FROM messages GROUP BY messageType ORDER BY cnt DESC;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute SELECT messageType, COUNT(*) as cnt FROM messages GROUP BY messageType ORDER BY cnt DESC;",
+  "rows": [
+    {
+      "messageType": "conversation",
+      "cnt": "40168"
+    },
+    {
+      "messageType": "audioMessage",
+      "cnt": "5443"
+    },
+    {
+      "messageType": "imageMessage",
+      "cnt": "3720"
+    },
+    {
+      "messageType": "documentMessage",
+      "cnt": "1910"
+    },
+    {
+      "messageType": "templateMessage",
+      "cnt": "1179"
+    },
+    {
+      "messageType": "videoMessage",
+      "cnt": "524"
+    },
+    {
+      "messageType": "protocolMessage",
+      "cnt": "439"
+    },
+    {
+      "messageType": "interactiveMessage",
+      "cnt": "386"
+    },
+    {
+      "messageType": "stickerMessage",
+      "cnt": "331"
+    },
+    {
+      "messageType": "extendedTextMessage",
+      "cnt": "298"
+    },
+    {
+      "messageType": "listMessage",
+      "cnt": "191"
+    },
+    {
+      "messageType": "reactionMessage",
+      "cnt": "131"
+    },
+    {
+      "messageType": "albumMessage",
+      "cnt": "106"
+    },
+    {
+      "messageType": "contactMessage",
+      "cnt": "104"
+    },
+    {
+      "messageType": "associatedChildMessage",
+      "cnt": "99"
+    },
+    {
+      "messageType": "buttonsMessage",
+      "cnt": "68"
+    },
+    {
+      "messageType": "listResponseMessage",
+      "cnt": "56"
+    },
+    {
+      "messageType": "placeholderMessage",
+      "cnt": "47"
+    },
+    {
+      "messageType": "buttonsResponseMessage",
+      "cnt": "35"
+    },
+    {
+      "messageType": "locationMessage",
+      "cnt": "19"
+    },
+    {
+      "messageType": "text",
+      "cnt": "19"
+    },
+    {
+      "messageType": "templateButtonReplyMessage",
+      "cnt": "13"
+    },
+    {
+      "messageType": "ptvMessage",
+      "cnt": "8"
+    },
+    {
+      "messageType": "groupInviteMessage",
+      "cnt": "7"
+    },
+    {
+      "messageType": "pollUpdateMessage",
+      "cnt": "3"
+    },
+    {
+      "messageType": "contactsArrayMessage",
+      "cnt": "3"
+    },
+    {
+      "messageType": "orderMessage",
+      "cnt": "3"
+    },
+    {
+      "messageType": "pollCreationMessageV3",
+      "cnt": "2"
+    },
+    {
+      "messageType": "pttMessage",
+      "cnt": "2"
+    },
+    {
+      "messageType": "lottieStickerMessage",
+      "cnt": "2"
+    },
+    {
+      "messageType": "editedMessage",
+      "cnt": "1"
+    },
+    {
+      "messageType": "productMessage",
+      "cnt": "1"
+    }
+  ],
+  "messages": [],
+  "stdout": "messageType\tcnt\nconversation\t40168\naudioMessage\t5443\nimageMessage\t3720\ndocumentMessage\t1910\ntemplateMessage\t1179\nvideoMessage\t524\nprotocolMessage\t439\ninteractiveMessage\t386\nstickerMessage\t331\nextendedTextMessage\t298\nlistMessage\t191\nreactionMessage\t131\nalbumMessage\t106\ncontactMessage\t104\nassociatedChildMessage\t99\nbuttonsMessage\t68\nlistResponseMessage\t56\nplaceholderMessage\t47\nbuttonsResponseMessage\t35\nlocationMessage\t19\ntext\t19\ntemplateButtonReplyMessage\t13\nptvMessage\t8\ngroupInviteMessage\t7\npollUpdateMessage\t3\ncontactsArrayMessage\t3\norderMessage\t3\npollCreationMessageV3\t2\npttMessage\t2\nlottieStickerMessage\t2\neditedMessage\t1\nproductMessage\t1\n",
+  "stderr": "",
+  "execution_time_ms": 85
+}

@@ -1,0 +1,58 @@
+{
+  "query": "SELECT cu.id, cu.tenantId, cu.email, cu.name, cu.status, t.name as tenantName\nFROM crm_users cu \nJOIN tenants t ON t.id = cu.tenantId\nWHERE cu.email IN ('bruno@entur.com.br', 'fernando@entur.com.br', 'viviane@entur.com.br')\nORDER BY cu.email, cu.tenantId;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute SELECT cu.id, cu.tenantId, cu.email, cu.name, cu.status, t.name as tenantName\nFROM crm_users cu \nJOIN tenants t ON t.id = cu.tenantId\nWHERE cu.email IN ('bruno@entur.com.br', 'fernando@entur.com.br', 'viviane@entur.com.br')\nORDER BY cu.email, cu.tenantId;",
+  "rows": [
+    {
+      "id": "150001",
+      "tenantId": "150002",
+      "email": "bruno@entur.com.br",
+      "name": "Bruno",
+      "status": "active",
+      "tenantName": "Entur"
+    },
+    {
+      "id": "300022",
+      "tenantId": "300005",
+      "email": "bruno@entur.com.br",
+      "name": "Bruno  Barbosa da Silva",
+      "status": "invited",
+      "tenantName": "Aceleradora"
+    },
+    {
+      "id": "240001",
+      "tenantId": "210002",
+      "email": "fernando@entur.com.br",
+      "name": "Fernando",
+      "status": "active",
+      "tenantName": "Boxtour"
+    },
+    {
+      "id": "300023",
+      "tenantId": "300005",
+      "email": "fernando@entur.com.br",
+      "name": "Fernando Guilherme ",
+      "status": "invited",
+      "tenantName": "Aceleradora"
+    },
+    {
+      "id": "270061",
+      "tenantId": "210002",
+      "email": "viviane@entur.com.br",
+      "name": "Viviane Assis",
+      "status": "invited",
+      "tenantName": "Boxtour"
+    },
+    {
+      "id": "300025",
+      "tenantId": "300005",
+      "email": "viviane@entur.com.br",
+      "name": "Viviane Assis ",
+      "status": "invited",
+      "tenantName": "Aceleradora"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\ttenantId\temail\tname\tstatus\ttenantName\n150001\t150002\tbruno@entur.com.br\tBruno\tactive\tEntur\n300022\t300005\tbruno@entur.com.br\tBruno  Barbosa da Silva\tinvited\tAceleradora\n240001\t210002\tfernando@entur.com.br\tFernando\tactive\tBoxtour\n300023\t300005\tfernando@entur.com.br\tFernando Guilherme \tinvited\tAceleradora\n270061\t210002\tviviane@entur.com.br\tViviane Assis\tinvited\tBoxtour\n300025\t300005\tviviane@entur.com.br\tViviane Assis \tinvited\tAceleradora\n",
+  "stderr": "",
+  "execution_time_ms": 53
+}
