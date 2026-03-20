@@ -116,9 +116,21 @@ export default function Pipeline() {
     },
   });
 
-  // Auto-select default pipeline on load
+  // Auto-select pipeline on load: prioritize last visited > default preference > first sales pipeline
   useEffect(() => {
     if (pipelineInitialized || !pipelines.data?.length) return;
+    // 1. Check if there's a last visited pipeline in sessionStorage
+    const lastVisited = sessionStorage.getItem("lastVisitedPipelineId");
+    if (lastVisited) {
+      const lastId = Number(lastVisited);
+      const exists = pipelines.data.find((p: any) => p.id === lastId && !p.isArchived);
+      if (exists) {
+        setSelectedPipelineId(lastId);
+        setPipelineInitialized(true);
+        return;
+      }
+    }
+    // 2. Check user's default pipeline preference
     const prefVal = defaultPipelinePref.data?.value;
     if (prefVal) {
       const prefId = Number(prefVal);
@@ -129,11 +141,18 @@ export default function Pipeline() {
         return;
       }
     }
-    // Fallback: first sales pipeline or first pipeline
+    // 3. Fallback: first sales pipeline or first pipeline
     const salesPipeline = pipelines.data.find((p: any) => p.pipelineType === "sales" && !p.isArchived);
     setSelectedPipelineId(salesPipeline?.id ?? pipelines.data[0]?.id ?? null);
     setPipelineInitialized(true);
   }, [pipelines.data, defaultPipelinePref.data, pipelineInitialized]);
+
+  // Persist selected pipeline to sessionStorage whenever it changes
+  useEffect(() => {
+    if (selectedPipelineId) {
+      sessionStorage.setItem("lastVisitedPipelineId", String(selectedPipelineId));
+    }
+  }, [selectedPipelineId]);
   const activePipeline = selectedPipelineId
     ? pipelines.data?.find((p: any) => p.id === selectedPipelineId)
     : pipelines.data?.[0];

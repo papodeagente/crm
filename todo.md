@@ -4392,3 +4392,11 @@
 - [x] 10 testes passando em tenantContamination.test.ts
 - [x] TypeScript compila sem erros
 - [x] Repo não inflado (apenas 1 arquivo de teste adicionado)
+
+## Bug Fix: Navegação Pipeline — Funil não preservado ao voltar de negociação
+- [x] Diagnosticar: Pipeline.tsx usava apenas defaultPipelinePref, sem memória do último funil
+- [x] Causa raiz: nenhum mecanismo de persistência do funil ativo entre navegações
+- [x] Correção: sessionStorage lastVisitedPipelineId (leitura na inicialização + escrita ao trocar)
+- [x] 9 testes passando (6 preservação + 3 não-regressão)
+- [x] Bonus: corrigido bug de tRPC path no optimistic reaction (utils.wa.messages → utils.whatsapp.messagesByContact)
+- [x] TypeScript compila sem erros

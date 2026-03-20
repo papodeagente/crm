@@ -2000,20 +2000,18 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
   const handleReact = useCallback((key: { remoteJid: string; fromMe: boolean; id: string }, emoji: string) => {
     // Optimistic update: show reaction immediately under the message bubble
     // Update the message cache optimistically (uses 'utils' from component scope)
-    utils.wa.messages.setData(
-      { sessionId, remoteJid: key.remoteJid, limit: 100 },
-      (old: any) => {
-        if (!old) return old;
-        return old.map((m: any) => {
-          if (m.messageId === key.id) {
-            const existing = m.reactions || [];
-            const filtered = existing.filter((r: any) => r.senderJid !== "me");
-            return { ...m, reactions: [...filtered, { senderJid: "me", emoji, timestamp: Date.now() }] };
-          }
-          return m;
-        });
-      }
-    );
+    const reactQueryKey = { sessionId, remoteJid: key.remoteJid, limit: msgLimit };
+    utils.whatsapp.messagesByContact.setData(reactQueryKey, (old: any) => {
+      if (!old) return old;
+      return old.map((m: any) => {
+        if (m.messageId === key.id) {
+          const existing = m.reactions || [];
+          const filtered = existing.filter((r: any) => r.senderJid !== "me");
+          return { ...m, reactions: [...filtered, { senderJid: "me", emoji, timestamp: Date.now() }] };
+        }
+        return m;
+      });
+    });
     sendReaction.mutate({ sessionId, key, reaction: emoji });
   }, [sessionId]);
 
