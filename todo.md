@@ -4352,3 +4352,10 @@
 - [x] Reduzir fetches redundantes: refetchInterval aumentado em 8 páginas
 - [x] Validar zero regressão funcional: 41 testes próprios passando, falhas são pré-existentes
 - [x] Confirmar que nenhuma regra de negócio, layout ou comportamento foi alterado
+
+## Correção: Valor da Negociação no Webhook RD Station
+- [x] Diagnosticar fluxo de webhook RD Station: onde produto é vinculado e valor calculado
+- [x] Identificar causa raiz: por que o 1º produto não soma no valor total
+- [x] Corrigir apenas o ponto necessário para valor refletir o produto importado
+- [x] Testes vitest para validar correção sem regressão (8 testes passando)
+- [x] Confirmar que nenhuma outra área foi alterada

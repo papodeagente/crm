@@ -17,7 +17,7 @@ import {
 } from "./leadProcessor";
 import { getDb } from "./db";
 import { eventLog, trackingTokens, rdStationConfig, rdStationWebhookLog, whatsappSessions, rdStationConfigTasks, productCatalog, dealProducts, tasks, webhookConfig, metaIntegrationConfig } from "../drizzle/schema";
-import { createDealProduct, createTask } from "./crmDb";
+import { createDealProduct, createTask, recalcDealValue } from "./crmDb";
 import { eq, and, sql } from "drizzle-orm";
 import { ENV } from "./_core/env";
 import { generateTrackerScript } from "./tracker-script";
@@ -895,8 +895,10 @@ router.post("/api/webhooks/rdstation", async (req: Request, res: Response) => {
                 unitPriceCents: product.basePriceCents,
                 supplier: product.supplier ?? undefined,
               });
+              // Recalcular valor total da negociação após vincular o produto
+              await recalcDealValue(tenantId, result.dealId);
               autoProductStatus = "linked";
-              console.log(`[RD Station Webhook] Auto-product "${product.name}" linked to deal #${result.dealId}`);
+              console.log(`[RD Station Webhook] Auto-product "${product.name}" linked to deal #${result.dealId} (value recalculated)`);
             }
           } catch (prodErr: any) {
             autoProductStatus = "failed";
