@@ -24,11 +24,11 @@ const eventConfig: Record<string, { icon: any; bg: string; color: string; label:
 
 export default function Logs() {
   const [sessionFilter, setSessionFilter] = useState("all");
-  const sessionsQuery = trpc.whatsapp.sessions.useQuery(undefined, { staleTime: 60 * 1000 });
+  const sessionsQuery = trpc.whatsapp.sessions.useQuery();
   const allSessions = sessionsQuery.data || [];
   const logsQuery = trpc.whatsapp.logs.useQuery(
     { sessionId: sessionFilter === "all" ? undefined : sessionFilter, limit: 200 },
-    { refetchInterval: 15000, staleTime: 5000 }
+    { refetchInterval: 5000 }
   );
   const logs = logsQuery.data || [];
 

@@ -1,0 +1,9 @@
+{
+  "query": "CREATE INDEX IF NOT EXISTS cfv_filter_idx ON custom_field_values (tenantId, fieldId, value(255));\nCREATE INDEX IF NOT EXISTS cfv_entity_field_idx ON custom_field_values (tenantId, entityType, fieldId, value(255));",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute CREATE INDEX IF NOT EXISTS cfv_filter_idx ON custom_field_values (tenantId, fieldId, value(255));\nCREATE INDEX IF NOT EXISTS cfv_entity_field_idx ON custom_field_values (tenantId, entityType, fieldId, value(255));",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 1139
+}

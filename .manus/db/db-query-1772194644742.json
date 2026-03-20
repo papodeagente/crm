@@ -1,0 +1,280 @@
+{
+  "query": "SELECT remoteJid, LENGTH(REPLACE(remoteJid, '@s.whatsapp.net', '')) as numlen, COUNT(*) as cnt, MIN(timestamp) as first_msg, MAX(timestamp) as last_msg, SUM(fromMe) as sent, SUM(NOT fromMe) as received FROM messages WHERE remoteJid LIKE '55%@s.whatsapp.net' AND (LENGTH(REPLACE(remoteJid, '@s.whatsapp.net', '')) = 12 OR LENGTH(REPLACE(remoteJid, '@s.whatsapp.net', '')) = 13) GROUP BY remoteJid ORDER BY REPLACE(remoteJid, '@s.whatsapp.net', '') LIMIT 30;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute SELECT remoteJid, LENGTH(REPLACE(remoteJid, '@s.whatsapp.net', '')) as numlen, COUNT(*) as cnt, MIN(timestamp) as first_msg, MAX(timestamp) as last_msg, SUM(fromMe) as sent, SUM(NOT fromMe) as received FROM messages WHERE remoteJid LIKE '55%@s.whatsapp.net' AND (LENGTH(REPLACE(remoteJid, '@s.whatsapp.net', '')) = 12 OR LENGTH(REPLACE(remoteJid, '@s.whatsapp.net', '')) = 13) GROUP BY remoteJid ORDER BY REPLACE(remoteJid, '@s.whatsapp.net', '') LIMIT 30;",
+  "rows": [
+    {
+      "remoteJid": "551123053530@s.whatsapp.net",
+      "numlen": "12",
+      "cnt": "17",
+      "first_msg": "2025-05-09 20:04:19",
+      "last_msg": "2025-10-18 15:00:12",
+      "sent": "7",
+      "received": "10"
+    },
+    {
+      "remoteJid": "551126509982@s.whatsapp.net",
+      "numlen": "12",
+      "cnt": "1",
+      "first_msg": "2025-06-12 19:01:48",
+      "last_msg": "2025-06-12 19:01:48",
+      "sent": "0",
+      "received": "1"
+    },
+    {
+      "remoteJid": "551126509991@s.whatsapp.net",
+      "numlen": "12",
+      "cnt": "2",
+      "first_msg": "2025-11-13 13:01:57",
+      "last_msg": "2025-12-08 17:01:07",
+      "sent": "0",
+      "received": "2"
+    },
+    {
+      "remoteJid": "551126509999@s.whatsapp.net",
+      "numlen": "12",
+      "cnt": "3",
+      "first_msg": "2025-10-21 13:16:38",
+      "last_msg": "2025-11-27 10:04:56",
+      "sent": "1",
+      "received": "2"
+    },
+    {
+      "remoteJid": "551128475131@s.whatsapp.net",
+      "numlen": "12",
+      "cnt": "9",
+      "first_msg": "2025-04-07 17:00:01",
+      "last_msg": "2026-02-20 15:40:38",
+      "sent": "1",
+      "received": "8"
+    },
+    {
+      "remoteJid": "551130047717@s.whatsapp.net",
+      "numlen": "12",
+      "cnt": "49",
+      "first_msg": "2025-04-16 14:19:39",
+      "last_msg": "2026-02-19 13:05:48",
+      "sent": "22",
+      "received": "27"
+    },
+    {
+      "remoteJid": "551130421291@s.whatsapp.net",
+      "numlen": "12",
+      "cnt": "8",
+      "first_msg": "2025-04-03 18:14:51",
+      "last_msg": "2025-12-01 13:02:34",
+      "sent": "0",
+      "received": "8"
+    },
+    {
+      "remoteJid": "551132304403@s.whatsapp.net",
+      "numlen": "12",
+      "cnt": "9",
+      "first_msg": "2025-03-17 12:27:11",
+      "last_msg": "2026-02-09 13:06:27",
+      "sent": "0",
+      "received": "9"
+    },
+    {
+      "remoteJid": "551140031118@s.whatsapp.net",
+      "numlen": "12",
+      "cnt": "2",
+      "first_msg": "2025-07-26 17:09:24",
+      "last_msg": "2025-08-05 07:47:59",
+      "sent": "0",
+      "received": "2"
+    },
+    {
+      "remoteJid": "551140041144@s.whatsapp.net",
+      "numlen": "12",
+      "cnt": "10",
+      "first_msg": "2025-06-19 15:11:39",
+      "last_msg": "2025-07-14 15:40:35",
+      "sent": "2",
+      "received": "8"
+    },
+    {
+      "remoteJid": "551140041188@s.whatsapp.net",
+      "numlen": "12",
+      "cnt": "1",
+      "first_msg": "2025-06-16 11:37:03",
+      "last_msg": "2025-06-16 11:37:03",
+      "sent": "0",
+      "received": "1"
+    },
+    {
+      "remoteJid": "551140041515@s.whatsapp.net",
+      "numlen": "12",
+      "cnt": "4",
+      "first_msg": "2025-10-25 11:44:43",
+      "last_msg": "2025-12-26 14:17:48",
+      "sent": "1",
+      "received": "3"
+    },
+    {
+      "remoteJid": "551140044828@s.whatsapp.net",
+      "numlen": "12",
+      "cnt": "128",
+      "first_msg": "2025-03-24 04:55:31",
+      "last_msg": "2026-02-24 13:51:38",
+      "sent": "14",
+      "received": "114"
+    },
+    {
+      "remoteJid": "551141302419@s.whatsapp.net",
+      "numlen": "12",
+      "cnt": "1",
+      "first_msg": "2025-05-04 22:42:29",
+      "last_msg": "2025-05-04 22:42:29",
+      "sent": "0",
+      "received": "1"
+    },
+    {
+      "remoteJid": "551142187455@s.whatsapp.net",
+      "numlen": "12",
+      "cnt": "2",
+      "first_msg": "2025-08-01 23:36:44",
+      "last_msg": "2025-08-01 23:37:20",
+      "sent": "1",
+      "received": "1"
+    },
+    {
+      "remoteJid": "551148636360@s.whatsapp.net",
+      "numlen": "12",
+      "cnt": "17",
+      "first_msg": "2025-03-27 10:52:48",
+      "last_msg": "2026-02-14 20:22:06",
+      "sent": "4",
+      "received": "13"
+    },
+    {
+      "remoteJid": "551149505846@s.whatsapp.net",
+      "numlen": "12",
+      "cnt": "20",
+      "first_msg": "2025-05-19 16:04:56",
+      "last_msg": "2025-12-01 18:51:52",
+      "sent": "0",
+      "received": "20"
+    },
+    {
+      "remoteJid": "551150282194@s.whatsapp.net",
+      "numlen": "12",
+      "cnt": "2",
+      "first_msg": "2025-06-04 22:49:50",
+      "last_msg": "2025-06-07 11:52:27",
+      "sent": "0",
+      "received": "2"
+    },
+    {
+      "remoteJid": "551150395776@s.whatsapp.net",
+      "numlen": "12",
+      "cnt": "3",
+      "first_msg": "2026-01-29 15:00:28",
+      "last_msg": "2026-02-11 15:07:50",
+      "sent": "0",
+      "received": "3"
+    },
+    {
+      "remoteJid": "551150398557@s.whatsapp.net",
+      "numlen": "12",
+      "cnt": "1",
+      "first_msg": "2025-07-14 15:28:29",
+      "last_msg": "2025-07-14 15:28:29",
+      "sent": "0",
+      "received": "1"
+    },
+    {
+      "remoteJid": "551150987000@s.whatsapp.net",
+      "numlen": "12",
+      "cnt": "1",
+      "first_msg": "2025-07-28 11:25:55",
+      "last_msg": "2025-07-28 11:25:55",
+      "sent": "1",
+      "received": "0"
+    },
+    {
+      "remoteJid": "551151042744@s.whatsapp.net",
+      "numlen": "12",
+      "cnt": "1",
+      "first_msg": "2025-10-15 15:00:41",
+      "last_msg": "2025-10-15 15:00:41",
+      "sent": "0",
+      "received": "1"
+    },
+    {
+      "remoteJid": "551151043039@s.whatsapp.net",
+      "numlen": "12",
+      "cnt": "1",
+      "first_msg": "2025-10-15 19:02:49",
+      "last_msg": "2025-10-15 19:02:49",
+      "sent": "1",
+      "received": "0"
+    },
+    {
+      "remoteJid": "551151044717@s.whatsapp.net",
+      "numlen": "12",
+      "cnt": "173",
+      "first_msg": "2025-10-20 14:02:44",
+      "last_msg": "2026-02-23 20:37:22",
+      "sent": "75",
+      "received": "98"
+    },
+    {
+      "remoteJid": "551151071775@s.whatsapp.net",
+      "numlen": "12",
+      "cnt": "145",
+      "first_msg": "2025-04-14 21:12:56",
+      "last_msg": "2025-10-17 21:57:26",
+      "sent": "29",
+      "received": "116"
+    },
+    {
+      "remoteJid": "551151921072@s.whatsapp.net",
+      "numlen": "12",
+      "cnt": "20",
+      "first_msg": "2025-07-15 12:57:57",
+      "last_msg": "2026-01-19 19:26:53",
+      "sent": "1",
+      "received": "19"
+    },
+    {
+      "remoteJid": "551151921641@s.whatsapp.net",
+      "numlen": "12",
+      "cnt": "10",
+      "first_msg": "2025-07-25 18:34:40",
+      "last_msg": "2025-09-05 12:01:35",
+      "sent": "0",
+      "received": "10"
+    },
+    {
+      "remoteJid": "551151922692@s.whatsapp.net",
+      "numlen": "12",
+      "cnt": "17",
+      "first_msg": "2025-03-18 22:30:40",
+      "last_msg": "2025-10-06 19:30:50",
+      "sent": "2",
+      "received": "15"
+    },
+    {
+      "remoteJid": "551151927306@s.whatsapp.net",
+      "numlen": "12",
+      "cnt": "2",
+      "first_msg": "2025-07-31 21:36:27",
+      "last_msg": "2025-07-31 23:08:08",
+      "sent": "0",
+      "received": "2"
+    },
+    {
+      "remoteJid": "551151940285@s.whatsapp.net",
+      "numlen": "12",
+      "cnt": "19",
+      "first_msg": "2025-03-06 12:35:33",
+      "last_msg": "2025-11-19 19:21:11",
+      "sent": "0",
+      "received": "19"
+    }
+  ],
+  "messages": [],
+  "stdout": "remoteJid\tnumlen\tcnt\tfirst_msg\tlast_msg\tsent\treceived\n551123053530@s.whatsapp.net\t12\t17\t2025-05-09 20:04:19\t2025-10-18 15:00:12\t7\t10\n551126509982@s.whatsapp.net\t12\t1\t2025-06-12 19:01:48\t2025-06-12 19:01:48\t0\t1\n551126509991@s.whatsapp.net\t12\t2\t2025-11-13 13:01:57\t2025-12-08 17:01:07\t0\t2\n551126509999@s.whatsapp.net\t12\t3\t2025-10-21 13:16:38\t2025-11-27 10:04:56\t1\t2\n551128475131@s.whatsapp.net\t12\t9\t2025-04-07 17:00:01\t2026-02-20 15:40:38\t1\t8\n551130047717@s.whatsapp.net\t12\t49\t2025-04-16 14:19:39\t2026-02-19 13:05:48\t22\t27\n551130421291@s.whatsapp.net\t12\t8\t2025-04-03 18:14:51\t2025-12-01 13:02:34\t0\t8\n551132304403@s.whatsapp.net\t12\t9\t2025-03-17 12:27:11\t2026-02-09 13:06:27\t0\t9\n551140031118@s.whatsapp.net\t12\t2\t2025-07-26 17:09:24\t2025-08-05 07:47:59\t0\t2\n551140041144@s.whatsapp.net\t12\t10\t2025-06-19 15:11:39\t2025-07-14 15:40:35\t2\t8\n551140041188@s.whatsapp.net\t12\t1\t2025-06-16 11:37:03\t2025-06-16 11:37:03\t0\t1\n551140041515@s.whatsapp.net\t12\t4\t2025-10-25 11:44:43\t2025-12-26 14:17:48\t1\t3\n551140044828@s.whatsapp.net\t12\t128\t2025-03-24 04:55:31\t2026-02-24 13:51:38\t14\t114\n551141302419@s.whatsapp.net\t12\t1\t2025-05-04 22:42:29\t2025-05-04 22:42:29\t0\t1\n551142187455@s.whatsapp.net\t12\t2\t2025-08-01 23:36:44\t2025-08-01 23:37:20\t1\t1\n551148636360@s.whatsapp.net\t12\t17\t2025-03-27 10:52:48\t2026-02-14 20:22:06\t4\t13\n551149505846@s.whatsapp.net\t12\t20\t2025-05-19 16:04:56\t2025-12-01 18:51:52\t0\t20\n551150282194@s.whatsapp.net\t12\t2\t2025-06-04 22:49:50\t2025-06-07 11:52:27\t0\t2\n551150395776@s.whatsapp.net\t12\t3\t2026-01-29 15:00:28\t2026-02-11 15:07:50\t0\t3\n551150398557@s.whatsapp.net\t12\t1\t2025-07-14 15:28:29\t2025-07-14 15:28:29\t0\t1\n551150987000@s.whatsapp.net\t12\t1\t2025-07-28 11:25:55\t2025-07-28 11:25:55\t1\t0\n551151042744@s.whatsapp.net\t12\t1\t2025-10-15 15:00:41\t2025-10-15 15:00:41\t0\t1\n551151043039@s.whatsapp.net\t12\t1\t2025-10-15 19:02:49\t2025-10-15 19:02:49\t1\t0\n551151044717@s.whatsapp.net\t12\t173\t2025-10-20 14:02:44\t2026-02-23 20:37:22\t75\t98\n551151071775@s.whatsapp.net\t12\t145\t2025-04-14 21:12:56\t2025-10-17 21:57:26\t29\t116\n551151921072@s.whatsapp.net\t12\t20\t2025-07-15 12:57:57\t2026-01-19 19:26:53\t1\t19\n551151921641@s.whatsapp.net\t12\t10\t2025-07-25 18:34:40\t2025-09-05 12:01:35\t0\t10\n551151922692@s.whatsapp.net\t12\t17\t2025-03-18 22:30:40\t2025-10-06 19:30:50\t2\t15\n551151927306@s.whatsapp.net\t12\t2\t2025-07-31 21:36:27\t2025-07-31 23:08:08\t0\t2\n551151940285@s.whatsapp.net\t12\t19\t2025-03-06 12:35:33\t2025-11-19 19:21:11\t0\t19\n",
+  "stderr": "",
+  "execution_time_ms": 434
+}

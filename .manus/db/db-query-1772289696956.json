@@ -1,0 +1,22 @@
+{
+  "query": "SELECT id, name, pipelineType, isDefault FROM pipelines WHERE tenantId = 1 AND isArchived = 0;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute SELECT id, name, pipelineType, isDefault FROM pipelines WHERE tenantId = 1 AND isArchived = 0;",
+  "rows": [
+    {
+      "id": "1",
+      "name": "Funil de Vendas",
+      "pipelineType": "sales",
+      "isDefault": "1"
+    },
+    {
+      "id": "90008",
+      "name": "Funil de Pós venda",
+      "pipelineType": "post_sale",
+      "isDefault": "0"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tname\tpipelineType\tisDefault\n1\tFunil de Vendas\tsales\t1\n90008\tFunil de Pós venda\tpost_sale\t0\n",
+  "stderr": "",
+  "execution_time_ms": 384
+}

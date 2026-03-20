@@ -1,0 +1,150 @@
+{
+  "query": "SELECT id, tenantId, name, email, status FROM crm_users WHERE status = 'active' ORDER BY tenantId, id LIMIT 20;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute SELECT id, tenantId, name, email, status FROM crm_users WHERE status = 'active' ORDER BY tenantId, id LIMIT 20;",
+  "rows": [
+    {
+      "id": "150001",
+      "tenantId": "150002",
+      "name": "Bruno",
+      "email": "bruno@entur.com.br",
+      "status": "active"
+    },
+    {
+      "id": "210001",
+      "tenantId": "210002",
+      "name": "Bruno Barbosa ",
+      "email": "bruno@boxtour.com.br",
+      "status": "active"
+    },
+    {
+      "id": "210002",
+      "tenantId": "210002",
+      "name": "Marcio Dias",
+      "email": "marcio.dias@boxtour.com.br",
+      "status": "active"
+    },
+    {
+      "id": "210004",
+      "tenantId": "210002",
+      "name": "Christian Urbano",
+      "email": "christian.urbano@boxtour.com.br",
+      "status": "active"
+    },
+    {
+      "id": "210007",
+      "tenantId": "210002",
+      "name": "Fabio Carvalho",
+      "email": "fabio.carvalho@boxtour.com.br",
+      "status": "active"
+    },
+    {
+      "id": "210008",
+      "tenantId": "210002",
+      "name": "Juliana Fernandes",
+      "email": "juliana.fernandes@boxtour.com.br",
+      "status": "active"
+    },
+    {
+      "id": "210010",
+      "tenantId": "210002",
+      "name": "Rafael",
+      "email": "rafael@boxtour.com.br",
+      "status": "active"
+    },
+    {
+      "id": "240001",
+      "tenantId": "210002",
+      "name": "Fernando",
+      "email": "fernando@entur.com.br",
+      "status": "active"
+    },
+    {
+      "id": "240002",
+      "tenantId": "240002",
+      "name": "Ludimila Figueiredo",
+      "email": "viajecomludi@gmail.com",
+      "status": "active"
+    },
+    {
+      "id": "240003",
+      "tenantId": "240003",
+      "name": "Juliana Carvalho",
+      "email": "jujubachicaoejoao@gmail.com",
+      "status": "active"
+    },
+    {
+      "id": "240004",
+      "tenantId": "240004",
+      "name": "Juliana Olivieri",
+      "email": "Comercial@mispviagens.com",
+      "status": "active"
+    },
+    {
+      "id": "240005",
+      "tenantId": "240005",
+      "name": "Luiz Eduardo Fabbri",
+      "email": "cassinotravel@gmail.com",
+      "status": "active"
+    },
+    {
+      "id": "270063",
+      "tenantId": "240005",
+      "name": "Fabbri GEV expert",
+      "email": "adm@cassinotravel.com.br",
+      "status": "active"
+    },
+    {
+      "id": "240006",
+      "tenantId": "240006",
+      "name": "Flávia Santiago",
+      "email": "fcsbarros01@gmail.com",
+      "status": "active"
+    },
+    {
+      "id": "270001",
+      "tenantId": "240006",
+      "name": "Luciana Dias",
+      "email": "luciana@fdsviagens.com.br",
+      "status": "active"
+    },
+    {
+      "id": "240007",
+      "tenantId": "240007",
+      "name": "Vanessa Mazza Azevedo",
+      "email": "vaness@legutour.com.br",
+      "status": "active"
+    },
+    {
+      "id": "270007",
+      "tenantId": "240007",
+      "name": "Isabela Nahirniak",
+      "email": "comercial@legutour.com.br",
+      "status": "active"
+    },
+    {
+      "id": "270008",
+      "tenantId": "240007",
+      "name": "Priscila Nascimento",
+      "email": "comercial2@legutour.com.br",
+      "status": "active"
+    },
+    {
+      "id": "270009",
+      "tenantId": "240007",
+      "name": "Rafaela Antas",
+      "email": "posvendas@legutour.com.br",
+      "status": "active"
+    },
+    {
+      "id": "270045",
+      "tenantId": "240007",
+      "name": "Ana Paula Ramazzini",
+      "email": "anapaula@galaxyprodutora.com.br",
+      "status": "active"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\ttenantId\tname\temail\tstatus\n150001\t150002\tBruno\tbruno@entur.com.br\tactive\n210001\t210002\tBruno Barbosa \tbruno@boxtour.com.br\tactive\n210002\t210002\tMarcio Dias\tmarcio.dias@boxtour.com.br\tactive\n210004\t210002\tChristian Urbano\tchristian.urbano@boxtour.com.br\tactive\n210007\t210002\tFabio Carvalho\tfabio.carvalho@boxtour.com.br\tactive\n210008\t210002\tJuliana Fernandes\tjuliana.fernandes@boxtour.com.br\tactive\n210010\t210002\tRafael\trafael@boxtour.com.br\tactive\n240001\t210002\tFernando\tfernando@entur.com.br\tactive\n240002\t240002\tLudimila Figueiredo\tviajecomludi@gmail.com\tactive\n240003\t240003\tJuliana Carvalho\tjujubachicaoejoao@gmail.com\tactive\n240004\t240004\tJuliana Olivieri\tComercial@mispviagens.com\tactive\n240005\t240005\tLuiz Eduardo Fabbri\tcassinotravel@gmail.com\tactive\n270063\t240005\tFabbri GEV expert\tadm@cassinotravel.com.br\tactive\n240006\t240006\tFlávia Santiago\tfcsbarros01@gmail.com\tactive\n270001\t240006\tLuciana Dias\tluciana@fdsviagens.com.br\tactive\n240007\t240007\tVanessa Mazza Azevedo\tvaness@legutour.com.br\tactive\n270007\t240007\tIsabela Nahirniak\tcomercial@legutour.com.br\tactive\n270008\t240007\tPriscila Nascimento\tcomercial2@legutour.com.br\tactive\n270009\t240007\tRafaela Antas\tposvendas@legutour.com.br\tactive\n270045\t240007\tAna Paula Ramazzini\tanapaula@galaxyprodutora.com.br\tactive\n",
+  "stderr": "",
+  "execution_time_ms": 155
+}

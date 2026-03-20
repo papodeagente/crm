@@ -1,0 +1,18 @@
+{
+  "query": "\nSELECT \n  FIELD('sent', 'error','pending','sent','delivered','read','played') AS sent_pos,\n  FIELD('delivered', 'error','pending','sent','delivered','read','played') AS delivered_pos,\n  FIELD('read', 'error','pending','sent','delivered','read','played') AS read_pos,\n  FIELD('', 'error','pending','sent','delivered','read','played') AS empty_pos,\n  FIELD(NULL, 'error','pending','sent','delivered','read','played') AS null_pos,\n  FIELD(COALESCE('sent',''), 'error','pending','sent','delivered','read','played') AS coalesce_sent\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute \nSELECT \n  FIELD('sent', 'error','pending','sent','delivered','read','played') AS sent_pos,\n  FIELD('delivered', 'error','pending','sent','delivered','read','played') AS delivered_pos,\n  FIELD('read', 'error','pending','sent','delivered','read','played') AS read_pos,\n  FIELD('', 'error','pending','sent','delivered','read','played') AS empty_pos,\n  FIELD(NULL, 'error','pending','sent','delivered','read','played') AS null_pos,\n  FIELD(COALESCE('sent',''), 'error','pending','sent','delivered','read','played') AS coalesce_sent\n",
+  "rows": [
+    {
+      "sent_pos": "3",
+      "delivered_pos": "4",
+      "read_pos": "5",
+      "empty_pos": "0",
+      "null_pos": "0",
+      "coalesce_sent": "3"
+    }
+  ],
+  "messages": [],
+  "stdout": "sent_pos\tdelivered_pos\tread_pos\tempty_pos\tnull_pos\tcoalesce_sent\n3\t4\t5\t0\t0\t3\n",
+  "stderr": "",
+  "execution_time_ms": 49
+}

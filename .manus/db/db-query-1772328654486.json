@@ -1,0 +1,22 @@
+{
+  "query": "SELECT 'overdue_tasks' as metric, COUNT(*) as cnt FROM crm_tasks WHERE tenantId = 1 AND entityType = 'deal' AND status NOT IN ('done', 'cancelled') AND dueAt < NOW() UNION ALL SELECT 'pending_tasks' as metric, COUNT(*) FROM crm_tasks WHERE tenantId = 1 AND entityType = 'deal' AND status NOT IN ('done', 'cancelled') UNION ALL SELECT 'deals_with_overdue' as metric, COUNT(DISTINCT entityId) FROM crm_tasks WHERE tenantId = 1 AND entityType = 'deal' AND status NOT IN ('done', 'cancelled') AND dueAt < NOW();",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute SELECT 'overdue_tasks' as metric, COUNT(*) as cnt FROM crm_tasks WHERE tenantId = 1 AND entityType = 'deal' AND status NOT IN ('done', 'cancelled') AND dueAt < NOW() UNION ALL SELECT 'pending_tasks' as metric, COUNT(*) FROM crm_tasks WHERE tenantId = 1 AND entityType = 'deal' AND status NOT IN ('done', 'cancelled') UNION ALL SELECT 'deals_with_overdue' as metric, COUNT(DISTINCT entityId) FROM crm_tasks WHERE tenantId = 1 AND entityType = 'deal' AND status NOT IN ('done', 'cancelled') AND dueAt < NOW();",
+  "rows": [
+    {
+      "metric": "pending_tasks",
+      "cnt": "186"
+    },
+    {
+      "metric": "overdue_tasks",
+      "cnt": "19"
+    },
+    {
+      "metric": "deals_with_overdue",
+      "cnt": "19"
+    }
+  ],
+  "messages": [],
+  "stdout": "metric\tcnt\npending_tasks\t186\noverdue_tasks\t19\ndeals_with_overdue\t19\n",
+  "stderr": "",
+  "execution_time_ms": 400
+}

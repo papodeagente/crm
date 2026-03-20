@@ -1,0 +1,133 @@
+{
+  "query": "\nSELECT \n  m.remoteJid,\n  m.fromMe AS lastFromMe,\n  m.status AS lastMsgStatus,\n  wc.lastStatus AS wcLastStatus,\n  wc.lastFromMe AS wcLastFromMe,\n  LEFT(m.content, 50) AS preview\nFROM messages m\nINNER JOIN (\n  SELECT remoteJid, sessionId, MAX(id) AS maxId\n  FROM messages\n  WHERE sessionId LIKE 'crm-%'\n  AND remoteJid NOT LIKE '%@g.us'\n  AND remoteJid != 'status@broadcast'\n  GROUP BY remoteJid, sessionId\n) latest ON m.remoteJid = latest.remoteJid AND m.id = latest.maxId AND m.sessionId = latest.sessionId\nLEFT JOIN wa_conversations wc ON wc.remoteJid = m.remoteJid AND wc.sessionId = m.sessionId\nWHERE m.fromMe = 1\nORDER BY m.id DESC\nLIMIT 15\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute \nSELECT \n  m.remoteJid,\n  m.fromMe AS lastFromMe,\n  m.status AS lastMsgStatus,\n  wc.lastStatus AS wcLastStatus,\n  wc.lastFromMe AS wcLastFromMe,\n  LEFT(m.content, 50) AS preview\nFROM messages m\nINNER JOIN (\n  SELECT remoteJid, sessionId, MAX(id) AS maxId\n  FROM messages\n  WHERE sessionId LIKE 'crm-%'\n  AND remoteJid NOT LIKE '%@g.us'\n  AND remoteJid != 'status@broadcast'\n  GROUP BY remoteJid, sessionId\n) latest ON m.remoteJid = latest.remoteJid AND m.id = latest.maxId AND m.sessionId = latest.sessionId\nLEFT JOIN wa_conversations wc ON wc.remoteJid = m.remoteJid AND wc.sessionId = m.sessionId\nWHERE m.fromMe = 1\nORDER BY m.id DESC\nLIMIT 15\n",
+  "rows": [
+    {
+      "remoteJid": "559185642903@s.whatsapp.net",
+      "lastFromMe": "1",
+      "lastMsgStatus": "delivered",
+      "wcLastStatus": "sent",
+      "wcLastFromMe": "1",
+      "preview": "[Mensagem apagada]"
+    },
+    {
+      "remoteJid": "5519998252546@s.whatsapp.net",
+      "lastFromMe": "1",
+      "lastMsgStatus": "played",
+      "wcLastStatus": "received",
+      "wcLastFromMe": "0",
+      "preview": "[Áudio]"
+    },
+    {
+      "remoteJid": "556593234587@s.whatsapp.net",
+      "lastFromMe": "1",
+      "lastMsgStatus": "sent",
+      "wcLastStatus": "sent",
+      "wcLastFromMe": "1",
+      "preview": "[Reação] 👍"
+    },
+    {
+      "remoteJid": "559184039473@s.whatsapp.net",
+      "lastFromMe": "1",
+      "lastMsgStatus": "read",
+      "wcLastStatus": "sent",
+      "wcLastFromMe": "1",
+      "preview": "Quero a capa dos meus"
+    },
+    {
+      "remoteJid": "555199590606@s.whatsapp.net",
+      "lastFromMe": "1",
+      "lastMsgStatus": "delivered",
+      "wcLastStatus": "sent",
+      "wcLastFromMe": "1",
+      "preview": "[Áudio]"
+    },
+    {
+      "remoteJid": "558499838420@s.whatsapp.net",
+      "lastFromMe": "1",
+      "lastMsgStatus": "delivered",
+      "wcLastStatus": "sent",
+      "wcLastFromMe": "1",
+      "preview": "Qq tu acha?"
+    },
+    {
+      "remoteJid": "33784467454@s.whatsapp.net",
+      "lastFromMe": "1",
+      "lastMsgStatus": "delivered",
+      "wcLastStatus": "sent",
+      "wcLastFromMe": "1",
+      "preview": "Oi, por gentileza pode me enviar o mateiral da Tal"
+    },
+    {
+      "remoteJid": "5521992797523@s.whatsapp.net",
+      "lastFromMe": "1",
+      "lastMsgStatus": "delivered",
+      "wcLastStatus": "sent",
+      "wcLastFromMe": "1",
+      "preview": "[Vídeo]"
+    },
+    {
+      "remoteJid": "556592589560@s.whatsapp.net",
+      "lastFromMe": "1",
+      "lastMsgStatus": "sent",
+      "wcLastStatus": "sent",
+      "wcLastFromMe": "1",
+      "preview": "🛫Bem-Vindo🔆 Agradecemos seu interesse em fazer sua"
+    },
+    {
+      "remoteJid": "5511993839734@s.whatsapp.net",
+      "lastFromMe": "1",
+      "lastMsgStatus": "delivered",
+      "wcLastStatus": "sent",
+      "wcLastFromMe": "1",
+      "preview": "Está tudo certinho pra amanhã"
+    },
+    {
+      "remoteJid": "558440072595@s.whatsapp.net",
+      "lastFromMe": "1",
+      "lastMsgStatus": "delivered",
+      "wcLastStatus": "sent",
+      "wcLastFromMe": "1",
+      "preview": "Gostaria de saber se existe algum preparo pra faze"
+    },
+    {
+      "remoteJid": "5511999356122@s.whatsapp.net",
+      "lastFromMe": "1",
+      "lastMsgStatus": "read",
+      "wcLastStatus": "sent",
+      "wcLastFromMe": "1",
+      "preview": "[Documento] Roteiro e Detalhes Grupo Japão_2026_Le"
+    },
+    {
+      "remoteJid": "5511985530231@s.whatsapp.net",
+      "lastFromMe": "1",
+      "lastMsgStatus": "delivered",
+      "wcLastStatus": "sent",
+      "wcLastFromMe": "1",
+      "preview": "[Áudio]"
+    },
+    {
+      "remoteJid": "64224309963@s.whatsapp.net",
+      "lastFromMe": "1",
+      "lastMsgStatus": "read",
+      "wcLastStatus": "sent",
+      "wcLastFromMe": "1",
+      "preview": "*Isabela*:"
+    },
+    {
+      "remoteJid": "558499445034@s.whatsapp.net",
+      "lastFromMe": "1",
+      "lastMsgStatus": "delivered",
+      "wcLastStatus": "sent",
+      "wcLastFromMe": "1",
+      "preview": "Pq o pessoal nunca mantém a comunicação no grupo"
+    }
+  ],
+  "messages": [
+    "*Tarifa Standard:*",
+    "- 1 bagagem de mão ("
+  ],
+  "stdout": "remoteJid\tlastFromMe\tlastMsgStatus\twcLastStatus\twcLastFromMe\tpreview\n559185642903@s.whatsapp.net\t1\tdelivered\tsent\t1\t[Mensagem apagada]\n5519998252546@s.whatsapp.net\t1\tplayed\treceived\t0\t[Áudio]\n556593234587@s.whatsapp.net\t1\tsent\tsent\t1\t[Reação] 👍\n559184039473@s.whatsapp.net\t1\tread\tsent\t1\tQuero a capa dos meus\n555199590606@s.whatsapp.net\t1\tdelivered\tsent\t1\t[Áudio]\n558499838420@s.whatsapp.net\t1\tdelivered\tsent\t1\tQq tu acha?\n33784467454@s.whatsapp.net\t1\tdelivered\tsent\t1\tOi, por gentileza pode me enviar o mateiral da Tal\n5521992797523@s.whatsapp.net\t1\tdelivered\tsent\t1\t[Vídeo]\n556592589560@s.whatsapp.net\t1\tsent\tsent\t1\t🛫Bem-Vindo🔆 Agradecemos seu interesse em fazer sua\n5511993839734@s.whatsapp.net\t1\tdelivered\tsent\t1\tEstá tudo certinho pra amanhã\n558440072595@s.whatsapp.net\t1\tdelivered\tsent\t1\tGostaria de saber se existe algum preparo pra faze\n5511999356122@s.whatsapp.net\t1\tread\tsent\t1\t[Documento] Roteiro e Detalhes Grupo Japão_2026_Le\n5511985530231@s.whatsapp.net\t1\tdelivered\tsent\t1\t[Áudio]\n64224309963@s.whatsapp.net\t1\tread\tsent\t1\t*Isabela*:\n*Tarifa Standard:*\n- 1 bagagem de mão (\n558499445034@s.whatsapp.net\t1\tdelivered\tsent\t1\tPq o pessoal nunca mantém a comunicação no grupo\n",
+  "stderr": "",
+  "execution_time_ms": 183
+}

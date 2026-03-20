@@ -1,0 +1,9 @@
+{
+  "query": "\nALTER TABLE contacts \n  ADD COLUMN stageClassification VARCHAR(32) NOT NULL DEFAULT 'desconhecido',\n  ADD COLUMN referralWindowStart TIMESTAMP NULL,\n  ADD COLUMN referralCount INT NOT NULL DEFAULT 0,\n  ADD COLUMN lastPurchaseAt TIMESTAMP NULL,\n  ADD COLUMN totalPurchases INT NOT NULL DEFAULT 0,\n  ADD COLUMN totalSpentCents BIGINT NOT NULL DEFAULT 0;\n\nCREATE INDEX contacts_classification_idx ON contacts (tenantId, stageClassification);\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute \nALTER TABLE contacts \n  ADD COLUMN stageClassification VARCHAR(32) NOT NULL DEFAULT 'desconhecido',\n  ADD COLUMN referralWindowStart TIMESTAMP NULL,\n  ADD COLUMN referralCount INT NOT NULL DEFAULT 0,\n  ADD COLUMN lastPurchaseAt TIMESTAMP NULL,\n  ADD COLUMN totalPurchases INT NOT NULL DEFAULT 0,\n  ADD COLUMN totalSpentCents BIGINT NOT NULL DEFAULT 0;\n\nCREATE INDEX contacts_classification_idx ON contacts (tenantId, stageClassification);\n",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 32098
+}

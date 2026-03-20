@@ -1,0 +1,9 @@
+{
+  "query": "UPDATE messages SET mediaUrl = NULL WHERE id = 540206 AND mediaUrl LIKE '%.svg+xml'",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute UPDATE messages SET mediaUrl = NULL WHERE id = 540206 AND mediaUrl LIKE '%.svg+xml'",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 60
+}

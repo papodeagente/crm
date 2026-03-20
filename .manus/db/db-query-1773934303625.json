@@ -1,0 +1,25 @@
+{
+  "query": "SELECT 'pipeline' as type, id, name FROM pipelines WHERE id = 390011 UNION ALL SELECT 'stage' as type, id, name FROM pipeline_stages WHERE id = 390064 UNION ALL SELECT 'contact' as type, id, name FROM contacts WHERE id = 664735;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute SELECT 'pipeline' as type, id, name FROM pipelines WHERE id = 390011 UNION ALL SELECT 'stage' as type, id, name FROM pipeline_stages WHERE id = 390064 UNION ALL SELECT 'contact' as type, id, name FROM contacts WHERE id = 664735;",
+  "rows": [
+    {
+      "type": "contact",
+      "id": "664735",
+      "name": "Maria Luiza"
+    },
+    {
+      "type": "pipeline",
+      "id": "390011",
+      "name": "Funil de Vendas – Alma Aventureira"
+    },
+    {
+      "type": "stage",
+      "id": "390064",
+      "name": "Novo Lead"
+    }
+  ],
+  "messages": [],
+  "stdout": "type\tid\tname\ncontact\t664735\tMaria Luiza\npipeline\t390011\tFunil de Vendas – Alma Aventureira\nstage\t390064\tNovo Lead\n",
+  "stderr": "",
+  "execution_time_ms": 60
+}

@@ -251,7 +251,7 @@ export const saasAuthRouter = router({
       if (!session || !isSuperAdmin(session.email)) {
         throw new TRPCError({ code: "FORBIDDEN", message: "Acesso negado" });
       }
-      return updateFreemiumPeriod(input.tenantId, input.days);
+      return updateFreemiumPeriod(getTenantId(ctx), input.days);
     }),
 
   // Update tenant plan (superadmin only)
@@ -267,7 +267,7 @@ export const saasAuthRouter = router({
       if (!session || !isSuperAdmin(session.email)) {
         throw new TRPCError({ code: "FORBIDDEN", message: "Acesso negado" });
       }
-      return updateTenantPlan(input.tenantId, input.plan);
+      return updateTenantPlan(getTenantId(ctx), input.plan);
     }),
 
   // List users for a tenant (superadmin only)
@@ -282,7 +282,7 @@ export const saasAuthRouter = router({
       if (!session || !isSuperAdmin(session.email)) {
         throw new TRPCError({ code: "FORBIDDEN", message: "Acesso negado" });
       }
-      return listTenantUsersAdmin(input.tenantId);
+      return listTenantUsersAdmin(getTenantId(ctx));
     }),
 
   // Update user status (superadmin only)
@@ -320,7 +320,7 @@ export const saasAuthRouter = router({
       const { eq } = await import("drizzle-orm");
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      const [tenant] = await db.select().from(tenants).where(eq(tenants.id, input.tenantId)).limit(1);
+      const [tenant] = await db.select().from(tenants).where(eq(tenants.id, getTenantId(ctx))).limit(1);
       if (!tenant) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Agência não encontrada" });
       }
@@ -331,9 +331,9 @@ export const saasAuthRouter = router({
       if (tenant.name.toLowerCase() === "entur") {
         throw new TRPCError({ code: "BAD_REQUEST", message: "O tenant 'Entur' é o tenant raiz e não pode ser excluído." });
       }
-      const result = await deleteTenantCompletely(input.tenantId);
+      const result = await deleteTenantCompletely(getTenantId(ctx));
       if (!result.success) {
-        console.error(`[SuperAdmin] Tenant ${input.tenantId} deletion had errors:`, result.errors);
+        console.error(`[SuperAdmin] Tenant ${getTenantId(ctx)} deletion had errors:`, result.errors);
       }
       return result;
     }),
@@ -369,7 +369,7 @@ export const saasAuthRouter = router({
       const { eq } = await import("drizzle-orm");
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      await db.update(tenants).set({ status: input.status }).where(eq(tenants.id, input.tenantId));
+      await db.update(tenants).set({ status: input.status }).where(eq(tenants.id, getTenantId(ctx)));
       return { success: true };
     }),
 });

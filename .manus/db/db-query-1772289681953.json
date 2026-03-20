@@ -1,0 +1,55 @@
+{
+  "query": "SELECT DISTINCT action FROM deal_history WHERE tenantId = 1;\nSELECT * FROM deal_history WHERE tenantId = 1 ORDER BY createdAt DESC LIMIT 5;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute SELECT DISTINCT action FROM deal_history WHERE tenantId = 1;\nSELECT * FROM deal_history WHERE tenantId = 1 ORDER BY createdAt DESC LIMIT 5;",
+  "rows": [
+    {
+      "action": "field_changed"
+    },
+    {
+      "action": "status_changed"
+    },
+    {
+      "action": "stage_moved"
+    },
+    {
+      "action": "automation_triggered"
+    },
+    {
+      "action": "automation_created"
+    },
+    {
+      "action": "deleted"
+    },
+    {
+      "action": "created"
+    },
+    {
+      "action": "whatsapp_backup"
+    },
+    {
+      "action": "product_added"
+    },
+    {
+      "action": "id\ttenantId\tdealId\taction\tdescription\tfromStageId\ttoStageId\tfromStageName\ttoStageName\tfieldChanged\toldValue\tnewValue\tactorUserId\tactorName\tmetadataJson\tcreatedAt"
+    },
+    {
+      "action": "240062\t1\t150006\tproduct_added\tProduto \"Consultoria de Viagens personalizada\" adicionado ao orçamento (1200.00)\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\t1\tBruno Barbosa\tNULL\t2026-02-28 14:40:19"
+    },
+    {
+      "action": "240061\t1\t150006\tstage_moved\tMovido de \"Novo Lead\" para \"Primeiro contato\"\t1\t2\tNovo Lead\tPrimeiro contato\tNULL\tNULL\tNULL\t1\tBruno Barbosa\tNULL\t2026-02-28 14:39:46"
+    },
+    {
+      "action": "240059\t1\t60003\twhatsapp_backup\tBackup de conversa WhatsApp — 27/02/2026 — 3 mensagens (2 enviadas, 1 recebidas)\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tSistema (Backup Automático)\t{\"contactName\": \"Bruno Dias\", \"contactPhone\": \"+5521967300697\", \"conversation\": \"── 27/02/2026 ──\\n[09:38] Bruno Dias: Bom dia mestre, confirmado hoje ou ainda está viajando? abs\\n[09:38] Bruno Barbosa: bom dia, confirmado\\n[12:00] Bruno Barbosa: Opa\", \"date\": \"27/02/2026\", \"receivedMessages\": 1, \"sentMessages\": 2, \"sessionId\": \"Entur\", \"totalMessages\": 3}\t2026-02-28 14:11:16"
+    },
+    {
+      "action": "240057\t1\t90026\twhatsapp_backup\tBackup de conversa WhatsApp — 27/02/2026 — 9 mensagens (9 enviadas, 0 recebidas)\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tSistema (Backup Automático)\t{\"contactName\": \"Bruno Barbosa\", \"contactPhone\": \"+558499838420\", \"conversation\": \"── 27/02/2026 ──\\n[09:40] Bruno Barbosa: teste\\n[11:13] Bruno Barbosa: [listMessage]\\n[11:30] Bruno Barbosa: oi\\n[11:30] Bruno Barbosa: ola\\n[11:44] Bruno Barbosa: oi\\n[11:48] Bruno Barbosa: teste\\n[17:04] Bruno Barbosa: oi\\n[17:04] Bruno Barbosa: conversar aqui\\n[17:10] Bruno Barbosa: Agora esta funcionando corretamente\", \"date\": \"27/02/2026\", \"receivedMessages\": 0, \"sentMessages\": 9, \"sessionId\": \"Entur\", \"totalMessages\": 9}\t2026-02-28 14:11:16"
+    },
+    {
+      "action": "240058\t1\t60002\twhatsapp_backup\tBackup de conversa WhatsApp — 27/02/2026 — 25 mensagens (23 enviadas, 2 recebidas)\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tSistema (Backup Automático)\t{\"contactName\": \"Grace Moura\", \"contactPhone\": \"84996051655\", \"conversation\": \"── 27/02/2026 ──\\n[09:16] Bruno Barbosa: isso deve dar dinheiro\\n[09:17] Bruno Barbosa: percebi que comprou o sabonete de lavar o rosto\\\\\\n[09:17] Bruno Barbosa: que você disse que compraria quando recebesse seus proventos\\n[09:17] Bruno Barbosa: 🤑🫰\\n[09:23] Bruno Barbosa: só seu carinho ja esta bom\\n[09:23] Bruno Barbosa: é brincadeira\\n[09:23] Bruno Barbosa: só para dizer que vi os sinais da sua riqueza\\n[09:41] Bruno Barbosa: oi\\n[10:43] Bruno Barbosa: teste\\n[10:55] Bruno Barbosa: teste\\n[10:57] Grace Moura: Muito estranho vc não querer mais o tênis rsr\\n[11:02] Bruno Barbosa: oxe\\n[11:02] Bruno Barbosa: quero\\n[11:07] Bruno Barbosa: vou escolher\\n[11:07] Bruno Barbosa: Adidas Adizero Evo SL\\n[11:07] Bruno Barbosa: mais barato que o ultimo\\n[11:11] Bruno Barbosa: oi\\n[11:25] Bruno Barbosa: oi\\n[11:28] Bruno Barbosa: teste\\n[11:28] Bruno Barbosa: teste\\n[11:43] Bruno Barbosa: oi\\n[11:43] Bruno Barbosa: teste\\n[12:37] Grace Moura: Caí pra trás e não me levantei ainda\\n[13:45] Bruno Barbosa: [Imagem]\\n[13:46] Bruno Barbosa: [Imagem]\", \"date\": \"27/02/2026\", \"receivedMessages\": 2, \"sentMessages\": 23, \"sessionId\": \"Entur\", \"totalMessages\": 25}\t2026-02-28 14:11:16"
+    }
+  ],
+  "messages": [],
+  "stdout": "action\nfield_changed\nstatus_changed\nstage_moved\nautomation_triggered\nautomation_created\ndeleted\ncreated\nwhatsapp_backup\nproduct_added\nid\ttenantId\tdealId\taction\tdescription\tfromStageId\ttoStageId\tfromStageName\ttoStageName\tfieldChanged\toldValue\tnewValue\tactorUserId\tactorName\tmetadataJson\tcreatedAt\n240062\t1\t150006\tproduct_added\tProduto \"Consultoria de Viagens personalizada\" adicionado ao orçamento (1200.00)\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\t1\tBruno Barbosa\tNULL\t2026-02-28 14:40:19\n240061\t1\t150006\tstage_moved\tMovido de \"Novo Lead\" para \"Primeiro contato\"\t1\t2\tNovo Lead\tPrimeiro contato\tNULL\tNULL\tNULL\t1\tBruno Barbosa\tNULL\t2026-02-28 14:39:46\n240059\t1\t60003\twhatsapp_backup\tBackup de conversa WhatsApp — 27/02/2026 — 3 mensagens (2 enviadas, 1 recebidas)\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tSistema (Backup Automático)\t{\"contactName\": \"Bruno Dias\", \"contactPhone\": \"+5521967300697\", \"conversation\": \"── 27/02/2026 ──\\n[09:38] Bruno Dias: Bom dia mestre, confirmado hoje ou ainda está viajando? abs\\n[09:38] Bruno Barbosa: bom dia, confirmado\\n[12:00] Bruno Barbosa: Opa\", \"date\": \"27/02/2026\", \"receivedMessages\": 1, \"sentMessages\": 2, \"sessionId\": \"Entur\", \"totalMessages\": 3}\t2026-02-28 14:11:16\n240057\t1\t90026\twhatsapp_backup\tBackup de conversa WhatsApp — 27/02/2026 — 9 mensagens (9 enviadas, 0 recebidas)\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tSistema (Backup Automático)\t{\"contactName\": \"Bruno Barbosa\", \"contactPhone\": \"+558499838420\", \"conversation\": \"── 27/02/2026 ──\\n[09:40] Bruno Barbosa: teste\\n[11:13] Bruno Barbosa: [listMessage]\\n[11:30] Bruno Barbosa: oi\\n[11:30] Bruno Barbosa: ola\\n[11:44] Bruno Barbosa: oi\\n[11:48] Bruno Barbosa: teste\\n[17:04] Bruno Barbosa: oi\\n[17:04] Bruno Barbosa: conversar aqui\\n[17:10] Bruno Barbosa: Agora esta funcionando corretamente\", \"date\": \"27/02/2026\", \"receivedMessages\": 0, \"sentMessages\": 9, \"sessionId\": \"Entur\", \"totalMessages\": 9}\t2026-02-28 14:11:16\n240058\t1\t60002\twhatsapp_backup\tBackup de conversa WhatsApp — 27/02/2026 — 25 mensagens (23 enviadas, 2 recebidas)\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tSistema (Backup Automático)\t{\"contactName\": \"Grace Moura\", \"contactPhone\": \"84996051655\", \"conversation\": \"── 27/02/2026 ──\\n[09:16] Bruno Barbosa: isso deve dar dinheiro\\n[09:17] Bruno Barbosa: percebi que comprou o sabonete de lavar o rosto\\\\\\n[09:17] Bruno Barbosa: que você disse que compraria quando recebesse seus proventos\\n[09:17] Bruno Barbosa: 🤑🫰\\n[09:23] Bruno Barbosa: só seu carinho ja esta bom\\n[09:23] Bruno Barbosa: é brincadeira\\n[09:23] Bruno Barbosa: só para dizer que vi os sinais da sua riqueza\\n[09:41] Bruno Barbosa: oi\\n[10:43] Bruno Barbosa: teste\\n[10:55] Bruno Barbosa: teste\\n[10:57] Grace Moura: Muito estranho vc não querer mais o tênis rsr\\n[11:02] Bruno Barbosa: oxe\\n[11:02] Bruno Barbosa: quero\\n[11:07] Bruno Barbosa: vou escolher\\n[11:07] Bruno Barbosa: Adidas Adizero Evo SL\\n[11:07] Bruno Barbosa: mais barato que o ultimo\\n[11:11] Bruno Barbosa: oi\\n[11:25] Bruno Barbosa: oi\\n[11:28] Bruno Barbosa: teste\\n[11:28] Bruno Barbosa: teste\\n[11:43] Bruno Barbosa: oi\\n[11:43] Bruno Barbosa: teste\\n[12:37] Grace Moura: Caí pra trás e não me levantei ainda\\n[13:45] Bruno Barbosa: [Imagem]\\n[13:46] Bruno Barbosa: [Imagem]\", \"date\": \"27/02/2026\", \"receivedMessages\": 2, \"sentMessages\": 23, \"sessionId\": \"Entur\", \"totalMessages\": 25}\t2026-02-28 14:11:16\n",
+  "stderr": "",
+  "execution_time_ms": 401
+}

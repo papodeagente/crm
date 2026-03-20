@@ -1,0 +1,1 @@
+ALTER TABLE `messages` ADD CONSTRAINT `idx_unique_msgid_session` UNIQUE(`messageId`,`sessionId`);

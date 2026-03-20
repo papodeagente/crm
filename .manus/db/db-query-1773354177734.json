@@ -1,0 +1,9 @@
+{
+  "query": "\n-- Remove remaining duplicates (keep the one with the lowest id to preserve references)\nDELETE wc1 FROM wa_conversations wc1\nINNER JOIN wa_conversations wc2\nON wc1.remoteJid = wc2.remoteJid \nAND wc1.sessionId = wc2.sessionId\nAND wc1.tenantId = wc2.tenantId\nAND wc1.id > wc2.id;\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute \n-- Remove remaining duplicates (keep the one with the lowest id to preserve references)\nDELETE wc1 FROM wa_conversations wc1\nINNER JOIN wa_conversations wc2\nON wc1.remoteJid = wc2.remoteJid \nAND wc1.sessionId = wc2.sessionId\nAND wc1.tenantId = wc2.tenantId\nAND wc1.id > wc2.id;\n",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 75
+}

@@ -47,7 +47,7 @@ export default function Contacts() {
   const deletedContacts = trpc.crm.contacts.listDeleted.useQuery({ limit: 100 }, { enabled: showTrash });
 
   // Custom fields for contacts
-  const contactCustomFields = trpc.customFields.list.useQuery({ entity: "contact" as const }, { staleTime: 5 * 60 * 1000 });
+  const contactCustomFields = trpc.customFields.list.useQuery({ entity: "contact" as const });
   const visibleFormFields = useMemo(() => (contactCustomFields.data || []).filter((f: any) => f.isVisibleOnForm), [contactCustomFields.data]);
   const setFieldValues = trpc.contactProfile.setCustomFieldValues.useMutation();
 

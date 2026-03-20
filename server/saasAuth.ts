@@ -154,36 +154,21 @@ export async function loginWithEmail(email: string, password: string) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
-  // Find ALL users with this email (may exist in multiple tenants)
-  const allUsers = await db.select().from(crmUsers).where(eq(crmUsers.email, email));
-  if (allUsers.length === 0) {
+  // Find user by email
+  const users = await db.select().from(crmUsers).where(eq(crmUsers.email, email)).limit(1);
+  if (users.length === 0) {
     throw new Error("INVALID_CREDENTIALS");
   }
 
-  // Try to find a matching user: prioritize active users with passwordHash
-  // Sort: active first, then invited, then inactive
-  const sortedUsers = allUsers
-    .filter(u => u.passwordHash) // only users with password set
-    .sort((a, b) => {
-      const statusOrder: Record<string, number> = { active: 0, invited: 1, inactive: 2 };
-      return (statusOrder[a.status] ?? 9) - (statusOrder[b.status] ?? 9);
-    });
+  const user = users[0];
 
-  if (sortedUsers.length === 0) {
+  if (!user.passwordHash) {
     throw new Error("INVALID_CREDENTIALS");
   }
 
-  // Verify password against each candidate (usually just 1-2)
-  let user = null;
-  for (const candidate of sortedUsers) {
-    const valid = await verifyPassword(password, candidate.passwordHash!);
-    if (valid) {
-      user = candidate;
-      break;
-    }
-  }
-
-  if (!user) {
+  // Verify password
+  const valid = await verifyPassword(password, user.passwordHash);
+  if (!valid) {
     throw new Error("INVALID_CREDENTIALS");
   }
 
@@ -431,24 +416,27 @@ const RESET_TOKEN_EXPIRY_MINUTES = 60;
 export async function requestPasswordReset(email: string, origin: string) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  // Find ALL users with this email (may exist in multiple tenants)
-  // Generate a single reset token for the primary (active) account
-  const allUsers = await db.select().from(crmUsers).where(eq(crmUsers.email, email));
-  if (allUsers.length === 0) {
+
+  // Find user by email
+  const users = await db.select().from(crmUsers).where(eq(crmUsers.email, email)).limit(1);
+  if (users.length === 0) {
     // Don't reveal if email exists
     return;
   }
-  // Prioritize active user; fall back to first found
-  const user = allUsers.find(u => u.status === "active" && u.passwordHash) || allUsers[0];
+
+  const user = users[0];
+
   // Generate token
   const token = randomBytes(32).toString("hex");
   const expiresAt = new Date(Date.now() + RESET_TOKEN_EXPIRY_MINUTES * 60 * 1000);
+
   // Save token
   await db.insert(passwordResetTokens).values({
     userId: user.id,
     token,
     expiresAt,
   });
+
   // Send email
   const resetUrl = `${origin}/reset-password?token=${token}`;
   await sendPasswordResetEmail({

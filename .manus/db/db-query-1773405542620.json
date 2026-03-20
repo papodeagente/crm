@@ -1,0 +1,35 @@
+{
+  "query": "SELECT id, name, LEFT(CAST(settingsJson AS CHAR), 100) as settings_preview FROM tenants ORDER BY id LIMIT 5",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute SELECT id, name, LEFT(CAST(settingsJson AS CHAR), 100) as settings_preview FROM tenants ORDER BY id LIMIT 5",
+  "rows": [
+    {
+      "id": "150002",
+      "name": "Entur",
+      "settings_preview": "NULL"
+    },
+    {
+      "id": "210002",
+      "name": "Boxtour",
+      "settings_preview": "NULL"
+    },
+    {
+      "id": "240002",
+      "name": "Viaje Com Ludi",
+      "settings_preview": "NULL"
+    },
+    {
+      "id": "240003",
+      "name": "Cais 3800 Travel",
+      "settings_preview": "NULL"
+    },
+    {
+      "id": "240004",
+      "name": "Misp viagens",
+      "settings_preview": "NULL"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tname\tsettings_preview\n150002\tEntur\tNULL\n210002\tBoxtour\tNULL\n240002\tViaje Com Ludi\tNULL\n240003\tCais 3800 Travel\tNULL\n240004\tMisp viagens\tNULL\n",
+  "stderr": "",
+  "execution_time_ms": 65
+}

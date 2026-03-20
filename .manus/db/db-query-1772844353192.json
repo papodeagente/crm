@@ -1,0 +1,9 @@
+{
+  "query": "CREATE TABLE `password_reset_tokens` (\n\t`id` int AUTO_INCREMENT NOT NULL,\n\t`userId` int NOT NULL,\n\t`token` varchar(128) NOT NULL,\n\t`expiresAt` timestamp NOT NULL,\n\t`usedAt` timestamp,\n\t`createdAt` timestamp NOT NULL DEFAULT (now()),\n\tCONSTRAINT `password_reset_tokens_id` PRIMARY KEY(`id`)\n);\nCREATE INDEX `prt_token_idx` ON `password_reset_tokens` (`token`);\nCREATE INDEX `prt_user_idx` ON `password_reset_tokens` (`userId`);",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute CREATE TABLE `password_reset_tokens` (\n\t`id` int AUTO_INCREMENT NOT NULL,\n\t`userId` int NOT NULL,\n\t`token` varchar(128) NOT NULL,\n\t`expiresAt` timestamp NOT NULL,\n\t`usedAt` timestamp,\n\t`createdAt` timestamp NOT NULL DEFAULT (now()),\n\tCONSTRAINT `password_reset_tokens_id` PRIMARY KEY(`id`)\n);\nCREATE INDEX `prt_token_idx` ON `password_reset_tokens` (`token`);\nCREATE INDEX `prt_user_idx` ON `password_reset_tokens` (`userId`);",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 1538
+}

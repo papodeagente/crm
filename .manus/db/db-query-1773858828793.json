@@ -1,0 +1,9 @@
+{
+  "query": "\nUPDATE messages \nSET audio_transcription_status = NULL, audio_transcription = NULL\nWHERE audio_transcription_status = 'failed';\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute \nUPDATE messages \nSET audio_transcription_status = NULL, audio_transcription = NULL\nWHERE audio_transcription_status = 'failed';\n",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 92
+}

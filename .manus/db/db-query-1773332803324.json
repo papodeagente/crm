@@ -1,0 +1,15 @@
+{
+  "query": "SELECT COUNT(*) as total, SUM(CASE WHEN contactPushName IS NOT NULL AND contactPushName != '' AND contactPushName NOT REGEXP '^[0-9]+$' THEN 1 ELSE 0 END) as with_real_name, SUM(CASE WHEN contactPushName IS NULL OR contactPushName = '' OR contactPushName REGEXP '^[0-9]+$' THEN 1 ELSE 0 END) as without_name FROM wa_conversations WHERE sessionId = 'crm-210002-240001'",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute SELECT COUNT(*) as total, SUM(CASE WHEN contactPushName IS NOT NULL AND contactPushName != '' AND contactPushName NOT REGEXP '^[0-9]+$' THEN 1 ELSE 0 END) as with_real_name, SUM(CASE WHEN contactPushName IS NULL OR contactPushName = '' OR contactPushName REGEXP '^[0-9]+$' THEN 1 ELSE 0 END) as without_name FROM wa_conversations WHERE sessionId = 'crm-210002-240001'",
+  "rows": [
+    {
+      "total": "561",
+      "with_real_name": "163",
+      "without_name": "398"
+    }
+  ],
+  "messages": [],
+  "stdout": "total\twith_real_name\twithout_name\n561\t163\t398\n",
+  "stderr": "",
+  "execution_time_ms": 469
+}

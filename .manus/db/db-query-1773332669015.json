@@ -1,0 +1,9 @@
+{
+  "query": "SELECT sessionId, jid, COUNT(*) as cnt FROM wa_contacts GROUP BY sessionId, jid HAVING cnt > 1 LIMIT 5",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute SELECT sessionId, jid, COUNT(*) as cnt FROM wa_contacts GROUP BY sessionId, jid HAVING cnt > 1 LIMIT 5",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 359
+}

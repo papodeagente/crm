@@ -1,0 +1,18 @@
+{
+  "query": "SELECT sessionId, userId, tenantId, status, phoneNumber, pushName FROM whatsapp_sessions WHERE userId = 240001",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute SELECT sessionId, userId, tenantId, status, phoneNumber, pushName FROM whatsapp_sessions WHERE userId = 240001",
+  "rows": [
+    {
+      "sessionId": "crm-210002-240001",
+      "userId": "240001",
+      "tenantId": "210002",
+      "status": "connected",
+      "phoneNumber": "NULL",
+      "pushName": "NULL"
+    }
+  ],
+  "messages": [],
+  "stdout": "sessionId\tuserId\ttenantId\tstatus\tphoneNumber\tpushName\ncrm-210002-240001\t240001\t210002\tconnected\tNULL\tNULL\n",
+  "stderr": "",
+  "execution_time_ms": 393
+}

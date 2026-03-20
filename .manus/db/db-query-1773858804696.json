@@ -1,0 +1,370 @@
+{
+  "query": "SELECT c.id, c.remoteJid, c.lastMessageType, c.lastMessagePreview, \n  (SELECT COUNT(*) FROM messages m WHERE m.waConversationId = c.id) as msg_count,\n  (SELECT COUNT(*) FROM messages m WHERE m.waConversationId = c.id AND m.messageType NOT IN ('protocolMessage', 'reactionMessage')) as real_msg_count\nFROM wa_conversations c \nWHERE c.lastMessageType IN ('protocolMessage', 'reactionMessage')\nORDER BY c.id DESC;\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute SELECT c.id, c.remoteJid, c.lastMessageType, c.lastMessagePreview, \n  (SELECT COUNT(*) FROM messages m WHERE m.waConversationId = c.id) as msg_count,\n  (SELECT COUNT(*) FROM messages m WHERE m.waConversationId = c.id AND m.messageType NOT IN ('protocolMessage', 'reactionMessage')) as real_msg_count\nFROM wa_conversations c \nWHERE c.lastMessageType IN ('protocolMessage', 'reactionMessage')\nORDER BY c.id DESC;\n",
+  "rows": [
+    {
+      "id": "360424",
+      "remoteJid": "5512981383346@s.whatsapp.net",
+      "lastMessageType": "protocolMessage",
+      "lastMessagePreview": "NULL",
+      "msg_count": "0",
+      "real_msg_count": "0"
+    },
+    {
+      "id": "360382",
+      "remoteJid": "5519971163279@s.whatsapp.net",
+      "lastMessageType": "protocolMessage",
+      "lastMessagePreview": "NULL",
+      "msg_count": "0",
+      "real_msg_count": "0"
+    },
+    {
+      "id": "360313",
+      "remoteJid": "5511956970396@s.whatsapp.net",
+      "lastMessageType": "protocolMessage",
+      "lastMessagePreview": "NULL",
+      "msg_count": "0",
+      "real_msg_count": "0"
+    },
+    {
+      "id": "331605",
+      "remoteJid": "558494747938@s.whatsapp.net",
+      "lastMessageType": "protocolMessage",
+      "lastMessagePreview": "NULL",
+      "msg_count": "1",
+      "real_msg_count": "0"
+    },
+    {
+      "id": "331601",
+      "remoteJid": "558481519942@s.whatsapp.net",
+      "lastMessageType": "protocolMessage",
+      "lastMessagePreview": "NULL",
+      "msg_count": "1",
+      "real_msg_count": "0"
+    },
+    {
+      "id": "331582",
+      "remoteJid": "558296954665@s.whatsapp.net",
+      "lastMessageType": "protocolMessage",
+      "lastMessagePreview": "NULL",
+      "msg_count": "1",
+      "real_msg_count": "0"
+    },
+    {
+      "id": "331534",
+      "remoteJid": "5511912428775@s.whatsapp.net",
+      "lastMessageType": "protocolMessage",
+      "lastMessagePreview": "NULL",
+      "msg_count": "1",
+      "real_msg_count": "0"
+    },
+    {
+      "id": "331428",
+      "remoteJid": "5511999893727@s.whatsapp.net",
+      "lastMessageType": "protocolMessage",
+      "lastMessagePreview": "NULL",
+      "msg_count": "1",
+      "real_msg_count": "0"
+    },
+    {
+      "id": "331300",
+      "remoteJid": "64211930102@s.whatsapp.net",
+      "lastMessageType": "reactionMessage",
+      "lastMessagePreview": "[Reação] 🙏🏻",
+      "msg_count": "1",
+      "real_msg_count": "0"
+    },
+    {
+      "id": "331247",
+      "remoteJid": "5511957879273@s.whatsapp.net",
+      "lastMessageType": "protocolMessage",
+      "lastMessagePreview": "NULL",
+      "msg_count": "1",
+      "real_msg_count": "0"
+    },
+    {
+      "id": "331229",
+      "remoteJid": "5511961621149@s.whatsapp.net",
+      "lastMessageType": "protocolMessage",
+      "lastMessagePreview": "NULL",
+      "msg_count": "1",
+      "real_msg_count": "0"
+    },
+    {
+      "id": "331113",
+      "remoteJid": "5511957879273@s.whatsapp.net",
+      "lastMessageType": "protocolMessage",
+      "lastMessagePreview": "NULL",
+      "msg_count": "1",
+      "real_msg_count": "0"
+    },
+    {
+      "id": "331094",
+      "remoteJid": "5511961621149@s.whatsapp.net",
+      "lastMessageType": "protocolMessage",
+      "lastMessagePreview": "NULL",
+      "msg_count": "1",
+      "real_msg_count": "0"
+    },
+    {
+      "id": "330984",
+      "remoteJid": "5511974183982@s.whatsapp.net",
+      "lastMessageType": "protocolMessage",
+      "lastMessagePreview": "NULL",
+      "msg_count": "0",
+      "real_msg_count": "0"
+    },
+    {
+      "id": "330977",
+      "remoteJid": "5511957879273@s.whatsapp.net",
+      "lastMessageType": "protocolMessage",
+      "lastMessagePreview": "NULL",
+      "msg_count": "0",
+      "real_msg_count": "0"
+    },
+    {
+      "id": "330959",
+      "remoteJid": "5511961621149@s.whatsapp.net",
+      "lastMessageType": "protocolMessage",
+      "lastMessagePreview": "NULL",
+      "msg_count": "0",
+      "real_msg_count": "0"
+    },
+    {
+      "id": "330887",
+      "remoteJid": "33614649040@s.whatsapp.net",
+      "lastMessageType": "protocolMessage",
+      "lastMessagePreview": "NULL",
+      "msg_count": "0",
+      "real_msg_count": "0"
+    },
+    {
+      "id": "330727",
+      "remoteJid": "5511992353609@s.whatsapp.net",
+      "lastMessageType": "protocolMessage",
+      "lastMessagePreview": "NULL",
+      "msg_count": "1",
+      "real_msg_count": "0"
+    },
+    {
+      "id": "330467",
+      "remoteJid": "556599481220@s.whatsapp.net",
+      "lastMessageType": "protocolMessage",
+      "lastMessagePreview": "NULL",
+      "msg_count": "2",
+      "real_msg_count": "1"
+    },
+    {
+      "id": "330097",
+      "remoteJid": "558596365026@s.whatsapp.net",
+      "lastMessageType": "protocolMessage",
+      "lastMessagePreview": "NULL",
+      "msg_count": "1",
+      "real_msg_count": "0"
+    },
+    {
+      "id": "330051",
+      "remoteJid": "557193822835@s.whatsapp.net",
+      "lastMessageType": "protocolMessage",
+      "lastMessagePreview": "NULL",
+      "msg_count": "1",
+      "real_msg_count": "0"
+    },
+    {
+      "id": "302226",
+      "remoteJid": "64211873916@s.whatsapp.net",
+      "lastMessageType": "reactionMessage",
+      "lastMessagePreview": "NULL",
+      "msg_count": "37",
+      "real_msg_count": "35"
+    },
+    {
+      "id": "302087",
+      "remoteJid": "61434396721@s.whatsapp.net",
+      "lastMessageType": "protocolMessage",
+      "lastMessagePreview": "NULL",
+      "msg_count": "86",
+      "real_msg_count": "84"
+    },
+    {
+      "id": "302081",
+      "remoteJid": "61404186261@s.whatsapp.net",
+      "lastMessageType": "protocolMessage",
+      "lastMessagePreview": "NULL",
+      "msg_count": "121",
+      "real_msg_count": "120"
+    },
+    {
+      "id": "302070",
+      "remoteJid": "555181820436@s.whatsapp.net",
+      "lastMessageType": "protocolMessage",
+      "lastMessagePreview": "NULL",
+      "msg_count": "59",
+      "real_msg_count": "58"
+    },
+    {
+      "id": "302024",
+      "remoteJid": "5512982021387@s.whatsapp.net",
+      "lastMessageType": "reactionMessage",
+      "lastMessagePreview": "NULL",
+      "msg_count": "64",
+      "real_msg_count": "63"
+    },
+    {
+      "id": "301994",
+      "remoteJid": "556295545694@s.whatsapp.net",
+      "lastMessageType": "protocolMessage",
+      "lastMessagePreview": "NULL",
+      "msg_count": "96",
+      "real_msg_count": "93"
+    },
+    {
+      "id": "301987",
+      "remoteJid": "5521975102777@s.whatsapp.net",
+      "lastMessageType": "reactionMessage",
+      "lastMessagePreview": "NULL",
+      "msg_count": "59",
+      "real_msg_count": "57"
+    },
+    {
+      "id": "301349",
+      "remoteJid": "558494747938@s.whatsapp.net",
+      "lastMessageType": "protocolMessage",
+      "lastMessagePreview": "NULL",
+      "msg_count": "1",
+      "real_msg_count": "0"
+    },
+    {
+      "id": "301345",
+      "remoteJid": "558481519942@s.whatsapp.net",
+      "lastMessageType": "protocolMessage",
+      "lastMessagePreview": "NULL",
+      "msg_count": "1",
+      "real_msg_count": "0"
+    },
+    {
+      "id": "301326",
+      "remoteJid": "558296954665@s.whatsapp.net",
+      "lastMessageType": "protocolMessage",
+      "lastMessagePreview": "NULL",
+      "msg_count": "1",
+      "real_msg_count": "0"
+    },
+    {
+      "id": "301278",
+      "remoteJid": "5511912428775@s.whatsapp.net",
+      "lastMessageType": "protocolMessage",
+      "lastMessagePreview": "NULL",
+      "msg_count": "1",
+      "real_msg_count": "0"
+    },
+    {
+      "id": "301172",
+      "remoteJid": "5511999893727@s.whatsapp.net",
+      "lastMessageType": "protocolMessage",
+      "lastMessagePreview": "NULL",
+      "msg_count": "1",
+      "real_msg_count": "0"
+    },
+    {
+      "id": "300805",
+      "remoteJid": "5511992353609@s.whatsapp.net",
+      "lastMessageType": "protocolMessage",
+      "lastMessagePreview": "NULL",
+      "msg_count": "1",
+      "real_msg_count": "0"
+    },
+    {
+      "id": "300572",
+      "remoteJid": "556392315447@s.whatsapp.net",
+      "lastMessageType": "protocolMessage",
+      "lastMessagePreview": "NULL",
+      "msg_count": "1",
+      "real_msg_count": "0"
+    },
+    {
+      "id": "300526",
+      "remoteJid": "559182685902@s.whatsapp.net",
+      "lastMessageType": "protocolMessage",
+      "lastMessagePreview": "NULL",
+      "msg_count": "1",
+      "real_msg_count": "0"
+    },
+    {
+      "id": "300408",
+      "remoteJid": "554199122441@s.whatsapp.net",
+      "lastMessageType": "protocolMessage",
+      "lastMessagePreview": "NULL",
+      "msg_count": "1",
+      "real_msg_count": "0"
+    },
+    {
+      "id": "300407",
+      "remoteJid": "554196828381@s.whatsapp.net",
+      "lastMessageType": "protocolMessage",
+      "lastMessagePreview": "NULL",
+      "msg_count": "1",
+      "real_msg_count": "0"
+    },
+    {
+      "id": "300368",
+      "remoteJid": "5511970676796@s.whatsapp.net",
+      "lastMessageType": "protocolMessage",
+      "lastMessagePreview": "NULL",
+      "msg_count": "1",
+      "real_msg_count": "0"
+    },
+    {
+      "id": "300333",
+      "remoteJid": "554197974511@s.whatsapp.net",
+      "lastMessageType": "protocolMessage",
+      "lastMessagePreview": "NULL",
+      "msg_count": "1",
+      "real_msg_count": "0"
+    },
+    {
+      "id": "300298",
+      "remoteJid": "5519999054966@s.whatsapp.net",
+      "lastMessageType": "protocolMessage",
+      "lastMessagePreview": "NULL",
+      "msg_count": "1",
+      "real_msg_count": "0"
+    },
+    {
+      "id": "300281",
+      "remoteJid": "553188280228@s.whatsapp.net",
+      "lastMessageType": "protocolMessage",
+      "lastMessagePreview": "NULL",
+      "msg_count": "1",
+      "real_msg_count": "0"
+    },
+    {
+      "id": "300184",
+      "remoteJid": "553172109541@s.whatsapp.net",
+      "lastMessageType": "protocolMessage",
+      "lastMessagePreview": "NULL",
+      "msg_count": "1",
+      "real_msg_count": "0"
+    },
+    {
+      "id": "300136",
+      "remoteJid": "13135550002@s.whatsapp.net",
+      "lastMessageType": "protocolMessage",
+      "lastMessagePreview": "NULL",
+      "msg_count": "1",
+      "real_msg_count": "0"
+    },
+    {
+      "id": "300102",
+      "remoteJid": "558498363069@s.whatsapp.net",
+      "lastMessageType": "protocolMessage",
+      "lastMessagePreview": "NULL",
+      "msg_count": "21",
+      "real_msg_count": "20"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tremoteJid\tlastMessageType\tlastMessagePreview\tmsg_count\treal_msg_count\n360424\t5512981383346@s.whatsapp.net\tprotocolMessage\tNULL\t0\t0\n360382\t5519971163279@s.whatsapp.net\tprotocolMessage\tNULL\t0\t0\n360313\t5511956970396@s.whatsapp.net\tprotocolMessage\tNULL\t0\t0\n331605\t558494747938@s.whatsapp.net\tprotocolMessage\tNULL\t1\t0\n331601\t558481519942@s.whatsapp.net\tprotocolMessage\tNULL\t1\t0\n331582\t558296954665@s.whatsapp.net\tprotocolMessage\tNULL\t1\t0\n331534\t5511912428775@s.whatsapp.net\tprotocolMessage\tNULL\t1\t0\n331428\t5511999893727@s.whatsapp.net\tprotocolMessage\tNULL\t1\t0\n331300\t64211930102@s.whatsapp.net\treactionMessage\t[Reação] 🙏🏻\t1\t0\n331247\t5511957879273@s.whatsapp.net\tprotocolMessage\tNULL\t1\t0\n331229\t5511961621149@s.whatsapp.net\tprotocolMessage\tNULL\t1\t0\n331113\t5511957879273@s.whatsapp.net\tprotocolMessage\tNULL\t1\t0\n331094\t5511961621149@s.whatsapp.net\tprotocolMessage\tNULL\t1\t0\n330984\t5511974183982@s.whatsapp.net\tprotocolMessage\tNULL\t0\t0\n330977\t5511957879273@s.whatsapp.net\tprotocolMessage\tNULL\t0\t0\n330959\t5511961621149@s.whatsapp.net\tprotocolMessage\tNULL\t0\t0\n330887\t33614649040@s.whatsapp.net\tprotocolMessage\tNULL\t0\t0\n330727\t5511992353609@s.whatsapp.net\tprotocolMessage\tNULL\t1\t0\n330467\t556599481220@s.whatsapp.net\tprotocolMessage\tNULL\t2\t1\n330097\t558596365026@s.whatsapp.net\tprotocolMessage\tNULL\t1\t0\n330051\t557193822835@s.whatsapp.net\tprotocolMessage\tNULL\t1\t0\n302226\t64211873916@s.whatsapp.net\treactionMessage\tNULL\t37\t35\n302087\t61434396721@s.whatsapp.net\tprotocolMessage\tNULL\t86\t84\n302081\t61404186261@s.whatsapp.net\tprotocolMessage\tNULL\t121\t120\n302070\t555181820436@s.whatsapp.net\tprotocolMessage\tNULL\t59\t58\n302024\t5512982021387@s.whatsapp.net\treactionMessage\tNULL\t64\t63\n301994\t556295545694@s.whatsapp.net\tprotocolMessage\tNULL\t96\t93\n301987\t5521975102777@s.whatsapp.net\treactionMessage\tNULL\t59\t57\n301349\t558494747938@s.whatsapp.net\tprotocolMessage\tNULL\t1\t0\n301345\t558481519942@s.whatsapp.net\tprotocolMessage\tNULL\t1\t0\n301326\t558296954665@s.whatsapp.net\tprotocolMessage\tNULL\t1\t0\n301278\t5511912428775@s.whatsapp.net\tprotocolMessage\tNULL\t1\t0\n301172\t5511999893727@s.whatsapp.net\tprotocolMessage\tNULL\t1\t0\n300805\t5511992353609@s.whatsapp.net\tprotocolMessage\tNULL\t1\t0\n300572\t556392315447@s.whatsapp.net\tprotocolMessage\tNULL\t1\t0\n300526\t559182685902@s.whatsapp.net\tprotocolMessage\tNULL\t1\t0\n300408\t554199122441@s.whatsapp.net\tprotocolMessage\tNULL\t1\t0\n300407\t554196828381@s.whatsapp.net\tprotocolMessage\tNULL\t1\t0\n300368\t5511970676796@s.whatsapp.net\tprotocolMessage\tNULL\t1\t0\n300333\t554197974511@s.whatsapp.net\tprotocolMessage\tNULL\t1\t0\n300298\t5519999054966@s.whatsapp.net\tprotocolMessage\tNULL\t1\t0\n300281\t553188280228@s.whatsapp.net\tprotocolMessage\tNULL\t1\t0\n300184\t553172109541@s.whatsapp.net\tprotocolMessage\tNULL\t1\t0\n300136\t13135550002@s.whatsapp.net\tprotocolMessage\tNULL\t1\t0\n300102\t558498363069@s.whatsapp.net\tprotocolMessage\tNULL\t21\t20\n",
+  "stderr": "",
+  "execution_time_ms": 136
+}

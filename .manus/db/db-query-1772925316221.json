@@ -1,0 +1,17 @@
+{
+  "query": "SELECT id, name, slug, plan, status FROM tenants WHERE slug = 'entur'",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute SELECT id, name, slug, plan, status FROM tenants WHERE slug = 'entur'",
+  "rows": [
+    {
+      "id": "150002",
+      "name": "Entur",
+      "slug": "entur",
+      "plan": "enterprise",
+      "status": "active"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tname\tslug\tplan\tstatus\n150002\tEntur\tentur\tenterprise\tactive\n",
+  "stderr": "",
+  "execution_time_ms": 369
+}

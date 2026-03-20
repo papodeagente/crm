@@ -1,0 +1,388 @@
+{
+  "query": "SELECT id, title, contactId, status, channelOrigin, leadSource, createdAt \nFROM deals \nWHERE title LIKE '%Test Lead%' \n   OR title LIKE '%Idempotent Lead%' \n   OR title LIKE '%Meta Lead%' \n   OR title LIKE '%Notification Test%' \n   OR title LIKE '%No Dup Notif%'\n   OR title LIKE '%Meta Notif%'\n   OR title LIKE '%testlead%'\n   OR title LIKE '%idempotent%'\n   OR title LIKE '%metalead%'\n   OR title LIKE '%notiftest%'\n   OR title LIKE '%nodup%'\n   OR title LIKE '%metanotif%'\nORDER BY id DESC\nLIMIT 100;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute SELECT id, title, contactId, status, channelOrigin, leadSource, createdAt \nFROM deals \nWHERE title LIKE '%Test Lead%' \n   OR title LIKE '%Idempotent Lead%' \n   OR title LIKE '%Meta Lead%' \n   OR title LIKE '%Notification Test%' \n   OR title LIKE '%No Dup Notif%'\n   OR title LIKE '%Meta Notif%'\n   OR title LIKE '%testlead%'\n   OR title LIKE '%idempotent%'\n   OR title LIKE '%metalead%'\n   OR title LIKE '%notiftest%'\n   OR title LIKE '%nodup%'\n   OR title LIKE '%metanotif%'\nORDER BY id DESC\nLIMIT 100;",
+  "rows": [
+    {
+      "id": "90024",
+      "title": "No Dup Notif • landing",
+      "contactId": "60070",
+      "status": "open",
+      "channelOrigin": "landing",
+      "leadSource": "landing",
+      "createdAt": "2026-02-27 18:42:47"
+    },
+    {
+      "id": "90023",
+      "title": "Meta Notif Lead • meta_lead_ads",
+      "contactId": "60069",
+      "status": "open",
+      "channelOrigin": "meta_lead_ads",
+      "leadSource": "meta_lead_ads",
+      "createdAt": "2026-02-27 18:42:46"
+    },
+    {
+      "id": "90022",
+      "title": "Notification Test Lead • landing",
+      "contactId": "60068",
+      "status": "open",
+      "channelOrigin": "landing",
+      "leadSource": "landing",
+      "createdAt": "2026-02-27 18:42:46"
+    },
+    {
+      "id": "90021",
+      "title": "Meta Lead • meta_lead_ads",
+      "contactId": "60067",
+      "status": "open",
+      "channelOrigin": "meta_lead_ads",
+      "leadSource": "meta_lead_ads",
+      "createdAt": "2026-02-27 18:42:45"
+    },
+    {
+      "id": "90020",
+      "title": "Idempotent Lead • landing",
+      "contactId": "60066",
+      "status": "open",
+      "channelOrigin": "landing",
+      "leadSource": "landing",
+      "createdAt": "2026-02-27 18:42:45"
+    },
+    {
+      "id": "90019",
+      "title": "Test Lead • landing",
+      "contactId": "60065",
+      "status": "open",
+      "channelOrigin": "landing",
+      "leadSource": "landing",
+      "createdAt": "2026-02-27 18:42:44"
+    },
+    {
+      "id": "90018",
+      "title": "No Dup Notif • landing",
+      "contactId": "60070",
+      "status": "open",
+      "channelOrigin": "landing",
+      "leadSource": "landing",
+      "createdAt": "2026-02-27 18:34:42"
+    },
+    {
+      "id": "90017",
+      "title": "Meta Notif Lead • meta_lead_ads",
+      "contactId": "60069",
+      "status": "open",
+      "channelOrigin": "meta_lead_ads",
+      "leadSource": "meta_lead_ads",
+      "createdAt": "2026-02-27 18:34:42"
+    },
+    {
+      "id": "90016",
+      "title": "Notification Test Lead • landing",
+      "contactId": "60068",
+      "status": "open",
+      "channelOrigin": "landing",
+      "leadSource": "landing",
+      "createdAt": "2026-02-27 18:34:41"
+    },
+    {
+      "id": "90015",
+      "title": "Meta Lead • meta_lead_ads",
+      "contactId": "60067",
+      "status": "open",
+      "channelOrigin": "meta_lead_ads",
+      "leadSource": "meta_lead_ads",
+      "createdAt": "2026-02-27 18:34:41"
+    },
+    {
+      "id": "90014",
+      "title": "Idempotent Lead • landing",
+      "contactId": "60066",
+      "status": "open",
+      "channelOrigin": "landing",
+      "leadSource": "landing",
+      "createdAt": "2026-02-27 18:34:40"
+    },
+    {
+      "id": "90013",
+      "title": "Test Lead • landing",
+      "contactId": "60065",
+      "status": "open",
+      "channelOrigin": "landing",
+      "leadSource": "landing",
+      "createdAt": "2026-02-27 18:34:40"
+    },
+    {
+      "id": "90012",
+      "title": "No Dup Notif • landing",
+      "contactId": "60070",
+      "status": "open",
+      "channelOrigin": "landing",
+      "leadSource": "landing",
+      "createdAt": "2026-02-27 18:07:00"
+    },
+    {
+      "id": "90011",
+      "title": "Meta Notif Lead • meta_lead_ads",
+      "contactId": "60069",
+      "status": "open",
+      "channelOrigin": "meta_lead_ads",
+      "leadSource": "meta_lead_ads",
+      "createdAt": "2026-02-27 18:07:00"
+    },
+    {
+      "id": "90010",
+      "title": "Notification Test Lead • landing",
+      "contactId": "60068",
+      "status": "open",
+      "channelOrigin": "landing",
+      "leadSource": "landing",
+      "createdAt": "2026-02-27 18:06:59"
+    },
+    {
+      "id": "90009",
+      "title": "Meta Lead • meta_lead_ads",
+      "contactId": "60067",
+      "status": "open",
+      "channelOrigin": "meta_lead_ads",
+      "leadSource": "meta_lead_ads",
+      "createdAt": "2026-02-27 18:06:59"
+    },
+    {
+      "id": "90008",
+      "title": "Idempotent Lead • landing",
+      "contactId": "60066",
+      "status": "open",
+      "channelOrigin": "landing",
+      "leadSource": "landing",
+      "createdAt": "2026-02-27 18:06:58"
+    },
+    {
+      "id": "90007",
+      "title": "Test Lead • landing",
+      "contactId": "60065",
+      "status": "open",
+      "channelOrigin": "landing",
+      "leadSource": "landing",
+      "createdAt": "2026-02-27 18:06:58"
+    },
+    {
+      "id": "90006",
+      "title": "No Dup Notif • landing",
+      "contactId": "60070",
+      "status": "open",
+      "channelOrigin": "landing",
+      "leadSource": "landing",
+      "createdAt": "2026-02-27 17:52:56"
+    },
+    {
+      "id": "90005",
+      "title": "Meta Notif Lead • meta_lead_ads",
+      "contactId": "60069",
+      "status": "open",
+      "channelOrigin": "meta_lead_ads",
+      "leadSource": "meta_lead_ads",
+      "createdAt": "2026-02-27 17:52:56"
+    },
+    {
+      "id": "90004",
+      "title": "Notification Test Lead • landing",
+      "contactId": "60068",
+      "status": "open",
+      "channelOrigin": "landing",
+      "leadSource": "landing",
+      "createdAt": "2026-02-27 17:52:55"
+    },
+    {
+      "id": "90003",
+      "title": "Meta Lead • meta_lead_ads",
+      "contactId": "60067",
+      "status": "open",
+      "channelOrigin": "meta_lead_ads",
+      "leadSource": "meta_lead_ads",
+      "createdAt": "2026-02-27 17:52:55"
+    },
+    {
+      "id": "90002",
+      "title": "Idempotent Lead • landing",
+      "contactId": "60066",
+      "status": "open",
+      "channelOrigin": "landing",
+      "leadSource": "landing",
+      "createdAt": "2026-02-27 17:52:54"
+    },
+    {
+      "id": "90001",
+      "title": "Test Lead • landing",
+      "contactId": "60065",
+      "status": "open",
+      "channelOrigin": "landing",
+      "leadSource": "landing",
+      "createdAt": "2026-02-27 17:52:54"
+    },
+    {
+      "id": "60021",
+      "title": "No Dup Notif • landing",
+      "contactId": "60070",
+      "status": "open",
+      "channelOrigin": "landing",
+      "leadSource": "landing",
+      "createdAt": "2026-02-27 15:46:29"
+    },
+    {
+      "id": "60020",
+      "title": "Meta Notif Lead • meta_lead_ads",
+      "contactId": "60069",
+      "status": "open",
+      "channelOrigin": "meta_lead_ads",
+      "leadSource": "meta_lead_ads",
+      "createdAt": "2026-02-27 15:46:28"
+    },
+    {
+      "id": "60019",
+      "title": "Notification Test Lead • landing",
+      "contactId": "60068",
+      "status": "open",
+      "channelOrigin": "landing",
+      "leadSource": "landing",
+      "createdAt": "2026-02-27 15:46:28"
+    },
+    {
+      "id": "60018",
+      "title": "Meta Lead • meta_lead_ads",
+      "contactId": "60067",
+      "status": "open",
+      "channelOrigin": "meta_lead_ads",
+      "leadSource": "meta_lead_ads",
+      "createdAt": "2026-02-27 15:46:27"
+    },
+    {
+      "id": "60017",
+      "title": "Idempotent Lead • landing",
+      "contactId": "60066",
+      "status": "open",
+      "channelOrigin": "landing",
+      "leadSource": "landing",
+      "createdAt": "2026-02-27 15:46:27"
+    },
+    {
+      "id": "60016",
+      "title": "Test Lead • landing",
+      "contactId": "60065",
+      "status": "open",
+      "channelOrigin": "landing",
+      "leadSource": "landing",
+      "createdAt": "2026-02-27 15:46:26"
+    },
+    {
+      "id": "60015",
+      "title": "No Dup Notif • landing",
+      "contactId": "60070",
+      "status": "open",
+      "channelOrigin": "landing",
+      "leadSource": "landing",
+      "createdAt": "2026-02-27 15:46:16"
+    },
+    {
+      "id": "60014",
+      "title": "Meta Notif Lead • meta_lead_ads",
+      "contactId": "60069",
+      "status": "open",
+      "channelOrigin": "meta_lead_ads",
+      "leadSource": "meta_lead_ads",
+      "createdAt": "2026-02-27 15:46:16"
+    },
+    {
+      "id": "60013",
+      "title": "Notification Test Lead • landing",
+      "contactId": "60068",
+      "status": "open",
+      "channelOrigin": "landing",
+      "leadSource": "landing",
+      "createdAt": "2026-02-27 15:46:15"
+    },
+    {
+      "id": "60012",
+      "title": "Meta Lead • meta_lead_ads",
+      "contactId": "60067",
+      "status": "open",
+      "channelOrigin": "meta_lead_ads",
+      "leadSource": "meta_lead_ads",
+      "createdAt": "2026-02-27 15:46:15"
+    },
+    {
+      "id": "60011",
+      "title": "Idempotent Lead • landing",
+      "contactId": "60066",
+      "status": "open",
+      "channelOrigin": "landing",
+      "leadSource": "landing",
+      "createdAt": "2026-02-27 15:46:14"
+    },
+    {
+      "id": "60010",
+      "title": "Test Lead • landing",
+      "contactId": "60065",
+      "status": "open",
+      "channelOrigin": "landing",
+      "leadSource": "landing",
+      "createdAt": "2026-02-27 15:46:14"
+    },
+    {
+      "id": "60009",
+      "title": "Meta Lead • meta_lead_ads",
+      "contactId": "60067",
+      "status": "open",
+      "channelOrigin": "meta_lead_ads",
+      "leadSource": "meta_lead_ads",
+      "createdAt": "2026-02-27 15:36:24"
+    },
+    {
+      "id": "60008",
+      "title": "Idempotent Lead • landing",
+      "contactId": "60066",
+      "status": "open",
+      "channelOrigin": "landing",
+      "leadSource": "landing",
+      "createdAt": "2026-02-27 15:36:23"
+    },
+    {
+      "id": "60007",
+      "title": "Test Lead • landing",
+      "contactId": "60065",
+      "status": "open",
+      "channelOrigin": "landing",
+      "leadSource": "landing",
+      "createdAt": "2026-02-27 15:36:23"
+    },
+    {
+      "id": "60006",
+      "title": "Meta Lead • meta_lead_ads",
+      "contactId": "60067",
+      "status": "open",
+      "channelOrigin": "meta_lead_ads",
+      "leadSource": "meta_lead_ads",
+      "createdAt": "2026-02-27 15:36:11"
+    },
+    {
+      "id": "60005",
+      "title": "Idempotent Lead • landing",
+      "contactId": "60066",
+      "status": "open",
+      "channelOrigin": "landing",
+      "leadSource": "landing",
+      "createdAt": "2026-02-27 15:36:11"
+    },
+    {
+      "id": "60004",
+      "title": "Test Lead • landing",
+      "contactId": "60065",
+      "status": "open",
+      "channelOrigin": "landing",
+      "leadSource": "landing",
+      "createdAt": "2026-02-27 15:36:10"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\ttitle\tcontactId\tstatus\tchannelOrigin\tleadSource\tcreatedAt\n90024\tNo Dup Notif • landing\t60070\topen\tlanding\tlanding\t2026-02-27 18:42:47\n90023\tMeta Notif Lead • meta_lead_ads\t60069\topen\tmeta_lead_ads\tmeta_lead_ads\t2026-02-27 18:42:46\n90022\tNotification Test Lead • landing\t60068\topen\tlanding\tlanding\t2026-02-27 18:42:46\n90021\tMeta Lead • meta_lead_ads\t60067\topen\tmeta_lead_ads\tmeta_lead_ads\t2026-02-27 18:42:45\n90020\tIdempotent Lead • landing\t60066\topen\tlanding\tlanding\t2026-02-27 18:42:45\n90019\tTest Lead • landing\t60065\topen\tlanding\tlanding\t2026-02-27 18:42:44\n90018\tNo Dup Notif • landing\t60070\topen\tlanding\tlanding\t2026-02-27 18:34:42\n90017\tMeta Notif Lead • meta_lead_ads\t60069\topen\tmeta_lead_ads\tmeta_lead_ads\t2026-02-27 18:34:42\n90016\tNotification Test Lead • landing\t60068\topen\tlanding\tlanding\t2026-02-27 18:34:41\n90015\tMeta Lead • meta_lead_ads\t60067\topen\tmeta_lead_ads\tmeta_lead_ads\t2026-02-27 18:34:41\n90014\tIdempotent Lead • landing\t60066\topen\tlanding\tlanding\t2026-02-27 18:34:40\n90013\tTest Lead • landing\t60065\topen\tlanding\tlanding\t2026-02-27 18:34:40\n90012\tNo Dup Notif • landing\t60070\topen\tlanding\tlanding\t2026-02-27 18:07:00\n90011\tMeta Notif Lead • meta_lead_ads\t60069\topen\tmeta_lead_ads\tmeta_lead_ads\t2026-02-27 18:07:00\n90010\tNotification Test Lead • landing\t60068\topen\tlanding\tlanding\t2026-02-27 18:06:59\n90009\tMeta Lead • meta_lead_ads\t60067\topen\tmeta_lead_ads\tmeta_lead_ads\t2026-02-27 18:06:59\n90008\tIdempotent Lead • landing\t60066\topen\tlanding\tlanding\t2026-02-27 18:06:58\n90007\tTest Lead • landing\t60065\topen\tlanding\tlanding\t2026-02-27 18:06:58\n90006\tNo Dup Notif • landing\t60070\topen\tlanding\tlanding\t2026-02-27 17:52:56\n90005\tMeta Notif Lead • meta_lead_ads\t60069\topen\tmeta_lead_ads\tmeta_lead_ads\t2026-02-27 17:52:56\n90004\tNotification Test Lead • landing\t60068\topen\tlanding\tlanding\t2026-02-27 17:52:55\n90003\tMeta Lead • meta_lead_ads\t60067\topen\tmeta_lead_ads\tmeta_lead_ads\t2026-02-27 17:52:55\n90002\tIdempotent Lead • landing\t60066\topen\tlanding\tlanding\t2026-02-27 17:52:54\n90001\tTest Lead • landing\t60065\topen\tlanding\tlanding\t2026-02-27 17:52:54\n60021\tNo Dup Notif • landing\t60070\topen\tlanding\tlanding\t2026-02-27 15:46:29\n60020\tMeta Notif Lead • meta_lead_ads\t60069\topen\tmeta_lead_ads\tmeta_lead_ads\t2026-02-27 15:46:28\n60019\tNotification Test Lead • landing\t60068\topen\tlanding\tlanding\t2026-02-27 15:46:28\n60018\tMeta Lead • meta_lead_ads\t60067\topen\tmeta_lead_ads\tmeta_lead_ads\t2026-02-27 15:46:27\n60017\tIdempotent Lead • landing\t60066\topen\tlanding\tlanding\t2026-02-27 15:46:27\n60016\tTest Lead • landing\t60065\topen\tlanding\tlanding\t2026-02-27 15:46:26\n60015\tNo Dup Notif • landing\t60070\topen\tlanding\tlanding\t2026-02-27 15:46:16\n60014\tMeta Notif Lead • meta_lead_ads\t60069\topen\tmeta_lead_ads\tmeta_lead_ads\t2026-02-27 15:46:16\n60013\tNotification Test Lead • landing\t60068\topen\tlanding\tlanding\t2026-02-27 15:46:15\n60012\tMeta Lead • meta_lead_ads\t60067\topen\tmeta_lead_ads\tmeta_lead_ads\t2026-02-27 15:46:15\n60011\tIdempotent Lead • landing\t60066\topen\tlanding\tlanding\t2026-02-27 15:46:14\n60010\tTest Lead • landing\t60065\topen\tlanding\tlanding\t2026-02-27 15:46:14\n60009\tMeta Lead • meta_lead_ads\t60067\topen\tmeta_lead_ads\tmeta_lead_ads\t2026-02-27 15:36:24\n60008\tIdempotent Lead • landing\t60066\topen\tlanding\tlanding\t2026-02-27 15:36:23\n60007\tTest Lead • landing\t60065\topen\tlanding\tlanding\t2026-02-27 15:36:23\n60006\tMeta Lead • meta_lead_ads\t60067\topen\tmeta_lead_ads\tmeta_lead_ads\t2026-02-27 15:36:11\n60005\tIdempotent Lead • landing\t60066\topen\tlanding\tlanding\t2026-02-27 15:36:11\n60004\tTest Lead • landing\t60065\topen\tlanding\tlanding\t2026-02-27 15:36:10\n",
+  "stderr": "",
+  "execution_time_ms": 350
+}

@@ -1,0 +1,24 @@
+{
+  "query": "SELECT id, name, slug, plan, `createdAt` FROM tenants WHERE name LIKE '%Teste%' OR name LIKE '%teste%';",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute SELECT id, name, slug, plan, `createdAt` FROM tenants WHERE name LIKE '%Teste%' OR name LIKE '%teste%';",
+  "rows": [
+    {
+      "id": "270006",
+      "name": "Teste Turismo",
+      "slug": "teste-turismo",
+      "plan": "free",
+      "createdAt": "2026-03-14 01:23:53"
+    },
+    {
+      "id": "270007",
+      "name": "Teste 2",
+      "slug": "teste-2",
+      "plan": "free",
+      "createdAt": "2026-03-14 01:57:53"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tname\tslug\tplan\tcreatedAt\n270006\tTeste Turismo\tteste-turismo\tfree\t2026-03-14 01:23:53\n270007\tTeste 2\tteste-2\tfree\t2026-03-14 01:57:53\n",
+  "stderr": "",
+  "execution_time_ms": 59
+}

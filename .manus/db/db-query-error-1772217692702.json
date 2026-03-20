@@ -1,0 +1,8 @@
+{
+  "query": "SELECT id, name, pipeline_type AS pipelineType, is_default AS isDefault, is_archived AS isArchived FROM pipelines WHERE tenant_id = 1 ORDER BY id;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute SELECT id, name, pipeline_type AS pipelineType, is_default AS isDefault, is_archived AS isArchived FROM pipelines WHERE tenant_id = 1 ORDER BY id;",
+  "returncode": 1,
+  "logs": [
+    "ERROR 1054 (42S22) at line 1: Unknown column 'tenant_id' in 'where clause'"
+  ]
+}

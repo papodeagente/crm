@@ -1,0 +1,25 @@
+{
+  "query": "SELECT t.id, t.name, COUNT(p.id) as pipelineCount FROM tenants t LEFT JOIN pipelines p ON p.tenantId = t.id GROUP BY t.id, t.name ORDER BY t.id;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute SELECT t.id, t.name, COUNT(p.id) as pipelineCount FROM tenants t LEFT JOIN pipelines p ON p.tenantId = t.id GROUP BY t.id, t.name ORDER BY t.id;",
+  "rows": [
+    {
+      "id": "1",
+      "name": "Minha Agência",
+      "pipelineCount": "7"
+    },
+    {
+      "id": "30002",
+      "name": "Boxtour",
+      "pipelineCount": "0"
+    },
+    {
+      "id": "60002",
+      "name": "Aceleradora",
+      "pipelineCount": "0"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tname\tpipelineCount\n1\tMinha Agência\t7\n30002\tBoxtour\t0\n60002\tAceleradora\t0\n",
+  "stderr": "",
+  "execution_time_ms": 350
+}

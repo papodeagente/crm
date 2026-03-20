@@ -1,0 +1,90 @@
+{
+  "query": "\nSELECT wc.lastStatus AS wcStatus, lm.status AS msgStatus, COUNT(*) as cnt\nFROM wa_conversations wc\nJOIN (\n  SELECT m.sessionId, m.remoteJid, m.status\n  FROM messages m\n  INNER JOIN (\n    SELECT sessionId, remoteJid, MAX(id) AS maxId\n    FROM messages\n    GROUP BY sessionId, remoteJid\n  ) latest ON m.sessionId = latest.sessionId AND m.remoteJid = latest.remoteJid AND m.id = latest.maxId\n  WHERE m.fromMe = 1\n) lm ON wc.sessionId = lm.sessionId AND wc.remoteJid = lm.remoteJid\nWHERE wc.lastFromMe = 1\nGROUP BY wc.lastStatus, lm.status\nORDER BY cnt DESC\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute \nSELECT wc.lastStatus AS wcStatus, lm.status AS msgStatus, COUNT(*) as cnt\nFROM wa_conversations wc\nJOIN (\n  SELECT m.sessionId, m.remoteJid, m.status\n  FROM messages m\n  INNER JOIN (\n    SELECT sessionId, remoteJid, MAX(id) AS maxId\n    FROM messages\n    GROUP BY sessionId, remoteJid\n  ) latest ON m.sessionId = latest.sessionId AND m.remoteJid = latest.remoteJid AND m.id = latest.maxId\n  WHERE m.fromMe = 1\n) lm ON wc.sessionId = lm.sessionId AND wc.remoteJid = lm.remoteJid\nWHERE wc.lastFromMe = 1\nGROUP BY wc.lastStatus, lm.status\nORDER BY cnt DESC\n",
+  "rows": [
+    {
+      "wcStatus": "delivered",
+      "msgStatus": "delivered",
+      "cnt": "460"
+    },
+    {
+      "wcStatus": "read",
+      "msgStatus": "read",
+      "cnt": "366"
+    },
+    {
+      "wcStatus": "sent",
+      "msgStatus": "sent",
+      "cnt": "297"
+    },
+    {
+      "wcStatus": "read",
+      "msgStatus": "sent",
+      "cnt": "147"
+    },
+    {
+      "wcStatus": "delivered",
+      "msgStatus": "sent",
+      "cnt": "146"
+    },
+    {
+      "wcStatus": "sent",
+      "msgStatus": "delivered",
+      "cnt": "27"
+    },
+    {
+      "wcStatus": "sent",
+      "msgStatus": "read",
+      "cnt": "23"
+    },
+    {
+      "wcStatus": "played",
+      "msgStatus": "sent",
+      "cnt": "18"
+    },
+    {
+      "wcStatus": "played",
+      "msgStatus": "played",
+      "cnt": "15"
+    },
+    {
+      "wcStatus": "pending",
+      "msgStatus": "delivered",
+      "cnt": "3"
+    },
+    {
+      "wcStatus": "sent",
+      "msgStatus": "played",
+      "cnt": "3"
+    },
+    {
+      "wcStatus": "pending",
+      "msgStatus": "sent",
+      "cnt": "3"
+    },
+    {
+      "wcStatus": "delivered",
+      "msgStatus": "read",
+      "cnt": "2"
+    },
+    {
+      "wcStatus": "read",
+      "msgStatus": "delivered",
+      "cnt": "1"
+    },
+    {
+      "wcStatus": "edited",
+      "msgStatus": "sent",
+      "cnt": "1"
+    },
+    {
+      "wcStatus": "pending",
+      "msgStatus": "read",
+      "cnt": "1"
+    }
+  ],
+  "messages": [],
+  "stdout": "wcStatus\tmsgStatus\tcnt\ndelivered\tdelivered\t460\nread\tread\t366\nsent\tsent\t297\nread\tsent\t147\ndelivered\tsent\t146\nsent\tdelivered\t27\nsent\tread\t23\nplayed\tsent\t18\nplayed\tplayed\t15\npending\tdelivered\t3\nsent\tplayed\t3\npending\tsent\t3\ndelivered\tread\t2\nread\tdelivered\t1\nedited\tsent\t1\npending\tread\t1\n",
+  "stderr": "",
+  "execution_time_ms": 132
+}

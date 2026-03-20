@@ -1,0 +1,70 @@
+{
+  "query": "SELECT id, messageId, timestamp, createdAt FROM messages ORDER BY timestamp DESC LIMIT 10;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute SELECT id, messageId, timestamp, createdAt FROM messages ORDER BY timestamp DESC LIMIT 10;",
+  "rows": [
+    {
+      "id": "605950",
+      "messageId": "2A05CD0383412CA13AFE",
+      "timestamp": "2026-03-16 14:30:26",
+      "createdAt": "2026-03-16 14:30:27"
+    },
+    {
+      "id": "605943",
+      "messageId": "3EB0F5755015DC3DE163E9",
+      "timestamp": "2026-03-16 14:30:06",
+      "createdAt": "2026-03-16 14:30:06"
+    },
+    {
+      "id": "605942",
+      "messageId": "ACA3DB5A41F7EDB63227DC88F0743AF1",
+      "timestamp": "2026-03-16 14:30:05",
+      "createdAt": "2026-03-16 14:30:05"
+    },
+    {
+      "id": "605941",
+      "messageId": "3EB0CFE3DC4BFC523950B7",
+      "timestamp": "2026-03-16 14:30:01",
+      "createdAt": "2026-03-16 14:30:02"
+    },
+    {
+      "id": "605938",
+      "messageId": "AC34A4D8E6F1448B10C0BDE31DD838EA",
+      "timestamp": "2026-03-16 14:29:35",
+      "createdAt": "2026-03-16 14:29:36"
+    },
+    {
+      "id": "605934",
+      "messageId": "AC9E85594F16F052112E3FA49963A6CA",
+      "timestamp": "2026-03-16 14:29:14",
+      "createdAt": "2026-03-16 14:29:14"
+    },
+    {
+      "id": "605931",
+      "messageId": "A580EA87BD86FF670C2BFA303ACC7192",
+      "timestamp": "2026-03-16 14:29:09",
+      "createdAt": "2026-03-16 14:29:09"
+    },
+    {
+      "id": "605930",
+      "messageId": "AC2B5BD27677A9E4CB9F1219B9440DC0",
+      "timestamp": "2026-03-16 14:29:06",
+      "createdAt": "2026-03-16 14:29:07"
+    },
+    {
+      "id": "605925",
+      "messageId": "3EB0A18E2FBF66B8C3A695",
+      "timestamp": "2026-03-16 14:28:49",
+      "createdAt": "2026-03-16 14:28:50"
+    },
+    {
+      "id": "605923",
+      "messageId": "AC9651B85167602787AE1D9E96C44B72",
+      "timestamp": "2026-03-16 14:28:46",
+      "createdAt": "2026-03-16 14:28:47"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tmessageId\ttimestamp\tcreatedAt\n605950\t2A05CD0383412CA13AFE\t2026-03-16 14:30:26\t2026-03-16 14:30:27\n605943\t3EB0F5755015DC3DE163E9\t2026-03-16 14:30:06\t2026-03-16 14:30:06\n605942\tACA3DB5A41F7EDB63227DC88F0743AF1\t2026-03-16 14:30:05\t2026-03-16 14:30:05\n605941\t3EB0CFE3DC4BFC523950B7\t2026-03-16 14:30:01\t2026-03-16 14:30:02\n605938\tAC34A4D8E6F1448B10C0BDE31DD838EA\t2026-03-16 14:29:35\t2026-03-16 14:29:36\n605934\tAC9E85594F16F052112E3FA49963A6CA\t2026-03-16 14:29:14\t2026-03-16 14:29:14\n605931\tA580EA87BD86FF670C2BFA303ACC7192\t2026-03-16 14:29:09\t2026-03-16 14:29:09\n605930\tAC2B5BD27677A9E4CB9F1219B9440DC0\t2026-03-16 14:29:06\t2026-03-16 14:29:07\n605925\t3EB0A18E2FBF66B8C3A695\t2026-03-16 14:28:49\t2026-03-16 14:28:50\n605923\tAC9651B85167602787AE1D9E96C44B72\t2026-03-16 14:28:46\t2026-03-16 14:28:47\n",
+  "stderr": "",
+  "execution_time_ms": 160
+}

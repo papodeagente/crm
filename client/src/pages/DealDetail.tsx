@@ -102,8 +102,8 @@ export default function DealDetail() {
 
   /* ─── Queries ─── */
   const dealQ = trpc.crm.deals.get.useQuery({ id: dealId }, { enabled: dealId > 0 });
-  const crmUsersQ = trpc.admin.users.list.useQuery(undefined, { staleTime: 5 * 60 * 1000 });
-  const pipelinesQ = trpc.crm.pipelines.list.useQuery({}, { staleTime: 5 * 60 * 1000 });
+  const crmUsersQ = trpc.admin.users.list.useQuery();
+  const pipelinesQ = trpc.crm.pipelines.list.useQuery({});
   const stagesQ = trpc.crm.pipelines.stages.useQuery(
     { pipelineId: dealQ.data?.pipelineId || 0 },
     { enabled: !!dealQ.data?.pipelineId }
@@ -134,17 +134,17 @@ export default function DealDetail() {
   const notesQ = trpc.crm.notes.list.useQuery({ entityType: "deal", entityId: dealId }, { enabled: dealId > 0 });
   const stageTimeQ = trpc.utmAnalytics.stageTime.useQuery({ dealId }, { enabled: dealId > 0 });
   const waMessagesCountQ = trpc.crm.dealWhatsApp.count.useQuery({ dealId }, { enabled: dealId > 0 });
-  const contactsQ = trpc.crm.contacts.list.useQuery({ limit: 200 }, { staleTime: 2 * 60 * 1000 });
-  const accountsQ = trpc.crm.accounts.list.useQuery(undefined, { staleTime: 2 * 60 * 1000 });
-  const customFieldsQ = trpc.customFields.list.useQuery({ entity: "deal" }, { staleTime: 5 * 60 * 1000 });
+  const contactsQ = trpc.crm.contacts.list.useQuery({ limit: 200 });
+  const accountsQ = trpc.crm.accounts.list.useQuery();
+  const customFieldsQ = trpc.customFields.list.useQuery({ entity: "deal" });
   const customValuesQ = trpc.contactProfile.getCustomFieldValues.useQuery(
     { entityType: "deal", entityId: dealId },
     { enabled: dealId > 0 }
   );
 
   // Custom fields for contact and company contexts within the deal
-  const contactCustomFieldsQ = trpc.customFields.list.useQuery({ entity: "contact" }, { staleTime: 5 * 60 * 1000 });
-  const companyCustomFieldsQ = trpc.customFields.list.useQuery({ entity: "company" }, { staleTime: 5 * 60 * 1000 });
+  const contactCustomFieldsQ = trpc.customFields.list.useQuery({ entity: "contact" });
+  const companyCustomFieldsQ = trpc.customFields.list.useQuery({ entity: "company" });
   const contactCustomValuesQ = trpc.contactProfile.getCustomFieldValues.useQuery(
     { entityType: "contact", entityId: dealQ.data?.contactId || 0 },
     { enabled: !!dealQ.data?.contactId && (dealQ.data?.contactId ?? 0) > 0 }
@@ -154,8 +154,8 @@ export default function DealDetail() {
     { enabled: !!dealQ.data?.accountId && (dealQ.data?.accountId ?? 0) > 0 }
   );
 
-  const leadSourcesQ = trpc.crm.leadSources.list.useQuery({}, { staleTime: 5 * 60 * 1000 });
-  const campaignsQ = trpc.crm.campaigns.list.useQuery({}, { staleTime: 5 * 60 * 1000 });
+  const leadSourcesQ = trpc.crm.leadSources.list.useQuery({});
+  const campaignsQ = trpc.crm.campaigns.list.useQuery({});
 
   /* ─── Mutations ─── */
   const moveStage = trpc.crm.deals.moveStage.useMutation({
@@ -253,7 +253,7 @@ export default function DealDetail() {
   const newPipelineStages = useMemo(() => (newPipelineStagesQ.data || []).sort((a: any, b: any) => a.orderIndex - b.orderIndex), [newPipelineStagesQ.data]);
 
   /* ─── Loss Reasons query ─── */
-  const lossReasonsQ = trpc.crm.lossReasons.list.useQuery({}, { staleTime: 5 * 60 * 1000 });
+  const lossReasonsQ = trpc.crm.lossReasons.list.useQuery({});
   const lossReasonsList = (lossReasonsQ.data || []).filter((r: any) => r.isActive && !r.isDeleted);
 
   /* ─── Loading / Error states ─── */
@@ -2772,7 +2772,7 @@ function WhatsAppPanel({ contact, dealId }: { contact: any; dealId: number }) {
     utils.notifications.unreadCount.invalidate();
   }, [lastMessage]);
   // Live chat setup
-  const sessionsQ = trpc.whatsapp.sessions.useQuery(undefined, { staleTime: 60 * 1000 });
+  const sessionsQ = trpc.whatsapp.sessions.useQuery();
   const activeSession = (sessionsQ.data || []).find((s: any) => s.liveStatus === "connected");
   const resolveQ = trpc.whatsapp.resolveJid.useQuery(
     { sessionId: activeSession?.sessionId || "", phone: contact?.phone || "" },

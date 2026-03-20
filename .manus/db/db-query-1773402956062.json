@@ -1,0 +1,52 @@
+{
+  "query": "SELECT sessionId, tenantId, pushName, phoneNumber, status FROM whatsapp_sessions WHERE pushName IS NOT NULL AND pushName != '' ORDER BY tenantId;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute SELECT sessionId, tenantId, pushName, phoneNumber, status FROM whatsapp_sessions WHERE pushName IS NOT NULL AND pushName != '' ORDER BY tenantId;",
+  "rows": [
+    {
+      "sessionId": "Whatsapp",
+      "tenantId": "0",
+      "pushName": "Bruno Barbosa",
+      "phoneNumber": "558499838420",
+      "status": "deleted"
+    },
+    {
+      "sessionId": "Boxtour",
+      "tenantId": "210002",
+      "pushName": "Bruno Barbosa",
+      "phoneNumber": "558499838420",
+      "status": "deleted"
+    },
+    {
+      "sessionId": "crm-210002-240001",
+      "tenantId": "210002",
+      "pushName": "Fernando alves",
+      "phoneNumber": "554892118034",
+      "status": "connected"
+    },
+    {
+      "sessionId": "crm-210002-210001",
+      "tenantId": "210002",
+      "pushName": "Bruno Barbosa",
+      "phoneNumber": "558499838420",
+      "status": "connecting"
+    },
+    {
+      "sessionId": "crm-240006-240006",
+      "tenantId": "240006",
+      "pushName": "Fds Viagens",
+      "phoneNumber": "5511995200889",
+      "status": "connected"
+    },
+    {
+      "sessionId": "crm-240007-240007",
+      "tenantId": "240007",
+      "pushName": "Equipe Legu Tour",
+      "phoneNumber": "5511986853606",
+      "status": "connected"
+    }
+  ],
+  "messages": [],
+  "stdout": "sessionId\ttenantId\tpushName\tphoneNumber\tstatus\nWhatsapp\t0\tBruno Barbosa\t558499838420\tdeleted\nBoxtour\t210002\tBruno Barbosa\t558499838420\tdeleted\ncrm-210002-240001\t210002\tFernando alves\t554892118034\tconnected\ncrm-210002-210001\t210002\tBruno Barbosa\t558499838420\tconnecting\ncrm-240006-240006\t240006\tFds Viagens\t5511995200889\tconnected\ncrm-240007-240007\t240007\tEquipe Legu Tour\t5511986853606\tconnected\n",
+  "stderr": "",
+  "execution_time_ms": 56
+}

@@ -1,0 +1,64 @@
+{
+  "query": "SELECT DISTINCT INDEX_NAME FROM information_schema.STATISTICS WHERE TABLE_NAME = 'wa_conversations' AND TABLE_SCHEMA = DATABASE(); SELECT DISTINCT INDEX_NAME FROM information_schema.STATISTICS WHERE TABLE_NAME = 'conversation_assignments' AND TABLE_SCHEMA = DATABASE();",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute SELECT DISTINCT INDEX_NAME FROM information_schema.STATISTICS WHERE TABLE_NAME = 'wa_conversations' AND TABLE_SCHEMA = DATABASE(); SELECT DISTINCT INDEX_NAME FROM information_schema.STATISTICS WHERE TABLE_NAME = 'conversation_assignments' AND TABLE_SCHEMA = DATABASE();",
+  "rows": [
+    {
+      "INDEX_NAME": "PRIMARY"
+    },
+    {
+      "INDEX_NAME": "idx_wc_inbox"
+    },
+    {
+      "INDEX_NAME": "uq_conversation_key"
+    },
+    {
+      "INDEX_NAME": "idx_wc_assigned_user"
+    },
+    {
+      "INDEX_NAME": "idx_wc_queued"
+    },
+    {
+      "INDEX_NAME": "idx_wc_tenant_contact"
+    },
+    {
+      "INDEX_NAME": "idx_wc_phone"
+    },
+    {
+      "INDEX_NAME": "idx_wc_assigned_ts"
+    },
+    {
+      "INDEX_NAME": "idx_wc_conv_key"
+    },
+    {
+      "INDEX_NAME": "idx_wc_tenant_jid"
+    },
+    {
+      "INDEX_NAME": "idx_wc_tenant_session"
+    },
+    {
+      "INDEX_NAME": "idx_wc_merged"
+    },
+    {
+      "INDEX_NAME": "INDEX_NAME"
+    },
+    {
+      "INDEX_NAME": "PRIMARY"
+    },
+    {
+      "INDEX_NAME": "ca_tenant_status_idx"
+    },
+    {
+      "INDEX_NAME": "ca_tenant_session_jid_idx"
+    },
+    {
+      "INDEX_NAME": "ca_tenant_team_idx"
+    },
+    {
+      "INDEX_NAME": "ca_tenant_user_idx"
+    }
+  ],
+  "messages": [],
+  "stdout": "INDEX_NAME\nPRIMARY\nidx_wc_inbox\nuq_conversation_key\nidx_wc_assigned_user\nidx_wc_queued\nidx_wc_tenant_contact\nidx_wc_phone\nidx_wc_assigned_ts\nidx_wc_conv_key\nidx_wc_tenant_jid\nidx_wc_tenant_session\nidx_wc_merged\nINDEX_NAME\nPRIMARY\nca_tenant_status_idx\nca_tenant_session_jid_idx\nca_tenant_team_idx\nca_tenant_user_idx\n",
+  "stderr": "",
+  "execution_time_ms": 62
+}

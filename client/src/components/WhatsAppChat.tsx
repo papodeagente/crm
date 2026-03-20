@@ -1586,16 +1586,7 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
 
   const sendReaction = trpc.whatsapp.sendReaction.useMutation({
     onSuccess: () => toast.success("Reação enviada"),
-    onError: (_, variables) => {
-      // Rollback optimistic reaction on error
-      const targetId = variables.key.id;
-      setReactionsMap(prev => {
-        const existing = [...(prev[targetId] || [])];
-        const filtered = existing.filter(r => r.senderJid !== sessionId + "@s.whatsapp.net");
-        return { ...prev, [targetId]: filtered };
-      });
-      toast.error("Erro ao enviar reação");
-    },
+    onError: () => toast.error("Erro ao enviar reação"),
   });
 
   const deleteMessage = trpc.whatsapp.deleteMessage.useMutation({
@@ -2007,18 +1998,6 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
 
   // Reaction handler
   const handleReact = useCallback((key: { remoteJid: string; fromMe: boolean; id: string }, emoji: string) => {
-    // Optimistic update: immediately show reaction under the bubble
-    const targetId = key.id;
-    setReactionsMap(prev => {
-      const existing = [...(prev[targetId] || [])];
-      // Remove any previous reaction from me
-      const filtered = existing.filter(r => !r.fromMe);
-      // Add new reaction (or remove if emoji is empty)
-      if (emoji) {
-        filtered.push({ emoji, senderJid: sessionId + "@s.whatsapp.net", fromMe: true });
-      }
-      return { ...prev, [targetId]: filtered };
-    });
     sendReaction.mutate({ sessionId, key, reaction: emoji });
   }, [sessionId]);
 
@@ -2093,13 +2072,6 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
       "locationMessage", "contactMessage", "contactsArrayMessage",
       "pollCreationMessage", "pollCreationMessageV3",
     ]);
-    // Rich message types that have their own renderer (templates, interactive, etc.)
-    const RICH_TYPES = new Set([
-      "templateMessage", "interactiveMessage", "buttonsMessage",
-      "listMessage", "listResponseMessage", "buttonsResponseMessage",
-      "templateButtonReplyMessage", "interactiveResponseMessage",
-      "orderMessage", "productMessage",
-    ]);
     const msgs: Message[] = [...(messagesQ.data || [])].reverse()
       .filter(m => {
         // Always hide protocol/system messages
@@ -2108,9 +2080,7 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
         if (MEDIA_TYPES.has(m.messageType)) return true;
         // Special types with their own rendering
         if (SPECIAL_TYPES.has(m.messageType)) return true;
-        // Rich message types (templates, interactive, etc.) always shown
-        if (RICH_TYPES.has(m.messageType)) return true;
-        // For other types: hide if content is empty or just a placeholder
+        // For other types: hide if content is empty or just a placeholder like "[Template]"
         const content = m.content?.trim();
         if (!content) return false;
         // Hide messages that are just type placeholders with no real content

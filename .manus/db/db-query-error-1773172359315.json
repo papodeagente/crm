@@ -1,0 +1,8 @@
+{
+  "query": "SELECT cu.id, cu.name, cu.email, cu.tenantId, cu.status, cu.role, cu.createdAt, t.name as tenantName \nFROM crm_users cu \nLEFT JOIN saas_tenants t ON cu.tenantId = t.id \nWHERE cu.email LIKE '%marcio%' OR cu.email LIKE '%boxtour%'\nORDER BY cu.createdAt DESC;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute SELECT cu.id, cu.name, cu.email, cu.tenantId, cu.status, cu.role, cu.createdAt, t.name as tenantName \nFROM crm_users cu \nLEFT JOIN saas_tenants t ON cu.tenantId = t.id \nWHERE cu.email LIKE '%marcio%' OR cu.email LIKE '%boxtour%'\nORDER BY cu.createdAt DESC;",
+  "returncode": 1,
+  "logs": [
+    "ERROR 1146 (42S02) at line 1: Table 'ekvcvicuvouxtnzjskzgdk.saas_tenants' doesn't exist"
+  ]
+}

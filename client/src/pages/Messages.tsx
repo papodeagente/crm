@@ -25,11 +25,11 @@ function MessageTypeIcon({ type }: { type: string }) {
 export default function Messages() {
   const [sessionId, setSessionId] = useState("");
   const { lastMessage } = useSocket();
-  const sessionsQuery = trpc.whatsapp.sessions.useQuery(undefined, { staleTime: 60 * 1000 });
+  const sessionsQuery = trpc.whatsapp.sessions.useQuery();
   const allSessions = sessionsQuery.data || [];
   const messagesQuery = trpc.whatsapp.messages.useQuery(
     { sessionId, limit: 100 },
-    { enabled: !!sessionId, refetchInterval: 15000, staleTime: 5000 }
+    { enabled: !!sessionId, refetchInterval: 5000 }
   );
 
   useEffect(() => {

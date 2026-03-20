@@ -1,0 +1,13 @@
+{
+  "query": "SELECT COUNT(*) as conversations_with_contact_match FROM wa_conversations c INNER JOIN wa_contacts ct ON c.sessionId = ct.sessionId AND c.remoteJid = ct.jid WHERE c.sessionId = 'crm-210002-240001' AND ct.pushName IS NOT NULL AND ct.pushName != ''",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute SELECT COUNT(*) as conversations_with_contact_match FROM wa_conversations c INNER JOIN wa_contacts ct ON c.sessionId = ct.sessionId AND c.remoteJid = ct.jid WHERE c.sessionId = 'crm-210002-240001' AND ct.pushName IS NOT NULL AND ct.pushName != ''",
+  "rows": [
+    {
+      "conversations_with_contact_match": "166"
+    }
+  ],
+  "messages": [],
+  "stdout": "conversations_with_contact_match\n166\n",
+  "stderr": "",
+  "execution_time_ms": 367
+}

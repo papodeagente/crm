@@ -1,0 +1,50 @@
+{
+  "query": "SELECT 'contacts' as tbl, COUNT(*) as cnt FROM contacts WHERE tenantId = 1 UNION ALL SELECT 'accounts', COUNT(*) FROM accounts WHERE tenantId = 1 UNION ALL SELECT 'deals', COUNT(*) FROM deals WHERE tenantId = 1 UNION ALL SELECT 'crm_tasks', COUNT(*) FROM crm_tasks WHERE tenantId = 1 UNION ALL SELECT 'pipelines', COUNT(*) FROM pipelines WHERE tenantId = 1 UNION ALL SELECT 'pipeline_stages', COUNT(*) FROM pipeline_stages UNION ALL SELECT 'lead_sources', COUNT(*) FROM lead_sources WHERE tenantId = 1 UNION ALL SELECT 'campaigns', COUNT(*) FROM campaigns WHERE tenantId = 1 UNION ALL SELECT 'loss_reasons', COUNT(*) FROM loss_reasons WHERE tenantId = 1 UNION ALL SELECT 'product_catalog', COUNT(*) FROM product_catalog WHERE tenantId = 1",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute SELECT 'contacts' as tbl, COUNT(*) as cnt FROM contacts WHERE tenantId = 1 UNION ALL SELECT 'accounts', COUNT(*) FROM accounts WHERE tenantId = 1 UNION ALL SELECT 'deals', COUNT(*) FROM deals WHERE tenantId = 1 UNION ALL SELECT 'crm_tasks', COUNT(*) FROM crm_tasks WHERE tenantId = 1 UNION ALL SELECT 'pipelines', COUNT(*) FROM pipelines WHERE tenantId = 1 UNION ALL SELECT 'pipeline_stages', COUNT(*) FROM pipeline_stages UNION ALL SELECT 'lead_sources', COUNT(*) FROM lead_sources WHERE tenantId = 1 UNION ALL SELECT 'campaigns', COUNT(*) FROM campaigns WHERE tenantId = 1 UNION ALL SELECT 'loss_reasons', COUNT(*) FROM loss_reasons WHERE tenantId = 1 UNION ALL SELECT 'product_catalog', COUNT(*) FROM product_catalog WHERE tenantId = 1",
+  "rows": [
+    {
+      "tbl": "crm_tasks",
+      "cnt": "0"
+    },
+    {
+      "tbl": "deals",
+      "cnt": "0"
+    },
+    {
+      "tbl": "pipelines",
+      "cnt": "7"
+    },
+    {
+      "tbl": "pipeline_stages",
+      "cnt": "33"
+    },
+    {
+      "tbl": "campaigns",
+      "cnt": "291"
+    },
+    {
+      "tbl": "lead_sources",
+      "cnt": "463"
+    },
+    {
+      "tbl": "loss_reasons",
+      "cnt": "26"
+    },
+    {
+      "tbl": "product_catalog",
+      "cnt": "167"
+    },
+    {
+      "tbl": "accounts",
+      "cnt": "4634"
+    },
+    {
+      "tbl": "contacts",
+      "cnt": "0"
+    }
+  ],
+  "messages": [],
+  "stdout": "tbl\tcnt\ncrm_tasks\t0\ndeals\t0\npipelines\t7\npipeline_stages\t33\ncampaigns\t291\nlead_sources\t463\nloss_reasons\t26\nproduct_catalog\t167\naccounts\t4634\ncontacts\t0\n",
+  "stderr": "",
+  "execution_time_ms": 373
+}

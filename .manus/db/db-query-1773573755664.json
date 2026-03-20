@@ -1,0 +1,43 @@
+{
+  "query": "SELECT m1.id, m1.messageId, m1.sessionId, m1.tenantId, m1.remoteJid, m1.content, \n       m2.id as dup_id, m2.sessionId as dup_session, m2.tenantId as dup_tenant\nFROM messages m1\nJOIN messages m2 ON m1.messageId = m2.messageId AND m1.id < m2.id\nWHERE m1.messageId IS NOT NULL\nLIMIT 3;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute SELECT m1.id, m1.messageId, m1.sessionId, m1.tenantId, m1.remoteJid, m1.content, \n       m2.id as dup_id, m2.sessionId as dup_session, m2.tenantId as dup_tenant\nFROM messages m1\nJOIN messages m2 ON m1.messageId = m2.messageId AND m1.id < m2.id\nWHERE m1.messageId IS NOT NULL\nLIMIT 3;",
+  "rows": [
+    {
+      "id": "360001",
+      "messageId": "3EB0FF7249E654557CCCDB",
+      "sessionId": "Whatsapp",
+      "tenantId": "1",
+      "remoteJid": "558499838420@s.whatsapp.net",
+      "content": "Olá, bom dia",
+      "dup_id": "491922",
+      "dup_session": "Boxtour",
+      "dup_tenant": "210002"
+    },
+    {
+      "id": "360001",
+      "messageId": "3EB0FF7249E654557CCCDB",
+      "sessionId": "Whatsapp",
+      "tenantId": "1",
+      "remoteJid": "558499838420@s.whatsapp.net",
+      "content": "Olá, bom dia",
+      "dup_id": "491889",
+      "dup_session": "crm-210002-210001",
+      "dup_tenant": "210002"
+    },
+    {
+      "id": "360002",
+      "messageId": "AC028BF1830F8FD8113900A0A3CE3931",
+      "sessionId": "Whatsapp",
+      "tenantId": "1",
+      "remoteJid": "5521988613313@s.whatsapp.net",
+      "content": "[Áudio]",
+      "dup_id": "494072",
+      "dup_session": "crm-210002-210001",
+      "dup_tenant": "210002"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tmessageId\tsessionId\ttenantId\tremoteJid\tcontent\tdup_id\tdup_session\tdup_tenant\n360001\t3EB0FF7249E654557CCCDB\tWhatsapp\t1\t558499838420@s.whatsapp.net\tOlá, bom dia\t491922\tBoxtour\t210002\n360001\t3EB0FF7249E654557CCCDB\tWhatsapp\t1\t558499838420@s.whatsapp.net\tOlá, bom dia\t491889\tcrm-210002-210001\t210002\n360002\tAC028BF1830F8FD8113900A0A3CE3931\tWhatsapp\t1\t5521988613313@s.whatsapp.net\t[Áudio]\t494072\tcrm-210002-210001\t210002\n",
+  "stderr": "",
+  "execution_time_ms": 114
+}

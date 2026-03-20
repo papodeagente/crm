@@ -1,0 +1,49 @@
+{
+  "query": "SELECT DISTINCT utmSource FROM deals WHERE utmSource IS NOT NULL AND utmSource != '' AND deletedAt IS NULL LIMIT 20;\nSELECT DISTINCT utmMedium FROM deals WHERE utmMedium IS NOT NULL AND utmMedium != '' AND deletedAt IS NULL LIMIT 20;\nSELECT DISTINCT utmCampaign FROM deals WHERE utmCampaign IS NOT NULL AND utmCampaign != '' AND deletedAt IS NULL LIMIT 20;\nSELECT DISTINCT leadSource FROM deals WHERE leadSource IS NOT NULL AND leadSource != '' AND deletedAt IS NULL LIMIT 20;\nSELECT DISTINCT channelOrigin FROM deals WHERE channelOrigin IS NOT NULL AND channelOrigin != '' AND deletedAt IS NULL LIMIT 20;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute SELECT DISTINCT utmSource FROM deals WHERE utmSource IS NOT NULL AND utmSource != '' AND deletedAt IS NULL LIMIT 20;\nSELECT DISTINCT utmMedium FROM deals WHERE utmMedium IS NOT NULL AND utmMedium != '' AND deletedAt IS NULL LIMIT 20;\nSELECT DISTINCT utmCampaign FROM deals WHERE utmCampaign IS NOT NULL AND utmCampaign != '' AND deletedAt IS NULL LIMIT 20;\nSELECT DISTINCT leadSource FROM deals WHERE leadSource IS NOT NULL AND leadSource != '' AND deletedAt IS NULL LIMIT 20;\nSELECT DISTINCT channelOrigin FROM deals WHERE channelOrigin IS NOT NULL AND channelOrigin != '' AND deletedAt IS NULL LIMIT 20;",
+  "rows": [
+    {
+      "utmSource": "google"
+    },
+    {
+      "utmSource": "unknown"
+    },
+    {
+      "utmSource": "utmMedium"
+    },
+    {
+      "utmSource": "cpc"
+    },
+    {
+      "utmSource": "unknown"
+    },
+    {
+      "utmSource": "utmCampaign"
+    },
+    {
+      "utmSource": "unknown"
+    },
+    {
+      "utmSource": "acelera10x"
+    },
+    {
+      "utmSource": "leadSource"
+    },
+    {
+      "utmSource": "rdstation"
+    },
+    {
+      "utmSource": "channelOrigin"
+    },
+    {
+      "utmSource": "Anúncio X"
+    },
+    {
+      "utmSource": "rdstation"
+    }
+  ],
+  "messages": [],
+  "stdout": "utmSource\ngoogle\nunknown\nutmMedium\ncpc\nunknown\nutmCampaign\nunknown\nacelera10x\nleadSource\nrdstation\nchannelOrigin\nAnúncio X\nrdstation\n",
+  "stderr": "",
+  "execution_time_ms": 658
+}

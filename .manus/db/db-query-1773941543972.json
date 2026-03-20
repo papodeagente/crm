@@ -1,0 +1,45 @@
+{
+  "query": "SELECT tenantId, audio_transcription_status, COUNT(*) as cnt FROM messages WHERE audio_transcription_status IS NOT NULL GROUP BY tenantId, audio_transcription_status ORDER BY tenantId, audio_transcription_status",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute SELECT tenantId, audio_transcription_status, COUNT(*) as cnt FROM messages WHERE audio_transcription_status IS NOT NULL GROUP BY tenantId, audio_transcription_status ORDER BY tenantId, audio_transcription_status",
+  "rows": [
+    {
+      "tenantId": "150002",
+      "audio_transcription_status": "pending",
+      "cnt": "2"
+    },
+    {
+      "tenantId": "210002",
+      "audio_transcription_status": "pending",
+      "cnt": "16"
+    },
+    {
+      "tenantId": "210002",
+      "audio_transcription_status": "completed",
+      "cnt": "8"
+    },
+    {
+      "tenantId": "240005",
+      "audio_transcription_status": "pending",
+      "cnt": "1"
+    },
+    {
+      "tenantId": "240005",
+      "audio_transcription_status": "completed",
+      "cnt": "1"
+    },
+    {
+      "tenantId": "240007",
+      "audio_transcription_status": "pending",
+      "cnt": "107"
+    },
+    {
+      "tenantId": "270008",
+      "audio_transcription_status": "pending",
+      "cnt": "16"
+    }
+  ],
+  "messages": [],
+  "stdout": "tenantId\taudio_transcription_status\tcnt\n150002\tpending\t2\n210002\tpending\t16\n210002\tcompleted\t8\n240005\tpending\t1\n240005\tcompleted\t1\n240007\tpending\t107\n270008\tpending\t16\n",
+  "stderr": "",
+  "execution_time_ms": 59
+}

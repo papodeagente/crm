@@ -172,8 +172,7 @@ export default function WhatsApp() {
     { sessionId: qrSessionId || "" },
     {
       enabled: !!qrSessionId,
-      refetchInterval: 5000,
-      staleTime: 2000,
+      refetchInterval: 2000,
     }
   );
 

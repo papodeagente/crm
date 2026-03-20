@@ -1,0 +1,22 @@
+{
+  "query": "SHOW TABLES LIKE '%tenant%'; SELECT * FROM crm_users WHERE email LIKE '%marcio%' OR email LIKE '%boxtour%' ORDER BY createdAt DESC;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute SHOW TABLES LIKE '%tenant%'; SELECT * FROM crm_users WHERE email LIKE '%marcio%' OR email LIKE '%boxtour%' ORDER BY createdAt DESC;",
+  "rows": [
+    {
+      "Tables_in_EKvcVicuVoUxTnzjSKzgdk (%tenant%)": "tenants"
+    },
+    {
+      "Tables_in_EKvcVicuVoUxTnzjSKzgdk (%tenant%)": "id\ttenantId\tname\temail\tphone\tpasswordHash\tstatus\tavatarUrl\tlastLoginAt\tcreatedAt\tupdatedAt\tcreatedBy\tupdatedBy\tcrm_user_role"
+    },
+    {
+      "Tables_in_EKvcVicuVoUxTnzjSKzgdk (%tenant%)": "210002\t210002\tMarcio Dias\tmarcio.dias@boxtour.com.br\tNULL\t$2b$12$hZZzftayzCXwMhG1TUt5R.Fqq/lGCc3Ho2Pr7mKFBDL6OPu0b34M6\tinvited\tNULL\tNULL\t2026-03-10 19:50:51\t2026-03-10 19:50:51\tNULL\tNULL\tuser"
+    },
+    {
+      "Tables_in_EKvcVicuVoUxTnzjSKzgdk (%tenant%)": "210001\t210002\tBruno Barbosa \tbruno@boxtour.com.br\t84999838420\t$2b$12$897aj/Sio5tfxtGxAIdoheAduZmM/tDhd8hVWEBh5ow8HKApDFypS\tactive\tNULL\t2026-03-10 19:50:19\t2026-03-10 19:08:08\t2026-03-10 19:50:19\tNULL\tNULL\tadmin"
+    }
+  ],
+  "messages": [],
+  "stdout": "Tables_in_EKvcVicuVoUxTnzjSKzgdk (%tenant%)\ntenants\nid\ttenantId\tname\temail\tphone\tpasswordHash\tstatus\tavatarUrl\tlastLoginAt\tcreatedAt\tupdatedAt\tcreatedBy\tupdatedBy\tcrm_user_role\n210002\t210002\tMarcio Dias\tmarcio.dias@boxtour.com.br\tNULL\t$2b$12$hZZzftayzCXwMhG1TUt5R.Fqq/lGCc3Ho2Pr7mKFBDL6OPu0b34M6\tinvited\tNULL\tNULL\t2026-03-10 19:50:51\t2026-03-10 19:50:51\tNULL\tNULL\tuser\n210001\t210002\tBruno Barbosa \tbruno@boxtour.com.br\t84999838420\t$2b$12$897aj/Sio5tfxtGxAIdoheAduZmM/tDhd8hVWEBh5ow8HKApDFypS\tactive\tNULL\t2026-03-10 19:50:19\t2026-03-10 19:08:08\t2026-03-10 19:50:19\tNULL\tNULL\tadmin\n",
+  "stderr": "",
+  "execution_time_ms": 404
+}

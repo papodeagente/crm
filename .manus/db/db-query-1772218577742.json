@@ -1,0 +1,22 @@
+{
+  "query": "SELECT 'total_deals' as metric, COUNT(*) as cnt FROM deals WHERE deletedAt IS NULL\nUNION ALL\nSELECT 'total_contacts' as metric, COUNT(*) as cnt FROM contacts WHERE deletedAt IS NULL\nUNION ALL\nSELECT 'total_pipelines' as metric, COUNT(*) as cnt FROM pipelines;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute SELECT 'total_deals' as metric, COUNT(*) as cnt FROM deals WHERE deletedAt IS NULL\nUNION ALL\nSELECT 'total_contacts' as metric, COUNT(*) as cnt FROM contacts WHERE deletedAt IS NULL\nUNION ALL\nSELECT 'total_pipelines' as metric, COUNT(*) as cnt FROM pipelines;",
+  "rows": [
+    {
+      "metric": "total_deals",
+      "cnt": "1"
+    },
+    {
+      "metric": "total_pipelines",
+      "cnt": "3"
+    },
+    {
+      "metric": "total_contacts",
+      "cnt": "5"
+    }
+  ],
+  "messages": [],
+  "stdout": "metric\tcnt\ntotal_deals\t1\ntotal_pipelines\t3\ntotal_contacts\t5\n",
+  "stderr": "",
+  "execution_time_ms": 361
+}

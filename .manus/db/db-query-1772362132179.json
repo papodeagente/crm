@@ -1,0 +1,31 @@
+{
+  "query": "SELECT id, name FROM tenants; SELECT id, tenantId, name, pipelineType FROM pipelines;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute SELECT id, name FROM tenants; SELECT id, tenantId, name, pipelineType FROM pipelines;",
+  "rows": [
+    {
+      "id": "1",
+      "name": "Minha Agência"
+    },
+    {
+      "id": "30002",
+      "name": "Boxtour"
+    },
+    {
+      "id": "60002",
+      "name": "Aceleradora"
+    }
+  ],
+  "messages": [
+    "id\ttenantId\tname\tpipelineType",
+    "150037\t1\tFunil de Vendas 1\tsales",
+    "150038\t1\tSucesso do Cliente\tsales",
+    "150039\t1\tFunil de Vendas 2\tsales",
+    "150040\t1\tFunil de Patrocínios\tsales",
+    "150041\t1\tRecuperação Workshop\tsales",
+    "150042\t1\tFunil de Vendas Simulação\tsales",
+    "150043\t1\tFunil de Avaliação de Atendimento ENTUR\tsales"
+  ],
+  "stdout": "id\tname\n1\tMinha Agência\n30002\tBoxtour\n60002\tAceleradora\nid\ttenantId\tname\tpipelineType\n150037\t1\tFunil de Vendas 1\tsales\n150038\t1\tSucesso do Cliente\tsales\n150039\t1\tFunil de Vendas 2\tsales\n150040\t1\tFunil de Patrocínios\tsales\n150041\t1\tRecuperação Workshop\tsales\n150042\t1\tFunil de Vendas Simulação\tsales\n150043\t1\tFunil de Avaliação de Atendimento ENTUR\tsales\n",
+  "stderr": "",
+  "execution_time_ms": 408
+}

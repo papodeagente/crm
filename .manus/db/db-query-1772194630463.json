@@ -1,0 +1,22 @@
+{
+  "query": "SELECT a.number as num_with9, b.number as num_without9, a.cnt as msgs_with9, b.cnt as msgs_without9\nFROM (\n  SELECT REPLACE(remoteJid, '@s.whatsapp.net', '') as number, COUNT(*) as cnt \n  FROM messages WHERE remoteJid LIKE '55%@s.whatsapp.net' \n  GROUP BY remoteJid\n) a\nJOIN (\n  SELECT REPLACE(remoteJid, '@s.whatsapp.net', '') as number, COUNT(*) as cnt \n  FROM messages WHERE remoteJid LIKE '55%@s.whatsapp.net' \n  GROUP BY remoteJid\n) b\nON SUBSTRING(a.number, 1, 4) = SUBSTRING(b.number, 1, 4)\nAND LENGTH(a.number) = 13 AND LENGTH(b.number) = 12\nAND SUBSTRING(a.number, 5, 1) = '9'\nAND SUBSTRING(a.number, 6) = SUBSTRING(b.number, 5)\nLIMIT 20;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute SELECT a.number as num_with9, b.number as num_without9, a.cnt as msgs_with9, b.cnt as msgs_without9\nFROM (\n  SELECT REPLACE(remoteJid, '@s.whatsapp.net', '') as number, COUNT(*) as cnt \n  FROM messages WHERE remoteJid LIKE '55%@s.whatsapp.net' \n  GROUP BY remoteJid\n) a\nJOIN (\n  SELECT REPLACE(remoteJid, '@s.whatsapp.net', '') as number, COUNT(*) as cnt \n  FROM messages WHERE remoteJid LIKE '55%@s.whatsapp.net' \n  GROUP BY remoteJid\n) b\nON SUBSTRING(a.number, 1, 4) = SUBSTRING(b.number, 1, 4)\nAND LENGTH(a.number) = 13 AND LENGTH(b.number) = 12\nAND SUBSTRING(a.number, 5, 1) = '9'\nAND SUBSTRING(a.number, 6) = SUBSTRING(b.number, 5)\nLIMIT 20;",
+  "rows": [
+    {
+      "num_with9": "5584999838420",
+      "num_without9": "558499838420",
+      "msgs_with9": "7",
+      "msgs_without9": "305"
+    },
+    {
+      "num_with9": "5584996051655",
+      "num_without9": "558496051655",
+      "msgs_with9": "2",
+      "msgs_without9": "8035"
+    }
+  ],
+  "messages": [],
+  "stdout": "num_with9\tnum_without9\tmsgs_with9\tmsgs_without9\n5584999838420\t558499838420\t7\t305\n5584996051655\t558496051655\t2\t8035\n",
+  "stderr": "",
+  "execution_time_ms": 410
+}
