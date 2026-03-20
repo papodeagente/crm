@@ -4281,3 +4281,35 @@
 - [x] Testes vitest validando o novo fluxo (6 testes passando)
 - [x] Confirmar que nenhuma regra do WhatsApp foi alterada (apenas Inbox.tsx modificado)
 - [x] Confirmar que nenhuma outra parte do sistema foi modificada
+
+## Módulo de Metas — Cadastro Completo
+- [ ] Diagnosticar estrutura existente de metas (schema, backend, frontend)
+- [ ] Ajustar schema: suporte a escopo (usuário/empresa) e 3 indicadores
+- [ ] Migração SQL para novos campos
+- [ ] Backend: CRUD de metas com novos campos (escopo, indicador, período, valor-alvo)
+- [ ] Frontend: formulário de criação com seleção de escopo (usuário/empresa)
+- [ ] Frontend: seleção de indicador (valor vendido / qtd negociações / taxa conversão)
+- [ ] Frontend: campo de valor-alvo da meta
+- [ ] Frontend: seleção de período com calendário clicável (data início/fim)
+- [ ] Frontend: listagem/visualização de metas cadastradas
+- [ ] Persistência correta de todos os campos
+- [ ] Testes vitest: 6 cenários (2 escopos x 3 indicadores)
+- [ ] Validar que nenhuma outra parte do sistema foi alterada
+
+## Módulo de Metas (Goals) — Configurações
+- [x] Schema: adicionar campos `name`, `scope` (user/company), `companyId` na tabela goals
+- [x] Migration: ALTER TABLE goals ADD name, scope, companyId
+- [x] Backend: atualizar createGoal com novos campos (name, scope, companyId)
+- [x] Backend: adicionar getGoalById, updateGoal, deleteGoal em crmDb.ts
+- [x] Backend: adicionar listCompaniesByTenant em crmDb.ts
+- [x] Backend: endpoints CRUD completos em featureRouters.ts (list, get, create, update, delete)
+- [x] Backend: endpoint management.companies.list para seletor de empresa
+- [x] Frontend: formulário de criação/edição com Dialog (nome, escopo, período, métrica, valor-alvo)
+- [x] Frontend: seletor de escopo (Usuário/Empresa) com seletor condicional de usuário ou empresa
+- [x] Frontend: DatePicker integrado para seleção de período (início e fim)
+- [x] Frontend: seletor de métrica (Valor Vendido, Qtd. Negociações, Taxa de Conversão)
+- [x] Frontend: campo de valor-alvo com formatação contextual (R$, %, número)
+- [x] Frontend: listagem em grid com cards, barra de progresso, badges de escopo
+- [x] Frontend: menu de ações (editar/excluir) em cada card
+- [x] Frontend: dialog de confirmação de exclusão
+- [x] Testes vitest: 15 testes passando (6 cenários de criação, list, get, update, delete, validação, tenant isolation, cleanup)

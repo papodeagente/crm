@@ -829,10 +829,13 @@ export const portalTickets = mysqlTable("portal_tickets", {
 export const goals = mysqlTable("goals", {
   id: int("id").autoincrement().primaryKey(),
   tenantId: int("tenantId").notNull(),
+  name: varchar("name", { length: 255 }),
+  scope: mysqlEnum("scope", ["user", "company"]).default("user").notNull(),
   periodStart: timestamp("periodStart").notNull(),
   periodEnd: timestamp("periodEnd").notNull(),
   teamId: int("teamId"),
   userId: int("userId"),
+  companyId: int("companyId"),
   metricKey: varchar("metricKey", { length: 64 }).notNull(),
   targetValue: bigint("targetValue", { mode: "number" }).default(0),
   createdAt: timestamp("createdAt").defaultNow().notNull(),

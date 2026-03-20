@@ -75,13 +75,56 @@ export const portalRouter = router({
 export const managementRouter = router({
   goals: router({
     list: tenantProcedure
-      
       .query(async ({ input, ctx }) => crm.listGoals(getTenantId(ctx))),
+    get: tenantProcedure
+      .input(z.object({ id: z.number() }))
+      .query(async ({ input, ctx }) => crm.getGoalById(getTenantId(ctx), input.id)),
     create: tenantProcedure
-      .input(z.object({ periodStart: z.string(), periodEnd: z.string(), metricKey: z.string(), targetValue: z.number(), teamId: z.number().optional(), userId: z.number().optional() }))
+      .input(z.object({
+        name: z.string().min(1).optional(),
+        scope: z.enum(["user", "company"]).default("user"),
+        periodStart: z.string(),
+        periodEnd: z.string(),
+        metricKey: z.string(),
+        targetValue: z.number().positive(),
+        teamId: z.number().optional(),
+        userId: z.number().optional(),
+        companyId: z.number().optional(),
+      }))
       .mutation(async ({ input, ctx }) => {
-        return crm.createGoal({ ...input, tenantId: getTenantId(ctx), periodStart: new Date(input.periodStart), periodEnd: new Date(input.periodEnd) });
+        return crm.createGoal({
+          ...input,
+          tenantId: getTenantId(ctx),
+          periodStart: new Date(input.periodStart),
+          periodEnd: new Date(input.periodEnd),
+        });
       }),
+    update: tenantProcedure
+      .input(z.object({
+        id: z.number(),
+        name: z.string().min(1).optional(),
+        scope: z.enum(["user", "company"]).optional(),
+        periodStart: z.string().optional(),
+        periodEnd: z.string().optional(),
+        metricKey: z.string().optional(),
+        targetValue: z.number().positive().optional(),
+        userId: z.number().nullable().optional(),
+        companyId: z.number().nullable().optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const { id, ...data } = input;
+        const updateData: any = { ...data };
+        if (data.periodStart) updateData.periodStart = new Date(data.periodStart);
+        if (data.periodEnd) updateData.periodEnd = new Date(data.periodEnd);
+        return crm.updateGoal(getTenantId(ctx), id, updateData);
+      }),
+    delete: tenantProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input, ctx }) => crm.deleteGoal(getTenantId(ctx), input.id)),
+  }),
+  companies: router({
+    list: tenantProcedure
+      .query(async ({ input, ctx }) => crm.listCompaniesByTenant(getTenantId(ctx))),
   }),
 });
 

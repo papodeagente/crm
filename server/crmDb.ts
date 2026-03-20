@@ -810,7 +810,7 @@ export async function createPortalTicket(data: { tenantId: number; contactId: nu
 // ═══════════════════════════════════════
 // GOALS & INSIGHTS
 // ═══════════════════════════════════════
-export async function createGoal(data: { tenantId: number; periodStart: Date; periodEnd: Date; metricKey: string; targetValue: number; teamId?: number; userId?: number }) {
+export async function createGoal(data: { tenantId: number; name?: string; scope?: "user" | "company"; periodStart: Date; periodEnd: Date; metricKey: string; targetValue: number; teamId?: number; userId?: number; companyId?: number }) {
   const db = await getDb(); if (!db) return null;
   const [result] = await db.insert(goals).values(data).$returningId();
   return result;
@@ -818,6 +818,25 @@ export async function createGoal(data: { tenantId: number; periodStart: Date; pe
 export async function listGoals(tenantId: number) {
   const db = await getDb(); if (!db) return [];
   return db.select().from(goals).where(eq(goals.tenantId, tenantId)).orderBy(desc(goals.createdAt));
+}
+export async function getGoalById(tenantId: number, goalId: number) {
+  const db = await getDb(); if (!db) return null;
+  const rows = await db.select().from(goals).where(and(eq(goals.id, goalId), eq(goals.tenantId, tenantId))).limit(1);
+  return rows[0] ?? null;
+}
+export async function updateGoal(tenantId: number, goalId: number, data: Partial<{ name: string; scope: "user" | "company"; periodStart: Date; periodEnd: Date; metricKey: string; targetValue: number; userId: number | null; companyId: number | null }>) {
+  const db = await getDb(); if (!db) return null;
+  await db.update(goals).set(data as any).where(and(eq(goals.id, goalId), eq(goals.tenantId, tenantId)));
+  return { id: goalId };
+}
+export async function deleteGoal(tenantId: number, goalId: number) {
+  const db = await getDb(); if (!db) return null;
+  await db.delete(goals).where(and(eq(goals.id, goalId), eq(goals.tenantId, tenantId)));
+  return { id: goalId };
+}
+export async function listCompaniesByTenant(tenantId: number) {
+  const db = await getDb(); if (!db) return [];
+  return db.select({ id: contacts.id, name: contacts.name }).from(contacts).where(and(eq(contacts.tenantId, tenantId), eq(contacts.type, "company"))).orderBy(contacts.name);
 }
 export async function listAlerts(tenantId: number, opts?: { status?: string }) {
   const db = await getDb(); if (!db) return [];
