@@ -4412,3 +4412,12 @@
 - [x] Restauração de dados: NÃO necessária (banco íntegro, problema era apenas de query)
 - [x] Guard rails: 17 testes vitest em tenantIsolation.test.ts
 - [x] Validação: 44 testes passando (17 tenant isolation + 27 chat bugfixes)
+
+## Correção Completa: Contaminação bruno@entur.com.br entre Tenants
+- [x] Diagnóstico: correção anterior (input.tenantId) aplicada e correta
+- [x] Auditoria: login, sessão, convite, agentes, admin — 2 pontos residuais encontrados
+- [x] Banco verificado: bruno@entur.com.br em 2 tenants (Entur + Aceleradora) — convite legítimo
+- [x] loginWithEmail: corrigido LIMIT 1 → busca todos, prioriza ativo, verifica senha em cada
+- [x] requestPasswordReset: corrigido LIMIT 1 → prioriza usuário ativo com senha
+- [x] 22 testes passando em tenantIsolation.test.ts (5 novos testes de login/reset/middleware)
+- [x] TypeScript compila sem erros, zero regressão

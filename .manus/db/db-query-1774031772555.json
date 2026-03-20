@@ -1,0 +1,55 @@
+{
+  "query": "SELECT id, tenantId, name, email, status, crm_user_role, createdAt FROM crm_users WHERE tenantId = 300005 ORDER BY id;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute SELECT id, tenantId, name, email, status, crm_user_role, createdAt FROM crm_users WHERE tenantId = 300005 ORDER BY id;",
+  "rows": [
+    {
+      "id": "300021",
+      "tenantId": "300005",
+      "name": "Bruno Acelera",
+      "email": "bruno@aceleradora.tur.br",
+      "status": "active",
+      "crm_user_role": "admin",
+      "createdAt": "2026-03-19 13:50:56"
+    },
+    {
+      "id": "300022",
+      "tenantId": "300005",
+      "name": "Bruno  Barbosa da Silva",
+      "email": "bruno@entur.com.br",
+      "status": "invited",
+      "crm_user_role": "user",
+      "createdAt": "2026-03-19 13:51:23"
+    },
+    {
+      "id": "300023",
+      "tenantId": "300005",
+      "name": "Fernando Guilherme ",
+      "email": "fernando@entur.com.br",
+      "status": "invited",
+      "crm_user_role": "user",
+      "createdAt": "2026-03-19 13:51:23"
+    },
+    {
+      "id": "300024",
+      "tenantId": "300005",
+      "name": "Maisa",
+      "email": "maisa@aceleradora.tur.br",
+      "status": "invited",
+      "crm_user_role": "user",
+      "createdAt": "2026-03-19 13:51:23"
+    },
+    {
+      "id": "300025",
+      "tenantId": "300005",
+      "name": "Viviane Assis ",
+      "email": "viviane@entur.com.br",
+      "status": "invited",
+      "crm_user_role": "user",
+      "createdAt": "2026-03-19 13:51:23"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\ttenantId\tname\temail\tstatus\tcrm_user_role\tcreatedAt\n300021\t300005\tBruno Acelera\tbruno@aceleradora.tur.br\tactive\tadmin\t2026-03-19 13:50:56\n300022\t300005\tBruno  Barbosa da Silva\tbruno@entur.com.br\tinvited\tuser\t2026-03-19 13:51:23\n300023\t300005\tFernando Guilherme \tfernando@entur.com.br\tinvited\tuser\t2026-03-19 13:51:23\n300024\t300005\tMaisa\tmaisa@aceleradora.tur.br\tinvited\tuser\t2026-03-19 13:51:23\n300025\t300005\tViviane Assis \tviviane@entur.com.br\tinvited\tuser\t2026-03-19 13:51:23\n",
+  "stderr": "",
+  "execution_time_ms": 57
+}

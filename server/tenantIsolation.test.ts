@@ -190,3 +190,65 @@ describe("Regression prevention: input.tenantId validation", () => {
     }
   });
 });
+
+// ─── LOGIN: multi-tenant user handling ───
+
+describe("Login: multi-tenant user safety", () => {
+  const saasAuthPath = path.join(__dirname, "saasAuth.ts");
+  const saasAuthCode = fs.readFileSync(saasAuthPath, "utf-8");
+
+  it("loginWithEmail fetches ALL users with email, not LIMIT 1", () => {
+    const fnStart = saasAuthCode.indexOf("export async function loginWithEmail");
+    expect(fnStart).toBeGreaterThan(-1);
+    const fnBlock = saasAuthCode.substring(fnStart, fnStart + 1200);
+    // Must NOT use .limit(1) for the initial email lookup
+    // Should fetch all users and verify password against each
+    expect(fnBlock).not.toMatch(/\.where\(eq\(crmUsers\.email.*\.limit\(1\)/);
+    // Must iterate candidates to verify password
+    expect(fnBlock).toContain("sortedUsers");
+    expect(fnBlock).toContain("verifyPassword");
+  });
+
+  it("loginWithEmail prioritizes active users over invited", () => {
+    const fnStart = saasAuthCode.indexOf("export async function loginWithEmail");
+    const fnBlock = saasAuthCode.substring(fnStart, fnStart + 1200);
+    expect(fnBlock).toContain("active");
+    expect(fnBlock).toContain("invited");
+    expect(fnBlock).toContain("sort");
+  });
+
+  it("requestPasswordReset fetches ALL users, not LIMIT 1", () => {
+    const fnStart = saasAuthCode.indexOf("export async function requestPasswordReset");
+    expect(fnStart).toBeGreaterThan(-1);
+    const fnBlock = saasAuthCode.substring(fnStart, fnStart + 800);
+    // Must NOT use .limit(1)
+    expect(fnBlock).not.toMatch(/\.where\(eq\(crmUsers\.email.*\.limit\(1\)/);
+    // Must prioritize active user
+    expect(fnBlock).toContain("active");
+  });
+});
+
+// ─── TENANT MIDDLEWARE: tenantProcedure blocks cross-tenant access ───
+
+describe("tenantProcedure middleware: cross-tenant protection", () => {
+  const trpcPath = path.join(__dirname, "_core/trpc.ts");
+  const trpcCode = fs.readFileSync(trpcPath, "utf-8");
+
+  it("tenantProcedure injects tenantId from JWT, not from client input", () => {
+    const mwStart = trpcCode.indexOf("const requireTenant = t.middleware");
+    expect(mwStart).toBeGreaterThan(-1);
+    const mwBlock = trpcCode.substring(mwStart, mwStart + 1500);
+    // Must use ctx.saasUser.tenantId
+    expect(mwBlock).toContain("ctx.saasUser.tenantId");
+    // Must log security warning if client tries to override
+    expect(mwBlock).toContain("SECURITY");
+    expect(mwBlock).toContain("Tenant mismatch");
+  });
+
+  it("tenantProcedure ignores client-sent tenantId", () => {
+    const mwStart = trpcCode.indexOf("const requireTenant = t.middleware");
+    const mwBlock = trpcCode.substring(mwStart, mwStart + 1500);
+    // The middleware must set tenantId from JWT, overriding any client input
+    expect(mwBlock).toContain("const tenantId = ctx.saasUser.tenantId");
+  });
+});
