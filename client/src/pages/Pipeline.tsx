@@ -99,10 +99,10 @@ export default function Pipeline() {
     window.addEventListener("sale-celebration", handler);
     return () => window.removeEventListener("sale-celebration", handler);
   }, []);
-  const crmUsers = trpc.admin.users.list.useQuery();
+  const crmUsers = trpc.admin.users.list.useQuery(undefined, { staleTime: 5 * 60 * 1000 });
 
   const utils = trpc.useUtils();
-  const pipelines = trpc.crm.pipelines.list.useQuery({});
+  const pipelines = trpc.crm.pipelines.list.useQuery({}, { staleTime: 5 * 60 * 1000 });
 
   // Load user's default pipeline preference
   const defaultPipelinePref = trpc.preferences.get.useQuery(
@@ -154,8 +154,8 @@ export default function Pipeline() {
     { enabled: !!activePipeline }
   );
 
-  const contacts = trpc.crm.contacts.list.useQuery({ limit: 200 });
-  const allAccounts = trpc.crm.accounts.list.useQuery();
+  const contacts = trpc.crm.contacts.list.useQuery({ limit: 200 }, { staleTime: 2 * 60 * 1000 });
+  const allAccounts = trpc.crm.accounts.list.useQuery(undefined, { staleTime: 2 * 60 * 1000 });
   // Optimized: aggregated overdue/pending counts per deal for Kanban cards
   const overdueSummary = trpc.crm.tasks.overdueSummary.useQuery({});
   const pendingCounts = trpc.crm.tasks.pendingCounts.useQuery();
@@ -943,7 +943,7 @@ function DealDrawer({ dealId, onClose, contacts, accounts, stages }: {
   const participants = trpc.crm.deals.participants.list.useQuery({ dealId });
   const dealTasks = trpc.crm.tasks.list.useQuery({ entityType: "deal", entityId: dealId });
   const dealNotes = trpc.crm.notes.list.useQuery({ entityType: "deal", entityId: dealId });
-  const lossReasonsQ = trpc.crm.lossReasons.list.useQuery({});
+  const lossReasonsQ = trpc.crm.lossReasons.list.useQuery({}, { staleTime: 5 * 60 * 1000 });
   const lossReasonsList = (lossReasonsQ.data || []).filter((r: any) => r.isActive && !r.isDeleted);
   const [showLossDialog, setShowLossDialog] = useState(false);
   const [lossDialogDealId, setLossDialogDealId] = useState<number | null>(null);

@@ -56,7 +56,7 @@ export default function Supervision() {
   const [selectedAgentForAssign, setSelectedAgentForAssign] = useState<number | null>(null);
 
   // Get sessions
-  const sessionsQ = trpc.whatsapp.sessions.useQuery();
+  const sessionsQ = trpc.whatsapp.sessions.useQuery(undefined, { staleTime: 60 * 1000 });
   const sessions = (sessionsQ.data as any[] || []);
   const onlineSessions = sessions.filter((s: any) => s.status === "open" || s.status === "connected");
   const activeSessionId = selectedSession || onlineSessions[0]?.sessionId || "";
@@ -64,19 +64,19 @@ export default function Supervision() {
   // Get agent workload
   const workloadQ = trpc.whatsapp.supervision.agentWorkload.useQuery(
     { sessionId: activeSessionId },
-    { enabled: !!activeSessionId, refetchInterval: 10000, staleTime: 5000 }
+    { enabled: !!activeSessionId, refetchInterval: 30000, staleTime: 15000 }
   );
 
   // Get queue stats with items
   const queueQ = trpc.whatsapp.supervision.queueStats.useQuery(
     { sessionId: activeSessionId },
-    { enabled: !!activeSessionId, refetchInterval: 10000, staleTime: 5000 }
+    { enabled: !!activeSessionId, refetchInterval: 30000, staleTime: 15000 }
   );
 
   // Get agent conversations when expanded
   const agentConvsQ = trpc.whatsapp.supervision.agentConversations.useQuery(
     { sessionId: activeSessionId, agentId: expandedAgent || 0, limit: 30 },
-    { enabled: !!activeSessionId && !!expandedAgent, refetchInterval: 15000 }
+    { enabled: !!activeSessionId && !!expandedAgent, refetchInterval: 30000, staleTime: 15000 }
   );
 
   // Mutations
@@ -168,7 +168,7 @@ export default function Supervision() {
               <h1 className="text-lg font-bold text-foreground">Supervisão</h1>
               <p className="text-[12px] text-muted-foreground flex items-center gap-1">
                 <Activity className="w-3 h-3" />
-                Atualiza a cada 10s
+                Atualiza a cada 30s
               </p>
             </div>
           </div>

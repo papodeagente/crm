@@ -213,7 +213,7 @@ export default function MessageMonitoring() {
   const [liveEvents, setLiveEvents] = useState<Array<{ type: string; data: any; ts: number }>>([]);
 
   // Get sessions
-  const sessionsQuery = trpc.whatsapp.sessions.useQuery(undefined, { enabled: !!user });
+  const sessionsQuery = trpc.whatsapp.sessions.useQuery(undefined, { enabled: !!user, staleTime: 60 * 1000 });
   const sessions = sessionsQuery.data || [];
   const [selectedSession, setSelectedSession] = useState("");
 
@@ -228,31 +228,31 @@ export default function MessageMonitoring() {
   // Queries
   const statusMetrics = trpc.monitoring.statusMetrics.useQuery(
     { sessionId: selectedSession, periodDays },
-    { enabled: queryEnabled, refetchInterval: 30000 }
+    { enabled: queryEnabled, refetchInterval: 60000, staleTime: 30000 }
   );
   const volumeOverTime = trpc.monitoring.volumeOverTime.useQuery(
     { sessionId: selectedSession, periodDays, granularity: periodDays <= 2 ? "hour" : "day" },
-    { enabled: queryEnabled, refetchInterval: 30000 }
+    { enabled: queryEnabled, refetchInterval: 60000, staleTime: 30000 }
   );
   const deliveryRate = trpc.monitoring.deliveryRate.useQuery(
     { sessionId: selectedSession, periodDays },
-    { enabled: queryEnabled, refetchInterval: 30000 }
+    { enabled: queryEnabled, refetchInterval: 60000, staleTime: 30000 }
   );
   const recentActivity = trpc.monitoring.recentActivity.useQuery(
     { sessionId: selectedSession, limit: 50 },
-    { enabled: queryEnabled, refetchInterval: 15000 }
+    { enabled: queryEnabled, refetchInterval: 30000, staleTime: 15000 }
   );
   const typeDistribution = trpc.monitoring.typeDistribution.useQuery(
     { sessionId: selectedSession, periodDays },
-    { enabled: queryEnabled, refetchInterval: 60000 }
+    { enabled: queryEnabled, refetchInterval: 120000, staleTime: 60000 }
   );
   const topContacts = trpc.monitoring.topContacts.useQuery(
     { sessionId: selectedSession, periodDays, limit: 10 },
-    { enabled: queryEnabled, refetchInterval: 60000 }
+    { enabled: queryEnabled, refetchInterval: 120000, staleTime: 60000 }
   );
   const responseTime = trpc.monitoring.responseTime.useQuery(
     { sessionId: selectedSession, periodDays },
-    { enabled: queryEnabled, refetchInterval: 60000 }
+    { enabled: queryEnabled, refetchInterval: 120000, staleTime: 60000 }
   );
 
   // Live events from Socket.IO

@@ -4380,3 +4380,13 @@
 - [x] Validar separação preço padrão do produto vs preço editado na negociação
 - [x] Testes vitest para todos os cenários de criação (9 testes passando)
 - [x] Nenhuma outra área do sistema alterada
+
+## Otimização de Performance (Round 2)
+- [x] Diagnosticar gargalos reais pós-alterações recentes
+- [x] Otimizar queries pesadas no backend: 2 índices compostos adicionados (messages sessionId+timestamp, sessionId+fromMe+status)
+- [x] Eliminar N+1 queries remanescentes (já otimizado no round 1)
+- [x] Otimizar frontend: staleTime global 30s adicionado ao QueryClient
+- [x] Reduzir fetches redundantes: staleTime específico em DealDetail (12 queries), Pipeline (5 queries), MessageMonitoring (7 queries), Contacts, Logs, Messages, WhatsApp
+- [x] Otimizar componentes pesados: refetchInterval aumentado em Messages 5s→15s, Logs 5s→15s, MessageMonitoring 15-30s→30-120s, Supervision 10s→30s, WhatsApp QR 2s→5s
+- [x] Validar zero regressão funcional: 66 testes passando em 7 suites
+- [x] Confirmar que nenhuma regra de negócio, layout ou comportamento foi alterado

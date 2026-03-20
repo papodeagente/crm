@@ -24,6 +24,8 @@ const queryClient = new QueryClient({
         return failureCount < 2;
       },
       retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10000),
+      staleTime: 30 * 1000, // 30s global default: avoid refetching data that was just fetched
+      refetchOnWindowFocus: false, // prevent refetch storms when user switches tabs
     },
     mutations: {
       retry: (failureCount, error) => {

@@ -62,6 +62,8 @@ export const waMessages = mysqlTable("messages", {
   index("msg_tenant_idx").on(t.tenantId),
   index("msg_session_jid_idx").on(t.sessionId, t.remoteJid, t.timestamp),
   index("idx_msg_wa_conv").on(t.waConversationId),
+  index("idx_msg_session_ts").on(t.sessionId, t.timestamp),
+  index("idx_msg_session_fromme").on(t.sessionId, t.fromMe, t.status, t.timestamp),
   uniqueIndex("idx_unique_msgid_session").on(t.messageId, t.sessionId),
 ]);
 
