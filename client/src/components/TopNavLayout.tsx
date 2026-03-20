@@ -380,7 +380,7 @@ function TopBar({ onSearchOpen, mobileMenuOpen, onToggleMobile }: {
           </Link>
 
           {/* Desktop Nav */}
-          <nav className="hidden md:flex items-center gap-0.5 ml-2">
+          <nav className="hidden md:flex items-center gap-0.5 ml-2 overflow-x-auto scrollbar-none shrink min-w-0">
             {navItems.map((item) => {
               const isActive = item.path === "/dashboard"
                 ? location === "/dashboard"
@@ -408,7 +408,7 @@ function TopBar({ onSearchOpen, mobileMenuOpen, onToggleMobile }: {
           {/* Search */}
           <button
             onClick={onSearchOpen}
-            className="hidden sm:flex items-center gap-2 h-8 px-3 rounded-lg bg-muted/60 border border-transparent hover:border-border text-muted-foreground text-[13px] transition-all duration-150 w-full max-w-[220px]"
+            className="hidden sm:flex items-center gap-2 h-8 px-3 rounded-lg bg-muted/60 border border-transparent hover:border-border text-muted-foreground text-[13px] transition-all duration-150 shrink min-w-[120px] max-w-[220px]"
           >
             <Search className="h-3.5 w-3.5" />
             <span>Buscar...</span>
@@ -416,7 +416,7 @@ function TopBar({ onSearchOpen, mobileMenuOpen, onToggleMobile }: {
           </button>
 
           {/* Right actions */}
-          <div className="flex items-center gap-0.5 ml-2">
+          <div className="flex items-center gap-0.5 ml-2 shrink-0">
             {/* Notifications bell */}
             <Button
               variant="ghost"
@@ -453,7 +453,7 @@ function TopBar({ onSearchOpen, mobileMenuOpen, onToggleMobile }: {
             {/* User avatar */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className="flex items-center gap-2 rounded-xl px-1.5 py-1 hover:bg-accent transition-all duration-150">
+                <button className="flex items-center gap-2 rounded-xl px-1.5 py-1 hover:bg-accent transition-all duration-150 shrink-0">
                   <Avatar className="h-8 w-8">
                     {saasMe?.avatarUrl && <AvatarImage src={saasMe.avatarUrl} alt={user?.name || ""} />}
                     <AvatarFallback className="text-[12px] font-semibold text-white" style={{

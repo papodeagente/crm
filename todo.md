@@ -4400,3 +4400,11 @@
 - [x] 9 testes passando (6 preservação + 3 não-regressão)
 - [x] Bonus: corrigido bug de tRPC path no optimistic reaction (utils.wa.messages → utils.whatsapp.messagesByContact)
 - [x] TypeScript compila sem erros
+
+## Bug Fix: Avatar desaparece no header em tela não-cheia
+- [x] Diagnosticar: nav desktop com 8 itens + spacer + search empurravam avatar para fora
+- [x] Causa raiz: bloco de ações da direita não tinha shrink-0, flex layout encolhia avatar
+- [x] Correção: shrink-0 no bloco de ações + avatar button, nav overflow-x-auto, search shrinkable
+- [x] 10 testes passando (6 layout + 4 não-regressão)
+- [x] TypeScript sem erros
+- [x] Zero regressão: header sticky, hamburger mobile, Super Admin, logout intactos
