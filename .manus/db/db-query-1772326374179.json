@@ -1,9 +1,0 @@
-{
-  "query": "CREATE TABLE `task_assignees` (\n\t`id` int AUTO_INCREMENT NOT NULL,\n\t`taskId` int NOT NULL,\n\t`userId` int NOT NULL,\n\t`tenantId` int NOT NULL,\n\t`createdAt` timestamp NOT NULL DEFAULT (now()),\n\tCONSTRAINT `task_assignees_id` PRIMARY KEY(`id`)\n);\nALTER TABLE `crm_tasks` ADD `taskType` varchar(32) DEFAULT 'task';\nALTER TABLE `crm_tasks` ADD `description` text;\nCREATE INDEX `ta_task_idx` ON `task_assignees` (`taskId`);\nCREATE INDEX `ta_user_idx` ON `task_assignees` (`userId`);",
-  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute CREATE TABLE `task_assignees` (\n\t`id` int AUTO_INCREMENT NOT NULL,\n\t`taskId` int NOT NULL,\n\t`userId` int NOT NULL,\n\t`tenantId` int NOT NULL,\n\t`createdAt` timestamp NOT NULL DEFAULT (now()),\n\tCONSTRAINT `task_assignees_id` PRIMARY KEY(`id`)\n);\nALTER TABLE `crm_tasks` ADD `taskType` varchar(32) DEFAULT 'task';\nALTER TABLE `crm_tasks` ADD `description` text;\nCREATE INDEX `ta_task_idx` ON `task_assignees` (`taskId`);\nCREATE INDEX `ta_user_idx` ON `task_assignees` (`userId`);",
-  "rows": [],
-  "messages": [],
-  "stdout": "",
-  "stderr": "",
-  "execution_time_ms": 2296
-}

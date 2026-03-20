@@ -1,9 +1,0 @@
-{
-  "query": "UPDATE wa_conversations c INNER JOIN wa_contacts ct ON c.sessionId = ct.sessionId AND c.remoteJid = ct.jid SET c.contactPushName = ct.pushName WHERE ct.pushName IS NOT NULL AND ct.pushName != '' AND (c.contactPushName IS NULL OR c.contactPushName = '' OR c.contactPushName REGEXP '^[0-9]+$')",
-  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute UPDATE wa_conversations c INNER JOIN wa_contacts ct ON c.sessionId = ct.sessionId AND c.remoteJid = ct.jid SET c.contactPushName = ct.pushName WHERE ct.pushName IS NOT NULL AND ct.pushName != '' AND (c.contactPushName IS NULL OR c.contactPushName = '' OR c.contactPushName REGEXP '^[0-9]+$')",
-  "rows": [],
-  "messages": [],
-  "stdout": "",
-  "stderr": "",
-  "execution_time_ms": 368
-}

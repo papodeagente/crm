@@ -1,8 +1,0 @@
-{
-  "query": "CREATE INDEX idx_msg_audio_status ON messages (audioTranscriptionStatus); CREATE INDEX idx_msg_type ON messages (messageType);",
-  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute CREATE INDEX idx_msg_audio_status ON messages (audioTranscriptionStatus); CREATE INDEX idx_msg_type ON messages (messageType);",
-  "returncode": 1,
-  "logs": [
-    "ERROR 1072 (42000) at line 1: column does not exist: audioTranscriptionStatus"
-  ]
-}

@@ -1,9 +1,0 @@
-{
-  "query": "DELETE FROM crm_notes WHERE tenantId = 1; DELETE FROM deal_products WHERE tenantId = 1; DELETE FROM deal_history WHERE tenantId = 1; DELETE FROM crm_tasks WHERE tenantId = 1; DELETE FROM deals WHERE tenantId = 1; DELETE FROM contacts WHERE tenantId = 1; DELETE FROM accounts WHERE tenantId = 1; DELETE FROM pipeline_stages WHERE tenantId = 1; DELETE FROM pipeline_automations WHERE tenantId = 1; DELETE FROM pipelines WHERE tenantId = 1; DELETE FROM product_catalog WHERE tenantId = 1; DELETE FROM lead_sources WHERE tenantId = 1; DELETE FROM campaigns WHERE tenantId = 1; DELETE FROM loss_reasons WHERE tenantId = 1",
-  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute DELETE FROM crm_notes WHERE tenantId = 1; DELETE FROM deal_products WHERE tenantId = 1; DELETE FROM deal_history WHERE tenantId = 1; DELETE FROM crm_tasks WHERE tenantId = 1; DELETE FROM deals WHERE tenantId = 1; DELETE FROM contacts WHERE tenantId = 1; DELETE FROM accounts WHERE tenantId = 1; DELETE FROM pipeline_stages WHERE tenantId = 1; DELETE FROM pipeline_automations WHERE tenantId = 1; DELETE FROM pipelines WHERE tenantId = 1; DELETE FROM product_catalog WHERE tenantId = 1; DELETE FROM lead_sources WHERE tenantId = 1; DELETE FROM campaigns WHERE tenantId = 1; DELETE FROM loss_reasons WHERE tenantId = 1",
-  "rows": [],
-  "messages": [],
-  "stdout": "",
-  "stderr": "",
-  "execution_time_ms": 1927
-}

@@ -4421,3 +4421,9 @@
 - [x] requestPasswordReset: corrigido LIMIT 1 → prioriza usuário ativo com senha
 - [x] 22 testes passando em tenantIsolation.test.ts (5 novos testes de login/reset/middleware)
 - [x] TypeScript compila sem erros, zero regressão
+
+## Fix: Deploy travado em "publicando" (Fase 2)
+- [x] Diagnóstico: 478 arquivos de log de queries (.manus/db/) rastreados pelo git
+- [x] Removidos 478 arquivos .manus/db/ do tracking git
+- [x] Adicionado .manus/ ao .gitignore para prevenir futuro acúmulo
+- [x] Repositório reduzido de 869 arquivos/8.9MB para 391 arquivos/6.7MB (redução de 55%)

@@ -1,9 +1,0 @@
-{
-  "query": "SELECT id, name, label FROM custom_fields \nWHERE name LIKE 'test_%' \n   OR name LIKE 'reorder_%'\n   OR label LIKE 'Test %'\n   OR label LIKE 'Visibility %';",
-  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Nn3NsgWfgWMEmv.e05a65be2af1 --database EKvcVicuVoUxTnzjSKzgdk --execute SELECT id, name, label FROM custom_fields \nWHERE name LIKE 'test_%' \n   OR name LIKE 'reorder_%'\n   OR label LIKE 'Test %'\n   OR label LIKE 'Visibility %';",
-  "rows": [],
-  "messages": [],
-  "stdout": "",
-  "stderr": "",
-  "execution_time_ms": 351
-}
