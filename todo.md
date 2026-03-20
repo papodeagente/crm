@@ -4294,7 +4294,7 @@
 - [ ] Frontend: listagem/visualização de metas cadastradas
 - [ ] Persistência correta de todos os campos
 - [ ] Testes vitest: 6 cenários (2 escopos x 3 indicadores)
-- [ ] Validar que nenhuma outra parte do sistema foi alterada
+- [x] Validar que nenhuma outra parte do sistema foi alterada
 
 ## Módulo de Metas (Goals) — Configurações
 - [x] Schema: adicionar campos `name`, `scope` (user/company), `companyId` na tabela goals
@@ -4313,3 +4313,14 @@
 - [x] Frontend: menu de ações (editar/excluir) em cada card
 - [x] Frontend: dialog de confirmação de exclusão
 - [x] Testes vitest: 15 testes passando (6 cenários de criação, list, get, update, delete, validação, tenant isolation, cleanup)
+
+## Correção: Progresso Automático das Metas com Pipeline
+- [x] Diagnosticar causa raiz: meta não avança quando pipeline muda
+- [x] Implementar recálculo automático de meta de valor vendido (ao ganhar negociação)
+- [x] Implementar recálculo automático de meta de qtd negociações (ao criar deal)
+- [x] Implementar recálculo automático de meta de taxa de conversão (ganhas/iniciadas)
+- [x] Respeitar escopo da meta (usuário ou empresa)
+- [x] Respeitar período da meta (data início e fim)
+- [x] Atualizar frontend para exibir progresso real calculado
+- [x] Testes vitest para validar os 3 tipos de meta com progresso automático (28 testes passando)
+- [x] Validar que nenhuma outra parte do sistema foi alterada

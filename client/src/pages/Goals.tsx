@@ -225,7 +225,9 @@ export default function Goals() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {goals.data.map((g: any) => {
-            const pct = g.targetValue > 0 ? Math.min(100, Math.round(((g.currentValue ?? 0) / g.targetValue) * 100)) : 0;
+            // For total_sold: currentValue comes as cents from DB, targetValue is in reais
+            const currentVal = g.metricKey === 'total_sold' ? (g.currentValue ?? 0) / 100 : (g.currentValue ?? 0);
+            const pct = g.targetValue > 0 ? Math.min(100, Math.round((currentVal / g.targetValue) * 100)) : 0;
             const isComplete = pct >= 100;
             const MetricIcon = getMetricIcon(g.metricKey);
             return (
@@ -279,7 +281,7 @@ export default function Goals() {
                   </div>
                   <div className="flex items-center justify-between mt-2">
                     <span className="text-[11px] text-muted-foreground">
-                      Atual: {formatTargetValue(g.currentValue ?? 0, g.metricKey)}
+                      Atual: {formatTargetValue(currentVal, g.metricKey)}
                     </span>
                     <span className="text-[11px] text-muted-foreground">
                       Alvo: {formatTargetValue(g.targetValue, g.metricKey)}

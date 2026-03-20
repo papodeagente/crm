@@ -817,12 +817,73 @@ export async function createGoal(data: { tenantId: number; name?: string; scope?
 }
 export async function listGoals(tenantId: number) {
   const db = await getDb(); if (!db) return [];
-  return db.select().from(goals).where(eq(goals.tenantId, tenantId)).orderBy(desc(goals.createdAt));
+  const rows = await db.select().from(goals).where(eq(goals.tenantId, tenantId)).orderBy(desc(goals.createdAt));
+  // Calculate currentValue for each goal from real pipeline data
+  return Promise.all(rows.map(async (goal) => {
+    const currentValue = await calculateGoalProgress(db, goal);
+    return { ...goal, currentValue };
+  }));
+}
+
+/** Calculate real-time progress for a goal based on deals in the pipeline */
+async function calculateGoalProgress(db: any, goal: any): Promise<number> {
+  try {
+    const { tenantId, metricKey, scope, userId, companyId, periodStart, periodEnd } = goal;
+    // Base conditions: same tenant, within period, not deleted
+    const baseConds = [
+      `d.tenantId = ${Number(tenantId)}`,
+      `d.deletedAt IS NULL`,
+      `d.createdAt >= '${new Date(periodStart).toISOString().slice(0, 19).replace('T', ' ')}'`,
+      `d.createdAt <= '${new Date(periodEnd).toISOString().slice(0, 19).replace('T', ' ')}'`,
+    ];
+    // Scope filter
+    if (scope === 'user' && userId) {
+      baseConds.push(`d.ownerUserId = ${Number(userId)}`);
+    } else if (scope === 'company' && companyId) {
+      baseConds.push(`d.accountId = ${Number(companyId)}`);
+    }
+    const whereClause = baseConds.join(' AND ');
+
+    if (metricKey === 'total_sold') {
+      // Sum valueCents of won deals within the period
+      const [rows] = await db.execute(
+        sql`SELECT COALESCE(SUM(d.valueCents), 0) as total FROM deals d WHERE ${sql.raw(whereClause)} AND d.status = 'won'`
+      );
+      return Number((rows as any)[0]?.total ?? 0);
+    }
+
+    if (metricKey === 'deals_count') {
+      // Count all deals created within the period
+      const [rows] = await db.execute(
+        sql`SELECT COUNT(*) as total FROM deals d WHERE ${sql.raw(whereClause)}`
+      );
+      return Number((rows as any)[0]?.total ?? 0);
+    }
+
+    if (metricKey === 'conversion_rate') {
+      // Conversion rate = (won deals / total deals) * 100
+      const [rows] = await db.execute(
+        sql`SELECT COUNT(*) as total, SUM(CASE WHEN d.status = 'won' THEN 1 ELSE 0 END) as won FROM deals d WHERE ${sql.raw(whereClause)}`
+      );
+      const total = Number((rows as any)[0]?.total ?? 0);
+      const won = Number((rows as any)[0]?.won ?? 0);
+      if (total === 0) return 0;
+      return Math.round((won / total) * 100 * 10) / 10; // one decimal place
+    }
+
+    return 0;
+  } catch (err) {
+    console.error('[calculateGoalProgress] Error:', err);
+    return 0;
+  }
 }
 export async function getGoalById(tenantId: number, goalId: number) {
   const db = await getDb(); if (!db) return null;
   const rows = await db.select().from(goals).where(and(eq(goals.id, goalId), eq(goals.tenantId, tenantId))).limit(1);
-  return rows[0] ?? null;
+  const goal = rows[0] ?? null;
+  if (!goal) return null;
+  const currentValue = await calculateGoalProgress(db, goal);
+  return { ...goal, currentValue };
 }
 export async function updateGoal(tenantId: number, goalId: number, data: Partial<{ name: string; scope: "user" | "company"; periodStart: Date; periodEnd: Date; metricKey: string; targetValue: number; userId: number | null; companyId: number | null }>) {
   const db = await getDb(); if (!db) return null;
