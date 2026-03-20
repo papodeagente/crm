@@ -112,6 +112,61 @@ const validateSessionMiddleware = t.middleware(async opts => {
 
 export const sessionProtectedProcedure = t.procedure.use(validateSessionMiddleware);
 
+/**
+ * sessionTenantProcedure: combines tenant isolation + session ownership validation.
+ * Use for ALL WhatsApp endpoints that accept sessionId AND need tenant context.
+ * 
+ * Guarantees:
+ * 1. ctx.saasUser exists with valid tenantId (from JWT)
+ * 2. ctx.tenantId is injected automatically
+ * 3. sessionId in input belongs to the user (or user has admin/share access)
+ * 4. Cross-tenant session access is blocked
+ */
+const requireTenantAndSession = t.middleware(async opts => {
+  const { ctx, next } = opts;
+
+  if (!ctx.user) {
+    throw new TRPCError({ code: "UNAUTHORIZED", message: UNAUTHED_ERR_MSG });
+  }
+
+  if (!ctx.saasUser || !ctx.saasUser.tenantId) {
+    throw new TRPCError({
+      code: "UNAUTHORIZED",
+      message: "Sessão de tenant não encontrada. Faça login novamente.",
+    });
+  }
+
+  const tenantId = ctx.saasUser.tenantId;
+
+  // Validate session ownership
+  const rawInput = (opts as any).rawInput as Record<string, unknown> | undefined;
+  const sessionId = rawInput?.sessionId as string | undefined;
+
+  if (sessionId) {
+    const { validateSessionOwnership } = await import("../db");
+    const userId = ctx.saasUser.userId || ctx.user.id;
+    await validateSessionOwnership(sessionId, userId, {
+      tenantId,
+      role: ctx.saasUser.role,
+      isSaasUser: true,
+    });
+  }
+
+  // Track presence
+  touchPresence(ctx.saasUser.userId).catch(() => {});
+
+  return next({
+    ctx: {
+      ...ctx,
+      user: ctx.user,
+      saasUser: ctx.saasUser,
+      tenantId,
+    },
+  });
+});
+
+export const sessionTenantProcedure = t.procedure.use(requireTenantAndSession);
+
 // ═══════════════════════════════════════════════════════════════════
 // TENANT ISOLATION — Guard Rail Central
 // ═══════════════════════════════════════════════════════════════════

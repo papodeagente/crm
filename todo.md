@@ -4251,3 +4251,15 @@
 - [x] Investigar query do painel super admin que lista usuários por tenant
 - [x] Corrigir para que cada tenant mostre apenas seus próprios usuários
 - [x] Restaurar input.tenantId em 6 endpoints super admin (exceção legítima à blindagem)
+
+## Correção WhatsApp/Evolution API após blindagem de tenant
+- [x] Auditar endpoints WhatsApp em routers.ts (tenantProcedure vs contexto)
+- [x] Auditar webhookRoutes.ts (resolução de tenant por instância/config)
+- [x] Auditar messageWorker.ts (tenantId em processamento assíncrono)
+- [x] Migrar 117 protectedProcedure → tenantProcedure + 70 sessionProtectedProcedure → sessionTenantProcedure
+- [x] Criar sessionTenantProcedure (combina tenant isolation + session ownership)
+- [x] Corrigir último tenantId: 1 hardcoded em webhookRoutes.ts (tracking script)
+- [x] Validar servidor funcionando: Evolution API sincronizando normalmente
+- [x] Validar messageWorker: resolve tenantId via getSessionInfo(instanceName)
+- [x] Validar isolamento entre tenants: 58 testes vitest passando
+- [x] Testes vitest de integração WhatsApp com tenant isolation

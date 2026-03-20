@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { publicProcedure, protectedProcedure, tenantProcedure, getTenantId, router } from "../_core/trpc";
+import { publicProcedure, tenantProcedure, getTenantId, router } from "../_core/trpc";
 import { TRPCError } from "@trpc/server";
 import {
   registerTenantAndUser,

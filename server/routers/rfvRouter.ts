@@ -2,7 +2,7 @@
  * RFV Router — tRPC endpoints for Matriz RFV + Campaign Registry
  */
 import { z } from "zod";
-import { tenantProcedure, getTenantId, sessionProtectedProcedure, router } from "../_core/trpc";
+import { tenantProcedure, getTenantId, sessionTenantProcedure, router } from "../_core/trpc";
 import { TRPCError } from "@trpc/server";
 import {
   getRfvContacts,
@@ -112,7 +112,7 @@ export const rfvRouter = router({
     }),
 
   // ─── Bulk Send WhatsApp Messages ───
-  bulkSend: sessionProtectedProcedure
+  bulkSend: sessionTenantProcedure
     .input(z.object({
       contactIds: z.array(z.number()).min(1).max(5000),
       messageTemplate: z.string().min(1).max(4096),

@@ -575,8 +575,9 @@ router.post("/api/collect", async (req: Request, res: Response) => {
       .limit(1);
 
     if (tokenRows.length === 0) {
+      // tenantId unknown when token is invalid — log with 0
       await logEvent({
-        tenantId: 1,
+        tenantId: 0,
         actorType: "webhook",
         entityType: "lead",
         action: "auth_failed",

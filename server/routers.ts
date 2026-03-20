@@ -1,7 +1,7 @@
 import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
-import { publicProcedure, protectedProcedure, sessionProtectedProcedure, tenantProcedure, getTenantId, router } from "./_core/trpc";
+import { publicProcedure, tenantProcedure, sessionTenantProcedure, getTenantId, router } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { whatsappManager } from "./whatsappEvolution";
@@ -233,7 +233,7 @@ export const appRouter = router({
 
   // ─── WhatsApp API (existing) ───
   whatsapp: router({
-    connect: protectedProcedure
+    connect: tenantProcedure
       .mutation(async ({ ctx }) => {
         // Each CRM user gets exactly ONE WhatsApp instance
         // No sessionId needed — system generates it automatically
@@ -281,21 +281,21 @@ export const appRouter = router({
           user: finalState?.user || null,
         };
       }),
-    disconnect: sessionProtectedProcedure
+    disconnect: sessionTenantProcedure
       .input(z.object({ sessionId: z.string() }))
       .mutation(async ({ input }) => {
         await whatsappManager.disconnect(input.sessionId);
         return { success: true };
       }),
     // Soft-delete: move session to trash (any user can do this)
-    deleteSession: sessionProtectedProcedure
+    deleteSession: sessionTenantProcedure
       .input(z.object({ sessionId: z.string() }))
       .mutation(async ({ input }) => {
         await whatsappManager.deleteSession(input.sessionId, false);
         return { success: true };
       }),
     // Hard-delete: permanently remove session (admin only)
-    hardDeleteSession: sessionProtectedProcedure
+    hardDeleteSession: sessionTenantProcedure
       .input(z.object({ sessionId: z.string() }))
       .mutation(async ({ ctx, input }) => {
         // Only admins can hard-delete
@@ -306,21 +306,21 @@ export const appRouter = router({
         await whatsappManager.deleteSession(input.sessionId, true);
         return { success: true };
       }),
-    status: sessionProtectedProcedure
+    status: sessionTenantProcedure
       .input(z.object({ sessionId: z.string() }))
       .query(async ({ input }) => {
         const session = await whatsappManager.getSessionLive(input.sessionId);
         return { status: session?.status || "disconnected", qrDataUrl: session?.qrDataUrl || null, user: session?.user || null };
       }),
     // Request pairing code as alternative to QR code
-    requestPairingCode: sessionProtectedProcedure
+    requestPairingCode: sessionTenantProcedure
       .input(z.object({ sessionId: z.string(), phoneNumber: z.string().min(8).max(20) }))
       .mutation(async ({ ctx, input }) => {
         // Evolution API does not support pairing codes directly.
         // Connection is done via QR code only.
         throw new TRPCError({ code: "BAD_REQUEST", message: "A conexão via código de pareamento não está disponível com a Evolution API. Use o QR Code para conectar." });
       }),
-    sessions: protectedProcedure.query(async ({ ctx }) => {
+    sessions: tenantProcedure.query(async ({ ctx }) => {
       // Each user has their own WhatsApp instance (Evolution API)
       // Filter by the CRM userId (saasUser.id) so users only see their own sessions
       const saasUserId = ctx.saasUser?.userId;
@@ -388,20 +388,20 @@ export const appRouter = router({
       return ownSessions;
     }),
     // Resolve a phone number to the actual WhatsApp JID
-    resolveJid: sessionProtectedProcedure
+    resolveJid: sessionTenantProcedure
       .input(z.object({ sessionId: z.string(), phone: z.string().min(1) }))
       .query(async ({ input }) => {
         const jid = await whatsappManager.resolveJidPublic(input.sessionId, input.phone);
         return { jid };
       }),
-    sendMessage: sessionProtectedProcedure
+    sendMessage: sessionTenantProcedure
       .input(z.object({ sessionId: z.string(), number: z.string().min(1), message: z.string().min(1) }))
       .mutation(async ({ input, ctx }) => {
         const agentId = ctx.user?.id;
         const result = await whatsappManager.sendTextMessage(input.sessionId, input.number, input.message, agentId);
         return { success: true, messageId: result?.key?.id, remoteJid: result?.key?.remoteJid };
       }),
-    sendMedia: sessionProtectedProcedure
+    sendMedia: sessionTenantProcedure
       .input(z.object({ sessionId: z.string(), number: z.string().min(1), mediaUrl: z.string().url(), mediaType: z.enum(["image", "audio", "document", "video"]), caption: z.string().optional(), fileName: z.string().optional(), ptt: z.boolean().optional(), mimetype: z.string().optional(), duration: z.number().optional() }))
       .mutation(async ({ input, ctx }) => {
         const agentId = ctx.user?.id;
@@ -409,7 +409,7 @@ export const appRouter = router({
         return { success: true, messageId: result?.key?.id };
       }),
     // ─── REACTIONS & INTERACTIONS ───
-    sendReaction: sessionProtectedProcedure
+    sendReaction: sessionTenantProcedure
       .input(z.object({
         sessionId: z.string(),
         key: z.object({ remoteJid: z.string(), fromMe: z.boolean(), id: z.string() }),
@@ -419,13 +419,13 @@ export const appRouter = router({
         const result = await whatsappManager.sendReaction(input.sessionId, input.key, input.reaction);
         return { success: true, messageId: result?.key?.id };
       }),
-    sendSticker: sessionProtectedProcedure
+    sendSticker: sessionTenantProcedure
       .input(z.object({ sessionId: z.string(), number: z.string().min(1), stickerUrl: z.string().url() }))
       .mutation(async ({ input }) => {
         const result = await whatsappManager.sendSticker(input.sessionId, input.number, input.stickerUrl);
         return { success: true, messageId: result?.key?.id };
       }),
-    sendLocation: sessionProtectedProcedure
+    sendLocation: sessionTenantProcedure
       .input(z.object({
         sessionId: z.string(),
         number: z.string().min(1),
@@ -438,7 +438,7 @@ export const appRouter = router({
         const result = await whatsappManager.sendLocation(input.sessionId, input.number, input.latitude, input.longitude, input.name, input.address);
         return { success: true, messageId: result?.key?.id };
       }),
-    sendContact: sessionProtectedProcedure
+    sendContact: sessionTenantProcedure
       .input(z.object({
         sessionId: z.string(),
         number: z.string().min(1),
@@ -448,7 +448,7 @@ export const appRouter = router({
         const result = await whatsappManager.sendContact(input.sessionId, input.number, input.contacts);
         return { success: true, messageId: result?.key?.id };
       }),
-    sendPoll: sessionProtectedProcedure
+    sendPoll: sessionTenantProcedure
       .input(z.object({
         sessionId: z.string(),
         number: z.string().min(1),
@@ -460,7 +460,7 @@ export const appRouter = router({
         const result = await whatsappManager.sendPoll(input.sessionId, input.number, input.name, input.values, input.selectableCount);
         return { success: true, messageId: result?.key?.id };
       }),
-    sendTextWithQuote: sessionProtectedProcedure
+    sendTextWithQuote: sessionTenantProcedure
       .input(z.object({
         sessionId: z.string(),
         number: z.string().min(1),
@@ -473,7 +473,7 @@ export const appRouter = router({
         const result = await whatsappManager.sendTextWithQuote(input.sessionId, input.number, input.message, input.quotedMessageId, input.quotedText, agentId);
         return { success: true, messageId: result?.key?.id };
       }),
-    deleteMessage: sessionProtectedProcedure
+    deleteMessage: sessionTenantProcedure
       .input(z.object({
         sessionId: z.string(),
         remoteJid: z.string(),
@@ -484,7 +484,7 @@ export const appRouter = router({
         await whatsappManager.deleteMessage(input.sessionId, input.remoteJid, input.messageId, input.fromMe);
         return { success: true };
       }),
-    editMessage: sessionProtectedProcedure
+    editMessage: sessionTenantProcedure
       .input(z.object({
         sessionId: z.string(),
         number: z.string().min(1),
@@ -495,7 +495,7 @@ export const appRouter = router({
         const result = await whatsappManager.editMessage(input.sessionId, input.number, input.messageId, input.newText);
         return { success: true, messageId: result?.key?.id };
       }),
-    sendPresence: sessionProtectedProcedure
+    sendPresence: sessionTenantProcedure
       .input(z.object({
         sessionId: z.string(),
         number: z.string().min(1),
@@ -506,7 +506,7 @@ export const appRouter = router({
         return { success: true };
       }),
     // ── Send Broken Message (server-side with composing presence) ──
-    sendBrokenMessage: sessionProtectedProcedure
+    sendBrokenMessage: sessionTenantProcedure
       .input(z.object({
         sessionId: z.string(),
         number: z.string().min(1),
@@ -555,41 +555,41 @@ export const appRouter = router({
         return { success: true, sentParts: results.length, results };
       }),
 
-    archiveChat: sessionProtectedProcedure
+    archiveChat: sessionTenantProcedure
       .input(z.object({ sessionId: z.string(), remoteJid: z.string(), archive: z.boolean() }))
       .mutation(async ({ input }) => {
         await whatsappManager.archiveChat(input.sessionId, input.remoteJid, input.archive);
         return { success: true };
       }),
-    blockContact: sessionProtectedProcedure
+    blockContact: sessionTenantProcedure
       .input(z.object({ sessionId: z.string(), number: z.string().min(1), block: z.boolean() }))
       .mutation(async ({ input }) => {
         await whatsappManager.blockContact(input.sessionId, input.number, input.block);
         return { success: true };
       }),
-    checkIsWhatsApp: sessionProtectedProcedure
+    checkIsWhatsApp: sessionTenantProcedure
       .input(z.object({ sessionId: z.string(), numbers: z.array(z.string().min(1)) }))
       .mutation(async ({ input }) => {
         return whatsappManager.checkIsWhatsApp(input.sessionId, input.numbers);
       }),
-    markAsUnread: sessionProtectedProcedure
+    markAsUnread: sessionTenantProcedure
       .input(z.object({ sessionId: z.string(), remoteJid: z.string(), messageId: z.string() }))
       .mutation(async ({ input }) => {
         await whatsappManager.markAsUnread(input.sessionId, input.remoteJid, input.messageId);
         return { success: true };
       }),
-    fetchContactProfile: sessionProtectedProcedure
+    fetchContactProfile: sessionTenantProcedure
       .input(z.object({ sessionId: z.string(), jid: z.string() }))
       .query(async ({ input }) => {
         return whatsappManager.fetchContactProfile(input.sessionId, input.jid);
       }),
-    fetchBusinessProfile: sessionProtectedProcedure
+    fetchBusinessProfile: sessionTenantProcedure
       .input(z.object({ sessionId: z.string(), jid: z.string() }))
       .query(async ({ input }) => {
         return whatsappManager.fetchContactBusinessProfile(input.sessionId, input.jid);
       }),
     // ─── CONVERSATION LOCKS (Part 8) ───
-    acquireLock: protectedProcedure
+    acquireLock: tenantProcedure
       .input(z.object({ waConversationId: z.number() }))
       .mutation(async ({ input, ctx }) => {
         const tenantId = getTenantId(ctx);
@@ -597,7 +597,7 @@ export const appRouter = router({
         const agentName = ctx.saasUser?.name || ctx.user!.name || "Agent";
         return acquireConversationLock(tenantId, input.waConversationId, agentId, agentName);
       }),
-    releaseLock: protectedProcedure
+    releaseLock: tenantProcedure
       .input(z.object({ waConversationId: z.number() }))
       .mutation(async ({ input, ctx }) => {
         const tenantId = getTenantId(ctx);
@@ -605,29 +605,29 @@ export const appRouter = router({
         await releaseConversationLock(tenantId, input.waConversationId, agentId);
         return { success: true };
       }),
-    getLock: protectedProcedure
+    getLock: tenantProcedure
       .input(z.object({ waConversationId: z.number() }))
       .query(async ({ input, ctx }) => {
         const tenantId = getTenantId(ctx);
         return getConversationLock(tenantId, input.waConversationId);
       }),
     // ─── EXISTING QUERIES ───
-    messages: sessionProtectedProcedure
+    messages: sessionTenantProcedure
       .input(z.object({ sessionId: z.string(), limit: z.number().min(1).max(200).default(50), beforeId: z.number().optional() }))
       .query(async ({ input }) => getMessages(input.sessionId, input.limit, input.beforeId)),
-    messagesByContact: sessionProtectedProcedure
+    messagesByContact: sessionTenantProcedure
       .input(z.object({ sessionId: z.string(), remoteJid: z.string(), limit: z.number().min(1).max(200).default(50), beforeId: z.number().optional() }))
       .query(async ({ input }) => getMessagesByContact(input.sessionId, input.remoteJid, input.limit, input.beforeId)),
-    reactions: sessionProtectedProcedure
+    reactions: sessionTenantProcedure
       .input(z.object({ sessionId: z.string(), messageIds: z.array(z.string()).max(200) }))
       .query(async ({ input }) => getReactionsForMessages(input.sessionId, input.messageIds)),
-    logs: sessionProtectedProcedure
+    logs: sessionTenantProcedure
       .input(z.object({ sessionId: z.string().optional(), limit: z.number().min(1).max(500).default(100) }))
       .query(async ({ input }) => input.sessionId ? getLogs(input.sessionId, input.limit) : getAllLogs(input.limit)),
-    getChatbotSettings: sessionProtectedProcedure
+    getChatbotSettings: sessionTenantProcedure
       .input(z.object({ sessionId: z.string() }))
       .query(async ({ input }) => getChatbotSettings(input.sessionId)),
-    updateChatbotSettings: sessionProtectedProcedure
+    updateChatbotSettings: sessionTenantProcedure
       .input(z.object({
         sessionId: z.string(),
         enabled: z.boolean().optional(),
@@ -657,16 +657,16 @@ export const appRouter = router({
         return { success: true };
       }),
     // Chatbot Rules (whitelist/blacklist)
-    getChatbotRules: sessionProtectedProcedure
+    getChatbotRules: sessionTenantProcedure
       .input(z.object({ sessionId: z.string(), ruleType: z.enum(["whitelist", "blacklist"]).optional() }))
       .query(async ({ input }) => getChatbotRules(input.sessionId, input.ruleType)),
-    addChatbotRule: sessionProtectedProcedure
+    addChatbotRule: sessionTenantProcedure
       .input(z.object({ sessionId: z.string(), remoteJid: z.string().min(1), ruleType: z.enum(["whitelist", "blacklist"]), contactName: z.string().optional() }))
       .mutation(async ({ input }) => {
         await addChatbotRule(input.sessionId, input.remoteJid, input.ruleType, input.contactName);
         return { success: true };
       }),
-    removeChatbotRule: protectedProcedure
+    removeChatbotRule: tenantProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ input }) => {
         await removeChatbotRule(input.id);
@@ -674,14 +674,14 @@ export const appRouter = router({
       }),
     // Conversations list — LEGACY (redirects to optimized wa_conversations query)
     // Kept for backward compatibility; frontend should use waConversations instead
-    conversations: sessionProtectedProcedure
+    conversations: sessionTenantProcedure
       .input(z.object({ sessionId: z.string() }))
       .query(async ({ input }) => {
         // Redirect to optimized query that reads from wa_conversations (no subqueries)
         return getWaConversationsList(input.sessionId, 0);
       }),
     // Conversations list with multi-agent assignment info — LEGACY
-    conversationsMultiAgent: sessionProtectedProcedure
+    conversationsMultiAgent: sessionTenantProcedure
       .input(z.object({
         sessionId: z.string(),
         assignedUserId: z.number().optional(),
@@ -695,7 +695,7 @@ export const appRouter = router({
         return getWaConversationsList(sessionId, tenantId, filter);
       }),
     // ─── WA Conversations (canônico — usa wa_conversations) ───
-    waConversations: sessionProtectedProcedure
+    waConversations: sessionTenantProcedure
       .input(z.object({
         sessionId: z.string(),
         assignedUserId: z.number().optional(),
@@ -709,7 +709,7 @@ export const appRouter = router({
         return getWaConversationsList(sessionId, tenantId, filter);
       }),
     // Messages by canonical conversation ID
-    messagesByConversation: protectedProcedure
+    messagesByConversation: tenantProcedure
       .input(z.object({
         conversationId: z.number(),
         limit: z.number().min(1).max(200).default(50),
@@ -717,14 +717,14 @@ export const appRouter = router({
       }))
       .query(async ({ input }) => getMessagesByConversationId(input.conversationId, input.limit, input.beforeId)),
     // Mark wa_conversation as read
-    markWaConversationRead: protectedProcedure
+    markWaConversationRead: tenantProcedure
       .input(z.object({ conversationId: z.number() }))
       .mutation(async ({ input }) => {
         await markWaConversationReadDb(input.conversationId);
         return { success: true };
       }),
     // Assign conversation to an agent
-    assignConversation: sessionProtectedProcedure
+    assignConversation: sessionTenantProcedure
       .input(z.object({
         sessionId: z.string(),
         remoteJid: z.string(),
@@ -748,7 +748,7 @@ export const appRouter = router({
         return result;
       }),
     // Transfer conversation to another agent
-    transferConversation: sessionProtectedProcedure
+    transferConversation: sessionTenantProcedure
       .input(z.object({
         sessionId: z.string(),
         remoteJid: z.string(),
@@ -772,7 +772,7 @@ export const appRouter = router({
         return result;
       }),
     // Update conversation assignment status
-    updateAssignmentStatus: sessionProtectedProcedure
+    updateAssignmentStatus: sessionTenantProcedure
       .input(z.object({
         sessionId: z.string(),
         remoteJid: z.string(),
@@ -794,7 +794,7 @@ export const appRouter = router({
         return { success: true };
       }),
     // Finish attendance — resolve and unassign from agent
-    finishAttendance: sessionProtectedProcedure
+    finishAttendance: sessionTenantProcedure
       .input(z.object({
         sessionId: z.string(),
         remoteJid: z.string(),
@@ -819,7 +819,7 @@ export const appRouter = router({
         return { success: true };
       }),
     // Get assignment for a specific conversation
-    getAssignment: sessionProtectedProcedure
+    getAssignment: sessionTenantProcedure
       .input(z.object({
         sessionId: z.string(),
         remoteJid: z.string(),
@@ -829,13 +829,13 @@ export const appRouter = router({
         return getAssignmentForConversation(tenantId, input.sessionId, input.remoteJid);
       }),
     // Get available agents for a tenant
-    agents: protectedProcedure
+    agents: tenantProcedure
       .query(async ({ input, ctx }) => getAgentsForTenant(getTenantId(ctx))),
     // Get teams for a tenant
-    teams: protectedProcedure
+    teams: tenantProcedure
       .query(async ({ input, ctx }) => getTeamsForTenant(getTenantId(ctx))),
     // Auto-assign via round-robin
-    autoAssign: sessionProtectedProcedure
+    autoAssign: sessionTenantProcedure
       .input(z.object({
         sessionId: z.string(),
         remoteJid: z.string(),
@@ -848,14 +848,14 @@ export const appRouter = router({
         return { assigned: true, assignment: result };
       }),
     // Mark conversation as read
-    markRead: sessionProtectedProcedure
+    markRead: sessionTenantProcedure
       .input(z.object({ sessionId: z.string(), remoteJid: z.string() }))
       .mutation(async ({ input }) => {
         await markConversationRead(input.sessionId, input.remoteJid);
         return { success: true };
       }),
     // Sync on conversation open — fetch last 10 messages, insert only missing
-    syncOnOpen: sessionProtectedProcedure
+    syncOnOpen: sessionTenantProcedure
       .input(z.object({ sessionId: z.string(), remoteJid: z.string(), conversationId: z.number() }))
       .mutation(async ({ input }) => {
         const session = whatsappManager.getSession(input.sessionId);
@@ -870,20 +870,20 @@ export const appRouter = router({
         );
       }),
     // Get profile picture for a single JID
-    profilePicture: sessionProtectedProcedure
+    profilePicture: sessionTenantProcedure
       .input(z.object({ sessionId: z.string(), jid: z.string() }))
       .query(async ({ input }) => {
         const url = await whatsappManager.getProfilePicture(input.sessionId, input.jid);
         return { url };
       }),
     // Get profile pictures for multiple JIDs (batch)
-    profilePictures: sessionProtectedProcedure
+    profilePictures: sessionTenantProcedure
       .input(z.object({ sessionId: z.string(), jids: z.array(z.string()).max(100) }))
       .query(async ({ input }) => {
         // Use fast DB query instead of N API calls to Evolution
         return getProfilePicturesFromDb(input.sessionId, input.jids);
       }),
-    uploadMedia: protectedProcedure
+    uploadMedia: tenantProcedure
       .input(z.object({ fileName: z.string(), fileBase64: z.string(), contentType: z.string() }))
       .mutation(async ({ input }) => {
         const fileBuffer = Buffer.from(input.fileBase64, "base64");
@@ -892,7 +892,7 @@ export const appRouter = router({
         return { url, fileKey };
       }),
     // Download media from Evolution API for messages that don't have mediaUrl yet
-    getMediaUrl: sessionProtectedProcedure
+    getMediaUrl: sessionTenantProcedure
       .input(z.object({ sessionId: z.string(), messageId: z.string() }))
       .mutation(async ({ input }) => {
         const { getBase64FromMediaMessage } = await import("./evolutionApi");
@@ -939,7 +939,7 @@ export const appRouter = router({
         return { url, mimetype: base64Data.mimetype, unavailable: false };
       }),
     // WA Contacts map (LID ↔ Phone resolution)
-    waContactsMap: sessionProtectedProcedure
+    waContactsMap: sessionTenantProcedure
       .input(z.object({ sessionId: z.string() }))
       .query(async ({ input }) => {
         const db = await getDb();
@@ -972,40 +972,40 @@ export const appRouter = router({
         return map;
       }),
     // Force sync contacts from WhatsApp
-    syncContacts: sessionProtectedProcedure
+    syncContacts: sessionTenantProcedure
       .input(z.object({ sessionId: z.string() }))
       .mutation(async ({ input }) => {
         const result = await whatsappManager.syncContacts(input.sessionId);
         return result;
       }),
     // Trigger deep sync of all messages from Evolution API
-    triggerDeepSync: sessionProtectedProcedure
+    triggerDeepSync: sessionTenantProcedure
       .input(z.object({ sessionId: z.string() }))
       .mutation(async ({ input }) => {
         const result = await whatsappManager.triggerDeepSync(input.sessionId);
         return result;
       }),
     // Manual trigger for daily backup
-    triggerDailyBackup: protectedProcedure
+    triggerDailyBackup: tenantProcedure
       .mutation(async () => {
         const { runDailyWhatsAppBackup } = await import("./whatsappDailyBackup");
         const result = await runDailyWhatsAppBackup();
         return result;
       }),
     // ─── Conversation Identity Resolver: Migration & Reconciliation ───
-    migrateConversations: protectedProcedure
+    migrateConversations: tenantProcedure
       .mutation(async ({ input, ctx }) => {
         const { migrateExistingData } = await import("./conversationResolver");
         return migrateExistingData(getTenantId(ctx));
       }),
-    reconcileGhosts: sessionProtectedProcedure
+    reconcileGhosts: sessionTenantProcedure
       .input(z.object({ sessionId: z.string() }))
       .mutation(async ({ input, ctx }) => {
         const { reconcileGhostThreads } = await import("./conversationResolver");
         return reconcileGhostThreads(getTenantId(ctx), input.sessionId);
       }),
     // Repair contact names contaminated by owner's name
-    repairContactNames: protectedProcedure
+    repairContactNames: tenantProcedure
       .mutation(async ({ ctx }) => {
         const db = await (await import("./db")).getDb();
         if (!db) throw new Error("Database not available");
@@ -1142,7 +1142,7 @@ export const appRouter = router({
         };
       }),
     // WhatsApp contact import settings
-    getContactImportSettings: protectedProcedure
+    getContactImportSettings: tenantProcedure
       .query(async ({ input, ctx }) => {
         const db = await (await import("./db")).getDb();
         if (!db) return { importContactsFromAgenda: false };
@@ -1152,7 +1152,7 @@ export const appRouter = router({
         const settings = (rows[0]?.settingsJson as any) || {};
         return { importContactsFromAgenda: settings.whatsapp?.importContactsFromAgenda ?? false };
       }),
-    saveContactImportSettings: protectedProcedure
+    saveContactImportSettings: tenantProcedure
       .input(z.object({ importContactsFromAgenda: z.boolean() }))
       .mutation(async ({ input, ctx }) => {
         const db = await (await import("./db")).getDb();
@@ -1167,7 +1167,7 @@ export const appRouter = router({
         return { success: true };
       }),
     // Cleanup synced contacts: remove contacts with source="whatsapp" that have NO deals and were NOT manually created
-    cleanupSyncedContacts: protectedProcedure
+    cleanupSyncedContacts: tenantProcedure
       .input(z.object({ dryRun: z.boolean().default(true) }))
       .mutation(async ({ input, ctx }) => {
         const db = await (await import("./db")).getDb();
@@ -1216,7 +1216,7 @@ export const appRouter = router({
         };
       }),
     // Get wa_conversations debug info
-    debugConversations: sessionProtectedProcedure
+    debugConversations: sessionTenantProcedure
       .input(z.object({ sessionId: z.string() }))
       .query(async ({ input, ctx }) => {
         const db = (await import("./db")).getDb;
@@ -1237,7 +1237,7 @@ export const appRouter = router({
 
     // ─── SESSION SHARING (Admin) ───
     // List all shares for the tenant
-    listShares: protectedProcedure
+    listShares: tenantProcedure
       .query(async ({ ctx, input }) => {
         const role = ctx.saasUser?.role;
         if (role !== "admin" && ctx.saasUser) {
@@ -1261,7 +1261,7 @@ export const appRouter = router({
       }),
 
     // Share a session with a user
-    shareSession: protectedProcedure
+    shareSession: tenantProcedure
       .input(z.object({
         sourceSessionId: z.string(),
         targetUserIds: z.array(z.number()).min(1),
@@ -1317,7 +1317,7 @@ export const appRouter = router({
       }),
 
     // Revoke a specific share
-    revokeShare: protectedProcedure
+    revokeShare: tenantProcedure
       .input(z.object({ shareId: z.number() }))
       .mutation(async ({ ctx, input }) => {
         const role = ctx.saasUser?.role;
@@ -1329,7 +1329,7 @@ export const appRouter = router({
       }),
 
     // Revoke all shares for a session
-    revokeAllShares: protectedProcedure
+    revokeAllShares: tenantProcedure
       .input(z.object({ sourceSessionId: z.string() }))
       .mutation(async ({ ctx, input }) => {
         const role = ctx.saasUser?.role;
@@ -1341,7 +1341,7 @@ export const appRouter = router({
       }),
 
     // Get all tenant sessions (for admin to choose which to share)
-    tenantSessions: protectedProcedure
+    tenantSessions: tenantProcedure
       .query(async ({ ctx, input }) => {
         const role = ctx.saasUser?.role;
         if (role !== "admin" && ctx.saasUser) {
@@ -1371,7 +1371,7 @@ export const appRouter = router({
       }),
 
     // Get active share for current user (used by frontend to show banner)
-    myActiveShare: protectedProcedure
+    myActiveShare: tenantProcedure
       .query(async ({ ctx, input }) => {
         const userId = ctx.saasUser?.userId || ctx.user.id;
         const share = await getActiveShareForUser(getTenantId(ctx), userId);
@@ -1397,13 +1397,13 @@ export const appRouter = router({
 
     // ─── Helpdesk: Internal Notes ───
     notes: router({
-    list: protectedProcedure
+    list: tenantProcedure
       .input(z.object({ waConversationId: z.number() }))
       .query(async ({ ctx, input }) => {
         const tenantId = getTenantId(ctx);
         return getInternalNotes(tenantId, input.waConversationId);
       }),
-    create: sessionProtectedProcedure
+    create: sessionTenantProcedure
       .input(z.object({
         waConversationId: z.number(),
         sessionId: z.string(),
@@ -1437,7 +1437,7 @@ export const appRouter = router({
         }
         return result;
       }),
-    update: protectedProcedure
+    update: tenantProcedure
       .input(z.object({
         noteId: z.number(),
         content: z.string().min(1).optional(),
@@ -1453,14 +1453,14 @@ export const appRouter = router({
         });
         return { success: true };
       }),
-    delete: protectedProcedure
+    delete: tenantProcedure
       .input(z.object({ noteId: z.number() }))
       .mutation(async ({ ctx, input }) => {
         const tenantId = getTenantId(ctx);
         await deleteInternalNote(tenantId, input.noteId);
         return { success: true };
       }),
-    globalByContact: protectedProcedure
+    globalByContact: tenantProcedure
       .input(z.object({ remoteJid: z.string() }))
       .query(async ({ ctx, input }) => {
         const tenantId = getTenantId(ctx);
@@ -1470,7 +1470,7 @@ export const appRouter = router({
 
     // ─── Helpdesk: Conversation Events / Timeline ───
     events: router({
-    list: protectedProcedure
+    list: tenantProcedure
       .input(z.object({ waConversationId: z.number() }))
       .query(async ({ ctx, input }) => {
         const tenantId = getTenantId(ctx);
@@ -1480,13 +1480,13 @@ export const appRouter = router({
 
     // ─── Helpdesk: Queue (Fila) ───
     queue: router({
-    list: sessionProtectedProcedure
+    list: sessionTenantProcedure
       .input(z.object({ sessionId: z.string(), limit: z.number().max(200).default(100) }))
       .query(async ({ ctx, input }) => {
         const tenantId = getTenantId(ctx);
         return getQueueConversations(input.sessionId, tenantId, input.limit);
       }),
-    claim: sessionProtectedProcedure
+    claim: sessionTenantProcedure
       .input(z.object({ sessionId: z.string(), remoteJid: z.string() }))
       .mutation(async ({ ctx, input }) => {
         const tenantId = getTenantId(ctx);
@@ -1504,7 +1504,7 @@ export const appRouter = router({
         }
         return result;
       }),
-    enqueue: sessionProtectedProcedure
+    enqueue: sessionTenantProcedure
       .input(z.object({ sessionId: z.string(), remoteJid: z.string() }))
       .mutation(async ({ ctx, input }) => {
         const tenantId = getTenantId(ctx);
@@ -1521,7 +1521,7 @@ export const appRouter = router({
         }
         return { success: true };
       }),
-    stats: sessionProtectedProcedure
+    stats: sessionTenantProcedure
       .input(z.object({ sessionId: z.string() }))
       .query(async ({ ctx, input }) => {
         const tenantId = getTenantId(ctx);
@@ -1531,7 +1531,7 @@ export const appRouter = router({
 
     // ─── Helpdesk: Transfer ───
     transfer: router({
-    execute: sessionProtectedProcedure
+    execute: sessionTenantProcedure
       .input(z.object({
         sessionId: z.string(),
         remoteJid: z.string(),
@@ -1551,26 +1551,26 @@ export const appRouter = router({
 
     // ─── Helpdesk: Supervision Dashboard ───
     supervision: router({
-    agentWorkload: sessionProtectedProcedure
+    agentWorkload: sessionTenantProcedure
       .input(z.object({ sessionId: z.string() }))
       .query(async ({ ctx, input }) => {
         const tenantId = getTenantId(ctx);
         return getAgentWorkload(tenantId, input.sessionId);
       }),
-    agentConversations: sessionProtectedProcedure
+    agentConversations: sessionTenantProcedure
       .input(z.object({ sessionId: z.string(), agentId: z.number(), limit: z.number().max(50).default(10) }))
       .query(async ({ ctx, input }) => {
         const tenantId = getTenantId(ctx);
         return getAgentConversations(tenantId, input.sessionId, input.agentId, input.limit);
       }),
-    queueStats: sessionProtectedProcedure
+    queueStats: sessionTenantProcedure
       .input(z.object({ sessionId: z.string() }))
       .query(async ({ ctx, input }) => {
         const tenantId = getTenantId(ctx);
         return getQueueStats(tenantId, input.sessionId);
       }),
     // Assign a queue conversation to a specific agent (admin action)
-    assignToAgent: sessionProtectedProcedure
+    assignToAgent: sessionTenantProcedure
       .input(z.object({
         sessionId: z.string(),
         remoteJid: z.string(),
@@ -1592,7 +1592,7 @@ export const appRouter = router({
         return result;
       }),
     // Return a conversation from an agent back to the queue
-    returnToQueue: sessionProtectedProcedure
+    returnToQueue: sessionTenantProcedure
       .input(z.object({
         sessionId: z.string(),
         remoteJid: z.string(),
@@ -1616,13 +1616,13 @@ export const appRouter = router({
 
     // ─── Helpdesk: Quick Replies ───
     quickReplies: router({
-    list: protectedProcedure
+    list: tenantProcedure
       .input(z.object({ teamId: z.number().optional() }))
       .query(async ({ ctx, input }) => {
         const tenantId = getTenantId(ctx);
         return getQuickReplies(tenantId, input.teamId);
       }),
-    create: protectedProcedure
+    create: tenantProcedure
       .input(z.object({
         shortcut: z.string().min(1).max(32),
         title: z.string().min(1).max(128),
@@ -1635,7 +1635,7 @@ export const appRouter = router({
         const userId = ctx.saasUser?.userId || ctx.user.id;
         return createQuickReply(tenantId, { ...input, createdBy: userId });
       }),
-    delete: protectedProcedure
+    delete: tenantProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ ctx, input }) => {
         const tenantId = getTenantId(ctx);
@@ -1647,42 +1647,42 @@ export const appRouter = router({
 
   // ─── Message Monitoring ───
   monitoring: router({
-    statusMetrics: sessionProtectedProcedure
+    statusMetrics: sessionTenantProcedure
       .input(z.object({ sessionId: z.string(), periodDays: z.number().min(1).max(365).default(7) }))
       .query(async ({ input }) => {
         return getMessageStatusMetrics(input.sessionId, input.periodDays);
       }),
-    volumeOverTime: sessionProtectedProcedure
+    volumeOverTime: sessionTenantProcedure
       .input(z.object({ sessionId: z.string(), periodDays: z.number().min(1).max(365).default(7), granularity: z.enum(["hour", "day"]).default("day") }))
       .query(async ({ input }) => {
         return getMessageVolumeOverTime(input.sessionId, input.periodDays, input.granularity);
       }),
-    deliveryRate: sessionProtectedProcedure
+    deliveryRate: sessionTenantProcedure
       .input(z.object({ sessionId: z.string(), periodDays: z.number().min(1).max(365).default(7) }))
       .query(async ({ input }) => {
         return getDeliveryRateMetrics(input.sessionId, input.periodDays);
       }),
-    recentActivity: sessionProtectedProcedure
+    recentActivity: sessionTenantProcedure
       .input(z.object({ sessionId: z.string(), limit: z.number().min(1).max(200).default(50) }))
       .query(async ({ input }) => {
         return getRecentMessageActivity(input.sessionId, input.limit);
       }),
-    typeDistribution: sessionProtectedProcedure
+    typeDistribution: sessionTenantProcedure
       .input(z.object({ sessionId: z.string(), periodDays: z.number().min(1).max(365).default(7) }))
       .query(async ({ input }) => {
         return getMessageTypeDistribution(input.sessionId, input.periodDays);
       }),
-    topContacts: sessionProtectedProcedure
+    topContacts: sessionTenantProcedure
       .input(z.object({ sessionId: z.string(), periodDays: z.number().min(1).max(365).default(7), limit: z.number().min(1).max(50).default(10) }))
       .query(async ({ input }) => {
         return getTopContactsByVolume(input.sessionId, input.periodDays, input.limit);
       }),
-    responseTime: sessionProtectedProcedure
+    responseTime: sessionTenantProcedure
       .input(z.object({ sessionId: z.string(), periodDays: z.number().min(1).max(365).default(7) }))
       .query(async ({ input }) => {
         return getResponseTimeMetrics(input.sessionId, input.periodDays);
       }),
-    fixWebhooks: protectedProcedure
+    fixWebhooks: tenantProcedure
       .mutation(async () => {
         const results: Array<{ instance: string; ok: boolean }> = [];
         const sessions = whatsappManager.getAllSessions();
@@ -1811,7 +1811,7 @@ export const appRouter = router({
 
   // ─── Birthday & Wedding Dates ───
   dateCelebrations: router({
-    upcoming: protectedProcedure
+    upcoming: tenantProcedure
       .input(z.object({
         dateType: z.enum(["birthDate", "weddingDate"]),
         daysAhead: z.number().default(7),
@@ -1820,7 +1820,7 @@ export const appRouter = router({
         const crm = await import("./crmDb");
         return crm.getContactsWithUpcomingDates(getTenantId(ctx), { daysAhead: input.daysAhead, dateType: input.dateType });
       }),
-    today: protectedProcedure
+    today: tenantProcedure
       .input(z.object({
         dateType: z.enum(["birthDate", "weddingDate"]),
       }))
@@ -1828,7 +1828,7 @@ export const appRouter = router({
         const crm = await import("./crmDb");
         return crm.getContactsWithDateToday(getTenantId(ctx), input.dateType);
       }),
-    inMonth: protectedProcedure
+    inMonth: tenantProcedure
       .input(z.object({
         month: z.number().min(1).max(12),
         dateType: z.enum(["birthDate", "weddingDate"]),
@@ -1842,12 +1842,12 @@ export const appRouter = router({
   // ─── Team & Agent Management ───
   teamManagement: router({
     // ── Teams CRUD ──
-    listTeams: protectedProcedure
+    listTeams: tenantProcedure
       .query(async ({ ctx }) => getTeamsForTenant(getTenantId(ctx))),
-    getTeam: protectedProcedure
+    getTeam: tenantProcedure
       .input(z.object({ teamId: z.number() }))
       .query(async ({ input, ctx }) => getTeamWithMembers(input.teamId, getTenantId(ctx))),
-    createTeam: protectedProcedure
+    createTeam: tenantProcedure
       .input(z.object({
         name: z.string().min(1).max(255),
         description: z.string().optional(),
@@ -1859,7 +1859,7 @@ export const appRouter = router({
         const { ...data } = input;
         return createTeam(tenantId, data);
       }),
-    updateTeam: protectedProcedure
+    updateTeam: tenantProcedure
       .input(z.object({
         id: z.number(),
         name: z.string().min(1).max(255).optional(),
@@ -1871,21 +1871,21 @@ export const appRouter = router({
 const tenantId = getTenantId(ctx); const { id, ...data } = input;
         return updateTeam(id, tenantId, data);
       }),
-    deleteTeam: protectedProcedure
+    deleteTeam: tenantProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ input, ctx }) => {
         await deleteTeam(input.id, getTenantId(ctx));
         return { success: true };
       }),
     // ── Team Members ──
-    addMember: protectedProcedure
+    addMember: tenantProcedure
       .input(z.object({
         teamId: z.number(),
         userId: z.number(),
         role: z.enum(["member", "leader"]).default("member"),
       }))
       .mutation(async ({ input }) => addTeamMember(getTenantId(ctx), input.teamId, input.userId, input.role)),
-    removeMember: protectedProcedure
+    removeMember: tenantProcedure
       .input(z.object({
         teamId: z.number(),
         userId: z.number(),
@@ -1894,7 +1894,7 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
         await removeTeamMember(getTenantId(ctx), input.teamId, input.userId);
         return { success: true };
       }),
-    updateMemberRole: protectedProcedure
+    updateMemberRole: tenantProcedure
       .input(z.object({
         teamId: z.number(),
         userId: z.number(),
@@ -1905,7 +1905,7 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
         return { success: true };
       }),
     // ── Agents ──
-    inviteAgent: protectedProcedure
+    inviteAgent: tenantProcedure
       .input(z.object({
         name: z.string().min(1),
         email: z.string().email(),
@@ -1937,9 +1937,9 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
           throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: e.message || "Erro ao convidar agente" });
         }
       }),
-    listAgents: protectedProcedure
+    listAgents: tenantProcedure
       .query(async ({ input }) => getAgentsWithTeams(getTenantId(ctx))),
-    updateAgentStatus: protectedProcedure
+    updateAgentStatus: tenantProcedure
       .input(z.object({
         userId: z.number(),
         status: z.enum(["active", "inactive", "invited"]),
@@ -1952,7 +1952,7 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
         await updateAgentStatus(getTenantId(ctx), input.userId, input.status);
         return { success: true };
       }),
-    updateAgentRole: protectedProcedure
+    updateAgentRole: tenantProcedure
       .input(z.object({
         userId: z.number(),
         role: z.enum(["admin", "user"]),
@@ -1974,9 +1974,9 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
         return { success: true };
       }),
     // ── Distribution Rules ──
-    listRules: protectedProcedure
+    listRules: tenantProcedure
       .query(async ({ input }) => getDistributionRules(getTenantId(ctx))),
-    createRule: protectedProcedure
+    createRule: tenantProcedure
       .input(z.object({
         name: z.string().min(1).max(255),
         description: z.string().optional(),
@@ -1991,7 +1991,7 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
 const tenantId = getTenantId(ctx); const { ...data } = input;
         return createDistributionRule(tenantId, data);
       }),
-    updateRule: protectedProcedure
+    updateRule: tenantProcedure
       .input(z.object({
         id: z.number(),
         name: z.string().min(1).max(255).optional(),
@@ -2007,13 +2007,13 @@ const tenantId = getTenantId(ctx); const { ...data } = input;
 const tenantId = getTenantId(ctx); const { id, ...data } = input;
         return updateDistributionRule(id, tenantId, data);
       }),
-    deleteRule: protectedProcedure
+    deleteRule: tenantProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ input, ctx }) => {
         await deleteDistributionRule(input.id, getTenantId(ctx));
         return { success: true };
       }),
-    toggleRule: protectedProcedure
+    toggleRule: tenantProcedure
       .input(z.object({ id: z.number(), isActive: z.boolean() }))
       .mutation(async ({ input, ctx }) => {
         await toggleDistributionRule(input.id, getTenantId(ctx), input.isActive);
@@ -2041,22 +2041,22 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
 
   // ─── Contact Profile & Custom Fields ───
   contactProfile: router({
-    getMetrics: protectedProcedure
+    getMetrics: tenantProcedure
       .input(z.object({ contactId: z.number() }))
       .query(async ({ input, ctx }) => {
         return getContactMetrics(getTenantId(ctx), input.contactId);
       }),
-    getDeals: protectedProcedure
+    getDeals: tenantProcedure
       .input(z.object({ contactId: z.number() }))
       .query(async ({ input, ctx }) => {
         return getContactDeals(getTenantId(ctx), input.contactId);
       }),
-    getCustomFieldValues: protectedProcedure
+    getCustomFieldValues: tenantProcedure
       .input(z.object({ entityType: z.enum(["contact", "deal", "company"]), entityId: z.number() }))
       .query(async ({ input, ctx }) => {
         return getCustomFieldValues(getTenantId(ctx), input.entityType, input.entityId);
       }),
-    setCustomFieldValues: protectedProcedure
+    setCustomFieldValues: tenantProcedure
       .input(z.object({
         entityType: z.enum(["contact", "deal", "company"]),
         entityId: z.number(),
@@ -2069,17 +2069,17 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
   }),
 
   customFields: router({
-    list: protectedProcedure
+    list: tenantProcedure
       .input(z.object({ entity: z.enum(["contact", "deal", "company"]) }))
       .query(async ({ input, ctx }) => {
         return listCustomFields(getTenantId(ctx), input.entity);
       }),
-    get: protectedProcedure
+    get: tenantProcedure
       .input(z.object({ id: z.number() }))
       .query(async ({ input, ctx }) => {
         return getCustomFieldById(getTenantId(ctx), input.id);
       }),
-    create: protectedProcedure
+    create: tenantProcedure
       .input(z.object({
         entity: z.enum(["contact", "deal", "company"]),
         name: z.string().min(1).max(128),
@@ -2097,7 +2097,7 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
       .mutation(async ({ input }) => {
         return createCustomField(input);
       }),
-    update: protectedProcedure
+    update: tenantProcedure
       .input(z.object({
         id: z.number(),
         label: z.string().optional(),
@@ -2115,13 +2115,13 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
 const tenantId = getTenantId(ctx); const { id, ...data } = input;
         return updateCustomField(tenantId, id, data);
       }),
-    delete: protectedProcedure
+    delete: tenantProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ input, ctx }) => {
         await deleteCustomField(getTenantId(ctx), input.id);
         return { success: true };
       }),
-    reorder: protectedProcedure
+    reorder: tenantProcedure
       .input(z.object({ entity: z.enum(["contact", "deal", "company"]), orderedIds: z.array(z.number()) }))
       .mutation(async ({ input, ctx }) => {
         await reorderCustomFields(getTenantId(ctx), input.entity, input.orderedIds);
@@ -2134,12 +2134,12 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
   // ═══════════════════════════════════════
   leadCapture: router({
     // Webhook config
-    getWebhookConfig: protectedProcedure
+    getWebhookConfig: tenantProcedure
       .query(async ({ input, ctx }) => {
         const config = await getWebhookConfig(getTenantId(ctx));
         return config;
       }),
-    generateWebhookToken: protectedProcedure
+    generateWebhookToken: tenantProcedure
       .mutation(async ({ input, ctx }) => {
         const secret = randomBytes(32).toString("hex");
         const config = await upsertWebhookConfig(getTenantId(ctx), secret);
@@ -2147,7 +2147,7 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
       }),
 
     // Meta integration
-    getMetaConfig: protectedProcedure
+    getMetaConfig: tenantProcedure
       .query(async ({ input, ctx }) => {
         const config = await getMetaConfig(getTenantId(ctx));
         // Don't expose full access token to frontend
@@ -2156,7 +2156,7 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
         }
         return config;
       }),
-    connectMeta: protectedProcedure
+    connectMeta: tenantProcedure
       .input(z.object({
         pageId: z.string(),
         pageName: z.string().optional(),
@@ -2176,14 +2176,14 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
         });
         return config;
       }),
-    disconnectMeta: protectedProcedure
+    disconnectMeta: tenantProcedure
       .mutation(async ({ input, ctx }) => {
         await disconnectMeta(getTenantId(ctx));
         return { success: true };
       }),
 
     // Event logs
-    listEvents: protectedProcedure
+    listEvents: tenantProcedure
       .input(z.object({
         source: z.string().optional(),
         status: z.string().optional(),
@@ -2197,14 +2197,14 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
         ]);
         return { events, total };
       }),
-    reprocessEvent: protectedProcedure
+    reprocessEvent: tenantProcedure
       .input(z.object({ eventId: z.number() }))
       .mutation(async ({ input, ctx }) => {
         return reprocessLeadEvent(getTenantId(ctx), input.eventId);
       }),
 
     // ─── Tracking Script Tokens ────────────────────────
-    listTrackingTokens: protectedProcedure
+    listTrackingTokens: tenantProcedure
       .query(async ({ input, ctx }) => {
         const db = await getDb();
         if (!db) return [];
@@ -2215,7 +2215,7 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
           .orderBy(desc(trackingTokens.createdAt));
       }),
 
-    createTrackingToken: protectedProcedure
+    createTrackingToken: tenantProcedure
       .input(z.object({
         name: z.string().min(1).max(255),
         allowedDomains: z.array(z.string()).optional(),
@@ -2233,7 +2233,7 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
         return { id: result!.id, token, name: input.name };
       }),
 
-    updateTrackingToken: protectedProcedure
+    updateTrackingToken: tenantProcedure
       .input(z.object({
         tokenId: z.number(),
         name: z.string().min(1).max(255).optional(),
@@ -2255,7 +2255,7 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
         return { success: true };
       }),
 
-    deleteTrackingToken: protectedProcedure
+    deleteTrackingToken: tenantProcedure
       .input(z.object({ tokenId: z.number() }))
       .mutation(async ({ input, ctx }) => {
         const db = await getDb();
@@ -2266,7 +2266,7 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
         return { success: true };
       }),
 
-    getTrackingSnippet: protectedProcedure
+    getTrackingSnippet: tenantProcedure
       .input(z.object({
         tokenId: z.number(),
         collectUrl: z.string().url(),
@@ -2292,7 +2292,7 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
         return { snippet: bootstrap };
       }),
 
-    verifyTrackingInstallation: protectedProcedure
+    verifyTrackingInstallation: tenantProcedure
       .input(z.object({
         url: z.string().url(),
       }))
@@ -2395,7 +2395,7 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
 
   // ─── RD Station Marketing Integration ───
   rdStation: router({
-    getConfig: protectedProcedure
+    getConfig: tenantProcedure
       .query(async ({ input, ctx }) => {
         const db = await getDb();
         if (!db) return null;
@@ -2407,7 +2407,7 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
         return rows[0] || null;
       }),
 
-    setupIntegration: protectedProcedure
+    setupIntegration: tenantProcedure
       .mutation(async ({ input, ctx }) => {
         const db = await getDb();
         if (!db) throw new Error("Database not available");
@@ -2438,7 +2438,7 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
         return rows[0]!;
       }),
 
-    regenerateToken: protectedProcedure
+    regenerateToken: tenantProcedure
       .mutation(async ({ input, ctx }) => {
         const db = await getDb();
         if (!db) throw new Error("Database not available");
@@ -2457,7 +2457,7 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
         return rows[0]!;
       }),
 
-    toggleActive: protectedProcedure
+    toggleActive: tenantProcedure
       .input(z.object({ isActive: z.boolean() }))
       .mutation(async ({ input, ctx }) => {
         const db = await getDb();
@@ -2469,7 +2469,7 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
         return { success: true };
       }),
 
-    getWebhookLogs: protectedProcedure
+    getWebhookLogs: tenantProcedure
       .input(z.object({
         status: z.enum(["success", "failed", "duplicate"]).optional(),
         limit: z.number().default(50),
@@ -2509,7 +2509,7 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
         };
       }),
 
-    getStats: protectedProcedure
+    getStats: tenantProcedure
       .query(async ({ input, ctx }) => {
         const db = await getDb();
         if (!db) return { total: 0, success: 0, failed: 0, duplicate: 0 };
@@ -2536,7 +2536,7 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
 
     // ─── Multi-Config CRUD ───────────────────────────────
 
-    listConfigs: protectedProcedure
+    listConfigs: tenantProcedure
       .query(async ({ input, ctx }) => {
         const db = await getDb();
         if (!db) return [];
@@ -2547,7 +2547,7 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
           .orderBy(desc(rdStationConfig.createdAt));
       }),
 
-    createConfig: protectedProcedure
+    createConfig: tenantProcedure
       .input(z.object({
         name: z.string().min(1).max(255),
         defaultPipelineId: z.number().optional(),
@@ -2588,7 +2588,7 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
         return rows[0]!;
       }),
 
-    updateConfig: protectedProcedure
+    updateConfig: tenantProcedure
       .input(z.object({
         configId: z.number(),
         name: z.string().min(1).max(255).optional(),
@@ -2639,7 +2639,7 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
         return rows[0] ?? null;
       }),
 
-    deleteConfig: protectedProcedure
+    deleteConfig: tenantProcedure
       .input(z.object({ configId: z.number(), }))
       .mutation(async ({ input, ctx }) => {
         const db = await getDb();
@@ -2651,7 +2651,7 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
         return { success: true };
       }),
 
-    getConfigLogs: protectedProcedure
+    getConfigLogs: tenantProcedure
       .input(z.object({
         configId: z.number(),
         status: z.enum(["success", "failed", "duplicate"]).optional(),
@@ -2692,7 +2692,7 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
         };
       }),
 
-    regenerateConfigToken: protectedProcedure
+    regenerateConfigToken: tenantProcedure
       .input(z.object({ configId: z.number(), }))
       .mutation(async ({ input, ctx }) => {
         const db = await getDb();
@@ -2713,7 +2713,7 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
       }),
 
     // ─── Helper: list pipelines & stages for config form ───
-    listPipelines: protectedProcedure
+    listPipelines: tenantProcedure
       .query(async ({ input, ctx }) => {
         const db = await getDb();
         if (!db) return [];
@@ -2725,7 +2725,7 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
         return rows;
       }),
 
-    listStages: protectedProcedure
+    listStages: tenantProcedure
       .input(z.object({ pipelineId: z.number() }))
       .query(async ({ input, ctx }) => {
         const db = await getDb();
@@ -2738,7 +2738,7 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
         return rows;
       }),
 
-    listTeamMembers: protectedProcedure
+    listTeamMembers: tenantProcedure
       .query(async ({ input, ctx }) => {
         const db = await getDb();
         if (!db) return [];
@@ -2751,7 +2751,7 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
       }),
 
     // ─── Config Task Templates CRUD ───
-    listConfigTasks: protectedProcedure
+    listConfigTasks: tenantProcedure
       .input(z.object({ configId: z.number(), }))
       .query(async ({ input, ctx }) => {
         const db = await getDb();
@@ -2763,7 +2763,7 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
           .orderBy(asc(rdStationConfigTasks.orderIndex));
       }),
 
-    addConfigTask: protectedProcedure
+    addConfigTask: tenantProcedure
       .input(z.object({
         configId: z.number(),
         title: z.string().min(1).max(255),
@@ -2802,7 +2802,7 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
         return rows[0]!;
       }),
 
-    updateConfigTask: protectedProcedure
+    updateConfigTask: tenantProcedure
       .input(z.object({
         taskId: z.number(),
         title: z.string().min(1).max(255).optional(),
@@ -2836,7 +2836,7 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
         return rows[0] ?? null;
       }),
 
-    removeConfigTask: protectedProcedure
+    removeConfigTask: tenantProcedure
       .input(z.object({ taskId: z.number(), }))
       .mutation(async ({ input, ctx }) => {
         const db = await getDb();
@@ -2847,7 +2847,7 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
       }),
 
     // ─── Helper: list active products for auto-product selector ───
-    listProducts: protectedProcedure
+    listProducts: tenantProcedure
       .query(async ({ input, ctx }) => {
         const db = await getDb();
         if (!db) return [];
@@ -2860,7 +2860,7 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
       }),
 
     // ─── Helper: check WhatsApp session status for tenant ───
-    getWhatsAppStatus: protectedProcedure
+    getWhatsAppStatus: tenantProcedure
       .query(async ({ input, ctx }) => {
         const db = await getDb();
         if (!db) return { connected: false, sessionId: null as string | null };
@@ -2878,7 +2878,7 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
 
   // ── Field Mappings (RD Station ↔ Entur OS) ──
   fieldMappings: router({
-    list: protectedProcedure
+    list: tenantProcedure
       .query(async ({ input, ctx }) => {
         const db = await getDb();
         if (!db) return [];
@@ -2888,7 +2888,7 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
         return mappings;
       }),
 
-    create: protectedProcedure
+    create: tenantProcedure
       .input(z.object({
         rdFieldKey: z.string().min(1),
         rdFieldLabel: z.string().min(1),
@@ -2910,7 +2910,7 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
         return { id: result!.id };
       }),
 
-    update: protectedProcedure
+    update: tenantProcedure
       .input(z.object({
         id: z.number(),
         rdFieldKey: z.string().min(1).optional(),
@@ -2929,7 +2929,7 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
         return { success: true };
       }),
 
-    delete: protectedProcedure
+    delete: tenantProcedure
       .input(z.object({ id: z.number(), }))
       .mutation(async ({ input, ctx }) => {
         const db = await getDb();
@@ -2940,7 +2940,7 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
       }),
 
     // Lista campos padrão do Entur OS disponíveis para mapeamento
-    enturStandardFields: protectedProcedure
+    enturStandardFields: tenantProcedure
       .query(async () => {
         return [
           { key: "contact.name", label: "Contato — Nome", entity: "contact" },
@@ -2960,7 +2960,7 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
       }),
 
     // Lista campos personalizados do Entur OS disponíveis para mapeamento
-    enturCustomFields: protectedProcedure
+    enturCustomFields: tenantProcedure
       .query(async ({ input, ctx }) => {
         const db = await getDb();
         if (!db) return [];
@@ -2981,7 +2981,7 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
   // AI INTEGRATIONS — OpenAI & Anthropic configuration
   // ════════════════════════════════════════════════════════════
   ai: router({
-    list: protectedProcedure
+    list: tenantProcedure
       .query(async ({ input, ctx }) => {
         const integrations = await listAiIntegrations(getTenantId(ctx));
         // Mask API keys for security
@@ -2991,7 +2991,7 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
         }));
       }),
 
-    get: protectedProcedure
+    get: tenantProcedure
       .input(z.object({ id: z.number() }))
       .query(async ({ input, ctx }) => {
         const integration = await getAiIntegration(getTenantId(ctx), input.id);
@@ -3002,7 +3002,7 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
         };
       }),
 
-    create: protectedProcedure
+    create: tenantProcedure
       .input(z.object({
         provider: z.enum(["openai", "anthropic"]),
         apiKey: z.string().min(10),
@@ -3014,7 +3014,7 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
         return createAiIntegration({ ...input, createdBy: userId });
       }),
 
-    update: protectedProcedure
+    update: tenantProcedure
       .input(z.object({
         id: z.number(),
         apiKey: z.string().min(10).optional(),
@@ -3027,14 +3027,14 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
         return { success: true };
       }),
 
-    delete: protectedProcedure
+    delete: tenantProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ input, ctx }) => {
         await deleteAiIntegration(getTenantId(ctx), input.id);
         return { success: true };
       }),
 
-    testKey: protectedProcedure
+    testKey: tenantProcedure
       .input(z.object({
         provider: z.enum(["openai", "anthropic"]),
         apiKey: z.string().min(10),
@@ -3045,7 +3045,7 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
       }),
 
     // Invoke AI completion (generic endpoint for both providers)
-    invoke: protectedProcedure
+    invoke: tenantProcedure
       .input(z.object({
         provider: z.enum(["openai", "anthropic"]),
         messages: z.array(z.object({
@@ -3124,12 +3124,12 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
       }),
 
     // ── Tenant AI Settings ──
-    getSettings: protectedProcedure
+    getSettings: tenantProcedure
       .query(async ({ input, ctx }) => {
         return getTenantAiSettings(getTenantId(ctx));
       }),
 
-    updateSettings: protectedProcedure
+    updateSettings: tenantProcedure
       .input(z.object({
         defaultAiProvider: z.enum(["openai", "anthropic"]).optional(),
         defaultAiModel: z.string().optional(),
@@ -3142,7 +3142,7 @@ const tenantId = getTenantId(ctx); const { ...patch } = input;
       }),
 
     // ── AI Suggestion (SPIN Selling) — uses isolated service ──
-    suggest: protectedProcedure
+    suggest: tenantProcedure
       .input(z.object({
         // Legacy: messages from frontend (kept for backward compat, ignored when sessionId+remoteJid present)
         messages: z.array(z.object({
@@ -3312,7 +3312,7 @@ REGRAS:
       }),
 
     // ── Audio Transcription via OpenAI Whisper ──
-    transcribe: protectedProcedure
+    transcribe: tenantProcedure
       .input(z.object({
         audioUrl: z.string(),
       }))
@@ -3364,7 +3364,7 @@ REGRAS:
       }),
 
     // ── Retranscribe audio message (manual trigger) ──
-    retranscribeAudio: protectedProcedure
+    retranscribeAudio: tenantProcedure
       .input(z.object({
         messageId: z.number(),
       }))
@@ -3402,7 +3402,7 @@ REGRAS:
       }),
 
     // ── Refine existing suggestion with different style ──
-    refine: protectedProcedure
+    refine: tenantProcedure
       .input(z.object({
         originalText: z.string(),
         style: z.enum(["default", "shorter", "human", "objective", "consultive"]),
@@ -3427,7 +3427,7 @@ REGRAS:
       }),
 
     // ── Async AI Suggestion (non-blocking, streaming via socket) ──
-    suggestAsync: protectedProcedure
+    suggestAsync: tenantProcedure
       .input(z.object({
         requestId: z.string(),
         sessionId: z.string(),
@@ -3453,7 +3453,7 @@ REGRAS:
       }),
 
     // ── Cancel AI Suggestion ──
-    cancel: protectedProcedure
+    cancel: tenantProcedure
       .input(z.object({
         requestId: z.string().optional(),
         sessionId: z.string().optional(),

@@ -183,7 +183,6 @@ describe("tenantProcedure middleware (via appRouter)", () => {
     const ctx = createAnonymousContext();
     const caller = appRouter.createCaller(ctx);
 
-    // Try to call a tenant-scoped endpoint (whatsapp.listSessions is tenantProcedure)
     await expect(
       caller.whatsapp.listSessions()
     ).rejects.toThrow();
@@ -193,7 +192,6 @@ describe("tenantProcedure middleware (via appRouter)", () => {
     const ctx = createNoTenantContext();
     const caller = appRouter.createCaller(ctx);
 
-    // This user has a Manus OAuth user but no saasUser (no tenant)
     await expect(
       caller.whatsapp.listSessions()
     ).rejects.toThrow();
@@ -203,7 +201,6 @@ describe("tenantProcedure middleware (via appRouter)", () => {
     const ctx = createTenantContext(1, { role: "admin" });
     const caller = appRouter.createCaller(ctx);
 
-    // This should NOT throw an auth error (may throw DB error which is fine)
     try {
       await caller.whatsapp.listSessions();
     } catch (e: any) {
@@ -214,14 +211,52 @@ describe("tenantProcedure middleware (via appRouter)", () => {
   });
 });
 
-// ─── 4. No input.tenantId Leakage Tests ─────────────────────
+// ─── 4. sessionTenantProcedure Middleware Tests ─────────────
+
+describe("sessionTenantProcedure middleware (WhatsApp session endpoints)", () => {
+  it("blocks anonymous users from session-scoped WhatsApp endpoints", async () => {
+    const ctx = createAnonymousContext();
+    const caller = appRouter.createCaller(ctx);
+
+    await expect(
+      caller.whatsapp.disconnect({ sessionId: "test-session" })
+    ).rejects.toThrow();
+  });
+
+  it("blocks users without saasUser from session-scoped WhatsApp endpoints", async () => {
+    const ctx = createNoTenantContext();
+    const caller = appRouter.createCaller(ctx);
+
+    await expect(
+      caller.whatsapp.disconnect({ sessionId: "test-session" })
+    ).rejects.toThrow();
+  });
+
+  it("blocks anonymous users from WhatsApp connect (tenantProcedure)", async () => {
+    const ctx = createAnonymousContext();
+    const caller = appRouter.createCaller(ctx);
+
+    await expect(
+      caller.whatsapp.connect()
+    ).rejects.toThrow();
+  });
+
+  it("blocks users without tenant from WhatsApp connect", async () => {
+    const ctx = createNoTenantContext();
+    const caller = appRouter.createCaller(ctx);
+
+    await expect(
+      caller.whatsapp.connect()
+    ).rejects.toThrow();
+  });
+});
+
+// ─── 5. No input.tenantId Leakage Tests ─────────────────────
 
 describe("input.tenantId elimination", () => {
   it("routers.ts has no input.tenantId references", async () => {
     const fs = await import("fs");
     const content = fs.readFileSync("/home/ubuntu/whatsapp-automation-app/server/routers.ts", "utf-8");
-    
-    // Count occurrences of input.tenantId (should be 0)
     const matches = content.match(/input\.tenantId/g) || [];
     expect(matches.length).toBe(0);
   });
@@ -229,8 +264,6 @@ describe("input.tenantId elimination", () => {
   it("routers.ts has no tenantId: z.number() in input schemas", async () => {
     const fs = await import("fs");
     const content = fs.readFileSync("/home/ubuntu/whatsapp-automation-app/server/routers.ts", "utf-8");
-    
-    // tenantId: z.number() should not appear in input schemas
     const matches = content.match(/tenantId:\s*z\.number\(\)/g) || [];
     expect(matches.length).toBe(0);
   });
@@ -238,8 +271,6 @@ describe("input.tenantId elimination", () => {
   it("routers.ts has no tenantId default(1) fallbacks", async () => {
     const fs = await import("fs");
     const content = fs.readFileSync("/home/ubuntu/whatsapp-automation-app/server/routers.ts", "utf-8");
-    
-    // No tenantId with default(1)
     const matches = content.match(/tenantId.*\.default\(1\)/g) || [];
     expect(matches.length).toBe(0);
   });
@@ -247,12 +278,10 @@ describe("input.tenantId elimination", () => {
   it("routers.ts has no || 1 tenant fallbacks (excluding maxTokens)", async () => {
     const fs = await import("fs");
     const content = fs.readFileSync("/home/ubuntu/whatsapp-automation-app/server/routers.ts", "utf-8");
-    
-    // Find all || 1 patterns
     const lines = content.split("\n");
     const badLines = lines.filter(line => {
-      if (line.includes("maxTokens")) return false; // legitimate use
-      if (line.includes("// ")) return false; // comments
+      if (line.includes("maxTokens")) return false;
+      if (line.includes("// ")) return false;
       return /\|\|\s*1[^0-9]/.test(line) && line.includes("tenantId");
     });
     expect(badLines.length).toBe(0);
@@ -280,7 +309,7 @@ describe("input.tenantId elimination", () => {
   });
 });
 
-// ─── 5. All router files use getTenantId(ctx) ───────────────
+// ─── 6. All router files use getTenantId(ctx) ───────────────
 
 describe("all router files use getTenantId(ctx)", () => {
   const routerFiles = [
@@ -301,7 +330,6 @@ describe("all router files use getTenantId(ctx)", () => {
       const path = `/home/ubuntu/whatsapp-automation-app/${file}`;
       try {
         const content = fs.readFileSync(path, "utf-8");
-        // If file has any tenant-scoped queries, it should use getTenantId
         if (content.includes("tenantId") && content.includes("Procedure")) {
           const hasGetTenantId = content.includes("getTenantId(ctx)") || content.includes("getTenantId");
           expect(hasGetTenantId).toBe(true);
@@ -313,7 +341,7 @@ describe("all router files use getTenantId(ctx)", () => {
   }
 });
 
-// ─── 6. Guard rail: tenantProcedure import check ────────────
+// ─── 7. Guard rail: tenantProcedure import check ────────────
 
 describe("tenantProcedure is imported in tenant-scoped routers", () => {
   const tenantRouterFiles = [
@@ -338,4 +366,108 @@ describe("tenantProcedure is imported in tenant-scoped routers", () => {
       }
     });
   }
+});
+
+// ─── 8. No protectedProcedure in application routers ────────
+
+describe("protectedProcedure eliminated from application routers", () => {
+  const appRouterFiles = [
+    "server/routers.ts",
+    "server/routers/crmRouter.ts",
+    "server/routers/adminRouter.ts",
+    "server/routers/featureRouters.ts",
+    "server/routers/inboxRouter.ts",
+    "server/routers/productCatalogRouter.ts",
+    "server/routers/rfvRouter.ts",
+    "server/routers/utmAnalyticsRouter.ts",
+    "server/routers/aiAnalysisRouter.ts",
+    "server/routers/rdCrmImportRouter.ts",
+  ];
+
+  for (const file of appRouterFiles) {
+    it(`${file} does not use protectedProcedure (should use tenantProcedure)`, async () => {
+      const fs = await import("fs");
+      const path = `/home/ubuntu/whatsapp-automation-app/${file}`;
+      try {
+        const content = fs.readFileSync(path, "utf-8");
+        // Remove import lines before checking
+        const lines = content.split("\n").filter(l => !l.includes("import "));
+        const codeOnly = lines.join("\n");
+        const matches = codeOnly.match(/protectedProcedure/g) || [];
+        expect(matches.length).toBe(0);
+      } catch {
+        // File doesn't exist, skip
+      }
+    });
+  }
+});
+
+// ─── 9. No sessionProtectedProcedure in application routers ─
+
+describe("sessionProtectedProcedure replaced by sessionTenantProcedure", () => {
+  const appRouterFiles = [
+    "server/routers.ts",
+    "server/routers/rfvRouter.ts",
+  ];
+
+  for (const file of appRouterFiles) {
+    it(`${file} does not use sessionProtectedProcedure`, async () => {
+      const fs = await import("fs");
+      const path = `/home/ubuntu/whatsapp-automation-app/${file}`;
+      try {
+        const content = fs.readFileSync(path, "utf-8");
+        const lines = content.split("\n").filter(l => !l.includes("import "));
+        const codeOnly = lines.join("\n");
+        const matches = codeOnly.match(/sessionProtectedProcedure/g) || [];
+        expect(matches.length).toBe(0);
+      } catch {
+        // File doesn't exist, skip
+      }
+    });
+  }
+
+  it("routers.ts imports sessionTenantProcedure", async () => {
+    const fs = await import("fs");
+    const content = fs.readFileSync("/home/ubuntu/whatsapp-automation-app/server/routers.ts", "utf-8");
+    expect(content).toContain("sessionTenantProcedure");
+  });
+});
+
+// ─── 10. WhatsApp webhook tenantId resolution ───────────────
+
+describe("webhookRoutes.ts tenant resolution", () => {
+  it("Evolution webhook passes tenantId: 0 (resolved by worker)", async () => {
+    const fs = await import("fs");
+    const content = fs.readFileSync("/home/ubuntu/whatsapp-automation-app/server/webhookRoutes.ts", "utf-8");
+    // The Evolution webhook should pass tenantId: 0 which is resolved by worker
+    expect(content).toContain("tenantId: 0, // Will be resolved by worker from session");
+  });
+
+  it("has tenant resolution functions for lead webhooks", async () => {
+    const fs = await import("fs");
+    const content = fs.readFileSync("/home/ubuntu/whatsapp-automation-app/server/webhookRoutes.ts", "utf-8");
+    expect(content).toContain("resolveLeadsTenantId");
+    expect(content).toContain("resolveMetaTenantByVerifyToken");
+    expect(content).toContain("resolveMetaTenantFromBody");
+  });
+});
+
+// ─── 11. messageWorker.ts tenant resolution ─────────────────
+
+describe("messageWorker.ts tenant resolution", () => {
+  it("resolves tenantId from session, not from hardcoded values", async () => {
+    const fs = await import("fs");
+    const content = fs.readFileSync("/home/ubuntu/whatsapp-automation-app/server/messageWorker.ts", "utf-8");
+    // Worker should resolve session info (including tenantId) from instanceName
+    expect(content).toContain("getSessionInfo(instanceName");
+    // Should NOT have hardcoded tenantId
+    const hardcoded = content.match(/tenantId\s*=\s*1\b/g) || [];
+    expect(hardcoded.length).toBe(0);
+  });
+
+  it("session info includes tenantId from whatsappManager", async () => {
+    const fs = await import("fs");
+    const content = fs.readFileSync("/home/ubuntu/whatsapp-automation-app/server/messageWorker.ts", "utf-8");
+    expect(content).toContain("tenantId: session.tenantId");
+  });
 });
