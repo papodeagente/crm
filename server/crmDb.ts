@@ -273,7 +273,7 @@ export async function createDeal(data: { tenantId: number; title: string; contac
   if (data.dedupeKey !== undefined) cleanData.dedupeKey = data.dedupeKey;
   if (data.status !== undefined) cleanData.status = data.status;
   try {
-    const [result] = await db.insert(deals).values(cleanData).$returningId();
+    const [result] = await db.insert(deals).values(cleanData as typeof deals.$inferInsert).$returningId();
     return result;
   } catch (error: any) {
     console.error('[createDeal] Failed to insert deal:', error?.message || error);

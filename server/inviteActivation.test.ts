@@ -73,7 +73,7 @@ describe("Agent Invite in teamManagement router", () => {
       "/home/ubuntu/whatsapp-automation-app/server/routers.ts",
       "utf-8"
     );
-    expect(routersContent).toContain("inviteAgent: protectedProcedure");
+    expect(routersContent).toContain("inviteAgent: tenantProcedure");
     expect(routersContent).toContain("inviteUserToTenant");
     expect(routersContent).toContain("EMAIL_EXISTS_IN_TENANT");
   });
@@ -85,8 +85,8 @@ describe("Agent Invite in teamManagement router", () => {
       "utf-8"
     );
     // Find the inviteAgent section
-    const inviteIdx = routersContent.indexOf("inviteAgent: protectedProcedure");
-    const sectionEnd = routersContent.indexOf("listAgents: protectedProcedure", inviteIdx);
+    const inviteIdx = routersContent.indexOf("inviteAgent: tenantProcedure");
+    const sectionEnd = routersContent.indexOf("listAgents: tenantProcedure", inviteIdx);
     const inviteSection = routersContent.substring(inviteIdx, sectionEnd);
     expect(inviteSection).toContain('ctx.saasUser?.role !== "admin"');
     expect(inviteSection).toContain("FORBIDDEN");

@@ -45,11 +45,11 @@ describe("WhatsApp Delete Session", () => {
   // ─── Router: deleteSession and hardDeleteSession endpoints ───
   describe("Router endpoints", () => {
     it("should have deleteSession endpoint (soft-delete for any user)", () => {
-      expect(router).toContain("deleteSession: sessionProtectedProcedure");
+      expect(router).toContain("deleteSession: sessionTenantProcedure");
     });
 
     it("should have hardDeleteSession endpoint (admin only)", () => {
-      expect(router).toContain("hardDeleteSession: sessionProtectedProcedure");
+      expect(router).toContain("hardDeleteSession: sessionTenantProcedure");
     });
 
     it("should restrict hard-delete to admins", () => {

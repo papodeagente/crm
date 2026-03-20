@@ -150,14 +150,14 @@ export const rdCrmImportRouter = router({
   // ─── Validate Token ───
   validateToken: tenantProcedure
     .input(z.object({ token: z.string().min(10) }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       return rdCrm.validateRdCrmToken(input.token);
     }),
 
   // ─── Fetch Summary (preview before import) ───
   fetchSummary: tenantProcedure
     .input(z.object({ token: z.string().min(10) }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       return rdCrm.fetchRdCrmSummary(input.token);
     }),
 

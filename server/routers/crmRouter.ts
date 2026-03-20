@@ -33,7 +33,7 @@ export const crmRouter = router({
         ownerUserId: z.number().optional(), teamId: z.number().optional(),
       }))
       .mutation(async ({ ctx, input }) => {
-        const result = await crm.createContact({ ...input, createdBy: ctx.user.id });
+        const result = await crm.createContact({ ...input, tenantId: getTenantId(ctx), createdBy: ctx.user.id });
         await emitEvent({ tenantId: getTenantId(ctx), actorUserId: ctx.user.id, entityType: "contact", entityId: result?.id, action: "create" });
         // In-app notification
         await createNotification(getTenantId(ctx), {
@@ -122,7 +122,7 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
         primaryContactId: z.number().optional(), ownerUserId: z.number().optional(), teamId: z.number().optional(),
       }))
       .mutation(async ({ ctx, input }) => {
-        const result = await crm.createAccount({ ...input, createdBy: ctx.user.id });
+        const result = await crm.createAccount({ ...input, tenantId: getTenantId(ctx), createdBy: ctx.user.id });
         await emitEvent({ tenantId: getTenantId(ctx), actorUserId: ctx.user.id, entityType: "account", entityId: result?.id, action: "create" });
         return result;
       }),
@@ -157,12 +157,12 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
       }),
     create: tenantProcedure
       .input(z.object({ name: z.string().min(1), description: z.string().optional(), color: z.string().optional(), pipelineType: z.enum(["sales", "post_sale", "support", "custom"]).optional(), isDefault: z.boolean().optional() }))
-      .mutation(async ({ input }) => {
-        return crm.createPipeline(input);
+      .mutation(async ({ input, ctx }) => {
+        return crm.createPipeline({ ...input, tenantId: getTenantId(ctx) });
       }),
     update: tenantProcedure
       .input(z.object({ id: z.number(), name: z.string().optional(), description: z.string().optional(), color: z.string().optional(), pipelineType: z.string().optional(), isDefault: z.boolean().optional(), isArchived: z.boolean().optional() }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
 const tenantId = getTenantId(ctx); const { id, ...data } = input;
         return crm.updatePipeline(tenantId, id, data);
       }),
@@ -178,12 +178,12 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
       }),
     createStage: tenantProcedure
       .input(z.object({ pipelineId: z.number(), name: z.string(), color: z.string().optional(), orderIndex: z.number(), probabilityDefault: z.number().optional(), isWon: z.boolean().optional(), isLost: z.boolean().optional() }))
-      .mutation(async ({ input }) => {
-        return crm.createStage(input);
+      .mutation(async ({ input, ctx }) => {
+        return crm.createStage({ ...input, tenantId: getTenantId(ctx) });
       }),
     updateStage: tenantProcedure
       .input(z.object({ id: z.number(), name: z.string().optional(), color: z.string().optional(), orderIndex: z.number().optional(), probabilityDefault: z.number().optional(), isWon: z.boolean().optional(), isLost: z.boolean().optional(), coolingEnabled: z.boolean().optional(), coolingDays: z.number().optional() }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
 const tenantId = getTenantId(ctx); const { id, ...data } = input;
         return crm.updateStage(tenantId, id, data);
       }),
@@ -220,8 +220,8 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
         triggerStageId: z.number().optional(), targetPipelineId: z.number(), targetStageId: z.number(),
         copyProducts: z.boolean().optional(), copyParticipants: z.boolean().optional(), copyCustomFields: z.boolean().optional(),
       }))
-      .mutation(async ({ input }) => {
-        return crm.createPipelineAutomation(input);
+      .mutation(async ({ input, ctx }) => {
+        return crm.createPipelineAutomation({ ...input, tenantId: getTenantId(ctx) });
       }),
     update: tenantProcedure
       .input(z.object({
@@ -231,7 +231,7 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
         copyProducts: z.boolean().optional(), copyParticipants: z.boolean().optional(),
         copyCustomFields: z.boolean().optional(), isActive: z.boolean().optional(),
       }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
 const tenantId = getTenantId(ctx); const { id, ...data } = input;
         return crm.updatePipelineAutomation(tenantId, id, data);
       }),
@@ -312,6 +312,7 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
         // REGRA 1: Auto-assign owner to the creating user if not specified
         const result = await crm.createDeal({
           ...dealInput,
+          tenantId: getTenantId(ctx),
           ownerUserId: dealInput.ownerUserId || ctx.saasUser?.userId || ctx.user.id,
           createdBy: ctx.user.id,
           boardingDate: boardingDate ? new Date(boardingDate) : null,
@@ -816,7 +817,7 @@ const tenantId = getTenantId(ctx); const { id, dealId, checkIn, checkOut, ...dat
           role: z.enum(["decision_maker", "traveler", "payer", "companion", "other"]).optional(),
         }))
         .mutation(async ({ ctx, input }) => {
-          const result = await crm.addDealParticipant(input);
+          const result = await crm.addDealParticipant({ ...input, tenantId: getTenantId(ctx) });
           await crm.createDealHistory({
             tenantId: getTenantId(ctx), dealId: input.dealId, action: "participant_added",
             description: `Participante adicionado à negociação`,
@@ -856,9 +857,7 @@ const tenantId = getTenantId(ctx); const { id, dealId, checkIn, checkOut, ...dat
         startDate: z.string().optional(), endDate: z.string().optional(), ownerUserId: z.number().optional(),
       }))
       .mutation(async ({ ctx, input }) => {
-        const result = await crm.createTrip({
-          ...input,
-          startDate: input.startDate ? new Date(input.startDate) : undefined,
+        const result = await crm.createTrip({ ...input, tenantId: getTenantId(ctx), startDate: input.startDate ? new Date(input.startDate) : undefined,
           endDate: input.endDate ? new Date(input.endDate) : undefined,
           createdBy: ctx.user.id,
         });
@@ -901,6 +900,7 @@ const tenantId = getTenantId(ctx); const { id, dealId, checkIn, checkOut, ...dat
         const { markAsDone, assigneeUserIds, ...taskInput } = input;
         const result = await crm.createTask({
           ...taskInput,
+          tenantId: getTenantId(ctx),
           dueAt: taskInput.dueAt ? new Date(taskInput.dueAt) : undefined,
           createdByUserId: ctx.user.id,
         });
@@ -965,7 +965,7 @@ const tenantId = getTenantId(ctx); const { id, dealId, checkIn, checkOut, ...dat
         dueAt: z.string().optional(), assignedToUserId: z.number().optional(),
         description: z.string().optional(),
       }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
 const tenantId = getTenantId(ctx); const { id, dueAt, ...data } = input;
         await crm.updateTask(tenantId, id, { ...data, dueAt: dueAt ? new Date(dueAt) : undefined });
 
@@ -1044,7 +1044,7 @@ const tenantId = getTenantId(ctx); const { id, dueAt, ...data } = input;
     create: tenantProcedure
       .input(z.object({ entityType: z.string(), entityId: z.number(), body: z.string().min(1) }))
       .mutation(async ({ ctx, input }) => {
-        return crm.createNote({ ...input, createdByUserId: ctx.user.id });
+        return crm.createNote({ ...input, tenantId: getTenantId(ctx), createdByUserId: ctx.user.id });
       }),
   }),
 
@@ -1077,29 +1077,29 @@ const tenantId = getTenantId(ctx); const { id, dueAt, ...data } = input;
     create: tenantProcedure
       .input(z.object({ name: z.string().min(1), color: z.string().optional() }))
       .mutation(async ({ ctx, input }) => {
-        const result = await crm.createLeadSource(input);
+        const result = await crm.createLeadSource({ ...input, tenantId: getTenantId(ctx) });
         await emitEvent({ tenantId: getTenantId(ctx), actorUserId: ctx.user.id, entityType: "lead_source", entityId: result?.id, action: "create" });
         return result;
       }),
     update: tenantProcedure
       .input(z.object({ id: z.number(), name: z.string().min(1).optional(), color: z.string().optional(), isActive: z.boolean().optional() }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         const { id, ...data } = input;
         return crm.updateLeadSource(id, data);
       }),
     delete: tenantProcedure
       .input(z.object({ id: z.number() }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         return crm.softDeleteLeadSource(input.id);
       }),
     restore: tenantProcedure
       .input(z.object({ id: z.number() }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         return crm.restoreLeadSource(input.id);
       }),
     hardDelete: tenantProcedure
       .input(z.object({ id: z.number() }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         return crm.hardDeleteLeadSource(input.id);
       }),
   }),
@@ -1114,29 +1114,29 @@ const tenantId = getTenantId(ctx); const { id, dueAt, ...data } = input;
     create: tenantProcedure
       .input(z.object({ sourceId: z.number().optional(), name: z.string().min(1), color: z.string().optional() }))
       .mutation(async ({ ctx, input }) => {
-        const result = await crm.createCampaign(input);
+        const result = await crm.createCampaign({ ...input, tenantId: getTenantId(ctx) });
         await emitEvent({ tenantId: getTenantId(ctx), actorUserId: ctx.user.id, entityType: "campaign", entityId: result?.id, action: "create" });
         return result;
       }),
     update: tenantProcedure
       .input(z.object({ id: z.number(), name: z.string().min(1).optional(), color: z.string().optional(), sourceId: z.number().nullish(), isActive: z.boolean().optional() }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         const { id, ...data } = input;
         return crm.updateCampaign(id, data);
       }),
     delete: tenantProcedure
       .input(z.object({ id: z.number() }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         return crm.softDeleteCampaign(input.id);
       }),
     restore: tenantProcedure
       .input(z.object({ id: z.number() }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         return crm.restoreCampaign(input.id);
       }),
     hardDelete: tenantProcedure
       .input(z.object({ id: z.number() }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         return crm.hardDeleteCampaign(input.id);
       }),
   }),
@@ -1151,29 +1151,29 @@ const tenantId = getTenantId(ctx); const { id, dueAt, ...data } = input;
     create: tenantProcedure
       .input(z.object({ name: z.string().min(1), description: z.string().optional() }))
       .mutation(async ({ ctx, input }) => {
-        const result = await crm.createLossReason(input);
+        const result = await crm.createLossReason({ ...input, tenantId: getTenantId(ctx) });
         await emitEvent({ tenantId: getTenantId(ctx), actorUserId: ctx.user.id, entityType: "loss_reason", entityId: result?.id, action: "create" });
         return result;
       }),
     update: tenantProcedure
       .input(z.object({ id: z.number(), name: z.string().min(1).optional(), description: z.string().optional(), isActive: z.boolean().optional() }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         const { id, ...data } = input;
         return crm.updateLossReason(id, data);
       }),
     delete: tenantProcedure
       .input(z.object({ id: z.number() }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         return crm.softDeleteLossReason(input.id);
       }),
     restore: tenantProcedure
       .input(z.object({ id: z.number() }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         return crm.restoreLossReason(input.id);
       }),
     hardDelete: tenantProcedure
       .input(z.object({ id: z.number() }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         return crm.hardDeleteLossReason(input.id);
       }),
   }),
@@ -1280,8 +1280,8 @@ const tenantId = getTenantId(ctx); const { id, dueAt, ...data } = input;
         isActive: z.boolean().default(true),
         orderIndex: z.number().default(0),
       }))
-      .mutation(async ({ input }) => {
-        return crm.createTaskAutomation(input);
+      .mutation(async ({ input, ctx }) => {
+        return crm.createTaskAutomation({ ...input, tenantId: getTenantId(ctx) });
       }),
     update: tenantProcedure
       .input(z.object({
@@ -1299,9 +1299,9 @@ const tenantId = getTenantId(ctx); const { id, dueAt, ...data } = input;
         stageId: z.number().optional(),
         pipelineId: z.number().optional(),
       }))
-      .mutation(async ({ input }) => {
-        const { id, tenantId, ...data } = input;
-        return crm.updateTaskAutomation(id, tenantId, data);
+      .mutation(async ({ input, ctx }) => {
+        const { id, ...data } = input;
+        return crm.updateTaskAutomation(id, getTenantId(ctx), data);
       }),
     delete: tenantProcedure
       .input(z.object({ id: z.number(), }))
@@ -1329,8 +1329,8 @@ const tenantId = getTenantId(ctx); const { id, dueAt, ...data } = input;
         dealStatusFilter: z.enum(["open", "won", "lost"]).optional(),
         isActive: z.boolean().optional(),
       }))
-      .mutation(async ({ input }) => {
-        return crm.createDateAutomation(input);
+      .mutation(async ({ input, ctx }) => {
+        return crm.createDateAutomation({ ...input, tenantId: getTenantId(ctx) });
       }),
     update: tenantProcedure
       .input(z.object({
@@ -1344,7 +1344,7 @@ const tenantId = getTenantId(ctx); const { id, dueAt, ...data } = input;
         dealStatusFilter: z.enum(["open", "won", "lost"]).nullable().optional(),
         isActive: z.boolean().optional(),
       }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
 const tenantId = getTenantId(ctx); const { id, ...data } = input;
         return crm.updateDateAutomation(tenantId, id, data);
       }),

@@ -89,6 +89,7 @@ describe("Lead Processor — tRPC Endpoints (read-only)", () => {
         updatedAt: new Date(),
         lastSignedIn: new Date(),
       },
+      saasUser: { userId: 1, tenantId: 1, role: "admin" as const, email: "test@example.com", name: "Test User" },
       req: { protocol: "https", headers: {} } as any,
       res: { clearCookie: () => {} } as any,
     });
@@ -112,6 +113,7 @@ describe("Lead Processor — tRPC Endpoints (read-only)", () => {
         updatedAt: new Date(),
         lastSignedIn: new Date(),
       },
+      saasUser: { userId: 1, tenantId: 1, role: "admin" as const, email: "test@example.com", name: "Test User" },
       req: { protocol: "https", headers: {} } as any,
       res: { clearCookie: () => {} } as any,
     });
@@ -137,6 +139,7 @@ describe("Lead Processor — tRPC Endpoints (read-only)", () => {
         updatedAt: new Date(),
         lastSignedIn: new Date(),
       },
+      saasUser: { userId: 1, tenantId: 1, role: "admin" as const, email: "test@example.com", name: "Test User" },
       req: { protocol: "https", headers: {} } as any,
       res: { clearCookie: () => {} } as any,
     });
@@ -347,6 +350,7 @@ describe("Lead Processor — Webhook Config Endpoints (read-only)", () => {
         updatedAt: new Date(),
         lastSignedIn: new Date(),
       },
+      saasUser: { userId: 1, tenantId: 1, role: "admin" as const, email: "test@example.com", name: "Test User" },
       req: { protocol: "https", headers: {} } as any,
       res: { clearCookie: () => {} } as any,
     });
@@ -372,6 +376,7 @@ describe("Lead Processor — Webhook Config Endpoints (read-only)", () => {
         updatedAt: new Date(),
         lastSignedIn: new Date(),
       },
+      saasUser: { userId: 1, tenantId: 1, role: "admin" as const, email: "test@example.com", name: "Test User" },
       req: { protocol: "https", headers: {} } as any,
       res: { clearCookie: () => {} } as any,
     });
@@ -402,6 +407,7 @@ describe("Lead Processor — Webhook Config Endpoints (read-only)", () => {
         updatedAt: new Date(),
         lastSignedIn: new Date(),
       },
+      saasUser: { userId: 1, tenantId: 1, role: "admin" as const, email: "test@example.com", name: "Test User" },
       req: { protocol: "https", headers: {} } as any,
       res: { clearCookie: () => {} } as any,
     });

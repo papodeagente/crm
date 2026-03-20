@@ -3,7 +3,6 @@ import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { AdminOnlyGuard } from "@/components/AdminOnlyGuard";
 import { useAuth } from "@/_core/hooks/useAuth";
-import { useTenantId } from "@/hooks/useTenantId";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -67,8 +66,6 @@ export default function PipelineSettings() {
   const [, setLocation] = useLocation();
   const { user } = useAuth();
   // toast from sonner (imported at top)
-  const tenantId = useTenantId();
-
   const [activeTab, setActiveTab] = useState<"pipelines" | "automations">("pipelines");
   const [selectedPipelineId, setSelectedPipelineId] = useState<number | null>(null);
 
@@ -93,38 +90,38 @@ export default function PipelineSettings() {
   });
 
   // Queries
-  const pipelinesQ = trpc.crm.pipelines.list.useQuery({ tenantId, includeArchived: true });
+  const pipelinesQ = trpc.crm.pipelines.list.useQuery({ includeArchived: true });
   const pipelines = (pipelinesQ.data || []) as unknown as PipelineData[];
   const activePipelines = pipelines.filter(p => !p.isArchived);
 
   const stagesQ = trpc.crm.pipelines.stages.useQuery(
-    { tenantId, pipelineId: selectedPipelineId! },
+    { pipelineId: selectedPipelineId! },
     { enabled: !!selectedPipelineId }
   );
   const stages = (stagesQ.data || []) as unknown as StageData[];
   const sortedStages = useMemo(() => [...stages].sort((a, b) => a.orderIndex - b.orderIndex), [stages]);
 
-  const automationsQ = trpc.crm.pipelineAutomations.list.useQuery({ tenantId });
+  const automationsQ = trpc.crm.pipelineAutomations.list.useQuery({});
   const automations = (automationsQ.data || []) as unknown as AutomationData[];
 
   // Target stages for automation form
   const targetStagesQ = trpc.crm.pipelines.stages.useQuery(
-    { tenantId, pipelineId: autoForm.targetPipelineId },
+    { pipelineId: autoForm.targetPipelineId },
     { enabled: autoForm.targetPipelineId > 0 }
   );
   const targetStages = (targetStagesQ.data || []) as unknown as StageData[];
 
   // Source stages for trigger
   const sourceStagesQ = trpc.crm.pipelines.stages.useQuery(
-    { tenantId, pipelineId: autoForm.sourcePipelineId },
+    { pipelineId: autoForm.sourcePipelineId },
     { enabled: autoForm.sourcePipelineId > 0 && autoForm.triggerEvent === "stage_reached" }
   );
   const sourceStages = (sourceStagesQ.data || []) as unknown as StageData[];
 
   // User default pipeline preference
   const defaultPipelinePref = trpc.preferences.get.useQuery(
-    { tenantId, key: "default_pipeline_id" },
-    { enabled: !!tenantId }
+    { key: "default_pipeline_id" },
+    { enabled: true }
   );
   const defaultPipelineId = defaultPipelinePref.data?.value ? Number(defaultPipelinePref.data.value) : null;
 
@@ -167,7 +164,7 @@ export default function PipelineSettings() {
   });
   const setDefaultPipelineMut = trpc.preferences.set.useMutation({
     onSuccess: () => {
-      utils.preferences.get.invalidate({ tenantId, key: "default_pipeline_id" });
+      utils.preferences.get.invalidate({ key: "default_pipeline_id" });
       toast.success("Funil padrão definido!");
     },
   });
@@ -191,9 +188,9 @@ export default function PipelineSettings() {
   function savePipeline() {
     if (!pipelineForm.name.trim()) return;
     if (editingPipeline) {
-      updatePipeline.mutate({ tenantId, id: editingPipeline.id, ...pipelineForm });
+      updatePipeline.mutate({ id: editingPipeline.id, ...pipelineForm });
     } else {
-      createPipeline.mutate({ tenantId, ...pipelineForm, pipelineType: pipelineForm.pipelineType as any });
+      createPipeline.mutate({ ...pipelineForm, pipelineType: pipelineForm.pipelineType as any });
     }
   }
 
@@ -211,9 +208,9 @@ export default function PipelineSettings() {
   function saveStage() {
     if (!stageForm.name.trim() || !selectedPipelineId) return;
     if (editingStage) {
-      updateStage.mutate({ tenantId, id: editingStage.id, ...stageForm });
+      updateStage.mutate({ id: editingStage.id, ...stageForm });
     } else {
-      createStage.mutate({ tenantId, pipelineId: selectedPipelineId, ...stageForm, orderIndex: sortedStages.length });
+      createStage.mutate({ pipelineId: selectedPipelineId, ...stageForm, orderIndex: sortedStages.length });
     }
   }
   function moveStage(stageId: number, direction: "up" | "down") {
@@ -226,7 +223,7 @@ export default function PipelineSettings() {
       if (i === swapIdx) return { id: s.id, orderIndex: idx };
       return { id: s.id, orderIndex: i };
     });
-    reorderStages.mutate({ tenantId, pipelineId: selectedPipelineId!, stageOrders: newOrders });
+    reorderStages.mutate({ pipelineId: selectedPipelineId!, stageOrders: newOrders });
   }
 
   function openCreateAutomation() {
@@ -251,13 +248,13 @@ export default function PipelineSettings() {
   function saveAutomation() {
     if (!autoForm.name.trim() || !autoForm.sourcePipelineId || !autoForm.targetPipelineId || !autoForm.targetStageId) return;
     if (editingAuto) {
-      updateAutomation.mutate({ tenantId, id: editingAuto.id, ...autoForm });
+      updateAutomation.mutate({ id: editingAuto.id, ...autoForm });
     } else {
-      createAutomation.mutate({ tenantId, ...autoForm, triggerEvent: autoForm.triggerEvent as any });
+      createAutomation.mutate({ ...autoForm, triggerEvent: autoForm.triggerEvent as any });
     }
   }
   function toggleAutomation(a: AutomationData) {
-    updateAutomation.mutate({ tenantId, id: a.id, isActive: !a.isActive });
+    updateAutomation.mutate({ id: a.id, isActive: !a.isActive });
   }
 
   const selectedPipeline = activePipelines.find(p => p.id === selectedPipelineId);
@@ -325,7 +322,7 @@ export default function PipelineSettings() {
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        setDefaultPipelineMut.mutate({ tenantId, key: "default_pipeline_id", value: String(p.id) });
+                        setDefaultPipelineMut.mutate({ key: "default_pipeline_id", value: String(p.id) });
                       }}
                       className={`h-6 w-6 rounded-full flex items-center justify-center shrink-0 transition-all ${
                         isDefault
@@ -347,7 +344,7 @@ export default function PipelineSettings() {
                     <button onClick={(e) => { e.stopPropagation(); openEditPipeline(p); }} className="h-6 w-6 rounded flex items-center justify-center hover:bg-accent">
                       <Pencil className="h-3 w-3 text-muted-foreground" />
                     </button>
-                    <button onClick={(e) => { e.stopPropagation(); deletePipeline.mutate({ tenantId, id: p.id }); }} className="h-6 w-6 rounded flex items-center justify-center hover:bg-destructive/10">
+                    <button onClick={(e) => { e.stopPropagation(); deletePipeline.mutate({ id: p.id }); }} className="h-6 w-6 rounded flex items-center justify-center hover:bg-destructive/10">
                       <Archive className="h-3 w-3 text-muted-foreground" />
                     </button>
                   </div>
@@ -436,7 +433,7 @@ export default function PipelineSettings() {
                           <button onClick={() => openEditStage(s)} className="h-7 w-7 rounded flex items-center justify-center hover:bg-accent">
                             <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
                           </button>
-                          <button onClick={() => deleteStage.mutate({ tenantId, id: s.id })} className="h-7 w-7 rounded flex items-center justify-center hover:bg-destructive/10">
+                          <button onClick={() => deleteStage.mutate({ id: s.id })} className="h-7 w-7 rounded flex items-center justify-center hover:bg-destructive/10">
                             <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
                           </button>
                         </div>
@@ -448,7 +445,7 @@ export default function PipelineSettings() {
                         <Switch
                           checked={!!s.coolingEnabled}
                           onCheckedChange={(checked) => {
-                            updateStage.mutate({ tenantId, id: s.id, coolingEnabled: checked, coolingDays: s.coolingDays || 3 });
+                            updateStage.mutate({ id: s.id, coolingEnabled: checked, coolingDays: s.coolingDays || 3 });
                           }}
                           className="scale-75"
                         />
@@ -462,7 +459,7 @@ export default function PipelineSettings() {
                               value={s.coolingDays || 3}
                               onChange={(e) => {
                                 const days = parseInt(e.target.value) || 1;
-                                updateStage.mutate({ tenantId, id: s.id, coolingDays: Math.max(1, Math.min(90, days)) });
+                                updateStage.mutate({ id: s.id, coolingDays: Math.max(1, Math.min(90, days)) });
                               }}
                               className="h-6 w-14 text-[11px] text-center px-1"
                             />
@@ -558,7 +555,7 @@ export default function PipelineSettings() {
                       <button onClick={() => openEditAutomation(a)} className="h-8 w-8 rounded-lg flex items-center justify-center hover:bg-accent opacity-0 group-hover:opacity-100 transition-opacity">
                         <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
                       </button>
-                      <button onClick={() => deleteAutomation.mutate({ tenantId, id: a.id })} className="h-8 w-8 rounded-lg flex items-center justify-center hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button onClick={() => deleteAutomation.mutate({ id: a.id })} className="h-8 w-8 rounded-lg flex items-center justify-center hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-opacity">
                         <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
                       </button>
                     </div>

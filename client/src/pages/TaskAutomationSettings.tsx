@@ -1,6 +1,5 @@
 import { useState, useMemo } from "react";
 import { trpc } from "@/lib/trpc";
-import { useTenantId } from "@/hooks/useTenantId";
 import { AdminOnlyGuard } from "@/components/AdminOnlyGuard";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -11,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
+import { useTenantId } from "@/hooks/useTenantId";
 import {
   ArrowLeft, Plus, Pencil, Trash2, Zap, Clock,
   MessageCircle, Phone, Mail, Video, CheckSquare,
@@ -56,27 +56,24 @@ const defaultFormData: AutomationFormData = {
 };
 
 export default function TaskAutomationSettings() {
-  const [, setLocation] = useLocation();
   const tenantId = useTenantId();
-
-
+  const [, setLocation] = useLocation();
   const [selectedPipelineId, setSelectedPipelineId] = useState<number | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [formData, setFormData] = useState<AutomationFormData>(defaultFormData);
 
   // Queries
-  const pipelinesQ = trpc.crm.pipelines.list.useQuery(
-    { tenantId: tenantId! },
-    { enabled: !!tenantId }
+  const pipelinesQ = trpc.crm.pipelines.list.useQuery({},
+    { enabled: true }
   );
   const stagesQ = trpc.crm.pipelines.stages.useQuery(
-    { tenantId: tenantId!, pipelineId: selectedPipelineId! },
-    { enabled: !!tenantId && !!selectedPipelineId }
+    { pipelineId: selectedPipelineId! },
+    { enabled: !!selectedPipelineId }
   );
   const automationsQ = trpc.crm.taskAutomations.list.useQuery(
-    { tenantId: tenantId!, pipelineId: selectedPipelineId ?? undefined },
-    { enabled: !!tenantId }
+    { pipelineId: selectedPipelineId ?? undefined },
+    { enabled: true }
   );
 
   const utils = trpc.useUtils();
@@ -170,18 +167,14 @@ export default function TaskAutomationSettings() {
 
     if (editingId) {
       updateMut.mutate({
-        id: editingId,
-        tenantId,
-        pipelineId: selectedPipelineId,
+        id: editingId, pipelineId: selectedPipelineId,
         ...formData,
         taskType: formData.taskType as any,
         deadlineReference: formData.deadlineReference as any,
         taskDescription: formData.taskDescription || null,
       });
     } else {
-      createMut.mutate({
-        tenantId,
-        pipelineId: selectedPipelineId,
+      createMut.mutate({ pipelineId: selectedPipelineId,
         ...formData,
         taskType: formData.taskType as any,
         deadlineReference: formData.deadlineReference as any,
@@ -190,13 +183,11 @@ export default function TaskAutomationSettings() {
   }
 
   function handleDelete(id: number) {
-    if (!tenantId) return;
-    deleteMut.mutate({ id, tenantId });
+    deleteMut.mutate({ id});
   }
 
   function handleToggleActive(auto: any) {
-    if (!tenantId) return;
-    updateMut.mutate({ id: auto.id, tenantId, isActive: !auto.isActive });
+    updateMut.mutate({ id: auto.id, isActive: !auto.isActive });
   }
 
   function getDeadlineLabel(ref: string, offset: number) {

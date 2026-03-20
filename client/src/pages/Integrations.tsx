@@ -18,7 +18,6 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
-import { useTenantId } from "@/hooks/useTenantId";
 import { formatDateTimeShort } from "../../../shared/dateUtils";
 import AiIntegrationsTab from "./AiIntegrationsTab";
 
@@ -42,8 +41,7 @@ function StatusBadge({ status }: { status: string }) {
 // ─── Webhook Config Tab ──────────────────────────────────
 
 function WebhookConfigTab() {
-  const TENANT_ID = useTenantId();
-  const config = trpc.leadCapture.getWebhookConfig.useQuery({ tenantId: TENANT_ID });
+  const config = trpc.leadCapture.getWebhookConfig.useQuery();
   const generateToken = trpc.leadCapture.generateWebhookToken.useMutation({
     onSuccess: () => {
       config.refetch();
@@ -112,7 +110,7 @@ function WebhookConfigTab() {
               variant="outline"
               size="sm"
               className="gap-1.5 mt-1"
-              onClick={() => generateToken.mutate({ tenantId: TENANT_ID })}
+              onClick={() => generateToken.mutate()}
               disabled={generateToken.isPending}
             >
               <RefreshCw className={`h-3.5 w-3.5 ${generateToken.isPending ? "animate-spin" : ""}`} />
@@ -156,8 +154,7 @@ Content-Type: application/json
 // ─── Meta Lead Ads Tab ───────────────────────────────────
 
 function MetaLeadAdsTab() {
-  const TENANT_ID = useTenantId();
-  const config = trpc.leadCapture.getMetaConfig.useQuery({ tenantId: TENANT_ID });
+  const config = trpc.leadCapture.getMetaConfig.useQuery();
   const connectMeta = trpc.leadCapture.connectMeta.useMutation({
     onSuccess: () => {
       config.refetch();
@@ -188,7 +185,6 @@ function MetaLeadAdsTab() {
       return;
     }
     connectMeta.mutate({
-      tenantId: TENANT_ID,
       pageId,
       pageName: pageName || undefined,
       accessToken,
@@ -262,7 +258,7 @@ function MetaLeadAdsTab() {
                 variant="destructive"
                 size="sm"
                 className="gap-1.5"
-                onClick={() => disconnectMeta.mutate({ tenantId: TENANT_ID })}
+                onClick={() => disconnectMeta.mutate()}
                 disabled={disconnectMeta.isPending}
               >
                 <XCircle className="h-3.5 w-3.5" />Desconectar
@@ -319,8 +315,7 @@ function MetaLeadAdsTab() {
 }// ─── Tracking Script Tab ──────────────────────────────────────
 
 function TrackingScriptTab() {
-  const TENANT_ID = useTenantId();
-  const tokens = trpc.leadCapture.listTrackingTokens.useQuery({ tenantId: TENANT_ID });
+  const tokens = trpc.leadCapture.listTrackingTokens.useQuery();
   const createToken = trpc.leadCapture.createTrackingToken.useMutation({
     onSuccess: () => { tokens.refetch(); toast.success("Token criado!"); setShowCreate(false); setNewName(""); setNewDomains(""); },
     onError: (e) => toast.error(e.message),
@@ -353,7 +348,6 @@ function TrackingScriptTab() {
     setLoadingSnippet(tokenId);
     try {
       const result = await utils.client.leadCapture.getTrackingSnippet.query({
-        tenantId: TENANT_ID,
         tokenId,
         collectUrl,
       });
@@ -483,7 +477,7 @@ function TrackingScriptTab() {
                       size="sm"
                       className="h-8 w-8 p-0"
                       title={t.isActive ? "Desativar" : "Ativar"}
-                      onClick={() => updateToken.mutate({ tenantId: TENANT_ID, tokenId: t.id, isActive: !t.isActive })}
+                      onClick={() => updateToken.mutate({ tokenId: t.id, isActive: !t.isActive })}
                     >
                       <Power className={`h-3.5 w-3.5 ${t.isActive ? "text-emerald-600" : "text-muted-foreground"}`} />
                     </Button>
@@ -494,7 +488,7 @@ function TrackingScriptTab() {
                       title="Excluir token"
                       onClick={() => {
                         if (confirm("Tem certeza? O script parará de funcionar no site.")) {
-                          deleteToken.mutate({ tenantId: TENANT_ID, tokenId: t.id });
+                          deleteToken.mutate({ tokenId: t.id });
                         }
                       }}
                     >
@@ -557,7 +551,7 @@ function TrackingScriptTab() {
                   let url = verifyUrl.trim();
                   if (!url.startsWith("http")) url = "https://" + url;
                   setVerifyUrl(url);
-                  verifyInstallation.mutate({ tenantId: TENANT_ID, url });
+                  verifyInstallation.mutate({ url });
                 }
               }}
             />
@@ -569,7 +563,7 @@ function TrackingScriptTab() {
                 let url = verifyUrl.trim();
                 if (!url.startsWith("http")) url = "https://" + url;
                 setVerifyUrl(url);
-                verifyInstallation.mutate({ tenantId: TENANT_ID, url });
+                verifyInstallation.mutate({ url });
               }}
             >
               {verifyInstallation.isPending ? (
@@ -688,7 +682,6 @@ function TrackingScriptTab() {
                 if (!newName.trim()) { toast.error("Informe o nome do site"); return; }
                 const domains = newDomains.split(",").map(d => d.trim()).filter(Boolean);
                 createToken.mutate({
-                  tenantId: TENANT_ID,
                   name: newName.trim(),
                   allowedDomains: domains.length > 0 ? domains : undefined,
                 });
@@ -707,13 +700,11 @@ function TrackingScriptTab() {
 // ─── Event Logs Tab ──────────────────────────────────────────
 
 function EventLogsTab() { const [sourceFilter, setSourceFilter] = useState<string>("all");
-  const TENANT_ID = useTenantId();
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [page, setPage] = useState(0);
   const LIMIT = 20;
 
   const events = trpc.leadCapture.listEvents.useQuery({
-    tenantId: TENANT_ID,
     source: sourceFilter === "all" ? undefined : sourceFilter,
     status: statusFilter === "all" ? undefined : statusFilter,
     limit: LIMIT,
@@ -826,7 +817,7 @@ function EventLogsTab() { const [sourceFilter, setSourceFilter] = useState<strin
                         size="sm"
                         className="h-7 w-7 p-0"
                         title="Reprocessar"
-                        onClick={() => reprocess.mutate({ tenantId: TENANT_ID, eventId: e.id })}
+                        onClick={() => reprocess.mutate({ eventId: e.id })}
                         disabled={reprocess.isPending}
                       >
                         <RotateCcw className={`h-3.5 w-3.5 ${reprocess.isPending ? "animate-spin" : ""}`} />
@@ -861,8 +852,7 @@ function EventLogsTab() { const [sourceFilter, setSourceFilter] = useState<strin
 // ─── Main Integrations Page ──────────────────────────────
 
 export default function Integrations() {
-  const TENANT_ID = useTenantId();
-  const integrations = trpc.integrationHub.integrations.list.useQuery({ tenantId: TENANT_ID });
+  const integrations = trpc.integrationHub.integrations.list.useQuery();
 
   return (
     <div className="p-5 lg:px-8 space-y-5">

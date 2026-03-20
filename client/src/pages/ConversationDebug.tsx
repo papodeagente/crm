@@ -8,17 +8,13 @@ import { toast } from "sonner";
 import { ArrowLeft, RefreshCw, Database, Merge, Search, Shield, Phone, MessageSquare, Users } from "lucide-react";
 import { formatFullDateTime } from "../../../shared/dateUtils";
 import { useLocation } from "wouter";
-import { useTenantId } from "@/hooks/useTenantId";
-
 export default function ConversationDebug() {
   const { user } = useAuth();
   const [, navigate] = useLocation();
   const [selectedSession, setSelectedSession] = useState("");
-  const tenantId = useTenantId();
-
   const sessions = trpc.whatsapp.sessions.useQuery();
   const debugData = trpc.whatsapp.debugConversations.useQuery(
-    { tenantId, sessionId: selectedSession },
+    { sessionId: selectedSession },
     { enabled: !!selectedSession }
   );
 
@@ -108,7 +104,7 @@ export default function ConversationDebug() {
           </CardHeader>
           <CardContent>
             <Button
-              onClick={() => migrateMutation.mutate({ tenantId })}
+              onClick={() => migrateMutation.mutate()}
               disabled={migrateMutation.isPending}
               className="w-full"
             >
@@ -134,7 +130,7 @@ export default function ConversationDebug() {
           </CardHeader>
           <CardContent>
             <Button
-              onClick={() => selectedSession && reconcileMutation.mutate({ tenantId, sessionId: selectedSession })}
+              onClick={() => selectedSession && reconcileMutation.mutate({ sessionId: selectedSession })}
               disabled={reconcileMutation.isPending || !selectedSession}
               variant="outline"
               className="w-full"

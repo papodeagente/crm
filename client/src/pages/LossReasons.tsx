@@ -19,11 +19,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { useTenantId } from "@/hooks/useTenantId";
-
-
 export default function LossReasons() {
-  const TENANT_ID = useTenantId();
   const [, setLocation] = useLocation();
   const [showDeleted, setShowDeleted] = useState(false);
 
@@ -37,7 +33,7 @@ export default function LossReasons() {
   const [deleteDialog, setDeleteDialog] = useState<{ id: number; name: string; hard?: boolean } | null>(null);
 
   // Queries
-  const reasonsQuery = trpc.crm.lossReasons.list.useQuery({ tenantId: TENANT_ID, includeDeleted: showDeleted });
+  const reasonsQuery = trpc.crm.lossReasons.list.useQuery({ includeDeleted: showDeleted });
   const utils = trpc.useUtils();
 
   // Mutations
@@ -79,7 +75,7 @@ export default function LossReasons() {
     if (editing) {
       updateReason.mutate({ id: editing.id, name: name.trim(), description: description.trim() || undefined });
     } else {
-      createReason.mutate({ tenantId: TENANT_ID, name: name.trim(), description: description.trim() || undefined });
+      createReason.mutate({ name: name.trim(), description: description.trim() || undefined });
     }
   }
   function handleDelete() {

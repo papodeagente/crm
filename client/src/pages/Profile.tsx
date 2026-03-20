@@ -152,7 +152,7 @@ export default function Profile() {
   });
 
   const handleConnectGoogleCalendar = useCallback(() => {
-    connectGCal.mutate({});
+    connectGCal.mutate();
   }, [connectGCal]);
 
   const handleSyncAllTasks = useCallback(() => {

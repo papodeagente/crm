@@ -15,6 +15,7 @@ function createAuthContext(userId = 1): TrpcContext {
       updatedAt: new Date(),
       lastSignedIn: new Date(),
     },
+    saasUser: { userId, tenantId: 1, role: "admin" as const, email: "test@example.com", name: "Test User" },
     req: { protocol: "https", headers: {} } as TrpcContext["req"],
     res: { clearCookie: () => {} } as TrpcContext["res"],
   };

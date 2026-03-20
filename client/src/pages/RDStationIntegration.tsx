@@ -22,8 +22,6 @@ import {
   Phone, XCircle, BarChart3, Settings2, FileText,
 } from "lucide-react";
 import { formatFullDateTime } from "../../../shared/dateUtils";
-import { useTenantId } from "@/hooks/useTenantId";
-
 // ─── Types ───────────────────────────────────────────────
 
 interface ConfigFormData {
@@ -75,7 +73,6 @@ function interpolateTemplate(template: string): string {
 // ─── Main Component ──────────────────────────────────────
 
 export default function RDStationIntegration() {
-  const TENANT_ID = useTenantId();
   const [, setLocation] = useLocation();
 
   // UI State
@@ -95,21 +92,21 @@ export default function RDStationIntegration() {
   const [newTaskPriority, setNewTaskPriority] = useState<"low" | "medium" | "high" | "urgent">("medium");
 
   // Queries
-  const configsQuery = trpc.rdStation.listConfigs.useQuery({ tenantId: TENANT_ID });
-  const statsQuery = trpc.rdStation.getStats.useQuery({ tenantId: TENANT_ID });
-  const pipelinesQuery = trpc.rdStation.listPipelines.useQuery({ tenantId: TENANT_ID });
-  const teamQuery = trpc.rdStation.listTeamMembers.useQuery({ tenantId: TENANT_ID });
-  const waStatusQuery = trpc.rdStation.getWhatsAppStatus.useQuery({ tenantId: TENANT_ID });
-  const productsQuery = trpc.rdStation.listProducts.useQuery({ tenantId: TENANT_ID });
+  const configsQuery = trpc.rdStation.listConfigs.useQuery();
+  const statsQuery = trpc.rdStation.getStats.useQuery();
+  const pipelinesQuery = trpc.rdStation.listPipelines.useQuery();
+  const teamQuery = trpc.rdStation.listTeamMembers.useQuery();
+  const waStatusQuery = trpc.rdStation.getWhatsAppStatus.useQuery();
+  const productsQuery = trpc.rdStation.listProducts.useQuery();
 
   const selectedPipelineId = form.defaultPipelineId;
   const stagesQuery = trpc.rdStation.listStages.useQuery(
-    { tenantId: TENANT_ID, pipelineId: selectedPipelineId! },
+    { pipelineId: selectedPipelineId! },
     { enabled: !!selectedPipelineId }
   );
 
   const logsQuery = trpc.rdStation.getConfigLogs.useQuery(
-    { tenantId: TENANT_ID, configId: expandedLogsId!, status: logFilter, limit: 20 },
+    { configId: expandedLogsId!, status: logFilter, limit: 20 },
     { enabled: !!expandedLogsId }
   );
 
@@ -162,7 +159,7 @@ export default function RDStationIntegration() {
   });
 
   const configTasksQuery = trpc.rdStation.listConfigTasks.useQuery(
-    { configId: editingConfigId!, tenantId: TENANT_ID },
+    { configId: editingConfigId!},
     { enabled: !!editingConfigId,
       onSuccess: (data: any) => setConfigTasksCache(data || []),
     } as any
@@ -223,7 +220,6 @@ export default function RDStationIntegration() {
     if (editingConfigId) {
       updateMutation.mutate({
         configId: editingConfigId,
-        tenantId: TENANT_ID,
         name: form.name,
         defaultPipelineId: form.defaultPipelineId,
         defaultStageId: form.defaultStageId,
@@ -237,7 +233,6 @@ export default function RDStationIntegration() {
       });
     } else {
       createMutation.mutate({
-        tenantId: TENANT_ID,
         name: form.name,
         defaultPipelineId: form.defaultPipelineId ?? undefined,
         defaultStageId: form.defaultStageId ?? undefined,
@@ -362,7 +357,7 @@ export default function RDStationIntegration() {
                     <Switch
                       checked={config.isActive}
                       onCheckedChange={(checked) =>
-                        toggleMutation.mutate({ configId: config.id, tenantId: TENANT_ID, isActive: checked })
+                        toggleMutation.mutate({ configId: config.id, isActive: checked })
                       }
                     />
                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEditForm(config)}>
@@ -408,7 +403,7 @@ export default function RDStationIntegration() {
                         variant="ghost"
                         size="sm"
                         className="h-6 text-xs gap-1"
-                        onClick={() => regenTokenMutation.mutate({ configId: config.id, tenantId: TENANT_ID })}
+                        onClick={() => regenTokenMutation.mutate({ configId: config.id})}
                         disabled={regenTokenMutation.isPending}
                       >
                         <RefreshCw className={`h-3 w-3 ${regenTokenMutation.isPending ? "animate-spin" : ""}`} />
@@ -803,7 +798,7 @@ export default function RDStationIntegration() {
                           variant="ghost"
                           size="icon"
                           className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                          onClick={() => removeTaskMutation.mutate({ taskId: task.id, tenantId: TENANT_ID })}
+                          onClick={() => removeTaskMutation.mutate({ taskId: task.id})}
                           disabled={removeTaskMutation.isPending}
                         >
                           <Trash2 className="h-3.5 w-3.5" />
@@ -856,7 +851,6 @@ export default function RDStationIntegration() {
                       if (!newTaskTitle.trim() || !editingConfigId) return;
                       addTaskMutation.mutate({
                         configId: editingConfigId,
-                        tenantId: TENANT_ID,
                         title: newTaskTitle.trim(),
                         dueDaysOffset: newTaskDueDays,
                         priority: newTaskPriority,
@@ -958,7 +952,7 @@ export default function RDStationIntegration() {
             <Button variant="outline" onClick={() => setDeleteConfirmId(null)}>Cancelar</Button>
             <Button
               variant="destructive"
-              onClick={() => deleteConfirmId && deleteMutation.mutate({ configId: deleteConfirmId, tenantId: TENANT_ID })}
+              onClick={() => deleteConfirmId && deleteMutation.mutate({ configId: deleteConfirmId})}
               disabled={deleteMutation.isPending}
             >
               {deleteMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}

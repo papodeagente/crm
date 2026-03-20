@@ -9,7 +9,6 @@ import { Plus, Plane, MapPin, Calendar, User, DollarSign, ArrowRight, ChevronRig
 import { useState, useMemo } from "react";
 import { toast } from "sonner";
 import { useLocation, Link } from "wouter";
-import { useTenantId } from "@/hooks/useTenantId";
 import { formatDateShort } from "../../../shared/dateUtils";
 
 
@@ -35,11 +34,10 @@ function formatDate(d: string | null) {
 }
 
 export default function Trips() {
-  const TENANT_ID = useTenantId();
   const [, setLocation] = useLocation();
 
   // Find the post_sale pipeline
-  const pipelinesQ = trpc.crm.pipelines.list.useQuery({ tenantId: TENANT_ID });
+  const pipelinesQ = trpc.crm.pipelines.list.useQuery({});
   const pipelines = (pipelinesQ.data || []) as any[];
   const postSalePipeline = useMemo(() => {
     return pipelines.find((p: any) => p.pipelineType === "post_sale" && !p.isArchived) || pipelines.find((p: any) => !p.isArchived);
@@ -49,7 +47,7 @@ export default function Trips() {
 
   // Stages
   const stagesQ = trpc.crm.pipelines.stages.useQuery(
-    { tenantId: TENANT_ID, pipelineId: pipelineId! },
+    { pipelineId: pipelineId! },
     { enabled: !!pipelineId }
   );
   const stages = useMemo(() => {
@@ -58,7 +56,7 @@ export default function Trips() {
   }, [stagesQ.data]);
 
   // Deals in this pipeline
-  const dealsQ = trpc.crm.deals.list.useQuery({ tenantId: TENANT_ID });
+  const dealsQ = trpc.crm.deals.list.useQuery({});
   const allDeals = (dealsQ.data || []) as unknown as DealData[];
   const pipelineDeals = useMemo(() => {
     if (!pipelineId) return [];
@@ -186,7 +184,6 @@ export default function Trips() {
                     const stageId = newDealStage || stages[0]?.id;
                     if (!stageId || !pipelineId) return;
                     createDeal.mutate({
-                      tenantId: TENANT_ID,
                       title: newDealName,
                       stageId,
                       pipelineId,
@@ -251,7 +248,6 @@ export default function Trips() {
                           onClick={(e) => {
                             e.stopPropagation();
                             moveDeal.mutate({
-                              tenantId: TENANT_ID,
                               dealId: deal.id,
                               fromStageId: stage.id,
                               toStageId: nextStage.id,

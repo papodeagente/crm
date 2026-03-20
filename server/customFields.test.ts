@@ -19,6 +19,7 @@ function createTestContext(): TrpcContext {
 
   return {
     user,
+    saasUser: { userId: 1, tenantId: 1, role: "admin" as const, email: "test@example.com", name: "Test User" },
     req: {
       protocol: "https",
       hostname: "test.manus.computer",

@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "@/components/ui/alert-dialog";
 import { formatDate } from "../../../shared/dateUtils";
+import { useTenantId } from "@/hooks/useTenantId";
 
 export default function SuperAdmin() {
   const [, navigate] = useLocation();
@@ -317,9 +318,9 @@ export default function SuperAdmin() {
                                 <td className="p-4 text-center">
                                   {m ? (
                                     m.whatsappConnected ? (
-                                      <Wifi className="w-4 h-4 text-emerald-400 mx-auto" title="Conectado" />
+                                      <span title="Conectado"><Wifi className="w-4 h-4 text-emerald-400 mx-auto" /></span>
                                     ) : (
-                                      <WifiOff className="w-4 h-4 text-red-400 mx-auto" title="Desconectado" />
+                                      <span title="Desconectado"><WifiOff className="w-4 h-4 text-red-400 mx-auto" /></span>
                                     )
                                   ) : (
                                     <span className="text-muted-foreground">—</span>
@@ -597,8 +598,7 @@ export default function SuperAdmin() {
                 onClick={() => {
                   if (!deleteDialog) return;
                   deleteTenantMutation.mutate({
-                    tenantId: deleteDialog.tenantId,
-                    confirmName: deleteConfirmName,
+                    tenantId: deleteDialog.tenantId, confirmName: deleteConfirmName,
                   });
                 }}
               >
@@ -617,9 +617,7 @@ export default function SuperAdmin() {
 }
 
 /* ─── Tenant Users Panel (expandable row) ─── */
-function TenantUsersPanel({
-  tenantId,
-  tenantName,
+function TenantUsersPanel({ tenantId, tenantName,
   userStatusBadge,
   updateUserStatusMutation,
 }: {
@@ -628,8 +626,7 @@ function TenantUsersPanel({
   userStatusBadge: (status: string) => React.ReactNode;
   updateUserStatusMutation: any;
 }) {
-  const usersQuery = trpc.saasAuth.adminListTenantUsers.useQuery(
-    { tenantId },
+  const usersQuery = trpc.saasAuth.adminListTenantUsers.useQuery({ tenantId },
     { enabled: true }
   );
 

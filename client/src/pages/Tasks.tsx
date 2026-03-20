@@ -18,7 +18,6 @@ import {
 } from "lucide-react";
 import { useState, useMemo, useCallback } from "react";
 import { toast } from "sonner";
-import { useTenantId } from "@/hooks/useTenantId";
 import { useAuth } from "@/_core/hooks/useAuth";
 import TaskFormDialog from "@/components/TaskFormDialog";
 import TaskActionPopover from "@/components/TaskActionPopover";
@@ -93,7 +92,6 @@ type CalendarView = "day" | "week" | "month";
 
 // ─── Main Component ───
 export default function Tasks() {
-  const TENANT_ID = useTenantId();
   const { user } = useAuth();
   const utils = trpc.useUtils();
 
@@ -123,10 +121,9 @@ export default function Tasks() {
   const [summaryOpen, setSummaryOpen] = useState(false);
 
   // Data
-  const crmUsers = trpc.admin.users.list.useQuery({ tenantId: TENANT_ID });
+  const crmUsers = trpc.admin.users.list.useQuery();
 
   const tasksQuery = trpc.crm.tasks.list.useQuery({
-    tenantId: TENANT_ID,
     status: statusFilter !== "all" ? statusFilter : undefined,
     taskType: typeFilter !== "all" ? typeFilter : undefined,
     assigneeUserId: assigneeFilter !== "all" ? Number(assigneeFilter) : undefined,
@@ -143,7 +140,6 @@ export default function Tasks() {
   const weekEnd = new Date(weekStart);
   weekEnd.setDate(weekStart.getDate() + 6);
   const summaryQuery = trpc.crm.tasks.list.useQuery({
-    tenantId: TENANT_ID,
     dateFrom: weekStart.toISOString().split("T")[0],
     dateTo: weekEnd.toISOString().split("T")[0],
     limit: 500,
@@ -240,7 +236,6 @@ export default function Tasks() {
   }, [calendarDate, calendarView]);
 
   const calendarTasksQuery = trpc.crm.tasks.list.useQuery({
-    tenantId: TENANT_ID,
     dateFrom: calendarRange.from,
     dateTo: calendarRange.to,
     taskType: typeFilter !== "all" ? typeFilter : undefined,
@@ -423,7 +418,6 @@ export default function Tasks() {
           }}
           onToggleStatus={(task: any) => {
             updateTask.mutate({
-              tenantId: TENANT_ID,
               id: task.id,
               status: task.status === "done" ? "pending" : "done",
             });
@@ -445,7 +439,6 @@ export default function Tasks() {
           onToday={() => setCalendarDate(new Date())}
           onToggleStatus={(task: any) => {
             updateTask.mutate({
-              tenantId: TENANT_ID,
               id: task.id,
               status: task.status === "done" ? "pending" : "done",
             });

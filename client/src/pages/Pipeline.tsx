@@ -31,7 +31,6 @@ import { DatePicker } from "@/components/ui/date-picker";
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
-import { useTenantId } from "@/hooks/useTenantId";
 import TaskFormDialog, { getTaskTypeIcon, getTaskTypeLabel } from "@/components/TaskFormDialog";
 import TaskActionPopover from "@/components/TaskActionPopover";
 import { formatDate, formatDateTime, formatTime } from "../../../shared/dateUtils";
@@ -68,7 +67,6 @@ function formatCurrency(cents: number) {
 // formatDate and formatDateTime imported from shared/dateUtils (UTC-3)
 
 export default function Pipeline() {
-  const TENANT_ID = useTenantId();
   const [viewMode, setViewMode] = useState<ViewMode>("kanban");
   const [selectedPipelineId, setSelectedPipelineId] = useState<number | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>("open");
@@ -101,19 +99,19 @@ export default function Pipeline() {
     window.addEventListener("sale-celebration", handler);
     return () => window.removeEventListener("sale-celebration", handler);
   }, []);
-  const crmUsers = trpc.admin.users.list.useQuery({ tenantId: TENANT_ID });
+  const crmUsers = trpc.admin.users.list.useQuery();
 
   const utils = trpc.useUtils();
-  const pipelines = trpc.crm.pipelines.list.useQuery({ tenantId: TENANT_ID });
+  const pipelines = trpc.crm.pipelines.list.useQuery({});
 
   // Load user's default pipeline preference
   const defaultPipelinePref = trpc.preferences.get.useQuery(
-    { tenantId: TENANT_ID, key: "default_pipeline_id" },
-    { enabled: !!TENANT_ID }
+    { key: "default_pipeline_id" },
+    { enabled: true }
   );
   const setDefaultPipelineMut = trpc.preferences.set.useMutation({
     onSuccess: () => {
-      utils.preferences.get.invalidate({ tenantId: TENANT_ID, key: "default_pipeline_id" });
+      utils.preferences.get.invalidate({ key: "default_pipeline_id" });
       toast.success("Funil padrão salvo!");
     },
   });
@@ -141,13 +139,12 @@ export default function Pipeline() {
     : pipelines.data?.[0];
 
   const stages = trpc.crm.pipelines.stages.useQuery(
-    { tenantId: TENANT_ID, pipelineId: activePipeline?.id ?? 0 },
+    { pipelineId: activePipeline?.id ?? 0 },
     { enabled: !!activePipeline }
   );
 
   const deals = trpc.crm.deals.list.useQuery(
     {
-      tenantId: TENANT_ID,
       pipelineId: activePipeline?.id,
       limit: 5000,
       status: statusFilter !== "all" ? statusFilter : undefined,
@@ -157,14 +154,13 @@ export default function Pipeline() {
     { enabled: !!activePipeline }
   );
 
-  const contacts = trpc.crm.contacts.list.useQuery({ tenantId: TENANT_ID, limit: 200 });
-  const allAccounts = trpc.crm.accounts.list.useQuery({ tenantId: TENANT_ID });
+  const contacts = trpc.crm.contacts.list.useQuery({ limit: 200 });
+  const allAccounts = trpc.crm.accounts.list.useQuery();
   // Optimized: aggregated overdue/pending counts per deal for Kanban cards
-  const overdueSummary = trpc.crm.tasks.overdueSummary.useQuery({ tenantId: TENANT_ID });
-  const pendingCounts = trpc.crm.tasks.pendingCounts.useQuery({ tenantId: TENANT_ID });
+  const overdueSummary = trpc.crm.tasks.overdueSummary.useQuery({});
+  const pendingCounts = trpc.crm.tasks.pendingCounts.useQuery();
   // WhatsApp unread counts per contact (for deal card badges)
-  const waUnread = trpc.crm.dealWhatsApp.unreadByContact.useQuery(
-    { tenantId: TENANT_ID },
+  const waUnread = trpc.crm.dealWhatsApp.unreadByContact.useQuery(undefined,
     { refetchInterval: 30000 }
   );
   // Real-time: refetch unread counts when a new WhatsApp message arrives
@@ -175,13 +171,11 @@ export default function Pipeline() {
     }
   }, [wsLastMessage]);
   // Full tasks for calendar and indicators panels
-  const allTasks = trpc.crm.tasks.list.useQuery(
-    { tenantId: TENANT_ID },
+  const allTasks = trpc.crm.tasks.list.useQuery({},
     { enabled: showIndicators || showTaskCalendar }
   );
 
-  const deletedDeals = trpc.crm.deals.listDeleted.useQuery(
-    { tenantId: TENANT_ID },
+  const deletedDeals = trpc.crm.deals.listDeleted.useQuery({},
     { enabled: listTab === "trash" }
   );
 
@@ -224,9 +218,9 @@ export default function Pipeline() {
   const moveStage = trpc.crm.deals.moveStage.useMutation({
     onMutate: async ({ dealId, toStageId }) => {
       await utils.crm.deals.list.cancel();
-      const prev = utils.crm.deals.list.getData({ tenantId: TENANT_ID, pipelineId: activePipeline?.id, limit: 5000, status: statusFilter !== "all" ? statusFilter : undefined });
+      const prev = utils.crm.deals.list.getData({ pipelineId: activePipeline?.id, limit: 5000, status: statusFilter !== "all" ? statusFilter : undefined });
       utils.crm.deals.list.setData(
-        { tenantId: TENANT_ID, pipelineId: activePipeline?.id, limit: 5000, status: statusFilter !== "all" ? statusFilter : undefined },
+        { pipelineId: activePipeline?.id, limit: 5000, status: statusFilter !== "all" ? statusFilter : undefined },
         (old: any) => {
           if (!old) return old;
           if (old.items) return { ...old, items: old.items.map((d: any) => d.id === dealId ? { ...d, stageId: toStageId } : d) };
@@ -237,7 +231,7 @@ export default function Pipeline() {
     },
     onError: (_err, _vars, ctx) => {
       if (ctx?.prev) {
-        utils.crm.deals.list.setData({ tenantId: TENANT_ID, pipelineId: activePipeline?.id, limit: 5000, status: statusFilter !== "all" ? statusFilter : undefined }, ctx.prev);
+        utils.crm.deals.list.setData({ pipelineId: activePipeline?.id, limit: 5000, status: statusFilter !== "all" ? statusFilter : undefined }, ctx.prev);
       }
       toast.error("Erro ao mover negociação");
     },
@@ -306,7 +300,7 @@ export default function Pipeline() {
     const toStage = stages.data.find((s: any) => s.id === toStageId);
     setDraggedDealId(null);
     moveStage.mutate({
-      tenantId: TENANT_ID, dealId, fromStageId: deal.stageId, toStageId,
+      dealId, fromStageId: deal.stageId, toStageId,
       fromStageName: fromStage?.name || "Desconhecida", toStageName: toStage?.name || "Desconhecida",
     });
     toast.success(`Movido para "${toStage?.name}"`);
@@ -411,7 +405,7 @@ export default function Pipeline() {
                 <button
                   onClick={() => {
                     if (activePipeline) {
-                      setDefaultPipelineMut.mutate({ tenantId: TENANT_ID, key: "default_pipeline_id", value: String(activePipeline.id) });
+                      setDefaultPipelineMut.mutate({ key: "default_pipeline_id", value: String(activePipeline.id) });
                     }
                   }}
                   className={`p-2 rounded-lg transition-all duration-200 flex-shrink-0 ${
@@ -594,7 +588,7 @@ export default function Pipeline() {
                     Excluir
                   </Button>
                 ) : (
-                  <Button variant="outline" size="sm" className="h-8 gap-1.5 text-[12px] rounded-lg" onClick={() => restoreDeals.mutate({ tenantId: TENANT_ID, ids: Array.from(selectedDealIds) })}>
+                  <Button variant="outline" size="sm" className="h-8 gap-1.5 text-[12px] rounded-lg" onClick={() => restoreDeals.mutate({ ids: Array.from(selectedDealIds) })}>
                     <RotateCcw className="h-3.5 w-3.5" />
                     Restaurar
                   </Button>
@@ -718,7 +712,7 @@ export default function Pipeline() {
             <AlertDialogAction
               className="rounded-lg bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={() => {
-                bulkDeleteDeals.mutate({ tenantId: TENANT_ID, ids: Array.from(selectedDealIds) });
+                bulkDeleteDeals.mutate({ ids: Array.from(selectedDealIds) });
                 setShowDeleteConfirm(false);
               }}
             >
@@ -942,15 +936,14 @@ function DealCard({ deal, contacts, accounts, overdueData, pendingCount, waUnrea
 function DealDrawer({ dealId, onClose, contacts, accounts, stages }: {
   dealId: number; onClose: () => void; contacts: any[]; accounts: any[]; stages: any[];
 }) {
-  const TENANT_ID = useTenantId();
   const utils = trpc.useUtils();
-  const deal = trpc.crm.deals.get.useQuery({ tenantId: TENANT_ID, id: dealId });
-  const products = trpc.crm.deals.products.list.useQuery({ tenantId: TENANT_ID, dealId });
-  const history = trpc.crm.deals.history.list.useQuery({ tenantId: TENANT_ID, dealId });
-  const participants = trpc.crm.deals.participants.list.useQuery({ tenantId: TENANT_ID, dealId });
-  const dealTasks = trpc.crm.tasks.list.useQuery({ tenantId: TENANT_ID, entityType: "deal", entityId: dealId });
-  const dealNotes = trpc.crm.notes.list.useQuery({ tenantId: TENANT_ID, entityType: "deal", entityId: dealId });
-  const lossReasonsQ = trpc.crm.lossReasons.list.useQuery({ tenantId: TENANT_ID });
+  const deal = trpc.crm.deals.get.useQuery({ id: dealId });
+  const products = trpc.crm.deals.products.list.useQuery({ dealId });
+  const history = trpc.crm.deals.history.list.useQuery({ dealId });
+  const participants = trpc.crm.deals.participants.list.useQuery({ dealId });
+  const dealTasks = trpc.crm.tasks.list.useQuery({ entityType: "deal", entityId: dealId });
+  const dealNotes = trpc.crm.notes.list.useQuery({ entityType: "deal", entityId: dealId });
+  const lossReasonsQ = trpc.crm.lossReasons.list.useQuery({});
   const lossReasonsList = (lossReasonsQ.data || []).filter((r: any) => r.isActive && !r.isDeleted);
   const [showLossDialog, setShowLossDialog] = useState(false);
   const [lossDialogDealId, setLossDialogDealId] = useState<number | null>(null);
@@ -969,48 +962,48 @@ function DealDrawer({ dealId, onClose, contacts, accounts, stages }: {
 
   const updateDeal = trpc.crm.deals.update.useMutation({
     onSuccess: () => {
-      utils.crm.deals.get.invalidate({ tenantId: TENANT_ID, id: dealId });
+      utils.crm.deals.get.invalidate({ id: dealId });
       utils.crm.deals.list.invalidate();
-      utils.crm.deals.history.list.invalidate({ tenantId: TENANT_ID, dealId });
+      utils.crm.deals.history.list.invalidate({ dealId });
       toast.success("Negociação atualizada!");
     },
   });
 
   const createProduct = trpc.crm.deals.products.create.useMutation({
     onSuccess: () => {
-      utils.crm.deals.products.list.invalidate({ tenantId: TENANT_ID, dealId });
-      utils.crm.deals.history.list.invalidate({ tenantId: TENANT_ID, dealId });
+      utils.crm.deals.products.list.invalidate({ dealId });
+      utils.crm.deals.history.list.invalidate({ dealId });
       toast.success("Produto adicionado!");
     },
   });
 
   const deleteProduct = trpc.crm.deals.products.delete.useMutation({
     onSuccess: () => {
-      utils.crm.deals.products.list.invalidate({ tenantId: TENANT_ID, dealId });
-      utils.crm.deals.history.list.invalidate({ tenantId: TENANT_ID, dealId });
+      utils.crm.deals.products.list.invalidate({ dealId });
+      utils.crm.deals.history.list.invalidate({ dealId });
       toast.success("Produto removido!");
     },
   });
 
   const addParticipant = trpc.crm.deals.participants.add.useMutation({
     onSuccess: () => {
-      utils.crm.deals.participants.list.invalidate({ tenantId: TENANT_ID, dealId });
-      utils.crm.deals.history.list.invalidate({ tenantId: TENANT_ID, dealId });
+      utils.crm.deals.participants.list.invalidate({ dealId });
+      utils.crm.deals.history.list.invalidate({ dealId });
       toast.success("Participante adicionado!");
     },
   });
 
   const removeParticipant = trpc.crm.deals.participants.remove.useMutation({
     onSuccess: () => {
-      utils.crm.deals.participants.list.invalidate({ tenantId: TENANT_ID, dealId });
-      utils.crm.deals.history.list.invalidate({ tenantId: TENANT_ID, dealId });
+      utils.crm.deals.participants.list.invalidate({ dealId });
+      utils.crm.deals.history.list.invalidate({ dealId });
       toast.success("Participante removido!");
     },
   });
 
   const createNote = trpc.crm.notes.create.useMutation({
     onSuccess: () => {
-      utils.crm.notes.list.invalidate({ tenantId: TENANT_ID, entityType: "deal", entityId: dealId });
+      utils.crm.notes.list.invalidate({ entityType: "deal", entityId: dealId });
       toast.success("Nota adicionada!");
     },
   });
@@ -1079,7 +1072,7 @@ function DealDrawer({ dealId, onClose, contacts, accounts, stages }: {
                   <User className="h-3.5 w-3.5" /> Contato Associado
                 </Label>
                 <div className="flex items-center gap-2">
-                  <Select value={d.contactId ? String(d.contactId) : "none"} onValueChange={(v) => updateDeal.mutate({ tenantId: TENANT_ID, id: dealId, contactId: v === "none" ? null : Number(v) })}>
+                  <Select value={d.contactId ? String(d.contactId) : "none"} onValueChange={(v) => updateDeal.mutate({ id: dealId, contactId: v === "none" ? null : Number(v) })}>
                     <SelectTrigger className="flex-1 h-10 text-[13px] rounded-xl"><SelectValue placeholder="Selecionar contato..." /></SelectTrigger>
                     <SelectContent className="rounded-xl">
                       <SelectItem value="none">Nenhum</SelectItem>
@@ -1087,7 +1080,7 @@ function DealDrawer({ dealId, onClose, contacts, accounts, stages }: {
                     </SelectContent>
                   </Select>
                   {d.contactId && (
-                    <Button variant="ghost" size="icon" className="h-10 w-10 rounded-xl shrink-0" onClick={() => updateDeal.mutate({ tenantId: TENANT_ID, id: dealId, contactId: null })}>
+                    <Button variant="ghost" size="icon" className="h-10 w-10 rounded-xl shrink-0" onClick={() => updateDeal.mutate({ id: dealId, contactId: null })}>
                       <Unlink className="h-4 w-4 text-muted-foreground" />
                     </Button>
                   )}
@@ -1099,7 +1092,7 @@ function DealDrawer({ dealId, onClose, contacts, accounts, stages }: {
                   <Building2 className="h-3.5 w-3.5" /> Empresa Associada
                 </Label>
                 <div className="flex items-center gap-2">
-                  <Select value={d.accountId ? String(d.accountId) : "none"} onValueChange={(v) => updateDeal.mutate({ tenantId: TENANT_ID, id: dealId, accountId: v === "none" ? null : Number(v) })}>
+                  <Select value={d.accountId ? String(d.accountId) : "none"} onValueChange={(v) => updateDeal.mutate({ id: dealId, accountId: v === "none" ? null : Number(v) })}>
                     <SelectTrigger className="flex-1 h-10 text-[13px] rounded-xl"><SelectValue placeholder="Selecionar empresa..." /></SelectTrigger>
                     <SelectContent className="rounded-xl">
                       <SelectItem value="none">Nenhuma</SelectItem>
@@ -1107,7 +1100,7 @@ function DealDrawer({ dealId, onClose, contacts, accounts, stages }: {
                     </SelectContent>
                   </Select>
                   {d.accountId && (
-                    <Button variant="ghost" size="icon" className="h-10 w-10 rounded-xl shrink-0" onClick={() => updateDeal.mutate({ tenantId: TENANT_ID, id: dealId, accountId: null })}>
+                    <Button variant="ghost" size="icon" className="h-10 w-10 rounded-xl shrink-0" onClick={() => updateDeal.mutate({ id: dealId, accountId: null })}>
                       <Unlink className="h-4 w-4 text-muted-foreground" />
                     </Button>
                   )}
@@ -1124,9 +1117,9 @@ function DealDrawer({ dealId, onClose, contacts, accounts, stages }: {
                       setLossDialogDealId(dealId);
                       setShowLossDialog(true);
                     } else if (v === "won") {
-                      updateDeal.mutate({ tenantId: TENANT_ID, id: dealId, status: "won" }, {
+                      updateDeal.mutate({ id: dealId, status: "won" }, {
                         onSuccess: () => {
-                          utils.crm.deals.get.invalidate({ tenantId: TENANT_ID, id: dealId });
+                          utils.crm.deals.get.invalidate({ id: dealId });
                           utils.crm.deals.list.invalidate();
                           // Trigger celebration in parent via custom event
                           window.dispatchEvent(new CustomEvent("sale-celebration", {
@@ -1135,7 +1128,7 @@ function DealDrawer({ dealId, onClose, contacts, accounts, stages }: {
                         },
                       });
                     } else {
-                      updateDeal.mutate({ tenantId: TENANT_ID, id: dealId, status: v as any });
+                      updateDeal.mutate({ id: dealId, status: v as any });
                     }
                   }}>
                     <SelectTrigger className="h-10 text-[13px] rounded-xl"><SelectValue /></SelectTrigger>
@@ -1165,7 +1158,7 @@ function DealDrawer({ dealId, onClose, contacts, accounts, stages }: {
                     <p className="text-[11px] text-muted-foreground mt-1.5">{formatDateTime(n.createdAt)}</p>
                   </div>
                 ))}
-                <AddNoteForm onAdd={(body) => createNote.mutate({ tenantId: TENANT_ID, entityType: "deal", entityId: dealId, body })} />
+                <AddNoteForm onAdd={(body) => createNote.mutate({ entityType: "deal", entityId: dealId, body })} />
               </div>
 
               <Separator className="bg-border/40" />
@@ -1184,7 +1177,7 @@ function DealDrawer({ dealId, onClose, contacts, accounts, stages }: {
                       <Checkbox
                         checked={t.status === "done"}
                         onCheckedChange={(checked) => {
-                          updateTaskStatus.mutate({ tenantId: TENANT_ID, id: t.id, status: checked ? "done" : "pending" });
+                          updateTaskStatus.mutate({ id: t.id, status: checked ? "done" : "pending" });
                         }}
                         className="shrink-0"
                       />
@@ -1224,7 +1217,7 @@ function DealDrawer({ dealId, onClose, contacts, accounts, stages }: {
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="font-bold text-[13px]">{formatCurrency((p.unitPriceCents || 0) * (p.quantity || 1) - (p.discountCents || 0))}</span>
-                      <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg" onClick={() => deleteProduct.mutate({ tenantId: TENANT_ID, id: p.id, dealId, productName: p.name })}>
+                      <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg" onClick={() => deleteProduct.mutate({ id: p.id, dealId, productName: p.name })}>
                         <Trash2 className="h-3.5 w-3.5 text-destructive/60" />
                       </Button>
                     </div>
@@ -1248,7 +1241,7 @@ function DealDrawer({ dealId, onClose, contacts, accounts, stages }: {
               )}
 
               <Separator className="bg-border/40" />
-              <AddProductForm dealId={dealId} onAdd={(data) => createProduct.mutate({ tenantId: TENANT_ID, dealId, ...data })} />
+              <AddProductForm dealId={dealId} onAdd={(data) => createProduct.mutate({ dealId, ...data })} />
             </div>
           </TabsContent>
 
@@ -1268,7 +1261,7 @@ function DealDrawer({ dealId, onClose, contacts, accounts, stages }: {
                         <p className="text-[11px] text-muted-foreground capitalize">{p.role?.replace("_", " ") || "outro"}</p>
                       </div>
                     </div>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg" onClick={() => removeParticipant.mutate({ tenantId: TENANT_ID, id: p.id, dealId })}>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg" onClick={() => removeParticipant.mutate({ id: p.id, dealId })}>
                       <Trash2 className="h-3.5 w-3.5 text-destructive/60" />
                     </Button>
                   </div>
@@ -1286,7 +1279,7 @@ function DealDrawer({ dealId, onClose, contacts, accounts, stages }: {
               <AddParticipantForm
                 contacts={contacts}
                 existingIds={(participants.data || []).map((p: any) => p.contactId)}
-                onAdd={(contactId, role) => addParticipant.mutate({ tenantId: TENANT_ID, dealId, contactId, role: role as any })}
+                onAdd={(contactId, role) => addParticipant.mutate({ dealId, contactId, role: role as any })}
               />
             </div>
           </TabsContent>
@@ -1406,7 +1399,6 @@ function DealDrawer({ dealId, onClose, contacts, accounts, stages }: {
               onClick={() => {
                 if (!selectedLossReasonId || !lossDialogDealId) return;
                 updateDeal.mutate({
-                  tenantId: TENANT_ID,
                   id: lossDialogDealId,
                   status: "lost",
                   lossReasonId: selectedLossReasonId,
@@ -1578,7 +1570,6 @@ const LEAD_SOURCES = [
 function CreateDealDialog({ open, onOpenChange, pipelineId, stages, contacts, accounts, pipelines }: {
   open: boolean; onOpenChange: (open: boolean) => void; pipelineId?: number; stages: any[]; contacts: any[]; accounts: any[]; pipelines: any[];
 }) {
-  const TENANT_ID = useTenantId();
   // Deal fields
   const [title, setTitle] = useState("");
   const [selectedPipeline, setSelectedPipeline] = useState<string>(String(pipelineId || ""));
@@ -1614,7 +1605,7 @@ function CreateDealDialog({ open, onOpenChange, pipelineId, stages, contacts, ac
   const utils = trpc.useUtils();
 
   // Load catalog products
-  const catalogProducts = trpc.productCatalog.products.list.useQuery({ tenantId: TENANT_ID, isActive: true, limit: 500 });
+  const catalogProducts = trpc.productCatalog.products.list.useQuery({ isActive: true, limit: 500 });
   const filteredCatalogProducts = useMemo(() => {
     const all = catalogProducts.data || [];
     if (!productSearch.trim()) return all;
@@ -1628,12 +1619,12 @@ function CreateDealDialog({ open, onOpenChange, pipelineId, stages, contacts, ac
   }, [selectedProducts]);
 
   // Load custom fields for deals
-  const dealCustomFields = trpc.customFields.list.useQuery({ tenantId: TENANT_ID, entity: "deal" });
+  const dealCustomFields = trpc.customFields.list.useQuery({ entity: "deal" });
   const visibleFields = (dealCustomFields.data || []).filter((f: any) => f.isVisibleOnForm);
 
   // Load stages for selected pipeline
   const pipelineStagesQuery = trpc.crm.pipelines.stages.useQuery(
-    { tenantId: TENANT_ID, pipelineId: Number(selectedPipeline) },
+    { pipelineId: Number(selectedPipeline) },
     { enabled: !!selectedPipeline }
   );
   const currentStages = selectedPipeline && Number(selectedPipeline) !== pipelineId
@@ -1697,7 +1688,7 @@ function CreateDealDialog({ open, onOpenChange, pipelineId, stages, contacts, ac
       // 1. Create account if needed
       let finalAccountId = accountId ? Number(accountId) : undefined;
       if (showNewAccount && newAccountName.trim()) {
-        const acc = await createAccount.mutateAsync({ tenantId: TENANT_ID, name: newAccountName.trim() });
+        const acc = await createAccount.mutateAsync({ name: newAccountName.trim() });
         if (acc?.id) finalAccountId = acc.id;
       }
 
@@ -1705,7 +1696,7 @@ function CreateDealDialog({ open, onOpenChange, pipelineId, stages, contacts, ac
       let finalContactId = contactId ? Number(contactId) : undefined;
       if (showNewContact && newContactName.trim()) {
         const ct = await createContact.mutateAsync({
-          tenantId: TENANT_ID, name: newContactName.trim(),
+          name: newContactName.trim(),
           email: newContactEmail.trim() || undefined,
           phone: newContactPhone.trim() || undefined,
         });
@@ -1714,7 +1705,6 @@ function CreateDealDialog({ open, onOpenChange, pipelineId, stages, contacts, ac
 
       // 3. Create deal with products
       const deal = await createDeal.mutateAsync({
-        tenantId: TENANT_ID,
         title,
         pipelineId: Number(selectedPipeline),
         stageId: Number(stageId),
@@ -1735,7 +1725,6 @@ function CreateDealDialog({ open, onOpenChange, pipelineId, stages, contacts, ac
       const cfEntries = Object.entries(customFieldValues).filter(([, v]) => v.trim());
       if (deal?.id && cfEntries.length > 0) {
         await setFieldValues.mutateAsync({
-          tenantId: TENANT_ID,
           entityType: "deal",
           entityId: deal.id,
           values: cfEntries.map(([fid, val]) => ({ fieldId: Number(fid), value: val })),
@@ -2084,7 +2073,6 @@ function CreateDealDialog({ open, onOpenChange, pipelineId, stages, contacts, ac
 
 /* ─── Pipeline Indicators Panel ─── */
 function PipelineIndicatorsPanel({ deals, tasks, stages }: { deals: any[]; tasks: any[]; stages: any[] }) {
-  const TENANT_ID = useTenantId();
   const openDeals = deals.filter((d: any) => d.status === "open");
   const now = Date.now();
   const sevenDaysAgo = now - 7 * 24 * 60 * 60 * 1000;

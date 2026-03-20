@@ -3,9 +3,6 @@ import { Button } from "@/components/ui/button";
 import { Bell, MessageSquare, ArrowRightLeft, UserPlus, ClipboardList, Briefcase, Check, CheckCheck, TrendingUp } from "lucide-react";
 import { formatDate } from "../../../shared/dateUtils";
 import { useLocation } from "wouter";
-import { useTenantId } from "@/hooks/useTenantId";
-
-
 const typeConfig: Record<string, { icon: any; bg: string; iconBg: string; iconColor: string; label: string; route?: (entityId: string) => string }> = {
   whatsapp_message: {
     icon: MessageSquare,
@@ -70,12 +67,11 @@ function timeAgo(ts: number): string {
 }
 
 export default function NotificationsPage() {
-  const TENANT_ID = useTenantId();
   const [, navigate] = useLocation();
   const utils = trpc.useUtils();
 
-  const notifications = trpc.notifications.list.useQuery({ tenantId: TENANT_ID, limit: 100 });
-  const unreadCount = trpc.notifications.unreadCount.useQuery({ tenantId: TENANT_ID });
+  const notifications = trpc.notifications.list.useQuery({ limit: 100 });
+  const unreadCount = trpc.notifications.unreadCount.useQuery();
 
   const markRead = trpc.notifications.markRead.useMutation({
     onSuccess: () => {
@@ -124,7 +120,7 @@ export default function NotificationsPage() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => markAllRead.mutate({ tenantId: TENANT_ID })}
+            onClick={() => markAllRead.mutate()}
             disabled={markAllRead.isPending}
             className="gap-1.5 text-[13px]"
           >

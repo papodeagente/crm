@@ -22,11 +22,12 @@ import {
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { useSocket } from "@/hooks/useSocket";
-import { useTenantId } from "@/hooks/useTenantId";
 import { useIsAdmin } from "@/components/AdminOnlyGuard";
 import SessionSharing from "@/components/SessionSharing";
+import { useTenantId } from "@/hooks/useTenantId";
 
 export default function WhatsApp() {
+  const tenantId = useTenantId();
   const [qrCode, setQrCode] = useState<string | null>(null);
   const [qrSessionId, setQrSessionId] = useState<string | null>(null);
   const [isWaitingQr, setIsWaitingQr] = useState(false);
@@ -38,7 +39,6 @@ export default function WhatsApp() {
 
   const utils = trpc.useUtils();
   const { qrData, waStatus } = useSocket();
-  const tenantId = useTenantId();
   const { isAdmin } = useIsAdmin();
 
   const sessions = trpc.whatsapp.sessions.useQuery(undefined, { refetchInterval: 15000, staleTime: 10000 });
@@ -49,8 +49,7 @@ export default function WhatsApp() {
   const isConnecting = mySession?.liveStatus === "connecting" || mySession?.liveStatus === "reconnecting";
 
   // ─── AI Settings (transcription) ───
-  const aiSettingsQ = trpc.ai.getSettings.useQuery(
-    { tenantId: tenantId || 0 },
+  const aiSettingsQ = trpc.ai.getSettings.useQuery(undefined,
     { enabled: tenantId > 0, staleTime: 30_000 }
   );
   const updateAiSettingsMut = trpc.ai.updateSettings.useMutation({
@@ -62,8 +61,7 @@ export default function WhatsApp() {
   });
 
   // ─── Contact Import Settings ───
-  const contactSettings = trpc.whatsapp.getContactImportSettings.useQuery(
-    { tenantId },
+  const contactSettings = trpc.whatsapp.getContactImportSettings.useQuery(undefined,
     { enabled: tenantId > 0, staleTime: 30_000 }
   );
 
@@ -92,16 +90,16 @@ export default function WhatsApp() {
   });
 
   const handleToggleImport = (checked: boolean) => {
-    saveSettings.mutate({ tenantId, importContactsFromAgenda: checked });
+    saveSettings.mutate({ importContactsFromAgenda: checked });
   };
 
   const handleCleanupDryRun = () => {
     setDryRunResult(null);
-    cleanupMutation.mutate({ tenantId, dryRun: true });
+    cleanupMutation.mutate({ dryRun: true });
   };
 
   const handleCleanupConfirm = () => {
-    cleanupMutation.mutate({ tenantId, dryRun: false });
+    cleanupMutation.mutate({ dryRun: false });
   };
 
   // ─── WhatsApp Connection Logic ───
@@ -645,8 +643,7 @@ export default function WhatsApp() {
                 id="transcription-toggle"
                 checked={aiSettingsQ.data?.audioTranscriptionEnabled ?? false}
                 onCheckedChange={(checked) => {
-                  if (!tenantId) return;
-                  updateAiSettingsMut.mutate({ tenantId, audioTranscriptionEnabled: checked });
+                  updateAiSettingsMut.mutate({ audioTranscriptionEnabled: checked });
                 }}
                 disabled={updateAiSettingsMut.isPending || aiSettingsQ.isLoading}
                 className="shrink-0 mt-1"

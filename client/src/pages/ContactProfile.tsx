@@ -2,7 +2,6 @@ import { useState, useMemo } from "react";
 import { useRoute, Link } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
-import { useTenantId } from "@/hooks/useTenantId";
 import {
   ArrowLeft, Mail, Phone, FileText, Calendar, DollarSign,
   TrendingUp, Clock, ShoppingCart, Award, Edit2, Save, X,
@@ -292,20 +291,18 @@ export default function ContactProfile() {
   const [, params] = useRoute("/contact/:id");
   const contactId = Number(params?.id);
   const { user } = useAuth();
-  const tenantId = useTenantId();
-
   const [isEditing, setIsEditing] = useState(false);
   const [editData, setEditData] = useState<{ name: string; email: string; phone: string; notes: string; birthDate: string; weddingDate: string }>({ name: "", email: "", phone: "", notes: "", birthDate: "", weddingDate: "" });
   const [customFieldEdits, setCustomFieldEdits] = useState<Record<number, string>>({});
   const [isEditingCustom, setIsEditingCustom] = useState(false);
 
   // Queries
-  const contactQ = trpc.crm.contacts.get.useQuery({ tenantId, id: contactId }, { enabled: !!contactId });
-  const metricsQ = trpc.contactProfile.getMetrics.useQuery({ tenantId, contactId }, { enabled: !!contactId });
-  const dealsQ = trpc.contactProfile.getDeals.useQuery({ tenantId, contactId }, { enabled: !!contactId });
-  const customFieldsQ = trpc.customFields.list.useQuery({ tenantId, entity: "contact" });
+  const contactQ = trpc.crm.contacts.get.useQuery({ id: contactId }, { enabled: !!contactId });
+  const metricsQ = trpc.contactProfile.getMetrics.useQuery({ contactId }, { enabled: !!contactId });
+  const dealsQ = trpc.contactProfile.getDeals.useQuery({ contactId }, { enabled: !!contactId });
+  const customFieldsQ = trpc.customFields.list.useQuery({ entity: "contact" });
   const customValuesQ = trpc.contactProfile.getCustomFieldValues.useQuery(
-    { tenantId, entityType: "contact", entityId: contactId },
+    { entityType: "contact", entityId: contactId },
     { enabled: !!contactId }
   );
 
@@ -313,7 +310,7 @@ export default function ContactProfile() {
   const utils = trpc.useUtils();
   const updateContact = trpc.crm.contacts.update.useMutation({
     onSuccess: () => {
-      utils.crm.contacts.get.invalidate({ tenantId, id: contactId });
+      utils.crm.contacts.get.invalidate({ id: contactId });
       setIsEditing(false);
       toast.success("Contato atualizado");
     },
@@ -321,7 +318,7 @@ export default function ContactProfile() {
   });
   const setCustomValues = trpc.contactProfile.setCustomFieldValues.useMutation({
     onSuccess: () => {
-      utils.contactProfile.getCustomFieldValues.invalidate({ tenantId, entityType: "contact", entityId: contactId });
+      utils.contactProfile.getCustomFieldValues.invalidate({ entityType: "contact", entityId: contactId });
       setIsEditingCustom(false);
       toast.success("Campos personalizados salvos");
     },
@@ -372,9 +369,7 @@ export default function ContactProfile() {
   }
 
   function saveEdit() {
-    updateContact.mutate({
-      tenantId,
-      id: contactId,
+    updateContact.mutate({ id: contactId,
       name: editData.name,
       email: editData.email || undefined,
       phone: editData.phone || undefined,
@@ -398,7 +393,7 @@ export default function ContactProfile() {
       fieldId: Number(fieldId),
       value: value || null,
     }));
-    setCustomValues.mutate({ tenantId, entityType: "contact", entityId: contactId, values });
+    setCustomValues.mutate({ entityType: "contact", entityId: contactId, values });
   }
 
   if (!contactId || contactQ.isLoading) {

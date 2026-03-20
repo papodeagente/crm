@@ -15,13 +15,13 @@ export const adminRouter = router({
     }),
     create: tenantProcedure
       .input(z.object({ name: z.string().min(1), plan: z.enum(["free", "pro", "enterprise"]).optional() }))
-      .mutation(async ({ input }) => {
-        const result = await crm.createTenant(input);
+      .mutation(async ({ input, ctx }) => {
+        const result = await crm.createTenant({ ...input });
         return result;
       }),
     get: tenantProcedure
       .input(z.object({ id: z.number() }))
-      .query(async ({ input }) => {
+      .query(async ({ input, ctx }) => {
         return crm.getTenantById(input.id);
       }),
   }),
@@ -59,7 +59,7 @@ export const adminRouter = router({
             throw new TRPCError({ code: "CONFLICT", message: "Este email já está cadastrado neste tenant" });
           }
           // Fallback: create without email if email service fails
-          const result = await crm.createCrmUser({ ...input, createdBy: ctx.user.id });
+          const result = await crm.createCrmUser({ ...input, tenantId: getTenantId(ctx), createdBy: ctx.user.id });
           await emitEvent({ tenantId: getTenantId(ctx), actorUserId: ctx.user.id, entityType: "crm_user", entityId: result?.id, action: "create" });
           return result;
         }
@@ -111,7 +111,7 @@ const tenantId = getTenantId(ctx); const { id, role, ...data } = input;
     create: tenantProcedure
       .input(z.object({ name: z.string().min(1) }))
       .mutation(async ({ ctx, input }) => {
-        const result = await crm.createTeam(input);
+        const result = await crm.createTeam({ ...input, tenantId: getTenantId(ctx) });
         await emitEvent({ tenantId: getTenantId(ctx), actorUserId: ctx.user.id, entityType: "team", entityId: result?.id, action: "create" });
         return result;
       }),
@@ -122,8 +122,8 @@ const tenantId = getTenantId(ctx); const { id, role, ...data } = input;
       }),
     addMember: tenantProcedure
       .input(z.object({ teamId: z.number(), userId: z.number() }))
-      .mutation(async ({ input }) => {
-        await crm.addTeamMember(input);
+      .mutation(async ({ input, ctx }) => {
+        await crm.addTeamMember({ ...input, tenantId: getTenantId(ctx) });
         return { success: true };
       }),
     removeMember: tenantProcedure
@@ -143,13 +143,13 @@ const tenantId = getTenantId(ctx); const { id, role, ...data } = input;
       }),
     create: tenantProcedure
       .input(z.object({ slug: z.string(), name: z.string(), description: z.string().optional() }))
-      .mutation(async ({ input }) => {
-        return crm.createRole(input);
+      .mutation(async ({ input, ctx }) => {
+        return crm.createRole({ ...input, tenantId: getTenantId(ctx) });
       }),
     assign: tenantProcedure
       .input(z.object({ userId: z.number(), roleId: z.number() }))
-      .mutation(async ({ input }) => {
-        await crm.assignRole(input);
+      .mutation(async ({ input, ctx }) => {
+        await crm.assignRole({ ...input, tenantId: getTenantId(ctx) });
         return { success: true };
       }),
     permissions: tenantProcedure.query(async () => {
@@ -157,8 +157,8 @@ const tenantId = getTenantId(ctx); const { id, role, ...data } = input;
     }),
     assignPermission: tenantProcedure
       .input(z.object({ roleId: z.number(), permissionId: z.number() }))
-      .mutation(async ({ input }) => {
-        await crm.assignPermissionToRole(input);
+      .mutation(async ({ input, ctx }) => {
+        await crm.assignPermissionToRole({ ...input, tenantId: getTenantId(ctx) });
         return { success: true };
       }),
   }),

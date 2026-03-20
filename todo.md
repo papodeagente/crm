@@ -4263,3 +4263,10 @@
 - [x] Validar messageWorker: resolve tenantId via getSessionInfo(instanceName)
 - [x] Validar isolamento entre tenants: 58 testes vitest passando
 - [x] Testes vitest de integração WhatsApp com tenant isolation
+
+## Correção de erros TypeScript pós-blindagem
+- [x] 3 erros originais (waReactions, conversationId): eram de cache incremental do tsc watcher — tsc --noEmit retorna 0 erros
+- [x] 488 erros causados pela blindagem: corrigidos (frontend tenantId removido, backend ctx restaurado, db calls com tenantId)
+- [x] 280 testes falhando por tenant: corrigidos (saasUser adicionado a todos os mock contexts)
+- [x] String assertions atualizadas: protectedProcedure → tenantProcedure, sessionProtectedProcedure → sessionTenantProcedure
+- [x] Build limpo: 0 erros TS, 2413 testes passando (15 falhas pré-existentes não relacionadas a tenant)

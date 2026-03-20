@@ -19,6 +19,7 @@ function createAuthContext(): { ctx: TrpcContext } {
 
   const ctx: TrpcContext = {
     user,
+    saasUser: { userId: 1, tenantId: 1, role: "admin" as const, email: "test@example.com", name: "Test User" },
     req: {
       protocol: "https",
       headers: {},
@@ -634,6 +635,7 @@ describe("Multi-Agent / SaaS Assignment Tests", () => {
     };
     const ctx = {
       user,
+      saasUser: { userId: 1, tenantId: 1, role: "admin" as const, email: "test@example.com", name: "Test User" },
       req: { protocol: "https", headers: {} } as any,
       res: { clearCookie: vi.fn() } as any,
     };
@@ -874,6 +876,7 @@ describe("Team Management API Routes", () => {
     return {
       ctx: {
         user,
+        saasUser: { userId: 1, tenantId: 1, role: "admin" as const, email: "test@example.com", name: "Test User" },
         req: { protocol: "https", headers: {} } as TrpcContext["req"],
         res: { clearCookie: vi.fn() } as unknown as TrpcContext["res"],
       } as TrpcContext,

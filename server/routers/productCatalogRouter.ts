@@ -25,9 +25,9 @@ export const productCatalogRouter = router({
         parentId: z.number().nullable().optional(),
         sortOrder: z.number().optional(),
       }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         const { parentId, ...rest } = input;
-        return crm.createProductCategory({ ...rest, parentId: parentId ?? undefined });
+        return crm.createProductCategory({ ...rest, tenantId: getTenantId(ctx), parentId: parentId ?? undefined });
       }),
     update: tenantProcedure
       .input(z.object({
@@ -38,7 +38,7 @@ export const productCatalogRouter = router({
         parentId: z.number().nullable().optional(),
         sortOrder: z.number().optional(),
       }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
 const tenantId = getTenantId(ctx); const { id, ...data } = input;
         await crm.updateProductCategory(tenantId, id, data);
         return { success: true };
@@ -87,9 +87,9 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
         isActive: z.boolean().optional(),
         detailsJson: z.any().optional(),
       }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         const { categoryId, ...rest } = input;
-        return crm.createCatalogProduct({ ...rest, categoryId: categoryId ?? undefined });
+        return crm.createCatalogProduct({ ...rest, tenantId: getTenantId(ctx), categoryId: categoryId ?? undefined });
       }),
     update: tenantProcedure
       .input(z.object({
@@ -109,7 +109,7 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
         isActive: z.boolean().optional(),
         detailsJson: z.any().optional(),
       }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
 const tenantId = getTenantId(ctx); const { id, ...data } = input;
         await crm.updateCatalogProduct(tenantId, id, data);
         return { success: true };

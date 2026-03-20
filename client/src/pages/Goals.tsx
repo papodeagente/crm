@@ -4,12 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Target, Plus, Calendar } from "lucide-react";
 import { formatDate } from "../../../shared/dateUtils";
 import { toast } from "sonner";
-import { useTenantId } from "@/hooks/useTenantId";
-
-
 export default function Goals() {
-  const TENANT_ID = useTenantId();
-  const goals = trpc.management.goals.list.useQuery({ tenantId: TENANT_ID });
+  const goals = trpc.management.goals.list.useQuery();
 
   return (
     <div className="p-5 lg:px-8 space-y-5">

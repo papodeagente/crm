@@ -24,7 +24,6 @@ import {
 } from "lucide-react";
 import { useState, useMemo, useCallback } from "react";
 import { toast } from "sonner";
-
 interface SessionSharingProps {
   tenantId: number;
 }
@@ -37,18 +36,15 @@ export default function SessionSharing({ tenantId }: SessionSharingProps) {
   const utils = trpc.useUtils();
 
   // Queries
-  const tenantSessions = trpc.whatsapp.tenantSessions.useQuery(
-    { tenantId },
+  const tenantSessions = trpc.whatsapp.tenantSessions.useQuery(undefined,
     { enabled: tenantId > 0, staleTime: 15_000 }
   );
 
-  const shares = trpc.whatsapp.listShares.useQuery(
-    { tenantId },
+  const shares = trpc.whatsapp.listShares.useQuery(undefined,
     { enabled: tenantId > 0, staleTime: 10_000 }
   );
 
-  const agents = trpc.whatsapp.agents.useQuery(
-    { tenantId },
+  const agents = trpc.whatsapp.agents.useQuery(undefined,
     { enabled: tenantId > 0, staleTime: 60_000 }
   );
 
@@ -107,9 +103,7 @@ export default function SessionSharing({ tenantId }: SessionSharingProps) {
 
   const handleShare = () => {
     if (!selectedSessionId || selectedUserIds.length === 0) return;
-    shareSession.mutate({
-      tenantId,
-      sourceSessionId: selectedSessionId,
+    shareSession.mutate({ sourceSessionId: selectedSessionId,
       targetUserIds: selectedUserIds,
     });
   };
@@ -395,7 +389,7 @@ export default function SessionSharing({ tenantId }: SessionSharingProps) {
                         size="sm"
                         className="h-7 px-2 rounded-md text-[11px] text-red-400 hover:text-red-300 hover:bg-red-500/10 shrink-0"
                         disabled={revokeShare.isPending}
-                        onClick={() => revokeShare.mutate({ tenantId, shareId: share.id })}
+                        onClick={() => revokeShare.mutate({ shareId: share.id })}
                       >
                         {revokeShare.isPending ? (
                           <Loader2 className="h-3 w-3 animate-spin" />

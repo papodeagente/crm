@@ -1,7 +1,6 @@
 import { useState, useMemo } from "react";
 import { Link } from "wouter";
 import { trpc } from "@/lib/trpc";
-import { useTenantId } from "@/hooks/useTenantId";
 import { AdminOnlyGuard } from "@/components/AdminOnlyGuard";
 import {
   ArrowLeft, Plus, Edit2, Trash2, GripVertical, Eye, EyeOff,
@@ -258,18 +257,17 @@ function FieldFormDialog({
 
 // ─── Main Component ───
 export default function CustomFieldsSettings() {
-  const tenantId = useTenantId();
   const [activeEntity, setActiveEntity] = useState<string>("contact");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingField, setEditingField] = useState<CustomField | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
 
-  const fieldsQ = trpc.customFields.list.useQuery({ tenantId, entity: activeEntity as any });
+  const fieldsQ = trpc.customFields.list.useQuery({ entity: activeEntity as any });
   const utils = trpc.useUtils();
 
   const createField = trpc.customFields.create.useMutation({
     onSuccess: () => {
-      utils.customFields.list.invalidate({ tenantId, entity: activeEntity as any });
+      utils.customFields.list.invalidate({ entity: activeEntity as any });
       setDialogOpen(false);
       setEditingField(null);
       toast.success("Campo criado com sucesso");
@@ -279,7 +277,7 @@ export default function CustomFieldsSettings() {
 
   const updateField = trpc.customFields.update.useMutation({
     onSuccess: () => {
-      utils.customFields.list.invalidate({ tenantId, entity: activeEntity as any });
+      utils.customFields.list.invalidate({ entity: activeEntity as any });
       setDialogOpen(false);
       setEditingField(null);
       toast.success("Campo atualizado");
@@ -289,7 +287,7 @@ export default function CustomFieldsSettings() {
 
   const deleteField = trpc.customFields.delete.useMutation({
     onSuccess: () => {
-      utils.customFields.list.invalidate({ tenantId, entity: activeEntity as any });
+      utils.customFields.list.invalidate({ entity: activeEntity as any });
       setDeleteConfirm(null);
       toast.success("Campo excluído");
     },
@@ -298,7 +296,7 @@ export default function CustomFieldsSettings() {
 
   const reorderFields = trpc.customFields.reorder.useMutation({
     onSuccess: () => {
-      utils.customFields.list.invalidate({ tenantId, entity: activeEntity as any });
+      utils.customFields.list.invalidate({ entity: activeEntity as any });
     },
   });
 
@@ -316,9 +314,9 @@ export default function CustomFieldsSettings() {
 
   function handleSave(data: any) {
     if (editingField) {
-      updateField.mutate({ tenantId, id: editingField.id, ...data });
+      updateField.mutate({ id: editingField.id, ...data });
     } else {
-      createField.mutate({ tenantId, entity: activeEntity as any, ...data });
+      createField.mutate({ entity: activeEntity as any, ...data });
     }
   }
 
@@ -326,20 +324,18 @@ export default function CustomFieldsSettings() {
     if (idx === 0) return;
     const ids = fields.map((f) => f.id);
     [ids[idx - 1], ids[idx]] = [ids[idx], ids[idx - 1]];
-    reorderFields.mutate({ tenantId, entity: activeEntity as any, orderedIds: ids });
+    reorderFields.mutate({ entity: activeEntity as any, orderedIds: ids });
   }
 
   function handleMoveDown(idx: number) {
     if (idx >= fields.length - 1) return;
     const ids = fields.map((f) => f.id);
     [ids[idx], ids[idx + 1]] = [ids[idx + 1], ids[idx]];
-    reorderFields.mutate({ tenantId, entity: activeEntity as any, orderedIds: ids });
+    reorderFields.mutate({ entity: activeEntity as any, orderedIds: ids });
   }
 
   function toggleVisibility(field: CustomField, key: "isVisibleOnForm" | "isVisibleOnProfile") {
-    updateField.mutate({
-      tenantId,
-      id: field.id,
+    updateField.mutate({ id: field.id,
       [key]: !field[key],
     });
   }
@@ -541,7 +537,7 @@ export default function CustomFieldsSettings() {
             <Button variant="outline" onClick={() => setDeleteConfirm(null)}>Cancelar</Button>
             <Button
               variant="destructive"
-              onClick={() => deleteConfirm && deleteField.mutate({ tenantId, id: deleteConfirm })}
+              onClick={() => deleteConfirm && deleteField.mutate({ id: deleteConfirm })}
               disabled={deleteField.isPending}
             >
               {deleteField.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Trash2 className="h-4 w-4 mr-1" />}

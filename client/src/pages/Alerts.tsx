@@ -2,9 +2,6 @@ import { trpc } from "@/lib/trpc";
 import { Card } from "@/components/ui/card";
 import { Bell, AlertTriangle, Info, CheckCircle2 } from "lucide-react";
 import { formatFullDateTime } from "../../../shared/dateUtils";
-import { useTenantId } from "@/hooks/useTenantId";
-
-
 const severityConfig: Record<string, { icon: any; bg: string; iconBg: string; iconColor: string; label: string }> = {
   critical: { icon: AlertTriangle, bg: "border-l-4 border-l-red-500", iconBg: "bg-red-50", iconColor: "text-red-600", label: "Crítico" },
   warning: { icon: AlertTriangle, bg: "border-l-4 border-l-amber-500", iconBg: "bg-amber-50", iconColor: "text-amber-600", label: "Aviso" },
@@ -13,8 +10,7 @@ const severityConfig: Record<string, { icon: any; bg: string; iconBg: string; ic
 };
 
 export default function Alerts() {
-  const TENANT_ID = useTenantId();
-  const alerts = trpc.insights.alerts.list.useQuery({ tenantId: TENANT_ID });
+  const alerts = trpc.insights.alerts.list.useQuery({});
 
   return (
     <div className="p-5 lg:px-8 space-y-5">

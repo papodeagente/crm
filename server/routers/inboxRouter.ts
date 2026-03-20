@@ -14,7 +14,7 @@ export const inboxRouter = router({
     create: tenantProcedure
       .input(z.object({ type: z.enum(["whatsapp", "instagram", "email", "webchat"]), name: z.string().optional(), connectionId: z.string().optional() }))
       .mutation(async ({ ctx, input }) => {
-        const result = await crm.createChannel(input);
+        const result = await crm.createChannel({ ...input, tenantId: getTenantId(ctx) });
         await emitEvent({ tenantId: getTenantId(ctx), actorUserId: ctx.user.id, entityType: "channel", entityId: result?.id, action: "create" });
         return result;
       }),
@@ -35,7 +35,7 @@ export const inboxRouter = router({
     create: tenantProcedure
       .input(z.object({ channelId: z.number(), contactId: z.number().optional(), providerThreadId: z.string().optional(), assignedToUserId: z.number().optional() }))
       .mutation(async ({ ctx, input }) => {
-        const result = await crm.createConversation(input);
+        const result = await crm.createConversation({ ...input, tenantId: getTenantId(ctx) });
         await emitEvent({ tenantId: getTenantId(ctx), actorUserId: ctx.user.id, entityType: "conversation", entityId: result?.id, action: "create" });
         return result;
       }),

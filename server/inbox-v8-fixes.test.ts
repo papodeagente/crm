@@ -29,7 +29,7 @@ describe("Internal Notes CRUD", () => {
     const fs = await import("fs");
     const routersCode = fs.readFileSync("server/routers.ts", "utf-8");
     // The notes router should have an update mutation
-    expect(routersCode).toContain("update: protectedProcedure");
+    expect(routersCode).toContain("update: tenantProcedure");
     // It should accept noteId and content
     expect(routersCode).toContain("noteId: z.number()");
     expect(routersCode).toContain("content: z.string().min(1).optional()");
@@ -38,7 +38,7 @@ describe("Internal Notes CRUD", () => {
   it("notes.delete tRPC endpoint should exist", async () => {
     const fs = await import("fs");
     const routersCode = fs.readFileSync("server/routers.ts", "utf-8");
-    expect(routersCode).toContain("delete: protectedProcedure");
+    expect(routersCode).toContain("delete: tenantProcedure");
     expect(routersCode).toContain("deleteInternalNote");
   });
 

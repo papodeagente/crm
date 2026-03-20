@@ -2,7 +2,6 @@ import { useState, useMemo, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
-import { useTenantId } from "@/hooks/useTenantId";
 import { Button } from "@/components/ui/button";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -182,16 +181,14 @@ function ConversionChart({ data }: { data: ConversionRow[] }) {
 export default function ProductReportsPage() {
   const [, setLocation] = useLocation();
   const { user } = useAuth();
-  const tenantId = useTenantId();
-
   // Queries
-  const summaryQ = trpc.productCatalog.analytics.summary.useQuery({ tenantId });
-  const mostSoldQ = trpc.productCatalog.analytics.mostSold.useQuery({ tenantId, limit: 10 });
-  const mostLostQ = trpc.productCatalog.analytics.mostLost.useQuery({ tenantId, limit: 10 });
-  const mostRequestedQ = trpc.productCatalog.analytics.mostRequested.useQuery({ tenantId, limit: 10 });
-  const revenueByTypeQ = trpc.productCatalog.analytics.revenueByType.useQuery({ tenantId });
-  const conversionQ = trpc.productCatalog.analytics.conversionRate.useQuery({ tenantId, limit: 10 });
-  const topDestQ = trpc.productCatalog.analytics.topDestinations.useQuery({ tenantId, limit: 10 });
+  const summaryQ = trpc.productCatalog.analytics.summary.useQuery();
+  const mostSoldQ = trpc.productCatalog.analytics.mostSold.useQuery({ limit: 10 });
+  const mostLostQ = trpc.productCatalog.analytics.mostLost.useQuery({ limit: 10 });
+  const mostRequestedQ = trpc.productCatalog.analytics.mostRequested.useQuery({ limit: 10 });
+  const revenueByTypeQ = trpc.productCatalog.analytics.revenueByType.useQuery();
+  const conversionQ = trpc.productCatalog.analytics.conversionRate.useQuery({ limit: 10 });
+  const topDestQ = trpc.productCatalog.analytics.topDestinations.useQuery({ limit: 10 });
 
   const summary = summaryQ.data;
   const isLoading = summaryQ.isLoading;

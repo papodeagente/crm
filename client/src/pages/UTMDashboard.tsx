@@ -21,9 +21,6 @@ import {
   AreaChart, Area, ComposedChart, Line
 } from "recharts";
 import { useLocation } from "wouter";
-import { useTenantId } from "@/hooks/useTenantId";
-
-
 // ─── Helpers ───
 function formatCurrency(cents: number): string {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(cents / 100);
@@ -101,7 +98,6 @@ function CustomTooltip({ active, payload, label }: any) {
 
 // ─── Main UTM Dashboard ───
 export default function UTMDashboard() {
-  const TENANT_ID = useTenantId();
   const [, navigate] = useLocation();
   const dateFilter = useDateFilter("all");
   const [pipelineId, setPipelineId] = useState<number | undefined>(undefined);
@@ -115,7 +111,6 @@ export default function UTMDashboard() {
   const dealFilters = useDealFilters();
 
   const filterInput = useMemo(() => ({
-    tenantId: TENANT_ID,
     dateFrom: dealFilters.filters.dateFrom || dateFilter.dates.dateFrom,
     dateTo: dealFilters.filters.dateTo || dateFilter.dates.dateTo,
     pipelineId,
@@ -135,7 +130,7 @@ export default function UTMDashboard() {
   const byDimension = trpc.utmAnalytics.byDimension.useQuery({ ...filterInput, dimension });
   const crossTable = trpc.utmAnalytics.crossTable.useQuery(filterInput);
   const timeline = trpc.utmAnalytics.timeline.useQuery(filterInput);
-  const filterValues = trpc.utmAnalytics.filterValues.useQuery({ tenantId: TENANT_ID });
+  const filterValues = trpc.utmAnalytics.filterValues.useQuery();
   const dealList = trpc.utmAnalytics.dealList.useQuery({
     ...filterInput,
     status: dealListStatus,
@@ -146,7 +141,7 @@ export default function UTMDashboard() {
   });
 
   // Pipeline list for filter
-  const pipelines = trpc.crm.pipelines.list.useQuery({ tenantId: TENANT_ID });
+  const pipelines = trpc.crm.pipelines.list.useQuery({});
 
   const ov = overview.data;
   const dimData = byDimension.data || [];

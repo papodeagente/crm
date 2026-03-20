@@ -1,6 +1,5 @@
 import { useState, useMemo } from "react";
 import { trpc } from "@/lib/trpc";
-import { useTenantId } from "@/hooks/useTenantId";
 import { useLocation } from "wouter";
 import { AdminOnlyGuard } from "@/components/AdminOnlyGuard";
 import { Button } from "@/components/ui/button";
@@ -394,28 +393,23 @@ const CONDITION_LABELS: Record<string, string> = {
 
 export default function SalesAutomationHub() {
   const [, setLocation] = useLocation();
-  const tenantId = useTenantId();
   const [activeTab, setActiveTab] = useState<"templates" | "my">("templates");
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
 
   // ─── Queries for "Minhas Automações" tab ───────────────
-  const taskAutomationsQ = trpc.crm.taskAutomations.list.useQuery(
-    { tenantId: tenantId! },
-    { enabled: !!tenantId && activeTab === "my" }
+  const taskAutomationsQ = trpc.crm.taskAutomations.list.useQuery({},
+    { enabled: activeTab === "my" }
   );
-  const pipelineAutomationsQ = trpc.crm.pipelineAutomations.list.useQuery(
-    { tenantId: tenantId! },
-    { enabled: !!tenantId && activeTab === "my" }
+  const pipelineAutomationsQ = trpc.crm.pipelineAutomations.list.useQuery({},
+    { enabled: activeTab === "my" }
   );
-  const dateAutomationsQ = trpc.crm.dateAutomations.list.useQuery(
-    { tenantId: tenantId! },
-    { enabled: !!tenantId && activeTab === "my" }
+  const dateAutomationsQ = trpc.crm.dateAutomations.list.useQuery({},
+    { enabled: activeTab === "my" }
   );
-  const pipelinesQ = trpc.crm.pipelines.list.useQuery(
-    { tenantId: tenantId! },
-    { enabled: !!tenantId && activeTab === "my" }
+  const pipelinesQ = trpc.crm.pipelines.list.useQuery({},
+    { enabled: activeTab === "my" }
   );
   // ─── Pipeline/Stage lookup helpers ─────────────────────
   const pipelineMap = useMemo(() => {

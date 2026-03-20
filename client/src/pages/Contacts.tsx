@@ -14,9 +14,6 @@ import { Link } from "wouter";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { useAuth } from "@/_core/hooks/useAuth";
-import { useTenantId } from "@/hooks/useTenantId";
-
-
 const stageConfig: Record<string, { dot: string; label: string }> = {
   lead: { dot: "bg-blue-500", label: "Lead" },
   prospect: { dot: "bg-amber-500", label: "Prospect" },
@@ -25,7 +22,6 @@ const stageConfig: Record<string, { dot: string; label: string }> = {
 };
 
 export default function Contacts() {
-  const TENANT_ID = useTenantId();
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
@@ -47,11 +43,11 @@ export default function Contacts() {
 
   const [page, setPage] = useState(0);
   const pageSize = 50;
-  const contacts = trpc.crm.contacts.list.useQuery({ tenantId: TENANT_ID, search: search || undefined, limit: pageSize, offset: page * pageSize, dateFrom: dateFilter.dates.dateFrom, dateTo: dateFilter.dates.dateTo, customFieldFilters: customFieldFilters.length > 0 ? customFieldFilters : undefined });
-  const deletedContacts = trpc.crm.contacts.listDeleted.useQuery({ tenantId: TENANT_ID, limit: 100 }, { enabled: showTrash });
+  const contacts = trpc.crm.contacts.list.useQuery({ search: search || undefined, limit: pageSize, offset: page * pageSize, dateFrom: dateFilter.dates.dateFrom, dateTo: dateFilter.dates.dateTo, customFieldFilters: customFieldFilters.length > 0 ? customFieldFilters : undefined });
+  const deletedContacts = trpc.crm.contacts.listDeleted.useQuery({ limit: 100 }, { enabled: showTrash });
 
   // Custom fields for contacts
-  const contactCustomFields = trpc.customFields.list.useQuery({ tenantId: TENANT_ID, entity: "contact" as const });
+  const contactCustomFields = trpc.customFields.list.useQuery({ entity: "contact" as const });
   const visibleFormFields = useMemo(() => (contactCustomFields.data || []).filter((f: any) => f.isVisibleOnForm), [contactCustomFields.data]);
   const setFieldValues = trpc.contactProfile.setCustomFieldValues.useMutation();
 
@@ -62,7 +58,6 @@ export default function Contacts() {
       if (result?.id && cfEntries.length > 0) {
         try {
           await setFieldValues.mutateAsync({
-            tenantId: TENANT_ID,
             entityType: "contact",
             entityId: result.id,
             values: cfEntries,
@@ -199,7 +194,7 @@ export default function Contacts() {
                   <Button
                     className="w-full h-10 rounded-lg text-[13px] font-medium bg-primary hover:bg-primary/90 shadow-sm transition-colors"
                     disabled={!name || createContact.isPending}
-                    onClick={() => createContact.mutate({ tenantId: TENANT_ID, name, email: email || undefined, phone: phone || undefined })}
+                    onClick={() => createContact.mutate({ name, email: email || undefined, phone: phone || undefined })}
                   >
                     {createContact.isPending ? "Criando..." : "Criar Contato"}
                   </Button>
@@ -301,7 +296,7 @@ export default function Contacts() {
           <div className="flex-1" />
           {showTrash ? (
             <>
-              <Button variant="outline" size="sm" className="h-8 gap-1.5 text-[12px] rounded-lg" onClick={() => restoreContacts.mutate({ tenantId: TENANT_ID, ids: Array.from(selectedIds) })} disabled={restoreContacts.isPending}>
+              <Button variant="outline" size="sm" className="h-8 gap-1.5 text-[12px] rounded-lg" onClick={() => restoreContacts.mutate({ ids: Array.from(selectedIds) })} disabled={restoreContacts.isPending}>
                 <RotateCcw className="h-3.5 w-3.5" />Restaurar
               </Button>
               {isAdmin && (
@@ -411,11 +406,11 @@ export default function Contacts() {
                       <DropdownMenuContent align="end" className="rounded-lg min-w-[140px]">
                         {showTrash ? (
                           <>
-                            <DropdownMenuItem className="text-[13px]" onClick={() => restoreContacts.mutate({ tenantId: TENANT_ID, ids: [c.id] })}>
+                            <DropdownMenuItem className="text-[13px]" onClick={() => restoreContacts.mutate({ ids: [c.id] })}>
                               <RotateCcw className="mr-2 h-3.5 w-3.5" />Restaurar
                             </DropdownMenuItem>
                             {isAdmin && (
-                              <DropdownMenuItem className="text-destructive text-[13px]" onClick={() => hardDelete.mutate({ tenantId: TENANT_ID, ids: [c.id] })}>
+                              <DropdownMenuItem className="text-destructive text-[13px]" onClick={() => hardDelete.mutate({ ids: [c.id] })}>
                                 <Trash2 className="mr-2 h-3.5 w-3.5" />Excluir Permanentemente
                               </DropdownMenuItem>
                             )}
@@ -424,7 +419,7 @@ export default function Contacts() {
                           <>
                             <DropdownMenuItem className="text-[13px]" asChild><Link href={`/contact/${c.id}`}><Eye className="mr-2 h-3.5 w-3.5" />Ver Perfil</Link></DropdownMenuItem>
                             <DropdownMenuItem className="text-[13px]" asChild><Link href={`/contact/${c.id}`}><Edit className="mr-2 h-3.5 w-3.5" />Editar</Link></DropdownMenuItem>
-                            <DropdownMenuItem className="text-destructive text-[13px]" onClick={() => deleteContact.mutate({ tenantId: TENANT_ID, id: c.id })}>
+                            <DropdownMenuItem className="text-destructive text-[13px]" onClick={() => deleteContact.mutate({ id: c.id })}>
                               <Trash2 className="mr-2 h-3.5 w-3.5" />Excluir
                             </DropdownMenuItem>
                           </>
@@ -472,7 +467,7 @@ export default function Contacts() {
             </p>
             <div className="flex gap-2 justify-end">
               <Button variant="outline" className="rounded-lg" onClick={() => setConfirmDelete(false)}>Cancelar</Button>
-              <Button variant="destructive" className="rounded-lg" disabled={bulkDelete.isPending} onClick={() => bulkDelete.mutate({ tenantId: TENANT_ID, ids: Array.from(selectedIds) })}>
+              <Button variant="destructive" className="rounded-lg" disabled={bulkDelete.isPending} onClick={() => bulkDelete.mutate({ ids: Array.from(selectedIds) })}>
                 {bulkDelete.isPending ? "Excluindo..." : "Excluir"}
               </Button>
             </div>
@@ -495,7 +490,7 @@ export default function Contacts() {
             </p>
             <div className="flex gap-2 justify-end">
               <Button variant="outline" className="rounded-lg" onClick={() => setConfirmHardDelete(false)}>Cancelar</Button>
-              <Button variant="destructive" className="rounded-lg" disabled={hardDelete.isPending} onClick={() => hardDelete.mutate({ tenantId: TENANT_ID, ids: Array.from(selectedIds) })}>
+              <Button variant="destructive" className="rounded-lg" disabled={hardDelete.isPending} onClick={() => hardDelete.mutate({ ids: Array.from(selectedIds) })}>
                 {hardDelete.isPending ? "Excluindo..." : "Excluir Permanentemente"}
               </Button>
             </div>

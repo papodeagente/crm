@@ -56,9 +56,7 @@ function generateRequestId(sessionId: string, remoteJid: string): string {
   return `${sessionId}:${remoteJid}:${Date.now()}-${++requestCounter}`;
 }
 
-export default function AiSuggestionPanel({
-  tenantId,
-  sessionId,
+export default function AiSuggestionPanel({ sessionId,
   remoteJid,
   contactName,
   onUseText,
@@ -87,9 +85,8 @@ export default function AiSuggestionPanel({
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Fetch available AI integrations
-  const integrationsQ = trpc.ai.list.useQuery(
-    { tenantId },
-    { enabled: !!tenantId }
+  const integrationsQ = trpc.ai.list.useQuery(undefined,
+    { enabled: true }
   );
 
   // Async suggestion mutation (non-blocking)
@@ -291,16 +288,14 @@ export default function AiSuggestionPanel({
 
     // Fire async request (returns immediately)
     suggestAsyncMut.mutate({
-      requestId: reqId,
-      tenantId,
-      sessionId,
+      requestId: reqId, sessionId,
       remoteJid,
       contactName,
       integrationId: effectiveIntegrationId,
       overrideModel: effectiveModel,
       style: style || "default",
     });
-  }, [tenantId, sessionId, remoteJid, contactName, effectiveIntegrationId, effectiveModel, suggestAsyncMut, cancelMut]);
+  }, [sessionId, remoteJid, contactName, effectiveIntegrationId, effectiveModel, suggestAsyncMut, cancelMut]);
 
   // ─── Debounced generate (1.5s after last trigger) ───
   const doGenerateDebounced = useCallback((style?: ResponseStyle) => {
@@ -315,14 +310,12 @@ export default function AiSuggestionPanel({
   // Refine with a different style
   const doRefine = useCallback((style: ResponseStyle) => {
     if (!editedText.trim()) return;
-    refineMut.mutate({
-      tenantId,
-      originalText: editedText.trim(),
+    refineMut.mutate({ originalText: editedText.trim(),
       style,
       integrationId: effectiveIntegrationId,
       overrideModel: effectiveModel,
     });
-  }, [tenantId, editedText, effectiveIntegrationId, effectiveModel, refineMut]);
+  }, [editedText, effectiveIntegrationId, effectiveModel, refineMut]);
 
   // Server-side broken sending
   const doSendBroken = useCallback((partsToSend: string[]) => {

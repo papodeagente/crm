@@ -9,9 +9,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import DateRangeFilter, { useDateFilter, getPresetDates, type DatePreset } from "@/components/DateRangeFilter";
 import { Filter, X, RotateCcw } from "lucide-react";
 import { trpc } from "@/lib/trpc";
-import { useTenantId } from "@/hooks/useTenantId";
-
-
 // ─── Types ───
 export interface DealFilters {
   status?: string;
@@ -138,7 +135,6 @@ export default function DealFiltersPanel({
   onApply: (filters: DealFilters) => void;
   onClear: () => void;
 }) {
-  const TENANT_ID = useTenantId();
   // Local state for editing before applying
   const [local, setLocal] = useState<DealFilters>(filters);
 
@@ -149,11 +145,11 @@ export default function DealFiltersPanel({
   };
 
   // Data for selects
-  const accounts = trpc.crm.accounts.list.useQuery({ tenantId: TENANT_ID });
-  const leadSources = trpc.crm.leadSources.list.useQuery({ tenantId: TENANT_ID });
-  const campaigns = trpc.crm.campaigns.list.useQuery({ tenantId: TENANT_ID });
-  const products = trpc.productCatalog.products.list.useQuery({ tenantId: TENANT_ID });
-  const utmValues = trpc.utmAnalytics.filterValues.useQuery({ tenantId: TENANT_ID });
+  const accounts = trpc.crm.accounts.list.useQuery();
+  const leadSources = trpc.crm.leadSources.list.useQuery({});
+  const campaigns = trpc.crm.campaigns.list.useQuery({});
+  const products = trpc.productCatalog.products.list.useQuery({});
+  const utmValues = trpc.utmAnalytics.filterValues.useQuery();
 
   const set = (key: keyof DealFilters, value: any) => {
     setLocal((prev) => ({ ...prev, [key]: value || undefined }));

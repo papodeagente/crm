@@ -3,9 +3,6 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { GraduationCap, Plus, BookOpen, Clock } from "lucide-react";
 import { toast } from "sonner";
-import { useTenantId } from "@/hooks/useTenantId";
-
-
 const courseStatusStyles: Record<string, { bg: string; text: string; dot: string; label: string }> = {
   draft: { bg: "bg-slate-50", text: "text-slate-600", dot: "bg-slate-400", label: "Rascunho" },
   published: { bg: "bg-emerald-50", text: "text-emerald-700", dot: "bg-emerald-500", label: "Publicado" },
@@ -13,8 +10,7 @@ const courseStatusStyles: Record<string, { bg: string; text: string; dot: string
 };
 
 export default function Academy() {
-  const TENANT_ID = useTenantId();
-  const courses = trpc.academy.courses.list.useQuery({ tenantId: TENANT_ID });
+  const courses = trpc.academy.courses.list.useQuery();
 
   return (
     <div className="p-5 lg:px-8 space-y-5">

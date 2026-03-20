@@ -4,7 +4,6 @@
  */
 import { useState, useMemo } from "react";
 import { trpc } from "@/lib/trpc";
-import { useTenantId } from "@/hooks/useTenantId";
 import { useLocation, useRoute } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -56,7 +55,6 @@ function formatDuration(start: string | Date, end: string | Date | null) {
 }
 
 export default function CampaignDetail() {
-  const tenantId = useTenantId();
   const [, setLocation] = useLocation();
   const [, params] = useRoute("/campaigns/:id");
   const campaignId = Number(params?.id);
@@ -65,15 +63,13 @@ export default function CampaignDetail() {
   const msgPageSize = 50;
 
   const detailQ = trpc.rfv.campaignDetail.useQuery(
-    { campaignId, tenantId },
+    { campaignId},
     { enabled: !!campaignId, refetchInterval: (query) => query.state.data?.status === "running" ? 3000 : false },
   );
 
   const messagesQ = trpc.rfv.campaignMessages.useQuery(
     {
-      campaignId,
-      tenantId,
-      page: msgPage,
+      campaignId, page: msgPage,
       pageSize: msgPageSize,
       status: msgStatusFilter === "all" ? undefined : msgStatusFilter,
     },

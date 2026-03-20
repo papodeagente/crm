@@ -15,8 +15,6 @@ import {
   Brain, Plus, Eye, EyeOff, Trash2, Edit2, CheckCircle2, XCircle,
   Loader2, Sparkles, Cpu, TestTube, AlertTriangle,
 } from "lucide-react";
-import { useTenantId } from "@/hooks/useTenantId";
-
 // ── Provider icons ──────────────────────────────────────────
 function ProviderIcon({ provider, size = 20 }: { provider: string; size?: number }) {
   if (provider === "openai") {
@@ -39,11 +37,10 @@ function providerLabel(p: string) {
 
 // ── Main Component ──────────────────────────────────────────
 export default function AiIntegrationsTab() {
-  const TENANT_ID = useTenantId();
   const utils = trpc.useUtils();
 
   // Queries
-  const listQ = trpc.ai.list.useQuery({ tenantId: TENANT_ID });
+  const listQ = trpc.ai.list.useQuery();
 
   // Mutations
   const createMut = trpc.ai.create.useMutation({
@@ -119,13 +116,12 @@ export default function AiIntegrationsTab() {
   const handleSave = () => {
     if (!model) { toast.error("Selecione um modelo."); return; }
     if (editingId) {
-      const data: any = { tenantId: TENANT_ID, id: editingId, defaultModel: model, isActive };
+      const data: any = { id: editingId, defaultModel: model, isActive };
       if (apiKey.length >= 10) data.apiKey = apiKey;
       updateMut.mutate(data);
     } else {
       if (!apiKey || apiKey.length < 10) { toast.error("Insira uma chave API válida (mínimo 10 caracteres)."); return; }
       createMut.mutate({
-        tenantId: TENANT_ID,
         provider,
         apiKey,
         defaultModel: model,
@@ -202,7 +198,7 @@ export default function AiIntegrationsTab() {
               </div>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
                 {openaiIntegrations.map((i: any) => (
-                  <IntegrationCard key={i.id} integration={i} onEdit={() => openEdit(i)} onDelete={() => setDeleteConfirm(i.id)} onToggle={(active) => updateMut.mutate({ tenantId: TENANT_ID, id: i.id, isActive: active })} />
+                  <IntegrationCard key={i.id} integration={i} onEdit={() => openEdit(i)} onDelete={() => setDeleteConfirm(i.id)} onToggle={(active) => updateMut.mutate({ id: i.id, isActive: active })} />
                 ))}
               </div>
             </div>
@@ -216,7 +212,7 @@ export default function AiIntegrationsTab() {
               </div>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
                 {anthropicIntegrations.map((i: any) => (
-                  <IntegrationCard key={i.id} integration={i} onEdit={() => openEdit(i)} onDelete={() => setDeleteConfirm(i.id)} onToggle={(active) => updateMut.mutate({ tenantId: TENANT_ID, id: i.id, isActive: active })} />
+                  <IntegrationCard key={i.id} integration={i} onEdit={() => openEdit(i)} onDelete={() => setDeleteConfirm(i.id)} onToggle={(active) => updateMut.mutate({ id: i.id, isActive: active })} />
                 ))}
               </div>
             </div>
@@ -393,7 +389,7 @@ export default function AiIntegrationsTab() {
             <Button variant="outline" onClick={() => setDeleteConfirm(null)}>Cancelar</Button>
             <Button
               variant="destructive"
-              onClick={() => { if (deleteConfirm) { deleteMut.mutate({ tenantId: TENANT_ID, id: deleteConfirm }); setDeleteConfirm(null); } }}
+              onClick={() => { if (deleteConfirm) { deleteMut.mutate({ id: deleteConfirm }); setDeleteConfirm(null); } }}
               disabled={deleteMut.isPending}
               className="gap-2"
             >

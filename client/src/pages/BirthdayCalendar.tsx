@@ -1,5 +1,4 @@
 import { trpc } from "@/lib/trpc";
-import { useTenantId } from "@/hooks/useTenantId";
 import { useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -16,14 +15,13 @@ const MONTH_NAMES = [
 ];
 
 export default function BirthdayCalendar() {
-  const TENANT_ID = useTenantId();
   const now = new Date();
   const [selectedMonth, setSelectedMonth] = useState(now.getMonth() + 1);
   const [daysAhead, setDaysAhead] = useState(7);
   const [tab, setTab] = useState<"upcoming" | "month">("upcoming");
 
   // Preferences
-  const prefQ = trpc.preferences.get.useQuery({ tenantId: TENANT_ID, key: "birthdayDaysAhead" });
+  const prefQ = trpc.preferences.get.useQuery({ key: "birthdayDaysAhead" });
   const setPref = trpc.preferences.set.useMutation({
     onSuccess: () => toast.success("Preferência salva"),
   });
@@ -36,27 +34,27 @@ export default function BirthdayCalendar() {
 
   // Queries
   const upcomingBirthdaysQ = trpc.dateCelebrations.upcoming.useQuery(
-    { tenantId: TENANT_ID, dateType: "birthDate", daysAhead: effectiveDaysAhead },
+    { dateType: "birthDate", daysAhead: effectiveDaysAhead },
     { enabled: tab === "upcoming" }
   );
   const upcomingWeddingsQ = trpc.dateCelebrations.upcoming.useQuery(
-    { tenantId: TENANT_ID, dateType: "weddingDate", daysAhead: effectiveDaysAhead },
+    { dateType: "weddingDate", daysAhead: effectiveDaysAhead },
     { enabled: tab === "upcoming" }
   );
   const monthBirthdaysQ = trpc.dateCelebrations.inMonth.useQuery(
-    { tenantId: TENANT_ID, month: selectedMonth, dateType: "birthDate" },
+    { month: selectedMonth, dateType: "birthDate" },
     { enabled: tab === "month" }
   );
   const monthWeddingsQ = trpc.dateCelebrations.inMonth.useQuery(
-    { tenantId: TENANT_ID, month: selectedMonth, dateType: "weddingDate" },
+    { month: selectedMonth, dateType: "weddingDate" },
     { enabled: tab === "month" }
   );
 
-  const todayBirthdaysQ = trpc.dateCelebrations.today.useQuery({ tenantId: TENANT_ID, dateType: "birthDate" });
-  const todayWeddingsQ = trpc.dateCelebrations.today.useQuery({ tenantId: TENANT_ID, dateType: "weddingDate" });
+  const todayBirthdaysQ = trpc.dateCelebrations.today.useQuery({ dateType: "birthDate" });
+  const todayWeddingsQ = trpc.dateCelebrations.today.useQuery({ dateType: "weddingDate" });
 
   function saveDaysAhead() {
-    setPref.mutate({ tenantId: TENANT_ID, key: "birthdayDaysAhead", value: String(daysAhead) });
+    setPref.mutate({ key: "birthdayDaysAhead", value: String(daysAhead) });
   }
 
   return (

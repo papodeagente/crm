@@ -83,15 +83,15 @@ describe("Session Sharing - Router endpoints exist", () => {
     expect(routersContent).toContain("tenantSessions:");
   });
 
-  it("should have sharing endpoints using protectedProcedure (admin-only)", async () => {
+  it("should have sharing endpoints using tenantProcedure (admin-only)", async () => {
     const fs = await import("fs");
     const routersContent = fs.readFileSync("server/routers.ts", "utf-8");
 
-    // shareSession should use protectedProcedure (admin-only check inside)
-    const shareSessionMatch = routersContent.match(/shareSession:\s*protectedProcedure/);
+    // shareSession should use tenantProcedure (admin-only check inside)
+    const shareSessionMatch = routersContent.match(/shareSession:\s*tenantProcedure/);
     expect(shareSessionMatch).not.toBeNull();
 
-    const revokeShareMatch = routersContent.match(/revokeShare:\s*protectedProcedure/);
+    const revokeShareMatch = routersContent.match(/revokeShare:\s*tenantProcedure/);
     expect(revokeShareMatch).not.toBeNull();
   });
 

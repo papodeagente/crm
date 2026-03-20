@@ -4,7 +4,6 @@
  */
 import { useState, useMemo } from "react";
 import { trpc } from "@/lib/trpc";
-import { useTenantId } from "@/hooks/useTenantId";
 import { useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -46,15 +45,12 @@ function formatDuration(start: string | Date, end: string | Date | null) {
 }
 
 export default function Campaigns() {
-  const tenantId = useTenantId();
   const [, setLocation] = useLocation();
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const pageSize = 15;
 
-  const campaignsQ = trpc.rfv.campaigns.useQuery({
-    tenantId,
-    page,
+  const campaignsQ = trpc.rfv.campaigns.useQuery({ page,
     pageSize,
     status: statusFilter === "all" ? undefined : statusFilter,
   }, { refetchInterval: 10000 });

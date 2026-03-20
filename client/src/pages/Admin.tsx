@@ -4,8 +4,6 @@ import { AdminOnlyGuard } from "@/components/AdminOnlyGuard";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Shield, Key, Activity } from "lucide-react";
 import { formatFullDateTime } from "../../../shared/dateUtils";
-import { useTenantId } from "@/hooks/useTenantId";
-
 const actionColors: Record<string, { bg: string; text: string }> = {
   create: { bg: "bg-emerald-50", text: "text-emerald-700" },
   update: { bg: "bg-blue-50", text: "text-blue-700" },
@@ -14,10 +12,8 @@ const actionColors: Record<string, { bg: string; text: string }> = {
 };
 
 export default function Admin() {
-  const TENANT_ID = useTenantId();
-
-  const roles = trpc.admin.roles.list.useQuery({ tenantId: TENANT_ID });
-  const eventLog = trpc.admin.eventLog.list.useQuery({ tenantId: TENANT_ID, limit: 50 });
+  const roles = trpc.admin.roles.list.useQuery();
+  const eventLog = trpc.admin.eventLog.list.useQuery({ limit: 50 });
 
   return (
     <AdminOnlyGuard pageTitle="Administração">

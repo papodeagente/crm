@@ -4,9 +4,6 @@ import { Button } from "@/components/ui/button";
 import { FileText, Plus, Eye, Send as SendIcon, CheckCircle, XCircle, Clock } from "lucide-react";
 import { formatDate } from "../../../shared/dateUtils";
 import { toast } from "sonner";
-import { useTenantId } from "@/hooks/useTenantId";
-
-
 const statusStyles: Record<string, { bg: string; text: string; dot: string; label: string; icon: any }> = {
   draft: { bg: "bg-slate-50", text: "text-slate-600", dot: "bg-slate-400", label: "Rascunho", icon: Clock },
   sent: { bg: "bg-blue-50", text: "text-blue-700", dot: "bg-blue-500", label: "Enviada", icon: SendIcon },
@@ -17,8 +14,7 @@ const statusStyles: Record<string, { bg: string; text: string; dot: string; labe
 };
 
 export default function Proposals() {
-  const TENANT_ID = useTenantId();
-  const proposals = trpc.proposals.list.useQuery({ tenantId: TENANT_ID });
+  const proposals = trpc.proposals.list.useQuery({});
 
   return (
     <div className="p-5 lg:px-8 space-y-5">

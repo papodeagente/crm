@@ -371,7 +371,7 @@ export const utmAnalyticsRouter = router({
     .input(z.object({
       dealId: z.number(),
     }))
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
       const db = await getDb();
       if (!db) return [];
 

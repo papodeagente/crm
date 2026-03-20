@@ -127,6 +127,7 @@ export const rfvRouter = router({
     .mutation(async ({ input, ctx }) => {
       return startBulkSend({
         ...input,
+        tenantId: getTenantId(ctx),
         userId: ctx.user.id,
         userName: ctx.user.name || undefined,
         source: "rfv",

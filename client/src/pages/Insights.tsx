@@ -21,7 +21,6 @@ import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip as RechartsTooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend
 } from "recharts";
-import { useTenantId } from "@/hooks/useTenantId";
 import { formatTime as formatTimeOfDay, formatTimeWithSeconds, SYSTEM_TIMEZONE, SYSTEM_LOCALE } from "../../../shared/dateUtils";
 
 
@@ -88,11 +87,10 @@ function StatusBadge({ status }: { status: string }) {
 
 // ─── CRM Dashboard ───
 function CRMDashboard() {
-  const TENANT_ID = useTenantId();
   const dateFilter = useDateFilter("all");
-  const dashboard = trpc.insights.dashboard.useQuery({ tenantId: TENANT_ID });
-  const homeData = trpc.dashboard.metrics.useQuery({ tenantId: TENANT_ID }, { refetchInterval: 60000 });
-  const pipelineSummary = trpc.dashboard.pipelineSummary.useQuery({ tenantId: TENANT_ID }, { refetchInterval: 60000 });
+  const dashboard = trpc.insights.dashboard.useQuery();
+  const homeData = trpc.dashboard.metrics.useQuery({}, { refetchInterval: 60000 });
+  const pipelineSummary = trpc.dashboard.pipelineSummary.useQuery({}, { refetchInterval: 60000 });
   const d = dashboard.data;
   const h = homeData.data;
 
@@ -807,7 +805,6 @@ function MessagesDashboard() {
 
 // ─── Main Page ───
 export default function Insights() {
-  const TENANT_ID = useTenantId();
   const [mainTab, setMainTab] = useState("crm");
 
   return (

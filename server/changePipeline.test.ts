@@ -19,6 +19,7 @@ function createAuthContext(overrides?: Partial<AuthenticatedUser>): { ctx: TrpcC
   };
   const ctx: TrpcContext = {
     user,
+    saasUser: { userId: 1, tenantId: 1, role: "admin" as const, email: "test@example.com", name: "Test User" },
     req: {
       protocol: "https",
       headers: {},

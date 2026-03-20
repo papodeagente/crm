@@ -171,11 +171,11 @@ describe("validateSessionOwnership", () => {
   });
 });
 
-describe("sessionProtectedProcedure middleware coverage", () => {
-  it("should have sessionProtectedProcedure exported from trpc.ts", async () => {
+describe("sessionTenantProcedure middleware coverage", () => {
+  it("should have sessionTenantProcedure exported from trpc.ts", async () => {
     const trpc = await import("./_core/trpc");
-    expect(trpc.sessionProtectedProcedure).toBeDefined();
-    expect(typeof trpc.sessionProtectedProcedure).toBe("object");
+    expect(trpc.sessionTenantProcedure).toBeDefined();
+    expect(typeof trpc.sessionTenantProcedure).toBe("object");
   });
 
   it("should have validateSessionOwnership exported from db.ts", async () => {
@@ -185,8 +185,8 @@ describe("sessionProtectedProcedure middleware coverage", () => {
   });
 });
 
-describe("Security audit: all sessionId endpoints use sessionProtectedProcedure", () => {
-  it("should have no protectedProcedure endpoints with sessionId input in whatsapp router", async () => {
+describe("Security audit: all sessionId endpoints use sessionTenantProcedure", () => {
+  it("should have no tenantProcedure endpoints with sessionId input in whatsapp router", async () => {
     const fs = await import("fs");
     const routersContent = fs.readFileSync("server/routers.ts", "utf-8");
     
@@ -208,17 +208,17 @@ describe("Security audit: all sessionId endpoints use sessionProtectedProcedure"
       depth -= (line.match(/}/g) || []).length;
       if (depth <= 0) break;
       
-      if (line.includes("protectedProcedure") && !line.includes("sessionProtectedProcedure")) {
+      if (line.includes("tenantProcedure") && !line.includes("sessionTenantProcedure")) {
         for (let j = 1; j <= 3; j++) {
           if (i + j < lines.length && lines[i + j].includes("sessionId: z.string()")) {
             const name = line.trim().split(":")[0].trim();
-            violations.push(`Line ${i + 1}: ${name} uses protectedProcedure but accepts sessionId`);
+            violations.push(`Line ${i + 1}: ${name} uses tenantProcedure but accepts sessionId`);
             break;
           }
         }
         if (line.includes("sessionId: z.string()")) {
           const name = line.trim().split(":")[0].trim();
-          violations.push(`Line ${i + 1}: ${name} uses protectedProcedure but accepts sessionId`);
+          violations.push(`Line ${i + 1}: ${name} uses tenantProcedure but accepts sessionId`);
         }
       }
     }
@@ -226,7 +226,7 @@ describe("Security audit: all sessionId endpoints use sessionProtectedProcedure"
     expect(violations).toEqual([]);
   });
 
-  it("should have no protectedProcedure endpoints with sessionId input in monitoring router", async () => {
+  it("should have no tenantProcedure endpoints with sessionId input in monitoring router", async () => {
     const fs = await import("fs");
     const routersContent = fs.readFileSync("server/routers.ts", "utf-8");
     
@@ -248,7 +248,7 @@ describe("Security audit: all sessionId endpoints use sessionProtectedProcedure"
       depth -= (line.match(/}/g) || []).length;
       if (depth <= 0) break;
       
-      if (line.includes("protectedProcedure") && !line.includes("sessionProtectedProcedure")) {
+      if (line.includes("tenantProcedure") && !line.includes("sessionTenantProcedure")) {
         for (let j = 1; j <= 3; j++) {
           if (i + j < lines.length && lines[i + j].includes("sessionId: z.string()")) {
             const name = line.trim().split(":")[0].trim();
@@ -262,7 +262,7 @@ describe("Security audit: all sessionId endpoints use sessionProtectedProcedure"
     expect(violations).toEqual([]);
   });
 
-  it("should have no protectedProcedure with sessionId in rfvRouter", async () => {
+  it("should have no tenantProcedure with sessionId in rfvRouter", async () => {
     const fs = await import("fs");
     const content = fs.readFileSync("server/routers/rfvRouter.ts", "utf-8");
     
@@ -271,7 +271,7 @@ describe("Security audit: all sessionId endpoints use sessionProtectedProcedure"
     
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
-      if (line.includes("protectedProcedure") && !line.includes("sessionProtectedProcedure")) {
+      if (line.includes("tenantProcedure") && !line.includes("sessionTenantProcedure")) {
         for (let j = 1; j <= 3; j++) {
           if (i + j < lines.length && lines[i + j].includes("sessionId:")) {
             const name = line.trim().split(":")[0].trim();

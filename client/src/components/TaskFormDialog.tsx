@@ -14,8 +14,6 @@ import {
   X, Phone, Mail, Video, MessageSquare, CheckSquare,
 } from "lucide-react";
 import { toast } from "sonner";
-import { useTenantId } from "@/hooks/useTenantId";
-
 export const taskTypeOptions = [
   { value: "task", label: "Tarefa", icon: CheckSquare },
   { value: "whatsapp", label: "WhatsApp", icon: MessageSquare },
@@ -69,7 +67,6 @@ export default function TaskFormDialog({
   onSuccess,
   showDealSelector = false,
 }: TaskFormDialogProps) {
-  const TENANT_ID = useTenantId();
   const utils = trpc.useUtils();
   const isEditMode = !!editTask;
 
@@ -85,13 +82,12 @@ export default function TaskFormDialog({
   const [selectedAccountId, setSelectedAccountId] = useState<string>("none");
 
   // Data queries
-  const crmUsers = trpc.admin.users.list.useQuery({ tenantId: TENANT_ID });
+  const crmUsers = trpc.admin.users.list.useQuery();
   const deals = trpc.crm.deals.list.useQuery(
-    { tenantId: TENANT_ID, limit: 200 },
+    { limit: 200 },
     { enabled: showDealSelector }
   );
-  const allAccounts = trpc.crm.accounts.list.useQuery(
-    { tenantId: TENANT_ID },
+  const allAccounts = trpc.crm.accounts.list.useQuery(undefined,
     { enabled: showDealSelector }
   );
 
@@ -198,7 +194,6 @@ export default function TaskFormDialog({
 
     if (isEditMode && editTask) {
       await updateTask.mutateAsync({
-        tenantId: TENANT_ID,
         id: editTask.id,
         title,
         description: description || undefined,
@@ -211,12 +206,12 @@ export default function TaskFormDialog({
       const newIds = new Set(assigneeUserIds);
       for (const uid of assigneeUserIds) {
         if (!currentIds.has(uid)) {
-          await addAssignee.mutateAsync({ tenantId: TENANT_ID, taskId: editTask.id, userId: uid });
+          await addAssignee.mutateAsync({ taskId: editTask.id, userId: uid });
         }
       }
       for (const uid of Array.from(currentIds)) {
         if (!newIds.has(uid)) {
-          await removeAssignee.mutateAsync({ tenantId: TENANT_ID, taskId: editTask.id, userId: uid });
+          await removeAssignee.mutateAsync({ taskId: editTask.id, userId: uid });
         }
       }
     } else {
@@ -226,7 +221,6 @@ export default function TaskFormDialog({
         return;
       }
       await createTask.mutateAsync({
-        tenantId: TENANT_ID,
         entityType: "deal",
         entityId: targetDealId,
         title,

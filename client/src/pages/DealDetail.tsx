@@ -22,7 +22,6 @@ import {
   Trash2, User, Users, X, AlertCircle, ClipboardList, Paperclip, Tag,
   Sparkles, BarChart3, TrendingUp, TrendingDown, Star, Target, Lightbulb, RefreshCw, Award, Search
 } from "lucide-react";
-import { useTenantId } from "@/hooks/useTenantId";
 import TaskFormDialog from "@/components/TaskFormDialog";
 import TaskActionPopover from "@/components/TaskActionPopover";
 import SaleCelebration from "@/components/SaleCelebration";
@@ -96,33 +95,32 @@ function formatDurationMs(ms: number): string {
 /* MAIN PAGE                                                   */
 /* ════════════════════════════════════════════════════════════ */
 export default function DealDetail() {
-  const TENANT_ID = useTenantId();
   const { user } = useAuth();
   const [, setLocation] = useLocation();
   const [matched, params] = useRoute("/deal/:id");
   const dealId = params?.id ? parseInt(params.id, 10) : 0;
 
   /* ─── Queries ─── */
-  const dealQ = trpc.crm.deals.get.useQuery({ tenantId: TENANT_ID, id: dealId }, { enabled: dealId > 0 });
-  const crmUsersQ = trpc.admin.users.list.useQuery({ tenantId: TENANT_ID });
-  const pipelinesQ = trpc.crm.pipelines.list.useQuery({ tenantId: TENANT_ID });
+  const dealQ = trpc.crm.deals.get.useQuery({ id: dealId }, { enabled: dealId > 0 });
+  const crmUsersQ = trpc.admin.users.list.useQuery();
+  const pipelinesQ = trpc.crm.pipelines.list.useQuery({});
   const stagesQ = trpc.crm.pipelines.stages.useQuery(
-    { tenantId: TENANT_ID, pipelineId: dealQ.data?.pipelineId || 0 },
+    { pipelineId: dealQ.data?.pipelineId || 0 },
     { enabled: !!dealQ.data?.pipelineId }
   );
   const contactQ = trpc.crm.contacts.get.useQuery(
-    { tenantId: TENANT_ID, id: dealQ.data?.contactId || 0 },
+    { id: dealQ.data?.contactId || 0 },
     { enabled: !!dealQ.data?.contactId }
   );
   const accountQ = trpc.crm.accounts.get.useQuery(
-    { tenantId: TENANT_ID, id: dealQ.data?.accountId || 0 },
+    { id: dealQ.data?.accountId || 0 },
     { enabled: !!dealQ.data?.accountId }
   );
-  const productsQ = trpc.crm.deals.products.list.useQuery({ tenantId: TENANT_ID, dealId }, { enabled: dealId > 0 });
-  const participantsQ = trpc.crm.deals.participants.list.useQuery({ tenantId: TENANT_ID, dealId }, { enabled: dealId > 0 });
-  const historyQ = trpc.crm.deals.history.list.useQuery({ tenantId: TENANT_ID, dealId }, { enabled: dealId > 0 });
+  const productsQ = trpc.crm.deals.products.list.useQuery({ dealId }, { enabled: dealId > 0 });
+  const participantsQ = trpc.crm.deals.participants.list.useQuery({ dealId }, { enabled: dealId > 0 });
+  const historyQ = trpc.crm.deals.history.list.useQuery({ dealId }, { enabled: dealId > 0 });
   const tasksRawQ = trpc.crm.tasks.list.useQuery(
-    { tenantId: TENANT_ID, entityType: "deal", entityId: dealId },
+    { entityType: "deal", entityId: dealId },
     { enabled: dealId > 0 }
   );
   const tasksList: any[] = (() => {
@@ -133,31 +131,31 @@ export default function DealDetail() {
     return [];
   })();
   const tasksQ = { ...tasksRawQ, data: tasksList };
-  const notesQ = trpc.crm.notes.list.useQuery({ tenantId: TENANT_ID, entityType: "deal", entityId: dealId }, { enabled: dealId > 0 });
-  const stageTimeQ = trpc.utmAnalytics.stageTime.useQuery({ tenantId: TENANT_ID, dealId }, { enabled: dealId > 0 });
-  const waMessagesCountQ = trpc.crm.dealWhatsApp.count.useQuery({ tenantId: TENANT_ID, dealId }, { enabled: dealId > 0 });
-  const contactsQ = trpc.crm.contacts.list.useQuery({ tenantId: TENANT_ID, limit: 200 });
-  const accountsQ = trpc.crm.accounts.list.useQuery({ tenantId: TENANT_ID });
-  const customFieldsQ = trpc.customFields.list.useQuery({ tenantId: TENANT_ID, entity: "deal" });
+  const notesQ = trpc.crm.notes.list.useQuery({ entityType: "deal", entityId: dealId }, { enabled: dealId > 0 });
+  const stageTimeQ = trpc.utmAnalytics.stageTime.useQuery({ dealId }, { enabled: dealId > 0 });
+  const waMessagesCountQ = trpc.crm.dealWhatsApp.count.useQuery({ dealId }, { enabled: dealId > 0 });
+  const contactsQ = trpc.crm.contacts.list.useQuery({ limit: 200 });
+  const accountsQ = trpc.crm.accounts.list.useQuery();
+  const customFieldsQ = trpc.customFields.list.useQuery({ entity: "deal" });
   const customValuesQ = trpc.contactProfile.getCustomFieldValues.useQuery(
-    { tenantId: TENANT_ID, entityType: "deal", entityId: dealId },
+    { entityType: "deal", entityId: dealId },
     { enabled: dealId > 0 }
   );
 
   // Custom fields for contact and company contexts within the deal
-  const contactCustomFieldsQ = trpc.customFields.list.useQuery({ tenantId: TENANT_ID, entity: "contact" });
-  const companyCustomFieldsQ = trpc.customFields.list.useQuery({ tenantId: TENANT_ID, entity: "company" });
+  const contactCustomFieldsQ = trpc.customFields.list.useQuery({ entity: "contact" });
+  const companyCustomFieldsQ = trpc.customFields.list.useQuery({ entity: "company" });
   const contactCustomValuesQ = trpc.contactProfile.getCustomFieldValues.useQuery(
-    { tenantId: TENANT_ID, entityType: "contact", entityId: dealQ.data?.contactId || 0 },
+    { entityType: "contact", entityId: dealQ.data?.contactId || 0 },
     { enabled: !!dealQ.data?.contactId && (dealQ.data?.contactId ?? 0) > 0 }
   );
   const companyCustomValuesQ = trpc.contactProfile.getCustomFieldValues.useQuery(
-    { tenantId: TENANT_ID, entityType: "company", entityId: dealQ.data?.accountId || 0 },
+    { entityType: "company", entityId: dealQ.data?.accountId || 0 },
     { enabled: !!dealQ.data?.accountId && (dealQ.data?.accountId ?? 0) > 0 }
   );
 
-  const leadSourcesQ = trpc.crm.leadSources.list.useQuery({ tenantId: TENANT_ID });
-  const campaignsQ = trpc.crm.campaigns.list.useQuery({ tenantId: TENANT_ID });
+  const leadSourcesQ = trpc.crm.leadSources.list.useQuery({});
+  const campaignsQ = trpc.crm.campaigns.list.useQuery({});
 
   /* ─── Mutations ─── */
   const moveStage = trpc.crm.deals.moveStage.useMutation({
@@ -184,7 +182,7 @@ export default function DealDetail() {
   });
   const createContact = trpc.crm.contacts.create.useMutation({
     onSuccess: (data) => {
-      if (data?.id) updateDeal.mutate({ tenantId: TENANT_ID, id: dealId, contactId: data.id });
+      if (data?.id) updateDeal.mutate({ id: dealId, contactId: data.id });
       contactsQ.refetch();
       toast.success("Contato criado e vinculado");
     },
@@ -196,7 +194,7 @@ export default function DealDetail() {
   });
   const createAccount = trpc.crm.accounts.create.useMutation({
     onSuccess: (data) => {
-      if (data?.id) updateDeal.mutate({ tenantId: TENANT_ID, id: dealId, accountId: data.id });
+      if (data?.id) updateDeal.mutate({ id: dealId, accountId: data.id });
       accountsQ.refetch();
       toast.success("Empresa criada e vinculada");
     },
@@ -249,13 +247,13 @@ export default function DealDetail() {
   const [selectedPipelineId, setSelectedPipelineId] = useState<number | null>(null);
   const [selectedNewStageId, setSelectedNewStageId] = useState<number | null>(null);
   const newPipelineStagesQ = trpc.crm.pipelines.stages.useQuery(
-    { tenantId: TENANT_ID, pipelineId: selectedPipelineId || 0 },
+    { pipelineId: selectedPipelineId || 0 },
     { enabled: !!selectedPipelineId && selectedPipelineId !== dealQ.data?.pipelineId }
   );
   const newPipelineStages = useMemo(() => (newPipelineStagesQ.data || []).sort((a: any, b: any) => a.orderIndex - b.orderIndex), [newPipelineStagesQ.data]);
 
   /* ─── Loss Reasons query ─── */
-  const lossReasonsQ = trpc.crm.lossReasons.list.useQuery({ tenantId: TENANT_ID });
+  const lossReasonsQ = trpc.crm.lossReasons.list.useQuery({});
   const lossReasonsList = (lossReasonsQ.data || []).filter((r: any) => r.isActive && !r.isDeleted);
 
   /* ─── Loading / Error states ─── */
@@ -288,7 +286,6 @@ export default function DealDetail() {
   const handleMoveStage = (toStage: any) => {
     if (!currentStage || toStage.id === currentStage.id) return;
     moveStage.mutate({
-      tenantId: TENANT_ID,
       dealId: deal.id,
       fromStageId: currentStage.id,
       toStageId: toStage.id,
@@ -298,7 +295,7 @@ export default function DealDetail() {
   };
 
   const handleMarkWon = () => {
-    updateDeal.mutate({ tenantId: TENANT_ID, id: deal.id, status: "won" }, {
+    updateDeal.mutate({ id: deal.id, status: "won" }, {
       onSuccess: () => {
         dealQ.refetch(); historyQ.refetch();
         setShowCelebration(true);
@@ -310,7 +307,6 @@ export default function DealDetail() {
   const handleMarkLost = () => {
     if (!selectedLossReasonId) return;
     updateDeal.mutate({
-      tenantId: TENANT_ID,
       id: deal.id,
       status: "lost",
       lossReasonId: selectedLossReasonId,
@@ -323,7 +319,7 @@ export default function DealDetail() {
 
   const handleReopen = () => {
     updateDeal.mutate(
-      { tenantId: TENANT_ID, id: deal.id, status: "open", lossReasonId: null, lossNotes: null },
+      { id: deal.id, status: "open", lossReasonId: null, lossNotes: null },
       {
         onSuccess: () => {
           dealQ.refetch();
@@ -361,13 +357,13 @@ export default function DealDetail() {
                     autoFocus
                     onKeyDown={(e) => {
                       if (e.key === "Enter" && titleDraft.trim()) {
-                        updateDeal.mutate({ tenantId: TENANT_ID, id: deal.id, title: titleDraft.trim() });
+                        updateDeal.mutate({ id: deal.id, title: titleDraft.trim() });
                         setEditingTitle(false);
                       }
                       if (e.key === "Escape") setEditingTitle(false);
                     }}
                   />
-                  <button onClick={() => { if (titleDraft.trim()) { updateDeal.mutate({ tenantId: TENANT_ID, id: deal.id, title: titleDraft.trim() }); } setEditingTitle(false); }} className="p-1 hover:bg-muted/60 rounded">
+                  <button onClick={() => { if (titleDraft.trim()) { updateDeal.mutate({ id: deal.id, title: titleDraft.trim() }); } setEditingTitle(false); }} className="p-1 hover:bg-muted/60 rounded">
                     <Check className="h-4 w-4 text-primary" />
                   </button>
                   <button onClick={() => setEditingTitle(false)} className="p-1 hover:bg-muted/60 rounded">
@@ -589,7 +585,7 @@ export default function DealDetail() {
                   onStartEdit={() => { setEditingDealField("title"); setDealFieldDraft(deal.title); }}
                   draft={dealFieldDraft}
                   onDraftChange={setDealFieldDraft}
-                  onSave={() => { if (dealFieldDraft.trim()) updateDeal.mutate({ tenantId: TENANT_ID, id: deal.id, title: dealFieldDraft.trim() }); setEditingDealField(null); }}
+                  onSave={() => { if (dealFieldDraft.trim()) updateDeal.mutate({ id: deal.id, title: dealFieldDraft.trim() }); setEditingDealField(null); }}
                   onCancel={() => setEditingDealField(null)}
                 />
                 {/* Valor - calculado automaticamente pela soma dos produtos */}
@@ -612,7 +608,7 @@ export default function DealDetail() {
                   onStartEdit={() => { setEditingDealField("expectedClose"); setDealFieldDraft(deal.expectedCloseAt ? new Date(deal.expectedCloseAt).toISOString().split("T")[0] : ""); }}
                   draft={dealFieldDraft}
                   onDraftChange={setDealFieldDraft}
-                  onSave={() => { updateDeal.mutate({ tenantId: TENANT_ID, id: deal.id, expectedCloseAt: dealFieldDraft || null }); setEditingDealField(null); }}
+                  onSave={() => { updateDeal.mutate({ id: deal.id, expectedCloseAt: dealFieldDraft || null }); setEditingDealField(null); }}
                   onCancel={() => setEditingDealField(null)}
                   inputType="date"
                 />
@@ -625,7 +621,7 @@ export default function DealDetail() {
                         value={dealFieldDraft || "none"}
                         onValueChange={(v) => {
                           const val = v === "none" ? null : v;
-                          updateDeal.mutate({ tenantId: TENANT_ID, id: deal.id, channelOrigin: val });
+                          updateDeal.mutate({ id: deal.id, channelOrigin: val });
                           setEditingDealField(null);
                         }}
                       >
@@ -675,7 +671,7 @@ export default function DealDetail() {
                   onStartEdit={() => { setEditingDealField("boardingDate"); setDealFieldDraft(deal.boardingDate ? new Date(deal.boardingDate).toISOString().split("T")[0] : ""); }}
                   draft={dealFieldDraft}
                   onDraftChange={setDealFieldDraft}
-                  onSave={() => { updateDeal.mutate({ tenantId: TENANT_ID, id: deal.id, boardingDate: dealFieldDraft || null }); setEditingDealField(null); }}
+                  onSave={() => { updateDeal.mutate({ id: deal.id, boardingDate: dealFieldDraft || null }); setEditingDealField(null); }}
                   onCancel={() => setEditingDealField(null)}
                   inputType="date"
                 />
@@ -686,7 +682,7 @@ export default function DealDetail() {
                   onStartEdit={() => { setEditingDealField("returnDate"); setDealFieldDraft(deal.returnDate ? new Date(deal.returnDate).toISOString().split("T")[0] : ""); }}
                   draft={dealFieldDraft}
                   onDraftChange={setDealFieldDraft}
-                  onSave={() => { updateDeal.mutate({ tenantId: TENANT_ID, id: deal.id, returnDate: dealFieldDraft || null }); setEditingDealField(null); }}
+                  onSave={() => { updateDeal.mutate({ id: deal.id, returnDate: dealFieldDraft || null }); setEditingDealField(null); }}
                   onCancel={() => setEditingDealField(null)}
                   inputType="date"
                 />
@@ -726,7 +722,7 @@ export default function DealDetail() {
                         <Edit2 className="h-3.5 w-3.5 text-muted-foreground" />
                       </button>
                       <button
-                        onClick={() => { updateDeal.mutate({ tenantId: TENANT_ID, id: deal.id, contactId: null }); }}
+                        onClick={() => { updateDeal.mutate({ id: deal.id, contactId: null }); }}
                         className="p-1 hover:bg-red-100 dark:hover:bg-red-500/10 rounded" title="Desvincular contato"
                       >
                         <X className="h-3.5 w-3.5 text-red-500" />
@@ -779,7 +775,7 @@ export default function DealDetail() {
                       <Edit2 className="h-3.5 w-3.5 text-muted-foreground" />
                     </button>
                     <button
-                      onClick={() => { updateDeal.mutate({ tenantId: TENANT_ID, id: deal.id, accountId: null }); }}
+                      onClick={() => { updateDeal.mutate({ id: deal.id, accountId: null }); }}
                       className="p-1 hover:bg-red-100 dark:hover:bg-red-500/10 rounded" title="Desvincular empresa"
                     >
                       <X className="h-3.5 w-3.5 text-red-500" />
@@ -821,7 +817,7 @@ export default function DealDetail() {
                         const newOwnerId = Number(val);
                         if (newOwnerId === deal.ownerUserId) return;
                         updateDeal.mutate(
-                          { tenantId: TENANT_ID, id: deal.id, ownerUserId: newOwnerId },
+                          { id: deal.id, ownerUserId: newOwnerId },
                           { onSuccess: () => { dealQ.refetch(); toast.success("Responsável alterado"); } }
                         );
                       }}
@@ -1249,7 +1245,6 @@ export default function DealDetail() {
                 const targetStage = newPipelineStages.find((s: any) => s.id === selectedNewStageId);
                 if (!targetPipeline || !targetStage) return;
                 changePipeline.mutate({
-                  tenantId: TENANT_ID,
                   dealId: deal.id,
                   newPipelineId: selectedPipelineId,
                   newStageId: selectedNewStageId,
@@ -1322,10 +1317,10 @@ export default function DealDetail() {
               onClick={() => {
                 if (contactMode === "create") {
                   if (!contactDraft.name.trim()) { toast.error("Nome é obrigatório"); return; }
-                  createContact.mutate({ tenantId: TENANT_ID, name: contactDraft.name.trim(), phone: contactDraft.phone || undefined, email: contactDraft.email || undefined });
+                  createContact.mutate({ name: contactDraft.name.trim(), phone: contactDraft.phone || undefined, email: contactDraft.email || undefined });
                 } else {
                   if (!selectedContactId) { toast.error("Selecione um contato"); return; }
-                  updateDeal.mutate({ tenantId: TENANT_ID, id: dealId, contactId: selectedContactId });
+                  updateDeal.mutate({ id: dealId, contactId: selectedContactId });
                 }
                 setShowContactDialog(false);
               }}
@@ -1366,7 +1361,7 @@ export default function DealDetail() {
               onClick={() => {
                 if (!contactDraft.name.trim()) { toast.error("Nome é obrigatório"); return; }
                 const cId = deal?.contactId;
-                if (cId) updateContact.mutate({ tenantId: TENANT_ID, id: cId, name: contactDraft.name.trim(), phone: contactDraft.phone || undefined, email: contactDraft.email || undefined });
+                if (cId) updateContact.mutate({ id: cId, name: contactDraft.name.trim(), phone: contactDraft.phone || undefined, email: contactDraft.email || undefined });
                 setShowEditContactDialog(false);
               }}
               disabled={updateContact.isPending}
@@ -1424,10 +1419,10 @@ export default function DealDetail() {
               onClick={() => {
                 if (accountMode === "create") {
                   if (!accountDraft.name.trim()) { toast.error("Nome é obrigatório"); return; }
-                  createAccount.mutate({ tenantId: TENANT_ID, name: accountDraft.name.trim() });
+                  createAccount.mutate({ name: accountDraft.name.trim() });
                 } else {
                   if (!selectedAccountId) { toast.error("Selecione uma empresa"); return; }
-                  updateDeal.mutate({ tenantId: TENANT_ID, id: dealId, accountId: selectedAccountId });
+                  updateDeal.mutate({ id: dealId, accountId: selectedAccountId });
                 }
                 setShowAccountDialog(false);
               }}
@@ -1458,7 +1453,7 @@ export default function DealDetail() {
               onClick={() => {
                 if (!accountDraft.name.trim()) { toast.error("Nome é obrigatório"); return; }
                 const aId = deal?.accountId;
-                if (aId) updateAccount.mutate({ tenantId: TENANT_ID, id: aId, name: accountDraft.name.trim() });
+                if (aId) updateAccount.mutate({ id: aId, name: accountDraft.name.trim() });
                 setShowEditAccountDialog(false);
               }}
               disabled={updateAccount.isPending}
@@ -1580,7 +1575,6 @@ function ContactInfoRow({ icon: Icon, value, copyable, whatsapp }: {
 
 /* ─── Custom Fields Sidebar ─── */
 function CustomFieldsSidebar({ fields, values, dealId, entityType = "deal", onRefresh }: any) {
-  const TENANT_ID = useTenantId();
   const setValuesM = trpc.contactProfile.setCustomFieldValues.useMutation({
     onSuccess: () => { onRefresh(); toast.success("Campos atualizados"); },
   });
@@ -1616,7 +1610,6 @@ function CustomFieldsSidebar({ fields, values, dealId, entityType = "deal", onRe
       value: (val as string).trim() || null,
     }));
     setValuesM.mutate({
-      tenantId: TENANT_ID,
       entityType: entityType,
       entityId: dealId,
       values: entries,
@@ -1695,7 +1688,6 @@ function CreateTaskButton({ dealId, onCreated, dealTitle }: { dealId: number; on
 }
 
 function TaskRow({ task, onUpdate, onEdit }: { task: any; onUpdate: () => void; onEdit?: (task: any) => void }) {
-  const TENANT_ID = useTenantId();
   const updateTask = trpc.crm.tasks.update.useMutation({
     onSuccess: () => { onUpdate(); toast.success("Tarefa atualizada"); },
   });
@@ -1710,7 +1702,7 @@ function TaskRow({ task, onUpdate, onEdit }: { task: any; onUpdate: () => void; 
       <Checkbox
         checked={isDone}
         onCheckedChange={(checked) => {
-          updateTask.mutate({ tenantId: TENANT_ID, id: task.id, status: checked ? "done" : "pending" });
+          updateTask.mutate({ id: task.id, status: checked ? "done" : "pending" });
         }}
         className="shrink-0"
       />
@@ -1751,7 +1743,7 @@ function TaskRow({ task, onUpdate, onEdit }: { task: any; onUpdate: () => void; 
         </TaskActionPopover>
         {!isDone && (
           <button
-            onClick={() => updateTask.mutate({ tenantId: TENANT_ID, id: task.id, status: "done" })}
+            onClick={() => updateTask.mutate({ id: task.id, status: "done" })}
             className="p-1.5 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 rounded-lg transition-colors"
             title="Concluir tarefa"
           >
@@ -1770,7 +1762,6 @@ function TaskRow({ task, onUpdate, onEdit }: { task: any; onUpdate: () => void; 
 function HistoryPanel({ history, notes, dealId, contactName, onNoteCreated }: {
   history: any[]; notes: any[]; dealId: number; contactName: string; onNoteCreated: () => void;
 }) {
-  const TENANT_ID = useTenantId();
   const [newNote, setNewNote] = useState("");
   const createNote = trpc.crm.notes.create.useMutation({
     onSuccess: () => { onNoteCreated(); setNewNote(""); toast.success("Anotação criada"); },
@@ -1833,7 +1824,7 @@ function HistoryPanel({ history, notes, dealId, contactName, onNoteCreated }: {
         <Button
           size="sm"
           disabled={!newNote.trim() || createNote.isPending}
-          onClick={() => createNote.mutate({ tenantId: TENANT_ID, entityType: "deal", entityId: dealId, body: newNote })}
+          onClick={() => createNote.mutate({ entityType: "deal", entityId: dealId, body: newNote })}
           className="mt-0"
         >
           <MessageSquarePlus className="h-3.5 w-3.5 mr-1" />
@@ -2012,7 +2003,6 @@ function TasksPanel({ tasks, dealId, onRefresh, dealTitle }: { tasks: any[]; dea
 /* ════════════════════════════════════════════════════════════ */
 
 function ProductsPanel({ products, dealId, onRefresh }: { products: any[]; dealId: number; onRefresh: () => void }) {
-  const TENANT_ID = useTenantId();
   const [showAdd, setShowAdd] = useState(false);
   const [editingItem, setEditingItem] = useState<any>(null);
   const [searchTerm, setSearchTerm] = useState("");
@@ -2026,8 +2016,7 @@ function ProductsPanel({ products, dealId, onRefresh }: { products: any[]; dealI
   const [showCreateCategory, setShowCreateCategory] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState("");
 
-  const categoriesQ = trpc.productCatalog.categories.list.useQuery(
-    { tenantId: TENANT_ID },
+  const categoriesQ = trpc.productCatalog.categories.list.useQuery(undefined,
     { enabled: showCreateProduct }
   );
 
@@ -2055,7 +2044,7 @@ function ProductsPanel({ products, dealId, onRefresh }: { products: any[]; dealI
   });
 
   const catalogQ = trpc.productCatalog.products.list.useQuery(
-    { tenantId: TENANT_ID, isActive: true, limit: 200 },
+    { isActive: true, limit: 200 },
     { enabled: showAdd }
   );
   const catalogProducts = catalogQ.data || [];
@@ -2154,7 +2143,7 @@ function ProductsPanel({ products, dealId, onRefresh }: { products: any[]; dealI
                   <Edit2 className="h-3.5 w-3.5 text-primary" />
                 </button>
                 <button
-                  onClick={() => deleteProduct.mutate({ tenantId: TENANT_ID, id: p.id, dealId, productName: p.name })}
+                  onClick={() => deleteProduct.mutate({ id: p.id, dealId, productName: p.name })}
                   className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-red-500/10 rounded"
                 >
                   <Trash2 className="h-3.5 w-3.5 text-red-500" />
@@ -2275,7 +2264,7 @@ function ProductsPanel({ products, dealId, onRefresh }: { products: any[]; dealI
                 <Button
                   disabled={createProduct.isPending}
                   onClick={() => createProduct.mutate({
-                    tenantId: TENANT_ID, dealId, productId: selectedProduct.id,
+                    dealId, productId: selectedProduct.id,
                     quantity: addForm.quantity,
                     unitPriceCents: addForm.unitPriceCents,
                     discountCents: addForm.discountCents || undefined,
@@ -2340,7 +2329,7 @@ function ProductsPanel({ products, dealId, onRefresh }: { products: any[]; dealI
                 <label className="text-xs font-medium text-primary">Nova Categoria</label>
                 <div className="flex gap-2">
                   <Input value={newCategoryName} onChange={(e) => setNewCategoryName(e.target.value)} placeholder="Nome da categoria" className="h-8 text-sm" autoFocus />
-                  <Button size="sm" className="h-8 px-3" disabled={!newCategoryName.trim() || createCategory.isPending} onClick={() => createCategory.mutate({ tenantId: TENANT_ID, name: newCategoryName.trim() })}>
+                  <Button size="sm" className="h-8 px-3" disabled={!newCategoryName.trim() || createCategory.isPending} onClick={() => createCategory.mutate({ name: newCategoryName.trim() })}>
                     {createCategory.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : "Criar"}
                   </Button>
                   <Button size="sm" variant="ghost" className="h-8 px-2" onClick={() => { setShowCreateCategory(false); setNewCategoryName(""); }}>
@@ -2352,7 +2341,7 @@ function ProductsPanel({ products, dealId, onRefresh }: { products: any[]; dealI
           </div>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setShowCreateProduct(false)}>Cancelar</Button>
-            <Button disabled={!newProduct.name.trim() || createCatalogProduct.isPending} onClick={() => createCatalogProduct.mutate({ tenantId: TENANT_ID, name: newProduct.name.trim(), basePriceCents: newProduct.basePriceCents, productType: newProduct.productType as any, supplier: newProduct.supplier || undefined, categoryId: newProduct.categoryId })}>
+            <Button disabled={!newProduct.name.trim() || createCatalogProduct.isPending} onClick={() => createCatalogProduct.mutate({ name: newProduct.name.trim(), basePriceCents: newProduct.basePriceCents, productType: newProduct.productType as any, supplier: newProduct.supplier || undefined, categoryId: newProduct.categoryId })}>
               {createCatalogProduct.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Plus className="h-4 w-4 mr-1" />}
               Criar e Selecionar
             </Button>
@@ -2391,7 +2380,7 @@ function ProductsPanel({ products, dealId, onRefresh }: { products: any[]; dealI
             <Button
               disabled={updateProduct.isPending}
               onClick={() => updateProduct.mutate({
-                tenantId: TENANT_ID, id: editingItem.id, dealId,
+                id: editingItem.id, dealId,
                 quantity: editForm.quantity, unitPriceCents: editForm.unitPriceCents,
                 discountCents: editForm.discountCents, supplier: editForm.supplier || undefined,
                 notes: editForm.notes || undefined,
@@ -2412,7 +2401,6 @@ function ProductsPanel({ products, dealId, onRefresh }: { products: any[]; dealI
 /* ════════════════════════════════════════════════════════════ */
 
 function ParticipantsPanel({ participants, contacts, dealId, onRefresh }: any) {
-  const TENANT_ID = useTenantId();
   const [showAdd, setShowAdd] = useState(false);
   const [selectedContact, setSelectedContact] = useState("");
   const [selectedRole, setSelectedRole] = useState("traveler");
@@ -2459,7 +2447,7 @@ function ParticipantsPanel({ participants, contacts, dealId, onRefresh }: any) {
                   </div>
                 </div>
                 <button
-                  onClick={() => removeParticipant.mutate({ tenantId: TENANT_ID, id: p.id, dealId })}
+                  onClick={() => removeParticipant.mutate({ id: p.id, dealId })}
                   className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-red-500/10 rounded"
                 >
                   <Trash2 className="h-3.5 w-3.5 text-red-500" />
@@ -2496,7 +2484,7 @@ function ParticipantsPanel({ participants, contacts, dealId, onRefresh }: any) {
             <Button
               disabled={!selectedContact}
               onClick={() => addParticipant.mutate({
-                tenantId: TENANT_ID, dealId, contactId: parseInt(selectedContact), role: selectedRole as any,
+                dealId, contactId: parseInt(selectedContact), role: selectedRole as any,
               })}
             >
               Adicionar
@@ -2784,7 +2772,6 @@ function AiAnalysisPanel({ dealId, contactName }: { dealId: number; contactName:
    ═══════════════════════════════════════════════════════════════════ */
 
 function WhatsAppPanel({ contact, dealId }: { contact: any; dealId: number }) {
-  const TENANT_ID = useTenantId();
   const [viewMode, setViewMode] = useState<"history" | "live">("history");
   const [loadMoreBefore, setLoadMoreBefore] = useState<number | undefined>(undefined);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -2792,7 +2779,7 @@ function WhatsAppPanel({ contact, dealId }: { contact: any; dealId: number }) {
   const utils = trpc.useUtils();
   // Fetch full message history from DB with periodic polling
   const messagesQ = trpc.crm.dealWhatsApp.messages.useQuery(
-    { tenantId: TENANT_ID, dealId, limit: 200, beforeId: loadMoreBefore },
+    { dealId, limit: 200, beforeId: loadMoreBefore },
     { enabled: dealId > 0, refetchInterval: 10000 }
   );
   // Real-time message updates via WebSocket

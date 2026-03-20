@@ -14,7 +14,6 @@ import {
 import { formatTime } from "../../../shared/dateUtils";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
-import { useTenantId } from "@/hooks/useTenantId";
 import { useIsAdmin } from "@/components/AdminOnlyGuard";
 import { Inbox as InboxIcon, ListOrdered, Contact2, LayoutGrid, HandMetal, Timer, ArrowRightLeft as Transfer } from "lucide-react";
 import InstantTooltip from "@/components/InstantTooltip";
@@ -454,7 +453,6 @@ function CreateContactDialog({
 }: {
   open: boolean; onClose: () => void; phone: string; pushName: string; onCreated: () => void;
 }) {
-  const tenantId = useTenantId();
   const [name, setName] = useState(pushName || "");
   const [email, setEmail] = useState("");
   const [notes, setNotes] = useState("");
@@ -465,7 +463,7 @@ function CreateContactDialog({
 
   // Load custom fields for contacts
   const contactCustomFields = trpc.customFields.list.useQuery(
-    { tenantId, entity: "contact" as const },
+    { entity: "contact" as const },
     { enabled: open }
   );
   const formFields = useMemo(() => {
@@ -490,18 +488,14 @@ function CreateContactDialog({
     try {
       const cleaned = phone.replace(/\D/g, "");
       const formatted = cleaned.startsWith("55") ? `+${cleaned}` : `+55${cleaned}`;
-      const result = await createContact.mutateAsync({
-        tenantId,
-        name: name.trim(),
+      const result = await createContact.mutateAsync({ name: name.trim(),
         phone: formatted,
         email: email.trim() || undefined,
       });
       // Save custom field values
       const cfEntries = customFieldValuesToArray(customFieldValues).filter(v => v.value);
       if (cfEntries.length > 0 && (result as any)?.id) {
-        await setFieldValues.mutateAsync({
-          tenantId,
-          entityType: "contact",
+        await setFieldValues.mutateAsync({ entityType: "contact",
           entityId: (result as any).id,
           values: cfEntries,
         });
@@ -606,18 +600,17 @@ function CreateDealDialog({
 }: {
   open: boolean; onClose: () => void; contactName: string; contactPhone: string; contactJid: string; sessionId: string;
 }) {
-  const tenantId = useTenantId();
   const [, navigate] = useLocation();
   const [title, setTitle] = useState(`Negociação - ${contactName}`);
   const [value, setValue] = useState("");
   const [customFieldValues, setCustomFieldValues] = useState<Record<number, string>>({});
 
-  const pipelinesQ = trpc.crm.pipelines.list.useQuery({ tenantId });
+  const pipelinesQ = trpc.crm.pipelines.list.useQuery({});
   const pipelines = (pipelinesQ.data || []) as any[];
   const [selectedPipelineId, setSelectedPipelineId] = useState<number | null>(null);
 
   const stagesQ = trpc.crm.pipelines.stages.useQuery(
-    { tenantId, pipelineId: selectedPipelineId! },
+    { pipelineId: selectedPipelineId! },
     { enabled: !!selectedPipelineId }
   );
   const stages = (stagesQ.data || []) as any[];
@@ -637,12 +630,12 @@ function CreateDealDialog({
 
   const createDeal = trpc.crm.deals.create.useMutation();
   const createContact = trpc.crm.contacts.create.useMutation();
-  const contactsQ = trpc.crm.contacts.list.useQuery({ tenantId, limit: 500 });
+  const contactsQ = trpc.crm.contacts.list.useQuery({ limit: 500 });
   const setFieldValues = trpc.contactProfile.setCustomFieldValues.useMutation();
 
   // Load custom fields for deals
   const dealCustomFields = trpc.customFields.list.useQuery(
-    { tenantId, entity: "deal" as const },
+    { entity: "deal" as const },
     { enabled: open }
   );
   const formFields = useMemo(() => {
@@ -661,23 +654,19 @@ function CreateDealDialog({
       })?.id;
 
       if (!contactId) {
-        const newContact = await createContact.mutateAsync({
-          tenantId, name: contactName, phone: formatted,
+        const newContact = await createContact.mutateAsync({ name: contactName, phone: formatted,
         });
         contactId = (newContact as any).id;
       }
 
-      const deal = await createDeal.mutateAsync({
-        tenantId, title: title.trim(),
+      const deal = await createDeal.mutateAsync({ title: title.trim(),
         pipelineId: selectedPipelineId, stageId: selectedStageId,
         contactId: contactId || undefined,
       });
       // Save custom field values for the deal
       const cfEntries = customFieldValuesToArray(customFieldValues).filter(v => v.value);
       if (cfEntries.length > 0 && (deal as any)?.id) {
-        await setFieldValues.mutateAsync({
-          tenantId,
-          entityType: "deal",
+        await setFieldValues.mutateAsync({ entityType: "deal",
           entityId: (deal as any).id,
           values: cfEntries,
         });
@@ -774,9 +763,7 @@ function NewChatPanel({
   const [phoneInput, setPhoneInput] = useState("");
   const [resolving, setResolving] = useState(false);
   const [resolveError, setResolveError] = useState("");
-
-  const tenantId = useTenantId();
-  const contactsQ = trpc.crm.contacts.list.useQuery({ tenantId, limit: 500 }, { enabled: open });
+  const contactsQ = trpc.crm.contacts.list.useQuery({ limit: 500 }, { enabled: open });
   const trpcUtils = trpc.useUtils();
 
   const contacts = useMemo(() => {
@@ -968,7 +955,6 @@ type InboxTab = "mine" | "queue" | "contacts" | "all";
 type AgentFilter = "all" | "unread" | "mine" | "unassigned";
 
 export default function InboxPage() {
-  const tenantId = useTenantId();
   const trpcUtils = trpc.useUtils();
   const { lastMessage, lastStatusUpdate, lastConversationUpdate, isConnected: socketConnected } = useSocket();
   // selectedKey = conversationKey (sessionId:remoteJid) — primary selection state
@@ -1023,7 +1009,7 @@ export default function InboxPage() {
 
   // Initial load only — fetch conversations once from server
   const conversationsQ = trpc.whatsapp.waConversations.useQuery(
-    { sessionId: activeSession?.sessionId || "", tenantId },
+    { sessionId: activeSession?.sessionId || ""},
     { enabled: !!activeSession?.sessionId && !hydrationDoneRef.current, staleTime: Infinity, refetchInterval: false, refetchOnWindowFocus: false }
   );
 
@@ -1060,7 +1046,7 @@ export default function InboxPage() {
   }, [activeSession?.sessionId, socketConnected]);
 
   // Agents list for assignment
-  const agentsQ = trpc.whatsapp.agents.useQuery({ tenantId }, { staleTime: 5 * 60 * 1000 });
+  const agentsQ = trpc.whatsapp.agents.useQuery(undefined, { staleTime: 5 * 60 * 1000 });
   const agents = useMemo(() => (agentsQ.data || []) as Array<{ id: number; name: string; email: string; avatarUrl?: string | null; status: string }>, [agentsQ.data]);
 
   // Queue conversations
@@ -1118,8 +1104,8 @@ export default function InboxPage() {
 
   const handleFinishAttendance = useCallback((remoteJid: string) => {
     if (!activeSession?.sessionId) return;
-    finishMut.mutate({ sessionId: activeSession.sessionId, remoteJid, tenantId });
-  }, [activeSession?.sessionId, finishMut, tenantId]);
+    finishMut.mutate({ sessionId: activeSession.sessionId, remoteJid});
+  }, [activeSession?.sessionId, finishMut]);
 
   // WA Contacts for Contacts tab (reuse waContactsMap but as a list)
   const waContactsForTabQ = trpc.whatsapp.waContactsMap.useQuery(
@@ -1148,7 +1134,7 @@ export default function InboxPage() {
   const updateStatusMutation = trpc.whatsapp.updateAssignmentStatus.useMutation({});
 
   const contactsQ = trpc.crm.contacts.list.useQuery(
-    { tenantId, limit: 500 },
+    { limit: 500 },
     { enabled: true, staleTime: 5 * 60 * 1000 }
   );
 
@@ -1458,7 +1444,7 @@ export default function InboxPage() {
         );
       }
     }
-  }, [activeSession?.sessionId, markRead, syncOnOpen, tenantId, convStore]);
+  }, [activeSession?.sessionId, markRead, syncOnOpen, convStore]);
 
   // View queue conversation WITHOUT auto-claiming
   const handleSelectQueueConv = useCallback((jid: string) => {
@@ -1558,9 +1544,7 @@ export default function InboxPage() {
 
   const handleAssign = useCallback((agentId: number | null) => {
     if (!selectedJid || !activeSession?.sessionId) return;
-    assignMutation.mutate({
-      tenantId,
-      sessionId: activeSession.sessionId,
+    assignMutation.mutate({ sessionId: activeSession.sessionId,
       remoteJid: selectedJid,
       assignedUserId: agentId,
     });
@@ -1569,9 +1553,7 @@ export default function InboxPage() {
 
   const handleStatusChange = useCallback((status: "open" | "pending" | "resolved" | "closed") => {
     if (!selectedJid || !activeSession?.sessionId) return;
-    updateStatusMutation.mutate({
-      tenantId,
-      sessionId: activeSession.sessionId,
+    updateStatusMutation.mutate({ sessionId: activeSession.sessionId,
       remoteJid: selectedJid,
       status,
     });

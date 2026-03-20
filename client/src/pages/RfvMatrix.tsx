@@ -1,6 +1,5 @@
 import { useState, useRef, useMemo, useCallback, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
-import { useTenantId } from "@/hooks/useTenantId";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -128,7 +127,6 @@ const templateVars = [
 ];
 
 export default function RfvMatrix() {
-  const tenantId = useTenantId();
   const [, setLocation] = useLocation();
   const utils = trpc.useUtils();
 
@@ -171,23 +169,20 @@ export default function RfvMatrix() {
   }, []);
 
   // ─── Queries ───
-  const dashboard = trpc.rfv.dashboard.useQuery({ tenantId }, { enabled: !!tenantId });
-  const contacts = trpc.rfv.list.useQuery({
-    tenantId,
-    page,
+  const dashboard = trpc.rfv.dashboard.useQuery(undefined, { enabled: true });
+  const contacts = trpc.rfv.list.useQuery({ page,
     pageSize: 50,
     search: debouncedSearch || undefined,
     audienceType: audienceFilter !== "all" ? audienceFilter : undefined,
     smartFilter: smartFilter || undefined,
     sortBy,
     sortDir,
-  }, { enabled: !!tenantId });
-  const smartCounts = trpc.rfv.smartFilterCounts.useQuery({ tenantId }, { enabled: !!tenantId });
-  const alerta = trpc.rfv.alertaDinheiroParado.useQuery({ tenantId }, { enabled: !!tenantId });
-  const activeSession = trpc.rfv.activeSession.useQuery(
-    { tenantId },
+  }, { enabled: true });
+  const smartCounts = trpc.rfv.smartFilterCounts.useQuery(undefined, { enabled: true });
+  const alerta = trpc.rfv.alertaDinheiroParado.useQuery(undefined, { enabled: true });
+  const activeSession = trpc.rfv.activeSession.useQuery(undefined,
     {
-      enabled: !!tenantId,
+      enabled: true,
       // Poll every 3s while dialog is open and session is not yet connected
       refetchInterval: (query) => {
         if (!bulkDialogOpen) return false;
@@ -199,9 +194,8 @@ export default function RfvMatrix() {
   );
 
   // ─── Bulk Send Progress Polling ───
-  const bulkProgress = trpc.rfv.bulkSendProgress.useQuery(
-    { tenantId },
-    { enabled: pollingEnabled && !!tenantId, refetchInterval: pollingEnabled ? 1500 : false },
+  const bulkProgress = trpc.rfv.bulkSendProgress.useQuery(undefined,
+    { enabled: pollingEnabled , refetchInterval: pollingEnabled ? 1500 : false },
   );
 
   // Stop polling when completed
@@ -278,7 +272,7 @@ export default function RfvMatrix() {
     reader.onload = (ev) => {
       const text = ev.target?.result as string;
       if (text) {
-        importCsv.mutate({ tenantId, csvText: text });
+        importCsv.mutate({ csvText: text });
       }
     };
     reader.readAsText(file);
@@ -336,9 +330,7 @@ export default function RfvMatrix() {
       return;
     }
     const ids = Array.from(selectedIds);
-    bulkSend.mutate({
-      tenantId,
-      contactIds: ids,
+    bulkSend.mutate({ contactIds: ids,
       messageTemplate: messageTemplate.trim(),
       sessionId: activeSession.data.sessionId,
       delayMs: delayMode === "fixed" ? delaySeconds * 1000 : Math.round((delayMinSeconds + delayMaxSeconds) / 2) * 1000,
@@ -403,7 +395,7 @@ export default function RfvMatrix() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => recalculate.mutate({ tenantId })}
+                    onClick={() => recalculate.mutate()}
                     disabled={recalculate.isPending}
                   >
                     <RefreshCw className={`w-4 h-4 mr-1.5 ${recalculate.isPending ? "animate-spin" : ""}`} />
@@ -438,7 +430,7 @@ export default function RfvMatrix() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => checkNotifications.mutate({ tenantId })}
+                    onClick={() => checkNotifications.mutate()}
                     disabled={checkNotifications.isPending}
                   >
                     <Bell className={`w-4 h-4 mr-1.5 ${checkNotifications.isPending ? "animate-pulse" : ""}`} />
@@ -833,7 +825,7 @@ export default function RfvMatrix() {
                     <Upload className="w-4 h-4 mr-1.5" />
                     Importar CSV
                   </Button>
-                  <Button onClick={() => recalculate.mutate({ tenantId })} disabled={recalculate.isPending}>
+                  <Button onClick={() => recalculate.mutate()} disabled={recalculate.isPending}>
                     <RefreshCw className={`w-4 h-4 mr-1.5 ${recalculate.isPending ? "animate-spin" : ""}`} />
                     Recalcular do CRM
                   </Button>
@@ -1254,7 +1246,7 @@ export default function RfvMatrix() {
             {bp?.status === "running" ? (
               <Button
                 variant="destructive"
-                onClick={() => cancelBulk.mutate({ tenantId })}
+                onClick={() => cancelBulk.mutate()}
                 disabled={cancelBulk.isPending}
               >
                 <Ban className="w-4 h-4 mr-1.5" />
@@ -1363,7 +1355,7 @@ export default function RfvMatrix() {
             <Button
               variant="destructive"
               disabled={resetConfirm !== "RESETAR" || resetData.isPending}
-              onClick={() => resetData.mutate({ tenantId })}
+              onClick={() => resetData.mutate()}
             >
               {resetData.isPending ? (
                 <><RefreshCw className="w-4 h-4 mr-1.5 animate-spin" /> Resetando...</>

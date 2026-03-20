@@ -11,9 +11,6 @@ import {
   ArrowLeft, ArrowRight, Plus, Trash2, Edit2, Loader2, Link2, Unlink,
   Settings, Zap, AlertCircle, CheckCircle2, HelpCircle, RefreshCw,
 } from "lucide-react";
-import { useTenantId } from "@/hooks/useTenantId";
-
-
 /* ── Campos comuns do RD Station para sugestão ── */
 const RD_COMMON_FIELDS = [
   { key: "email", label: "Email" },
@@ -42,14 +39,13 @@ const RD_COMMON_FIELDS = [
 ];
 
 export default function RDFieldMappings() {
-  const TENANT_ID = useTenantId();
   const [showAdd, setShowAdd] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
 
   // Queries
-  const mappingsQ = trpc.fieldMappings.list.useQuery({ tenantId: TENANT_ID });
+  const mappingsQ = trpc.fieldMappings.list.useQuery();
   const standardFieldsQ = trpc.fieldMappings.enturStandardFields.useQuery();
-  const customFieldsQ = trpc.fieldMappings.enturCustomFields.useQuery({ tenantId: TENANT_ID });
+  const customFieldsQ = trpc.fieldMappings.enturCustomFields.useQuery();
 
   const mappings = mappingsQ.data || [];
   const standardFields = standardFieldsQ.data || [];
@@ -217,7 +213,7 @@ export default function RDFieldMappings() {
                   {/* Actions */}
                   <div className="flex items-center justify-end gap-1">
                     <button
-                      onClick={() => updateMapping.mutate({ id: m.id, tenantId: TENANT_ID, isActive: !m.isActive })}
+                      onClick={() => updateMapping.mutate({ id: m.id, isActive: !m.isActive })}
                       className="p-1.5 rounded hover:bg-muted transition-colors"
                       title={m.isActive ? "Desativar" : "Ativar"}
                     >
@@ -234,7 +230,7 @@ export default function RDFieldMappings() {
                       <Edit2 className="h-3.5 w-3.5 text-primary" />
                     </button>
                     <button
-                      onClick={() => { if (confirm("Remover este mapeamento?")) deleteMapping.mutate({ id: m.id, tenantId: TENANT_ID }); }}
+                      onClick={() => { if (confirm("Remover este mapeamento?")) deleteMapping.mutate({ id: m.id}); }}
                       className="p-1.5 rounded hover:bg-red-500/10 transition-colors"
                     >
                       <Trash2 className="h-3.5 w-3.5 text-red-500" />
@@ -283,7 +279,7 @@ export default function RDFieldMappings() {
         onOpenChange={setShowAdd}
         standardFields={standardFields}
         customFields={customFieldsList}
-        onSave={(data) => createMapping.mutate({ tenantId: TENANT_ID, ...data })}
+        onSave={(data) => createMapping.mutate({ ...data })}
         isPending={createMapping.isPending}
       />
 
@@ -295,7 +291,7 @@ export default function RDFieldMappings() {
           standardFields={standardFields}
           customFields={customFieldsList}
           initialData={mappings.find((m: any) => m.id === editingId)}
-          onSave={(data) => updateMapping.mutate({ id: editingId, tenantId: TENANT_ID, ...data })}
+          onSave={(data) => updateMapping.mutate({ id: editingId, ...data })}
           isPending={updateMapping.isPending}
         />
       )}

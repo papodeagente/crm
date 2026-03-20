@@ -13,9 +13,6 @@ import DealFiltersPanel, { useDealFilters, DealFilterButton } from "@/components
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { useAuth } from "@/_core/hooks/useAuth";
-import { useTenantId } from "@/hooks/useTenantId";
-
-
 const statusStyles: Record<string, { bg: string; text: string; dot: string; label: string }> = {
   open: { bg: "bg-blue-50", text: "text-blue-700", dot: "bg-blue-500", label: "Em andamento" },
   won: { bg: "bg-emerald-50", text: "text-emerald-700", dot: "bg-emerald-500", label: "Ganho" },
@@ -23,7 +20,6 @@ const statusStyles: Record<string, { bg: string; text: string; dot: string; labe
 };
 
 export default function Deals() {
-  const TENANT_ID = useTenantId();
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [value, setValue] = useState("");
@@ -40,12 +36,12 @@ export default function Deals() {
   const [dealPage, setDealPage] = useState(0);
   const dealPageSize = 50;
   const deals = trpc.crm.deals.list.useQuery({
-    tenantId: TENANT_ID, limit: dealPageSize, offset: dealPage * dealPageSize,
+    limit: dealPageSize, offset: dealPage * dealPageSize,
     dateFrom: dateFilter.dates.dateFrom, dateTo: dateFilter.dates.dateTo,
     ...dealFilters.filters,
   });
-  const deletedDeals = trpc.crm.deals.listDeleted.useQuery({ tenantId: TENANT_ID, limit: 100 }, { enabled: showTrash });
-  const pipelines = trpc.crm.pipelines.list.useQuery({ tenantId: TENANT_ID });
+  const deletedDeals = trpc.crm.deals.listDeleted.useQuery({ limit: 100 }, { enabled: showTrash });
+  const pipelines = trpc.crm.pipelines.list.useQuery({});
 
   const createDeal = trpc.crm.deals.create.useMutation({
     onSuccess: () => { utils.crm.deals.list.invalidate(); setOpen(false); setTitle(""); setValue(""); toast.success("Negócio criado!"); },
@@ -154,7 +150,7 @@ export default function Deals() {
                   <div><Label className="text-[12px] font-medium">Valor (R$)</Label><Input value={value} onChange={(e) => setValue(e.target.value)} placeholder="5000.00" type="number" className="mt-1.5 h-10 rounded-xl" /></div>
                   <Button className="w-full h-11 rounded-lg text-[14px] font-medium bg-primary hover:bg-primary/90 shadow-sm transition-colors" disabled={!title || createDeal.isPending} onClick={() => {
                     if (!defaultPipeline) { toast.error("Crie um pipeline primeiro na seção Funil."); return; }
-                    createDeal.mutate({ tenantId: TENANT_ID, title, pipelineId: defaultPipeline.id, stageId: 1 });
+                    createDeal.mutate({ title, pipelineId: defaultPipeline.id, stageId: 1 });
                   }}>
                     {createDeal.isPending ? "Criando..." : "Criar Negócio"}
                   </Button>
@@ -190,7 +186,7 @@ export default function Deals() {
           <div className="flex-1" />
           {showTrash ? (
             <>
-              <Button variant="outline" size="sm" className="h-8 gap-1.5 text-[12px] rounded-lg" onClick={() => restoreDeals.mutate({ tenantId: TENANT_ID, ids: Array.from(selectedIds) })} disabled={restoreDeals.isPending}>
+              <Button variant="outline" size="sm" className="h-8 gap-1.5 text-[12px] rounded-lg" onClick={() => restoreDeals.mutate({ ids: Array.from(selectedIds) })} disabled={restoreDeals.isPending}>
                 <RotateCcw className="h-3.5 w-3.5" />Restaurar
               </Button>
               {isAdmin && (
@@ -287,11 +283,11 @@ export default function Deals() {
                         <DropdownMenuContent align="end" className="rounded-xl">
                           {showTrash ? (
                             <>
-                              <DropdownMenuItem onClick={() => restoreDeals.mutate({ tenantId: TENANT_ID, ids: [d.id] })}>
+                              <DropdownMenuItem onClick={() => restoreDeals.mutate({ ids: [d.id] })}>
                                 <RotateCcw className="mr-2 h-4 w-4" />Restaurar
                               </DropdownMenuItem>
                               {isAdmin && (
-                                <DropdownMenuItem className="text-destructive" onClick={() => hardDelete.mutate({ tenantId: TENANT_ID, ids: [d.id] })}>
+                                <DropdownMenuItem className="text-destructive" onClick={() => hardDelete.mutate({ ids: [d.id] })}>
                                   <Trash2 className="mr-2 h-4 w-4" />Excluir Permanentemente
                                 </DropdownMenuItem>
                               )}
@@ -299,7 +295,7 @@ export default function Deals() {
                           ) : (
                             <>
                               <DropdownMenuItem onClick={() => toast("Edição em breve")}>Editar</DropdownMenuItem>
-                              <DropdownMenuItem className="text-destructive" onClick={() => bulkDelete.mutate({ tenantId: TENANT_ID, ids: [d.id] })}>
+                              <DropdownMenuItem className="text-destructive" onClick={() => bulkDelete.mutate({ ids: [d.id] })}>
                                 <Trash2 className="mr-2 h-4 w-4" />Excluir
                               </DropdownMenuItem>
                             </>
@@ -348,7 +344,7 @@ export default function Deals() {
             </p>
             <div className="flex gap-2 justify-end">
               <Button variant="outline" className="rounded-lg" onClick={() => setConfirmDelete(false)}>Cancelar</Button>
-              <Button variant="destructive" className="rounded-lg" disabled={bulkDelete.isPending} onClick={() => bulkDelete.mutate({ tenantId: TENANT_ID, ids: Array.from(selectedIds) })}>
+              <Button variant="destructive" className="rounded-lg" disabled={bulkDelete.isPending} onClick={() => bulkDelete.mutate({ ids: Array.from(selectedIds) })}>
                 {bulkDelete.isPending ? "Excluindo..." : "Excluir"}
               </Button>
             </div>
@@ -371,7 +367,7 @@ export default function Deals() {
             </p>
             <div className="flex gap-2 justify-end">
               <Button variant="outline" className="rounded-lg" onClick={() => setConfirmHardDelete(false)}>Cancelar</Button>
-              <Button variant="destructive" className="rounded-lg" disabled={hardDelete.isPending} onClick={() => hardDelete.mutate({ tenantId: TENANT_ID, ids: Array.from(selectedIds) })}>
+              <Button variant="destructive" className="rounded-lg" disabled={hardDelete.isPending} onClick={() => hardDelete.mutate({ ids: Array.from(selectedIds) })}>
                 {hardDelete.isPending ? "Excluindo..." : "Excluir Permanentemente"}
               </Button>
             </div>

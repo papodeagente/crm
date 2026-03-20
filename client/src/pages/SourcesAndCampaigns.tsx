@@ -1,6 +1,5 @@
 import { useState, useMemo } from "react";
 import { trpc } from "@/lib/trpc";
-import { useTenantId } from "@/hooks/useTenantId";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -29,7 +28,6 @@ const COLORS = [
 
 export default function SourcesAndCampaigns() {
   const [, setLocation] = useLocation();
-  const tenantId = useTenantId();
   const [activeTab, setActiveTab] = useState<"sources" | "campaigns">("sources");
   const [showDeleted, setShowDeleted] = useState(false);
 
@@ -50,8 +48,8 @@ export default function SourcesAndCampaigns() {
   const [deleteDialog, setDeleteDialog] = useState<{ type: "source" | "campaign"; id: number; name: string; hard?: boolean } | null>(null);
 
   // Queries
-  const sourcesQuery = trpc.crm.leadSources.list.useQuery({ tenantId, includeDeleted: showDeleted });
-  const campaignsQuery = trpc.crm.campaigns.list.useQuery({ tenantId, includeDeleted: showDeleted });
+  const sourcesQuery = trpc.crm.leadSources.list.useQuery({ includeDeleted: showDeleted });
+  const campaignsQuery = trpc.crm.campaigns.list.useQuery({ includeDeleted: showDeleted });
   const utils = trpc.useUtils();
 
   // Source mutations
@@ -114,7 +112,7 @@ export default function SourcesAndCampaigns() {
     if (editingSource) {
       updateSource.mutate({ id: editingSource.id, name: sourceName.trim(), color: sourceColor });
     } else {
-      createSource.mutate({ tenantId, name: sourceName.trim(), color: sourceColor });
+      createSource.mutate({ name: sourceName.trim(), color: sourceColor });
     }
   }
 
@@ -142,9 +140,7 @@ export default function SourcesAndCampaigns() {
         sourceId: campaignSourceId ? Number(campaignSourceId) : null,
       });
     } else {
-      createCampaign.mutate({
-        tenantId,
-        name: campaignName.trim(),
+      createCampaign.mutate({ name: campaignName.trim(),
         color: campaignColor,
         sourceId: campaignSourceId ? Number(campaignSourceId) : undefined,
       });

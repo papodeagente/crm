@@ -10,7 +10,6 @@ import {
   CheckCircle2, Pencil, Clock, ChevronRight, ArrowLeft,
 } from "lucide-react";
 import { toast } from "sonner";
-import { useTenantId } from "@/hooks/useTenantId";
 import { formatDate, formatTime } from "../../../shared/dateUtils";
 
 const postponeOptions = [
@@ -45,7 +44,6 @@ export default function TaskActionPopover({
   side = "bottom",
   align = "center",
 }: TaskActionPopoverProps) {
-  const TENANT_ID = useTenantId();
   const utils = trpc.useUtils();
   const [open, setOpen] = useState(false);
   const [showPostpone, setShowPostpone] = useState(false);
@@ -63,7 +61,6 @@ export default function TaskActionPopover({
 
   const handleComplete = async () => {
     await updateTask.mutateAsync({
-      tenantId: TENANT_ID,
       id: task.id,
       status: "done",
     });
@@ -76,7 +73,6 @@ export default function TaskActionPopover({
     const currentDue = task.dueAt ? new Date(task.dueAt) : new Date();
     const newDue = new Date(currentDue.getTime() + hours * 60 * 60 * 1000);
     await updateTask.mutateAsync({
-      tenantId: TENANT_ID,
       id: task.id,
       dueAt: newDue.toISOString(),
     });
@@ -93,7 +89,6 @@ export default function TaskActionPopover({
     }
     const newDue = new Date(`${customDate}T${customTime}:00`);
     await updateTask.mutateAsync({
-      tenantId: TENANT_ID,
       id: task.id,
       dueAt: newDue.toISOString(),
     });

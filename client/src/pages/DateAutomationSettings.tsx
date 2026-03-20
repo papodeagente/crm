@@ -1,6 +1,5 @@
 import { useState, useMemo } from "react";
 import { trpc } from "@/lib/trpc";
-import { useTenantId } from "@/hooks/useTenantId";
 import { useLocation } from "wouter";
 import { AdminOnlyGuard } from "@/components/AdminOnlyGuard";
 import { Button } from "@/components/ui/button";
@@ -65,27 +64,24 @@ const defaultFormData: AutomationFormData = {
 
 export default function DateAutomationSettings() {
   const [, setLocation] = useLocation();
-  const tenantId = useTenantId();
   const [showDialog, setShowDialog] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState<AutomationFormData>({ ...defaultFormData });
   const [selectedPipelineFilter, setSelectedPipelineFilter] = useState<string>("all");
 
   // Queries
-  const { data: automations = [], refetch } = trpc.crm.dateAutomations.list.useQuery(
-    { tenantId: tenantId! },
-    { enabled: !!tenantId }
+  const { data: automations = [], refetch } = trpc.crm.dateAutomations.list.useQuery({},
+    { enabled: true }
   );
-  const { data: pipelinesRaw = [] } = trpc.crm.pipelines.list.useQuery(
-    { tenantId: tenantId! },
-    { enabled: !!tenantId }
+  const { data: pipelinesRaw = [] } = trpc.crm.pipelines.list.useQuery({},
+    { enabled: true }
   );
   const pipelines = pipelinesRaw.filter((p: any) => !p.isArchived);
 
   // Get stages for selected pipeline in form
   const { data: formStages = [] } = trpc.crm.pipelines.stages.useQuery(
-    { tenantId: tenantId!, pipelineId: form.pipelineId },
-    { enabled: !!tenantId && form.pipelineId > 0 }
+    { pipelineId: form.pipelineId },
+    { enabled: form.pipelineId > 0 }
   );
 
   // Mutations
@@ -160,15 +156,12 @@ export default function DateAutomationSettings() {
   };
 
   const handleSave = () => {
-    if (!tenantId) return;
     if (!form.name.trim()) return toast.error("Nome é obrigatório");
     if (!form.pipelineId) return toast.error("Selecione um funil");
     if (!form.targetStageId) return toast.error("Selecione a etapa de destino");
 
     if (editingId) {
-      updateMut.mutate({
-        tenantId,
-        id: editingId,
+      updateMut.mutate({ id: editingId,
         name: form.name,
         description: form.description || undefined,
         dateField: form.dateField as any,
@@ -180,9 +173,7 @@ export default function DateAutomationSettings() {
         isActive: form.isActive,
       });
     } else {
-      createMut.mutate({
-        tenantId,
-        name: form.name,
+      createMut.mutate({ name: form.name,
         description: form.description || undefined,
         pipelineId: form.pipelineId,
         dateField: form.dateField as any,
@@ -197,16 +188,10 @@ export default function DateAutomationSettings() {
   };
 
   const handleToggle = (auto: any) => {
-    if (!tenantId) return;
-    updateMut.mutate({
-      tenantId,
-      id: auto.id,
+    updateMut.mutate({ id: auto.id,
       isActive: !auto.isActive,
     });
   };
-
-  if (!tenantId) return null;
-
   return (
     <AdminOnlyGuard pageTitle="Automações por data">
     <div className="min-h-screen bg-background">
@@ -252,7 +237,7 @@ export default function DateAutomationSettings() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => runNowMut.mutate({ tenantId: tenantId! })}
+              onClick={() => runNowMut.mutate()}
               disabled={runNowMut.isPending}
             >
               <Play className="h-4 w-4 mr-1" />
@@ -329,7 +314,7 @@ export default function DateAutomationSettings() {
                         className="h-8 w-8 text-destructive hover:text-destructive"
                         onClick={() => {
                           if (confirm("Excluir esta automação?")) {
-                            deleteMut.mutate({ tenantId: tenantId!, id: auto.id });
+                            deleteMut.mutate({ id: auto.id });
                           }
                         }}
                       >

@@ -15,9 +15,6 @@ import {
   BarChart3, Zap, RefreshCw, UserCog, FileSpreadsheet,
   Upload, Info, Clock, Link2, Shield, Sparkles,
 } from "lucide-react";
-import { useTenantId } from "@/hooks/useTenantId";
-
-
 type Step = "token" | "preview" | "configure" | "importing" | "done";
 
 interface ImportConfig {
@@ -88,7 +85,6 @@ interface SpreadsheetRow {
 }
 
 export default function RDCrmImport() {
-  const TENANT_ID = useTenantId();
   const [, setLocation] = useLocation();
   const [activeTab, setActiveTab] = useState<"api" | "spreadsheet">("api");
 
@@ -167,7 +163,6 @@ export default function RDCrmImport() {
     setStep("importing");
     try {
       await importMutation.mutateAsync({
-        tenantId: TENANT_ID,
         token: token.trim(),
         ...config,
         cleanBeforeImport,
@@ -370,7 +365,6 @@ export default function RDCrmImport() {
         // Send ALL columns as Record<string, string> — the backend handles mapping
         // This returns immediately, the import runs in background
         await spreadsheetImportMutation.mutateAsync({
-          tenantId: TENANT_ID,
           rows: ssRows as any, // rows already have all CSV columns as keys
         });
         // Start polling for progress
@@ -386,7 +380,7 @@ export default function RDCrmImport() {
       setSsStep("preview");
       setSsImporting(false);
     }
-  }, [ssRows, TENANT_ID, spreadsheetImportMutation]);
+  }, [ssRows, spreadsheetImportMutation]);
 
   return (
     <div className="page-content max-w-3xl mx-auto">

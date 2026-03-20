@@ -4,9 +4,6 @@ import { Button } from "@/components/ui/button";
 import { Plus, Ticket } from "lucide-react";
 import { formatDate } from "../../../shared/dateUtils";
 import { toast } from "sonner";
-import { useTenantId } from "@/hooks/useTenantId";
-
-
 const priorityStyles: Record<string, { bg: string; text: string; dot: string; label: string }> = {
   low: { bg: "bg-slate-50", text: "text-slate-600", dot: "bg-slate-400", label: "Baixa" },
   medium: { bg: "bg-amber-50", text: "text-amber-700", dot: "bg-amber-500", label: "Média" },
@@ -22,8 +19,7 @@ const ticketStatusStyles: Record<string, { bg: string; text: string; dot: string
 };
 
 export default function Portal() {
-  const TENANT_ID = useTenantId();
-  const tickets = trpc.portal.tickets.list.useQuery({ tenantId: TENANT_ID });
+  const tickets = trpc.portal.tickets.list.useQuery({});
 
   return (
     <div className="p-5 lg:px-8 space-y-5">

@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
-import { useTenantId } from "@/hooks/useTenantId";
 import { useLocation } from "wouter";
 import { AdminOnlyGuard } from "@/components/AdminOnlyGuard";
 import { Button } from "@/components/ui/button";
@@ -133,12 +132,11 @@ const CLASSIFICATION_RULES = [
 // ═══════════════════════════════════════
 
 export default function ClassificationSettings() {
-  const TENANT_ID = useTenantId();
   const [, navigate] = useLocation();
 
 
   // Fetch current settings
-  const settingsQ = trpc.crm.classification.getSettings.useQuery({ tenantId: TENANT_ID });
+  const settingsQ = trpc.crm.classification.getSettings.useQuery();
 
   // Local form state
   const [inactivityDays, setInactivityDays] = useState(360);
@@ -186,7 +184,6 @@ export default function ClassificationSettings() {
 
   const handleSave = () => {
     saveMutation.mutate({
-      tenantId: TENANT_ID,
       inactivityDays,
       referralWindowDays,
       autoClassifyOnMove,
@@ -225,7 +222,7 @@ export default function ClassificationSettings() {
         <div className="flex items-center gap-3">
           <Button
             variant="outline"
-            onClick={() => processInactiveMutation.mutate({ tenantId: TENANT_ID, inactivityDays })}
+            onClick={() => processInactiveMutation.mutate({ inactivityDays })}
             disabled={processInactiveMutation.isPending}
             className="rounded-xl"
           >

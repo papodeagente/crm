@@ -2,7 +2,6 @@ import { useState, useMemo } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
-import { useTenantId } from "@/hooks/useTenantId";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,6 +20,7 @@ import {
   FolderOpen, MoreHorizontal, ChevronDown, Building2,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useTenantId } from "@/hooks/useTenantId";
 
 /* ─── Types ─── */
 interface CatalogProduct {
@@ -55,10 +55,9 @@ function formatCurrency(cents: number): string {
 
 /* ─── Category Manager Dialog ─── */
 function CategoryManagerDialog({
-  open, onClose, tenantId,
-}: { open: boolean; onClose: () => void; tenantId: number }) {
+  open, onClose, }: { open: boolean; onClose: () => void; tenantId: number }) {
   const utils = trpc.useUtils();
-  const categoriesQ = trpc.productCatalog.categories.list.useQuery({ tenantId });
+  const categoriesQ = trpc.productCatalog.categories.list.useQuery();
   const createCat = trpc.productCatalog.categories.create.useMutation({
     onSuccess: () => { utils.productCatalog.categories.list.invalidate(); toast.success("Categoria criada"); },
   });
@@ -89,7 +88,7 @@ function CategoryManagerDialog({
               className="flex-1"
               onKeyDown={(e) => {
                 if (e.key === "Enter" && newName.trim()) {
-                  createCat.mutate({ tenantId, name: newName.trim(), color: newColor });
+                  createCat.mutate({ name: newName.trim(), color: newColor });
                   setNewName("");
                 }
               }}
@@ -98,7 +97,7 @@ function CategoryManagerDialog({
               size="sm"
               disabled={!newName.trim() || createCat.isPending}
               onClick={() => {
-                createCat.mutate({ tenantId, name: newName.trim(), color: newColor });
+                createCat.mutate({ name: newName.trim(), color: newColor });
                 setNewName("");
               }}
             >
@@ -128,7 +127,7 @@ function CategoryManagerDialog({
                   className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
                   onClick={() => {
                     if (confirm(`Excluir categoria "${cat.name}"?`)) {
-                      deleteCat.mutate({ tenantId, id: cat.id });
+                      deleteCat.mutate({ id: cat.id });
                     }
                   }}
                 >
@@ -151,7 +150,7 @@ function CategoryManagerDialog({
 
 /* ─── Product Form Dialog ─── */
 function ProductFormDialog({
-  open, onClose, tenantId, product, categories,
+  open, onClose, product, categories,
 }: {
   open: boolean; onClose: () => void; tenantId: number;
   product: CatalogProduct | null; categories: ProductCategory[];
@@ -193,9 +192,7 @@ function ProductFormDialog({
 
   function handleSubmit() {
     if (!form.name.trim()) { toast.error("Nome é obrigatório"); return; }
-    const data = {
-      tenantId,
-      name: form.name.trim(),
+    const data = { name: form.name.trim(),
       description: form.description || undefined,
       productType: form.productType as any,
       categoryId: form.categoryId ? Number(form.categoryId) : null,
@@ -482,9 +479,9 @@ function ProductRow({
 
 /* ─── Main Page ─── */
 export default function ProductCatalogPage() {
+  const tenantId = useTenantId();
   const [, setLocation] = useLocation();
   const { user } = useAuth();
-  const tenantId = useTenantId();
   const utils = trpc.useUtils();
 
   // State
@@ -498,15 +495,13 @@ export default function ProductCatalogPage() {
   const [showCategoryManager, setShowCategoryManager] = useState(false);
 
   // Queries
-  const productsQ = trpc.productCatalog.products.list.useQuery({
-    tenantId,
-    search: search || undefined,
+  const productsQ = trpc.productCatalog.products.list.useQuery({ search: search || undefined,
     productType: filterType !== "all" ? filterType : undefined,
     categoryId: filterCategory !== "all" ? Number(filterCategory) : undefined,
     isActive: filterActive === "active" ? true : filterActive === "inactive" ? false : undefined,
   });
-  const categoriesQ = trpc.productCatalog.categories.list.useQuery({ tenantId });
-  const countQ = trpc.productCatalog.products.count.useQuery({ tenantId });
+  const categoriesQ = trpc.productCatalog.categories.list.useQuery();
+  const countQ = trpc.productCatalog.products.count.useQuery({});
 
   // Mutations
   const toggleProduct = trpc.productCatalog.products.update.useMutation({
@@ -684,10 +679,10 @@ export default function ProductCatalogPage() {
               product={product}
               categories={categories}
               onEdit={() => { setEditingProduct(product); setShowProductForm(true); }}
-              onToggle={() => toggleProduct.mutate({ tenantId, id: product.id, isActive: !Boolean(product.isActive) })}
+              onToggle={() => toggleProduct.mutate({ id: product.id, isActive: !Boolean(product.isActive) })}
               onDelete={() => {
                 if (confirm(`Excluir "${product.name}"?`)) {
-                  deleteProduct.mutate({ tenantId, id: product.id });
+                  deleteProduct.mutate({ id: product.id });
                 }
               }}
             />
@@ -714,10 +709,10 @@ export default function ProductCatalogPage() {
                   product={product}
                   categories={categories}
                   onEdit={() => { setEditingProduct(product); setShowProductForm(true); }}
-                  onToggle={() => toggleProduct.mutate({ tenantId, id: product.id, isActive: !Boolean(product.isActive) })}
+                  onToggle={() => toggleProduct.mutate({ id: product.id, isActive: !Boolean(product.isActive) })}
                   onDelete={() => {
                     if (confirm(`Excluir "${product.name}"?`)) {
-                      deleteProduct.mutate({ tenantId, id: product.id });
+                      deleteProduct.mutate({ id: product.id });
                     }
                   }}
                 />

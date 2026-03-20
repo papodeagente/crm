@@ -58,9 +58,6 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { useLocation } from "wouter";
-import { useTenantId } from "@/hooks/useTenantId";
-
-
 // ─── Types ───
 type Tab = "agents" | "teams" | "rules";
 
@@ -153,7 +150,6 @@ function AgentAvatar({ name, avatarUrl, size = 40 }: { name: string; avatarUrl?:
 // ════════════════════════════════════════════════════════════
 
 function AgentsTab() {
-  const TENANT_ID = useTenantId();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [showInvite, setShowInvite] = useState(false);
@@ -169,7 +165,7 @@ function AgentsTab() {
   const currentUserId = saasMe.data?.userId;
   const isCurrentAdmin = currentUserRole === "admin";
 
-  const { data: agents = [], isLoading } = trpc.teamManagement.listAgents.useQuery({ tenantId: TENANT_ID });
+  const { data: agents = [], isLoading } = trpc.teamManagement.listAgents.useQuery();
 
   const updateStatus = trpc.teamManagement.updateAgentStatus.useMutation({
     onSuccess: () => {
@@ -332,7 +328,6 @@ function AgentsTab() {
             <Button
               disabled={!inviteName.trim() || !inviteEmail.trim() || inviteAgent.isPending}
               onClick={() => inviteAgent.mutate({
-                tenantId: TENANT_ID,
                 name: inviteName,
                 email: inviteEmail,
                 phone: invitePhone || undefined,
@@ -392,7 +387,7 @@ function AgentsTab() {
                       {isCurrentAdmin && !isSelf ? (
                         <Select
                           value={agent.role || "user"}
-                          onValueChange={(newRole) => updateRole.mutate({ tenantId: TENANT_ID, userId: agent.id, role: newRole as "admin" | "user" })}
+                          onValueChange={(newRole) => updateRole.mutate({ userId: agent.id, role: newRole as "admin" | "user" })}
                         >
                           <SelectTrigger className="h-6 w-[140px] rounded-full text-[10px] font-medium border-border/40 bg-transparent hover:bg-muted/30 transition-colors px-2 py-0 gap-1 [&>svg]:h-3 [&>svg]:w-3 [&>span]:flex [&>span]:items-center [&>span]:gap-1">
                             <SelectValue />
@@ -468,12 +463,12 @@ function AgentsTab() {
                         {!isSelf && (
                           <>
                             {agent.role !== "admin" && (
-                              <DropdownMenuItem onClick={() => updateRole.mutate({ tenantId: TENANT_ID, userId: agent.id, role: "admin" })}>
+                              <DropdownMenuItem onClick={() => updateRole.mutate({ userId: agent.id, role: "admin" })}>
                                 <Crown className="h-4 w-4 mr-2 text-amber-500" /> Tornar Administrador
                               </DropdownMenuItem>
                             )}
                             {agent.role === "admin" && (
-                              <DropdownMenuItem onClick={() => updateRole.mutate({ tenantId: TENANT_ID, userId: agent.id, role: "user" })}>
+                              <DropdownMenuItem onClick={() => updateRole.mutate({ userId: agent.id, role: "user" })}>
                                 <Shield className="h-4 w-4 mr-2" /> Tornar Usuário
                               </DropdownMenuItem>
                             )}
@@ -482,12 +477,12 @@ function AgentsTab() {
                         )}
                         {/* Status management */}
                         {agent.status !== "active" && (
-                          <DropdownMenuItem onClick={() => updateStatus.mutate({ tenantId: TENANT_ID, userId: agent.id, status: "active" })}>
+                          <DropdownMenuItem onClick={() => updateStatus.mutate({ userId: agent.id, status: "active" })}>
                             <UserCheck className="h-4 w-4 mr-2" /> Ativar
                           </DropdownMenuItem>
                         )}
                         {agent.status === "active" && !isSelf && (
-                          <DropdownMenuItem onClick={() => updateStatus.mutate({ tenantId: TENANT_ID, userId: agent.id, status: "inactive" })}>
+                          <DropdownMenuItem onClick={() => updateStatus.mutate({ userId: agent.id, status: "inactive" })}>
                             <UserX className="h-4 w-4 mr-2" /> Desativar
                           </DropdownMenuItem>
                         )}
@@ -509,7 +504,6 @@ function AgentsTab() {
 // ════════════════════════════════════════════════════════════
 
 function TeamsTab() {
-  const TENANT_ID = useTenantId();
   const [showCreate, setShowCreate] = useState(false);
   const [editTeam, setEditTeam] = useState<TeamData | null>(null);
   const [selectedTeamId, setSelectedTeamId] = useState<number | null>(null);
@@ -517,10 +511,10 @@ function TeamsTab() {
   const [newTeam, setNewTeam] = useState({ name: "", description: "", color: "#6366f1" });
   const utils = trpc.useUtils();
 
-  const { data: teamsList = [], isLoading } = trpc.teamManagement.listTeams.useQuery({ tenantId: TENANT_ID });
-  const { data: agents = [] } = trpc.teamManagement.listAgents.useQuery({ tenantId: TENANT_ID });
+  const { data: teamsList = [], isLoading } = trpc.teamManagement.listTeams.useQuery();
+  const { data: agents = [] } = trpc.teamManagement.listAgents.useQuery();
   const { data: selectedTeam } = trpc.teamManagement.getTeam.useQuery(
-    { tenantId: TENANT_ID, teamId: selectedTeamId! },
+    { teamId: selectedTeamId! },
     { enabled: !!selectedTeamId }
   );
 
@@ -537,7 +531,7 @@ function TeamsTab() {
   const updateTeamMut = trpc.teamManagement.updateTeam.useMutation({
     onSuccess: () => {
       utils.teamManagement.listTeams.invalidate();
-      if (selectedTeamId) utils.teamManagement.getTeam.invalidate({ tenantId: TENANT_ID, teamId: selectedTeamId });
+      if (selectedTeamId) utils.teamManagement.getTeam.invalidate({ teamId: selectedTeamId });
       setEditTeam(null);
       toast.success("Equipe atualizada");
     },
@@ -560,7 +554,7 @@ function TeamsTab() {
       } else {
         toast.success("Membro adicionado");
       }
-      utils.teamManagement.getTeam.invalidate({ tenantId: TENANT_ID, teamId: selectedTeamId! });
+      utils.teamManagement.getTeam.invalidate({ teamId: selectedTeamId! });
       utils.teamManagement.listAgents.invalidate();
       setShowAddMember(false);
     },
@@ -569,7 +563,7 @@ function TeamsTab() {
 
   const removeMemberMut = trpc.teamManagement.removeMember.useMutation({
     onSuccess: () => {
-      utils.teamManagement.getTeam.invalidate({ tenantId: TENANT_ID, teamId: selectedTeamId! });
+      utils.teamManagement.getTeam.invalidate({ teamId: selectedTeamId! });
       utils.teamManagement.listAgents.invalidate();
       toast.success("Membro removido");
     },
@@ -578,7 +572,7 @@ function TeamsTab() {
 
   const updateRoleMut = trpc.teamManagement.updateMemberRole.useMutation({
     onSuccess: () => {
-      utils.teamManagement.getTeam.invalidate({ tenantId: TENANT_ID, teamId: selectedTeamId! });
+      utils.teamManagement.getTeam.invalidate({ teamId: selectedTeamId! });
       toast.success("Papel atualizado");
     },
     onError: () => toast.error("Erro ao atualizar papel"),
@@ -609,7 +603,7 @@ function TeamsTab() {
           </Button>
           <Button variant="outline" size="sm" className="text-destructive" onClick={() => {
             if (confirm("Tem certeza que deseja excluir esta equipe?")) {
-              deleteTeamMut.mutate({ tenantId: TENANT_ID, id: selectedTeamId });
+              deleteTeamMut.mutate({ id: selectedTeamId });
             }
           }}>
             <Trash2 className="h-3.5 w-3.5 mr-1.5" /> Excluir
@@ -653,16 +647,16 @@ function TeamsTab() {
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
                     {m.role === "member" ? (
-                      <DropdownMenuItem onClick={() => updateRoleMut.mutate({ tenantId: TENANT_ID, teamId: selectedTeamId, userId: m.userId, role: "leader" })}>
+                      <DropdownMenuItem onClick={() => updateRoleMut.mutate({ teamId: selectedTeamId, userId: m.userId, role: "leader" })}>
                         <Crown className="h-4 w-4 mr-2" /> Promover a Líder
                       </DropdownMenuItem>
                     ) : (
-                      <DropdownMenuItem onClick={() => updateRoleMut.mutate({ tenantId: TENANT_ID, teamId: selectedTeamId, userId: m.userId, role: "member" })}>
+                      <DropdownMenuItem onClick={() => updateRoleMut.mutate({ teamId: selectedTeamId, userId: m.userId, role: "member" })}>
                         <Users className="h-4 w-4 mr-2" /> Rebaixar a Membro
                       </DropdownMenuItem>
                     )}
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem className="text-destructive" onClick={() => removeMemberMut.mutate({ tenantId: TENANT_ID, teamId: selectedTeamId, userId: m.userId })}>
+                    <DropdownMenuItem className="text-destructive" onClick={() => removeMemberMut.mutate({ teamId: selectedTeamId, userId: m.userId })}>
                       <Trash2 className="h-4 w-4 mr-2" /> Remover
                     </DropdownMenuItem>
                   </DropdownMenuContent>
@@ -687,7 +681,7 @@ function TeamsTab() {
                   <button
                     key={a.id}
                     className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-accent/10 transition-colors text-left"
-                    onClick={() => addMemberMut.mutate({ tenantId: TENANT_ID, teamId: selectedTeamId, userId: a.id })}
+                    onClick={() => addMemberMut.mutate({ teamId: selectedTeamId, userId: a.id })}
                   >
                     <AgentAvatar name={a.name} avatarUrl={a.avatarUrl} size={32} />
                     <div className="flex-1 min-w-0">
@@ -734,7 +728,6 @@ function TeamsTab() {
                 <DialogFooter>
                   <Button variant="outline" onClick={() => setEditTeam(null)}>Cancelar</Button>
                   <Button onClick={() => updateTeamMut.mutate({
-                    tenantId: TENANT_ID,
                     id: editTeam.id,
                     name: editTeam.name,
                     description: editTeam.description || undefined,
@@ -834,7 +827,7 @@ function TeamsTab() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowCreate(false)}>Cancelar</Button>
-            <Button disabled={!newTeam.name.trim()} onClick={() => createTeamMut.mutate({ tenantId: TENANT_ID, ...newTeam })}>
+            <Button disabled={!newTeam.name.trim()} onClick={() => createTeamMut.mutate({ ...newTeam })}>
               Criar Equipe
             </Button>
           </DialogFooter>
@@ -849,7 +842,6 @@ function TeamsTab() {
 // ════════════════════════════════════════════════════════════
 
 function DistributionTab() {
-  const TENANT_ID = useTenantId();
   const [showCreate, setShowCreate] = useState(false);
   const [editRule, setEditRule] = useState<Rule | null>(null);
   const [newRule, setNewRule] = useState({
@@ -863,8 +855,8 @@ function DistributionTab() {
   });
   const utils = trpc.useUtils();
 
-  const { data: rules = [], isLoading } = trpc.teamManagement.listRules.useQuery({ tenantId: TENANT_ID });
-  const { data: teamsList = [] } = trpc.teamManagement.listTeams.useQuery({ tenantId: TENANT_ID });
+  const { data: rules = [], isLoading } = trpc.teamManagement.listRules.useQuery();
+  const { data: teamsList = [] } = trpc.teamManagement.listTeams.useQuery();
 
   const createRuleMut = trpc.teamManagement.createRule.useMutation({
     onSuccess: () => {
@@ -1063,7 +1055,7 @@ function DistributionTab() {
                   <div className="flex items-center gap-2 shrink-0">
                     <Switch
                       checked={rule.isActive}
-                      onCheckedChange={v => toggleRuleMut.mutate({ tenantId: TENANT_ID, id: rule.id, isActive: v })}
+                      onCheckedChange={v => toggleRuleMut.mutate({ id: rule.id, isActive: v })}
                     />
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
@@ -1077,7 +1069,7 @@ function DistributionTab() {
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem className="text-destructive" onClick={() => {
-                          if (confirm("Excluir esta regra?")) deleteRuleMut.mutate({ tenantId: TENANT_ID, id: rule.id });
+                          if (confirm("Excluir esta regra?")) deleteRuleMut.mutate({ id: rule.id });
                         }}>
                           <Trash2 className="h-4 w-4 mr-2" /> Excluir
                         </DropdownMenuItem>
@@ -1102,7 +1094,6 @@ function DistributionTab() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowCreate(false)}>Cancelar</Button>
             <Button disabled={!newRule.name.trim()} onClick={() => createRuleMut.mutate({
-              tenantId: TENANT_ID,
               name: newRule.name,
               description: newRule.description || undefined,
               strategy: newRule.strategy as any,
@@ -1141,7 +1132,6 @@ function DistributionTab() {
               <DialogFooter>
                 <Button variant="outline" onClick={() => setEditRule(null)}>Cancelar</Button>
                 <Button onClick={() => updateRuleMut.mutate({
-                  tenantId: TENANT_ID,
                   id: editRule.id,
                   name: editRule.name,
                   description: editRule.description || undefined,
@@ -1172,7 +1162,6 @@ function DistributionTab() {
 // ════════════════════════════════════════════════════════════
 
 export default function AgentManagement() {
-  const TENANT_ID = useTenantId();
   const [tab, setTab] = useState<Tab>("agents");
   const [, setLocation] = useLocation();
 

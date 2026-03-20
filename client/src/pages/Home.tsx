@@ -1,7 +1,6 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import { useState, useMemo, useEffect } from "react";
-import { useTenantId } from "@/hooks/useTenantId";
 import {
   Briefcase, Users, Plane, CheckSquare, MessageSquare,
   TrendingUp, ArrowUpRight, ArrowDownRight, Clock,
@@ -417,40 +416,36 @@ function ConversionDonut({ rate, won, lost, open }: { rate: number; won: number;
 /* ─── Main Dashboard ─── */
 export default function Home() {
   const { user } = useAuth();
-  const tenantId = useTenantId();
-
   const [dealStatus, setDealStatus] = useState<'open' | 'won' | 'lost' | 'all'>('open');
 
   // Load user's default pipeline preference
   const defaultPipelinePref = trpc.preferences.get.useQuery(
-    { tenantId, key: "default_pipeline_id" },
-    { enabled: !!tenantId }
+    { key: "default_pipeline_id" },
+    { enabled: true }
   );
   const defaultPipelineId = defaultPipelinePref.data?.value ? Number(defaultPipelinePref.data.value) : undefined;
 
   // All queries with refetchInterval for real-time sync
   const metricsQ = trpc.dashboard.metrics.useQuery(
-    { tenantId, pipelineId: defaultPipelineId, dealStatus },
+    { pipelineId: defaultPipelineId, dealStatus },
     { refetchInterval: REFETCH_INTERVAL }
   );
   const pipelineQ = trpc.dashboard.pipelineSummary.useQuery(
-    { tenantId, pipelineId: defaultPipelineId, dealStatus },
+    { pipelineId: defaultPipelineId, dealStatus },
     { refetchInterval: REFETCH_INTERVAL }
   );
   const tasksQ = trpc.dashboard.upcomingTasks.useQuery(
-    { tenantId, limit: 6 },
+    { limit: 6 },
     { refetchInterval: REFETCH_INTERVAL }
   );
-  const waMetricsQ = trpc.dashboard.whatsappMetrics.useQuery(
-    { tenantId },
+  const waMetricsQ = trpc.dashboard.whatsappMetrics.useQuery(undefined,
     { refetchInterval: REFETCH_INTERVAL }
   );
-  const conversionQ = trpc.dashboard.conversionRates.useQuery(
-    { tenantId },
+  const conversionQ = trpc.dashboard.conversionRates.useQuery(undefined,
     { refetchInterval: REFETCH_INTERVAL }
   );
   const funnelQ = trpc.dashboard.funnelData.useQuery(
-    { tenantId, pipelineId: defaultPipelineId },
+    { pipelineId: defaultPipelineId },
     { refetchInterval: REFETCH_INTERVAL }
   );
 

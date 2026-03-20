@@ -14,10 +14,10 @@ import data from "@emoji-mart/data";
 
 import { formatTime, SYSTEM_TIMEZONE, SYSTEM_LOCALE } from "../../../shared/dateUtils";
 import TransferDialog from "./TransferDialog";
-import { useTenantId } from "@/hooks/useTenantId";
 import InstantTooltip from "@/components/InstantTooltip";
 import AiSuggestionPanel from "@/components/AiSuggestionPanel";
 import RichMessageRenderer, { isRichMessageType } from "@/components/RichMessageRenderer";
+import { useTenantId } from "@/hooks/useTenantId";
 
 /* ─── Types ─── */
 interface Message {
@@ -1239,6 +1239,7 @@ function EditMessageModal({ currentText, onSave, onClose }: { currentText: strin
    ═══════════════════════════════════════════════════════ */
 
 export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDeal, onCreateContact, hasCrmContact, assignment, agents, onAssign, onStatusChange, myAvatarUrl, waConversationId, onOptimisticSend }: WhatsAppChatProps) {
+  const tenantId = useTenantId();
   const [showAgentDropdown, setShowAgentDropdown] = useState(false);
   const { lastMessage, lastStatusUpdate, lastMediaUpdate, lastConversationUpdate, lastTranscriptionUpdate, lastReaction, isConnected: socketConnected } = useSocket();
   const [messageText, setMessageText] = useState("");
@@ -1267,7 +1268,6 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
   const [quickReplyFilter, setQuickReplyFilter] = useState("");
   const [showAiSuggestion, setShowAiSuggestion] = useState(false);
   const [transcriptions, setTranscriptions] = useState<Record<number, { text?: string; loading?: boolean; error?: string }>>({});
-  const tenantId = useTenantId();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -1316,8 +1316,7 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
   );
 
   // Quick replies
-  const quickRepliesQ = trpc.whatsapp.quickReplies.list.useQuery(
-    {},
+  const quickRepliesQ = trpc.whatsapp.quickReplies.list.useQuery({},
     { staleTime: 5 * 60 * 1000 }
   );
   const filteredQuickReplies = useMemo(() => {
@@ -1340,9 +1339,8 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
   });
 
   // AI Settings query (for auto-transcription)
-  const aiSettingsQ = trpc.ai.getSettings.useQuery(
-    { tenantId: tenantId || 0 },
-    { enabled: !!tenantId, staleTime: 60000 }
+  const aiSettingsQ = trpc.ai.getSettings.useQuery(undefined,
+    { enabled: true, staleTime: 60000 }
   );
 
   // Messages query — load only last 50 messages for fast opening; older messages load on scroll up
@@ -1405,10 +1403,9 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
   const transcribeMut = trpc.ai.transcribe.useMutation();
 
   const handleTranscribe = useCallback((msgId: number, audioUrl: string) => {
-    if (!tenantId) return;
     setTranscriptions(prev => ({ ...prev, [msgId]: { loading: true } }));
     transcribeMut.mutate(
-      { tenantId, audioUrl },
+      { audioUrl },
       {
         onSuccess: (data) => {
           setTranscriptions(prev => ({ ...prev, [msgId]: { text: data.text } }));
@@ -1422,17 +1419,16 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
         },
       }
     );
-  }, [tenantId, transcribeMut]);
+  }, [transcribeMut]);
 
   const utils = trpc.useUtils();
 
   // Retranscribe via BullMQ worker (for retry button and auto-transcribe)
   const retranscribeMut = trpc.ai.retranscribeAudio.useMutation();
   const handleRetranscribe = useCallback((msgId: number) => {
-    if (!tenantId) return;
     setTranscriptions(prev => ({ ...prev, [msgId]: { loading: true } }));
     retranscribeMut.mutate(
-      { tenantId, messageId: msgId },
+      { messageId: msgId },
       {
         onSuccess: () => {
           // Worker will process async and emit socket event — poll for result
@@ -1446,7 +1442,7 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
         },
       }
     );
-  }, [tenantId, retranscribeMut, utils]);
+  }, [retranscribeMut, utils]);
 
   // Auto-transcribe new audio messages
   const autoTranscribedRef = useRef<Set<number>>(new Set());
@@ -1463,7 +1459,7 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
         handleRetranscribe(m.id);
       }
     }
-  }, [messagesQ.data, aiSettingsQ.data?.audioTranscriptionEnabled, tenantId, handleRetranscribe, transcriptions]);
+  }, [messagesQ.data, aiSettingsQ.data?.audioTranscriptionEnabled, handleRetranscribe, transcriptions]);
 
   // Part 2: Optimistic update helper with unique clientMessageId
   // Each optimistic message gets a unique ID so we can match it precisely on server confirm
