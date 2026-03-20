@@ -2012,7 +2012,7 @@ function ProductsPanel({ products, dealId, onRefresh }: { products: any[]; dealI
 
   // --- Criar produto inline ---
   const [showCreateProduct, setShowCreateProduct] = useState(false);
-  const [newProduct, setNewProduct] = useState({ name: "", basePriceCents: 0, productType: "other" as string, supplier: "", categoryId: null as number | null });
+  const [newProduct, setNewProduct] = useState({ name: "", basePriceCents: 0, costPriceCents: 0, supplier: "" });
   const [showCreateCategory, setShowCreateCategory] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState("");
 
@@ -2025,18 +2025,17 @@ function ProductsPanel({ products, dealId, onRefresh }: { products: any[]; dealI
       toast.success(`Produto "${newProduct.name}" criado no catálogo`);
       catalogQ.refetch();
       // Auto-selecionar o produto reciém-criado
-      handleSelectCatalogProduct({ ...newProd, basePriceCents: newProduct.basePriceCents, productType: newProduct.productType, supplier: newProduct.supplier, name: newProduct.name });
+      handleSelectCatalogProduct({ ...newProd, basePriceCents: newProduct.basePriceCents, productType: "other", supplier: newProduct.supplier, name: newProduct.name });
       setShowCreateProduct(false);
-      setNewProduct({ name: "", basePriceCents: 0, productType: "other", supplier: "", categoryId: null });
+      setNewProduct({ name: "", basePriceCents: 0, costPriceCents: 0, supplier: "" });
     },
     onError: (e: any) => toast.error(e.message || "Erro ao criar produto"),
   });
 
   const createCategory = trpc.productCatalog.categories.create.useMutation({
-    onSuccess: (cat: any) => {
+    onSuccess: () => {
       toast.success(`Categoria "${newCategoryName}" criada`);
       categoriesQ.refetch();
-      setNewProduct({ ...newProduct, categoryId: cat?.id || null });
       setShowCreateCategory(false);
       setNewCategoryName("");
     },
@@ -2176,7 +2175,7 @@ function ProductsPanel({ products, dealId, onRefresh }: { products: any[]; dealI
                 />
               </div>
               {/* Botão Criar Novo Produto */}
-              <Button variant="outline" size="sm" className="w-full border-dashed" onClick={() => { setShowCreateProduct(true); setNewProduct({ name: searchTerm || "", basePriceCents: 0, productType: "other", supplier: "", categoryId: null }); }}>
+              <Button variant="outline" size="sm" className="w-full border-dashed" onClick={() => { setShowCreateProduct(true); setNewProduct({ name: searchTerm || "", basePriceCents: 0, costPriceCents: 0, supplier: "" }); }}>
                 <Plus className="h-3.5 w-3.5 mr-1" /> Criar Novo Produto
               </Button>
               <div className="flex-1 overflow-y-auto space-y-1 max-h-[400px] pr-1">
@@ -2294,54 +2293,34 @@ function ProductsPanel({ products, dealId, onRefresh }: { products: any[]; dealI
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-xs font-medium text-muted-foreground">Tipo</label>
-                <Select value={newProduct.productType} onValueChange={(v) => setNewProduct({ ...newProduct, productType: v })}>
-                  <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {Object.entries(categoryLabels).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                <label className="text-xs font-medium text-muted-foreground">Preço base (R$)</label>
+                <Input type="number" step="0.01" min="0" value={newProduct.basePriceCents / 100 || ""} onChange={(e) => setNewProduct({ ...newProduct, basePriceCents: Math.round(parseFloat(e.target.value || "0") * 100) })} placeholder="0,00" />
               </div>
               <div>
-                <label className="text-xs font-medium text-muted-foreground">Preço base (R$)</label>
-                <Input type="number" step="0.01" value={newProduct.basePriceCents / 100 || ""} onChange={(e) => setNewProduct({ ...newProduct, basePriceCents: Math.round(parseFloat(e.target.value || "0") * 100) })} />
+                <label className="text-xs font-medium text-muted-foreground">Preço de custo (R$)</label>
+                <Input type="number" step="0.01" min="0" value={newProduct.costPriceCents / 100 || ""} onChange={(e) => setNewProduct({ ...newProduct, costPriceCents: Math.round(parseFloat(e.target.value || "0") * 100) })} placeholder="0,00" />
               </div>
             </div>
+            {/* Auto margin */}
+            {newProduct.basePriceCents > 0 && newProduct.costPriceCents > 0 && (() => {
+              const margin = ((newProduct.basePriceCents - newProduct.costPriceCents) / newProduct.costPriceCents) * 100;
+              return (
+                <div className={`text-xs px-3 py-1.5 rounded-md ${margin >= 0 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}`}>
+                  Margem: {margin >= 0 ? '+' : ''}{margin.toFixed(1)}%
+                  <span className="ml-2 text-muted-foreground">
+                    (Lucro: R$ {((newProduct.basePriceCents - newProduct.costPriceCents) / 100).toFixed(2)})
+                  </span>
+                </div>
+              );
+            })()}
             <div>
               <label className="text-xs font-medium text-muted-foreground">Fornecedor (opcional)</label>
               <Input value={newProduct.supplier} onChange={(e) => setNewProduct({ ...newProduct, supplier: e.target.value })} placeholder="Ex: CVC, Decolar" />
             </div>
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="text-xs font-medium text-muted-foreground">Categoria</label>
-                <button onClick={() => setShowCreateCategory(true)} className="text-[11px] text-primary hover:underline flex items-center gap-0.5"><Plus className="h-3 w-3" /> Nova Categoria</button>
-              </div>
-              <Select value={newProduct.categoryId ? String(newProduct.categoryId) : "none"} onValueChange={(v) => setNewProduct({ ...newProduct, categoryId: v === "none" ? null : Number(v) })}>
-                <SelectTrigger className="h-9"><SelectValue placeholder="Sem categoria" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Sem categoria</SelectItem>
-                  {(categoriesQ.data || []).map((c: any) => <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            {showCreateCategory && (
-              <div className="p-3 bg-muted/30 rounded-lg border border-dashed border-primary/30 space-y-2">
-                <label className="text-xs font-medium text-primary">Nova Categoria</label>
-                <div className="flex gap-2">
-                  <Input value={newCategoryName} onChange={(e) => setNewCategoryName(e.target.value)} placeholder="Nome da categoria" className="h-8 text-sm" autoFocus />
-                  <Button size="sm" className="h-8 px-3" disabled={!newCategoryName.trim() || createCategory.isPending} onClick={() => createCategory.mutate({ name: newCategoryName.trim() })}>
-                    {createCategory.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : "Criar"}
-                  </Button>
-                  <Button size="sm" variant="ghost" className="h-8 px-2" onClick={() => { setShowCreateCategory(false); setNewCategoryName(""); }}>
-                    <X className="h-3 w-3" />
-                  </Button>
-                </div>
-              </div>
-            )}
           </div>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setShowCreateProduct(false)}>Cancelar</Button>
-            <Button disabled={!newProduct.name.trim() || createCatalogProduct.isPending} onClick={() => createCatalogProduct.mutate({ name: newProduct.name.trim(), basePriceCents: newProduct.basePriceCents, productType: newProduct.productType as any, supplier: newProduct.supplier || undefined, categoryId: newProduct.categoryId })}>
+            <Button disabled={!newProduct.name.trim() || createCatalogProduct.isPending} onClick={() => createCatalogProduct.mutate({ name: newProduct.name.trim(), basePriceCents: newProduct.basePriceCents, costPriceCents: newProduct.costPriceCents || null, supplier: newProduct.supplier || undefined })}>
               {createCatalogProduct.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Plus className="h-4 w-4 mr-1" />}
               Criar e Selecionar
             </Button>

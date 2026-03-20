@@ -75,9 +75,9 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
         name: z.string().min(1).max(255),
         description: z.string().optional(),
         categoryId: z.number().nullable().optional(),
-        productType: productTypeEnum.optional(),
+        productType: productTypeEnum.default("other"),
         basePriceCents: z.number().default(0),
-        costPriceCents: z.number().optional(),
+        costPriceCents: z.number().nullable().optional(),
         currency: z.string().max(3).optional(),
         supplier: z.string().max(255).optional(),
         destination: z.string().max(255).optional(),
@@ -88,8 +88,13 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
         detailsJson: z.any().optional(),
       }))
       .mutation(async ({ input, ctx }) => {
-        const { categoryId, ...rest } = input;
-        return crm.createCatalogProduct({ ...rest, tenantId: getTenantId(ctx), categoryId: categoryId ?? undefined });
+        const { categoryId, costPriceCents, ...rest } = input;
+        return crm.createCatalogProduct({
+          ...rest,
+          tenantId: getTenantId(ctx),
+          categoryId: categoryId ?? undefined,
+          costPriceCents: costPriceCents ?? undefined,
+        });
       }),
     update: tenantProcedure
       .input(z.object({

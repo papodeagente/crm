@@ -4369,3 +4369,14 @@
 - [x] Preservar opções existentes (usuário específico e aleatória)
 - [x] Testes vitest para validar as 3 opções de distribuição (7 testes passando)
 - [x] Nenhuma outra área do sistema alterada (57 testes totais passando)
+
+## Simplificação do Cadastro de Produtos
+- [x] Diagnosticar causa raiz do erro ao criar produtos
+- [x] Backend: tornar apenas nome obrigatório na criação de produto
+- [x] Backend: permitir preço zero sem erro
+- [x] Frontend: reduzir formulário a 5 campos (nome, descrição, preço base, preço custo, fornecedor)
+- [x] Frontend: remover campos tipo, categoria, destino, duração, SKU
+- [x] Frontend: calcular margem automática quando preço base e custo preenchidos
+- [x] Validar separação preço padrão do produto vs preço editado na negociação
+- [x] Testes vitest para todos os cenários de criação (9 testes passando)
+- [x] Nenhuma outra área do sistema alterada

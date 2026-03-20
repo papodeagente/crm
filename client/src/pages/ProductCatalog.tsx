@@ -176,11 +176,12 @@ function ProductFormDialog({
   const [form, setForm] = useState({
     name: product?.name || "",
     description: product?.description || "",
-    productType: product?.productType || "other",
-    categoryId: product?.categoryId ? String(product.categoryId) : "",
     basePriceCents: product?.basePriceCents ? String(product.basePriceCents / 100) : "",
     costPriceCents: product?.costPriceCents ? String(product.costPriceCents / 100) : "",
     supplier: product?.supplier || "",
+    // Preserve existing values for edit mode (not shown in simplified create form)
+    productType: product?.productType || "other",
+    categoryId: product?.categoryId ? String(product.categoryId) : "",
     destination: product?.destination || "",
     duration: product?.duration || "",
     sku: product?.sku || "",
@@ -190,21 +191,28 @@ function ProductFormDialog({
   const isEditing = !!product;
   const isPending = createProduct.isPending || updateProduct.isPending;
 
+  // Auto margin calculation
+  const basePrice = Number(form.basePriceCents || 0);
+  const costPrice = Number(form.costPriceCents || 0);
+  const marginPercent = (basePrice > 0 && costPrice > 0) ? (((basePrice - costPrice) / costPrice) * 100) : null;
+
   function handleSubmit() {
     if (!form.name.trim()) { toast.error("Nome é obrigatório"); return; }
-    const data = { name: form.name.trim(),
+    const data: any = {
+      name: form.name.trim(),
       description: form.description || undefined,
-      productType: form.productType as any,
-      categoryId: form.categoryId ? Number(form.categoryId) : null,
       basePriceCents: Math.round(Number(form.basePriceCents || 0) * 100),
-      costPriceCents: form.costPriceCents ? Math.round(Number(form.costPriceCents) * 100) : undefined,
+      costPriceCents: form.costPriceCents ? Math.round(Number(form.costPriceCents) * 100) : null,
       supplier: form.supplier || undefined,
-      destination: form.destination || undefined,
-      duration: form.duration || undefined,
-      sku: form.sku || undefined,
-      isActive: form.isActive,
     };
     if (isEditing) {
+      // Preserve all existing fields on edit
+      data.productType = form.productType as any;
+      data.categoryId = form.categoryId ? Number(form.categoryId) : null;
+      data.destination = form.destination || undefined;
+      data.duration = form.duration || undefined;
+      data.sku = form.sku || undefined;
+      data.isActive = form.isActive;
       updateProduct.mutate({ ...data, id: product.id });
     } else {
       createProduct.mutate(data);
@@ -213,87 +221,103 @@ function ProductFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Package className="h-5 w-5 text-primary" />
             {isEditing ? "Editar Produto" : "Novo Produto"}
           </DialogTitle>
         </DialogHeader>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {/* Name */}
-          <div className="sm:col-span-2">
+        <div className="space-y-4">
+          {/* Name - only required field */}
+          <div>
             <Label>Nome do Produto *</Label>
-            <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Ex: Pacote Paris 7 noites" />
+            <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Ex: Pacote Paris 7 noites" autoFocus />
           </div>
           {/* Description */}
-          <div className="sm:col-span-2">
+          <div>
             <Label>Descrição</Label>
-            <Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Detalhes do produto..." rows={3} />
+            <Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Detalhes do produto (opcional)" rows={2} />
           </div>
-          {/* Type */}
-          <div>
-            <Label>Tipo</Label>
-            <Select value={form.productType} onValueChange={(v) => setForm({ ...form, productType: v })}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {Object.entries(PRODUCT_TYPES).map(([key, { label }]) => (
-                  <SelectItem key={key} value={key}>{label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          {/* Prices */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label>Preço Base (R$)</Label>
+              <Input type="number" step="0.01" min="0" value={form.basePriceCents} onChange={(e) => setForm({ ...form, basePriceCents: e.target.value })} placeholder="0,00" />
+            </div>
+            <div>
+              <Label>Preço de Custo (R$)</Label>
+              <Input type="number" step="0.01" min="0" value={form.costPriceCents} onChange={(e) => setForm({ ...form, costPriceCents: e.target.value })} placeholder="0,00" />
+            </div>
           </div>
-          {/* Category */}
-          <div>
-            <Label>Categoria</Label>
-            <Select value={form.categoryId} onValueChange={(v) => setForm({ ...form, categoryId: v })}>
-              <SelectTrigger><SelectValue placeholder="Selecionar..." /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">Sem categoria</SelectItem>
-                {categories.map((cat) => (
-                  <SelectItem key={cat.id} value={String(cat.id)}>{cat.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          {/* Base Price */}
-          <div>
-            <Label>Preço Base (R$)</Label>
-            <Input type="number" step="0.01" min="0" value={form.basePriceCents} onChange={(e) => setForm({ ...form, basePriceCents: e.target.value })} placeholder="0,00" />
-          </div>
-          {/* Cost Price */}
-          <div>
-            <Label>Preço de Custo (R$)</Label>
-            <Input type="number" step="0.01" min="0" value={form.costPriceCents} onChange={(e) => setForm({ ...form, costPriceCents: e.target.value })} placeholder="0,00" />
-          </div>
+          {/* Auto margin display */}
+          {marginPercent !== null && (
+            <div className={`text-xs px-3 py-1.5 rounded-md ${marginPercent >= 0 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}`}>
+              Margem: {marginPercent >= 0 ? '+' : ''}{marginPercent.toFixed(1)}%
+              {basePrice > 0 && costPrice > 0 && (
+                <span className="ml-2 text-muted-foreground">
+                  (Lucro: R$ {(basePrice - costPrice).toFixed(2)})
+                </span>
+              )}
+            </div>
+          )}
           {/* Supplier */}
           <div>
             <Label>Fornecedor</Label>
-            <Input value={form.supplier} onChange={(e) => setForm({ ...form, supplier: e.target.value })} placeholder="Nome do fornecedor" />
+            <Input value={form.supplier} onChange={(e) => setForm({ ...form, supplier: e.target.value })} placeholder="Nome do fornecedor (opcional)" />
           </div>
-          {/* Destination */}
-          <div>
-            <Label>Destino</Label>
-            <Input value={form.destination} onChange={(e) => setForm({ ...form, destination: e.target.value })} placeholder="Ex: Paris, França" />
-          </div>
-          {/* Duration */}
-          <div>
-            <Label>Duração</Label>
-            <Input value={form.duration} onChange={(e) => setForm({ ...form, duration: e.target.value })} placeholder="Ex: 7 noites" />
-          </div>
-          {/* SKU */}
-          <div>
-            <Label>SKU / Código</Label>
-            <Input value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} placeholder="Ex: PKG-PAR-001" />
-          </div>
-          {/* Active */}
-          <div className="sm:col-span-2 flex items-center justify-between px-3 py-2 rounded-lg bg-muted/50">
-            <div>
-              <p className="text-sm font-medium text-foreground">Produto Ativo</p>
-              <p className="text-xs text-muted-foreground">Produtos inativos não aparecem na seleção de negociações</p>
-            </div>
-            <Switch checked={form.isActive} onCheckedChange={(v) => setForm({ ...form, isActive: v })} />
-          </div>
+          {/* Additional fields only in edit mode */}
+          {isEditing && (
+            <>
+              <div className="border-t border-border pt-3">
+                <p className="text-xs text-muted-foreground mb-3">Campos adicionais</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label>Tipo</Label>
+                    <Select value={form.productType} onValueChange={(v) => setForm({ ...form, productType: v })}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {Object.entries(PRODUCT_TYPES).map(([key, { label }]) => (
+                          <SelectItem key={key} value={key}>{label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label>Categoria</Label>
+                    <Select value={form.categoryId} onValueChange={(v) => setForm({ ...form, categoryId: v })}>
+                      <SelectTrigger><SelectValue placeholder="Selecionar..." /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Sem categoria</SelectItem>
+                        {categories.map((cat) => (
+                          <SelectItem key={cat.id} value={String(cat.id)}>{cat.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label>Destino</Label>
+                    <Input value={form.destination} onChange={(e) => setForm({ ...form, destination: e.target.value })} placeholder="Ex: Paris, França" />
+                  </div>
+                  <div>
+                    <Label>Duração</Label>
+                    <Input value={form.duration} onChange={(e) => setForm({ ...form, duration: e.target.value })} placeholder="Ex: 7 noites" />
+                  </div>
+                  <div>
+                    <Label>SKU / Código</Label>
+                    <Input value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} placeholder="Ex: PKG-PAR-001" />
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-muted/50">
+                <div>
+                  <p className="text-sm font-medium text-foreground">Produto Ativo</p>
+                  <p className="text-xs text-muted-foreground">Produtos inativos não aparecem na seleção</p>
+                </div>
+                <Switch checked={form.isActive} onCheckedChange={(v) => setForm({ ...form, isActive: v })} />
+              </div>
+            </>
+          )}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancelar</Button>
