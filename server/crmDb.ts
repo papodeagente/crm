@@ -562,7 +562,12 @@ export async function listTasks(tenantId: number, opts?: { entityType?: string; 
   const [countResult] = await db.select({ count: sql<number>`COUNT(*)` }).from(tasks).where(whereClause);
   const total = Number(countResult?.count || 0);
   
-  let query = db.select().from(tasks).where(whereClause).orderBy(desc(tasks.dueAt));
+  // Ordenação: atrasadas primeiro (mais antiga primeiro), depois futuras (mais próxima primeiro)
+  let query = db.select().from(tasks).where(whereClause).orderBy(
+    sql`CASE WHEN ${tasks.status} IN ('done','cancelled') THEN 1 ELSE 0 END ASC`,
+    sql`CASE WHEN ${tasks.dueAt} < NOW() AND ${tasks.status} NOT IN ('done','cancelled') THEN 0 ELSE 1 END ASC`,
+    asc(tasks.dueAt)
+  );
   if (opts?.limit) query = query.limit(opts.limit) as any;
   if (opts?.offset) query = query.offset(opts.offset) as any;
   const taskList = await query;
@@ -1790,13 +1795,22 @@ export async function executeTaskAutomations(
       baseDate = new Date(now);
     }
     
-    // Aplicar offset em dias
+    // Aplicar offset conforme unidade (minutes, hours, days)
     const dueDate = new Date(baseDate);
-    dueDate.setDate(dueDate.getDate() + auto.deadlineOffsetDays);
+    const unit = (auto as any).deadlineOffsetUnit || "days";
+    const offsetValue = auto.deadlineOffsetDays;
     
-    // Aplicar horário
-    const [hours, minutes] = (auto.deadlineTime || "09:00").split(":").map(Number);
-    dueDate.setHours(hours || 9, minutes || 0, 0, 0);
+    if (unit === "minutes") {
+      dueDate.setMinutes(dueDate.getMinutes() + offsetValue);
+    } else if (unit === "hours") {
+      dueDate.setHours(dueDate.getHours() + offsetValue);
+    } else {
+      // days (default)
+      dueDate.setDate(dueDate.getDate() + offsetValue);
+      // Aplicar horário apenas para offset em dias
+      const [hours, minutes] = (auto.deadlineTime || "09:00").split(":").map(Number);
+      dueDate.setHours(hours || 9, minutes || 0, 0, 0);
+    }
     
     // Determinar responsáveis
     let assigneeIds: number[] = [];

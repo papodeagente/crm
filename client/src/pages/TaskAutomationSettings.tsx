@@ -38,10 +38,17 @@ interface AutomationFormData {
   taskType: string;
   deadlineReference: string;
   deadlineOffsetDays: number;
+  deadlineOffsetUnit: "minutes" | "hours" | "days";
   deadlineTime: string;
   assignToOwner: boolean;
   isActive: boolean;
 }
+
+const OFFSET_UNIT_OPTIONS = [
+  { value: "minutes" as const, label: "Minutos" },
+  { value: "hours" as const, label: "Horas" },
+  { value: "days" as const, label: "Dias" },
+];
 
 const defaultFormData: AutomationFormData = {
   stageId: 0,
@@ -50,6 +57,7 @@ const defaultFormData: AutomationFormData = {
   taskType: "task",
   deadlineReference: "current_date",
   deadlineOffsetDays: 0,
+  deadlineOffsetUnit: "days",
   deadlineTime: "09:00",
   assignToOwner: true,
   isActive: true,
@@ -147,6 +155,7 @@ export default function TaskAutomationSettings() {
       taskType: auto.taskType || "task",
       deadlineReference: auto.deadlineReference || "current_date",
       deadlineOffsetDays: auto.deadlineOffsetDays ?? 0,
+      deadlineOffsetUnit: auto.deadlineOffsetUnit || "days",
       deadlineTime: auto.deadlineTime || "09:00",
       assignToOwner: auto.assignToOwner ?? true,
       isActive: auto.isActive ?? true,
@@ -190,12 +199,15 @@ export default function TaskAutomationSettings() {
     updateMut.mutate({ id: auto.id, isActive: !auto.isActive });
   }
 
-  function getDeadlineLabel(ref: string, offset: number) {
+  function getDeadlineLabel(ref: string, offset: number, unit?: string) {
     const direction = offset >= 0 ? "depois" : "antes";
     const absOffset = Math.abs(offset);
     const refLabel = DEADLINE_REF_OPTIONS.find(o => o.value === ref)?.label || ref;
-    if (offset === 0) return `No dia da ${refLabel.toLowerCase()}`;
-    return `${absOffset} dia${absOffset > 1 ? "s" : ""} ${direction} da ${refLabel.toLowerCase()}`;
+    if (offset === 0) return `No momento da ${refLabel.toLowerCase()}`;
+    const unitLabel = unit === "minutes" ? (absOffset === 1 ? "minuto" : "minutos")
+      : unit === "hours" ? (absOffset === 1 ? "hora" : "horas")
+      : (absOffset === 1 ? "dia" : "dias");
+    return `${absOffset} ${unitLabel} ${direction} da ${refLabel.toLowerCase()}`;
   }
 
   return (
@@ -310,7 +322,7 @@ export default function TaskAutomationSettings() {
                             <div className="flex-1 min-w-0">
                               <p className="text-sm font-medium truncate">{auto.taskTitle}</p>
                               <p className="text-xs text-muted-foreground">
-                                {getDeadlineLabel(auto.deadlineReference, auto.deadlineOffsetDays)} · às {auto.deadlineTime || "09:00"}
+                                {getDeadlineLabel(auto.deadlineReference, auto.deadlineOffsetDays, auto.deadlineOffsetUnit)} {(auto.deadlineOffsetUnit || "days") === "days" ? `· às ${auto.deadlineTime || "09:00"}` : ""}
                                 {auto.assignToOwner && " · Atribuir ao responsável"}
                               </p>
                             </div>
@@ -435,10 +447,10 @@ export default function TaskAutomationSettings() {
               </p>
             </div>
 
-            {/* Offset Days + Time */}
-            <div className="grid grid-cols-2 gap-4">
+            {/* Offset Value + Unit + Time */}
+            <div className="grid grid-cols-3 gap-3">
               <div>
-                <Label className="text-sm font-medium">Dias de deslocamento</Label>
+                <Label className="text-sm font-medium">Deslocamento</Label>
                 <Input
                   type="number"
                   className="mt-1"
@@ -447,8 +459,24 @@ export default function TaskAutomationSettings() {
                   placeholder="0"
                 />
                 <p className="text-xs text-muted-foreground mt-1">
-                  Positivo = depois, Negativo = antes
+                  + depois, - antes
                 </p>
+              </div>
+              <div>
+                <Label className="text-sm font-medium">Unidade</Label>
+                <Select
+                  value={formData.deadlineOffsetUnit}
+                  onValueChange={(v) => setFormData({ ...formData, deadlineOffsetUnit: v as any })}
+                >
+                  <SelectTrigger className="mt-1">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {OFFSET_UNIT_OPTIONS.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div>
                 <Label className="text-sm font-medium">Horário</Label>
@@ -457,7 +485,11 @@ export default function TaskAutomationSettings() {
                   className="mt-1"
                   value={formData.deadlineTime}
                   onChange={(e) => setFormData({ ...formData, deadlineTime: e.target.value })}
+                  disabled={formData.deadlineOffsetUnit !== "days"}
                 />
+                <p className="text-xs text-muted-foreground mt-1">
+                  {formData.deadlineOffsetUnit !== "days" ? "Usa hora atual" : ""}
+                </p>
               </div>
             </div>
 

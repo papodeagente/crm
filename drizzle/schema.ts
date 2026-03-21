@@ -462,8 +462,10 @@ export const taskAutomations = mysqlTable("task_automations", {
   taskType: mysqlEnum("taskType", ["whatsapp", "phone", "email", "video", "task"]).default("task").notNull(),
   // Referência de prazo: "current_date", "boarding_date", "return_date"
   deadlineReference: mysqlEnum("deadlineReference", ["current_date", "boarding_date", "return_date"]).default("current_date").notNull(),
-  // Offset em dias: positivo = depois, negativo = antes
+  // Offset: positivo = depois, negativo = antes
   deadlineOffsetDays: int("deadlineOffsetDays").default(0).notNull(),
+  // Unidade do offset: minutes, hours, days
+  deadlineOffsetUnit: mysqlEnum("deadlineOffsetUnit", ["minutes", "hours", "days"]).default("days").notNull(),
   // Hora do dia para a tarefa (ex: "09:00")
   deadlineTime: varchar("deadlineTime", { length: 5 }).default("09:00").notNull(),
   // Atribuir a quem? null = dono do deal

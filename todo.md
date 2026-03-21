@@ -4408,3 +4408,14 @@
 - [x] 10 testes passando (6 layout + 4 não-regressão)
 - [x] TypeScript sem erros
 - [x] Zero regressão: header sticky, hamburger mobile, Super Admin, logout intactos
+
+## Melhoria: Sistema de Tarefas
+- [x] Schema: deadlineOffsetUnit (minutes/hours/days) adicionado a task_automations
+- [x] Backend: executeTaskAutomations suporta minutos/horas/dias (horário só aplica para dias)
+- [x] Backend: ordenação corrigida (atrasadas primeiro ASC, futuras ASC, concluídas/canceladas por último)
+- [x] Router: create/update de taskAutomations aceita deadlineOffsetUnit
+- [x] Frontend: TaskAutomationSettings com seletor de unidade (Minutos/Horas/Dias)
+- [x] Frontend: horário desabilitado quando unidade não é dias
+- [x] Frontend: DealDetail preview mostra 1 tarefa + botão "Ver todas" → aba Tarefas
+- [x] 18 testes passando em taskImprovements.test.ts
+- [x] TypeScript sem erros, zero regressão

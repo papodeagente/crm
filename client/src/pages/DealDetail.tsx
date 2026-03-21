@@ -995,13 +995,14 @@ export default function DealDetail() {
               </div>
             ) : (
               <div className="space-y-2">
-                {pendingTasks.slice(0, 3).map((task: any) => (
-                  <TaskRow key={task.id} task={task} onUpdate={() => tasksQ.refetch()} />
-                ))}
-                {pendingTasks.length > 3 && (
-                  <p className="text-xs text-muted-foreground">
-                    Mostrando 3/{pendingTasks.length} tarefas
-                  </p>
+                <TaskRow key={pendingTasks[0].id} task={pendingTasks[0]} onUpdate={() => tasksQ.refetch()} />
+                {pendingTasks.length > 1 && (
+                  <button
+                    onClick={() => setActiveTab("tasks")}
+                    className="w-full text-center text-xs text-primary hover:text-primary/80 font-medium py-1.5 rounded-md hover:bg-primary/5 transition-colors"
+                  >
+                    Ver todas ({pendingTasks.length} tarefas pendentes)
+                  </button>
                 )}
               </div>
             )}
