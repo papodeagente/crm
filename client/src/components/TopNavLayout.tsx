@@ -36,7 +36,7 @@ const navItems: NavItem[] = [
   { icon: MessageSquare, label: "Inbox", path: "/inbox", matchPaths: ["/inbox"] },
   { icon: Headphones, label: "Supervisão", path: "/supervision", matchPaths: ["/supervision"] },
   { icon: TrendingUp, label: "RFV", path: "/rfv", matchPaths: ["/rfv", "/campaigns"] },
-  { icon: BarChart3, label: "Análises", path: "/insights", matchPaths: ["/insights", "/goals"] },
+  { icon: BarChart3, label: "Análises", path: "/analytics", matchPaths: ["/analytics", "/insights", "/goals"] },
 ];
 
 /* ─── Quick Nav Pages ─── */
@@ -48,7 +48,7 @@ const quickNavPages = [
   { icon: MessageSquare, label: "Inbox", path: "/inbox" },
   { icon: Headphones, label: "Supervisão", path: "/supervision" },
   { icon: TrendingUp, label: "RFV", path: "/rfv" },
-  { icon: BarChart3, label: "Análises", path: "/insights" },
+  { icon: BarChart3, label: "Análises", path: "/analytics" },
   { icon: Bell, label: "Notificações", path: "/notifications" },
   { icon: Settings, label: "Configurações", path: "/settings" },
 ];

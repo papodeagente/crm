@@ -148,6 +148,7 @@ import { saasAuthRouter } from "./routers/saasAuthRouter";
 import { inviteUserToTenant } from "./saasAuth";
 import { rfvRouter } from "./routers/rfvRouter";
 import { profileRouter } from "./routers/profileRouter";
+import { analyticsRouter } from "./routers/analyticsRouter";
 import {
   listLeadEvents,
   countLeadEvents,
@@ -2037,6 +2038,7 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
   rdCrmImport: rdCrmImportRouter, // M12: Importação do RD Station CRM
   saasAuth: saasAuthRouter, // SaaS Authentication (email/senha)
   rfv: rfvRouter, // M13: Matriz RFV — Classificação Automática de Contatos
+  crmAnalytics: analyticsRouter, // M14: Análises de Negociações (KPIs, Funil, Motivos de Perda)
   profile: profileRouter, // Perfil do usuário (avatar, nome, senha, Google Calendar)
 
   // ─── Contact Profile & Custom Fields ───

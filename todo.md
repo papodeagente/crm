@@ -4419,3 +4419,15 @@
 - [x] Frontend: DealDetail preview mostra 1 tarefa + botão "Ver todas" → aba Tarefas
 - [x] 18 testes passando em taskImprovements.test.ts
 - [x] TypeScript sem erros, zero regressão
+
+## Nova Página: Análises (Analytics)
+- [x] Auditoria: mapear rotas, menu, layout, schema de deals sem alterar nada
+- [x] Backend: crmAnalytics (summary, topLossReasons, pipelineFunnel, dealsByPeriod) + fix GROUP BY
+- [x] Frontend: Analytics.tsx isolada com filtros visuais executivos (pipeline, usuário, período)
+- [x] Frontend: 6 KPI cards (total, ganhas, perdidas, conversão, ticket médio, ciclo médio)
+- [x] Frontend: Top 5 motivos de perda com barras de progresso e valores
+- [x] Frontend: Navegação visual para relatórios futuros (Produtos, Insights WhatsApp)
+- [x] Frontend: Skeleton loading + empty states + funil de vendas por pipeline + gráfico de área
+- [x] Integração: rota /analytics + menu Análises agora aponta para /analytics
+- [x] Testes: 8 testes em crmAnalytics.test.ts (summary, filters, lossReasons, funnel, period, consistency)
+- [x] Validação: TypeScript sem erros, /insights intacta, zero regressão
