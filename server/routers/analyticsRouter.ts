@@ -5,7 +5,7 @@
 import { z } from "zod";
 import { router } from "../_core/trpc";
 import { tenantProcedure, getTenantId } from "../_core/trpc";
-import { getAnalyticsSummary, getTopLossReasons, getPipelineFunnel, getDealsByPeriod } from "../crmAnalytics";
+import { getAnalyticsSummary, getTopLossReasons, getPipelineFunnel, getDealsByPeriod, getFunnelConversion } from "../crmAnalytics";
 
 export const analyticsRouter = router({
   summary: tenantProcedure
@@ -74,6 +74,23 @@ export const analyticsRouter = router({
         dateTo: input?.dateTo,
         pipelineId: input?.pipelineId,
         ownerUserId: input?.ownerUserId,
+      });
+    }),
+
+  funnelConversion: tenantProcedure
+    .input(z.object({
+      pipelineId: z.number(),
+      dateFrom: z.string().optional(),
+      dateTo: z.string().optional(),
+      ownerUserId: z.number().optional(),
+    }))
+    .query(async ({ input, ctx }) => {
+      return getFunnelConversion({
+        tenantId: getTenantId(ctx),
+        pipelineId: input.pipelineId,
+        dateFrom: input.dateFrom,
+        dateTo: input.dateTo,
+        ownerUserId: input.ownerUserId,
       });
     }),
 });

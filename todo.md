@@ -4454,3 +4454,11 @@
 - [x] Seed retroativa: seedLossReasonsRetroactive.ts roda no startup para 24 tenants
 - [x] 9 testes vitest: 15 motivos, unicidade, idempotência, case-insensitive, sem flags especiais
 - [x] TypeScript sem erros, registros normais e editáveis, sem regressão
+
+## Redesign: Funil de Vendas (Conversão por Volume)
+- [x] Backend: getFunnelConversion — open+won+lost por stage, cumulative totals, conversionFromPrev
+- [x] Frontend: barras horizontais empilhadas (azul=#4A90D9, verde=#22c55e, vermelho=#ef4444)
+- [x] Frontend: tooltip com taxa de conversão entre etapas, quantidade open/won/lost
+- [x] Frontend: última linha "Conversão final" com verde+azul+vermelho e taxa final
+- [x] Frontend: seletor de funil dedicado no header do card (independente do filtro global)
+- [x] Testes: 17 testes passando (8 analytics + 9 seed), TypeScript sem erros

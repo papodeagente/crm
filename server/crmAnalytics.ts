@@ -46,6 +46,25 @@ export interface PipelineFunnel {
   valueCents: number;
 }
 
+export interface FunnelConversionStage {
+  stageId: number;
+  stageName: string;
+  orderIndex: number;
+  open: number;
+  won: number;
+  lost: number;
+  total: number;            // open + won + lost that passed through this stage
+  conversionFromPrev: number; // % of deals that reached this stage from the previous one
+}
+
+export interface FunnelConversionResult {
+  stages: FunnelConversionStage[];
+  totalDeals: number;       // total deals in the pipeline
+  totalWon: number;
+  totalLost: number;
+  finalConversionRate: number; // won / (won + lost) * 100
+}
+
 export interface DealsByPeriod {
   period: string;  // YYYY-MM or YYYY-MM-DD depending on granularity
   won: number;
@@ -207,4 +226,116 @@ export async function getDealsByPeriod(f: AnalyticsFilters): Promise<DealsByPeri
   }
 
   return Array.from(periodMap.values());
+}
+
+/* ─── 5. Funnel Conversion by Volume ─── */
+/**
+ * Returns conversion-by-volume data for a pipeline.
+ * For each stage: how many deals are open, won, or lost.
+ * "Won" and "lost" deals are attributed to the LAST stage they occupied before closing.
+ * The concept: a deal that reached stage 3 before being won counts in stages 1, 2, 3 for "passed through".
+ * But for the stacked bar chart, we show per-stage: open (still there), won (closed-won from that stage or beyond), lost (closed-lost from that stage).
+ *
+ * Simpler approach matching the reference image:
+ * - For each stage, count deals currently in that stage (open) + deals that were won/lost while in that stage.
+ * - The "total" for a stage = cumulative deals that reached at least that stage.
+ * - Conversion between stages = total(stage N) / total(stage N-1) * 100
+ */
+export async function getFunnelConversion(f: AnalyticsFilters & { pipelineId: number }): Promise<FunnelConversionResult> {
+  const db = await getDb();
+  if (!db) return { stages: [], totalDeals: 0, totalWon: 0, totalLost: 0, finalConversionRate: 0 };
+
+  // Base conditions (no status filter — we want all statuses)
+  const baseConds: any[] = [
+    eq(deals.tenantId, f.tenantId),
+    isNull(deals.deletedAt),
+    eq(deals.pipelineId, f.pipelineId),
+  ];
+  if (f.dateFrom) baseConds.push(gte(deals.createdAt, new Date(f.dateFrom + "T00:00:00")));
+  if (f.dateTo) baseConds.push(lte(deals.createdAt, new Date(f.dateTo + "T23:59:59")));
+  if (f.ownerUserId) baseConds.push(eq(deals.ownerUserId, f.ownerUserId));
+
+  // Get all stages for this pipeline
+  const stagesRows = await db.select({
+    id: pipelineStages.id,
+    name: pipelineStages.name,
+    orderIndex: pipelineStages.orderIndex,
+  })
+    .from(pipelineStages)
+    .where(and(eq(pipelineStages.pipelineId, f.pipelineId), eq(pipelineStages.tenantId, f.tenantId)))
+    .orderBy(pipelineStages.orderIndex);
+
+  if (stagesRows.length === 0) return { stages: [], totalDeals: 0, totalWon: 0, totalLost: 0, finalConversionRate: 0 };
+
+  // Get deal counts grouped by stageId and status
+  const dealRows = await db.select({
+    stageId: deals.stageId,
+    status: deals.status,
+    cnt: sql<number>`COUNT(*)`,
+  })
+    .from(deals)
+    .where(and(...baseConds))
+    .groupBy(deals.stageId, deals.status);
+
+  // Build a map: stageId -> { open, won, lost }
+  const stageMap = new Map<number, { open: number; won: number; lost: number }>();
+  for (const s of stagesRows) {
+    stageMap.set(s.id, { open: 0, won: 0, lost: 0 });
+  }
+  for (const r of dealRows) {
+    const entry = stageMap.get(r.stageId);
+    if (!entry) continue;
+    const cnt = Number(r.cnt);
+    if (r.status === "open") entry.open = cnt;
+    if (r.status === "won") entry.won = cnt;
+    if (r.status === "lost") entry.lost = cnt;
+  }
+
+  // Build cumulative funnel: deals that "passed through" each stage
+  // A deal at stage N has passed through stages 0..N
+  // So for stage i, cumulative = sum of (open+won+lost) for stages i..last
+  // This gives us the "volume" that reached at least stage i
+  const stageData = stagesRows.map(s => {
+    const d = stageMap.get(s.id)!;
+    return { ...s, open: d.open, won: d.won, lost: d.lost, direct: d.open + d.won + d.lost };
+  });
+
+  // Calculate cumulative from bottom up (deals that reached at least this stage)
+  // cumulative[i] = direct[i] + direct[i+1] + ... + direct[last]
+  const cumulativeTotal: number[] = new Array(stageData.length).fill(0);
+  let runningTotal = 0;
+  for (let i = stageData.length - 1; i >= 0; i--) {
+    runningTotal += stageData[i].direct;
+    cumulativeTotal[i] = runningTotal;
+  }
+
+  // For the stacked bar: each stage shows its own open/won/lost counts
+  // But the "total" bar width should represent cumulative volume
+  // The "lost" at each stage = deals lost at that stage specifically
+  // The "open" = deals still open at that stage
+  // The "conversion" (blue) = deals that moved past this stage = cumulative of next stages
+  const stages: FunnelConversionStage[] = stageData.map((s, i) => {
+    const total = cumulativeTotal[i];
+    const prevTotal = i === 0 ? total : cumulativeTotal[i - 1];
+    const conversionFromPrev = prevTotal > 0 ? Math.round((total / prevTotal) * 10000) / 100 : 100;
+
+    return {
+      stageId: s.id,
+      stageName: s.name,
+      orderIndex: s.orderIndex,
+      open: s.open,
+      won: s.won,
+      lost: s.lost,
+      total,
+      conversionFromPrev,
+    };
+  });
+
+  const totalDeals = cumulativeTotal[0] || 0;
+  const totalWon = stageData.reduce((s, d) => s + d.won, 0);
+  const totalLost = stageData.reduce((s, d) => s + d.lost, 0);
+  const decided = totalWon + totalLost;
+  const finalConversionRate = decided > 0 ? Math.round((totalWon / decided) * 10000) / 100 : 0;
+
+  return { stages, totalDeals, totalWon, totalLost, finalConversionRate };
 }

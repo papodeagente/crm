@@ -90,11 +90,14 @@ export default function Analytics() {
   const lossReasonsQ = trpc.crmAnalytics.topLossReasons.useQuery({ ...filterInput, limit: 5 });
   const dealsByPeriodQ = trpc.crmAnalytics.dealsByPeriod.useQuery(filterInput);
 
-  const funnelPipelineId = selectedPipeline !== "all"
-    ? Number(selectedPipeline)
-    : pipelinesQ.data?.[0]?.id;
+  // Funnel pipeline: default to first pipeline, allow switching
+  const defaultPipelineId = pipelinesQ.data?.[0]?.id;
+  const [funnelPipelineOverride, setFunnelPipelineOverride] = useState<string | null>(null);
+  const funnelPipelineId = funnelPipelineOverride
+    ? Number(funnelPipelineOverride)
+    : (selectedPipeline !== "all" ? Number(selectedPipeline) : defaultPipelineId);
 
-  const funnelQ = trpc.crmAnalytics.pipelineFunnel.useQuery(
+  const funnelConversionQ = trpc.crmAnalytics.funnelConversion.useQuery(
     {
       pipelineId: funnelPipelineId ?? 0,
       dateFrom: filterInput.dateFrom,
@@ -405,69 +408,193 @@ export default function Analytics() {
           </Card>
         </div>
 
-        {/* ─── Pipeline Funnel ─── */}
+        {/* ─── Funnel: Conversão por Volume ─── */}
         {funnelPipelineId && (
           <Card className="border-border/50">
             <CardHeader className="px-5 pt-5 pb-3">
-              <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                <TrendingUp className="h-4 w-4 text-muted-foreground" />
-                Funil de Vendas
-                {selectedPipeline === "all" && pipelinesQ.data?.[0] && (
-                  <Badge variant="secondary" className="text-[10px] ml-1.5">{pipelinesQ.data[0].name}</Badge>
-                )}
-              </CardTitle>
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                  <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                  Conversão por Volume
+                </CardTitle>
+                <Select
+                  value={String(funnelPipelineId)}
+                  onValueChange={(v) => setFunnelPipelineOverride(v)}
+                >
+                  <SelectTrigger className="w-full sm:w-[220px] h-8 text-xs">
+                    <SelectValue placeholder="Selecione o funil" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {pipelinesQ.data?.map(p => (
+                      <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </CardHeader>
             <CardContent className="px-5 pb-5 pt-0">
-              {funnelQ.isLoading ? (
-                <div className="flex items-center justify-center h-[180px]">
+              {funnelConversionQ.isLoading ? (
+                <div className="flex items-center justify-center h-[300px]">
                   <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                 </div>
-              ) : !funnelQ.data?.length ? (
-                <div className="flex flex-col items-center justify-center h-[180px] text-muted-foreground">
+              ) : !funnelConversionQ.data?.stages?.length ? (
+                <div className="flex flex-col items-center justify-center h-[300px] text-muted-foreground">
                   <BarChart3 className="h-12 w-12 mb-3 opacity-20" />
                   <p className="text-sm">Nenhuma etapa configurada</p>
                 </div>
-              ) : (
-                <div className="space-y-3 mt-1">
-                  {funnelQ.data.map((stage) => {
-                    const maxCount = Math.max(...funnelQ.data!.map(s => s.dealCount), 1);
-                    const pct = (stage.dealCount / maxCount) * 100;
-                    return (
-                      <Tooltip key={stage.stageId}>
-                        <TooltipTrigger asChild>
-                          <div className="group cursor-default">
-                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 mb-1.5">
-                              <div className="flex items-center gap-2.5">
-                                <span
-                                  className="w-3 h-3 rounded-sm shrink-0"
-                                  style={{ backgroundColor: stage.stageColor }}
-                                />
-                                <span className="text-sm font-medium">{stage.stageName}</span>
-                              </div>
-                              <div className="flex items-center gap-4 text-xs text-muted-foreground pl-5 sm:pl-0">
-                                <span className="font-semibold text-foreground/80">{stage.dealCount} negociações</span>
-                                <span>{formatCompact(stage.valueCents)}</span>
+              ) : (() => {
+                const fc = funnelConversionQ.data!;
+                const maxTotal = Math.max(...fc.stages.map(s => s.total), 1);
+                return (
+                  <div className="space-y-1">
+                    {/* Legend */}
+                    <div className="flex items-center justify-end gap-4 mb-4 text-xs">
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-3 h-3 rounded-full bg-[#4A90D9]" />
+                        <span className="text-muted-foreground">Conversão</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-3 h-3 rounded-full bg-[#22c55e]" />
+                        <span className="text-muted-foreground">Vendas</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-3 h-3 rounded-full bg-[#ef4444]" />
+                        <span className="text-muted-foreground">Perdidos</span>
+                      </div>
+                    </div>
+
+                    {/* Stage bars */}
+                    {fc.stages.map((stage, i) => {
+                      const barWidth = (stage.total / maxTotal) * 100;
+                      const openPct = stage.total > 0 ? (stage.open / stage.total) * 100 : 0;
+                      const lostPct = stage.total > 0 ? (stage.lost / stage.total) * 100 : 0;
+                      // won is not shown per-stage bar (only in final row)
+                      return (
+                        <Tooltip key={stage.stageId}>
+                          <TooltipTrigger asChild>
+                            <div className="group cursor-default py-1.5">
+                              <div className="flex items-center gap-3">
+                                <span className="text-xs text-muted-foreground w-[140px] sm:w-[180px] text-right truncate shrink-0 font-medium">
+                                  {stage.stageName}
+                                </span>
+                                <div className="flex-1 relative">
+                                  <div
+                                    className="h-8 sm:h-9 rounded-sm flex overflow-hidden transition-all duration-500 group-hover:brightness-110"
+                                    style={{ width: `${Math.max(barWidth, 3)}%` }}
+                                  >
+                                    {/* Blue = open (conversion / in progress) */}
+                                    <div
+                                      className="h-full transition-all duration-500"
+                                      style={{
+                                        width: `${openPct}%`,
+                                        backgroundColor: "#4A90D9",
+                                      }}
+                                    />
+                                    {/* Red = lost */}
+                                    <div
+                                      className="h-full transition-all duration-500"
+                                      style={{
+                                        width: `${lostPct}%`,
+                                        backgroundColor: "#ef4444",
+                                      }}
+                                    />
+                                  </div>
+                                </div>
                               </div>
                             </div>
-                            <div className="relative h-2.5 bg-muted rounded-full overflow-hidden">
+                          </TooltipTrigger>
+                          <TooltipContent side="top" className="max-w-[280px]">
+                            <div className="space-y-1 text-xs">
+                              <p className="font-semibold">{stage.stageName}</p>
+                              <p>Total: <span className="font-medium">{stage.total}</span> negociações</p>
+                              <p className="text-[#4A90D9]">Em andamento: <span className="font-medium">{stage.open}</span></p>
+                              <p className="text-[#ef4444]">Perdidos: <span className="font-medium">{stage.lost}</span></p>
+                              <p className="text-[#22c55e]">Ganhos: <span className="font-medium">{stage.won}</span></p>
+                              {i > 0 && (
+                                <p className="text-muted-foreground pt-1 border-t border-border/50">
+                                  Conversão da etapa anterior: <span className="font-medium">{formatPercent(stage.conversionFromPrev)}</span>
+                                </p>
+                              )}
+                            </div>
+                          </TooltipContent>
+                        </Tooltip>
+                      );
+                    })}
+
+                    {/* Final conversion row */}
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="group cursor-default py-1.5 mt-1 border-t border-border/30 pt-3">
+                          <div className="flex items-center gap-3">
+                            <span className="text-xs w-[140px] sm:w-[180px] text-right shrink-0 font-semibold text-emerald-500">
+                              Conversão final
+                            </span>
+                            <div className="flex-1 relative">
                               <div
-                                className="absolute inset-y-0 left-0 rounded-full transition-all duration-700 ease-out group-hover:brightness-110"
-                                style={{
-                                  width: `${pct}%`,
-                                  backgroundColor: stage.stageColor,
-                                }}
-                              />
+                                className="h-8 sm:h-9 rounded-sm flex overflow-hidden transition-all duration-500 group-hover:brightness-110"
+                                style={{ width: "100%" }}
+                              >
+                                {/* Green = won */}
+                                <div
+                                  className="h-full transition-all duration-500"
+                                  style={{
+                                    width: `${fc.totalDeals > 0 ? (fc.totalWon / fc.totalDeals) * 100 : 0}%`,
+                                    backgroundColor: "#22c55e",
+                                  }}
+                                />
+                                {/* Blue = still open */}
+                                <div
+                                  className="h-full transition-all duration-500"
+                                  style={{
+                                    width: `${fc.totalDeals > 0 ? ((fc.totalDeals - fc.totalWon - fc.totalLost) / fc.totalDeals) * 100 : 0}%`,
+                                    backgroundColor: "#4A90D9",
+                                  }}
+                                />
+                                {/* Red = lost */}
+                                <div
+                                  className="h-full transition-all duration-500"
+                                  style={{
+                                    width: `${fc.totalDeals > 0 ? (fc.totalLost / fc.totalDeals) * 100 : 0}%`,
+                                    backgroundColor: "#ef4444",
+                                  }}
+                                />
+                              </div>
                             </div>
                           </div>
-                        </TooltipTrigger>
-                        <TooltipContent side="top">
-                          <p className="text-xs">{stage.stageName}: {stage.dealCount} negociações ({formatCurrency(stage.valueCents)})</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    );
-                  })}
-                </div>
-              )}
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-[280px]">
+                        <div className="space-y-1 text-xs">
+                          <p className="font-semibold">Conversão Final do Funil</p>
+                          <p>Total: <span className="font-medium">{fc.totalDeals}</span> negociações</p>
+                          <p className="text-[#22c55e]">Vendas: <span className="font-medium">{fc.totalWon}</span></p>
+                          <p className="text-[#4A90D9]">Em andamento: <span className="font-medium">{fc.totalDeals - fc.totalWon - fc.totalLost}</span></p>
+                          <p className="text-[#ef4444]">Perdidos: <span className="font-medium">{fc.totalLost}</span></p>
+                          <p className="text-muted-foreground pt-1 border-t border-border/50">
+                            Taxa de conversão: <span className="font-semibold">{formatPercent(fc.finalConversionRate)}</span>
+                          </p>
+                        </div>
+                      </TooltipContent>
+                    </Tooltip>
+
+                    {/* X-axis label */}
+                    <div className="flex items-center gap-3 pt-2">
+                      <span className="w-[140px] sm:w-[180px] shrink-0" />
+                      <div className="flex-1 flex justify-between text-[10px] text-muted-foreground/60">
+                        <span>0</span>
+                        <span>{Math.round(maxTotal / 4)}</span>
+                        <span>{Math.round(maxTotal / 2)}</span>
+                        <span>{Math.round(maxTotal * 3 / 4)}</span>
+                        <span className="font-medium text-foreground/60">{maxTotal}</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="w-[140px] sm:w-[180px] shrink-0" />
+                      <p className="text-center flex-1 text-[11px] text-muted-foreground/50">Negociações</p>
+                    </div>
+                  </div>
+                );
+              })()}
             </CardContent>
           </Card>
         )}
