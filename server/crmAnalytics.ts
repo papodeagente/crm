@@ -174,14 +174,14 @@ export async function getPipelineFunnel(f: AnalyticsFilters & { pipelineId: numb
   }));
 }
 
-/* ─── 4. Deals by Period (monthly) ─── */
+/* ─── 4. Deals by Period (daily) ─── */
 export async function getDealsByPeriod(f: AnalyticsFilters): Promise<DealsByPeriod[]> {
   const db = await getDb();
   if (!db) return [];
 
   const where = buildConditions(f);
 
-  const periodExpr = sql<string>`DATE_FORMAT(${deals.createdAt}, '%Y-%m')`.as('period');
+  const periodExpr = sql<string>`DATE_FORMAT(${deals.createdAt}, '%Y-%m-%d')`.as('period');
   const rows = await db.select({
     period: periodExpr,
     status: deals.status,

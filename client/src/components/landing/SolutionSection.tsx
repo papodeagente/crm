@@ -1,7 +1,7 @@
 import { FadeIn } from "./FadeIn";
 import { Sparkles } from "lucide-react";
 
-const MOCKUP_URL = "https://d2xsxph8kpxj0f.cloudfront.net/310519663249817763/EKvcVicuVoUxTnzjSKzgdk/crm-dashboard-mockup-3YZmw47tu8PYFxqCzQyyib.webp";
+const MOCKUP_URL = "https://aceleradora.tur.br/teste/wp-content/uploads/2026/03/ChatGPT-Image-22-de-mar.-de-2026-14_07_25.png";
 
 export function SolutionSection() {
   return (

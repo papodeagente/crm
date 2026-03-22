@@ -50,10 +50,13 @@ function formatPercent(v: number): string {
   return `${v.toFixed(1)}%`;
 }
 
-function formatMonthLabel(period: string): string {
-  const [y, m] = period.split("-");
-  const months = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
-  return `${months[parseInt(m, 10) - 1]}/${y.slice(2)}`;
+function formatDayLabel(period: string): string {
+  // period is YYYY-MM-DD
+  const parts = period.split("-");
+  if (parts.length === 3) {
+    return `${parts[2]}/${parts[1]}`; // DD/MM
+  }
+  return period;
 }
 
 /* ─── Sub-pages for navigation ─── */
@@ -165,7 +168,7 @@ export default function Analytics() {
     if (!dealsByPeriodQ.data) return [];
     return dealsByPeriodQ.data.map(d => ({
       ...d,
-      label: formatMonthLabel(d.period),
+      label: formatDayLabel(d.period),
       wonValue: d.wonValueCents / 100,
       lostValue: d.lostValueCents / 100,
     }));

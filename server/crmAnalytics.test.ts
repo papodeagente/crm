@@ -100,12 +100,12 @@ describe("CRM Analytics Router", () => {
     }
   });
 
-  it("dealsByPeriod returns array of monthly data", async () => {
+  it("dealsByPeriod returns array of daily data", async () => {
     const result = await caller.crmAnalytics.dealsByPeriod({});
     expect(Array.isArray(result)).toBe(true);
     for (const row of result) {
       expect(typeof row.period).toBe("string");
-      expect(row.period).toMatch(/^\d{4}-\d{2}$/); // YYYY-MM
+      expect(row.period).toMatch(/^\d{4}-\d{2}-\d{2}$/); // YYYY-MM-DD
       expect(typeof row.won).toBe("number");
       expect(typeof row.lost).toBe("number");
       expect(typeof row.open).toBe("number");

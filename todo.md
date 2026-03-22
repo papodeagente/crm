@@ -4441,3 +4441,8 @@
 - [x] Melhorar espaçamento interno dos cards (p-5, gap-4/5, space-y-8)
 - [x] Garantir scroll suave e sem overflow horizontal
 - [x] Validar visual em múltiplas resoluções (padding 40px, max-w 1280px)
+
+## Melhoria: Gráfico Negociações por Período — dia a dia
+- [x] Backend: dealsByPeriod agora agrupa por dia (DATE_FORMAT %Y-%m-%d)
+- [x] Frontend: labels diários DD/MM no eixo X do gráfico de área
+- [x] Testes: regex atualizado para YYYY-MM-DD, 8 testes passando
