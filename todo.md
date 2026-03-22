@@ -4446,3 +4446,11 @@
 - [x] Backend: dealsByPeriod agora agrupa por dia (DATE_FORMAT %Y-%m-%d)
 - [x] Frontend: labels diários DD/MM no eixo X do gráfico de área
 - [x] Testes: regex atualizado para YYYY-MM-DD, 8 testes passando
+
+## Seed: Motivos de Perda Padrão por Tenant
+- [x] Auditar schema loss_reasons (tenantId, name, description, isActive, isDeleted) e createTenant
+- [x] Criar seedDefaultLossReasons(tenantId) — idempotente, 15 motivos, case-insensitive
+- [x] Integrar no createTenant (onboarding) com try/catch isolado
+- [x] Seed retroativa: seedLossReasonsRetroactive.ts roda no startup para 24 tenants
+- [x] 9 testes vitest: 15 motivos, unicidade, idempotência, case-insensitive, sem flags especiais
+- [x] TypeScript sem erros, registros normais e editáveis, sem regressão

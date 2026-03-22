@@ -34,6 +34,13 @@ export async function createTenant(data: { name: string; plan?: "free" | "pro" |
   } catch (e) {
     console.error("[Onboarding] Failed to create default pipelines:", e);
   }
+  // Auto-seed default loss reasons for new tenant
+  try {
+    const { seedDefaultLossReasons } = await import("./seedLossReasons");
+    await seedDefaultLossReasons(result.id);
+  } catch (e) {
+    console.error("[Onboarding] Failed to seed default loss reasons:", e);
+  }
   return result;
 }
 export async function getTenantById(id: number) {

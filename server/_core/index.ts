@@ -226,6 +226,11 @@ async function startServer() {
     // Start birthday/wedding notification scheduler
     import("../birthdayScheduler").then(m => m.startBirthdayScheduler());
 
+    // Retroactive seed: ensure all tenants have default loss reasons
+    import("../seedLossReasonsRetroactive").then(m => m.seedLossReasonsForAllTenants()).catch(e => {
+      console.warn("[SeedLossReasons] Retroactive seed failed:", e.message);
+    });
+
     // Auto-restore WhatsApp sessions that were connected before server restart
     // Delayed by 10s to let the server fully initialize first
     setTimeout(() => {
