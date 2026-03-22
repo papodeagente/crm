@@ -149,6 +149,7 @@ import { inviteUserToTenant } from "./saasAuth";
 import { rfvRouter } from "./routers/rfvRouter";
 import { profileRouter } from "./routers/profileRouter";
 import { analyticsRouter } from "./routers/analyticsRouter";
+import { getHomeExecutive, getHomeTasks, getHomeRFV, getHomeOnboarding, toggleOnboardingStep, dismissOnboarding, isOnboardingDismissed } from "./services/homeService";
 import {
   listLeadEvents,
   countLeadEvents,
@@ -1746,6 +1747,40 @@ export const appRouter = router({
     allPipelines: tenantProcedure
       .query(async ({ input, ctx }) => {
         return getDashboardAllPipelines(getTenantId(ctx));
+      }),
+   }),
+
+  // ─── Home Dashboard (Redesigned) ───
+  home: router({
+    executive: tenantProcedure
+      .query(async ({ ctx }) => {
+        const isAdmin = ctx.saasUser?.role === "admin";
+        const ownerFilter = isAdmin ? undefined : ctx.saasUser?.userId;
+        return getHomeExecutive(getTenantId(ctx), ownerFilter);
+      }),
+    tasks: tenantProcedure
+      .input(z.object({ limit: z.number().optional() }))
+      .query(async ({ ctx, input }) => {
+        return getHomeTasks(getTenantId(ctx), ctx.user?.id, input.limit);
+      }),
+    rfv: tenantProcedure
+      .query(async ({ ctx }) => {
+        return getHomeRFV(getTenantId(ctx));
+      }),
+    onboarding: tenantProcedure
+      .query(async ({ ctx }) => {
+        const dismissed = await isOnboardingDismissed(getTenantId(ctx));
+        if (dismissed) return { dismissed: true, steps: [], completedCount: 0, totalSteps: 0, progressPercent: 100 };
+        return { dismissed: false, ...(await getHomeOnboarding(getTenantId(ctx))) };
+      }),
+    toggleOnboardingStep: tenantProcedure
+      .input(z.object({ stepKey: z.string(), completed: z.boolean() }))
+      .mutation(async ({ ctx, input }) => {
+        return toggleOnboardingStep(getTenantId(ctx), ctx.user!.id, input.stepKey, input.completed);
+      }),
+    dismissOnboarding: tenantProcedure
+      .mutation(async ({ ctx }) => {
+        return dismissOnboarding(getTenantId(ctx), ctx.user!.id);
       }),
   }),
 

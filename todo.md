@@ -4508,3 +4508,56 @@
 
 ## Fix: Cor do item ativo responsiva ao tema
 - [x] Alterar text-white para text-foreground no item ativo (preto no claro, branco no escuro)
+
+## Redesign: Página Início — Dashboard de Comando Comercial
+### Bloco 1 — Visão Executiva Imediata
+- [ ] Negociações sem tarefa (card clicável + modal com lista)
+- [ ] Negociações esfriando (card clicável + modal com lista)
+- [ ] Quantidade de negociações em andamento/ativas
+- [ ] Valor total em andamento/ativo
+- [ ] Taxa de conversão do mês atual
+- [ ] Previsão de fechamento (vendido + ativo * conversão)
+### Bloco 2 — Prioridades de Ação
+- [ ] Tarefas do dia (vencidas + pendentes, ordenadas da mais atrasada)
+- [ ] Cada tarefa clicável para abrir item relacionado
+### Bloco 3 — Oportunidades de Receita (RFV)
+- [ ] Indicador: pessoas na janela de indicação (clicável)
+- [ ] Indicador: pessoas na janela de recuperação (clicável)
+- [ ] Indicador: pessoas na janela de recorrência (clicável)
+### Bloco 4 — Checklist Didático de Onboarding
+- [ ] Checklist progressivo com 14 etapas
+- [ ] Cada item clicável levando à área correspondente
+- [ ] Progresso salvo por tenant
+- [ ] Barra de progresso geral
+### Backend
+- [ ] Procedure homeExecutive (indicadores mês corrente)
+- [ ] Procedure homeTasks (tarefas do dia ordenadas)
+- [ ] Procedure homeRFV (contagens das janelas)
+- [ ] Procedure homeOnboarding (estado do checklist)
+### Regras
+- [ ] Sempre mês corrente, sem filtro manual
+- [ ] Multi-tenant, permissões preservadas
+- [ ] Nenhuma outra página alterada
+- [ ] Testes vitest
+
+## Redesign Home — Comando Comercial (v-home)
+
+### Backend (server/services/homeService.ts)
+- [x] homeExecutive: KPIs do mês (deals sem tarefa, esfriando, ativos, valor, conversão, previsão)
+- [x] homeTasks: tarefas do dia + atrasadas ordenadas por urgência
+- [x] homeRFV: contagens de oportunidades (indicação, recuperação, recorrência)
+- [x] homeOnboarding: checklist auto-detectado (14 etapas) + toggle manual + dismiss
+- [x] toggleOnboardingStep mutation
+- [x] dismissOnboarding mutation
+
+### Frontend (client/src/pages/Home.tsx)
+- [x] Bloco 1 — Visão Executiva: 6 cards (sem tarefa, esfriando, em andamento, valor ativo, conversão, previsão)
+- [x] Bloco 2 — Prioridades de Ação: tarefas do dia com ícones por tipo e indicador de atraso
+- [x] Bloco 3 — Oportunidades RFV: indicação, recuperação, recorrência com links para filtros
+- [x] Bloco 4 — Checklist de Onboarding: 14 etapas auto-detectadas com barra de progresso
+- [x] Modais de detalhes para deals sem tarefa e esfriando
+- [x] Design premium com surface cards, gradientes ENTUR, micro-interações
+
+### Testes
+- [x] Vitest: 5 testes para home.executive, home.tasks, home.rfv, home.onboarding
+- [x] TypeScript: Zero erros de compilação
