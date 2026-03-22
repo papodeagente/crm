@@ -4499,3 +4499,12 @@
 
 ## Fix: Cor do item ativo no menu
 - [x] Alterar cor da fonte do item selecionado no menu de roxo para branco (text-primary → text-white) (text-primary → text-white)
+
+## Reorganização: Mover Inbox e Supervisão para Configurações > Comunicação
+- [x] Remover Inbox e Supervisão do navItems no menu principal (TopNavLayout)
+- [x] Remover dos quickNavPages também
+- [x] Adicionar Supervisão na área de Comunicação em Configurações (Inbox já estava)
+- [x] Rotas /inbox e /supervision continuam funcionando (apenas removidos do menu)
+
+## Fix: Cor do item ativo responsiva ao tema
+- [ ] Alterar text-white para text-foreground no item ativo (preto no claro, branco no escuro)

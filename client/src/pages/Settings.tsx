@@ -1,6 +1,6 @@
 import { useLocation } from "wouter";
 import {
-  Settings, Inbox, MessageSquare, Bot,
+  Settings, Inbox, MessageSquare, Bot, Headphones,
   FileText, Globe, Plane,
   GraduationCap, Plug, Shield, BookOpen,
   ChevronRight, Users, Tag, GitBranch,
@@ -81,6 +81,7 @@ const settingsCategories: SettingsCategory[] = [
     title: "COMUNICAÇÃO",
     links: [
       { icon: Inbox, label: "Inbox", path: "/inbox" },
+      { icon: Headphones, label: "Supervisão", path: "/supervision" },
       { icon: MessageSquare, label: "WhatsApp", path: "/whatsapp" },
       { icon: Bot, label: "Chatbot IA", path: "/chatbot" },
       { icon: Cake, label: "Datas Comemorativas", path: "/birthdays" },

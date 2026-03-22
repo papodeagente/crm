@@ -12,7 +12,7 @@ import { getLoginUrl } from "@/const";
 import {
   Home, Briefcase, Users, CheckSquare, BarChart3,
   Bell, Settings, Search, ChevronRight, LogOut, Menu, X,
-  Loader2, User, Building2, ListTodo, Phone, Mail, Sun, Moon, MessageSquare, Shield, TrendingUp, Headphones,
+  Loader2, User, Building2, ListTodo, Phone, Mail, Sun, Moon, MessageSquare, Shield, TrendingUp,
 } from "lucide-react";
 import { formatDateShort } from "../../../shared/dateUtils";
 import { useState, useEffect, useRef, useCallback } from "react";
@@ -33,8 +33,7 @@ const navItems: NavItem[] = [
   { icon: Briefcase, label: "Negociações", path: "/pipeline", matchPaths: ["/pipeline", "/deal"] },
   { icon: Users, label: "Contatos", path: "/contacts", matchPaths: ["/contacts"] },
   { icon: CheckSquare, label: "Tarefas", path: "/tasks", matchPaths: ["/tasks"] },
-  { icon: MessageSquare, label: "Inbox", path: "/inbox", matchPaths: ["/inbox"] },
-  { icon: Headphones, label: "Supervisão", path: "/supervision", matchPaths: ["/supervision"] },
+
   { icon: TrendingUp, label: "RFV", path: "/rfv", matchPaths: ["/rfv", "/campaigns"] },
   { icon: BarChart3, label: "Análises", path: "/analytics", matchPaths: ["/analytics", "/insights", "/goals"] },
 ];
@@ -45,8 +44,7 @@ const quickNavPages = [
   { icon: Briefcase, label: "Negociações", path: "/pipeline" },
   { icon: Users, label: "Contatos", path: "/contacts" },
   { icon: CheckSquare, label: "Tarefas", path: "/tasks" },
-  { icon: MessageSquare, label: "Inbox", path: "/inbox" },
-  { icon: Headphones, label: "Supervisão", path: "/supervision" },
+
   { icon: TrendingUp, label: "RFV", path: "/rfv" },
   { icon: BarChart3, label: "Análises", path: "/analytics" },
   { icon: Bell, label: "Notificações", path: "/notifications" },
@@ -391,11 +389,11 @@ function TopBar({ onSearchOpen, mobileMenuOpen, onToggleMobile }: {
                   href={item.path}
                   className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-[13.5px] font-medium transition-all duration-200 ${
                     isActive
-                      ? "bg-primary/15 text-white font-semibold border-b-2 border-primary"
+                      ? "bg-primary/15 text-foreground font-semibold border-b-2 border-primary"
                       : "text-muted-foreground hover:text-foreground hover:bg-accent"
                   }`}
                 >
-                  <item.icon className={`h-4 w-4 ${isActive ? "text-white" : ""}`} />
+                  <item.icon className={`h-4 w-4 ${isActive ? "text-foreground" : ""}`} />
                   <span>{item.label}</span>
                 </Link>
               );
