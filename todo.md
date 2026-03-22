@@ -4507,4 +4507,4 @@
 - [x] Rotas /inbox e /supervision continuam funcionando (apenas removidos do menu)
 
 ## Fix: Cor do item ativo responsiva ao tema
-- [ ] Alterar text-white para text-foreground no item ativo (preto no claro, branco no escuro)
+- [x] Alterar text-white para text-foreground no item ativo (preto no claro, branco no escuro)
