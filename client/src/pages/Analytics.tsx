@@ -13,7 +13,7 @@ import {
 import {
   BarChart3, TrendingUp, TrendingDown, DollarSign, Target,
   Trophy, XCircle, Clock, Briefcase, Filter,
-  ChevronRight, Loader2, AlertTriangle, Package, Users as UsersIcon,
+  ChevronRight, Loader2, AlertTriangle, Package, Users as UsersIcon, Activity,
 } from "lucide-react";
 import DateRangeFilter, { useDateFilter } from "@/components/DateRangeFilter";
 import {
@@ -61,6 +61,7 @@ function formatDayLabel(period: string): string {
 
 /* ─── Sub-pages for navigation ─── */
 const REPORT_PAGES = [
+  { label: "CRM Live", path: "/analytics/crm-live", icon: Activity, description: "Visão em tempo real da operação comercial" },
   { label: "Metas", path: "/analytics/goals", icon: Target, description: "Acompanhamento de metas com análise IA" },
   { label: "Produtos", path: "/analytics/products", icon: Package, description: "Análise de produtos vendidos" },
   { label: "Insights WhatsApp", path: "/insights", icon: BarChart3, description: "Métricas de mensagens e atendimento" },

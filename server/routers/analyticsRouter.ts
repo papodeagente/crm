@@ -7,6 +7,7 @@ import { router } from "../_core/trpc";
 import { tenantProcedure, getTenantId } from "../_core/trpc";
 import { getAnalyticsSummary, getTopLossReasons, getPipelineFunnel, getDealsByPeriod, getFunnelConversion } from "../crmAnalytics";
 import { getGoalsReport, generateGoalsAIAnalysis } from "../goalsAnalytics";
+import { getCrmLiveCover, getCrmLiveOperation } from "../crmLive";
 
 export const analyticsRouter = router({
   summary: tenantProcedure
@@ -104,5 +105,41 @@ export const analyticsRouter = router({
     .mutation(async ({ ctx }) => {
       const reportData = await getGoalsReport(getTenantId(ctx));
       return generateGoalsAIAnalysis(getTenantId(ctx), reportData);
+    }),
+
+  crmLiveCover: tenantProcedure
+    .input(z.object({
+      tab: z.enum(["finalized", "in_progress"]),
+      dateFrom: z.string().optional(),
+      dateTo: z.string().optional(),
+      pipelineId: z.number().optional(),
+      ownerUserId: z.number().optional(),
+    }))
+    .query(async ({ input, ctx }) => {
+      return getCrmLiveCover({
+        tenantId: getTenantId(ctx),
+        dateFrom: input.dateFrom,
+        dateTo: input.dateTo,
+        pipelineId: input.pipelineId,
+        ownerUserId: input.ownerUserId,
+      }, input.tab);
+    }),
+
+  crmLiveOperation: tenantProcedure
+    .input(z.object({
+      tab: z.enum(["finalized", "in_progress"]),
+      dateFrom: z.string().optional(),
+      dateTo: z.string().optional(),
+      pipelineId: z.number().optional(),
+      ownerUserId: z.number().optional(),
+    }))
+    .query(async ({ input, ctx }) => {
+      return getCrmLiveOperation({
+        tenantId: getTenantId(ctx),
+        dateFrom: input.dateFrom,
+        dateTo: input.dateTo,
+        pipelineId: input.pipelineId,
+        ownerUserId: input.ownerUserId,
+      }, input.tab);
     }),
 });

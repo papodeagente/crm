@@ -4484,3 +4484,15 @@
 - [x] Frontend: Análise IA com veredicto, projeção, plano de ação, produtos, orientações
 - [x] Integrar rota /analytics/goals + card "Metas" em Outros Relatórios
 - [x] Testes: 14 testes goalsAnalytics + 31 total passando, TypeScript sem erros
+
+## Relatório CRM Live (Outros Relatórios)
+- [x] Auditar schema: deals, tasks, stages, loss_reasons, crmUsers, pipelines
+- [x] Backend: getCrmLiveCover (3 destaques, KPIs comparativos, conversão, perdas, top 3 motivos pizza)
+- [x] Backend: getCrmLiveOperation (resumo, feed tarefas, distribuição etapas, probabilidade 5 estrelas)
+- [x] Frontend: CRMLive.tsx com abas Finalizadas/Em Andamento
+- [x] Frontend: Capa Executiva — HighlightCards, KPICards comparativos, conversão, perdas, pie chart motivos
+- [x] Frontend: Operação Pipeline — resumo, feed tarefas, StageRows, ProbabilityCards com estrelas
+- [x] Frontend: Filtros globais reais (funil, período DateRangeFilter, responsável)
+- [x] Integrar rota /analytics/crm-live + card "CRM Live" em Outros Relatórios
+- [x] Testes: 12 testes crmLive.test.ts passando (cover + operation, filtros, shapes)
+- [x] Validação: TypeScript sem erros, 43 testes nossas features passando, zero regressão
