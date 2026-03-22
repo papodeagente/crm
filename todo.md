@@ -4469,3 +4469,8 @@
 - [x] Barras: última linha "Conversão final" com verde (vendas) + vermelho (perdidos)
 - [x] Tooltip: "Passaram por esta etapa", em andamento, ganhos, perdidos, conversão entre etapas
 - [x] Apenas frontend — backend inalterado, 17 testes passando
+
+## Ajuste: Lógica Azul = Conversão no Funil
+- [x] Azul = total que passou pela etapa (conversão), vermelho = perdidos no final da barra
+- [x] Legenda: "Conversão" + "Vendas" + "Perdidos"
+- [x] Tooltip: "Passaram por esta etapa" em azul, perdidos, ganhos, conversão entre etapas

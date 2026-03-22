@@ -452,7 +452,7 @@ export default function Analytics() {
                     <div className="flex items-center justify-end gap-4 mb-4 text-xs">
                       <div className="flex items-center gap-1.5">
                         <span className="w-3 h-3 rounded-full bg-[#4A90D9]" />
-                        <span className="text-muted-foreground">Em andamento</span>
+                        <span className="text-muted-foreground">Conversão</span>
                       </div>
                       <div className="flex items-center gap-1.5">
                         <span className="w-3 h-3 rounded-full bg-[#22c55e]" />
@@ -464,16 +464,14 @@ export default function Analytics() {
                       </div>
                     </div>
 
-                    {/* Stage bars — progression funnel */}
+                    {/* Stage bars — conversion funnel */}
                     {fc.stages.map((stage, i) => {
-                      // The bar width represents the TOTAL that reached this stage,
-                      // relative to the first stage (which is always 100%)
+                      // The full bar width = total that reached this stage (relative to 1st stage)
                       const barWidthPct = (stage.total / maxTotal) * 100;
 
-                      // Inside the bar: blue (open) on the left, red (lost) on the right
-                      // The blue portion = open deals still in progress at this stage
-                      // The red portion = deals lost at this specific stage
-                      const blueWidth = stage.total > 0 ? ((stage.open + stage.won) / stage.total) * 100 : 0;
+                      // Inside the bar: blue = conversion (total that passed), red = lost here
+                      // Blue represents the full stage volume (conversion), red is overlaid at the end
+                      const blueWidth = stage.total > 0 ? ((stage.total - stage.lost) / stage.total) * 100 : 100;
                       const redWidth = stage.total > 0 ? (stage.lost / stage.total) * 100 : 0;
 
                       return (
@@ -489,7 +487,7 @@ export default function Analytics() {
                                     className="h-8 sm:h-9 rounded-sm flex overflow-hidden transition-all duration-500 group-hover:brightness-110"
                                     style={{ width: `${Math.max(barWidthPct, 2)}%` }}
                                   >
-                                    {/* Blue = in progress (open + won that passed through) */}
+                                    {/* Blue = conversion (deals that passed through / are progressing) */}
                                     <div
                                       className="h-full transition-all duration-500"
                                       style={{
@@ -513,21 +511,17 @@ export default function Analytics() {
                           <TooltipContent side="top" className="max-w-[300px]">
                             <div className="space-y-1.5 text-xs">
                               <p className="font-semibold text-sm">{stage.stageName}</p>
-                              <div className="flex items-center justify-between gap-4">
+                              <div className="flex items-center justify-between gap-4 text-[#4A90D9]">
                                 <span>Passaram por esta etapa:</span>
                                 <span className="font-semibold">{stage.total}</span>
-                              </div>
-                              <div className="flex items-center justify-between gap-4 text-[#4A90D9]">
-                                <span>Em andamento:</span>
-                                <span className="font-medium">{stage.open}</span>
-                              </div>
-                              <div className="flex items-center justify-between gap-4 text-[#22c55e]">
-                                <span>Ganhos nesta etapa:</span>
-                                <span className="font-medium">{stage.won}</span>
                               </div>
                               <div className="flex items-center justify-between gap-4 text-[#ef4444]">
                                 <span>Perdidos nesta etapa:</span>
                                 <span className="font-medium">{stage.lost}</span>
+                              </div>
+                              <div className="flex items-center justify-between gap-4 text-[#22c55e]">
+                                <span>Ganhos nesta etapa:</span>
+                                <span className="font-medium">{stage.won}</span>
                               </div>
                               {i > 0 && (
                                 <div className="pt-1.5 border-t border-border/50 flex items-center justify-between gap-4">
