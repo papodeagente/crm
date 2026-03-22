@@ -444,14 +444,15 @@ export default function Analytics() {
                 </div>
               ) : (() => {
                 const fc = funnelConversionQ.data!;
-                const maxTotal = Math.max(...fc.stages.map(s => s.total), 1);
+                // maxTotal = first stage total (widest bar = 100%)
+                const maxTotal = fc.stages.length > 0 ? Math.max(fc.stages[0].total, 1) : 1;
                 return (
                   <div className="space-y-1">
                     {/* Legend */}
                     <div className="flex items-center justify-end gap-4 mb-4 text-xs">
                       <div className="flex items-center gap-1.5">
                         <span className="w-3 h-3 rounded-full bg-[#4A90D9]" />
-                        <span className="text-muted-foreground">Conversão</span>
+                        <span className="text-muted-foreground">Em andamento</span>
                       </div>
                       <div className="flex items-center gap-1.5">
                         <span className="w-3 h-3 rounded-full bg-[#22c55e]" />
@@ -463,12 +464,18 @@ export default function Analytics() {
                       </div>
                     </div>
 
-                    {/* Stage bars */}
+                    {/* Stage bars — progression funnel */}
                     {fc.stages.map((stage, i) => {
-                      const barWidth = (stage.total / maxTotal) * 100;
-                      const openPct = stage.total > 0 ? (stage.open / stage.total) * 100 : 0;
-                      const lostPct = stage.total > 0 ? (stage.lost / stage.total) * 100 : 0;
-                      // won is not shown per-stage bar (only in final row)
+                      // The bar width represents the TOTAL that reached this stage,
+                      // relative to the first stage (which is always 100%)
+                      const barWidthPct = (stage.total / maxTotal) * 100;
+
+                      // Inside the bar: blue (open) on the left, red (lost) on the right
+                      // The blue portion = open deals still in progress at this stage
+                      // The red portion = deals lost at this specific stage
+                      const blueWidth = stage.total > 0 ? ((stage.open + stage.won) / stage.total) * 100 : 0;
+                      const redWidth = stage.total > 0 ? (stage.lost / stage.total) * 100 : 0;
+
                       return (
                         <Tooltip key={stage.stageId}>
                           <TooltipTrigger asChild>
@@ -480,21 +487,21 @@ export default function Analytics() {
                                 <div className="flex-1 relative">
                                   <div
                                     className="h-8 sm:h-9 rounded-sm flex overflow-hidden transition-all duration-500 group-hover:brightness-110"
-                                    style={{ width: `${Math.max(barWidth, 3)}%` }}
+                                    style={{ width: `${Math.max(barWidthPct, 2)}%` }}
                                   >
-                                    {/* Blue = open (conversion / in progress) */}
+                                    {/* Blue = in progress (open + won that passed through) */}
                                     <div
                                       className="h-full transition-all duration-500"
                                       style={{
-                                        width: `${openPct}%`,
+                                        width: `${blueWidth}%`,
                                         backgroundColor: "#4A90D9",
                                       }}
                                     />
-                                    {/* Red = lost */}
+                                    {/* Red = lost at this stage (at the end of the bar) */}
                                     <div
                                       className="h-full transition-all duration-500"
                                       style={{
-                                        width: `${lostPct}%`,
+                                        width: `${redWidth}%`,
                                         backgroundColor: "#ef4444",
                                       }}
                                     />
@@ -503,17 +510,30 @@ export default function Analytics() {
                               </div>
                             </div>
                           </TooltipTrigger>
-                          <TooltipContent side="top" className="max-w-[280px]">
-                            <div className="space-y-1 text-xs">
-                              <p className="font-semibold">{stage.stageName}</p>
-                              <p>Total: <span className="font-medium">{stage.total}</span> negociações</p>
-                              <p className="text-[#4A90D9]">Em andamento: <span className="font-medium">{stage.open}</span></p>
-                              <p className="text-[#ef4444]">Perdidos: <span className="font-medium">{stage.lost}</span></p>
-                              <p className="text-[#22c55e]">Ganhos: <span className="font-medium">{stage.won}</span></p>
+                          <TooltipContent side="top" className="max-w-[300px]">
+                            <div className="space-y-1.5 text-xs">
+                              <p className="font-semibold text-sm">{stage.stageName}</p>
+                              <div className="flex items-center justify-between gap-4">
+                                <span>Passaram por esta etapa:</span>
+                                <span className="font-semibold">{stage.total}</span>
+                              </div>
+                              <div className="flex items-center justify-between gap-4 text-[#4A90D9]">
+                                <span>Em andamento:</span>
+                                <span className="font-medium">{stage.open}</span>
+                              </div>
+                              <div className="flex items-center justify-between gap-4 text-[#22c55e]">
+                                <span>Ganhos nesta etapa:</span>
+                                <span className="font-medium">{stage.won}</span>
+                              </div>
+                              <div className="flex items-center justify-between gap-4 text-[#ef4444]">
+                                <span>Perdidos nesta etapa:</span>
+                                <span className="font-medium">{stage.lost}</span>
+                              </div>
                               {i > 0 && (
-                                <p className="text-muted-foreground pt-1 border-t border-border/50">
-                                  Conversão da etapa anterior: <span className="font-medium">{formatPercent(stage.conversionFromPrev)}</span>
-                                </p>
+                                <div className="pt-1.5 border-t border-border/50 flex items-center justify-between gap-4">
+                                  <span className="text-muted-foreground">Conversão da etapa anterior:</span>
+                                  <span className="font-semibold">{formatPercent(stage.conversionFromPrev)}</span>
+                                </div>
                               )}
                             </div>
                           </TooltipContent>
@@ -521,7 +541,7 @@ export default function Analytics() {
                       );
                     })}
 
-                    {/* Final conversion row */}
+                    {/* Final conversion row — green (won) + red (lost) */}
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <div className="group cursor-default py-1.5 mt-1 border-t border-border/30 pt-3">
@@ -530,49 +550,58 @@ export default function Analytics() {
                               Conversão final
                             </span>
                             <div className="flex-1 relative">
-                              <div
-                                className="h-8 sm:h-9 rounded-sm flex overflow-hidden transition-all duration-500 group-hover:brightness-110"
-                                style={{ width: "100%" }}
-                              >
-                                {/* Green = won */}
-                                <div
-                                  className="h-full transition-all duration-500"
-                                  style={{
-                                    width: `${fc.totalDeals > 0 ? (fc.totalWon / fc.totalDeals) * 100 : 0}%`,
-                                    backgroundColor: "#22c55e",
-                                  }}
-                                />
-                                {/* Blue = still open */}
-                                <div
-                                  className="h-full transition-all duration-500"
-                                  style={{
-                                    width: `${fc.totalDeals > 0 ? ((fc.totalDeals - fc.totalWon - fc.totalLost) / fc.totalDeals) * 100 : 0}%`,
-                                    backgroundColor: "#4A90D9",
-                                  }}
-                                />
-                                {/* Red = lost */}
-                                <div
-                                  className="h-full transition-all duration-500"
-                                  style={{
-                                    width: `${fc.totalDeals > 0 ? (fc.totalLost / fc.totalDeals) * 100 : 0}%`,
-                                    backgroundColor: "#ef4444",
-                                  }}
-                                />
-                              </div>
+                              {(() => {
+                                const decided = fc.totalWon + fc.totalLost;
+                                const finalBarWidth = maxTotal > 0 ? (decided / maxTotal) * 100 : 0;
+                                const greenPct = decided > 0 ? (fc.totalWon / decided) * 100 : 0;
+                                const redPct = decided > 0 ? (fc.totalLost / decided) * 100 : 0;
+                                return (
+                                  <div
+                                    className="h-8 sm:h-9 rounded-sm flex overflow-hidden transition-all duration-500 group-hover:brightness-110"
+                                    style={{ width: `${Math.max(finalBarWidth, 2)}%` }}
+                                  >
+                                    {/* Green = won */}
+                                    <div
+                                      className="h-full transition-all duration-500"
+                                      style={{
+                                        width: `${greenPct}%`,
+                                        backgroundColor: "#22c55e",
+                                      }}
+                                    />
+                                    {/* Red = lost */}
+                                    <div
+                                      className="h-full transition-all duration-500"
+                                      style={{
+                                        width: `${redPct}%`,
+                                        backgroundColor: "#ef4444",
+                                      }}
+                                    />
+                                  </div>
+                                );
+                              })()}
                             </div>
                           </div>
                         </div>
                       </TooltipTrigger>
-                      <TooltipContent side="top" className="max-w-[280px]">
-                        <div className="space-y-1 text-xs">
-                          <p className="font-semibold">Conversão Final do Funil</p>
-                          <p>Total: <span className="font-medium">{fc.totalDeals}</span> negociações</p>
-                          <p className="text-[#22c55e]">Vendas: <span className="font-medium">{fc.totalWon}</span></p>
-                          <p className="text-[#4A90D9]">Em andamento: <span className="font-medium">{fc.totalDeals - fc.totalWon - fc.totalLost}</span></p>
-                          <p className="text-[#ef4444]">Perdidos: <span className="font-medium">{fc.totalLost}</span></p>
-                          <p className="text-muted-foreground pt-1 border-t border-border/50">
-                            Taxa de conversão: <span className="font-semibold">{formatPercent(fc.finalConversionRate)}</span>
-                          </p>
+                      <TooltipContent side="top" className="max-w-[300px]">
+                        <div className="space-y-1.5 text-xs">
+                          <p className="font-semibold text-sm">Conversão Final do Funil</p>
+                          <div className="flex items-center justify-between gap-4">
+                            <span>Total de negociações:</span>
+                            <span className="font-semibold">{fc.totalDeals}</span>
+                          </div>
+                          <div className="flex items-center justify-between gap-4 text-[#22c55e]">
+                            <span>Vendas realizadas:</span>
+                            <span className="font-semibold">{fc.totalWon}</span>
+                          </div>
+                          <div className="flex items-center justify-between gap-4 text-[#ef4444]">
+                            <span>Total perdidos:</span>
+                            <span className="font-semibold">{fc.totalLost}</span>
+                          </div>
+                          <div className="pt-1.5 border-t border-border/50 flex items-center justify-between gap-4">
+                            <span className="text-muted-foreground">Taxa de conversão final:</span>
+                            <span className="font-bold text-sm">{formatPercent(fc.finalConversionRate)}</span>
+                          </div>
                         </div>
                       </TooltipContent>
                     </Tooltip>

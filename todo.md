@@ -4462,3 +4462,10 @@
 - [x] Frontend: última linha "Conversão final" com verde+azul+vermelho e taxa final
 - [x] Frontend: seletor de funil dedicado no header do card (independente do filtro global)
 - [x] Testes: 17 testes passando (8 analytics + 9 seed), TypeScript sem erros
+
+## Melhoria Visual: Funil Conversão por Volume
+- [x] Barras: azul (em andamento) diminuindo a cada etapa — largura relativa ao 1º stage
+- [x] Barras: vermelho (perdidos) no final de cada barra, após o azul
+- [x] Barras: última linha "Conversão final" com verde (vendas) + vermelho (perdidos)
+- [x] Tooltip: "Passaram por esta etapa", em andamento, ganhos, perdidos, conversão entre etapas
+- [x] Apenas frontend — backend inalterado, 17 testes passando
