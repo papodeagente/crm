@@ -391,11 +391,11 @@ function TopBar({ onSearchOpen, mobileMenuOpen, onToggleMobile }: {
                   href={item.path}
                   className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-[13.5px] font-medium transition-all duration-200 ${
                     isActive
-                      ? "bg-primary/15 text-primary font-semibold border-b-2 border-primary"
+                      ? "bg-primary/15 text-white font-semibold border-b-2 border-primary"
                       : "text-muted-foreground hover:text-foreground hover:bg-accent"
                   }`}
                 >
-                  <item.icon className={`h-4 w-4 ${isActive ? "text-primary" : ""}`} />
+                  <item.icon className={`h-4 w-4 ${isActive ? "text-white" : ""}`} />
                   <span>{item.label}</span>
                 </Link>
               );

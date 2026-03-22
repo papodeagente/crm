@@ -4496,3 +4496,6 @@
 - [x] Integrar rota /analytics/crm-live + card "CRM Live" em Outros Relatórios
 - [x] Testes: 12 testes crmLive.test.ts passando (cover + operation, filtros, shapes)
 - [x] Validação: TypeScript sem erros, 43 testes nossas features passando, zero regressão
+
+## Fix: Cor do item ativo no menu
+- [x] Alterar cor da fonte do item selecionado no menu de roxo para branco (text-primary → text-white) (text-primary → text-white)
