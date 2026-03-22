@@ -61,6 +61,7 @@ function formatDayLabel(period: string): string {
 
 /* ─── Sub-pages for navigation ─── */
 const REPORT_PAGES = [
+  { label: "Metas", path: "/analytics/goals", icon: Target, description: "Acompanhamento de metas com análise IA" },
   { label: "Produtos", path: "/analytics/products", icon: Package, description: "Análise de produtos vendidos" },
   { label: "Insights WhatsApp", path: "/insights", icon: BarChart3, description: "Métricas de mensagens e atendimento" },
 ];

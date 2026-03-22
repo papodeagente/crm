@@ -6,6 +6,7 @@ import { z } from "zod";
 import { router } from "../_core/trpc";
 import { tenantProcedure, getTenantId } from "../_core/trpc";
 import { getAnalyticsSummary, getTopLossReasons, getPipelineFunnel, getDealsByPeriod, getFunnelConversion } from "../crmAnalytics";
+import { getGoalsReport, generateGoalsAIAnalysis } from "../goalsAnalytics";
 
 export const analyticsRouter = router({
   summary: tenantProcedure
@@ -92,5 +93,16 @@ export const analyticsRouter = router({
         dateTo: input.dateTo,
         ownerUserId: input.ownerUserId,
       });
+    }),
+
+  goalsReport: tenantProcedure
+    .query(async ({ ctx }) => {
+      return getGoalsReport(getTenantId(ctx));
+    }),
+
+  goalsAIAnalysis: tenantProcedure
+    .mutation(async ({ ctx }) => {
+      const reportData = await getGoalsReport(getTenantId(ctx));
+      return generateGoalsAIAnalysis(getTenantId(ctx), reportData);
     }),
 });

@@ -4474,3 +4474,13 @@
 - [x] Azul = total que passou pela etapa (conversão), vermelho = perdidos no final da barra
 - [x] Legenda: "Conversão" + "Vendas" + "Perdidos"
 - [x] Tooltip: "Passaram por esta etapa" em azul, perdidos, ganhos, conversão entre etapas
+
+## Relatório de Metas (Analytics)
+- [x] Auditar schema de metas (goals, deals, dealProducts, crmUsers)
+- [x] Backend: goalsReport (agrega metas ativas + métricas do mês + top produtos)
+- [x] Backend: goalsAIAnalysis (LLM gestor sênior com JSON schema estruturado)
+- [x] Frontend: GoalsReport.tsx com 3 gráficos pizza (status metas, negociações, produtos)
+- [x] Frontend: 5 KPIs + barras de progresso individual com marcador de esperado
+- [x] Frontend: Análise IA com veredicto, projeção, plano de ação, produtos, orientações
+- [x] Integrar rota /analytics/goals + card "Metas" em Outros Relatórios
+- [x] Testes: 14 testes goalsAnalytics + 31 total passando, TypeScript sem erros
