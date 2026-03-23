@@ -6,7 +6,7 @@ import { trpc } from "@/lib/trpc";
 
 export default function Upgrade() {
   const [, navigate] = useLocation();
-  const meQuery = trpc.saasAuth.me.useQuery(undefined, { retry: false, refetchOnWindowFocus: false, staleTime: 5 * 60 * 1000 });
+  const meQuery = trpc.saasAuth.me.useQuery();
 
   const isExpired = meQuery.data?.access?.reason === "FREEMIUM_EXPIRED" ||
     meQuery.data?.access?.reason === "SUBSCRIPTION_EXPIRED" ||

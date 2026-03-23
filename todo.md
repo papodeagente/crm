@@ -4725,9 +4725,3 @@
 - [x] Alterar 'Automações por data de embarque' → 'Automações de pós vendas' (SOLO e GROWTH)
 - [x] Alterar 'Até 4 usuários inclusos' → 'Até 5 usuários inclusos' (GROWTH)
 - [x] Alterar 'WhatsApp integrado com histórico' → '1 número de WhatsApp integrado' (SOLO e GROWTH)
-
-## Correção Urgente: Login Rate Limit Exceeded
-
-- [x] Diagnosticar causa raiz do rate limit no fluxo de login
-- [x] Corrigir o problema sem alterar funcionalidades existentes
-- [x] Validar login funcionando corretamente
