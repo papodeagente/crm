@@ -4688,3 +4688,9 @@
 - [x] Preservar blindagem de tenants e segurança
 - [x] Testes vitest: importação pequena e grande, progresso, fidelidade de dados (20 testes passando)
 - [x] Validar ausência de regressão em outros módulos (TypeScript: 0 erros, LSP: 0 erros)
+
+## Bug Fix: Importação RD CRM ainda trava em 0% (investigação profunda)
+- [x] Investigar logs do servidor durante importação real
+- [x] Identificar se o backend está crashando, timeout, ou progresso não persiste (causa: progressStore em memória perdido entre instâncias)
+- [x] Implementar fix robusto: progresso via tabela import_progress no DB, debounce 1.5s, flushNow para estados críticos
+- [x] Testar e validar: 17 testes passando, 0 erros TypeScript

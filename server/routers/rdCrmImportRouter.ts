@@ -21,7 +21,9 @@ import {
 } from "../../drizzle/schema";
 import { eq, and, sql } from "drizzle-orm";
 
-// ─── In-memory progress store ───
+// ─── Database-backed progress store ───
+// Progress is persisted to the `import_progress` table so it survives
+// server restarts and works across multiple server instances.
 interface ImportProgress {
   status: "idle" | "fetching" | "importing" | "done" | "error";
   phase: string;
@@ -35,12 +37,11 @@ interface ImportProgress {
   error?: string;
   startedAt: number;
   validation?: ImportValidation;
-  // Enhanced progress tracking for large imports
-  fetchPhase: boolean; // true when currently fetching from RD API
-  fetchedRecords: number; // total records fetched so far across all categories
-  totalRecordsEstimate: number; // estimated total records to process
-  processedRecords: number; // total records processed (imported + skipped) across all categories
-  lastActivityAt: number; // timestamp of last progress update (heartbeat)
+  fetchPhase: boolean;
+  fetchedRecords: number;
+  totalRecordsEstimate: number;
+  processedRecords: number;
+  lastActivityAt: number;
 }
 
 interface ImportValidation {
@@ -50,13 +51,63 @@ interface ImportValidation {
   duplicatesRemoved: Record<string, number>;
 }
 
-const progressStore = new Map<string, ImportProgress>();
+// In-memory cache + debounced DB writes
+const progressCache = new Map<string, ImportProgress>();
+const pendingFlush = new Map<string, NodeJS.Timeout>();
+const FLUSH_INTERVAL_MS = 1500; // Write to DB at most every 1.5s
 
-function getProgressKey(userId: number): string {
-  return `import_${userId}`;
+// Also keep the old progressStore reference for spreadsheet import (which stays in-memory)
+const progressStore = new Map<string, any>();
+
+function getProgressKey(tenantId: number, userId: number): string {
+  return `import_${tenantId}_${userId}`;
 }
 
-function initProgress(userId: number): ImportProgress {
+// Legacy key for backward compat in spreadsheet import
+function getLegacyKey(userId: number): string {
+  return `spreadsheet_${userId}`;
+}
+
+async function flushProgressToDb(tenantId: number, userId: number): Promise<void> {
+  const key = getProgressKey(tenantId, userId);
+  const p = progressCache.get(key);
+  if (!p) return;
+  try {
+    const db = await getDb();
+    if (!db) return;
+    await db.execute(sql.raw(`
+      INSERT INTO import_progress (tenantId, userId, importType, status, phase, currentStep, totalSteps, completedSteps, currentCategory, categoryTotal, categoryDone, results, error, startedAt, fetchPhase, fetchedRecords, totalRecordsEstimate, processedRecords, lastActivityAt, validation)
+      VALUES (${tenantId}, ${userId}, 'rdcrm', '${p.status}', ${escSql(p.phase)}, ${escSql(p.currentStep)}, ${p.totalSteps}, ${p.completedSteps}, ${escSql(p.currentCategory)}, ${p.categoryTotal}, ${p.categoryDone}, ${escSql(JSON.stringify(p.results || {}))}, ${p.error ? escSql(p.error) : 'NULL'}, ${p.startedAt}, ${p.fetchPhase ? 1 : 0}, ${p.fetchedRecords}, ${p.totalRecordsEstimate}, ${p.processedRecords}, ${p.lastActivityAt}, ${p.validation ? escSql(JSON.stringify(p.validation)) : 'NULL'})
+      ON DUPLICATE KEY UPDATE
+        status = VALUES(status), phase = VALUES(phase), currentStep = VALUES(currentStep),
+        totalSteps = VALUES(totalSteps), completedSteps = VALUES(completedSteps),
+        currentCategory = VALUES(currentCategory), categoryTotal = VALUES(categoryTotal),
+        categoryDone = VALUES(categoryDone), results = VALUES(results), error = VALUES(error),
+        fetchPhase = VALUES(fetchPhase), fetchedRecords = VALUES(fetchedRecords),
+        totalRecordsEstimate = VALUES(totalRecordsEstimate), processedRecords = VALUES(processedRecords),
+        lastActivityAt = VALUES(lastActivityAt), validation = VALUES(validation)
+    `));
+  } catch (e: any) {
+    console.error("[RD Import] Failed to flush progress to DB:", e.message?.substring(0, 120));
+  }
+}
+
+function escSql(val: string): string {
+  if (val === null || val === undefined) return 'NULL';
+  return `'${String(val).replace(/'/g, "''").replace(/\\/g, "\\\\")}'`;
+}
+
+function scheduleFlush(tenantId: number, userId: number): void {
+  const key = getProgressKey(tenantId, userId);
+  if (pendingFlush.has(key)) return; // Already scheduled
+  const timer = setTimeout(async () => {
+    pendingFlush.delete(key);
+    await flushProgressToDb(tenantId, userId);
+  }, FLUSH_INTERVAL_MS);
+  pendingFlush.set(key, timer);
+}
+
+function initProgress(tenantId: number, userId: number): ImportProgress {
   const p: ImportProgress = {
     status: "idle",
     phase: "Preparando...",
@@ -74,16 +125,69 @@ function initProgress(userId: number): ImportProgress {
     processedRecords: 0,
     lastActivityAt: Date.now(),
   };
-  progressStore.set(getProgressKey(userId), p);
+  const key = getProgressKey(tenantId, userId);
+  progressCache.set(key, p);
+  // Immediately flush the initial state
+  flushProgressToDb(tenantId, userId).catch(() => {});
   return p;
 }
 
-function updateProgress(userId: number, update: Partial<ImportProgress>) {
-  const key = getProgressKey(userId);
-  const current = progressStore.get(key);
-  if (current) {
-    Object.assign(current, update);
-    current.lastActivityAt = Date.now();
+function updateProgress(tenantId: number, userId: number, update: Partial<ImportProgress>) {
+  const key = getProgressKey(tenantId, userId);
+  let current = progressCache.get(key);
+  if (!current) {
+    // Shouldn't happen, but create a fallback
+    current = initProgress(tenantId, userId);
+  }
+  Object.assign(current, update);
+  current.lastActivityAt = Date.now();
+  // Schedule debounced DB write
+  scheduleFlush(tenantId, userId);
+}
+
+// Force immediate flush (used for critical state changes like done/error)
+async function flushNow(tenantId: number, userId: number): Promise<void> {
+  const key = getProgressKey(tenantId, userId);
+  const timer = pendingFlush.get(key);
+  if (timer) {
+    clearTimeout(timer);
+    pendingFlush.delete(key);
+  }
+  await flushProgressToDb(tenantId, userId);
+}
+
+async function readProgressFromDb(tenantId: number, userId: number): Promise<ImportProgress | null> {
+  try {
+    const db = await getDb();
+    if (!db) return null;
+    const [rows]: any = await db.execute(
+      sql.raw(`SELECT * FROM import_progress WHERE tenantId = ${tenantId} AND userId = ${userId} AND importType = 'rdcrm' LIMIT 1`)
+    );
+    if (!rows || rows.length === 0) return null;
+    const row = rows[0] || rows;
+    if (!row || !row.status) return null;
+    return {
+      status: row.status,
+      phase: row.phase || "",
+      currentStep: row.currentStep || "",
+      totalSteps: Number(row.totalSteps) || 0,
+      completedSteps: Number(row.completedSteps) || 0,
+      currentCategory: row.currentCategory || "",
+      categoryTotal: Number(row.categoryTotal) || 0,
+      categoryDone: Number(row.categoryDone) || 0,
+      results: typeof row.results === 'string' ? JSON.parse(row.results) : (row.results || {}),
+      error: row.error || undefined,
+      startedAt: Number(row.startedAt) || Date.now(),
+      fetchPhase: Boolean(row.fetchPhase),
+      fetchedRecords: Number(row.fetchedRecords) || 0,
+      totalRecordsEstimate: Number(row.totalRecordsEstimate) || 0,
+      processedRecords: Number(row.processedRecords) || 0,
+      lastActivityAt: Number(row.lastActivityAt) || Date.now(),
+      validation: row.validation ? (typeof row.validation === 'string' ? JSON.parse(row.validation) : row.validation) : undefined,
+    };
+  } catch (e: any) {
+    console.error("[RD Import] Failed to read progress from DB:", e.message?.substring(0, 120));
+    return null;
   }
 }
 
@@ -173,10 +277,15 @@ export const rdCrmImportRouter = router({
       return rdCrm.fetchRdCrmSummary(input.token);
     }),
 
-  // ─── Get Import Progress ───
-  getProgress: tenantAdminProcedure.query(({ ctx }) => {
-    const key = getProgressKey(ctx.user.id);
-    return progressStore.get(key) || null;
+  // ─── Get Import Progress (reads from database for cross-instance persistence) ───
+  getProgress: tenantAdminProcedure.query(async ({ ctx }) => {
+    const tenantId = (ctx as any).saasUser?.tenantId ?? getTenantId(ctx);
+    // First check in-memory cache (faster, same instance)
+    const key = getProgressKey(tenantId, ctx.user.id);
+    const cached = progressCache.get(key);
+    if (cached) return cached;
+    // Fallback: read from DB (cross-instance)
+    return readProgressFromDb(tenantId, ctx.user.id);
   }),
 
   // ─── Import All Data (runs in background, progress via polling) ───
@@ -201,7 +310,7 @@ export const rdCrmImportRouter = router({
       const userId = ctx.user.id;
       const userName = ctx.user.name || "Sistema";
 
-      const progress = initProgress(userId);
+      const progress = initProgress(tenantId, userId);
       progress.status = "fetching";
       progress.phase = "Iniciando importação...";
 
@@ -218,13 +327,16 @@ export const rdCrmImportRouter = router({
       if (input.importTasks) enabledCategories.push("tasks");
       enabledCategories.push("validation"); // Always run validation at the end
       progress.totalSteps = enabledCategories.length;
+      // Immediately flush the initial fetching state to DB
+      await flushNow(tenantId, userId);
 
-      runImport(userId, tenantId, token, userName, input, enabledCategories).catch((err) => {
+      runImport(tenantId, userId, tenantId, token, userName, input, enabledCategories).catch((err) => {
         console.error("[RD Import] FATAL ERROR:", err);
-        updateProgress(userId, {
+        updateProgress(tenantId, userId, {
           status: "error",
           error: err.message || "Erro desconhecido na importação",
         });
+        flushNow(tenantId, userId).catch(() => {});
       });
 
       return { started: true, categories: enabledCategories.length };
@@ -882,6 +994,7 @@ async function runSpreadsheetImport(
 
 // ─── Background import function ───
 async function runImport(
+  tenantIdForProgress: number,
   userId: number,
   tenantId: number,
   token: string,
@@ -903,19 +1016,20 @@ async function runImport(
 ) {
   const db = await getDb();
   if (!db) {
-    updateProgress(userId, { status: "error", error: "Database unavailable" });
+    updateProgress(tenantIdForProgress, userId, { status: "error", error: "Database unavailable" });
+    await flushNow(tenantIdForProgress, userId);
     return;
   }
 
   // Ensure rdExternalId columns exist
   console.log("[RD Import] Ensuring rdExternalId columns exist...");
-  updateProgress(userId, { phase: "Preparando banco de dados..." });
+  updateProgress(tenantIdForProgress, userId, { phase: "Preparando banco de dados..." });
   await ensureRdExternalIdColumns();
 
   // ─── Clean before import: remove all RD-imported data ───
   if (input.cleanBeforeImport) {
     console.log("[RD Import] Cleaning all previously imported RD Station data...");
-    updateProgress(userId, { phase: "Limpando dados importados anteriormente..." });
+    updateProgress(tenantIdForProgress, userId, { phase: "Limpando dados importados anteriormente..." });
     try {
       // Delete in order: tasks → deal_products → deal_history → deals → contacts → accounts → stages → pipelines → products → sources → campaigns → loss_reasons → crm_users (with rdExternalId)
       await db.execute(sql.raw(`DELETE FROM crm_tasks WHERE tenantId = ${tenantId} AND rdExternalId IS NOT NULL`));
@@ -975,7 +1089,7 @@ async function runImport(
 
   function advanceStep(category: string, label: string) {
     stepIndex++;
-    updateProgress(userId, {
+    updateProgress(tenantIdForProgress, userId, {
       status: "importing",
       phase: `Importando ${label}...`,
       currentStep: label,
@@ -988,7 +1102,7 @@ async function runImport(
   }
 
   function setFetchPhase(category: string, label: string) {
-    updateProgress(userId, {
+    updateProgress(tenantIdForProgress, userId, {
       fetchPhase: true,
       phase: `Buscando ${label} do RD Station...`,
       currentCategory: category,
@@ -998,7 +1112,7 @@ async function runImport(
   }
 
   function setImportPhase(label: string, total: number) {
-    updateProgress(userId, {
+    updateProgress(tenantIdForProgress, userId, {
       fetchPhase: false,
       phase: `Importando ${label}...`,
       categoryDone: 0,
@@ -1007,12 +1121,12 @@ async function runImport(
   }
 
   function setCategoryProgress(done: number, total: number) {
-    updateProgress(userId, { categoryDone: done, categoryTotal: total });
+    updateProgress(tenantIdForProgress, userId, { categoryDone: done, categoryTotal: total });
   }
 
   function addProcessed(count: number) {
     cumulativeProcessed += count;
-    updateProgress(userId, { processedRecords: cumulativeProcessed });
+    updateProgress(tenantIdForProgress, userId, { processedRecords: cumulativeProcessed });
   }
 
   function makeEntry() {
@@ -1344,10 +1458,10 @@ async function runImport(
         setFetchPhase("organizations", "empresas");
         const rdOrgs = await rdCrm.fetchAllOrganizations(token, (fetched, total) => {
           setCategoryProgress(fetched, total);
-          updateProgress(userId, { phase: `Buscando empresas... ${fetched.toLocaleString("pt-BR")}/${total.toLocaleString("pt-BR")}` });
+          updateProgress(tenantIdForProgress, userId, { phase: `Buscando empresas... ${fetched.toLocaleString("pt-BR")}/${total.toLocaleString("pt-BR")}` });
         });
         rdCounts.organizations = rdOrgs.length;
-        updateProgress(userId, { fetchedRecords: (progressStore.get(getProgressKey(userId))?.fetchedRecords || 0) + rdOrgs.length });
+        updateProgress(tenantIdForProgress, userId, { fetchedRecords: (progressCache.get(getProgressKey(tenantIdForProgress, userId))?.fetchedRecords || 0) + rdOrgs.length });
         setImportPhase("empresas", rdOrgs.length);
         setCategoryProgress(0, rdOrgs.length);
 
@@ -1396,13 +1510,12 @@ async function runImport(
         setFetchPhase("contacts", "contatos");
         const rdContacts = await rdCrm.fetchAllContacts(token, (fetched, total) => {
           setCategoryProgress(fetched, total);
-          updateProgress(userId, {
+          updateProgress(tenantIdForProgress, userId, {
             phase: `Buscando contatos... ${fetched.toLocaleString("pt-BR")}/${total.toLocaleString("pt-BR")}`,
-            fetchedRecords: (progressStore.get(getProgressKey(userId))?.fetchedRecords || 0) + 0, // keep current
           });
         });
         rdCounts.contacts = rdContacts.length;
-        updateProgress(userId, { fetchedRecords: (progressStore.get(getProgressKey(userId))?.fetchedRecords || 0) + rdContacts.length });
+        updateProgress(tenantIdForProgress, userId, { fetchedRecords: (progressCache.get(getProgressKey(tenantIdForProgress, userId))?.fetchedRecords || 0) + rdContacts.length });
         console.log(`[RD Import] Fetched ${rdContacts.length} contacts. Starting import...`);
         setImportPhase("contatos", rdContacts.length);
         setCategoryProgress(0, rdContacts.length);
@@ -1525,12 +1638,12 @@ async function runImport(
         setFetchPhase("deals", "negocia\u00e7\u00f5es");
         const rdDeals = await rdCrm.fetchAllDeals(token, (fetched, total) => {
           setCategoryProgress(fetched, total);
-          updateProgress(userId, {
+          updateProgress(tenantIdForProgress, userId, {
             phase: `Buscando negocia\u00e7\u00f5es... ${fetched.toLocaleString("pt-BR")}/${total.toLocaleString("pt-BR")}`,
           });
         });
         rdCounts.deals = rdDeals.length;
-        updateProgress(userId, { fetchedRecords: (progressStore.get(getProgressKey(userId))?.fetchedRecords || 0) + rdDeals.length });
+        updateProgress(tenantIdForProgress, userId, { fetchedRecords: (progressCache.get(getProgressKey(tenantIdForProgress, userId))?.fetchedRecords || 0) + rdDeals.length });
         console.log(`[RD Import] Fetched ${rdDeals.length} deals. Starting import...`);
 
         setImportPhase("negocia\u00e7\u00f5es", rdDeals.length);
@@ -1808,10 +1921,10 @@ async function runImport(
         setFetchPhase("tasks", "tarefas");
         const rdTasks = await rdCrm.fetchAllTasks(token, (fetched, total) => {
           setCategoryProgress(fetched, total);
-          updateProgress(userId, { phase: `Buscando tarefas... ${fetched.toLocaleString("pt-BR")}/${total.toLocaleString("pt-BR")}` });
+          updateProgress(tenantIdForProgress, userId, { phase: `Buscando tarefas... ${fetched.toLocaleString("pt-BR")}/${total.toLocaleString("pt-BR")}` });
         });
         rdCounts.tasks = rdTasks.length;
-        updateProgress(userId, { fetchedRecords: (progressStore.get(getProgressKey(userId))?.fetchedRecords || 0) + rdTasks.length });
+        updateProgress(tenantIdForProgress, userId, { fetchedRecords: (progressCache.get(getProgressKey(tenantIdForProgress, userId))?.fetchedRecords || 0) + rdTasks.length });
         console.log(`[RD Import] Fetched ${rdTasks.length} tasks. Starting import...`);
         setImportPhase("tarefas", rdTasks.length);
         setCategoryProgress(0, rdTasks.length);
@@ -1904,7 +2017,7 @@ async function runImport(
     // 11. POST-IMPORT VALIDATION
     // ═══════════════════════════════════════════════════════════
     advanceStep("validation", "Validação pós-importação");
-    updateProgress(userId, { phase: "Validando dados importados..." });
+    updateProgress(tenantIdForProgress, userId, { phase: "Validando dados importados..." });
 
     const validation: ImportValidation = {
       rdCounts,
@@ -1974,20 +2087,23 @@ async function runImport(
     }
 
     // ─── Done ───
-    updateProgress(userId, {
+    updateProgress(tenantIdForProgress, userId, {
       status: "done",
       phase: "Importação concluída!",
       completedSteps: enabledCategories.length,
       results,
       validation,
     });
+    // Immediately flush final state to DB
+    await flushNow(tenantIdForProgress, userId);
     console.log("[RD Import] IMPORT COMPLETE. Results:", JSON.stringify(results, null, 2));
   } catch (e: any) {
     console.error("[RD Import] FATAL:", e.message, e.stack);
-    updateProgress(userId, {
+    updateProgress(tenantIdForProgress, userId, {
       status: "error",
       error: e.message || "Erro desconhecido na importação",
       results,
     });
+    await flushNow(tenantIdForProgress, userId).catch(() => {});
   }
 }
