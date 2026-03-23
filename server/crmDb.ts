@@ -41,6 +41,13 @@ export async function createTenant(data: { name: string; plan?: "free" | "pro" |
   } catch (e) {
     console.error("[Onboarding] Failed to seed default loss reasons:", e);
   }
+  // Auto-seed default UTM field mappings for new tenant
+  try {
+    const { seedDefaultUtmMappings } = await import("./services/seedDefaultUtmMappings");
+    await seedDefaultUtmMappings(result.id);
+  } catch (e) {
+    console.error("[Onboarding] Failed to seed default UTM mappings:", e);
+  }
   return result;
 }
 export async function getTenantById(id: number) {

@@ -4627,3 +4627,19 @@
 - [x] Testes vitest: 19 testes passando (auth, overview, bySources, byCampaigns, dealList, filterOptions, multi-tenant)
 - [x] Validar que nada fora desse relatório foi alterado
 - [x] Validar segurança e blindagem de tenants (2 testes de isolamento)
+
+## UTMs como Padrão Nativo Global — Todas as Tenants
+
+- [x] Diagnosticar como os 5 UTMs funcionam hoje (deals columns, applyFieldMappings, rd_field_mappings)
+- [x] Criar lógica de provisionamento idempotente (seedDefaultUtmMappings.ts)
+- [x] Evitar duplicação: verifica rdFieldKey + enturFieldKey antes de criar
+- [x] Preservar mapeamentos manuais já válidos (Entur 150002: 0 criados, 5 skipped)
+- [x] Garantir que novas tenants nasçam com os 5 UTMs: hook no createTenant (crmDb.ts)
+- [x] Migração executada: 28 tenants, 27 provisionadas, 135 mapeamentos criados, 0 duplicações
+- [x] Idempotência confirmada: segunda execução = 0 criados, 140 skipped
+- [x] Testes vitest: 16 novos (idempotência, duplicação, isolamento, auth)
+- [x] Testes vitest: segurança multi-tenant preservada (isolamento confirmado)
+- [x] Validar aba RASTREAMENTO continua correta (lê de deal.utm* — OK)
+- [x] Validar relatórios de conversão por canal continuam corretos (utmAnalyticsRouter — OK)
+- [x] Validar webhook RD Station continua funcionando (16 testes fieldMapping passando)
+- [x] Confirmar que nada fora do escopo foi alterado (apenas 2 arquivos + 1 script)
