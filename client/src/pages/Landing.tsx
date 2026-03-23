@@ -29,43 +29,46 @@ export default function Landing() {
 
   return (
     <div className="min-h-screen bg-[#0a0a12] text-white overflow-x-hidden">
-      {/* 1. Hero — promessa principal */}
+      {/* 1. Hero */}
       <HeroSection onCTA={scrollToPlanos} onDemo={scrollToDemo} />
 
-      {/* 2. Simulador de vendas — engajamento imediato */}
+      {/* Simulador simples */}
       <SalesSimulator onCTA={scrollToPlanos} />
 
-      {/* 3. Bloco de problema — dor real */}
+      {/* CTA between sections */}
+      <SectionCTA text="Quero organizar minhas vendas" onClick={scrollToPlanos} variant="secondary" />
+
+      {/* 2. Seção do Inimigo */}
       <EnemySection />
 
-      {/* CTA de transição */}
-      <SectionCTA text="Quero parar de perder vendas" onClick={scrollToPlanos} variant="secondary" />
-
-      {/* 4. Revelação — dados e padrão */}
+      {/* 3. Seção de Revelação */}
       <RevelationSection />
 
-      {/* 5. Solução — apresentação do ENTUR OS */}
+      {/* CTA between sections */}
+      <SectionCTA text="Quero ver como funciona o ENTUR OS" onClick={scrollToPlanos} />
+
+      {/* 4. Introdução da Solução */}
       <SolutionSection />
 
-      {/* CTA de transição */}
-      <SectionCTA text="Quero conhecer o ENTUR OS" onClick={scrollToPlanos} />
-
-      {/* 6. Benefícios percebidos */}
+      {/* 5. Como Funciona */}
       <HowItWorks />
 
-      {/* 7. Diferencial — por que não usar CRM genérico */}
-      <DifferentiatorSection />
+      {/* CTA between sections */}
+      <SectionCTA text="Quero estruturar meu processo comercial" onClick={scrollToPlanos} variant="secondary" />
 
-      {/* CTA de transição */}
-      <SectionCTA text="Quero um sistema feito para turismo" onClick={scrollToPlanos} variant="secondary" />
-
-      {/* 8. Prova social — resultados e credibilidade */}
+      {/* 6. Prova Social */}
       <SocialProof />
 
-      {/* 9. Demonstração visual */}
+      {/* 7. Diferencial */}
+      <DifferentiatorSection />
+
+      {/* CTA between sections */}
+      <SectionCTA text="Quero um sistema feito para turismo" onClick={scrollToPlanos} />
+
+      {/* 8. Demonstração */}
       <DemoSection />
 
-      {/* 10. Planos, preços e CTA final */}
+      {/* 9. Planos e Preços */}
       <PricingSection onSelectPlan={goToRegister} />
 
       {/* Sticky CTA Mobile */}

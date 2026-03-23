@@ -1,66 +1,61 @@
 import { FadeIn } from "./FadeIn";
-import { Plane, X, Check } from "lucide-react";
+import { Plane, Heart, Calendar, Users, MapPin, Sparkles } from "lucide-react";
 
-const comparisons = [
-  { generic: "Funil genérico de vendas", entur: "Pipeline com etapas do turismo (orçamento, proposta, reserva, embarque)" },
-  { generic: "Campos padrão (empresa, cargo)", entur: "Campos de viagem: destino, data, passageiros, tipo de pacote" },
-  { generic: "Sem contexto do setor", entur: "Inteligência comercial baseada em 8.000+ agentes treinados" },
-  { generic: "WhatsApp via integração terceira", entur: "WhatsApp nativo com histórico vinculado à negociação" },
-  { generic: "Relatórios genéricos", entur: "Relatórios por destino, operadora, produto e sazonalidade" },
-  { generic: "Suporte técnico padrão", entur: "Suporte + mentoria comercial para agências" },
+const DIFFERENTIALS = [
+  { icon: <MapPin className="w-6 h-6" />, title: "Planejamento", description: "Roteiros, destinos e logística que CRMs genéricos não entendem" },
+  { icon: <Users className="w-6 h-6" />, title: "Família", description: "Viagens envolvem múltiplos viajantes, preferências e necessidades" },
+  { icon: <Calendar className="w-6 h-6" />, title: "Datas", description: "Sazonalidade, alta temporada e janelas de oportunidade específicas" },
+  { icon: <Heart className="w-6 h-6" />, title: "Emoção", description: "Vender viagens é vender sonhos — o processo precisa refletir isso" },
 ];
 
 export function DifferentiatorSection() {
   return (
-    <section className="relative py-24 sm:py-32">
+    <section className="py-20 sm:py-28 px-5 sm:px-8 relative overflow-hidden">
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute bottom-0 right-0 w-[600px] h-[500px] bg-gradient-to-tl from-fuchsia-600/8 to-transparent rounded-full blur-[120px]" />
       </div>
 
-      <div className="max-w-5xl mx-auto px-5 sm:px-8 relative z-10">
+      <div className="max-w-4xl mx-auto relative z-10">
         <FadeIn>
-          <div className="text-center max-w-3xl mx-auto mb-16">
-            <div className="inline-flex items-center gap-2 bg-fuchsia-500/10 text-fuchsia-300 px-4 py-1.5 rounded-full text-sm font-medium mb-6 border border-fuchsia-500/15">
+          <div className="text-center mb-12">
+            <div className="inline-flex items-center gap-2 bg-fuchsia-500/10 text-fuchsia-300 px-4 py-1.5 rounded-full text-sm font-medium mb-5 border border-fuchsia-500/15">
               <Plane className="w-4 h-4" />
               Feito para turismo
             </div>
-            <h2 className="text-3xl sm:text-4xl lg:text-[2.75rem] font-bold tracking-tight text-white mb-6 leading-tight">
-              Por que um CRM genérico{" "}
-              <span className="text-fuchsia-400">não funciona</span>{" "}
-              para agências de viagens?
+            <h2 className="text-3xl sm:text-4xl font-bold text-white mb-4 tracking-tight">
+              Não é um CRM genérico
             </h2>
-            <p className="text-lg text-white/50 leading-relaxed">
-              Vender viagens não é vender software. O processo, os dados e o relacionamento são completamente diferentes.
-              O ENTUR OS foi construído do zero para o turismo.
+            <p className="text-lg text-white/45 max-w-2xl mx-auto leading-relaxed">
+              Foi criado especificamente para o mercado de turismo.
+              Porque vender viagens envolve:
             </p>
           </div>
         </FadeIn>
 
-        <FadeIn delay={0.15}>
-          <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl overflow-hidden">
-            {/* Header */}
-            <div className="grid grid-cols-2 border-b border-white/[0.06]">
-              <div className="px-6 py-4 text-center">
-                <span className="text-sm font-medium text-white/40">CRM Genérico</span>
+        <div className="grid sm:grid-cols-2 gap-5">
+          {DIFFERENTIALS.map((d, i) => (
+            <FadeIn key={i} delay={0.1 * (i + 1)}>
+              <div className="group flex items-start gap-5 bg-white/[0.03] border border-white/[0.06] rounded-xl p-6 hover:border-fuchsia-500/20 hover:bg-white/[0.05] transition-all duration-300">
+                <div className="w-12 h-12 rounded-xl bg-fuchsia-500/10 flex items-center justify-center text-fuchsia-400 flex-shrink-0 group-hover:scale-110 transition-transform duration-300">
+                  {d.icon}
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-white mb-1">{d.title}</h3>
+                  <p className="text-sm text-white/40 leading-relaxed">{d.description}</p>
+                </div>
               </div>
-              <div className="px-6 py-4 text-center bg-violet-500/[0.06] border-l border-white/[0.06]">
-                <span className="text-sm font-semibold text-violet-400">ENTUR OS</span>
-              </div>
-            </div>
+            </FadeIn>
+          ))}
+        </div>
 
-            {/* Rows */}
-            {comparisons.map((row, i) => (
-              <div key={i} className={`grid grid-cols-2 ${i < comparisons.length - 1 ? "border-b border-white/[0.04]" : ""}`}>
-                <div className="px-6 py-4 flex items-start gap-3">
-                  <X className="w-4 h-4 text-red-400/60 flex-shrink-0 mt-0.5" />
-                  <span className="text-sm text-white/40 leading-relaxed">{row.generic}</span>
-                </div>
-                <div className="px-6 py-4 flex items-start gap-3 bg-violet-500/[0.03] border-l border-white/[0.06]">
-                  <Check className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
-                  <span className="text-sm text-white/70 leading-relaxed">{row.entur}</span>
-                </div>
-              </div>
-            ))}
+        <FadeIn delay={0.5}>
+          <div className="mt-10 text-center">
+            <div className="inline-flex items-center gap-2 bg-white/[0.04] border border-white/[0.08] rounded-xl px-6 py-3">
+              <Sparkles className="w-4 h-4 text-violet-400" />
+              <span className="text-sm text-white/50">
+                Criado pela <span className="text-white/70 font-medium">Escola de Negócios do Turismo</span> com base em +8.000 agentes treinados
+              </span>
+            </div>
           </div>
         </FadeIn>
       </div>

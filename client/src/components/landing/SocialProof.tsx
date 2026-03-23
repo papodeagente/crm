@@ -1,37 +1,28 @@
 import { FadeIn } from "./FadeIn";
-import { Star, Quote, Shield, Users, Award } from "lucide-react";
+import { Star, Quote } from "lucide-react";
 
 const TESTIMONIALS = [
   {
     name: "Ana Souza",
     city: "São Paulo, SP",
     photo: "https://d2xsxph8kpxj0f.cloudfront.net/310519663249817763/EKvcVicuVoUxTnzjSKzgdk/testimonial-woman-1_42afe008.jpg",
-    result: "+35% de conversão",
+    result: "Aumentou conversão em 35%",
     text: "Antes do ENTUR OS, eu perdia clientes porque esquecia de fazer follow-up. Agora tenho visão completa de cada negociação e minha conversão subiu de 12% para 35% em 6 meses.",
-    role: "Agente autônoma",
   },
   {
     name: "Carlos Mendes",
     city: "Belo Horizonte, MG",
     photo: "https://d2xsxph8kpxj0f.cloudfront.net/310519663249817763/EKvcVicuVoUxTnzjSKzgdk/testimonial-man-1_14ea59a3.jpg",
-    result: "+R$180k recuperados",
+    result: "Recuperou R$180k em vendas",
     text: "Descobri que 40% dos meus orçamentos ficavam sem resposta. Com o pipeline e os alertas automáticos, recuperei vendas que estavam perdidas. Resultado: R$180 mil a mais no ano.",
-    role: "Dono de agência",
   },
   {
     name: "Juliana Costa",
     city: "Florianópolis, SC",
     photo: "https://d2xsxph8kpxj0f.cloudfront.net/310519663249817763/EKvcVicuVoUxTnzjSKzgdk/testimonial-woman-2_c8a09ffc.jpg",
-    result: "3x mais faturamento",
+    result: "Triplicou o faturamento",
     text: "Minha equipe de 5 agentes agora trabalha com processo definido. Cada um sabe exatamente o que fazer e quando. O faturamento triplicou em 12 meses.",
-    role: "Gestora comercial",
   },
-];
-
-const TRUST_STATS = [
-  { icon: Users, value: "8.000+", label: "agentes treinados pela ENT" },
-  { icon: Award, value: "12+", label: "anos formando profissionais do turismo" },
-  { icon: Shield, value: "100%", label: "dados protegidos e isolados por agência" },
 ];
 
 export function SocialProof() {
@@ -41,30 +32,14 @@ export function SocialProof() {
         <FadeIn>
           <div className="text-center mb-14">
             <h2 className="text-3xl sm:text-4xl font-bold text-white mb-3 tracking-tight">
-              Quem usa, vende mais
+              Resultados reais de agências reais
             </h2>
             <p className="text-lg text-white/40">
-              Resultados reais de agências que trocaram o improviso por processo
+              Veja o que agências como a sua conquistaram com processo comercial estruturado
             </p>
           </div>
         </FadeIn>
 
-        {/* Trust stats */}
-        <FadeIn delay={0.05}>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-12">
-            {TRUST_STATS.map((stat, i) => (
-              <div key={i} className="flex items-center gap-3 bg-white/[0.02] border border-white/[0.06] rounded-xl px-5 py-4">
-                <stat.icon className="w-5 h-5 text-violet-400/60 shrink-0" />
-                <div>
-                  <span className="text-lg font-bold text-white">{stat.value}</span>
-                  <span className="text-sm text-white/35 ml-1.5">{stat.label}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </FadeIn>
-
-        {/* Testimonials */}
         <div className="grid md:grid-cols-3 gap-5">
           {TESTIMONIALS.map((t, i) => (
             <FadeIn key={i} delay={0.1 * (i + 1)}>
@@ -89,7 +64,7 @@ export function SocialProof() {
                   />
                   <div>
                     <p className="text-sm font-medium text-white">{t.name}</p>
-                    <p className="text-xs text-white/30">{t.role} &middot; {t.city}</p>
+                    <p className="text-xs text-white/30">{t.city}</p>
                   </div>
                 </div>
 

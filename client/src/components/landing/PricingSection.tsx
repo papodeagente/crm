@@ -3,9 +3,24 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { FadeIn } from "./FadeIn";
-import { Check, ArrowRight, X, Phone, Star, Sparkles } from "lucide-react";
+import { Check, ArrowRight, X, Phone } from "lucide-react";
 
 const LOGO_URL = "https://files.manuscdn.com/user_upload_by_module/session_file/310519663249817763/XXuAsdiNIcgnwwra.png";
+
+const SHARED_FEATURES = [
+  "Pipeline visual de negociações",
+  "Gestão de contatos e empresas",
+  "Catálogo de produtos turísticos",
+  "Propostas comerciais",
+  "Tarefas e follow-up",
+  "WhatsApp integrado (inbox)",
+  "Histórico completo de atendimento",
+  "Dashboard com indicadores",
+  "Matriz RFV de clientes",
+  "Análise de conversas com IA",
+  "Funil de pós-venda",
+  "Campos personalizados",
+];
 
 interface PricingSectionProps {
   onSelectPlan: () => void;
@@ -33,70 +48,53 @@ export function PricingSection({ onSelectPlan }: PricingSectionProps) {
           <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[600px] bg-gradient-to-b from-violet-600/15 via-purple-600/10 to-transparent rounded-full blur-[120px]" />
         </div>
 
-        <div className="max-w-6xl mx-auto relative z-10">
+        <div className="max-w-5xl mx-auto relative z-10">
           <FadeIn>
             <div className="text-center mb-14">
-              <span className="inline-block text-sm font-medium text-violet-400/80 bg-violet-500/10 border border-violet-500/15 px-4 py-1.5 rounded-full mb-6">
-                Planos e preços
-              </span>
-              <h2 className="text-3xl sm:text-4xl lg:text-[2.75rem] font-bold text-white mb-4 tracking-tight leading-tight">
-                Escolha o plano certo{" "}
+              <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white mb-4 tracking-tight leading-tight">
+                Escolha o plano ideal{" "}
                 <span className="bg-gradient-to-r from-violet-400 via-purple-400 to-fuchsia-400 bg-clip-text text-transparent">
-                  para o momento da sua agência
+                  para sua agência
                 </span>
               </h2>
-              <p className="text-lg text-white/45 max-w-2xl mx-auto leading-relaxed">
-                Cada plano foi pensado para um estágio diferente de maturidade comercial.
-                Comece de onde faz sentido para você. Sem fidelidade.
+              <p className="text-lg text-white/40 max-w-xl mx-auto">
+                Todos os planos incluem acesso completo ao ENTUR OS. Sem fidelidade.
               </p>
             </div>
           </FadeIn>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-5 items-start">
-            {/* SOLO */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8">
+            {/* BASIC */}
             <FadeIn delay={0.1}>
-              <div className="bg-white/[0.03] border border-white/[0.08] rounded-2xl p-7 flex flex-col h-full backdrop-blur-sm">
+              <div className="bg-white/[0.03] border border-white/[0.08] rounded-2xl p-6 sm:p-8 flex flex-col h-full backdrop-blur-sm">
                 <div className="mb-6">
-                  <p className="text-sm font-bold text-white/50 uppercase tracking-wider mb-1">Solo</p>
-                  <p className="text-sm text-white/35 mb-4">Para quem vende sozinho e quer organizar sua operação comercial de verdade.</p>
+                  <p className="text-sm font-medium text-white/40 uppercase tracking-wider mb-2">Basic</p>
                   <div className="flex items-baseline gap-1">
-                    <span className="text-4xl font-bold text-white">R$ 97</span>
+                    <span className="text-4xl font-bold text-white">R$ 67</span>
                     <span className="text-white/30 text-sm">/mês</span>
                   </div>
-                  <p className="text-xs text-white/25 mt-1.5">1 usuário incluso</p>
+                  <p className="text-sm text-white/30 mt-2">1 usuário incluso</p>
                 </div>
 
-                <div className="border-t border-white/[0.06] pt-5 mb-6 flex-1">
-                  <p className="text-xs font-semibold text-white/40 uppercase tracking-wider mb-4">O que você ganha:</p>
+                <div className="border-t border-white/[0.06] pt-6 mb-6 flex-1">
+                  <p className="text-xs font-medium text-white/50 uppercase tracking-wider mb-4">Inclui:</p>
                   <ul className="space-y-3">
-                    {[
-                      "Pipeline visual de negociações",
-                      "Gestão completa de contatos e empresas",
-                      "1 número de WhatsApp integrado",
-                      "Follow-up e tarefas automáticas",
-                      "Catálogo de produtos turísticos",
-                      "Propostas comerciais",
-                      "Dashboard com indicadores",
-                      "Matriz RFV de clientes",
-                      "Análise de conversas com IA",
-                      "Funil de pós-venda",
-                      "Campos personalizados",
-                    ].map((f, i) => (
-                      <li key={i} className="flex items-start gap-2.5 text-sm text-white/55">
+                    {SHARED_FEATURES.map((f, i) => (
+                      <li key={i} className="flex items-start gap-2.5 text-sm text-white/60">
                         <Check className="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" />
                         <span>{f}</span>
                       </li>
                     ))}
-                    <li className="flex items-start gap-2.5 text-sm text-white/25 mt-2">
-                      <X className="w-4 h-4 text-white/15 mt-0.5 shrink-0" />
-                      <span>Automações de vendas</span>
+                    <li className="flex items-start gap-2.5 text-sm text-white/35">
+                      <X className="w-4 h-4 text-white/20 mt-0.5 shrink-0" />
+                      <span>Automações por etapa do funil</span>
                     </li>
-                    <li className="flex items-start gap-2.5 text-sm text-white/25">
-                      <X className="w-4 h-4 text-white/15 mt-0.5 shrink-0" />
-                      <span>Automações de pós vendas</span>
+                    <li className="flex items-start gap-2.5 text-sm text-white/35">
+                      <X className="w-4 h-4 text-white/20 mt-0.5 shrink-0" />
+                      <span>Automações por data de embarque</span>
                     </li>
-                    <li className="flex items-start gap-2.5 text-sm text-white/25">
-                      <X className="w-4 h-4 text-white/15 mt-0.5 shrink-0" />
+                    <li className="flex items-start gap-2.5 text-sm text-white/35">
+                      <X className="w-4 h-4 text-white/20 mt-0.5 shrink-0" />
                       <span>Usuários adicionais</span>
                     </li>
                   </ul>
@@ -111,103 +109,96 @@ export function PricingSection({ onSelectPlan }: PricingSectionProps) {
               </div>
             </FadeIn>
 
-            {/* GROWTH - HIGHLIGHTED */}
+            {/* PRO */}
             <FadeIn delay={0.2}>
-              <div className="relative bg-gradient-to-b from-violet-500/[0.10] to-purple-500/[0.04] border-2 border-violet-500/30 rounded-2xl p-7 flex flex-col h-full backdrop-blur-sm shadow-xl shadow-violet-500/10 md:-mt-4 md:mb-[-16px]">
-                <div className="absolute -top-3.5 left-1/2 -translate-x-1/2">
-                  <span className="inline-flex items-center gap-1.5 bg-gradient-to-r from-violet-600 to-purple-600 text-white text-xs font-bold px-5 py-1.5 rounded-full shadow-lg shadow-violet-500/30">
-                    <Star className="w-3.5 h-3.5" />
-                    Melhor escolha
+              <div className="bg-gradient-to-b from-violet-500/[0.08] to-purple-500/[0.03] border border-violet-500/20 rounded-2xl p-6 sm:p-8 flex flex-col h-full relative backdrop-blur-sm">
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                  <span className="bg-gradient-to-r from-violet-600 to-purple-600 text-white text-xs font-semibold px-4 py-1.5 rounded-full shadow-lg shadow-violet-500/25">
+                    Mais popular
                   </span>
                 </div>
 
-                <div className="mb-6 mt-1">
-                  <p className="text-sm font-bold text-violet-400 uppercase tracking-wider mb-1">Growth</p>
-                  <p className="text-sm text-white/45 mb-4">Para agências que querem crescer com processo, equipe, automação e previsibilidade.</p>
+                <div className="mb-6">
+                  <p className="text-sm font-medium text-violet-400 uppercase tracking-wider mb-2">Pro</p>
                   <div className="flex items-baseline gap-1">
-                    <span className="text-4xl font-bold text-white">R$ 297</span>
+                    <span className="text-4xl font-bold text-white">R$ 97</span>
                     <span className="text-white/30 text-sm">/mês</span>
                   </div>
-                  <p className="text-xs text-white/25 mt-1.5">Até 5 usuários inclusos &middot; + R$ 97/mês por adicional</p>
+                  <p className="text-sm text-white/30 mt-2">Até 4 usuários inclusos</p>
+                  <p className="text-xs text-white/20 mt-1">+ R$ 97/mês por usuário adicional</p>
                 </div>
 
-                <div className="border-t border-violet-500/15 pt-5 mb-6 flex-1">
-                  <p className="text-xs font-semibold text-violet-400/60 uppercase tracking-wider mb-4">Tudo do Solo, mais:</p>
+                <div className="border-t border-violet-500/10 pt-6 mb-6 flex-1">
+                  <p className="text-xs font-medium text-white/50 uppercase tracking-wider mb-4">Tudo do Basic, mais:</p>
                   <ul className="space-y-3">
-                    {[
-                      "Pipeline visual de negociações",
-                      "Gestão completa de contatos e empresas",
-                      "1 número de WhatsApp integrado",
-                      "Follow-up e tarefas automáticas",
-                      "Catálogo de produtos turísticos",
-                      "Propostas comerciais",
-                      "Dashboard com indicadores",
-                      "Matriz RFV de clientes",
-                      "Análise de conversas com IA",
-                      "Funil de pós-venda",
-                      "Campos personalizados",
-                    ].map((f, i) => (
-                      <li key={i} className="flex items-start gap-2.5 text-sm text-white/55">
+                    {SHARED_FEATURES.map((f, i) => (
+                      <li key={i} className="flex items-start gap-2.5 text-sm text-white/60">
                         <Check className="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" />
                         <span>{f}</span>
                       </li>
                     ))}
-                    <li className="flex items-start gap-2.5 text-sm text-white/80 mt-2 pt-2 border-t border-violet-500/10">
-                      <Sparkles className="w-4 h-4 text-violet-400 mt-0.5 shrink-0" />
-                      <span className="font-medium">Automações de vendas</span>
+                    <li className="flex items-start gap-2.5 text-sm text-white/80">
+                      <Check className="w-4 h-4 text-violet-400 mt-0.5 shrink-0" />
+                      <span className="font-medium">Automações por etapa do funil</span>
                     </li>
                     <li className="flex items-start gap-2.5 text-sm text-white/80">
-                      <Sparkles className="w-4 h-4 text-violet-400 mt-0.5 shrink-0" />
-                      <span className="font-medium">Automações de pós vendas</span>
+                      <Check className="w-4 h-4 text-violet-400 mt-0.5 shrink-0" />
+                      <span className="font-medium">Automações por data de embarque</span>
                     </li>
                     <li className="flex items-start gap-2.5 text-sm text-white/80">
-                      <Sparkles className="w-4 h-4 text-violet-400 mt-0.5 shrink-0" />
-                      <span className="font-medium">Até 5 usuários inclusos</span>
+                      <Check className="w-4 h-4 text-violet-400 mt-0.5 shrink-0" />
+                      <span className="font-medium">Até 4 usuários inclusos</span>
                     </li>
                   </ul>
                 </div>
 
                 <Button
-                  className="w-full h-12 bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white border-0 shadow-lg shadow-violet-500/25 transition-all duration-300 hover:shadow-violet-500/40 font-semibold"
+                  className="w-full h-12 bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white border-0 shadow-lg shadow-violet-500/25 transition-all duration-300 hover:shadow-violet-500/35"
                   onClick={onSelectPlan}
                 >
-                  Começar com Growth <ArrowRight className="w-4 h-4 ml-2" />
+                  Começar agora <ArrowRight className="w-4 h-4 ml-2" />
                 </Button>
               </div>
             </FadeIn>
 
-            {/* SCALE */}
+            {/* ENTERPRISE */}
             <FadeIn delay={0.3}>
-              <div className="bg-white/[0.03] border border-white/[0.08] rounded-2xl p-7 flex flex-col h-full backdrop-blur-sm">
+              <div className="bg-white/[0.03] border border-white/[0.08] rounded-2xl p-6 sm:p-8 flex flex-col h-full backdrop-blur-sm">
                 <div className="mb-6">
-                  <p className="text-sm font-bold text-amber-400/70 uppercase tracking-wider mb-1">Scale</p>
-                  <p className="text-sm text-white/35 mb-4">Para operações estruturadas que precisam de suporte próximo e implantação consultiva.</p>
+                  <p className="text-sm font-medium text-white/40 uppercase tracking-wider mb-2">Enterprise</p>
                   <div className="flex items-baseline gap-1">
-                    <span className="text-3xl font-bold text-white">Sob consulta</span>
+                    <span className="text-4xl font-bold text-white">Sob consulta</span>
                   </div>
-                  <p className="text-xs text-white/25 mt-1.5">Usuários ilimitados</p>
+                  <p className="text-sm text-white/30 mt-2">Usuários ilimitados</p>
                 </div>
 
-                <div className="border-t border-white/[0.06] pt-5 mb-6 flex-1">
-                  <p className="text-xs font-semibold text-white/40 uppercase tracking-wider mb-4">Tudo do Growth, mais:</p>
+                <div className="border-t border-white/[0.06] pt-6 mb-6 flex-1">
+                  <p className="text-xs font-medium text-white/50 uppercase tracking-wider mb-4">Tudo do Pro, mais:</p>
                   <ul className="space-y-3">
-                    <li className="flex items-start gap-2.5 text-sm text-white/55">
+                    <li className="flex items-start gap-2.5 text-sm text-white/60">
                       <Check className="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" />
-                      <span>Todas as funcionalidades do Growth</span>
+                      <span>Todas as funcionalidades do Pro</span>
                     </li>
-                    {[
-                      "Usuários ilimitados",
-                      "Onboarding personalizado",
-                      "Suporte prioritário dedicado",
-                      "Consultoria comercial para sua agência",
-                      "SLA de atendimento",
-                      "Implantação orientada",
-                    ].map((f, i) => (
-                      <li key={i} className="flex items-start gap-2.5 text-sm text-white/70">
-                        <Check className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
-                        <span className="font-medium">{f}</span>
-                      </li>
-                    ))}
+                    <li className="flex items-start gap-2.5 text-sm text-white/80">
+                      <Check className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
+                      <span className="font-medium">Usuários ilimitados</span>
+                    </li>
+                    <li className="flex items-start gap-2.5 text-sm text-white/80">
+                      <Check className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
+                      <span className="font-medium">Onboarding personalizado</span>
+                    </li>
+                    <li className="flex items-start gap-2.5 text-sm text-white/80">
+                      <Check className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
+                      <span className="font-medium">Suporte prioritário</span>
+                    </li>
+                    <li className="flex items-start gap-2.5 text-sm text-white/80">
+                      <Check className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
+                      <span className="font-medium">Consultoria comercial dedicada</span>
+                    </li>
+                    <li className="flex items-start gap-2.5 text-sm text-white/80">
+                      <Check className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
+                      <span className="font-medium">SLA de atendimento</span>
+                    </li>
                   </ul>
                 </div>
 
@@ -220,62 +211,6 @@ export function PricingSection({ onSelectPlan }: PricingSectionProps) {
               </div>
             </FadeIn>
           </div>
-
-          {/* Trust badges */}
-          <FadeIn delay={0.4}>
-            <div className="mt-12 flex flex-wrap items-center justify-center gap-6 text-sm text-white/30">
-              <span className="flex items-center gap-2">
-                <Check className="w-4 h-4 text-emerald-400/50" />
-                Sem fidelidade
-              </span>
-              <span className="flex items-center gap-2">
-                <Check className="w-4 h-4 text-emerald-400/50" />
-                Cancele quando quiser
-              </span>
-              <span className="flex items-center gap-2">
-                <Check className="w-4 h-4 text-emerald-400/50" />
-                Suporte incluso em todos os planos
-              </span>
-            </div>
-          </FadeIn>
-        </div>
-      </section>
-
-      {/* Final CTA Block */}
-      <section className="py-20 sm:py-28 px-5 sm:px-8 relative">
-        <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[600px] h-[400px] bg-gradient-to-t from-violet-600/10 to-transparent rounded-full blur-[100px]" />
-        </div>
-        <div className="max-w-3xl mx-auto text-center relative z-10">
-          <FadeIn>
-            <h2 className="text-3xl sm:text-4xl font-bold text-white mb-4 tracking-tight leading-tight">
-              Sua agência merece vender com processo,{" "}
-              <span className="bg-gradient-to-r from-violet-400 to-purple-400 bg-clip-text text-transparent">
-                não com improviso.
-              </span>
-            </h2>
-            <p className="text-lg text-white/45 mb-8 leading-relaxed">
-              Comece hoje. Organize suas vendas. Acompanhe cada cliente.
-              E veja a diferença que um processo comercial de verdade faz no seu faturamento.
-            </p>
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-              <Button
-                size="lg"
-                className="h-13 px-8 bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white border-0 shadow-lg shadow-violet-500/25 hover:shadow-violet-500/40 transition-all duration-300 text-base font-semibold"
-                onClick={onSelectPlan}
-              >
-                Começar agora <ArrowRight className="w-5 h-5 ml-2" />
-              </Button>
-              <Button
-                size="lg"
-                variant="outline"
-                className="h-13 px-8 bg-transparent border-white/10 text-white/60 hover:text-white hover:border-white/20 transition-all duration-300 text-base"
-                onClick={() => setShowEnterprise(true)}
-              >
-                <Phone className="w-4 h-4 mr-2" /> Falar com vendas
-              </Button>
-            </div>
-          </FadeIn>
         </div>
       </section>
 
@@ -324,9 +259,9 @@ export function PricingSection({ onSelectPlan }: PricingSectionProps) {
               </div>
             ) : (
               <>
-                <h3 className="text-xl font-bold text-white mb-1">Plano Scale</h3>
+                <h3 className="text-xl font-bold text-white mb-1">Plano Enterprise</h3>
                 <p className="text-sm text-white/40 mb-6">
-                  Preencha o formulário e nossa equipe entrará em contato para entender sua operação e montar a melhor proposta.
+                  Preencha o formulário e nossa equipe de vendas entrará em contato.
                 </p>
 
                 <form onSubmit={handleEnterpriseSubmit} className="space-y-4">
