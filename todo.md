@@ -4661,3 +4661,11 @@
 
 ## Bug Fix: Caracteres Unicode Escapados no Modal de Visibilidade
 - [x] Corrigir caracteres especiais (ã, õ, é, etc.) aparecendo como \u00f5, \u00e7, etc. no dialog de Permissões de Visibilidade
+
+## Bug Fix: Filtro do Pipeline inativo após permissão Geral
+- [x] Diagnosticar causa raiz: como deals.list mescla visibilidade com filtro ownerUserId
+- [x] Corrigir backend: permitir filtro ownerUserId dentro do escopo de visibilidade
+- [x] Corrigir frontend: visão padrão = negociações do próprio usuário em andamento
+- [x] Garantir que filtro funciona para Geral, Equipe e Restrita
+- [x] Testes vitest: filtro + visibilidade interagem corretamente (23 testes passando)
+- [x] Validar que nada fora do pipeline foi alterado

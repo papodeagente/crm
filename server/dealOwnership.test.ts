@@ -250,17 +250,31 @@ describe("Deal Ownership & Visibility Rules", () => {
       );
     });
 
-    it("non-admin user cannot override visibility filter by passing ownerUserId", async () => {
+    it("non-admin user cannot filter by ownerUserId outside their visibility scope", async () => {
       const ctx = createContext({ userId: 10, role: "user" });
       const caller = appRouter.createCaller(ctx);
 
-      // Try to pass ownerUserId: 20 (another user)
+      // Try to pass ownerUserId: 20 (outside scope — restrita only has [10])
       await caller.crm.deals.list({ tenantId: 1, ownerUserId: 20 });
 
-      // Should still use ownerUserIds from visibility service, not the passed ownerUserId
+      // Should fall back to full visibility set since 20 is not in [10]
       expect(crm.listDeals).toHaveBeenCalledWith(
         1,
         expect.objectContaining({ ownerUserIds: [10] })
+      );
+    });
+
+    it("non-admin user CAN filter by their own ownerUserId within visibility scope", async () => {
+      const ctx = createContext({ userId: 10, role: "user" });
+      const caller = appRouter.createCaller(ctx);
+
+      // Filter by ownerUserId: 10 (within scope — restrita has [10])
+      await caller.crm.deals.list({ tenantId: 1, ownerUserId: 10 });
+
+      // Should use ownerUserId filter directly since 10 is within the allowed set
+      expect(crm.listDeals).toHaveBeenCalledWith(
+        1,
+        expect.objectContaining({ ownerUserId: 10 })
       );
     });
 
@@ -356,6 +370,114 @@ describe("Deal Ownership & Visibility Rules", () => {
       expect(crm.listDeals).toHaveBeenCalledWith(
         1,
         expect.objectContaining({ ownerUserId: 20 })
+      );
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════
+  // REGRA 5: Filter within visibility scope (Geral user)
+  // ═══════════════════════════════════════════════════════════
+  describe("REGRA 5: Filter within Geral visibility scope", () => {
+    it("user with Geral permission can filter by their own ownerUserId", async () => {
+      // Override visibility mock to return geral for this test
+      const { resolveVisibilityFilter } = await import("./services/visibilityService");
+      (resolveVisibilityFilter as any).mockResolvedValueOnce({ mode: "geral", ownerUserIds: undefined });
+
+      const ctx = createContext({ userId: 10, role: "user" });
+      const caller = appRouter.createCaller(ctx);
+
+      await caller.crm.deals.list({ tenantId: 1, ownerUserId: 10 });
+
+      // Should pass ownerUserId filter directly (geral has no restriction)
+      expect(crm.listDeals).toHaveBeenCalledWith(
+        1,
+        expect.objectContaining({ ownerUserId: 10 })
+      );
+    });
+
+    it("user with Geral permission can see all deals when no filter applied", async () => {
+      const { resolveVisibilityFilter } = await import("./services/visibilityService");
+      (resolveVisibilityFilter as any).mockResolvedValueOnce({ mode: "geral", ownerUserIds: undefined });
+
+      const ctx = createContext({ userId: 10, role: "user" });
+      const caller = appRouter.createCaller(ctx);
+
+      await caller.crm.deals.list({ tenantId: 1 });
+
+      // No ownerUserId filter, no ownerUserIds restriction
+      expect(crm.listDeals).toHaveBeenCalledWith(
+        1,
+        expect.objectContaining({ ownerUserId: undefined })
+      );
+    });
+
+    it("user with Geral permission can filter by another user's ownerUserId", async () => {
+      const { resolveVisibilityFilter } = await import("./services/visibilityService");
+      (resolveVisibilityFilter as any).mockResolvedValueOnce({ mode: "geral", ownerUserIds: undefined });
+
+      const ctx = createContext({ userId: 10, role: "user" });
+      const caller = appRouter.createCaller(ctx);
+
+      await caller.crm.deals.list({ tenantId: 1, ownerUserId: 20 });
+
+      expect(crm.listDeals).toHaveBeenCalledWith(
+        1,
+        expect.objectContaining({ ownerUserId: 20 })
+      );
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════
+  // REGRA 6: Filter within Equipe visibility scope
+  // ═══════════════════════════════════════════════════════════
+  describe("REGRA 6: Filter within Equipe visibility scope", () => {
+    it("user with Equipe permission can filter by teammate's ownerUserId", async () => {
+      const { resolveVisibilityFilter } = await import("./services/visibilityService");
+      // Equipe: user 10 sees [10, 11, 12]
+      (resolveVisibilityFilter as any).mockResolvedValueOnce({ mode: "equipe", ownerUserIds: [10, 11, 12] });
+
+      const ctx = createContext({ userId: 10, role: "user" });
+      const caller = appRouter.createCaller(ctx);
+
+      await caller.crm.deals.list({ tenantId: 1, ownerUserId: 11 });
+
+      // 11 is within the team set, so filter should be applied directly
+      expect(crm.listDeals).toHaveBeenCalledWith(
+        1,
+        expect.objectContaining({ ownerUserId: 11 })
+      );
+    });
+
+    it("user with Equipe permission cannot filter by non-teammate's ownerUserId", async () => {
+      const { resolveVisibilityFilter } = await import("./services/visibilityService");
+      // Equipe: user 10 sees [10, 11, 12]
+      (resolveVisibilityFilter as any).mockResolvedValueOnce({ mode: "equipe", ownerUserIds: [10, 11, 12] });
+
+      const ctx = createContext({ userId: 10, role: "user" });
+      const caller = appRouter.createCaller(ctx);
+
+      await caller.crm.deals.list({ tenantId: 1, ownerUserId: 99 });
+
+      // 99 is NOT in the team set, so should fall back to full team ownerUserIds
+      expect(crm.listDeals).toHaveBeenCalledWith(
+        1,
+        expect.objectContaining({ ownerUserIds: [10, 11, 12] })
+      );
+    });
+
+    it("user with Equipe permission can filter by own ownerUserId", async () => {
+      const { resolveVisibilityFilter } = await import("./services/visibilityService");
+      (resolveVisibilityFilter as any).mockResolvedValueOnce({ mode: "equipe", ownerUserIds: [10, 11, 12] });
+
+      const ctx = createContext({ userId: 10, role: "user" });
+      const caller = appRouter.createCaller(ctx);
+
+      await caller.crm.deals.list({ tenantId: 1, ownerUserId: 10 });
+
+      // 10 is within the team set
+      expect(crm.listDeals).toHaveBeenCalledWith(
+        1,
+        expect.objectContaining({ ownerUserId: 10 })
       );
     });
   });

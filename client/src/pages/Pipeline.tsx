@@ -81,11 +81,11 @@ export default function Pipeline() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [listTab, setListTab] = useState<"active" | "trash">("active");
   const dealFilters = useDealFilters();
-  const [ownerFilter, setOwnerFilter] = useState<number | "all">("all");
+  const [ownerFilter, setOwnerFilter] = useState<number | "all" | "mine">("mine");
   const saasMe = trpc.saasAuth.me.useQuery(undefined, { retry: 1, refetchOnWindowFocus: false, staleTime: 5 * 60 * 1000 });
   const isAdmin = saasMe.data?.role === "admin" || saasMe.data?.isSuperAdmin;
-  // Visibility is now enforced server-side; ownerFilter is only for admin UI filtering
-  const effectiveOwnerFilter = ownerFilter;
+  // Resolve "mine" to the actual userId for the backend filter
+  const effectiveOwnerFilter = ownerFilter === "mine" ? (saasMe.data?.userId ?? "all") : ownerFilter;
   const [showIndicators, setShowIndicators] = useState(false);
   const [celebration, setCelebration] = useState<{ open: boolean; title?: string; value?: string }>({ open: false });
   const [showTaskCalendar, setShowTaskCalendar] = useState(false);
@@ -445,14 +445,19 @@ export default function Pipeline() {
           </div>
 
           {/* User filter */}
-          <Select value={String(effectiveOwnerFilter)} onValueChange={(v) => isAdmin && setOwnerFilter(v === "all" ? "all" : Number(v))} disabled={!isAdmin}>
+          <Select value={ownerFilter === "mine" ? "mine" : String(effectiveOwnerFilter)} onValueChange={(v) => {
+            if (v === "mine") setOwnerFilter("mine");
+            else if (v === "all") setOwnerFilter("all");
+            else setOwnerFilter(Number(v));
+          }}>
             <SelectTrigger className="flex-1 h-10 text-[13px] rounded-xl border-border/50 bg-background">
               <User className="h-3.5 w-3.5 mr-1.5 text-muted-foreground flex-shrink-0" />
-              <SelectValue placeholder="Todas as negociações" />
+              <SelectValue placeholder="Minhas negociações" />
             </SelectTrigger>
             <SelectContent className="rounded-xl">
+              <SelectItem value="mine">Minhas negociações</SelectItem>
               <SelectItem value="all">Todas as negociações</SelectItem>
-              {crmUsers.data?.map((u: any) => (
+              {crmUsers.data?.filter((u: any) => u.id !== saasMe.data?.userId).map((u: any) => (
                 <SelectItem key={u.id} value={String(u.id)}>{u.name}</SelectItem>
               ))}
             </SelectContent>

@@ -305,10 +305,21 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
         const userId = ctx.saasUser?.userId || ctx.user!.id;
         const tenantId = getTenantId(ctx);
         const { ownerUserIds } = await resolveVisibilityFilter(userId, tenantId, "deals", isAdmin);
-        // If admin filters by a specific owner, respect that; otherwise use visibility filter
-        const finalOpts = ownerUserIds
-          ? { ...input, ownerUserIds, ownerUserId: undefined }
-          : { ...input, ownerUserId: input.ownerUserId };
+        // Permissão define o teto; filtro define o recorte dentro do teto
+        let finalOpts: any;
+        if (ownerUserIds) {
+          // Non-geral: visibility limits the universe
+          if (input.ownerUserId && ownerUserIds.includes(input.ownerUserId)) {
+            // User wants to filter by a specific owner within their allowed set
+            finalOpts = { ...input, ownerUserIds: undefined, ownerUserId: input.ownerUserId };
+          } else {
+            // No specific filter or filter outside scope → show full allowed set
+            finalOpts = { ...input, ownerUserIds, ownerUserId: undefined };
+          }
+        } else {
+          // Geral: no visibility restriction, pass ownerUserId filter as-is
+          finalOpts = { ...input, ownerUserId: input.ownerUserId };
+        }
         const items = await crm.listDeals(tenantId, finalOpts);
         const totalCount = await crm.countDeals(tenantId, input.status, finalOpts);
         return { items, totalCount };
