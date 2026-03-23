@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -264,7 +264,7 @@ export default function SuperAdmin() {
                     const daysLeft = getDaysLeft(tenant.freemiumExpiresAt);
                     const isExpanded = expandedTenant === tenant.id;
                     return (
-                      <React.Fragment key={tenant.id}>
+                      <>
                         <tr key={tenant.id} className={`border-b border-border/50 hover:bg-accent/30 transition-colors cursor-pointer ${isExpanded ? "bg-accent/20" : ""}`}>
                           <td className="p-4" onClick={() => setExpandedTenant(isExpanded ? null : tenant.id)}>
                             {isExpanded ? (
@@ -421,7 +421,7 @@ export default function SuperAdmin() {
                             </td>
                           </tr>
                         )}
-                      </React.Fragment>
+                      </>
                     );
                   })}
                   {filteredTenants.length === 0 && (
