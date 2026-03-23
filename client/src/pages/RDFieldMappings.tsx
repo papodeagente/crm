@@ -197,7 +197,17 @@ export default function RDFieldMappings() {
                     </div>
                     <div className="min-w-0">
                       <p className="text-sm font-medium truncate">{enturLabel}</p>
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <Badge
+                          variant="outline"
+                          className={`text-[9px] ${
+                            m.targetEntity === "deal" ? "bg-blue-500/10 text-blue-600 border-blue-200" :
+                            m.targetEntity === "contact" ? "bg-emerald-500/10 text-emerald-600 border-emerald-200" :
+                            "bg-amber-500/10 text-amber-600 border-amber-200"
+                          }`}
+                        >
+                          {m.targetEntity === "deal" ? "Negociação" : m.targetEntity === "contact" ? "Contato" : "Empresa"}
+                        </Badge>
                         <Badge variant={m.enturFieldType === "standard" ? "secondary" : "outline"} className="text-[9px]">
                           {m.enturFieldType === "standard" ? "Padrão" : "Personalizado"}
                         </Badge>
@@ -311,15 +321,25 @@ function MappingDialog({
   standardFields: Array<{ key: string; label: string; entity: string }>;
   customFields: Array<{ id: number; key: string; label: string; entity: string; fieldType: string }>;
   initialData?: any;
-  onSave: (data: { rdFieldKey: string; rdFieldLabel: string; enturFieldType: "standard" | "custom"; enturFieldKey?: string; enturCustomFieldId?: number }) => void;
+  onSave: (data: { rdFieldKey: string; rdFieldLabel: string; targetEntity: "deal" | "contact" | "company"; enturFieldType: "standard" | "custom"; enturFieldKey?: string; enturCustomFieldId?: number }) => void;
   isPending: boolean;
 }) {
   const [rdFieldKey, setRdFieldKey] = useState(initialData?.rdFieldKey || "");
   const [rdFieldLabel, setRdFieldLabel] = useState(initialData?.rdFieldLabel || "");
+  const [targetEntity, setTargetEntity] = useState<"deal" | "contact" | "company">(initialData?.targetEntity || "deal");
   const [enturFieldType, setEnturFieldType] = useState<"standard" | "custom">(initialData?.enturFieldType || "standard");
   const [enturFieldKey, setEnturFieldKey] = useState(initialData?.enturFieldKey || "");
   const [enturCustomFieldId, setEnturCustomFieldId] = useState<number | null>(initialData?.enturCustomFieldId || null);
   const [rdSearch, setRdSearch] = useState("");
+
+  // Filter standard/custom fields by selected entity
+  const entityMap: Record<string, string> = { deal: "deal", contact: "contact", company: "account" };
+  const filteredStandardFields = useMemo(() => {
+    return standardFields.filter(f => f.entity === entityMap[targetEntity]);
+  }, [standardFields, targetEntity]);
+  const filteredCustomFields = useMemo(() => {
+    return customFields.filter(f => f.entity === targetEntity || (targetEntity === "company" && f.entity === "account"));
+  }, [customFields, targetEntity]);
 
   const filteredRdFields = useMemo(() => {
     if (!rdSearch.trim()) return RD_COMMON_FIELDS;
@@ -404,6 +424,35 @@ function MappingDialog({
             <div className="flex-1 border-t border-border" />
           </div>
 
+          {/* Target Entity */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 rounded bg-violet-500/10 flex items-center justify-center">
+                <span className="text-[9px] font-bold text-violet-600">→</span>
+              </div>
+              <h3 className="text-sm font-semibold">Entidade de destino</h3>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              {(["deal", "contact", "company"] as const).map((entity) => {
+                const labels = { deal: "Negociação", contact: "Contato", company: "Empresa" };
+                const colors = { deal: "bg-blue-500/10 text-blue-600 border-blue-200", contact: "bg-emerald-500/10 text-emerald-600 border-emerald-200", company: "bg-amber-500/10 text-amber-600 border-amber-200" };
+                return (
+                  <button
+                    key={entity}
+                    onClick={() => { setTargetEntity(entity); setEnturFieldKey(""); setEnturCustomFieldId(null); }}
+                    className={`px-3 py-2 rounded-lg border text-xs font-medium transition-all ${
+                      targetEntity === entity
+                        ? colors[entity] + " ring-2 ring-offset-1 ring-primary/30"
+                        : "bg-card border-border text-muted-foreground hover:bg-muted"
+                    }`}
+                  >
+                    {labels[entity]}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
           {/* Entur OS Field */}
           <div className="space-y-3">
             <div className="flex items-center gap-2">
@@ -427,21 +476,27 @@ function MappingDialog({
             {enturFieldType === "standard" ? (
               <div>
                 <label className="text-xs font-medium text-muted-foreground">Selecione o campo padrão</label>
-                <Select value={enturFieldKey} onValueChange={setEnturFieldKey}>
-                  <SelectTrigger className="mt-1"><SelectValue placeholder="Escolha um campo..." /></SelectTrigger>
-                  <SelectContent>
-                    {standardFields.map((f) => (
-                      <SelectItem key={f.key} value={f.key}>{f.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                {filteredStandardFields.length === 0 ? (
+                  <div className="mt-2 p-3 bg-muted/30 rounded-lg text-center">
+                    <p className="text-xs text-muted-foreground">Nenhum campo padrão disponível para {targetEntity === "deal" ? "Negociação" : targetEntity === "contact" ? "Contato" : "Empresa"}</p>
+                  </div>
+                ) : (
+                  <Select value={enturFieldKey} onValueChange={setEnturFieldKey}>
+                    <SelectTrigger className="mt-1"><SelectValue placeholder="Escolha um campo..." /></SelectTrigger>
+                    <SelectContent>
+                      {filteredStandardFields.map((f) => (
+                        <SelectItem key={f.key} value={f.key}>{f.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
               </div>
             ) : (
               <div>
                 <label className="text-xs font-medium text-muted-foreground">Selecione o campo personalizado</label>
-                {customFields.length === 0 ? (
+                {filteredCustomFields.length === 0 ? (
                   <div className="mt-2 p-3 bg-muted/30 rounded-lg text-center">
-                    <p className="text-xs text-muted-foreground">Nenhum campo personalizado cadastrado</p>
+                    <p className="text-xs text-muted-foreground">Nenhum campo personalizado de {targetEntity === "deal" ? "Negociação" : targetEntity === "contact" ? "Contato" : "Empresa"}</p>
                     <p className="text-[10px] text-muted-foreground mt-1">Crie campos personalizados em Configurações → Campos Personalizados</p>
                   </div>
                 ) : (
@@ -451,7 +506,7 @@ function MappingDialog({
                   >
                     <SelectTrigger className="mt-1"><SelectValue placeholder="Escolha um campo..." /></SelectTrigger>
                     <SelectContent>
-                      {customFields.map((f) => (
+                      {filteredCustomFields.map((f) => (
                         <SelectItem key={f.id} value={String(f.id)}>
                           {f.label} <span className="text-muted-foreground ml-1">({f.fieldType})</span>
                         </SelectItem>
@@ -471,6 +526,7 @@ function MappingDialog({
             onClick={() => onSave({
               rdFieldKey,
               rdFieldLabel,
+              targetEntity,
               enturFieldType,
               enturFieldKey: enturFieldType === "standard" ? enturFieldKey : undefined,
               enturCustomFieldId: enturFieldType === "custom" ? (enturCustomFieldId || undefined) : undefined,

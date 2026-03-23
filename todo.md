@@ -4573,3 +4573,22 @@
 - [x] Respeitar multi-tenant e permissões do usuário
 - [x] Testes vitest para o bloco corrigido (8 testes passando)
 - [x] Validar ausência de regressão nos demais blocos da Home
+
+## Mapeamento de Campos RD Station → Custom Fields (v-rd-mapping)
+
+- [x] Diagnosticar estrutura atual: webhook RD Station, custom fields, schema
+- [x] Criar tabela rd_station_field_mappings (tenantId, rdFieldKey, targetEntity, customFieldId, isActive)
+- [x] Migração SQL aplicada via webdev_execute_sql (targetEntity column added)
+- [x] DB helpers: CRUD de mapeamentos (create, list, update, delete)
+- [x] Procedure CRUD protegida (tenantProcedure) para mapeamentos
+- [x] Aplicar mapeamento no webhook: ler regras, extrair valores do payload, gravar em custom fields
+- [x] Tratar campo ausente no payload sem quebrar importação (skip silencioso)
+- [x] Tratar custom field inativo/inválido sem quebrar importação (skip + log)
+- [x] Frontend: UI de configuração na tela de integração RD Station
+- [x] Campo de origem em texto aberto (input livre)
+- [x] Seleção de entidade destino (Negociação, Contato, Empresa) — 3 botões visuais
+- [x] Seleção de custom field destino (filtrado por entidade)
+- [x] Multi-tenant: cada tenant só vê/usa seus mapeamentos (16 testes passando)
+- [x] Segurança: nenhuma brecha de vazamento entre contas (teste de isolamento)
+- [x] Testes vitest: 16 testes — CRUD, aplicação, segurança multi-tenant
+- [x] Validar importação principal continua intacta (webhook não alterado, camada adicionada após processInboundLead)

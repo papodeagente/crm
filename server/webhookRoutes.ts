@@ -21,6 +21,7 @@ import { createDealProduct, createTask, recalcDealValue } from "./crmDb";
 import { eq, and, sql } from "drizzle-orm";
 import { ENV } from "./_core/env";
 import { generateTrackerScript } from "./tracker-script";
+import { applyFieldMappings } from "./services/applyFieldMappings";
 
 
 // ─── Tenant Resolution Helpers for Webhooks ───────────────
@@ -1045,6 +1046,29 @@ router.post("/api/webhooks/rdstation", async (req: Request, res: Response) => {
         } else if (config.autoWhatsAppEnabled && result.isExisting) {
           autoWhatsAppStatus = "skipped";
           autoWhatsAppError = "Lead duplicado — WhatsApp não reenviado";
+        }
+
+        // 9b. Apply field mappings (RD → Entur OS custom fields)
+        let fieldMappingApplied = 0;
+        let fieldMappingErrors: string[] = [];
+        if (result.success && (result.dealId || result.contactId)) {
+          try {
+            const mappingResult = await applyFieldMappings({
+              tenantId,
+              dealId: result.dealId,
+              contactId: result.contactId,
+              leadData: lead,
+              rdCustomFields: hasCustomFields ? rdCustomFields : undefined,
+            });
+            fieldMappingApplied = mappingResult.applied;
+            fieldMappingErrors = mappingResult.errors;
+            if (mappingResult.applied > 0) {
+              console.log(`[RD Station Webhook] Field mappings: ${mappingResult.applied} applied, ${mappingResult.skipped} skipped for deal #${result.dealId || 'N/A'}`);
+            }
+          } catch (fmErr: any) {
+            fieldMappingErrors = [fmErr.message || String(fmErr)];
+            console.error(`[RD Station Webhook] Field mapping error (non-blocking):`, fmErr.message);
+          }
         }
 
         // 10. Log in rd_station_webhook_log

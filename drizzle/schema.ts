@@ -1482,6 +1482,7 @@ export const rdFieldMappings = mysqlTable("rd_field_mappings", {
   tenantId: int("tenantId").notNull(),
   rdFieldKey: varchar("rdFieldKey", { length: 255 }).notNull(), // campo do RD Station (ex: "cf_interesse", "company", "job_title")
   rdFieldLabel: varchar("rdFieldLabel", { length: 255 }).notNull(), // label amigável do campo RD
+  targetEntity: mysqlEnum("targetEntity", ["deal", "contact", "company"]).default("deal").notNull(), // entidade de destino no Entur OS
   enturFieldType: mysqlEnum("enturFieldType", ["standard", "custom"]).default("custom").notNull(), // tipo: campo padrão ou personalizado
   enturFieldKey: varchar("enturFieldKey", { length: 255 }), // campo padrão do Entur (ex: "contact.email", "deal.utmSource") ou null se custom
   enturCustomFieldId: int("enturCustomFieldId"), // FK para custom_fields.id se for campo personalizado

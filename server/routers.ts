@@ -2943,6 +2943,7 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
       .input(z.object({
         rdFieldKey: z.string().min(1),
         rdFieldLabel: z.string().min(1),
+        targetEntity: z.enum(["deal", "contact", "company"]).default("deal"),
         enturFieldType: z.enum(["standard", "custom"]),
         enturFieldKey: z.string().optional(),
         enturCustomFieldId: z.number().optional(),
@@ -2954,6 +2955,7 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
           tenantId: getTenantId(ctx),
           rdFieldKey: input.rdFieldKey,
           rdFieldLabel: input.rdFieldLabel,
+          targetEntity: input.targetEntity,
           enturFieldType: input.enturFieldType,
           enturFieldKey: input.enturFieldKey || null,
           enturCustomFieldId: input.enturCustomFieldId || null,
@@ -2966,6 +2968,7 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
         id: z.number(),
         rdFieldKey: z.string().min(1).optional(),
         rdFieldLabel: z.string().min(1).optional(),
+        targetEntity: z.enum(["deal", "contact", "company"]).optional(),
         enturFieldType: z.enum(["standard", "custom"]).optional(),
         enturFieldKey: z.string().nullable().optional(),
         enturCustomFieldId: z.number().nullable().optional(),
