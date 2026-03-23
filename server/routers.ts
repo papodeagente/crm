@@ -1761,7 +1761,11 @@ export const appRouter = router({
     tasks: tenantProcedure
       .input(z.object({ limit: z.number().optional() }))
       .query(async ({ ctx, input }) => {
-        return getHomeTasks(getTenantId(ctx), ctx.user?.id, input.limit);
+        // Use saasUser.userId (crm_users.id) for proper task ownership filtering
+        // Admin users see all tasks (no userId filter)
+        const isAdmin = ctx.saasUser?.role === "admin";
+        const userIdFilter = isAdmin ? undefined : ctx.saasUser?.userId;
+        return getHomeTasks(getTenantId(ctx), userIdFilter, input.limit);
       }),
     rfv: tenantProcedure
       .query(async ({ ctx }) => {

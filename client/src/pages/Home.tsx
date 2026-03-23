@@ -70,16 +70,27 @@ const TASK_TYPE_ICONS: Record<string, { icon: any; color: string; bg: string }> 
   task: { icon: CheckSquare, color: "text-teal-500", bg: "bg-teal-500/10" },
 };
 
+const PRIORITY_STYLES: Record<string, { label: string; className: string }> = {
+  urgent: { label: "Urgente", className: "bg-red-500/15 text-red-600 dark:text-red-400" },
+  high: { label: "Alta", className: "bg-orange-500/15 text-orange-600 dark:text-orange-400" },
+  medium: { label: "Média", className: "bg-blue-500/10 text-blue-600 dark:text-blue-400" },
+  low: { label: "Baixa", className: "bg-muted text-muted-foreground" },
+};
+
 function TaskItem({ task }: { task: any }) {
   const typeInfo = TASK_TYPE_ICONS[task.taskType] || TASK_TYPE_ICONS.task;
   const TypeIcon = typeInfo.icon;
   const isOverdue = task.isOverdue;
+  const priorityInfo = PRIORITY_STYLES[task.priority] || PRIORITY_STYLES.medium;
 
   const dueLabel = (() => {
     if (!task.dueAt) return "Sem prazo";
     const d = new Date(task.dueAt);
     const now = new Date();
     const isToday = d.toDateString() === now.toDateString();
+    const tomorrow = new Date(now);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const isTomorrow = d.toDateString() === tomorrow.toDateString();
     const time = formatTime(d);
     if (isOverdue) {
       const diff = now.getTime() - d.getTime();
@@ -89,12 +100,19 @@ function TaskItem({ task }: { task: any }) {
       if (hours > 0) return `${hours}h atrasada`;
       return "Atrasada";
     }
-    if (isToday) return time;
-    return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", timeZone: SYSTEM_TIMEZONE });
+    if (isToday) return `Hoje ${time}`;
+    if (isTomorrow) return `Amanhã ${time}`;
+    return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", timeZone: SYSTEM_TIMEZONE }) + " " + time;
   })();
 
   const entityHref = task.entityType === "deal" ? `/deal/${task.entityId}` : task.entityType === "contact" ? `/contacts/${task.entityId}` : "#";
-  const entityLabel = task.dealTitle || task.contactName || "";
+  
+  // Build subtitle: dealTitle + contactName + accountName
+  const subtitleParts: string[] = [];
+  if (task.dealTitle) subtitleParts.push(task.dealTitle);
+  if (task.contactName) subtitleParts.push(task.contactName);
+  if (task.accountName) subtitleParts.push(task.accountName);
+  const entityLabel = subtitleParts.join(" · ");
 
   return (
     <Link href={entityHref}>
@@ -103,12 +121,22 @@ function TaskItem({ task }: { task: any }) {
           <TypeIcon className={`h-4.5 w-4.5 ${isOverdue ? "text-red-500" : typeInfo.color}`} />
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-[13px] font-semibold text-foreground truncate leading-tight">{task.title}</p>
+          <div className="flex items-center gap-2">
+            <p className="text-[13px] font-semibold text-foreground truncate leading-tight">{task.title}</p>
+            {(task.priority === "urgent" || task.priority === "high") && (
+              <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider shrink-0 ${priorityInfo.className}`}>
+                {priorityInfo.label}
+              </span>
+            )}
+          </div>
           {entityLabel && (
             <p className="text-[11px] text-muted-foreground truncate mt-0.5">{entityLabel}</p>
           )}
         </div>
         <div className="flex items-center gap-2 shrink-0">
+          {task.dealValueCents > 0 && (
+            <span className="text-[11px] font-bold text-foreground">{formatCurrency(task.dealValueCents)}</span>
+          )}
           <span className={`text-[11px] flex items-center gap-1 px-2 py-1 rounded-lg font-semibold ${
             isOverdue
               ? "bg-red-500/15 text-red-500"
@@ -446,7 +474,7 @@ export default function Home() {
                 </div>
                 <div>
                   <h2 className="text-[14px] font-bold text-foreground tracking-tight">Prioridades de Ação</h2>
-                  <p className="text-[11px] text-muted-foreground">Tarefas do dia e atrasadas</p>
+                  <p className="text-[11px] text-muted-foreground">Atrasadas, hoje e próximos 7 dias</p>
                 </div>
               </div>
               <div className="flex items-center gap-2">

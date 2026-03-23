@@ -4561,3 +4561,15 @@
 ### Testes
 - [x] Vitest: 5 testes para home.executive, home.tasks, home.rfv, home.onboarding
 - [x] TypeScript: Zero erros de compilação
+
+## Correção Bloco de Tarefas da Home (v-home-tasks)
+
+- [x] Diagnosticar causa raiz: por que o bloco não puxa tarefas reais
+- [x] Corrigir backend homeTasks: query real de crm_tasks com ordenação por urgência
+- [x] Ordenação: vencidas mais antigas → vencidas recentes → hoje → futuras
+- [x] Incluir vínculo com negociação/contato/empresa nos dados retornados
+- [x] Corrigir frontend: renderizar tarefas reais com título, status, atraso, contexto
+- [x] Ação clicável para abrir item relacionado (deal/contato)
+- [x] Respeitar multi-tenant e permissões do usuário
+- [x] Testes vitest para o bloco corrigido (8 testes passando)
+- [x] Validar ausência de regressão nos demais blocos da Home

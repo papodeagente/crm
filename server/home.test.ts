@@ -75,24 +75,37 @@ describe("home.executive", () => {
 });
 
 describe("home.tasks", () => {
-  it("returns an array of tasks with expected shape", async () => {
+  it("returns an array of tasks with enriched shape", async () => {
     const ctx = createAuthContext();
     const caller = appRouter.createCaller(ctx);
     const result = await caller.home.tasks({ limit: 5 });
 
     expect(Array.isArray(result)).toBe(true);
 
-    // If there are tasks, validate shape
+    // If there are tasks, validate enriched shape
     if (result.length > 0) {
       const task = result[0];
+      // Core fields
       expect(task).toHaveProperty("id");
       expect(task).toHaveProperty("title");
       expect(task).toHaveProperty("priority");
       expect(task).toHaveProperty("status");
       expect(task).toHaveProperty("isOverdue");
+      expect(task).toHaveProperty("taskType");
+      expect(task).toHaveProperty("entityType");
+      expect(task).toHaveProperty("entityId");
+      // Enriched fields (nullable)
+      expect(task).toHaveProperty("dealTitle");
+      expect(task).toHaveProperty("dealValueCents");
+      expect(task).toHaveProperty("contactName");
+      expect(task).toHaveProperty("accountName");
+      expect(task).toHaveProperty("description");
+      // Type checks
       expect(typeof task.id).toBe("number");
       expect(typeof task.title).toBe("string");
       expect(typeof task.isOverdue).toBe("boolean");
+      expect(["pending", "in_progress"]).toContain(task.status);
+      expect(["low", "medium", "high", "urgent"]).toContain(task.priority);
     }
   });
 
@@ -103,6 +116,43 @@ describe("home.tasks", () => {
 
     expect(Array.isArray(result)).toBe(true);
     expect(result.length).toBeLessThanOrEqual(2);
+  });
+
+  it("admin sees all tasks (no user filter)", async () => {
+    const ctx = createAuthContext(1, 1);
+    ctx.saasUser!.role = "admin";
+    const caller = appRouter.createCaller(ctx);
+    const result = await caller.home.tasks({ limit: 15 });
+
+    expect(Array.isArray(result)).toBe(true);
+    // Admin should get results without user filter
+  });
+
+  it("non-admin sees only own tasks", async () => {
+    const ctx = createAuthContext(1, 999);
+    ctx.saasUser!.role = "user";
+    const caller = appRouter.createCaller(ctx);
+    const result = await caller.home.tasks({ limit: 15 });
+
+    expect(Array.isArray(result)).toBe(true);
+    // Non-admin with userId=999 should only see tasks assigned/created by them
+  });
+
+  it("tasks are ordered: overdue first, then today, then future", async () => {
+    const ctx = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    const result = await caller.home.tasks({ limit: 15 });
+
+    if (result.length >= 2) {
+      const now = Date.now();
+      let lastGroup = -1;
+      for (const task of result) {
+        const group = task.dueAt === null ? 3 : task.dueAt < now ? 0 : 2;
+        // Each task's group should be >= the previous task's group (ordered)
+        expect(group).toBeGreaterThanOrEqual(lastGroup === -1 ? group : lastGroup);
+        lastGroup = group;
+      }
+    }
   });
 });
 

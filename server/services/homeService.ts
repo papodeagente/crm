@@ -161,7 +161,10 @@ export async function getHomeExecutive(tenantId: number, userId?: number) {
 }
 
 // ═══════════════════════════════════════
-// 2. HOME TASKS — Today's tasks ordered by most overdue first
+// 2. HOME TASKS — Real CRM tasks ordered by urgency
+//    Ordering: overdue oldest→newest → today → future upcoming
+//    Includes: deal title, contact name, account name
+//    Respects: multi-tenant, user ownership (assignedTo + task_assignees + createdBy)
 // ═══════════════════════════════════════
 
 export async function getHomeTasks(tenantId: number, userId?: number, limit = 15) {
@@ -170,34 +173,56 @@ export async function getHomeTasks(tenantId: number, userId?: number, limit = 15
 
   const now = new Date();
   const nowSP = new Date(now.toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
-  const todayStart = new Date(nowSP.getFullYear(), nowSP.getMonth(), nowSP.getDate());
-  const todayEnd = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000);
+  const todayEnd = new Date(nowSP.getFullYear(), nowSP.getMonth(), nowSP.getDate() + 1);
+  // Include tasks up to 7 days in the future for "upcoming" view
+  const futureLimit = new Date(todayEnd.getTime() + 7 * 24 * 60 * 60 * 1000);
 
-  const assigneeFilter = userId ? sql`AND t.assignedToUserId = ${userId}` : sql``;
+  // User filter: match the CRM task module logic
+  // Non-admin users see tasks they created, are assigned to (direct), or are in task_assignees
+  const userFilter = userId
+    ? sql`AND (
+        t.assignedToUserId = ${userId}
+        OR t.createdByUserId = ${userId}
+        OR t.id IN (SELECT taskId FROM task_assignees WHERE userId = ${userId})
+      )`
+    : sql``;
 
   const [rows] = await db.execute(sql`
     SELECT t.id, t.title, t.dueAt, t.priority, t.status, t.taskType,
-           t.entityType, t.entityId,
+           t.entityType, t.entityId, t.description,
            d.title as dealTitle,
-           c.name as contactName
+           d.valueCents as dealValueCents,
+           c.name as contactName,
+           a.name as accountName
     FROM crm_tasks t
     LEFT JOIN deals d ON t.entityType = 'deal' AND d.id = t.entityId AND d.tenantId = ${tenantId}
-    LEFT JOIN contacts c ON t.entityType = 'contact' AND c.id = t.entityId AND c.tenantId = ${tenantId}
+    LEFT JOIN contacts c ON (
+      (t.entityType = 'contact' AND c.id = t.entityId)
+      OR (t.entityType = 'deal' AND d.contactId IS NOT NULL AND c.id = d.contactId)
+    ) AND c.tenantId = ${tenantId}
+    LEFT JOIN accounts a ON t.entityType = 'deal' AND d.accountId IS NOT NULL AND a.id = d.accountId AND a.tenantId = ${tenantId}
     WHERE t.tenantId = ${tenantId}
       AND t.status IN ('pending', 'in_progress')
-      ${assigneeFilter}
+      ${userFilter}
       AND (
-        (t.dueAt >= ${todayStart} AND t.dueAt < ${todayEnd})
-        OR (t.dueAt < ${now} AND t.dueAt IS NOT NULL)
-        OR (t.dueAt IS NULL)
+        t.dueAt IS NULL
+        OR t.dueAt < ${futureLimit}
       )
     ORDER BY
       CASE
-        WHEN t.dueAt < ${now} AND t.dueAt IS NOT NULL THEN 0
-        WHEN t.dueAt IS NOT NULL THEN 1
-        ELSE 2
+        WHEN t.dueAt IS NOT NULL AND t.dueAt < ${now} THEN 0
+        WHEN t.dueAt IS NOT NULL AND t.dueAt < ${todayEnd} THEN 1
+        WHEN t.dueAt IS NOT NULL THEN 2
+        ELSE 3
       END ASC,
-      t.dueAt ASC,
+      CASE
+        WHEN t.dueAt IS NOT NULL AND t.dueAt < ${now} THEN t.dueAt
+        ELSE NULL
+      END ASC,
+      CASE
+        WHEN t.dueAt IS NOT NULL AND t.dueAt >= ${now} THEN t.dueAt
+        ELSE NULL
+      END ASC,
       CASE t.priority
         WHEN 'urgent' THEN 0
         WHEN 'high' THEN 1
@@ -210,6 +235,7 @@ export async function getHomeTasks(tenantId: number, userId?: number, limit = 15
   return (rows as unknown as any[]).map((r: any) => ({
     id: Number(r.id),
     title: String(r.title),
+    description: r.description ? String(r.description) : null,
     dueAt: r.dueAt ? new Date(r.dueAt).getTime() : null,
     priority: String(r.priority) as "low" | "medium" | "high" | "urgent",
     status: String(r.status),
@@ -217,7 +243,9 @@ export async function getHomeTasks(tenantId: number, userId?: number, limit = 15
     entityType: String(r.entityType),
     entityId: Number(r.entityId),
     dealTitle: r.dealTitle ? String(r.dealTitle) : null,
+    dealValueCents: r.dealValueCents ? Number(r.dealValueCents) : null,
     contactName: r.contactName ? String(r.contactName) : null,
+    accountName: r.accountName ? String(r.accountName) : null,
     isOverdue: r.dueAt ? new Date(r.dueAt).getTime() < now.getTime() : false,
   }));
 }
