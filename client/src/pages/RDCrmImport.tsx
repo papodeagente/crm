@@ -206,11 +206,28 @@ export default function RDCrmImport() {
 
   const overallPercent = useMemo(() => {
     if (!progress || progress.totalSteps === 0) return 0;
+    // Base: completed categories as percentage
     const basePercent = (progress.completedSteps / progress.totalSteps) * 100;
+    // Current category progress (whether fetching or importing)
     const categoryPercent = progress.categoryTotal > 0
       ? (progress.categoryDone / progress.categoryTotal) * (100 / progress.totalSteps)
       : 0;
-    return Math.min(Math.round(basePercent + categoryPercent), 99);
+    const calculated = basePercent + categoryPercent;
+    // During fetch phase with no category total yet, show at least 1% if import has started
+    // to avoid the dreaded 0% freeze
+    if (calculated === 0 && progress.status !== "idle") {
+      // Show a small pulse to indicate activity
+      const elapsed = Date.now() - progress.startedAt;
+      if (elapsed > 2000) return 1; // After 2s, show at least 1%
+    }
+    return Math.min(Math.round(calculated), 99);
+  }, [progress]);
+
+  // Detect if the import is alive (heartbeat check)
+  const isImportAlive = useMemo(() => {
+    if (!progress || progress.status !== "importing") return true;
+    const lastActivity = (progress as any).lastActivityAt || progress.startedAt;
+    return (Date.now() - lastActivity) < 30000; // 30s timeout
   }, [progress]);
 
   const totalImportedSoFar = useMemo(() => {
@@ -815,10 +832,16 @@ export default function RDCrmImport() {
                         <span className="text-primary font-medium">{totalImportedSoFar.toLocaleString("pt-BR")} registros importados</span>
                       )}
                       {totalErrorsSoFar > 0 && (
-                        <span className="text-red-400 ml-2">· {totalErrorsSoFar} erros</span>
+                        <span className="text-red-400 ml-2">{"\u00b7"} {totalErrorsSoFar} erros</span>
                       )}
-                      {totalImportedSoFar === 0 && "Conectando ao RD Station CRM..."}
+                      {totalImportedSoFar === 0 && (progress as any)?.fetchPhase && (
+                        <span className="text-amber-500 font-medium">Buscando dados do RD Station...</span>
+                      )}
+                      {totalImportedSoFar === 0 && !(progress as any)?.fetchPhase && "Conectando ao RD Station CRM..."}
                     </p>
+                    {!isImportAlive && (
+                      <p className="text-xs text-red-400 mt-1">A importa\u00e7\u00e3o parece estar inativa. Aguarde ou tente novamente.</p>
+                    )}
                   </div>
 
                   {/* Overall progress bar */}
@@ -836,21 +859,32 @@ export default function RDCrmImport() {
                   </div>
 
                   {/* Current category progress */}
-                  {progress?.currentCategory && progress.categoryTotal > 0 && (
+                  {progress?.currentCategory && (
                     <div className="mb-6">
                       <div className="flex items-center justify-between text-xs text-muted-foreground mb-1.5">
                         <span className="flex items-center gap-1.5">
                           <Loader2 className="h-3 w-3 animate-spin text-primary" />
+                          {(progress as any)?.fetchPhase ? "Buscando" : "Importando"}{" "}
                           {categoryLabels[progress.currentCategory] || progress.currentCategory}
                         </span>
-                        <span>{progress.categoryDone.toLocaleString("pt-BR")} de {progress.categoryTotal.toLocaleString("pt-BR")}</span>
+                        {progress.categoryTotal > 0 ? (
+                          <span>{progress.categoryDone.toLocaleString("pt-BR")} de {progress.categoryTotal.toLocaleString("pt-BR")}</span>
+                        ) : (
+                          <span className="text-amber-500">Aguardando...</span>
+                        )}
                       </div>
-                      <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
-                        <div
-                          className="h-full bg-primary/60 rounded-full transition-all duration-300"
-                          style={{ width: `${Math.round((progress.categoryDone / progress.categoryTotal) * 100)}%` }}
-                        />
-                      </div>
+                      {progress.categoryTotal > 0 ? (
+                        <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+                          <div
+                            className="h-full bg-primary/60 rounded-full transition-all duration-300"
+                            style={{ width: `${Math.round((progress.categoryDone / progress.categoryTotal) * 100)}%` }}
+                          />
+                        </div>
+                      ) : (
+                        <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+                          <div className="h-full bg-primary/40 rounded-full animate-pulse" style={{ width: '30%' }} />
+                        </div>
+                      )}
                     </div>
                   )}
 

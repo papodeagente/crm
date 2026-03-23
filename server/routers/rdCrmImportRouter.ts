@@ -35,6 +35,12 @@ interface ImportProgress {
   error?: string;
   startedAt: number;
   validation?: ImportValidation;
+  // Enhanced progress tracking for large imports
+  fetchPhase: boolean; // true when currently fetching from RD API
+  fetchedRecords: number; // total records fetched so far across all categories
+  totalRecordsEstimate: number; // estimated total records to process
+  processedRecords: number; // total records processed (imported + skipped) across all categories
+  lastActivityAt: number; // timestamp of last progress update (heartbeat)
 }
 
 interface ImportValidation {
@@ -62,6 +68,11 @@ function initProgress(userId: number): ImportProgress {
     categoryDone: 0,
     results: {},
     startedAt: Date.now(),
+    fetchPhase: false,
+    fetchedRecords: 0,
+    totalRecordsEstimate: 0,
+    processedRecords: 0,
+    lastActivityAt: Date.now(),
   };
   progressStore.set(getProgressKey(userId), p);
   return p;
@@ -72,6 +83,7 @@ function updateProgress(userId: number, update: Partial<ImportProgress>) {
   const current = progressStore.get(key);
   if (current) {
     Object.assign(current, update);
+    current.lastActivityAt = Date.now();
   }
 }
 
@@ -191,6 +203,7 @@ export const rdCrmImportRouter = router({
 
       const progress = initProgress(userId);
       progress.status = "fetching";
+      progress.phase = "Iniciando importação...";
 
       const enabledCategories: string[] = [];
       if (input.importPipelines) enabledCategories.push("pipelines");
@@ -958,6 +971,7 @@ async function runImport(
   const orgByRdId = new Map<string, number>();
 
   let stepIndex = 0;
+  let cumulativeProcessed = 0;
 
   function advanceStep(category: string, label: string) {
     stepIndex++;
@@ -969,11 +983,36 @@ async function runImport(
       currentCategory: category,
       categoryTotal: 0,
       categoryDone: 0,
+      fetchPhase: false,
+    });
+  }
+
+  function setFetchPhase(category: string, label: string) {
+    updateProgress(userId, {
+      fetchPhase: true,
+      phase: `Buscando ${label} do RD Station...`,
+      currentCategory: category,
+      categoryDone: 0,
+      categoryTotal: 0,
+    });
+  }
+
+  function setImportPhase(label: string, total: number) {
+    updateProgress(userId, {
+      fetchPhase: false,
+      phase: `Importando ${label}...`,
+      categoryDone: 0,
+      categoryTotal: total,
     });
   }
 
   function setCategoryProgress(done: number, total: number) {
     updateProgress(userId, { categoryDone: done, categoryTotal: total });
+  }
+
+  function addProcessed(count: number) {
+    cumulativeProcessed += count;
+    updateProgress(userId, { processedRecords: cumulativeProcessed });
   }
 
   function makeEntry() {
@@ -1052,6 +1091,7 @@ async function runImport(
           }
           setCategoryProgress(i + 1, rdPipelines.length);
         }
+        addProcessed(entry.imported + entry.skipped);
       } catch (e: any) {
         entry.errors.push(`Buscar funis: ${e.message}`);
       }
@@ -1107,6 +1147,7 @@ async function runImport(
           }
           setCategoryProgress(i + 1, rdUsers.length);
         }
+        addProcessed(entry.imported + entry.skipped);
       } catch (e: any) {
         entry.errors.push(`Buscar usuários: ${e.message}`);
       }
@@ -1120,12 +1161,12 @@ async function runImport(
       advanceStep("sources", "Fontes de Leads");
       const entry = makeEntry();
       try {
-        updateProgress(userId, { phase: "Buscando fontes do RD Station..." });
+        setFetchPhase("sources", "fontes de leads");
         const rdSources = await rdCrm.fetchAllSources(token, (fetched, total) => {
           setCategoryProgress(fetched, total);
         });
         rdCounts.sources = rdSources.length;
-        updateProgress(userId, { phase: "Importando fontes..." });
+        setImportPhase("fontes", rdSources.length);
         setCategoryProgress(0, rdSources.length);
 
         for (let i = 0; i < rdSources.length; i++) {
@@ -1148,6 +1189,8 @@ async function runImport(
           }
           setCategoryProgress(i + 1, rdSources.length);
         }
+        setCategoryProgress(rdSources.length, rdSources.length);
+        addProcessed(entry.imported + entry.skipped);
       } catch (e: any) {
         entry.errors.push(`Buscar fontes: ${e.message}`);
       }
@@ -1161,12 +1204,12 @@ async function runImport(
       advanceStep("campaigns", "Campanhas");
       const entry = makeEntry();
       try {
-        updateProgress(userId, { phase: "Buscando campanhas do RD Station..." });
+        setFetchPhase("campaigns", "campanhas");
         const rdCampaigns = await rdCrm.fetchAllCampaigns(token, (fetched, total) => {
           setCategoryProgress(fetched, total);
         });
         rdCounts.campaigns = rdCampaigns.length;
-        updateProgress(userId, { phase: "Importando campanhas..." });
+        setImportPhase("campanhas", rdCampaigns.length);
         setCategoryProgress(0, rdCampaigns.length);
 
         for (let i = 0; i < rdCampaigns.length; i++) {
@@ -1189,6 +1232,8 @@ async function runImport(
           }
           setCategoryProgress(i + 1, rdCampaigns.length);
         }
+        setCategoryProgress(rdCampaigns.length, rdCampaigns.length);
+        addProcessed(entry.imported + entry.skipped);
       } catch (e: any) {
         entry.errors.push(`Buscar campanhas: ${e.message}`);
       }
@@ -1202,12 +1247,12 @@ async function runImport(
       advanceStep("lossReasons", "Motivos de Perda");
       const entry = makeEntry();
       try {
-        updateProgress(userId, { phase: "Buscando motivos de perda..." });
+        setFetchPhase("lossReasons", "motivos de perda");
         const rdReasons = await rdCrm.fetchAllLossReasons(token, (fetched, total) => {
           setCategoryProgress(fetched, total);
         });
         rdCounts.lossReasons = rdReasons.length;
-        updateProgress(userId, { phase: "Importando motivos de perda..." });
+        setImportPhase("motivos de perda", rdReasons.length);
         setCategoryProgress(0, rdReasons.length);
 
         for (let i = 0; i < rdReasons.length; i++) {
@@ -1230,6 +1275,8 @@ async function runImport(
           }
           setCategoryProgress(i + 1, rdReasons.length);
         }
+        setCategoryProgress(rdReasons.length, rdReasons.length);
+        addProcessed(entry.imported + entry.skipped);
       } catch (e: any) {
         entry.errors.push(`Buscar motivos: ${e.message}`);
       }
@@ -1243,12 +1290,12 @@ async function runImport(
       advanceStep("products", "Produtos e Serviços");
       const entry = makeEntry();
       try {
-        updateProgress(userId, { phase: "Buscando produtos do RD Station..." });
+        setFetchPhase("products", "produtos");
         const rdProducts = await rdCrm.fetchAllProducts(token, (fetched, total) => {
           setCategoryProgress(fetched, total);
         });
         rdCounts.products = rdProducts.length;
-        updateProgress(userId, { phase: "Importando produtos..." });
+        setImportPhase("produtos", rdProducts.length);
         setCategoryProgress(0, rdProducts.length);
 
         for (let i = 0; i < rdProducts.length; i++) {
@@ -1279,6 +1326,8 @@ async function runImport(
           }
           setCategoryProgress(i + 1, rdProducts.length);
         }
+        setCategoryProgress(rdProducts.length, rdProducts.length);
+        addProcessed(entry.imported + entry.skipped);
       } catch (e: any) {
         entry.errors.push(`Buscar produtos: ${e.message}`);
       }
@@ -1292,12 +1341,14 @@ async function runImport(
       advanceStep("organizations", "Empresas");
       const entry = makeEntry();
       try {
-        updateProgress(userId, { phase: "Buscando empresas do RD Station..." });
+        setFetchPhase("organizations", "empresas");
         const rdOrgs = await rdCrm.fetchAllOrganizations(token, (fetched, total) => {
           setCategoryProgress(fetched, total);
+          updateProgress(userId, { phase: `Buscando empresas... ${fetched.toLocaleString("pt-BR")}/${total.toLocaleString("pt-BR")}` });
         });
         rdCounts.organizations = rdOrgs.length;
-        updateProgress(userId, { phase: "Importando empresas como contas..." });
+        updateProgress(userId, { fetchedRecords: (progressStore.get(getProgressKey(userId))?.fetchedRecords || 0) + rdOrgs.length });
+        setImportPhase("empresas", rdOrgs.length);
         setCategoryProgress(0, rdOrgs.length);
 
         for (let i = 0; i < rdOrgs.length; i++) {
@@ -1324,8 +1375,10 @@ async function runImport(
           } catch (e: any) {
             entry.errors.push(`Empresa ${org.name}: ${e.message}`);
           }
-          setCategoryProgress(i + 1, rdOrgs.length);
+          if (i % 50 === 0) setCategoryProgress(i + 1, rdOrgs.length);
         }
+        setCategoryProgress(rdOrgs.length, rdOrgs.length);
+        addProcessed(entry.imported + entry.skipped);
       } catch (e: any) {
         entry.errors.push(`Buscar empresas: ${e.message}`);
       }
@@ -1340,14 +1393,18 @@ async function runImport(
       const entry = makeEntry();
       try {
         console.log("[RD Import] Starting contacts fetch...");
-        updateProgress(userId, { phase: "Buscando contatos do RD Station..." });
+        setFetchPhase("contacts", "contatos");
         const rdContacts = await rdCrm.fetchAllContacts(token, (fetched, total) => {
           setCategoryProgress(fetched, total);
-          updateProgress(userId, { phase: `Buscando contatos... ${fetched}/${total}` });
+          updateProgress(userId, {
+            phase: `Buscando contatos... ${fetched.toLocaleString("pt-BR")}/${total.toLocaleString("pt-BR")}`,
+            fetchedRecords: (progressStore.get(getProgressKey(userId))?.fetchedRecords || 0) + 0, // keep current
+          });
         });
         rdCounts.contacts = rdContacts.length;
+        updateProgress(userId, { fetchedRecords: (progressStore.get(getProgressKey(userId))?.fetchedRecords || 0) + rdContacts.length });
         console.log(`[RD Import] Fetched ${rdContacts.length} contacts. Starting import...`);
-        updateProgress(userId, { phase: "Importando contatos..." });
+        setImportPhase("contatos", rdContacts.length);
         setCategoryProgress(0, rdContacts.length);
 
         for (let i = 0; i < rdContacts.length; i++) {
@@ -1414,12 +1471,13 @@ async function runImport(
           } catch (e: any) {
             if (entry.errors.length < 20) entry.errors.push(`Contato ${c.name}: ${e.message}`);
           }
-          if (i % 100 === 0) {
+          if (i % 50 === 0) {
             setCategoryProgress(i + 1, rdContacts.length);
-            if (i % 1000 === 0) console.log(`[RD Import] Contacts progress: ${i}/${rdContacts.length}, imported: ${entry.imported}, skipped: ${entry.skipped}`);
+            if (i % 500 === 0) console.log(`[RD Import] Contacts progress: ${i}/${rdContacts.length}, imported: ${entry.imported}, skipped: ${entry.skipped}`);
           }
         }
         setCategoryProgress(rdContacts.length, rdContacts.length);
+        addProcessed(entry.imported + entry.skipped);
         console.log(`[RD Import] Contacts done: ${entry.imported} imported, ${entry.skipped} skipped, ${entry.errors.length} errors`);
       } catch (e: any) {
         console.error("[RD Import] CONTACTS OUTER ERROR:", e.message, e.stack);
@@ -1464,15 +1522,18 @@ async function runImport(
 
         // Fetch all deals
         console.log("[RD Import] Starting deals fetch...");
-        updateProgress(userId, { phase: "Buscando negociações do RD Station..." });
+        setFetchPhase("deals", "negocia\u00e7\u00f5es");
         const rdDeals = await rdCrm.fetchAllDeals(token, (fetched, total) => {
           setCategoryProgress(fetched, total);
-          updateProgress(userId, { phase: `Buscando negociações... ${fetched}/${total}` });
+          updateProgress(userId, {
+            phase: `Buscando negocia\u00e7\u00f5es... ${fetched.toLocaleString("pt-BR")}/${total.toLocaleString("pt-BR")}`,
+          });
         });
         rdCounts.deals = rdDeals.length;
+        updateProgress(userId, { fetchedRecords: (progressStore.get(getProgressKey(userId))?.fetchedRecords || 0) + rdDeals.length });
         console.log(`[RD Import] Fetched ${rdDeals.length} deals. Starting import...`);
 
-        updateProgress(userId, { phase: "Importando negociações..." });
+        setImportPhase("negocia\u00e7\u00f5es", rdDeals.length);
         setCategoryProgress(0, rdDeals.length);
 
         for (let i = 0; i < rdDeals.length; i++) {
@@ -1727,6 +1788,7 @@ async function runImport(
           }
         }
         setCategoryProgress(rdDeals.length, rdDeals.length);
+        addProcessed(entry.imported + entry.skipped);
         console.log(`[RD Import] Deals done: ${entry.imported} imported, ${entry.skipped} skipped, ${entry.errors.length} errors`);
       } catch (e: any) {
         console.error("[RD Import] DEALS OUTER ERROR:", e.message, e.stack);
@@ -1743,14 +1805,15 @@ async function runImport(
       const entry = makeEntry();
       try {
         console.log("[RD Import] Starting tasks fetch...");
-        updateProgress(userId, { phase: "Buscando tarefas do RD Station..." });
+        setFetchPhase("tasks", "tarefas");
         const rdTasks = await rdCrm.fetchAllTasks(token, (fetched, total) => {
           setCategoryProgress(fetched, total);
-          updateProgress(userId, { phase: `Buscando tarefas... ${fetched}/${total}` });
+          updateProgress(userId, { phase: `Buscando tarefas... ${fetched.toLocaleString("pt-BR")}/${total.toLocaleString("pt-BR")}` });
         });
         rdCounts.tasks = rdTasks.length;
+        updateProgress(userId, { fetchedRecords: (progressStore.get(getProgressKey(userId))?.fetchedRecords || 0) + rdTasks.length });
         console.log(`[RD Import] Fetched ${rdTasks.length} tasks. Starting import...`);
-        updateProgress(userId, { phase: "Importando tarefas..." });
+        setImportPhase("tarefas", rdTasks.length);
         setCategoryProgress(0, rdTasks.length);
 
         for (let i = 0; i < rdTasks.length; i++) {
@@ -1828,6 +1891,7 @@ async function runImport(
           if (i % 50 === 0) setCategoryProgress(i + 1, rdTasks.length);
         }
         setCategoryProgress(rdTasks.length, rdTasks.length);
+        addProcessed(entry.imported + entry.skipped);
         console.log(`[RD Import] Tasks done: ${entry.imported} imported, ${entry.skipped} skipped, ${entry.errors.length} errors`);
       } catch (e: any) {
         console.error("[RD Import] TASKS OUTER ERROR:", e.message, e.stack);

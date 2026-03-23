@@ -4679,3 +4679,12 @@
 - [x] Reorganizar menu Módulos com: Viagens, Propostas, Portal do cliente, Academy (todos "em breve")
 - [x] Testes vitest para bloqueio de acesso (17 testes passando)
 - [x] Validar que nada fora do escopo foi alterado (TypeScript: 0 erros, LSP: 0 erros)
+
+## Bug Fix: Importação RD Station CRM trava em 0% com muitos registros
+- [x] Diagnosticar causa raiz: ler backend import, frontend progress, identificar gargalo
+- [x] Corrigir backend: processamento em lotes, execução em background, progresso real
+- [x] Corrigir frontend: polling de progresso e UI refletindo status em tempo real
+- [x] Preservar fidelidade dos dados: contatos, negociações, usuários, status, empresas
+- [x] Preservar blindagem de tenants e segurança
+- [x] Testes vitest: importação pequena e grande, progresso, fidelidade de dados (20 testes passando)
+- [x] Validar ausência de regressão em outros módulos (TypeScript: 0 erros, LSP: 0 erros)
