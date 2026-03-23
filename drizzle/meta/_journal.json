@@ -43,6 +43,13 @@
       "when": 1774297942617,
       "tag": "0060_whole_ted_forrester",
       "breakpoints": true
+    },
+    {
+      "idx": 61,
+      "version": "5",
+      "when": 1774307471910,
+      "tag": "0061_abandoned_microbe",
+      "breakpoints": true
     }
   ]
 }

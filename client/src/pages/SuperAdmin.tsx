@@ -50,13 +50,15 @@ export default function SuperAdmin() {
   };
 
   const [search, setSearch] = useState("");
-  const [editDialog, setEditDialog] = useState<{ tenantId: number; type: "freemium" | "plan" | "status" } | null>(null);
+  const [billingFilter, setBillingFilter] = useState<string>("all");
+  const [editDialog, setEditDialog] = useState<{ tenantId: number; type: "freemium" | "plan" | "status" | "billingStatus" } | null>(null);
   const [deleteDialog, setDeleteDialog] = useState<{ tenantId: number; tenantName: string } | null>(null);
   const [deleteConfirmName, setDeleteConfirmName] = useState("");
   const [deleteStep, setDeleteStep] = useState<1 | 2>(1);
   const [freemiumDays, setFreemiumDays] = useState("365");
   const [selectedPlan, setSelectedPlan] = useState<"free" | "pro" | "enterprise">("free");
   const [selectedStatus, setSelectedStatus] = useState<"active" | "suspended" | "cancelled">("active");
+  const [selectedBillingStatus, setSelectedBillingStatus] = useState<string>("active");
   const [expandedTenant, setExpandedTenant] = useState<number | null>(null);
 
   const updateFreemiumMutation = trpc.saasAuth.adminUpdateFreemium.useMutation({
@@ -80,6 +82,15 @@ export default function SuperAdmin() {
   const toggleStatusMutation = trpc.saasAuth.adminToggleTenantStatus.useMutation({
     onSuccess: () => {
       toast.success("Status atualizado!");
+      tenantsQuery.refetch();
+      setEditDialog(null);
+    },
+    onError: (err: any) => toast.error(err.message),
+  });
+
+  const updateBillingStatusMutation = trpc.billing.adminUpdateBillingStatus.useMutation({
+    onSuccess: () => {
+      toast.success("Billing status atualizado!");
       tenantsQuery.refetch();
       setEditDialog(null);
     },
@@ -133,16 +144,31 @@ export default function SuperAdmin() {
     );
   }
 
-  const filteredTenants = (tenantsQuery.data || []).filter((t: any) =>
-    t.name.toLowerCase().includes(search.toLowerCase()) ||
-    t.hotmartEmail?.toLowerCase().includes(search.toLowerCase())
-  );
+  const filteredTenants = (tenantsQuery.data || []).filter((t: any) => {
+    const matchesSearch = t.name.toLowerCase().includes(search.toLowerCase()) ||
+      t.hotmartEmail?.toLowerCase().includes(search.toLowerCase());
+    const matchesBilling = billingFilter === "all" || t.billingStatus === billingFilter || (billingFilter === "legacy" && t.isLegacy);
+    return matchesSearch && matchesBilling;
+  });
 
   const planBadge = (plan: string) => {
     switch (plan) {
       case "pro": return <Badge className="bg-purple-500/20 text-purple-400 border-purple-500/30 hover:bg-purple-500/20">Pro</Badge>;
       case "enterprise": return <Badge className="bg-blue-500/20 text-blue-400 border-blue-500/30 hover:bg-blue-500/20">Enterprise</Badge>;
       default: return <Badge variant="secondary">Free</Badge>;
+    }
+  };
+
+  const billingStatusBadge = (billingStatus: string | null, isLegacy: boolean) => {
+    if (isLegacy) return <Badge className="bg-cyan-500/20 text-cyan-400 border-cyan-500/30 hover:bg-cyan-500/20">Legacy</Badge>;
+    switch (billingStatus) {
+      case "active": return <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20">Ativo</Badge>;
+      case "trialing": return <Badge className="bg-purple-500/20 text-purple-400 border-purple-500/30 hover:bg-purple-500/20">Trial</Badge>;
+      case "past_due": return <Badge className="bg-amber-500/20 text-amber-400 border-amber-500/30 hover:bg-amber-500/20">Inadimplente</Badge>;
+      case "restricted": return <Badge className="bg-red-500/20 text-red-400 border-red-500/30 hover:bg-red-500/20">Restrito</Badge>;
+      case "cancelled": return <Badge className="bg-orange-500/20 text-orange-400 border-orange-500/30 hover:bg-orange-500/20">Cancelado</Badge>;
+      case "expired": return <Badge className="bg-red-500/20 text-red-400 border-red-500/30 hover:bg-red-500/20">Expirado</Badge>;
+      default: return <Badge variant="secondary">{billingStatus || "—"}</Badge>;
     }
   };
 
@@ -218,7 +244,7 @@ export default function SuperAdmin() {
           ))}
         </div>
 
-        {/* Search */}
+        {/* Search & Filters */}
         <div className="flex items-center gap-4 mb-6">
           <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -229,6 +255,21 @@ export default function SuperAdmin() {
               className="pl-10"
             />
           </div>
+          <Select value={billingFilter} onValueChange={setBillingFilter}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Billing" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos</SelectItem>
+              <SelectItem value="legacy">Legacy</SelectItem>
+              <SelectItem value="active">Ativo</SelectItem>
+              <SelectItem value="trialing">Trial</SelectItem>
+              <SelectItem value="past_due">Inadimplente</SelectItem>
+              <SelectItem value="restricted">Restrito</SelectItem>
+              <SelectItem value="cancelled">Cancelado</SelectItem>
+              <SelectItem value="expired">Expirado</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
 
         {/* Tenants list */}
@@ -249,7 +290,7 @@ export default function SuperAdmin() {
                     <th className="text-left p-4 font-medium">Email</th>
                     <th className="text-left p-4 font-medium">Plano</th>
                     <th className="text-left p-4 font-medium">Status</th>
-                    <th className="text-left p-4 font-medium">Freemium</th>
+                    <th className="text-left p-4 font-medium">Billing</th>
                     <th className="text-left p-4 font-medium">Usuários</th>
                     <th className="text-center p-4 font-medium" title="Negociações em andamento / total"><Handshake className="w-4 h-4 mx-auto text-muted-foreground" /></th>
                     <th className="text-center p-4 font-medium" title="Contatos"><Contact className="w-4 h-4 mx-auto text-muted-foreground" /></th>
@@ -285,13 +326,14 @@ export default function SuperAdmin() {
                           <td className="p-4">{planBadge(tenant.plan)}</td>
                           <td className="p-4">{statusBadge(tenant.status)}</td>
                           <td className="p-4">
-                            {tenant.plan === "free" && daysLeft !== null ? (
-                              <span className={`text-sm font-medium ${daysLeft <= 30 ? "text-amber-400" : "text-emerald-400"}`}>
-                                {daysLeft > 0 ? `${daysLeft} dias` : "Expirado"}
-                              </span>
-                            ) : (
-                              <span className="text-muted-foreground">—</span>
-                            )}
+                            <div className="flex flex-col gap-1">
+                              {billingStatusBadge(tenant.billingStatus, tenant.isLegacy)}
+                              {tenant.billingStatus === "trialing" && daysLeft !== null && daysLeft > 0 && (
+                                <span className={`text-xs ${daysLeft <= 3 ? "text-amber-400" : "text-muted-foreground"}`}>
+                                  {daysLeft}d restantes
+                                </span>
+                              )}
+                            </div>
                           </td>
                           <td className="p-4 text-muted-foreground">{tenant.userCount}</td>
                           {(() => {
@@ -345,14 +387,14 @@ export default function SuperAdmin() {
                                 variant="ghost"
                                 size="sm"
                                 className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
-                                title="Alterar período freemium"
+                                title="Alterar billing status"
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  setFreemiumDays(String(tenant.freemiumDays || 365));
-                                  setEditDialog({ tenantId: tenant.id, type: "freemium" });
+                                  setSelectedBillingStatus(tenant.billingStatus || "active");
+                                  setEditDialog({ tenantId: tenant.id, type: "billingStatus" });
                                 }}
                               >
-                                <Clock className="w-4 h-4" />
+                                <CreditCard className="w-4 h-4" />
                               </Button>
                               <Button
                                 variant="ghost"
@@ -446,6 +488,7 @@ export default function SuperAdmin() {
               {editDialog?.type === "freemium" && "Alterar Período Freemium"}
               {editDialog?.type === "plan" && "Alterar Plano"}
               {editDialog?.type === "status" && "Alterar Status"}
+              {editDialog?.type === "billingStatus" && "Alterar Billing Status"}
             </DialogTitle>
           </DialogHeader>
 
@@ -501,11 +544,33 @@ export default function SuperAdmin() {
             </div>
           )}
 
+          {editDialog?.type === "billingStatus" && (
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label>Billing Status</Label>
+                <Select value={selectedBillingStatus} onValueChange={setSelectedBillingStatus}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="active">Ativo</SelectItem>
+                    <SelectItem value="trialing">Trial</SelectItem>
+                    <SelectItem value="past_due">Inadimplente</SelectItem>
+                    <SelectItem value="restricted">Restrito</SelectItem>
+                    <SelectItem value="cancelled">Cancelado</SelectItem>
+                    <SelectItem value="expired">Expirado</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">Altera o status de billing manualmente. Use com cuidado.</p>
+              </div>
+            </div>
+          )}
+
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditDialog(null)}>Cancelar</Button>
             <Button
               className="bg-purple-600 hover:bg-purple-700 text-white"
-              disabled={updateFreemiumMutation.isPending || updatePlanMutation.isPending || toggleStatusMutation.isPending}
+              disabled={updateFreemiumMutation.isPending || updatePlanMutation.isPending || toggleStatusMutation.isPending || updateBillingStatusMutation.isPending}
               onClick={() => {
                 if (!editDialog) return;
                 if (editDialog.type === "freemium") {
@@ -514,10 +579,12 @@ export default function SuperAdmin() {
                   updatePlanMutation.mutate({ tenantId: editDialog.tenantId, plan: selectedPlan });
                 } else if (editDialog.type === "status") {
                   toggleStatusMutation.mutate({ tenantId: editDialog.tenantId, status: selectedStatus });
+                } else if (editDialog.type === "billingStatus") {
+                  updateBillingStatusMutation.mutate({ tenantId: editDialog.tenantId, billingStatus: selectedBillingStatus as any });
                 }
               }}
             >
-              {(updateFreemiumMutation.isPending || updatePlanMutation.isPending || toggleStatusMutation.isPending) ? (
+              {(updateFreemiumMutation.isPending || updatePlanMutation.isPending || toggleStatusMutation.isPending || updateBillingStatusMutation.isPending) ? (
                 <Loader2 className="w-4 h-4 animate-spin mr-2" />
               ) : null}
               Salvar

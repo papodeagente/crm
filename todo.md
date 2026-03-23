@@ -4752,3 +4752,107 @@
 
 ### Fase 4 — Testes
 - [x] Testes vitest para definição de planos e enforcement de limites (45 testes passando)
+
+## Estabilização Cirúrgica v2 — Prioridade Máxima
+
+### Regras
+- Tenants já criados mantêm planos inalterados
+- Não alterar regras de negócio
+- Não refatorar por estética
+- Toda correção cirúrgica e reversível
+
+### Fase 1 — Verificar estado atual
+- [ ] Revisar correções já aplicadas no checkpoint 53503b76 (circuit breaker, staleTime, indexes)
+- [ ] Verificar se essas correções estão presentes no código atual (3edc5141)
+
+### Fase 2 — Diagnóstico produção
+- [ ] Testar login na produção (crm.acelerador.tur.br)
+- [ ] Medir tempo de resposta dos endpoints críticos
+- [ ] Verificar se rate limit 429 ainda ocorre
+
+### Fase 3 — Correções adicionais
+- [ ] Aplicar correções pendentes se identificadas
+
+### Fase 4 — Segurança multi-tenant
+- [ ] Auditar isolamento por tenantId em queries
+- [ ] Validar que cache não vaza entre tenants
+- [ ] Testar cenários: admin, usuário comum, tenant novo, super admin
+
+### Fase 5 — Testes e relatório
+- [ ] Rodar testes existentes + novos
+- [ ] Compilar relatório final com métricas e evidências
+
+## Integração Billing Hotmart — Reorganização Completa
+
+### Regras
+- Tenants já criados mantêm acesso inalterado
+- Não quebrar login, tenants, permissões, fluxos existentes
+- Toda mudança incremental, segura e reversível
+- Hotmart é fonte da verdade para assinatura
+
+### Fase 1 — Levantamento
+- [x] Auditar modelo atual: trial 12 meses, seeds, tabelas billing, webhook Hotmart existente
+- [x] Mapear impacto e dependências
+
+### Fase 2 — Schema
+- [x] Criar/adaptar tabelas: subscriptions, subscription_events
+- [x] Campos: tenant_id, provider, external_subscription_id, status, trial_started_at, trial_ends_at, etc.
+- [x] Adicionado billingStatus e isLegacy na tabela tenants
+- [x] Tenants existentes marcados como isLegacy=true
+
+### Fase 3 — Webhook Hotmart
+- [x] Endpoint robusto com validação HOTTOK
+- [x] Idempotência por event+transaction+email composite key
+- [x] Tradução de eventos Hotmart → status interno (EVENT_STATUS_MAP)
+- [x] Log completo de payloads (subscription_events table)
+- [x] Legacy tenant protection (isLegacy skip enforcement)
+
+### Fase 4 — Vinculação e Controle de Acesso
+- [x] Vincular comprador Hotmart → tenant por email (hotmartEmail field)
+- [x] Controle de acesso: billingAccessService.ts centralizado
+- [x] Modo restrito: login OK, visualização OK, criação/edição bloqueada
+- [x] checkTenantAccess reescrito para usar billingAccessService
+- [x] loginWithEmail permite login mesmo em modo restrito
+
+### Fase 5 — Remover Trial 12 Meses
+- [x] Remover seeds/lógica de plano grátis 12 meses (registerTenantAndUser + createTenant)
+- [x] Ajustar onboarding para trial 7 dias
+- [x] Atualizar SaasRegister.tsx com messaging de 7 dias
+
+### Fase 6 — Frontend
+- [x] Painel de assinatura do tenant (billing.myBilling endpoint)
+- [x] Banner/CTA de modo restrito (BillingBanner component)
+- [x] Página /upgrade reescrita com planos Start/Growth/Scale
+- [x] SaasRegister atualizado para 7 dias de trial
+- [ ] Tela de regularização
+
+### Fase 7 — Área Admin (Super Admin)
+- [x] Lista de tenants com coluna Billing Status (badge colorido)
+- [x] Filtro por billing status (dropdown)
+- [x] Botão para alterar billing status manualmente
+- [x] Dialog para editar billing status
+- [x] Mutation adminUpdateBillingStatus integrada
+- [ ] Logs de integração Hotmart
+- [ ] Filtros por status, busca por tenant/email
+
+### Fase 8 — Segurança Multi-Tenant
+- [x] Auditar isolamento em toda implementação billing
+- [x] myBilling usa tenantProcedure + getTenantId
+- [x] Admin endpoints verificam isSuperAdmin
+- [x] Webhook protegido por HOTTOK
+- [x] assertNotRestricted disponível para guard
+
+### Fase 9 — Testes
+- [x] Testes billing: billingAccessService (28 testes passando)
+- [x] Testes acesso: trial ativo, expirado, modo restrito, legacy
+- [x] Testes multi-tenant: isolamento billing (assertNotRestricted, isTenantRestricted)
+- [x] Testes Hotmart event mapping
+- [x] Testes BillingAccessResult type contract
+
+### Fase 10 — Migração
+- [x] Tenants existentes marcados como isLegacy=true (SQL executado)
+- [x] Novos tenants seguem modelo Hotmart (7 dias trial, billingStatus=trialing)
+
+### Fase 11 — Entrega
+- [x] Checkpoint salvo
+- [x] Relatório final entregue

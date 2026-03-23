@@ -41,7 +41,7 @@ export default function SaasRegister() {
   };
 
   const benefits = [
-    "12 meses de acesso gratuito",
+    "7 dias grátis para testar tudo",
     "CRM completo para agências de viagens",
     "Pipeline de vendas ilimitado",
     "WhatsApp integrado com IA",
@@ -71,7 +71,7 @@ export default function SaasRegister() {
             O sistema que sua agência precisa
           </h2>
           <p className="text-gray-400 mb-8">
-            Comece agora com 12 meses grátis. Sem cartão de crédito.
+            Comece agora com 7 dias grátis. Sem cartão de crédito.
           </p>
           <div className="space-y-3">
             {benefits.map((benefit, i) => (
@@ -84,10 +84,10 @@ export default function SaasRegister() {
             ))}
           </div>
           <div className="mt-8 p-4 bg-purple-500/10 rounded-xl border border-purple-500/20">
-            <p className="text-sm text-purple-300 font-medium">Plano Pro — R$97/mês</p>
+            <p className="text-sm text-purple-300 font-medium">Planos a partir de R$97/mês</p>
             <p className="text-xs text-purple-400/70 mt-1">
-              Após o período gratuito, assine o plano Pro para continuar com acesso completo.
-              Plano Enterprise disponível para grandes operações.
+              Após os 7 dias de teste, assine via Hotmart para continuar com acesso completo.
+              Escolha entre Start, Growth ou Scale.
             </p>
           </div>
         </div>
@@ -105,7 +105,7 @@ export default function SaasRegister() {
           <div className="text-center mb-6">
             <h1 className="text-xl font-semibold text-white">Criar conta grátis</h1>
             <p className="text-sm text-gray-400 mt-1">
-              12 meses de acesso gratuito, sem cartão de crédito
+              7 dias de acesso completo, sem cartão de crédito
             </p>
           </div>
 

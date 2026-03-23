@@ -20,6 +20,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { Link, useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from "./DashboardLayoutSkeleton";
 import { trpc } from "@/lib/trpc";
+import { BillingBanner } from "./BillingBanner";
 /* ─── Top Nav Items ─── */
 interface NavItem {
   icon: any;
@@ -340,6 +341,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
         mobileMenuOpen={mobileMenuOpen}
         onToggleMobile={() => setMobileMenuOpen(!mobileMenuOpen)}
       />
+      <BillingBanner />
       <main className="flex-1 overflow-y-auto scrollbar-thin">{children}</main>
       <SearchPalette open={searchOpen} onClose={() => setSearchOpen(false)} />
     </div>

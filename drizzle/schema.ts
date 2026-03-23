@@ -172,6 +172,8 @@ export const tenants = mysqlTable("tenants", {
   slug: varchar("slug", { length: 128 }),
   plan: mysqlEnum("plan", ["free", "pro", "enterprise", "start", "growth", "scale"]).default("start").notNull(),
   status: mysqlEnum("status", ["active", "suspended", "cancelled"]).default("active").notNull(),
+  billingStatus: mysqlEnum("billingStatus", ["active", "trialing", "past_due", "restricted", "cancelled", "expired"]).default("active").notNull(),
+  isLegacy: boolean("isLegacy").default(false).notNull(),
   ownerUserId: int("ownerUserId"),
   billingCustomerId: varchar("billingCustomerId", { length: 128 }),
   hotmartEmail: varchar("hotmartEmail", { length: 320 }),
@@ -1504,28 +1506,70 @@ export type InsertRdFieldMapping = typeof rdFieldMappings.$inferInsert;
 export const subscriptions = mysqlTable("subscriptions", {
   id: int("id").autoincrement().primaryKey(),
   tenantId: int("tenantId").notNull(),
+  provider: varchar("provider", { length: 32 }).default("hotmart").notNull(),
   plan: mysqlEnum("plan", ["free", "pro", "enterprise", "start", "growth", "scale"]).default("start").notNull(),
   status: mysqlEnum("status", ["active", "trialing", "past_due", "cancelled", "expired"]).default("trialing").notNull(),
+  // Hotmart external references
   hotmartTransactionId: varchar("hotmartTransactionId", { length: 255 }),
   hotmartSubscriptionId: varchar("hotmartSubscriptionId", { length: 255 }),
   hotmartProductId: varchar("hotmartProductId", { length: 255 }),
+  hotmartOfferId: varchar("hotmartOfferId", { length: 255 }),
   hotmartBuyerEmail: varchar("hotmartBuyerEmail", { length: 320 }),
-  priceInCents: int("priceInCents").default(9700), // R$97,00
+  hotmartBuyerName: varchar("hotmartBuyerName", { length: 255 }),
+  // Pricing
+  priceInCents: int("priceInCents").default(9700),
+  currency: varchar("currency", { length: 8 }).default("BRL"),
+  // Trial
   trialStartedAt: timestamp("trialStartedAt"),
   trialEndsAt: timestamp("trialEndsAt"),
+  // Period
   currentPeriodStart: timestamp("currentPeriodStart"),
   currentPeriodEnd: timestamp("currentPeriodEnd"),
+  // Lifecycle
   cancelledAt: timestamp("cancelledAt"),
+  lastEventAt: timestamp("lastEventAt"),
+  lastSyncAt: timestamp("lastSyncAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 }, (t) => [
   index("sub_tenant_idx").on(t.tenantId),
   index("sub_hotmart_idx").on(t.hotmartSubscriptionId),
   index("sub_status_idx").on(t.status),
+  index("sub_buyer_email_idx").on(t.hotmartBuyerEmail),
 ]);
 
 export type Subscription = typeof subscriptions.$inferSelect;
 export type InsertSubscription = typeof subscriptions.$inferInsert;
+
+// ════════════════════════════════════════════════════════════
+// SUBSCRIPTION EVENTS (Hotmart webhook audit trail)
+// ════════════════════════════════════════════════════════════
+
+export const subscriptionEvents = mysqlTable("subscription_events", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId"),
+  subscriptionId: int("subscriptionId"),
+  provider: varchar("provider", { length: 32 }).default("hotmart").notNull(),
+  externalEvent: varchar("externalEvent", { length: 128 }).notNull(),
+  internalStatus: varchar("internalStatus", { length: 64 }).notNull(),
+  transactionId: varchar("transactionId", { length: 255 }),
+  buyerEmail: varchar("buyerEmail", { length: 320 }),
+  rawPayload: json("rawPayload"),
+  processed: boolean("processed").default(false).notNull(),
+  processedAt: timestamp("processedAt"),
+  errorMessage: text("errorMessage"),
+  idempotencyKey: varchar("idempotencyKey", { length: 512 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (t) => [
+  index("se_tenant_idx").on(t.tenantId),
+  index("se_subscription_idx").on(t.subscriptionId),
+  index("se_idempotency_idx").on(t.idempotencyKey),
+  index("se_created_idx").on(t.createdAt),
+  index("se_buyer_email_idx").on(t.buyerEmail),
+]);
+
+export type SubscriptionEvent = typeof subscriptionEvents.$inferSelect;
+export type InsertSubscriptionEvent = typeof subscriptionEvents.$inferInsert;
 
 
 // ════════════════════════════════════════════════════════════

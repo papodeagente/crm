@@ -22,11 +22,12 @@ import {
 // ═══════════════════════════════════════
 // TENANTS
 // ═══════════════════════════════════════
-export async function createTenant(data: { name: string; plan?: "free" | "pro" | "enterprise"; ownerUserId?: number; hotmartEmail?: string; freemiumDays?: number }) {
+export async function createTenant(data: { name: string; plan?: "free" | "pro" | "enterprise" | "start" | "growth" | "scale"; ownerUserId?: number; hotmartEmail?: string; freemiumDays?: number; isLegacy?: boolean }) {
   const db = await getDb(); if (!db) return null;
-  const freemiumDays = data.freemiumDays ?? 365;
+  const freemiumDays = data.freemiumDays ?? 7; // Default 7-day trial for new tenants
   const freemiumExpiresAt = new Date(Date.now() + freemiumDays * 24 * 60 * 60 * 1000);
-  const [result] = await db.insert(tenants).values({ name: data.name, plan: data.plan || "free", ownerUserId: data.ownerUserId, hotmartEmail: data.hotmartEmail, freemiumDays, freemiumExpiresAt }).$returningId();
+  const isLegacy = data.isLegacy ?? false;
+  const [result] = await db.insert(tenants).values({ name: data.name, plan: data.plan || "start", status: "active", billingStatus: "trialing", isLegacy, ownerUserId: data.ownerUserId, hotmartEmail: data.hotmartEmail, freemiumDays, freemiumExpiresAt }).$returningId();
   // Auto-create default pipelines for new tenant
   try {
     const { createDefaultPipelines } = await import("./classificationEngine");

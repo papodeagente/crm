@@ -87,19 +87,21 @@ export async function registerTenantAndUser(data: {
     throw new Error("EMAIL_EXISTS");
   }
 
-  // Create tenant
+  // Create tenant — new tenants get 7-day trial (non-legacy)
   const slug = data.companyName.toLowerCase().replace(/[^a-z0-9]/g, "-").replace(/-+/g, "-").slice(0, 64);
-  const freemiumDays = 365;
-  const freemiumExpiresAt = new Date(Date.now() + freemiumDays * 24 * 60 * 60 * 1000);
+  const trialDays = 7;
+  const trialExpiresAt = new Date(Date.now() + trialDays * 24 * 60 * 60 * 1000);
 
   const [tenantResult] = await db.insert(tenants).values({
     name: data.companyName,
     slug,
-    plan: "free",
+    plan: "start",
     status: "active",
+    billingStatus: "trialing",
+    isLegacy: false,
     hotmartEmail: data.email,
-    freemiumDays,
-    freemiumExpiresAt,
+    freemiumDays: trialDays,
+    freemiumExpiresAt: trialExpiresAt,
   }).$returningId();
 
   const tenantId = tenantResult.id;
@@ -129,13 +131,14 @@ export async function registerTenantAndUser(data: {
     console.error("[Onboarding] Failed to create default pipelines for tenant", tenantId, e);
   }
 
-  // Create subscription (trialing/freemium)
+  // Create subscription (7-day trial)
   await db.insert(subscriptions).values({
     tenantId,
-    plan: "free",
+    provider: "hotmart",
+    plan: "start",
     status: "trialing",
     trialStartedAt: new Date(),
-    trialEndsAt: freemiumExpiresAt,
+    trialEndsAt: trialExpiresAt,
   });
 
   return {
@@ -198,14 +201,19 @@ export async function loginWithEmail(email: string, password: string) {
 
   const tenant = tenantRows[0];
 
-  // Check if tenant is suspended
+  // Check if tenant is hard-suspended (admin action)
+  // Note: billingStatus "restricted" still allows login (read-only mode)
   if (tenant.status === "suspended") {
-    // Check subscription
-    const subs = await db.select().from(subscriptions)
-      .where(and(eq(subscriptions.tenantId, tenant.id), eq(subscriptions.status, "active")))
-      .limit(1);
-    
-    if (subs.length === 0) {
+    // Legacy tenants: check subscription
+    if (tenant.isLegacy) {
+      const subs = await db.select().from(subscriptions)
+        .where(and(eq(subscriptions.tenantId, tenant.id), eq(subscriptions.status, "active")))
+        .limit(1);
+      if (subs.length === 0) {
+        throw new Error("SUBSCRIPTION_EXPIRED");
+      }
+    } else {
+      // Non-legacy: suspended means admin action, block login
       throw new Error("SUBSCRIPTION_EXPIRED");
     }
   }
@@ -232,6 +240,8 @@ export async function loginWithEmail(email: string, password: string) {
       name: tenant.name,
       plan: tenant.plan,
       status: tenant.status,
+      billingStatus: tenant.billingStatus,
+      isLegacy: tenant.isLegacy,
       freemiumExpiresAt: tenant.freemiumExpiresAt,
     },
   };
@@ -247,51 +257,66 @@ export async function checkTenantAccess(tenantId: number): Promise<{
   plan: string;
   daysLeft?: number;
   paymentUrl?: string;
+  billingStatus?: string;
+  isLegacy?: boolean;
+  message?: string;
+  trialEndsAt?: Date | null;
+  currentPeriodEnd?: Date | null;
 }> {
+  const { checkBillingAccess } = await import("./services/billingAccessService");
+  const billing = await checkBillingAccess(tenantId);
+
+  // Also check tenant.status for suspended/cancelled (admin-level suspension)
   const db = await getDb();
-  if (!db) return { allowed: false, reason: "DB_ERROR", plan: "free" };
+  if (db) {
+    const tenantRows = await db.select().from(tenants).where(eq(tenants.id, tenantId)).limit(1);
+    if (tenantRows.length > 0) {
+      const tenant = tenantRows[0];
+      if (tenant.status === "suspended") {
+        return {
+          allowed: false,
+          reason: "SUSPENDED",
+          plan: tenant.plan,
+          paymentUrl: "/upgrade",
+          billingStatus: billing.billingStatus,
+          isLegacy: billing.isLegacy,
+          message: "Sua conta foi suspensa. Entre em contato com o suporte.",
+        };
+      }
+      if (tenant.status === "cancelled") {
+        return {
+          allowed: false,
+          reason: "CANCELLED",
+          plan: tenant.plan,
+          billingStatus: billing.billingStatus,
+          isLegacy: billing.isLegacy,
+        };
+      }
 
-  const tenantRows = await db.select().from(tenants).where(eq(tenants.id, tenantId)).limit(1);
-  if (tenantRows.length === 0) return { allowed: false, reason: "TENANT_NOT_FOUND", plan: "free" };
-
-  const tenant = tenantRows[0];
-
-  if (tenant.status === "cancelled") {
-    return { allowed: false, reason: "CANCELLED", plan: tenant.plan };
-  }
-
-  if (tenant.status === "suspended") {
-    return { allowed: false, reason: "SUSPENDED", plan: tenant.plan, paymentUrl: "/upgrade" };
-  }
-
-  // Check freemium expiration
-  if (tenant.plan === "free" && tenant.freemiumExpiresAt) {
-    const now = new Date();
-    if (now > tenant.freemiumExpiresAt) {
-      // Freemium expired - suspend tenant
-      await db.update(tenants).set({ status: "suspended" }).where(eq(tenants.id, tenantId));
-      return { allowed: false, reason: "FREEMIUM_EXPIRED", plan: "free", paymentUrl: "/upgrade" };
-    }
-    const daysLeft = Math.ceil((tenant.freemiumExpiresAt.getTime() - now.getTime()) / (24 * 60 * 60 * 1000));
-    return { allowed: true, plan: "free", daysLeft };
-  }
-
-  // Pro/Enterprise - check active subscription
-  if (tenant.plan === "pro" || tenant.plan === "enterprise") {
-    const subs = await db.select().from(subscriptions)
-      .where(and(eq(subscriptions.tenantId, tenantId)))
-      .limit(1);
-    
-    if (subs.length > 0) {
-      const sub = subs[0];
-      if (sub.status === "expired" || sub.status === "cancelled") {
-        await db.update(tenants).set({ status: "suspended" }).where(eq(tenants.id, tenantId));
-        return { allowed: false, reason: "SUBSCRIPTION_EXPIRED", plan: tenant.plan, paymentUrl: "/upgrade" };
+      // Legacy tenants with freemium: check expiration (backward compat)
+      if (tenant.isLegacy && tenant.plan === "free" && tenant.freemiumExpiresAt) {
+        const now = new Date();
+        if (now > tenant.freemiumExpiresAt) {
+          await db.update(tenants).set({ status: "suspended" }).where(eq(tenants.id, tenantId));
+          return { allowed: false, reason: "FREEMIUM_EXPIRED", plan: "free", paymentUrl: "/upgrade", isLegacy: true, billingStatus: "expired" };
+        }
+        const daysLeft = Math.ceil((tenant.freemiumExpiresAt.getTime() - now.getTime()) / (24 * 60 * 60 * 1000));
+        return { allowed: true, plan: "free", daysLeft, isLegacy: true, billingStatus: "active" };
       }
     }
   }
 
-  return { allowed: true, plan: tenant.plan };
+  return {
+    allowed: billing.level === "full",
+    reason: billing.reason,
+    plan: billing.plan,
+    billingStatus: billing.billingStatus,
+    isLegacy: billing.isLegacy,
+    message: billing.message,
+    trialEndsAt: billing.trialEndsAt,
+    currentPeriodEnd: billing.currentPeriodEnd,
+    paymentUrl: billing.level === "restricted" ? "/upgrade" : undefined,
+  };
 }
 
 // ═══════════════════════════════════════

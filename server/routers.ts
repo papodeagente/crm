@@ -147,6 +147,7 @@ import { utmAnalyticsRouter } from "./routers/utmAnalyticsRouter";
 import { sourcesCampaignsRouter } from "./routers/sourcesCampaignsRouter";
 import { rdCrmImportRouter } from "./routers/rdCrmImportRouter";
 import { saasAuthRouter } from "./routers/saasAuthRouter";
+import { billingRouter } from "./routers/billingRouter";
 import { inviteUserToTenant } from "./saasAuth";
 import { rfvRouter } from "./routers/rfvRouter";
 import { profileRouter } from "./routers/profileRouter";
@@ -2088,6 +2089,7 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
   sourcesCampaigns: sourcesCampaignsRouter, // Relatório Fontes e Campanhas
   rdCrmImport: rdCrmImportRouter, // M12: Importação do RD Station CRM
   saasAuth: saasAuthRouter, // SaaS Authentication (email/senha)
+  billing: billingRouter, // Billing & Subscription management
   rfv: rfvRouter, // M13: Matriz RFV — Classificação Automática de Contatos
   crmAnalytics: analyticsRouter, // M14: Análises de Negociações (KPIs, Funil, Motivos de Perda)
   profile: profileRouter, // Perfil do usuário (avatar, nome, senha, Google Calendar)
