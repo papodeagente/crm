@@ -4731,3 +4731,7 @@
 - [x] Diagnosticar causa raiz do rate limit no fluxo de login
 - [x] Corrigir o problema sem alterar funcionalidades existentes
 - [x] Validar login funcionando corretamente
+
+## Bug Fix: SuperAdmin missing key prop
+
+- [x] Corrigir erro "Each child in a list should have a unique key prop" no tbody do SuperAdmin.tsx
