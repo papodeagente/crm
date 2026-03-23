@@ -9,4 +9,8 @@ export const ENV = {
   forgeApiKey: process.env.BUILT_IN_FORGE_API_KEY ?? "",
   wpSecret: process.env.WP_SECRET ?? "",
   resendApiKey: process.env.RESEND_API_KEY ?? "",
+  stripeSecretKey: process.env.STRIPE_SECRET_KEY ?? "",
+  stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET ?? "",
+  stripePriceSolo: process.env.STRIPE_PRICE_SOLO ?? "",
+  stripePriceGrowth: process.env.STRIPE_PRICE_GROWTH ?? "",
 };

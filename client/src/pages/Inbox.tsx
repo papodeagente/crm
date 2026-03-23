@@ -1577,7 +1577,7 @@ export default function InboxPage() {
   }, []);
 
   // Current user ID for filtering "mine" tab
-  const meQ = trpc.auth.me.useQuery();
+  const meQ = trpc.auth.me.useQuery(undefined, { retry: false, refetchOnWindowFocus: false, staleTime: 5 * 60 * 1000 });
   const myUserId = useMemo(() => (meQ.data as any)?.saasUser?.userId || (meQ.data as any)?.id || 0, [meQ.data]);
 
   // ─── Render from deterministic store (pre-sorted, pre-deduped) ───

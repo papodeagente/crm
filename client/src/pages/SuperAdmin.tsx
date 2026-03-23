@@ -21,7 +21,7 @@ import { useTenantId } from "@/hooks/useTenantId";
 
 export default function SuperAdmin() {
   const [, navigate] = useLocation();
-  const meQuery = trpc.saasAuth.me.useQuery();
+  const meQuery = trpc.saasAuth.me.useQuery(undefined, { retry: false, refetchOnWindowFocus: false, staleTime: 5 * 60 * 1000 });
   const tenantsQuery = trpc.saasAuth.adminListTenants.useQuery(undefined, {
     enabled: !!meQuery.data?.isSuperAdmin,
   });

@@ -8,34 +8,56 @@ import App from "./App";
 import { getLoginUrl } from "./const";
 import "./index.css";
 
+// ═══════════════════════════════════════
+// GLOBAL RATE LIMIT CIRCUIT BREAKER
+// Prevents retry amplification when the
+// platform returns 429 Rate exceeded.
+// ═══════════════════════════════════════
+let rateLimitedUntil = 0;
+
+function isRateLimited(): boolean {
+  return Date.now() < rateLimitedUntil;
+}
+
+function markRateLimited(backoffMs: number) {
+  const until = Date.now() + backoffMs;
+  if (until > rateLimitedUntil) {
+    rateLimitedUntil = until;
+    console.warn(`[RateLimit] Backing off for ${backoffMs}ms until ${new Date(until).toISOString()}`);
+  }
+}
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       retry: (failureCount, error) => {
-        // Retry on rate limit / network errors up to 3 times
+        // Never retry if we're in a rate-limit backoff window
+        if (isRateLimited()) return false;
+
         if (error instanceof TRPCClientError) {
           const msg = error.message || "";
-          if (msg.includes("Rate exceeded") || msg.includes("Unexpected token") || msg.includes("fetch failed")) {
-            return failureCount < 3;
-          }
-          // Don't retry auth errors
+          // Don't retry auth errors at all
           if (msg === UNAUTHED_ERR_MSG) return false;
+          // Rate limit: let the fetch-level handler deal with it, don't double-retry
+          if (msg.includes("Rate exceeded")) return false;
+          // Network errors: retry once
+          if (msg.includes("fetch failed") || msg.includes("Unexpected token")) {
+            return failureCount < 1;
+          }
         }
-        return failureCount < 2;
+        return failureCount < 1;
       },
-      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10000),
+      retryDelay: (attemptIndex) => Math.min(2000 * 2 ** attemptIndex, 15000),
     },
     mutations: {
       retry: (failureCount, error) => {
+        if (isRateLimited()) return false;
         if (error instanceof TRPCClientError) {
           const msg = error.message || "";
-          if (msg.includes("Rate exceeded") || msg.includes("Unexpected token") || msg.includes("fetch failed")) {
-            return failureCount < 3;
-          }
+          if (msg.includes("Rate exceeded")) return false;
         }
         return false;
       },
-      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10000),
     },
   },
 });
@@ -55,7 +77,10 @@ queryClient.getQueryCache().subscribe(event => {
   if (event.type === "updated" && event.action.type === "error") {
     const error = event.query.state.error;
     redirectToLoginIfUnauthorized(error);
-    console.error("[API Query Error]", error);
+    // Only log non-rate-limit errors to avoid console spam
+    if (!(error instanceof TRPCClientError && error.message?.includes("Rate exceeded"))) {
+      console.error("[API Query Error]", error);
+    }
   }
 });
 
@@ -63,7 +88,9 @@ queryClient.getMutationCache().subscribe(event => {
   if (event.type === "updated" && event.action.type === "error") {
     const error = event.mutation.state.error;
     redirectToLoginIfUnauthorized(error);
-    console.error("[API Mutation Error]", error);
+    if (!(error instanceof TRPCClientError && error.message?.includes("Rate exceeded"))) {
+      console.error("[API Mutation Error]", error);
+    }
   }
 });
 
@@ -73,29 +100,54 @@ const trpcClient = trpc.createClient({
       url: "/api/trpc",
       transformer: superjson,
       async fetch(input, init) {
-        const maxRetries = 3;
+        // If we're in a rate-limit backoff window, wait before even trying
+        if (isRateLimited()) {
+          const waitMs = rateLimitedUntil - Date.now();
+          if (waitMs > 0) {
+            await new Promise(r => setTimeout(r, waitMs));
+          }
+        }
+
+        const MAX_RETRIES = 2; // Only 2 retries at fetch level (total 3 attempts)
         let lastError: Error | null = null;
-        for (let attempt = 0; attempt <= maxRetries; attempt++) {
+
+        for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
           try {
             const response = await globalThis.fetch(input, {
               ...(init ?? {}),
               credentials: "include",
             });
-            // Check if response is actually JSON (rate limit returns plain text)
+
             const contentType = response.headers.get("content-type") || "";
-            if (!response.ok && !contentType.includes("application/json")) {
+
+            if (response.status === 429) {
               const text = await response.text();
-              if (text.includes("Rate exceeded") && attempt < maxRetries) {
-                await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
+              // Exponential backoff: 3s, 6s, 12s
+              const backoffMs = 3000 * Math.pow(2, attempt);
+              markRateLimited(backoffMs);
+
+              if (attempt < MAX_RETRIES) {
+                await new Promise(r => setTimeout(r, backoffMs));
                 continue;
               }
+              throw new Error("Rate exceeded");
+            }
+
+            if (!response.ok && !contentType.includes("application/json")) {
+              const text = await response.text();
               throw new Error(text || `HTTP ${response.status}`);
             }
+
             return response;
           } catch (err: any) {
             lastError = err;
-            if (attempt < maxRetries && (err.message?.includes("Rate exceeded") || err.message?.includes("fetch failed"))) {
-              await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
+            if (err.message?.includes("Rate exceeded")) {
+              if (attempt >= MAX_RETRIES) throw err;
+              // Already handled above via markRateLimited
+              continue;
+            }
+            if (attempt < MAX_RETRIES && err.message?.includes("fetch failed")) {
+              await new Promise(r => setTimeout(r, 2000 * (attempt + 1)));
               continue;
             }
             throw err;

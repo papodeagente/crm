@@ -170,7 +170,7 @@ export const tenants = mysqlTable("tenants", {
   id: int("id").autoincrement().primaryKey(),
   name: varchar("name", { length: 255 }).notNull(),
   slug: varchar("slug", { length: 128 }),
-  plan: mysqlEnum("plan", ["free", "pro", "enterprise"]).default("free").notNull(),
+  plan: mysqlEnum("plan", ["free", "pro", "enterprise", "solo", "growth", "scale"]).default("free").notNull(),
   status: mysqlEnum("status", ["active", "suspended", "cancelled"]).default("active").notNull(),
   ownerUserId: int("ownerUserId"),
   billingCustomerId: varchar("billingCustomerId", { length: 128 }),
@@ -1504,23 +1504,34 @@ export type InsertRdFieldMapping = typeof rdFieldMappings.$inferInsert;
 export const subscriptions = mysqlTable("subscriptions", {
   id: int("id").autoincrement().primaryKey(),
   tenantId: int("tenantId").notNull(),
-  plan: mysqlEnum("plan", ["free", "pro", "enterprise"]).default("free").notNull(),
-  status: mysqlEnum("status", ["active", "trialing", "past_due", "cancelled", "expired"]).default("trialing").notNull(),
+  plan: mysqlEnum("plan", ["free", "pro", "enterprise", "solo", "growth", "scale"]).default("free").notNull(),
+  status: mysqlEnum("status", ["active", "trialing", "past_due", "cancelled", "expired", "unpaid", "incomplete"]).default("trialing").notNull(),
+  billingProvider: mysqlEnum("billing_provider", ["stripe", "hotmart", "manual"]).default("manual").notNull(),
+  // Hotmart fields (preserved)
   hotmartTransactionId: varchar("hotmartTransactionId", { length: 255 }),
   hotmartSubscriptionId: varchar("hotmartSubscriptionId", { length: 255 }),
   hotmartProductId: varchar("hotmartProductId", { length: 255 }),
   hotmartBuyerEmail: varchar("hotmartBuyerEmail", { length: 320 }),
-  priceInCents: int("priceInCents").default(9700), // R$97,00
+  // Stripe fields
+  stripeCustomerId: varchar("stripeCustomerId", { length: 128 }),
+  stripeSubscriptionId: varchar("stripeSubscriptionId", { length: 128 }),
+  stripePriceId: varchar("stripePriceId", { length: 128 }),
+  paymentStatus: mysqlEnum("payment_status", ["paid", "pending", "failed", "refunded"]).default("pending"),
+  // Common fields
+  priceInCents: int("priceInCents").default(9700),
   trialStartedAt: timestamp("trialStartedAt"),
   trialEndsAt: timestamp("trialEndsAt"),
   currentPeriodStart: timestamp("currentPeriodStart"),
   currentPeriodEnd: timestamp("currentPeriodEnd"),
+  subscriptionStartedAt: timestamp("subscriptionStartedAt"),
+  subscriptionEndsAt: timestamp("subscriptionEndsAt"),
   cancelledAt: timestamp("cancelledAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 }, (t) => [
   index("sub_tenant_idx").on(t.tenantId),
   index("sub_hotmart_idx").on(t.hotmartSubscriptionId),
+  index("sub_stripe_idx").on(t.stripeSubscriptionId),
   index("sub_status_idx").on(t.status),
 ]);
 
