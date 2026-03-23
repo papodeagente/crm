@@ -4643,3 +4643,18 @@
 - [x] Validar relatórios de conversão por canal continuam corretos (utmAnalyticsRouter — OK)
 - [x] Validar webhook RD Station continua funcionando (16 testes fieldMapping passando)
 - [x] Confirmar que nada fora do escopo foi alterado (apenas 2 arquivos + 1 script)
+
+## Evolução de Permissões de Visibilidade + Exportação
+
+- [x] Diagnosticar schema user_preferences e lógica de visibilidade atual
+- [x] Identificar todos os endpoints de Negociações, Empresas e Contatos (listagem, busca, detalhe, contadores, exportação)
+- [x] Criar helper reutilizável de visibilidade (Restrita/Equipe/Geral) baseado em user_preferences
+- [x] Aplicar visibilidade em Negociações: listagem, busca, detalhe, contadores
+- [x] Aplicar visibilidade em Empresas: listagem, busca, detalhe, contadores
+- [x] Aplicar visibilidade em Contatos: listagem, busca, detalhe, contadores
+- [x] Bloquear exportação para usuário comum em todos os endpoints (backend)
+- [x] Frontend: esconder botões de exportação para usuário comum
+- [x] Testes vitest: Restrita/Equipe/Geral para cada entidade (14 testes passando)
+- [x] Testes vitest: exportação bloqueada para usuário comum
+- [x] Testes vitest: tenant isolation preservada
+- [x] Validar ausência de regressão em funcionalidades existentes (TypeScript: 0 erros, LSP: 0 erros)

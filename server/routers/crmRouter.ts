@@ -7,6 +7,7 @@ import { createNotification } from "../db";
 import { getDb } from "../db";
 import { tenants } from "../../drizzle/schema";
 import { eq } from "drizzle-orm";
+import { resolveVisibilityFilter } from "../services/visibilityService";
 
 export const crmRouter = router({
   // ─── CONTACTS ───
@@ -14,17 +15,26 @@ export const crmRouter = router({
     list: tenantProcedure
       .input(z.object({ search: z.string().optional(), stage: z.string().optional(), limit: z.number().default(50), offset: z.number().default(0), dateFrom: z.string().optional(), dateTo: z.string().optional(), customFieldFilters: z.array(z.object({ fieldId: z.number(), value: z.string() })).optional() }))
       .query(async ({ ctx, input }) => {
-        // Non-admin users only see their own contacts
         const isAdmin = ctx.saasUser?.role === "admin";
-        const ownerUserId = isAdmin ? undefined : ctx.saasUser?.userId;
-        const items = await crm.listContacts(getTenantId(ctx), { ...input, ownerUserId });
-        const totalCount = await crm.countContacts(getTenantId(ctx), { ...input, ownerUserId });
+        const userId = ctx.saasUser?.userId || ctx.user!.id;
+        const tenantId = getTenantId(ctx);
+        const { ownerUserIds } = await resolveVisibilityFilter(userId, tenantId, "contacts", isAdmin);
+        const items = await crm.listContacts(tenantId, { ...input, ownerUserIds });
+        const totalCount = await crm.countContacts(tenantId, { ...input, ownerUserIds });
         return { items, totalCount };
       }),
     get: tenantProcedure
       .input(z.object({ id: z.number() }))
       .query(async ({ input, ctx }) => {
-        return crm.getContactById(getTenantId(ctx), input.id);
+        const contact = await crm.getContactById(getTenantId(ctx), input.id);
+        if (!contact) return null;
+        const isAdmin = ctx.saasUser?.role === "admin";
+        const userId = ctx.saasUser?.userId || ctx.user!.id;
+        const { ownerUserIds } = await resolveVisibilityFilter(userId, getTenantId(ctx), "contacts", isAdmin);
+        if (ownerUserIds && !ownerUserIds.includes(contact.ownerUserId!)) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Você não tem permissão para visualizar este contato" });
+        }
+        return contact;
       }),
     create: tenantProcedure
       .input(z.object({
@@ -68,7 +78,11 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
     count: tenantProcedure
       
       .query(async ({ input, ctx }) => {
-        return crm.countContacts(getTenantId(ctx));
+        const isAdmin = ctx.saasUser?.role === "admin";
+        const userId = ctx.saasUser?.userId || ctx.user!.id;
+        const tenantId = getTenantId(ctx);
+        const { ownerUserIds } = await resolveVisibilityFilter(userId, tenantId, "contacts", isAdmin);
+        return crm.countContacts(tenantId, { ownerUserIds });
       }),
     bulkDelete: tenantProcedure
       .input(z.object({ ids: z.array(z.number()).min(1).max(500) }))
@@ -108,13 +122,23 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
       
       .query(async ({ ctx, input }) => {
         const isAdmin = ctx.saasUser?.role === "admin";
-        const ownerUserId = isAdmin ? undefined : ctx.saasUser?.userId;
-        return crm.listAccounts(getTenantId(ctx), { ownerUserId });
+        const userId = ctx.saasUser?.userId || ctx.user!.id;
+        const tenantId = getTenantId(ctx);
+        const { ownerUserIds } = await resolveVisibilityFilter(userId, tenantId, "accounts", isAdmin);
+        return crm.listAccounts(tenantId, { ownerUserIds });
       }),
     get: tenantProcedure
       .input(z.object({ id: z.number() }))
       .query(async ({ input, ctx }) => {
-        return crm.getAccountById(getTenantId(ctx), input.id);
+        const account = await crm.getAccountById(getTenantId(ctx), input.id);
+        if (!account) return null;
+        const isAdmin = ctx.saasUser?.role === "admin";
+        const userId = ctx.saasUser?.userId || ctx.user!.id;
+        const { ownerUserIds } = await resolveVisibilityFilter(userId, getTenantId(ctx), "accounts", isAdmin);
+        if (ownerUserIds && !ownerUserIds.includes(account.ownerUserId!)) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Voc\u00ea n\u00e3o tem permiss\u00e3o para visualizar esta empresa" });
+        }
+        return account;
       }),
     create: tenantProcedure
       .input(z.object({
@@ -139,7 +163,11 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
     search: tenantProcedure
       .input(z.object({ search: z.string() }))
       .query(async ({ input, ctx }) => {
-        return crm.searchAccounts(getTenantId(ctx), input.search);
+        const isAdmin = ctx.saasUser?.role === "admin";
+        const userId = ctx.saasUser?.userId || ctx.user!.id;
+        const tenantId = getTenantId(ctx);
+        const { ownerUserIds } = await resolveVisibilityFilter(userId, tenantId, "accounts", isAdmin);
+        return crm.searchAccounts(tenantId, input.search, { ownerUserIds });
       }),
   }),
 
@@ -273,21 +301,28 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
         ownerUserId: z.number().optional(),
       }))
       .query(async ({ ctx, input }) => {
-        // Non-admin users ONLY see their own deals (enforced, cannot override)
         const isAdmin = ctx.saasUser?.role === "admin";
-        const ownerFilter = isAdmin ? input.ownerUserId : ctx.saasUser?.userId;
-        const items = await crm.listDeals(getTenantId(ctx), { ...input, ownerUserId: ownerFilter });
-        const totalCount = await crm.countDeals(getTenantId(ctx), input.status, { ...input, ownerUserId: ownerFilter });
+        const userId = ctx.saasUser?.userId || ctx.user!.id;
+        const tenantId = getTenantId(ctx);
+        const { ownerUserIds } = await resolveVisibilityFilter(userId, tenantId, "deals", isAdmin);
+        // If admin filters by a specific owner, respect that; otherwise use visibility filter
+        const finalOpts = ownerUserIds
+          ? { ...input, ownerUserIds, ownerUserId: undefined }
+          : { ...input, ownerUserId: input.ownerUserId };
+        const items = await crm.listDeals(tenantId, finalOpts);
+        const totalCount = await crm.countDeals(tenantId, input.status, finalOpts);
         return { items, totalCount };
       }),
     get: tenantProcedure
       .input(z.object({ id: z.number() }))
       .query(async ({ ctx, input }) => {
         const deal = await crm.getDealById(getTenantId(ctx), input.id);
-        // Non-admin users can only view their own deals
+        if (!deal) return null;
         const isAdmin = ctx.saasUser?.role === "admin";
-        if (!isAdmin && deal && deal.ownerUserId !== ctx.saasUser?.userId) {
-          throw new TRPCError({ code: "FORBIDDEN", message: "Você não tem permissão para visualizar esta negociação" });
+        const userId = ctx.saasUser?.userId || ctx.user!.id;
+        const { ownerUserIds } = await resolveVisibilityFilter(userId, getTenantId(ctx), "deals", isAdmin);
+        if (ownerUserIds && !ownerUserIds.includes(deal.ownerUserId!)) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Voc\u00ea n\u00e3o tem permiss\u00e3o para visualizar esta negocia\u00e7\u00e3o" });
         }
         return deal;
       }),

@@ -183,6 +183,20 @@ function AgentsTab() {
     onError: (err) => toast.error(err.message || "Erro ao atualizar permissão"),
   });
 
+  // Visibility settings
+  const [visibilityUserId, setVisibilityUserId] = useState<number | null>(null);
+  const visibilityQ = trpc.admin.users.getVisibility.useQuery(
+    { userId: visibilityUserId! },
+    { enabled: !!visibilityUserId }
+  );
+  const setVisibility = trpc.admin.users.setVisibility.useMutation({
+    onSuccess: () => {
+      if (visibilityUserId) utils.admin.users.getVisibility.invalidate({ userId: visibilityUserId });
+      toast.success("Permiss\u00f5es de visibilidade atualizadas");
+    },
+    onError: (err) => toast.error(err.message || "Erro ao atualizar visibilidade"),
+  });
+
   const inviteAgent = trpc.teamManagement.inviteAgent.useMutation({
     onSuccess: () => {
       utils.teamManagement.listAgents.invalidate();
@@ -486,6 +500,10 @@ function AgentsTab() {
                             <UserX className="h-4 w-4 mr-2" /> Desativar
                           </DropdownMenuItem>
                         )}
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => setVisibilityUserId(agent.id)}>
+                          <Lock className="h-4 w-4 mr-2" /> Permiss\u00f5es de visibilidade
+                        </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   )}
@@ -495,6 +513,92 @@ function AgentsTab() {
           })}
         </div>
       )}
+
+      {/* Visibility Settings Dialog */}
+      <Dialog open={!!visibilityUserId} onOpenChange={(open) => { if (!open) setVisibilityUserId(null); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Lock className="h-5 w-5 text-primary" />
+              Permiss\u00f5es de Visibilidade
+            </DialogTitle>
+            <DialogDescription>
+              Defina quais registros este usu\u00e1rio pode visualizar no CRM.
+            </DialogDescription>
+          </DialogHeader>
+          {visibilityQ.isLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <RefreshCw className="h-5 w-5 animate-spin text-muted-foreground" />
+            </div>
+          ) : (
+            <div className="space-y-5 py-2">
+              <VisibilitySelect
+                label="Negocia\u00e7\u00f5es"
+                description="Controla quais deals o usu\u00e1rio v\u00ea no pipeline"
+                value={visibilityQ.data?.deals || "geral"}
+                onChange={(v) => visibilityUserId && setVisibility.mutate({ userId: visibilityUserId, deals: v as any })}
+              />
+              <VisibilitySelect
+                label="Contatos"
+                description="Controla quais contatos aparecem na lista"
+                value={visibilityQ.data?.contacts || "geral"}
+                onChange={(v) => visibilityUserId && setVisibility.mutate({ userId: visibilityUserId, contacts: v as any })}
+              />
+              <VisibilitySelect
+                label="Empresas"
+                description="Controla quais empresas o usu\u00e1rio pode acessar"
+                value={visibilityQ.data?.accounts || "geral"}
+                onChange={(v) => visibilityUserId && setVisibility.mutate({ userId: visibilityUserId, accounts: v as any })}
+              />
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setVisibilityUserId(null)}>Fechar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+/** Reusable visibility select row */
+function VisibilitySelect({ label, description, value, onChange }: {
+  label: string;
+  description: string;
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-4">
+      <div className="min-w-0">
+        <p className="text-sm font-medium text-foreground">{label}</p>
+        <p className="text-xs text-muted-foreground mt-0.5">{description}</p>
+      </div>
+      <Select value={value} onValueChange={onChange}>
+        <SelectTrigger className="w-[160px] shrink-0">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="geral">
+            <div className="flex items-center gap-1.5">
+              <Users className="h-3.5 w-3.5 text-emerald-500" />
+              <span>Todos</span>
+            </div>
+          </SelectItem>
+          <SelectItem value="equipe">
+            <div className="flex items-center gap-1.5">
+              <Shield className="h-3.5 w-3.5 text-blue-500" />
+              <span>Minha equipe</span>
+            </div>
+          </SelectItem>
+          <SelectItem value="restrita">
+            <div className="flex items-center gap-1.5">
+              <Lock className="h-3.5 w-3.5 text-amber-500" />
+              <span>Apenas meus</span>
+            </div>
+          </SelectItem>
+        </SelectContent>
+      </Select>
     </div>
   );
 }

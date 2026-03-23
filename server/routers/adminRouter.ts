@@ -6,6 +6,7 @@ import { emitEvent } from "../middleware/eventLog";
 import { inviteUserToTenant } from "../saasAuth";
 import { runDbRepair } from "../dbRepair";
 import { reprocessStuckTranscriptions } from "../audioTranscriptionWorker";
+import { getAllVisibilityModes, setAllVisibilityModes, type VisibilityMode, type EntityType } from "../services/visibilityService";
 
 export const adminRouter = router({
   // ─── TENANTS ───
@@ -97,6 +98,33 @@ const tenantId = getTenantId(ctx); const { id, role, ...data } = input;
       .mutation(async ({ ctx, input }) => {
         await crm.deleteCrmUser(getTenantId(ctx), input.id);
         await emitEvent({ tenantId: getTenantId(ctx), actorUserId: ctx.user.id, entityType: "crm_user", entityId: input.id, action: "delete" });
+        return { success: true };
+      }),
+    getVisibility: tenantProcedure
+      .input(z.object({ userId: z.number() }))
+      .query(async ({ ctx, input }) => {
+        if (ctx.saasUser?.role !== "admin") {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Apenas administradores podem ver configura\u00e7\u00f5es de visibilidade" });
+        }
+        return getAllVisibilityModes(input.userId, getTenantId(ctx));
+      }),
+    setVisibility: tenantProcedure
+      .input(z.object({
+        userId: z.number(),
+        deals: z.enum(["restrita", "equipe", "geral"]).optional(),
+        contacts: z.enum(["restrita", "equipe", "geral"]).optional(),
+        accounts: z.enum(["restrita", "equipe", "geral"]).optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.saasUser?.role !== "admin") {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Apenas administradores podem alterar configura\u00e7\u00f5es de visibilidade" });
+        }
+        const modes: Partial<Record<EntityType, VisibilityMode>> = {};
+        if (input.deals) modes.deals = input.deals;
+        if (input.contacts) modes.contacts = input.contacts;
+        if (input.accounts) modes.accounts = input.accounts;
+        await setAllVisibilityModes(input.userId, getTenantId(ctx), modes);
+        await emitEvent({ tenantId: getTenantId(ctx), actorUserId: ctx.user.id, entityType: "crm_user", entityId: input.userId, action: "update" });
         return { success: true };
       }),
   }),

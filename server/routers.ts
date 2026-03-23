@@ -26,6 +26,7 @@ import {
   getRecentActivity,
   getUpcomingTasks,
   globalSearch,
+  globalSearchWithVisibility,
   createNotification,
   getNotifications,
   getUnreadNotificationCount,
@@ -1814,7 +1815,16 @@ export const appRouter = router({
     global: tenantProcedure
       .input(z.object({ query: z.string().min(1).max(100), limit: z.number().optional() }))
       .query(async ({ input, ctx }) => {
-        return globalSearch(getTenantId(ctx), input.query, input.limit);
+        const { resolveVisibilityFilter } = await import("./services/visibilityService");
+        const isAdmin = ctx.saasUser?.role === "admin";
+        const userId = ctx.saasUser?.userId || ctx.user!.id;
+        const tenantId = getTenantId(ctx);
+        const dealVis = await resolveVisibilityFilter(userId, tenantId, "deals", isAdmin);
+        const contactVis = await resolveVisibilityFilter(userId, tenantId, "contacts", isAdmin);
+        return globalSearchWithVisibility(tenantId, input.query, input.limit, {
+          dealOwnerIds: dealVis.ownerUserIds,
+          contactOwnerIds: contactVis.ownerUserIds,
+        });
       }),
   }),
 

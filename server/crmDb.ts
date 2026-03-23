@@ -155,14 +155,18 @@ export async function getContactById(tenantId: number, id: number) {
   const rows = await db.select().from(contacts).where(and(eq(contacts.id, id), eq(contacts.tenantId, tenantId))).limit(1);
   return rows[0] || null;
 }
-export async function listContacts(tenantId: number, opts?: { search?: string; stage?: string; limit?: number; offset?: number; includeDeleted?: boolean; dateFrom?: string; dateTo?: string; ownerUserId?: number; customFieldFilters?: { fieldId: number; value: string }[] }) {
+export async function listContacts(tenantId: number, opts?: { search?: string; stage?: string; limit?: number; offset?: number; includeDeleted?: boolean; dateFrom?: string; dateTo?: string; ownerUserId?: number; ownerUserIds?: number[]; customFieldFilters?: { fieldId: number; value: string }[] }) {
   const db = await getDb(); if (!db) return [];
   const conditions: any[] = [eq(contacts.tenantId, tenantId)];
   if (!opts?.includeDeleted) conditions.push(isNull(contacts.deletedAt));
   if (opts?.search) conditions.push(like(contacts.name, `%${opts.search}%`));
   if (opts?.dateFrom) conditions.push(gte(contacts.createdAt, new Date(opts.dateFrom + "T00:00:00")));
   if (opts?.dateTo) conditions.push(lte(contacts.createdAt, new Date(opts.dateTo + "T23:59:59")));
-  if (opts?.ownerUserId) conditions.push(eq(contacts.ownerUserId, opts.ownerUserId));
+  if (opts?.ownerUserIds && opts.ownerUserIds.length > 0) {
+    conditions.push(inArray(contacts.ownerUserId, opts.ownerUserIds));
+  } else if (opts?.ownerUserId) {
+    conditions.push(eq(contacts.ownerUserId, opts.ownerUserId));
+  }
   // Custom field filters: subquery to find matching entity IDs
   if (opts?.customFieldFilters && opts.customFieldFilters.length > 0) {
     for (const cf of opts.customFieldFilters) {
@@ -209,13 +213,17 @@ export async function listDeletedContacts(tenantId: number, limit = 50) {
   const db = await getDb(); if (!db) return [];
   return db.select().from(contacts).where(and(eq(contacts.tenantId, tenantId), isNotNull(contacts.deletedAt))).orderBy(desc(contacts.deletedAt)).limit(limit);
 }
-export async function countContacts(tenantId: number, opts?: { search?: string; stage?: string; dateFrom?: string; dateTo?: string; ownerUserId?: number; customFieldFilters?: { fieldId: number; value: string }[] }) {
+export async function countContacts(tenantId: number, opts?: { search?: string; stage?: string; dateFrom?: string; dateTo?: string; ownerUserId?: number; ownerUserIds?: number[]; customFieldFilters?: { fieldId: number; value: string }[] }) {
   const db = await getDb(); if (!db) return 0;
   const conditions: any[] = [eq(contacts.tenantId, tenantId), isNull(contacts.deletedAt)];
   if (opts?.search) conditions.push(like(contacts.name, `%${opts.search}%`));
   if (opts?.dateFrom) conditions.push(gte(contacts.createdAt, new Date(opts.dateFrom + "T00:00:00")));
   if (opts?.dateTo) conditions.push(lte(contacts.createdAt, new Date(opts.dateTo + "T23:59:59")));
-  if (opts?.ownerUserId) conditions.push(eq(contacts.ownerUserId, opts.ownerUserId));
+  if (opts?.ownerUserIds && opts.ownerUserIds.length > 0) {
+    conditions.push(inArray(contacts.ownerUserId, opts.ownerUserIds));
+  } else if (opts?.ownerUserId) {
+    conditions.push(eq(contacts.ownerUserId, opts.ownerUserId));
+  }
   if (opts?.customFieldFilters && opts.customFieldFilters.length > 0) {
     for (const cf of opts.customFieldFilters) {
       conditions.push(
@@ -320,6 +328,7 @@ export async function listDeals(tenantId: number, opts?: {
   cooling?: boolean; // no activity in last 7 days
   coolingDays?: number;
   ownerUserId?: number;
+  ownerUserIds?: number[];
 }) {
   const db = await getDb(); if (!db) return [];
   const conditions: any[] = [eq(deals.tenantId, tenantId)];
@@ -356,8 +365,12 @@ export async function listDeals(tenantId: number, opts?: {
   if (opts?.noTasks) {
     conditions.push(sql`${deals.id} NOT IN (SELECT entityId FROM crm_tasks WHERE entityType = 'deal' AND tenantId = ${tenantId} AND status IN ('pending','in_progress'))`);
   }
-  // Owner user filter
-  if (opts?.ownerUserId) conditions.push(eq(deals.ownerUserId, opts.ownerUserId));
+  // Owner user filter (ownerUserIds takes precedence for visibility)
+  if (opts?.ownerUserIds && opts.ownerUserIds.length > 0) {
+    conditions.push(inArray(deals.ownerUserId, opts.ownerUserIds));
+  } else if (opts?.ownerUserId) {
+    conditions.push(eq(deals.ownerUserId, opts.ownerUserId));
+  }
   // Cooling filter — no activity in last N days
   if (opts?.cooling) {
     const days = opts.coolingDays || 7;
@@ -392,7 +405,7 @@ export async function updateDeal(tenantId: number, id: number, data: Partial<{ t
   const db = await getDb(); if (!db) return;
   await db.update(deals).set({ ...data, lastActivityAt: new Date() }).where(and(eq(deals.id, id), eq(deals.tenantId, tenantId)));
 }
-export async function countDeals(tenantId: number, status?: string, opts?: { pipelineId?: number; stageId?: number; titleSearch?: string; dateFrom?: string; dateTo?: string; ownerUserId?: number }) {
+export async function countDeals(tenantId: number, status?: string, opts?: { pipelineId?: number; stageId?: number; titleSearch?: string; dateFrom?: string; dateTo?: string; ownerUserId?: number; ownerUserIds?: number[] }) {
   const db = await getDb(); if (!db) return 0;
   const conditions: any[] = [eq(deals.tenantId, tenantId), isNull(deals.deletedAt)];
   if (status) conditions.push(eq(deals.status, status as any));
@@ -401,7 +414,11 @@ export async function countDeals(tenantId: number, status?: string, opts?: { pip
   if (opts?.titleSearch) conditions.push(like(deals.title, `%${opts.titleSearch}%`));
   if (opts?.dateFrom) conditions.push(gte(deals.createdAt, new Date(opts.dateFrom + "T00:00:00")));
   if (opts?.dateTo) conditions.push(lte(deals.createdAt, new Date(opts.dateTo + "T23:59:59")));
-  if (opts?.ownerUserId) conditions.push(eq(deals.ownerUserId, opts.ownerUserId));
+  if (opts?.ownerUserIds && opts.ownerUserIds.length > 0) {
+    conditions.push(inArray(deals.ownerUserId, opts.ownerUserIds));
+  } else if (opts?.ownerUserId) {
+    conditions.push(eq(deals.ownerUserId, opts.ownerUserId));
+  }
   const rows = await db.select({ count: sql<number>`count(*)` }).from(deals).where(and(...conditions));
   return rows[0]?.count || 0;
 }
@@ -419,10 +436,14 @@ export async function sumDealValue(tenantId: number, status?: string, opts?: { d
 // ═══════════════════════════════════════
 // ACCOUNTS
 // ═══════════════════════════════════════
-export async function listAccounts(tenantId: number, opts?: { ownerUserId?: number }) {
+export async function listAccounts(tenantId: number, opts?: { ownerUserId?: number; ownerUserIds?: number[] }) {
   const db = await getDb(); if (!db) return [];
   const conditions: any[] = [eq(accounts.tenantId, tenantId)];
-  if (opts?.ownerUserId) conditions.push(eq(accounts.ownerUserId, opts.ownerUserId));
+  if (opts?.ownerUserIds && opts.ownerUserIds.length > 0) {
+    conditions.push(inArray(accounts.ownerUserId, opts.ownerUserIds));
+  } else if (opts?.ownerUserId) {
+    conditions.push(eq(accounts.ownerUserId, opts.ownerUserId));
+  }
   return db.select().from(accounts).where(and(...conditions)).orderBy(desc(accounts.createdAt));
 }
 export async function getAccountById(tenantId: number, id: number) {
@@ -439,9 +460,13 @@ export async function updateAccount(tenantId: number, id: number, data: Partial<
   const db = await getDb(); if (!db) return;
   await db.update(accounts).set(data).where(and(eq(accounts.id, id), eq(accounts.tenantId, tenantId)));
 }
-export async function searchAccounts(tenantId: number, search: string) {
+export async function searchAccounts(tenantId: number, search: string, opts?: { ownerUserIds?: number[] }) {
   const db = await getDb(); if (!db) return [];
-  return db.select().from(accounts).where(and(eq(accounts.tenantId, tenantId), like(accounts.name, `%${search}%`))).orderBy(accounts.name).limit(20);
+  const conditions: any[] = [eq(accounts.tenantId, tenantId), like(accounts.name, `%${search}%`)];
+  if (opts?.ownerUserIds && opts.ownerUserIds.length > 0) {
+    conditions.push(inArray(accounts.ownerUserId, opts.ownerUserIds));
+  }
+  return db.select().from(accounts).where(and(...conditions)).orderBy(accounts.name).limit(20);
 }
 
 // ═══════════════════════════════════════

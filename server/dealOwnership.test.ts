@@ -1,15 +1,15 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 
 /**
- * Tests for Deal Ownership & Visibility Rules
+ * Tests for Deal Ownership & Visibility Rules (v2 — visibility-service based)
  *
  * Validates:
  * 1. Auto-assign owner on deal creation (REGRA 1)
  * 2. Owner change is allowed and logged in history (REGRA 2)
- * 3. Non-admin users can only see their own deals (REGRA 3)
+ * 3. Non-admin users visibility controlled by resolveVisibilityFilter (REGRA 3)
  * 4. Admin users can see all deals (REGRA 4)
- * 5. Non-admin users cannot access other users' deals by ID
- * 6. Non-admin users cannot update/move other users' deals
+ * 5. Non-admin users cannot update/move other users' deals
+ * 6. Dashboard metrics respect ownership
  */
 
 // ─── Mocks ───
@@ -88,6 +88,21 @@ vi.mock("./db", () => ({
   getUserPreference: vi.fn().mockResolvedValue(null),
   setUserPreference: vi.fn().mockResolvedValue(undefined),
 }));
+
+// Mock the visibility service to return "restrita" for non-admin by default
+vi.mock("./services/visibilityService", async (importOriginal) => {
+  const original = await importOriginal<typeof import("./services/visibilityService")>();
+  return {
+    ...original,
+    resolveVisibilityFilter: vi.fn().mockImplementation(
+      async (userId: number, _tenantId: number, _entity: string, isAdmin: boolean) => {
+        if (isAdmin) return { mode: "geral" as const, ownerUserIds: undefined };
+        // Default mock: non-admin sees only their own (restrita)
+        return { mode: "restrita" as const, ownerUserIds: [userId] };
+      }
+    ),
+  };
+});
 
 import { appRouter } from "./routers";
 import type { TrpcContext } from "./_core/context";
@@ -219,33 +234,33 @@ describe("Deal Ownership & Visibility Rules", () => {
   });
 
   // ═══════════════════════════════════════════════════════════
-  // REGRA 3: Non-admin visibility restriction
+  // REGRA 3: Non-admin visibility via resolveVisibilityFilter
   // ═══════════════════════════════════════════════════════════
   describe("REGRA 3: Non-admin visibility restriction", () => {
-    it("non-admin user listing deals should only get their own (ownerUserId forced)", async () => {
+    it("non-admin user listing deals uses visibility filter (ownerUserIds)", async () => {
       const ctx = createContext({ userId: 10, role: "user" });
       const caller = appRouter.createCaller(ctx);
 
       await caller.crm.deals.list({ tenantId: 1 });
 
-      // listDeals should be called with ownerUserId = 10 (forced)
+      // listDeals should be called with ownerUserIds = [10] (from visibility mock)
       expect(crm.listDeals).toHaveBeenCalledWith(
         1,
-        expect.objectContaining({ ownerUserId: 10 })
+        expect.objectContaining({ ownerUserIds: [10] })
       );
     });
 
-    it("non-admin user cannot override ownerUserId filter to see others' deals", async () => {
+    it("non-admin user cannot override visibility filter by passing ownerUserId", async () => {
       const ctx = createContext({ userId: 10, role: "user" });
       const caller = appRouter.createCaller(ctx);
 
       // Try to pass ownerUserId: 20 (another user)
       await caller.crm.deals.list({ tenantId: 1, ownerUserId: 20 });
 
-      // Should still be forced to userId 10
+      // Should still use ownerUserIds from visibility service, not the passed ownerUserId
       expect(crm.listDeals).toHaveBeenCalledWith(
         1,
-        expect.objectContaining({ ownerUserId: 10 })
+        expect.objectContaining({ ownerUserIds: [10] })
       );
     });
 
@@ -300,13 +315,13 @@ describe("Deal Ownership & Visibility Rules", () => {
   // REGRA 4: Admin sees everything
   // ═══════════════════════════════════════════════════════════
   describe("REGRA 4: Admin sees everything", () => {
-    it("admin user listing deals should see all (no ownerUserId filter)", async () => {
+    it("admin user listing deals should see all (no ownerUserIds filter)", async () => {
       const ctx = createContext({ userId: 1, role: "admin" });
       const caller = appRouter.createCaller(ctx);
 
       await caller.crm.deals.list({ tenantId: 1 });
 
-      // listDeals should be called WITHOUT ownerUserId filter
+      // listDeals should be called WITHOUT ownerUserIds (visibility returns undefined for admin)
       expect(crm.listDeals).toHaveBeenCalledWith(
         1,
         expect.objectContaining({ ownerUserId: undefined })
@@ -356,7 +371,10 @@ describe("Deal Ownership & Visibility Rules", () => {
 
       await caller.dashboard.metrics({ tenantId: 1 });
 
-      expect(getDashboardMetrics).toHaveBeenCalledWith(1, 10, undefined, undefined);
+      // Dashboard still uses the old ownerFilter approach (userId for non-admin)
+      expect(getDashboardMetrics).toHaveBeenCalledWith(
+        1, 10, undefined, undefined, undefined, undefined
+      );
     });
 
     it("admin user gets global dashboard metrics", async () => {
@@ -366,7 +384,9 @@ describe("Deal Ownership & Visibility Rules", () => {
 
       await caller.dashboard.metrics({ tenantId: 1 });
 
-      expect(getDashboardMetrics).toHaveBeenCalledWith(1, undefined, undefined, undefined);
+      expect(getDashboardMetrics).toHaveBeenCalledWith(
+        1, undefined, undefined, undefined, undefined, undefined
+      );
     });
   });
 });

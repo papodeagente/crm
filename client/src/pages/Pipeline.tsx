@@ -84,8 +84,8 @@ export default function Pipeline() {
   const [ownerFilter, setOwnerFilter] = useState<number | "all">("all");
   const saasMe = trpc.saasAuth.me.useQuery(undefined, { retry: 1, refetchOnWindowFocus: false, staleTime: 5 * 60 * 1000 });
   const isAdmin = saasMe.data?.role === "admin" || saasMe.data?.isSuperAdmin;
-  // Non-admin users: force filter to their own userId
-  const effectiveOwnerFilter = isAdmin ? ownerFilter : (saasMe.data?.userId || ownerFilter);
+  // Visibility is now enforced server-side; ownerFilter is only for admin UI filtering
+  const effectiveOwnerFilter = ownerFilter;
   const [showIndicators, setShowIndicators] = useState(false);
   const [celebration, setCelebration] = useState<{ open: boolean; title?: string; value?: string }>({ open: false });
   const [showTaskCalendar, setShowTaskCalendar] = useState(false);
@@ -386,9 +386,11 @@ export default function Pipeline() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-52 rounded-xl">
-              <DropdownMenuItem onClick={() => { toast.info("Exportação em breve!"); }}>
-                <Download className="h-4 w-4 mr-2" /> Exportar dados
-              </DropdownMenuItem>
+              {isAdmin && (
+                <DropdownMenuItem onClick={() => { toast.info("Exportação em breve!"); }}>
+                  <Download className="h-4 w-4 mr-2" /> Exportar dados
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem onClick={() => utils.crm.deals.list.invalidate()}>
                 <RefreshCw className="h-4 w-4 mr-2" /> Atualizar
               </DropdownMenuItem>

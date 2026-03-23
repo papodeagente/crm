@@ -181,6 +181,8 @@ function ConversionChart({ data }: { data: ConversionRow[] }) {
 export default function ProductReportsPage() {
   const [, setLocation] = useLocation();
   const { user } = useAuth();
+  const saasMe = trpc.saasAuth.me.useQuery(undefined, { retry: 1, refetchOnWindowFocus: false, staleTime: 5 * 60 * 1000 });
+  const isAdmin = saasMe.data?.role === "admin" || saasMe.data?.isSuperAdmin;
   // Queries
   const summaryQ = trpc.productCatalog.analytics.summary.useQuery();
   const mostSoldQ = trpc.productCatalog.analytics.mostSold.useQuery({ limit: 10 });
@@ -231,10 +233,12 @@ export default function ProductReportsPage() {
             <Package className="h-4 w-4 mr-1.5" />
             Catálogo
           </Button>
-          <Button variant="outline" size="sm" onClick={exportCSV}>
-            <Download className="h-4 w-4 mr-1.5" />
-            Exportar CSV
-          </Button>
+          {isAdmin && (
+            <Button variant="outline" size="sm" onClick={exportCSV}>
+              <Download className="h-4 w-4 mr-1.5" />
+              Exportar CSV
+            </Button>
+          )}
         </div>
       </div>
 

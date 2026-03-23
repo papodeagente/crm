@@ -1195,6 +1195,97 @@ export async function globalSearch(tenantId: number, query: string, limit = 5) {
   return { contacts, deals, tasks };
 }
 
+/**
+ * Global search with visibility filtering.
+ * ownerIds arrays restrict results to records owned by those users.
+ * If undefined, no restriction (geral mode).
+ */
+export async function globalSearchWithVisibility(
+  tenantId: number,
+  query: string,
+  limit = 5,
+  visibility: {
+    dealOwnerIds?: number[];
+    contactOwnerIds?: number[];
+  }
+) {
+  const db = await getDb();
+  if (!db || !query.trim()) {
+    return { contacts: [], deals: [], tasks: [] };
+  }
+
+  const searchTerm = `%${query.trim()}%`;
+
+  // Build contact owner filter
+  const contactOwnerClause = visibility.contactOwnerIds && visibility.contactOwnerIds.length > 0
+    ? sql`AND ownerUserId IN (${sql.join(visibility.contactOwnerIds.map(id => sql`${id}`), sql`, `)})`
+    : sql``;
+
+  const [contactRows] = await db.execute(sql`
+    SELECT id, name, email, phone, type, lifecycleStage
+    FROM contacts
+    WHERE tenantId = ${tenantId}
+      AND (name LIKE ${searchTerm} OR email LIKE ${searchTerm} OR phone LIKE ${searchTerm})
+      ${contactOwnerClause}
+    ORDER BY updatedAt DESC
+    LIMIT ${limit}
+  `);
+
+  // Build deal owner filter
+  const dealOwnerClause = visibility.dealOwnerIds && visibility.dealOwnerIds.length > 0
+    ? sql`AND d.ownerUserId IN (${sql.join(visibility.dealOwnerIds.map(id => sql`${id}`), sql`, `)})`
+    : sql``;
+
+  const [dealRows] = await db.execute(sql`
+    SELECT d.id, d.title, d.valueCents, d.status,
+           ps.name AS stageName
+    FROM deals d
+    LEFT JOIN pipeline_stages ps ON ps.id = d.stageId
+    WHERE d.tenantId = ${tenantId}
+      AND d.title LIKE ${searchTerm}
+      ${dealOwnerClause}
+    ORDER BY d.updatedAt DESC
+    LIMIT ${limit}
+  `);
+
+  const [taskRows] = await db.execute(sql`
+    SELECT id, title, dueAt, priority, status, entityType, entityId
+    FROM crm_tasks
+    WHERE tenantId = ${tenantId}
+      AND title LIKE ${searchTerm}
+    ORDER BY updatedAt DESC
+    LIMIT ${limit}
+  `);
+
+  const contacts = (contactRows as unknown as any[]).map((r: any) => ({
+    id: Number(r.id),
+    name: String(r.name),
+    email: r.email ? String(r.email) : null,
+    phone: r.phone ? String(r.phone) : null,
+    type: String(r.type) as "person" | "company",
+    lifecycleStage: String(r.lifecycleStage),
+  }));
+
+  const deals = (dealRows as unknown as any[]).map((r: any) => ({
+    id: Number(r.id),
+    title: String(r.title),
+    valueCents: Number(r.valueCents) || 0,
+    status: String(r.status),
+    stageName: r.stageName ? String(r.stageName) : null,
+  }));
+
+  const tasks = (taskRows as unknown as any[]).map((r: any) => ({
+    id: Number(r.id),
+    title: String(r.title),
+    dueAt: r.dueAt ? new Date(r.dueAt).getTime() : null,
+    priority: String(r.priority) as "low" | "medium" | "high" | "urgent",
+    status: String(r.status),
+    entityType: String(r.entityType),
+    entityId: Number(r.entityId),
+  }));
+
+  return { contacts, deals, tasks };
+}
 
 // ─── Notifications ───
 
