@@ -4604,3 +4604,9 @@
 - [x] Testes vitest: 16 novos + 16 fieldMapping + 17 utmAnalytics + 58 blindagem = todos passando
 - [x] Segurança e blindagem de tenants preservadas (58 testes passando)
 - [x] Importação principal via RD continua intacta (16 testes fieldMapping passando)
+
+## Correção Aba RASTREAMENTO — Campos Content e Term faltando
+
+- [x] Diagnosticar por que utmContent e utmTerm não aparecem na aba RASTREAMENTO (deal processado antes da correção)
+- [x] Corrigir deal 540745 com valores corretos do rdCustomFields (SQL direto)
+- [x] Abrir seção RASTREAMENTO por padrão (utm: true)

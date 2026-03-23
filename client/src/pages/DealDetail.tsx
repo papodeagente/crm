@@ -211,7 +211,7 @@ export default function DealDetail() {
 
   /* ─── Sidebar collapsed sections ─── */
   const [sidebarSections, setSidebarSections] = useState({
-    deal: true, travel: true, contact: true, company: true, responsible: true, utm: false, rdFields: false, custom: false, contactCustom: false, companyCustom: false,
+    deal: true, travel: true, contact: true, company: true, responsible: true, utm: true, rdFields: false, custom: false, contactCustom: false, companyCustom: false,
   });
   const toggleSection = (key: keyof typeof sidebarSections) =>
     setSidebarSections((prev) => ({ ...prev, [key]: !prev[key] }));
