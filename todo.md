@@ -4658,3 +4658,6 @@
 - [x] Testes vitest: exportação bloqueada para usuário comum
 - [x] Testes vitest: tenant isolation preservada
 - [x] Validar ausência de regressão em funcionalidades existentes (TypeScript: 0 erros, LSP: 0 erros)
+
+## Bug Fix: Caracteres Unicode Escapados no Modal de Visibilidade
+- [x] Corrigir caracteres especiais (ã, õ, é, etc.) aparecendo como \u00f5, \u00e7, etc. no dialog de Permissões de Visibilidade

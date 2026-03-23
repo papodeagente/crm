@@ -192,7 +192,7 @@ function AgentsTab() {
   const setVisibility = trpc.admin.users.setVisibility.useMutation({
     onSuccess: () => {
       if (visibilityUserId) utils.admin.users.getVisibility.invalidate({ userId: visibilityUserId });
-      toast.success("Permiss\u00f5es de visibilidade atualizadas");
+      toast.success("Permissões de visibilidade atualizadas");
     },
     onError: (err) => toast.error(err.message || "Erro ao atualizar visibilidade"),
   });
@@ -502,7 +502,7 @@ function AgentsTab() {
                         )}
                         <DropdownMenuSeparator />
                         <DropdownMenuItem onClick={() => setVisibilityUserId(agent.id)}>
-                          <Lock className="h-4 w-4 mr-2" /> Permiss\u00f5es de visibilidade
+                          <Lock className="h-4 w-4 mr-2" /> Permissões de visibilidade
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
@@ -520,10 +520,10 @@ function AgentsTab() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Lock className="h-5 w-5 text-primary" />
-              Permiss\u00f5es de Visibilidade
+              Permissões de Visibilidade
             </DialogTitle>
             <DialogDescription>
-              Defina quais registros este usu\u00e1rio pode visualizar no CRM.
+              Defina quais registros este usuário pode visualizar no CRM.
             </DialogDescription>
           </DialogHeader>
           {visibilityQ.isLoading ? (
@@ -533,8 +533,8 @@ function AgentsTab() {
           ) : (
             <div className="space-y-5 py-2">
               <VisibilitySelect
-                label="Negocia\u00e7\u00f5es"
-                description="Controla quais deals o usu\u00e1rio v\u00ea no pipeline"
+                label="Negociações"
+                description="Controla quais deals o usuário vê no pipeline"
                 value={visibilityQ.data?.deals || "geral"}
                 onChange={(v) => visibilityUserId && setVisibility.mutate({ userId: visibilityUserId, deals: v as any })}
               />
@@ -546,7 +546,7 @@ function AgentsTab() {
               />
               <VisibilitySelect
                 label="Empresas"
-                description="Controla quais empresas o usu\u00e1rio pode acessar"
+                description="Controla quais empresas o usuário pode acessar"
                 value={visibilityQ.data?.accounts || "geral"}
                 onChange={(v) => visibilityUserId && setVisibility.mutate({ userId: visibilityUserId, accounts: v as any })}
               />
