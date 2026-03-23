@@ -772,11 +772,13 @@ router.post("/api/webhooks/rdstation", async (req: Request, res: Response) => {
         const utmTerm = conversionOrigin.term || "";
 
         // Also check for direct UTM fields (some RD Station versions)
-        const directUtmSource = lead.utm_source || lead.traffic_source || utmSource;
-        const directUtmMedium = lead.utm_medium || lead.traffic_medium || utmMedium;
-        const directUtmCampaign = lead.utm_campaign || lead.traffic_campaign || utmCampaign;
-        const directUtmContent = lead.utm_content || utmContent;
-        const directUtmTerm = lead.utm_term || utmTerm;
+        // Priority: top-level lead fields → custom_fields (where RD Station MKT often stores UTMs as utm_* or cf_utm_*) → conversion_origin
+        const cf = lead.custom_fields && typeof lead.custom_fields === "object" ? lead.custom_fields : {} as Record<string, any>;
+        const directUtmSource = lead.utm_source || lead.traffic_source || cf.utm_source || cf.cf_utm_source || utmSource;
+        const directUtmMedium = lead.utm_medium || lead.traffic_medium || cf.utm_medium || cf.cf_utm_medium || utmMedium;
+        const directUtmCampaign = lead.utm_campaign || lead.traffic_campaign || cf.utm_campaign || cf.cf_utm_campaign || utmCampaign;
+        const directUtmContent = lead.utm_content || cf.utm_content || cf.cf_utm_content || utmContent;
+        const directUtmTerm = lead.utm_term || cf.utm_term || cf.cf_utm_term || utmTerm;
 
         // 7. Auto-capture all cf_* custom fields from RD Station
         const rdCustomFields: Record<string, string> = {};

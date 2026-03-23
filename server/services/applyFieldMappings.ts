@@ -30,30 +30,51 @@ interface MappingResult {
  * Busca em: top-level fields, custom_fields object, cf_* fields, last_conversion.content
  */
 function resolveRdFieldValue(leadData: Record<string, any>, rdFieldKey: string, rdCustomFields?: Record<string, string>): string | null {
-  // 1. Direto no rdCustomFields já extraídos (cf_* e custom_fields)
-  if (rdCustomFields && rdCustomFields[rdFieldKey] !== undefined) {
-    return String(rdCustomFields[rdFieldKey]);
+  // Build alternate keys: if key starts with cf_, also try without prefix; if not, also try with cf_ prefix
+  const alternateKeys: string[] = [rdFieldKey];
+  if (rdFieldKey.startsWith("cf_")) {
+    alternateKeys.push(rdFieldKey.slice(3)); // "cf_utm_source" → "utm_source"
+  } else {
+    alternateKeys.push(`cf_${rdFieldKey}`); // "utm_source" → "cf_utm_source"
   }
 
-  // 2. Top-level field no lead (ex: "company", "job_title", "city", "state")
-  if (leadData[rdFieldKey] !== undefined && leadData[rdFieldKey] !== null && String(leadData[rdFieldKey]).trim() !== "") {
-    return String(leadData[rdFieldKey]);
-  }
-
-  // 3. Dentro de custom_fields object
-  if (leadData.custom_fields && typeof leadData.custom_fields === "object") {
-    const val = leadData.custom_fields[rdFieldKey];
-    if (val !== undefined && val !== null && String(val).trim() !== "") {
-      return String(val);
+  for (const key of alternateKeys) {
+    // 1. Direto no rdCustomFields já extraídos (cf_* e custom_fields)
+    if (rdCustomFields && rdCustomFields[key] !== undefined) {
+      const v = String(rdCustomFields[key]);
+      if (v.trim() !== "") return v;
     }
-  }
 
-  // 4. Dentro de last_conversion.content (form fields)
-  const lastConversion = leadData.last_conversion || leadData.first_conversion;
-  if (lastConversion?.content && typeof lastConversion.content === "object") {
-    const val = lastConversion.content[rdFieldKey];
-    if (val !== undefined && val !== null && String(val).trim() !== "") {
-      return String(val);
+    // 2. Top-level field no lead (ex: "company", "job_title", "city", "state")
+    if (leadData[key] !== undefined && leadData[key] !== null && String(leadData[key]).trim() !== "") {
+      return String(leadData[key]);
+    }
+
+    // 3. Dentro de custom_fields object
+    if (leadData.custom_fields && typeof leadData.custom_fields === "object") {
+      const val = leadData.custom_fields[key];
+      if (val !== undefined && val !== null && String(val).trim() !== "") {
+        return String(val);
+      }
+    }
+
+    // 4. Dentro de last_conversion.content (form fields)
+    const lastConversion = leadData.last_conversion || leadData.first_conversion;
+    if (lastConversion?.content && typeof lastConversion.content === "object") {
+      const val = lastConversion.content[key];
+      if (val !== undefined && val !== null && String(val).trim() !== "") {
+        return String(val);
+      }
+    }
+
+    // 5. Dentro de first_conversion.content.__cdp__original_event.payload (RD Station CDP events)
+    const firstConversion = leadData.first_conversion;
+    if (firstConversion?.content?.__cdp__original_event?.payload) {
+      const cdpPayload = firstConversion.content.__cdp__original_event.payload;
+      const val = cdpPayload[key];
+      if (val !== undefined && val !== null && String(val).trim() !== "") {
+        return String(val);
+      }
     }
   }
 

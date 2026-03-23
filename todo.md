@@ -4592,3 +4592,15 @@
 - [x] Segurança: nenhuma brecha de vazamento entre contas (teste de isolamento)
 - [x] Testes vitest: 16 testes — CRUD, aplicação, segurança multi-tenant
 - [x] Validar importação principal continua intacta (webhook não alterado, camada adicionada após processInboundLead)
+
+## Correção UTM RD Station → Rastreamento (v-utm-fix)
+
+- [x] Diagnosticar fluxo completo: webhook → applyFieldMappings → persistência → aba RASTREAMENTO
+- [x] Investigar negociação 540745: verificar dados no banco, webhook log, campos UTM
+- [x] Identificar causa raiz: mismatch cf_utm_* vs utm_* + custom_fields não consultado na extração
+- [x] Corrigir persistência dos 5 UTMs padrão na negociação (2 pontos corrigidos)
+- [x] Validar aba RASTREAMENTO exibe os 5 valores corretos (lê de deal.utm* — OK)
+- [x] Validar relatório de conversão por canal lê os campos padronizados (utmAnalyticsRouter — OK)
+- [x] Testes vitest: 16 novos + 16 fieldMapping + 17 utmAnalytics + 58 blindagem = todos passando
+- [x] Segurança e blindagem de tenants preservadas (58 testes passando)
+- [x] Importação principal via RD continua intacta (16 testes fieldMapping passando)
