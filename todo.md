@@ -4669,3 +4669,13 @@
 - [x] Garantir que filtro funciona para Geral, Equipe e Restrita
 - [x] Testes vitest: filtro + visibilidade interagem corretamente (23 testes passando)
 - [x] Validar que nada fora do pipeline foi alterado
+
+## Ajuste de Permissões do Painel de Configurações + Menu Módulos
+- [x] Diagnosticar estrutura atual do Painel de Configurações (rotas, menu, proteção)
+- [x] Restringir Supervisão para admin-only (backend + frontend)
+- [x] Restringir Chat bot de IA para admin-only (backend + frontend)
+- [x] Restringir Meta para admin-only (backend + frontend)
+- [x] Restringir menu Avançado inteiro para admin-only (backend + frontend)
+- [x] Reorganizar menu Módulos com: Viagens, Propostas, Portal do cliente, Academy (todos "em breve")
+- [x] Testes vitest para bloqueio de acesso (17 testes passando)
+- [x] Validar que nada fora do escopo foi alterado (TypeScript: 0 erros, LSP: 0 erros)

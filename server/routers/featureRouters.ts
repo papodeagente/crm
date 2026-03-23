@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { tenantProcedure, getTenantId, router } from "../_core/trpc";
+import { tenantProcedure, tenantAdminProcedure, getTenantId, router } from "../_core/trpc";
 import * as crm from "../crmDb";
 import { emitEvent } from "../middleware/eventLog";
 
@@ -74,12 +74,12 @@ export const portalRouter = router({
 // ═══════════════════════════════════════
 export const managementRouter = router({
   goals: router({
-    list: tenantProcedure
+    list: tenantAdminProcedure
       .query(async ({ input, ctx }) => crm.listGoals(getTenantId(ctx))),
-    get: tenantProcedure
+    get: tenantAdminProcedure
       .input(z.object({ id: z.number() }))
       .query(async ({ input, ctx }) => crm.getGoalById(getTenantId(ctx), input.id)),
-    create: tenantProcedure
+    create: tenantAdminProcedure
       .input(z.object({
         name: z.string().min(1).optional(),
         scope: z.enum(["user", "company"]).default("user"),
@@ -99,7 +99,7 @@ export const managementRouter = router({
           periodEnd: new Date(input.periodEnd),
         });
       }),
-    update: tenantProcedure
+    update: tenantAdminProcedure
       .input(z.object({
         id: z.number(),
         name: z.string().min(1).optional(),
@@ -118,7 +118,7 @@ export const managementRouter = router({
         if (data.periodEnd) updateData.periodEnd = new Date(data.periodEnd);
         return crm.updateGoal(getTenantId(ctx), id, updateData);
       }),
-    delete: tenantProcedure
+    delete: tenantAdminProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ input, ctx }) => crm.deleteGoal(getTenantId(ctx), input.id)),
   }),
@@ -201,26 +201,26 @@ export const academyRouter = router({
 // ═══════════════════════════════════════
 export const integrationHubRouter = router({
   integrations: router({
-    list: tenantProcedure
+    list: tenantAdminProcedure
       
       .query(async ({ input, ctx }) => crm.listIntegrations(getTenantId(ctx))),
-    create: tenantProcedure
+    create: tenantAdminProcedure
       .input(z.object({ provider: z.string(), name: z.string() }))
       .mutation(async ({ input, ctx }) => crm.createIntegration({ ...input, tenantId: getTenantId(ctx) })),
   }),
   webhooks: router({
-    list: tenantProcedure
+    list: tenantAdminProcedure
       
       .query(async ({ input, ctx }) => crm.listWebhooks(getTenantId(ctx))),
-    create: tenantProcedure
+    create: tenantAdminProcedure
       .input(z.object({ provider: z.string(), endpoint: z.string().url(), secretHash: z.string().optional() }))
       .mutation(async ({ input, ctx }) => crm.createWebhook({ ...input, tenantId: getTenantId(ctx) })),
   }),
   jobs: router({
-    list: tenantProcedure
+    list: tenantAdminProcedure
       .input(z.object({ status: z.string().optional() }))
       .query(async ({ input, ctx }) => crm.listJobs(getTenantId(ctx), input)),
-    create: tenantProcedure
+    create: tenantAdminProcedure
       .input(z.object({ type: z.string(), payloadJson: z.any().optional() }))
       .mutation(async ({ input, ctx }) => crm.createJob({ ...input, tenantId: getTenantId(ctx) })),
   }),

@@ -11,7 +11,7 @@
  * 7. Detailed logging throughout
  */
 import { z } from "zod";
-import { tenantProcedure, getTenantId, router } from "../_core/trpc";
+import { tenantAdminProcedure, getTenantId, router } from "../_core/trpc";
 import * as rdCrm from "../rdStationCrmImport";
 import * as crm from "../crmDb";
 import { getDb } from "../db";
@@ -148,27 +148,27 @@ async function setRdExternalId(table: string, id: number, rdExternalId: string) 
 
 export const rdCrmImportRouter = router({
   // ─── Validate Token ───
-  validateToken: tenantProcedure
+  validateToken: tenantAdminProcedure
     .input(z.object({ token: z.string().min(10) }))
     .mutation(async ({ input, ctx }) => {
       return rdCrm.validateRdCrmToken(input.token);
     }),
 
   // ─── Fetch Summary (preview before import) ───
-  fetchSummary: tenantProcedure
+  fetchSummary: tenantAdminProcedure
     .input(z.object({ token: z.string().min(10) }))
     .mutation(async ({ input, ctx }) => {
       return rdCrm.fetchRdCrmSummary(input.token);
     }),
 
   // ─── Get Import Progress ───
-  getProgress: tenantProcedure.query(({ ctx }) => {
+  getProgress: tenantAdminProcedure.query(({ ctx }) => {
     const key = getProgressKey(ctx.user.id);
     return progressStore.get(key) || null;
   }),
 
   // ─── Import All Data (runs in background, progress via polling) ───
-  importAll: tenantProcedure
+  importAll: tenantAdminProcedure
     .input(z.object({
       token: z.string().min(10),
       importContacts: z.boolean().default(true),
@@ -218,13 +218,13 @@ export const rdCrmImportRouter = router({
     }),
 
   // ─── Get Spreadsheet Import Progress ───
-  getSpreadsheetProgress: tenantProcedure.query(({ ctx }) => {
+  getSpreadsheetProgress: tenantAdminProcedure.query(({ ctx }) => {
     const key = `spreadsheet_${ctx.user.id}`;
     return progressStore.get(key) || null;
   }),
 
   // ─── Import from RD Station CSV (comprehensive, all 48 columns) ───
-  importSpreadsheet: tenantProcedure
+  importSpreadsheet: tenantAdminProcedure
     .input(z.object({
       rows: z.array(z.record(z.string(), z.string().nullable().optional())),
       columnMapping: z.record(z.string(), z.string()).optional(), // csvHeader → internalKey

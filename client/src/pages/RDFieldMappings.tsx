@@ -1,5 +1,8 @@
 import { useState, useMemo } from "react";
 import { trpc } from "@/lib/trpc";
+import { useIsAdmin } from "@/components/AdminOnlyGuard";
+import { useLocation } from "wouter";
+import { ShieldAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -39,13 +42,33 @@ const RD_COMMON_FIELDS = [
 ];
 
 export default function RDFieldMappings() {
+  const { isAdmin, isLoading: adminLoading } = useIsAdmin();
+  const [, setLocation] = useLocation();
   const [showAdd, setShowAdd] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
 
   // Queries
-  const mappingsQ = trpc.fieldMappings.list.useQuery();
-  const standardFieldsQ = trpc.fieldMappings.enturStandardFields.useQuery();
-  const customFieldsQ = trpc.fieldMappings.enturCustomFields.useQuery();
+  const mappingsQ = trpc.fieldMappings.list.useQuery(undefined, { enabled: isAdmin });
+  const standardFieldsQ = trpc.fieldMappings.enturStandardFields.useQuery(undefined, { enabled: isAdmin });
+  const customFieldsQ = trpc.fieldMappings.enturCustomFields.useQuery(undefined, { enabled: isAdmin });
+
+  if (!adminLoading && !isAdmin) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full gap-4 text-center px-4 py-20">
+        <ShieldAlert className="w-12 h-12 text-red-400" />
+        <h2 className="text-xl font-semibold text-foreground">Acesso Restrito</h2>
+        <p className="text-muted-foreground max-w-md">
+          O Mapeamento de Campos é exclusivo para administradores.
+        </p>
+        <button
+          onClick={() => setLocation("/settings")}
+          className="px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors"
+        >
+          Voltar às Configurações
+        </button>
+      </div>
+    );
+  }
 
   const mappings = mappingsQ.data || [];
   const standardFields = standardFieldsQ.data || [];

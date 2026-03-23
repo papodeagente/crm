@@ -167,6 +167,61 @@ const requireTenantAndSession = t.middleware(async opts => {
 
 export const sessionTenantProcedure = t.procedure.use(requireTenantAndSession);
 
+/**
+ * sessionTenantAdminProcedure: combines session ownership + tenant isolation + admin role check.
+ * Use for admin-only WhatsApp endpoints (supervision, chatbot settings).
+ */
+const requireTenantSessionAndAdmin = t.middleware(async opts => {
+  const { ctx, next } = opts;
+
+  if (!ctx.user) {
+    throw new TRPCError({ code: "UNAUTHORIZED", message: UNAUTHED_ERR_MSG });
+  }
+
+  if (!ctx.saasUser || !ctx.saasUser.tenantId) {
+    throw new TRPCError({
+      code: "UNAUTHORIZED",
+      message: "Sess\u00e3o de tenant n\u00e3o encontrada. Fa\u00e7a login novamente.",
+    });
+  }
+
+  if (ctx.saasUser.role !== "admin") {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "Apenas administradores podem acessar esta funcionalidade.",
+    });
+  }
+
+  const tenantId = ctx.saasUser.tenantId;
+
+  // Validate session ownership
+  const rawInput = (opts as any).rawInput as Record<string, unknown> | undefined;
+  const sessionId = rawInput?.sessionId as string | undefined;
+
+  if (sessionId) {
+    const { validateSessionOwnership } = await import("../db");
+    const userId = ctx.saasUser.userId || ctx.user.id;
+    await validateSessionOwnership(sessionId, userId, {
+      tenantId,
+      role: ctx.saasUser.role,
+      isSaasUser: true,
+    });
+  }
+
+  touchPresence(ctx.saasUser.userId).catch(() => {});
+
+  return next({
+    ctx: {
+      ...ctx,
+      user: ctx.user,
+      saasUser: ctx.saasUser,
+      tenantId,
+    },
+  });
+});
+
+export const sessionTenantAdminProcedure = t.procedure.use(requireTenantSessionAndAdmin);
+
 // ═══════════════════════════════════════════════════════════════════
 // TENANT ISOLATION — Guard Rail Central
 // ═══════════════════════════════════════════════════════════════════

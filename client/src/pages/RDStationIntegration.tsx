@@ -1,6 +1,8 @@
 import { useState, useMemo } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
+import { useIsAdmin } from "@/components/AdminOnlyGuard";
+import { ShieldAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -75,7 +77,26 @@ function interpolateTemplate(template: string): string {
 // ─── Main Component ──────────────────────────────────────
 
 export default function RDStationIntegration() {
+  const { isAdmin, isLoading: adminLoading } = useIsAdmin();
   const [, setLocation] = useLocation();
+
+  if (!adminLoading && !isAdmin) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full gap-4 text-center px-4 py-20">
+        <ShieldAlert className="w-12 h-12 text-red-400" />
+        <h2 className="text-xl font-semibold text-foreground">Acesso Restrito</h2>
+        <p className="text-muted-foreground max-w-md">
+          A integração com RD Station é exclusiva para administradores.
+        </p>
+        <button
+          onClick={() => setLocation("/settings")}
+          className="px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors"
+        >
+          Voltar às Configurações
+        </button>
+      </div>
+    );
+  }
 
   // UI State
   const [showForm, setShowForm] = useState(false);

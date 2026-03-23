@@ -20,6 +20,9 @@ import {
 } from "lucide-react";
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { toast } from "sonner";
+import { useIsAdmin } from "@/components/AdminOnlyGuard";
+import { useLocation } from "wouter";
+import { ShieldAlert } from "lucide-react";
 
 /* ─── Types ─── */
 interface ChatbotSettingsData {
@@ -82,8 +85,28 @@ const TIMEZONES = [
 ];
 
 export default function Chatbot() {
+  const { isAdmin, isLoading: adminLoading } = useIsAdmin();
+  const [, setLocation] = useLocation();
   const [sessionId, setSessionId] = useState("");
   const [activeTab, setActiveTab] = useState("general");
+
+  if (!adminLoading && !isAdmin) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full gap-4 text-center px-4 py-20">
+        <ShieldAlert className="w-12 h-12 text-red-400" />
+        <h2 className="text-xl font-semibold text-foreground">Acesso Restrito</h2>
+        <p className="text-muted-foreground max-w-md">
+          A configuração do Chatbot IA é exclusiva para administradores.
+        </p>
+        <button
+          onClick={() => setLocation("/settings")}
+          className="px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors"
+        >
+          Voltar às Configurações
+        </button>
+      </div>
+    );
+  }
 
   // ─── Form state ───
   const [enabled, setEnabled] = useState(false);

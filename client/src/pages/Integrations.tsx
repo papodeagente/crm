@@ -1,4 +1,7 @@
 import { trpc } from "@/lib/trpc";
+import { useIsAdmin } from "@/components/AdminOnlyGuard";
+import { useLocation } from "wouter";
+import { ShieldAlert } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -852,7 +855,27 @@ function EventLogsTab() { const [sourceFilter, setSourceFilter] = useState<strin
 // ─── Main Integrations Page ──────────────────────────────
 
 export default function Integrations() {
-  const integrations = trpc.integrationHub.integrations.list.useQuery();
+  const { isAdmin, isLoading: adminLoading } = useIsAdmin();
+  const [, setLocation] = useLocation();
+  const integrations = trpc.integrationHub.integrations.list.useQuery(undefined, { enabled: isAdmin });
+
+  if (!adminLoading && !isAdmin) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full gap-4 text-center px-4 py-20">
+        <ShieldAlert className="w-12 h-12 text-red-400" />
+        <h2 className="text-xl font-semibold text-foreground">Acesso Restrito</h2>
+        <p className="text-muted-foreground max-w-md">
+          As Integrações são exclusivas para administradores.
+        </p>
+        <button
+          onClick={() => setLocation("/settings")}
+          className="px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors"
+        >
+          Voltar às Configurações
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="p-5 lg:px-8 space-y-5">
