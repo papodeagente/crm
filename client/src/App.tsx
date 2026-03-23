@@ -55,6 +55,7 @@ const Supervision = lazyWithRetry(() => import("./pages/Supervision"));
 const Analytics = lazyWithRetry(() => import("./pages/Analytics"));
 const GoalsReport = lazyWithRetry(() => import("./pages/GoalsReport"));
 const CRMLive = lazyWithRetry(() => import("./pages/CRMLive"));
+const SourcesCampaignsReport = lazyWithRetry(() => import("./pages/SourcesCampaignsReport"));
 
 // SaaS pages (outside TopNavLayout)
 const SaasLogin = lazyWithRetry(() => import("./pages/SaasLogin"));
@@ -113,6 +114,7 @@ function AppRouter() {
                 <Route path="/analytics/products" component={ProductReports} />
                 <Route path="/analytics/goals" component={GoalsReport} />
                 <Route path="/analytics/crm-live" component={CRMLive} />
+                <Route path="/analytics/sources-campaigns" component={SourcesCampaignsReport} />
                 <Route path="/contact/:id" component={ContactProfile} />
                 <Route path="/inbox" component={InboxPage} />
                 <Route path="/rfv" component={RfvMatrix} />

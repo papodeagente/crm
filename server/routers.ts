@@ -143,6 +143,7 @@ import { proposalRouter, portalRouter, managementRouter, insightsRouter, academy
 import { productCatalogRouter } from "./routers/productCatalogRouter";
 import { aiAnalysisRouter } from "./routers/aiAnalysisRouter";
 import { utmAnalyticsRouter } from "./routers/utmAnalyticsRouter";
+import { sourcesCampaignsRouter } from "./routers/sourcesCampaignsRouter";
 import { rdCrmImportRouter } from "./routers/rdCrmImportRouter";
 import { saasAuthRouter } from "./routers/saasAuthRouter";
 import { inviteUserToTenant } from "./saasAuth";
@@ -2074,6 +2075,7 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
   productCatalog: productCatalogRouter, // M9: Catálogo de Produtos Turísticos
   aiAnalysis: aiAnalysisRouter, // M10: Análise de Atendimento por IA
   utmAnalytics: utmAnalyticsRouter, // M11: Dashboard de Rastreamento UTM
+  sourcesCampaigns: sourcesCampaignsRouter, // Relatório Fontes e Campanhas
   rdCrmImport: rdCrmImportRouter, // M12: Importação do RD Station CRM
   saasAuth: saasAuthRouter, // SaaS Authentication (email/senha)
   rfv: rfvRouter, // M13: Matriz RFV — Classificação Automática de Contatos

@@ -13,7 +13,7 @@ import {
 import {
   BarChart3, TrendingUp, TrendingDown, DollarSign, Target,
   Trophy, XCircle, Clock, Briefcase, Filter,
-  ChevronRight, Loader2, AlertTriangle, Package, Users as UsersIcon, Activity,
+  ChevronRight, Loader2, AlertTriangle, Package, Users as UsersIcon, Activity, Megaphone,
 } from "lucide-react";
 import DateRangeFilter, { useDateFilter } from "@/components/DateRangeFilter";
 import {
@@ -65,6 +65,7 @@ const REPORT_PAGES = [
   { label: "Metas", path: "/analytics/goals", icon: Target, description: "Acompanhamento de metas com análise IA" },
   { label: "Produtos", path: "/analytics/products", icon: Package, description: "Análise de produtos vendidos" },
   { label: "Insights WhatsApp", path: "/insights", icon: BarChart3, description: "Métricas de mensagens e atendimento" },
+  { label: "Fontes e Campanhas", path: "/analytics/sources-campaigns", icon: Megaphone, description: "Análise de origem por fonte, campanha e UTMs" },
 ];
 
 /* ─── Main Component ─── */

@@ -4610,3 +4610,20 @@
 - [x] Diagnosticar por que utmContent e utmTerm não aparecem na aba RASTREAMENTO (deal processado antes da correção)
 - [x] Corrigir deal 540745 com valores corretos do rdCustomFields (SQL direto)
 - [x] Abrir seção RASTREAMENTO por padrão (utm: true)
+
+## Relatório Fontes e Campanhas — Análises > Outros Relatórios
+
+- [x] Diagnosticar estrutura atual de Análises > Outros Relatórios
+- [x] Backend: procedure tRPC com filtros reais (5 UTMs, fonte, campanha, status, período, responsável, funil, etapa, produto, empresa, contato, equipe, motivo de perda)
+- [x] Backend: query agrupada por fonte e por campanha com contagem e valor
+- [x] Backend: toggle vendas/perdas/ativas usando status real do CRM
+- [x] Frontend: página SourcesCampaignsReport.tsx (600+ linhas)
+- [x] Frontend: filtros principais no topo (5 UTMs + fonte + campanha)
+- [x] Frontend: toggle vendas/perdas/ativas com badges de contagem
+- [x] Frontend: aba Fontes com tabela + barra horizontal de proporção
+- [x] Frontend: aba Campanhas com tabela + barra horizontal de proporção
+- [x] Frontend: painel lateral direito de filtros avançados (funil, etapa, responsável, equipe, empresa, valor, motivo de perda)
+- [x] Registrar rota /analytics/sources-campaigns e link no menu Outros Relatórios
+- [x] Testes vitest: 19 testes passando (auth, overview, bySources, byCampaigns, dealList, filterOptions, multi-tenant)
+- [x] Validar que nada fora desse relatório foi alterado
+- [x] Validar segurança e blindagem de tenants (2 testes de isolamento)
