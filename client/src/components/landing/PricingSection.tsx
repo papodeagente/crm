@@ -89,11 +89,11 @@ export function PricingSection({ onSelectPlan }: PricingSectionProps) {
                     ))}
                     <li className="flex items-start gap-2.5 text-sm text-white/25 mt-2">
                       <X className="w-4 h-4 text-white/15 mt-0.5 shrink-0" />
-                      <span>Automações por etapa do funil</span>
+                      <span>Automações de vendas</span>
                     </li>
                     <li className="flex items-start gap-2.5 text-sm text-white/25">
                       <X className="w-4 h-4 text-white/15 mt-0.5 shrink-0" />
-                      <span>Automações por data de embarque</span>
+                      <span>Automações de pós vendas</span>
                     </li>
                     <li className="flex items-start gap-2.5 text-sm text-white/25">
                       <X className="w-4 h-4 text-white/15 mt-0.5 shrink-0" />
@@ -128,7 +128,7 @@ export function PricingSection({ onSelectPlan }: PricingSectionProps) {
                     <span className="text-4xl font-bold text-white">R$ 297</span>
                     <span className="text-white/30 text-sm">/mês</span>
                   </div>
-                  <p className="text-xs text-white/25 mt-1.5">Até 4 usuários inclusos &middot; + R$ 97/mês por adicional</p>
+                  <p className="text-xs text-white/25 mt-1.5">Até 5 usuários inclusos &middot; + R$ 97/mês por adicional</p>
                 </div>
 
                 <div className="border-t border-violet-500/15 pt-5 mb-6 flex-1">
@@ -154,15 +154,15 @@ export function PricingSection({ onSelectPlan }: PricingSectionProps) {
                     ))}
                     <li className="flex items-start gap-2.5 text-sm text-white/80 mt-2 pt-2 border-t border-violet-500/10">
                       <Sparkles className="w-4 h-4 text-violet-400 mt-0.5 shrink-0" />
-                      <span className="font-medium">Automações por etapa do funil</span>
+                      <span className="font-medium">Automações de vendas</span>
                     </li>
                     <li className="flex items-start gap-2.5 text-sm text-white/80">
                       <Sparkles className="w-4 h-4 text-violet-400 mt-0.5 shrink-0" />
-                      <span className="font-medium">Automações por data de embarque</span>
+                      <span className="font-medium">Automações de pós vendas</span>
                     </li>
                     <li className="flex items-start gap-2.5 text-sm text-white/80">
                       <Sparkles className="w-4 h-4 text-violet-400 mt-0.5 shrink-0" />
-                      <span className="font-medium">Até 4 usuários inclusos</span>
+                      <span className="font-medium">Até 5 usuários inclusos</span>
                     </li>
                   </ul>
                 </div>
