@@ -29,6 +29,20 @@
       "when": 1774227037073,
       "tag": "0058_sturdy_glorian",
       "breakpoints": true
+    },
+    {
+      "idx": 59,
+      "version": "5",
+      "when": 1774296423685,
+      "tag": "0059_dizzy_famine",
+      "breakpoints": true
+    },
+    {
+      "idx": 60,
+      "version": "5",
+      "when": 1774297942617,
+      "tag": "0060_whole_ted_forrester",
+      "breakpoints": true
     }
   ]
 }

@@ -2760,7 +2760,7 @@ function WhatsAppPanel({ contact, dealId }: { contact: any; dealId: number }) {
   // Fetch full message history from DB with periodic polling
   const messagesQ = trpc.crm.dealWhatsApp.messages.useQuery(
     { dealId, limit: 200, beforeId: loadMoreBefore },
-    { enabled: dealId > 0, refetchInterval: 30000, staleTime: 10000 }
+    { enabled: dealId > 0, refetchInterval: 30000, staleTime: 10000, refetchIntervalInBackground: false }
   );
   // Real-time message updates via WebSocket
   const prevMsgRef = useRef<typeof lastMessage>(null);

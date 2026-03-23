@@ -64,19 +64,19 @@ export default function Supervision() {
   // Get agent workload
   const workloadQ = trpc.whatsapp.supervision.agentWorkload.useQuery(
     { sessionId: activeSessionId },
-    { enabled: !!activeSessionId, refetchInterval: 10000, staleTime: 5000 }
+    { enabled: !!activeSessionId, refetchInterval: 10000, staleTime: 5000, refetchIntervalInBackground: false }
   );
 
   // Get queue stats with items
   const queueQ = trpc.whatsapp.supervision.queueStats.useQuery(
     { sessionId: activeSessionId },
-    { enabled: !!activeSessionId, refetchInterval: 10000, staleTime: 5000 }
+    { enabled: !!activeSessionId, refetchInterval: 10000, staleTime: 5000, refetchIntervalInBackground: false }
   );
 
   // Get agent conversations when expanded
   const agentConvsQ = trpc.whatsapp.supervision.agentConversations.useQuery(
     { sessionId: activeSessionId, agentId: expandedAgent || 0, limit: 30 },
-    { enabled: !!activeSessionId && !!expandedAgent, refetchInterval: 15000 }
+    { enabled: !!activeSessionId && !!expandedAgent, refetchInterval: 15000, staleTime: 10000, refetchIntervalInBackground: false }
   );
 
   // Mutations

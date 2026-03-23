@@ -267,21 +267,20 @@ export async function getHomeRFV(tenantId: number) {
   const now = new Date();
   const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
   const ninetyDaysAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
-  const baseWhere = `rc.tenantId = ${tenantId} AND rc.deletedAt IS NULL`;
 
   const [result] = await db.execute(sql`
     SELECT
       (
         SELECT COUNT(*) FROM rfv_contacts rc
-        WHERE ${sql.raw(baseWhere)} AND rc.fScore > 0 AND rc.lastPurchaseAt >= ${thirtyDaysAgo}
+        WHERE rc.tenantId = ${tenantId} AND rc.deletedAt IS NULL AND rc.fScore > 0 AND rc.lastPurchaseAt >= ${thirtyDaysAgo}
       ) AS indicacao,
       (
         SELECT COUNT(*) FROM rfv_contacts rc
-        WHERE ${sql.raw(baseWhere)} AND rc.rScore BETWEEN 250 AND 350 AND rc.fScore > 0
+        WHERE rc.tenantId = ${tenantId} AND rc.deletedAt IS NULL AND rc.rScore BETWEEN 250 AND 350 AND rc.fScore > 0
       ) AS recuperacao,
       (
         SELECT COUNT(*) FROM rfv_contacts rc
-        WHERE ${sql.raw(baseWhere)} AND rc.fScore > 1
+        WHERE rc.tenantId = ${tenantId} AND rc.deletedAt IS NULL AND rc.fScore > 1
       ) AS recorrencia
   `);
 

@@ -180,7 +180,7 @@ export default function Pipeline() {
   const pendingCounts = trpc.crm.tasks.pendingCounts.useQuery();
   // WhatsApp unread counts per contact (for deal card badges)
   const waUnread = trpc.crm.dealWhatsApp.unreadByContact.useQuery(undefined,
-    { refetchInterval: 60000, staleTime: 30000 }
+    { refetchInterval: 60000, staleTime: 30000, refetchIntervalInBackground: false }
   );
   // Real-time: refetch unread counts when a new WhatsApp message arrives
   const { lastMessage: wsLastMessage } = useSocket();

@@ -29,7 +29,7 @@ export default function Messages() {
   const allSessions = sessionsQuery.data || [];
   const messagesQuery = trpc.whatsapp.messages.useQuery(
     { sessionId, limit: 100 },
-    { enabled: !!sessionId, refetchInterval: 5000 }
+    { enabled: !!sessionId, refetchInterval: 15000, staleTime: 10000, refetchIntervalInBackground: false }
   );
 
   useEffect(() => {

@@ -228,31 +228,31 @@ export default function MessageMonitoring() {
   // Queries
   const statusMetrics = trpc.monitoring.statusMetrics.useQuery(
     { sessionId: selectedSession, periodDays },
-    { enabled: queryEnabled, refetchInterval: 30000 }
+    { enabled: queryEnabled, refetchInterval: 30000, staleTime: 15000, refetchIntervalInBackground: false }
   );
   const volumeOverTime = trpc.monitoring.volumeOverTime.useQuery(
     { sessionId: selectedSession, periodDays, granularity: periodDays <= 2 ? "hour" : "day" },
-    { enabled: queryEnabled, refetchInterval: 30000 }
+    { enabled: queryEnabled, refetchInterval: 30000, staleTime: 15000, refetchIntervalInBackground: false }
   );
   const deliveryRate = trpc.monitoring.deliveryRate.useQuery(
     { sessionId: selectedSession, periodDays },
-    { enabled: queryEnabled, refetchInterval: 30000 }
+    { enabled: queryEnabled, refetchInterval: 30000, staleTime: 15000, refetchIntervalInBackground: false }
   );
   const recentActivity = trpc.monitoring.recentActivity.useQuery(
     { sessionId: selectedSession, limit: 50 },
-    { enabled: queryEnabled, refetchInterval: 15000 }
+    { enabled: queryEnabled, refetchInterval: 15000, staleTime: 10000, refetchIntervalInBackground: false }
   );
   const typeDistribution = trpc.monitoring.typeDistribution.useQuery(
     { sessionId: selectedSession, periodDays },
-    { enabled: queryEnabled, refetchInterval: 60000 }
+    { enabled: queryEnabled, refetchInterval: 60000, staleTime: 30000, refetchIntervalInBackground: false }
   );
   const topContacts = trpc.monitoring.topContacts.useQuery(
     { sessionId: selectedSession, periodDays, limit: 10 },
-    { enabled: queryEnabled, refetchInterval: 60000 }
+    { enabled: queryEnabled, refetchInterval: 60000, staleTime: 30000, refetchIntervalInBackground: false }
   );
   const responseTime = trpc.monitoring.responseTime.useQuery(
     { sessionId: selectedSession, periodDays },
-    { enabled: queryEnabled, refetchInterval: 60000 }
+    { enabled: queryEnabled, refetchInterval: 60000, staleTime: 30000, refetchIntervalInBackground: false }
   );
 
   // Live events from Socket.IO

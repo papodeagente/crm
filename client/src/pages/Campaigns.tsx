@@ -53,7 +53,7 @@ export default function Campaigns() {
   const campaignsQ = trpc.rfv.campaigns.useQuery({ page,
     pageSize,
     status: statusFilter === "all" ? undefined : statusFilter,
-  }, { refetchInterval: 30000, staleTime: 15000 });
+  }, { refetchInterval: 30000, staleTime: 15000, refetchIntervalInBackground: false });
 
   const campaigns = campaignsQ.data?.campaigns || [];
   const total = campaignsQ.data?.total || 0;

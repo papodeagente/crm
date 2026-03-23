@@ -28,7 +28,7 @@ export default function Logs() {
   const allSessions = sessionsQuery.data || [];
   const logsQuery = trpc.whatsapp.logs.useQuery(
     { sessionId: sessionFilter === "all" ? undefined : sessionFilter, limit: 200 },
-    { refetchInterval: 5000 }
+    { refetchInterval: 15000, staleTime: 10000, refetchIntervalInBackground: false }
   );
   const logs = logsQuery.data || [];
 

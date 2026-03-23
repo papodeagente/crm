@@ -4694,3 +4694,38 @@
 - [x] Identificar se o backend está crashando, timeout, ou progresso não persiste (causa: progressStore em memória perdido entre instâncias)
 - [x] Implementar fix robusto: progresso via tabela import_progress no DB, debounce 1.5s, flushNow para estados críticos
 - [x] Testar e validar: 17 testes passando, 0 erros TypeScript
+
+## Estabilização: Login + Performance + Segurança Multi-Tenant
+
+### Fase 1 — Diagnóstico Login
+- [x] Auditar fluxo completo de login (rota, validação, sessão, cookie, middleware, guards)
+- [x] Identificar loops de retry e chamadas redundantes no frontend pós-login
+- [x] Mapear todas as queries disparadas na carga inicial do dashboard
+
+### Fase 2 — Correção Login
+- [x] Eliminar loops de retry amplificados no main.tsx (circuit breaker)
+- [x] Aplicar staleTime/cache em queries de autenticação (saasAuth.me, auth.me)
+- [x] Garantir que falha em widget não bloqueia entrada do usuário
+
+### Fase 3 — Performance Backend
+- [x] Auditar queries lentas e N+1 nos endpoints do dashboard
+- [x] Criar/ajustar índices necessários no banco
+- [x] Limitar payloads excessivos e otimizar paginação
+
+### Fase 4 — Performance Frontend
+- [ ] Reduzir refetchInterval agressivos (5s, 10s → valores seguros)
+- [ ] Adicionar refetchIntervalInBackground: false em polling queries
+- [ ] Implementar carregamento lazy para widgets secundários do dashboard
+
+### Fase 5 — Segurança Multi-Tenant
+- [x] Auditar isolamento por tenantId em todas as queries do backend
+- [x] Verificar que nenhum cache compartilha dados entre tenants
+- [x] Validar que super admin não contamina dados de tenants comuns (isolamento via JWT)
+
+### Fase 6 — Testes
+- [ ] Testes de autenticação (login válido/inválido, sessão, logout)
+- [ ] Testes multi-tenant (isolamento, tenant novo, admin vs comum)
+- [ ] Testes de regressão (CRM, pipeline, contatos, tarefas, inbox, WhatsApp)
+
+### Entrega
+- [ ] Relatório final com causa raiz, correções, métricas e evidências

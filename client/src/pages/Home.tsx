@@ -256,14 +256,17 @@ export default function Home() {
   const execQ = trpc.home.executive.useQuery(undefined, {
     refetchInterval: REFETCH_INTERVAL,
     staleTime: 30000,
+    refetchIntervalInBackground: false,
   });
   const tasksQ = trpc.home.tasks.useQuery({ limit: 10 }, {
     refetchInterval: REFETCH_INTERVAL,
     staleTime: 30000,
+    refetchIntervalInBackground: false,
   });
   const rfvQ = trpc.home.rfv.useQuery(undefined, {
     refetchInterval: REFETCH_INTERVAL,
     staleTime: 60000,
+    refetchIntervalInBackground: false,
   });
   const onboardingQ = trpc.home.onboarding.useQuery(undefined, {
     staleTime: 120000,

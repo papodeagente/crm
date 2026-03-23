@@ -18,6 +18,8 @@ export default function SaasLogin() {
   const meQuery = trpc.saasAuth.me.useQuery(undefined, {
     retry: false,
     refetchOnWindowFocus: false,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
   });
 
   useEffect(() => {

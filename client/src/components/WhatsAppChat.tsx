@@ -1280,7 +1280,7 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
   // Internal notes queries
   const notesQ = trpc.whatsapp.notes.list.useQuery(
     { waConversationId: waConversationId || 0 },
-    { enabled: !!waConversationId, refetchInterval: socketConnected ? false : 30000, staleTime: 15000 }
+    { enabled: !!waConversationId, refetchInterval: socketConnected ? false : 30000, staleTime: 15000, refetchIntervalInBackground: false }
   );
   const createNoteMut = trpc.whatsapp.notes.create.useMutation({
     onSuccess: () => {
@@ -1329,7 +1329,7 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
   // Conversation events/timeline
   const eventsQ = trpc.whatsapp.events.list.useQuery(
     { waConversationId: waConversationId || 0 },
-    { enabled: !!waConversationId && showTimeline, refetchInterval: 60000, staleTime: 30000 }
+    { enabled: !!waConversationId && showTimeline, refetchInterval: 60000, staleTime: 30000, refetchIntervalInBackground: false }
   );
 
   // Transfer mutation
@@ -1350,7 +1350,7 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
   useEffect(() => { setMsgLimit(INITIAL_MSG_LIMIT); }, [remoteJid]);
   const messagesQ = trpc.whatsapp.messagesByContact.useQuery(
     { sessionId, remoteJid, limit: msgLimit },
-    { enabled: !!sessionId && !!remoteJid, refetchInterval: socketConnected ? false : 30000, staleTime: 5000 }
+    { enabled: !!sessionId && !!remoteJid, refetchInterval: socketConnected ? false : 30000, staleTime: 5000, refetchIntervalInBackground: false }
   );
   const hasMoreMessages = (messagesQ.data?.length || 0) >= msgLimit;
   const loadMoreMessages = useCallback(() => {

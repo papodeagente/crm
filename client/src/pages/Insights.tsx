@@ -98,8 +98,8 @@ function CRMDashboard() {
     ? { dateFrom: dateFilter.dates.dateFrom, dateTo: dateFilter.dates.dateTo, userId: userIdNum }
     : undefined;
   const dashboard = trpc.insights.dashboard.useQuery(insightsInput, { staleTime: 30000 });
-  const homeData = trpc.dashboard.metrics.useQuery({ dateFrom: dateFilter.dates.dateFrom, dateTo: dateFilter.dates.dateTo, userId: userIdNum }, { refetchInterval: 60000, staleTime: 30000 });
-  const pipelineSummary = trpc.dashboard.pipelineSummary.useQuery({ dateFrom: dateFilter.dates.dateFrom, dateTo: dateFilter.dates.dateTo, userId: userIdNum }, { refetchInterval: 60000, staleTime: 30000 });
+  const homeData = trpc.dashboard.metrics.useQuery({ dateFrom: dateFilter.dates.dateFrom, dateTo: dateFilter.dates.dateTo, userId: userIdNum }, { refetchInterval: 60000, staleTime: 30000, refetchIntervalInBackground: false });
+  const pipelineSummary = trpc.dashboard.pipelineSummary.useQuery({ dateFrom: dateFilter.dates.dateFrom, dateTo: dateFilter.dates.dateTo, userId: userIdNum }, { refetchInterval: 60000, staleTime: 30000, refetchIntervalInBackground: false });
   const d = dashboard.data;
   const h = homeData.data;
 
@@ -343,31 +343,31 @@ function MessagesDashboard() {
 
   const statusMetrics = trpc.monitoring.statusMetrics.useQuery(
     { sessionId: selectedSession, periodDays, dateFrom, dateTo },
-    { enabled: queryEnabled, refetchInterval: 60000, staleTime: 30000 }
+    { enabled: queryEnabled, refetchInterval: 60000, staleTime: 30000, refetchIntervalInBackground: false }
   );
   const volumeOverTime = trpc.monitoring.volumeOverTime.useQuery(
     { sessionId: selectedSession, periodDays, granularity: periodDays <= 2 ? "hour" : "day", dateFrom, dateTo },
-    { enabled: queryEnabled, refetchInterval: 60000, staleTime: 30000 }
+    { enabled: queryEnabled, refetchInterval: 60000, staleTime: 30000, refetchIntervalInBackground: false }
   );
   const deliveryRate = trpc.monitoring.deliveryRate.useQuery(
     { sessionId: selectedSession, periodDays, dateFrom, dateTo },
-    { enabled: queryEnabled, refetchInterval: 60000, staleTime: 30000 }
+    { enabled: queryEnabled, refetchInterval: 60000, staleTime: 30000, refetchIntervalInBackground: false }
   );
   const recentActivity = trpc.monitoring.recentActivity.useQuery(
     { sessionId: selectedSession, limit: 50 },
-    { enabled: queryEnabled, refetchInterval: 30000, staleTime: 15000 }
+    { enabled: queryEnabled, refetchInterval: 30000, staleTime: 15000, refetchIntervalInBackground: false }
   );
   const typeDistribution = trpc.monitoring.typeDistribution.useQuery(
     { sessionId: selectedSession, periodDays, dateFrom, dateTo },
-    { enabled: queryEnabled, refetchInterval: 120000, staleTime: 60000 }
+    { enabled: queryEnabled, refetchInterval: 120000, staleTime: 60000, refetchIntervalInBackground: false }
   );
   const topContacts = trpc.monitoring.topContacts.useQuery(
     { sessionId: selectedSession, periodDays, limit: 10, dateFrom, dateTo },
-    { enabled: queryEnabled, refetchInterval: 120000, staleTime: 60000 }
+    { enabled: queryEnabled, refetchInterval: 120000, staleTime: 60000, refetchIntervalInBackground: false }
   );
   const responseTime = trpc.monitoring.responseTime.useQuery(
     { sessionId: selectedSession, periodDays, dateFrom, dateTo },
-    { enabled: queryEnabled, refetchInterval: 120000, staleTime: 60000 }
+    { enabled: queryEnabled, refetchInterval: 120000, staleTime: 60000, refetchIntervalInBackground: false }
   );
 
   useEffect(() => {

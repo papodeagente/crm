@@ -41,7 +41,7 @@ export default function WhatsApp() {
   const { qrData, waStatus } = useSocket();
   const { isAdmin } = useIsAdmin();
 
-  const sessions = trpc.whatsapp.sessions.useQuery(undefined, { refetchInterval: 15000, staleTime: 10000 });
+  const sessions = trpc.whatsapp.sessions.useQuery(undefined, { refetchInterval: 15000, staleTime: 10000, refetchIntervalInBackground: false });
 
   // The user's session (each user has exactly one)
   const mySession = sessions.data?.[0] || null;
@@ -172,7 +172,7 @@ export default function WhatsApp() {
     { sessionId: qrSessionId || "" },
     {
       enabled: !!qrSessionId,
-      refetchInterval: 2000,
+      refetchInterval: 15000, refetchIntervalInBackground: false,
     }
   );
 
