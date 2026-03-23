@@ -4719,3 +4719,9 @@
 - [x] Atualizar Landing.tsx orquestração
 - [x] Confirmar preços mantidos: SOLO R$97, GROWTH R$297, SCALE sob consulta
 - [x] Confirmar zero alterações no sistema interno
+
+## Ajustes Visuais Landing Page — PricingSection
+- [x] Alterar 'Automações por etapa do funil' → 'Automações de vendas' (SOLO e GROWTH)
+- [x] Alterar 'Automações por data de embarque' → 'Automações de pós vendas' (SOLO e GROWTH)
+- [x] Alterar 'Até 4 usuários inclusos' → 'Até 5 usuários inclusos' (GROWTH)
+- [x] Alterar 'WhatsApp integrado com histórico' → '1 número de WhatsApp integrado' (SOLO e GROWTH)

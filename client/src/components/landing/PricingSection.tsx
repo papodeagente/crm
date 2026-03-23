@@ -72,7 +72,7 @@ export function PricingSection({ onSelectPlan }: PricingSectionProps) {
                     {[
                       "Pipeline visual de negociações",
                       "Gestão completa de contatos e empresas",
-                      "WhatsApp integrado com histórico",
+                      "1 número de WhatsApp integrado",
                       "Follow-up e tarefas automáticas",
                       "Catálogo de produtos turísticos",
                       "Propostas comerciais",
@@ -137,7 +137,7 @@ export function PricingSection({ onSelectPlan }: PricingSectionProps) {
                     {[
                       "Pipeline visual de negociações",
                       "Gestão completa de contatos e empresas",
-                      "WhatsApp integrado com histórico",
+                      "1 número de WhatsApp integrado",
                       "Follow-up e tarefas automáticas",
                       "Catálogo de produtos turísticos",
                       "Propostas comerciais",
