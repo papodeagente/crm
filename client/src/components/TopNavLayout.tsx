@@ -364,6 +364,12 @@ function TopBar({ onSearchOpen, mobileMenuOpen, onToggleMobile }: {
     staleTime: 5 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
   }).data;
+  const planSummary = trpc.plan.summary.useQuery(undefined, {
+    retry: false,
+    refetchOnWindowFocus: false,
+    staleTime: 5 * 60 * 1000,
+  });
+  const hasStrategicClassification = planSummary.data?.features?.strategicClassification !== false;
 
   return (
     <>
@@ -381,7 +387,10 @@ function TopBar({ onSearchOpen, mobileMenuOpen, onToggleMobile }: {
 
           {/* Desktop Nav */}
           <nav className="hidden md:flex items-center gap-0.5 ml-2 overflow-x-auto scrollbar-none shrink min-w-0">
-            {navItems.map((item) => {
+            {navItems.filter((item) => {
+              if (item.path === "/rfv" && !hasStrategicClassification) return false;
+              return true;
+            }).map((item) => {
               const isActive = item.path === "/dashboard"
                 ? location === "/dashboard"
                 : (item.matchPaths || [item.path]).some((p) => location.startsWith(p));
@@ -515,7 +524,10 @@ function TopBar({ onSearchOpen, mobileMenuOpen, onToggleMobile }: {
       {mobileMenuOpen && (
         <div className="md:hidden fixed inset-x-0 top-[56px] z-40 bg-card/95 backdrop-blur-xl border-b border-border shadow-lg animate-in slide-in-from-top-2 duration-200">
           <nav className="flex flex-col p-3 gap-1">
-            {navItems.map((item) => {
+            {navItems.filter((item) => {
+              if (item.path === "/rfv" && !hasStrategicClassification) return false;
+              return true;
+            }).map((item) => {
               const isActive = item.path === "/dashboard"
                 ? location === "/dashboard"
                 : (item.matchPaths || [item.path]).some((p) => location.startsWith(p));

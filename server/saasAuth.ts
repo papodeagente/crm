@@ -524,6 +524,10 @@ export async function inviteUserToTenant(data: {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
+  // Check plan user limit before proceeding
+  const { assertCanAddUser } = await import("./services/planLimitsService");
+  await assertCanAddUser(data.tenantId);
+
   // Check if email already exists in this tenant
   const existing = await db.select().from(crmUsers)
     .where(and(eq(crmUsers.tenantId, data.tenantId), eq(crmUsers.email, data.email)))

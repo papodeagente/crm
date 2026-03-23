@@ -19,8 +19,8 @@ export default function Landing() {
     document.getElementById("planos")?.scrollIntoView({ behavior: "smooth" });
   };
 
-  const goToRegister = () => {
-    navigate("/register");
+  const goToRegister = (plan?: string) => {
+    navigate(plan ? `/register?plan=${plan}` : "/register");
   };
 
   const scrollToDemo = () => {

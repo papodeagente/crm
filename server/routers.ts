@@ -3559,6 +3559,18 @@ REGRAS:
       }),
   }),
 
+  // ─── Plan & Limits ───
+  plan: router({
+    summary: tenantProcedure.query(async ({ ctx }) => {
+      const { getTenantPlanSummary } = await import("./services/planLimitsService");
+      return getTenantPlanSummary(getTenantId(ctx));
+    }),
+    canAddUser: tenantProcedure.query(async ({ ctx }) => {
+      const { canAddUser } = await import("./services/planLimitsService");
+      return canAddUser(getTenantId(ctx));
+    }),
+  }),
+
 });
 
 export type AppRouter = typeof appRouter;

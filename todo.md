@@ -4729,3 +4729,26 @@
 
 ### Entrega
 - [ ] Relatório final com causa raiz, correções, métricas e evidências
+
+## Organização de Planos Start/Growth/Scale (sem Stripe)
+
+### Fase 1 — Definição e Schema
+- [x] Criar shared/plans.ts com definição centralizada dos planos (limites, features)
+- [x] Migrar schema: expandir enum plan na tabela tenants (start/growth/scale)
+- [x] Migrar schema: expandir enum plan na tabela subscriptions
+
+### Fase 2 — Enforcement de Limites e Restrições
+- [x] Criar server/services/planLimitsService.ts
+- [x] Bloquear Central de Automações para plano Start
+- [x] Bloquear Classificação Estratégica para plano Start
+- [x] Limitar usuários: Start=1, Growth=5, Scale=ilimitado
+- [x] Limitar instâncias WhatsApp: Start=1, Growth=1(compartilhada 5 users), Scale=ilimitado
+- [x] Guard no inviteUserToTenant para respeitar limite de usuários
+
+### Fase 3 — Landing Page
+- [x] Renomear planos: Basic→Start, Pro→Growth, Enterprise→Scale
+- [x] Atualizar features/limites nos cards de preço
+- [x] Atualizar texto "Tudo do Basic" → "Tudo do Start"
+
+### Fase 4 — Testes
+- [x] Testes vitest para definição de planos e enforcement de limites (45 testes passando)

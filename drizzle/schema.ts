@@ -170,7 +170,7 @@ export const tenants = mysqlTable("tenants", {
   id: int("id").autoincrement().primaryKey(),
   name: varchar("name", { length: 255 }).notNull(),
   slug: varchar("slug", { length: 128 }),
-  plan: mysqlEnum("plan", ["free", "pro", "enterprise"]).default("free").notNull(),
+  plan: mysqlEnum("plan", ["free", "pro", "enterprise", "start", "growth", "scale"]).default("start").notNull(),
   status: mysqlEnum("status", ["active", "suspended", "cancelled"]).default("active").notNull(),
   ownerUserId: int("ownerUserId"),
   billingCustomerId: varchar("billingCustomerId", { length: 128 }),
@@ -1504,7 +1504,7 @@ export type InsertRdFieldMapping = typeof rdFieldMappings.$inferInsert;
 export const subscriptions = mysqlTable("subscriptions", {
   id: int("id").autoincrement().primaryKey(),
   tenantId: int("tenantId").notNull(),
-  plan: mysqlEnum("plan", ["free", "pro", "enterprise"]).default("free").notNull(),
+  plan: mysqlEnum("plan", ["free", "pro", "enterprise", "start", "growth", "scale"]).default("start").notNull(),
   status: mysqlEnum("status", ["active", "trialing", "past_due", "cancelled", "expired"]).default("trialing").notNull(),
   hotmartTransactionId: varchar("hotmartTransactionId", { length: 255 }),
   hotmartSubscriptionId: varchar("hotmartSubscriptionId", { length: 255 }),

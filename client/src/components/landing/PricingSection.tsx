@@ -13,17 +13,16 @@ const SHARED_FEATURES = [
   "Catálogo de produtos turísticos",
   "Propostas comerciais",
   "Tarefas e follow-up",
-  "WhatsApp integrado (inbox)",
+  "1 número de WhatsApp integrado",
   "Histórico completo de atendimento",
   "Dashboard com indicadores",
-  "Matriz RFV de clientes",
   "Análise de conversas com IA",
   "Funil de pós-venda",
   "Campos personalizados",
 ];
 
 interface PricingSectionProps {
-  onSelectPlan: () => void;
+  onSelectPlan: (plan?: string) => void;
 }
 
 export function PricingSection({ onSelectPlan }: PricingSectionProps) {
@@ -64,16 +63,17 @@ export function PricingSection({ onSelectPlan }: PricingSectionProps) {
           </FadeIn>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8">
-            {/* BASIC */}
+            {/* START */}
             <FadeIn delay={0.1}>
               <div className="bg-white/[0.03] border border-white/[0.08] rounded-2xl p-6 sm:p-8 flex flex-col h-full backdrop-blur-sm">
                 <div className="mb-6">
-                  <p className="text-sm font-medium text-white/40 uppercase tracking-wider mb-2">Basic</p>
+                  <p className="text-sm font-medium text-white/40 uppercase tracking-wider mb-2">Start</p>
                   <div className="flex items-baseline gap-1">
                     <span className="text-4xl font-bold text-white">R$ 67</span>
                     <span className="text-white/30 text-sm">/mês</span>
                   </div>
                   <p className="text-sm text-white/30 mt-2">1 usuário incluso</p>
+                  <p className="text-xs text-white/20 mt-1">1 número de WhatsApp integrado</p>
                 </div>
 
                 <div className="border-t border-white/[0.06] pt-6 mb-6 flex-1">
@@ -87,11 +87,11 @@ export function PricingSection({ onSelectPlan }: PricingSectionProps) {
                     ))}
                     <li className="flex items-start gap-2.5 text-sm text-white/35">
                       <X className="w-4 h-4 text-white/20 mt-0.5 shrink-0" />
-                      <span>Automações por etapa do funil</span>
+                      <span>Central de Automações</span>
                     </li>
                     <li className="flex items-start gap-2.5 text-sm text-white/35">
                       <X className="w-4 h-4 text-white/20 mt-0.5 shrink-0" />
-                      <span>Automações por data de embarque</span>
+                      <span>Classificação estratégica (Matriz RFV)</span>
                     </li>
                     <li className="flex items-start gap-2.5 text-sm text-white/35">
                       <X className="w-4 h-4 text-white/20 mt-0.5 shrink-0" />
@@ -102,14 +102,14 @@ export function PricingSection({ onSelectPlan }: PricingSectionProps) {
 
                 <Button
                   className="w-full h-12 bg-white/[0.06] hover:bg-white/[0.10] text-white border border-white/[0.10] hover:border-white/[0.15] transition-all duration-300"
-                  onClick={onSelectPlan}
+                  onClick={() => onSelectPlan("start")}
                 >
                   Começar agora <ArrowRight className="w-4 h-4 ml-2" />
                 </Button>
               </div>
             </FadeIn>
 
-            {/* PRO */}
+            {/* GROWTH */}
             <FadeIn delay={0.2}>
               <div className="bg-gradient-to-b from-violet-500/[0.08] to-purple-500/[0.03] border border-violet-500/20 rounded-2xl p-6 sm:p-8 flex flex-col h-full relative backdrop-blur-sm">
                 <div className="absolute -top-3 left-1/2 -translate-x-1/2">
@@ -119,17 +119,17 @@ export function PricingSection({ onSelectPlan }: PricingSectionProps) {
                 </div>
 
                 <div className="mb-6">
-                  <p className="text-sm font-medium text-violet-400 uppercase tracking-wider mb-2">Pro</p>
+                  <p className="text-sm font-medium text-violet-400 uppercase tracking-wider mb-2">Growth</p>
                   <div className="flex items-baseline gap-1">
                     <span className="text-4xl font-bold text-white">R$ 97</span>
                     <span className="text-white/30 text-sm">/mês</span>
                   </div>
-                  <p className="text-sm text-white/30 mt-2">Até 4 usuários inclusos</p>
-                  <p className="text-xs text-white/20 mt-1">+ R$ 97/mês por usuário adicional</p>
+                  <p className="text-sm text-white/30 mt-2">Até 5 usuários inclusos</p>
+                  <p className="text-xs text-white/20 mt-1">1 número de WhatsApp para até 5 usuários</p>
                 </div>
 
                 <div className="border-t border-violet-500/10 pt-6 mb-6 flex-1">
-                  <p className="text-xs font-medium text-white/50 uppercase tracking-wider mb-4">Tudo do Basic, mais:</p>
+                  <p className="text-xs font-medium text-white/50 uppercase tracking-wider mb-4">Tudo do Start, mais:</p>
                   <ul className="space-y-3">
                     {SHARED_FEATURES.map((f, i) => (
                       <li key={i} className="flex items-start gap-2.5 text-sm text-white/60">
@@ -139,49 +139,54 @@ export function PricingSection({ onSelectPlan }: PricingSectionProps) {
                     ))}
                     <li className="flex items-start gap-2.5 text-sm text-white/80">
                       <Check className="w-4 h-4 text-violet-400 mt-0.5 shrink-0" />
-                      <span className="font-medium">Automações por etapa do funil</span>
+                      <span className="font-medium">Central de Automações</span>
                     </li>
                     <li className="flex items-start gap-2.5 text-sm text-white/80">
                       <Check className="w-4 h-4 text-violet-400 mt-0.5 shrink-0" />
-                      <span className="font-medium">Automações por data de embarque</span>
+                      <span className="font-medium">Classificação estratégica (Matriz RFV)</span>
                     </li>
                     <li className="flex items-start gap-2.5 text-sm text-white/80">
                       <Check className="w-4 h-4 text-violet-400 mt-0.5 shrink-0" />
-                      <span className="font-medium">Até 4 usuários inclusos</span>
+                      <span className="font-medium">Até 5 usuários inclusos</span>
                     </li>
                   </ul>
                 </div>
 
                 <Button
                   className="w-full h-12 bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white border-0 shadow-lg shadow-violet-500/25 transition-all duration-300 hover:shadow-violet-500/35"
-                  onClick={onSelectPlan}
+                  onClick={() => onSelectPlan("growth")}
                 >
                   Começar agora <ArrowRight className="w-4 h-4 ml-2" />
                 </Button>
               </div>
             </FadeIn>
 
-            {/* ENTERPRISE */}
+            {/* SCALE */}
             <FadeIn delay={0.3}>
               <div className="bg-white/[0.03] border border-white/[0.08] rounded-2xl p-6 sm:p-8 flex flex-col h-full backdrop-blur-sm">
                 <div className="mb-6">
-                  <p className="text-sm font-medium text-white/40 uppercase tracking-wider mb-2">Enterprise</p>
+                  <p className="text-sm font-medium text-white/40 uppercase tracking-wider mb-2">Scale</p>
                   <div className="flex items-baseline gap-1">
                     <span className="text-4xl font-bold text-white">Sob consulta</span>
                   </div>
                   <p className="text-sm text-white/30 mt-2">Usuários ilimitados</p>
+                  <p className="text-xs text-white/20 mt-1">WhatsApp ilimitado</p>
                 </div>
 
                 <div className="border-t border-white/[0.06] pt-6 mb-6 flex-1">
-                  <p className="text-xs font-medium text-white/50 uppercase tracking-wider mb-4">Tudo do Pro, mais:</p>
+                  <p className="text-xs font-medium text-white/50 uppercase tracking-wider mb-4">Tudo do Growth, mais:</p>
                   <ul className="space-y-3">
                     <li className="flex items-start gap-2.5 text-sm text-white/60">
                       <Check className="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" />
-                      <span>Todas as funcionalidades do Pro</span>
+                      <span>Todas as funcionalidades do Growth</span>
                     </li>
                     <li className="flex items-start gap-2.5 text-sm text-white/80">
                       <Check className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
                       <span className="font-medium">Usuários ilimitados</span>
+                    </li>
+                    <li className="flex items-start gap-2.5 text-sm text-white/80">
+                      <Check className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
+                      <span className="font-medium">Instâncias WhatsApp ilimitadas</span>
                     </li>
                     <li className="flex items-start gap-2.5 text-sm text-white/80">
                       <Check className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
@@ -234,7 +239,7 @@ export function PricingSection({ onSelectPlan }: PricingSectionProps) {
         </div>
       </footer>
 
-      {/* Enterprise Popup */}
+      {/* Scale Popup */}
       {showEnterprise && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div
@@ -259,7 +264,7 @@ export function PricingSection({ onSelectPlan }: PricingSectionProps) {
               </div>
             ) : (
               <>
-                <h3 className="text-xl font-bold text-white mb-1">Plano Enterprise</h3>
+                <h3 className="text-xl font-bold text-white mb-1">Plano Scale</h3>
                 <p className="text-sm text-white/40 mb-6">
                   Preencha o formulário e nossa equipe de vendas entrará em contato.
                 </p>

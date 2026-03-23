@@ -56,6 +56,7 @@ interface SettingsLink {
   badge?: string;
   adminOnly?: boolean;
   comingSoon?: boolean;
+  requiredFeature?: string;
 }
 
 interface SettingsCategory {
@@ -76,8 +77,8 @@ const settingsCategories: SettingsCategory[] = [
     links: [
       { icon: GitBranch, label: "Funis de vendas", path: "/settings/pipelines" },
       { icon: Tag, label: "Campos personalizados", path: "/settings/custom-fields" },
-      { icon: Zap, label: "Central de Automações", path: "/settings/automation-hub", badge: "Novo" },
-      { icon: Target, label: "Classificação estratégica", path: "/settings/classification" },
+      { icon: Zap, label: "Central de Automações", path: "/settings/automation-hub", badge: "Novo", requiredFeature: "automationCenter" },
+      { icon: Target, label: "Classificação estratégica", path: "/settings/classification", requiredFeature: "strategicClassification" },
     ],
   },
   {
@@ -122,7 +123,9 @@ const settingsCategories: SettingsCategory[] = [
 export default function SettingsPage() {
   const [, setLocation] = useLocation();
   const saasMe = trpc.saasAuth.me.useQuery(undefined, { retry: 1, refetchOnWindowFocus: false, refetchOnMount: false, staleTime: 5 * 60 * 1000 });
+  const planSummary = trpc.plan.summary.useQuery(undefined, { retry: 1, refetchOnWindowFocus: false, staleTime: 5 * 60 * 1000 });
   const isAdmin = saasMe.data?.role === "admin";
+  const planFeatures = planSummary.data?.features;
 
   const handleLinkClick = (link: SettingsLink) => {
     if (link.comingSoon) {
@@ -131,6 +134,10 @@ export default function SettingsPage() {
     }
     if (link.adminOnly && !isAdmin) {
       toast.error("Acesso restrito a administradores.");
+      return;
+    }
+    if (link.requiredFeature && planFeatures && !(planFeatures as any)[link.requiredFeature]) {
+      toast.error(`Recurso disponível a partir do plano Growth. Faça upgrade para acessar.`);
       return;
     }
     setLocation(link.path);
@@ -228,6 +235,11 @@ export default function SettingsPage() {
                     {link.adminOnly && isAdmin && (
                       <span className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-600 uppercase">
                         <Lock className="h-2.5 w-2.5" /> Admin
+                      </span>
+                    )}
+                    {link.requiredFeature && planFeatures && !(planFeatures as any)[link.requiredFeature] && (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-400 uppercase">
+                        <Crown className="h-2.5 w-2.5" /> Growth
                       </span>
                     )}
                   </button>
