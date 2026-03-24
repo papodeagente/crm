@@ -318,9 +318,9 @@ export default function Home() {
       {/* ═══════════════════════════════════════════════════════
           HEADER
           ═══════════════════════════════════════════════════════ */}
-      <div className="flex items-start justify-between mb-8">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-6 sm:mb-8">
         <div>
-          <h1 className="text-[26px] font-extrabold tracking-tight text-foreground">
+          <h1 className="text-[22px] sm:text-[26px] font-extrabold tracking-tight text-foreground">
             {greeting}, {user?.name?.split(" ")[0] || "Usuário"}
           </h1>
           <p className="text-[13px] text-muted-foreground mt-1 capitalize">{today}</p>
@@ -347,7 +347,7 @@ export default function Home() {
         </div>
 
         {/* Top row: 2 alert cards + 4 metric cards */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3">
           {/* Card 1: Sem Tarefa (clicável) */}
           <button
             onClick={() => setNoTaskModalOpen(true)}
@@ -469,14 +469,14 @@ export default function Home() {
       {/* ═══════════════════════════════════════════════════════
           BLOCO 2 + 3 — PRIORIDADES + OPORTUNIDADES (side by side)
           ═══════════════════════════════════════════════════════ */}
-      <div className="grid lg:grid-cols-12 gap-5 mb-8">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-5 mb-6 sm:mb-8">
 
         {/* ─── BLOCO 2: Prioridades de Ação (8 cols) ─── */}
         <section className="lg:col-span-8">
           <div className="surface p-5">
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
               <div className="flex items-center gap-2.5">
-                <div className="h-9 w-9 rounded-xl flex items-center justify-center bg-amber-500/10">
+                <div className="h-9 w-9 rounded-xl flex items-center justify-center bg-amber-500/10 shrink-0">
                   <Zap className="h-4.5 w-4.5 text-amber-500" />
                 </div>
                 <div>
@@ -484,7 +484,7 @@ export default function Home() {
                   <p className="text-[11px] text-muted-foreground">Atrasadas, hoje e próximos 7 dias</p>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 {overdueCount > 0 && (
                   <span className="text-[10px] bg-red-500/15 text-red-500 px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
                     <AlertTriangle className="h-3 w-3" />

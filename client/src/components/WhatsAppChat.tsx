@@ -283,7 +283,7 @@ const AudioPlayer = memo(({ src, duration, isVoice, fromMe, avatarUrl }: {
   const unplayedColor = fromMe ? "rgba(83,189,235,0.3)" : "rgba(0,168,132,0.25)";
 
   return (
-    <div className="flex items-center gap-2.5 min-w-[250px] max-w-[340px] py-1">
+    <div className="flex items-center gap-2.5 min-w-0 sm:min-w-[250px] max-w-full sm:max-w-[340px] py-1">
       <audio ref={audioRef} src={src} preload="metadata" />
 
       {/* Avatar - always show photo if available, like WhatsApp Web */}
@@ -421,13 +421,13 @@ function MediaLoader({ sessionId, messageId, messageType, mediaDuration, isVoice
     if (isAudio) return <AudioPlayer src={mediaUrl} duration={mediaDuration} isVoice={isVoiceNote || false} fromMe={fromMe} avatarUrl={avatarUrl} />;
     if (isImage) return (
       <div className="relative -mx-1 -mt-0.5 mb-1 overflow-hidden rounded-md">
-        <img src={mediaUrl} alt="Imagem" className="max-w-[300px] w-full h-auto object-cover cursor-pointer hover:opacity-95 transition-opacity rounded-lg" loading="lazy" onClick={() => onImageClick?.(mediaUrl)}
+        <img src={mediaUrl} alt="Imagem" className="max-w-full sm:max-w-[300px] w-full h-auto object-cover cursor-pointer hover:opacity-95 transition-opacity rounded-lg" loading="lazy" onClick={() => onImageClick?.(mediaUrl)}
           onError={() => setUnavailable(true)} />
       </div>
     );
     if (isVideo) return (
       <div className="relative -mx-1 -mt-0.5 mb-1 overflow-hidden rounded-md">
-        <video src={mediaUrl} controls className="max-w-[300px] w-full h-auto rounded-md" preload="metadata"
+        <video src={mediaUrl} controls className="max-w-full sm:max-w-[300px] w-full h-auto rounded-md" preload="metadata"
           onError={() => setUnavailable(true)} />
       </div>
     );
@@ -620,7 +620,7 @@ function ImageWithFallback({ msg, fromMe, myAvatarUrl, contactAvatarUrl, onImage
 
   return (
     <div className="relative -mx-1 -mt-0.5 mb-1 overflow-hidden rounded-md">
-      <img src={msg.mediaUrl!} alt="Imagem" className="max-w-[300px] w-full h-auto object-cover cursor-pointer hover:opacity-95 transition-opacity rounded-lg" loading="lazy"
+      <img src={msg.mediaUrl!} alt="Imagem" className="max-w-full sm:max-w-[300px] w-full h-auto object-cover cursor-pointer hover:opacity-95 transition-opacity rounded-lg" loading="lazy"
         onClick={() => onImageClick?.(msg.mediaUrl!)}
         onError={() => setBroken(true)} />
     </div>
@@ -690,7 +690,7 @@ const MessageBubble = memo(({
         padding: '5px 12px 7px 8px',
       }}>
         <p className="text-[12.5px] font-medium" style={{ color: 'var(--wa-tint)' }}>{quotedMsg.fromMe ? "Você" : "Contato"}</p>
-        <p className="text-[12.5px] truncate max-w-[300px]" style={{ color: 'var(--wa-text-secondary)' }}>{quotedContent}</p>
+        <p className="text-[12.5px] truncate max-w-full sm:max-w-[300px]" style={{ color: 'var(--wa-text-secondary)' }}>{quotedContent}</p>
       </div>
     );
   };
@@ -747,7 +747,7 @@ const MessageBubble = memo(({
       if (isVideo && msg.mediaUrl) {
         return (
           <div className="relative -mx-1 -mt-0.5 mb-1 overflow-hidden rounded-md">
-            <video src={msg.mediaUrl} controls className="max-w-[300px] w-full h-auto rounded-md" preload="metadata" />
+            <video src={msg.mediaUrl} controls className="max-w-full sm:max-w-[300px] w-full h-auto rounded-md" preload="metadata" />
           </div>
         );
       }

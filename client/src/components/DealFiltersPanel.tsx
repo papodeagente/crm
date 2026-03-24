@@ -173,7 +173,7 @@ export default function DealFiltersPanel({
 
   return (
     <Sheet open={open} onOpenChange={handleOpenChange}>
-      <SheetContent side="right" className="w-[400px] sm:max-w-[400px] p-0 flex flex-col h-full overflow-hidden !gap-0">
+      <SheetContent side="right" className="w-full sm:w-[400px] sm:max-w-[400px] p-0 flex flex-col h-full overflow-hidden !gap-0">
         <SheetHeader className="px-5 pt-5 pb-3 border-b">
           <div className="flex items-center justify-between">
             <SheetTitle className="text-base">Filtros</SheetTitle>

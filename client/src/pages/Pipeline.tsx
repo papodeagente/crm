@@ -329,7 +329,7 @@ export default function Pipeline() {
     <div className="flex flex-col h-[calc(100vh-56px)]">
       {/* Toolbar — Linha 1: Toggle view + ações */}
       <div className="border-b border-border/40">
-        <div className="flex items-center gap-2 px-5 lg:px-8 py-2.5">
+        <div className="flex items-center gap-2 px-3 sm:px-5 lg:px-8 py-2.5 flex-wrap">
           {/* View toggle */}
           <div className="flex bg-muted/60 rounded-xl p-1 gap-0.5">
             <Tooltip><TooltipTrigger asChild>
@@ -360,7 +360,7 @@ export default function Pipeline() {
                 <TooltipContent side="bottom"><p className="text-xs">Indicadores do Pipeline</p></TooltipContent></Tooltip>
               </Button>
             </PopoverTrigger>
-            <PopoverContent align="end" className="w-[420px] p-0 rounded-2xl shadow-xl border-border/50">
+            <PopoverContent align="end" className="w-[calc(100vw-2rem)] sm:w-[420px] p-0 rounded-2xl shadow-xl border-border/50">
               <PipelineIndicatorsPanel deals={sortedDeals} tasks={allTasks.data?.tasks || []} stages={stages.data || []} />
             </PopoverContent>
           </Popover>
@@ -373,7 +373,7 @@ export default function Pipeline() {
                 <TooltipContent side="bottom"><p className="text-xs">Calendário de Tarefas</p></TooltipContent></Tooltip>
               </Button>
             </PopoverTrigger>
-            <PopoverContent align="end" className="w-[520px] p-0 rounded-2xl shadow-xl border-border/50">
+            <PopoverContent align="end" className="w-[calc(100vw-2rem)] sm:w-[520px] p-0 rounded-2xl shadow-xl border-border/50">
               <TaskCalendarPanel tasks={allTasks.data?.tasks || []} deals={sortedDeals} onEditTask={(t: any) => setShowTaskForm({ editTask: t, editAssigneeIds: t.assignedToUserId ? [t.assignedToUserId] : [] })} />
             </PopoverContent>
           </Popover>
@@ -408,9 +408,9 @@ export default function Pipeline() {
         </div>
 
         {/* Linha 2: Filtros inline — funil na esquerda, Filtros na direita, selects proporcionais */}
-        <div className="flex items-center gap-2.5 px-5 lg:px-8 pb-3">
+        <div className="flex items-center gap-2 sm:gap-2.5 px-3 sm:px-5 lg:px-8 pb-3 overflow-x-auto">
           {/* Pipeline selector */}
-          <div className="flex items-center gap-1.5 flex-1">
+          <div className="flex items-center gap-1.5 min-w-[140px] sm:flex-1">
             <Select value={String(activePipeline?.id ?? "")} onValueChange={(v) => setSelectedPipelineId(Number(v))}>
               <SelectTrigger className="flex-1 h-10 text-[13px] rounded-xl border-border/50 bg-background">
                 <SelectValue placeholder="Selecionar funil" />
@@ -450,7 +450,7 @@ export default function Pipeline() {
             else if (v === "all") setOwnerFilter("all");
             else setOwnerFilter(Number(v));
           }}>
-            <SelectTrigger className="flex-1 h-10 text-[13px] rounded-xl border-border/50 bg-background">
+            <SelectTrigger className="min-w-[130px] sm:flex-1 h-10 text-[13px] rounded-xl border-border/50 bg-background">
               <User className="h-3.5 w-3.5 mr-1.5 text-muted-foreground flex-shrink-0" />
               <SelectValue placeholder="Minhas negociações" />
             </SelectTrigger>
@@ -465,7 +465,7 @@ export default function Pipeline() {
 
           {/* Status filter */}
           <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="flex-1 h-10 text-[13px] rounded-xl border-border/50 bg-background">
+            <SelectTrigger className="min-w-[110px] sm:flex-1 h-10 text-[13px] rounded-xl border-border/50 bg-background">
               <SelectValue placeholder="Todos os status" />
             </SelectTrigger>
             <SelectContent className="rounded-xl">
@@ -478,7 +478,7 @@ export default function Pipeline() {
 
           {/* Sort */}
           <Select value={sortMode} onValueChange={(v) => setSortMode(v as SortMode)}>
-            <SelectTrigger className="flex-1 h-10 text-[13px] rounded-xl border-border/50 bg-background">
+            <SelectTrigger className="min-w-[130px] sm:flex-1 h-10 text-[13px] rounded-xl border-border/50 bg-background hidden sm:flex">
               <ArrowUpDown className="h-3.5 w-3.5 mr-1.5 text-muted-foreground flex-shrink-0" />
               <SelectValue />
             </SelectTrigger>
@@ -501,7 +501,7 @@ export default function Pipeline() {
         </div>
 
         {/* Contagem */}
-        <div className="px-5 lg:px-8 pb-2">
+        <div className="px-3 sm:px-5 lg:px-8 pb-2">
           <span className="text-[12px] font-medium text-muted-foreground">{totalDeals} Negociações · {statusFilter === 'all' ? 'Todos' : statusFilter === 'open' ? 'Em andamento' : statusFilter === 'won' ? 'Ganhos' : 'Perdidos'}</span>
         </div>
       </div>
@@ -509,7 +509,7 @@ export default function Pipeline() {
       {/* Kanban Board */}
       {viewMode === "kanban" ? (
         <div className="flex-1 overflow-x-auto overflow-y-hidden bg-background">
-          <div className="flex gap-4 p-5 lg:px-8 h-full min-w-max">
+          <div className="flex gap-3 sm:gap-4 p-3 sm:p-5 lg:px-8 h-full min-w-max">
             {stages.isLoading ? (
               <p className="text-muted-foreground p-4 text-sm">Carregando etapas...</p>
             ) : !stages.data?.length ? (
@@ -526,7 +526,7 @@ export default function Pipeline() {
                 return (
                   <div
                     key={stage.id}
-                    className="w-[310px] flex-shrink-0 flex flex-col h-full"
+                    className="w-[280px] sm:w-[310px] flex-shrink-0 flex flex-col h-full"
                     onDragOver={(e) => handleDragOver(e, stage.id)}
                     onDragLeave={handleDragLeave}
                     onDrop={(e) => handleDrop(e, stage.id)}
@@ -1050,7 +1050,7 @@ function DealDrawer({ dealId, onClose, contacts, accounts, stages }: {
     <div className="fixed inset-0 z-50 flex justify-end">
       <div className="absolute inset-0 bg-black/20 backdrop-blur-[2px]" onClick={onClose} />
 
-      <div className="relative w-full max-w-[680px] bg-card shadow-2xl flex flex-col animate-in slide-in-from-right duration-300">
+      <div className="relative w-full max-w-full sm:max-w-[680px] bg-card shadow-2xl flex flex-col animate-in slide-in-from-right duration-300">
         {/* Header */}
         <div className="px-6 py-5 border-b border-border/40 bg-gradient-to-r from-card to-muted/20">
           <div className="flex items-start justify-between">

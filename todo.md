@@ -4948,3 +4948,39 @@
 - [x] Badge 'padrão' nos 4 tipos default
 - [x] 14 tipos de notificação com ícones e cores distintas
 - [x] 15 testes passando (notifications.pref.test.ts)
+
+## Projeto de Responsividade Mobile
+### Fase 1 — Auditoria
+- [ ] Mapear todas as páginas e componentes com problemas de responsividade
+### Fase 2 — Componentes Globais
+- [x] TopNavLayout: menu mobile, hamburger, search mobile
+- [x] index.css: breakpoints globais, containers, overflow, touch targets
+- [x] Modais: max-height, scroll interno (global CSS)
+- [x] Drawers: largura mobile (DealFiltersPanel w-full sm:w-[400px])
+- [x] Tabelas: scroll horizontal (global .responsive-table)
+### Fase 3 — Páginas Principais
+- [x] Home/Dashboard: stats grid, prioridades, header wrap
+- [x] Pipeline/Kanban: toolbar responsive, kanban columns, drawer
+- [x] Deals: tabela, filtros, grid responsive
+- [x] Contatos: tabela, filtros, padding
+### Fase 4 — Páginas Secundárias
+- [x] Tarefas: grid, filtros, calendar
+- [x] Inbox/WhatsApp: chat media, contact info, split view
+- [x] Relatórios/Análises: gráficos, grids
+- [x] Supervisão: dashboard, métricas
+- [x] RFV: matriz, filtros, KPI cards
+### Fase 5 — Páginas Restantes
+- [x] Login/Onboarding: já responsivos
+- [x] Upgrade/Planos: cards de preço
+- [x] SuperAdmin: tabela tenants, dashboard billing
+- [x] Settings: abas, formulários
+- [x] Notificações: lista, preferências
+### Fase 6 — Componentes Reutilizáveis
+- [x] DealFiltersPanel: w-full sm:w-[400px]
+- [x] WhatsAppChat: media max-w-full sm:max-w-[300px]
+- [x] BillingBanner, TrialCountdownBanner: já responsivos
+- [x] Touch targets: min-h-[44px] global
+### Fase 7 — Validação
+- [x] Compilação sem erros TypeScript
+- [x] 2880 testes passando (21 falhas pré-existentes não relacionadas)
+- [x] 45+ páginas e componentes processados

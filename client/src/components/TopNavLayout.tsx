@@ -182,7 +182,7 @@ function SearchPalette({ open, onClose }: { open: boolean; onClose: () => void }
   return (
     <div className="fixed inset-0 z-[100]" onClick={onClose}>
       <div className="absolute inset-0 bg-black/20 backdrop-blur-sm" />
-      <div className="relative mx-auto mt-[12vh] w-full max-w-lg px-4" onClick={(e) => e.stopPropagation()}>
+        <div className="relative mx-auto mt-[8vh] sm:mt-[12vh] w-full max-w-lg px-3 sm:px-4" onClick={(e) => e.stopPropagation()}>
         <div className="surface overflow-hidden shadow-2xl" style={{ borderRadius: "1rem" }}>
           {/* Input */}
           <div className="flex items-center gap-3 px-4 border-b border-border">
@@ -416,7 +416,7 @@ function TopBar({ onSearchOpen, mobileMenuOpen, onToggleMobile }: {
           {/* Spacer */}
           <div className="flex-1" />
 
-          {/* Search */}
+          {/* Search - desktop */}
           <button
             onClick={onSearchOpen}
             className="hidden sm:flex items-center gap-2 h-8 px-3 rounded-lg bg-muted/60 border border-transparent hover:border-border text-muted-foreground text-[13px] transition-all duration-150 shrink min-w-[120px] max-w-[220px]"
@@ -425,6 +425,15 @@ function TopBar({ onSearchOpen, mobileMenuOpen, onToggleMobile }: {
             <span>Buscar...</span>
             <kbd className="ml-auto text-[10px] font-medium bg-background/80 border border-border rounded px-1.5 py-0.5">⌘K</kbd>
           </button>
+          {/* Search - mobile */}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="sm:hidden h-9 w-9 rounded-xl text-muted-foreground hover:text-foreground"
+            onClick={onSearchOpen}
+          >
+            <Search className="h-[18px] w-[18px]" />
+          </Button>
 
           {/* Right actions */}
           <div className="flex items-center gap-0.5 ml-2 shrink-0">
