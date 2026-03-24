@@ -47,8 +47,8 @@ describe("Plan Definitions", () => {
       expect(plan.features.allCoreFeatures).toBe(true);
     });
 
-    it("costs R$ 67/mês (6700 cents)", () => {
-      expect(plan.priceInCents).toBe(6700);
+    it("costs R$ 97/mês (9700 cents)", () => {
+      expect(plan.priceInCents).toBe(9700);
     });
   });
 
@@ -79,8 +79,8 @@ describe("Plan Definitions", () => {
       expect(plan.features.strategicClassification).toBe(true);
     });
 
-    it("costs R$ 97/mês (9700 cents)", () => {
-      expect(plan.priceInCents).toBe(9700);
+    it("costs R$ 297/mês (29700 cents)", () => {
+      expect(plan.priceInCents).toBe(29700);
     });
   });
 

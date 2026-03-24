@@ -18,18 +18,18 @@ export default function Upgrade() {
   const isTrialing = billing?.billingStatus === "trialing";
   const currentPlan = billing?.plan || "start";
 
-  // Hotmart checkout URLs — will be configured via env or hardcoded
+  // Hotmart checkout URLs
   const hotmartUrls = {
-    start: "https://pay.hotmart.com/SEU_PRODUTO_START",
-    growth: "https://pay.hotmart.com/SEU_PRODUTO_GROWTH",
-    scale: "https://pay.hotmart.com/SEU_PRODUTO_SCALE",
+    start: "https://pay.hotmart.com/S104799458W?off=axm3bvsz",
+    growth: "https://pay.hotmart.com/S104799458W?off=pubryjat",
+    scale: "", // sob consulta
   };
 
   const plans = [
     {
       id: "start" as const,
       name: "Start",
-      price: "R$67",
+      price: "R$97",
       period: "/mês",
       description: "Para agências que estão começando a organizar suas vendas",
       icon: Zap,
@@ -48,7 +48,7 @@ export default function Upgrade() {
     {
       id: "growth" as const,
       name: "Growth",
-      price: "R$97",
+      price: "R$297",
       period: "/mês",
       description: "Para agências em crescimento que precisam de automação e equipe",
       icon: Rocket,

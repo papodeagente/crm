@@ -4856,3 +4856,45 @@
 ### Fase 11 — Entrega
 - [x] Checkpoint salvo
 - [x] Relatório final entregue
+
+## Atualização de Preços e Dashboard SaaS (23/03/2026)
+
+### Fase 1 — Atualizar Preços e Links
+- [x] Atualizar Start de R$67 para R$97 (9700 cents)
+- [x] Atualizar Growth de R$97 para R$297 (29700 cents)
+- [x] Atualizar links de checkout Hotmart reais
+- [x] Atualizar página /upgrade com novos valores
+- [x] Atualizar PricingSection landing page
+- [x] Atualizar SuperAdmin plan labels
+- [x] Atualizar plans.test.ts
+
+### Fase 2 — Backend Métricas SaaS
+- [x] Endpoint: MRR (Monthly Recurring Revenue)
+- [x] Endpoint: Churn rate e evolução
+- [x] Endpoint: Distribuição por plano e billing status
+- [x] Endpoint: Evolução de assinantes ao longo do tempo
+- [x] Endpoint: Status da integração Hotmart (último evento, health check)
+- [x] Endpoint: Últimos eventos de webhook
+- [x] Endpoint: Trial conversion rate
+- [x] Endpoint: ARPU
+- [x] saasMetricsService.ts criado
+- [x] adminSaasDashboard endpoint no billingRouter
+
+### Fase 3 — Dashboard SaaS (Super Admin)
+- [x] Card MRR com evolução e trend indicator
+- [x] Card Churn rate com tendência
+- [x] Card Total assinantes ativos vs trial vs legacy
+- [x] Gráfico evolução de assinantes (bar chart)
+- [x] Gráfico distribuição por plano (progress bars)
+- [x] Gráfico distribuição por billing status
+- [x] Status da integração Hotmart (health, HOTTOK, URL webhook, contadores)
+- [x] Tabela de eventos recentes do webhook
+- [x] Indicadores: ARPU, taxa de conversão trial→pago
+- [x] Tabela evolução mensal detalhada
+- [x] Botão Dashboard Financeiro no SuperAdmin header
+- [x] Rota /super-admin/billing registrada
+
+### Fase 4 — Testes e Entrega
+- [x] Testes das métricas (28 testes saasMetrics.test.ts)
+- [x] Todos os 101 testes passando (billing + plans + metrics)
+- [x] Checkpoint final

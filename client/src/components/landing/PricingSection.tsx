@@ -69,7 +69,7 @@ export function PricingSection({ onSelectPlan }: PricingSectionProps) {
                 <div className="mb-6">
                   <p className="text-sm font-medium text-white/40 uppercase tracking-wider mb-2">Start</p>
                   <div className="flex items-baseline gap-1">
-                    <span className="text-4xl font-bold text-white">R$ 67</span>
+                    <span className="text-4xl font-bold text-white">R$ 97</span>
                     <span className="text-white/30 text-sm">/mês</span>
                   </div>
                   <p className="text-sm text-white/30 mt-2">1 usuário incluso</p>
@@ -121,7 +121,7 @@ export function PricingSection({ onSelectPlan }: PricingSectionProps) {
                 <div className="mb-6">
                   <p className="text-sm font-medium text-violet-400 uppercase tracking-wider mb-2">Growth</p>
                   <div className="flex items-baseline gap-1">
-                    <span className="text-4xl font-bold text-white">R$ 97</span>
+                    <span className="text-4xl font-bold text-white">R$ 297</span>
                     <span className="text-white/30 text-sm">/mês</span>
                   </div>
                   <p className="text-sm text-white/30 mt-2">Até 5 usuários inclusos</p>

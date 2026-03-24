@@ -214,9 +214,18 @@ export default function SuperAdmin() {
               <span className="font-bold text-lg">Super Admin</span>
             </div>
           </div>
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Shield className="w-4 h-4 text-purple-400" />
-            {meQuery.data?.email}
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => navigate("/super-admin/billing")}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-purple-500/10 text-purple-400 hover:bg-purple-500/20 transition-colors text-sm font-medium"
+            >
+              <DollarSign className="w-4 h-4" />
+              Dashboard Financeiro
+            </button>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Shield className="w-4 h-4 text-purple-400" />
+              {meQuery.data?.email}
+            </div>
           </div>
         </div>
       </div>
@@ -518,7 +527,7 @@ export default function SuperAdmin() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="free">Free (Freemium)</SelectItem>
-                    <SelectItem value="pro">Pro (R$97/mês)</SelectItem>
+                    <SelectItem value="pro">Pro / Growth (R$297/mês)</SelectItem>
                     <SelectItem value="enterprise">Enterprise</SelectItem>
                   </SelectContent>
                 </Select>

@@ -6,6 +6,16 @@ import { subscriptions, subscriptionEvents, tenants } from "../../drizzle/schema
 import { getDb } from "../db";
 import { checkBillingAccess } from "../services/billingAccessService";
 import { verifySaasSession, isSuperAdmin, SAAS_COOKIE } from "../saasAuth";
+import {
+  getSaasOverview,
+  getChurnMetrics,
+  getPlanDistribution,
+  getBillingStatusDistribution,
+  getMonthlyEvolution,
+  getHotmartHealth,
+  getTrialConversion,
+  getRecentEvents,
+} from "../services/saasMetricsService";
 
 export const billingRouter = router({
   // ─── Get current billing status for the logged-in tenant ───
@@ -127,6 +137,43 @@ export const billingRouter = router({
         .where(eq(tenants.id, input.tenantId));
 
       return { success: true };
+    }),
+
+  // ─── SuperAdmin: SaaS Dashboard Metrics ───
+  adminSaasDashboard: publicProcedure
+    .input(z.object({ months: z.number().min(1).max(24).default(6) }).optional())
+    .query(async ({ ctx, input }) => {
+      const cookies = parseCookies(ctx.req.headers.cookie);
+      const token = cookies.get(SAAS_COOKIE);
+      const session = await verifySaasSession(token);
+      if (!session || !isSuperAdmin(session.email)) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Acesso negado" });
+      }
+
+      const months = input?.months ?? 6;
+
+      const [overview, churn, planDist, statusDist, evolution, hotmart, trialConversion, recentEvents] =
+        await Promise.all([
+          getSaasOverview(),
+          getChurnMetrics(),
+          getPlanDistribution(),
+          getBillingStatusDistribution(),
+          getMonthlyEvolution(months),
+          getHotmartHealth(),
+          getTrialConversion(),
+          getRecentEvents(20),
+        ]);
+
+      return {
+        overview,
+        churn,
+        planDistribution: planDist,
+        statusDistribution: statusDist,
+        evolution,
+        hotmart,
+        trialConversion,
+        recentEvents,
+      };
     }),
 
   // ─── SuperAdmin: toggle legacy flag ───
