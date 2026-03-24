@@ -22,11 +22,11 @@ import { resolveInbound, updateConversationLastMessage } from "./conversationRes
 import os from "os";
 
 // ─── CONSTANTS ──────────────────────────────────────────────
-// Part 10: max 10 conversations per cycle, 15 messages each
-const MAX_CONVERSATIONS_PER_CYCLE = 10;
+// Reduced from 10 to 5 conversations per cycle to lower Evolution API load
+const MAX_CONVERSATIONS_PER_CYCLE = 5;
 const MAX_MESSAGES_PER_CONVERSATION = 15;
-// Part 10: run every 5 minutes
-const RECONCILIATION_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
+// Increased from 5 to 10 minutes to reduce API call frequency
+const RECONCILIATION_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes
 // Part 14: server load protection
 const CPU_THRESHOLD = 0.70; // 70%
 const QUEUE_LENGTH_THRESHOLD = 500;

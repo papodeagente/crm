@@ -1,5 +1,6 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { trpc } from "@/lib/trpc";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -25,7 +26,7 @@ import { useIsMobile } from "@/hooks/useMobile";
 import {
   LayoutDashboard, LogOut, PanelLeft, MessageSquare, Send, Bot, Settings,
   Users, Building2, Target, Inbox, FileText, Globe, BarChart3, GraduationCap,
-  Plug, Activity, Shield, Briefcase, Plane, ClipboardList, Bell,
+  Plug, Activity, Shield, Briefcase, Plane, ClipboardList, Bell, Crown, Sparkles,
 } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
@@ -162,6 +163,20 @@ function DashboardLayoutContent({
   const isMobile = useIsMobile();
   const { isAdmin } = useIsAdmin();
 
+  // Plan & billing info for dropdown
+  const planSummary = trpc.plan.summary.useQuery(undefined, {
+    retry: false, refetchOnWindowFocus: false, staleTime: 5 * 60 * 1000,
+  });
+  const billingQuery = trpc.billing.myBilling.useQuery(undefined, {
+    retry: false, refetchOnWindowFocus: false, staleTime: 5 * 60 * 1000, gcTime: 30 * 60 * 1000,
+  });
+  const billingData = billingQuery.data;
+  const currentPlan = planSummary.data?.planName || (billingData?.plan === "growth" ? "Growth" : billingData?.plan === "scale" ? "Scale" : "Start");
+  const isTrial = billingData?.billingStatus === "trialing";
+  const trialDaysLeft = isTrial && billingData?.subscription?.trialEndsAt
+    ? Math.max(0, Math.ceil((new Date(billingData.subscription.trialEndsAt).getTime() - Date.now()) / (24 * 60 * 60 * 1000)))
+    : null;
+
   useEffect(() => {
     if (isCollapsed) setIsResizing(false);
   }, [isCollapsed]);
@@ -266,7 +281,42 @@ function DashboardLayoutContent({
                   </div>
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuContent align="end" className="w-56">
+                <div className="px-3 py-2.5 border-b border-border mb-1">
+                  <p className="text-[13px] font-semibold text-foreground">{user?.name || "Usu\u00e1rio"}</p>
+                  <p className="text-[11px] text-muted-foreground truncate mt-0.5">{user?.email || ""}</p>
+                  {/* Plan badge */}
+                  <div className="flex items-center gap-1.5 mt-2">
+                    {isTrial ? (
+                      <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/30">
+                        <Sparkles className="h-3 w-3 text-amber-400" />
+                        <span className="text-[10px] font-semibold text-amber-400">Trial</span>
+                        {trialDaysLeft !== null && (
+                          <span className="text-[10px] font-medium text-amber-300/80">
+                            {trialDaysLeft <= 0 ? "(expira hoje)" : trialDaysLeft === 1 ? "(1 dia restante)" : `(${trialDaysLeft} dias restantes)`}
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border ${
+                        currentPlan === "Scale" ? "bg-amber-500/15 border-amber-500/30" :
+                        currentPlan === "Growth" ? "bg-violet-500/15 border-violet-500/30" :
+                        "bg-purple-500/15 border-purple-500/30"
+                      }`}>
+                        <Crown className={`h-3 w-3 ${
+                          currentPlan === "Scale" ? "text-amber-400" :
+                          currentPlan === "Growth" ? "text-violet-400" :
+                          "text-purple-400"
+                        }`} />
+                        <span className={`text-[10px] font-semibold ${
+                          currentPlan === "Scale" ? "text-amber-400" :
+                          currentPlan === "Growth" ? "text-violet-400" :
+                          "text-purple-400"
+                        }`}>Plano {currentPlan}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
                 <DropdownMenuItem onClick={() => setLocation("/admin")} className="cursor-pointer">
                   <Settings className="mr-2 h-4 w-4" />
                   <span>Configurações</span>

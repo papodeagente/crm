@@ -5038,3 +5038,11 @@
 - [x] Reduzir cooldown de 30-180s para 5-30s
 - [x] Auth requests (auth.me, auth.logout, saasAuth, plan.summary) nunca bloqueados pelo circuit breaker
 - [x] Reset do circuit breaker ao receber resposta OK
+## Plano Ativo no Popup do Menu
+- [ ] Mostrar plano ativo no popup do menu do usuário (abaixo do nome/email)
+- [ ] Destacar dias restantes se trial
+## Fix Definitivo Rate Exceeded
+- [x] Diagnosticar causa raiz real do Rate exceeded em todas as camadas
+- [x] Implementar correção mínima e segura
+- [x] Testes automatizados
+- [x] Relatório técnico completo

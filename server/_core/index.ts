@@ -241,12 +241,14 @@ async function startServer() {
       whatsappManager.autoRestoreSessions().catch(e => {
         console.error("[WA AutoRestore] Error:", e);
       });
-      // Start fast polling (30s) — PRIMARY mechanism for near-real-time messages
+      // Start fast polling (60s) — PRIMARY mechanism for near-real-time messages
       // Evolution API webhooks are unreliable, so we poll the most recent chats frequently
-      whatsappManager.startFastPoll(30 * 1000); // Every 30 seconds
+      // Increased from 30s to 60s to reduce Evolution API load (~50% reduction)
+      whatsappManager.startFastPoll(60 * 1000); // Every 60 seconds
 
       // Start periodic deep sync to catch anything FastPoll missed
-      whatsappManager.startPeriodicSync(5 * 60 * 1000); // Every 5 minutes
+      // Increased from 5min to 10min to reduce Evolution API load
+      whatsappManager.startPeriodicSync(10 * 60 * 1000); // Every 10 minutes
 
       // Start safe message reconciliation (every 3 min, max 20 convs, 10 msgs/conv)
       import("../messageReconciliation").then(({ startReconciliation }) => {

@@ -102,12 +102,61 @@ export interface SendMessageResult {
 }
 
 // ════════════════════════════════════════════════════════════
+// CONCURRENCY LIMITER — Prevents overwhelming Evolution API
+// Max 5 concurrent requests + 100ms minimum gap between requests
+// ════════════════════════════════════════════════════════════
+const MAX_CONCURRENT_REQUESTS = 5;
+const MIN_REQUEST_GAP_MS = 100;
+let _activeRequests = 0;
+let _lastRequestTime = 0;
+const _requestQueue: Array<{ resolve: () => void }> = [];
+
+function _acquireSlot(): Promise<void> {
+  return new Promise<void>((resolve) => {
+    if (_activeRequests < MAX_CONCURRENT_REQUESTS) {
+      _activeRequests++;
+      const now = Date.now();
+      const gap = _lastRequestTime + MIN_REQUEST_GAP_MS - now;
+      _lastRequestTime = Math.max(now, _lastRequestTime + MIN_REQUEST_GAP_MS);
+      if (gap > 0) {
+        setTimeout(resolve, gap);
+      } else {
+        resolve();
+      }
+    } else {
+      _requestQueue.push({ resolve });
+    }
+  });
+}
+
+function _releaseSlot(): void {
+  _activeRequests--;
+  const next = _requestQueue.shift();
+  if (next) {
+    _activeRequests++;
+    const now = Date.now();
+    const gap = _lastRequestTime + MIN_REQUEST_GAP_MS - now;
+    _lastRequestTime = Math.max(now, _lastRequestTime + MIN_REQUEST_GAP_MS);
+    if (gap > 0) {
+      setTimeout(() => next.resolve(), gap);
+    } else {
+      next.resolve();
+    }
+  }
+}
+
+/** Expose current queue depth for diagnostics */
+export function getEvoConcurrencyStats() {
+  return { active: _activeRequests, queued: _requestQueue.length };
+}
+
+// ════════════════════════════════════════════════════════════
 // HTTP HELPERS
 // ════════════════════════════════════════════════════════════
 
 const RETRYABLE_STATUS_CODES = new Set([408, 429, 500, 502, 503, 504]);
-const MAX_RETRIES = 3;
-const BASE_DELAY_MS = 1000;
+const MAX_RETRIES = 2; // Reduced from 3 to lower retry amplification
+const BASE_DELAY_MS = 1500; // Increased from 1000 for better backoff
 
 async function evoFetch<T = any>(
   path: string,
@@ -119,60 +168,68 @@ async function evoFetch<T = any>(
     throw new Error("Evolution API not configured (missing EVOLUTION_API_URL or EVOLUTION_API_KEY)");
   }
 
+  // Acquire concurrency slot before making request
+  await _acquireSlot();
+
   let lastError: Error | null = null;
 
-  for (let attempt = 0; attempt <= retries; attempt++) {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeout);
+  try {
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeout);
 
-    try {
-      const response = await fetch(`${EVOLUTION_API_URL}${path}`, {
-        method,
-        headers: {
-          apikey: EVOLUTION_API_KEY,
-          "Content-Type": "application/json",
-        },
-        body: body ? JSON.stringify(body) : undefined,
-        signal: controller.signal,
-      });
+      try {
+        const response = await fetch(`${EVOLUTION_API_URL}${path}`, {
+          method,
+          headers: {
+            apikey: EVOLUTION_API_KEY,
+            "Content-Type": "application/json",
+          },
+          body: body ? JSON.stringify(body) : undefined,
+          signal: controller.signal,
+        });
 
-      // If retryable status and we have retries left, wait and retry
-      if (RETRYABLE_STATUS_CODES.has(response.status) && attempt < retries) {
-        const delay = BASE_DELAY_MS * Math.pow(2, attempt) + Math.random() * 500;
-        console.warn(`[EvoAPI] ${method} ${path} returned ${response.status}, retrying in ${Math.round(delay)}ms (attempt ${attempt + 1}/${retries})`);
+        // If retryable status and we have retries left, wait and retry
+        if (RETRYABLE_STATUS_CODES.has(response.status) && attempt < retries) {
+          const delay = BASE_DELAY_MS * Math.pow(2, attempt) + Math.random() * 500;
+          console.warn(`[EvoAPI] ${method} ${path} returned ${response.status}, retrying in ${Math.round(delay)}ms (attempt ${attempt + 1}/${retries})`);
+          clearTimeout(timer);
+          await new Promise(r => setTimeout(r, delay));
+          continue;
+        }
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          const errMsg = data?.response?.message?.[0] || data?.message || `HTTP ${response.status}`;
+          throw new Error(`Evolution API error: ${errMsg}`);
+        }
+
+        return data as T;
+      } catch (e: any) {
         clearTimeout(timer);
-        await new Promise(r => setTimeout(r, delay));
-        continue;
+        lastError = e;
+
+        // Retry on network errors (ECONNRESET, ETIMEDOUT, AbortError) if we have retries left
+        const isNetworkError = e.name === 'AbortError' || e.code === 'ECONNRESET' || e.code === 'ETIMEDOUT' || e.code === 'ECONNREFUSED' || e.message?.includes('fetch failed');
+        if (isNetworkError && attempt < retries) {
+          const delay = BASE_DELAY_MS * Math.pow(2, attempt) + Math.random() * 500;
+          console.warn(`[EvoAPI] ${method} ${path} network error: ${e.message}, retrying in ${Math.round(delay)}ms (attempt ${attempt + 1}/${retries})`);
+          await new Promise(r => setTimeout(r, delay));
+          continue;
+        }
+
+        throw e;
+      } finally {
+        clearTimeout(timer);
       }
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        const errMsg = data?.response?.message?.[0] || data?.message || `HTTP ${response.status}`;
-        throw new Error(`Evolution API error: ${errMsg}`);
-      }
-
-      return data as T;
-    } catch (e: any) {
-      clearTimeout(timer);
-      lastError = e;
-
-      // Retry on network errors (ECONNRESET, ETIMEDOUT, AbortError) if we have retries left
-      const isNetworkError = e.name === 'AbortError' || e.code === 'ECONNRESET' || e.code === 'ETIMEDOUT' || e.code === 'ECONNREFUSED' || e.message?.includes('fetch failed');
-      if (isNetworkError && attempt < retries) {
-        const delay = BASE_DELAY_MS * Math.pow(2, attempt) + Math.random() * 500;
-        console.warn(`[EvoAPI] ${method} ${path} network error: ${e.message}, retrying in ${Math.round(delay)}ms (attempt ${attempt + 1}/${retries})`);
-        await new Promise(r => setTimeout(r, delay));
-        continue;
-      }
-
-      throw e;
-    } finally {
-      clearTimeout(timer);
     }
-  }
 
-  throw lastError || new Error(`Evolution API: max retries exceeded for ${path}`);
+    throw lastError || new Error(`Evolution API: max retries exceeded for ${path}`);
+  } finally {
+    // ALWAYS release the concurrency slot
+    _releaseSlot();
+  }
 }
 
 // ════════════════════════════════════════════════════════════

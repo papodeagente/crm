@@ -12,7 +12,7 @@ import { getLoginUrl } from "@/const";
 import {
   Home, Briefcase, Users, CheckSquare, BarChart3,
   Bell, Settings, Search, ChevronRight, LogOut, Menu, X,
-  Loader2, User, Building2, ListTodo, Phone, Mail, Sun, Moon, MessageSquare, Shield, TrendingUp,
+  Loader2, User, Building2, ListTodo, Phone, Mail, Sun, Moon, MessageSquare, Shield, TrendingUp, Crown, Sparkles,
 } from "lucide-react";
 import { formatDateShort } from "../../../shared/dateUtils";
 import { useState, useEffect, useRef, useCallback } from "react";
@@ -371,7 +371,21 @@ function TopBar({ onSearchOpen, mobileMenuOpen, onToggleMobile }: {
     refetchOnWindowFocus: false,
     staleTime: 5 * 60 * 1000,
   });
+  const billingQuery = trpc.billing.myBilling.useQuery(undefined, {
+    retry: false,
+    refetchOnWindowFocus: false,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+  });
   const hasStrategicClassification = planSummary.data?.features?.strategicClassification !== false;
+
+  // Plan badge info for user dropdown
+  const billingData = billingQuery.data;
+  const currentPlan = planSummary.data?.planName || (billingData?.plan === "growth" ? "Growth" : billingData?.plan === "scale" ? "Scale" : "Start");
+  const isTrial = billingData?.billingStatus === "trialing";
+  const trialDaysLeft = isTrial && billingData?.subscription?.trialEndsAt
+    ? Math.max(0, Math.ceil((new Date(billingData.subscription.trialEndsAt).getTime() - Date.now()) / (24 * 60 * 60 * 1000)))
+    : null;
 
   return (
     <>
@@ -487,10 +501,41 @@ function TopBar({ onSearchOpen, mobileMenuOpen, onToggleMobile }: {
                   </span>
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-52 p-1.5 rounded-xl">
+              <DropdownMenuContent align="end" className="w-56 p-1.5 rounded-xl">
                 <div className="px-3 py-2.5 border-b border-border mb-1">
                   <p className="text-[13px] font-semibold text-foreground">{user?.name || "Usuário"}</p>
                   <p className="text-[11px] text-muted-foreground truncate mt-0.5">{user?.email || ""}</p>
+                  {/* Plan badge */}
+                  <div className="flex items-center gap-1.5 mt-2">
+                    {isTrial ? (
+                      <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/30">
+                        <Sparkles className="h-3 w-3 text-amber-400" />
+                        <span className="text-[10px] font-semibold text-amber-400">Trial</span>
+                        {trialDaysLeft !== null && (
+                          <span className="text-[10px] font-medium text-amber-300/80">
+                            {trialDaysLeft <= 0 ? "(expira hoje)" : trialDaysLeft === 1 ? "(1 dia restante)" : `(${trialDaysLeft} dias restantes)`}
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border ${
+                        currentPlan === "Scale" ? "bg-amber-500/15 border-amber-500/30" :
+                        currentPlan === "Growth" ? "bg-violet-500/15 border-violet-500/30" :
+                        "bg-purple-500/15 border-purple-500/30"
+                      }`}>
+                        <Crown className={`h-3 w-3 ${
+                          currentPlan === "Scale" ? "text-amber-400" :
+                          currentPlan === "Growth" ? "text-violet-400" :
+                          "text-purple-400"
+                        }`} />
+                        <span className={`text-[10px] font-semibold ${
+                          currentPlan === "Scale" ? "text-amber-400" :
+                          currentPlan === "Growth" ? "text-violet-400" :
+                          "text-purple-400"
+                        }`}>Plano {currentPlan}</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
                 <DropdownMenuItem onClick={() => setLocation("/profile")} className="cursor-pointer rounded-lg px-3 py-2 text-[13px] gap-2.5">
                   <User className="h-3.5 w-3.5 text-muted-foreground" />

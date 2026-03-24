@@ -2297,8 +2297,8 @@ class WhatsAppEvolutionManager extends EventEmitter {
       let totalFiltered = 0;
       let chatsProcessed = 0;
 
-      // ── Step 3: Sort by most recent activity, LIMIT to 50 chats ──
-      const MAX_CHATS = 50;
+      // ── Step 3: Sort by most recent activity, LIMIT to 25 chats (reduced from 50) ──
+      const MAX_CHATS = 25;
       const MAX_MSGS_PER_CHAT = 20;
       const sortedChats = [...chats].sort((a: any, b: any) => {
         const tsA = a.lastMessage?.messageTimestamp || 0;
@@ -2880,8 +2880,8 @@ class WhatsAppEvolutionManager extends EventEmitter {
         return tsB - tsA;
       });
 
-    // Only check the top 15 most recently active chats
-    const topChats = individualChats.slice(0, 15);
+    // Only check the top 8 most recently active chats (reduced from 15 to lower API load)
+    const topChats = individualChats.slice(0, 8);
     let newMessagesFound = 0;
 
     // Get existing messageIds for this session — query per-chat for accuracy
@@ -3152,7 +3152,7 @@ class WhatsAppEvolutionManager extends EventEmitter {
 
         // Periodic sync for connected sessions
         const lastSync = this.lastSyncTimestamps.get(row.sessionId) || 0;
-        if (now - lastSync > 4 * 60 * 1000) { // At least 4 min since last sync
+        if (now - lastSync > 8 * 60 * 1000) { // At least 8 min since last sync (increased from 4 min)
           console.log(`[EvoWA Polling] Periodic sync for ${row.sessionId}`);
           this.syncConversationsBackground(state, false);
           this.lastSyncTimestamps.set(row.sessionId, now);

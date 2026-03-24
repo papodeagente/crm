@@ -76,7 +76,12 @@ const queryClient = new QueryClient({
       },
       retryDelay: (attemptIndex) => Math.min(3000 * 2 ** attemptIndex, 15000),
       // Global staleTime: avoid re-fetching data that was just fetched
-      staleTime: 10_000,
+      staleTime: 15_000,
+      // CRITICAL: Disable refetchOnWindowFocus globally to prevent burst of ~291 queries on tab switch
+      // Individual queries can override this if they truly need fresh data on focus
+      refetchOnWindowFocus: false,
+      // Disable refetchOnReconnect to prevent burst after network recovery
+      refetchOnReconnect: false,
     },
     mutations: {
       // Never retry mutations automatically
