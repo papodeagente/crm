@@ -5020,3 +5020,6 @@
 
 ## Alterar Título SEO
 - [x] Alterar título de SEO da landing page para "Entur OS"
+
+## Script de Monitoramento RD Station
+- [x] Adicionar script RD Station no head do index.html para rastreamento global
