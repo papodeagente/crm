@@ -5026,3 +5026,6 @@
 
 ## Layout Barra Trial Dashboard
 - [x] Tornar barra de trial mais discreta (menor, sem vermelho, seguir UX do sistema)
+
+## Página /upgrade - Fundo Preto Dark
+- [x] Ajustar fundo da página /upgrade para preto (#0a0a12), integrado ao layout dark do Entur OS
