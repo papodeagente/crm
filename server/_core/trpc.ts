@@ -276,6 +276,34 @@ const requireTenant = t.middleware(async opts => {
 export const tenantProcedure = t.procedure.use(requireTenant);
 
 /**
+ * restrictedWriteGuard: blocks write operations for tenants in restricted billing mode.
+ * Use after requireTenant to enforce billing restrictions on mutations.
+ * Legacy tenants, active, trialing, and past_due statuses are allowed.
+ * Only restricted/expired/cancelled-with-expired-period are blocked.
+ */
+const restrictedWriteGuard = t.middleware(async ({ ctx, next }) => {
+  const tenantId = (ctx as any).tenantId ?? (ctx as any).saasUser?.tenantId;
+  if (tenantId) {
+    const { assertNotRestricted } = await import("../services/billingAccessService");
+    await assertNotRestricted(tenantId);
+  }
+  return next();
+});
+
+/**
+ * tenantWriteProcedure: tenant auth + billing restriction check.
+ * Use for ALL mutations that create/update/delete data (deals, contacts, tasks, messages, etc.).
+ * Read-only queries should continue using tenantProcedure.
+ */
+export const tenantWriteProcedure = t.procedure.use(requireTenant).use(restrictedWriteGuard);
+
+/**
+ * sessionTenantWriteProcedure: session+tenant+billing restriction check.
+ * Use for WhatsApp send mutations and other session-based write operations.
+ */
+export const sessionTenantWriteProcedure = t.procedure.use(requireTenantAndSession).use(restrictedWriteGuard);
+
+/**
  * tenantAdminProcedure: like tenantProcedure but also requires admin role
  */
 const requireTenantAdmin = t.middleware(async opts => {

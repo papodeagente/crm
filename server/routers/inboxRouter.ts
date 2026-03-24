@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { tenantProcedure, getTenantId, router } from "../_core/trpc";
+import { tenantProcedure, tenantWriteProcedure, getTenantId, router } from "../_core/trpc";
 import * as crm from "../crmDb";
 import { emitEvent } from "../middleware/eventLog";
 
@@ -11,7 +11,7 @@ export const inboxRouter = router({
       .query(async ({ input, ctx }) => {
         return crm.listChannels(getTenantId(ctx));
       }),
-    create: tenantProcedure
+    create: tenantWriteProcedure
       .input(z.object({ type: z.enum(["whatsapp", "instagram", "email", "webchat"]), name: z.string().optional(), connectionId: z.string().optional() }))
       .mutation(async ({ ctx, input }) => {
         const result = await crm.createChannel({ ...input, tenantId: getTenantId(ctx) });
@@ -32,14 +32,14 @@ export const inboxRouter = router({
       .query(async ({ input, ctx }) => {
         return crm.getConversationById(getTenantId(ctx), input.id);
       }),
-    create: tenantProcedure
+    create: tenantWriteProcedure
       .input(z.object({ channelId: z.number(), contactId: z.number().optional(), providerThreadId: z.string().optional(), assignedToUserId: z.number().optional() }))
       .mutation(async ({ ctx, input }) => {
         const result = await crm.createConversation({ ...input, tenantId: getTenantId(ctx) });
         await emitEvent({ tenantId: getTenantId(ctx), actorUserId: ctx.user.id, entityType: "conversation", entityId: result?.id, action: "create" });
         return result;
       }),
-    update: tenantProcedure
+    update: tenantWriteProcedure
       .input(z.object({ id: z.number(), status: z.enum(["open", "pending", "closed"]).optional(), assignedToUserId: z.number().optional(), assignedTeamId: z.number().optional(), priority: z.enum(["low", "medium", "high", "urgent"]).optional() }))
       .mutation(async ({ ctx, input }) => {
 const tenantId = getTenantId(ctx); const { id, ...data } = input;
@@ -61,7 +61,7 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
       .query(async ({ input, ctx }) => {
         return crm.listInboxMessages(getTenantId(ctx), input.conversationId, input);
       }),
-    send: tenantProcedure
+    send: tenantWriteProcedure
       .input(z.object({ conversationId: z.number(), bodyText: z.string().min(1), senderLabel: z.string().optional() }))
       .mutation(async ({ ctx, input }) => {
         const result = await crm.createInboxMessage({

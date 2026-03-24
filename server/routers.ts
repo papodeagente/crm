@@ -1,7 +1,7 @@
 import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
-import { publicProcedure, tenantProcedure, tenantAdminProcedure, sessionTenantProcedure, sessionTenantAdminProcedure, getTenantId, router } from "./_core/trpc";
+import { publicProcedure, tenantProcedure, tenantWriteProcedure, tenantAdminProcedure, sessionTenantProcedure, sessionTenantWriteProcedure, sessionTenantAdminProcedure, getTenantId, router } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { whatsappManager } from "./whatsappEvolution";
@@ -238,7 +238,7 @@ export const appRouter = router({
 
   // ─── WhatsApp API (existing) ───
   whatsapp: router({
-    connect: tenantProcedure
+    connect: tenantWriteProcedure
       .mutation(async ({ ctx }) => {
         // Each CRM user gets exactly ONE WhatsApp instance
         // No sessionId needed — system generates it automatically
@@ -399,14 +399,14 @@ export const appRouter = router({
         const jid = await whatsappManager.resolveJidPublic(input.sessionId, input.phone);
         return { jid };
       }),
-    sendMessage: sessionTenantProcedure
+    sendMessage: sessionTenantWriteProcedure
       .input(z.object({ sessionId: z.string(), number: z.string().min(1), message: z.string().min(1) }))
       .mutation(async ({ input, ctx }) => {
         const agentId = ctx.user?.id;
         const result = await whatsappManager.sendTextMessage(input.sessionId, input.number, input.message, agentId);
         return { success: true, messageId: result?.key?.id, remoteJid: result?.key?.remoteJid };
       }),
-    sendMedia: sessionTenantProcedure
+    sendMedia: sessionTenantWriteProcedure
       .input(z.object({ sessionId: z.string(), number: z.string().min(1), mediaUrl: z.string().url(), mediaType: z.enum(["image", "audio", "document", "video"]), caption: z.string().optional(), fileName: z.string().optional(), ptt: z.boolean().optional(), mimetype: z.string().optional(), duration: z.number().optional() }))
       .mutation(async ({ input, ctx }) => {
         const agentId = ctx.user?.id;
@@ -414,7 +414,7 @@ export const appRouter = router({
         return { success: true, messageId: result?.key?.id };
       }),
     // ─── REACTIONS & INTERACTIONS ───
-    sendReaction: sessionTenantProcedure
+    sendReaction: sessionTenantWriteProcedure
       .input(z.object({
         sessionId: z.string(),
         key: z.object({ remoteJid: z.string(), fromMe: z.boolean(), id: z.string() }),
@@ -424,13 +424,13 @@ export const appRouter = router({
         const result = await whatsappManager.sendReaction(input.sessionId, input.key, input.reaction);
         return { success: true, messageId: result?.key?.id };
       }),
-    sendSticker: sessionTenantProcedure
+    sendSticker: sessionTenantWriteProcedure
       .input(z.object({ sessionId: z.string(), number: z.string().min(1), stickerUrl: z.string().url() }))
       .mutation(async ({ input, ctx }) => {
         const result = await whatsappManager.sendSticker(input.sessionId, input.number, input.stickerUrl);
         return { success: true, messageId: result?.key?.id };
       }),
-    sendLocation: sessionTenantProcedure
+    sendLocation: sessionTenantWriteProcedure
       .input(z.object({
         sessionId: z.string(),
         number: z.string().min(1),
@@ -443,7 +443,7 @@ export const appRouter = router({
         const result = await whatsappManager.sendLocation(input.sessionId, input.number, input.latitude, input.longitude, input.name, input.address);
         return { success: true, messageId: result?.key?.id };
       }),
-    sendContact: sessionTenantProcedure
+    sendContact: sessionTenantWriteProcedure
       .input(z.object({
         sessionId: z.string(),
         number: z.string().min(1),
@@ -453,7 +453,7 @@ export const appRouter = router({
         const result = await whatsappManager.sendContact(input.sessionId, input.number, input.contacts);
         return { success: true, messageId: result?.key?.id };
       }),
-    sendPoll: sessionTenantProcedure
+    sendPoll: sessionTenantWriteProcedure
       .input(z.object({
         sessionId: z.string(),
         number: z.string().min(1),
@@ -465,7 +465,7 @@ export const appRouter = router({
         const result = await whatsappManager.sendPoll(input.sessionId, input.number, input.name, input.values, input.selectableCount);
         return { success: true, messageId: result?.key?.id };
       }),
-    sendTextWithQuote: sessionTenantProcedure
+    sendTextWithQuote: sessionTenantWriteProcedure
       .input(z.object({
         sessionId: z.string(),
         number: z.string().min(1),
@@ -478,7 +478,7 @@ export const appRouter = router({
         const result = await whatsappManager.sendTextWithQuote(input.sessionId, input.number, input.message, input.quotedMessageId, input.quotedText, agentId);
         return { success: true, messageId: result?.key?.id };
       }),
-    deleteMessage: sessionTenantProcedure
+    deleteMessage: sessionTenantWriteProcedure
       .input(z.object({
         sessionId: z.string(),
         remoteJid: z.string(),
@@ -489,7 +489,7 @@ export const appRouter = router({
         await whatsappManager.deleteMessage(input.sessionId, input.remoteJid, input.messageId, input.fromMe);
         return { success: true };
       }),
-    editMessage: sessionTenantProcedure
+    editMessage: sessionTenantWriteProcedure
       .input(z.object({
         sessionId: z.string(),
         number: z.string().min(1),
@@ -500,7 +500,7 @@ export const appRouter = router({
         const result = await whatsappManager.editMessage(input.sessionId, input.number, input.messageId, input.newText);
         return { success: true, messageId: result?.key?.id };
       }),
-    sendPresence: sessionTenantProcedure
+    sendPresence: sessionTenantWriteProcedure
       .input(z.object({
         sessionId: z.string(),
         number: z.string().min(1),
@@ -511,7 +511,7 @@ export const appRouter = router({
         return { success: true };
       }),
     // ── Send Broken Message (server-side with composing presence) ──
-    sendBrokenMessage: sessionTenantProcedure
+    sendBrokenMessage: sessionTenantWriteProcedure
       .input(z.object({
         sessionId: z.string(),
         number: z.string().min(1),
@@ -560,13 +560,13 @@ export const appRouter = router({
         return { success: true, sentParts: results.length, results };
       }),
 
-    archiveChat: sessionTenantProcedure
+    archiveChat: sessionTenantWriteProcedure
       .input(z.object({ sessionId: z.string(), remoteJid: z.string(), archive: z.boolean() }))
       .mutation(async ({ input, ctx }) => {
         await whatsappManager.archiveChat(input.sessionId, input.remoteJid, input.archive);
         return { success: true };
       }),
-    blockContact: sessionTenantProcedure
+    blockContact: sessionTenantWriteProcedure
       .input(z.object({ sessionId: z.string(), number: z.string().min(1), block: z.boolean() }))
       .mutation(async ({ input, ctx }) => {
         await whatsappManager.blockContact(input.sessionId, input.number, input.block);
@@ -577,7 +577,7 @@ export const appRouter = router({
       .mutation(async ({ input, ctx }) => {
         return whatsappManager.checkIsWhatsApp(input.sessionId, input.numbers);
       }),
-    markAsUnread: sessionTenantProcedure
+    markAsUnread: sessionTenantWriteProcedure
       .input(z.object({ sessionId: z.string(), remoteJid: z.string(), messageId: z.string() }))
       .mutation(async ({ input, ctx }) => {
         await whatsappManager.markAsUnread(input.sessionId, input.remoteJid, input.messageId);
@@ -594,7 +594,7 @@ export const appRouter = router({
         return whatsappManager.fetchContactBusinessProfile(input.sessionId, input.jid);
       }),
     // ─── CONVERSATION LOCKS (Part 8) ───
-    acquireLock: tenantProcedure
+    acquireLock: tenantWriteProcedure
       .input(z.object({ waConversationId: z.number() }))
       .mutation(async ({ input, ctx }) => {
         const tenantId = getTenantId(ctx);
@@ -602,7 +602,7 @@ export const appRouter = router({
         const agentName = ctx.saasUser?.name || ctx.user!.name || "Agent";
         return acquireConversationLock(tenantId, input.waConversationId, agentId, agentName);
       }),
-    releaseLock: tenantProcedure
+    releaseLock: tenantWriteProcedure
       .input(z.object({ waConversationId: z.number() }))
       .mutation(async ({ input, ctx }) => {
         const tenantId = getTenantId(ctx);
@@ -722,7 +722,7 @@ export const appRouter = router({
       }))
       .query(async ({ input, ctx }) => getMessagesByConversationId(input.conversationId, input.limit, input.beforeId)),
     // Mark wa_conversation as read
-    markWaConversationRead: tenantProcedure
+    markWaConversationRead: tenantWriteProcedure
       .input(z.object({ conversationId: z.number() }))
       .mutation(async ({ input, ctx }) => {
         await markWaConversationReadDb(input.conversationId);
@@ -888,7 +888,7 @@ export const appRouter = router({
         // Use fast DB query instead of N API calls to Evolution
         return getProfilePicturesFromDb(input.sessionId, input.jids);
       }),
-    uploadMedia: tenantProcedure
+    uploadMedia: tenantWriteProcedure
       .input(z.object({ fileName: z.string(), fileBase64: z.string(), contentType: z.string() }))
       .mutation(async ({ input, ctx }) => {
         const fileBuffer = Buffer.from(input.fileBase64, "base64");
@@ -991,14 +991,14 @@ export const appRouter = router({
         return result;
       }),
     // Manual trigger for daily backup
-    triggerDailyBackup: tenantProcedure
+    triggerDailyBackup: tenantWriteProcedure
       .mutation(async () => {
         const { runDailyWhatsAppBackup } = await import("./whatsappDailyBackup");
         const result = await runDailyWhatsAppBackup();
         return result;
       }),
     // ─── Conversation Identity Resolver: Migration & Reconciliation ───
-    migrateConversations: tenantProcedure
+    migrateConversations: tenantWriteProcedure
       .mutation(async ({ input, ctx }) => {
         const { migrateExistingData } = await import("./conversationResolver");
         return migrateExistingData(getTenantId(ctx));
@@ -1010,7 +1010,7 @@ export const appRouter = router({
         return reconcileGhostThreads(getTenantId(ctx), input.sessionId);
       }),
     // Repair contact names contaminated by owner's name
-    repairContactNames: tenantProcedure
+    repairContactNames: tenantWriteProcedure
       .mutation(async ({ ctx }) => {
         const db = await (await import("./db")).getDb();
         if (!db) throw new Error("Database not available");
@@ -1157,7 +1157,7 @@ export const appRouter = router({
         const settings = (rows[0]?.settingsJson as any) || {};
         return { importContactsFromAgenda: settings.whatsapp?.importContactsFromAgenda ?? false };
       }),
-    saveContactImportSettings: tenantProcedure
+    saveContactImportSettings: tenantWriteProcedure
       .input(z.object({ importContactsFromAgenda: z.boolean() }))
       .mutation(async ({ input, ctx }) => {
         const db = await (await import("./db")).getDb();
@@ -1172,7 +1172,7 @@ export const appRouter = router({
         return { success: true };
       }),
     // Cleanup synced contacts: remove contacts with source="whatsapp" that have NO deals and were NOT manually created
-    cleanupSyncedContacts: tenantProcedure
+    cleanupSyncedContacts: tenantWriteProcedure
       .input(z.object({ dryRun: z.boolean().default(true) }))
       .mutation(async ({ input, ctx }) => {
         const db = await (await import("./db")).getDb();
@@ -1266,7 +1266,7 @@ export const appRouter = router({
       }),
 
     // Share a session with a user
-    shareSession: tenantProcedure
+    shareSession: tenantWriteProcedure
       .input(z.object({
         sourceSessionId: z.string(),
         targetUserIds: z.array(z.number()).min(1),
@@ -1322,7 +1322,7 @@ export const appRouter = router({
       }),
 
     // Revoke a specific share
-    revokeShare: tenantProcedure
+    revokeShare: tenantWriteProcedure
       .input(z.object({ shareId: z.number() }))
       .mutation(async ({ ctx, input }) => {
         const role = ctx.saasUser?.role;
@@ -1334,7 +1334,7 @@ export const appRouter = router({
       }),
 
     // Revoke all shares for a session
-    revokeAllShares: tenantProcedure
+    revokeAllShares: tenantWriteProcedure
       .input(z.object({ sourceSessionId: z.string() }))
       .mutation(async ({ ctx, input }) => {
         const role = ctx.saasUser?.role;
@@ -1442,7 +1442,7 @@ export const appRouter = router({
         }
         return result;
       }),
-    update: tenantProcedure
+    update: tenantWriteProcedure
       .input(z.object({
         noteId: z.number(),
         content: z.string().min(1).optional(),
@@ -1458,7 +1458,7 @@ export const appRouter = router({
         });
         return { success: true };
       }),
-    delete: tenantProcedure
+    delete: tenantWriteProcedure
       .input(z.object({ noteId: z.number() }))
       .mutation(async ({ ctx, input }) => {
         const tenantId = getTenantId(ctx);
@@ -1627,7 +1627,7 @@ export const appRouter = router({
         const tenantId = getTenantId(ctx);
         return getQuickReplies(tenantId, input.teamId);
       }),
-    create: tenantProcedure
+    create: tenantWriteProcedure
       .input(z.object({
         shortcut: z.string().min(1).max(32),
         title: z.string().min(1).max(128),
@@ -1640,7 +1640,7 @@ export const appRouter = router({
         const userId = ctx.saasUser?.userId || ctx.user.id;
         return createQuickReply(tenantId, { ...input, createdBy: userId });
       }),
-    delete: tenantProcedure
+    delete: tenantWriteProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ ctx, input }) => {
         const tenantId = getTenantId(ctx);
@@ -1687,7 +1687,7 @@ export const appRouter = router({
       .query(async ({ input, ctx }) => {
         return getResponseTimeMetrics(input.sessionId, input.periodDays, input.dateFrom, input.dateTo);
       }),
-    fixWebhooks: tenantProcedure
+    fixWebhooks: tenantWriteProcedure
       .mutation(async () => {
         const results: Array<{ instance: string; ok: boolean }> = [];
         const sessions = whatsappManager.getAllSessions();
@@ -1992,14 +1992,14 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
         return { success: true };
       }),
     // ── Team Members ──
-    addMember: tenantProcedure
+    addMember: tenantWriteProcedure
       .input(z.object({
         teamId: z.number(),
         userId: z.number(),
         role: z.enum(["member", "leader"]).default("member"),
       }))
       .mutation(async ({ input, ctx }) => addTeamMember(getTenantId(ctx), input.teamId, input.userId, input.role)),
-    removeMember: tenantProcedure
+    removeMember: tenantWriteProcedure
       .input(z.object({
         teamId: z.number(),
         userId: z.number(),
@@ -2008,7 +2008,7 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
         await removeTeamMember(getTenantId(ctx), input.teamId, input.userId);
         return { success: true };
       }),
-    updateMemberRole: tenantProcedure
+    updateMemberRole: tenantWriteProcedure
       .input(z.object({
         teamId: z.number(),
         userId: z.number(),
@@ -2019,7 +2019,7 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
         return { success: true };
       }),
     // ── Agents ──
-    inviteAgent: tenantProcedure
+    inviteAgent: tenantWriteProcedure
       .input(z.object({
         name: z.string().min(1),
         email: z.string().email(),
@@ -2053,7 +2053,7 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
       }),
     listAgents: tenantProcedure
       .query(async ({ input, ctx }) => getAgentsWithTeams(getTenantId(ctx))),
-    updateAgentStatus: tenantProcedure
+    updateAgentStatus: tenantWriteProcedure
       .input(z.object({
         userId: z.number(),
         status: z.enum(["active", "inactive", "invited"]),
@@ -2066,7 +2066,7 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
         await updateAgentStatus(getTenantId(ctx), input.userId, input.status);
         return { success: true };
       }),
-    updateAgentRole: tenantProcedure
+    updateAgentRole: tenantWriteProcedure
       .input(z.object({
         userId: z.number(),
         role: z.enum(["admin", "user"]),
@@ -2090,7 +2090,7 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
     // ── Distribution Rules ──
     listRules: tenantProcedure
       .query(async ({ input, ctx }) => getDistributionRules(getTenantId(ctx))),
-    createRule: tenantProcedure
+    createRule: tenantWriteProcedure
       .input(z.object({
         name: z.string().min(1).max(255),
         description: z.string().optional(),
@@ -2105,7 +2105,7 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
 const tenantId = getTenantId(ctx); const { ...data } = input;
         return createDistributionRule(tenantId, data);
       }),
-    updateRule: tenantProcedure
+    updateRule: tenantWriteProcedure
       .input(z.object({
         id: z.number(),
         name: z.string().min(1).max(255).optional(),
@@ -2121,13 +2121,13 @@ const tenantId = getTenantId(ctx); const { ...data } = input;
 const tenantId = getTenantId(ctx); const { id, ...data } = input;
         return updateDistributionRule(id, tenantId, data);
       }),
-    deleteRule: tenantProcedure
+    deleteRule: tenantWriteProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ input, ctx }) => {
         await deleteDistributionRule(input.id, getTenantId(ctx));
         return { success: true };
       }),
-    toggleRule: tenantProcedure
+    toggleRule: tenantWriteProcedure
       .input(z.object({ id: z.number(), isActive: z.boolean() }))
       .mutation(async ({ input, ctx }) => {
         await toggleDistributionRule(input.id, getTenantId(ctx), input.isActive);
@@ -2173,7 +2173,7 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
       .query(async ({ input, ctx }) => {
         return getCustomFieldValues(getTenantId(ctx), input.entityType, input.entityId);
       }),
-    setCustomFieldValues: tenantProcedure
+    setCustomFieldValues: tenantWriteProcedure
       .input(z.object({
         entityType: z.enum(["contact", "deal", "company"]),
         entityId: z.number(),
@@ -2196,7 +2196,7 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
       .query(async ({ input, ctx }) => {
         return getCustomFieldById(getTenantId(ctx), input.id);
       }),
-    create: tenantProcedure
+    create: tenantWriteProcedure
       .input(z.object({
         entity: z.enum(["contact", "deal", "company"]),
         name: z.string().min(1).max(128),
@@ -2214,7 +2214,7 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
       .mutation(async ({ input, ctx }) => {
         return createCustomField({ ...input, tenantId: getTenantId(ctx) });
       }),
-    update: tenantProcedure
+    update: tenantWriteProcedure
       .input(z.object({
         id: z.number(),
         label: z.string().optional(),
@@ -2232,13 +2232,13 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
 const tenantId = getTenantId(ctx); const { id, ...data } = input;
         return updateCustomField(tenantId, id, data);
       }),
-    delete: tenantProcedure
+    delete: tenantWriteProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ input, ctx }) => {
         await deleteCustomField(getTenantId(ctx), input.id);
         return { success: true };
       }),
-    reorder: tenantProcedure
+    reorder: tenantWriteProcedure
       .input(z.object({ entity: z.enum(["contact", "deal", "company"]), orderedIds: z.array(z.number()) }))
       .mutation(async ({ input, ctx }) => {
         await reorderCustomFields(getTenantId(ctx), input.entity, input.orderedIds);
@@ -2256,7 +2256,7 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
         const config = await getWebhookConfig(getTenantId(ctx));
         return config;
       }),
-    generateWebhookToken: tenantProcedure
+    generateWebhookToken: tenantWriteProcedure
       .mutation(async ({ input, ctx }) => {
         const secret = randomBytes(32).toString("hex");
         const config = await upsertWebhookConfig(getTenantId(ctx), secret);
@@ -2314,7 +2314,7 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
         ]);
         return { events, total };
       }),
-    reprocessEvent: tenantProcedure
+    reprocessEvent: tenantWriteProcedure
       .input(z.object({ eventId: z.number() }))
       .mutation(async ({ input, ctx }) => {
         return reprocessLeadEvent(getTenantId(ctx), input.eventId);
@@ -2332,7 +2332,7 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
           .orderBy(desc(trackingTokens.createdAt));
       }),
 
-    createTrackingToken: tenantProcedure
+    createTrackingToken: tenantWriteProcedure
       .input(z.object({
         name: z.string().min(1).max(255),
         allowedDomains: z.array(z.string()).optional(),
@@ -2350,7 +2350,7 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
         return { id: result!.id, token, name: input.name };
       }),
 
-    updateTrackingToken: tenantProcedure
+    updateTrackingToken: tenantWriteProcedure
       .input(z.object({
         tokenId: z.number(),
         name: z.string().min(1).max(255).optional(),
@@ -2372,7 +2372,7 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
         return { success: true };
       }),
 
-    deleteTrackingToken: tenantProcedure
+    deleteTrackingToken: tenantWriteProcedure
       .input(z.object({ tokenId: z.number() }))
       .mutation(async ({ input, ctx }) => {
         const db = await getDb();
@@ -3260,7 +3260,7 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
         return getTenantAiSettings(getTenantId(ctx));
       }),
 
-    updateSettings: tenantProcedure
+    updateSettings: tenantWriteProcedure
       .input(z.object({
         defaultAiProvider: z.enum(["openai", "anthropic"]).optional(),
         defaultAiModel: z.string().optional(),

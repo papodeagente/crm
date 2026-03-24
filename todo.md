@@ -4984,3 +4984,23 @@
 - [x] Compilação sem erros TypeScript
 - [x] 2880 testes passando (21 falhas pré-existentes não relacionadas)
 - [x] 45+ páginas e componentes processados
+
+## Fix: Esfriando no Dashboard
+- [x] Corrigir lógica: usar marcação do pipeline (coolingEnabled/coolingDays) em vez de 7 dias parados
+- [x] Popup clicável ao clicar na quantidade de esfriando (igual ao Sem Tarefas) — já implementado
+- [x] Testes (9 testes billingAccessGuard.test.ts)
+
+## Billing Guard: tenantWriteProcedure
+- [x] Criar middleware restrictedWriteGuard no trpc.ts
+- [x] Criar tenantWriteProcedure (tenant auth + billing check)
+- [x] Criar sessionTenantWriteProcedure (session + tenant + billing check)
+- [x] Aplicar em crmRouter.ts (todas as mutations de create/update/delete)
+- [x] Aplicar em routers.ts (WhatsApp send, pipeline config, etc.)
+- [x] Aplicar em rfvRouter.ts (recalculate, importCsv, bulkSend, etc.)
+- [x] Aplicar em adminRouter.ts (tags, users, teams, roles, permissions)
+- [x] Aplicar em analyticsRouter.ts (goalsAIAnalysis)
+- [x] Aplicar em featureRouters.ts (automations, goals, custom fields)
+- [x] Aplicar em productCatalogRouter.ts (categories, products)
+- [x] Aplicar em inboxRouter.ts (send, markRead, etc.)
+- [x] 0 erros TypeScript após todas as mudanças
+- [x] 9 testes billingAccessGuard.test.ts passando

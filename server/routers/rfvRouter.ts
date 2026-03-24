@@ -2,7 +2,7 @@
  * RFV Router — tRPC endpoints for Matriz RFV + Campaign Registry
  */
 import { z } from "zod";
-import { tenantProcedure, getTenantId, sessionTenantProcedure, router } from "../_core/trpc";
+import { tenantProcedure, tenantWriteProcedure, getTenantId, sessionTenantProcedure, sessionTenantWriteProcedure, router } from "../_core/trpc";
 import { TRPCError } from "@trpc/server";
 import {
   getRfvContacts,
@@ -90,14 +90,14 @@ export const rfvRouter = router({
     }),
 
   // ─── Recalculate RFV from existing deals ───
-  recalculate: tenantProcedure
+  recalculate: tenantWriteProcedure
     
     .mutation(async ({ input, ctx }) => {
       return recalculateRfvFromDeals(getTenantId(ctx));
     }),
 
   // ─── Import CSV ───
-  importCsv: tenantProcedure
+  importCsv: tenantWriteProcedure
     .input(z.object({
       csvText: z.string(),
     }))
@@ -107,7 +107,7 @@ export const rfvRouter = router({
     }),
 
   // ─── Reset agency RFV data ───
-  resetData: tenantProcedure
+  resetData: tenantWriteProcedure
     
     .mutation(async ({ input, ctx }) => {
       return resetAgencyRfvData(getTenantId(ctx));
@@ -120,7 +120,7 @@ export const rfvRouter = router({
     }),
 
   // ─── Bulk Send WhatsApp Messages ───
-  bulkSend: sessionTenantProcedure
+  bulkSend: sessionTenantWriteProcedure
     .input(z.object({
       contactIds: z.array(z.number()).min(1).max(5000),
       messageTemplate: z.string().min(1).max(4096),
@@ -150,7 +150,7 @@ export const rfvRouter = router({
     }),
 
   // ─── Cancel Bulk Send ───
-  cancelBulkSend: tenantProcedure
+  cancelBulkSend: tenantWriteProcedure
     
     .mutation(async ({ input, ctx }) => {
       const cancelled = cancelBulkSend(getTenantId(ctx));
@@ -168,7 +168,7 @@ export const rfvRouter = router({
     }),
 
   // ─── Run RFV Notification Check (manual trigger) ───
-  checkNotifications: tenantProcedure
+  checkNotifications: tenantWriteProcedure
     
     .mutation(async ({ input, ctx }) => {
       return runRfvNotificationCheck(getTenantId(ctx));

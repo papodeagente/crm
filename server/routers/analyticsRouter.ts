@@ -4,7 +4,7 @@
  */
 import { z } from "zod";
 import { router } from "../_core/trpc";
-import { tenantProcedure, getTenantId } from "../_core/trpc";
+import { tenantProcedure, tenantWriteProcedure, getTenantId } from "../_core/trpc";
 import { getAnalyticsSummary, getTopLossReasons, getPipelineFunnel, getDealsByPeriod, getFunnelConversion } from "../crmAnalytics";
 import { getGoalsReport, generateGoalsAIAnalysis } from "../goalsAnalytics";
 import { getCrmLiveCover, getCrmLiveOperation } from "../crmLive";
@@ -101,7 +101,7 @@ export const analyticsRouter = router({
       return getGoalsReport(getTenantId(ctx));
     }),
 
-  goalsAIAnalysis: tenantProcedure
+  goalsAIAnalysis: tenantWriteProcedure
     .mutation(async ({ ctx }) => {
       const reportData = await getGoalsReport(getTenantId(ctx));
       return generateGoalsAIAnalysis(getTenantId(ctx), reportData);

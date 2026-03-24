@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { tenantProcedure, getTenantId, router } from "../_core/trpc";
+import { tenantProcedure, tenantWriteProcedure, getTenantId, router } from "../_core/trpc";
 import * as crm from "../crmDb";
 
 const productTypeEnum = z.enum(["flight", "hotel", "tour", "transfer", "insurance", "cruise", "visa", "package", "other"]);
@@ -17,7 +17,7 @@ export const productCatalogRouter = router({
       .query(async ({ input, ctx }) => {
         return crm.getProductCategoryById(getTenantId(ctx), input.id);
       }),
-    create: tenantProcedure
+    create: tenantWriteProcedure
       .input(z.object({
         name: z.string().min(1).max(128),
         icon: z.string().max(64).optional(),
@@ -29,7 +29,7 @@ export const productCatalogRouter = router({
         const { parentId, ...rest } = input;
         return crm.createProductCategory({ ...rest, tenantId: getTenantId(ctx), parentId: parentId ?? undefined });
       }),
-    update: tenantProcedure
+    update: tenantWriteProcedure
       .input(z.object({
         id: z.number(),
         name: z.string().min(1).max(128).optional(),
@@ -43,7 +43,7 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
         await crm.updateProductCategory(tenantId, id, data);
         return { success: true };
       }),
-    delete: tenantProcedure
+    delete: tenantWriteProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ input, ctx }) => {
         await crm.deleteProductCategory(getTenantId(ctx), input.id);
@@ -70,7 +70,7 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
       .query(async ({ input, ctx }) => {
         return crm.getCatalogProductById(getTenantId(ctx), input.id);
       }),
-    create: tenantProcedure
+    create: tenantWriteProcedure
       .input(z.object({
         name: z.string().min(1).max(255),
         description: z.string().optional(),
@@ -96,7 +96,7 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
           costPriceCents: costPriceCents ?? undefined,
         });
       }),
-    update: tenantProcedure
+    update: tenantWriteProcedure
       .input(z.object({
         id: z.number(),
         name: z.string().min(1).max(255).optional(),
@@ -119,7 +119,7 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
         await crm.updateCatalogProduct(tenantId, id, data);
         return { success: true };
       }),
-    delete: tenantProcedure
+    delete: tenantWriteProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ input, ctx }) => {
         await crm.deleteCatalogProduct(getTenantId(ctx), input.id);

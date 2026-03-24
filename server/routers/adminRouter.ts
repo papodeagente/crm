@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { tenantProcedure, getTenantId, router } from "../_core/trpc";
+import { tenantProcedure, tenantWriteProcedure, getTenantId, router } from "../_core/trpc";
 import { TRPCError } from "@trpc/server";
 import * as crm from "../crmDb";
 import { emitEvent } from "../middleware/eventLog";
@@ -14,7 +14,7 @@ export const adminRouter = router({
     list: tenantProcedure.query(async () => {
       return crm.listTenants();
     }),
-    create: tenantProcedure
+    create: tenantWriteProcedure
       .input(z.object({ name: z.string().min(1), plan: z.enum(["free", "pro", "enterprise"]).optional() }))
       .mutation(async ({ input, ctx }) => {
         const result = await crm.createTenant({ ...input });
@@ -34,7 +34,7 @@ export const adminRouter = router({
       .query(async ({ input, ctx }) => {
         return crm.listCrmUsers(getTenantId(ctx));
       }),
-    create: tenantProcedure
+    create: tenantWriteProcedure
       .input(z.object({ name: z.string().min(1), email: z.string().email(), phone: z.string().optional(), role: z.enum(["admin", "user"]).default("user"), origin: z.string().optional() }))
       .mutation(async ({ ctx, input }) => {
         // Only admins can create users
@@ -70,7 +70,7 @@ export const adminRouter = router({
       .query(async ({ input, ctx }) => {
         return crm.getCrmUserById(getTenantId(ctx), input.id);
       }),
-    update: tenantProcedure
+    update: tenantWriteProcedure
       .input(z.object({ id: z.number(), name: z.string().optional(), email: z.string().email().optional(), phone: z.string().optional(), role: z.enum(["admin", "user"]).optional(), status: z.enum(["active", "inactive", "invited"]).optional() }))
       .mutation(async ({ ctx, input }) => {
         // Only admins can update users
@@ -93,7 +93,7 @@ const tenantId = getTenantId(ctx); const { id, role, ...data } = input;
         await emitEvent({ tenantId, actorUserId: ctx.user.id, entityType: "crm_user", entityId: id, action: "update" });
         return { success: true };
       }),
-    delete: tenantProcedure
+    delete: tenantWriteProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ ctx, input }) => {
         await crm.deleteCrmUser(getTenantId(ctx), input.id);
@@ -108,7 +108,7 @@ const tenantId = getTenantId(ctx); const { id, role, ...data } = input;
         }
         return getAllVisibilityModes(input.userId, getTenantId(ctx));
       }),
-    setVisibility: tenantProcedure
+    setVisibility: tenantWriteProcedure
       .input(z.object({
         userId: z.number(),
         deals: z.enum(["restrita", "equipe", "geral"]).optional(),
@@ -136,7 +136,7 @@ const tenantId = getTenantId(ctx); const { id, role, ...data } = input;
       .query(async ({ input, ctx }) => {
         return crm.listTeams(getTenantId(ctx));
       }),
-    create: tenantProcedure
+    create: tenantWriteProcedure
       .input(z.object({ name: z.string().min(1) }))
       .mutation(async ({ ctx, input }) => {
         const result = await crm.createTeam({ ...input, tenantId: getTenantId(ctx) });
@@ -148,13 +148,13 @@ const tenantId = getTenantId(ctx); const { id, role, ...data } = input;
       .query(async ({ input, ctx }) => {
         return crm.getTeamMembers(getTenantId(ctx), input.teamId);
       }),
-    addMember: tenantProcedure
+    addMember: tenantWriteProcedure
       .input(z.object({ teamId: z.number(), userId: z.number() }))
       .mutation(async ({ input, ctx }) => {
         await crm.addTeamMember({ ...input, tenantId: getTenantId(ctx) });
         return { success: true };
       }),
-    removeMember: tenantProcedure
+    removeMember: tenantWriteProcedure
       .input(z.object({ teamId: z.number(), userId: z.number() }))
       .mutation(async ({ input, ctx }) => {
         await crm.removeTeamMember(getTenantId(ctx), input.userId, input.teamId);
@@ -169,12 +169,12 @@ const tenantId = getTenantId(ctx); const { id, role, ...data } = input;
       .query(async ({ input, ctx }) => {
         return crm.listRoles(getTenantId(ctx));
       }),
-    create: tenantProcedure
+    create: tenantWriteProcedure
       .input(z.object({ slug: z.string(), name: z.string(), description: z.string().optional() }))
       .mutation(async ({ input, ctx }) => {
         return crm.createRole({ ...input, tenantId: getTenantId(ctx) });
       }),
-    assign: tenantProcedure
+    assign: tenantWriteProcedure
       .input(z.object({ userId: z.number(), roleId: z.number() }))
       .mutation(async ({ input, ctx }) => {
         await crm.assignRole({ ...input, tenantId: getTenantId(ctx) });
@@ -183,7 +183,7 @@ const tenantId = getTenantId(ctx); const { id, role, ...data } = input;
     permissions: tenantProcedure.query(async () => {
       return crm.listPermissions();
     }),
-    assignPermission: tenantProcedure
+    assignPermission: tenantWriteProcedure
       .input(z.object({ roleId: z.number(), permissionId: z.number() }))
       .mutation(async ({ input, ctx }) => {
         await crm.assignPermissionToRole({ ...input, tenantId: getTenantId(ctx) });
@@ -201,7 +201,7 @@ const tenantId = getTenantId(ctx); const { id, role, ...data } = input;
   }),
 
   // ─── DB REPAIR ───
-  dbRepair: tenantProcedure
+  dbRepair: tenantWriteProcedure
     .mutation(async ({ ctx }) => {
       // Only allow owner (admin) to run repair
       if (ctx.saasUser?.role !== "admin" && ctx.user.openId !== process.env.OWNER_OPEN_ID) {
@@ -210,7 +210,7 @@ const tenantId = getTenantId(ctx); const { id, role, ...data } = input;
       return runDbRepair();
     }),
   // ─── REPROCESS STUCK TRANSCRIPTIONS ───
-  reprocessTranscriptions: tenantProcedure
+  reprocessTranscriptions: tenantWriteProcedure
     .mutation(async ({ ctx }) => {
       if (ctx.saasUser?.role !== "admin" && ctx.user.openId !== process.env.OWNER_OPEN_ID) {
         throw new TRPCError({ code: "FORBIDDEN", message: "Apenas administradores podem reprocessar transcrições" });

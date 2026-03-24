@@ -37,7 +37,6 @@ export async function getHomeExecutive(tenantId: number, userId?: number) {
   // Month boundaries in SP timezone
   const nowSP = new Date(now.toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
   const monthStart = new Date(nowSP.getFullYear(), nowSP.getMonth(), 1);
-  const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 
   // Owner filter for non-admin users
   const ownerFilter = userId ? sql`AND d.ownerUserId = ${userId}` : sql``;
@@ -116,22 +115,22 @@ export async function getHomeExecutive(tenantId: number, userId?: number) {
     lastActivityAt: r.lastActivityAt ? new Date(r.lastActivityAt).getTime() : null,
   }));
 
-  // 4. Cooling deals (no activity in 7+ days)
+  // 4. Cooling deals — uses per-stage coolingEnabled + coolingDays from pipeline config
   const [coolingResult] = await db.execute(sql`
     SELECT d.id, d.title, d.valueCents, d.ownerUserId, d.stageId, d.createdAt, d.lastActivityAt,
-           ps.name as stageName,
+           ps.name as stageName, ps.coolingDays,
            c.name as contactName,
            u.name as ownerName
     FROM deals d
     JOIN pipelines p ON p.id = d.pipelineId AND p.pipelineType = 'sales'
-    LEFT JOIN pipeline_stages ps ON ps.id = d.stageId
+    INNER JOIN pipeline_stages ps ON ps.id = d.stageId AND ps.coolingEnabled = 1
     LEFT JOIN contacts c ON c.id = d.contactId
     LEFT JOIN crm_users u ON u.id = d.ownerUserId AND u.tenantId = ${tenantId}
     WHERE d.tenantId = ${tenantId}
       AND d.deletedAt IS NULL
       AND d.status = 'open'
       ${ownerFilter}
-      AND COALESCE(d.lastActivityAt, d.createdAt) < ${sevenDaysAgo}
+      AND COALESCE(d.lastActivityAt, d.createdAt) < DATE_SUB(NOW(), INTERVAL COALESCE(ps.coolingDays, 3) DAY)
     ORDER BY COALESCE(d.lastActivityAt, d.createdAt) ASC
     LIMIT 100
   `);
@@ -143,6 +142,7 @@ export async function getHomeExecutive(tenantId: number, userId?: number) {
     contactName: r.contactName ? String(r.contactName) : "",
     ownerName: r.ownerName ? String(r.ownerName) : "",
     lastActivityAt: r.lastActivityAt ? new Date(r.lastActivityAt).getTime() : new Date(r.createdAt).getTime(),
+    coolingDays: Number(r.coolingDays) || 3,
   }));
 
   return {

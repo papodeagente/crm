@@ -16,6 +16,7 @@
 import { eq } from "drizzle-orm";
 import { getDb } from "../db";
 import { tenants, subscriptions } from "../../drizzle/schema";
+import { TRPCError } from "@trpc/server";
 
 export type BillingAccessLevel = "full" | "restricted";
 
@@ -180,6 +181,9 @@ export async function isTenantRestricted(tenantId: number): Promise<boolean> {
 export async function assertNotRestricted(tenantId: number): Promise<void> {
   const result = await checkBillingAccess(tenantId);
   if (result.level === "restricted") {
-    throw new Error(result.message || "BILLING_RESTRICTED");
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: result.message || "Seu acesso está restrito. Assine um plano para continuar.",
+    });
   }
 }

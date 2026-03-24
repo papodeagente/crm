@@ -390,7 +390,7 @@ export default function Home() {
               </div>
             )}
             <p className="text-[10px] text-muted-foreground mt-1.5 group-hover:text-foreground transition-colors">
-              Sem atividade 7+ dias <ChevronRight className="inline h-3 w-3" />
+              Conforme config. do funil <ChevronRight className="inline h-3 w-3" />
             </p>
           </button>
 
@@ -697,7 +697,7 @@ export default function Home() {
         open={coolingModalOpen}
         onOpenChange={setCoolingModalOpen}
         title="Negociações Esfriando"
-        description={`${exec?.coolingDeals ?? 0} negociações sem atividade nos últimos 7 dias`}
+        description={`${exec?.coolingDeals ?? 0} negociações marcadas como esfriando conforme configuração do funil`}
         deals={exec?.coolingDealsList ?? []}
         icon={Flame}
         iconColor="bg-red-500/10 text-red-500"

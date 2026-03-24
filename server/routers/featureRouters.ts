@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { tenantProcedure, tenantAdminProcedure, getTenantId, router } from "../_core/trpc";
+import { tenantProcedure, tenantWriteProcedure, tenantAdminProcedure, getTenantId, router } from "../_core/trpc";
 import * as crm from "../crmDb";
 import { emitEvent } from "../middleware/eventLog";
 
@@ -11,7 +11,7 @@ export const proposalRouter = router({
     list: tenantProcedure
       
       .query(async ({ input, ctx }) => crm.listProposalTemplates(getTenantId(ctx))),
-    create: tenantProcedure
+    create: tenantWriteProcedure
       .input(z.object({ name: z.string().min(1), htmlBody: z.string().optional(), variablesJson: z.any().optional() }))
       .mutation(async ({ input, ctx }) => crm.createProposalTemplate({ ...input, tenantId: getTenantId(ctx) })),
   }),
@@ -21,14 +21,14 @@ export const proposalRouter = router({
   get: tenantProcedure
     .input(z.object({ id: z.number() }))
     .query(async ({ input, ctx }) => crm.getProposalById(getTenantId(ctx), input.id)),
-  create: tenantProcedure
+  create: tenantWriteProcedure
     .input(z.object({ dealId: z.number(), totalCents: z.number().optional() }))
     .mutation(async ({ ctx, input }) => {
       const result = await crm.createProposal({ ...input, tenantId: getTenantId(ctx), createdBy: ctx.user.id });
       await emitEvent({ tenantId: getTenantId(ctx), actorUserId: ctx.user.id, entityType: "proposal", entityId: result?.id, action: "create" });
       return result;
     }),
-  update: tenantProcedure
+  update: tenantWriteProcedure
     .input(z.object({ id: z.number(), status: z.enum(["draft", "sent", "viewed", "accepted", "rejected", "expired"]).optional(), totalCents: z.number().optional(), pdfUrl: z.string().optional() }))
     .mutation(async ({ ctx, input }) => {
 const tenantId = getTenantId(ctx); const { id, ...data } = input;
@@ -40,7 +40,7 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
     list: tenantProcedure
       .input(z.object({ proposalId: z.number() }))
       .query(async ({ input, ctx }) => crm.listProposalItems(getTenantId(ctx), input.proposalId)),
-    create: tenantProcedure
+    create: tenantWriteProcedure
       .input(z.object({ proposalId: z.number(), title: z.string(), description: z.string().optional(), qty: z.number().optional(), unitPriceCents: z.number().optional(), totalCents: z.number().optional() }))
       .mutation(async ({ input, ctx }) => crm.createProposalItem({ ...input, tenantId: getTenantId(ctx) })),
   }),
@@ -51,7 +51,7 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
 // ═══════════════════════════════════════
 export const portalRouter = router({
   users: router({
-    create: tenantProcedure
+    create: tenantWriteProcedure
       .input(z.object({ contactId: z.number(), email: z.string().email() }))
       .mutation(async ({ input, ctx }) => crm.createPortalUser({ ...input, tenantId: getTenantId(ctx) })),
   }),
@@ -59,7 +59,7 @@ export const portalRouter = router({
     list: tenantProcedure
       .input(z.object({ contactId: z.number().optional(), status: z.string().optional() }))
       .query(async ({ input, ctx }) => crm.listPortalTickets(getTenantId(ctx), input)),
-    create: tenantProcedure
+    create: tenantWriteProcedure
       .input(z.object({ contactId: z.number(), subject: z.string().min(1), tripId: z.number().optional(), priority: z.enum(["low", "medium", "high", "urgent"]).optional() }))
       .mutation(async ({ ctx, input }) => {
         const result = await crm.createPortalTicket({ ...input, tenantId: getTenantId(ctx) });
@@ -136,7 +136,7 @@ export const insightsRouter = router({
     list: tenantProcedure
       .input(z.object({ status: z.string().optional() }))
       .query(async ({ input, ctx }) => crm.listAlerts(getTenantId(ctx), input)),
-    create: tenantProcedure
+    create: tenantWriteProcedure
       .input(z.object({ type: z.string(), entityType: z.string().optional(), entityId: z.number().optional(), payloadJson: z.any().optional() }))
       .mutation(async ({ input, ctx }) => crm.createAlert({ ...input, tenantId: getTenantId(ctx) })),
   }),
@@ -174,7 +174,7 @@ export const academyRouter = router({
     get: tenantProcedure
       .input(z.object({ id: z.number() }))
       .query(async ({ input, ctx }) => crm.getCourseById(getTenantId(ctx), input.id)),
-    create: tenantProcedure
+    create: tenantWriteProcedure
       .input(z.object({ title: z.string().min(1), description: z.string().optional(), coverUrl: z.string().optional() }))
       .mutation(async ({ input, ctx }) => crm.createCourse({ ...input, tenantId: getTenantId(ctx) })),
   }),
@@ -182,7 +182,7 @@ export const academyRouter = router({
     list: tenantProcedure
       .input(z.object({ courseId: z.number() }))
       .query(async ({ input, ctx }) => crm.listLessons(getTenantId(ctx), input.courseId)),
-    create: tenantProcedure
+    create: tenantWriteProcedure
       .input(z.object({ courseId: z.number(), title: z.string(), contentBody: z.string().optional(), contentUrl: z.string().optional(), orderIndex: z.number() }))
       .mutation(async ({ input, ctx }) => crm.createLesson({ ...input, tenantId: getTenantId(ctx) })),
   }),
@@ -190,7 +190,7 @@ export const academyRouter = router({
     list: tenantProcedure
       .input(z.object({ userId: z.number() }))
       .query(async ({ input, ctx }) => crm.listEnrollments(getTenantId(ctx), input.userId)),
-    enroll: tenantProcedure
+    enroll: tenantWriteProcedure
       .input(z.object({ userId: z.number(), courseId: z.number() }))
       .mutation(async ({ input, ctx }) => crm.enrollUser({ ...input, tenantId: getTenantId(ctx) })),
   }),
