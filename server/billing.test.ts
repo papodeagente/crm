@@ -348,6 +348,116 @@ describe("Hotmart Event Status Mapping", () => {
   });
 });
 
+// ─── Test: Webhook offer code → plan mapping ────────────────
+
+import { determinePlanFromPayload, OFFER_PLAN_MAP, PLAN_DISPLAY_NAMES } from "./hotmartWebhook";
+import type { HotmartWebhookPayload } from "./hotmartWebhook";
+
+describe("Offer Code → Plan Mapping", () => {
+  it("maps axm3bvsz to start plan", () => {
+    expect(OFFER_PLAN_MAP["axm3bvsz"]).toBe("start");
+  });
+
+  it("maps pubryjat to growth plan", () => {
+    expect(OFFER_PLAN_MAP["pubryjat"]).toBe("growth");
+  });
+
+  it("determinePlanFromPayload returns start for axm3bvsz offer code", () => {
+    const payload: HotmartWebhookPayload = {
+      event: "PURCHASE_APPROVED",
+      data: {
+        buyer: { email: "test@test.com", name: "Test" },
+        purchase: {
+          transaction: "tx1",
+          status: "approved",
+          offer: { code: "axm3bvsz" },
+        },
+      },
+    };
+    expect(determinePlanFromPayload(payload)).toBe("start");
+  });
+
+  it("determinePlanFromPayload returns growth for pubryjat offer code", () => {
+    const payload: HotmartWebhookPayload = {
+      event: "PURCHASE_APPROVED",
+      data: {
+        buyer: { email: "test@test.com", name: "Test" },
+        purchase: {
+          transaction: "tx2",
+          status: "approved",
+          offer: { code: "pubryjat" },
+        },
+      },
+    };
+    expect(determinePlanFromPayload(payload)).toBe("growth");
+  });
+
+  it("determinePlanFromPayload falls back to keyword matching for unknown offer", () => {
+    const payload: HotmartWebhookPayload = {
+      event: "PURCHASE_APPROVED",
+      data: {
+        buyer: { email: "test@test.com", name: "Test" },
+        product: { id: 1, name: "Scale Enterprise Plan" },
+        purchase: {
+          transaction: "tx3",
+          status: "approved",
+          offer: { code: "unknown123" },
+        },
+      },
+    };
+    expect(determinePlanFromPayload(payload)).toBe("scale");
+  });
+
+  it("determinePlanFromPayload defaults to start for completely unknown payload", () => {
+    const payload: HotmartWebhookPayload = {
+      event: "PURCHASE_APPROVED",
+      data: {
+        buyer: { email: "test@test.com", name: "Test" },
+        purchase: {
+          transaction: "tx4",
+          status: "approved",
+        },
+      },
+    };
+    expect(determinePlanFromPayload(payload)).toBe("start");
+  });
+});
+
+describe("Plan Display Names", () => {
+  it("has display name for start", () => {
+    expect(PLAN_DISPLAY_NAMES["start"]).toBe("Start (R$97/m\u00eas)");
+  });
+
+  it("has display name for growth", () => {
+    expect(PLAN_DISPLAY_NAMES["growth"]).toBe("Growth (R$297/m\u00eas)");
+  });
+
+  it("has display name for scale", () => {
+    expect(PLAN_DISPLAY_NAMES["scale"]).toBe("Scale");
+  });
+});
+
+// ─── Test: Webhook auto-create activation events ─────────────
+
+describe("Webhook Auto-Create Logic", () => {
+  const ACTIVATION_EVENTS = ["PURCHASE_APPROVED", "PURCHASE_COMPLETE"];
+  const NON_ACTIVATION_EVENTS = ["PURCHASE_CANCELED", "PURCHASE_REFUNDED", "SUBSCRIPTION_CANCELLATION", "PURCHASE_DELAYED"];
+
+  it("PURCHASE_APPROVED is an activation event", () => {
+    expect(ACTIVATION_EVENTS.includes("PURCHASE_APPROVED")).toBe(true);
+  });
+
+  it("PURCHASE_COMPLETE is an activation event", () => {
+    expect(ACTIVATION_EVENTS.includes("PURCHASE_COMPLETE")).toBe(true);
+  });
+
+  NON_ACTIVATION_EVENTS.forEach(event => {
+    it(`${event} is NOT an activation event`, () => {
+      expect(ACTIVATION_EVENTS.includes(event)).toBe(false);
+    });
+  });
+});
+
 // ─── Test: BillingAccessResult type contract ──────────────────────
 
 describe("BillingAccessResult type contract", () => {

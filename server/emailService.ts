@@ -224,6 +224,47 @@ export async function sendWeddingNotificationEmail(opts: {
   });
 }
 
+// ═══════════════════════════════════════
+// WELCOME EMAIL (Hotmart purchase)
+// ═══════════════════════════════════════
+
+export async function sendWelcomeEmail(opts: {
+  to: string;
+  userName: string;
+  companyName: string;
+  password: string;
+  planName: string;
+  loginUrl: string;
+}) {
+  const html = baseTemplate(`
+    <h2 style="margin:0 0 8px;color:#1e293b;font-size:20px;">Bem-vindo ao ${APP_NAME}!</h2>
+    <p style="color:#64748b;margin:0 0 24px;font-size:14px;line-height:1.6;">
+      Olá <strong>${opts.userName}</strong>, sua conta foi criada com sucesso!
+      Você adquiriu o plano <strong>${opts.planName}</strong> e já pode começar a usar o sistema.
+    </p>
+    <div style="background:#f8fafc;border-radius:8px;padding:16px;margin-bottom:24px;">
+      <p style="margin:0 0 8px;color:#475569;font-size:13px;font-weight:600;">Seus dados de acesso:</p>
+      <p style="margin:0 0 4px;color:#64748b;font-size:13px;">Empresa: <strong style="color:#1e293b;">${opts.companyName}</strong></p>
+      <p style="margin:0 0 4px;color:#64748b;font-size:13px;">Email: <strong style="color:#1e293b;">${opts.to}</strong></p>
+      <p style="margin:0;color:#64748b;font-size:13px;">Senha: <strong style="color:#7c3aed;">${opts.password}</strong></p>
+    </div>
+    <p style="color:#64748b;font-size:13px;margin:0 0 24px;line-height:1.5;">
+      Recomendamos que altere sua senha após o primeiro acesso.
+    </p>
+    <div style="text-align:center;">
+      <a href="${opts.loginUrl}" style="display:inline-block;background:linear-gradient(135deg,#7c3aed,#6d28d9);color:#fff;text-decoration:none;padding:12px 32px;border-radius:8px;font-weight:600;font-size:14px;">
+        Acessar ${APP_NAME}
+      </a>
+    </div>
+  `);
+
+  return sendEmail({
+    to: opts.to,
+    subject: `Bem-vindo ao ${APP_NAME} — Sua conta está pronta!`,
+    html,
+  });
+}
+
 export async function sendMonthlyBirthdayReport(opts: {
   to: string;
   month: number;

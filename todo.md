@@ -4898,3 +4898,21 @@
 - [x] Testes das métricas (28 testes saasMetrics.test.ts)
 - [x] Todos os 101 testes passando (billing + plans + metrics)
 - [x] Checkpoint final
+
+## Bug Fix: Webhook Hotmart não recebe eventos
+- [x] Corrigir URL do webhook exibida no dashboard (era /api/hotmart/webhook, correto é /api/webhooks/hotmart)
+- [x] Corrigir payload parsing: subscription.subscriber_code → subscription.subscriber.code
+- [x] Corrigir payload parsing: data.offer.code → data.purchase.offer.code
+- [x] Aceitar hottok também no body (não só no header)
+- [x] Adicionar log detalhado de debug no webhook para facilitar troubleshooting
+- [x] Rota registrada como /api/webhooks/hotmart
+- [x] Testar e validar
+
+## Fix Webhook Hotmart — Criar tenant+usuário na compra
+- [x] Corrigir parsing do payload Hotmart v2.0.0 (subscriber.code, purchase.offer.code, hottok no body)
+- [x] Ao receber PURCHASE_APPROVED/COMPLETE: se email não tem tenant, criar tenant+usuário automaticamente
+- [x] Enviar email de boas-vindas com credenciais via Resend (sendWelcomeEmail)
+- [x] Mapear plano pelo código da oferta (axm3bvsz=Start, pubryjat=Growth)
+- [x] Corrigir URL do webhook no dashboard para /api/webhooks/hotmart
+- [x] Não alterar nenhuma regra existente do sistema
+- [x] 116 testes passando (billing + plans + metrics)
