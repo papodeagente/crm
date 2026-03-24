@@ -5023,3 +5023,6 @@
 
 ## Script de Monitoramento RD Station
 - [x] Adicionar script RD Station no head do index.html para rastreamento global
+
+## Layout Barra Trial Dashboard
+- [x] Tornar barra de trial mais discreta (menor, sem vermelho, seguir UX do sistema)
