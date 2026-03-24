@@ -5017,3 +5017,6 @@
 - [x] Palavras-chave: 7 keywords relevantes (CRM, turismo, funil, WhatsApp, etc.)
 - [x] Open Graph tags (og:title, og:description, og:type, og:locale)
 - [x] Meta robots: index, follow
+
+## Alterar Título SEO
+- [x] Alterar título de SEO da landing page para "Entur OS"

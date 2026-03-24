@@ -17,7 +17,7 @@ export default function Landing() {
   const [, navigate] = useLocation();
 
   useEffect(() => {
-    document.title = "ENTUR OS | CRM e Gestão para Agências de Viagens";
+    document.title = "Entur OS";
   }, []);
 
   const scrollToPlanos = () => {
