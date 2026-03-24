@@ -226,6 +226,9 @@ async function startServer() {
     // Start birthday/wedding notification scheduler
     import("../birthdayScheduler").then(m => m.startBirthdayScheduler());
 
+    // Start task due soon notification scheduler (tasks due within 3h)
+    import("../taskDueScheduler").then(m => m.startTaskDueScheduler());
+
     // Retroactive seed: ensure all tenants have default loss reasons
     import("../seedLossReasonsRetroactive").then(m => m.seedLossReasonsForAllTenants()).catch(e => {
       console.warn("[SeedLossReasons] Retroactive seed failed:", e.message);

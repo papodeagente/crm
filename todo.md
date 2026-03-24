@@ -4929,3 +4929,22 @@
 - [x] Inserir na página Início acima das prioridades de ação
 - [x] Mostrar apenas para tenants em trial (não-legacy, billingStatus=trialing)
 - [x] 15 testes passando (trialBanner.test.ts)
+
+## Sistema de Notificações do Sino
+### Tipos de notificação
+- [x] Novas negociações (PADRÃO - ativo por default)
+- [x] Alertas da RFV (PADRÃO - ativo por default)
+- [x] Tarefa vencendo nas próximas 3 horas (PADRÃO - ativo por default)
+- [x] Aniversariantes do dia (PADRÃO - ativo por default)
+- [x] Demais tipos opcionais (desativados por default): 10 tipos
+### Backend
+- [x] Preferências via userPreferences (key-value, sem nova tabela)
+- [x] Tabela notifications (já existia)
+- [x] Endpoints: getPreferences, setPreferences, filteredList, filteredUnreadCount
+- [x] TaskDueScheduler: verifica a cada 15min tarefas vencendo em 3h
+### Frontend
+- [x] Área de preferências com categorias (Padrão, Vendas & CRM, WhatsApp, Outros)
+- [x] Switch toggle por tipo de notificação
+- [x] Badge 'padrão' nos 4 tipos default
+- [x] 14 tipos de notificação com ícones e cores distintas
+- [x] 15 testes passando (notifications.pref.test.ts)

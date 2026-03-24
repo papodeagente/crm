@@ -1,8 +1,17 @@
+import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
-import { Bell, MessageSquare, ArrowRightLeft, UserPlus, ClipboardList, Briefcase, Check, CheckCheck, TrendingUp } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import {
+  Bell, MessageSquare, ArrowRightLeft, UserPlus, ClipboardList, Briefcase,
+  Check, CheckCheck, TrendingUp, Settings2, Clock, Cake, Heart,
+  Wifi, WifiOff, AlertTriangle, Zap, UserCheck, X,
+} from "lucide-react";
 import { formatDate } from "../../../shared/dateUtils";
 import { useLocation } from "wouter";
+import { toast } from "sonner";
+
+// ─── Notification Type Config ───
 const typeConfig: Record<string, { icon: any; bg: string; iconBg: string; iconColor: string; label: string; route?: (entityId: string) => string }> = {
   whatsapp_message: {
     icon: MessageSquare,
@@ -44,6 +53,14 @@ const typeConfig: Record<string, { icon: any; bg: string; iconBg: string; iconCo
     label: "Tarefa",
     route: () => "/tasks",
   },
+  task_due_soon: {
+    icon: Clock,
+    bg: "border-l-4 border-l-red-500",
+    iconBg: "bg-red-500/15",
+    iconColor: "text-red-400",
+    label: "Tarefa Vencendo",
+    route: () => "/tasks",
+  },
   rfv_filter_alert: {
     icon: TrendingUp,
     bg: "border-l-4 border-l-orange-500",
@@ -52,7 +69,103 @@ const typeConfig: Record<string, { icon: any; bg: string; iconBg: string; iconCo
     label: "Matriz RFV",
     route: (filterKey) => `/rfv?filter=${filterKey}`,
   },
+  birthday: {
+    icon: Cake,
+    bg: "border-l-4 border-l-pink-500",
+    iconBg: "bg-pink-500/15",
+    iconColor: "text-pink-400",
+    label: "Aniversário",
+    route: (id) => `/contacts?id=${id}`,
+  },
+  wedding_anniversary: {
+    icon: Heart,
+    bg: "border-l-4 border-l-rose-500",
+    iconBg: "bg-rose-500/15",
+    iconColor: "text-rose-400",
+    label: "Casamento",
+    route: (id) => `/contacts?id=${id}`,
+  },
+  new_lead: {
+    icon: UserCheck,
+    bg: "border-l-4 border-l-teal-500",
+    iconBg: "bg-teal-500/15",
+    iconColor: "text-teal-400",
+    label: "Novo Lead",
+    route: (id) => `/deal/${id}`,
+  },
+  whatsapp_connected: {
+    icon: Wifi,
+    bg: "border-l-4 border-l-green-500",
+    iconBg: "bg-green-500/15",
+    iconColor: "text-green-400",
+    label: "WhatsApp",
+  },
+  whatsapp_disconnected: {
+    icon: WifiOff,
+    bg: "border-l-4 border-l-red-500",
+    iconBg: "bg-red-500/15",
+    iconColor: "text-red-400",
+    label: "WhatsApp",
+    route: () => "/settings/inbox",
+  },
+  whatsapp_warning: {
+    icon: AlertTriangle,
+    bg: "border-l-4 border-l-yellow-500",
+    iconBg: "bg-yellow-500/15",
+    iconColor: "text-yellow-400",
+    label: "WhatsApp",
+    route: () => "/settings/inbox",
+  },
+  automation_triggered: {
+    icon: Zap,
+    bg: "border-l-4 border-l-cyan-500",
+    iconBg: "bg-cyan-500/15",
+    iconColor: "text-cyan-400",
+    label: "Automação",
+  },
 };
+
+// ─── Preference Categories ───
+const PREF_CATEGORIES = [
+  {
+    title: "Padrão",
+    description: "Notificações essenciais ativas por padrão",
+    items: [
+      { key: "deal_created", label: "Novas negociações", description: "Quando uma nova negociação é criada", icon: Briefcase, isDefault: true },
+      { key: "rfv_filter_alert", label: "Alertas da Matriz RFV", description: "Quando contatos entram em novos segmentos RFV", icon: TrendingUp, isDefault: true },
+      { key: "task_due_soon", label: "Tarefas vencendo em 3 horas", description: "Alerta quando uma tarefa está prestes a vencer", icon: Clock, isDefault: true },
+      { key: "birthday", label: "Aniversariantes do dia", description: "Contatos que fazem aniversário hoje", icon: Cake, isDefault: true },
+    ],
+  },
+  {
+    title: "Vendas & CRM",
+    description: "Movimentações no funil e contatos",
+    items: [
+      { key: "deal_moved", label: "Negociação movida no funil", description: "Quando uma negociação muda de etapa", icon: ArrowRightLeft, isDefault: false },
+      { key: "contact_created", label: "Novo contato criado", description: "Quando um novo contato é adicionado", icon: UserPlus, isDefault: false },
+      { key: "new_lead", label: "Novo lead capturado", description: "Quando um lead é capturado automaticamente", icon: UserCheck, isDefault: false },
+      { key: "task_created", label: "Nova tarefa criada", description: "Quando uma tarefa é criada no sistema", icon: ClipboardList, isDefault: false },
+    ],
+  },
+  {
+    title: "WhatsApp",
+    description: "Status de conexão e mensagens",
+    items: [
+      { key: "whatsapp_message", label: "Mensagens recebidas", description: "Novas mensagens no WhatsApp", icon: MessageSquare, isDefault: false },
+      { key: "whatsapp_connected", label: "WhatsApp conectado", description: "Quando o WhatsApp é conectado com sucesso", icon: Wifi, isDefault: false },
+      { key: "whatsapp_disconnected", label: "WhatsApp desconectado", description: "Quando o WhatsApp perde a conexão", icon: WifiOff, isDefault: false },
+      { key: "whatsapp_warning", label: "Alertas do WhatsApp", description: "Avisos importantes sobre o WhatsApp", icon: AlertTriangle, isDefault: false },
+    ],
+  },
+  {
+    title: "Outros",
+    description: "Datas especiais e automações",
+    items: [
+      { key: "wedding_anniversary", label: "Aniversário de casamento", description: "Contatos com aniversário de casamento hoje", icon: Heart, isDefault: false },
+      { key: "automation_triggered", label: "Automação disparada", description: "Quando uma automação é executada", icon: Zap, isDefault: false },
+    ],
+  },
+];
 
 function timeAgo(ts: number): string {
   const diff = Date.now() - ts;
@@ -68,10 +181,13 @@ function timeAgo(ts: number): string {
 
 export default function NotificationsPage() {
   const [, navigate] = useLocation();
+
   const utils = trpc.useUtils();
+  const [showPreferences, setShowPreferences] = useState(false);
 
   const notifications = trpc.notifications.list.useQuery({ limit: 100 });
   const unreadCount = trpc.notifications.unreadCount.useQuery();
+  const preferences = trpc.notifications.getPreferences.useQuery();
 
   const markRead = trpc.notifications.markRead.useMutation({
     onSuccess: () => {
@@ -86,6 +202,21 @@ export default function NotificationsPage() {
       utils.notifications.unreadCount.invalidate();
     },
   });
+
+  const setPreferences = trpc.notifications.setPreferences.useMutation({
+    onSuccess: () => {
+      utils.notifications.getPreferences.invalidate();
+      utils.notifications.list.invalidate();
+      utils.notifications.unreadCount.invalidate();
+      toast.success("Preferências de notificação atualizadas");
+    },
+  });
+
+  const handleTogglePref = (key: string, value: boolean) => {
+    if (!preferences.data) return;
+    const updated = { ...preferences.data, [key]: value };
+    setPreferences.mutate({ preferences: updated });
+  };
 
   const handleClick = (n: any) => {
     if (!n.isRead) {
@@ -116,20 +247,94 @@ export default function NotificationsPage() {
             </p>
           </div>
         </div>
-        {(unreadCount.data ?? 0) > 0 && (
+        <div className="flex items-center gap-2">
           <Button
             variant="outline"
             size="sm"
-            onClick={() => markAllRead.mutate()}
-            disabled={markAllRead.isPending}
-            className="gap-1.5 text-[13px]"
+            onClick={() => setShowPreferences(!showPreferences)}
+            className={`gap-1.5 text-[13px] ${showPreferences ? "bg-primary/10 border-primary/30" : ""}`}
           >
-            <CheckCheck className="h-4 w-4" />
-            Marcar todas como lidas
+            <Settings2 className="h-4 w-4" />
+            Preferências
           </Button>
-        )}
+          {(unreadCount.data ?? 0) > 0 && !showPreferences && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => markAllRead.mutate()}
+              disabled={markAllRead.isPending}
+              className="gap-1.5 text-[13px]"
+            >
+              <CheckCheck className="h-4 w-4" />
+              Marcar todas como lidas
+            </Button>
+          )}
+        </div>
       </div>
 
+      {/* Preferences Panel */}
+      {showPreferences && (
+        <div className="mb-8 surface overflow-hidden">
+          <div className="p-5 border-b border-border/40 flex items-center justify-between">
+            <div>
+              <h2 className="text-[15px] font-semibold text-foreground">Preferências de Notificação</h2>
+              <p className="text-[13px] text-muted-foreground mt-0.5">Selecione quais notificações deseja receber no sino</p>
+            </div>
+            <button
+              onClick={() => setShowPreferences(false)}
+              className="p-1.5 rounded-lg hover:bg-muted transition-colors"
+            >
+              <X className="h-4 w-4 text-muted-foreground" />
+            </button>
+          </div>
+
+          <div className="divide-y divide-border/40">
+            {PREF_CATEGORIES.map((category) => (
+              <div key={category.title} className="p-5">
+                <div className="mb-4">
+                  <h3 className="text-[14px] font-semibold text-foreground">{category.title}</h3>
+                  <p className="text-[12px] text-muted-foreground mt-0.5">{category.description}</p>
+                </div>
+                <div className="space-y-3">
+                  {category.items.map((item) => {
+                    const Icon = item.icon;
+                    const isEnabled = preferences.data ? preferences.data[item.key] !== false : item.isDefault;
+                    return (
+                      <div key={item.key} className="flex items-center justify-between gap-4 py-1.5">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className={`h-8 w-8 rounded-lg flex items-center justify-center shrink-0 ${
+                            isEnabled ? "bg-primary/10" : "bg-muted/50"
+                          }`}>
+                            <Icon className={`h-4 w-4 ${isEnabled ? "text-primary" : "text-muted-foreground/50"}`} />
+                          </div>
+                          <div className="min-w-0">
+                            <p className={`text-[13px] font-medium ${isEnabled ? "text-foreground" : "text-muted-foreground"}`}>
+                              {item.label}
+                              {item.isDefault && (
+                                <span className="ml-2 text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-primary/10 text-primary">
+                                  padrão
+                                </span>
+                              )}
+                            </p>
+                            <p className="text-[12px] text-muted-foreground/70 truncate">{item.description}</p>
+                          </div>
+                        </div>
+                        <Switch
+                          checked={isEnabled}
+                          onCheckedChange={(checked) => handleTogglePref(item.key, checked)}
+                          disabled={setPreferences.isPending}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Notification List */}
       {notifications.isLoading ? (
         <div className="space-y-3">
           {[1, 2, 3, 4].map((i) => (
@@ -158,7 +363,13 @@ export default function NotificationsPage() {
       ) : (
         <div className="space-y-2">
           {notifications.data.map((n: any) => {
-            const cfg = typeConfig[n.type] || typeConfig["whatsapp_message"];
+            const cfg = typeConfig[n.type] || {
+              icon: Bell,
+              bg: "border-l-4 border-l-gray-500",
+              iconBg: "bg-gray-500/15",
+              iconColor: "text-gray-400",
+              label: n.type,
+            };
             const Icon = cfg.icon;
             return (
               <div

@@ -1838,15 +1838,37 @@ export const appRouter = router({
         beforeId: z.number().optional(),
       }))
       .query(async ({ input, ctx }) => {
-        return getNotifications(getTenantId(ctx), {
+        const allNotifs = await getNotifications(getTenantId(ctx), {
           onlyUnread: input.onlyUnread,
-          limit: input.limit,
+          limit: (input.limit ?? 50) * 3, // fetch more to filter
           beforeId: input.beforeId,
         });
+        // Filter by user notification preferences
+        const userId = ctx.saasUser?.userId || ctx.user!.id;
+        const tenantId = getTenantId(ctx);
+        const prefVal = await getUserPreference(userId, tenantId, "notification_preferences");
+        if (prefVal) {
+          try {
+            const prefs = JSON.parse(prefVal) as Record<string, boolean>;
+            const filtered = allNotifs.filter((n: any) => prefs[n.type] !== false);
+            return filtered.slice(0, input.limit ?? 50);
+          } catch { /* fallback to all */ }
+        }
+        return allNotifs.slice(0, input.limit ?? 50);
       }),
     unreadCount: tenantProcedure
       .query(async ({ input, ctx }) => {
-        return getUnreadNotificationCount(getTenantId(ctx));
+        const allNotifs = await getNotifications(getTenantId(ctx), { onlyUnread: true, limit: 200 });
+        const userId = ctx.saasUser?.userId || ctx.user!.id;
+        const tenantId = getTenantId(ctx);
+        const prefVal = await getUserPreference(userId, tenantId, "notification_preferences");
+        if (prefVal) {
+          try {
+            const prefs = JSON.parse(prefVal) as Record<string, boolean>;
+            return allNotifs.filter((n: any) => prefs[n.type] !== false).length;
+          } catch { /* fallback */ }
+        }
+        return allNotifs.length;
       }),
     markRead: tenantProcedure
       .input(z.object({ id: z.number() }))
@@ -1857,6 +1879,46 @@ export const appRouter = router({
     markAllRead: tenantProcedure
       .mutation(async ({ input, ctx }) => {
         await markAllNotificationsRead(getTenantId(ctx));
+        return { success: true };
+      }),
+    // ─── Notification Preferences ───
+    getPreferences: tenantProcedure
+      .query(async ({ ctx }) => {
+        const userId = ctx.saasUser?.userId || ctx.user!.id;
+        const tenantId = getTenantId(ctx);
+        const val = await getUserPreference(userId, tenantId, "notification_preferences");
+        // Default preferences: 4 types ON, rest OFF
+        const defaults: Record<string, boolean> = {
+          deal_created: true,
+          rfv_filter_alert: true,
+          task_due_soon: true,
+          birthday: true,
+          // Optional (off by default)
+          deal_moved: false,
+          contact_created: false,
+          task_created: false,
+          whatsapp_message: false,
+          whatsapp_connected: false,
+          whatsapp_disconnected: false,
+          whatsapp_warning: false,
+          wedding_anniversary: false,
+          new_lead: false,
+          automation_triggered: false,
+        };
+        if (val) {
+          try {
+            const saved = JSON.parse(val) as Record<string, boolean>;
+            return { ...defaults, ...saved };
+          } catch { /* fallback */ }
+        }
+        return defaults;
+      }),
+    setPreferences: tenantProcedure
+      .input(z.object({ preferences: z.record(z.string(), z.boolean()) }))
+      .mutation(async ({ input, ctx }) => {
+        const userId = ctx.saasUser?.userId || ctx.user!.id;
+        const tenantId = getTenantId(ctx);
+        await setUserPreference(userId, tenantId, "notification_preferences", JSON.stringify(input.preferences));
         return { success: true };
       }),
   }),
