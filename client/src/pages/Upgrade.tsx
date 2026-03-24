@@ -217,7 +217,7 @@ export default function Upgrade() {
                     <Button
                       variant="outline"
                       className="w-full h-10 border-gray-700 text-gray-300 hover:bg-gray-800 hover:text-white font-medium"
-                      onClick={() => window.open("https://wa.me/5511999999999?text=Olá! Gostaria de saber mais sobre o plano Scale do Entur OS.", "_blank")}
+                      onClick={() => window.open("https://wa.me/551151982627?text=" + encodeURIComponent("Quero conhecer o Plano Scale do Entur OS. Pode me ajudar?"), "_blank")}
                     >
                       Falar com vendas <ArrowRight className="w-4 h-4 ml-2" />
                     </Button>

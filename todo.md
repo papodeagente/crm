@@ -5032,3 +5032,8 @@
 
 ## Badge do Plano no Dropdown de Perfil
 - [x] Exibir versão do plano (Start, Growth, Scale) abaixo do nome/email no dropdown do perfil (TopNavLayout + DashboardLayout)
+
+## Upgrade/Downgrade na Página /profile
+- [x] Adicionar seção de planos na página /profile com upgrade/downgrade
+- [x] Scale: direcionar para WhatsApp 11 51982627 com mensagem padrão
+- [x] Atualizar link do Scale na página /upgrade para o mesmo WhatsApp (551151982627)
