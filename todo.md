@@ -5037,3 +5037,6 @@
 - [x] Adicionar seção de planos na página /profile com upgrade/downgrade
 - [x] Scale: direcionar para WhatsApp 11 51982627 com mensagem padrão
 - [x] Atualizar link do Scale na página /upgrade para o mesmo WhatsApp (551151982627)
+
+## Botão de Atalho Inbox na Página Início
+- [x] Adicionar botão de atalho do Inbox no header da página Início com badge de não lidas (tempo real)
