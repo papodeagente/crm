@@ -33,8 +33,6 @@ import { DashboardLayoutSkeleton } from "./DashboardLayoutSkeleton";
 import { useIsAdmin } from "./AdminOnlyGuard";
 import { Button } from "./ui/button";
 import { Separator } from "./ui/separator";
-import { trpc } from "@/lib/trpc";
-import { Crown } from "lucide-react";
 
 interface MenuSection {
   label: string;
@@ -163,11 +161,6 @@ function DashboardLayoutContent({
   const activeMenuItem = allMenuItems.find((item) => item.path === location);
   const isMobile = useIsMobile();
   const { isAdmin } = useIsAdmin();
-  const planSummary = trpc.plan.summary.useQuery(undefined, {
-    retry: false,
-    refetchOnWindowFocus: false,
-    staleTime: 5 * 60 * 1000,
-  });
 
   useEffect(() => {
     if (isCollapsed) setIsResizing(false);
@@ -273,24 +266,8 @@ function DashboardLayoutContent({
                   </div>
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-52 p-1.5 rounded-xl">
-                <div className="px-3 py-2.5 border-b border-border mb-1">
-                  <p className="text-[13px] font-semibold text-foreground">{user?.name || "Usuário"}</p>
-                  <p className="text-[11px] text-muted-foreground truncate mt-0.5">{user?.email || ""}</p>
-                  {planSummary.data?.planName && (
-                    <span className={`inline-flex items-center gap-1 mt-1.5 text-[10px] font-medium px-2 py-0.5 rounded-full ${
-                      planSummary.data.planId === "scale"
-                        ? "bg-amber-500/10 text-amber-500 dark:bg-amber-400/10 dark:text-amber-400"
-                        : planSummary.data.planId === "growth"
-                          ? "bg-violet-500/10 text-violet-500 dark:bg-violet-400/10 dark:text-violet-400"
-                          : "bg-primary/10 text-primary"
-                    }`}>
-                      <Crown className="h-2.5 w-2.5" />
-                      Plano {planSummary.data.planName}
-                    </span>
-                  )}
-                </div>
-                <DropdownMenuItem onClick={() => setLocation("/admin")} className="cursor-pointer rounded-lg px-3 py-2 text-[13px] gap-2.5">
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuItem onClick={() => setLocation("/admin")} className="cursor-pointer">
                   <Settings className="mr-2 h-4 w-4" />
                   <span>Configurações</span>
                 </DropdownMenuItem>

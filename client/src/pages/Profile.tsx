@@ -29,11 +29,6 @@ import {
   CalendarCheck,
   CalendarX,
   Zap,
-  Crown,
-  ArrowRight,
-  Rocket,
-  Building2,
-  MessageSquare,
 } from "lucide-react";
 
 export default function Profile() {
@@ -130,13 +125,6 @@ export default function Profile() {
     }
     changePassword.mutate({ currentPassword, newPassword });
   }, [currentPassword, newPassword, confirmPassword, changePassword]);
-
-  // ─── Plan Summary ───
-  const planSummary = trpc.plan.summary.useQuery(undefined, {
-    retry: false,
-    refetchOnWindowFocus: false,
-    staleTime: 5 * 60 * 1000,
-  });
 
   // ─── Google Calendar ───
   const connectGCal = trpc.profile.connectGoogleCalendar.useMutation({
@@ -485,162 +473,6 @@ export default function Profile() {
               </div>
             </CardContent>
           )}
-        </Card>
-
-        {/* ═══ PLAN SECTION ═══ */}
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <Crown className="h-5 w-5 text-primary" />
-              Meu Plano
-            </CardTitle>
-            <CardDescription>Gerencie sua assinatura e plano do Entur OS</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {planSummary.isLoading ? (
-              <div className="flex items-center justify-center py-6">
-                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-              </div>
-            ) : (
-              <div className="space-y-5">
-                {/* Current Plan */}
-                <div className="flex items-center gap-4 p-4 rounded-lg border border-border bg-muted/30">
-                  <div className={`h-12 w-12 rounded-xl flex items-center justify-center shrink-0 ${
-                    planSummary.data?.planId === "scale"
-                      ? "bg-amber-500/10"
-                      : planSummary.data?.planId === "growth"
-                        ? "bg-violet-500/10"
-                        : "bg-primary/10"
-                  }`}>
-                    {planSummary.data?.planId === "scale" ? (
-                      <Building2 className="h-6 w-6 text-amber-500" />
-                    ) : planSummary.data?.planId === "growth" ? (
-                      <Rocket className="h-6 w-6 text-violet-500" />
-                    ) : (
-                      <Zap className="h-6 w-6 text-primary" />
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <p className="font-semibold text-foreground">
-                        Plano {planSummary.data?.planName || "Start"}
-                      </p>
-                      <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
-                        Ativo
-                      </Badge>
-                    </div>
-                    <p className="text-sm text-muted-foreground mt-0.5">
-                      {planSummary.data?.currentUsers || 1}/{planSummary.data?.maxUsers === -1 ? "\u221E" : planSummary.data?.maxUsers || 1} usuário(s)
-                      &middot; {planSummary.data?.maxWhatsAppInstances === -1 ? "\u221E" : planSummary.data?.maxWhatsAppInstances || 1} instância(s) WhatsApp
-                    </p>
-                  </div>
-                </div>
-
-                {/* Plan Options */}
-                <div>
-                  <h4 className="text-sm font-medium text-foreground mb-3">Alterar plano</h4>
-                  <div className="grid gap-3">
-                    {/* Start */}
-                    <div className={`flex items-center justify-between p-3 rounded-lg border transition-colors ${
-                      planSummary.data?.planId === "start"
-                        ? "border-primary/30 bg-primary/5"
-                        : "border-border hover:border-border/80 hover:bg-muted/20"
-                    }`}>
-                      <div className="flex items-center gap-3">
-                        <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
-                          <Zap className="h-4 w-4 text-primary" />
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-foreground">Start</p>
-                          <p className="text-xs text-muted-foreground">1 usuário · 1 WhatsApp · R$97/mês</p>
-                        </div>
-                      </div>
-                      {planSummary.data?.planId === "start" ? (
-                        <Badge variant="outline" className="text-xs">Atual</Badge>
-                      ) : (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="text-xs h-7 px-3"
-                          onClick={() => window.open("https://pay.hotmart.com/S104799458W?off=axm3bvsz", "_blank")}
-                        >
-                          {planSummary.data?.planId === "growth" || planSummary.data?.planId === "scale" ? "Downgrade" : "Assinar"}
-                          <ArrowRight className="h-3 w-3 ml-1" />
-                        </Button>
-                      )}
-                    </div>
-
-                    {/* Growth */}
-                    <div className={`flex items-center justify-between p-3 rounded-lg border transition-colors ${
-                      planSummary.data?.planId === "growth"
-                        ? "border-violet-500/30 bg-violet-500/5"
-                        : "border-border hover:border-border/80 hover:bg-muted/20"
-                    }`}>
-                      <div className="flex items-center gap-3">
-                        <div className="h-8 w-8 rounded-lg bg-violet-500/10 flex items-center justify-center">
-                          <Rocket className="h-4 w-4 text-violet-500" />
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-foreground">Growth <span className="text-[10px] text-violet-500 font-normal ml-1">Popular</span></p>
-                          <p className="text-xs text-muted-foreground">5 usuários · 1 WhatsApp · R$297/mês</p>
-                        </div>
-                      </div>
-                      {planSummary.data?.planId === "growth" ? (
-                        <Badge variant="outline" className="text-xs">Atual</Badge>
-                      ) : (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="text-xs h-7 px-3"
-                          onClick={() => window.open("https://pay.hotmart.com/S104799458W?off=pubryjat", "_blank")}
-                        >
-                          {planSummary.data?.planId === "scale" ? "Downgrade" : "Upgrade"}
-                          <ArrowRight className="h-3 w-3 ml-1" />
-                        </Button>
-                      )}
-                    </div>
-
-                    {/* Scale */}
-                    <div className={`flex items-center justify-between p-3 rounded-lg border transition-colors ${
-                      planSummary.data?.planId === "scale"
-                        ? "border-amber-500/30 bg-amber-500/5"
-                        : "border-border hover:border-border/80 hover:bg-muted/20"
-                    }`}>
-                      <div className="flex items-center gap-3">
-                        <div className="h-8 w-8 rounded-lg bg-amber-500/10 flex items-center justify-center">
-                          <Building2 className="h-4 w-4 text-amber-500" />
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-foreground">Scale</p>
-                          <p className="text-xs text-muted-foreground">Ilimitado · Sob consulta</p>
-                        </div>
-                      </div>
-                      {planSummary.data?.planId === "scale" ? (
-                        <Badge variant="outline" className="text-xs">Atual</Badge>
-                      ) : (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="text-xs h-7 px-3"
-                          onClick={() => window.open(
-                            "https://wa.me/551151982627?text=" + encodeURIComponent("Quero conhecer o Plano Scale do Entur OS. Pode me ajudar?"),
-                            "_blank"
-                          )}
-                        >
-                          <MessageSquare className="h-3 w-3 mr-1" />
-                          Falar com vendas
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                <p className="text-xs text-muted-foreground">
-                  Pagamento processado pela Hotmart. Você pode alterar ou cancelar a qualquer momento.
-                </p>
-              </div>
-            )}
-          </CardContent>
         </Card>
 
         {/* ═══ GOOGLE CALENDAR SECTION ═══ */}

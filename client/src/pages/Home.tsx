@@ -7,7 +7,7 @@ import {
   Target, DollarSign, TrendingUp, Flame, ListTodo,
   Sparkles, Users, Settings, Package, FileText,
   Import, BarChart3, Radio, ShieldCheck, X,
-  CheckCircle2, Circle, Eye, ArrowRight, Inbox,
+  CheckCircle2, Circle, Eye, ArrowRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -254,12 +254,6 @@ export default function Home() {
   const [coolingModalOpen, setCoolingModalOpen] = useState(false);
 
   // ─── Data Queries ───
-  const waMetricsQ = trpc.dashboard.whatsappMetrics.useQuery(undefined, {
-    refetchInterval: REFETCH_INTERVAL,
-    staleTime: 30_000,
-  });
-  const unreadConversations = waMetricsQ.data?.unreadConversations ?? 0;
-
   const execQ = trpc.home.executive.useQuery(undefined, {
     refetchInterval: REFETCH_INTERVAL,
     staleTime: 30000,
@@ -332,17 +326,6 @@ export default function Home() {
           <p className="text-[13px] text-muted-foreground mt-1 capitalize">{today}</p>
         </div>
         <div className="flex items-center gap-2">
-          <Link href="/inbox">
-            <button className="relative flex items-center gap-2 px-3.5 py-1.5 rounded-lg bg-primary/10 border border-primary/20 hover:bg-primary/20 hover:border-primary/30 transition-all duration-200 group">
-              <Inbox className="h-4 w-4 text-primary group-hover:scale-110 transition-transform" />
-              <span className="text-[11px] font-semibold text-primary">Inbox</span>
-              {unreadConversations > 0 && (
-                <span className="flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold leading-none">
-                  {unreadConversations > 99 ? "99+" : unreadConversations}
-                </span>
-              )}
-            </button>
-          </Link>
           <span className="text-[11px] text-muted-foreground font-medium bg-muted/50 px-3 py-1.5 rounded-lg capitalize">
             {monthLabel}
           </span>

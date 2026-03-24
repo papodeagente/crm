@@ -5029,14 +5029,3 @@
 
 ## Página /upgrade - Fundo Preto Dark
 - [x] Ajustar fundo da página /upgrade para preto (#0a0a12), integrado ao layout dark do Entur OS
-
-## Badge do Plano no Dropdown de Perfil
-- [x] Exibir versão do plano (Start, Growth, Scale) abaixo do nome/email no dropdown do perfil (TopNavLayout + DashboardLayout)
-
-## Upgrade/Downgrade na Página /profile
-- [x] Adicionar seção de planos na página /profile com upgrade/downgrade
-- [x] Scale: direcionar para WhatsApp 11 51982627 com mensagem padrão
-- [x] Atualizar link do Scale na página /upgrade para o mesmo WhatsApp (551151982627)
-
-## Botão de Atalho Inbox na Página Início
-- [x] Adicionar botão de atalho do Inbox no header da página Início com badge de não lidas (tempo real)
