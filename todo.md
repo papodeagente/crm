@@ -5029,3 +5029,6 @@
 
 ## Página /upgrade - Fundo Preto Dark
 - [x] Ajustar fundo da página /upgrade para preto (#0a0a12), integrado ao layout dark do Entur OS
+
+## Remover Script RD Station
+- [x] Remover script de monitoramento do RD Station do index.html
