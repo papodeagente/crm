@@ -10,15 +10,15 @@ import "./index.css";
 
 // ═══════════════════════════════════════
 // CIRCUIT BREAKER — Global rate limit protection
-// When a 429 is received, ALL requests pause for a cooldown period.
-// This prevents retry amplification that keeps the rate limit active.
+// When a 429 is received, non-critical requests pause for a cooldown period.
+// Auth-related requests (auth.me, auth.logout) are NEVER blocked.
 // ═══════════════════════════════════════
 let rateLimitedUntil = 0;
 let consecutiveRateLimits = 0;
 
 function getRateLimitCooldown(): number {
-  // Escalating cooldown: 30s → 60s → 120s → 180s (max)
-  const base = 30_000;
+  // Less aggressive cooldown: 5s → 10s → 20s → 30s (max)
+  const base = 5_000;
   const multiplier = Math.min(consecutiveRateLimits, 3);
   return base * (multiplier + 1);
 }
@@ -28,7 +28,7 @@ function activateCircuitBreaker() {
   const cooldown = getRateLimitCooldown();
   rateLimitedUntil = Date.now() + cooldown;
   console.warn(
-    `[CircuitBreaker] Rate limited. Pausing ALL requests for ${cooldown / 1000}s ` +
+    `[CircuitBreaker] Rate limited. Pausing non-critical requests for ${cooldown / 1000}s ` +
     `(consecutive: ${consecutiveRateLimits})`
   );
 }
@@ -38,10 +38,19 @@ function resetCircuitBreaker() {
     console.info("[CircuitBreaker] Requests flowing normally again.");
   }
   consecutiveRateLimits = 0;
+  rateLimitedUntil = 0;
 }
 
 function isCircuitBreakerOpen(): boolean {
   return Date.now() < rateLimitedUntil;
+}
+
+// Check if a request URL targets auth-related endpoints that should never be blocked
+function isAuthRequest(input: RequestInfo | URL): boolean {
+  const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+  // tRPC batch requests encode procedure names in the URL
+  // Allow auth.me, auth.logout, saasAuth, plan.summary through always
+  return /auth\.me|auth\.logout|saasAuth|plan\.summary|oauth/i.test(url);
 }
 
 // ═══════════════════════════════════════
@@ -102,6 +111,7 @@ queryClient.getMutationCache().subscribe(event => {
 
 // ═══════════════════════════════════════
 // tRPC CLIENT — Zero fetch-level retries, circuit breaker integration
+// Auth requests bypass circuit breaker to ensure login always works
 // ═══════════════════════════════════════
 const trpcClient = trpc.createClient({
   links: [
@@ -109,8 +119,11 @@ const trpcClient = trpc.createClient({
       url: "/api/trpc",
       transformer: superjson,
       async fetch(input, init) {
-        // Check circuit breaker BEFORE making any request
-        if (isCircuitBreakerOpen()) {
+        // Auth requests ALWAYS go through — never blocked by circuit breaker
+        const isAuth = isAuthRequest(input);
+
+        // Check circuit breaker BEFORE making non-auth requests
+        if (!isAuth && isCircuitBreakerOpen()) {
           const waitMs = rateLimitedUntil - Date.now();
           throw new Error(
             `RATE_LIMITED: Sistema pausado por ${Math.ceil(waitMs / 1000)}s. Aguarde.`

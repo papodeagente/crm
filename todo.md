@@ -5032,3 +5032,9 @@
 
 ## Remover Script RD Station
 - [x] Remover script de monitoramento do RD Station do index.html
+
+## Fix RATE_LIMITED no Login
+- [x] Diagnosticar e corrigir erro RATE_LIMITED que impede login (pausado por 56s)
+- [x] Reduzir cooldown de 30-180s para 5-30s
+- [x] Auth requests (auth.me, auth.logout, saasAuth, plan.summary) nunca bloqueados pelo circuit breaker
+- [x] Reset do circuit breaker ao receber resposta OK
