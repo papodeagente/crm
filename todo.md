@@ -5029,3 +5029,6 @@
 
 ## Página /upgrade - Fundo Preto Dark
 - [x] Ajustar fundo da página /upgrade para preto (#0a0a12), integrado ao layout dark do Entur OS
+
+## Badge do Plano no Dropdown de Perfil
+- [x] Exibir versão do plano (Start, Growth, Scale) abaixo do nome/email no dropdown do perfil (TopNavLayout + DashboardLayout)

@@ -12,7 +12,7 @@ import { getLoginUrl } from "@/const";
 import {
   Home, Briefcase, Users, CheckSquare, BarChart3,
   Bell, Settings, Search, ChevronRight, LogOut, Menu, X,
-  Loader2, User, Building2, ListTodo, Phone, Mail, Sun, Moon, MessageSquare, Shield, TrendingUp,
+  Loader2, User, Building2, ListTodo, Phone, Mail, Sun, Moon, MessageSquare, Shield, TrendingUp, Crown,
 } from "lucide-react";
 import { formatDateShort } from "../../../shared/dateUtils";
 import { useState, useEffect, useRef, useCallback } from "react";
@@ -491,6 +491,18 @@ function TopBar({ onSearchOpen, mobileMenuOpen, onToggleMobile }: {
                 <div className="px-3 py-2.5 border-b border-border mb-1">
                   <p className="text-[13px] font-semibold text-foreground">{user?.name || "Usuário"}</p>
                   <p className="text-[11px] text-muted-foreground truncate mt-0.5">{user?.email || ""}</p>
+                  {planSummary.data?.planName && (
+                    <span className={`inline-flex items-center gap-1 mt-1.5 text-[10px] font-medium px-2 py-0.5 rounded-full ${
+                      planSummary.data.planId === "scale"
+                        ? "bg-amber-500/10 text-amber-500 dark:bg-amber-400/10 dark:text-amber-400"
+                        : planSummary.data.planId === "growth"
+                          ? "bg-violet-500/10 text-violet-500 dark:bg-violet-400/10 dark:text-violet-400"
+                          : "bg-primary/10 text-primary"
+                    }`}>
+                      <Crown className="h-2.5 w-2.5" />
+                      Plano {planSummary.data.planName}
+                    </span>
+                  )}
                 </div>
                 <DropdownMenuItem onClick={() => setLocation("/profile")} className="cursor-pointer rounded-lg px-3 py-2 text-[13px] gap-2.5">
                   <User className="h-3.5 w-3.5 text-muted-foreground" />
