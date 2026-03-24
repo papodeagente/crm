@@ -13,9 +13,9 @@
  * - billingStatus "cancelled" with expired period → read-only mode
  */
 
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { getDb } from "../db";
-import { tenants, subscriptions } from "../../drizzle/schema";
+import { tenants, subscriptions, crmUsers } from "../../drizzle/schema";
 import { TRPCError } from "@trpc/server";
 
 export type BillingAccessLevel = "full" | "restricted";
@@ -163,6 +163,72 @@ export async function checkBillingAccess(tenantId: number): Promise<BillingAcces
         plan: tenant.plan,
         reason: "UNKNOWN_STATUS",
       };
+  }
+}
+
+/**
+ * Plan user limits.
+ * Trial (any plan): max 1 user
+ * Active Start: max 1 user
+ * Active Growth/Scale: unlimited
+ */
+const PLAN_USER_LIMITS: Record<string, number> = {
+  free: 1,
+  start: 1,
+  pro: 5,
+  growth: 999,
+  scale: 999,
+  enterprise: 999,
+};
+
+/**
+ * Guard: throws if tenant cannot add more users.
+ * Rules:
+ * - Trial (any plan): max 1 user → must upgrade to add more
+ * - Active Start: max 1 user
+ * - Active Growth+: unlimited
+ */
+export async function assertCanAddUser(tenantId: number): Promise<void> {
+  const db = await getDb();
+  if (!db) return; // fail-open
+
+  const tenantRows = await db.select().from(tenants).where(eq(tenants.id, tenantId)).limit(1);
+  if (tenantRows.length === 0) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Tenant não encontrado." });
+  }
+  const tenant = tenantRows[0];
+
+  // Legacy tenants: no restrictions
+  if (tenant.isLegacy) return;
+
+  // Count current users
+  const userCountRows = await db.select({ count: sql<number>`COUNT(*)` }).from(crmUsers).where(eq(crmUsers.tenantId, tenantId));
+  const currentUserCount = Number(userCountRows[0]?.count ?? 0);
+
+  // Trial: always limited to 1 user, regardless of plan
+  if (tenant.billingStatus === "trialing") {
+    if (currentUserCount >= 1) {
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: "Durante o período de teste, é permitido apenas 1 usuário. Faça upgrade para o plano Growth para adicionar mais usuários.",
+      });
+    }
+    return;
+  }
+
+  // Active/past_due: check plan limits
+  const maxUsers = PLAN_USER_LIMITS[tenant.plan] ?? 1;
+  if (currentUserCount >= maxUsers) {
+    if (tenant.plan === "start" || tenant.plan === "free") {
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: "O plano Start permite apenas 1 usuário. Faça upgrade para o plano Growth para adicionar mais usuários.",
+      });
+    }
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: `Limite de ${maxUsers} usuários atingido para o plano ${tenant.plan}. Entre em contato com o suporte.`,
+    });
   }
 }
 

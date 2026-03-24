@@ -149,6 +149,7 @@ import { rdCrmImportRouter } from "./routers/rdCrmImportRouter";
 import { saasAuthRouter } from "./routers/saasAuthRouter";
 import { billingRouter } from "./routers/billingRouter";
 import { inviteUserToTenant } from "./saasAuth";
+import { assertCanAddUser } from "./services/billingAccessService";
 import { rfvRouter } from "./routers/rfvRouter";
 import { profileRouter } from "./routers/profileRouter";
 import { analyticsRouter } from "./routers/analyticsRouter";
@@ -2032,6 +2033,8 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
         if (ctx.saasUser?.role !== "admin") {
           throw new TRPCError({ code: "FORBIDDEN", message: "Apenas administradores podem convidar agentes" });
         }
+        // Check user limit (trial = 1 user, Start = 1, Growth+ = unlimited)
+        await assertCanAddUser(getTenantId(ctx));
         try {
           // inviteUserToTenant imported statically at top of file
           const result = await inviteUserToTenant({

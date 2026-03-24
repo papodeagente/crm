@@ -78,6 +78,11 @@ export async function listCrmUsers(tenantId: number) {
   const db = await getDb(); if (!db) return [];
   return db.select().from(crmUsers).where(eq(crmUsers.tenantId, tenantId)).orderBy(desc(crmUsers.createdAt));
 }
+export async function countCrmUsers(tenantId: number): Promise<number> {
+  const db = await getDb(); if (!db) return 0;
+  const rows = await db.select({ count: sql<number>`COUNT(*)` }).from(crmUsers).where(eq(crmUsers.tenantId, tenantId));
+  return Number(rows[0]?.count ?? 0);
+}
 export async function updateCrmUser(tenantId: number, id: number, data: Partial<{ name: string; email: string; phone: string; status: "active" | "inactive" | "invited"; updatedBy: number }>) {
   const db = await getDb(); if (!db) return;
   await db.update(crmUsers).set(data).where(and(eq(crmUsers.id, id), eq(crmUsers.tenantId, tenantId)));

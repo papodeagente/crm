@@ -4,6 +4,7 @@ import { TRPCError } from "@trpc/server";
 import * as crm from "../crmDb";
 import { emitEvent } from "../middleware/eventLog";
 import { inviteUserToTenant } from "../saasAuth";
+import { assertCanAddUser } from "../services/billingAccessService";
 import { runDbRepair } from "../dbRepair";
 import { reprocessStuckTranscriptions } from "../audioTranscriptionWorker";
 import { getAllVisibilityModes, setAllVisibilityModes, type VisibilityMode, type EntityType } from "../services/visibilityService";
@@ -41,6 +42,8 @@ export const adminRouter = router({
         if (ctx.saasUser?.role !== "admin") {
           throw new TRPCError({ code: "FORBIDDEN", message: "Apenas administradores podem adicionar usuários" });
         }
+        // Check user limit (trial = 1 user, Start = 1, Growth+ = unlimited)
+        await assertCanAddUser(getTenantId(ctx));
         // Use inviteUserToTenant to create user + send invite email
         try {
           // inviteUserToTenant imported statically at top of file

@@ -5004,3 +5004,9 @@
 - [x] Aplicar em inboxRouter.ts (send, markRead, etc.)
 - [x] 0 erros TypeScript após todas as mudanças
 - [x] 9 testes billingAccessGuard.test.ts passando
+
+## Restrição de 1 Usuário no Trial
+- [x] Backend: assertCanAddUser no billingAccessService (trial=1, Start=1, Growth+=ilimitado)
+- [x] Backend: guard aplicado em admin.users.create e teamManagement.inviteAgent
+- [x] Frontend: erro FORBIDDEN exibido via toast.error (já tratado pelo onError do mutation)
+- [x] 10 testes passando (trialUserLimit.test.ts)
