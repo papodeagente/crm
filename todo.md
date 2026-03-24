@@ -4916,3 +4916,16 @@
 - [x] Corrigir URL do webhook no dashboard para /api/webhooks/hotmart
 - [x] Não alterar nenhuma regra existente do sistema
 - [x] 116 testes passando (billing + plans + metrics)
+
+## Debug: Webhook Hotmart não cria usuário na compra
+- [ ] Investigar logs do servidor para ver se webhook está chegando
+- [ ] Verificar se HOTTOK está configurado corretamente
+- [ ] Verificar parsing do payload Hotmart v2.0.0
+- [ ] Corrigir problema identificado
+- [ ] Testar fluxo completo
+
+## Banner Contagem Regressiva Trial
+- [x] Criar componente TrialCountdownBanner (vermelho, countdown dias/horas/min/seg, botão Assine Agora)
+- [x] Inserir na página Início acima das prioridades de ação
+- [x] Mostrar apenas para tenants em trial (não-legacy, billingStatus=trialing)
+- [x] 15 testes passando (trialBanner.test.ts)

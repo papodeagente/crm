@@ -17,6 +17,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import TrialCountdownBanner from "@/components/TrialCountdownBanner";
 
 /* ─── Polling interval for real-time sync (60 seconds) ─── */
 const REFETCH_INTERVAL = 60_000;
@@ -461,6 +462,9 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      {/* ─── TRIAL COUNTDOWN BANNER ─── */}
+      <TrialCountdownBanner />
 
       {/* ═══════════════════════════════════════════════════════
           BLOCO 2 + 3 — PRIORIDADES + OPORTUNIDADES (side by side)
