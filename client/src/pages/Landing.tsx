@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useLocation } from "wouter";
 import { HeroSection } from "@/components/landing/HeroSection";
 import { EnemySection } from "@/components/landing/EnemySection";
@@ -14,6 +15,10 @@ import { SalesSimulator } from "@/components/landing/SalesSimulator";
 
 export default function Landing() {
   const [, navigate] = useLocation();
+
+  useEffect(() => {
+    document.title = "ENTUR OS | CRM e Gestão para Agências de Viagens";
+  }, []);
 
   const scrollToPlanos = () => {
     document.getElementById("planos")?.scrollIntoView({ behavior: "smooth" });

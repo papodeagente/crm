@@ -5010,3 +5010,10 @@
 - [x] Backend: guard aplicado em admin.users.create e teamManagement.inviteAgent
 - [x] Frontend: erro FORBIDDEN exibido via toast.error (já tratado pelo onError do mutation)
 - [x] 10 testes passando (trialUserLimit.test.ts)
+
+## Fix SEO Landing Page (/)
+- [x] Título: "ENTUR OS | CRM e Gestão para Agências de Viagens" (50 chars) via document.title + index.html
+- [x] Meta description: 144 chars com palavras-chave do nicho
+- [x] Palavras-chave: 7 keywords relevantes (CRM, turismo, funil, WhatsApp, etc.)
+- [x] Open Graph tags (og:title, og:description, og:type, og:locale)
+- [x] Meta robots: index, follow
