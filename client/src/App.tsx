@@ -45,6 +45,7 @@ const RDCrmImport = lazyWithRetry(() => import("./pages/RDCrmImport"));
 const TaskAutomationSettings = lazyWithRetry(() => import("./pages/TaskAutomationSettings"));
 const ClassificationSettings = lazyWithRetry(() => import("./pages/ClassificationSettings"));
 const DateAutomationSettings = lazyWithRetry(() => import("./pages/DateAutomationSettings"));
+const StageOwnerRuleSettings = lazyWithRetry(() => import("./pages/StageOwnerRuleSettings"));
 const SalesAutomationHub = lazyWithRetry(() => import("./pages/SalesAutomationHub"));
 const RfvMatrix = lazyWithRetry(() => import("./pages/RfvMatrix"));
 const BirthdayCalendar = lazyWithRetry(() => import("./pages/BirthdayCalendar"));
@@ -142,6 +143,7 @@ function AppRouter() {
                 <Route path="/settings/automation-hub" component={SalesAutomationHub} />
                 <Route path="/settings/automations" component={TaskAutomationSettings} />
                 <Route path="/settings/date-automations" component={DateAutomationSettings} />
+                <Route path="/settings/stage-owner-rules" component={StageOwnerRuleSettings} />
                 <Route path="/settings/classification" component={ClassificationSettings} />
 
                 {/* Super Admin */}

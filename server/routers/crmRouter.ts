@@ -693,6 +693,17 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
               console.log(`[TaskAutomation] Created ${createdTaskIds.length} tasks for deal ${input.dealId} at stage ${input.toStageId}`);
             }
           }
+          // Execute stage owner rule: auto-reassign deal owner
+          try {
+            const ownerResult = await crm.executeStageOwnerRule(
+              getTenantId(ctx), input.dealId, input.toStageId, ctx.user.id
+            );
+            if (ownerResult) {
+              console.log(`[StageOwnerRule] Deal ${input.dealId} reassigned to ${ownerResult.assignedUserName} (userId: ${ownerResult.assignedUserId})`);
+            }
+          } catch (ownerErr) {
+            console.error("[StageOwnerRule] Error:", ownerErr);
+          }
         } catch (e) {
           console.error("[Classification/TaskAutomation] Error on deal moved:", e);
         }
@@ -780,6 +791,17 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
           );
           if (createdTaskIds.length > 0) {
             console.log(`[TaskAutomation] Created ${createdTaskIds.length} tasks for deal ${input.dealId} at new pipeline stage ${input.newStageId}`);
+          }
+          // Execute stage owner rule: auto-reassign deal owner on pipeline change
+          try {
+            const ownerResult = await crm.executeStageOwnerRule(
+              getTenantId(ctx), input.dealId, input.newStageId, ctx.user.id
+            );
+            if (ownerResult) {
+              console.log(`[StageOwnerRule] Deal ${input.dealId} reassigned to ${ownerResult.assignedUserName} on pipeline change`);
+            }
+          } catch (ownerErr) {
+            console.error("[StageOwnerRule] Error on pipeline change:", ownerErr);
           }
         } catch (e) {
           console.error("[Classification/TaskAutomation] Error on pipeline change:", e);
@@ -1525,6 +1547,46 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
       .mutation(async ({ input, ctx }) => {
         const { runDateAutomationsForTenant } = await import("../dateAutomationScheduler");
         return runDateAutomationsForTenant(getTenantId(ctx));
+      }),
+  }),
+
+  // ─── STAGE OWNER RULES (Mudar responsável ao mover etapa) ───
+  stageOwnerRules: router({
+    list: tenantProcedure
+      .input(z.object({ pipelineId: z.number().optional() }))
+      .query(async ({ input, ctx }) => {
+        const { canAccessAutomationCenter } = await import("../services/planLimitsService");
+        if (!(await canAccessAutomationCenter(getTenantId(ctx)))) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "PLAN_FEATURE_BLOCKED:automationCenter" });
+        }
+        return crm.listStageOwnerRules(getTenantId(ctx), input.pipelineId);
+      }),
+    create: tenantWriteProcedure
+      .input(z.object({
+        pipelineId: z.number(),
+        stageId: z.number(),
+        assignToUserId: z.number(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const id = await crm.createStageOwnerRule({ ...input, tenantId: getTenantId(ctx) });
+        return { id };
+      }),
+    update: tenantWriteProcedure
+      .input(z.object({
+        id: z.number(),
+        assignToUserId: z.number().optional(),
+        isActive: z.boolean().optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const { id, ...data } = input;
+        await crm.updateStageOwnerRule(getTenantId(ctx), id, data);
+        return { success: true };
+      }),
+    delete: tenantWriteProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        await crm.deleteStageOwnerRule(getTenantId(ctx), input.id);
+        return { success: true };
       }),
   }),
 });

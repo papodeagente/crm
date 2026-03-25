@@ -5204,3 +5204,19 @@
 - [x] Testes: replay idêntico = não duplica (coberto por idempotency key test)
 - [x] Testes: histórico aparece no deal e no contato (coberto por endpoint tRPC)
 - [x] Testes: isolamento multi-tenant (coberto por multi-tenant isolation tests)
+
+## Automação: Mudar responsável ao mover etapa
+
+- [x] Análise: mapear central de automações, schema de funis/etapas, lógica de movimentação de deals
+- [x] Schema: tabela stage_owner_rules (tenantId, pipelineId, stageId, assignToUserId, isActive)
+- [x] Backend: lógica de reatribuição automática ao mover deal de etapa (executeStageOwnerRule)
+- [x] Backend: endpoints tRPC para CRUD da configuração de responsável por etapa (stageOwnerRules.list/create/update/delete)
+- [x] Backend: integração com moveStage e changePipeline (executeStageOwnerRule)
+- [x] Frontend: UI de configuração da automação (StageOwnerRuleSettings.tsx)
+- [x] Frontend: integrar card existente na central de automações com a nova tela
+- [x] Frontend: card na central remove badge 'Em breve' e aponta para /settings/stage-owner-rules
+- [x] Frontend: stageOwnerRules aparece na tab 'Minhas automações' da central
+- [x] Testes: 12 testes passando (CRUD, execução, isolamento multi-tenant)
+- [x] Testes: sem reatribuição quando etapa não tem regra configurada
+- [x] Testes: CRUD de configuração de responsável por etapa (create, upsert, update, delete)
+- [x] Testes: isolamento multi-tenant (regras não visíveis entre tenants, delete protegido)

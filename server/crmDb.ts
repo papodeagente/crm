@@ -17,6 +17,7 @@ import {
   leadSources, campaigns, lossReasons,
   taskAutomations,
   dateAutomations,
+  stageOwnerRules,
 } from "../drizzle/schema";
 
 // ═══════════════════════════════════════
@@ -1893,6 +1894,97 @@ export async function executeTaskAutomations(
   return createdTasks;
 }
 
+
+// ═══════════════════════════════════════
+// STAGE OWNER RULES (Mudar responsável ao mover etapa)
+// ═══════════════════════════════════════
+
+export async function listStageOwnerRules(tenantId: number, pipelineId?: number) {
+  const db = await getDb(); if (!db) return [];
+  const conditions = [eq(stageOwnerRules.tenantId, tenantId)];
+  if (pipelineId) conditions.push(eq(stageOwnerRules.pipelineId, pipelineId));
+  return db.select().from(stageOwnerRules).where(and(...conditions)).orderBy(stageOwnerRules.stageId);
+}
+
+export async function getStageOwnerRule(tenantId: number, stageId: number) {
+  const db = await getDb(); if (!db) return null;
+  const rows = await db.select().from(stageOwnerRules)
+    .where(and(
+      eq(stageOwnerRules.tenantId, tenantId),
+      eq(stageOwnerRules.stageId, stageId),
+      eq(stageOwnerRules.isActive, true),
+    ))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+export async function createStageOwnerRule(data: {
+  tenantId: number; pipelineId: number; stageId: number; assignToUserId: number;
+}) {
+  const db = await getDb(); if (!db) return null;
+  // Upsert: se já existe regra para esta etapa, atualiza
+  const existing = await db.select().from(stageOwnerRules)
+    .where(and(
+      eq(stageOwnerRules.tenantId, data.tenantId),
+      eq(stageOwnerRules.stageId, data.stageId),
+    ))
+    .limit(1);
+  if (existing.length > 0) {
+    await db.update(stageOwnerRules)
+      .set({ assignToUserId: data.assignToUserId, isActive: true })
+      .where(eq(stageOwnerRules.id, existing[0].id));
+    return existing[0].id;
+  }
+  const [result] = await db.insert(stageOwnerRules).values(data).$returningId();
+  return result.id;
+}
+
+export async function updateStageOwnerRule(tenantId: number, id: number, data: Partial<{
+  assignToUserId: number; isActive: boolean;
+}>) {
+  const db = await getDb(); if (!db) return;
+  await db.update(stageOwnerRules).set(data)
+    .where(and(eq(stageOwnerRules.id, id), eq(stageOwnerRules.tenantId, tenantId)));
+}
+
+export async function deleteStageOwnerRule(tenantId: number, id: number) {
+  const db = await getDb(); if (!db) return;
+  await db.delete(stageOwnerRules)
+    .where(and(eq(stageOwnerRules.id, id), eq(stageOwnerRules.tenantId, tenantId)));
+}
+
+/**
+ * Executa a regra de reatribuição de responsável ao mover deal para uma etapa.
+ * Retorna o userId atribuído ou null se não há regra ativa.
+ */
+export async function executeStageOwnerRule(
+  tenantId: number, dealId: number, stageId: number, actorUserId?: number
+): Promise<{ assignedUserId: number; assignedUserName: string } | null> {
+  const db = await getDb(); if (!db) return null;
+  const rule = await getStageOwnerRule(tenantId, stageId);
+  if (!rule) return null;
+
+  // Buscar o usuário alvo
+  const user = await getCrmUserById(tenantId, rule.assignToUserId);
+  if (!user) return null;
+
+  // Atualizar o responsável do deal
+  await updateDeal(tenantId, dealId, { ownerUserId: rule.assignToUserId, updatedBy: actorUserId });
+
+  // Registrar no histórico do deal
+  await createDealHistory({
+    tenantId,
+    dealId,
+    action: "owner_changed",
+    description: `Responsável alterado automaticamente para "${user.name}" (automação de etapa)`,
+    fieldChanged: "ownerUserId",
+    newValue: String(rule.assignToUserId),
+    actorUserId: actorUserId,
+    actorName: "Sistema (Automação)",
+  });
+
+  return { assignedUserId: rule.assignToUserId, assignedUserName: user.name };
+}
 
 // ═══════════════════════════════════════
 // DATE-BASED AUTOMATIONS

@@ -506,6 +506,23 @@ export const taskAutomations = mysqlTable("task_automations", {
   index("task_auto_tenant_stage_idx").on(t.tenantId, t.stageId),
 ]);
 
+// ═══════════════════════════════════════
+// STAGE OWNER RULES (Mudar responsável ao mover etapa)
+// ═══════════════════════════════════════
+export const stageOwnerRules = mysqlTable("stage_owner_rules", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  pipelineId: int("pipelineId").notNull(),
+  stageId: int("stageId").notNull(),
+  assignToUserId: int("assignToUserId").notNull(),
+  isActive: boolean("isActive").default(true).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (t) => [
+  index("sor_tenant_pipeline_idx").on(t.tenantId, t.pipelineId),
+  index("sor_tenant_stage_idx").on(t.tenantId, t.stageId),
+]);
+
 export const dealParticipants = mysqlTable("deal_participants", {
   id: int("id").autoincrement().primaryKey(),
   tenantId: int("tenantId").notNull(),

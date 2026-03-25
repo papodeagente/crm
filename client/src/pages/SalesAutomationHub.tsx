@@ -133,8 +133,7 @@ const AUTOMATION_CATEGORIES: AutomationCategory[] = [
         actionIcon: UserCog,
         color: "text-blue-400",
         bgGradient: "from-blue-500/10 to-indigo-500/5",
-        path: "/settings/automations",
-        badge: "Em breve",
+        path: "/settings/stage-owner-rules",
       },
     ],
   },
@@ -408,6 +407,9 @@ export default function SalesAutomationHub() {
   const dateAutomationsQ = trpc.crm.dateAutomations.list.useQuery({},
     { enabled: activeTab === "my" }
   );
+  const stageOwnerRulesQ = trpc.crm.stageOwnerRules.list.useQuery({},
+    { enabled: activeTab === "my" }
+  );
   const pipelinesQ = trpc.crm.pipelines.list.useQuery({},
     { enabled: activeTab === "my" }
   );
@@ -440,7 +442,7 @@ export default function SalesAutomationHub() {
   // ─── Unified automation list ───────────────────────────
   type UnifiedAutomation = {
     id: string;
-    type: "task" | "pipeline" | "date";
+    type: "task" | "pipeline" | "date" | "stage_owner";
     name: string;
     description: string;
     trigger: string;
@@ -518,8 +520,27 @@ export default function SalesAutomationHub() {
       });
     });
 
+    // Stage owner rules
+    (stageOwnerRulesQ.data || []).forEach((a: any) => {
+      list.push({
+        id: `stage-owner-${a.id}`,
+        type: "stage_owner",
+        name: `Mudar responsável na etapa "${stageMap.get(a.stageId) || "..."}"`,
+        description: `Reatribuir responsável automaticamente ao mover para "${stageMap.get(a.stageId) || "..."}"`,
+        trigger: `Etapa: ${stageMap.get(a.stageId) || "..."}`,
+        action: "Mudar responsável",
+        pipeline: pipelineMap.get(a.pipelineId) || "...",
+        isActive: a.isActive,
+        icon: ArrowRightLeft,
+        actionIcon: UserCog,
+        color: "text-blue-400",
+        editPath: "/settings/stage-owner-rules",
+        category: "Automação por etapa",
+      });
+    });
+
     return list;
-  }, [taskAutomationsQ.data, pipelineAutomationsQ.data, dateAutomationsQ.data, pipelineMap, stageMap]);
+  }, [taskAutomationsQ.data, pipelineAutomationsQ.data, dateAutomationsQ.data, stageOwnerRulesQ.data, pipelineMap, stageMap]);
 
   // ─── Filtered templates ────────────────────────────────
   const filteredCategories = useMemo(() => {
@@ -781,7 +802,7 @@ export default function SalesAutomationHub() {
               </div>
 
               {/* Loading state */}
-              {(taskAutomationsQ.isLoading || pipelineAutomationsQ.isLoading || dateAutomationsQ.isLoading) && (
+              {(taskAutomationsQ.isLoading || pipelineAutomationsQ.isLoading || dateAutomationsQ.isLoading || stageOwnerRulesQ.isLoading) && (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                   {[1, 2, 3, 4, 5, 6].map((i) => (
                     <Card key={i} className="border-border/30 animate-pulse">
@@ -796,7 +817,7 @@ export default function SalesAutomationHub() {
               )}
 
               {/* Empty state */}
-              {!taskAutomationsQ.isLoading && !pipelineAutomationsQ.isLoading && !dateAutomationsQ.isLoading && filteredMyAutomations.length === 0 && (
+              {!taskAutomationsQ.isLoading && !pipelineAutomationsQ.isLoading && !dateAutomationsQ.isLoading && !stageOwnerRulesQ.isLoading && filteredMyAutomations.length === 0 && (
                 <div className="text-center py-16">
                   <div className="h-16 w-16 rounded-2xl bg-muted/20 flex items-center justify-center mx-auto mb-4">
                     <Zap className="h-7 w-7 text-muted-foreground/40" />
