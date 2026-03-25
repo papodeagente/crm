@@ -216,6 +216,13 @@ export default function SuperAdmin() {
           </div>
           <div className="flex items-center gap-3">
             <button
+              onClick={() => navigate("/super-admin/zapi")}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 transition-colors text-sm font-medium"
+            >
+              <Wifi className="w-4 h-4" />
+              Z-API
+            </button>
+            <button
               onClick={() => navigate("/super-admin/billing")}
               className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-purple-500/10 text-purple-400 hover:bg-purple-500/20 transition-colors text-sm font-medium"
             >

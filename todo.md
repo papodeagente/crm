@@ -5098,3 +5098,15 @@
 - [x] AI Analysis: score circles empilhados no mobile
 - [x] Corrigir sobreposição de botões e textos no mobile
 - [x] Simplificar layout para ser funcional em telas pequenas
+## Dashboard Super Admin - Gerenciamento Z-API
+- [x] Backend: endpoint listar todas instâncias Z-API com info de tenant e status
+- [x] Backend: endpoint liberar Z-API manualmente para tenant sem pagamento
+- [x] Backend: endpoint revogar/cancelar instância Z-API
+- [x] Backend: endpoint ver detalhes da instância (status conexão)
+- [x] Frontend: página SuperAdmin Z-API com tabela de instâncias
+- [x] Frontend: botão liberar Z-API para tenant (com confirmação)
+- [x] Frontend: botão revogar instância (com confirmação)
+- [x] Frontend: filtros por status (ativa, cancelada, pendente)
+- [x] Frontend: indicador visual de status de conexão WhatsApp
+- [x] Rota registrada no App.tsx e menu de navegação
+- [x] Testes vitest: 10 testes passando (access control, provisioning, deprovisioning, stats, data shape)

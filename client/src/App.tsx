@@ -64,6 +64,7 @@ const Upgrade = lazyWithRetry(() => import("./pages/Upgrade"));
 const Landing = lazyWithRetry(() => import("./pages/Landing"));
 const SuperAdmin = lazyWithRetry(() => import("./pages/SuperAdmin"));
 const SaasBillingDashboard = lazyWithRetry(() => import("./pages/SaasBillingDashboard"));
+const ZapiAdmin = lazyWithRetry(() => import("./pages/ZapiAdmin"));
 const ForgotPassword = lazyWithRetry(() => import("./pages/ForgotPassword"));
 const ResetPassword = lazyWithRetry(() => import("./pages/ResetPassword"));
 
@@ -146,6 +147,7 @@ function AppRouter() {
                 {/* Super Admin */}
                 <Route path="/super-admin" component={SuperAdmin} />
                 <Route path="/super-admin/billing" component={SaasBillingDashboard} />
+                <Route path="/super-admin/zapi" component={ZapiAdmin} />
 
                 {/* Notifications */}
                 <Route path="/notifications" component={NotificationsPage} />
