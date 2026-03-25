@@ -384,7 +384,46 @@ export async function listDeals(tenantId: number, opts?: {
     conditions.push(sql`${deals.lastActivityAt} < DATE_SUB(NOW(), INTERVAL ${days} DAY)`);
     conditions.push(eq(deals.status, "open"));
   }
-  return db.select().from(deals).where(and(...conditions)).orderBy(desc(deals.lastActivityAt)).limit(opts?.limit || 50).offset(opts?.offset || 0);
+  return db.select({
+    id: deals.id,
+    tenantId: deals.tenantId,
+    pipelineId: deals.pipelineId,
+    stageId: deals.stageId,
+    title: deals.title,
+    valueCents: deals.valueCents,
+    status: deals.status,
+    probability: deals.probability,
+    contactId: deals.contactId,
+    accountId: deals.accountId,
+    ownerUserId: deals.ownerUserId,
+    expectedCloseAt: deals.expectedCloseAt,
+    channelOrigin: deals.channelOrigin,
+    leadSource: deals.leadSource,
+    boardingDate: deals.boardingDate,
+    returnDate: deals.returnDate,
+    lossReasonId: deals.lossReasonId,
+    lossNotes: deals.lossNotes,
+    utmCampaign: deals.utmCampaign,
+    utmSource: deals.utmSource,
+    utmMedium: deals.utmMedium,
+    utmTerm: deals.utmTerm,
+    utmContent: deals.utmContent,
+    rdCustomFields: deals.rdCustomFields,
+    lastActivityAt: deals.lastActivityAt,
+    createdAt: deals.createdAt,
+    updatedAt: deals.updatedAt,
+    deletedAt: deals.deletedAt,
+    contactName: contacts.name,
+    contactPhone: contacts.phone,
+    stageName: pipelineStages.name,
+  })
+    .from(deals)
+    .leftJoin(contacts, eq(deals.contactId, contacts.id))
+    .leftJoin(pipelineStages, eq(deals.stageId, pipelineStages.id))
+    .where(and(...conditions))
+    .orderBy(desc(deals.lastActivityAt))
+    .limit(opts?.limit || 50)
+    .offset(opts?.offset || 0);
 }
 export async function bulkSoftDeleteDeals(tenantId: number, ids: number[]) {
   const db = await getDb(); if (!db) return 0;

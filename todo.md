@@ -5260,3 +5260,12 @@
 - [x] Telefone do contato principal é usado no disparo (deduplicado por contactId)
 - [x] Frontend de Negociações com variáveis corretas ({negociacao}, {valor}, {etapa}, {empresa})
 - [x] Testes unitários para disparo via negociações (18 testes passando)
+
+## Negociações Lista — Disparo WhatsApp (Mar 25)
+- [x] Formato lista na página de Negociações com checkboxes e seleção (já existia)
+- [x] Barra de ações em lote com botão "Disparar WhatsApp" (já existia)
+- [x] BulkWhatsAppDialog integrado na página de Negociações (já existia)
+- [x] Disparo usa contato principal de cada negociação selecionada (já existia no backend)
+- [x] Colunas Contato (nome + telefone) e Etapa adicionadas na tabela
+- [x] listDeals com JOIN em contacts e pipelineStages
+- [x] 18 testes passando

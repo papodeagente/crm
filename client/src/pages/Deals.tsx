@@ -267,7 +267,9 @@ export default function Deals() {
                   <Checkbox checked={allSelected} onCheckedChange={toggleAll} />
                 </th>
                 <th className="text-left p-3.5 font-semibold text-muted-foreground">Título</th>
+                <th className="text-left p-3.5 font-semibold text-muted-foreground">Contato</th>
                 <th className="text-left p-3.5 font-semibold text-muted-foreground">Valor</th>
+                <th className="text-left p-3.5 font-semibold text-muted-foreground">Etapa</th>
                 <th className="text-left p-3.5 font-semibold text-muted-foreground">Status</th>
                 <th className="text-left p-3.5 font-semibold text-muted-foreground">{showTrash ? "Excluído em" : "Criado em"}</th>
                 <th className="p-3.5 w-12"></th>
@@ -275,9 +277,9 @@ export default function Deals() {
             </thead>
             <tbody>
               {(showTrash ? deletedDeals.isLoading : deals.isLoading) ? (
-                <tr><td colSpan={6} className="p-12 text-center text-muted-foreground text-sm">Carregando...</td></tr>
+                <tr><td colSpan={8} className="p-12 text-center text-muted-foreground text-sm">Carregando...</td></tr>
               ) : !currentList.length ? (
-                <tr><td colSpan={6} className="p-12 text-center text-muted-foreground">
+                <tr><td colSpan={8} className="p-12 text-center text-muted-foreground">
                   {showTrash ? (
                     <>
                       <Archive className="h-10 w-10 mx-auto mb-3 text-muted-foreground/30" />
@@ -306,7 +308,31 @@ export default function Deals() {
                         <span className={`font-semibold ${showTrash ? "text-muted-foreground line-through" : ""}`}>{d.title}</span>
                       </div>
                     </td>
+                    <td className="p-3.5">
+                      {d.contactName ? (
+                        <div className="flex items-center gap-2">
+                          <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-bold text-primary shrink-0">
+                            {d.contactName.charAt(0).toUpperCase()}
+                          </div>
+                          <div>
+                            <span className="text-[13px] font-medium">{d.contactName}</span>
+                            {d.contactPhone && <p className="text-[11px] text-muted-foreground">{d.contactPhone}</p>}
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground text-[12px] italic">Sem contato</span>
+                      )}
+                    </td>
                     <td className="p-3.5 font-semibold">{d.valueCents ? new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(d.valueCents / 100) : "—"}</td>
+                    <td className="p-3.5">
+                      {d.stageName ? (
+                        <span className="inline-flex items-center text-[11px] font-medium px-2.5 py-1 rounded-full bg-violet-50 text-violet-700 dark:bg-violet-950/30 dark:text-violet-300">
+                          {d.stageName}
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </td>
                     <td className="p-3.5">
                       <span className={`inline-flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded-full ${ss.bg} ${ss.text}`}>
                         <span className={`h-1.5 w-1.5 rounded-full ${ss.dot}`} />
