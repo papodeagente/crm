@@ -34,6 +34,7 @@ export default function WhatsApp() {
   const [qrCode, setQrCode] = useState<string | null>(null);
   const [qrSessionId, setQrSessionId] = useState<string | null>(null);
   const [isWaitingQr, setIsWaitingQr] = useState(false);
+  const [selectedProvider, setSelectedProvider] = useState<"evolution" | "zapi">("evolution");
   const [cleanupDialogOpen, setCleanupDialogOpen] = useState(false);
   const [dryRunResult, setDryRunResult] = useState<{
     contactsToDelete: number;
@@ -204,9 +205,17 @@ export default function WhatsApp() {
     }
   }, [sessions.data, qrSessionId]);
 
-  const handleConnect = () => {
+  // Z-API provisioning status (to show provider selector)
+  const zapiStatus = trpc.monitoring.zapiProvisioningStatus.useQuery(undefined, {
+    enabled: tenantId > 0,
+    staleTime: 60_000,
+  });
+  const hasZapi = zapiStatus.data?.provisioned === true;
+
+  const handleConnect = (providerOverride?: "evolution" | "zapi") => {
+    const provider = providerOverride || selectedProvider;
     setQrCode(null);
-    connect.mutate();
+    connect.mutate({ provider });
   };
 
   return (
@@ -377,7 +386,7 @@ export default function WhatsApp() {
         </Card>
       )}
 
-      {/* NOT CONNECTED STATE — Show connect button */}
+      {/* NOT CONNECTED STATE — Show connect button with provider selector */}
       {!sessions.isLoading && !isConnected && !isConnecting && !isWaitingQr && !qrCode && (
         <Card className="border border-border/40 shadow-none rounded-xl">
           <div className="p-8 flex flex-col items-center gap-5">
@@ -391,15 +400,53 @@ export default function WhatsApp() {
                 Será gerado um QR Code para você escanear com seu celular.
               </p>
             </div>
+
+            {/* Provider Selector — only shown when Z-API is provisioned */}
+            {hasZapi && (
+              <div className="w-full max-w-sm">
+                <p className="text-[12px] text-muted-foreground text-center mb-2.5">Escolha o provedor de conexão:</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedProvider("evolution")}
+                    className={`flex items-center justify-center gap-2 px-4 py-3 rounded-xl border text-[13px] font-medium transition-all ${
+                      selectedProvider === "evolution"
+                        ? "border-emerald-300 bg-emerald-50 text-emerald-700 ring-2 ring-emerald-200"
+                        : "border-border/60 bg-background text-muted-foreground hover:border-emerald-200 hover:bg-emerald-50/50"
+                    }`}
+                  >
+                    <Server className="h-4 w-4" />
+                    Evolution API
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedProvider("zapi")}
+                    className={`flex items-center justify-center gap-2 px-4 py-3 rounded-xl border text-[13px] font-medium transition-all ${
+                      selectedProvider === "zapi"
+                        ? "border-blue-300 bg-blue-50 text-blue-700 ring-2 ring-blue-200"
+                        : "border-border/60 bg-background text-muted-foreground hover:border-blue-200 hover:bg-blue-50/50"
+                    }`}
+                  >
+                    <Zap className="h-4 w-4" />
+                    Z-API
+                  </button>
+                </div>
+              </div>
+            )}
+
             <Button
-              className="h-11 px-8 rounded-xl text-[14px] font-semibold shadow-sm bg-emerald-600 hover:bg-emerald-700 text-white transition-colors gap-2"
+              className={`h-11 px-8 rounded-xl text-[14px] font-semibold shadow-sm text-white transition-colors gap-2 ${
+                selectedProvider === "zapi" && hasZapi
+                  ? "bg-blue-600 hover:bg-blue-700"
+                  : "bg-emerald-600 hover:bg-emerald-700"
+              }`}
               disabled={connect.isPending || isWaitingQr}
-              onClick={handleConnect}
+              onClick={() => handleConnect()}
             >
               {connect.isPending || isWaitingQr ? (
-                <><Loader2 className="h-4 w-4 animate-spin" />Conectando...</>
+                <><Loader2 className="h-4 w-4 animate-spin" />Conectando via {selectedProvider === "zapi" && hasZapi ? "Z-API" : "Evolution"}...</>
               ) : (
-                <><Wifi className="h-4 w-4" />Conectar WhatsApp</>
+                <><Wifi className="h-4 w-4" />Conectar via {selectedProvider === "zapi" && hasZapi ? "Z-API" : "Evolution"}</>
               )}
             </Button>
           </div>
@@ -422,15 +469,53 @@ export default function WhatsApp() {
                 Clique abaixo para reconectar ao seu WhatsApp.
               </p>
             </div>
+
+            {/* Provider Selector for reconnect — only shown when Z-API is provisioned */}
+            {hasZapi && (
+              <div className="w-full max-w-sm">
+                <p className="text-[12px] text-muted-foreground text-center mb-2.5">Escolha o provedor:</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedProvider("evolution")}
+                    className={`flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border text-[12px] font-medium transition-all ${
+                      selectedProvider === "evolution"
+                        ? "border-emerald-300 bg-emerald-50 text-emerald-700 ring-2 ring-emerald-200"
+                        : "border-border/60 bg-background text-muted-foreground hover:border-emerald-200 hover:bg-emerald-50/50"
+                    }`}
+                  >
+                    <Server className="h-3.5 w-3.5" />
+                    Evolution
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedProvider("zapi")}
+                    className={`flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border text-[12px] font-medium transition-all ${
+                      selectedProvider === "zapi"
+                        ? "border-blue-300 bg-blue-50 text-blue-700 ring-2 ring-blue-200"
+                        : "border-border/60 bg-background text-muted-foreground hover:border-blue-200 hover:bg-blue-50/50"
+                    }`}
+                  >
+                    <Zap className="h-3.5 w-3.5" />
+                    Z-API
+                  </button>
+                </div>
+              </div>
+            )}
+
             <Button
-              className="h-10 px-6 rounded-xl text-[13px] font-medium shadow-sm bg-emerald-600 hover:bg-emerald-700 text-white transition-colors gap-2"
+              className={`h-10 px-6 rounded-xl text-[13px] font-medium shadow-sm text-white transition-colors gap-2 ${
+                selectedProvider === "zapi" && hasZapi
+                  ? "bg-blue-600 hover:bg-blue-700"
+                  : "bg-emerald-600 hover:bg-emerald-700"
+              }`}
               disabled={connect.isPending || isWaitingQr}
-              onClick={handleConnect}
+              onClick={() => handleConnect()}
             >
               {connect.isPending || isWaitingQr ? (
                 <><Loader2 className="h-4 w-4 animate-spin" />Reconectando...</>
               ) : (
-                <><RefreshCw className="h-4 w-4" />Reconectar</>
+                <><RefreshCw className="h-4 w-4" />Reconectar via {selectedProvider === "zapi" && hasZapi ? "Z-API" : "Evolution"}</>
               )}
             </Button>
           </div>

@@ -5121,3 +5121,13 @@
 - [x] Frontend: botão "Verificar Agora" para trigger manual de check
 - [x] Frontend: filtros por tipo (desconectado, inadimplente) e status (pendente/resolvido)
 - [x] Testes vitest: 32 testes passando (alert types, billing detection, auto-resolution, metadata, etc.)
+## Escolha de Provider para QR Code (Evolution ou Z-API)
+- [x] Analisar fluxo atual de conexão/QR code (frontend + backend)
+- [x] Backend: aceitar parâmetro provider no endpoint connect (evolution/zapi)
+- [x] Backend: rotear para Z-API quando provider=zapi (buscar credenciais da instância provisionada)
+- [x] Backend: registrar sessão Z-API no DB com provider/instanceId/token/clientToken
+- [x] Backend: método setSessionState adicionado ao WhatsAppEvolutionManager
+- [x] Frontend: mostrar seletor de provider quando tenant tem Z-API provisionado
+- [x] Frontend: botões visuais para Evolution (verde) e Z-API (azul) com cores distintas
+- [x] Frontend: seletor também no estado "desconectado" para reconexão
+- [x] Testes vitest: 15 testes passando (input validation, session registration, UI logic, edge cases)

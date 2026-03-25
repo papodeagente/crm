@@ -241,11 +241,13 @@ export const appRouter = router({
   // ─── WhatsApp API (existing) ───
   whatsapp: router({
     connect: tenantWriteProcedure
-      .mutation(async ({ ctx }) => {
+      .input(z.object({ provider: z.enum(["evolution", "zapi"]).optional() }).optional())
+      .mutation(async ({ input, ctx }) => {
         // Each CRM user gets exactly ONE WhatsApp instance
         // No sessionId needed — system generates it automatically
         const tenantId = getTenantId(ctx);
         const userId = ctx.saasUser?.userId || ctx.user.id;
+        const requestedProvider = input?.provider || "evolution";
 
         // Block connection if user has an active session share
         if (tenantId > 0) {
@@ -258,6 +260,112 @@ export const appRouter = router({
           }
         }
 
+        // ─── Z-API PROVIDER ───
+        if (requestedProvider === "zapi") {
+          const { getZapiInstanceForTenant } = await import("./services/zapiProvisioningService");
+          const { registerZApiSession } = await import("./providers/zapiProvider");
+          const { zapiProvider } = await import("./providers/zapiProvider");
+          const { getInstanceName } = await import("./evolutionApi");
+
+          const zapiInstance = await getZapiInstanceForTenant(tenantId);
+          if (!zapiInstance) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message: "Nenhuma instância Z-API provisionada para este tenant. Solicite ao administrador.",
+            });
+          }
+
+          const sessionId = getInstanceName(tenantId, userId);
+
+          // Register Z-API session credentials
+          registerZApiSession(sessionId, {
+            instanceId: zapiInstance.zapiInstanceId,
+            token: zapiInstance.zapiToken,
+            clientToken: zapiInstance.zapiClientToken || undefined,
+          });
+
+          // Check if already connected via Z-API
+          try {
+            const existingInst = await zapiProvider.fetchInstance(sessionId);
+            if (existingInst?.connectionStatus === "open") {
+              // Already connected — update DB and return
+              const db = await getDb();
+              const [existingSession] = await db!.select({ id: whatsappSessions.id })
+                .from(whatsappSessions)
+                .where(eq(whatsappSessions.sessionId, sessionId))
+                .limit(1);
+              
+              const sessionData = {
+                status: "connected" as const,
+                provider: "zapi" as const,
+                providerInstanceId: zapiInstance.zapiInstanceId,
+                providerToken: zapiInstance.zapiToken,
+                providerClientToken: zapiInstance.zapiClientToken,
+                phoneNumber: existingInst.phoneNumber || null,
+              };
+
+              if (existingSession) {
+                await db!.update(whatsappSessions).set(sessionData).where(eq(whatsappSessions.sessionId, sessionId));
+              } else {
+                await db!.insert(whatsappSessions).values({ sessionId, userId, tenantId, ...sessionData });
+              }
+
+              return { sessionId, status: "connected", qrDataUrl: null, user: null };
+            }
+          } catch (e) {
+            // Instance might not exist yet on Z-API side, continue to QR
+          }
+
+          // Generate QR code via Z-API
+          try {
+            const qrResult = await zapiProvider.connectInstance(sessionId);
+            const qrDataUrl = qrResult?.base64 || null;
+
+            // Save/update session in DB with Z-API provider info
+            const db = await getDb();
+            const [existingSession] = await db!.select({ id: whatsappSessions.id })
+              .from(whatsappSessions)
+              .where(eq(whatsappSessions.sessionId, sessionId))
+              .limit(1);
+
+            const sessionData = {
+              status: "connecting" as const,
+              provider: "zapi" as const,
+              providerInstanceId: zapiInstance.zapiInstanceId,
+              providerToken: zapiInstance.zapiToken,
+              providerClientToken: zapiInstance.zapiClientToken,
+            };
+
+            if (existingSession) {
+              await db!.update(whatsappSessions).set(sessionData).where(eq(whatsappSessions.sessionId, sessionId));
+            } else {
+              await db!.insert(whatsappSessions).values({ sessionId, userId, tenantId, ...sessionData });
+            }
+
+            // Also update in-memory session for WebSocket/polling
+            whatsappManager.setSessionState(sessionId, {
+              instanceName: sessionId,
+              sessionId,
+              userId,
+              tenantId,
+              status: "connecting",
+              qrCode: qrDataUrl,
+              qrDataUrl,
+              user: null,
+              lastConnectedAt: null,
+              connectingStartedAt: Date.now(),
+            });
+
+            return { sessionId, status: "connecting", qrDataUrl, user: null };
+          } catch (e: any) {
+            throw new TRPCError({
+              code: "INTERNAL_SERVER_ERROR",
+              message: `Erro ao gerar QR Code via Z-API: ${e.message}`,
+            });
+          }
+        }
+
+        // ─── EVOLUTION PROVIDER (default) ───
         const state = await whatsappManager.connectUser(userId, tenantId);
         
         // If already connected, return immediately

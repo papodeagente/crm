@@ -60,6 +60,12 @@ class WhatsAppEvolutionManager extends EventEmitter {
     return this.sessions.get(sessionId);
   }
 
+  /** Set session state externally (used by Z-API connect flow) */
+  setSessionState(sessionId: string, state: EvolutionSessionState): void {
+    this.sessions.set(sessionId, state);
+    this.instanceToSession.set(state.instanceName, sessionId);
+  }
+
   /** Get the instance name for a given sessionId (used by Z-API webhook normalizer) */
   getInstanceNameForSession(sessionId: string): string | undefined {
     const session = this.sessions.get(sessionId);
