@@ -229,6 +229,9 @@ async function startServer() {
     // Start task due soon notification scheduler (tasks due within 3h)
     import("../taskDueScheduler").then(m => m.startTaskDueScheduler());
 
+    // Start Z-API alert monitoring scheduler (disconnections + billing overdue)
+    import("../zapiAlertScheduler").then(m => m.startZapiAlertScheduler());
+
     // Retroactive seed: ensure all tenants have default loss reasons
     import("../seedLossReasonsRetroactive").then(m => m.seedLossReasonsForAllTenants()).catch(e => {
       console.warn("[SeedLossReasons] Retroactive seed failed:", e.message);

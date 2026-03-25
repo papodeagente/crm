@@ -2094,3 +2094,35 @@ export const tenantZapiInstances = mysqlTable("tenant_zapi_instances", {
 ]);
 export type TenantZapiInstance = typeof tenantZapiInstances.$inferSelect;
 export type InsertTenantZapiInstance = typeof tenantZapiInstances.$inferInsert;
+
+// ════════════════════════════════════════════════════════════
+// Z-API Admin Alerts
+// ════════════════════════════════════════════════════════════
+
+export const zapiAdminAlerts = mysqlTable("zapi_admin_alerts", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  tenantName: varchar("tenantName", { length: 255 }),
+  type: mysqlEnum("alert_type", ["disconnected", "billing_overdue", "instance_error"]).notNull(),
+  severity: mysqlEnum("alert_severity", ["critical", "warning", "info"]).default("warning").notNull(),
+  message: text("message").notNull(),
+  /** Additional context (e.g. instanceId, billingStatus, etc.) */
+  metadata: json("metadata"),
+  /** Whether the alert has been resolved/dismissed */
+  resolved: boolean("resolved").default(false).notNull(),
+  resolvedAt: timestamp("resolvedAt"),
+  resolvedBy: varchar("resolvedBy", { length: 320 }),
+  /** Unique key to prevent duplicate alerts (e.g. "disconnected:tenantId:instanceId") */
+  alertKey: varchar("alertKey", { length: 255 }).notNull(),
+  /** Whether owner was notified about this alert */
+  ownerNotified: boolean("ownerNotified").default(false).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (t) => [
+  index("zaa_tenant_idx").on(t.tenantId),
+  index("zaa_type_idx").on(t.type),
+  index("zaa_resolved_idx").on(t.resolved),
+  index("zaa_alert_key_idx").on(t.alertKey),
+]);
+export type ZapiAdminAlert = typeof zapiAdminAlerts.$inferSelect;
+export type InsertZapiAdminAlert = typeof zapiAdminAlerts.$inferInsert;

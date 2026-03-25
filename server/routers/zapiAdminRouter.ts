@@ -261,6 +261,114 @@ export const zapiAdminRouter = router({
     }),
 
   /**
+   * List alerts (unresolved by default)
+   */
+  listAlerts: publicProcedure
+    .input(z.object({
+      resolved: z.boolean().optional().default(false),
+      type: z.enum(["disconnected", "billing_overdue", "instance_error"]).optional(),
+      limit: z.number().optional().default(50),
+    }).optional())
+    .query(async ({ input, ctx }) => {
+      const cookie = ctx.req?.cookies?.[SAAS_COOKIE];
+      const session = cookie ? await verifySaasSession(cookie) : null;
+      if (!session || !isSuperAdmin(session.email)) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Acesso negado" });
+      }
+
+      const { getDb } = await import("../db");
+      const { zapiAdminAlerts } = await import("../../drizzle/schema");
+      const { eq, and, sql, desc } = await import("drizzle-orm");
+
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+
+      const filters = [eq(zapiAdminAlerts.resolved, input?.resolved ?? false)];
+      if (input?.type) {
+        filters.push(eq(zapiAdminAlerts.type, input.type));
+      }
+
+      const alerts = await db
+        .select()
+        .from(zapiAdminAlerts)
+        .where(and(...filters))
+        .orderBy(desc(zapiAdminAlerts.createdAt))
+        .limit(input?.limit ?? 50);
+
+      return alerts;
+    }),
+
+  /**
+   * Get alert counts by type and severity
+   */
+  getAlertCounts: publicProcedure.query(async ({ ctx }) => {
+    const cookie = ctx.req?.cookies?.[SAAS_COOKIE];
+    const session = cookie ? await verifySaasSession(cookie) : null;
+    if (!session || !isSuperAdmin(session.email)) {
+      throw new TRPCError({ code: "FORBIDDEN", message: "Acesso negado" });
+    }
+
+    const { getAlertCounts } = await import("../services/zapiAlertService");
+    return await getAlertCounts();
+  }),
+
+  /**
+   * Resolve a single alert
+   */
+  resolveAlert: publicProcedure
+    .input(z.object({ alertId: z.number() }))
+    .mutation(async ({ input, ctx }) => {
+      const cookie = ctx.req?.cookies?.[SAAS_COOKIE];
+      const session = cookie ? await verifySaasSession(cookie) : null;
+      if (!session || !isSuperAdmin(session.email)) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Acesso negado" });
+      }
+
+      const { resolveAlert } = await import("../services/zapiAlertService");
+      const success = await resolveAlert(input.alertId, session.email);
+      if (!success) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Falha ao resolver alerta" });
+
+      console.log(`[ZapiAdmin] Alert ${input.alertId} resolved by ${session.email}`);
+      return { success: true };
+    }),
+
+  /**
+   * Resolve all alerts for a tenant
+   */
+  resolveAllForTenant: publicProcedure
+    .input(z.object({ tenantId: z.number() }))
+    .mutation(async ({ input, ctx }) => {
+      const cookie = ctx.req?.cookies?.[SAAS_COOKIE];
+      const session = cookie ? await verifySaasSession(cookie) : null;
+      if (!session || !isSuperAdmin(session.email)) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Acesso negado" });
+      }
+
+      const { resolveAllAlertsForTenant } = await import("../services/zapiAlertService");
+      const count = await resolveAllAlertsForTenant(input.tenantId, session.email);
+
+      console.log(`[ZapiAdmin] ${count} alerts resolved for tenant ${input.tenantId} by ${session.email}`);
+      return { success: true, resolved: count };
+    }),
+
+  /**
+   * Manually trigger an alert check (for testing/immediate check)
+   */
+  runAlertCheck: publicProcedure.mutation(async ({ ctx }) => {
+    const cookie = ctx.req?.cookies?.[SAAS_COOKIE];
+    const session = cookie ? await verifySaasSession(cookie) : null;
+    if (!session || !isSuperAdmin(session.email)) {
+      throw new TRPCError({ code: "FORBIDDEN", message: "Acesso negado" });
+    }
+
+    const { runZapiAlertCheck } = await import("../services/zapiAlertService");
+    const result = await runZapiAlertCheck();
+
+    console.log(`[ZapiAdmin] Manual alert check triggered by ${session.email}: ${JSON.stringify(result)}`);
+    return result;
+  }),
+
+  /**
    * Get summary stats for the Z-API admin dashboard
    */
   getStats: publicProcedure.query(async ({ ctx }) => {

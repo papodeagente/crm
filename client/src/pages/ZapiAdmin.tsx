@@ -24,6 +24,7 @@ import {
   AlertDialogAction,
 } from "@/components/ui/alert-dialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
 import {
@@ -46,10 +47,17 @@ import {
   AlertTriangle,
   Zap,
   ServerCrash,
+  Bell,
+  BellRing,
+  ShieldAlert,
+  CreditCard,
+  CheckCheck,
+  Play,
 } from "lucide-react";
 
 export default function ZapiAdmin() {
   const [, navigate] = useLocation();
+  const utils = trpc.useUtils();
   const meQuery = trpc.saasAuth.me.useQuery(undefined, {
     retry: false,
     refetchOnWindowFocus: false,
@@ -66,6 +74,61 @@ export default function ZapiAdmin() {
 
   const tenantsWithoutQuery = trpc.zapiAdmin.listTenantsWithoutZapi.useQuery(undefined, {
     enabled: !!meQuery.data?.isSuperAdmin,
+  });
+
+  // Alert queries
+  const alertCountsQuery = trpc.zapiAdmin.getAlertCounts.useQuery(undefined, {
+    enabled: !!meQuery.data?.isSuperAdmin,
+    refetchInterval: 60_000, // refresh every minute
+  });
+
+  const [alertFilter, setAlertFilter] = useState<"all" | "disconnected" | "billing_overdue">("all");
+  const [showResolved, setShowResolved] = useState(false);
+
+  const alertsQuery = trpc.zapiAdmin.listAlerts.useQuery(
+    {
+      resolved: showResolved,
+      type: alertFilter === "all" ? undefined : alertFilter,
+      limit: 100,
+    },
+    {
+      enabled: !!meQuery.data?.isSuperAdmin,
+    }
+  );
+
+  const resolveAlertMutation = trpc.zapiAdmin.resolveAlert.useMutation({
+    onSuccess: () => {
+      toast.success("Alerta resolvido!");
+      alertsQuery.refetch();
+      alertCountsQuery.refetch();
+    },
+    onError: (err: any) => toast.error(err.message),
+  });
+
+  const resolveAllMutation = trpc.zapiAdmin.resolveAllForTenant.useMutation({
+    onSuccess: (data) => {
+      toast.success(`${data.resolved} alerta(s) resolvido(s)!`);
+      alertsQuery.refetch();
+      alertCountsQuery.refetch();
+    },
+    onError: (err: any) => toast.error(err.message),
+  });
+
+  const runCheckMutation = trpc.zapiAdmin.runAlertCheck.useMutation({
+    onSuccess: (data) => {
+      if (data.totalNew > 0) {
+        toast.warning(`${data.totalNew} novo(s) alerta(s) detectado(s)!`);
+      } else {
+        toast.success("Verificação concluída — nenhum novo alerta.");
+      }
+      if (data.autoResolved > 0) {
+        toast.info(`${data.autoResolved} alerta(s) resolvido(s) automaticamente.`);
+      }
+      alertsQuery.refetch();
+      alertCountsQuery.refetch();
+      statsQuery.refetch();
+    },
+    onError: (err: any) => toast.error(err.message),
   });
 
   const provisionMutation = trpc.zapiAdmin.provisionForTenant.useMutation({
@@ -98,6 +161,7 @@ export default function ZapiAdmin() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [provisionDialog, setProvisionDialog] = useState<{ tenantId: number; tenantName: string } | null>(null);
   const [deprovisionDialog, setDeprovisionDialog] = useState<{ tenantId: number; tenantName: string } | null>(null);
+  const [activeTab, setActiveTab] = useState("instances");
 
   // Filter instances
   const filteredInstances = useMemo(() => {
@@ -128,6 +192,17 @@ export default function ZapiAdmin() {
       day: "2-digit",
       month: "2-digit",
       year: "numeric",
+    });
+  };
+
+  const formatDateTime = (d: any) => {
+    if (!d) return "—";
+    return new Date(d).toLocaleString("pt-BR", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
     });
   };
 
@@ -237,6 +312,8 @@ export default function ZapiAdmin() {
   }
 
   const stats = statsQuery.data;
+  const alertCounts = alertCountsQuery.data;
+  const totalAlerts = alertCounts?.total ?? 0;
 
   return (
     <div className="min-h-screen bg-background">
@@ -256,6 +333,16 @@ export default function ZapiAdmin() {
               </div>
               <span className="font-bold text-lg">Z-API Admin</span>
             </div>
+            {/* Alert badge in header */}
+            {totalAlerts > 0 && (
+              <button
+                onClick={() => setActiveTab("alerts")}
+                className="relative flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-500/15 border border-red-500/30 text-red-400 text-xs font-medium hover:bg-red-500/25 transition-colors"
+              >
+                <BellRing className="w-3.5 h-3.5" />
+                {totalAlerts} alerta{totalAlerts !== 1 ? "s" : ""}
+              </button>
+            )}
           </div>
           <div className="flex items-center gap-3">
             <Button
@@ -264,7 +351,7 @@ export default function ZapiAdmin() {
               onClick={() => setProvisionDialog({ tenantId: 0, tenantName: "" })}
             >
               <Plus className="w-4 h-4" />
-              Liberar Z-API
+              <span className="hidden sm:inline">Liberar Z-API</span>
             </Button>
             <Button
               variant="outline"
@@ -273,12 +360,14 @@ export default function ZapiAdmin() {
                 instancesQuery.refetch();
                 statsQuery.refetch();
                 tenantsWithoutQuery.refetch();
+                alertsQuery.refetch();
+                alertCountsQuery.refetch();
                 toast.info("Dados atualizados!");
               }}
               className="gap-1.5"
             >
               <RefreshCw className="w-4 h-4" />
-              Atualizar
+              <span className="hidden sm:inline">Atualizar</span>
             </Button>
           </div>
         </div>
@@ -286,7 +375,7 @@ export default function ZapiAdmin() {
 
       <div className="max-w-7xl mx-auto px-6 py-8">
         {/* Stats Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
           {[
             {
               icon: <Signal className="w-5 h-5" />,
@@ -296,7 +385,7 @@ export default function ZapiAdmin() {
             },
             {
               icon: <Wifi className="w-5 h-5" />,
-              label: "WhatsApp Conectado",
+              label: "WA Conectado",
               value: stats?.connected ?? "—",
               color: "text-blue-400 bg-blue-500/10",
             },
@@ -312,8 +401,19 @@ export default function ZapiAdmin() {
               value: stats?.cancelled ?? "—",
               color: "text-red-400 bg-red-500/10",
             },
+            {
+              icon: <BellRing className="w-5 h-5" />,
+              label: "Alertas Ativos",
+              value: totalAlerts,
+              color: totalAlerts > 0 ? "text-red-400 bg-red-500/10" : "text-gray-400 bg-gray-500/10",
+              onClick: () => setActiveTab("alerts"),
+            },
           ].map((stat, i) => (
-            <Card key={i} className="surface">
+            <Card
+              key={i}
+              className={`surface ${stat.onClick ? "cursor-pointer hover:border-primary/30 transition-colors" : ""}`}
+              onClick={stat.onClick}
+            >
               <CardContent className="pt-5 pb-4 px-5">
                 <div className="flex items-center gap-3">
                   <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${stat.color}`}>
@@ -329,248 +429,503 @@ export default function ZapiAdmin() {
           ))}
         </div>
 
-        {/* Filters */}
-        <div className="flex flex-col sm:flex-row gap-3 mb-6">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              placeholder="Buscar por tenant, instância, ID..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-9"
-            />
-          </div>
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Filtrar por status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos os status</SelectItem>
-              <SelectItem value="active">Ativas</SelectItem>
-              <SelectItem value="pending">Pendentes</SelectItem>
-              <SelectItem value="cancelled">Canceladas</SelectItem>
-              <SelectItem value="expired">Expiradas</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+        {/* Tabs: Instances / Alerts */}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+          <TabsList className="bg-muted/50">
+            <TabsTrigger value="instances" className="gap-1.5">
+              <Zap className="w-4 h-4" />
+              Instâncias
+            </TabsTrigger>
+            <TabsTrigger value="alerts" className="gap-1.5 relative">
+              <Bell className="w-4 h-4" />
+              Alertas
+              {totalAlerts > 0 && (
+                <span className="ml-1 inline-flex items-center justify-center w-5 h-5 text-[10px] font-bold rounded-full bg-red-500 text-white">
+                  {totalAlerts > 99 ? "99+" : totalAlerts}
+                </span>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="tenants" className="gap-1.5">
+              <Building2 className="w-4 h-4" />
+              Sem Z-API
+            </TabsTrigger>
+          </TabsList>
 
-        {/* Instances Table */}
-        <Card className="surface">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base font-semibold flex items-center gap-2">
-              <Zap className="w-4 h-4 text-emerald-400" />
-              Instâncias Z-API ({filteredInstances.length})
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            {instancesQuery.isLoading ? (
-              <div className="flex items-center justify-center py-16">
-                <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+          {/* ═══════ INSTANCES TAB ═══════ */}
+          <TabsContent value="instances" className="space-y-4">
+            {/* Filters */}
+            <div className="flex flex-col sm:flex-row gap-3">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  placeholder="Buscar por tenant, instância, ID..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="pl-9"
+                />
               </div>
-            ) : filteredInstances.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
-                <SignalZero className="w-10 h-10 mb-3 opacity-40" />
-                <p className="text-sm">Nenhuma instância encontrada</p>
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-border bg-muted/30">
-                      <th className="text-left px-4 py-3 font-medium text-muted-foreground">Tenant</th>
-                      <th className="text-left px-4 py-3 font-medium text-muted-foreground">Instância</th>
-                      <th className="text-left px-4 py-3 font-medium text-muted-foreground">Status</th>
-                      <th className="text-left px-4 py-3 font-medium text-muted-foreground">WhatsApp</th>
-                      <th className="text-left px-4 py-3 font-medium text-muted-foreground">Billing</th>
-                      <th className="text-left px-4 py-3 font-medium text-muted-foreground">Criado em</th>
-                      <th className="text-right px-4 py-3 font-medium text-muted-foreground">Ações</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredInstances.map((inst) => (
-                      <tr
-                        key={inst.id}
-                        className="border-b border-border/50 hover:bg-muted/20 transition-colors"
-                      >
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-2">
-                            <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-xs font-bold text-primary">
-                              {inst.tenantId}
-                            </div>
-                            <div className="min-w-0">
-                              <p className="font-medium truncate max-w-[200px]">{inst.tenantName || "—"}</p>
-                              <p className="text-[10px] text-muted-foreground">ID: {inst.tenantId}</p>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="min-w-0">
-                            <p className="font-mono text-xs truncate max-w-[180px]">{inst.instanceName}</p>
-                            <p className="text-[10px] text-muted-foreground font-mono">{inst.zapiInstanceId}</p>
-                          </div>
-                        </td>
-                        <td className="px-4 py-3">{statusBadge(inst.status)}</td>
-                        <td className="px-4 py-3">
-                          <div className="flex flex-col gap-1">
-                            {whatsappStatusBadge(inst.whatsappStatus)}
-                            {inst.whatsappPhone && (
-                              <span className="text-[10px] text-muted-foreground flex items-center gap-1">
-                                <Phone className="w-3 h-3" />
-                                {inst.whatsappPhone}
-                              </span>
-                            )}
-                            {inst.whatsappPushName && (
-                              <span className="text-[10px] text-muted-foreground truncate max-w-[120px]">
-                                {inst.whatsappPushName}
-                              </span>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex flex-col gap-1">
-                            {billingBadge(inst.tenantBillingStatus)}
-                            <span className="text-[10px] text-muted-foreground capitalize">{inst.tenantPlan}</span>
-                          </div>
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="text-xs text-muted-foreground">
-                            <p>{formatDate(inst.createdAt)}</p>
-                            {inst.cancelledAt && (
-                              <p className="text-red-400">Cancelada: {formatDate(inst.cancelledAt)}</p>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 text-right">
-                          {inst.status === "active" ? (
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  className="h-7 px-2 border-red-300 text-red-500 hover:bg-red-50 hover:text-red-600 dark:border-red-500/40 dark:hover:bg-red-500/10"
-                                  onClick={() =>
-                                    setDeprovisionDialog({
-                                      tenantId: inst.tenantId,
-                                      tenantName: inst.tenantName || `Tenant ${inst.tenantId}`,
-                                    })
-                                  }
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>Revogar instância Z-API</TooltipContent>
-                            </Tooltip>
-                          ) : inst.status === "cancelled" ? (
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  className="h-7 px-2 border-emerald-300 text-emerald-500 hover:bg-emerald-50 hover:text-emerald-600 dark:border-emerald-500/40 dark:hover:bg-emerald-500/10"
-                                  onClick={() =>
-                                    setProvisionDialog({
-                                      tenantId: inst.tenantId,
-                                      tenantName: inst.tenantName || `Tenant ${inst.tenantId}`,
-                                    })
-                                  }
-                                >
-                                  <Plus className="w-3.5 h-3.5" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>Re-provisionar Z-API</TooltipContent>
-                            </Tooltip>
-                          ) : (
-                            <span className="text-xs text-muted-foreground">—</span>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Filtrar por status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os status</SelectItem>
+                  <SelectItem value="active">Ativas</SelectItem>
+                  <SelectItem value="pending">Pendentes</SelectItem>
+                  <SelectItem value="cancelled">Canceladas</SelectItem>
+                  <SelectItem value="expired">Expiradas</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
 
-        {/* Tenants Without Z-API */}
-        <Card className="surface mt-6">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base font-semibold flex items-center gap-2">
-              <Building2 className="w-4 h-4 text-amber-400" />
-              Tenants sem Z-API ({filteredTenantsWithout.length})
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            {tenantsWithoutQuery.isLoading ? (
-              <div className="flex items-center justify-center py-12">
-                <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-              </div>
-            ) : filteredTenantsWithout.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-                <CheckCircle className="w-10 h-10 mb-3 opacity-40" />
-                <p className="text-sm">Todos os tenants ativos possuem Z-API</p>
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-border bg-muted/30">
-                      <th className="text-left px-4 py-3 font-medium text-muted-foreground">Tenant</th>
-                      <th className="text-left px-4 py-3 font-medium text-muted-foreground">Plano</th>
-                      <th className="text-left px-4 py-3 font-medium text-muted-foreground">Billing</th>
-                      <th className="text-left px-4 py-3 font-medium text-muted-foreground">Criado em</th>
-                      <th className="text-right px-4 py-3 font-medium text-muted-foreground">Ação</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredTenantsWithout.map((t) => (
-                      <tr
-                        key={t.id}
-                        className="border-b border-border/50 hover:bg-muted/20 transition-colors"
-                      >
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-2">
-                            <div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center text-xs font-bold text-amber-400">
-                              {t.id}
-                            </div>
-                            <div>
-                              <p className="font-medium">{t.name}</p>
-                              <p className="text-[10px] text-muted-foreground">ID: {t.id}</p>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-4 py-3">
-                          <Badge variant="outline" className="text-[10px] capitalize">
-                            {t.plan}
-                          </Badge>
-                        </td>
-                        <td className="px-4 py-3">{billingBadge(t.billingStatus)}</td>
-                        <td className="px-4 py-3 text-xs text-muted-foreground">
-                          {formatDate(t.createdAt)}
-                        </td>
-                        <td className="px-4 py-3 text-right">
-                          <Button
-                            size="sm"
-                            className="h-7 bg-emerald-600 hover:bg-emerald-700 text-white gap-1 text-xs"
-                            onClick={() =>
-                              setProvisionDialog({
-                                tenantId: t.id,
-                                tenantName: t.name,
-                              })
-                            }
+            {/* Instances Table */}
+            <Card className="surface">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base font-semibold flex items-center gap-2">
+                  <Zap className="w-4 h-4 text-emerald-400" />
+                  Instâncias Z-API ({filteredInstances.length})
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                {instancesQuery.isLoading ? (
+                  <div className="flex items-center justify-center py-16">
+                    <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                  </div>
+                ) : filteredInstances.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+                    <SignalZero className="w-10 h-10 mb-3 opacity-40" />
+                    <p className="text-sm">Nenhuma instância encontrada</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-border bg-muted/30">
+                          <th className="text-left px-4 py-3 font-medium text-muted-foreground">Tenant</th>
+                          <th className="text-left px-4 py-3 font-medium text-muted-foreground">Instância</th>
+                          <th className="text-left px-4 py-3 font-medium text-muted-foreground">Status</th>
+                          <th className="text-left px-4 py-3 font-medium text-muted-foreground">WhatsApp</th>
+                          <th className="text-left px-4 py-3 font-medium text-muted-foreground">Billing</th>
+                          <th className="text-left px-4 py-3 font-medium text-muted-foreground">Criado em</th>
+                          <th className="text-right px-4 py-3 font-medium text-muted-foreground">Ações</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredInstances.map((inst) => (
+                          <tr
+                            key={inst.id}
+                            className="border-b border-border/50 hover:bg-muted/20 transition-colors"
                           >
-                            <Plus className="w-3.5 h-3.5" />
-                            Liberar Z-API
-                          </Button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                            <td className="px-4 py-3">
+                              <div className="flex items-center gap-2">
+                                <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-xs font-bold text-primary">
+                                  {inst.tenantId}
+                                </div>
+                                <div className="min-w-0">
+                                  <p className="font-medium truncate max-w-[200px]">{inst.tenantName || "—"}</p>
+                                  <p className="text-[10px] text-muted-foreground">ID: {inst.tenantId}</p>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="min-w-0">
+                                <p className="font-mono text-xs truncate max-w-[180px]">{inst.instanceName}</p>
+                                <p className="text-[10px] text-muted-foreground font-mono">{inst.zapiInstanceId}</p>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3">{statusBadge(inst.status)}</td>
+                            <td className="px-4 py-3">
+                              <div className="flex flex-col gap-1">
+                                {whatsappStatusBadge(inst.whatsappStatus)}
+                                {inst.whatsappPhone && (
+                                  <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+                                    <Phone className="w-3 h-3" />
+                                    {inst.whatsappPhone}
+                                  </span>
+                                )}
+                                {inst.whatsappPushName && (
+                                  <span className="text-[10px] text-muted-foreground truncate max-w-[120px]">
+                                    {inst.whatsappPushName}
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="flex flex-col gap-1">
+                                {billingBadge(inst.tenantBillingStatus)}
+                                <span className="text-[10px] text-muted-foreground capitalize">{inst.tenantPlan}</span>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="text-xs text-muted-foreground">
+                                <p>{formatDate(inst.createdAt)}</p>
+                                {inst.cancelledAt && (
+                                  <p className="text-red-400">Cancelada: {formatDate(inst.cancelledAt)}</p>
+                                )}
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 text-right">
+                              {inst.status === "active" ? (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="h-7 px-2 border-red-300 text-red-500 hover:bg-red-50 hover:text-red-600 dark:border-red-500/40 dark:hover:bg-red-500/10"
+                                      onClick={() =>
+                                        setDeprovisionDialog({
+                                          tenantId: inst.tenantId,
+                                          tenantName: inst.tenantName || `Tenant ${inst.tenantId}`,
+                                        })
+                                      }
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>Revogar instância Z-API</TooltipContent>
+                                </Tooltip>
+                              ) : inst.status === "cancelled" ? (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="h-7 px-2 border-emerald-300 text-emerald-500 hover:bg-emerald-50 hover:text-emerald-600 dark:border-emerald-500/40 dark:hover:bg-emerald-500/10"
+                                      onClick={() =>
+                                        setProvisionDialog({
+                                          tenantId: inst.tenantId,
+                                          tenantName: inst.tenantName || `Tenant ${inst.tenantId}`,
+                                        })
+                                      }
+                                    >
+                                      <Plus className="w-3.5 h-3.5" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>Re-provisionar Z-API</TooltipContent>
+                                </Tooltip>
+                              ) : (
+                                <span className="text-xs text-muted-foreground">—</span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* ═══════ ALERTS TAB ═══════ */}
+          <TabsContent value="alerts" className="space-y-4">
+            {/* Alert Summary Cards */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <Card
+                className={`surface cursor-pointer transition-colors ${alertFilter === "all" ? "border-primary/50" : "hover:border-primary/20"}`}
+                onClick={() => setAlertFilter("all")}
+              >
+                <CardContent className="pt-4 pb-3 px-4">
+                  <div className="flex items-center gap-2">
+                    <ShieldAlert className="w-4 h-4 text-red-400" />
+                    <span className="text-sm font-medium">Total</span>
+                  </div>
+                  <p className="text-2xl font-bold mt-1">{alertCounts?.total ?? 0}</p>
+                </CardContent>
+              </Card>
+              <Card
+                className={`surface cursor-pointer transition-colors ${alertFilter === "disconnected" ? "border-orange-500/50" : "hover:border-orange-500/20"}`}
+                onClick={() => setAlertFilter("disconnected")}
+              >
+                <CardContent className="pt-4 pb-3 px-4">
+                  <div className="flex items-center gap-2">
+                    <WifiOff className="w-4 h-4 text-orange-400" />
+                    <span className="text-sm font-medium">Desconectados</span>
+                  </div>
+                  <p className="text-2xl font-bold mt-1">{alertCounts?.disconnected ?? 0}</p>
+                </CardContent>
+              </Card>
+              <Card
+                className={`surface cursor-pointer transition-colors ${alertFilter === "billing_overdue" ? "border-red-500/50" : "hover:border-red-500/20"}`}
+                onClick={() => setAlertFilter("billing_overdue")}
+              >
+                <CardContent className="pt-4 pb-3 px-4">
+                  <div className="flex items-center gap-2">
+                    <CreditCard className="w-4 h-4 text-red-400" />
+                    <span className="text-sm font-medium">Inadimplentes</span>
+                  </div>
+                  <p className="text-2xl font-bold mt-1">{alertCounts?.billingOverdue ?? 0}</p>
+                </CardContent>
+              </Card>
+              <Card className="surface">
+                <CardContent className="pt-4 pb-3 px-4">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 text-amber-400" />
+                    <span className="text-sm font-medium">Críticos</span>
+                  </div>
+                  <p className="text-2xl font-bold mt-1">{alertCounts?.critical ?? 0}</p>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Alert Actions */}
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <Button
+                  variant={showResolved ? "default" : "outline"}
+                  size="sm"
+                  className="gap-1.5 text-xs"
+                  onClick={() => setShowResolved(!showResolved)}
+                >
+                  {showResolved ? <CheckCheck className="w-3.5 h-3.5" /> : <Bell className="w-3.5 h-3.5" />}
+                  {showResolved ? "Resolvidos" : "Pendentes"}
+                </Button>
               </div>
-            )}
-          </CardContent>
-        </Card>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5 text-xs"
+                  onClick={() => runCheckMutation.mutate()}
+                  disabled={runCheckMutation.isPending}
+                >
+                  {runCheckMutation.isPending ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Play className="w-3.5 h-3.5" />
+                  )}
+                  Verificar Agora
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5 text-xs"
+                  onClick={() => {
+                    alertsQuery.refetch();
+                    alertCountsQuery.refetch();
+                  }}
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  Atualizar
+                </Button>
+              </div>
+            </div>
+
+            {/* Alerts List */}
+            <Card className="surface">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base font-semibold flex items-center gap-2">
+                  <Bell className="w-4 h-4 text-amber-400" />
+                  {showResolved ? "Alertas Resolvidos" : "Alertas Pendentes"} ({alertsQuery.data?.length ?? 0})
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                {alertsQuery.isLoading ? (
+                  <div className="flex items-center justify-center py-16">
+                    <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                  </div>
+                ) : !alertsQuery.data || alertsQuery.data.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+                    <CheckCircle className="w-10 h-10 mb-3 opacity-40" />
+                    <p className="text-sm">
+                      {showResolved
+                        ? "Nenhum alerta resolvido encontrado"
+                        : "Nenhum alerta pendente — tudo funcionando!"}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="divide-y divide-border/50">
+                    {alertsQuery.data.map((alert: any) => (
+                      <div
+                        key={alert.id}
+                        className={`px-4 py-4 hover:bg-muted/20 transition-colors ${
+                          alert.severity === "critical" ? "border-l-4 border-l-red-500" : "border-l-4 border-l-amber-500"
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex items-start gap-3 min-w-0 flex-1">
+                            {/* Icon */}
+                            <div
+                              className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${
+                                alert.type === "disconnected"
+                                  ? "bg-orange-500/15 text-orange-400"
+                                  : alert.type === "billing_overdue"
+                                  ? "bg-red-500/15 text-red-400"
+                                  : "bg-amber-500/15 text-amber-400"
+                              }`}
+                            >
+                              {alert.type === "disconnected" ? (
+                                <WifiOff className="w-4 h-4" />
+                              ) : alert.type === "billing_overdue" ? (
+                                <CreditCard className="w-4 h-4" />
+                              ) : (
+                                <ServerCrash className="w-4 h-4" />
+                              )}
+                            </div>
+
+                            {/* Content */}
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <Badge
+                                  variant="outline"
+                                  className={`text-[10px] ${
+                                    alert.severity === "critical"
+                                      ? "bg-red-500/10 text-red-400 border-red-500/30"
+                                      : "bg-amber-500/10 text-amber-400 border-amber-500/30"
+                                  }`}
+                                >
+                                  {alert.severity === "critical" ? "CRÍTICO" : "AVISO"}
+                                </Badge>
+                                <Badge variant="outline" className="text-[10px]">
+                                  {alert.type === "disconnected"
+                                    ? "Desconectado"
+                                    : alert.type === "billing_overdue"
+                                    ? "Inadimplente"
+                                    : "Erro"}
+                                </Badge>
+                                {alert.ownerNotified && (
+                                  <Badge variant="outline" className="text-[10px] bg-blue-500/10 text-blue-400 border-blue-500/30">
+                                    Notificado
+                                  </Badge>
+                                )}
+                              </div>
+                              <p className="text-sm mt-1.5">{alert.message}</p>
+                              <div className="flex items-center gap-3 mt-1.5 text-[11px] text-muted-foreground">
+                                <span>Tenant: {alert.tenantName || alert.tenantId}</span>
+                                <span>Criado: {formatDateTime(alert.createdAt)}</span>
+                                {alert.resolved && alert.resolvedBy && (
+                                  <span className="text-emerald-400">
+                                    Resolvido por: {alert.resolvedBy === "auto" ? "Auto" : alert.resolvedBy}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Actions */}
+                          {!alert.resolved && (
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-7 px-2 text-emerald-500 border-emerald-500/30 hover:bg-emerald-500/10"
+                                    onClick={() => resolveAlertMutation.mutate({ alertId: alert.id })}
+                                    disabled={resolveAlertMutation.isPending}
+                                  >
+                                    <CheckCircle className="w-3.5 h-3.5" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Resolver alerta</TooltipContent>
+                              </Tooltip>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-7 px-2 text-blue-500 border-blue-500/30 hover:bg-blue-500/10"
+                                    onClick={() => resolveAllMutation.mutate({ tenantId: alert.tenantId })}
+                                    disabled={resolveAllMutation.isPending}
+                                  >
+                                    <CheckCheck className="w-3.5 h-3.5" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Resolver todos do tenant</TooltipContent>
+                              </Tooltip>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* ═══════ TENANTS WITHOUT Z-API TAB ═══════ */}
+          <TabsContent value="tenants" className="space-y-4">
+            <Card className="surface">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base font-semibold flex items-center gap-2">
+                  <Building2 className="w-4 h-4 text-amber-400" />
+                  Tenants sem Z-API ({filteredTenantsWithout.length})
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                {tenantsWithoutQuery.isLoading ? (
+                  <div className="flex items-center justify-center py-12">
+                    <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                  </div>
+                ) : filteredTenantsWithout.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                    <CheckCircle className="w-10 h-10 mb-3 opacity-40" />
+                    <p className="text-sm">Todos os tenants ativos possuem Z-API</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-border bg-muted/30">
+                          <th className="text-left px-4 py-3 font-medium text-muted-foreground">Tenant</th>
+                          <th className="text-left px-4 py-3 font-medium text-muted-foreground">Plano</th>
+                          <th className="text-left px-4 py-3 font-medium text-muted-foreground">Billing</th>
+                          <th className="text-left px-4 py-3 font-medium text-muted-foreground">Criado em</th>
+                          <th className="text-right px-4 py-3 font-medium text-muted-foreground">Ação</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredTenantsWithout.map((t) => (
+                          <tr
+                            key={t.id}
+                            className="border-b border-border/50 hover:bg-muted/20 transition-colors"
+                          >
+                            <td className="px-4 py-3">
+                              <div className="flex items-center gap-2">
+                                <div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center text-xs font-bold text-amber-400">
+                                  {t.id}
+                                </div>
+                                <div>
+                                  <p className="font-medium">{t.name}</p>
+                                  <p className="text-[10px] text-muted-foreground">ID: {t.id}</p>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3">
+                              <Badge variant="outline" className="text-[10px] capitalize">
+                                {t.plan}
+                              </Badge>
+                            </td>
+                            <td className="px-4 py-3">{billingBadge(t.billingStatus)}</td>
+                            <td className="px-4 py-3 text-xs text-muted-foreground">
+                              {formatDate(t.createdAt)}
+                            </td>
+                            <td className="px-4 py-3 text-right">
+                              <Button
+                                size="sm"
+                                className="h-7 bg-emerald-600 hover:bg-emerald-700 text-white gap-1 text-xs"
+                                onClick={() =>
+                                  setProvisionDialog({
+                                    tenantId: t.id,
+                                    tenantName: t.name,
+                                  })
+                                }
+                              >
+                                <Plus className="w-3.5 h-3.5" />
+                                Liberar Z-API
+                              </Button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </div>
 
       {/* Provision Dialog */}

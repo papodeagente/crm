@@ -5110,3 +5110,14 @@
 - [x] Frontend: indicador visual de status de conexão WhatsApp
 - [x] Rota registrada no App.tsx e menu de navegação
 - [x] Testes vitest: 10 testes passando (access control, provisioning, deprovisioning, stats, data shape)
+## Sistema de Alertas Z-API - Super Admin
+- [x] Schema: tabela zapi_admin_alerts para persistir alertas
+- [x] Backend: serviço de monitoramento que verifica desconexões e inadimplência (a cada 30min)
+- [x] Backend: endpoints tRPC para listar, resolver e contar alertas
+- [x] Backend: notificação ao owner via notifyOwner quando alerta crítico é gerado
+- [x] Backend: auto-resolução de alertas quando instância reconecta ou billing normaliza
+- [x] Frontend: painel de alertas na página ZapiAdmin com badges e ações
+- [x] Frontend: indicador de alertas pendentes no header (badge vermelho)
+- [x] Frontend: botão "Verificar Agora" para trigger manual de check
+- [x] Frontend: filtros por tipo (desconectado, inadimplente) e status (pendente/resolvido)
+- [x] Testes vitest: 32 testes passando (alert types, billing detection, auto-resolution, metadata, etc.)
