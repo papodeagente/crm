@@ -5078,3 +5078,8 @@
 - [x] Desativar sessões WhatsApp vinculadas à instância Z-API cancelada
 - [x] Testes automatizados (19 testes passando)
 - [x] Fix: erro de provisionamento Z-API - colunas zapiToken/zapiClientToken/providerToken/providerClientToken eram varchar(255/256) mas JWT tem 341 chars, alterado para text
+## Z-API Apenas Provisionamento Automático
+- [x] Remover opção de migração manual Z-API da UI (ProviderManager)
+- [x] Remover/desabilitar endpoints de migração manual no backend
+- [x] Testar geração de QR code pela instância Z-API provisionada
+- [x] Corrigir problemas encontrados nos testes (Client-Token corrigido: ZAPI_CLIENT_TOKEN separado do Partner Token)

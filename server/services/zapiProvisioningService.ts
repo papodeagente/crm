@@ -21,6 +21,7 @@ import { tenantZapiInstances, whatsappSessions, tenants } from "../../drizzle/sc
 const ZAPI_BASE_URL = "https://api.z-api.io";
 const WEBHOOK_BASE_URL = process.env.ZAPI_WEBHOOK_BASE_URL || "https://crm.acelerador.tur.br";
 const PARTNER_TOKEN = () => process.env.ZAPI_PARTNER_TOKEN || "";
+const CLIENT_TOKEN = () => process.env.ZAPI_CLIENT_TOKEN || "";
 
 // ─── Types ───
 export interface ZapiCreateInstanceResponse {
@@ -208,7 +209,7 @@ export async function provisionZapiForTenant(
       tenantId,
       zapiInstanceId: instance.id,
       zapiToken: instance.token,
-      zapiClientToken: PARTNER_TOKEN(),
+      zapiClientToken: CLIENT_TOKEN(),
       instanceName,
       status: "active",
       subscribedAt: new Date(),
@@ -232,7 +233,7 @@ export async function provisionZapiForTenant(
       provider: "zapi",
       providerInstanceId: instance.id,
       providerToken: instance.token,
-      providerClientToken: PARTNER_TOKEN(),
+      providerClientToken: CLIENT_TOKEN(),
       status: "disconnected",
     });
 

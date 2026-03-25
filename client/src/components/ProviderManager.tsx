@@ -2,16 +2,6 @@ import { trpc } from "@/lib/trpc";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -29,8 +19,8 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import {
-  ArrowRightLeft, Loader2, Zap, Server, ShieldCheck,
-  RotateCcw, Activity, Eye, EyeOff, Info, CheckCircle2, XCircle,
+  Loader2, Zap, Server, ShieldCheck,
+  RotateCcw, Info, CheckCircle2, XCircle,
   CloudLightning, Package, Calendar, Clock
 } from "lucide-react";
 import { useState } from "react";
@@ -81,24 +71,8 @@ export default function ProviderManager({ session }: ProviderManagerProps) {
   });
   const [deprovisionDialogOpen, setDeprovisionDialogOpen] = useState(false);
 
-  // ─── State ───
-  const [migrateDialogOpen, setMigrateDialogOpen] = useState(false);
+  // ─── Rollback State ───
   const [rollbackDialogOpen, setRollbackDialogOpen] = useState(false);
-  const [zapiInstanceId, setZapiInstanceId] = useState(session.providerInstanceId || "");
-  const [zapiToken, setZapiToken] = useState(session.providerToken || "");
-  const [zapiClientToken, setZapiClientToken] = useState(session.providerClientToken || "");
-  const [showToken, setShowToken] = useState(false);
-  const [showClientToken, setShowClientToken] = useState(false);
-
-  // ─── Mutations ───
-  const migrateMut = trpc.monitoring.migrateProvider.useMutation({
-    onSuccess: (data: any) => {
-      toast.success(`Sessão migrada para ${data.provider === "zapi" ? "Z-API" : "Evolution API"} com sucesso!`);
-      setMigrateDialogOpen(false);
-      utils.whatsapp.sessions.invalidate();
-    },
-    onError: (err: any) => toast.error(`Erro ao migrar: ${err.message}`),
-  });
 
   const rollbackMut = trpc.monitoring.rollbackProvider.useMutation({
     onSuccess: () => {
@@ -109,41 +83,17 @@ export default function ProviderManager({ session }: ProviderManagerProps) {
     onError: (err: any) => toast.error(`Erro ao restaurar: ${err.message}`),
   });
 
-  // ─── Handlers ───
-  const handleMigrate = () => {
-    if (currentProvider === "evolution") {
-      // Migrating to Z-API — need credentials
-      if (!zapiInstanceId.trim() || !zapiToken.trim()) {
-        toast.error("Preencha o Instance ID e o Token da Z-API.");
-        return;
-      }
-      migrateMut.mutate({
-        sessionId: session.sessionId,
-        toProvider: "zapi",
-        zapiInstanceId: zapiInstanceId.trim(),
-        zapiToken: zapiToken.trim(),
-        zapiClientToken: zapiClientToken.trim() || undefined,
-      });
-    } else {
-      // Migrating back to Evolution
-      migrateMut.mutate({
-        sessionId: session.sessionId,
-        toProvider: "evolution",
-      });
-    }
-  };
-
   const handleRollback = () => {
     rollbackMut.mutate({ sessionId: session.sessionId });
   };
 
   const isZapi = currentProvider === "zapi";
-  const targetProvider = isZapi ? "Evolution API" : "Z-API";
 
   return (
     <div className="mt-8">
+      {/* ─── CURRENT PROVIDER STATUS ─── */}
       <div className="flex items-center gap-2 mb-4">
-        <ArrowRightLeft className="h-5 w-5 text-muted-foreground" />
+        <Server className="h-5 w-5 text-muted-foreground" />
         <h2 className="text-[15px] font-semibold text-foreground">Provedor de API</h2>
         <TooltipProvider>
           <Tooltip>
@@ -152,8 +102,8 @@ export default function ProviderManager({ session }: ProviderManagerProps) {
             </TooltipTrigger>
             <TooltipContent side="right" className="max-w-[280px]">
               <p className="text-[12px]">
-                Escolha qual API de WhatsApp será usada para esta sessão.
-                A migração pode ser revertida a qualquer momento.
+                O provedor Z-API é ativado automaticamente ao contratar um plano pago.
+                A Evolution API é usada durante o período de trial.
               </p>
             </TooltipContent>
           </Tooltip>
@@ -189,11 +139,19 @@ export default function ProviderManager({ session }: ProviderManagerProps) {
                   >
                     Ativo
                   </Badge>
+                  {isZapi && (
+                    <Badge
+                      variant="outline"
+                      className="text-[10px] px-1.5 py-0 h-5 border-purple-200 text-purple-700 bg-purple-50"
+                    >
+                      Automático
+                    </Badge>
+                  )}
                 </div>
                 <p className="text-[12px] text-muted-foreground mt-0.5">
                   {isZapi
-                    ? "Serviço gerenciado — webhooks confiáveis, sem servidor próprio"
-                    : "Self-hosted — controle total, requer manutenção"}
+                    ? "Provisionado automaticamente — serviço gerenciado, webhooks confiáveis"
+                    : "Self-hosted — controle total, usado durante o período trial"}
                 </p>
               </div>
             </div>
@@ -224,45 +182,47 @@ export default function ProviderManager({ session }: ProviderManagerProps) {
             </div>
           )}
 
-          {/* Divider */}
-          <div className="border-t border-border/40" />
+          {/* Emergency Rollback (only when on Z-API) */}
+          {isZapi && (
+            <>
+              <div className="border-t border-border/40" />
+              <div className="flex gap-2">
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className="h-10 rounded-xl text-[13px] gap-2 border-amber-200 text-amber-700 hover:bg-amber-50"
+                        onClick={() => setRollbackDialogOpen(true)}
+                      >
+                        <RotateCcw className="h-4 w-4" />
+                        Rollback para Evolution API
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p className="text-[12px]">Reverter para Evolution API em caso de emergência</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
+            </>
+          )}
 
-          {/* Action Buttons */}
-          <div className="flex gap-2">
-            {/* Migrate Button */}
-            <Button
-              variant="outline"
-              className={`flex-1 h-10 rounded-xl text-[13px] gap-2 ${
-                isZapi
-                  ? "border-emerald-200 text-emerald-700 hover:bg-emerald-50"
-                  : "border-blue-200 text-blue-700 hover:bg-blue-50"
-              }`}
-              onClick={() => setMigrateDialogOpen(true)}
-            >
-              <ArrowRightLeft className="h-4 w-4" />
-              Migrar para {targetProvider}
-            </Button>
-
-            {/* Emergency Rollback (only when on Z-API) */}
-            {isZapi && (
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className="h-10 px-3 rounded-xl text-[13px] border-amber-200 text-amber-700 hover:bg-amber-50"
-                      onClick={() => setRollbackDialogOpen(true)}
-                    >
-                      <RotateCcw className="h-4 w-4" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p className="text-[12px]">Rollback de emergência para Evolution</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            )}
-          </div>
+          {/* Info box when on Evolution */}
+          {!isZapi && (
+            <>
+              <div className="border-t border-border/40" />
+              <div className="rounded-lg bg-blue-50 border border-blue-200/60 p-3">
+                <div className="flex gap-2 items-start">
+                  <ShieldCheck className="h-4 w-4 text-blue-500 shrink-0 mt-0.5" />
+                  <p className="text-[11px] text-blue-700 leading-relaxed">
+                    Ao ativar um plano pago (após o trial), uma instância Z-API será provisionada
+                    automaticamente e esta sessão será migrada para o novo provedor.
+                  </p>
+                </div>
+              </div>
+            </>
+          )}
 
           {/* Provider Comparison */}
           <div className="rounded-xl border border-border/30 overflow-hidden">
@@ -275,9 +235,10 @@ export default function ProviderManager({ session }: ProviderManagerProps) {
               {[
                 { label: "Tipo", evo: "Self-hosted", zapi: "Serviço gerenciado" },
                 { label: "Webhooks", evo: "Instáveis (requer polling)", zapi: "Confiáveis" },
-                { label: "Custo", evo: "Gratuito", zapi: "Pago por instância" },
+                { label: "Custo", evo: "Gratuito (trial)", zapi: "Incluído no plano" },
                 { label: "Manutenção", evo: "Alta", zapi: "Baixa" },
                 { label: "Estabilidade", evo: "Variável", zapi: "Alta" },
+                { label: "Ativação", evo: "Manual (QR Code)", zapi: "Automática (pós-trial)" },
               ].map((row) => (
                 <div key={row.label} className="grid grid-cols-3 px-4 py-2">
                   <span className="text-[11px] text-muted-foreground font-medium">{row.label}</span>
@@ -294,154 +255,6 @@ export default function ProviderManager({ session }: ProviderManagerProps) {
         </div>
       </Card>
 
-      {/* ─── MIGRATE DIALOG ─── */}
-      <Dialog open={migrateDialogOpen} onOpenChange={setMigrateDialogOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="text-[16px] flex items-center gap-2">
-              <ArrowRightLeft className="h-5 w-5" />
-              Migrar para {targetProvider}
-            </DialogTitle>
-            <DialogDescription className="text-[13px]">
-              {isZapi
-                ? "A sessão será migrada de volta para a Evolution API. As credenciais Z-API serão removidas."
-                : "Preencha as credenciais da Z-API para migrar esta sessão. Você pode obter essas informações no painel da Z-API."}
-            </DialogDescription>
-          </DialogHeader>
-
-          {/* Z-API Credentials Form (when migrating TO Z-API) */}
-          {!isZapi && (
-            <div className="space-y-4 py-2">
-              <div className="space-y-2">
-                <Label htmlFor="zapi-instance" className="text-[13px] font-medium">
-                  Instance ID <span className="text-red-500">*</span>
-                </Label>
-                <Input
-                  id="zapi-instance"
-                  placeholder="Ex: 3C7A1B2D9E4F..."
-                  value={zapiInstanceId}
-                  onChange={(e) => setZapiInstanceId(e.target.value)}
-                  className="h-10 rounded-lg text-[13px] font-mono"
-                />
-                <p className="text-[11px] text-muted-foreground">
-                  Encontre no painel Z-API &rarr; Sua instância &rarr; ID
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="zapi-token" className="text-[13px] font-medium">
-                  Token <span className="text-red-500">*</span>
-                </Label>
-                <div className="relative">
-                  <Input
-                    id="zapi-token"
-                    type={showToken ? "text" : "password"}
-                    placeholder="Token da instância"
-                    value={zapiToken}
-                    onChange={(e) => setZapiToken(e.target.value)}
-                    className="h-10 rounded-lg text-[13px] font-mono pr-10"
-                  />
-                  <button
-                    type="button"
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                    onClick={() => setShowToken(!showToken)}
-                  >
-                    {showToken ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </button>
-                </div>
-                <p className="text-[11px] text-muted-foreground">
-                  Encontre no painel Z-API &rarr; Sua instância &rarr; Token
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="zapi-client-token" className="text-[13px] font-medium">
-                  Client Token <span className="text-muted-foreground text-[11px]">(opcional)</span>
-                </Label>
-                <div className="relative">
-                  <Input
-                    id="zapi-client-token"
-                    type={showClientToken ? "text" : "password"}
-                    placeholder="Token de segurança do cliente"
-                    value={zapiClientToken}
-                    onChange={(e) => setZapiClientToken(e.target.value)}
-                    className="h-10 rounded-lg text-[13px] font-mono pr-10"
-                  />
-                  <button
-                    type="button"
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                    onClick={() => setShowClientToken(!showClientToken)}
-                  >
-                    {showClientToken ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </button>
-                </div>
-                <p className="text-[11px] text-muted-foreground">
-                  Usado para validar webhooks recebidos. Recomendado para segurança.
-                </p>
-              </div>
-
-              {/* Info box */}
-              <div className="rounded-lg bg-blue-50 border border-blue-200/60 p-3">
-                <div className="flex gap-2 items-start">
-                  <ShieldCheck className="h-4 w-4 text-blue-500 shrink-0 mt-0.5" />
-                  <p className="text-[11px] text-blue-700 leading-relaxed">
-                    As credenciais são armazenadas de forma segura e usadas apenas para comunicação com a Z-API.
-                    A migração pode ser revertida a qualquer momento.
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Confirmation when migrating back to Evolution */}
-          {isZapi && (
-            <div className="py-2">
-              <div className="rounded-lg bg-amber-50 border border-amber-200/60 p-3.5">
-                <div className="flex gap-2 items-start">
-                  <Info className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
-                  <div className="space-y-1.5">
-                    <p className="text-[12px] text-amber-700 font-medium">
-                      Ao migrar de volta para Evolution API:
-                    </p>
-                    <ul className="text-[11px] text-amber-600 space-y-1 list-disc list-inside">
-                      <li>As credenciais Z-API serão removidas</li>
-                      <li>A sessão voltará a usar polling para sincronização</li>
-                      <li>Pode ser necessário reconectar o QR Code</li>
-                    </ul>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          <DialogFooter>
-            <Button
-              variant="outline"
-              className="rounded-lg text-[13px]"
-              onClick={() => setMigrateDialogOpen(false)}
-              disabled={migrateMut.isPending}
-            >
-              Cancelar
-            </Button>
-            <Button
-              className={`rounded-lg text-[13px] text-white gap-2 ${
-                isZapi
-                  ? "bg-emerald-600 hover:bg-emerald-700"
-                  : "bg-blue-600 hover:bg-blue-700"
-              }`}
-              onClick={handleMigrate}
-              disabled={migrateMut.isPending}
-            >
-              {migrateMut.isPending ? (
-                <><Loader2 className="h-4 w-4 animate-spin" />Migrando...</>
-              ) : (
-                <><ArrowRightLeft className="h-4 w-4" />Confirmar Migração</>
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
       {/* ─── Z-API PROVISIONING SECTION ─── */}
       <div className="mt-6">
         <div className="flex items-center gap-2 mb-4">
@@ -455,7 +268,7 @@ export default function ProviderManager({ session }: ProviderManagerProps) {
               <TooltipContent side="right" className="max-w-[300px]">
                 <p className="text-[12px]">
                   Ao ativar um plano pago (após o trial), uma instância Z-API é provisionada
-                  automaticamente via API de parceiro. Você também pode provisionar manualmente.
+                  automaticamente via API de parceiro. Administradores também podem provisionar manualmente.
                 </p>
               </TooltipContent>
             </Tooltip>
@@ -568,8 +381,7 @@ export default function ProviderManager({ session }: ProviderManagerProps) {
                       Nenhuma instância provisionada
                     </p>
                     <p className="text-[12px] text-muted-foreground mt-0.5">
-                      Uma instância Z-API será criada automaticamente ao ativar um plano pago,
-                      ou você pode provisionar manualmente.
+                      Uma instância Z-API será criada automaticamente ao ativar um plano pago após o trial.
                     </p>
                   </div>
                 </div>

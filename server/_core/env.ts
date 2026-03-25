@@ -9,4 +9,5 @@ export const ENV = {
   forgeApiKey: process.env.BUILT_IN_FORGE_API_KEY ?? "",
   wpSecret: process.env.WP_SECRET ?? "",
   resendApiKey: process.env.RESEND_API_KEY ?? "",
+  zapiClientToken: process.env.ZAPI_CLIENT_TOKEN ?? "",
 };

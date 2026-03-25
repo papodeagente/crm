@@ -1739,6 +1739,8 @@ export const appRouter = router({
         };
       }),
     // Migrate a session to a different provider
+    // NOTE: Manual migration to Z-API is DISABLED. Z-API is only available via automatic provisioning.
+    // Only migration back to Evolution (rollback) is allowed through this endpoint.
     migrateProvider: tenantWriteProcedure
       .input(z.object({
         sessionId: z.string(),
@@ -1748,11 +1750,15 @@ export const appRouter = router({
         zapiClientToken: z.string().optional(),
       }))
       .mutation(async ({ input }) => {
+        // Block manual migration to Z-API — only automatic provisioning is allowed
+        if (input.toProvider === "zapi") {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "A migração manual para Z-API foi desabilitada. A Z-API é provisionada automaticamente ao ativar um plano pago.",
+          });
+        }
         const { migrateSessionProvider } = await import("./providers/providerFactory");
-        const zapiConfig = input.toProvider === "zapi" && input.zapiInstanceId && input.zapiToken
-          ? { instanceId: input.zapiInstanceId, token: input.zapiToken, clientToken: input.zapiClientToken }
-          : undefined;
-        await migrateSessionProvider(input.sessionId, input.toProvider, zapiConfig);
+        await migrateSessionProvider(input.sessionId, input.toProvider);
         return { success: true, sessionId: input.sessionId, provider: input.toProvider };
       }),
     // Rollback a session to Evolution (emergency)
