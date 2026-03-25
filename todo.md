@@ -5242,3 +5242,15 @@
 - [x] Registro de transferência no histórico da conversa (nota interna + evento Socket.IO)
 - [x] Integração com painel de supervisão (transferBetweenAgents endpoint + botão ↔ nas conversas)
 - [x] Testes unitários para as novas funcionalidades (13 testes passando)
+
+## Disparo de Mensagens Segmentadas via Negociações e Contatos (Mar 25)
+- [x] Analisar sistema de disparo RFV existente para reutilizar
+- [x] Seleção múltipla (checkboxes) na página de Contatos (já existia)
+- [x] Seleção múltipla (checkboxes) na página de Negociações (já existia)
+- [x] Botão "Disparar WhatsApp" visível quando há itens selecionados (Contatos)
+- [x] Botão "Disparar WhatsApp" visível quando há itens selecionados (Negociações)
+- [x] Componente reutilizável BulkWhatsAppDialog (template, delay, preview, progresso)
+- [x] Backend startBulkSendCrm genérico (source: contacts | deals)
+- [x] Endpoints crm.contacts.bulkWhatsApp e crm.deals.bulkWhatsApp
+- [x] Variáveis de personalização: {nome}, {primeiro_nome}, {email}, {telefone}, {negocio}, {valor}
+- [x] Testes unitários para o disparo segmentado (18 testes passando)

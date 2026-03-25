@@ -5,7 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Plus, Briefcase, MoreHorizontal, Trash2, TrendingUp, DollarSign, RotateCcw, AlertTriangle, Archive } from "lucide-react";
+import { Plus, Briefcase, MoreHorizontal, Trash2, TrendingUp, DollarSign, RotateCcw, AlertTriangle, Archive, Send } from "lucide-react";
+import BulkWhatsAppDialog from "@/components/BulkWhatsAppDialog";
 import { useState, useMemo } from "react";
 import DateRangeFilter, { useDateFilter } from "@/components/DateRangeFilter";
 import { formatDate } from "../../../shared/dateUtils";
@@ -27,6 +28,8 @@ export default function Deals() {
   const [showTrash, setShowTrash] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [confirmHardDelete, setConfirmHardDelete] = useState(false);
+  const [bulkDialogOpen, setBulkDialogOpen] = useState(false);
+  const [progressDialogOpen, setProgressDialogOpen] = useState(false);
   const utils = trpc.useUtils();
   const { user } = useAuth();
   const isAdmin = user?.role === "admin";
@@ -75,6 +78,36 @@ export default function Deals() {
     },
     onError: (err) => toast.error(err.message),
   });
+
+  // Bulk WhatsApp
+  const activeSession = trpc.crm.deals.activeSession.useQuery(undefined, { enabled: bulkDialogOpen });
+  const bulkSendDeals = trpc.crm.deals.bulkWhatsApp.useMutation({
+    onSuccess: () => { setBulkDialogOpen(false); setProgressDialogOpen(true); toast.success("Disparo iniciado!"); },
+    onError: (e: any) => toast.error(e.message || "Erro ao iniciar disparo"),
+  });
+  const bulkProgress = trpc.crm.deals.bulkProgress.useQuery(undefined, { enabled: progressDialogOpen, refetchInterval: progressDialogOpen ? 2000 : false });
+  const cancelBulk = trpc.crm.deals.cancelBulk.useMutation({
+    onSuccess: () => toast.info("Envio cancelado"),
+    onError: (e: any) => toast.error(e.message),
+  });
+  const sessionConnected = activeSession.data?.status === "connected";
+  const sessionConnecting = activeSession.data?.status === "connecting";
+  const dealTemplateVars = [
+    { var: "{nome}", desc: "Nome do contato vinculado" },
+    { var: "{primeiro_nome}", desc: "Primeiro nome do contato" },
+    { var: "{email}", desc: "E-mail do contato" },
+    { var: "{telefone}", desc: "Telefone do contato" },
+    { var: "{negocio}", desc: "Título da negociação" },
+    { var: "{valor}", desc: "Valor da negociação" },
+  ];
+  const dealPreviewReplacements: Record<string, string> = {
+    "{nome}": "João da Silva",
+    "{primeiro_nome}": "João",
+    "{email}": "joao@email.com",
+    "{telefone}": "(11) 99999-0000",
+    "{negocio}": "Proposta Comercial",
+    "{valor}": "R$ 5.000,00",
+  };
 
   const defaultPipeline = pipelines.data?.[0];
   const dealItems = (deals.data as any)?.items || deals.data || [];
@@ -196,9 +229,14 @@ export default function Deals() {
               )}
             </>
           ) : (
-            <Button variant="destructive" size="sm" className="h-8 gap-1.5 text-[12px] rounded-lg" onClick={() => setConfirmDelete(true)} disabled={bulkDelete.isPending}>
-              <Trash2 className="h-3.5 w-3.5" />Excluir Selecionados
-            </Button>
+            <>
+              <Button size="sm" className="h-8 gap-1.5 text-[12px] rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => setBulkDialogOpen(true)}>
+                <Send className="h-3.5 w-3.5" />Disparar WhatsApp
+              </Button>
+              <Button variant="destructive" size="sm" className="h-8 gap-1.5 text-[12px] rounded-lg" onClick={() => setConfirmDelete(true)} disabled={bulkDelete.isPending}>
+                <Trash2 className="h-3.5 w-3.5" />Excluir Selecionados
+              </Button>
+            </>
           )}
           <Button variant="ghost" size="sm" className="h-8 text-[12px] rounded-lg" onClick={() => setSelectedIds(new Set())}>
             Limpar seleção
@@ -380,6 +418,34 @@ export default function Deals() {
         filters={dealFilters.filters}
         onApply={(f) => { dealFilters.setFilters(f); }}
         onClear={dealFilters.clear}
+      />
+
+      {/* Bulk WhatsApp Dialog */}
+      <BulkWhatsAppDialog
+        open={bulkDialogOpen}
+        onOpenChange={setBulkDialogOpen}
+        selectedCount={selectedIds.size}
+        sessionConnected={sessionConnected}
+        sessionConnecting={sessionConnecting}
+        templateVars={dealTemplateVars}
+        previewReplacements={dealPreviewReplacements}
+        onSend={(params) => {
+          bulkSendDeals.mutate({
+            dealIds: Array.from(selectedIds),
+            messageTemplate: params.messageTemplate,
+            sessionId: activeSession.data?.sessionId || "",
+            delayMs: params.delayMs,
+            randomDelay: params.randomDelay,
+          });
+        }}
+        isSending={bulkSendDeals.isPending}
+        progress={bulkProgress.data as any}
+        progressOpen={progressDialogOpen}
+        onProgressOpenChange={setProgressDialogOpen}
+        onCancel={() => cancelBulk.mutate()}
+        isCancelling={cancelBulk.isPending}
+        onClearSelection={() => setSelectedIds(new Set())}
+        entityLabel="negociações"
       />
     </div>
   );

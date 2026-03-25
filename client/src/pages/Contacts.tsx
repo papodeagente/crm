@@ -4,7 +4,8 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Plus, Search, Users, Mail, Phone, MoreHorizontal, Trash2, Edit, Eye, RotateCcw, AlertTriangle, Archive, RefreshCw, Filter, X } from "lucide-react";
+import { Plus, Search, Users, Mail, Phone, MoreHorizontal, Trash2, Edit, Eye, RotateCcw, AlertTriangle, Archive, RefreshCw, Filter, X, Send } from "lucide-react";
+import BulkWhatsAppDialog from "@/components/BulkWhatsAppDialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useState, useMemo } from "react";
 import CustomFieldRenderer, { customFieldValuesToArray, initCustomFieldValues } from "@/components/CustomFieldRenderer";
@@ -32,6 +33,8 @@ export default function Contacts() {
   const [showTrash, setShowTrash] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [confirmHardDelete, setConfirmHardDelete] = useState(false);
+  const [bulkDialogOpen, setBulkDialogOpen] = useState(false);
+  const [progressDialogOpen, setProgressDialogOpen] = useState(false);
   const utils = trpc.useUtils();
   const { user } = useAuth();
   const isAdmin = user?.role === "admin";
@@ -45,6 +48,32 @@ export default function Contacts() {
   const pageSize = 50;
   const contacts = trpc.crm.contacts.list.useQuery({ search: search || undefined, limit: pageSize, offset: page * pageSize, dateFrom: dateFilter.dates.dateFrom, dateTo: dateFilter.dates.dateTo, customFieldFilters: customFieldFilters.length > 0 ? customFieldFilters : undefined });
   const deletedContacts = trpc.crm.contacts.listDeleted.useQuery({ limit: 100 }, { enabled: showTrash });
+
+  // Bulk WhatsApp
+  const activeSession = trpc.crm.contacts.activeSession.useQuery(undefined, { enabled: bulkDialogOpen });
+  const bulkSend = trpc.crm.contacts.bulkWhatsApp.useMutation({
+    onSuccess: () => { setBulkDialogOpen(false); setProgressDialogOpen(true); toast.success("Disparo iniciado!"); },
+    onError: (e: any) => toast.error(e.message || "Erro ao iniciar disparo"),
+  });
+  const bulkProgress = trpc.crm.contacts.bulkProgress.useQuery(undefined, { enabled: progressDialogOpen, refetchInterval: progressDialogOpen ? 2000 : false });
+  const cancelBulk = trpc.crm.contacts.cancelBulk.useMutation({
+    onSuccess: () => toast.info("Envio cancelado"),
+    onError: (e: any) => toast.error(e.message),
+  });
+  const sessionConnected = activeSession.data?.status === "connected";
+  const sessionConnecting = activeSession.data?.status === "connecting";
+  const contactTemplateVars = [
+    { var: "{nome}", desc: "Nome completo do contato" },
+    { var: "{primeiro_nome}", desc: "Primeiro nome" },
+    { var: "{email}", desc: "E-mail do contato" },
+    { var: "{telefone}", desc: "Telefone do contato" },
+  ];
+  const contactPreviewReplacements: Record<string, string> = {
+    "{nome}": "João da Silva",
+    "{primeiro_nome}": "João",
+    "{email}": "joao@email.com",
+    "{telefone}": "(11) 99999-0000",
+  };
 
   // Custom fields for contacts
   const contactCustomFields = trpc.customFields.list.useQuery({ entity: "contact" as const });
@@ -306,9 +335,14 @@ export default function Contacts() {
               )}
             </>
           ) : (
-            <Button variant="destructive" size="sm" className="h-8 gap-1.5 text-[12px] rounded-lg" onClick={() => setConfirmDelete(true)} disabled={bulkDelete.isPending}>
-              <Trash2 className="h-3.5 w-3.5" />Excluir Selecionados
-            </Button>
+            <>
+              <Button size="sm" className="h-8 gap-1.5 text-[12px] rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => setBulkDialogOpen(true)}>
+                <Send className="h-3.5 w-3.5" />Disparar WhatsApp
+              </Button>
+              <Button variant="destructive" size="sm" className="h-8 gap-1.5 text-[12px] rounded-lg" onClick={() => setConfirmDelete(true)} disabled={bulkDelete.isPending}>
+                <Trash2 className="h-3.5 w-3.5" />Excluir Selecionados
+              </Button>
+            </>
           )}
           <Button variant="ghost" size="sm" className="h-8 text-[12px] rounded-lg" onClick={() => setSelectedIds(new Set())}>
             Limpar seleção
@@ -497,6 +531,34 @@ export default function Contacts() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Bulk WhatsApp Dialog */}
+      <BulkWhatsAppDialog
+        open={bulkDialogOpen}
+        onOpenChange={setBulkDialogOpen}
+        selectedCount={selectedIds.size}
+        sessionConnected={sessionConnected}
+        sessionConnecting={sessionConnecting}
+        templateVars={contactTemplateVars}
+        previewReplacements={contactPreviewReplacements}
+        onSend={(params) => {
+          bulkSend.mutate({
+            contactIds: Array.from(selectedIds),
+            messageTemplate: params.messageTemplate,
+            sessionId: activeSession.data?.sessionId || "",
+            delayMs: params.delayMs,
+            randomDelay: params.randomDelay,
+          });
+        }}
+        isSending={bulkSend.isPending}
+        progress={bulkProgress.data as any}
+        progressOpen={progressDialogOpen}
+        onProgressOpenChange={setProgressDialogOpen}
+        onCancel={() => cancelBulk.mutate()}
+        isCancelling={cancelBulk.isPending}
+        onClearSelection={() => setSelectedIds(new Set())}
+        entityLabel="contatos"
+      />
     </div>
   );
 }

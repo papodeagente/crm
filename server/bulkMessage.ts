@@ -5,7 +5,7 @@
  */
 import { getDb } from "./db";
 import { rfvContacts, whatsappSessions, bulkCampaigns, bulkCampaignMessages } from "../drizzle/schema";
-import { eq, and, inArray, desc, sql, count } from "drizzle-orm";
+import { eq, and, inArray, desc, sql, count, isNull } from "drizzle-orm";
 import { whatsappManager as baileysManager } from "./whatsapp";
 import { whatsappManager as evolutionManager } from "./whatsappEvolution";
 
@@ -602,4 +602,361 @@ function findBestSession(sessions: any[], tenantId: number): { sessionId: string
   const firstSession = sessions[0];
   const live = getSessionFromAnyManager(firstSession.sessionId);
   return { sessionId: firstSession.sessionId, status: live?.status || firstSession.status || "disconnected" };
+}
+
+
+// ═══════════════════════════════════════════════════════
+// GENERIC CRM BULK SEND — Contacts & Deals
+// ═══════════════════════════════════════════════════════
+
+import { contacts as contactsTable, deals as dealsTable } from "../drizzle/schema";
+
+export interface CrmBulkSendRequest {
+  tenantId: number;
+  userId: number;
+  userName?: string;
+  /** For source="contacts": these are contact IDs. For source="deals": these are deal IDs */
+  entityIds: number[];
+  messageTemplate: string;
+  sessionId: string;
+  delayMs?: number;
+  randomDelay?: boolean;
+  delayMinMs?: number;
+  delayMaxMs?: number;
+  campaignName?: string;
+  source: "contacts" | "deals";
+  audienceFilter?: string;
+}
+
+/**
+ * Interpolate template for CRM contacts (different variables than RFV)
+ */
+export function interpolateCrmTemplate(template: string, data: {
+  name: string;
+  email: string | null;
+  phone: string | null;
+  dealTitle?: string | null;
+  dealValue?: number | null;
+  stage?: string | null;
+  company?: string | null;
+}): string {
+  const firstName = data.name.split(" ")[0];
+  const valor = data.dealValue
+    ? new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(data.dealValue / 100)
+    : "";
+
+  return template
+    .replace(/\{nome\}/gi, data.name)
+    .replace(/\{primeiro_nome\}/gi, firstName)
+    .replace(/\{email\}/gi, data.email || "")
+    .replace(/\{telefone\}/gi, data.phone || "")
+    .replace(/\{negociacao\}/gi, data.dealTitle || "")
+    .replace(/\{valor\}/gi, valor)
+    .replace(/\{etapa\}/gi, data.stage || "")
+    .replace(/\{empresa\}/gi, data.company || "");
+}
+
+/**
+ * Start bulk send for CRM contacts or deals.
+ * For deals, resolves the contactId and phone from the associated contact.
+ */
+export async function startBulkSendCrm(request: CrmBulkSendRequest): Promise<{ jobId: string; campaignId: number }> {
+  const { tenantId, userId, userName, entityIds, messageTemplate, sessionId, delayMs = 3000, randomDelay = false, delayMinMs, delayMaxMs, source, audienceFilter } = request;
+  const key = jobKey(tenantId);
+
+  // Check if there's already a running job
+  const existing = activeJobs.get(key);
+  if (existing && existing.status === "running") {
+    throw new Error("Já existe um envio em massa em andamento para esta agência. Aguarde ou cancele.");
+  }
+
+  // Verify session is connected
+  const session = getSessionFromAnyManager(sessionId);
+  if (!session || session.status !== "connected") {
+    throw new Error("Sessão WhatsApp não está conectada. Conecte-se primeiro.");
+  }
+
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  // Resolve contacts based on source
+  let resolvedContacts: Array<{
+    id: number; name: string; email: string | null; phone: string | null;
+    dealTitle?: string | null; dealValue?: number | null; stage?: string | null; company?: string | null;
+  }> = [];
+
+  if (source === "contacts") {
+    // Direct contact IDs
+    const rows = await db
+      .select({
+        id: contactsTable.id,
+        name: contactsTable.name,
+        email: contactsTable.email,
+        phone: contactsTable.phone,
+      })
+      .from(contactsTable)
+      .where(and(
+        eq(contactsTable.tenantId, tenantId),
+        inArray(contactsTable.id, entityIds),
+        isNull(contactsTable.deletedAt),
+      ));
+    resolvedContacts = rows;
+  } else {
+    // Deal IDs → resolve to contacts
+    const dealRows = await db
+      .select({
+        dealId: dealsTable.id,
+        dealTitle: dealsTable.title,
+        dealValue: dealsTable.valueCents,
+        contactId: dealsTable.contactId,
+      })
+      .from(dealsTable)
+      .where(and(
+        eq(dealsTable.tenantId, tenantId),
+        inArray(dealsTable.id, entityIds),
+        isNull(dealsTable.deletedAt),
+      ));
+
+    // Get unique contact IDs
+    const contactIds = Array.from(new Set(dealRows.filter(d => d.contactId).map(d => d.contactId!)));
+    if (contactIds.length === 0) {
+      throw new Error("Nenhuma negociação selecionada possui contato vinculado.");
+    }
+
+    const contactRows = await db
+      .select({
+        id: contactsTable.id,
+        name: contactsTable.name,
+        email: contactsTable.email,
+        phone: contactsTable.phone,
+      })
+      .from(contactsTable)
+      .where(and(
+        eq(contactsTable.tenantId, tenantId),
+        inArray(contactsTable.id, contactIds),
+      ));
+
+    const contactMap = new Map(contactRows.map(c => [c.id, c]));
+
+    // Merge deal info with contact info (deduplicate by contactId)
+    const seenContacts = new Set<number>();
+    for (const deal of dealRows) {
+      if (!deal.contactId || seenContacts.has(deal.contactId)) continue;
+      const contact = contactMap.get(deal.contactId);
+      if (!contact) continue;
+      seenContacts.add(deal.contactId);
+      resolvedContacts.push({
+        ...contact,
+        dealTitle: deal.dealTitle,
+        dealValue: deal.dealValue,
+      });
+    }
+  }
+
+  if (resolvedContacts.length === 0) {
+    throw new Error("Nenhum contato encontrado com telefone para envio.");
+  }
+
+  // Generate campaign name
+  const campaignName = request.campaignName || `${source === "deals" ? "Negociações" : "Contatos"} ${new Date().toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })} ${new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" })}`;
+
+  // Create campaign record
+  const [campaignResult] = await db.insert(bulkCampaigns).values({
+    tenantId,
+    userId,
+    userName: userName || null,
+    name: campaignName,
+    messageTemplate,
+    source,
+    audienceFilter: audienceFilter || null,
+    sessionId,
+    intervalMs: delayMs,
+    totalContacts: resolvedContacts.length,
+    sentCount: 0,
+    failedCount: 0,
+    skippedCount: 0,
+    status: "running",
+  });
+
+  const campaignId = campaignResult.insertId;
+
+  // Pre-create all message records as "pending"
+  const messageRecords = resolvedContacts.map((contact) => ({
+    campaignId,
+    tenantId,
+    contactId: contact.id,
+    contactName: contact.name,
+    contactPhone: contact.phone || null,
+    messageContent: null as string | null,
+    status: "pending" as const,
+  }));
+
+  for (let i = 0; i < messageRecords.length; i += 100) {
+    const batch = messageRecords.slice(i, i + 100);
+    await db.insert(bulkCampaignMessages).values(batch);
+  }
+
+  // Initialize job progress
+  const job: BulkJobProgress = {
+    tenantId,
+    campaignId,
+    total: resolvedContacts.length,
+    processed: 0,
+    sent: 0,
+    failed: 0,
+    skipped: 0,
+    status: "running",
+    startedAt: new Date(),
+    results: [],
+  };
+  activeJobs.set(key, job);
+
+  // Run async (fire and forget)
+  processCrmBulkSend(key, job, campaignId, resolvedContacts, messageTemplate, sessionId, delayMs, randomDelay, delayMinMs, delayMaxMs).catch((err) => {
+    console.error("[CrmBulkSend] Fatal error:", err);
+    job.status = "completed";
+    getDb().then(db2 => {
+      if (db2) {
+        db2.update(bulkCampaigns)
+          .set({ status: "failed", completedAt: new Date() })
+          .where(eq(bulkCampaigns.id, campaignId))
+          .catch(console.error);
+      }
+    });
+  });
+
+  return { jobId: key, campaignId };
+}
+
+async function processCrmBulkSend(
+  key: string,
+  job: BulkJobProgress,
+  campaignId: number,
+  contacts: Array<{ id: number; name: string; email: string | null; phone: string | null; dealTitle?: string | null; dealValue?: number | null; stage?: string | null; company?: string | null }>,
+  messageTemplate: string,
+  sessionId: string,
+  delayMs: number,
+  randomDelay: boolean = false,
+  delayMinMs?: number,
+  delayMaxMs?: number,
+) {
+  const db = await getDb();
+  if (!db) return;
+
+  // Fetch campaign message records to get their IDs
+  const campaignMessages = await db
+    .select({ id: bulkCampaignMessages.id, contactId: bulkCampaignMessages.contactId })
+    .from(bulkCampaignMessages)
+    .where(eq(bulkCampaignMessages.campaignId, campaignId));
+
+  const msgIdMap = new Map<number, number>();
+  for (const m of campaignMessages) {
+    if (m.contactId) msgIdMap.set(m.contactId, m.id);
+  }
+
+  for (const contact of contacts) {
+    if (job.status === "cancelled") {
+      await db.update(bulkCampaignMessages)
+        .set({ status: "skipped", errorMessage: "Campanha cancelada" })
+        .where(and(
+          eq(bulkCampaignMessages.campaignId, campaignId),
+          eq(bulkCampaignMessages.status, "pending"),
+        ));
+      break;
+    }
+
+    const msgId = msgIdMap.get(contact.id);
+    const result: BulkSendResult["results"][0] = {
+      contactId: contact.id,
+      name: contact.name,
+      phone: contact.phone,
+      status: "skipped",
+    };
+
+    if (!contact.phone) {
+      result.status = "skipped";
+      result.error = "Sem telefone";
+      job.skipped++;
+      if (msgId) {
+        await db.update(bulkCampaignMessages)
+          .set({ status: "skipped", errorMessage: "Sem telefone" })
+          .where(eq(bulkCampaignMessages.id, msgId));
+      }
+    } else {
+      const jid = phoneToJid(contact.phone);
+      if (!jid) {
+        result.status = "skipped";
+        result.error = "Telefone inválido";
+        job.skipped++;
+        if (msgId) {
+          await db.update(bulkCampaignMessages)
+            .set({ status: "skipped", errorMessage: "Telefone inválido" })
+            .where(eq(bulkCampaignMessages.id, msgId));
+        }
+      } else {
+        if (msgId) {
+          await db.update(bulkCampaignMessages)
+            .set({ status: "sending" })
+            .where(eq(bulkCampaignMessages.id, msgId));
+        }
+        try {
+          const message = interpolateCrmTemplate(messageTemplate, contact);
+          const sendResult = await sendTextMessageViaAnyManager(sessionId, jid, message);
+          const waMessageId = sendResult?.key?.id || null;
+
+          result.status = "sent";
+          job.sent++;
+          if (msgId) {
+            await db.update(bulkCampaignMessages)
+              .set({
+                status: "sent",
+                messageContent: message,
+                sentAt: new Date(),
+                waMessageId,
+              })
+              .where(eq(bulkCampaignMessages.id, msgId));
+          }
+        } catch (err: any) {
+          result.status = "failed";
+          result.error = err.message || "Erro desconhecido";
+          job.failed++;
+          if (msgId) {
+            await db.update(bulkCampaignMessages)
+              .set({
+                status: "failed",
+                messageContent: interpolateCrmTemplate(messageTemplate, contact),
+                errorMessage: err.message || "Erro desconhecido",
+              })
+              .where(eq(bulkCampaignMessages.id, msgId));
+          }
+        }
+      }
+    }
+
+    job.processed++;
+    job.results.push(result);
+
+    // Delay between messages
+    if (job.status === "running" && contact !== contacts[contacts.length - 1]) {
+      const actualDelay = randomDelay
+        ? Math.floor(Math.random() * ((delayMaxMs || delayMs * 1.5) - (delayMinMs || delayMs * 0.5)) + (delayMinMs || delayMs * 0.5))
+        : delayMs;
+      await new Promise((r) => setTimeout(r, actualDelay));
+    }
+  }
+
+  // Mark campaign as completed
+  job.status = job.status === "cancelled" ? "cancelled" : "completed";
+  const finalStatus = job.status === "cancelled" ? "cancelled" : "completed";
+  await db.update(bulkCampaigns)
+    .set({
+      status: finalStatus,
+      sentCount: job.sent,
+      failedCount: job.failed,
+      skippedCount: job.skipped,
+      completedAt: new Date(),
+    })
+    .where(eq(bulkCampaigns.id, campaignId));
+
+  console.log(`[CrmBulkSend] Campaign ${campaignId} ${finalStatus}: ${job.sent} sent, ${job.failed} failed, ${job.skipped} skipped`);
 }

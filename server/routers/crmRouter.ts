@@ -8,6 +8,7 @@ import { getDb } from "../db";
 import { tenants } from "../../drizzle/schema";
 import { eq } from "drizzle-orm";
 import { resolveVisibilityFilter } from "../services/visibilityService";
+import { startBulkSendCrm, getBulkSendProgress, cancelBulkSend, getActiveSessionForTenant, listCampaigns, getCampaignDetail, getCampaignMessages } from "../bulkMessage";
 
 export const crmRouter = router({
   // ─── CONTACTS ───
@@ -202,6 +203,43 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
       .query(async ({ ctx }) => {
         const { getPendingMerges } = await import("../services/contactDedup");
         return getPendingMerges(getTenantId(ctx));
+      }),
+    // ─── BULK WHATSAPP SEND (Contacts) ───
+    bulkWhatsApp: tenantWriteProcedure
+      .input(z.object({
+        contactIds: z.array(z.number()).min(1),
+        messageTemplate: z.string().min(1),
+        sessionId: z.string(),
+        delayMs: z.number().default(3000),
+        randomDelay: z.boolean().default(false),
+        campaignName: z.string().optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        return startBulkSendCrm({
+          tenantId: getTenantId(ctx),
+          userId: ctx.user.id,
+          userName: ctx.user.name || undefined,
+          entityIds: input.contactIds,
+          messageTemplate: input.messageTemplate,
+          sessionId: input.sessionId,
+          delayMs: input.delayMs,
+          randomDelay: input.randomDelay,
+          campaignName: input.campaignName,
+          source: "contacts",
+        });
+      }),
+    activeSession: tenantProcedure
+      .query(async ({ ctx }) => {
+        const userId = ctx.saasUser?.userId || ctx.user?.id;
+        return getActiveSessionForTenant(getTenantId(ctx), userId);
+      }),
+    bulkProgress: tenantProcedure
+      .query(async ({ ctx }) => {
+        return getBulkSendProgress(getTenantId(ctx));
+      }),
+    cancelBulk: tenantWriteProcedure
+      .mutation(async ({ ctx }) => {
+        return cancelBulkSend(getTenantId(ctx));
       }),
   }),
 
@@ -857,6 +895,44 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
       .input(z.object({ status: z.string().optional() }))
       .query(async ({ input, ctx }) => {
         return crm.sumDealValue(getTenantId(ctx), input.status);
+      }),
+
+    // ─── BULK WHATSAPP SEND (Deals) ───
+    bulkWhatsApp: tenantWriteProcedure
+      .input(z.object({
+        dealIds: z.array(z.number()).min(1),
+        messageTemplate: z.string().min(1),
+        sessionId: z.string(),
+        delayMs: z.number().default(3000),
+        randomDelay: z.boolean().default(false),
+        campaignName: z.string().optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        return startBulkSendCrm({
+          tenantId: getTenantId(ctx),
+          userId: ctx.user.id,
+          userName: ctx.user.name || undefined,
+          entityIds: input.dealIds,
+          messageTemplate: input.messageTemplate,
+          sessionId: input.sessionId,
+          delayMs: input.delayMs,
+          randomDelay: input.randomDelay,
+          campaignName: input.campaignName,
+          source: "deals",
+        });
+      }),
+    activeSession: tenantProcedure
+      .query(async ({ ctx }) => {
+        const userId = ctx.saasUser?.userId || ctx.user?.id;
+        return getActiveSessionForTenant(getTenantId(ctx), userId);
+      }),
+    bulkProgress: tenantProcedure
+      .query(async ({ ctx }) => {
+        return getBulkSendProgress(getTenantId(ctx));
+      }),
+    cancelBulk: tenantWriteProcedure
+      .mutation(async ({ ctx }) => {
+        return cancelBulkSend(getTenantId(ctx));
       }),
 
     // ─── DEAL PRODUCTS (Orçamento) ───
