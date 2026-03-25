@@ -5254,3 +5254,9 @@
 - [x] Endpoints crm.contacts.bulkWhatsApp e crm.deals.bulkWhatsApp
 - [x] Variáveis de personalização: {nome}, {primeiro_nome}, {email}, {telefone}, {negocio}, {valor}
 - [x] Testes unitários para o disparo segmentado (18 testes passando)
+
+## Disparo Negociações — Contato Principal (Mar 25)
+- [x] Backend busca contato principal da negociação (contactId) com JOIN em pipelineStages
+- [x] Telefone do contato principal é usado no disparo (deduplicado por contactId)
+- [x] Frontend de Negociações com variáveis corretas ({negociacao}, {valor}, {etapa}, {empresa})
+- [x] Testes unitários para disparo via negociações (18 testes passando)

@@ -702,27 +702,28 @@ export async function startBulkSendCrm(request: CrmBulkSendRequest): Promise<{ j
       ));
     resolvedContacts = rows;
   } else {
-    // Deal IDs → resolve to contacts
+    // Deal IDs → resolve to contacts via contato principal
+    const { pipelineStages } = await import("../drizzle/schema");
     const dealRows = await db
       .select({
         dealId: dealsTable.id,
         dealTitle: dealsTable.title,
         dealValue: dealsTable.valueCents,
         contactId: dealsTable.contactId,
+        stageName: pipelineStages.name,
       })
       .from(dealsTable)
+      .leftJoin(pipelineStages, eq(dealsTable.stageId, pipelineStages.id))
       .where(and(
         eq(dealsTable.tenantId, tenantId),
         inArray(dealsTable.id, entityIds),
         isNull(dealsTable.deletedAt),
       ));
-
     // Get unique contact IDs
     const contactIds = Array.from(new Set(dealRows.filter(d => d.contactId).map(d => d.contactId!)));
     if (contactIds.length === 0) {
       throw new Error("Nenhuma negociação selecionada possui contato vinculado.");
     }
-
     const contactRows = await db
       .select({
         id: contactsTable.id,
@@ -735,9 +736,7 @@ export async function startBulkSendCrm(request: CrmBulkSendRequest): Promise<{ j
         eq(contactsTable.tenantId, tenantId),
         inArray(contactsTable.id, contactIds),
       ));
-
     const contactMap = new Map(contactRows.map(c => [c.id, c]));
-
     // Merge deal info with contact info (deduplicate by contactId)
     const seenContacts = new Set<number>();
     for (const deal of dealRows) {
@@ -749,6 +748,7 @@ export async function startBulkSendCrm(request: CrmBulkSendRequest): Promise<{ j
         ...contact,
         dealTitle: deal.dealTitle,
         dealValue: deal.dealValue,
+        stage: deal.stageName || undefined,
       });
     }
   }

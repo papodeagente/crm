@@ -93,20 +93,24 @@ export default function Deals() {
   const sessionConnected = activeSession.data?.status === "connected";
   const sessionConnecting = activeSession.data?.status === "connecting";
   const dealTemplateVars = [
-    { var: "{nome}", desc: "Nome do contato vinculado" },
+    { var: "{nome}", desc: "Nome do contato principal" },
     { var: "{primeiro_nome}", desc: "Primeiro nome do contato" },
     { var: "{email}", desc: "E-mail do contato" },
     { var: "{telefone}", desc: "Telefone do contato" },
-    { var: "{negocio}", desc: "Título da negociação" },
+    { var: "{negociacao}", desc: "Título da negociação" },
     { var: "{valor}", desc: "Valor da negociação" },
+    { var: "{etapa}", desc: "Etapa atual do funil" },
+    { var: "{empresa}", desc: "Empresa do contato" },
   ];
   const dealPreviewReplacements: Record<string, string> = {
     "{nome}": "João da Silva",
     "{primeiro_nome}": "João",
     "{email}": "joao@email.com",
     "{telefone}": "(11) 99999-0000",
-    "{negocio}": "Proposta Comercial",
+    "{negociacao}": "Pacote Europa 2026",
     "{valor}": "R$ 5.000,00",
+    "{etapa}": "Cotação",
+    "{empresa}": "Viagens ABC",
   };
 
   const defaultPipeline = pipelines.data?.[0];
