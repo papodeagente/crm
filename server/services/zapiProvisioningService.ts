@@ -279,17 +279,39 @@ export async function deprovisionZapiForTenant(tenantId: number): Promise<{ succ
     }
 
     for (const inst of instances) {
+      // 1. Cancel instance on Z-API Partner API
       try {
         await cancelInstance(inst.zapiInstanceId, inst.zapiToken);
       } catch (err: any) {
         console.warn(`[ZapiProvisioning] Failed to cancel Z-API instance ${inst.zapiInstanceId}: ${err.message}`);
+        // Continue anyway — mark as cancelled locally even if API call fails
       }
 
-      // Mark as cancelled in DB
+      // 2. Mark instance as cancelled in DB
       await db
         .update(tenantZapiInstances)
         .set({ status: "cancelled", cancelledAt: new Date() })
         .where(eq(tenantZapiInstances.id, inst.id));
+
+      // 3. Deactivate all WhatsApp sessions linked to this Z-API instance
+      const linkedSessions = await db
+        .select()
+        .from(whatsappSessions)
+        .where(
+          and(
+            eq(whatsappSessions.tenantId, tenantId),
+            eq(whatsappSessions.provider, "zapi"),
+            eq(whatsappSessions.providerInstanceId, inst.zapiInstanceId)
+          )
+        );
+
+      for (const session of linkedSessions) {
+        await db
+          .update(whatsappSessions)
+          .set({ status: "disconnected" })
+          .where(eq(whatsappSessions.id, session.id));
+        console.log(`[ZapiProvisioning] Session ${session.sessionId} deactivated (instance ${inst.zapiInstanceId} cancelled)`);
+      }
     }
 
     console.log(`[ZapiProvisioning] ✓ Deprovisioned ${instances.length} instance(s) for tenant ${tenantId}`);

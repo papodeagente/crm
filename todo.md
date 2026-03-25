@@ -5072,3 +5072,8 @@
 - [x] Integrar provisionamento ao fluxo de ativação de plano pós-trial
 - [x] Atualizar UI: mostrar status de instância Z-API provisionada
 - [x] Testes automatizados
+## Deprovisionamento Automático Z-API
+- [x] Analisar eventos de cancelamento no webhook Hotmart
+- [x] Integrar deprovisionamento ao webhook nos eventos de cancelamento/expiração
+- [x] Desativar sessões WhatsApp vinculadas à instância Z-API cancelada
+- [x] Testes automatizados (19 testes passando)
