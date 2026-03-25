@@ -31,9 +31,9 @@ export const whatsappSessions = mysqlTable("whatsapp_sessions", {
   /** Z-API instance ID (only for zapi provider) */
   providerInstanceId: varchar("providerInstanceId", { length: 128 }),
   /** Z-API token (only for zapi provider) */
-  providerToken: varchar("providerToken", { length: 256 }),
+  providerToken: text("providerToken"),
   /** Z-API client/security token (only for zapi provider) */
-  providerClientToken: varchar("providerClientToken", { length: 256 }),
+  providerClientToken: text("providerClientToken"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 }, (t) => [
@@ -2078,8 +2078,8 @@ export const tenantZapiInstances = mysqlTable("tenant_zapi_instances", {
   id: int("id").autoincrement().primaryKey(),
   tenantId: int("tenantId").notNull(),
   zapiInstanceId: varchar("zapiInstanceId", { length: 128 }).notNull(),
-  zapiToken: varchar("zapiToken", { length: 255 }).notNull(),
-  zapiClientToken: varchar("zapiClientToken", { length: 255 }),
+  zapiToken: text("zapiToken").notNull(),
+  zapiClientToken: text("zapiClientToken"),
   instanceName: varchar("instanceName", { length: 255 }).notNull(),
   status: mysqlEnum("zapi_instance_status", ["active", "pending", "cancelled", "expired"]).default("pending").notNull(),
   subscribedAt: timestamp("subscribedAt"),

@@ -5077,3 +5077,4 @@
 - [x] Integrar deprovisionamento ao webhook nos eventos de cancelamento/expiração
 - [x] Desativar sessões WhatsApp vinculadas à instância Z-API cancelada
 - [x] Testes automatizados (19 testes passando)
+- [x] Fix: erro de provisionamento Z-API - colunas zapiToken/zapiClientToken/providerToken/providerClientToken eram varchar(255/256) mas JWT tem 341 chars, alterado para text
