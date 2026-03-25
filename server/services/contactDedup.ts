@@ -425,6 +425,8 @@ export interface ConversionEventData {
   dedupeMatchType: "lead_id" | "email" | "phone" | "email_and_phone" | "manual_merge" | "new_contact";
   matchedExistingContactId?: number;
   dealId?: number;
+  dealDecision?: string;
+  dealDecisionReason?: string;
   idempotencyKey: string;
 }
 
@@ -462,6 +464,8 @@ export async function recordConversionEvent(data: ConversionEventData): Promise<
     dedupeMatchType: data.dedupeMatchType,
     matchedExistingContactId: data.matchedExistingContactId,
     dealId: data.dealId,
+    dealDecision: data.dealDecision,
+    dealDecisionReason: data.dealDecisionReason,
     idempotencyKey: data.idempotencyKey,
   }).$returningId();
 

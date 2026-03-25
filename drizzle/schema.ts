@@ -458,11 +458,21 @@ export const deals = mysqlTable("deals", {
   boardingDate: timestamp("boardingDate"),
   returnDate: timestamp("returnDate"),
   deletedAt: timestamp("deletedAt"),
+  /** Conversion tracking fields */
+  lastConversionAt: timestamp("lastConversionAt"),
+  lastConversionSource: varchar("lastConversionSource", { length: 64 }),
+  lastWebhookName: varchar("lastWebhookName", { length: 255 }),
+  lastUtmSource: varchar("lastUtmSource", { length: 255 }),
+  lastUtmMedium: varchar("lastUtmMedium", { length: 255 }),
+  lastUtmCampaign: varchar("lastUtmCampaign", { length: 255 }),
+  conversionCount: int("conversionCount").notNull().default(1),
 }, (t) => [
   index("deals_tenant_pipeline_idx").on(t.tenantId, t.pipelineId, t.stageId),
   index("deals_tenant_status_idx").on(t.tenantId, t.status, t.lastActivityAt),
   index("deals_tenant_owner_idx").on(t.tenantId, t.ownerUserId),
   index("idx_deals_wa_conv").on(t.waConversationId),
+  index("deals_tenant_contact_status_idx").on(t.tenantId, t.contactId, t.status),
+  index("deals_tenant_contact_pipeline_idx").on(t.tenantId, t.contactId, t.pipelineId, t.status),
 ]);
 
 // ═══════════════════════════════════════
@@ -2182,6 +2192,10 @@ export const contactConversionEvents = mysqlTable("contact_conversion_events", {
   idempotencyKey: varchar("idempotencyKey", { length: 255 }).notNull(),
   /** Deal created or linked by this event */
   dealId: int("dealId"),
+  /** Decision made by the system: reused_existing_deal | created_new_deal | reopened_existing_context */
+  dealDecision: varchar("dealDecision", { length: 64 }),
+  /** Human-readable reason for the decision */
+  dealDecisionReason: varchar("dealDecisionReason", { length: 512 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 }, (t) => [
   index("cce_tenant_contact_idx").on(t.tenantId, t.contactId),

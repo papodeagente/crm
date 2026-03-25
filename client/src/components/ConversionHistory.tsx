@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
+import { useLocation } from "wouter";
 import {
   ArrowDownToLine, ExternalLink, Globe, Megaphone,
-  FileText, Loader2, ChevronDown, ChevronUp, Zap
+  FileText, Loader2, ChevronDown, ChevronUp, Zap,
+  RefreshCw, PlusCircle, RotateCcw, Link2
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 
 function sourceIcon(source: string) {
   switch (source) {
@@ -39,6 +40,35 @@ function matchBadge(matchType: string) {
   }
 }
 
+function dealDecisionBadge(decision: string | null | undefined) {
+  if (!decision) return null;
+  switch (decision) {
+    case "reused_existing_deal":
+      return (
+        <Badge variant="outline" className="text-[10px] bg-amber-500/10 text-amber-400 border-amber-500/30 gap-1">
+          <RefreshCw className="h-2.5 w-2.5" />
+          Deal reutilizado
+        </Badge>
+      );
+    case "created_new_deal":
+      return (
+        <Badge variant="outline" className="text-[10px] bg-emerald-500/10 text-emerald-400 border-emerald-500/30 gap-1">
+          <PlusCircle className="h-2.5 w-2.5" />
+          Novo deal
+        </Badge>
+      );
+    case "reopened_existing_context":
+      return (
+        <Badge variant="outline" className="text-[10px] bg-blue-500/10 text-blue-400 border-blue-500/30 gap-1">
+          <RotateCcw className="h-2.5 w-2.5" />
+          Deal reaberto
+        </Badge>
+      );
+    default:
+      return <Badge variant="outline" className="text-[10px]">{decision}</Badge>;
+  }
+}
+
 function formatDate(d: string | Date | null) {
   if (!d) return "—";
   return new Date(d).toLocaleDateString("pt-BR", {
@@ -54,6 +84,7 @@ interface ConversionHistoryProps {
 
 export default function ConversionHistory({ contactId }: ConversionHistoryProps) {
   const [expanded, setExpanded] = useState<number | null>(null);
+  const [, navigate] = useLocation();
   const conversionsQ = trpc.crm.contacts.conversionHistory.useQuery(
     { contactId },
     { enabled: !!contactId }
@@ -97,11 +128,12 @@ export default function ConversionHistory({ contactId }: ConversionHistoryProps)
                       {sourceIcon(conv.integrationSource)}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-sm font-medium text-foreground">
                           {conv.conversionName || conv.conversionIdentifier || sourceLabel(conv.integrationSource)}
                         </span>
                         {matchBadge(conv.dedupeMatchType)}
+                        {dealDecisionBadge(conv.dealDecision)}
                       </div>
                       <div className="flex items-center gap-2 mt-0.5 text-xs text-muted-foreground">
                         <span>{formatDate(conv.receivedAt)}</span>
@@ -112,6 +144,21 @@ export default function ConversionHistory({ contactId }: ConversionHistoryProps)
                               <ExternalLink className="h-2.5 w-2.5" />
                               {conv.utmSource}{conv.utmMedium ? ` / ${conv.utmMedium}` : ""}
                             </span>
+                          </>
+                        )}
+                        {conv.dealId && (
+                          <>
+                            <span>•</span>
+                            <button
+                              className="flex items-center gap-1 text-primary hover:underline"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                navigate(`/deals/${conv.dealId}`);
+                              }}
+                            >
+                              <Link2 className="h-2.5 w-2.5" />
+                              Deal #{conv.dealId}
+                            </button>
                           </>
                         )}
                       </div>
@@ -188,10 +235,30 @@ export default function ConversionHistory({ contactId }: ConversionHistoryProps)
                             <p className="text-foreground font-medium">{conv.trafficSource}</p>
                           </div>
                         )}
-                        {conv.dealId && (
-                          <div>
-                            <span className="text-muted-foreground">Negociação</span>
-                            <p className="text-foreground font-medium">#{conv.dealId}</p>
+                        {/* Deal decision info */}
+                        {conv.dealDecision && (
+                          <div className="col-span-2 mt-1 p-2 rounded-md bg-muted/30 border border-border/20">
+                            <span className="text-muted-foreground text-[10px] uppercase tracking-wider font-medium">Decisão do Sistema</span>
+                            <div className="flex items-center gap-2 mt-1">
+                              {dealDecisionBadge(conv.dealDecision)}
+                              {conv.dealId && (
+                                <button
+                                  className="flex items-center gap-1 text-xs text-primary hover:underline"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    navigate(`/deals/${conv.dealId}`);
+                                  }}
+                                >
+                                  <Link2 className="h-3 w-3" />
+                                  Abrir negociação #{conv.dealId}
+                                </button>
+                              )}
+                            </div>
+                            {conv.dealDecisionReason && (
+                              <p className="text-[11px] text-muted-foreground mt-1 leading-relaxed">
+                                {conv.dealDecisionReason}
+                              </p>
+                            )}
                           </div>
                         )}
                       </div>

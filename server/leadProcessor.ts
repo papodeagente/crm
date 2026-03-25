@@ -22,13 +22,13 @@
  */
 
 import { getDb, createNotification } from "./db";
-import { createDeal } from "./crmDb";
+import { createDeal, createDealHistory } from "./crmDb";
 import { createHash } from "crypto";
 import {
   contacts, deals, pipelines, pipelineStages,
-  leadEventLog, crmUsers,
+  leadEventLog, crmUsers, contactConversionEvents,
 } from "../drizzle/schema";
-import { eq, and, or, sql, asc, lt, ne } from "drizzle-orm";
+import { eq, and, or, sql, asc, lt, ne, desc } from "drizzle-orm";
 import { normalizeBrazilianPhone } from "./phoneUtils";
 import {
   findDuplicateContacts,
@@ -77,6 +77,8 @@ export interface ProcessResult {
   mergePerformed?: boolean;
   mergeId?: number;
   conversionEventId?: number;
+  dealDecision?: "reused_existing_deal" | "created_new_deal" | "reopened_existing_context";
+  dealDecisionReason?: string;
   error?: string;
 }
 
@@ -562,7 +564,6 @@ export async function processInboundLead(
     if (options?.pipelineId && options?.stageId) {
       pipelineInfo = { pipelineId: options.pipelineId, stageId: options.stageId };
     } else if (options?.pipelineId) {
-      // Pipeline specified but no stage — get first stage of that pipeline
       const stageRows = await db
         .select()
         .from(pipelineStages)
@@ -580,36 +581,195 @@ export async function processInboundLead(
       throw new Error("Nenhum pipeline encontrado. Crie um pipeline antes de receber leads.");
     }
 
-    // 7. Owner (from options or round-robin)
-    const ownerUserId = options?.ownerUserId ?? await getNextOwner(tenantId);
+    // ═══════════════════════════════════════════════════════════
+    // 7. DEAL GOVERNANCE — Reutilizar deal aberto ou criar novo
+    // ═══════════════════════════════════════════════════════════
+    const REUSE_WINDOW_MS = 12 * 60 * 60 * 1000; // 12 horas
+    const currentSource = options?.source || payload.source;
+    const currentWebhookName = payload.conversionIdentifier || payload.conversionName || payload.source;
 
-    // 8. Create Deal (using centralized createDeal for clean field handling + error messages)
-    const dealTitle = options?.dealTitle || `${normalizedName} \u2022 ${payload.source}`;
-    const dealResult = await createDeal({
-      tenantId,
-      title: dealTitle,
-      contactId: contact.id,
-      pipelineId: pipelineInfo.pipelineId,
-      stageId: pipelineInfo.stageId,
-      status: "open",
-      ownerUserId: ownerUserId ?? undefined,
-      channelOrigin: options?.source || payload.source,
-      leadSource: options?.source || payload.source,
-      utmSource: payload.utm?.source || undefined,
-      utmMedium: payload.utm?.medium || undefined,
-      utmCampaign: options?.campaign || payload.utm?.campaign || undefined,
-      utmTerm: payload.utm?.term || undefined,
-      utmContent: payload.utm?.content || undefined,
-      utmJson: payload.utm ? (payload.utm as any) : undefined,
-      rdCustomFields: payload.rdCustomFields ? (payload.rdCustomFields as any) : undefined,
-      metaJson: payload.meta ? (payload.meta as any) : undefined,
-      rawPayloadJson: payload.raw ? (payload.raw as any) : (payload as any),
-      dedupeKey,
-    });
-    if (!dealResult) throw new Error('Falha ao criar negociação - banco de dados indisponível');
-    const dealId = dealResult.id;
+    let dealId: number;
+    let dealDecision: "reused_existing_deal" | "created_new_deal" | "reopened_existing_context" = "created_new_deal";
+    let dealDecisionReason = "";
 
-    // 9. Record conversion event
+    // 7a. Find open deals for this contact in the same pipeline
+    const openDeals = await db
+      .select()
+      .from(deals)
+      .where(and(
+        eq(deals.tenantId, tenantId),
+        eq(deals.contactId, contact.id),
+        eq(deals.pipelineId, pipelineInfo.pipelineId),
+        eq(deals.status, "open"),
+      ))
+      .orderBy(desc(deals.createdAt))
+      .limit(5);
+
+    // 7b. Determine the "commercial context" key for this conversion
+    // Same context = same source + same conversionIdentifier/webhookName
+    const isSameContext = (deal: typeof openDeals[0]) => {
+      const dealSource = deal.leadSource || deal.channelOrigin || "";
+      const dealWebhook = deal.lastWebhookName || deal.dedupeKey?.split(":")[0] || "";
+      // Same source AND same webhook/conversion identifier
+      return dealSource === currentSource || dealWebhook === currentWebhookName;
+    };
+
+    // 7c. Find the last conversion event for this contact in this pipeline context
+    const getLastConversionTimestamp = async (existingDealId: number): Promise<Date | null> => {
+      const [lastConv] = await db
+        .select({ receivedAt: contactConversionEvents.receivedAt })
+        .from(contactConversionEvents)
+        .where(and(
+          eq(contactConversionEvents.tenantId, tenantId),
+          eq(contactConversionEvents.contactId, contact.id),
+          eq(contactConversionEvents.dealId, existingDealId),
+        ))
+        .orderBy(desc(contactConversionEvents.receivedAt))
+        .limit(1);
+      return lastConv?.receivedAt || null;
+    };
+
+    let reusedDeal: typeof openDeals[0] | null = null;
+
+    if (openDeals.length > 0) {
+      // Check each open deal for reuse eligibility
+      for (const openDeal of openDeals) {
+        if (isSameContext(openDeal)) {
+          // Same context — check 12h window
+          const lastConvAt = await getLastConversionTimestamp(openDeal.id);
+          const dealCreatedAt = openDeal.createdAt;
+          const referenceTime = lastConvAt || dealCreatedAt;
+          const elapsedMs = Date.now() - referenceTime.getTime();
+
+          if (elapsedMs < REUSE_WINDOW_MS) {
+            // Within 12h window — REUSE this deal
+            reusedDeal = openDeal;
+            dealDecision = "reused_existing_deal";
+            dealDecisionReason = `Deal #${openDeal.id} reutilizado: mesmo contexto comercial (${currentSource}/${currentWebhookName}), última conversão há ${Math.round(elapsedMs / 60000)}min (dentro da janela de 12h)`;
+            break;
+          } else {
+            // Same context but past 12h — allow new deal
+            dealDecision = "created_new_deal";
+            dealDecisionReason = `Novo deal criado: mesmo contexto comercial mas última conversão há ${Math.round(elapsedMs / 3600000)}h (fora da janela de 12h)`;
+          }
+        }
+        // Different context (different webhook/source) — will create new deal
+      }
+
+      // If no same-context deal found, check if ANY open deal exists but from different context
+      if (!reusedDeal && dealDecisionReason === "") {
+        dealDecision = "created_new_deal";
+        dealDecisionReason = `Novo deal criado: contexto comercial diferente (${currentSource}/${currentWebhookName}) dos deals abertos existentes`;
+      }
+    } else {
+      // No open deals at all
+      dealDecision = "created_new_deal";
+      dealDecisionReason = `Novo deal criado: nenhum deal aberto encontrado para o contato #${contact.id} no pipeline #${pipelineInfo.pipelineId}`;
+    }
+
+    if (reusedDeal) {
+      // ── REUSE existing deal ──
+      dealId = reusedDeal.id;
+
+      // Update deal conversion tracking fields
+      await db.update(deals).set({
+        lastConversionAt: new Date(),
+        lastConversionSource: currentSource,
+        lastWebhookName: currentWebhookName,
+        lastUtmSource: payload.utm?.source || undefined,
+        lastUtmMedium: payload.utm?.medium || undefined,
+        lastUtmCampaign: options?.campaign || payload.utm?.campaign || undefined,
+        conversionCount: sql`${deals.conversionCount} + 1`,
+        lastActivityAt: new Date(),
+      }).where(eq(deals.id, dealId));
+
+      // Record in deal_history
+      await createDealHistory({
+        tenantId,
+        dealId,
+        action: "conversion_received",
+        description: `Nova conversão recebida via ${currentSource} — deal reutilizado (${dealDecisionReason})`,
+        metadataJson: {
+          decision: dealDecision,
+          reason: dealDecisionReason,
+          source: currentSource,
+          webhookName: currentWebhookName,
+          campaign: options?.campaign || payload.utm?.campaign,
+          utmSource: payload.utm?.source,
+          utmMedium: payload.utm?.medium,
+          utmCampaign: payload.utm?.campaign,
+          formName: payload.formName,
+          landingPage: payload.landingPage,
+          conversionIdentifier: payload.conversionIdentifier,
+          rawPayload: payload.raw,
+        },
+      });
+
+      console.log(`[LeadProcessor] Deal REUSED: #${dealId} for contact #${contact.id} — ${dealDecisionReason}`);
+    } else {
+      // ── CREATE new deal ──
+      const ownerUserId = options?.ownerUserId ?? await getNextOwner(tenantId);
+      const dealTitle = options?.dealTitle || `${normalizedName} \u2022 ${payload.source}`;
+      const dealResult = await createDeal({
+        tenantId,
+        title: dealTitle,
+        contactId: contact.id,
+        pipelineId: pipelineInfo.pipelineId,
+        stageId: pipelineInfo.stageId,
+        status: "open",
+        ownerUserId: ownerUserId ?? undefined,
+        channelOrigin: currentSource,
+        leadSource: currentSource,
+        utmSource: payload.utm?.source || undefined,
+        utmMedium: payload.utm?.medium || undefined,
+        utmCampaign: options?.campaign || payload.utm?.campaign || undefined,
+        utmTerm: payload.utm?.term || undefined,
+        utmContent: payload.utm?.content || undefined,
+        utmJson: payload.utm ? (payload.utm as any) : undefined,
+        rdCustomFields: payload.rdCustomFields ? (payload.rdCustomFields as any) : undefined,
+        metaJson: payload.meta ? (payload.meta as any) : undefined,
+        rawPayloadJson: payload.raw ? (payload.raw as any) : (payload as any),
+        dedupeKey,
+      });
+      if (!dealResult) throw new Error('Falha ao criar negociação - banco de dados indisponível');
+      dealId = dealResult.id;
+
+      // Set initial conversion tracking on new deal
+      await db.update(deals).set({
+        lastConversionAt: new Date(),
+        lastConversionSource: currentSource,
+        lastWebhookName: currentWebhookName,
+        lastUtmSource: payload.utm?.source || undefined,
+        lastUtmMedium: payload.utm?.medium || undefined,
+        lastUtmCampaign: options?.campaign || payload.utm?.campaign || undefined,
+        conversionCount: 1,
+      }).where(eq(deals.id, dealId));
+
+      // Record in deal_history
+      await createDealHistory({
+        tenantId,
+        dealId,
+        action: "deal_created_from_lead",
+        description: `Negociação criada via ${currentSource} — ${dealDecisionReason}`,
+        metadataJson: {
+          decision: dealDecision,
+          reason: dealDecisionReason,
+          source: currentSource,
+          webhookName: currentWebhookName,
+          campaign: options?.campaign || payload.utm?.campaign,
+          utmSource: payload.utm?.source,
+          utmMedium: payload.utm?.medium,
+          utmCampaign: payload.utm?.campaign,
+          formName: payload.formName,
+          landingPage: payload.landingPage,
+          conversionIdentifier: payload.conversionIdentifier,
+        },
+      });
+
+      console.log(`[LeadProcessor] Deal CREATED: #${dealId} for contact #${contact.id} — ${dealDecisionReason}`);
+    }
+
+    // 8. Record conversion event (on contact, with deal decision)
     const convIdempotencyKey = generateConversionIdempotencyKey(
       tenantId, payload.source, payload.lead_id, normalizedEmail, normalizedPhone, payload.conversionIdentifier
     );
@@ -637,30 +797,36 @@ export async function processInboundLead(
         dedupeMatchType: contact.matchType,
         matchedExistingContactId: contact.isNew ? undefined : contact.id,
         dealId,
+        dealDecision,
+        dealDecisionReason,
         idempotencyKey: convIdempotencyKey,
       });
     } catch (convErr: any) {
       console.warn(`[LeadProcessor] Failed to record conversion event: ${convErr.message}`);
     }
 
-    // 10. Update event log → success
+    // 9. Update event log → success
     await db
       .update(leadEventLog)
       .set({ status: "success", dealId, contactId: contact.id })
       .where(eq(leadEventLog.id, eventLogId));
 
-    console.log(`[LeadProcessor] Lead processed: ${dedupeKey} → deal #${dealId}, contact #${contact.id} (${contact.isNew ? "new" : "existing"}, match: ${contact.matchType}${contact.mergePerformed ? ", merged" : ""})`);
+    console.log(`[LeadProcessor] Lead processed: ${dedupeKey} → deal #${dealId} (${dealDecision}), contact #${contact.id} (${contact.isNew ? "new" : "existing"}, match: ${contact.matchType}${contact.mergePerformed ? ", merged" : ""})`);
 
-    // 11. Notificação in-app para a equipe
+    // 10. Notificação in-app para a equipe
     try {
       const sourceLabel = payload.source === "meta_lead_ads" ? "Meta Lead Ads" : payload.source === "landing" ? "Landing Page" : payload.source === "rdstation" ? "RD Station" : payload.source;
       const contactInfo = [normalizedName];
       if (normalizedEmail) contactInfo.push(normalizedEmail);
       if (normalizedPhone) contactInfo.push(normalizedPhone);
 
+      const notifTitle = dealDecision === "reused_existing_deal"
+        ? `Conversão via ${sourceLabel} — deal #${dealId} reutilizado`
+        : `Novo lead via ${sourceLabel}`;
+
       await createNotification(tenantId, {
         type: "new_lead",
-        title: `Novo lead via ${sourceLabel}`,
+        title: notifTitle,
         body: `${contactInfo.join(" • ")}${payload.utm?.campaign ? ` — Campanha: ${payload.utm.campaign}` : ""}`,
         entityType: "deal",
         entityId: String(dealId),
@@ -674,10 +840,12 @@ export async function processInboundLead(
       dealId,
       contactId: contact.id,
       dedupeKey,
-      isExisting: false,
+      isExisting: dealDecision === "reused_existing_deal",
       mergePerformed: contact.mergePerformed,
       mergeId: contact.mergeId,
       conversionEventId: conversionEventId ?? undefined,
+      dealDecision,
+      dealDecisionReason,
     };
   } catch (error: any) {
     // 12. Log failure

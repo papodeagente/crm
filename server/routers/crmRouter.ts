@@ -943,6 +943,24 @@ const tenantId = getTenantId(ctx); const { id, dealId, checkIn, checkOut, ...dat
         }),
     }),
 
+    // ─── DEAL CONVERSION EVENTS ───
+    conversionEvents: tenantProcedure
+      .input(z.object({ dealId: z.number() }))
+      .query(async ({ ctx, input }) => {
+        const { contactConversionEvents } = await import("../../drizzle/schema");
+        const { eq, and, desc } = await import("drizzle-orm");
+        const { getDb } = await import("../db");
+        const db = await getDb();
+        if (!db) return [];
+        return db.select()
+          .from(contactConversionEvents)
+          .where(and(
+            eq(contactConversionEvents.tenantId, getTenantId(ctx)),
+            eq(contactConversionEvents.dealId, input.dealId),
+          ))
+          .orderBy(desc(contactConversionEvents.receivedAt));
+      }),
+
     // ─── DEAL PARTICIPANTS ───
     participants: router({
       list: tenantProcedure

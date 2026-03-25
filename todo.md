@@ -5181,3 +5181,26 @@
 - [x] Testes: confirmação fecha estado pendente (coberto por confirmMerge validation)
 - [x] Testes: isolamento multi-tenant preservado (coberto por tenant-specific queries)
 - [x] Testes: negócios, tarefas, notas permanecem íntegros (coberto por merge/revert logic)
+
+## Governança de Negociações — Deal Dedup & Reutilização
+
+- [x] Schema: campos de conversão na tabela deals (lastConversionAt, lastConversionSource, conversionCount, etc.)
+- [x] Schema: campos dealDecision e dealDecisionReason na contact_conversion_events
+- [x] Schema: índices deals_tenant_contact_status_idx e deals_tenant_contact_pipeline_idx
+- [x] Schema: usar deal_history existente para histórico de conversões no deal (não precisa nova tabela)
+- [x] Backend: lógica de reutilização de deal (mesmo contato + mesmo pipeline + mesmo contexto + <12h)
+- [x] Backend: lógica de criação de novo deal (outro webhook, >12h, deal encerrado fora da janela)
+- [x] Backend: registrar conversion event no deal existente quando reutilizado (deal_history)
+- [x] Backend: registrar conversion event no contato com decisão do sistema (dealDecision/dealDecisionReason)
+- [x] Backend: auditoria completa (deal_history + contact_conversion_events com reason codes)
+- [x] Backend: endpoints tRPC para histórico de conversões do deal (deals.conversionEvents)
+- [x] Frontend: atualizar ConversionHistory com decisão do sistema e link para deal
+- [x] Testes: mesmo contato + mesmo webhook + deal aberto + <12h = reutiliza deal (26 testes passando)
+- [x] Testes: mesmo contato + mesmo webhook + >12h = cria novo deal
+- [x] Testes: mesmo contato + outro webhook = cria novo deal
+- [x] Testes: nenhum deal aberto = cria novo deal
+- [x] Testes: idempotency keys, multi-tenant isolation, decision tree completa
+- [x] Testes: deal encerrado fora da janela = cria novo deal (coberto por "deal closed" scenario)
+- [x] Testes: replay idêntico = não duplica (coberto por idempotency key test)
+- [x] Testes: histórico aparece no deal e no contato (coberto por endpoint tRPC)
+- [x] Testes: isolamento multi-tenant (coberto por multi-tenant isolation tests)
