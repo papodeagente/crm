@@ -114,6 +114,95 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
         const count = await crm.hardDeleteContacts(getTenantId(ctx), input.ids);
         return { success: true, count };
       }),
+
+    // ─── Conversion History ───
+    conversionHistory: tenantProcedure
+      .input(z.object({ contactId: z.number() }))
+      .query(async ({ ctx, input }) => {
+        const { getConversionHistory } = await import("../services/contactDedup");
+        return getConversionHistory(getTenantId(ctx), input.contactId);
+      }),
+
+    // ─── Merge History ───
+    mergeHistory: tenantProcedure
+      .input(z.object({ contactId: z.number() }))
+      .query(async ({ ctx, input }) => {
+        const { getMergeHistory } = await import("../services/contactDedup");
+        return getMergeHistory(getTenantId(ctx), input.contactId);
+      }),
+
+    // ─── Find Duplicates ───
+    findDuplicates: tenantProcedure
+      .input(z.object({ contactId: z.number(), email: z.string().optional(), phone: z.string().optional() }))
+      .query(async ({ ctx, input }) => {
+        const { findDuplicateContacts } = await import("../services/contactDedup");
+        return findDuplicateContacts(getTenantId(ctx), input.email, input.phone, input.contactId);
+      }),
+
+    // ─── Manual Merge ───
+    merge: tenantWriteProcedure
+      .input(z.object({
+        primaryContactId: z.number(),
+        secondaryContactId: z.number(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const { mergeContacts } = await import("../services/contactDedup");
+        const result = await mergeContacts(
+          getTenantId(ctx),
+          input.primaryContactId,
+          input.secondaryContactId,
+          "manual",
+          String(ctx.user.id)
+        );
+        await emitEvent({
+          tenantId: getTenantId(ctx),
+          actorUserId: ctx.user.id,
+          entityType: "contact",
+          entityId: input.primaryContactId,
+          action: "contact_merged",
+          metadataJson: {
+            mergeId: result.mergeId,
+            secondaryContactId: input.secondaryContactId,
+            movedDeals: result.movedDeals,
+            movedTasks: result.movedTasks,
+          },
+        });
+        return result;
+      }),
+
+    // ─── Confirm Merge ───
+    confirmMerge: tenantWriteProcedure
+      .input(z.object({ mergeId: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        const { confirmMerge } = await import("../services/contactDedup");
+        return confirmMerge(getTenantId(ctx), input.mergeId, String(ctx.user.id));
+      }),
+
+    // ─── Revert Merge ───
+    revertMerge: tenantWriteProcedure
+      .input(z.object({ mergeId: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        const { revertMerge } = await import("../services/contactDedup");
+        const result = await revertMerge(getTenantId(ctx), input.mergeId, String(ctx.user.id));
+        if (result.success) {
+          await emitEvent({
+            tenantId: getTenantId(ctx),
+            actorUserId: ctx.user.id,
+            entityType: "contact",
+            entityId: 0,
+            action: "merge_reverted",
+            metadataJson: { mergeId: input.mergeId },
+          });
+        }
+        return result;
+      }),
+
+    // ─── Pending Merges (for admin review) ───
+    pendingMerges: tenantProcedure
+      .query(async ({ ctx }) => {
+        const { getPendingMerges } = await import("../services/contactDedup");
+        return getPendingMerges(getTenantId(ctx));
+      }),
   }),
 
   // ─── ACCOUNTS ───

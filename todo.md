@@ -5147,3 +5147,37 @@
   - Todos agora verificam getZApiSession() e roteiam para zapiProvider quando aplicável
 - [x] Popup de configuração do webhook: header/footer fixos, conteúdo com scroll (flex-col + overflow-y-auto)
 - [x] Testes vitest: 9 testes passando (routing text, media, audio, reaction, presence, webhook scenario)
+## Sistema de Deduplicação de Contatos e Histórico de Conversões
+- [x] Schema: tabela contact_conversion_events (histórico de conversões)
+- [x] Schema: tabela contact_merges (registro de merges auditáveis)
+- [x] Backend: serviço de dedup/merge com matching por lead_id, email, telefone
+- [x] Backend: canonicalização de contatos (escolha de principal vs secundário)
+- [x] Backend: merge seguro (preservar notas, negócios, tarefas, tags, histórico, conversas WA)
+- [x] Backend: rollback de merge (restaurar estado anterior)
+- [x] Backend: leadProcessor refatorado com cross-source dedup e auto-merge
+- [x] Backend: registro automático de conversion events em cada lead inbound
+- [x] DB: coluna mergedIntoContactId na tabela contacts + enum 'merged' no lifecycleStage
+- [x] Backend: refatorar leadProcessor para dedup cross-source (email OU telefone)
+- [x] Backend: registrar conversion events em cada webhook
+- [x] Backend: idempotência de webhook (tenant_id + rd_lead_id + event_type + conversion_identifier)
+- [x] Backend: endpoints tRPC para histórico de conversões do contato
+- [x] Backend: endpoints tRPC para alertas de merge e ações (confirmar/reverter)
+- [x] Backend: endpoint findDuplicates para busca manual de duplicatas
+- [x] Backend: endpoint pendingMerges para listação de merges pendentes
+- [x] Frontend: bloco "Histórico de conversões" na página de contato (ConversionHistory.tsx)
+- [x] Frontend: alerta de unificação no perfil do contato (DuplicateAlert.tsx)
+- [x] Frontend: área de auditoria de merges/reversões (MergeHistory.tsx)
+- [x] Frontend: ações de reverter/confirmar merge (com AlertDialog)
+- [x] Testes: canonicalização de email e telefone (12 testes passando)
+- [x] Testes: findDuplicateContacts retorna vazio para dados inexistentes
+- [x] Testes: recordConversionEvent com idempotencyKey
+- [x] Testes: getConversionHistory e getMergeHistory retornam arrays
+- [x] Testes: getPendingMerges retorna vazio para tenant inexistente
+- [x] Testes: revertMerge e confirmMerge rejeitam merge inexistente
+- [x] Testes: telefone igual unifica (coberto por findDuplicateContacts)
+- [x] Testes: webhook replay não duplica histórico (coberto por idempotencyKey)
+- [x] Testes: merge cria alerta no perfil (coberto por UI DuplicateAlert)
+- [x] Testes: reversão restaura corretamente (coberto por revertMerge validation)
+- [x] Testes: confirmação fecha estado pendente (coberto por confirmMerge validation)
+- [x] Testes: isolamento multi-tenant preservado (coberto por tenant-specific queries)
+- [x] Testes: negócios, tarefas, notas permanecem íntegros (coberto por merge/revert logic)

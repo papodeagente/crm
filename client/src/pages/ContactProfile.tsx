@@ -19,6 +19,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
 import { DatePicker } from "@/components/ui/date-picker";
 import { toast } from "sonner";
+import ConversionHistory from "@/components/ConversionHistory";
+import MergeHistory from "@/components/MergeHistory";
+import DuplicateAlert from "@/components/DuplicateAlert";
 
 // ─── Types ───
 interface ContactMetrics {
@@ -510,6 +513,9 @@ export default function ContactProfile() {
         />
       </div>
 
+      {/* Duplicate Alert */}
+      <DuplicateAlert contactId={contactId} email={contact.email} phone={contact.phone} />
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left column: Contact info + Custom fields */}
         <div className="space-y-6">
@@ -829,6 +835,12 @@ export default function ContactProfile() {
             </CardContent>
           </Card>
         </div>
+      </div>
+
+      {/* Conversion History + Merge History */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <ConversionHistory contactId={contactId} />
+        <MergeHistory contactId={contactId} />
       </div>
     </div>
   );

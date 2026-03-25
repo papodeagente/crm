@@ -322,7 +322,9 @@ export const contacts = mysqlTable("contacts", {
   docId: varchar("docId", { length: 64 }),
   tagsJson: json("tagsJson"),
   source: varchar("source", { length: 64 }),
-  lifecycleStage: mysqlEnum("lifecycleStage", ["lead", "prospect", "customer", "churned"]).default("lead").notNull(),
+  lifecycleStage: mysqlEnum("lifecycleStage", ["lead", "prospect", "customer", "churned", "merged"]).default("lead").notNull(),
+  /** If this contact was merged into another, points to the canonical contact */
+  mergedIntoContactId: int("mergedIntoContactId"),
   ownerUserId: int("ownerUserId"),
   teamId: int("teamId"),
   visibilityScope: mysqlEnum("visibilityScope", ["personal", "team", "global"]).default("global").notNull(),
@@ -349,6 +351,10 @@ export const contacts = mysqlTable("contacts", {
   index("contacts_tenant_idx").on(t.tenantId),
   index("contacts_owner_idx").on(t.tenantId, t.ownerUserId),
   index("contacts_classification_idx").on(t.tenantId, t.stageClassification),
+  index("idx_contacts_email").on(t.tenantId, t.email),
+  index("idx_contacts_phone").on(t.tenantId, t.phoneE164),
+  index("idx_contacts_phone_last11").on(t.tenantId, t.phoneLast11),
+  index("idx_contacts_merged").on(t.mergedIntoContactId),
 ]);
 
 export const accounts = mysqlTable("accounts", {
@@ -2126,3 +2132,114 @@ export const zapiAdminAlerts = mysqlTable("zapi_admin_alerts", {
 ]);
 export type ZapiAdminAlert = typeof zapiAdminAlerts.$inferSelect;
 export type InsertZapiAdminAlert = typeof zapiAdminAlerts.$inferInsert;
+
+// ════════════════════════════════════════════════════════════
+// CONTACT CONVERSION EVENTS — Histórico de conversões do contato
+// ════════════════════════════════════════════════════════════
+
+export const contactConversionEvents = mysqlTable("contact_conversion_events", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  contactId: int("contactId").notNull(),
+  /** Integration source: rdstation_marketing, meta_lead_ads, landing, tracking_script, elementor, manual */
+  integrationSource: varchar("integrationSource", { length: 64 }).notNull(),
+  /** RD Station lead_id or external lead identifier */
+  externalLeadId: varchar("externalLeadId", { length: 255 }),
+  /** Event type: conversion, opportunity, sale, etc. */
+  eventType: varchar("eventType", { length: 64 }).notNull().default("conversion"),
+  /** Conversion identifier (form name, page, etc.) */
+  conversionIdentifier: varchar("conversionIdentifier", { length: 512 }),
+  /** Human-readable conversion name */
+  conversionName: varchar("conversionName", { length: 512 }),
+  /** Asset name (landing page, form, ad, etc.) */
+  assetName: varchar("assetName", { length: 512 }),
+  /** Asset type (landing_page, form, popup, ad, etc.) */
+  assetType: varchar("assetType", { length: 64 }),
+  /** Traffic source */
+  trafficSource: varchar("trafficSource", { length: 255 }),
+  /** UTM fields */
+  utmSource: varchar("utmSource", { length: 255 }),
+  utmMedium: varchar("utmMedium", { length: 255 }),
+  utmCampaign: varchar("utmCampaign", { length: 512 }),
+  utmContent: varchar("utmContent", { length: 512 }),
+  utmTerm: varchar("utmTerm", { length: 512 }),
+  /** Form name or landing page URL */
+  formName: varchar("formName", { length: 512 }),
+  landingPage: varchar("landingPage", { length: 1024 }),
+  /** Raw webhook payload for audit */
+  rawPayload: json("rawPayload"),
+  /** When the event was received */
+  receivedAt: timestamp("receivedAt").defaultNow().notNull(),
+  /** How this event was matched to the contact */
+  dedupeMatchType: mysqlEnum("dedupeMatchType", [
+    "lead_id", "email", "phone", "email_and_phone", "manual_merge", "new_contact"
+  ]).notNull().default("new_contact"),
+  /** If matched to an existing contact, store the matched contact ID */
+  matchedExistingContactId: int("matchedExistingContactId"),
+  /** If this event triggered a merge, link to the merge record */
+  mergeEventId: int("mergeEventId"),
+  /** Idempotency key to prevent duplicate event processing */
+  idempotencyKey: varchar("idempotencyKey", { length: 255 }).notNull(),
+  /** Deal created or linked by this event */
+  dealId: int("dealId"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (t) => [
+  index("cce_tenant_contact_idx").on(t.tenantId, t.contactId),
+  index("cce_tenant_source_idx").on(t.tenantId, t.integrationSource),
+  index("cce_idempotency_idx").on(t.idempotencyKey),
+  index("cce_external_lead_idx").on(t.tenantId, t.externalLeadId),
+  index("cce_received_at_idx").on(t.tenantId, t.receivedAt),
+]);
+export type ContactConversionEvent = typeof contactConversionEvents.$inferSelect;
+export type InsertContactConversionEvent = typeof contactConversionEvents.$inferInsert;
+
+// ════════════════════════════════════════════════════════════
+// CONTACT MERGES — Registro de merges/unificações de contatos
+// ════════════════════════════════════════════════════════════
+
+export const contactMerges = mysqlTable("contact_merges", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  /** The canonical/primary contact that survives the merge */
+  primaryContactId: int("primaryContactId").notNull(),
+  /** The secondary contact that was merged into the primary */
+  secondaryContactId: int("secondaryContactId").notNull(),
+  /** Human-readable reason for the merge */
+  reason: varchar("reason", { length: 512 }).notNull(),
+  /** How the match was detected */
+  matchType: mysqlEnum("matchType", [
+    "lead_id", "email", "phone", "email_and_phone", "manual"
+  ]).notNull(),
+  /** Who/what initiated the merge (system, user ID, webhook) */
+  createdBy: varchar("createdBy", { length: 128 }).notNull().default("system"),
+  /** Merge lifecycle status */
+  status: mysqlEnum("status", [
+    "pending_review", "confirmed", "reverted"
+  ]).notNull().default("pending_review"),
+  /** Snapshot of both contacts BEFORE the merge (for rollback) */
+  snapshotBeforeMerge: json("snapshotBeforeMerge").notNull(),
+  /** Snapshot of the primary contact AFTER the merge */
+  snapshotAfterMerge: json("snapshotAfterMerge"),
+  /** IDs of deals moved from secondary to primary */
+  movedDealIds: json("movedDealIds"),
+  /** IDs of tasks moved from secondary to primary */
+  movedTaskIds: json("movedTaskIds"),
+  /** IDs of conversion events moved from secondary to primary */
+  movedConversionEventIds: json("movedConversionEventIds"),
+  /** Whether this merge can be reverted */
+  reversible: boolean("reversible").default(true).notNull(),
+  /** Timestamps for status transitions */
+  confirmedAt: timestamp("confirmedAt"),
+  confirmedBy: varchar("confirmedBy", { length: 128 }),
+  revertedAt: timestamp("revertedAt"),
+  revertedBy: varchar("revertedBy", { length: 128 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (t) => [
+  index("cm_tenant_idx").on(t.tenantId),
+  index("cm_primary_idx").on(t.tenantId, t.primaryContactId),
+  index("cm_secondary_idx").on(t.tenantId, t.secondaryContactId),
+  index("cm_status_idx").on(t.tenantId, t.status),
+]);
+export type ContactMerge = typeof contactMerges.$inferSelect;
+export type InsertContactMerge = typeof contactMerges.$inferInsert;
