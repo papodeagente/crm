@@ -13,16 +13,32 @@ import { publicProcedure, router } from "../_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { verifySaasSession, isSuperAdmin, SAAS_COOKIE } from "../saasAuth";
 
+function parseCookies(cookieHeader: string | undefined): Map<string, string> {
+  const map = new Map<string, string>();
+  if (!cookieHeader) return map;
+  cookieHeader.split(";").forEach((cookie) => {
+    const [key, ...vals] = cookie.trim().split("=");
+    if (key) map.set(key.trim(), vals.join("=").trim());
+  });
+  return map;
+}
+
+async function requireSuperAdmin(ctx: any) {
+  const cookies = parseCookies(ctx.req?.headers?.cookie);
+  const token = cookies.get(SAAS_COOKIE);
+  const session = token ? await verifySaasSession(token) : null;
+  if (!session || !isSuperAdmin(session.email)) {
+    throw new TRPCError({ code: "FORBIDDEN", message: "Acesso negado" });
+  }
+  return session;
+}
+
 export const zapiAdminRouter = router({
   /**
    * List all Z-API instances with tenant info
    */
   listInstances: publicProcedure.query(async ({ ctx }) => {
-    const cookie = ctx.req?.cookies?.[SAAS_COOKIE];
-    const session = cookie ? await verifySaasSession(cookie) : null;
-    if (!session || !isSuperAdmin(session.email)) {
-      throw new TRPCError({ code: "FORBIDDEN", message: "Acesso negado" });
-    }
+    await requireSuperAdmin(ctx);
 
     const { getDb } = await import("../db");
     const { tenantZapiInstances, tenants, whatsappSessions } = await import("../../drizzle/schema");
@@ -90,11 +106,7 @@ export const zapiAdminRouter = router({
    * List tenants that DON'T have a Z-API instance (candidates for manual provisioning)
    */
   listTenantsWithoutZapi: publicProcedure.query(async ({ ctx }) => {
-    const cookie = ctx.req?.cookies?.[SAAS_COOKIE];
-    const session = cookie ? await verifySaasSession(cookie) : null;
-    if (!session || !isSuperAdmin(session.email)) {
-      throw new TRPCError({ code: "FORBIDDEN", message: "Acesso negado" });
-    }
+    await requireSuperAdmin(ctx);
 
     const { getDb } = await import("../db");
     const { tenantZapiInstances, tenants } = await import("../../drizzle/schema");
@@ -140,11 +152,7 @@ export const zapiAdminRouter = router({
       tenantId: z.number(),
     }))
     .mutation(async ({ input, ctx }) => {
-      const cookie = ctx.req?.cookies?.[SAAS_COOKIE];
-      const session = cookie ? await verifySaasSession(cookie) : null;
-      if (!session || !isSuperAdmin(session.email)) {
-        throw new TRPCError({ code: "FORBIDDEN", message: "Acesso negado" });
-      }
+      const session = await requireSuperAdmin(ctx);
 
       const { getDb } = await import("../db");
       const { tenants } = await import("../../drizzle/schema");
@@ -193,11 +201,7 @@ export const zapiAdminRouter = router({
       tenantId: z.number(),
     }))
     .mutation(async ({ input, ctx }) => {
-      const cookie = ctx.req?.cookies?.[SAAS_COOKIE];
-      const session = cookie ? await verifySaasSession(cookie) : null;
-      if (!session || !isSuperAdmin(session.email)) {
-        throw new TRPCError({ code: "FORBIDDEN", message: "Acesso negado" });
-      }
+      const session = await requireSuperAdmin(ctx);
 
       const { deprovisionZapiForTenant } = await import("../services/zapiProvisioningService");
       const result = await deprovisionZapiForTenant(input.tenantId);
@@ -223,11 +227,7 @@ export const zapiAdminRouter = router({
       zapiToken: z.string(),
     }))
     .query(async ({ input, ctx }) => {
-      const cookie = ctx.req?.cookies?.[SAAS_COOKIE];
-      const session = cookie ? await verifySaasSession(cookie) : null;
-      if (!session || !isSuperAdmin(session.email)) {
-        throw new TRPCError({ code: "FORBIDDEN", message: "Acesso negado" });
-      }
+      await requireSuperAdmin(ctx);
 
       const clientToken = process.env.ZAPI_CLIENT_TOKEN || "";
 
@@ -270,11 +270,7 @@ export const zapiAdminRouter = router({
       limit: z.number().optional().default(50),
     }).optional())
     .query(async ({ input, ctx }) => {
-      const cookie = ctx.req?.cookies?.[SAAS_COOKIE];
-      const session = cookie ? await verifySaasSession(cookie) : null;
-      if (!session || !isSuperAdmin(session.email)) {
-        throw new TRPCError({ code: "FORBIDDEN", message: "Acesso negado" });
-      }
+      await requireSuperAdmin(ctx);
 
       const { getDb } = await import("../db");
       const { zapiAdminAlerts } = await import("../../drizzle/schema");
@@ -302,11 +298,7 @@ export const zapiAdminRouter = router({
    * Get alert counts by type and severity
    */
   getAlertCounts: publicProcedure.query(async ({ ctx }) => {
-    const cookie = ctx.req?.cookies?.[SAAS_COOKIE];
-    const session = cookie ? await verifySaasSession(cookie) : null;
-    if (!session || !isSuperAdmin(session.email)) {
-      throw new TRPCError({ code: "FORBIDDEN", message: "Acesso negado" });
-    }
+    await requireSuperAdmin(ctx);
 
     const { getAlertCounts } = await import("../services/zapiAlertService");
     return await getAlertCounts();
@@ -318,11 +310,7 @@ export const zapiAdminRouter = router({
   resolveAlert: publicProcedure
     .input(z.object({ alertId: z.number() }))
     .mutation(async ({ input, ctx }) => {
-      const cookie = ctx.req?.cookies?.[SAAS_COOKIE];
-      const session = cookie ? await verifySaasSession(cookie) : null;
-      if (!session || !isSuperAdmin(session.email)) {
-        throw new TRPCError({ code: "FORBIDDEN", message: "Acesso negado" });
-      }
+      const session = await requireSuperAdmin(ctx);
 
       const { resolveAlert } = await import("../services/zapiAlertService");
       const success = await resolveAlert(input.alertId, session.email);
@@ -338,11 +326,7 @@ export const zapiAdminRouter = router({
   resolveAllForTenant: publicProcedure
     .input(z.object({ tenantId: z.number() }))
     .mutation(async ({ input, ctx }) => {
-      const cookie = ctx.req?.cookies?.[SAAS_COOKIE];
-      const session = cookie ? await verifySaasSession(cookie) : null;
-      if (!session || !isSuperAdmin(session.email)) {
-        throw new TRPCError({ code: "FORBIDDEN", message: "Acesso negado" });
-      }
+      const session = await requireSuperAdmin(ctx);
 
       const { resolveAllAlertsForTenant } = await import("../services/zapiAlertService");
       const count = await resolveAllAlertsForTenant(input.tenantId, session.email);
@@ -355,11 +339,7 @@ export const zapiAdminRouter = router({
    * Manually trigger an alert check (for testing/immediate check)
    */
   runAlertCheck: publicProcedure.mutation(async ({ ctx }) => {
-    const cookie = ctx.req?.cookies?.[SAAS_COOKIE];
-    const session = cookie ? await verifySaasSession(cookie) : null;
-    if (!session || !isSuperAdmin(session.email)) {
-      throw new TRPCError({ code: "FORBIDDEN", message: "Acesso negado" });
-    }
+    const session = await requireSuperAdmin(ctx);
 
     const { runZapiAlertCheck } = await import("../services/zapiAlertService");
     const result = await runZapiAlertCheck();
@@ -372,11 +352,7 @@ export const zapiAdminRouter = router({
    * Get summary stats for the Z-API admin dashboard
    */
   getStats: publicProcedure.query(async ({ ctx }) => {
-    const cookie = ctx.req?.cookies?.[SAAS_COOKIE];
-    const session = cookie ? await verifySaasSession(cookie) : null;
-    if (!session || !isSuperAdmin(session.email)) {
-      throw new TRPCError({ code: "FORBIDDEN", message: "Acesso negado" });
-    }
+    await requireSuperAdmin(ctx);
 
     const { getDb } = await import("../db");
     const { tenantZapiInstances, whatsappSessions } = await import("../../drizzle/schema");

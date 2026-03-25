@@ -5131,3 +5131,10 @@
 - [x] Frontend: botões visuais para Evolution (verde) e Z-API (azul) com cores distintas
 - [x] Frontend: seletor também no estado "desconectado" para reconexão
 - [x] Testes vitest: 15 testes passando (input validation, session registration, UI logic, edge cases)
+## Correção Dashboard Z-API Admin - Dados e Gerenciamento
+- [x] Diagnosticar por que o dashboard não espelha dados reais (causa: ctx.req?.cookies não funciona, precisa parseCookies)
+- [x] Verificar endpoints backend (listInstances, stats) - todos retornando 403 por cookie parsing errado
+- [x] Verificar se dados existem no banco de dados - 1 instância ativa (tenant 330007), 1 cancelada (150002)
+- [x] Corrigir problemas de exibição/consulta - usar parseCookies(ctx.req?.headers?.cookie) + função requireSuperAdmin centralizada
+- [ ] Publicar para que correções cheguem ao servidor de produção
+- [ ] Testar fluxo completo após publicação
