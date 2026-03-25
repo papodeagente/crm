@@ -12,7 +12,7 @@ import { getLoginUrl } from "@/const";
 import {
   Home, Briefcase, Users, CheckSquare, BarChart3,
   Bell, Settings, Search, ChevronRight, LogOut, Menu, X,
-  Loader2, User, Building2, ListTodo, Phone, Mail, Sun, Moon, MessageSquare, Shield, TrendingUp, Crown, Sparkles,
+  Loader2, User, Building2, ListTodo, Phone, Mail, Sun, Moon, MessageSquare, Shield, TrendingUp, Crown, Sparkles, Inbox,
 } from "lucide-react";
 import { formatDateShort } from "../../../shared/dateUtils";
 import { useState, useEffect, useRef, useCallback } from "react";
@@ -37,6 +37,7 @@ const navItems: NavItem[] = [
 
   { icon: TrendingUp, label: "RFV", path: "/rfv", matchPaths: ["/rfv", "/campaigns"] },
   { icon: BarChart3, label: "Análises", path: "/analytics", matchPaths: ["/analytics", "/insights", "/goals"] },
+  { icon: Inbox, label: "Inbox", path: "/inbox", matchPaths: ["/inbox"] },
 ];
 
 /* ─── Quick Nav Pages ─── */
@@ -48,6 +49,7 @@ const quickNavPages = [
 
   { icon: TrendingUp, label: "RFV", path: "/rfv" },
   { icon: BarChart3, label: "Análises", path: "/analytics" },
+  { icon: Inbox, label: "Inbox", path: "/inbox" },
   { icon: Bell, label: "Notificações", path: "/notifications" },
   { icon: Settings, label: "Configurações", path: "/settings" },
 ];

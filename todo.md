@@ -5083,3 +5083,5 @@
 - [x] Remover/desabilitar endpoints de migração manual no backend
 - [x] Testar geração de QR code pela instância Z-API provisionada
 - [x] Corrigir problemas encontrados nos testes (Client-Token corrigido: ZAPI_CLIENT_TOKEN separado do Partner Token)
+## Menu Inbox
+- [x] Adicionar botão de atalho "Inbox" ao lado de "Análises" no menu de navegação principal
