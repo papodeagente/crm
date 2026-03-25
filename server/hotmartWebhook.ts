@@ -3,6 +3,7 @@ import { tenants, crmUsers, subscriptions, subscriptionEvents } from "../drizzle
 import { getDb } from "./db";
 import { hashPassword } from "./saasAuth";
 import { sendWelcomeEmail } from "./emailService";
+import { provisionZapiForTenant, deprovisionZapiForTenant } from "./services/zapiProvisioningService";
 import type { Request, Response } from "express";
 import crypto from "crypto";
 
@@ -539,6 +540,46 @@ export async function handleHotmartWebhook(req: Request, res: Response) {
     }
 
     await db.update(tenants).set(tenantUpdate).where(eq(tenants.id, tenant.id));
+
+    // 8.5. Auto-provision Z-API instance on trial→paid transition
+    const previousBillingStatus = tenant.billingStatus;
+    const isTransitionToPaid = (
+      translation?.internalStatus === "active" &&
+      (previousBillingStatus === "trialing" || previousBillingStatus === "past_due")
+    );
+    if (isTransitionToPaid) {
+      console.log(`[Hotmart Webhook] Tenant ${tenant.id} transitioned from ${previousBillingStatus} → active. Provisioning Z-API instance...`);
+      try {
+        const provisionResult = await provisionZapiForTenant(tenant.id, tenant.name);
+        if (provisionResult.success) {
+          if (provisionResult.alreadyProvisioned) {
+            console.log(`[Hotmart Webhook] Tenant ${tenant.id} already has Z-API instance: ${provisionResult.instanceId}`);
+          } else {
+            console.log(`[Hotmart Webhook] ✓ Z-API instance provisioned for tenant ${tenant.id}: ${provisionResult.instanceId}`);
+          }
+        } else {
+          console.error(`[Hotmart Webhook] ✗ Z-API provisioning failed for tenant ${tenant.id}: ${provisionResult.error}`);
+          // Non-blocking: provisioning failure should not block the billing update
+        }
+      } catch (provErr: any) {
+        console.error(`[Hotmart Webhook] ✗ Z-API provisioning error for tenant ${tenant.id}:`, provErr.message);
+      }
+    }
+
+    // 8.6. Deprovision Z-API on cancellation/restriction
+    const shouldDeprovision = (
+      translation?.shouldSuspendTenant ||
+      translation?.internalStatus === "expired" ||
+      (translation?.internalStatus === "cancelled" && !(existingSub[0]?.currentPeriodEnd && existingSub[0].currentPeriodEnd > now))
+    );
+    if (shouldDeprovision) {
+      console.log(`[Hotmart Webhook] Tenant ${tenant.id} restricted/expired. Deprovisioning Z-API...`);
+      try {
+        await deprovisionZapiForTenant(tenant.id);
+      } catch (deprovErr: any) {
+        console.error(`[Hotmart Webhook] ✗ Z-API deprovision error for tenant ${tenant.id}:`, deprovErr.message);
+      }
+    }
 
     // 9. Mark event as processed
     await db.update(subscriptionEvents).set({

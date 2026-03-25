@@ -5065,3 +5065,10 @@
 - [x] Frontend: formulário de credenciais Z-API (instanceId, token, clientToken)
 - [x] Frontend: indicador visual de provider ativo e status de saúde
 - [x] Testes automatizados
+## Provisionamento Automático Z-API (Partner API)
+- [x] Pesquisar Partner API Z-API: criar/deletar instância, configurar webhooks
+- [x] Analisar fluxo de billing/planos: onde detectar transição trial→pago
+- [x] Implementar serviço de provisionamento Z-API via Partner API
+- [x] Integrar provisionamento ao fluxo de ativação de plano pós-trial
+- [x] Atualizar UI: mostrar status de instância Z-API provisionada
+- [x] Testes automatizados

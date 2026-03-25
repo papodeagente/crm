@@ -2070,3 +2070,27 @@ export const channelChangeEvents = mysqlTable("channel_change_events", {
 ]);
 export type ChannelChangeEvent = typeof channelChangeEvents.$inferSelect;
 export type InsertChannelChangeEvent = typeof channelChangeEvents.$inferInsert;
+
+// ════════════════════════════════════════════════════════════
+// Z-API Partner Provisioning
+// ════════════════════════════════════════════════════════════
+export const tenantZapiInstances = mysqlTable("tenant_zapi_instances", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  zapiInstanceId: varchar("zapiInstanceId", { length: 128 }).notNull(),
+  zapiToken: varchar("zapiToken", { length: 255 }).notNull(),
+  zapiClientToken: varchar("zapiClientToken", { length: 255 }),
+  instanceName: varchar("instanceName", { length: 255 }).notNull(),
+  status: mysqlEnum("zapi_instance_status", ["active", "pending", "cancelled", "expired"]).default("pending").notNull(),
+  subscribedAt: timestamp("subscribedAt"),
+  cancelledAt: timestamp("cancelledAt"),
+  expiresAt: timestamp("expiresAt"),
+  webhookBaseUrl: text("webhookBaseUrl"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (t) => [
+  index("tzi_tenant_idx").on(t.tenantId),
+  index("tzi_zapi_instance_idx").on(t.zapiInstanceId),
+]);
+export type TenantZapiInstance = typeof tenantZapiInstances.$inferSelect;
+export type InsertTenantZapiInstance = typeof tenantZapiInstances.$inferInsert;

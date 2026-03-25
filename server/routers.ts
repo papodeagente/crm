@@ -1763,6 +1763,44 @@ export const appRouter = router({
         await rollbackSessionToEvolution(input.sessionId);
         return { success: true, sessionId: input.sessionId, provider: "evolution" };
       }),
+    // Z-API Provisioning — get provisioned instance for tenant
+    zapiProvisioningStatus: tenantProcedure
+      .query(async ({ ctx }) => {
+        const { getZapiInstanceForTenant, hasZapiInstance } = await import("./services/zapiProvisioningService");
+        const tid = getTenantId(ctx);
+        const instance = await getZapiInstanceForTenant(tid);
+        return {
+          provisioned: instance !== null,
+          instance: instance ? {
+            id: instance.id,
+            zapiInstanceId: instance.zapiInstanceId,
+            instanceName: instance.instanceName,
+            status: instance.status,
+            subscribedAt: instance.subscribedAt,
+            expiresAt: instance.expiresAt,
+            createdAt: instance.createdAt,
+          } : null,
+        };
+      }),
+    // Z-API Provisioning — manually provision for tenant (admin)
+    zapiProvision: tenantWriteProcedure
+      .mutation(async ({ ctx }) => {
+        const { provisionZapiForTenant } = await import("./services/zapiProvisioningService");
+        const { tenants } = await import("../drizzle/schema");
+        const tid = getTenantId(ctx);
+        // Get tenant name
+        const db = await getDb();
+        const [tenant] = await db!.select().from(tenants).where(eq(tenants.id, tid)).limit(1);
+        const result = await provisionZapiForTenant(tid, tenant?.name || `Tenant-${tid}`);
+        return result;
+      }),
+    // Z-API Provisioning — deprovision for tenant (admin)
+    zapiDeprovision: tenantWriteProcedure
+      .mutation(async ({ ctx }) => {
+        const { deprovisionZapiForTenant } = await import("./services/zapiProvisioningService");
+        const tid = getTenantId(ctx);
+        return deprovisionZapiForTenant(tid);
+      }),
   }),
 
   // ─── Dashboard ───
