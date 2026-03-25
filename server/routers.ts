@@ -1738,8 +1738,39 @@ export const appRouter = router({
         }
         return { success: true };
       }),
+    // Transfer conversation between agents (admin action from supervision panel)
+    transferBetweenAgents: sessionTenantAdminProcedure
+      .input(z.object({
+        sessionId: z.string(),
+        remoteJid: z.string(),
+        fromAgentId: z.number(),
+        toAgentId: z.number(),
+        note: z.string().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const tenantId = getTenantId(ctx);
+        const result = await assignConversation(tenantId, input.sessionId, input.remoteJid, input.toAgentId);
+        // Log the transfer event
+        await transferConversationWithNote(
+          tenantId, input.sessionId, input.remoteJid,
+          input.fromAgentId, input.toAgentId,
+          null,
+          input.note || `Transferido pelo supervisor ${ctx.user?.name || 'Admin'}`
+        );
+        const io = getIo();
+        if (io) {
+          io.emit("conversationUpdated", {
+            type: "transfer",
+            sessionId: input.sessionId,
+            remoteJid: input.remoteJid,
+            assignedUserId: input.toAgentId,
+            fromAgentId: input.fromAgentId,
+            timestamp: Date.now(),
+          });
+        }
+         return result;
+      }),
     }),
-
     // ─── Helpdesk: Quick Replies ───
     quickReplies: router({
     list: tenantProcedure

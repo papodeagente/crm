@@ -40,6 +40,7 @@ interface Message {
   structuredData?: any | null;
   audioTranscription?: string | null;
   audioTranscriptionStatus?: string | null;
+  senderAgentId?: number | null;
 }
 
 interface AssignmentInfo {
@@ -631,7 +632,8 @@ function ImageWithFallback({ msg, fromMe, myAvatarUrl, contactAvatarUrl, onImage
 const MessageBubble = memo(({
   msg, isFirst, isLast, allMessages,
   onReply, onReact, onDelete, onEdit, onForward, contactAvatarUrl, myAvatarUrl, onImageClick,
-  autoTranscribe, onTranscribe, transcriptions, onRetranscribe, reactions
+  autoTranscribe, onTranscribe, transcriptions, onRetranscribe, reactions,
+  agentMap, showAgentNames
 }: {
   msg: Message; isFirst: boolean; isLast: boolean; allMessages: Message[];
   onReply: (target: ReplyTarget) => void;
@@ -647,6 +649,8 @@ const MessageBubble = memo(({
   transcriptions?: Record<number, { text?: string; loading?: boolean; error?: string }>;
   onRetranscribe?: (msgId: number) => void;
   reactions?: Array<{ emoji: string; senderJid: string; fromMe: boolean }>;
+  agentMap?: Record<number, string>;
+  showAgentNames?: boolean;
 }) => {
   const [showMenu, setShowMenu] = useState(false);
   const fromMe = msg.fromMe;
@@ -860,6 +864,12 @@ const MessageBubble = memo(({
             </div>
           )}
 
+          {/* Agent name label */}
+          {showAgentNames && fromMe && msg.senderAgentId && agentMap?.[msg.senderAgentId] && isFirst && (
+            <p className="text-[11px] font-semibold mb-0.5 truncate" style={{ color: 'var(--wa-tint)' }}>
+              {agentMap[msg.senderAgentId]}
+            </p>
+          )}
           {renderQuotedMessage()}
           {renderMedia()}
 
@@ -1268,6 +1278,18 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
   const [quickReplyFilter, setQuickReplyFilter] = useState("");
   const [showAiSuggestion, setShowAiSuggestion] = useState(false);
   const [showSummary, setShowSummary] = useState(false);
+  const [showAgentNames, setShowAgentNames] = useState(true); // Show agent names before messages by default
+
+  // Build agentMap from agents prop for displaying agent names on messages
+  const agentMap = useMemo(() => {
+    const map: Record<number, string> = {};
+    if (agents) {
+      for (const a of agents) {
+        map[a.id] = a.name;
+      }
+    }
+    return map;
+  }, [agents]);
   const [summaryText, setSummaryText] = useState("");
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [transcriptions, setTranscriptions] = useState<Record<number, { text?: string; loading?: boolean; error?: string }>>({});
@@ -2208,21 +2230,21 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
           <p className="text-[13px] truncate leading-[20px]" style={{ color: 'var(--wa-text-secondary)' }}>{contact?.phone || ""}</p>
         </div>
         <div className="flex items-center gap-[2px]">
-          {/* Assignment badge */}
-          {assignment && (
+          {/* Assignment badge — always visible when agents are available */}
+          {(assignment || agents?.length) && (
             <div className="relative">
               <button
                 onClick={() => setShowAgentDropdown(!showAgentDropdown)}
                 className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-full transition-all mr-1 ${
-                  assignment.assignedAgentName
+                  assignment?.assignedAgentName
                     ? "bg-wa-tint/10 text-wa-tint hover:bg-wa-tint/20"
                     : "bg-muted text-muted-foreground hover:bg-muted/80"
                 }`}
-                title={assignment.assignedAgentName ? `Atribuído a ${assignment.assignedAgentName}` : "Sem agente atribuído"}
+                title={assignment?.assignedAgentName ? `Atribuído a ${assignment.assignedAgentName}` : "Atribuir atendente"}
               >
                 <Users className="w-[14px] h-[14px]" />
                 <span className="hidden sm:inline max-w-[80px] truncate">
-                  {assignment.assignedAgentName || "Atribuir"}
+                  {assignment?.assignedAgentName || "Atribuir"}
                 </span>
                 <ChevronDown className="w-[12px] h-[12px]" />
               </button>
@@ -2247,7 +2269,7 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
                         key={agent.id}
                         onClick={() => { onAssign?.(agent.id); setShowAgentDropdown(false); }}
                         className={`w-full flex items-center gap-2.5 px-3 py-2 hover:bg-muted/50 transition-colors text-left ${
-                          assignment.assignedUserId === agent.id ? "bg-wa-tint/5" : ""
+                          assignment?.assignedUserId === agent.id ? "bg-wa-tint/5" : ""
                         }`}
                       >
                         <div className="w-7 h-7 rounded-full bg-wa-tint/15 flex items-center justify-center overflow-hidden shrink-0">
@@ -2263,7 +2285,7 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
                           <p className="text-sm text-foreground truncate">{agent.name}</p>
                           <p className="text-[11px] text-muted-foreground truncate">{agent.email}</p>
                         </div>
-                        {assignment.assignedUserId === agent.id && (
+                        {assignment?.assignedUserId === agent.id && (
                           <Check className="w-4 h-4 text-wa-tint shrink-0" />
                         )}
                       </button>
@@ -2281,7 +2303,7 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
                             key={s}
                             onClick={() => { onStatusChange?.(s); setShowAgentDropdown(false); }}
                             className={`px-2 py-0.5 rounded-full text-[11px] font-medium transition-colors ${
-                              assignment.assignmentStatus === s
+                              assignment?.assignmentStatus === s
                                 ? statusColors[s] + " ring-1 ring-current/20"
                                 : "bg-muted/50 text-muted-foreground hover:bg-muted"
                             }`}
@@ -2291,6 +2313,18 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
                         );
                       })}
                     </div>
+                  </div>
+                  {/* Show agent names toggle */}
+                  <div className="border-t border-border px-3 py-2">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={showAgentNames}
+                        onChange={(e) => setShowAgentNames(e.target.checked)}
+                        className="rounded border-border text-wa-tint focus:ring-wa-tint/30 w-3.5 h-3.5"
+                      />
+                      <span className="text-[11px] text-muted-foreground">Mostrar nome do atendente nas mensagens</span>
+                    </label>
                   </div>
                 </div>
               )}
@@ -2623,6 +2657,8 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
                       transcriptions={transcriptions}
                       onRetranscribe={handleRetranscribe}
                       reactions={msg.messageId ? reactionsMap[msg.messageId] : undefined}
+                      agentMap={agentMap}
+                      showAgentNames={showAgentNames}
                     />
                   );
                 })}

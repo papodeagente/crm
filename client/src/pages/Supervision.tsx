@@ -101,6 +101,20 @@ export default function Supervision() {
     onError: (e) => toast.error(e.message || "Erro ao devolver"),
   });
 
+  const transferMut = trpc.whatsapp.supervision.transferBetweenAgents.useMutation({
+    onSuccess: () => {
+      toast.success("Conversa transferida com sucesso");
+      workloadQ.refetch();
+      queueQ.refetch();
+      if (expandedAgent) agentConvsQ.refetch();
+    },
+    onError: (e) => toast.error(e.message || "Erro ao transferir"),
+  });
+
+  const handleTransfer = useCallback((remoteJid: string, fromAgentId: number, toAgentId: number) => {
+    transferMut.mutate({ sessionId: activeSessionId, remoteJid, fromAgentId, toAgentId });
+  }, [activeSessionId, transferMut]);
+
   const agents = (workloadQ.data || []) as AgentData[];
   const queueStats = queueQ.data as { total: number; oldest: any; items: QueueItem[] } | undefined;
   const queueItems = queueStats?.items || [];
@@ -277,6 +291,9 @@ export default function Supervision() {
                     sessionId={activeSessionId}
                     onReturnToQueue={handleReturnToQueue}
                     isReturning={returnToQueueMut.isPending}
+                    allAgents={agents}
+                    onTransfer={handleTransfer}
+                    isTransferring={transferMut.isPending}
                   />
                 ))
               )}
@@ -444,11 +461,15 @@ function KpiCard({ icon, label, value, sub, color, highlight }: {
 /* ─── Agent Card ─── */
 function AgentCard({
   agent, isExpanded, onToggle, conversations, isLoadingConvs, avgTickets, sessionId, onReturnToQueue, isReturning,
+  allAgents, onTransfer, isTransferring,
 }: {
   agent: AgentData; isExpanded: boolean; onToggle: () => void;
   conversations: AgentConv[]; isLoadingConvs: boolean; avgTickets: number;
   sessionId: string; onReturnToQueue: (jid: string) => void; isReturning: boolean;
+  allAgents: AgentData[]; onTransfer: (remoteJid: string, fromAgentId: number, toAgentId: number) => void; isTransferring: boolean;
 }) {
+  const [transferringJid, setTransferringJid] = useState<string | null>(null);
+  const [transferTargetId, setTransferTargetId] = useState<number | null>(null);
   const initials = agent.agentName?.split(" ").map((w) => w[0]).join("").substring(0, 2).toUpperCase() || "?";
   const isOnline = Number(agent.isOnline) === 1;
   const active = Number(agent.activeConversations || 0);
@@ -547,15 +568,64 @@ function AgentCard({
                     <span className="text-[11px] text-muted-foreground shrink-0">
                       {conv.lastTimestamp ? formatRelativeTime(new Date(conv.lastTimestamp).getTime()) : ""}
                     </span>
-                    {/* Return to queue button */}
-                    <button
-                      onClick={(e) => { e.stopPropagation(); onReturnToQueue(conv.remoteJid); }}
-                      disabled={isReturning}
-                      title="Devolver à fila"
-                      className="opacity-0 group-hover/conv:opacity-100 transition-opacity p-1 rounded hover:bg-amber-500/10 text-amber-600"
-                    >
-                      <RotateCcw className="w-3.5 h-3.5" />
-                    </button>
+                    {/* Transfer & Return buttons */}
+                    <div className="flex items-center gap-1 shrink-0">
+                      {transferringJid === conv.remoteJid ? (
+                        <div className="flex items-center gap-1">
+                          <select
+                            value={transferTargetId || ""}
+                            onChange={(e) => setTransferTargetId(Number(e.target.value))}
+                            className="px-1.5 py-1 bg-muted/50 border border-border rounded text-[11px] text-foreground outline-none w-28"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <option value="">Transferir para...</option>
+                            {allAgents.filter(a => a.agentId !== agent.agentId).map((a) => (
+                              <option key={a.agentId} value={a.agentId}>
+                                {a.agentName} ({a.activeConversations})
+                              </option>
+                            ))}
+                          </select>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (transferTargetId) {
+                                onTransfer(conv.remoteJid, agent.agentId, transferTargetId);
+                                setTransferringJid(null);
+                                setTransferTargetId(null);
+                              }
+                            }}
+                            disabled={!transferTargetId || isTransferring}
+                            className="px-1.5 py-1 bg-blue-500 text-white text-[11px] rounded hover:bg-blue-600 disabled:opacity-50"
+                          >
+                            {isTransferring ? <Loader2 className="w-3 h-3 animate-spin" /> : "OK"}
+                          </button>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setTransferringJid(null); setTransferTargetId(null); }}
+                            className="px-1 py-1 text-muted-foreground text-[11px] rounded hover:bg-muted"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      ) : (
+                        <>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setTransferringJid(conv.remoteJid); }}
+                            title="Transferir para outro agente"
+                            className="opacity-0 group-hover/conv:opacity-100 transition-opacity p-1 rounded hover:bg-blue-500/10 text-blue-600"
+                          >
+                            <ArrowRightLeft className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); onReturnToQueue(conv.remoteJid); }}
+                            disabled={isReturning}
+                            title="Devolver à fila"
+                            className="opacity-0 group-hover/conv:opacity-100 transition-opacity p-1 rounded hover:bg-amber-500/10 text-amber-600"
+                          >
+                            <RotateCcw className="w-3.5 h-3.5" />
+                          </button>
+                        </>
+                      )}
+                    </div>
                   </div>
                 );
               })}

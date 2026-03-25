@@ -5232,3 +5232,13 @@
 - [x] UI: Painel de resumo IA com loading, atualizar e fechar
 - [x] UI: Formatação de mensagens para LLM (áudio transcrito, imagem, vídeo, documento, sticker, localização, contato)
 - [x] 33 testes unitários passando para as melhorias da Fase 4
+
+## Inbox — Atribuição de Atendente, Transferência e Supervisão (Mar 25)
+- [x] Botão de atribuir atendente visível no inbox (header da conversa — sempre visível agora)
+- [x] Dropdown/modal para selecionar atendente disponível da equipe
+- [x] Nome do atendente exibido antes das mensagens enviadas (quando atribuído)
+- [x] Opção de toggle para mostrar/ocultar nome do atendente nas mensagens
+- [x] Transferência de conversa entre atendentes (botão dedicado no chat + TransferDialog)
+- [x] Registro de transferência no histórico da conversa (nota interna + evento Socket.IO)
+- [x] Integração com painel de supervisão (transferBetweenAgents endpoint + botão ↔ nas conversas)
+- [x] Testes unitários para as novas funcionalidades (13 testes passando)
