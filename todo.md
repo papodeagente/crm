@@ -5220,3 +5220,15 @@
 - [x] Testes: sem reatribuição quando etapa não tem regra configurada
 - [x] Testes: CRUD de configuração de responsável por etapa (create, upsert, update, delete)
 - [x] Testes: isolamento multi-tenant (regras não visíveis entre tenants, delete protegido)
+
+## Fase 4 Melhorias — Áudio Z-API + Forge API Fallback + Resumo IA (Mar 25)
+- [x] audioTranscriptionWorker: Corrigido download de áudio Z-API — usa mediaUrl do DB (Z-API fornece URLs diretas, não base64)
+- [x] audioTranscriptionWorker: Fallback para Forge API (transcribeAudio built-in) quando tenant não tem chave OpenAI
+- [x] audioTranscriptionWorker: Upload de áudio para S3 antes de enviar para transcrição (URLs permanentes)
+- [x] audioTranscriptionWorker: Mapeamento de MIME type para extensão de arquivo (audio/ogg; codecs=opus → ogg)
+- [x] Endpoint ai.transcribe: Fallback para Forge API quando não há chave OpenAI (não exige mais OPENAI_REQUIRED)
+- [x] Endpoint ai.summarizeConversation: Resumo de conversa com IA usando LLM built-in
+- [x] UI: Botão Brain no header do chat para gerar resumo IA da conversa
+- [x] UI: Painel de resumo IA com loading, atualizar e fechar
+- [x] UI: Formatação de mensagens para LLM (áudio transcrito, imagem, vídeo, documento, sticker, localização, contato)
+- [x] 33 testes unitários passando para as melhorias da Fase 4

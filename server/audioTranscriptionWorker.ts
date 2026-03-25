@@ -1,13 +1,19 @@
 /**
  * Audio Transcription Worker — Background processing for WhatsApp audio messages
  * 
- * Uses ONLY the tenant's OpenAI Whisper API key — each client pays their own credits.
- * No built-in/Forge API is used.
+ * Supports two transcription backends:
+ * 1. Tenant's OpenAI Whisper API key (preferred, each client pays their own credits)
+ * 2. Built-in Forge API (free, platform-provided fallback when no OpenAI key)
+ * 
+ * Audio download strategies (in order):
+ * 1. mediaUrl from DB (Z-API provides permanent URLs, S3 URLs from downloadAndStoreMedia)
+ * 2. getBase64FromMediaMessage via provider (Evolution API)
+ * 3. Direct Evolution API fallback
  * 
  * Flow:
- * 1. Audio message detected → job enqueued to BullMQ
- * 2. Worker downloads audio from Evolution API (base64)
- * 3. Worker sends audio to OpenAI Whisper API using tenant's API key
+ * 1. Audio message detected → job enqueued to BullMQ (or sync fallback)
+ * 2. Worker resolves audio URL (DB mediaUrl or provider base64)
+ * 3. Worker sends audio to Whisper API (tenant key) or Forge API (fallback)
  * 4. Transcription saved to wa_messages
  * 5. Socket event emitted to update CRM UI in real-time
  * 
@@ -28,6 +34,7 @@ import { waMessages } from "../drizzle/schema";
 import { getActiveAiIntegration, getTenantAiSettings } from "./db";
 import * as evo from "./evolutionApi";
 import { resolveProviderForSession } from "./providers/providerFactory";
+import { storagePut } from "./storage";
 
 // ── Types ──────────────────────────────────────────────────────
 
@@ -183,15 +190,9 @@ async function processTranscriptionJob(data: AudioTranscriptionJob): Promise<voi
     return;
   }
 
-  // ── Step 2: Check tenant has OpenAI API key ──
+  // ── Step 2: Check if tenant has OpenAI API key (optional — Forge API is fallback) ──
   const aiIntegration = await getActiveAiIntegration(tenantId, "openai");
-  if (!aiIntegration || !aiIntegration.apiKey) {
-    console.log(`[AudioTranscription] No OpenAI API key for tenant ${tenantId}, skipping`);
-    await db.update(waMessages)
-      .set({ audioTranscriptionStatus: "failed" })
-      .where(eq(waMessages.id, messageId));
-    return;
-  }
+  const hasTenantOpenAiKey = !!(aiIntegration?.apiKey);
 
   // ── Step 3: Check duration limit ──
   if (mediaDuration && mediaDuration > MAX_AUDIO_DURATION_SEC) {
@@ -207,32 +208,74 @@ async function processTranscriptionJob(data: AudioTranscriptionJob): Promise<voi
     .set({ audioTranscriptionStatus: "processing" })
     .where(eq(waMessages.id, messageId));
 
-  // ── Step 5: Download audio from Evolution API ──
-  let base64Data: string;
-  let mimeType: string;
+  // ── Step 5: Resolve audio — try DB mediaUrl first, then provider base64 ──
+  let audioUrl: string | null = null;
+  let audioBuffer: Buffer | null = null;
+  let mimeType = mediaMimeType || "audio/ogg";
+
   try {
-    // Use provider factory to resolve correct provider for this session
-    let mediaResult: { base64: string; mimetype: string; fileName?: string } | null = null;
-    try {
-      const provider = await resolveProviderForSession(sessionId);
-      mediaResult = await provider.getBase64FromMediaMessage(instanceName, externalMessageId, {
-        remoteJid,
-        fromMe,
-      });
-    } catch {
-      // Fallback to direct Evolution API
-      mediaResult = await evo.getBase64FromMediaMessage(instanceName, externalMessageId, {
-        remoteJid,
-        fromMe,
-      });
+    // Strategy 1: Check if mediaUrl is already in DB (Z-API permanent URLs, S3 URLs)
+    const [msgRow] = await db.select({
+      mediaUrl: waMessages.mediaUrl,
+      mediaMimeType: waMessages.mediaMimeType,
+    })
+      .from(waMessages)
+      .where(eq(waMessages.id, messageId))
+      .limit(1);
+
+    if (msgRow?.mediaUrl && !msgRow.mediaUrl.includes("whatsapp.net")) {
+      // Permanent URL available — download directly
+      audioUrl = msgRow.mediaUrl;
+      mimeType = msgRow.mediaMimeType || mimeType;
+      console.log(`[AudioTranscription] Using DB mediaUrl for msg ${messageId}: ${audioUrl.substring(0, 80)}...`);
+
+      const audioRes = await fetch(audioUrl);
+      if (!audioRes.ok) throw new Error(`Failed to download from mediaUrl: ${audioRes.status}`);
+      audioBuffer = Buffer.from(await audioRes.arrayBuffer());
     }
-    if (!mediaResult || !mediaResult.base64) {
-      throw new Error("Failed to download media from provider");
+
+    // Strategy 2: getBase64FromMediaMessage via provider (Evolution API)
+    if (!audioBuffer) {
+      let mediaResult: { base64: string; mimetype: string; fileName?: string } | null = null;
+      try {
+        const provider = await resolveProviderForSession(sessionId);
+        mediaResult = await provider.getBase64FromMediaMessage(instanceName, externalMessageId, {
+          remoteJid,
+          fromMe,
+        });
+      } catch {
+        // Fallback to direct Evolution API
+        mediaResult = await evo.getBase64FromMediaMessage(instanceName, externalMessageId, {
+          remoteJid,
+          fromMe,
+        });
+      }
+      if (mediaResult?.base64) {
+        audioBuffer = Buffer.from(mediaResult.base64, "base64");
+        mimeType = mediaResult.mimetype || mimeType;
+        console.log(`[AudioTranscription] Downloaded via provider base64 for msg ${messageId} (${(audioBuffer.length / 1024).toFixed(0)}KB)`);
+
+        // Upload to S3 for a permanent URL (useful for Forge API)
+        try {
+          const ext = getFileExtension(mimeType);
+          const fileKey = `whatsapp-audio/${sessionId}/${messageId}-${Date.now()}.${ext}`;
+          const { url } = await storagePut(fileKey, audioBuffer, mimeType);
+          audioUrl = url;
+          // Update DB with permanent URL
+          await db.update(waMessages)
+            .set({ mediaUrl: url })
+            .where(eq(waMessages.id, messageId));
+        } catch (s3Err: any) {
+          console.warn(`[AudioTranscription] S3 upload failed for msg ${messageId}:`, s3Err.message);
+        }
+      }
     }
-    base64Data = mediaResult.base64;
-    mimeType = mediaResult.mimetype || mediaMimeType || "audio/ogg";
+
+    if (!audioBuffer) {
+      throw new Error("Failed to download audio from any source");
+    }
   } catch (err: any) {
-    console.error(`[AudioTranscription] Media download failed for msg ${messageId}:`, err.message);
+    console.error(`[AudioTranscription] Audio download failed for msg ${messageId}:`, err.message);
     await db.update(waMessages)
       .set({ audioTranscriptionStatus: "failed" })
       .where(eq(waMessages.id, messageId));
@@ -240,7 +283,6 @@ async function processTranscriptionJob(data: AudioTranscriptionJob): Promise<voi
   }
 
   // ── Step 6: Check size limit ──
-  const audioBuffer = Buffer.from(base64Data, "base64");
   const sizeMB = audioBuffer.length / (1024 * 1024);
   if (sizeMB > MAX_AUDIO_SIZE_MB) {
     console.log(`[AudioTranscription] Audio too large (${sizeMB.toFixed(1)}MB > ${MAX_AUDIO_SIZE_MB}MB), skipping msg ${messageId}`);
@@ -250,65 +292,110 @@ async function processTranscriptionJob(data: AudioTranscriptionJob): Promise<voi
     return;
   }
 
-  // ── Step 7: Call OpenAI Whisper API with tenant's API key ──
+  // ── Step 7: Transcribe — OpenAI Whisper (tenant key) or Forge API (fallback) ──
   try {
-    const ext = getFileExtension(mimeType);
-    const filename = `audio.${ext}`;
+    let transcriptionText: string;
+    let transcriptionLanguage: string = "pt";
+    let transcriptionDuration: number | null = mediaDuration;
 
-    const formData = new FormData();
-    const audioBlob = new Blob([new Uint8Array(audioBuffer)], { type: mimeType });
-    formData.append("file", audioBlob, filename);
-    formData.append("model", "whisper-1");
-    formData.append("response_format", "verbose_json");
-    formData.append("prompt", "Transcreva o áudio do usuário para texto. O idioma principal é português brasileiro.");
+    if (hasTenantOpenAiKey) {
+      // Use tenant's OpenAI Whisper API
+      console.log(`[AudioTranscription] Using tenant OpenAI key for msg ${messageId}`);
+      const ext = getFileExtension(mimeType);
+      const filename = `audio.${ext}`;
 
-    const response = await fetch("https://api.openai.com/v1/audio/transcriptions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${aiIntegration.apiKey}`,
-      },
-      body: formData,
-    });
+      const formData = new FormData();
+      const audioBlob = new Blob([new Uint8Array(audioBuffer)], { type: mimeType });
+      formData.append("file", audioBlob, filename);
+      formData.append("model", "whisper-1");
+      formData.append("response_format", "verbose_json");
+      formData.append("prompt", "Transcreva o áudio do usuário para texto. O idioma principal é português brasileiro.");
 
-    if (!response.ok) {
-      const errorText = await response.text().catch(() => "");
-      throw new Error(`Whisper API error: ${response.status} ${response.statusText} ${errorText}`);
-    }
+      const response = await fetch("https://api.openai.com/v1/audio/transcriptions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${aiIntegration!.apiKey}`,
+        },
+        body: formData,
+      });
 
-    const result = await response.json() as {
-      text: string;
-      language?: string;
-      duration?: number;
-      segments?: any[];
-    };
+      if (!response.ok) {
+        const errorText = await response.text().catch(() => "");
+        throw new Error(`Whisper API error: ${response.status} ${response.statusText} ${errorText}`);
+      }
 
-    if (!result.text || typeof result.text !== "string") {
-      throw new Error("Invalid Whisper API response: no text field");
+      const result = await response.json() as {
+        text: string;
+        language?: string;
+        duration?: number;
+      };
+
+      if (!result.text || typeof result.text !== "string") {
+        throw new Error("Invalid Whisper API response: no text field");
+      }
+
+      transcriptionText = result.text;
+      transcriptionLanguage = result.language || "pt";
+      transcriptionDuration = result.duration ? Math.round(result.duration) : mediaDuration;
+    } else {
+      // Fallback: use built-in Forge API (free, platform-provided)
+      console.log(`[AudioTranscription] Using Forge API (no tenant OpenAI key) for msg ${messageId}`);
+
+      if (!audioUrl) {
+        // Need a URL for Forge API — upload to S3 first
+        const ext = getFileExtension(mimeType);
+        const fileKey = `whatsapp-audio/${sessionId}/${messageId}-${Date.now()}.${ext}`;
+        const { url } = await storagePut(fileKey, audioBuffer, mimeType);
+        audioUrl = url;
+        await db.update(waMessages)
+          .set({ mediaUrl: url })
+          .where(eq(waMessages.id, messageId));
+      }
+
+      const { transcribeAudio } = await import("./_core/voiceTranscription");
+      const forgeResult = await transcribeAudio({
+        audioUrl,
+        language: "pt",
+        prompt: "Transcreva o áudio do usuário para texto. O idioma principal é português brasileiro.",
+      });
+
+      if ("error" in forgeResult) {
+        throw new Error(`Forge API error: ${(forgeResult as any).error} (${(forgeResult as any).code})`);
+      }
+
+      const result = forgeResult as { text: string; language?: string; duration?: number; segments?: any[] };
+      if (!result.text || typeof result.text !== "string") {
+        throw new Error("Invalid Forge API response: no text field");
+      }
+
+      transcriptionText = result.text;
+      transcriptionLanguage = result.language || "pt";
+      transcriptionDuration = result.duration ? Math.round(result.duration) : mediaDuration;
     }
 
     // ── Step 8: Save transcription ──
     await db.update(waMessages)
       .set({
-        audioTranscription: result.text,
+        audioTranscription: transcriptionText,
         audioTranscriptionStatus: "completed",
-        audioTranscriptionLanguage: result.language || "pt",
-        audioTranscriptionDuration: result.duration ? Math.round(result.duration) : mediaDuration,
+        audioTranscriptionLanguage: transcriptionLanguage,
+        audioTranscriptionDuration: transcriptionDuration,
       })
       .where(eq(waMessages.id, messageId));
 
-    console.log(`[AudioTranscription] Completed msg ${messageId}: "${result.text.substring(0, 80)}..." (${result.language}, ${result.duration?.toFixed(1)}s)`);
+    console.log(`[AudioTranscription] Completed msg ${messageId}: "${transcriptionText.substring(0, 80)}..." (${transcriptionLanguage}, ${transcriptionDuration?.toFixed?.(1) || "?"}s, provider: ${hasTenantOpenAiKey ? "openai" : "forge"})`);
 
     // ── Step 9: Emit socket event to update CRM UI ──
     emitTranscriptionUpdate(tenantId, sessionId, messageId, {
-      transcription: result.text,
+      transcription: transcriptionText,
       status: "completed",
-      language: result.language || "pt",
-      duration: result.duration ? Math.round(result.duration) : mediaDuration,
+      language: transcriptionLanguage,
+      duration: transcriptionDuration,
       remoteJid,
     });
 
   } catch (err: any) {
-    console.error(`[AudioTranscription] Whisper API failed for msg ${messageId}:`, err.message);
+    console.error(`[AudioTranscription] Transcription failed for msg ${messageId}:`, err.message);
     await db.update(waMessages)
       .set({ audioTranscriptionStatus: "failed" })
       .where(eq(waMessages.id, messageId));

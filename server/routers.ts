@@ -3668,46 +3668,54 @@ REGRAS:
         audioUrl: z.string(),
       }))
       .mutation(async ({ input, ctx }) => {
-        // Check if tenant has OpenAI integration
+        // Check if tenant has OpenAI integration (optional — Forge API is fallback)
         const integration = await getActiveAiIntegration(getTenantId(ctx), "openai");
-        if (!integration) {
-          throw new TRPCError({
-            code: "PRECONDITION_FAILED",
-            message: "OPENAI_REQUIRED",
-          });
-        }
+        const hasTenantKey = !!(integration?.apiKey);
 
         try {
-          // Download audio file
-          const audioRes = await fetch(input.audioUrl);
-          if (!audioRes.ok) throw new Error(`Failed to download audio: ${audioRes.status}`);
-          const audioBuffer = await audioRes.arrayBuffer();
-          const audioBlob = new Blob([audioBuffer]);
+          if (hasTenantKey) {
+            // Use tenant's OpenAI Whisper API
+            const audioRes = await fetch(input.audioUrl);
+            if (!audioRes.ok) throw new Error(`Failed to download audio: ${audioRes.status}`);
+            const audioBuffer = await audioRes.arrayBuffer();
+            const audioBlob = new Blob([audioBuffer]);
 
-          // Determine file extension from URL
-          const urlPath = new URL(input.audioUrl).pathname;
-          const ext = urlPath.split(".").pop() || "ogg";
+            const urlPath = new URL(input.audioUrl).pathname;
+            const ext = urlPath.split(".").pop() || "ogg";
 
-          // Create FormData for Whisper API
-          const formData = new FormData();
-          formData.append("file", audioBlob, `audio.${ext}`);
-          formData.append("model", "whisper-1");
-          formData.append("language", "pt");
-          formData.append("response_format", "json");
+            const formData = new FormData();
+            formData.append("file", audioBlob, `audio.${ext}`);
+            formData.append("model", "whisper-1");
+            formData.append("language", "pt");
+            formData.append("response_format", "json");
 
-          const whisperRes = await fetch("https://api.openai.com/v1/audio/transcriptions", {
-            method: "POST",
-            headers: { "Authorization": `Bearer ${integration.apiKey}` },
-            body: formData,
-          });
+            const whisperRes = await fetch("https://api.openai.com/v1/audio/transcriptions", {
+              method: "POST",
+              headers: { "Authorization": `Bearer ${integration!.apiKey}` },
+              body: formData,
+            });
 
-          if (!whisperRes.ok) {
-            const body = await whisperRes.json().catch(() => ({}));
-            throw new Error(body?.error?.message || `Whisper API error: ${whisperRes.status}`);
+            if (!whisperRes.ok) {
+              const body = await whisperRes.json().catch(() => ({}));
+              throw new Error(body?.error?.message || `Whisper API error: ${whisperRes.status}`);
+            }
+
+            const result = await whisperRes.json();
+            return { text: result.text || "", language: result.language || "pt" };
+          } else {
+            // Fallback: use built-in Forge API (free, platform-provided)
+            const { transcribeAudio } = await import("./_core/voiceTranscription");
+            const forgeResult = await transcribeAudio({
+              audioUrl: input.audioUrl,
+              language: "pt",
+              prompt: "Transcreva o áudio do usuário para texto.",
+            });
+            if ("error" in forgeResult) {
+              throw new Error(`Forge API error: ${(forgeResult as any).error}`);
+            }
+            const result = forgeResult as { text: string; language?: string };
+            return { text: result.text || "", language: result.language || "pt" };
           }
-
-          const result = await whisperRes.json();
-          return { text: result.text || "", language: result.language || "pt" };
         } catch (err: any) {
           if (err instanceof TRPCError) throw err;
           throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: err.message || "Transcription failed" });
@@ -3840,6 +3848,95 @@ REGRAS:
             { id: "claude-opus-4-6", name: "Claude Opus 4.6", description: "Mais inteligente para agentes e código", contextWindow: "1M" },
           ];
         }
+      }),
+
+    // ── Summarize conversation with AI ──
+    summarizeConversation: tenantProcedure
+      .input(z.object({
+        sessionId: z.string(),
+        remoteJid: z.string(),
+        maxMessages: z.number().optional().default(50),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const tenantId = getTenantId(ctx);
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+        const { waMessages } = await import("../drizzle/schema");
+
+        // Fetch recent messages for this conversation
+        const messages = await db.select({
+          id: waMessages.id,
+          content: waMessages.content,
+          fromMe: waMessages.fromMe,
+          pushName: waMessages.pushName,
+          messageType: waMessages.messageType,
+          timestamp: waMessages.timestamp,
+          audioTranscription: waMessages.audioTranscription,
+        })
+          .from(waMessages)
+          .where(
+            and(
+              eq(waMessages.sessionId, input.sessionId),
+              eq(waMessages.remoteJid, input.remoteJid),
+              eq(waMessages.tenantId, tenantId),
+            )
+          )
+          .orderBy(waMessages.timestamp)
+          .limit(input.maxMessages);
+
+        if (messages.length === 0) {
+          return { summary: "Nenhuma mensagem encontrada nesta conversa." };
+        }
+
+        // Format messages for LLM
+        const formatted = messages.map((m) => {
+          const sender = m.fromMe ? "Agente" : (m.pushName || "Cliente");
+          const time = m.timestamp ? new Date(m.timestamp).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" }) : "";
+          const isAudio = m.messageType === "audioMessage" || m.messageType === "pttMessage" || m.messageType === "audio";
+          let text = m.content || "";
+          if (isAudio) {
+            text = m.audioTranscription ? `[Áudio transcrito: ${m.audioTranscription}]` : "[Áudio não transcrito]";
+          } else if (m.messageType === "imageMessage") {
+            text = text ? `[Imagem] ${text}` : "[Imagem]";
+          } else if (m.messageType === "videoMessage") {
+            text = text ? `[Vídeo] ${text}` : "[Vídeo]";
+          } else if (m.messageType === "documentMessage") {
+            text = text ? `[Documento] ${text}` : "[Documento]";
+          } else if (m.messageType === "stickerMessage") {
+            text = "[Sticker]";
+          } else if (m.messageType === "locationMessage") {
+            text = "[Localização]";
+          } else if (m.messageType === "contactMessage" || m.messageType === "contactsArrayMessage") {
+            text = "[Contato]";
+          }
+          return `[${time}] ${sender}: ${text}`;
+        }).join("\n");
+
+        // Call LLM to generate summary
+        const { invokeLLM } = await import("./_core/llm");
+        const llmResponse = await invokeLLM({
+          messages: [
+            {
+              role: "system",
+              content: `Você é um assistente de atendimento ao cliente. Gere um resumo conciso da conversa de WhatsApp abaixo.
+
+O resumo deve conter:
+1. **Assunto principal** da conversa (1 linha)
+2. **Pontos-chave** discutidos (lista curta)
+3. **Status atual** (aguardando resposta do cliente, aguardando ação do agente, resolvido, etc.)
+4. **Próximos passos** sugeridos (se houver)
+
+Seja direto e objetivo. Use português brasileiro. Máximo 200 palavras.`,
+            },
+            {
+              role: "user",
+              content: `Conversa (${messages.length} mensagens):\n\n${formatted}`,
+            },
+          ],
+        });
+
+        const summary = llmResponse?.choices?.[0]?.message?.content || "Não foi possível gerar o resumo.";
+        return { summary };
       }),
   }),
 

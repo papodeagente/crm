@@ -1267,6 +1267,9 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
   const [showQuickReplies, setShowQuickReplies] = useState(false);
   const [quickReplyFilter, setQuickReplyFilter] = useState("");
   const [showAiSuggestion, setShowAiSuggestion] = useState(false);
+  const [showSummary, setShowSummary] = useState(false);
+  const [summaryText, setSummaryText] = useState("");
+  const [summaryLoading, setSummaryLoading] = useState(false);
   const [transcriptions, setTranscriptions] = useState<Record<number, { text?: string; loading?: boolean; error?: string }>>({});
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -1443,6 +1446,28 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
       }
     );
   }, [retranscribeMut, utils]);
+
+  // Summarize conversation
+  const summarizeMut = trpc.ai.summarizeConversation.useMutation();
+  const handleSummarize = useCallback(() => {
+    setSummaryLoading(true);
+    setSummaryText("");
+    setShowSummary(true);
+    summarizeMut.mutate(
+      { sessionId, remoteJid },
+      {
+        onSuccess: (data) => {
+          const text = typeof data.summary === "string" ? data.summary : String(data.summary || "");
+          setSummaryText(text);
+          setSummaryLoading(false);
+        },
+        onError: (err) => {
+          setSummaryText(`Erro: ${err.message}`);
+          setSummaryLoading(false);
+        },
+      }
+    );
+  }, [summarizeMut, sessionId, remoteJid]);
 
   // Auto-transcribe new audio messages
   const autoTranscribedRef = useRef<Set<number>>(new Set());
@@ -2310,6 +2335,22 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
               <History className="w-[20px] h-[20px]" style={showTimeline ? { color: 'var(--wa-tint)' } : { color: 'var(--wa-text-secondary)' }} />
             </button>
           </InstantTooltip>
+          {/* AI Summary button */}
+          <InstantTooltip label="Resumo IA da conversa">
+            <button
+              onClick={handleSummarize}
+              disabled={summaryLoading}
+              className={`w-[40px] h-[40px] flex items-center justify-center rounded-full transition-colors ${
+                showSummary ? "bg-violet-500/15 text-violet-500" : "hover:bg-[var(--wa-hover)]"
+              }`}
+            >
+              {summaryLoading ? (
+                <Loader2 className="w-[20px] h-[20px] animate-spin" style={{ color: 'var(--wa-tint)' }} />
+              ) : (
+                <Brain className="w-[20px] h-[20px]" style={showSummary ? { color: '#8b5cf6' } : { color: 'var(--wa-text-secondary)' }} />
+              )}
+            </button>
+          </InstantTooltip>
           <InstantTooltip label="Buscar na conversa">
             <button className="w-[40px] h-[40px] flex items-center justify-center hover:bg-[var(--wa-hover)] rounded-full transition-colors">
               <Search className="w-[20px] h-[20px]" style={{ color: 'var(--wa-text-secondary)' }} />
@@ -2347,6 +2388,43 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
               <span className="text-[10px] text-amber-500">+{(globalNotesQ.data as any[]).length - 3} mais...</span>
             )}
           </div>
+        </div>
+      )}
+
+      {/* ─── AI Summary Panel ─── */}
+      {showSummary && (
+        <div className="bg-violet-50 dark:bg-violet-950/30 border-b border-violet-200 dark:border-violet-800/40 px-4 py-3 shrink-0 z-10">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <Brain className="w-4 h-4 text-violet-600 dark:text-violet-400" />
+              <span className="text-[12px] font-semibold text-violet-700 dark:text-violet-300 uppercase tracking-wider">Resumo da Conversa</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={handleSummarize}
+                disabled={summaryLoading}
+                className="text-[11px] text-violet-600 hover:text-violet-800 dark:text-violet-400 dark:hover:text-violet-200 px-2 py-0.5 rounded hover:bg-violet-100 dark:hover:bg-violet-900/30 transition-colors"
+              >
+                {summaryLoading ? "Gerando..." : "Atualizar"}
+              </button>
+              <button
+                onClick={() => setShowSummary(false)}
+                className="w-6 h-6 flex items-center justify-center rounded-full hover:bg-violet-100 dark:hover:bg-violet-900/30 transition-colors"
+              >
+                <X className="w-3.5 h-3.5 text-violet-500" />
+              </button>
+            </div>
+          </div>
+          {summaryLoading ? (
+            <div className="flex items-center gap-2 py-2">
+              <Loader2 className="w-4 h-4 animate-spin text-violet-500" />
+              <span className="text-[12px] text-violet-600 dark:text-violet-400">Analisando conversa com IA...</span>
+            </div>
+          ) : (
+            <div className="text-[12px] text-violet-900 dark:text-violet-200 leading-relaxed whitespace-pre-wrap max-h-[200px] overflow-y-auto">
+              {summaryText}
+            </div>
+          )}
         </div>
       )}
 
