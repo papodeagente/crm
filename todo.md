@@ -5138,3 +5138,12 @@
 - [x] Corrigir problemas de exibição/consulta - usar parseCookies(ctx.req?.headers?.cookie) + função requireSuperAdmin centralizada
 - [ ] Publicar para que correções cheguem ao servidor de produção
 - [ ] Testar fluxo completo após publicação
+## Correção Webhook RD Station + Z-API
+- [x] Diagnosticar por que webhook RD Station não dispara mensagem quando conectado via Z-API
+  - Causa: sendTextMessage/sendMediaMessage usavam sempre Evolution API, sem verificar se sessão é Z-API
+- [x] Verificar fluxo de envio de mensagem no webhook handler (provider detection)
+- [x] Corrigir envio para usar provider correto (Z-API quando sessão é Z-API)
+  - sendTextMessage, sendMediaMessage, sendTextWithQuote, sendReaction, sendPresenceUpdate
+  - Todos agora verificam getZApiSession() e roteiam para zapiProvider quando aplicável
+- [x] Popup de configuração do webhook: header/footer fixos, conteúdo com scroll (flex-col + overflow-y-auto)
+- [x] Testes vitest: 9 testes passando (routing text, media, audio, reaction, presence, webhook scenario)

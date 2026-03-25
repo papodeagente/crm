@@ -18,6 +18,7 @@ import { whatsappSessions, waMessages, waConversations, waContacts, tenants, waC
 import { eq, and, sql, desc } from "drizzle-orm";
 import * as evo from "./evolutionApi";
 import { resolveInbound, updateConversationLastMessage } from "./conversationResolver";
+import { zapiProvider, getZApiSession } from "./providers/zapiProvider";
 import { storagePut } from "./storage";
 import { nanoid } from "nanoid";
 import { createNotification } from "./db";
@@ -358,7 +359,22 @@ class WhatsAppEvolutionManager extends EventEmitter {
     if (session.status !== "connected") throw new Error(`WhatsApp não está conectado. Reconecte seu WhatsApp.`);
 
     const number = this.jidToNumber(jid);
-    const result = await evo.sendText(session.instanceName, number, text);
+
+    // Route to Z-API if session is registered as Z-API provider
+    const zapiSession = getZApiSession(sessionId);
+    let result: any;
+    if (zapiSession) {
+      console.log(`[SendText] Using Z-API provider for session ${sessionId}`);
+      const zapiResult = await zapiProvider.sendText(sessionId, number, text);
+      // WASendResult already has canonical format (key.id, key.remoteJid, etc.)
+      result = {
+        key: zapiResult.key,
+        messageTimestamp: zapiResult.messageTimestamp,
+        status: zapiResult.status,
+      };
+    } else {
+      result = await evo.sendText(session.instanceName, number, text);
+    }
 
     // Save sent message to DB immediately so frontend refetch finds it
     if (result?.key?.id) {
@@ -419,14 +435,32 @@ class WhatsAppEvolutionManager extends EventEmitter {
     const number = this.jidToNumber(jid);
 
     let result: any;
-    if (mediaType === "audio" && opts?.ptt) {
-      result = await evo.sendAudio(session.instanceName, number, mediaUrl);
+    const zapiSession = getZApiSession(sessionId);
+    if (zapiSession) {
+      // Route via Z-API provider
+      console.log(`[SendMedia] Using Z-API provider for session ${sessionId}`);
+      if (mediaType === "audio" && opts?.ptt) {
+        const zapiResult = await zapiProvider.sendAudio(sessionId, number, mediaUrl);
+        result = { key: zapiResult.key, messageTimestamp: zapiResult.messageTimestamp, status: zapiResult.status };
+      } else {
+        const zapiResult = await zapiProvider.sendMedia(sessionId, number, mediaUrl, mediaType, {
+          caption,
+          fileName,
+          mimetype: opts?.mimetype,
+        });
+        result = { key: zapiResult.key, messageTimestamp: zapiResult.messageTimestamp, status: zapiResult.status };
+      }
     } else {
-      result = await evo.sendMedia(session.instanceName, number, mediaUrl, mediaType, {
-        caption,
-        fileName,
-        mimetype: opts?.mimetype,
-      });
+      // Route via Evolution API
+      if (mediaType === "audio" && opts?.ptt) {
+        result = await evo.sendAudio(session.instanceName, number, mediaUrl);
+      } else {
+        result = await evo.sendMedia(session.instanceName, number, mediaUrl, mediaType, {
+          caption,
+          fileName,
+          mimetype: opts?.mimetype,
+        });
+      }
     }
 
     // Save sent media message to DB immediately
@@ -483,6 +517,10 @@ class WhatsAppEvolutionManager extends EventEmitter {
     const session = this.sessions.get(sessionId);
     if (!session) throw new Error(`Sessão não encontrada.`);
     if (session.status !== "connected") throw new Error(`WhatsApp não está conectado.`);
+    const zapiSess = getZApiSession(sessionId);
+    if (zapiSess) {
+      return zapiProvider.sendReaction(sessionId, key, reaction);
+    }
     return evo.sendReaction(session.instanceName, key, reaction);
   }
 
@@ -523,10 +561,21 @@ class WhatsAppEvolutionManager extends EventEmitter {
     if (!session) throw new Error(`Sessão não encontrada.`);
     if (session.status !== "connected") throw new Error(`WhatsApp não está conectado.`);
     const number = this.jidToNumber(jid);
-    const result = await evo.sendTextWithQuote(session.instanceName, number, text, {
-      key: { id: quotedMessageId },
-      message: { conversation: quotedText },
-    });
+    const zapiSess = getZApiSession(sessionId);
+    let result: any;
+    if (zapiSess) {
+      console.log(`[SendTextWithQuote] Using Z-API provider for session ${sessionId}`);
+      const zapiResult = await zapiProvider.sendTextWithQuote(sessionId, number, text, {
+        key: { id: quotedMessageId },
+        message: { conversation: quotedText },
+      });
+      result = { key: zapiResult.key, messageTimestamp: zapiResult.messageTimestamp, status: zapiResult.status };
+    } else {
+      result = await evo.sendTextWithQuote(session.instanceName, number, text, {
+        key: { id: quotedMessageId },
+        message: { conversation: quotedText },
+      });
+    }
 
     // Save sent message to DB immediately
     if (result?.key?.id) {
@@ -590,6 +639,11 @@ class WhatsAppEvolutionManager extends EventEmitter {
     const session = this.sessions.get(sessionId);
     if (!session || session.status !== "connected") return;
     const number = this.jidToNumber(jid);
+    const zapiSess = getZApiSession(sessionId);
+    if (zapiSess) {
+      // Z-API doesn't have a direct presence API, skip silently
+      return;
+    }
     await evo.sendPresence(session.instanceName, number, presence);
   }
 

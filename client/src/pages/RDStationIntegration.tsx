@@ -648,8 +648,8 @@ export default function RDStationIntegration() {
 
       {/* ─── Create/Edit Dialog ─────────────────────────── */}
       <Dialog open={showForm} onOpenChange={(open) => { if (!open) { setShowForm(false); setEditingConfigId(null); } }}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
+        <DialogContent className="max-w-lg max-h-[90vh] flex flex-col">
+          <DialogHeader className="flex-shrink-0">
             <DialogTitle>{editingConfigId ? "Editar Configuração" : "Nova Configuração"}</DialogTitle>
             <DialogDescription>
               {editingConfigId
@@ -658,7 +658,7 @@ export default function RDStationIntegration() {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4 py-2">
+          <div className="space-y-4 py-2 overflow-y-auto flex-1 min-h-0 pr-1">
             {/* Name */}
             <div>
               <Label htmlFor="cfg-name">Nome da configuração *</Label>
@@ -1024,7 +1024,7 @@ export default function RDStationIntegration() {
             </div>
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="flex-shrink-0 border-t pt-4">
             <Button variant="outline" onClick={() => { setShowForm(false); setEditingConfigId(null); }}>
               Cancelar
             </Button>
