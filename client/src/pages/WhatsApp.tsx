@@ -17,13 +17,16 @@ import {
 import {
   Smartphone, Wifi, WifiOff, QrCode,
   ShieldAlert, Loader2, RefreshCw, CheckCircle2,
-  Settings2, Trash2, Users, Info, Share2, Mic, Brain, AlertTriangle
+  Settings2, Trash2, Users, Info, Share2, Mic, Brain, AlertTriangle,
+  Zap, Server
 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { useSocket } from "@/hooks/useSocket";
 import { useIsAdmin } from "@/components/AdminOnlyGuard";
 import SessionSharing from "@/components/SessionSharing";
+import ProviderManager from "@/components/ProviderManager";
 import { useTenantId } from "@/hooks/useTenantId";
 
 export default function WhatsApp() {
@@ -247,7 +250,23 @@ export default function WhatsApp() {
                 <CheckCircle2 className="h-7 w-7 text-emerald-600" />
               </div>
               <div>
-                <p className="text-[16px] font-semibold text-foreground">WhatsApp Conectado</p>
+                <div className="flex items-center gap-2">
+                  <p className="text-[16px] font-semibold text-foreground">WhatsApp Conectado</p>
+                  <Badge
+                    variant="outline"
+                    className={`text-[10px] px-1.5 py-0 h-5 gap-1 ${
+                      (mySession?.provider || 'evolution') === 'zapi'
+                        ? 'border-blue-200 text-blue-700 bg-blue-50'
+                        : 'border-emerald-200 text-emerald-700 bg-emerald-50'
+                    }`}
+                  >
+                    {(mySession?.provider || 'evolution') === 'zapi' ? (
+                      <><Zap className="h-3 w-3" />Z-API</>
+                    ) : (
+                      <><Server className="h-3 w-3" />Evolution</>
+                    )}
+                  </Badge>
+                </div>
                 <div className="flex items-center gap-2 mt-1">
                   <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
                   <span className="text-[13px] text-emerald-600 font-medium">Online</span>
@@ -257,6 +276,12 @@ export default function WhatsApp() {
 
             {/* Connection details */}
             <div className="rounded-xl bg-muted/30 p-4 space-y-2.5 mb-5">
+              <div className="flex justify-between items-center">
+                <span className="text-[12px] text-muted-foreground">Provedor</span>
+                <span className="text-[13px] font-medium">
+                  {(mySession?.provider || 'evolution') === 'zapi' ? 'Z-API' : 'Evolution API'}
+                </span>
+              </div>
               {mySession?.phoneNumber && (
                 <div className="flex justify-between items-center">
                   <span className="text-[12px] text-muted-foreground">Número</span>
@@ -434,6 +459,9 @@ export default function WhatsApp() {
 
       {/* ─── SESSION SHARING (Admin only) ─── */}
       {isAdmin && <SessionSharing tenantId={tenantId} />}
+
+      {/* ─── PROVIDER MANAGEMENT (Admin only) ─── */}
+      {isAdmin && mySession && <ProviderManager session={mySession as any} />}
 
       {/* ─── CONFIGURAÇÕES DE CONTATOS ─── */}
       <div className="mt-8">

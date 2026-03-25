@@ -5058,3 +5058,10 @@
 - [x] Fase 9: Adicionar observabilidade (métricas por provider, logs, instrumentação)
 - [x] Fase 10: Testes (contract, webhook normalization, message flow, multi-tenant, rollback)
 - [x] Fase 11: Checkpoint e relatório técnico
+## Interface de Gerenciamento de Provider (Evolution/Z-API)
+- [x] Analisar tela de sessões WhatsApp existente
+- [x] Backend: endpoints de migração, rollback, status e credenciais Z-API por sessão
+- [x] Frontend: UI de seletor de provider por sessão com migração/rollback
+- [x] Frontend: formulário de credenciais Z-API (instanceId, token, clientToken)
+- [x] Frontend: indicador visual de provider ativo e status de saúde
+- [x] Testes automatizados
