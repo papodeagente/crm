@@ -5085,3 +5085,16 @@
 - [x] Corrigir problemas encontrados nos testes (Client-Token corrigido: ZAPI_CLIENT_TOKEN separado do Partner Token)
 ## Menu Inbox
 - [x] Adicionar botão de atalho "Inbox" ao lado de "Análises" no menu de navegação principal
+## Responsividade Mobile - Página de Negociação Aberta
+- [x] Melhorar responsividade mobile da página de negociação aberta (DealDetail)
+- [x] Header: empilhar título e botões verticalmente no mobile
+- [x] Sidebar: Sheet drawer acessível por botão no mobile
+- [x] Stage bar: scroll horizontal suave
+- [x] Tabs: labels curtas no mobile, completas no desktop
+- [x] TaskRow: layout empilhado no mobile
+- [x] ProductRow: layout empilhado no mobile
+- [x] HistoryPanel: nota textarea empilhada no mobile
+- [x] WhatsApp panel: padding e info compactos no mobile
+- [x] AI Analysis: score circles empilhados no mobile
+- [x] Corrigir sobreposição de botões e textos no mobile
+- [x] Simplificar layout para ser funcional em telas pequenas

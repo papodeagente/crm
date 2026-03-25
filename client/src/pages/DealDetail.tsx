@@ -13,6 +13,7 @@ import { Separator } from "@/components/ui/separator";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { toast } from "sonner";
 import {
   ArrowLeft, Building2, Calendar, Check, CheckCheck, ChevronDown, ChevronRight, ChevronUp,
@@ -20,7 +21,8 @@ import {
   History, Loader2, Mail, MapPin, MessageCircle, MessageSquarePlus, Mic, MoreHorizontal,
   Package, Phone, Plane, Play, Plus, Send, ShoppingBag, ThumbsDown, ThumbsUp,
   Trash2, User, Users, X, AlertCircle, ClipboardList, Paperclip, Tag,
-  Sparkles, BarChart3, TrendingUp, TrendingDown, Star, Target, Lightbulb, RefreshCw, Award, Search
+  Sparkles, BarChart3, TrendingUp, TrendingDown, Star, Target, Lightbulb, RefreshCw, Award, Search,
+  PanelLeftOpen
 } from "lucide-react";
 import TaskFormDialog from "@/components/TaskFormDialog";
 import TaskActionPopover from "@/components/TaskActionPopover";
@@ -216,6 +218,9 @@ export default function DealDetail() {
   const toggleSection = (key: keyof typeof sidebarSections) =>
     setSidebarSections((prev) => ({ ...prev, [key]: !prev[key] }));
 
+  /* ─── Mobile sidebar drawer ─── */
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+
   /* ─── Content tabs ─── */
   const [activeTab, setActiveTab] = useState<"history" | "tasks" | "products" | "participants" | "whatsapp" | "ai-analysis">("history");
 
@@ -338,14 +343,22 @@ export default function DealDetail() {
       {/* TOP HEADER — Title + Pipeline badge + Action buttons    */}
       {/* ════════════════════════════════════════════════════════ */}
       <div className="shrink-0 border-b border-border bg-card">
-        <div className="flex items-center justify-between px-5 py-4">
-          <div className="flex items-center gap-3 min-w-0">
+        <div className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5 sm:py-4">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
             <button
               onClick={() => setLocation("/pipeline")}
-              className="flex items-center justify-center w-9 h-9 rounded-lg hover:bg-muted/60 transition-colors shrink-0 border border-border/60"
+              className="flex items-center justify-center w-8 h-8 sm:w-9 sm:h-9 rounded-lg hover:bg-muted/60 transition-colors shrink-0 border border-border/60"
               title="Voltar ao pipeline"
             >
               <ArrowLeft className="h-4 w-4 text-muted-foreground" />
+            </button>
+            {/* Mobile sidebar toggle */}
+            <button
+              onClick={() => setMobileSidebarOpen(true)}
+              className="flex lg:hidden items-center justify-center w-8 h-8 rounded-lg hover:bg-muted/60 transition-colors shrink-0 border border-border/60"
+              title="Ver detalhes"
+            >
+              <PanelLeftOpen className="h-4 w-4 text-muted-foreground" />
             </button>
             <div className="min-w-0">
               {editingTitle ? (
@@ -372,7 +385,7 @@ export default function DealDetail() {
                 </div>
               ) : (
                 <h1
-                  className="text-lg font-semibold text-foreground truncate cursor-pointer hover:text-primary transition-colors group/title flex items-center gap-1.5"
+                  className="text-base sm:text-lg font-semibold text-foreground truncate cursor-pointer hover:text-primary transition-colors group/title flex items-center gap-1.5"
                   onClick={() => { setTitleDraft(deal.title); setEditingTitle(true); }}
                   title="Clique para editar o nome"
                 >
@@ -418,19 +431,19 @@ export default function DealDetail() {
                 <Button
                   variant="outline"
                   size="sm"
-                  className="border-red-300 text-red-600 hover:bg-red-50 hover:text-red-700 dark:border-red-500/40 dark:text-red-400 dark:hover:bg-red-500/10 gap-1.5 font-medium"
+                  className="border-red-300 text-red-600 hover:bg-red-50 hover:text-red-700 dark:border-red-500/40 dark:text-red-400 dark:hover:bg-red-500/10 gap-1.5 font-medium h-8 px-2 sm:px-3"
                   onClick={() => setShowLostDialog(true)}
                 >
                   <ThumbsDown className="h-4 w-4" />
-                  Marcar perda
+                  <span className="hidden sm:inline">Marcar perda</span>
                 </Button>
                 <Button
                   size="sm"
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm gap-1.5 font-medium"
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm gap-1.5 font-medium h-8 px-2 sm:px-3"
                   onClick={() => setShowWonDialog(true)}
                 >
                   <ThumbsUp className="h-4 w-4" />
-                  Marcar venda
+                  <span className="hidden sm:inline">Marcar venda</span>
                 </Button>
               </>
             )}
@@ -438,12 +451,12 @@ export default function DealDetail() {
               <Button
                 variant="outline"
                 size="sm"
-                className="border-blue-300 text-blue-600 hover:bg-blue-50 hover:text-blue-700 dark:border-blue-500/40 dark:text-blue-400 dark:hover:bg-blue-500/10 gap-1.5 font-medium"
+                className="border-blue-300 text-blue-600 hover:bg-blue-50 hover:text-blue-700 dark:border-blue-500/40 dark:text-blue-400 dark:hover:bg-blue-500/10 gap-1.5 font-medium h-8 px-2 sm:px-3"
                 onClick={handleReopen}
                 disabled={updateDeal.isPending}
               >
                 <RefreshCw className={`h-4 w-4 ${updateDeal.isPending ? "animate-spin" : ""}`} />
-                Reabrir negociação
+                <span className="hidden sm:inline">Reabrir negociação</span>
               </Button>
             )}
           </div>
@@ -453,7 +466,7 @@ export default function DealDetail() {
         {/* STAGE BAR — Chevron arrow pipeline steps (RD Station style) */}
         {/* ════════════════════════════════════════════════════════ */}
         {stages.length > 0 && deal.status === "open" && (
-          <div className="flex items-stretch px-5 pb-4 overflow-x-auto" style={{ gap: 0 }}>
+          <div className="flex items-stretch px-3 sm:px-5 pb-3 sm:pb-4 overflow-x-auto scrollbar-none" style={{ gap: 0 }}>
             {stages.map((stage: any, idx: number) => {
               const isActive = stage.id === deal.stageId;
               const isPast = idx < currentStageIdx;
@@ -978,7 +991,7 @@ export default function DealDetail() {
         {/* ─── RIGHT CONTENT ─── */}
         <div className="flex-1 flex flex-col overflow-hidden">
           {/* ── Próximas Tarefas (top card) ── */}
-          <div className="shrink-0 border-b border-border bg-card p-5">
+          <div className="shrink-0 border-b border-border bg-card p-3 sm:p-5">
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-[13px] font-semibold text-foreground flex items-center gap-2">
                 <ClipboardList className="h-4 w-4 text-primary/60" />
@@ -1009,14 +1022,14 @@ export default function DealDetail() {
           </div>
 
           {/* ── Tab bar ── */}
-          <div className="shrink-0 flex items-center gap-0 px-4 border-b border-border bg-card overflow-x-auto">
+          <div className="shrink-0 flex items-center gap-0 px-2 sm:px-4 border-b border-border bg-card overflow-x-auto scrollbar-none">
             {[
-              { key: "history" as const, label: "Histórico", icon: History },
-              { key: "tasks" as const, label: "Tarefas", icon: ClipboardList, count: tasksList.length },
-              { key: "products" as const, label: "Produtos e Serviços", icon: ShoppingBag, count: (productsQ.data || []).length },
-              { key: "participants" as const, label: "Participantes", icon: Users, count: (participantsQ.data || []).length },
-              { key: "whatsapp" as const, label: "WhatsApp", icon: MessageCircle, count: waMessagesCountQ.data || 0 },
-              { key: "ai-analysis" as const, label: "Análise IA", icon: Sparkles },
+              { key: "history" as const, label: "Histórico", shortLabel: "Hist.", icon: History },
+              { key: "tasks" as const, label: "Tarefas", shortLabel: "Tarefas", icon: ClipboardList, count: tasksList.length },
+              { key: "products" as const, label: "Produtos e Serviços", shortLabel: "Produtos", icon: ShoppingBag, count: (productsQ.data || []).length },
+              { key: "participants" as const, label: "Participantes", shortLabel: "Partic.", icon: Users, count: (participantsQ.data || []).length },
+              { key: "whatsapp" as const, label: "WhatsApp", shortLabel: "WA", icon: MessageCircle, count: waMessagesCountQ.data || 0 },
+              { key: "ai-analysis" as const, label: "Análise IA", shortLabel: "IA", icon: Sparkles },
             ].map((tab) => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.key;
@@ -1024,19 +1037,20 @@ export default function DealDetail() {
                 <button
                   key={tab.key}
                   onClick={() => setActiveTab(tab.key)}
-                  className={`flex items-center gap-1.5 px-4 py-3 text-[13px] font-medium transition-all relative whitespace-nowrap
+                  className={`flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-4 py-2.5 sm:py-3 text-[12px] sm:text-[13px] font-medium transition-all relative whitespace-nowrap
                     ${isActive
                       ? "text-primary"
                       : "text-muted-foreground hover:text-foreground"
                     }`}
                 >
-                  <Icon className="h-3.5 w-3.5" />
-                  {tab.label}
+                  <Icon className="h-3.5 w-3.5 shrink-0" />
+                  <span className="hidden sm:inline">{tab.label}</span>
+                  <span className="sm:hidden">{tab.shortLabel}</span>
                   {tab.count !== undefined && tab.count > 0 && (
-                    <span className="ml-1 text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-full font-semibold">{tab.count}</span>
+                    <span className="ml-0.5 sm:ml-1 text-[9px] sm:text-[10px] bg-primary/10 text-primary px-1 sm:px-1.5 py-0.5 rounded-full font-semibold">{tab.count}</span>
                   )}
                   {isActive && (
-                    <span className="absolute bottom-0 left-2 right-2 h-[2.5px] bg-primary rounded-full" />
+                    <span className="absolute bottom-0 left-1 right-1 sm:left-2 sm:right-2 h-[2.5px] bg-primary rounded-full" />
                   )}
                 </button>
               );
@@ -1086,6 +1100,106 @@ export default function DealDetail() {
           </div>
         </div>
       </div>
+
+      {/* ── Mobile Sidebar Sheet ── */}
+      <Sheet open={mobileSidebarOpen} onOpenChange={setMobileSidebarOpen}>
+        <SheetContent side="left" className="w-[85vw] max-w-[380px] p-0 overflow-y-auto">
+          <SheetHeader className="sr-only">
+            <SheetTitle>Detalhes da Negociação</SheetTitle>
+            <SheetDescription>Informações da sidebar da negociação</SheetDescription>
+          </SheetHeader>
+          <div className="p-5 space-y-0">
+            {/* ── Negociação ── */}
+            <SidebarSection
+              title="Negociação"
+              open={sidebarSections.deal}
+              onToggle={() => toggleSection("deal")}
+            >
+              <div className="space-y-3">
+                <EditableSidebarField
+                  label="Nome"
+                  value={deal.title}
+                  isEditing={editingDealField === "title"}
+                  onStartEdit={() => { setEditingDealField("title"); setDealFieldDraft(deal.title); }}
+                  draft={dealFieldDraft}
+                  onDraftChange={setDealFieldDraft}
+                  onSave={() => { if (dealFieldDraft.trim()) updateDeal.mutate({ id: deal.id, title: dealFieldDraft.trim() }); setEditingDealField(null); }}
+                  onCancel={() => setEditingDealField(null)}
+                />
+                <div className="flex items-baseline justify-between gap-3">
+                  <span className="text-xs text-muted-foreground shrink-0">Valor total</span>
+                  <div className="text-right">
+                    <span className="text-lg font-semibold text-foreground">{fmt$(deal.valueCents)}</span>
+                    <p className="text-[10px] text-muted-foreground/70 mt-0.5 flex items-center gap-1 justify-end">
+                      <ShoppingBag className="h-2.5 w-2.5" /> via Produtos e Serviços
+                    </p>
+                  </div>
+                </div>
+                <SidebarField label="Criada em" value={fmtDateTime(deal.createdAt)} />
+                <SidebarField
+                  label="Status"
+                  value={deal.status === "open" ? "Aberta" : deal.status === "won" ? "Ganha" : "Perdida"}
+                />
+              </div>
+            </SidebarSection>
+
+            <SidebarDivider />
+
+            {/* ── Contato ── */}
+            <SidebarSection
+              title="Contato"
+              open={sidebarSections.contact}
+              onToggle={() => toggleSection("contact")}
+            >
+              {contact ? (
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">{contact.name}</p>
+                  {contact.phone && <ContactInfoRow icon={Phone} value={contact.phone} copyable whatsapp />}
+                  {contact.email && <ContactInfoRow icon={Mail} value={contact.email} copyable />}
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground">Nenhum contato associado</p>
+              )}
+            </SidebarSection>
+
+            <SidebarDivider />
+
+            {/* ── Empresa ── */}
+            <SidebarSection
+              title="Empresa"
+              open={sidebarSections.company}
+              onToggle={() => toggleSection("company")}
+            >
+              {account ? (
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg bg-secondary flex items-center justify-center shrink-0">
+                    <Building2 className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                  <p className="text-sm font-medium flex-1">{account.name}</p>
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground">Não há empresa na negociação</p>
+              )}
+            </SidebarSection>
+
+            <SidebarDivider />
+
+            {/* ── Responsável ── */}
+            <SidebarSection
+              title="Responsável"
+              open={sidebarSections.responsible}
+              onToggle={() => toggleSection("responsible")}
+            >
+              {(() => {
+                const ownerUser = crmUsersQ.data?.find((u: any) => u.id === deal.ownerUserId);
+                return (
+                  <p className="text-sm">{ownerUser ? ownerUser.name : "Não atribuído"}</p>
+                );
+              })()}
+            </SidebarSection>
+          </div>
+        </SheetContent>
+      </Sheet>
 
       {/* ── Won Dialog ── */}
       <Dialog open={showWonDialog} onOpenChange={setShowWonDialog}>
@@ -1697,34 +1811,37 @@ function TaskRow({ task, onUpdate, onEdit }: { task: any; onUpdate: () => void; 
   const isDone = task.status === "done";
 
   return (
-    <div className={`flex items-center gap-3 p-3 rounded-xl border transition-colors ${
+    <div className={`flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 p-3 rounded-xl border transition-colors ${
       isOverdue ? "border-red-500/40 bg-red-500/5 dark:bg-red-500/10" : isDone ? "border-emerald-200 dark:border-emerald-800 bg-emerald-500/5" : "border-border bg-background hover:border-primary/30 hover:shadow-sm"
     }`}>
-      <Checkbox
-        checked={isDone}
-        onCheckedChange={(checked) => {
-          updateTask.mutate({ id: task.id, status: checked ? "done" : "pending" });
-        }}
-        className="shrink-0"
-      />
-      <div className="flex-1 min-w-0">
-        <p className={`text-sm font-medium truncate ${isDone ? "line-through text-muted-foreground" : ""}`}>
-          {task.title}
-        </p>
-        <div className="flex items-center gap-2 mt-0.5">
-          {task.dueAt && (
-            <span className={`text-[10px] flex items-center gap-0.5 ${isOverdue ? "text-red-500 font-medium" : "text-muted-foreground"}`}>
-              <Clock className="h-2.5 w-2.5" />
-              Prazo: {fmtDateTime(task.dueAt)}
+      <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+        <Checkbox
+          checked={isDone}
+          onCheckedChange={(checked) => {
+            updateTask.mutate({ id: task.id, status: checked ? "done" : "pending" });
+          }}
+          className="shrink-0"
+        />
+        <div className="flex-1 min-w-0">
+          <p className={`text-sm font-medium truncate ${isDone ? "line-through text-muted-foreground" : ""}`}>
+            {task.title}
+          </p>
+          <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+            {task.dueAt && (
+              <span className={`text-[10px] flex items-center gap-0.5 ${isOverdue ? "text-red-500 font-medium" : "text-muted-foreground"}`}>
+                <Clock className="h-2.5 w-2.5" />
+                Prazo: {fmtDateTime(task.dueAt)}
+              </span>
+            )}
+            <span className={`text-[10px] ${pri.color}`}>
+              <Flag className="h-2.5 w-2.5 inline mr-0.5" />{pri.label}
             </span>
-          )}
-          <span className={`text-[10px] ${pri.color}`}>
-            <Flag className="h-2.5 w-2.5 inline mr-0.5" />{pri.label}
-          </span>
+            {isOverdue && <Badge variant="destructive" className="text-[9px] px-1.5 py-0 h-4 rounded-md sm:hidden">ATRASADA</Badge>}
+          </div>
         </div>
       </div>
-      {isOverdue && <Badge variant="destructive" className="text-[9px] px-1.5 py-0 h-4 rounded-md shrink-0">ATRASADA</Badge>}
-      <div className="flex items-center gap-1 shrink-0">
+      <div className="flex items-center gap-1 shrink-0 self-end sm:self-center">
+        {isOverdue && <Badge variant="destructive" className="text-[9px] px-1.5 py-0 h-4 rounded-md shrink-0 hidden sm:inline-flex">ATRASADA</Badge>}
         <button
           onClick={() => onEdit?.(task)}
           className="p-1.5 hover:bg-muted/60 rounded-lg transition-colors"
@@ -1813,7 +1930,7 @@ function HistoryPanel({ history, notes, dealId, contactName, onNoteCreated }: {
   return (
     <div className="p-5">
       {/* Create note */}
-      <div className="flex items-start gap-3 mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-start gap-2 sm:gap-3 mb-6">
         <div className="flex-1">
           <Textarea
             value={newNote}
@@ -1826,7 +1943,7 @@ function HistoryPanel({ history, notes, dealId, contactName, onNoteCreated }: {
           size="sm"
           disabled={!newNote.trim() || createNote.isPending}
           onClick={() => createNote.mutate({ entityType: "deal", entityId: dealId, body: newNote })}
-          className="mt-0"
+          className="self-end sm:self-start sm:mt-0"
         >
           <MessageSquarePlus className="h-3.5 w-3.5 mr-1" />
           Criar anotação
@@ -2091,12 +2208,12 @@ function ProductsPanel({ products, dealId, onRefresh }: { products: any[]; dealI
 
   return (
     <div className="p-5 space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
         <div>
           <h3 className="text-sm font-semibold">Produtos e Serviços</h3>
           <p className="text-xs text-muted-foreground mt-0.5">{products.length} itens — Total: {fmt$(total)}</p>
         </div>
-        <Button size="sm" variant="outline" onClick={() => { setShowAdd(true); setSelectedProduct(null); setSearchTerm(""); }}>
+        <Button size="sm" variant="outline" className="self-start sm:self-auto" onClick={() => { setShowAdd(true); setSelectedProduct(null); setSearchTerm(""); }}>
           <Plus className="h-3.5 w-3.5 mr-1" /> Adicionar do Catálogo
         </Button>
       </div>
@@ -2113,41 +2230,46 @@ function ProductsPanel({ products, dealId, onRefresh }: { products: any[]; dealI
             const Icon = categoryIcons[p.category] || Package;
             const itemTotal = p.finalPriceCents || (p.quantity * p.unitPriceCents - (p.discountCents || 0));
             return (
-              <div key={p.id} className="flex items-center gap-3 p-3 bg-background border border-border rounded-lg hover:border-primary/30 hover:shadow-sm transition-all group">
-                <div className="w-9 h-9 rounded-lg bg-muted/50 flex items-center justify-center shrink-0">
-                  <Icon className="h-4 w-4 text-muted-foreground" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <p className="text-sm font-medium truncate">{p.name}</p>
-                    <Badge variant="outline" className="text-[10px] shrink-0">{categoryLabels[p.category] || p.category}</Badge>
-                    {p.productId > 0 && <Badge variant="secondary" className="text-[9px] shrink-0">Catálogo #{p.productId}</Badge>}
+              <div key={p.id} className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 p-3 bg-background border border-border rounded-lg hover:border-primary/30 hover:shadow-sm transition-all group">
+                <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
+                  <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-muted/50 flex items-center justify-center shrink-0">
+                    <Icon className="h-4 w-4 text-muted-foreground" />
                   </div>
-                  <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
-                    {p.supplier && <span>{p.supplier}</span>}
-                    <span>{p.quantity}x {fmt$(p.unitPriceCents)}</span>
-                    {(p.discountCents || 0) > 0 && <span className="text-emerald-600">-{fmt$(p.discountCents)}</span>}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                      <p className="text-sm font-medium truncate">{p.name}</p>
+                      <Badge variant="outline" className="text-[10px] shrink-0">{categoryLabels[p.category] || p.category}</Badge>
+                    </div>
+                    <div className="flex items-center gap-2 sm:gap-3 text-xs text-muted-foreground mt-0.5 flex-wrap">
+                      {p.supplier && <span>{p.supplier}</span>}
+                      <span>{p.quantity}x {fmt$(p.unitPriceCents)}</span>
+                      {(p.discountCents || 0) > 0 && <span className="text-emerald-600">-{fmt$(p.discountCents)}</span>}
+                    </div>
                   </div>
                 </div>
-                <p className="text-sm font-semibold shrink-0">{fmt$(itemTotal)}</p>
-                <button
-                  onClick={() => {
-                    setEditingItem(p);
-                    setEditForm({
-                      quantity: p.quantity, unitPriceCents: p.unitPriceCents,
-                      discountCents: p.discountCents || 0, supplier: p.supplier || "", notes: p.notes || "",
-                    });
-                  }}
-                  className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-primary/10 rounded"
-                >
-                  <Edit2 className="h-3.5 w-3.5 text-primary" />
-                </button>
-                <button
-                  onClick={() => deleteProduct.mutate({ id: p.id, dealId, productName: p.name })}
-                  className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-red-500/10 rounded"
-                >
-                  <Trash2 className="h-3.5 w-3.5 text-red-500" />
-                </button>
+                <div className="flex items-center justify-between sm:justify-end gap-2 pl-10 sm:pl-0">
+                  <p className="text-sm font-semibold shrink-0">{fmt$(itemTotal)}</p>
+                  <div className="flex items-center gap-1 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                    <button
+                      onClick={() => {
+                        setEditingItem(p);
+                        setEditForm({
+                          quantity: p.quantity, unitPriceCents: p.unitPriceCents,
+                          discountCents: p.discountCents || 0, supplier: p.supplier || "", notes: p.notes || "",
+                        });
+                      }}
+                      className="p-1.5 hover:bg-primary/10 rounded"
+                    >
+                      <Edit2 className="h-3.5 w-3.5 text-primary" />
+                    </button>
+                    <button
+                      onClick={() => deleteProduct.mutate({ id: p.id, dealId, productName: p.name })}
+                      className="p-1.5 hover:bg-red-500/10 rounded"
+                    >
+                      <Trash2 className="h-3.5 w-3.5 text-red-500" />
+                    </button>
+                  </div>
+                </div>
               </div>
             );
           })}
@@ -2604,13 +2726,13 @@ function AiAnalysisPanel({ dealId, contactName }: { dealId: number; contactName:
             <div className="flex items-center gap-2 mb-6">
               <Award className="h-4 w-4 text-primary" />
               <h4 className="text-sm font-semibold">Pontuação Geral</h4>
-              <span className="text-[10px] text-muted-foreground ml-auto">
+              <span className="text-[10px] text-muted-foreground ml-auto hidden sm:inline">
                 {analysis.messagesAnalyzed} mensagens analisadas · {analysis.createdAt ? formatFullDateTime(analysis.createdAt) : ""}
               </span>
             </div>
-            <div className="flex items-center justify-center gap-8 flex-wrap">
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-8 flex-wrap">
               <ScoreCircle score={analysis.overallScore || 0} label="Geral" size="lg" />
-              <div className="flex gap-6 flex-wrap justify-center">
+              <div className="flex gap-4 sm:gap-6 flex-wrap justify-center">
                 <ScoreCircle score={analysis.toneScore || 0} label="Tom e Empatia" />
                 <ScoreCircle score={analysis.responsivenessScore || 0} label="Responsividade" />
                 <ScoreCircle score={analysis.clarityScore || 0} label="Clareza" />
@@ -2833,10 +2955,10 @@ function WhatsAppPanel({ contact, dealId }: { contact: any; dealId: number }) {
   return (
     <div className="flex flex-col h-full min-h-0">
       {/* Tab toggle: History vs Live */}
-      <div className="shrink-0 flex items-center gap-2 px-4 py-2 border-b border-border bg-card/50 sticky top-0 z-10">
+      <div className="shrink-0 flex items-center gap-2 px-3 sm:px-4 py-2 border-b border-border bg-card/50 sticky top-0 z-10">
         <button
           onClick={() => setViewMode("history")}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+          className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
             viewMode === "history" ? "bg-green-600 text-white" : "text-muted-foreground hover:text-foreground hover:bg-muted"
           }`}
         >
@@ -2853,7 +2975,7 @@ function WhatsAppPanel({ contact, dealId }: { contact: any; dealId: number }) {
           Chat ao Vivo
         </button>
         <div className="flex-1" />
-        <span className="text-[10px] text-muted-foreground">Contato: {contact.name} · {contact.phone}</span>
+        <span className="text-[10px] text-muted-foreground hidden sm:inline">Contato: {contact.name} · {contact.phone}</span>
       </div>
 
       {viewMode === "history" ? (
