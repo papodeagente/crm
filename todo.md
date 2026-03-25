@@ -5046,3 +5046,15 @@
 - [x] Implementar correção mínima e segura
 - [x] Testes automatizados
 - [x] Relatório técnico completo
+## Migração Evolution API → Z-API (Adapter Pattern)
+- [x] Fase 1: Análise completa do código atual - mapear funções, tipos e dependências
+- [x] Fase 2: Criar interface WhatsAppProvider (contrato único) e tipos canônicos
+- [x] Fase 3: Criar EvolutionProvider adaptado ao contrato (wrapper)
+- [x] Fase 4: Pesquisar Z-API endpoints, payloads, webhooks, autenticação, QR, mídia
+- [x] Fase 5: Criar ZApiProvider com tradução completa de payloads/responses
+- [x] Fase 6: Criar Provider Factory com resolução por sessão/canal/tenant + schema DB
+- [x] Fase 7: Criar normalizador de webhooks Z-API para formato canônico
+- [x] Fase 8: Migrar consumers para usar provider interface (whatsappEvolution, reconciliation, routers)
+- [x] Fase 9: Adicionar observabilidade (métricas por provider, logs, instrumentação)
+- [x] Fase 10: Testes (contract, webhook normalization, message flow, multi-tenant, rollback)
+- [x] Fase 11: Checkpoint e relatório técnico

@@ -26,6 +26,14 @@ export const whatsappSessions = mysqlTable("whatsapp_sessions", {
   phoneNumber: varchar("phoneNumber", { length: 32 }),
   pushName: varchar("pushName", { length: 128 }),
   platform: varchar("platform", { length: 64 }),
+  /** WhatsApp API provider: 'evolution' (default) or 'zapi' */
+  provider: mysqlEnum("provider", ["evolution", "zapi"]).default("evolution").notNull(),
+  /** Z-API instance ID (only for zapi provider) */
+  providerInstanceId: varchar("providerInstanceId", { length: 128 }),
+  /** Z-API token (only for zapi provider) */
+  providerToken: varchar("providerToken", { length: 256 }),
+  /** Z-API client/security token (only for zapi provider) */
+  providerClientToken: varchar("providerClientToken", { length: 256 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 }, (t) => [

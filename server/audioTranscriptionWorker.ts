@@ -27,6 +27,7 @@ import { eq, and } from "drizzle-orm";
 import { waMessages } from "../drizzle/schema";
 import { getActiveAiIntegration, getTenantAiSettings } from "./db";
 import * as evo from "./evolutionApi";
+import { resolveProviderForSession } from "./providers/providerFactory";
 
 // ── Types ──────────────────────────────────────────────────────
 
@@ -210,12 +211,23 @@ async function processTranscriptionJob(data: AudioTranscriptionJob): Promise<voi
   let base64Data: string;
   let mimeType: string;
   try {
-    const mediaResult = await evo.getBase64FromMediaMessage(instanceName, externalMessageId, {
-      remoteJid,
-      fromMe,
-    });
+    // Use provider factory to resolve correct provider for this session
+    let mediaResult: { base64: string; mimetype: string; fileName?: string } | null = null;
+    try {
+      const provider = await resolveProviderForSession(sessionId);
+      mediaResult = await provider.getBase64FromMediaMessage(instanceName, externalMessageId, {
+        remoteJid,
+        fromMe,
+      });
+    } catch {
+      // Fallback to direct Evolution API
+      mediaResult = await evo.getBase64FromMediaMessage(instanceName, externalMessageId, {
+        remoteJid,
+        fromMe,
+      });
+    }
     if (!mediaResult || !mediaResult.base64) {
-      throw new Error("Failed to download media from Evolution API");
+      throw new Error("Failed to download media from provider");
     }
     base64Data = mediaResult.base64;
     mimeType = mediaResult.mimetype || mediaMimeType || "audio/ogg";

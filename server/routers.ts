@@ -902,6 +902,7 @@ export const appRouter = router({
       .input(z.object({ sessionId: z.string(), messageId: z.string() }))
       .mutation(async ({ input, ctx }) => {
         const { getBase64FromMediaMessage } = await import("./evolutionApi");
+        const { resolveProviderForSession } = await import("./providers/providerFactory");
         const db = await getDb();
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
         const { waMessages } = await import("../drizzle/schema");
@@ -917,13 +918,23 @@ export const appRouter = router({
         if (msg.mediaUrl === null && msg.mediaMimeType === "__unavailable__") {
           return { url: null, mimetype: null, unavailable: true };
         }
-        // Download from Evolution API - resolve the instanceName from the session
+        // Download from provider - resolve the correct provider for this session
         const session = whatsappManager.getSession(input.sessionId);
         const instanceName = session?.instanceName || input.sessionId;
-        const base64Data = await getBase64FromMediaMessage(instanceName, input.messageId, {
-          remoteJid: msg.remoteJid,
-          fromMe: msg.fromMe,
-        });
+        let base64Data: { base64: string; mimetype: string; fileName?: string } | null = null;
+        try {
+          const provider = await resolveProviderForSession(input.sessionId);
+          base64Data = await provider.getBase64FromMediaMessage(instanceName, input.messageId, {
+            remoteJid: msg.remoteJid,
+            fromMe: msg.fromMe,
+          });
+        } catch {
+          // Fallback to direct Evolution API
+          base64Data = await getBase64FromMediaMessage(instanceName, input.messageId, {
+            remoteJid: msg.remoteJid,
+            fromMe: msg.fromMe,
+          });
+        }
         if (!base64Data?.base64) {
           // Mark as unavailable in DB so we don't keep retrying
           await db.update(waMessages)
@@ -1694,11 +1705,63 @@ export const appRouter = router({
         const sessions = whatsappManager.getAllSessions();
         for (const sess of sessions) {
           if (sess.status === "connected") {
-            const ok = await (await import("./evolutionApi")).ensureWebhook(sess.instanceName);
+            // Use provider factory to resolve correct provider for webhook fix
+            let ok = false;
+            try {
+              const { resolveProviderForSession: resolveProvider } = await import("./providers/providerFactory");
+              const provider = await resolveProvider(sess.sessionId);
+              ok = await provider.ensureWebhook(sess.instanceName);
+            } catch {
+              ok = await (await import("./evolutionApi")).ensureWebhook(sess.instanceName);
+            }
             results.push({ instance: sess.instanceName, ok });
           }
         }
         return { fixed: results.filter(r => r.ok).length, total: results.length, results };
+      }),
+    // Provider metrics — observability per provider (Evolution vs Z-API)
+    providerMetrics: tenantProcedure
+      .query(async () => {
+        const { getAllProviderMetrics, getSessionsByProvider } = await import("./providers/providerFactory");
+        const metrics = getAllProviderMetrics();
+        const evoSessions = await getSessionsByProvider("evolution");
+        const zapiSessions = await getSessionsByProvider("zapi");
+        return {
+          metrics,
+          sessionCounts: {
+            evolution: evoSessions.length,
+            zapi: zapiSessions.length,
+          },
+          sessions: {
+            evolution: evoSessions,
+            zapi: zapiSessions,
+          },
+        };
+      }),
+    // Migrate a session to a different provider
+    migrateProvider: tenantWriteProcedure
+      .input(z.object({
+        sessionId: z.string(),
+        toProvider: z.enum(["evolution", "zapi"]),
+        zapiInstanceId: z.string().optional(),
+        zapiToken: z.string().optional(),
+        zapiClientToken: z.string().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const { migrateSessionProvider } = await import("./providers/providerFactory");
+        const zapiConfig = input.toProvider === "zapi" && input.zapiInstanceId && input.zapiToken
+          ? { instanceId: input.zapiInstanceId, token: input.zapiToken, clientToken: input.zapiClientToken }
+          : undefined;
+        await migrateSessionProvider(input.sessionId, input.toProvider, zapiConfig);
+        return { success: true, sessionId: input.sessionId, provider: input.toProvider };
+      }),
+    // Rollback a session to Evolution (emergency)
+    rollbackProvider: tenantWriteProcedure
+      .input(z.object({ sessionId: z.string() }))
+      .mutation(async ({ input }) => {
+        const { rollbackSessionToEvolution } = await import("./providers/providerFactory");
+        await rollbackSessionToEvolution(input.sessionId);
+        return { success: true, sessionId: input.sessionId, provider: "evolution" };
       }),
   }),
 

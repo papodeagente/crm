@@ -18,6 +18,7 @@ import { getDb } from "./db";
 import { waConversations, waMessages } from "../drizzle/schema";
 import { eq, and, sql, gt, desc } from "drizzle-orm";
 import * as evo from "./evolutionApi";
+import { resolveProviderForSession } from "./providers/providerFactory";
 import { resolveInbound, updateConversationLastMessage } from "./conversationResolver";
 import os from "os";
 
@@ -191,11 +192,22 @@ async function reconcileConversation(
     if (r.messageId) existingMsgIds.add(r.messageId);
   }
 
-  // Part 10/12: Fetch last MAX_MESSAGES_PER_CONVERSATION messages from Evolution API
-  const messages = await evo.findMessages(session.instanceName, conv.remoteJid, {
-    limit: MAX_MESSAGES_PER_CONVERSATION,
-    page: 1,
-  });
+  // Part 10/12: Fetch last MAX_MESSAGES_PER_CONVERSATION messages from provider
+  // Use provider factory to resolve the correct provider for this session
+  let messages: any[];
+  try {
+    const provider = await resolveProviderForSession(session.sessionId);
+    messages = await provider.findMessages(session.instanceName, conv.remoteJid, {
+      limit: MAX_MESSAGES_PER_CONVERSATION,
+      page: 1,
+    });
+  } catch {
+    // Fallback to direct Evolution API if provider resolution fails
+    messages = await evo.findMessages(session.instanceName, conv.remoteJid, {
+      limit: MAX_MESSAGES_PER_CONVERSATION,
+      page: 1,
+    });
+  }
 
   if (!messages || messages.length === 0) return { skipped: 0, inserted: 0 };
 

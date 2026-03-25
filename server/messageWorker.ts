@@ -24,6 +24,7 @@ import { resolveInbound, updateConversationLastMessage } from "./conversationRes
 import { storagePut } from "./storage";
 import { createNotification } from "./db";
 import * as evo from "./evolutionApi";
+import { resolveProviderForSession } from "./providers/providerFactory";
 import { nanoid } from "nanoid";
 import type { MessageEventPayload } from "./messageQueue";
 import { startMessageWorker, isQueueEnabled, isRedisReady } from "./messageQueue";
@@ -1157,10 +1158,21 @@ async function downloadAndStoreMedia(
   mediaInfo: { mediaUrl?: string | null; mediaMimeType?: string | null; mediaFileName?: string | null }
 ): Promise<void> {
   try {
-    const base64Data = await evo.getBase64FromMediaMessage(session.instanceName, messageId, {
-      remoteJid,
-      fromMe,
-    });
+    // Use provider factory to resolve correct provider for this session
+    let base64Data: { base64: string; mimetype: string; fileName?: string } | null = null;
+    try {
+      const provider = await resolveProviderForSession(session.sessionId);
+      base64Data = await provider.getBase64FromMediaMessage(session.instanceName, messageId, {
+        remoteJid,
+        fromMe,
+      });
+    } catch {
+      // Fallback to direct Evolution API
+      base64Data = await evo.getBase64FromMediaMessage(session.instanceName, messageId, {
+        remoteJid,
+        fromMe,
+      });
+    }
     if (base64Data?.base64) {
       const ext = mimeToExt(base64Data.mimetype || mediaInfo.mediaMimeType || "application/octet-stream");
       const fileKey = `whatsapp-media/${session.sessionId}/${nanoid()}.${ext}`;

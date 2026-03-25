@@ -60,6 +60,18 @@ class WhatsAppEvolutionManager extends EventEmitter {
     return this.sessions.get(sessionId);
   }
 
+  /** Get the instance name for a given sessionId (used by Z-API webhook normalizer) */
+  getInstanceNameForSession(sessionId: string): string | undefined {
+    const session = this.sessions.get(sessionId);
+    if (session) return session.instanceName;
+    // Fallback: check instanceToSession reverse map
+    for (const [instName, sessId] of Array.from(this.instanceToSession)) {
+      if (sessId === sessionId) return instName;
+    }
+    // Last fallback: sessionId === instanceName in most cases
+    return sessionId;
+  }
+
   /**
    * Get session with live check against Evolution API.
    * If session is in memory, returns it. Otherwise, queries Evolution API

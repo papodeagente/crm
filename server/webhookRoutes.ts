@@ -1263,6 +1263,145 @@ router.post("/api/webhooks/evolution", handleEvolutionWebhook);
 //   /api/webhooks/evolution/send-message
 router.post("/api/webhooks/evolution/:eventType", handleEvolutionWebhook);
 
+// ─── Z-API Webhook ──────────────────────────────────────
+// Receives events from Z-API and normalizes them to Evolution format
+// so the existing whatsappManager.handleWebhookEvent() works unchanged.
+//
+// Routes:
+//   POST /api/webhooks/zapi/:sessionId                       → generic (event detected from body)
+//   POST /api/webhooks/zapi/:sessionId/:eventType             → event-specific
+//   POST /api/webhooks/zapi/:sessionId/on-message-received    → incoming message
+//   POST /api/webhooks/zapi/:sessionId/on-message-send        → outgoing message
+//   POST /api/webhooks/zapi/:sessionId/on-whatsapp-message-status-changes → status ticks
+//   POST /api/webhooks/zapi/:sessionId/on-whatsapp-message-revoked → message deleted
+//   POST /api/webhooks/zapi/:sessionId/on-connection          → connection status
+//   POST /api/webhooks/zapi/:sessionId/on-disconnect          → disconnection
+
+import {
+  normalizeZApiWebhook,
+  detectZApiEventFromPath,
+  validateZApiClientToken,
+  type ZApiWebhookEvent,
+} from "./providers/zapiWebhookNormalizer";
+import { getZApiSession } from "./providers/zapiProvider";
+import { resolveProviderTypeForSession } from "./providers/providerFactory";
+
+async function handleZApiWebhook(req: Request, res: Response) {
+  const startTime = Date.now();
+  try {
+    const { sessionId, eventType } = req.params;
+    const body = req.body;
+
+    if (!sessionId) {
+      return res.status(400).json({ error: "Missing sessionId in path" });
+    }
+
+    console.log(`[Webhook /zapi] Received | Session: ${sessionId} | Path: ${req.path} | Event: ${eventType || 'auto-detect'}`);
+
+    // Verify this session is actually using Z-API provider
+    const providerType = await resolveProviderTypeForSession(sessionId);
+    if (providerType !== "zapi") {
+      console.warn(`[Webhook /zapi] Session ${sessionId} is not using Z-API provider (using: ${providerType})`);
+      return res.status(200).json({ received: true, ignored: true, reason: "session not using zapi" });
+    }
+
+    // Validate client token if configured
+    const zapiSession = getZApiSession(sessionId);
+    if (zapiSession?.clientToken) {
+      const receivedToken = req.headers["client-token"] as string || req.query.token as string;
+      if (!validateZApiClientToken(receivedToken, zapiSession.clientToken)) {
+        console.warn(`[Webhook /zapi] Invalid client-token for session ${sessionId}`);
+        return res.status(403).json({ error: "Invalid client-token" });
+      }
+    }
+
+    // Detect event type from path or body
+    const zapiEvent: ZApiWebhookEvent = eventType
+      ? detectZApiEventFromPath(eventType)
+      : detectZApiEventFromBody(body);
+
+    if (zapiEvent === "unknown") {
+      console.warn(`[Webhook /zapi] Unknown event type from path: ${eventType}`);
+      return res.status(200).json({ received: true, ignored: true });
+    }
+
+    // Get the Evolution-compatible instance name for this session
+    // The whatsappManager uses instanceName to find sessions
+    const { whatsappManager } = await import("./whatsappEvolution");
+    const instanceName = whatsappManager.getInstanceNameForSession(sessionId);
+    if (!instanceName) {
+      console.warn(`[Webhook /zapi] No instance name found for session: ${sessionId}`);
+      return res.status(200).json({ received: true, ignored: true, reason: "no instance" });
+    }
+
+    // Normalize Z-API payload → Evolution format
+    const normalized = normalizeZApiWebhook(zapiEvent, body, instanceName);
+    if (!normalized) {
+      console.log(`[Webhook /zapi] Event filtered out (group/broadcast/unknown): ${zapiEvent}`);
+      return res.status(200).json({ received: true, filtered: true });
+    }
+
+    console.log(`[Webhook /zapi] Normalized: ${zapiEvent} → ${normalized.event} | Instance: ${instanceName} | JID: ${normalized.data?.key?.remoteJid || 'N/A'}`);
+
+    // Route to the same handler as Evolution webhooks
+    // Events that should be enqueued for async processing via BullMQ
+    const queueableEvents = [
+      'messages.upsert', 'send.message',
+      'messages.update', 'messages.delete',
+    ];
+
+    if (queueableEvents.includes(normalized.event)) {
+      const { enqueueMessageEvent, isQueueEnabled } = await import("./messageQueue");
+
+      if (isQueueEnabled()) {
+        const enqueued = await enqueueMessageEvent({
+          tenantId: 0, // Resolved by worker from session
+          sessionId: '', // Resolved by worker from instanceName
+          instanceName: normalized.instance,
+          event: normalized.event,
+          data: normalized.data,
+          receivedAt: Date.now(),
+        });
+
+        if (enqueued) {
+          console.log(`[Webhook /zapi] Enqueued ${normalized.event} in ${Date.now() - startTime}ms`);
+          return res.status(200).json({ received: true, queued: true });
+        }
+      }
+
+      // Fallback: process async in-process
+      whatsappManager.handleWebhookEvent(normalized).catch((e: any) =>
+        console.error(`[Webhook /zapi] Async processing error for ${normalized.event}:`, e.message)
+      );
+      console.log(`[Webhook /zapi] Responded in ${Date.now() - startTime}ms (sync fallback)`);
+      return res.status(200).json({ received: true });
+    }
+
+    // For other events (connection, etc.), process async
+    whatsappManager.handleWebhookEvent(normalized).catch((e: any) =>
+      console.error(`[Webhook /zapi] Async processing error for ${normalized.event}:`, e.message)
+    );
+    console.log(`[Webhook /zapi] Responded in ${Date.now() - startTime}ms (async)`);
+    return res.status(200).json({ received: true });
+  } catch (error: any) {
+    console.error(`[Webhook /zapi] Error after ${Date.now() - startTime}ms:`, error.message);
+    return res.status(200).json({ received: true, error: error.message });
+  }
+}
+
+/** Detect Z-API event type from body content when not in URL path */
+function detectZApiEventFromBody(body: any): ZApiWebhookEvent {
+  if (body?.connected !== undefined) return body.connected ? "on-connection" : "on-disconnect";
+  if (body?.status && body?.ids) return "on-whatsapp-message-status-changes";
+  if (body?.fromMe === true) return "on-message-send";
+  if (body?.phone || body?.chatId) return "on-message-received";
+  return "unknown";
+}
+
+// Z-API webhook routes
+router.post("/api/webhooks/zapi/:sessionId", handleZApiWebhook);
+router.post("/api/webhooks/zapi/:sessionId/:eventType", handleZApiWebhook);
+
 export { router as webhookRouter };
 
 // Export for testing
