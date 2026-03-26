@@ -5335,3 +5335,8 @@
 ## Bug: Fuso Horário nas Tarefas Agendadas (Mar 26)
 - [x] Corrigir offset de -3h no horário das tarefas agendadas (exibe UTC em vez de Brasília)
 - [x] Garantir que o sistema salve e exiba horários corretamente no fuso de Brasília (UTC-3)
+
+## Bug: Botões de Tarefa na Página Deal (Mar 26)
+- [x] Corrigir botão lápis (editar tarefa) que não funciona ao clicar na página deal
+- [x] Menu do relógio: remover opções "Finalizar" e "Editar", manter apenas opção de adiar
+- [x] Manter botão finalizar tarefa como está

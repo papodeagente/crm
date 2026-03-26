@@ -2065,6 +2065,25 @@ function HistoryPanel({ history, notes, dealId, contactName, onNoteCreated }: {
 
 function TasksPanel({ tasks, dealId, onRefresh, dealTitle }: { tasks: any[]; dealId: number; onRefresh: () => void; dealTitle?: string }) {
   const [editTask, setEditTask] = useState<any>(null);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+
+  const handleEditTask = (task: any) => {
+    setEditTask(task);
+    setEditDialogOpen(true);
+  };
+
+  const handleCloseEdit = (open: boolean) => {
+    if (!open) {
+      setEditDialogOpen(false);
+      // Delay clearing editTask to avoid flash
+      setTimeout(() => setEditTask(null), 200);
+    }
+  };
+
+  const editAssigneeIds = useMemo(
+    () => editTask?.assignedToUserId ? [editTask.assignedToUserId] : [],
+    [editTask?.assignedToUserId]
+  );
 
   const pending = tasks.filter((t: any) => t.status === "pending" || t.status === "in_progress");
   const done = tasks.filter((t: any) => t.status === "done" || t.status === "cancelled");
@@ -2087,7 +2106,7 @@ function TasksPanel({ tasks, dealId, onRefresh, dealTitle }: { tasks: any[]; dea
             <div className="space-y-2">
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Pendentes ({pending.length})</p>
               {pending.map((task: any) => (
-                <TaskRow key={task.id} task={task} onUpdate={onRefresh} onEdit={(t) => setEditTask(t)} />
+                <TaskRow key={task.id} task={task} onUpdate={onRefresh} onEdit={handleEditTask} />
               ))}
             </div>
           )}
@@ -2095,23 +2114,22 @@ function TasksPanel({ tasks, dealId, onRefresh, dealTitle }: { tasks: any[]; dea
             <div className="space-y-2">
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Concluídas ({done.length})</p>
               {done.map((task: any) => (
-                <TaskRow key={task.id} task={task} onUpdate={onRefresh} onEdit={(t) => setEditTask(t)} />
+                <TaskRow key={task.id} task={task} onUpdate={onRefresh} onEdit={handleEditTask} />
               ))}
             </div>
           )}
         </>
       )}
 
-      {editTask && (
-        <TaskFormDialog
-          open={true}
-          onOpenChange={() => setEditTask(null)}
-          dealId={dealId}
-          dealTitle={dealTitle}
-          editTask={editTask}
-          editAssigneeIds={editTask.assignedToUserId ? [editTask.assignedToUserId] : []}
-        />
-      )}
+      <TaskFormDialog
+        open={editDialogOpen}
+        onOpenChange={handleCloseEdit}
+        dealId={dealId}
+        dealTitle={dealTitle}
+        editTask={editTask}
+        editAssigneeIds={editAssigneeIds}
+        onSuccess={onRefresh}
+      />
     </div>
   );
 }
