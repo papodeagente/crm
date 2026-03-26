@@ -5359,3 +5359,10 @@
 ## Bug: Botão Lápis (Editar Tarefa) não funciona na página de negociação (Mar 26)
 - [x] Investigar e corrigir botão lápis que não abre o dialog de edição de tarefa
 - [x] Testar a correção com teste automatizado (TypeScript 0 erros, testes existentes passando)
+
+## Melhorias em Tarefas: Responsável Padrão e Vinculação de Negociação (Mar 26)
+- [x] Responsável padrão: ao criar tarefa, o usuário logado é automaticamente atribuído como responsável
+- [x] Validação obrigatória: impedir salvar tarefa sem pelo menos um responsável (mensagem de erro clara)
+- [x] Página de Tarefas: adicionar campo para vincular negociação ao criar tarefa
+- [x] Ao vincular negociação, a tarefa aparece dentro da negociação vinculada
+- [x] Tarefa sempre atribuída a quem criou como padrão

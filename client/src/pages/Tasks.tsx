@@ -274,6 +274,7 @@ export default function Tasks() {
             <TaskFormDialog
               open={true}
               onOpenChange={() => setCreateOpen(false)}
+              showDealSelector
             />
           )}
           {editTask && (
@@ -284,6 +285,7 @@ export default function Tasks() {
               dealTitle={editTask.deal?.title}
               editTask={editTask}
               editAssigneeIds={editTask.assignees?.map((a: any) => a.userId || a.id) || []}
+              showDealSelector
             />
           )}
         </div>

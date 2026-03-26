@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { trpc } from "@/lib/trpc";
+import { useAuth } from "@/_core/hooks/useAuth";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -79,6 +80,7 @@ export default function TaskFormDialog({
   showDealSelector = false,
 }: TaskFormDialogProps) {
   const utils = trpc.useUtils();
+  const { user: currentUser } = useAuth();
   const isEditMode = !!editTask;
 
   // Form state
@@ -195,13 +197,15 @@ export default function TaskFormDialog({
       setDueTime(
         String(now.getHours()).padStart(2, "0") + ":" + String(now.getMinutes()).padStart(2, "0")
       );
-      setAssigneeUserIds([]);
+      // Default assignee: current logged-in user
+      const currentUserId = (currentUser as any)?.userId || (currentUser as any)?.id;
+      setAssigneeUserIds(currentUserId ? [currentUserId] : []);
       setMarkAsDone(false);
       setSelectedDealId(dealId || null);
       setSelectedAccountId("none");
       setWaMessageBody("");
     }
-  }, [open, editTask, dealId, editAssigneeIds]);
+  }, [open, editTask, dealId, editAssigneeIds, currentUser]);
 
   // Filter deals by selected account
   const dealItemsList = (deals.data as any)?.items || (Array.isArray(deals.data) ? deals.data : []);
@@ -217,7 +221,14 @@ export default function TaskFormDialog({
     : (dealTitle || "");
 
   const handleRemoveAssignee = (userId: number) => {
-    setAssigneeUserIds(prev => prev.filter(id => id !== userId));
+    setAssigneeUserIds(prev => {
+      const next = prev.filter(id => id !== userId);
+      if (next.length === 0) {
+        toast.error("A tarefa precisa ter pelo menos um responsável.");
+        return prev;
+      }
+      return next;
+    });
   };
 
   const handleSubmit = async () => {
@@ -275,7 +286,7 @@ export default function TaskFormDialog({
       return;
     }
     if (assigneeUserIds.length === 0) {
-      toast.error("Selecione ao menos um responsável");
+      toast.error("É obrigatório ter pelo menos um responsável. Adicione um responsável para salvar a tarefa.");
       return;
     }
 
