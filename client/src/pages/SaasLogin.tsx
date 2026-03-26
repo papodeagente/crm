@@ -43,6 +43,11 @@ export default function SaasLogin() {
         navigate("/upgrade");
         return;
       }
+      // Friendly message for rate limit errors
+      if (error.message?.includes("Rate exceeded") || error.message?.includes("RATE_LIMITED")) {
+        toast.error("Servidor ocupado. Aguarde alguns segundos e tente novamente.");
+        return;
+      }
       toast.error(error.message || "Erro no login");
     },
   });

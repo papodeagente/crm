@@ -5366,3 +5366,7 @@
 - [x] Página de Tarefas: adicionar campo para vincular negociação ao criar tarefa
 - [x] Ao vincular negociação, a tarefa aparece dentro da negociação vinculada
 - [x] Tarefa sempre atribuída a quem criou como padrão
+
+## Bug: Rate exceeded ao logar no sistema (Mar 26)
+- [x] Investigar e corrigir erro de Rate exceeded no login
+- [x] Garantir que a correção não comprometa funcionalidades existentes

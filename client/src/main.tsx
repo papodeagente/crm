@@ -11,16 +11,19 @@ import "./index.css";
 // ═══════════════════════════════════════
 // CIRCUIT BREAKER — Global rate limit protection
 // When a 429 is received, non-critical requests pause for a cooldown period.
-// Auth-related requests (auth.me, auth.logout) are NEVER blocked.
+// Auth-related requests (auth.me, auth.logout, saasAuth.login, saasAuth.register) are NEVER blocked.
+// After cooldown, requests resume with jitter to prevent thundering herd.
 // ═══════════════════════════════════════
 let rateLimitedUntil = 0;
 let consecutiveRateLimits = 0;
 
 function getRateLimitCooldown(): number {
-  // Less aggressive cooldown: 5s → 10s → 20s → 30s (max)
-  const base = 5_000;
-  const multiplier = Math.min(consecutiveRateLimits, 3);
-  return base * (multiplier + 1);
+  // Gentle cooldown: 3s → 5s → 8s → 12s (max)
+  // Add random jitter (0-2s) to prevent all clients resuming at once
+  const steps = [3_000, 5_000, 8_000, 12_000];
+  const base = steps[Math.min(consecutiveRateLimits, steps.length - 1)];
+  const jitter = Math.random() * 2_000;
+  return base + jitter;
 }
 
 function activateCircuitBreaker() {
@@ -28,7 +31,7 @@ function activateCircuitBreaker() {
   const cooldown = getRateLimitCooldown();
   rateLimitedUntil = Date.now() + cooldown;
   console.warn(
-    `[CircuitBreaker] Rate limited. Pausing non-critical requests for ${cooldown / 1000}s ` +
+    `[CircuitBreaker] Rate limited. Pausing non-critical requests for ${Math.ceil(cooldown / 1000)}s ` +
     `(consecutive: ${consecutiveRateLimits})`
   );
 }
@@ -49,8 +52,8 @@ function isCircuitBreakerOpen(): boolean {
 function isAuthRequest(input: RequestInfo | URL): boolean {
   const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
   // tRPC batch requests encode procedure names in the URL
-  // Allow auth.me, auth.logout, saasAuth, plan.summary through always
-  return /auth\.me|auth\.logout|saasAuth|plan\.summary|oauth/i.test(url);
+  // Allow auth.me, auth.logout, saasAuth (login/register/me), plan.summary, billing through always
+  return /auth\.me|auth\.logout|saasAuth|plan\.summary|billing\.myBilling|oauth/i.test(url);
 }
 
 // ═══════════════════════════════════════
@@ -84,8 +87,16 @@ const queryClient = new QueryClient({
       refetchOnReconnect: false,
     },
     mutations: {
-      // Never retry mutations automatically
-      retry: false,
+      // Retry mutations once on rate limit (login can hit rate limit)
+      retry: (failureCount, error) => {
+        if (error instanceof TRPCClientError) {
+          const msg = error.message || "";
+          // Retry rate limit errors once with delay for login/register
+          if (msg.includes("Rate exceeded") && failureCount < 1) return true;
+        }
+        return false;
+      },
+      retryDelay: () => 3000 + Math.random() * 2000, // 3-5s random delay
     },
   },
 });
@@ -135,6 +146,12 @@ const trpcClient = trpc.createClient({
           );
         }
 
+        // Add small random delay for non-auth requests right after cooldown expires
+        // This prevents thundering herd when all paused queries resume at once
+        if (!isAuth && consecutiveRateLimits > 0) {
+          await new Promise(r => setTimeout(r, Math.random() * 1500));
+        }
+
         const response = await globalThis.fetch(input, {
           ...(init ?? {}),
           credentials: "include",
@@ -145,7 +162,11 @@ const trpcClient = trpc.createClient({
         if (!response.ok && !contentType.includes("application/json")) {
           const text = await response.text();
           if (text.includes("Rate exceeded") || response.status === 429) {
-            activateCircuitBreaker();
+            // Only activate circuit breaker for non-auth requests
+            // Auth requests that hit rate limit should just retry naturally
+            if (!isAuth) {
+              activateCircuitBreaker();
+            }
             throw new Error("Rate exceeded");
           }
           throw new Error(text || `HTTP ${response.status}`);
