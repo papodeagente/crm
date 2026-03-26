@@ -5355,3 +5355,7 @@
 - [x] Preservar layout 50/50 nas demais abas
 - [x] Preservar todos os estados (loading, error, empty)
 - [x] Nenhum estilo global modificado
+
+## Bug: Botão Lápis (Editar Tarefa) não funciona na página de negociação (Mar 26)
+- [x] Investigar e corrigir botão lápis que não abre o dialog de edição de tarefa
+- [x] Testar a correção com teste automatizado (TypeScript 0 erros, testes existentes passando)

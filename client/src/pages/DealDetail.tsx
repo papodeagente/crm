@@ -252,6 +252,24 @@ export default function DealDetail() {
   const [selectedContactId, setSelectedContactId] = useState<number | null>(null);
   const [selectedAccountId, setSelectedAccountId] = useState<number | null>(null);
 
+  /* ─── Inline task edit (for "Próximas Tarefas" section) ─── */
+  const [inlineEditTask, setInlineEditTask] = useState<any>(null);
+  const [inlineEditDialogOpen, setInlineEditDialogOpen] = useState(false);
+  const handleInlineEditTask = (task: any) => {
+    setInlineEditTask(task);
+    setInlineEditDialogOpen(true);
+  };
+  const handleInlineEditClose = (open: boolean) => {
+    if (!open) {
+      setInlineEditDialogOpen(false);
+      setTimeout(() => setInlineEditTask(null), 200);
+    }
+  };
+  const inlineEditAssigneeIds = useMemo(
+    () => inlineEditTask?.assignedToUserId ? [inlineEditTask.assignedToUserId] : [],
+    [inlineEditTask?.assignedToUserId]
+  );
+
   /* ─── Status dialogs ─── */
   const [showWonDialog, setShowWonDialog] = useState(false);
   const [showCelebration, setShowCelebration] = useState(false);
@@ -1210,7 +1228,7 @@ export default function DealDetail() {
               </div>
             ) : (
               <div className="space-y-2">
-                <TaskRow key={pendingTasks[0].id} task={pendingTasks[0]} onUpdate={() => tasksQ.refetch()} />
+                <TaskRow key={pendingTasks[0].id} task={pendingTasks[0]} onUpdate={() => tasksQ.refetch()} onEdit={handleInlineEditTask} />
                 {pendingTasks.length > 1 && (
                   <button
                     onClick={() => handleSetActiveTab("tasks")}
@@ -1223,6 +1241,17 @@ export default function DealDetail() {
             )}
           </div>
           )}
+
+          {/* TaskFormDialog for inline edit from "Próximas Tarefas" */}
+          <TaskFormDialog
+            open={inlineEditDialogOpen}
+            onOpenChange={handleInlineEditClose}
+            dealId={dealId}
+            dealTitle={deal?.title}
+            editTask={inlineEditTask}
+            editAssigneeIds={inlineEditAssigneeIds}
+            onSuccess={() => tasksQ.refetch()}
+          />
 
           {/* ── Tab bar ── */}
           <div className="shrink-0 flex items-center gap-0 px-2 sm:px-4 border-b border-border bg-card overflow-x-auto scrollbar-none">
