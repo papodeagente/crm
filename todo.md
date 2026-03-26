@@ -5331,3 +5331,7 @@
 - [x] Frontend: campo de mensagem, agendamento data/hora, seleção de canal
 - [x] Frontend: preview do envio, status da tarefa, cancelar/reprogramar
 - [x] Testes: 19 cenários passando (criar, agendar, processar, idempotência, falhas, inbox, multi-tenant, cancelamento, reprogramação)
+
+## Bug: Fuso Horário nas Tarefas Agendadas (Mar 26)
+- [x] Corrigir offset de -3h no horário das tarefas agendadas (exibe UTC em vez de Brasília)
+- [x] Garantir que o sistema salve e exiba horários corretamente no fuso de Brasília (UTC-3)

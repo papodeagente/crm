@@ -166,7 +166,11 @@ export default function TaskFormDialog({
       setTaskType(editTask.taskType || "task");
       if (editTask.dueAt) {
         const d = new Date(editTask.dueAt);
-        setDueDate(d.toISOString().split("T")[0]);
+        // Use local date parts (getFullYear/getMonth/getDate) to display in user's local timezone
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, "0");
+        const day = String(d.getDate()).padStart(2, "0");
+        setDueDate(`${year}-${month}-${day}`);
         setDueTime(
           String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0")
         );
@@ -183,7 +187,11 @@ export default function TaskFormDialog({
       setDescription("");
       setTaskType("task");
       const now = new Date();
-      setDueDate(now.toISOString().split("T")[0]);
+      // Use local date parts for default values
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, "0");
+      const day = String(now.getDate()).padStart(2, "0");
+      setDueDate(`${year}-${month}-${day}`);
       setDueTime(
         String(now.getHours()).padStart(2, "0") + ":" + String(now.getMinutes()).padStart(2, "0")
       );
@@ -226,7 +234,10 @@ export default function TaskFormDialog({
       return;
     }
 
-    const dueAt = `${dueDate}T${dueTime}:00`;
+    // Build a proper Date from local date+time inputs, then convert to ISO (UTC)
+    // This ensures the backend receives the correct UTC timestamp regardless of server timezone
+    const localDate = new Date(`${dueDate}T${dueTime}:00`);
+    const dueAt = localDate.toISOString();
 
     // ── Scheduled WhatsApp Send ──
     if (isScheduledWhatsApp && !isEditMode) {
