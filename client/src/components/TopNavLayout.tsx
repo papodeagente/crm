@@ -17,6 +17,7 @@ import {
 import { formatDateShort } from "../../../shared/dateUtils";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useTheme } from "@/contexts/ThemeContext";
+import { ThemedLogo } from "@/components/ThemedLogo";
 import { Link, useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from "./DashboardLayoutSkeleton";
 import { trpc } from "@/lib/trpc";
@@ -400,11 +401,7 @@ function TopBar({ onSearchOpen, mobileMenuOpen, onToggleMobile }: {
               alt="ENTUR OS"
               className="h-8 w-8 rounded-lg"
             />
-            <img
-              src="https://d2xsxph8kpxj0f.cloudfront.net/310519663249817763/EKvcVicuVoUxTnzjSKzgdk/OSVBRANCA_ea41014a.webp"
-              alt="ENTUR OS"
-              className="hidden sm:block h-5 object-contain"
-            />
+            <ThemedLogo className="hidden sm:block h-5 object-contain" />
           </Link>
 
           {/* Desktop Nav */}

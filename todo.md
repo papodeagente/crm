@@ -5459,3 +5459,9 @@
 - [x] Adicionar logo texto (OSVBRANCA) em todos os locais que mostram "ENTUR OS" sem logo
 - [x] Atualizar favicon com OSICON.webp no index.html
 - [x] Nomes de planos atualizados em SaasRegister (Essencial/Pro/Elite)
+
+## Logo Tema Claro (Mar 26)
+- [x] Upload Frame39 (logo tema claro) para CDN
+- [x] Criar componente ThemedLogo que troca automaticamente por tema
+- [x] Aplicar ThemedLogo em DashboardLayout e TopNavLayout
+- [x] Landing page, login e register mantêm StaticLogo (fundo escuro fixo)

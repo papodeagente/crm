@@ -1,5 +1,6 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { ThemedLogo } from "@/components/ThemedLogo";
 import { trpc } from "@/lib/trpc";
 import {
   DropdownMenu,
@@ -122,11 +123,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               alt="ENTUR OS"
               className="h-14 w-14 rounded-xl shadow-lg"
             />
-            <img
-              src="https://d2xsxph8kpxj0f.cloudfront.net/310519663249817763/EKvcVicuVoUxTnzjSKzgdk/OSVBRANCA_ea41014a.webp"
-              alt="ENTUR OS"
-              className="h-8 object-contain"
-            />
+            <ThemedLogo className="h-8 object-contain" />
             <p className="text-sm text-muted-foreground text-center max-w-sm">
               Plataforma completa de CRM para agências de viagens. Faça login para acessar o painel.
             </p>
@@ -227,11 +224,7 @@ function DashboardLayoutContent({
                     alt="ENTUR OS"
                     className="h-7 w-7 rounded-md shrink-0"
                   />
-                  <img
-                    src="https://d2xsxph8kpxj0f.cloudfront.net/310519663249817763/EKvcVicuVoUxTnzjSKzgdk/OSVBRANCA_ea41014a.webp"
-                    alt="ENTUR OS"
-                    className="h-5 object-contain"
-                  />
+                  <ThemedLogo className="h-5 object-contain" />
                 </div>
               )}
             </div>
