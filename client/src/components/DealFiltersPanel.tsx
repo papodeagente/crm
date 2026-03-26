@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SearchableCombobox } from "@/components/ui/searchable-combobox";
 import DateRangeFilter, { useDateFilter, getPresetDates, type DatePreset } from "@/components/DateRangeFilter";
 import { Filter, X, RotateCcw } from "lucide-react";
 import { trpc } from "@/lib/trpc";
@@ -288,17 +289,17 @@ export default function DealFiltersPanel({
             {/* ─── Empresa ─── */}
             <div className="space-y-2">
               <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Empresa</Label>
-              <Select value={local.accountId ? String(local.accountId) : "all"} onValueChange={(v) => set("accountId", v === "all" ? undefined : parseInt(v))}>
-                <SelectTrigger className="h-9">
-                  <SelectValue placeholder="Selecionar" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todas</SelectItem>
-                  {(accounts.data || []).map((a: any) => (
-                    <SelectItem key={a.id} value={String(a.id)}>{a.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <SearchableCombobox
+                options={[
+                  { value: "all", label: "Todas" },
+                  ...(accounts.data || []).map((a: any) => ({ value: String(a.id), label: a.name })),
+                ]}
+                value={local.accountId ? String(local.accountId) : "all"}
+                onValueChange={(v) => set("accountId", v === "all" ? undefined : parseInt(v))}
+                placeholder="Buscar empresa..."
+                searchPlaceholder="Digite o nome da empresa..."
+                className="h-9"
+              />
             </div>
 
             {/* ─── Campanha UTM ─── */}
@@ -368,17 +369,17 @@ export default function DealFiltersPanel({
             {/* ─── Produto ou Serviço ─── */}
             <div className="space-y-2">
               <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Produto ou Serviço</Label>
-              <Select value={local.productId ? String(local.productId) : "all"} onValueChange={(v) => set("productId", v === "all" ? undefined : parseInt(v))}>
-                <SelectTrigger className="h-9">
-                  <SelectValue placeholder="Selecionar" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos</SelectItem>
-                  {(products.data || []).map((p: any) => (
-                    <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <SearchableCombobox
+                options={[
+                  { value: "all", label: "Todos" },
+                  ...(products.data || []).map((p: any) => ({ value: String(p.id), label: p.name })),
+                ]}
+                value={local.productId ? String(local.productId) : "all"}
+                onValueChange={(v) => set("productId", v === "all" ? undefined : parseInt(v))}
+                placeholder="Buscar produto..."
+                searchPlaceholder="Digite o nome do produto..."
+                className="h-9"
+              />
             </div>
 
             {/* Spacer for footer */}

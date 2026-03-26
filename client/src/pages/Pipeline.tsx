@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SearchableCombobox } from "@/components/ui/searchable-combobox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
@@ -1288,13 +1289,17 @@ function DealDrawer({ dealId, onClose, contacts, accounts, stages }: {
                   <User className="h-3.5 w-3.5" /> Contato Associado
                 </Label>
                 <div className="flex items-center gap-2">
-                  <Select value={d.contactId ? String(d.contactId) : "none"} onValueChange={(v) => updateDeal.mutate({ id: dealId, contactId: v === "none" ? null : Number(v) })}>
-                    <SelectTrigger className="flex-1 h-10 text-[13px] rounded-xl"><SelectValue placeholder="Selecionar contato..." /></SelectTrigger>
-                    <SelectContent className="rounded-xl">
-                      <SelectItem value="none">Nenhum</SelectItem>
-                      {contacts.map((c: any) => <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
+                  <SearchableCombobox
+                    options={[
+                      { value: "none", label: "Nenhum" },
+                      ...contacts.map((c: any) => ({ value: String(c.id), label: c.name, sublabel: c.phone || c.email || undefined })),
+                    ]}
+                    value={d.contactId ? String(d.contactId) : "none"}
+                    onValueChange={(v) => updateDeal.mutate({ id: dealId, contactId: v === "none" ? null : Number(v) })}
+                    placeholder="Buscar contato..."
+                    searchPlaceholder="Digite o nome do contato..."
+                    className="flex-1"
+                  />
                   {d.contactId && (
                     <Button variant="ghost" size="icon" className="h-10 w-10 rounded-xl shrink-0" onClick={() => updateDeal.mutate({ id: dealId, contactId: null })}>
                       <Unlink className="h-4 w-4 text-muted-foreground" />
@@ -1308,13 +1313,17 @@ function DealDrawer({ dealId, onClose, contacts, accounts, stages }: {
                   <Building2 className="h-3.5 w-3.5" /> Empresa Associada
                 </Label>
                 <div className="flex items-center gap-2">
-                  <Select value={d.accountId ? String(d.accountId) : "none"} onValueChange={(v) => updateDeal.mutate({ id: dealId, accountId: v === "none" ? null : Number(v) })}>
-                    <SelectTrigger className="flex-1 h-10 text-[13px] rounded-xl"><SelectValue placeholder="Selecionar empresa..." /></SelectTrigger>
-                    <SelectContent className="rounded-xl">
-                      <SelectItem value="none">Nenhuma</SelectItem>
-                      {accounts.map((a: any) => <SelectItem key={a.id} value={String(a.id)}>{a.name}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
+                  <SearchableCombobox
+                    options={[
+                      { value: "none", label: "Nenhuma" },
+                      ...accounts.map((a: any) => ({ value: String(a.id), label: a.name })),
+                    ]}
+                    value={d.accountId ? String(d.accountId) : "none"}
+                    onValueChange={(v) => updateDeal.mutate({ id: dealId, accountId: v === "none" ? null : Number(v) })}
+                    placeholder="Buscar empresa..."
+                    searchPlaceholder="Digite o nome da empresa..."
+                    className="flex-1"
+                  />
                   {d.accountId && (
                     <Button variant="ghost" size="icon" className="h-10 w-10 rounded-xl shrink-0" onClick={() => updateDeal.mutate({ id: dealId, accountId: null })}>
                       <Unlink className="h-4 w-4 text-muted-foreground" />
@@ -1743,12 +1752,14 @@ function AddParticipantForm({ contacts, existingIds, onAdd }: { contacts: any[];
     <div className="space-y-3">
       <p className="text-[11px] font-bold uppercase tracking-[0.1em] text-muted-foreground">Adicionar Participante</p>
       <div className="flex gap-2">
-        <Select value={contactId} onValueChange={setContactId}>
-          <SelectTrigger className="flex-1 h-10 text-[13px] rounded-xl"><SelectValue placeholder="Selecionar contato..." /></SelectTrigger>
-          <SelectContent className="rounded-xl">
-            {available.map((c: any) => <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>)}
-          </SelectContent>
-        </Select>
+        <SearchableCombobox
+          options={available.map((c: any) => ({ value: String(c.id), label: c.name, sublabel: c.phone || c.email || undefined }))}
+          value={contactId}
+          onValueChange={setContactId}
+          placeholder="Buscar contato..."
+          searchPlaceholder="Digite o nome do contato..."
+          className="flex-1"
+        />
         <Select value={role} onValueChange={setRole}>
           <SelectTrigger className="w-[150px] h-10 text-[13px] rounded-xl"><SelectValue /></SelectTrigger>
           <SelectContent className="rounded-xl">
@@ -2161,12 +2172,14 @@ function CreateDealDialog({ open, onOpenChange, pipelineId, stages, contacts, ac
                 <>
                   <div>
                     <Label className="text-[12px] font-medium">Empresa da negociação</Label>
-                    <Select value={accountId} onValueChange={setAccountId}>
-                      <SelectTrigger className="mt-1.5 h-10 rounded-xl"><SelectValue placeholder="Selecionar" /></SelectTrigger>
-                      <SelectContent className="rounded-xl">
-                        {accounts.map((a: any) => <SelectItem key={a.id} value={String(a.id)}>{a.name}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
+                    <SearchableCombobox
+                      options={accounts.map((a: any) => ({ value: String(a.id), label: a.name }))}
+                      value={accountId}
+                      onValueChange={setAccountId}
+                      placeholder="Buscar empresa..."
+                      searchPlaceholder="Digite o nome da empresa..."
+                      className="mt-1.5"
+                    />
                   </div>
                   <button
                     type="button"
@@ -2203,12 +2216,14 @@ function CreateDealDialog({ open, onOpenChange, pipelineId, stages, contacts, ac
                 <>
                   <div>
                     <Label className="text-[12px] font-medium">Contato</Label>
-                    <Select value={contactId} onValueChange={setContactId}>
-                      <SelectTrigger className="mt-1.5 h-10 rounded-xl"><SelectValue placeholder="Selecionar" /></SelectTrigger>
-                      <SelectContent className="rounded-xl">
-                        {contacts.map((c: any) => <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
+                    <SearchableCombobox
+                      options={contacts.map((c: any) => ({ value: String(c.id), label: c.name, sublabel: c.phone || c.email || undefined }))}
+                      value={contactId}
+                      onValueChange={setContactId}
+                      placeholder="Buscar contato..."
+                      searchPlaceholder="Digite o nome do contato..."
+                      className="mt-1.5"
+                    />
                   </div>
                   <button
                     type="button"

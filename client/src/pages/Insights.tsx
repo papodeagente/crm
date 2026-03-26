@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SearchableCombobox } from "@/components/ui/searchable-combobox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
@@ -134,18 +135,17 @@ function CRMDashboard() {
         />
 
         {isAdmin && (teamMembers.data || []).length > 0 && (
-          <Select value={selectedUserId} onValueChange={setSelectedUserId}>
-            <SelectTrigger className="h-8 w-auto min-w-[160px] text-xs gap-1.5">
-              <Users className="h-3 w-3 text-muted-foreground shrink-0" />
-              <SelectValue placeholder="Usuário" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos os usuários</SelectItem>
-              {(teamMembers.data || []).map((m: any) => (
-                <SelectItem key={m.id} value={String(m.id)}>{m.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <SearchableCombobox
+            options={[
+              { value: "all", label: "Todos os usuários" },
+              ...(teamMembers.data || []).map((m: any) => ({ value: String(m.id), label: m.name })),
+            ]}
+            value={selectedUserId}
+            onValueChange={setSelectedUserId}
+            placeholder="Usuário"
+            searchPlaceholder="Buscar usuário..."
+            className="h-8 w-auto min-w-[160px] text-xs"
+          />
         )}
       </div>
 
@@ -447,33 +447,31 @@ function MessagesDashboard() {
         </Tooltip>
 
         {isAdminMsg && (teamMembersMsg.data || []).length > 0 && (
-          <Select value={selectedMsgUserId} onValueChange={setSelectedMsgUserId}>
-            <SelectTrigger className="h-8 w-auto min-w-[160px] text-xs gap-1.5">
-              <Users className="h-3 w-3 text-muted-foreground shrink-0" />
-              <SelectValue placeholder="Usuário" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos os usuários</SelectItem>
-              {(teamMembersMsg.data || []).map((m: any) => (
-                <SelectItem key={m.id} value={String(m.id)}>{m.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <SearchableCombobox
+            options={[
+              { value: "all", label: "Todos os usuários" },
+              ...(teamMembersMsg.data || []).map((m: any) => ({ value: String(m.id), label: m.name })),
+            ]}
+            value={selectedMsgUserId}
+            onValueChange={setSelectedMsgUserId}
+            placeholder="Usuário"
+            searchPlaceholder="Buscar usuário..."
+            className="h-8 w-auto min-w-[160px] text-xs"
+          />
         )}
 
         {sessions.length > 1 && (
-          <Select value={selectedSession} onValueChange={setSelectedSession}>
-            <SelectTrigger className="w-[180px] h-8 text-xs">
-              <SelectValue placeholder="Sessão" />
-            </SelectTrigger>
-            <SelectContent>
-              {sessions.map((s: any) => (
-                <SelectItem key={s.sessionId} value={s.sessionId}>
-                  {s.ownerName ? `${s.ownerName} (${s.sessionId})` : s.sessionId}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <SearchableCombobox
+            options={sessions.map((s: any) => ({
+              value: s.sessionId,
+              label: s.ownerName ? `${s.ownerName} (${s.sessionId})` : s.sessionId,
+            }))}
+            value={selectedSession}
+            onValueChange={setSelectedSession}
+            placeholder="Sessão"
+            searchPlaceholder="Buscar sessão..."
+            className="w-[180px] h-8 text-xs"
+          />
         )}
 
         <DateRangeFilter

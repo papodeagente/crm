@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SearchableCombobox } from "@/components/ui/searchable-combobox";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -351,17 +352,20 @@ export default function TaskFormDialog({
           {showDealSelector && (
             <div className="space-y-1.5">
               <Label className="text-[13px] font-semibold text-foreground">Empresa da negociação</Label>
-              <Select value={selectedAccountId} onValueChange={setSelectedAccountId}>
-                <SelectTrigger className="h-10 rounded-xl border-border/60">
-                  <SelectValue placeholder="Selecionar" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Todas</SelectItem>
-                  {(allAccounts.data || []).map((acc: any) => (
-                    <SelectItem key={acc.id} value={String(acc.id)}>{acc.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <SearchableCombobox
+                options={[
+                  { value: "none", label: "Todas" },
+                  ...(allAccounts.data || []).map((acc: any) => ({
+                    value: String(acc.id),
+                    label: acc.name,
+                  })),
+                ]}
+                value={selectedAccountId}
+                onValueChange={setSelectedAccountId}
+                placeholder="Buscar empresa..."
+                searchPlaceholder="Digite o nome da empresa..."
+                clearable
+              />
             </div>
           )}
 
@@ -371,19 +375,19 @@ export default function TaskFormDialog({
               <Label className="text-[13px] font-semibold text-foreground">
                 Negociação <span className="text-destructive">*</span>
               </Label>
-              <Select
+              <SearchableCombobox
+                options={filteredDeals.map((d: any) => ({
+                  value: String(d.id),
+                  label: d.title,
+                  sublabel: d.accountName || d.contactName || undefined,
+                }))}
                 value={selectedDealId ? String(selectedDealId) : ""}
-                onValueChange={(v) => setSelectedDealId(Number(v))}
-              >
-                <SelectTrigger className="h-10 rounded-xl border-border/60">
-                  <SelectValue placeholder="Selecionar negociação" />
-                </SelectTrigger>
-                <SelectContent className="max-h-[200px]">
-                  {filteredDeals.map((d: any) => (
-                    <SelectItem key={d.id} value={String(d.id)}>{d.title}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                onValueChange={(v) => setSelectedDealId(v ? Number(v) : null)}
+                placeholder="Buscar negociação..."
+                searchPlaceholder="Digite o nome da negociação..."
+                emptyText="Nenhuma negociação encontrada."
+                loading={deals.isLoading}
+              />
             </div>
           ) : effectiveDealTitle ? (
             <div className="space-y-1.5">

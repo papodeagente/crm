@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SearchableCombobox } from "@/components/ui/searchable-combobox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { toast } from "sonner";
@@ -1653,14 +1654,17 @@ export default function DealDetail() {
             ) : (
               <div>
                 <label className="text-xs font-medium text-muted-foreground">Selecione um contato</label>
-                <Select value={selectedContactId ? String(selectedContactId) : ""} onValueChange={(v) => setSelectedContactId(Number(v))}>
-                  <SelectTrigger><SelectValue placeholder="Buscar contato..." /></SelectTrigger>
-                  <SelectContent>
-                    {((contactsQ.data as any)?.items || contactsQ.data || []).map((c: any) => (
-                      <SelectItem key={c.id} value={String(c.id)}>{c.name}{c.phone ? ` — ${c.phone}` : ""}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <SearchableCombobox
+                  options={((contactsQ.data as any)?.items || contactsQ.data || []).map((c: any) => ({
+                    value: String(c.id),
+                    label: c.name,
+                    sublabel: c.phone || c.email || undefined,
+                  }))}
+                  value={selectedContactId ? String(selectedContactId) : ""}
+                  onValueChange={(v) => setSelectedContactId(Number(v))}
+                  placeholder="Buscar contato..."
+                  searchPlaceholder="Digite o nome do contato..."
+                />
               </div>
             )}
           </div>
@@ -1755,14 +1759,16 @@ export default function DealDetail() {
             ) : (
               <div>
                 <label className="text-xs font-medium text-muted-foreground">Selecione uma empresa</label>
-                <Select value={selectedAccountId ? String(selectedAccountId) : ""} onValueChange={(v) => setSelectedAccountId(Number(v))}>
-                  <SelectTrigger><SelectValue placeholder="Buscar empresa..." /></SelectTrigger>
-                  <SelectContent>
-                    {(accountsQ.data || []).map((a: any) => (
-                      <SelectItem key={a.id} value={String(a.id)}>{a.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <SearchableCombobox
+                  options={(accountsQ.data || []).map((a: any) => ({
+                    value: String(a.id),
+                    label: a.name,
+                  }))}
+                  value={selectedAccountId ? String(selectedAccountId) : ""}
+                  onValueChange={(v) => setSelectedAccountId(Number(v))}
+                  placeholder="Buscar empresa..."
+                  searchPlaceholder="Digite o nome da empresa..."
+                />
               </div>
             )}
           </div>
@@ -2820,14 +2826,17 @@ function ParticipantsPanel({ participants, contacts, dealId, onRefresh }: any) {
         <DialogContent className="sm:max-w-sm">
           <DialogHeader><DialogTitle>Adicionar Participante</DialogTitle></DialogHeader>
           <div className="space-y-3">
-            <Select value={selectedContact} onValueChange={setSelectedContact}>
-              <SelectTrigger><SelectValue placeholder="Selecionar contato" /></SelectTrigger>
-              <SelectContent>
-                {availableContacts.map((c: any) => (
-                  <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <SearchableCombobox
+              options={availableContacts.map((c: any) => ({
+                value: String(c.id),
+                label: c.name,
+                sublabel: c.phone || c.email || undefined,
+              }))}
+              value={selectedContact}
+              onValueChange={setSelectedContact}
+              placeholder="Buscar contato..."
+              searchPlaceholder="Digite o nome do contato..."
+            />
             <Select value={selectedRole} onValueChange={setSelectedRole}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>

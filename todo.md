@@ -5370,3 +5370,12 @@
 ## Bug: Rate exceeded ao logar no sistema (Mar 26)
 - [x] Investigar e corrigir erro de Rate exceeded no login
 - [x] Garantir que a correção não comprometa funcionalidades existentes
+
+## Sistema de Busca Incremental (Typeahead/Autocomplete) - Mar 26
+- [x] Criar componente reutilizável SearchableCombobox com debounce, loading, UX profissional
+- [x] Backend: endpoints de busca otimizados para contatos, empresas, negociações (client-side filtering com dados em cache)
+- [x] Aplicar na criação de negociação (busca contato e empresa)
+- [x] Aplicar na criação de tarefa na página Tarefas (busca negociação)
+- [x] Aplicar nos filtros de contatos e negociações
+- [x] Aplicar no TaskFormDialog (busca negociação vinculada)
+- [x] Garantir performance: debounce 300ms, limite de resultados, highlight do termo buscado

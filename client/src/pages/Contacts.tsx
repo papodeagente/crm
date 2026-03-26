@@ -7,6 +7,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Plus, Search, Users, Mail, Phone, MoreHorizontal, Trash2, Edit, Eye, RotateCcw, AlertTriangle, Archive, RefreshCw, Filter, X, Send } from "lucide-react";
 import BulkWhatsAppDialog from "@/components/BulkWhatsAppDialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SearchableCombobox } from "@/components/ui/searchable-combobox";
 import { useState, useMemo } from "react";
 import CustomFieldRenderer, { customFieldValuesToArray, initCustomFieldValues } from "@/components/CustomFieldRenderer";
 import DateRangeFilter, { useDateFilter } from "@/components/DateRangeFilter";
@@ -262,16 +263,17 @@ export default function Contacts() {
           {showFieldFilter && (contactCustomFields.data as any[])?.length > 0 && (
             <div className="p-3 bg-muted/30 rounded-xl border border-border/40 space-y-2">
               <div className="flex items-center gap-2">
-                <Select value={filterFieldId ? String(filterFieldId) : ""} onValueChange={(v) => setFilterFieldId(Number(v))}>
-                  <SelectTrigger className="h-8 text-[12px] w-48">
-                    <SelectValue placeholder="Selecione um campo" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {(contactCustomFields.data as any[]).map((f: any) => (
-                      <SelectItem key={f.id} value={String(f.id)}>{f.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <SearchableCombobox
+                  options={(contactCustomFields.data as any[] || []).map((f: any) => ({
+                    value: String(f.id),
+                    label: f.label,
+                  }))}
+                  value={filterFieldId ? String(filterFieldId) : ""}
+                  onValueChange={(v) => setFilterFieldId(Number(v))}
+                  placeholder="Selecione um campo"
+                  searchPlaceholder="Buscar campo..."
+                  className="h-8 text-[12px] w-48"
+                />
                 <Input
                   className="h-8 text-[12px] flex-1 max-w-xs"
                   placeholder="Valor do filtro..."

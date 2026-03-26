@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SearchableCombobox } from "@/components/ui/searchable-combobox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Badge } from "@/components/ui/badge";
@@ -294,20 +295,21 @@ export default function Tasks() {
       {/* ─── Filters Bar ─── */}
       <div className="flex items-center gap-2 flex-wrap">
         {/* Responsável */}
-        <Select value={assigneeFilter} onValueChange={(v) => { setAssigneeFilter(v); setPage(0); }}>
-          <SelectTrigger className="h-9 w-[200px] rounded-xl border-border/50 bg-card text-[13px]">
-            <div className="flex items-center gap-2">
-              <Users className="h-3.5 w-3.5 text-muted-foreground" />
-              <SelectValue placeholder="Todas as tarefas" />
-            </div>
-          </SelectTrigger>
-          <SelectContent className="rounded-xl">
-            <SelectItem value="all">Todas as tarefas</SelectItem>
-            {(crmUsers.data || []).map((u: any) => (
-              <SelectItem key={u.id} value={String(u.id)}>{u.name || u.email}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <SearchableCombobox
+          options={[
+            { value: "all", label: "Todas as tarefas" },
+            ...(crmUsers.data || []).map((u: any) => ({
+              value: String(u.id),
+              label: u.name || u.email,
+              sublabel: u.email || undefined,
+            })),
+          ]}
+          value={assigneeFilter}
+          onValueChange={(v) => { setAssigneeFilter(v); setPage(0); }}
+          placeholder="Todas as tarefas"
+          searchPlaceholder="Buscar responsável..."
+          className="h-9 w-[200px] rounded-xl border-border/50 bg-card text-[13px]"
+        />
 
         {/* Período */}
         <Popover>
