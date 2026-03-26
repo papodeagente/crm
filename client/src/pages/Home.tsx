@@ -1,4 +1,5 @@
 import { useAuth } from "@/_core/hooks/useAuth";
+import { useIsAdmin } from "@/components/AdminOnlyGuard";
 import { trpc } from "@/lib/trpc";
 import { useState, useMemo } from "react";
 import {
@@ -8,6 +9,7 @@ import {
   Sparkles, Users, Settings, Package, FileText,
   Import, BarChart3, Radio, ShieldCheck, X,
   CheckCircle2, Circle, Eye, ArrowRight,
+  Filter, User, UsersRound, Building2, ChevronDown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -17,6 +19,11 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem,
+  DropdownMenuTrigger, DropdownMenuSeparator, DropdownMenuLabel,
+  DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent,
+} from "@/components/ui/dropdown-menu";
 import TrialCountdownBanner from "@/components/TrialCountdownBanner";
 
 /* ─── Polling interval for real-time sync (60 seconds) ─── */
@@ -58,6 +65,17 @@ function timeAgo(ts: number | null): string {
   if (days === 1) return "Ontem";
   if (days < 30) return `${days} dias`;
   return `${Math.floor(days / 30)} meses`;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   FILTER TYPES
+   ═══════════════════════════════════════════════════════════════ */
+type FilterType = "all" | "mine" | "user" | "team";
+interface HomeFilter {
+  type: FilterType;
+  userId?: number;
+  teamId?: number;
+  label: string;
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -243,23 +261,60 @@ const ONBOARDING_ICONS: Record<string, any> = {
 };
 
 /* ═══════════════════════════════════════════════════════════════
-   MAIN HOME COMPONENT
+   FILTER ICON MAP
+   ═══════════════════════════════════════════════════════════════ */
+const FILTER_ICONS: Record<FilterType, any> = {
+  all: UsersRound,
+  mine: User,
+  user: User,
+  team: Building2,
+};
+
+/* ═══════════════════════════════════════════════════════════════
+   MAIN HOME COMP
    ═══════════════════════════════════════════════════════════════ */
 export default function Home() {
   const { user } = useAuth();
+  const { isAdmin } = useIsAdmin();
   const [, navigate] = useLocation();
 
   // Modals
   const [noTaskModalOpen, setNoTaskModalOpen] = useState(false);
   const [coolingModalOpen, setCoolingModalOpen] = useState(false);
 
+  // ─── Filter State (admin only) ───
+  const [filter, setFilter] = useState<HomeFilter>({ type: "all", label: "Todos" });
+
+  // Build query params from filter
+  const execFilterInput = useMemo(() => {
+    if (!isAdmin || filter.type === "all") return undefined;
+    if (filter.type === "mine") return { userId: user?.id };
+    if (filter.type === "user" && filter.userId) return { userId: filter.userId };
+    if (filter.type === "team" && filter.teamId) return { teamId: filter.teamId };
+    return undefined;
+  }, [isAdmin, filter, user?.id]);
+
+  const taskFilterInput = useMemo(() => {
+    const base: { limit: number; userId?: number; teamId?: number } = { limit: 10 };
+    if (!isAdmin || filter.type === "all") return base;
+    if (filter.type === "mine") return { ...base, userId: user?.id };
+    if (filter.type === "user" && filter.userId) return { ...base, userId: filter.userId };
+    if (filter.type === "team" && filter.teamId) return { ...base, teamId: filter.teamId };
+    return base;
+  }, [isAdmin, filter, user?.id]);
+
   // ─── Data Queries ───
-  const execQ = trpc.home.executive.useQuery(undefined, {
+  const filterOptionsQ = trpc.home.filterOptions.useQuery(undefined, {
+    staleTime: 120000,
+    enabled: isAdmin,
+  });
+
+  const execQ = trpc.home.executive.useQuery(execFilterInput, {
     refetchInterval: REFETCH_INTERVAL,
     staleTime: 30000,
     refetchIntervalInBackground: false,
   });
-  const tasksQ = trpc.home.tasks.useQuery({ limit: 10 }, {
+  const tasksQ = trpc.home.tasks.useQuery(taskFilterInput, {
     refetchInterval: REFETCH_INTERVAL,
     staleTime: 30000,
     refetchIntervalInBackground: false,
@@ -285,6 +340,7 @@ export default function Home() {
   const rfv = rfvQ.data;
   const onboarding = onboardingQ.data;
   const loading = execQ.isLoading;
+  const filterOptions = filterOptionsQ.data;
 
   // Greeting
   const greeting = useMemo(() => {
@@ -313,6 +369,9 @@ export default function Home() {
     return tasks?.filter(t => t.isOverdue).length ?? 0;
   }, [tasks]);
 
+  // Filter icon
+  const FilterIcon = FILTER_ICONS[filter.type] || Filter;
+
   return (
     <div className="page-content max-w-7xl mx-auto">
       {/* ═══════════════════════════════════════════════════════
@@ -326,6 +385,118 @@ export default function Home() {
           <p className="text-[13px] text-muted-foreground mt-1 capitalize">{today}</p>
         </div>
         <div className="flex items-center gap-2">
+          {/* ─── ADMIN FILTER DROPDOWN ─── */}
+          {isAdmin && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 gap-2 text-[12px] font-medium border-border/60 bg-background hover:bg-muted/50"
+                >
+                  <FilterIcon className="h-3.5 w-3.5 text-primary" />
+                  <span className="max-w-[140px] truncate">{filter.label}</span>
+                  <ChevronDown className="h-3 w-3 text-muted-foreground" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-64">
+                <DropdownMenuLabel className="text-[11px] text-muted-foreground uppercase tracking-wider font-bold">
+                  Filtrar relatório por
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+
+                {/* All */}
+                <DropdownMenuItem
+                  onClick={() => setFilter({ type: "all", label: "Todos" })}
+                  className={`cursor-pointer gap-2.5 rounded-lg ${filter.type === "all" ? "bg-primary/10 text-primary" : ""}`}
+                >
+                  <UsersRound className="h-3.5 w-3.5" />
+                  <span className="text-[13px] font-medium">Todos</span>
+                  {filter.type === "all" && <CheckCircle2 className="h-3.5 w-3.5 ml-auto text-primary" />}
+                </DropdownMenuItem>
+
+                {/* Mine */}
+                <DropdownMenuItem
+                  onClick={() => setFilter({ type: "mine", label: "Meu relatório" })}
+                  className={`cursor-pointer gap-2.5 rounded-lg ${filter.type === "mine" ? "bg-primary/10 text-primary" : ""}`}
+                >
+                  <User className="h-3.5 w-3.5" />
+                  <span className="text-[13px] font-medium">Meu relatório</span>
+                  {filter.type === "mine" && <CheckCircle2 className="h-3.5 w-3.5 ml-auto text-primary" />}
+                </DropdownMenuItem>
+
+                <DropdownMenuSeparator />
+
+                {/* Users submenu */}
+                {filterOptions && filterOptions.users.length > 0 && (
+                  <DropdownMenuSub>
+                    <DropdownMenuSubTrigger className="gap-2.5 rounded-lg cursor-pointer">
+                      <Users className="h-3.5 w-3.5" />
+                      <span className="text-[13px] font-medium">Por usuário</span>
+                    </DropdownMenuSubTrigger>
+                    <DropdownMenuSubContent className="max-h-[300px] overflow-y-auto w-56">
+                      {filterOptions.users.map((u) => (
+                        <DropdownMenuItem
+                          key={u.id}
+                          onClick={() => setFilter({ type: "user", userId: u.id, label: u.name })}
+                          className={`cursor-pointer gap-2.5 rounded-lg ${filter.type === "user" && filter.userId === u.id ? "bg-primary/10 text-primary" : ""}`}
+                        >
+                          <div className="h-6 w-6 rounded-full bg-muted flex items-center justify-center text-[10px] font-bold text-muted-foreground shrink-0">
+                            {u.avatarUrl ? (
+                              <img src={u.avatarUrl} className="h-6 w-6 rounded-full object-cover" alt="" />
+                            ) : (
+                              u.name?.charAt(0)?.toUpperCase() || "?"
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[12px] font-medium truncate">{u.name}</p>
+                            <p className="text-[10px] text-muted-foreground truncate">{u.role === "admin" ? "Admin" : "Usuário"}</p>
+                          </div>
+                          {filter.type === "user" && filter.userId === u.id && (
+                            <CheckCircle2 className="h-3.5 w-3.5 text-primary shrink-0" />
+                          )}
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuSubContent>
+                  </DropdownMenuSub>
+                )}
+
+                {/* Teams submenu */}
+                {filterOptions && filterOptions.teams.length > 0 && (
+                  <DropdownMenuSub>
+                    <DropdownMenuSubTrigger className="gap-2.5 rounded-lg cursor-pointer">
+                      <Building2 className="h-3.5 w-3.5" />
+                      <span className="text-[13px] font-medium">Por equipe</span>
+                    </DropdownMenuSubTrigger>
+                    <DropdownMenuSubContent className="max-h-[300px] overflow-y-auto w-56">
+                      {filterOptions.teams.map((t) => (
+                        <DropdownMenuItem
+                          key={t.id}
+                          onClick={() => setFilter({ type: "team", teamId: t.id, label: t.name })}
+                          className={`cursor-pointer gap-2.5 rounded-lg ${filter.type === "team" && filter.teamId === t.id ? "bg-primary/10 text-primary" : ""}`}
+                        >
+                          <div
+                            className="h-6 w-6 rounded-lg flex items-center justify-center text-[10px] font-bold text-white shrink-0"
+                            style={{ backgroundColor: t.color || "#6366f1" }}
+                          >
+                            {t.name?.charAt(0)?.toUpperCase() || "?"}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[12px] font-medium truncate">{t.name}</p>
+                            <p className="text-[10px] text-muted-foreground">{t.memberCount} membro{t.memberCount !== 1 ? "s" : ""}</p>
+                          </div>
+                          {filter.type === "team" && filter.teamId === t.id && (
+                            <CheckCircle2 className="h-3.5 w-3.5 text-primary shrink-0" />
+                          )}
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuSubContent>
+                  </DropdownMenuSub>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+
           <span className="text-[11px] text-muted-foreground font-medium bg-muted/50 px-3 py-1.5 rounded-lg capitalize">
             {monthLabel}
           </span>
@@ -335,6 +506,24 @@ export default function Home() {
           </div>
         </div>
       </div>
+
+      {/* ─── ACTIVE FILTER BADGE (when not "all") ─── */}
+      {isAdmin && filter.type !== "all" && (
+        <div className="flex items-center gap-2 mb-4">
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-primary/5 border border-primary/15">
+            <FilterIcon className="h-3.5 w-3.5 text-primary" />
+            <span className="text-[12px] font-medium text-primary">
+              Filtrando: {filter.label}
+            </span>
+            <button
+              onClick={() => setFilter({ type: "all", label: "Todos" })}
+              className="ml-1 h-4 w-4 rounded-full bg-primary/10 hover:bg-primary/20 flex items-center justify-center transition-colors"
+            >
+              <X className="h-2.5 w-2.5 text-primary" />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ═══════════════════════════════════════════════════════
           BLOCO 1 — VISÃO EXECUTIVA IMEDIATA

@@ -5279,3 +5279,11 @@
 
 ## Perfil — Tenant ID (Mar 25)
 - [x] Exibir número do Tenant no menu de perfil no formato "ID: 000000" (TopNavLayout.tsx, abaixo do badge do plano)
+
+## Filtros de Relatório na Página Início (Mar 25)
+- [x] Filtro por usuário específico no relatório da página Início (admin)
+- [x] Filtro por equipe no relatório da página Início (admin)
+- [x] Filtro "Todos" mostrando dados consolidados (padrão para admin)
+- [x] Filtro "Meu relatório" mostrando apenas dados do próprio admin
+- [x] Backend: endpoints tRPC aceitam parâmetros de filtro (userId, teamId)
+- [x] Frontend: seletor de filtro visível apenas para administradores

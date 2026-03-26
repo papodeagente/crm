@@ -154,7 +154,7 @@ import { rfvRouter } from "./routers/rfvRouter";
 import { profileRouter } from "./routers/profileRouter";
 import { analyticsRouter } from "./routers/analyticsRouter";
 import { zapiAdminRouter } from "./routers/zapiAdminRouter";
-import { getHomeExecutive, getHomeTasks, getHomeRFV, getHomeOnboarding, toggleOnboardingStep, dismissOnboarding, isOnboardingDismissed } from "./services/homeService";
+import { getHomeExecutive, getHomeTasks, getHomeRFV, getHomeOnboarding, toggleOnboardingStep, dismissOnboarding, isOnboardingDismissed, getHomeFilterOptions } from "./services/homeService";
 import {
   listLeadEvents,
   countLeadEvents,
@@ -2003,20 +2003,37 @@ export const appRouter = router({
 
   // ─── Home Dashboard (Redesigned) ───
   home: router({
-    executive: tenantProcedure
+    filterOptions: tenantProcedure
       .query(async ({ ctx }) => {
         const isAdmin = ctx.saasUser?.role === "admin";
-        const ownerFilter = isAdmin ? undefined : ctx.saasUser?.userId;
-        return getHomeExecutive(getTenantId(ctx), ownerFilter);
+        if (!isAdmin) return { users: [], teams: [] };
+        return getHomeFilterOptions(getTenantId(ctx));
+      }),
+    executive: tenantProcedure
+      .input(z.object({ userId: z.number().optional(), teamId: z.number().optional() }).optional())
+      .query(async ({ ctx, input }) => {
+        const isAdmin = ctx.saasUser?.role === "admin";
+        if (!isAdmin) {
+          // Non-admin always sees only their own data
+          return getHomeExecutive(getTenantId(ctx), ctx.saasUser?.userId);
+        }
+        // Admin: apply filter if provided
+        const userId = input?.userId;
+        const teamId = input?.teamId;
+        return getHomeExecutive(getTenantId(ctx), userId, teamId);
       }),
     tasks: tenantProcedure
-      .input(z.object({ limit: z.number().optional() }))
+      .input(z.object({ limit: z.number().optional(), userId: z.number().optional(), teamId: z.number().optional() }))
       .query(async ({ ctx, input }) => {
-        // Use saasUser.userId (crm_users.id) for proper task ownership filtering
-        // Admin users see all tasks (no userId filter)
         const isAdmin = ctx.saasUser?.role === "admin";
-        const userIdFilter = isAdmin ? undefined : ctx.saasUser?.userId;
-        return getHomeTasks(getTenantId(ctx), userIdFilter, input.limit);
+        if (!isAdmin) {
+          // Non-admin always sees only their own tasks
+          return getHomeTasks(getTenantId(ctx), ctx.saasUser?.userId, input.limit);
+        }
+        // Admin: apply filter if provided
+        const userId = input.userId;
+        const teamId = input.teamId;
+        return getHomeTasks(getTenantId(ctx), userId, input.limit, teamId);
       }),
     rfv: tenantProcedure
       .query(async ({ ctx }) => {

@@ -6,16 +6,111 @@
  * - homeTasks: today's tasks ordered by most overdue first
  * - homeRFV: smart filter counts for RFV opportunities
  * - homeOnboarding: checklist progress per tenant
+ * - homeFilterOptions: list of users and teams for admin filter
  */
 
 import { getDb } from "../db";
 import { sql } from "drizzle-orm";
 
 // ═══════════════════════════════════════
+// HELPER: Resolve team members to user IDs
+// ═══════════════════════════════════════
+
+async function getTeamMemberIds(tenantId: number, teamId: number): Promise<number[]> {
+  const db = await getDb();
+  if (!db) return [];
+  const [rows] = await db.execute(sql`
+    SELECT userId FROM team_members WHERE tenantId = ${tenantId} AND teamId = ${teamId}
+  `);
+  return (rows as unknown as any[]).map((r: any) => Number(r.userId));
+}
+
+// ═══════════════════════════════════════
+// HELPER: Build owner filter SQL fragment
+// Supports: single userId, or array of userIds (team)
+// ═══════════════════════════════════════
+
+function buildOwnerFilter(userId?: number, userIds?: number[]) {
+  if (userIds && userIds.length > 0) {
+    // Team filter: IN (id1, id2, ...)
+    const idList = userIds.join(",");
+    return sql.raw(`AND d.ownerUserId IN (${idList})`);
+  }
+  if (userId) {
+    return sql`AND d.ownerUserId = ${userId}`;
+  }
+  return sql``;
+}
+
+function buildTaskUserFilter(userId?: number, userIds?: number[]) {
+  if (userIds && userIds.length > 0) {
+    const idList = userIds.join(",");
+    return sql.raw(`AND (
+      t.assignedToUserId IN (${idList})
+      OR t.createdByUserId IN (${idList})
+      OR t.id IN (SELECT taskId FROM task_assignees WHERE userId IN (${idList}))
+    )`);
+  }
+  if (userId) {
+    return sql`AND (
+      t.assignedToUserId = ${userId}
+      OR t.createdByUserId = ${userId}
+      OR t.id IN (SELECT taskId FROM task_assignees WHERE userId = ${userId})
+    )`;
+  }
+  return sql``;
+}
+
+// ═══════════════════════════════════════
+// 0. HOME FILTER OPTIONS — Users & Teams for admin filter
+// ═══════════════════════════════════════
+
+export async function getHomeFilterOptions(tenantId: number) {
+  const db = await getDb();
+  if (!db) return { users: [], teams: [] };
+
+  const [userRows] = await db.execute(sql`
+    SELECT id, name, email, role, avatarUrl
+    FROM crm_users
+    WHERE tenantId = ${tenantId} AND status = 'active'
+    ORDER BY name ASC
+  `);
+
+  const [teamRows] = await db.execute(sql`
+    SELECT t.id, t.name, t.color,
+      (SELECT COUNT(*) FROM team_members tm WHERE tm.teamId = t.id AND tm.tenantId = ${tenantId}) as memberCount
+    FROM teams t
+    WHERE t.tenantId = ${tenantId}
+    ORDER BY t.name ASC
+  `);
+
+  return {
+    users: (userRows as unknown as any[]).map((r: any) => ({
+      id: Number(r.id),
+      name: String(r.name || ""),
+      email: String(r.email || ""),
+      role: String(r.role || "user"),
+      avatarUrl: r.avatarUrl ? String(r.avatarUrl) : null,
+    })),
+    teams: (teamRows as unknown as any[]).map((r: any) => ({
+      id: Number(r.id),
+      name: String(r.name || ""),
+      color: r.color ? String(r.color) : "#6366f1",
+      memberCount: Number(r.memberCount) || 0,
+    })),
+  };
+}
+
+// ═══════════════════════════════════════
 // 1. HOME EXECUTIVE — Month KPIs
 // ═══════════════════════════════════════
 
-export async function getHomeExecutive(tenantId: number, userId?: number) {
+export interface HomeExecutiveFilter {
+  userId?: number;
+  teamId?: number;
+}
+
+export async function getHomeExecutive(tenantId: number, userId?: number, teamId?: number) {
   const db = await getDb();
   if (!db) {
     return {
@@ -33,13 +128,35 @@ export async function getHomeExecutive(tenantId: number, userId?: number) {
     };
   }
 
+  // Resolve team to user IDs if teamId is provided
+  let userIds: number[] | undefined;
+  if (teamId) {
+    userIds = await getTeamMemberIds(tenantId, teamId);
+    if (userIds.length === 0) {
+      // Team has no members, return empty
+      return {
+        dealsWithoutTask: 0,
+        dealsWithoutTaskList: [] as any[],
+        coolingDeals: 0,
+        coolingDealsList: [] as any[],
+        activeDeals: 0,
+        activeValueCents: 0,
+        conversionRate: 0,
+        wonValueCents: 0,
+        forecastCents: 0,
+        wonDeals: 0,
+        lostDeals: 0,
+      };
+    }
+  }
+
   const now = new Date();
   // Month boundaries in SP timezone
   const nowSP = new Date(now.toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
   const monthStart = new Date(nowSP.getFullYear(), nowSP.getMonth(), 1);
 
-  // Owner filter for non-admin users
-  const ownerFilter = userId ? sql`AND d.ownerUserId = ${userId}` : sql``;
+  // Owner filter
+  const ownerFilter = buildOwnerFilter(userId, userIds);
 
   // 1. Active open deals (in sales pipelines)
   const [activeResult] = await db.execute(sql`
@@ -167,9 +284,16 @@ export async function getHomeExecutive(tenantId: number, userId?: number) {
 //    Respects: multi-tenant, user ownership (assignedTo + task_assignees + createdBy)
 // ═══════════════════════════════════════
 
-export async function getHomeTasks(tenantId: number, userId?: number, limit = 15) {
+export async function getHomeTasks(tenantId: number, userId?: number, limit = 15, teamId?: number) {
   const db = await getDb();
   if (!db) return [];
+
+  // Resolve team to user IDs if teamId is provided
+  let userIds: number[] | undefined;
+  if (teamId) {
+    userIds = await getTeamMemberIds(tenantId, teamId);
+    if (userIds.length === 0) return [];
+  }
 
   const now = new Date();
   const nowSP = new Date(now.toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
@@ -177,15 +301,8 @@ export async function getHomeTasks(tenantId: number, userId?: number, limit = 15
   // Include tasks up to 7 days in the future for "upcoming" view
   const futureLimit = new Date(todayEnd.getTime() + 7 * 24 * 60 * 60 * 1000);
 
-  // User filter: match the CRM task module logic
-  // Non-admin users see tasks they created, are assigned to (direct), or are in task_assignees
-  const userFilter = userId
-    ? sql`AND (
-        t.assignedToUserId = ${userId}
-        OR t.createdByUserId = ${userId}
-        OR t.id IN (SELECT taskId FROM task_assignees WHERE userId = ${userId})
-      )`
-    : sql``;
+  // User filter
+  const userFilter = buildTaskUserFilter(userId, userIds);
 
   const [rows] = await db.execute(sql`
     SELECT t.id, t.title, t.dueAt, t.priority, t.status, t.taskType,
@@ -276,7 +393,7 @@ export async function getHomeRFV(tenantId: number) {
       ) AS indicacao,
       (
         SELECT COUNT(*) FROM rfv_contacts rc
-        WHERE rc.tenantId = ${tenantId} AND rc.deletedAt IS NULL AND rc.rScore BETWEEN 250 AND 350 AND rc.fScore > 0
+        WHERE rc.tenantId = ${tenantId} AND rc.deletedAt IS NULL AND rc.fScore = 0 AND rc.lastPurchaseAt >= ${ninetyDaysAgo} AND rc.lastPurchaseAt < ${thirtyDaysAgo}
       ) AS recuperacao,
       (
         SELECT COUNT(*) FROM rfv_contacts rc
