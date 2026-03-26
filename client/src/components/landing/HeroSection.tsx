@@ -3,7 +3,7 @@ import { ArrowRight, Play, Star } from "lucide-react";
 import { motion } from "motion/react";
 
 const MOCKUP_URL = "https://aceleradora.tur.br/teste/wp-content/uploads/2026/03/Captura-de-Tela-2026-03-22-as-13.21.01.png";
-const LOGO_URL = "https://files.manuscdn.com/user_upload_by_module/session_file/310519663249817763/XXuAsdiNIcgnwwra.png";
+const LOGO_URL = "https://d2xsxph8kpxj0f.cloudfront.net/310519663249817763/EKvcVicuVoUxTnzjSKzgdk/OSICON_03b1c322.webp";
 
 interface HeroSectionProps {
   onCTA: () => void;
@@ -32,9 +32,7 @@ export function HeroSection({ onCTA, onDemo }: HeroSectionProps) {
         <div className="max-w-7xl mx-auto px-5 sm:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <img src={LOGO_URL} alt="Entur OS" className="h-8 w-8 rounded-lg" />
-            <span className="text-lg font-bold bg-gradient-to-r from-violet-300 via-purple-300 to-fuchsia-300 bg-clip-text text-transparent tracking-tight">
-              ENTUR OS
-            </span>
+            <img src="https://d2xsxph8kpxj0f.cloudfront.net/310519663249817763/EKvcVicuVoUxTnzjSKzgdk/OSVBRANCA_ea41014a.webp" alt="ENTUR OS" className="h-6 object-contain" />
           </div>
           <div className="hidden md:flex items-center gap-3">
             <Button

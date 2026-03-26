@@ -5452,3 +5452,10 @@
 - [x] Automação de vendas: bloqueado no Essencial, liberado Pro/Elite
 - [x] Suporte prioritário: somente Elite
 - [x] Testes e validações: 0 erros TS, 3190 testes passando
+
+## Atualização de Logo e Favicon (Mar 26)
+- [x] Upload OSVBRANCA.webp (logo texto) e OSICON.webp (favicon/ícone) para CDN
+- [x] Substituir logo antiga em DashboardLayout, TopNavLayout, landing page, login, register, SuperAdmin
+- [x] Adicionar logo texto (OSVBRANCA) em todos os locais que mostram "ENTUR OS" sem logo
+- [x] Atualizar favicon com OSICON.webp no index.html
+- [x] Nomes de planos atualizados em SaasRegister (Essencial/Pro/Elite)

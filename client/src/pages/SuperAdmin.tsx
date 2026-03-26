@@ -207,7 +207,7 @@ export default function SuperAdmin() {
             </button>
             <div className="flex items-center gap-2">
               <img
-                src="https://files.manuscdn.com/user_upload_by_module/session_file/310519663249817763/XXuAsdiNIcgnwwra.png"
+                src="https://d2xsxph8kpxj0f.cloudfront.net/310519663249817763/EKvcVicuVoUxTnzjSKzgdk/OSICON_03b1c322.webp"
                 alt="ENTUR OS"
                 className="h-8 w-8 rounded-lg"
               />

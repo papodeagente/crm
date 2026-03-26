@@ -396,11 +396,15 @@ function TopBar({ onSearchOpen, mobileMenuOpen, onToggleMobile }: {
           {/* Logo */}
           <Link href="/dashboard" className="flex items-center gap-2.5 shrink-0 mr-2">
             <img
-              src="https://files.manuscdn.com/user_upload_by_module/session_file/310519663249817763/XXuAsdiNIcgnwwra.png"
+              src="https://d2xsxph8kpxj0f.cloudfront.net/310519663249817763/EKvcVicuVoUxTnzjSKzgdk/OSICON_03b1c322.webp"
               alt="ENTUR OS"
               className="h-8 w-8 rounded-lg"
             />
-            <span className="hidden sm:block text-[15px] font-semibold tracking-tight entur-gradient-text">ENTUR OS</span>
+            <img
+              src="https://d2xsxph8kpxj0f.cloudfront.net/310519663249817763/EKvcVicuVoUxTnzjSKzgdk/OSVBRANCA_ea41014a.webp"
+              alt="ENTUR OS"
+              className="hidden sm:block h-5 object-contain"
+            />
           </Link>
 
           {/* Desktop Nav */}

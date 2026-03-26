@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { ArrowRight } from "lucide-react";
 import { FadeIn } from "./FadeIn";
 
-const LOGO_URL = "https://files.manuscdn.com/user_upload_by_module/session_file/310519663249817763/XXuAsdiNIcgnwwra.png";
+const LOGO_URL = "https://d2xsxph8kpxj0f.cloudfront.net/310519663249817763/EKvcVicuVoUxTnzjSKzgdk/OSICON_03b1c322.webp";
 
 interface FinalCTAProps {
   onCTA: () => void;
@@ -47,9 +47,7 @@ export function FinalCTA({ onCTA }: FinalCTAProps) {
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2.5">
             <img src={LOGO_URL} alt="ENTUR OS" className="h-7 w-7 rounded-lg" />
-            <span className="font-bold bg-gradient-to-r from-violet-400 to-purple-400 bg-clip-text text-transparent text-sm">
-              ENTUR OS
-            </span>
+            <img src="https://d2xsxph8kpxj0f.cloudfront.net/310519663249817763/EKvcVicuVoUxTnzjSKzgdk/OSVBRANCA_ea41014a.webp" alt="ENTUR OS" className="h-5 object-contain" />
           </div>
           <p className="text-xs text-white/20">
             &copy; {new Date().getFullYear()} Escola de Negócios do Turismo. Todos os direitos reservados.

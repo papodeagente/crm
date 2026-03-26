@@ -4,7 +4,7 @@ import { FadeIn } from "./FadeIn";
 import { Check, ArrowRight, X, MessageSquare, Crown } from "lucide-react";
 import { PLANS, PLAN_ORDER, FEATURE_DESCRIPTIONS, type PlanId, type PlanFeatures } from "../../../../shared/plans";
 
-const LOGO_URL = "https://files.manuscdn.com/user_upload_by_module/session_file/310519663249817763/XXuAsdiNIcgnwwra.png";
+const LOGO_URL = "https://d2xsxph8kpxj0f.cloudfront.net/310519663249817763/EKvcVicuVoUxTnzjSKzgdk/OSICON_03b1c322.webp";
 const SCALE_WHATSAPP_URL = "https://wa.me/551151982627?text=Quero%20conhecer%20o%20Plano%20Elite%20do%20Entur%20OS.%20Pode%20me%20ajudar%3F";
 
 interface PricingSectionProps {
@@ -349,9 +349,7 @@ export function PricingSection({ onSelectPlan }: PricingSectionProps) {
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2.5">
             <img src={LOGO_URL} alt="ENTUR OS" className="h-7 w-7 rounded-lg" />
-            <span className="font-bold bg-gradient-to-r from-violet-400 to-purple-400 bg-clip-text text-transparent text-sm">
-              ENTUR OS
-            </span>
+            <img src="https://d2xsxph8kpxj0f.cloudfront.net/310519663249817763/EKvcVicuVoUxTnzjSKzgdk/OSVBRANCA_ea41014a.webp" alt="ENTUR OS" className="h-5 object-contain" />
           </div>
           <p className="text-xs text-white/20">
             &copy; {new Date().getFullYear()} Escola de Negócios do Turismo. Todos os direitos reservados.

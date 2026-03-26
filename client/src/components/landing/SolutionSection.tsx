@@ -17,9 +17,11 @@ export function SolutionSection() {
               <Sparkles className="w-4 h-4" />
               A solução
             </div>
-            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white mb-4 tracking-tight">
-              ENTUR OS
-            </h2>
+            <img
+              src="https://d2xsxph8kpxj0f.cloudfront.net/310519663249817763/EKvcVicuVoUxTnzjSKzgdk/OSVBRANCA_ea41014a.webp"
+              alt="ENTUR OS"
+              className="h-12 sm:h-14 lg:h-16 object-contain mx-auto mb-4"
+            />
             <p className="text-lg text-white/45 max-w-2xl mx-auto leading-relaxed">
               O sistema operacional que organiza vendas, WhatsApp, pós-venda e inteligência comercial da sua agência em um só lugar.
             </p>
