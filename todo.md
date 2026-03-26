@@ -5465,3 +5465,6 @@
 - [x] Criar componente ThemedLogo que troca automaticamente por tema
 - [x] Aplicar ThemedLogo em DashboardLayout e TopNavLayout
 - [x] Landing page, login e register mantêm StaticLogo (fundo escuro fixo)
+
+## Ajuste Logo TopNav (Mar 26)
+- [x] Diminuir tamanho da logo (ícone h-7, texto h-4) e reduzir gap para alinhar com conteúdo
