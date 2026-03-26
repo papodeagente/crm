@@ -22,7 +22,7 @@ import {
   Package, Phone, Plane, Play, Plus, Send, ShoppingBag, ThumbsDown, ThumbsUp,
   Trash2, User, Users, X, AlertCircle, ClipboardList, Paperclip, Tag,
   Sparkles, BarChart3, TrendingUp, TrendingDown, Star, Target, Lightbulb, RefreshCw, Award, Search,
-  PanelLeftOpen
+  PanelLeftOpen, Maximize2, Minimize2
 } from "lucide-react";
 import TaskFormDialog from "@/components/TaskFormDialog";
 import TaskActionPopover from "@/components/TaskActionPopover";
@@ -221,8 +221,20 @@ export default function DealDetail() {
   /* ─── Mobile sidebar drawer ─── */
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
+  /* ─── WhatsApp split-view state ─── */
+  const [chatFullscreen, setChatFullscreen] = useState(false);
+  const [waSidebarDrawerOpen, setWaSidebarDrawerOpen] = useState(false);
+
   /* ─── Content tabs ─── */
   const [activeTab, setActiveTab] = useState<"history" | "tasks" | "products" | "participants" | "whatsapp" | "ai-analysis">("history");
+
+  const isWhatsAppTab = activeTab === "whatsapp";
+
+  // Reset fullscreen when leaving WhatsApp tab
+  const handleSetActiveTab = (tab: typeof activeTab) => {
+    if (tab !== "whatsapp") setChatFullscreen(false);
+    setActiveTab(tab);
+  };
 
   /* ─── Edit states ─── */
   const [editingTitle, setEditingTitle] = useState(false);
@@ -579,8 +591,196 @@ export default function DealDetail() {
       {/* ════════════════════════════════════════════════════════ */}
       {/* MAIN CONTENT — Sidebar left + Content right             */}
       {/* ════════════════════════════════════════════════════════ */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* ─── LEFT SIDEBAR ─── */}
+      <div className={`flex-1 overflow-hidden ${
+        isWhatsAppTab
+          ? `grid transition-[grid-template-columns] duration-300 ${chatFullscreen ? 'grid-cols-[0_1fr]' : 'grid-cols-[220px_1fr]'} max-md:flex max-md:flex-col`
+          : 'flex'
+      }`}>
+
+        {/* ─── WHATSAPP COMPACT SIDEBAR (220px, only when WhatsApp tab active) ─── */}
+        {isWhatsAppTab && (
+          <aside className={`border-r border-border bg-card overflow-y-auto overflow-x-hidden transition-all duration-300 hidden md:block ${
+            chatFullscreen ? 'w-0 opacity-0 pointer-events-none' : 'opacity-100'
+          }`}>
+            <div className="p-3 space-y-0 text-xs">
+              {/* ── Valor & Status compacto ── */}
+              <div className="py-2">
+                <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Negociação</p>
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">Valor</span>
+                    <span className="font-semibold text-foreground">
+                      {fmt$(deal.valueCents)}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">Status</span>
+                    <Badge variant="secondary" className="text-[10px] capitalize">{deal.status}</Badge>
+                  </div>
+                  {currentStage && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">Etapa</span>
+                      <span className="text-foreground truncate max-w-[110px]" title={currentStage.name}>{currentStage.name}</span>
+                    </div>
+                  )}
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">Criado</span>
+                    <span className="text-foreground">{new Date(deal.createdAt).toLocaleDateString("pt-BR")}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="border-b border-border" />
+
+              {/* ── Contato compacto ── */}
+              <div className="py-2">
+                <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Contato</p>
+                {contact ? (
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-6 h-6 rounded-full bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center shrink-0">
+                        <User className="h-3 w-3 text-primary" />
+                      </div>
+                      <span className="font-medium text-foreground truncate">{contact.name}</span>
+                    </div>
+                    {contact.phone && (
+                      <div className="flex items-center gap-1 text-muted-foreground">
+                        <Phone className="h-3 w-3 shrink-0" />
+                        <span className="truncate">{contact.phone}</span>
+                      </div>
+                    )}
+                    {contact.email && (
+                      <div className="flex items-center gap-1 text-muted-foreground">
+                        <Mail className="h-3 w-3 shrink-0" />
+                        <span className="truncate">{contact.email}</span>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-muted-foreground italic">Sem contato</p>
+                )}
+              </div>
+
+              <div className="border-b border-border" />
+
+              {/* ── Tarefa urgente compacta ── */}
+              <div className="py-2">
+                <div className="flex items-center justify-between mb-1.5">
+                  <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Tarefa</p>
+                  <CreateTaskButton dealId={dealId} onCreated={() => tasksQ.refetch()} />
+                </div>
+                {pendingTasks.length > 0 ? (
+                  <div className="bg-muted/40 rounded-lg p-2 space-y-1">
+                    <p className="font-medium text-foreground truncate" title={pendingTasks[0].title}>{pendingTasks[0].title}</p>
+                    <div className="flex items-center gap-1.5">
+                      <Clock className="h-3 w-3 text-muted-foreground shrink-0" />
+                      <span className={`${
+                        pendingTasks[0].dueAt && new Date(pendingTasks[0].dueAt) < new Date()
+                          ? 'text-red-500 font-semibold'
+                          : 'text-muted-foreground'
+                      }`}>
+                        {pendingTasks[0].dueAt
+                          ? new Date(pendingTasks[0].dueAt).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })
+                          : "Sem prazo"}
+                      </span>
+                      <Badge variant="secondary" className="text-[9px] capitalize ml-auto">{pendingTasks[0].status === "in_progress" ? "em andamento" : "pendente"}</Badge>
+                    </div>
+                    {pendingTasks.length > 1 && (
+                      <button
+                        onClick={() => handleSetActiveTab("tasks")}
+                        className="text-[10px] text-primary hover:underline"
+                      >
+                        +{pendingTasks.length - 1} tarefa(s)
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-muted-foreground italic">Nenhuma pendente</p>
+                )}
+              </div>
+
+              <div className="border-b border-border" />
+
+              {/* ── Responsável compacto ── */}
+              <div className="py-2">
+                <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Responsável</p>
+                {(() => {
+                  const ownerUser = (crmUsersQ.data || []).find((u: any) => u.id === deal.ownerUserId);
+                  return ownerUser ? (
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-6 h-6 rounded-full bg-secondary flex items-center justify-center shrink-0">
+                        <User className="h-3 w-3 text-muted-foreground" />
+                      </div>
+                      <span className="font-medium text-foreground truncate">{ownerUser.name}</span>
+                    </div>
+                  ) : (
+                    <p className="text-muted-foreground italic">Não atribuído</p>
+                  );
+                })()}
+              </div>
+            </div>
+          </aside>
+        )}
+
+        {/* ─── WHATSAPP MOBILE SIDEBAR DRAWER (< 768px) ─── */}
+        {isWhatsAppTab && (
+          <Sheet open={waSidebarDrawerOpen} onOpenChange={setWaSidebarDrawerOpen}>
+            <SheetContent side="left" className="w-[260px] p-0 overflow-y-auto">
+              <SheetHeader className="sr-only">
+                <SheetTitle>Detalhes</SheetTitle>
+              </SheetHeader>
+              <div className="p-3 space-y-0 text-xs">
+                {/* Same compact content as desktop sidebar */}
+                <div className="py-2">
+                  <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Negociação</p>
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">Valor</span>
+                      <span className="font-semibold text-foreground">
+                        {fmt$(deal.valueCents)}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">Status</span>
+                      <Badge variant="secondary" className="text-[10px] capitalize">{deal.status}</Badge>
+                    </div>
+                  </div>
+                </div>
+                <div className="border-b border-border" />
+                <div className="py-2">
+                  <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Contato</p>
+                  {contact ? (
+                    <div className="space-y-1">
+                      <span className="font-medium text-foreground">{contact.name}</span>
+                      {contact.phone && <p className="text-muted-foreground">{contact.phone}</p>}
+                    </div>
+                  ) : (
+                    <p className="text-muted-foreground italic">Sem contato</p>
+                  )}
+                </div>
+                <div className="border-b border-border" />
+                <div className="py-2">
+                  <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Tarefa</p>
+                  {pendingTasks.length > 0 ? (
+                    <div className="bg-muted/40 rounded-lg p-2">
+                      <p className="font-medium text-foreground truncate">{pendingTasks[0].title}</p>
+                      <span className="text-muted-foreground">
+                        {pendingTasks[0].dueAt
+                          ? new Date(pendingTasks[0].dueAt).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })
+                          : "Sem prazo"}
+                      </span>
+                    </div>
+                  ) : (
+                    <p className="text-muted-foreground italic">Nenhuma pendente</p>
+                  )}
+                </div>
+              </div>
+            </SheetContent>
+          </Sheet>
+        )}
+
+        {/* ─── LEFT SIDEBAR (original, hidden when WhatsApp tab active) ─── */}
+        {!isWhatsAppTab && (
         <aside className="w-[380px] shrink-0 border-r border-border bg-card overflow-y-auto hidden lg:block">
           <div className="p-5 space-y-0">
             {/* ── Negociação ── */}
@@ -987,10 +1187,12 @@ export default function DealDetail() {
             )}
           </div>
         </aside>
+        )}
 
         {/* ─── RIGHT CONTENT ─── */}
         <div className="flex-1 flex flex-col overflow-hidden">
-          {/* ── Próximas Tarefas (top card) ── */}
+          {/* ── Próximas Tarefas (top card, hidden when WhatsApp tab active) ── */}
+          {!isWhatsAppTab && (
           <div className="shrink-0 border-b border-border bg-card p-3 sm:p-5">
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-[13px] font-semibold text-foreground flex items-center gap-2">
@@ -1011,7 +1213,7 @@ export default function DealDetail() {
                 <TaskRow key={pendingTasks[0].id} task={pendingTasks[0]} onUpdate={() => tasksQ.refetch()} />
                 {pendingTasks.length > 1 && (
                   <button
-                    onClick={() => setActiveTab("tasks")}
+                    onClick={() => handleSetActiveTab("tasks")}
                     className="w-full text-center text-xs text-primary hover:text-primary/80 font-medium py-1.5 rounded-md hover:bg-primary/5 transition-colors"
                   >
                     Ver todas ({pendingTasks.length} tarefas pendentes)
@@ -1020,6 +1222,7 @@ export default function DealDetail() {
               </div>
             )}
           </div>
+          )}
 
           {/* ── Tab bar ── */}
           <div className="shrink-0 flex items-center gap-0 px-2 sm:px-4 border-b border-border bg-card overflow-x-auto scrollbar-none">
@@ -1036,7 +1239,7 @@ export default function DealDetail() {
               return (
                 <button
                   key={tab.key}
-                  onClick={() => setActiveTab(tab.key)}
+                  onClick={() => handleSetActiveTab(tab.key)}
                   className={`flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-4 py-2.5 sm:py-3 text-[12px] sm:text-[13px] font-medium transition-all relative whitespace-nowrap
                     ${isActive
                       ? "text-primary"
@@ -1092,7 +1295,13 @@ export default function DealDetail() {
               />
             )}
             {activeTab === "whatsapp" && (
-              <WhatsAppPanel contact={contact} dealId={dealId} />
+              <WhatsAppPanel
+                contact={contact}
+                dealId={dealId}
+                isFullscreen={chatFullscreen}
+                onToggleFullscreen={() => setChatFullscreen(f => !f)}
+                onOpenSidebar={() => setWaSidebarDrawerOpen(true)}
+              />
             )}
             {activeTab === "ai-analysis" && (
               <AiAnalysisPanel dealId={dealId} contactName={contact?.name || "Contato"} />
@@ -2891,7 +3100,10 @@ function AiAnalysisPanel({ dealId, contactName }: { dealId: number; contactName:
    WHATSAPP PANEL
    ═══════════════════════════════════════════════════════════════════ */
 
-function WhatsAppPanel({ contact, dealId }: { contact: any; dealId: number }) {
+function WhatsAppPanel({ contact, dealId, isFullscreen, onToggleFullscreen, onOpenSidebar }: {
+  contact: any; dealId: number;
+  isFullscreen?: boolean; onToggleFullscreen?: () => void; onOpenSidebar?: () => void;
+}) {
   const [viewMode, setViewMode] = useState<"history" | "live">("history");
   const [loadMoreBefore, setLoadMoreBefore] = useState<number | undefined>(undefined);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -2994,6 +3206,26 @@ function WhatsAppPanel({ contact, dealId }: { contact: any; dealId: number }) {
         </button>
         <div className="flex-1" />
         <span className="text-[10px] text-muted-foreground hidden sm:inline">Contato: {contact.name} · {contact.phone}</span>
+        {/* Mobile: button to open sidebar drawer */}
+        {onOpenSidebar && (
+          <button
+            onClick={onOpenSidebar}
+            className="md:hidden p-1.5 rounded-md hover:bg-muted transition-colors"
+            title="Ver detalhes"
+          >
+            <PanelLeftOpen className="h-4 w-4 text-muted-foreground" />
+          </button>
+        )}
+        {/* Fullscreen toggle */}
+        {onToggleFullscreen && (
+          <button
+            onClick={onToggleFullscreen}
+            className="hidden md:flex p-1.5 rounded-md hover:bg-muted transition-colors"
+            title={isFullscreen ? "Sair da tela cheia" : "Tela cheia"}
+          >
+            {isFullscreen ? <Minimize2 className="h-4 w-4 text-muted-foreground" /> : <Maximize2 className="h-4 w-4 text-muted-foreground" />}
+          </button>
+        )}
       </div>
 
       {viewMode === "history" ? (

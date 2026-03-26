@@ -5340,3 +5340,18 @@
 - [x] Corrigir botão lápis (editar tarefa) que não funciona ao clicar na página deal
 - [x] Menu do relógio: remover opções "Finalizar" e "Editar", manter apenas opção de adiar
 - [x] Manter botão finalizar tarefa como está
+
+## Split-View Layout na Aba WhatsApp (Mar 26)
+- [x] Layout CSS Grid 220px 1fr quando aba WhatsApp ativa
+- [x] Sidebar esquerdo com infos essenciais (valor, status, datas, contato)
+- [x] Reposicionar "Próximas tarefas" para sidebar (apenas aba WhatsApp)
+- [x] Restaurar "Próximas tarefas" na posição original nas outras abas
+- [x] Tarefa mais urgente/atrasada em formato compacto no sidebar
+- [x] Link "+ Criar tarefa" acima do card de tarefa no sidebar
+- [x] Painel de chat full-height (flex column, mensagens flex-1, input fixo no rodapé)
+- [x] Botão "Tela cheia" no header do chat (colapsa sidebar)
+- [x] Estado fullscreen local, reseta ao trocar de aba
+- [x] Responsividade: drawer/modal deslizante em telas < 768px
+- [x] Preservar layout 50/50 nas demais abas
+- [x] Preservar todos os estados (loading, error, empty)
+- [x] Nenhum estilo global modificado
