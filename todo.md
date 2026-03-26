@@ -5422,3 +5422,9 @@
 ## Bug Fix: Layout bagunçado na conversa importada como anotação (Mar 26)
 - [x] Backend: formatar cada mensagem em sua própria linha com dupla quebra de linha (\n\n) entre elas
 - [x] Frontend: exibição da nota já usa whitespace-pre-wrap — quebras de linha preservadas
+
+## Bug Fix: Formatação importação conversa v2 (Mar 26)
+- [x] Backend: cada mensagem em nova linha simples (\n), sem dupla quebra — formato WhatsApp padrão
+- [x] Backend: corrigir erro ao importar conversa dentro da negociação (dealId path) — adicionado try-catch com log detalhado
+- [x] Backend: incluir transcrição de áudio no formato "[Áudio] Transcrição de áudio: [texto]"
+- [x] Frontend: exibição correta com whitespace-pre-wrap já existente na linha 2219

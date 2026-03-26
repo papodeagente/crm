@@ -120,6 +120,7 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
         content: waMessages.content,
         mediaFileName: waMessages.mediaFileName,
         timestamp: waMessages.timestamp,
+        audioTranscription: waMessages.audioTranscription,
       })
         .from(waMessages)
         .where(and(...conditions))
@@ -137,6 +138,7 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
           content: waMessages.content,
           mediaFileName: waMessages.mediaFileName,
           timestamp: waMessages.timestamp,
+          audioTranscription: waMessages.audioTranscription,
         })
           .from(waMessages)
           .where(and(...conditions))
@@ -195,7 +197,11 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
         } else if (msgType === "image" || msgType === "imagemessage") {
           content = "[Imagem]";
         } else if (msgType === "audio" || msgType === "audiomessage" || msgType === "ptt" || msgType === "pttmessage") {
-          content = "[Áudio]";
+          if (msg.audioTranscription) {
+            content = `[Áudio] Transcrição de áudio: ${msg.audioTranscription}`;
+          } else {
+            content = "[Áudio]";
+          }
         } else if (msgType === "video" || msgType === "videomessage") {
           content = "[Vídeo]";
         } else if (msgType === "document" || msgType === "documentmessage" || msgType === "documentwithcaptionmessage") {
@@ -219,31 +225,37 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
         return { success: false, error: "Nenhuma mensagem válida encontrada (apenas mensagens de sistema)." };
       }
 
-      const noteBody = lines.join("\n\n");
+      const noteBody = lines.join("\n");
       const firstMsg = messages.find(m => !IGNORED_TYPES.has(m.messageType));
       const titleDate = firstMsg ? `${formatDate(firstMsg.timestamp)} ${formatTime(firstMsg.timestamp)}` : formatDate(new Date());
       const noteTitle = `Conversa WhatsApp — ${titleDate}`;
 
       // ── Save as CRM note (deal) or internal note (conversation) ──
       if (input.dealId) {
-        await crm.createNote({
-          tenantId,
-          entityType: "deal",
-          entityId: input.dealId,
-          body: `**${noteTitle}**\n\n${noteBody}`,
-          createdByUserId: ctx.user.id,
-        });
-        // Also log in deal history
-        await crm.createDealHistory({
-          dealId: input.dealId,
-          tenantId,
-          action: "note",
-          description: noteTitle,
-          actorUserId: ctx.user.id,
-          actorName: ctx.user.name || "Usuário",
-          eventCategory: "note",
-          eventSource: "user",
-        });
+        try {
+          console.log(`[ImportConversation] Saving note for deal ${input.dealId}, tenant ${tenantId}, body length: ${noteBody.length}`);
+          await crm.createNote({
+            tenantId,
+            entityType: "deal",
+            entityId: input.dealId,
+            body: `**${noteTitle}**\n\n${noteBody}`,
+            createdByUserId: ctx.user.id,
+          });
+          // Also log in deal history
+          await crm.createDealHistory({
+            dealId: input.dealId,
+            tenantId,
+            action: "note",
+            description: noteTitle,
+            actorUserId: ctx.user.id,
+            actorName: ctx.user.name || "Usuário",
+            eventCategory: "note",
+            eventSource: "user",
+          });
+        } catch (err: any) {
+          console.error(`[ImportConversation] Error saving deal note:`, err?.message || err);
+          return { success: false, error: `Erro ao salvar nota na negociação: ${err?.message || "Erro desconhecido"}` };
+        }
       } else if (input.waConversationId) {
         await createInternalNote(
           tenantId,
