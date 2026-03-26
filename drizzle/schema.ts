@@ -625,9 +625,23 @@ export const dealHistory = mysqlTable("deal_history", {
   actorUserId: int("actorUserId"),
   actorName: varchar("actorName", { length: 255 }),
   metadataJson: json("metadataJson"),
+  /** Timeline category for filtering (conversion, whatsapp, task, funnel, proposal, product, note, assignment, automation, audit, imported_data) */
+  eventCategory: varchar("eventCategory", { length: 32 }),
+  /** Source of the event (user, system, webhook, automation, rd_station, whatsapp, api) */
+  eventSource: varchar("eventSource", { length: 32 }),
+  /** Optional contact reference for contact-scoped timeline */
+  contactId: int("contactId"),
+  /** Idempotency key to prevent duplicate events */
+  dedupeKey: varchar("dedupeKey", { length: 255 }),
+  /** Timestamp of when the event actually occurred (may differ from createdAt for imported events) */
+  occurredAt: timestamp("occurredAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 }, (t) => [
   index("dh_tenant_deal_idx").on(t.tenantId, t.dealId),
+  index("dh_tenant_deal_cat_idx").on(t.tenantId, t.dealId, t.eventCategory),
+  index("dh_tenant_contact_idx").on(t.tenantId, t.contactId),
+  index("dh_dedupe_idx").on(t.dedupeKey),
+  index("dh_occurred_idx").on(t.tenantId, t.dealId, t.occurredAt),
 ]);
 
 // ════════════════════════════════════════════════════════════

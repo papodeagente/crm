@@ -1,4 +1,4 @@
-import { eq, and, desc, asc, like, sql, inArray, count, sum, gte, lt, lte, ne, isNull, isNotNull } from "drizzle-orm";
+import { eq, and, or, desc, asc, like, sql, inArray, count, sum, gte, lt, lte, ne, isNull, isNotNull } from "drizzle-orm";
 import { getDb } from "./db";
 import {
   tenants, crmUsers, teams, teamMembers, roles, permissions, rolePermissions, userRoles, apiKeys,
@@ -560,14 +560,149 @@ export async function recalcDealValue(tenantId: number, dealId: number) {
 // ═══════════════════════════════════════
 // DEAL HISTORY
 // ═══════════════════════════════════════
-export async function createDealHistory(data: { tenantId: number; dealId: number; action: string; description: string; fromStageId?: number; toStageId?: number; fromStageName?: string; toStageName?: string; fieldChanged?: string; oldValue?: string; newValue?: string; actorUserId?: number; actorName?: string; metadataJson?: any }) {
+export async function createDealHistory(data: {
+  tenantId: number; dealId: number; action: string; description: string;
+  fromStageId?: number; toStageId?: number; fromStageName?: string; toStageName?: string;
+  fieldChanged?: string; oldValue?: string; newValue?: string;
+  actorUserId?: number; actorName?: string; metadataJson?: any;
+  eventCategory?: string; eventSource?: string; contactId?: number;
+  dedupeKey?: string; occurredAt?: Date;
+}) {
   const db = await getDb(); if (!db) return null;
   const [result] = await db.insert(dealHistory).values(data).$returningId();
   return result;
 }
+
 export async function listDealHistory(tenantId: number, dealId: number) {
   const db = await getDb(); if (!db) return [];
   return db.select().from(dealHistory).where(and(eq(dealHistory.tenantId, tenantId), eq(dealHistory.dealId, dealId))).orderBy(desc(dealHistory.createdAt));
+}
+
+/** Unified timeline: deal_history + wa_messages for a deal, with optional category filter */
+export async function getDealTimeline(tenantId: number, dealId: number, opts?: {
+  categories?: string[];
+  limit?: number;
+  offset?: number;
+  includeWhatsApp?: boolean;
+}) {
+  const db = await getDb(); if (!db) return { events: [] as any[], total: 0, hasMore: false };
+  const limit = opts?.limit ?? 50;
+  const offset = opts?.offset ?? 0;
+  const categories = opts?.categories;
+  const includeWA = opts?.includeWhatsApp !== false;
+
+  // Build conditions for deal_history
+  const conditions: any[] = [
+    eq(dealHistory.tenantId, tenantId),
+    eq(dealHistory.dealId, dealId),
+  ];
+  // If categories filter is set and doesn't include 'whatsapp', only filter deal_history
+  if (categories && categories.length > 0) {
+    // Include null eventCategory (legacy events) when no specific filter
+    const catConditions = categories.map(c => eq(dealHistory.eventCategory, c));
+    // Also include legacy events (eventCategory is null) unless filtering specifically
+    if (categories.includes('funnel') || categories.includes('audit')) {
+      catConditions.push(isNull(dealHistory.eventCategory));
+    }
+    conditions.push(or(...catConditions));
+  }
+
+  const historyRows = await db.select()
+    .from(dealHistory)
+    .where(and(...conditions))
+    .orderBy(desc(dealHistory.createdAt))
+    .limit(limit + 100) // fetch extra for merging
+    .offset(offset);
+
+  // Map history rows to timeline events
+  const events: any[] = historyRows.map(h => ({
+    id: `dh-${h.id}`,
+    type: 'history',
+    action: h.action,
+    description: h.description,
+    actorName: h.actorName,
+    actorUserId: h.actorUserId,
+    eventCategory: h.eventCategory || categorizeAction(h.action),
+    eventSource: h.eventSource || 'user',
+    fromStageName: h.fromStageName,
+    toStageName: h.toStageName,
+    fieldChanged: h.fieldChanged,
+    oldValue: h.oldValue,
+    newValue: h.newValue,
+    metadataJson: h.metadataJson,
+    occurredAt: h.occurredAt || h.createdAt,
+    createdAt: h.createdAt,
+  }));
+
+  // If includeWhatsApp and (no category filter or 'whatsapp' is in categories)
+  if (includeWA && (!categories || categories.length === 0 || categories.includes('whatsapp'))) {
+    // Get the deal's waConversationId to fetch messages
+    const [deal] = await db.select({ waConversationId: deals.waConversationId, contactId: deals.contactId })
+      .from(deals)
+      .where(and(eq(deals.id, dealId), eq(deals.tenantId, tenantId)))
+      .limit(1);
+
+    if (deal?.waConversationId) {
+      const { waMessages } = await import("../drizzle/schema");
+      const waRows = await db.select({
+        id: waMessages.id,
+        content: waMessages.content,
+        fromMe: waMessages.fromMe,
+        pushName: waMessages.pushName,
+        messageType: waMessages.messageType,
+        timestamp: waMessages.timestamp,
+        status: waMessages.status,
+      })
+        .from(waMessages)
+        .where(eq(waMessages.waConversationId, deal.waConversationId))
+        .orderBy(desc(waMessages.timestamp))
+        .limit(limit);
+
+      waRows.forEach(m => {
+        events.push({
+          id: `wa-${m.id}`,
+          type: 'whatsapp',
+          action: 'whatsapp_message',
+          description: m.content || (m.messageType !== 'text' ? `[${m.messageType}]` : '[mensagem]'),
+          actorName: m.fromMe ? 'Agente' : (m.pushName || 'Contato'),
+          eventCategory: 'whatsapp',
+          eventSource: 'whatsapp',
+          metadataJson: { fromMe: m.fromMe, messageType: m.messageType, status: m.status, pushName: m.pushName },
+          occurredAt: m.timestamp,
+          createdAt: m.timestamp,
+        });
+      });
+    }
+  }
+
+  // Sort all events by occurredAt desc
+  events.sort((a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime());
+
+  return {
+    events: events.slice(0, limit),
+    total: events.length,
+    hasMore: events.length > limit,
+  };
+}
+
+/** Categorize legacy actions that don't have eventCategory */
+function categorizeAction(action: string): string {
+  switch (action) {
+    case 'created': return 'funnel';
+    case 'stage_moved': return 'funnel';
+    case 'status_changed': return 'funnel';
+    case 'field_changed': return 'audit';
+    case 'product_added': case 'product_updated': case 'product_removed': return 'product';
+    case 'participant_added': case 'participant_removed': return 'assignment';
+    case 'deleted': case 'restored': return 'audit';
+    case 'whatsapp_backup': return 'whatsapp';
+    case 'import': return 'imported_data';
+    case 'note': return 'note';
+    case 'task_created': case 'task_completed': case 'task_cancelled': case 'task_reopened':
+    case 'task_edited': case 'task_deleted': case 'task_postponed': return 'task';
+    case 'conversion': return 'conversion';
+    default: return 'audit';
+  }
 }
 
 // ═══════════════════════════════════════
@@ -616,6 +751,12 @@ export async function createTask(data: { tenantId: number; entityType: string; e
     await db.insert(taskAssignees).values({ taskId: result.id, userId: data.createdByUserId, tenantId: data.tenantId });
   }
   return result;
+}
+
+export async function getTaskById(tenantId: number, taskId: number) {
+  const db = await getDb(); if (!db) return null;
+  const [task] = await db.select().from(tasks).where(and(eq(tasks.id, taskId), eq(tasks.tenantId, tenantId))).limit(1);
+  return task || null;
 }
 
 export async function listTasks(tenantId: number, opts?: { entityType?: string; entityId?: number; status?: string; taskType?: string; assigneeUserId?: number; dateFrom?: string; dateTo?: string; limit?: number; offset?: number; createdByUserId?: number }) {

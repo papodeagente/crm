@@ -3,6 +3,7 @@ import { trpc } from "@/lib/trpc";
 import { useSocket } from "@/hooks/useSocket";
 import { useState, useMemo, useRef, useEffect } from "react";
 import WhatsAppChat from "@/components/WhatsAppChat";
+import { DealTimeline } from "@/components/DealTimeline";
 import { useRoute, useLocation, Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -1293,13 +1294,7 @@ export default function DealDetail() {
           {/* ── Tab content ── */}
           <div className={`flex-1 ${activeTab === "whatsapp" ? "overflow-hidden flex flex-col" : "overflow-y-auto"}`}>
             {activeTab === "history" && (
-              <HistoryPanel
-                history={historyQ.data || []}
-                notes={notesQ.data || []}
-                dealId={dealId}
-                contactName={contact?.name || "Contato"}
-                onNoteCreated={() => { notesQ.refetch(); historyQ.refetch(); }}
-              />
+              <DealTimeline dealId={dealId} />
             )}
             {activeTab === "tasks" && (
               <TasksPanel

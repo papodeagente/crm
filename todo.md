@@ -5379,3 +5379,22 @@
 - [x] Aplicar nos filtros de contatos e negociações
 - [x] Aplicar no TaskFormDialog (busca negociação vinculada)
 - [x] Garantir performance: debounce 300ms, limite de resultados, highlight do termo buscado
+
+## Evolução do Histórico da Negociação - Timeline Completa (Mar 26)
+- [x] Modelar tabela canônica deal_timeline_events no schema e migrar (estendido deal_history com eventCategory, eventSource, contactId, dedupeKey, occurredAt)
+- [x] Implementar funções de ingestão de eventos e endpoint tRPC de timeline (getDealTimeline + crm.deals.timeline)
+- [x] Instrumentar hooks de tarefas (criar, editar, adiar, concluir, cancelar, reabrir)
+- [x] Instrumentar hooks de funil (já existentes no deal_history - created, stage_moved, status_changed)
+- [x] Instrumentar hooks de responsável (já existentes - participant_added, participant_removed)
+- [x] Instrumentar hooks de propostas (já existentes - proposal_added, proposal_removed)
+- [x] Instrumentar hooks de produtos (já existentes - product_added, product_updated, product_removed)
+- [x] Instrumentar hooks de anotações (criar nota agora registra na timeline)
+- [x] Instrumentar hooks de automação/sistema (categoria automation suportada)
+- [x] Implementar ingestão de WhatsApp mensagem por mensagem na timeline (mesclado dinamicamente de wa_messages)
+- [x] Implementar ingestão de conversão e dados importados (mesclado dinamicamente de contactConversionEvents)
+- [x] Implementar frontend: componente DealTimeline cronológica com ícones/categorias
+- [x] Implementar filtros por checkbox (Funil, WhatsApp, Tarefas, Anotações, Produtos, Participantes, Conversões, Auditoria, Automação)
+- [x] Integrar timeline na página de negociação (DealDetail) - substituiu HistoryPanel
+- [x] Paginação da timeline (load more com offset, limite de 50 por página)
+- [x] Idempotência na gravação de eventos (coluna dedupeKey com unique index)
+- [x] Testes obrigatórios cobrindo todos os cenários (14 testes passando)

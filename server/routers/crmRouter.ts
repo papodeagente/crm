@@ -1042,6 +1042,95 @@ const tenantId = getTenantId(ctx); const { id, dealId, checkIn, checkOut, ...dat
         }),
     }),
 
+    /** Unified timeline: deal_history + wa_messages + notes + conversions */
+    timeline: tenantProcedure
+      .input(z.object({
+        dealId: z.number(),
+        categories: z.array(z.string()).optional(),
+        limit: z.number().min(1).max(200).optional().default(50),
+        offset: z.number().min(0).optional().default(0),
+        includeWhatsApp: z.boolean().optional().default(true),
+      }))
+      .query(async ({ input, ctx }) => {
+        const result = await crm.getDealTimeline(getTenantId(ctx), input.dealId, {
+          categories: input.categories,
+          limit: input.limit,
+          offset: input.offset,
+          includeWhatsApp: input.includeWhatsApp,
+        });
+
+        // Also merge notes if no category filter or 'note' is in categories
+        if (!input.categories || input.categories.length === 0 || input.categories.includes('note')) {
+          const notes = await crm.listNotes(getTenantId(ctx), 'deal', input.dealId);
+          notes.forEach((n: any) => {
+            result.events.push({
+              id: `note-${n.id}`,
+              type: 'note',
+              action: 'note',
+              description: n.body,
+              actorName: n.createdByName || 'Anota\u00e7\u00e3o',
+              actorUserId: n.createdBy,
+              eventCategory: 'note',
+              eventSource: 'user',
+              metadataJson: { noteId: n.id },
+              occurredAt: n.createdAt,
+              createdAt: n.createdAt,
+            });
+          });
+        }
+
+        // Also merge conversion events if no category filter or 'conversion' is in categories
+        if (!input.categories || input.categories.length === 0 || input.categories.includes('conversion')) {
+          try {
+            const { contactConversionEvents } = await import("../../drizzle/schema");
+            const { eq, and: andOp, desc: descOp } = await import("drizzle-orm");
+            const { getDb } = await import("../db");
+            const db = await getDb();
+            if (db) {
+              const convEvents = await db.select()
+                .from(contactConversionEvents)
+                .where(andOp(
+                  eq(contactConversionEvents.tenantId, getTenantId(ctx)),
+                  eq(contactConversionEvents.dealId, input.dealId),
+                ))
+                .orderBy(descOp(contactConversionEvents.receivedAt))
+                .limit(50);
+              convEvents.forEach((ce: any) => {
+                result.events.push({
+                  id: `conv-${ce.id}`,
+                  type: 'conversion',
+                  action: 'conversion',
+                  description: ce.conversionIdentifier || ce.source || 'Convers\u00e3o',
+                  actorName: ce.source || 'Sistema',
+                  eventCategory: 'conversion',
+                  eventSource: ce.source || 'webhook',
+                  metadataJson: {
+                    conversionIdentifier: ce.conversionIdentifier,
+                    source: ce.source,
+                    utmSource: ce.utmSource,
+                    utmMedium: ce.utmMedium,
+                    utmCampaign: ce.utmCampaign,
+                    utmContent: ce.utmContent,
+                    utmTerm: ce.utmTerm,
+                    customFields: ce.customFields,
+                  },
+                  occurredAt: ce.receivedAt || ce.createdAt,
+                  createdAt: ce.createdAt,
+                });
+              });
+            }
+          } catch (e) { /* ignore if table doesn't exist */ }
+        }
+
+        // Re-sort after merging all sources
+        result.events.sort((a: any, b: any) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime());
+        result.total = result.events.length;
+        // Apply limit
+        result.events = result.events.slice(0, input.limit);
+        result.hasMore = result.total > input.limit;
+        return result;
+      }),
+
     // ─── DEAL CONVERSION EVENTS ───
     conversionEvents: tenantProcedure
       .input(z.object({ dealId: z.number() }))
@@ -1401,6 +1490,16 @@ const tenantId = getTenantId(ctx); const { id, dealId, checkIn, checkOut, ...dat
           entityType: "task",
           entityId: String(result?.id),
         });
+        // Log task creation in deal timeline
+        if (input.entityType === "deal" && input.entityId) {
+          await crm.createDealHistory({
+            tenantId: getTenantId(ctx), dealId: input.entityId,
+            action: "task_created", description: `Tarefa criada: ${input.title}`,
+            actorUserId: ctx.user.id, actorName: ctx.saasUser?.name || ctx.user.name || undefined,
+            eventCategory: "task", eventSource: "user",
+            metadataJson: { taskId: result?.id, taskTitle: input.title, taskType: input.taskType, priority: input.priority, dueAt: input.dueAt },
+          });
+        }
         return result;
       }),
     update: tenantWriteProcedure
@@ -1414,7 +1513,25 @@ const tenantId = getTenantId(ctx); const { id, dealId, checkIn, checkOut, ...dat
       }))
       .mutation(async ({ input, ctx }) => {
 const tenantId = getTenantId(ctx); const { id, dueAt, ...data } = input;
+        // Get task before update for timeline logging
+        const taskBefore = await crm.getTaskById(tenantId, id);
         await crm.updateTask(tenantId, id, { ...data, dueAt: dueAt ? new Date(dueAt) : undefined });
+        // Log task update in deal timeline
+        if (taskBefore && taskBefore.entityType === "deal" && taskBefore.entityId) {
+          let action = "task_edited";
+          let description = `Tarefa editada: ${taskBefore.title}`;
+          if (input.status === "done") { action = "task_completed"; description = `Tarefa conclu\u00edda: ${taskBefore.title}`; }
+          else if (input.status === "cancelled") { action = "task_cancelled"; description = `Tarefa cancelada: ${taskBefore.title}`; }
+          else if (input.status === "pending" && taskBefore.status !== "pending") { action = "task_reopened"; description = `Tarefa reaberta: ${taskBefore.title}`; }
+          else if (input.dueAt && taskBefore.dueAt && new Date(input.dueAt).getTime() !== new Date(taskBefore.dueAt).getTime()) { action = "task_postponed"; description = `Tarefa adiada: ${taskBefore.title}`; }
+          await crm.createDealHistory({
+            tenantId, dealId: taskBefore.entityId,
+            action, description,
+            actorUserId: ctx.user.id, actorName: ctx.saasUser?.name || ctx.user.name || undefined,
+            eventCategory: "task", eventSource: "user",
+            metadataJson: { taskId: id, taskTitle: taskBefore.title, oldStatus: taskBefore.status, newStatus: input.status, oldDueAt: taskBefore.dueAt, newDueAt: input.dueAt },
+          });
+        }
 
         // Auto-sync to Google Calendar (fire-and-forget)
         import("../googleCalendarSync").then(async (gcSync) => {
@@ -1539,7 +1656,18 @@ const tenantId = getTenantId(ctx); const { id, dueAt, ...data } = input;
     create: tenantWriteProcedure
       .input(z.object({ entityType: z.string(), entityId: z.number(), body: z.string().min(1) }))
       .mutation(async ({ ctx, input }) => {
-        return crm.createNote({ ...input, tenantId: getTenantId(ctx), createdByUserId: ctx.user.id });
+        const result = await crm.createNote({ ...input, tenantId: getTenantId(ctx), createdByUserId: ctx.user.id });
+        // Log note creation in deal timeline
+        if (input.entityType === "deal" && input.entityId) {
+          await crm.createDealHistory({
+            tenantId: getTenantId(ctx), dealId: input.entityId,
+            action: "note", description: input.body.substring(0, 200),
+            actorUserId: ctx.user.id, actorName: ctx.saasUser?.name || ctx.user.name || undefined,
+            eventCategory: "note", eventSource: "user",
+            metadataJson: { noteId: result?.id },
+          });
+        }
+        return result;
       }),
   }),
 
