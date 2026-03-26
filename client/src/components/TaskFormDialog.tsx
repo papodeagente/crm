@@ -11,12 +11,13 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { DatePicker } from "@/components/ui/date-picker";
 import {
-  X, Phone, Mail, Video, MessageSquare, CheckSquare,
+  X, Phone, Mail, Video, MessageSquare, CheckSquare, Send, Clock, AlertCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 export const taskTypeOptions = [
   { value: "task", label: "Tarefa", icon: CheckSquare },
   { value: "whatsapp", label: "WhatsApp", icon: MessageSquare },
+  { value: "whatsapp_scheduled_send", label: "Disparar WhatsApp", icon: Send },
   { value: "phone", label: "Telefone", icon: Phone },
   { value: "email", label: "E-mail", icon: Mail },
   { value: "video_call", label: "Videoconferência", icon: Video },
@@ -36,6 +37,10 @@ interface TaskFormDialogProps {
   /** Pre-fill deal context (when creating from a deal page) */
   dealId?: number;
   dealTitle?: string;
+  /** Contact ID for whatsapp_scheduled_send */
+  contactId?: number;
+  contactName?: string;
+  contactPhone?: string;
   /** Pre-fill for editing an existing task */
   editTask?: {
     id: number;
@@ -48,6 +53,9 @@ interface TaskFormDialogProps {
     status?: string;
     priority?: string | null;
     assignedToUserId?: number | null;
+    waMessageBody?: string | null;
+    waScheduledAt?: string | Date | null;
+    waStatus?: string | null;
   };
   /** Existing assignee user IDs for edit mode */
   editAssigneeIds?: number[];
@@ -62,6 +70,9 @@ export default function TaskFormDialog({
   onOpenChange,
   dealId,
   dealTitle,
+  contactId: propContactId,
+  contactName: propContactName,
+  contactPhone: propContactPhone,
   editTask,
   editAssigneeIds,
   onSuccess,
@@ -81,6 +92,11 @@ export default function TaskFormDialog({
   const [selectedDealId, setSelectedDealId] = useState<number | null>(null);
   const [selectedAccountId, setSelectedAccountId] = useState<string>("none");
 
+  // WhatsApp scheduled send state
+  const [waMessageBody, setWaMessageBody] = useState("");
+
+  const isScheduledWhatsApp = taskType === "whatsapp_scheduled_send";
+
   // Data queries
   const crmUsers = trpc.admin.users.list.useQuery();
   const deals = trpc.crm.deals.list.useQuery(
@@ -90,6 +106,16 @@ export default function TaskFormDialog({
   const allAccounts = trpc.crm.accounts.list.useQuery(undefined,
     { enabled: showDealSelector }
   );
+
+  // Fetch deal detail to get contactId when in scheduled WA mode
+  const effectiveDealIdForContact = showDealSelector ? selectedDealId : (dealId || editTask?.entityId);
+  const dealDetail = trpc.crm.deals.get.useQuery(
+    { id: effectiveDealIdForContact! },
+    { enabled: isScheduledWhatsApp && !!effectiveDealIdForContact }
+  );
+  const resolvedContactId = propContactId || (dealDetail.data as any)?.contactId;
+  const resolvedContactName = propContactName || (dealDetail.data as any)?.contactName;
+  const resolvedContactPhone = propContactPhone || (dealDetail.data as any)?.contactPhone || (dealDetail.data as any)?.contactPhoneE164;
 
   // Mutations
   const createTask = trpc.crm.tasks.create.useMutation({
@@ -102,6 +128,18 @@ export default function TaskFormDialog({
       onSuccess?.();
     },
     onError: (err) => toast.error(`Erro ao criar tarefa: ${err.message}`),
+  });
+
+  const createScheduledWA = trpc.crm.tasks.scheduledWhatsApp.create.useMutation({
+    onSuccess: () => {
+      toast.success("Disparo de WhatsApp agendado com sucesso!");
+      utils.crm.tasks.list.invalidate();
+      utils.crm.tasks.overdueSummary.invalidate();
+      utils.crm.tasks.pendingCounts.invalidate();
+      onOpenChange(false);
+      onSuccess?.();
+    },
+    onError: (err) => toast.error(`Erro ao agendar disparo: ${err.message}`),
   });
 
   const updateTask = trpc.crm.tasks.update.useMutation({
@@ -139,6 +177,7 @@ export default function TaskFormDialog({
       setAssigneeUserIds(editAssigneeIds || (editTask.assignedToUserId ? [editTask.assignedToUserId] : []));
       setMarkAsDone(editTask.status === "done");
       setSelectedDealId(editTask.entityType === "deal" ? editTask.entityId : null);
+      setWaMessageBody(editTask.waMessageBody || "");
     } else {
       setTitle("");
       setDescription("");
@@ -152,6 +191,7 @@ export default function TaskFormDialog({
       setMarkAsDone(false);
       setSelectedDealId(dealId || null);
       setSelectedAccountId("none");
+      setWaMessageBody("");
     }
   }, [open, editTask, dealId, editAssigneeIds]);
 
@@ -173,7 +213,7 @@ export default function TaskFormDialog({
   };
 
   const handleSubmit = async () => {
-    if (!title.trim()) {
+    if (!isScheduledWhatsApp && !title.trim()) {
       toast.error("Informe o assunto da tarefa");
       return;
     }
@@ -182,15 +222,51 @@ export default function TaskFormDialog({
       return;
     }
     if (!dueTime) {
-      toast.error("Informe o horário da tarefa");
+      toast.error("Informe o horário");
+      return;
+    }
+
+    const dueAt = `${dueDate}T${dueTime}:00`;
+
+    // ── Scheduled WhatsApp Send ──
+    if (isScheduledWhatsApp && !isEditMode) {
+      if (!waMessageBody.trim()) {
+        toast.error("Informe a mensagem do WhatsApp");
+        return;
+      }
+      const targetDealId = effectiveDealId;
+      if (!targetDealId) {
+        toast.error("Selecione uma negociação");
+        return;
+      }
+      if (!resolvedContactId) {
+        toast.error("Negociação sem contato vinculado. Vincule um contato antes de agendar.");
+        return;
+      }
+
+      await createScheduledWA.mutateAsync({
+        entityType: "deal",
+        entityId: targetDealId,
+        contactId: resolvedContactId,
+        dealId: targetDealId,
+        messageBody: waMessageBody,
+        scheduledAt: dueAt,
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "America/Sao_Paulo",
+        assignedToUserId: assigneeUserIds[0] || undefined,
+        title: title.trim() || undefined,
+      });
+      return;
+    }
+
+    // ── Regular task ──
+    if (!title.trim()) {
+      toast.error("Informe o assunto da tarefa");
       return;
     }
     if (assigneeUserIds.length === 0) {
       toast.error("Selecione ao menos um responsável");
       return;
     }
-
-    const dueAt = `${dueDate}T${dueTime}:00`;
 
     if (isEditMode && editTask) {
       await updateTask.mutateAsync({
@@ -233,14 +309,16 @@ export default function TaskFormDialog({
     }
   };
 
-  const isPending = createTask.isPending || updateTask.isPending;
+  const isPending = createTask.isPending || updateTask.isPending || createScheduledWA.isPending;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[520px] p-0 gap-0 rounded-2xl overflow-hidden">
         <DialogHeader className="px-6 pt-6 pb-0">
           <DialogTitle className="text-lg font-bold text-foreground">
-            {isEditMode ? "Editar Tarefa" : "Criar Tarefa"}
+            {isScheduledWhatsApp
+              ? "Agendar Disparo de WhatsApp"
+              : isEditMode ? "Editar Tarefa" : "Criar Tarefa"}
           </DialogTitle>
         </DialogHeader>
 
@@ -288,40 +366,126 @@ export default function TaskFormDialog({
           ) : effectiveDealTitle ? (
             <div className="space-y-1.5">
               <Label className="text-[13px] font-semibold text-muted-foreground">Negociação</Label>
-              <div className="h-10 px-3 flex items-center rounded-xl bg-muted/40 border border-border/40 text-[13px] text-foreground font-medium">
+              <div className="h-10 px-3 flex items-center rounded-xl bg-muted/50 text-[13px] text-foreground font-medium">
                 {effectiveDealTitle}
               </div>
             </div>
           ) : null}
 
-          {/* Assunto da tarefa */}
+          {/* Tipo de tarefa */}
           <div className="space-y-1.5">
             <Label className="text-[13px] font-semibold text-foreground">
-              Assunto da tarefa <span className="text-destructive">*</span>
+              Tipo de tarefa <span className="text-destructive">*</span>
             </Label>
-            <Input
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Assunto da tarefa"
-              className="h-10 rounded-xl border-border/60"
-            />
+            <Select value={taskType} onValueChange={setTaskType}>
+              <SelectTrigger className="h-10 rounded-xl border-border/60">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {taskTypeOptions.map(opt => {
+                  const Icon = opt.icon;
+                  return (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      <span className="flex items-center gap-2">
+                        <Icon className="h-4 w-4 text-primary" />
+                        {opt.label}
+                      </span>
+                    </SelectItem>
+                  );
+                })}
+              </SelectContent>
+            </Select>
           </div>
 
-          {/* Descrição */}
-          <div className="space-y-1.5">
-            <Label className="text-[13px] font-semibold text-foreground">Descrição da tarefa</Label>
-            <Textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Descrição da tarefa"
-              className="min-h-[80px] rounded-xl border-border/60 resize-y"
-            />
-          </div>
+          {/* ── WhatsApp Scheduled Send fields ── */}
+          {isScheduledWhatsApp && (
+            <>
+              {/* Contact info */}
+              {resolvedContactName && (
+                <div className="flex items-center gap-3 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
+                  <Send className="h-4 w-4 text-emerald-600 shrink-0" />
+                  <div className="text-[13px]">
+                    <span className="font-semibold text-foreground">{resolvedContactName}</span>
+                    {resolvedContactPhone && (
+                      <span className="text-muted-foreground ml-2">{resolvedContactPhone}</span>
+                    )}
+                  </div>
+                </div>
+              )}
+              {!resolvedContactId && effectiveDealId && !dealDetail.isLoading && (
+                <div className="flex items-center gap-3 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20">
+                  <AlertCircle className="h-4 w-4 text-amber-600 shrink-0" />
+                  <span className="text-[13px] text-amber-700">
+                    Negociação sem contato vinculado. Vincule um contato antes de agendar.
+                  </span>
+                </div>
+              )}
+
+              {/* Message body */}
+              <div className="space-y-1.5">
+                <Label className="text-[13px] font-semibold text-foreground">
+                  Mensagem do WhatsApp <span className="text-destructive">*</span>
+                </Label>
+                <Textarea
+                  value={waMessageBody}
+                  onChange={(e) => setWaMessageBody(e.target.value)}
+                  placeholder="Digite a mensagem que será enviada via WhatsApp..."
+                  className="min-h-[120px] rounded-xl border-border/60 resize-y"
+                />
+                <p className="text-[11px] text-muted-foreground">
+                  {waMessageBody.length} caracteres
+                </p>
+              </div>
+            </>
+          )}
+
+          {/* Assunto da tarefa (optional for scheduled WA) */}
+          {!isScheduledWhatsApp && (
+            <div className="space-y-1.5">
+              <Label className="text-[13px] font-semibold text-foreground">
+                Assunto da tarefa <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="Assunto da tarefa"
+                className="h-10 rounded-xl border-border/60"
+              />
+            </div>
+          )}
+
+          {isScheduledWhatsApp && (
+            <div className="space-y-1.5">
+              <Label className="text-[13px] font-semibold text-foreground">
+                Titulo da tarefa <span className="text-muted-foreground text-[11px]">(opcional)</span>
+              </Label>
+              <Input
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder={`WhatsApp para ${resolvedContactName || "contato"}`}
+                className="h-10 rounded-xl border-border/60"
+              />
+            </div>
+          )}
+
+          {/* Descrição (hidden for scheduled WA) */}
+          {!isScheduledWhatsApp && (
+            <div className="space-y-1.5">
+              <Label className="text-[13px] font-semibold text-foreground">Descrição da tarefa</Label>
+              <Textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Descrição da tarefa"
+                className="min-h-[80px] rounded-xl border-border/60 resize-y"
+              />
+            </div>
+          )}
 
           {/* Responsável */}
           <div className="space-y-1.5">
             <Label className="text-[13px] font-semibold text-foreground">
-              Responsável <span className="text-destructive">*</span>
+              Responsável {!isScheduledWhatsApp && <span className="text-destructive">*</span>}
+              {isScheduledWhatsApp && <span className="text-muted-foreground text-[11px] ml-1">(quem envia)</span>}
             </Label>
             <div className="border border-border/60 rounded-xl p-2.5 min-h-[42px]">
               <div className="flex flex-wrap gap-1.5 mb-1">
@@ -368,36 +532,11 @@ export default function TaskFormDialog({
             </div>
           </div>
 
-          {/* Tipo de tarefa */}
-          <div className="space-y-1.5">
-            <Label className="text-[13px] font-semibold text-foreground">
-              Tipo de tarefa <span className="text-destructive">*</span>
-            </Label>
-            <Select value={taskType} onValueChange={setTaskType}>
-              <SelectTrigger className="h-10 rounded-xl border-border/60">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {taskTypeOptions.map(opt => {
-                  const Icon = opt.icon;
-                  return (
-                    <SelectItem key={opt.value} value={opt.value}>
-                      <span className="flex items-center gap-2">
-                        <Icon className="h-4 w-4 text-primary" />
-                        {opt.label}
-                      </span>
-                    </SelectItem>
-                  );
-                })}
-              </SelectContent>
-            </Select>
-          </div>
-
           {/* Data e Horário */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <Label className="text-[13px] font-semibold text-foreground">
-                Data do agendamento <span className="text-destructive">*</span>
+                {isScheduledWhatsApp ? "Data do envio" : "Data do agendamento"} <span className="text-destructive">*</span>
               </Label>
               <DatePicker
                 value={dueDate}
@@ -408,7 +547,7 @@ export default function TaskFormDialog({
             </div>
             <div className="space-y-1.5">
               <Label className="text-[13px] font-semibold text-foreground">
-                Horário da tarefa <span className="text-destructive">*</span>
+                {isScheduledWhatsApp ? "Horário do envio" : "Horário da tarefa"} <span className="text-destructive">*</span>
               </Label>
               <Input
                 type="time"
@@ -419,17 +558,30 @@ export default function TaskFormDialog({
             </div>
           </div>
 
-          {/* Marcar como concluída */}
-          <div className="flex items-center gap-2.5 pt-1">
-            <Checkbox
-              id="markAsDone"
-              checked={markAsDone}
-              onCheckedChange={(checked) => setMarkAsDone(checked === true)}
-            />
-            <Label htmlFor="markAsDone" className="text-[13px] text-foreground cursor-pointer">
-              {isEditMode ? "Marcar como concluída" : "Marcar como concluída ao criar"}
-            </Label>
-          </div>
+          {/* Info box for scheduled WA */}
+          {isScheduledWhatsApp && (
+            <div className="flex items-start gap-3 p-3 rounded-xl bg-sky-500/10 border border-sky-500/20">
+              <Clock className="h-4 w-4 text-sky-600 shrink-0 mt-0.5" />
+              <div className="text-[12px] text-sky-800 dark:text-sky-300 space-y-1">
+                <p className="font-medium">Como funciona o disparo agendado</p>
+                <p>A mensagem será enviada automaticamente na data e horário definidos, usando o WhatsApp do responsável selecionado. A conversa será vinculada ao responsável no Inbox.</p>
+              </div>
+            </div>
+          )}
+
+          {/* Marcar como concluída (hidden for scheduled WA) */}
+          {!isScheduledWhatsApp && (
+            <div className="flex items-center gap-2.5 pt-1">
+              <Checkbox
+                id="markAsDone"
+                checked={markAsDone}
+                onCheckedChange={(checked) => setMarkAsDone(checked === true)}
+              />
+              <Label htmlFor="markAsDone" className="text-[13px] text-foreground cursor-pointer">
+                {isEditMode ? "Marcar como concluída" : "Marcar como concluída ao criar"}
+              </Label>
+            </div>
+          )}
         </div>
 
         <Separator />
@@ -444,10 +596,18 @@ export default function TaskFormDialog({
           </Button>
           <Button
             onClick={handleSubmit}
-            disabled={isPending}
-            className="rounded-xl px-6 h-10 text-[13px] font-medium bg-primary hover:bg-primary/90"
+            disabled={isPending || (isScheduledWhatsApp && !resolvedContactId && !!effectiveDealId)}
+            className={`rounded-xl px-6 h-10 text-[13px] font-medium ${
+              isScheduledWhatsApp
+                ? "bg-emerald-600 hover:bg-emerald-700 text-white"
+                : "bg-primary hover:bg-primary/90"
+            }`}
           >
-            {isPending ? "Salvando..." : "Salvar"}
+            {isPending
+              ? "Salvando..."
+              : isScheduledWhatsApp
+                ? "Agendar Disparo"
+                : "Salvar"}
           </Button>
         </div>
       </DialogContent>

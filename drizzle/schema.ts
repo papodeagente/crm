@@ -686,9 +686,24 @@ export const tasks = mysqlTable("crm_tasks", {
   description: text("description"),
   googleEventId: varchar("googleEventId", { length: 512 }),
   googleCalendarSynced: boolean("googleCalendarSynced").default(false),
+  // ── WhatsApp Scheduled Send fields ──
+  waMessageBody: text("waMessageBody"),
+  waScheduledAt: timestamp("waScheduledAt"),
+  waTimezone: varchar("waTimezone", { length: 64 }),
+  waStatus: varchar("waStatus", { length: 32 }), // draft, scheduled, processing, sent, failed, cancelled
+  waSentAt: timestamp("waSentAt"),
+  waFailedAt: timestamp("waFailedAt"),
+  waFailureReason: text("waFailureReason"),
+  waMessageId: varchar("waMessageId", { length: 256 }),
+  waConversationId: int("waConversationId"),
+  waChannelId: int("waChannelId"),
+  waContactId: int("waContactId"),
+  waRetryCount: int("waRetryCount").default(0),
+  waProcessingLockId: varchar("waProcessingLockId", { length: 64 }),
+  waProcessingLockedAt: timestamp("waProcessingLockedAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-}, (t) => [index("tasks_tenant_idx").on(t.tenantId)]);
+}, (t) => [index("tasks_tenant_idx").on(t.tenantId), index("tasks_wa_scheduled_idx").on(t.taskType, t.waStatus, t.waScheduledAt)]);
 
 export const taskAssignees = mysqlTable("task_assignees", {
   id: int("id").autoincrement().primaryKey(),

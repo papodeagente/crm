@@ -1479,6 +1479,54 @@ const tenantId = getTenantId(ctx); const { id, dueAt, ...data } = input;
       .query(async ({ input, ctx }) => {
         return crm.getPendingTaskCountsByDeal(getTenantId(ctx));
       }),
+    // ── Scheduled WhatsApp Send ──
+    scheduledWhatsApp: router({
+      create: tenantWriteProcedure
+        .input(z.object({
+          entityType: z.string(),
+          entityId: z.number(),
+          contactId: z.number(),
+          dealId: z.number().optional(),
+          messageBody: z.string().min(1),
+          scheduledAt: z.string(),
+          timezone: z.string().default("America/Sao_Paulo"),
+          channelId: z.number().optional(),
+          assignedToUserId: z.number().optional(),
+          priority: z.enum(["low", "medium", "high", "urgent"]).optional(),
+          title: z.string().optional(),
+        }))
+        .mutation(async ({ ctx, input }) => {
+          const { createScheduledWhatsApp } = await import("../services/scheduledWhatsAppService");
+          return createScheduledWhatsApp({
+            ...input,
+            tenantId: getTenantId(ctx),
+            createdByUserId: ctx.user.id,
+          });
+        }),
+      cancel: tenantWriteProcedure
+        .input(z.object({ taskId: z.number() }))
+        .mutation(async ({ ctx, input }) => {
+          const { cancelScheduledWhatsApp } = await import("../services/scheduledWhatsAppService");
+          return cancelScheduledWhatsApp(input.taskId, getTenantId(ctx), ctx.user.id);
+        }),
+      reschedule: tenantWriteProcedure
+        .input(z.object({
+          taskId: z.number(),
+          scheduledAt: z.string(),
+          timezone: z.string().optional(),
+          messageBody: z.string().optional(),
+        }))
+        .mutation(async ({ ctx, input }) => {
+          const { rescheduleWhatsApp } = await import("../services/scheduledWhatsAppService");
+          return rescheduleWhatsApp({ ...input, tenantId: getTenantId(ctx) }, ctx.user.id);
+        }),
+      retry: tenantWriteProcedure
+        .input(z.object({ taskId: z.number() }))
+        .mutation(async ({ ctx, input }) => {
+          const { retryScheduledWhatsApp } = await import("../services/scheduledWhatsAppService");
+          return retryScheduledWhatsApp(input.taskId, getTenantId(ctx), ctx.user.id);
+        }),
+    }),
   }),
 
   // ─── NOTES ───

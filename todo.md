@@ -5317,3 +5317,17 @@
 - [x] Botão "Disparar WhatsApp" na barra de ações em massa (BulkActionsBar)
 - [x] Coluna "Responsável" com avatar na tabela da visão lista
 - [x] Paginação na visão lista com controle de itens por página (25, 50, 100)
+
+## Tarefa Disparar WhatsApp Agendado (Mar 25)
+- [x] Schema: adicionar campos whatsapp_scheduled_send na tabela tasks (message_body, scheduled_at, timezone, wa_status, sent_at, failed_at, failure_reason, wa_message_id, inbox_conversation_id, wa_channel_id)
+- [x] Backend: serviço scheduledWhatsAppService (criar, cancelar, reprogramar, processar)
+- [x] Backend: job/worker com lock idempotente para processar tarefas agendadas
+- [x] Backend: envio via infraestrutura existente de WhatsApp (não criar bypass)
+- [x] Backend: vínculo de conversa/Inbox ao dono da tarefa após envio
+- [x] Backend: auditoria completa (EventLog + DealHistory + TaskHistory)
+- [x] Backend: tratamento de falhas (canal desconectado, contato sem JID, retry controlado)
+- [x] Backend: validação multi-tenant em todas as queries e mutations
+- [x] Frontend: tipo "Disparar WhatsApp" no formulário de criação/edição de tarefa
+- [x] Frontend: campo de mensagem, agendamento data/hora, seleção de canal
+- [x] Frontend: preview do envio, status da tarefa, cancelar/reprogramar
+- [x] Testes: 19 cenários passando (criar, agendar, processar, idempotência, falhas, inbox, multi-tenant, cancelamento, reprogramação)
