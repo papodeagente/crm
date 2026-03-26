@@ -5276,3 +5276,6 @@
 - [x] BulkWhatsAppDialog integrado no Pipeline.tsx com endpoint crm.deals.bulkWhatsApp
 - [x] Variáveis: {nome}, {primeiro_nome}, {email}, {telefone}, {negociacao}, {valor}, {etapa}, {empresa}
 - [x] Botão "Limpar seleção" adicionado
+
+## Perfil — Tenant ID (Mar 25)
+- [x] Exibir número do Tenant no menu de perfil no formato "ID: 000000" (TopNavLayout.tsx, abaixo do badge do plano)

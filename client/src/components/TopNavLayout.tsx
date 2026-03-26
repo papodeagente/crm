@@ -535,9 +535,12 @@ function TopBar({ onSearchOpen, mobileMenuOpen, onToggleMobile }: {
                           currentPlan === "Growth" ? "text-violet-400" :
                           "text-purple-400"
                         }`}>Plano {currentPlan}</span>
-                      </div>
-                    )}
                   </div>
+                )}
+                  </div>
+                  {saasMe?.tenantId && (
+                    <p className="text-[10px] text-muted-foreground/70 font-mono mt-1.5">ID: {String(saasMe.tenantId).padStart(6, '0')}</p>
+                  )}
                 </div>
                 <DropdownMenuItem onClick={() => setLocation("/profile")} className="cursor-pointer rounded-lg px-3 py-2 text-[13px] gap-2.5">
                   <User className="h-3.5 w-3.5 text-muted-foreground" />
