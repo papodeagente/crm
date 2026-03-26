@@ -7,7 +7,8 @@
 import { eq, and, sql } from "drizzle-orm";
 import { getDb } from "../db";
 import { tenants, crmUsers } from "../../drizzle/schema";
-import { getPlanDefinition, planHasFeature, type PlanId } from "../../shared/plans";
+import { getPlanDefinition, planHasFeature, getMinPlanForFeature, type PlanId, type PlanFeatures } from "../../shared/plans";
+import { TRPCError } from "@trpc/server";
 
 // ─── Tenant Plan Lookup ────────────────────────────────────────────
 
@@ -69,17 +70,47 @@ export async function assertCanAddUser(tenantId: number): Promise<void> {
 
 // ─── Feature Access Enforcement ────────────────────────────────────
 
-/** Verifica se o tenant tem acesso à Central de Automações */
-export async function canAccessAutomationCenter(tenantId: number): Promise<boolean> {
+/** Verifica se o tenant tem acesso a uma feature específica */
+export async function canAccessFeature(tenantId: number, feature: keyof PlanFeatures): Promise<boolean> {
   const plan = await getTenantPlan(tenantId);
-  return planHasFeature(plan, "automationCenter");
+  return planHasFeature(plan, feature);
 }
 
-/** Verifica se o tenant tem acesso à Classificação Estratégica */
-export async function canAccessStrategicClassification(tenantId: number): Promise<boolean> {
-  const plan = await getTenantPlan(tenantId);
-  return planHasFeature(plan, "strategicClassification");
+/** Guard genérico: lança FORBIDDEN se tenant não tem acesso à feature */
+export async function assertFeatureAccess(tenantId: number, feature: keyof PlanFeatures): Promise<void> {
+  const hasAccess = await canAccessFeature(tenantId, feature);
+  if (!hasAccess) {
+    const minPlan = getMinPlanForFeature(feature);
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: `PLAN_FEATURE_BLOCKED:${feature}:${minPlan.name}`,
+    });
+  }
 }
+
+// ─── Backward-compatible aliases ───────────────────────────────────
+
+/** Verifica se o tenant tem acesso à Central de Automações (salesAutomation) */
+export async function canAccessAutomationCenter(tenantId: number): Promise<boolean> {
+  return canAccessFeature(tenantId, "salesAutomation");
+}
+
+/** Verifica se o tenant tem acesso à Classificação Estratégica (rfvEnabled) */
+export async function canAccessStrategicClassification(tenantId: number): Promise<boolean> {
+  return canAccessFeature(tenantId, "rfvEnabled");
+}
+
+/** Verifica se o tenant tem acesso ao WhatsApp integrado */
+export async function canAccessWhatsApp(tenantId: number): Promise<boolean> {
+  return canAccessFeature(tenantId, "whatsappEmbedded");
+}
+
+/** Verifica se o tenant tem acesso ao disparo segmentado */
+export async function canAccessSegmentedBroadcast(tenantId: number): Promise<boolean> {
+  return canAccessFeature(tenantId, "segmentedBroadcast");
+}
+
+// ─── Plan Summary ──────────────────────────────────────────────────
 
 /** Retorna um resumo completo dos limites e features do tenant */
 export async function getTenantPlanSummary(tenantId: number) {
@@ -90,10 +121,13 @@ export async function getTenantPlanSummary(tenantId: number) {
   return {
     planId: def.id,
     planName: def.name,
+    description: def.description,
+    commercialCopy: def.commercialCopy,
     maxUsers: def.maxUsers,
     currentUsers,
-    maxWhatsAppInstances: def.maxWhatsAppInstances,
-    maxUsersPerInstance: def.maxUsersPerInstance,
+    maxWhatsAppAccounts: def.maxWhatsAppAccounts,
+    maxAttendantsPerAccount: def.maxAttendantsPerAccount,
     features: def.features,
+    priceInCents: def.priceInCents,
   };
 }

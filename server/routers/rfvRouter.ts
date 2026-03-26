@@ -35,10 +35,8 @@ export const rfvRouter = router({
   dashboard: tenantProcedure
     
     .query(async ({ input, ctx }) => {
-      const { canAccessStrategicClassification } = await import("../services/planLimitsService");
-      if (!(await canAccessStrategicClassification(getTenantId(ctx)))) {
-        throw new TRPCError({ code: "FORBIDDEN", message: "PLAN_FEATURE_BLOCKED:strategicClassification" });
-      }
+      const { assertFeatureAccess } = await import("../services/planLimitsService");
+      await assertFeatureAccess(getTenantId(ctx), "rfvEnabled");
       return getRfvDashboard(getTenantId(ctx));
     }),
 
@@ -54,10 +52,8 @@ export const rfvRouter = router({
       sortDir: z.enum(["asc", "desc"]).optional().default("desc"),
     }))
     .query(async ({ input, ctx }) => {
-      const { canAccessStrategicClassification } = await import("../services/planLimitsService");
-      if (!(await canAccessStrategicClassification(getTenantId(ctx)))) {
-        throw new TRPCError({ code: "FORBIDDEN", message: "PLAN_FEATURE_BLOCKED:strategicClassification" });
-      }
+      const { assertFeatureAccess } = await import("../services/planLimitsService");
+      await assertFeatureAccess(getTenantId(ctx), "rfvEnabled");
       return getRfvContacts(getTenantId(ctx), {
         page: input.page,
         pageSize: input.pageSize,

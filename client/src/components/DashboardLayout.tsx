@@ -171,7 +171,7 @@ function DashboardLayoutContent({
     retry: false, refetchOnWindowFocus: false, staleTime: 5 * 60 * 1000, gcTime: 30 * 60 * 1000,
   });
   const billingData = billingQuery.data;
-  const currentPlan = planSummary.data?.planName || (billingData?.plan === "growth" ? "Growth" : billingData?.plan === "scale" ? "Scale" : "Start");
+  const currentPlan = planSummary.data?.planName || (billingData?.plan === "growth" ? "Pro" : billingData?.plan === "scale" ? "Elite" : "Essencial");
   const isTrial = billingData?.billingStatus === "trialing";
   const trialDaysLeft = isTrial && billingData?.subscription?.trialEndsAt
     ? Math.max(0, Math.ceil((new Date(billingData.subscription.trialEndsAt).getTime() - Date.now()) / (24 * 60 * 60 * 1000)))
@@ -299,18 +299,18 @@ function DashboardLayoutContent({
                       </div>
                     ) : (
                       <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border ${
-                        currentPlan === "Scale" ? "bg-amber-500/15 border-amber-500/30" :
-                        currentPlan === "Growth" ? "bg-violet-500/15 border-violet-500/30" :
+                        currentPlan === "Elite" ? "bg-amber-500/15 border-amber-500/30" :
+                        currentPlan === "Pro" ? "bg-violet-500/15 border-violet-500/30" :
                         "bg-purple-500/15 border-purple-500/30"
                       }`}>
                         <Crown className={`h-3 w-3 ${
-                          currentPlan === "Scale" ? "text-amber-400" :
-                          currentPlan === "Growth" ? "text-violet-400" :
+                          currentPlan === "Elite" ? "text-amber-400" :
+                          currentPlan === "Pro" ? "text-violet-400" :
                           "text-purple-400"
                         }`} />
                         <span className={`text-[10px] font-semibold ${
-                          currentPlan === "Scale" ? "text-amber-400" :
-                          currentPlan === "Growth" ? "text-violet-400" :
+                          currentPlan === "Elite" ? "text-amber-400" :
+                          currentPlan === "Pro" ? "text-violet-400" :
                           "text-purple-400"
                         }`}>Plano {currentPlan}</span>
                       </div>

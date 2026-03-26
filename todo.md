@@ -5432,3 +5432,23 @@
 ## Bug Fix: Importação conversa v3 (Mar 26)
 - [x] DealDetail: importa apenas 1 mensagem — corrigido usando getAllJidVariants para buscar variantes de JID brasileiro
 - [x] Exibição da nota: adicionado whitespace-pre-wrap no DealTimeline para notas (action=note)
+
+## Reorganização dos Planos Comerciais — Essencial/Pro/Elite (Mar 26)
+- [x] Diagnosticar estrutura atual de planos, feature flags e permissões
+- [x] Renomear planos: Start→Essencial, Growth→Pro, Scale→Elite em todo o sistema
+- [x] Atualizar shared/plans.ts com feature flags completas
+- [x] Atualizar planLimitsService.ts e billingAccessService.ts com novos nomes
+- [x] Adicionar guards backend: assertFeatureAccess para WhatsApp, RFV, automação, broadcast
+- [x] Implementar bloqueios visuais (UpgradeModal com cadeado + CTA upgrade)
+- [x] Criar modais de upgrade com benefício, motivo do bloqueio, plano necessário e botão upgrade
+- [x] Criar/ajustar tela de Assinatura e Plano — Upgrade.tsx reescrito com plano atual, limites, uso, recursos
+- [x] Criar tela comparativa de planos dentro do sistema — Upgrade.tsx com tabela comparativa
+- [x] Atualizar landing page com tabela comparativa didática — PricingSection.tsx reescrito
+- [x] Destacar Pro como plano âncora/principal (badge 'Mais popular', borda violeta, CTA destaque)
+- [x] Limites de usuários: Essencial=1, Pro=4, Elite=15
+- [x] WhatsApp no CRM: bloqueado no Essencial, liberado Pro/Elite
+- [x] Disparo segmentado: bloqueado no Essencial, liberado Pro/Elite
+- [x] Matriz RFV: bloqueado no Essencial, liberado Pro/Elite
+- [x] Automação de vendas: bloqueado no Essencial, liberado Pro/Elite
+- [x] Suporte prioritário: somente Elite
+- [x] Testes e validações: 0 erros TS, 3190 testes passando

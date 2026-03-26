@@ -246,6 +246,8 @@ export const appRouter = router({
         // Each CRM user gets exactly ONE WhatsApp instance
         // No sessionId needed — system generates it automatically
         const tenantId = getTenantId(ctx);
+        const { assertFeatureAccess } = await import("./services/planLimitsService");
+        await assertFeatureAccess(tenantId, "whatsappEmbedded");
         const userId = ctx.saasUser?.userId || ctx.user.id;
         const requestedProvider = input?.provider || "evolution";
 

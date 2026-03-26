@@ -1,45 +1,31 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { FadeIn } from "./FadeIn";
-import { Check, ArrowRight, X, Phone } from "lucide-react";
+import { Check, ArrowRight, X, MessageSquare, Crown } from "lucide-react";
+import { PLANS, PLAN_ORDER, FEATURE_DESCRIPTIONS, type PlanId, type PlanFeatures } from "../../../../shared/plans";
 
 const LOGO_URL = "https://files.manuscdn.com/user_upload_by_module/session_file/310519663249817763/XXuAsdiNIcgnwwra.png";
-
-const SHARED_FEATURES = [
-  "Pipeline visual de negociações",
-  "Gestão de contatos e empresas",
-  "Catálogo de produtos turísticos",
-  "Propostas comerciais",
-  "Tarefas e follow-up",
-  "1 número de WhatsApp integrado",
-  "Histórico completo de atendimento",
-  "Dashboard com indicadores",
-  "Análise de conversas com IA",
-  "Funil de pós-venda",
-  "Campos personalizados",
-];
+const SCALE_WHATSAPP_URL = "https://wa.me/551151982627?text=Quero%20conhecer%20o%20Plano%20Elite%20do%20Entur%20OS.%20Pode%20me%20ajudar%3F";
 
 interface PricingSectionProps {
   onSelectPlan: (plan?: string) => void;
 }
 
+// Feature rows for comparison table
+const COMPARISON_ROWS: { label: string; key?: keyof PlanFeatures; type: "feature" | "limit"; getValue?: (planId: PlanId) => string }[] = [
+  { label: "CRM completo (contatos, negociações, funil, tarefas)", key: "crmCore", type: "feature" },
+  { label: "Comunidade Acelera Turismo", key: "communityAccess", type: "feature" },
+  { label: "Usuários", type: "limit", getValue: (id) => PLANS[id].maxUsers === -1 ? "Ilimitado" : `${PLANS[id].maxUsers}` },
+  { label: "WhatsApp integrado ao CRM", key: "whatsappEmbedded", type: "feature" },
+  { label: "Contas de WhatsApp", type: "limit", getValue: (id) => PLANS[id].maxWhatsAppAccounts === 0 ? "—" : `${PLANS[id].maxWhatsAppAccounts}` },
+  { label: "Atendentes por conta", type: "limit", getValue: (id) => PLANS[id].maxAttendantsPerAccount === 0 ? "—" : `${PLANS[id].maxAttendantsPerAccount}` },
+  { label: "Disparo segmentado de mensagens", key: "segmentedBroadcast", type: "feature" },
+  { label: "Matriz RFV (Classificação Estratégica)", key: "rfvEnabled", type: "feature" },
+  { label: "Automação de vendas", key: "salesAutomation", type: "feature" },
+  { label: "Suporte prioritário", key: "prioritySupport", type: "feature" },
+];
+
 export function PricingSection({ onSelectPlan }: PricingSectionProps) {
-  const [showEnterprise, setShowEnterprise] = useState(false);
-  const [formData, setFormData] = useState({ name: "", email: "", phone: "", company: "", agents: "" });
-  const [formSent, setFormSent] = useState(false);
-
-  const handleEnterpriseSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setFormSent(true);
-    setTimeout(() => {
-      setShowEnterprise(false);
-      setFormSent(false);
-      setFormData({ name: "", email: "", phone: "", company: "", agents: "" });
-    }, 3000);
-  };
-
   return (
     <>
       <section id="planos" className="py-24 sm:py-32 px-5 sm:px-8 relative overflow-hidden">
@@ -57,47 +43,70 @@ export function PricingSection({ onSelectPlan }: PricingSectionProps) {
                 </span>
               </h2>
               <p className="text-lg text-white/40 max-w-xl mx-auto">
-                Todos os planos incluem acesso completo ao ENTUR OS. Sem fidelidade.
+                Todos os planos incluem CRM completo e acesso à Comunidade Acelera Turismo. Sem fidelidade.
               </p>
             </div>
           </FadeIn>
 
+          {/* ─── Plan Cards ─── */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8">
-            {/* START */}
+            {/* ESSENCIAL */}
             <FadeIn delay={0.1}>
               <div className="bg-white/[0.03] border border-white/[0.08] rounded-2xl p-6 sm:p-8 flex flex-col h-full backdrop-blur-sm">
                 <div className="mb-6">
-                  <p className="text-sm font-medium text-white/40 uppercase tracking-wider mb-2">Start</p>
+                  <p className="text-sm font-medium text-white/40 uppercase tracking-wider mb-2">Essencial</p>
                   <div className="flex items-baseline gap-1">
                     <span className="text-4xl font-bold text-white">R$ 97</span>
                     <span className="text-white/30 text-sm">/mês</span>
                   </div>
-                  <p className="text-sm text-white/30 mt-2">1 usuário incluso</p>
-                  <p className="text-xs text-white/20 mt-1">1 número de WhatsApp integrado</p>
+                  <p className="text-sm text-white/50 mt-3">{PLANS.start.commercialCopy}</p>
                 </div>
 
                 <div className="border-t border-white/[0.06] pt-6 mb-6 flex-1">
                   <p className="text-xs font-medium text-white/50 uppercase tracking-wider mb-4">Inclui:</p>
                   <ul className="space-y-3">
-                    {SHARED_FEATURES.map((f, i) => (
-                      <li key={i} className="flex items-start gap-2.5 text-sm text-white/60">
-                        <Check className="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" />
-                        <span>{f}</span>
-                      </li>
-                    ))}
-                    <li className="flex items-start gap-2.5 text-sm text-white/35">
-                      <X className="w-4 h-4 text-white/20 mt-0.5 shrink-0" />
-                      <span>Central de Automações</span>
+                    <li className="flex items-start gap-2.5 text-sm text-white/60">
+                      <Check className="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" />
+                      <span>CRM completo (contatos, negociações, funil, tarefas)</span>
                     </li>
-                    <li className="flex items-start gap-2.5 text-sm text-white/35">
-                      <X className="w-4 h-4 text-white/20 mt-0.5 shrink-0" />
-                      <span>Classificação estratégica (Matriz RFV)</span>
+                    <li className="flex items-start gap-2.5 text-sm text-white/60">
+                      <Check className="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" />
+                      <span>Histórico comercial</span>
                     </li>
-                    <li className="flex items-start gap-2.5 text-sm text-white/35">
-                      <X className="w-4 h-4 text-white/20 mt-0.5 shrink-0" />
-                      <span>Usuários adicionais</span>
+                    <li className="flex items-start gap-2.5 text-sm text-white/60">
+                      <Check className="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" />
+                      <span>Dashboard com indicadores</span>
+                    </li>
+                    <li className="flex items-start gap-2.5 text-sm text-white/60">
+                      <Check className="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" />
+                      <span>Comunidade Acelera Turismo</span>
+                    </li>
+                    <li className="flex items-start gap-2.5 text-sm text-white/60">
+                      <Check className="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" />
+                      <span>1 usuário</span>
                     </li>
                   </ul>
+                  <div className="mt-4 pt-4 border-t border-white/[0.04]">
+                    <p className="text-xs font-medium text-white/30 uppercase tracking-wider mb-3">Não inclui:</p>
+                    <ul className="space-y-2">
+                      <li className="flex items-start gap-2.5 text-sm text-white/25">
+                        <X className="w-4 h-4 text-white/15 mt-0.5 shrink-0" />
+                        <span>WhatsApp no CRM</span>
+                      </li>
+                      <li className="flex items-start gap-2.5 text-sm text-white/25">
+                        <X className="w-4 h-4 text-white/15 mt-0.5 shrink-0" />
+                        <span>Disparo segmentado</span>
+                      </li>
+                      <li className="flex items-start gap-2.5 text-sm text-white/25">
+                        <X className="w-4 h-4 text-white/15 mt-0.5 shrink-0" />
+                        <span>Matriz RFV</span>
+                      </li>
+                      <li className="flex items-start gap-2.5 text-sm text-white/25">
+                        <X className="w-4 h-4 text-white/15 mt-0.5 shrink-0" />
+                        <span>Automação de vendas</span>
+                      </li>
+                    </ul>
+                  </div>
                 </div>
 
                 <Button
@@ -109,47 +118,61 @@ export function PricingSection({ onSelectPlan }: PricingSectionProps) {
               </div>
             </FadeIn>
 
-            {/* GROWTH */}
+            {/* PRO */}
             <FadeIn delay={0.2}>
-              <div className="bg-gradient-to-b from-violet-500/[0.08] to-purple-500/[0.03] border border-violet-500/20 rounded-2xl p-6 sm:p-8 flex flex-col h-full relative backdrop-blur-sm">
+              <div className="bg-gradient-to-b from-violet-500/[0.08] to-purple-500/[0.03] border-2 border-violet-500/25 rounded-2xl p-6 sm:p-8 flex flex-col h-full relative backdrop-blur-sm shadow-xl shadow-violet-900/10">
                 <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                  <span className="bg-gradient-to-r from-violet-600 to-purple-600 text-white text-xs font-semibold px-4 py-1.5 rounded-full shadow-lg shadow-violet-500/25">
-                    Mais popular
+                  <span className="bg-gradient-to-r from-violet-600 to-purple-600 text-white text-xs font-semibold px-4 py-1.5 rounded-full shadow-lg shadow-violet-500/25 flex items-center gap-1.5">
+                    <Crown className="w-3 h-3" /> Mais popular
                   </span>
                 </div>
 
                 <div className="mb-6">
-                  <p className="text-sm font-medium text-violet-400 uppercase tracking-wider mb-2">Growth</p>
+                  <p className="text-sm font-medium text-violet-400 uppercase tracking-wider mb-2">Pro</p>
                   <div className="flex items-baseline gap-1">
                     <span className="text-4xl font-bold text-white">R$ 297</span>
                     <span className="text-white/30 text-sm">/mês</span>
                   </div>
-                  <p className="text-sm text-white/30 mt-2">Até 5 usuários inclusos</p>
-                  <p className="text-xs text-white/20 mt-1">1 número de WhatsApp para até 5 usuários</p>
+                  <p className="text-sm text-white/50 mt-3">{PLANS.growth.commercialCopy}</p>
                 </div>
 
                 <div className="border-t border-violet-500/10 pt-6 mb-6 flex-1">
-                  <p className="text-xs font-medium text-white/50 uppercase tracking-wider mb-4">Tudo do Start, mais:</p>
+                  <p className="text-xs font-medium text-violet-400/70 uppercase tracking-wider mb-4">Tudo do Essencial, mais:</p>
                   <ul className="space-y-3">
-                    {SHARED_FEATURES.map((f, i) => (
-                      <li key={i} className="flex items-start gap-2.5 text-sm text-white/60">
-                        <Check className="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" />
-                        <span>{f}</span>
-                      </li>
-                    ))}
                     <li className="flex items-start gap-2.5 text-sm text-white/80">
                       <Check className="w-4 h-4 text-violet-400 mt-0.5 shrink-0" />
-                      <span className="font-medium">Central de Automações</span>
+                      <span className="font-medium">WhatsApp integrado ao CRM</span>
+                    </li>
+                    <li className="flex items-start gap-2.5 text-sm text-white/60">
+                      <Check className="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" />
+                      <span>1 conta WhatsApp com até 4 atendentes</span>
                     </li>
                     <li className="flex items-start gap-2.5 text-sm text-white/80">
                       <Check className="w-4 h-4 text-violet-400 mt-0.5 shrink-0" />
-                      <span className="font-medium">Classificação estratégica (Matriz RFV)</span>
+                      <span className="font-medium">Disparo segmentado de mensagens</span>
                     </li>
                     <li className="flex items-start gap-2.5 text-sm text-white/80">
                       <Check className="w-4 h-4 text-violet-400 mt-0.5 shrink-0" />
-                      <span className="font-medium">Até 5 usuários inclusos</span>
+                      <span className="font-medium">Matriz RFV (Classificação Estratégica)</span>
+                    </li>
+                    <li className="flex items-start gap-2.5 text-sm text-white/80">
+                      <Check className="w-4 h-4 text-violet-400 mt-0.5 shrink-0" />
+                      <span className="font-medium">Automação de vendas</span>
+                    </li>
+                    <li className="flex items-start gap-2.5 text-sm text-white/60">
+                      <Check className="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" />
+                      <span>Até 4 usuários</span>
                     </li>
                   </ul>
+                  <div className="mt-4 pt-4 border-t border-violet-500/[0.08]">
+                    <p className="text-xs font-medium text-white/30 uppercase tracking-wider mb-3">Não inclui:</p>
+                    <ul className="space-y-2">
+                      <li className="flex items-start gap-2.5 text-sm text-white/25">
+                        <X className="w-4 h-4 text-white/15 mt-0.5 shrink-0" />
+                        <span>Suporte prioritário</span>
+                      </li>
+                    </ul>
+                  </div>
                 </div>
 
                 <Button
@@ -161,61 +184,163 @@ export function PricingSection({ onSelectPlan }: PricingSectionProps) {
               </div>
             </FadeIn>
 
-            {/* SCALE */}
+            {/* ELITE */}
             <FadeIn delay={0.3}>
-              <div className="bg-white/[0.03] border border-white/[0.08] rounded-2xl p-6 sm:p-8 flex flex-col h-full backdrop-blur-sm">
+              <div className="bg-gradient-to-b from-amber-500/[0.04] to-transparent border border-amber-500/10 rounded-2xl p-6 sm:p-8 flex flex-col h-full backdrop-blur-sm">
                 <div className="mb-6">
-                  <p className="text-sm font-medium text-white/40 uppercase tracking-wider mb-2">Scale</p>
+                  <p className="text-sm font-medium text-amber-400/70 uppercase tracking-wider mb-2">Elite</p>
                   <div className="flex items-baseline gap-1">
                     <span className="text-4xl font-bold text-white">Sob consulta</span>
                   </div>
-                  <p className="text-sm text-white/30 mt-2">Usuários ilimitados</p>
-                  <p className="text-xs text-white/20 mt-1">WhatsApp ilimitado</p>
+                  <p className="text-sm text-white/50 mt-3">{PLANS.scale.commercialCopy}</p>
                 </div>
 
-                <div className="border-t border-white/[0.06] pt-6 mb-6 flex-1">
-                  <p className="text-xs font-medium text-white/50 uppercase tracking-wider mb-4">Tudo do Growth, mais:</p>
+                <div className="border-t border-amber-500/[0.08] pt-6 mb-6 flex-1">
+                  <p className="text-xs font-medium text-amber-400/50 uppercase tracking-wider mb-4">Tudo do Pro, mais:</p>
                   <ul className="space-y-3">
-                    <li className="flex items-start gap-2.5 text-sm text-white/60">
-                      <Check className="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" />
-                      <span>Todas as funcionalidades do Growth</span>
-                    </li>
                     <li className="flex items-start gap-2.5 text-sm text-white/80">
                       <Check className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
-                      <span className="font-medium">Usuários ilimitados</span>
-                    </li>
-                    <li className="flex items-start gap-2.5 text-sm text-white/80">
-                      <Check className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
-                      <span className="font-medium">Instâncias WhatsApp ilimitadas</span>
-                    </li>
-                    <li className="flex items-start gap-2.5 text-sm text-white/80">
-                      <Check className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
-                      <span className="font-medium">Onboarding personalizado</span>
+                      <span className="font-medium">Até 15 usuários</span>
                     </li>
                     <li className="flex items-start gap-2.5 text-sm text-white/80">
                       <Check className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
                       <span className="font-medium">Suporte prioritário</span>
                     </li>
-                    <li className="flex items-start gap-2.5 text-sm text-white/80">
-                      <Check className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
-                      <span className="font-medium">Consultoria comercial dedicada</span>
+                    <li className="flex items-start gap-2.5 text-sm text-white/60">
+                      <Check className="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" />
+                      <span>Onboarding personalizado</span>
                     </li>
-                    <li className="flex items-start gap-2.5 text-sm text-white/80">
-                      <Check className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
-                      <span className="font-medium">SLA de atendimento</span>
+                    <li className="flex items-start gap-2.5 text-sm text-white/60">
+                      <Check className="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" />
+                      <span>Consultoria comercial dedicada</span>
+                    </li>
+                    <li className="flex items-start gap-2.5 text-sm text-white/60">
+                      <Check className="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" />
+                      <span>SLA de atendimento</span>
                     </li>
                   </ul>
                 </div>
 
                 <Button
-                  className="w-full h-12 bg-white/[0.06] hover:bg-white/[0.10] text-white border border-white/[0.10] hover:border-white/[0.15] transition-all duration-300"
-                  onClick={() => setShowEnterprise(true)}
+                  className="w-full h-12 bg-gradient-to-r from-amber-500/20 to-orange-500/20 hover:from-amber-500/30 hover:to-orange-500/30 text-amber-300 border border-amber-500/20 hover:border-amber-500/30 transition-all duration-300"
+                  onClick={() => window.open(SCALE_WHATSAPP_URL, "_blank")}
                 >
-                  <Phone className="w-4 h-4 mr-2" /> Falar com vendas
+                  <MessageSquare className="w-4 h-4 mr-2" /> Falar com consultor
                 </Button>
               </div>
             </FadeIn>
           </div>
+
+          {/* ─── Comparison Table ─── */}
+          <FadeIn delay={0.4}>
+            <div className="mt-20">
+              <div className="text-center mb-10">
+                <h3 className="text-2xl sm:text-3xl font-bold text-white mb-3">
+                  Compare os planos
+                </h3>
+                <p className="text-sm text-white/40 max-w-lg mx-auto">
+                  Veja exatamente o que cada plano oferece para escolher o ideal para sua agência.
+                </p>
+              </div>
+
+              <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl overflow-hidden backdrop-blur-sm">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-white/[0.06]">
+                        <th className="text-left py-4 px-5 text-white/40 font-medium w-[40%]">Recurso</th>
+                        <th className="text-center py-4 px-4 w-[20%]">
+                          <span className="text-white/60 font-semibold">Essencial</span>
+                          <p className="text-xs text-white/25 mt-0.5">R$ 97/mês</p>
+                        </th>
+                        <th className="text-center py-4 px-4 w-[20%] bg-violet-500/[0.06]">
+                          <span className="text-violet-400 font-bold">Pro</span>
+                          <p className="text-xs text-violet-400/50 mt-0.5">R$ 297/mês</p>
+                        </th>
+                        <th className="text-center py-4 px-4 w-[20%]">
+                          <span className="text-amber-400/80 font-semibold">Elite</span>
+                          <p className="text-xs text-amber-400/30 mt-0.5">Sob consulta</p>
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {COMPARISON_ROWS.map((row, i) => (
+                        <tr key={i} className="border-b border-white/[0.04] last:border-0">
+                          <td className="py-3.5 px-5 text-white/50">{row.label}</td>
+                          {PLAN_ORDER.map((planId) => {
+                            const isProCol = planId === "growth";
+                            const cellBg = isProCol ? "bg-violet-500/[0.04]" : "";
+
+                            if (row.type === "limit" && row.getValue) {
+                              const val = row.getValue(planId);
+                              return (
+                                <td key={planId} className={`text-center py-3.5 px-4 ${cellBg}`}>
+                                  <span className={val === "—" ? "text-white/20" : "text-white/70 font-medium"}>
+                                    {val}
+                                  </span>
+                                </td>
+                              );
+                            }
+
+                            const hasFeature = row.key ? PLANS[planId].features[row.key] : false;
+                            return (
+                              <td key={planId} className={`text-center py-3.5 px-4 ${cellBg}`}>
+                                {hasFeature ? (
+                                  <div className="flex items-center justify-center">
+                                    <div className="w-6 h-6 rounded-full bg-emerald-500/10 flex items-center justify-center">
+                                      <Check className="w-3.5 h-3.5 text-emerald-400" />
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div className="flex items-center justify-center">
+                                    <div className="w-6 h-6 rounded-full bg-white/[0.03] flex items-center justify-center">
+                                      <X className="w-3.5 h-3.5 text-white/15" />
+                                    </div>
+                                  </div>
+                                )}
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* CTA row */}
+                <div className="border-t border-white/[0.06] grid grid-cols-[40%_20%_20%_20%]">
+                  <div className="py-5 px-5" />
+                  <div className="py-5 px-4 flex items-center justify-center">
+                    <Button
+                      size="sm"
+                      className="bg-white/[0.06] hover:bg-white/[0.10] text-white border border-white/[0.10] text-xs"
+                      onClick={() => onSelectPlan("start")}
+                    >
+                      Assinar
+                    </Button>
+                  </div>
+                  <div className="py-5 px-4 flex items-center justify-center bg-violet-500/[0.06]">
+                    <Button
+                      size="sm"
+                      className="bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white text-xs shadow-lg shadow-violet-500/20"
+                      onClick={() => onSelectPlan("growth")}
+                    >
+                      Assinar Pro
+                    </Button>
+                  </div>
+                  <div className="py-5 px-4 flex items-center justify-center">
+                    <Button
+                      size="sm"
+                      className="bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/15 text-xs"
+                      onClick={() => window.open(SCALE_WHATSAPP_URL, "_blank")}
+                    >
+                      Consultar
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </FadeIn>
         </div>
       </section>
 
@@ -238,106 +363,6 @@ export function PricingSection({ onSelectPlan }: PricingSectionProps) {
           </div>
         </div>
       </footer>
-
-      {/* Scale Popup */}
-      {showEnterprise && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div
-            className="absolute inset-0 bg-black/70 backdrop-blur-sm"
-            onClick={() => { setShowEnterprise(false); setFormSent(false); }}
-          />
-          <div className="relative bg-[#12121a] border border-white/[0.10] rounded-2xl p-6 sm:p-8 w-full max-w-md shadow-2xl">
-            <button
-              className="absolute top-4 right-4 text-white/30 hover:text-white/60 transition-colors"
-              onClick={() => { setShowEnterprise(false); setFormSent(false); }}
-            >
-              <X className="w-5 h-5" />
-            </button>
-
-            {formSent ? (
-              <div className="text-center py-8">
-                <div className="w-16 h-16 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mx-auto mb-4">
-                  <Check className="w-8 h-8 text-emerald-400" />
-                </div>
-                <h3 className="text-xl font-bold text-white mb-2">Solicitação enviada!</h3>
-                <p className="text-sm text-white/40">Nossa equipe entrará em contato em breve.</p>
-              </div>
-            ) : (
-              <>
-                <h3 className="text-xl font-bold text-white mb-1">Plano Scale</h3>
-                <p className="text-sm text-white/40 mb-6">
-                  Preencha o formulário e nossa equipe de vendas entrará em contato.
-                </p>
-
-                <form onSubmit={handleEnterpriseSubmit} className="space-y-4">
-                  <div>
-                    <Label className="text-sm text-white/50 mb-1.5 block">Nome completo</Label>
-                    <Input
-                      required
-                      type="text"
-                      placeholder="Seu nome"
-                      value={formData.name}
-                      onChange={(e) => setFormData((p) => ({ ...p, name: e.target.value }))}
-                      className="bg-white/[0.04] border-white/[0.08] text-white placeholder:text-white/20 h-11 focus:border-violet-500/40"
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-sm text-white/50 mb-1.5 block">E-mail</Label>
-                    <Input
-                      required
-                      type="email"
-                      placeholder="seu@email.com"
-                      value={formData.email}
-                      onChange={(e) => setFormData((p) => ({ ...p, email: e.target.value }))}
-                      className="bg-white/[0.04] border-white/[0.08] text-white placeholder:text-white/20 h-11 focus:border-violet-500/40"
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-sm text-white/50 mb-1.5 block">WhatsApp</Label>
-                    <Input
-                      required
-                      type="tel"
-                      placeholder="(11) 99999-9999"
-                      value={formData.phone}
-                      onChange={(e) => setFormData((p) => ({ ...p, phone: e.target.value }))}
-                      className="bg-white/[0.04] border-white/[0.08] text-white placeholder:text-white/20 h-11 focus:border-violet-500/40"
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-sm text-white/50 mb-1.5 block">Nome da agência</Label>
-                    <Input
-                      required
-                      type="text"
-                      placeholder="Sua agência"
-                      value={formData.company}
-                      onChange={(e) => setFormData((p) => ({ ...p, company: e.target.value }))}
-                      className="bg-white/[0.04] border-white/[0.08] text-white placeholder:text-white/20 h-11 focus:border-violet-500/40"
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-sm text-white/50 mb-1.5 block">Quantos agentes na equipe?</Label>
-                    <Input
-                      required
-                      type="number"
-                      placeholder="Ex: 10"
-                      value={formData.agents}
-                      onChange={(e) => setFormData((p) => ({ ...p, agents: e.target.value }))}
-                      className="bg-white/[0.04] border-white/[0.08] text-white placeholder:text-white/20 h-11 focus:border-violet-500/40"
-                    />
-                  </div>
-
-                  <Button
-                    type="submit"
-                    className="w-full h-12 bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white border-0 shadow-lg shadow-violet-500/25 mt-2"
-                  >
-                    Solicitar atendimento <ArrowRight className="w-4 h-4 ml-2" />
-                  </Button>
-                </form>
-              </>
-            )}
-          </div>
-        </div>
-      )}
     </>
   );
 }

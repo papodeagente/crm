@@ -77,8 +77,8 @@ const settingsCategories: SettingsCategory[] = [
     links: [
       { icon: GitBranch, label: "Funis de vendas", path: "/settings/pipelines" },
       { icon: Tag, label: "Campos personalizados", path: "/settings/custom-fields" },
-      { icon: Zap, label: "Central de Automações", path: "/settings/automation-hub", badge: "Novo", requiredFeature: "automationCenter" },
-      { icon: Target, label: "Classificação estratégica", path: "/settings/classification", requiredFeature: "strategicClassification" },
+      { icon: Zap, label: "Central de Automações", path: "/settings/automation-hub", badge: "Novo", requiredFeature: "salesAutomation" },
+      { icon: Target, label: "Classificação estratégica", path: "/settings/classification", requiredFeature: "rfvEnabled" },
     ],
   },
   {
@@ -137,7 +137,7 @@ export default function SettingsPage() {
       return;
     }
     if (link.requiredFeature && planFeatures && !(planFeatures as any)[link.requiredFeature]) {
-      toast.error(`Recurso disponível a partir do plano Growth. Faça upgrade para acessar.`);
+      toast.error(`Recurso disponível a partir do plano Pro. Faça upgrade para acessar.`);
       return;
     }
     setLocation(link.path);

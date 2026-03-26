@@ -216,6 +216,8 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
         campaignName: z.string().optional(),
       }))
       .mutation(async ({ input, ctx }) => {
+        const { assertFeatureAccess } = await import("../services/planLimitsService");
+        await assertFeatureAccess(getTenantId(ctx), "segmentedBroadcast");
         return startBulkSendCrm({
           tenantId: getTenantId(ctx),
           userId: ctx.user.id,
@@ -367,10 +369,8 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
     list: tenantProcedure
       .input(z.object({ sourcePipelineId: z.number().optional() }))
       .query(async ({ input, ctx }) => {
-        const { canAccessAutomationCenter } = await import("../services/planLimitsService");
-        if (!(await canAccessAutomationCenter(getTenantId(ctx)))) {
-          throw new TRPCError({ code: "FORBIDDEN", message: "PLAN_FEATURE_BLOCKED:automationCenter" });
-        }
+        const { assertFeatureAccess } = await import("../services/planLimitsService");
+        await assertFeatureAccess(getTenantId(ctx), "salesAutomation");
         return crm.listPipelineAutomations(getTenantId(ctx), input.sourcePipelineId);
       }),
     create: tenantWriteProcedure
@@ -909,6 +909,8 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
         campaignName: z.string().optional(),
       }))
       .mutation(async ({ input, ctx }) => {
+        const { assertFeatureAccess } = await import("../services/planLimitsService");
+        await assertFeatureAccess(getTenantId(ctx), "segmentedBroadcast");
         return startBulkSendCrm({
           tenantId: getTenantId(ctx),
           userId: ctx.user.id,
@@ -1886,10 +1888,8 @@ const tenantId = getTenantId(ctx); const { id, dueAt, ...data } = input;
     list: tenantProcedure
       .input(z.object({ pipelineId: z.number().optional() }))
       .query(async ({ input, ctx }) => {
-        const { canAccessAutomationCenter } = await import("../services/planLimitsService");
-        if (!(await canAccessAutomationCenter(getTenantId(ctx)))) {
-          throw new TRPCError({ code: "FORBIDDEN", message: "PLAN_FEATURE_BLOCKED:automationCenter" });
-        }
+        const { assertFeatureAccess } = await import("../services/planLimitsService");
+        await assertFeatureAccess(getTenantId(ctx), "salesAutomation");
         return crm.listTaskAutomations(getTenantId(ctx), input.pipelineId);
       }),
     create: tenantWriteProcedure
@@ -1944,10 +1944,8 @@ const tenantId = getTenantId(ctx); const { id, dueAt, ...data } = input;
     list: tenantProcedure
       .input(z.object({ pipelineId: z.number().optional() }))
       .query(async ({ input, ctx }) => {
-        const { canAccessAutomationCenter } = await import("../services/planLimitsService");
-        if (!(await canAccessAutomationCenter(getTenantId(ctx)))) {
-          throw new TRPCError({ code: "FORBIDDEN", message: "PLAN_FEATURE_BLOCKED:automationCenter" });
-        }
+        const { assertFeatureAccess } = await import("../services/planLimitsService");
+        await assertFeatureAccess(getTenantId(ctx), "salesAutomation");
         return crm.listDateAutomations(getTenantId(ctx), input.pipelineId);
       }),
     create: tenantWriteProcedure
@@ -1999,10 +1997,8 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
     list: tenantProcedure
       .input(z.object({ pipelineId: z.number().optional() }))
       .query(async ({ input, ctx }) => {
-        const { canAccessAutomationCenter } = await import("../services/planLimitsService");
-        if (!(await canAccessAutomationCenter(getTenantId(ctx)))) {
-          throw new TRPCError({ code: "FORBIDDEN", message: "PLAN_FEATURE_BLOCKED:automationCenter" });
-        }
+        const { assertFeatureAccess } = await import("../services/planLimitsService");
+        await assertFeatureAccess(getTenantId(ctx), "salesAutomation");
         return crm.listStageOwnerRules(getTenantId(ctx), input.pipelineId);
       }),
     create: tenantWriteProcedure
