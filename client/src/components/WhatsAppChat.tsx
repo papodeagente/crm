@@ -9,6 +9,7 @@ import {
   UserPlus, Briefcase, Users, Reply, Trash2, Pencil, Forward, MapPin,
   Contact, BarChart3, Copy, Ban, StickyNote, ArrowRightLeft, History, Sparkles, Brain, MessageCircle
 } from "lucide-react";
+import ImportConversationDialog from "@/components/ImportConversationDialog";
 import Picker from "@emoji-mart/react";
 import data from "@emoji-mart/data";
 
@@ -1274,6 +1275,7 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
   const [selectedMentions, setSelectedMentions] = useState<number[]>([]);
   const [showTimeline, setShowTimeline] = useState(false);
   const [showTransfer, setShowTransfer] = useState(false);
+  const [showImportDialog, setShowImportDialog] = useState(false);
   const [showQuickReplies, setShowQuickReplies] = useState(false);
   const [quickReplyFilter, setQuickReplyFilter] = useState("");
   const [showAiSuggestion, setShowAiSuggestion] = useState(false);
@@ -2358,6 +2360,15 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
               </button>
             </InstantTooltip>
           )}
+          {/* Import conversation as note */}
+          <InstantTooltip label="Importar conversa como anotação">
+            <button
+              onClick={() => setShowImportDialog(true)}
+              className="w-[40px] h-[40px] flex items-center justify-center hover:bg-[var(--wa-hover)] rounded-full transition-colors"
+            >
+              <FileText className="w-[20px] h-[20px]" style={{ color: 'var(--wa-text-secondary)' }} />
+            </button>
+          </InstantTooltip>
           {/* Timeline toggle */}
           <InstantTooltip label="Timeline de eventos">
             <button
@@ -3015,6 +3026,16 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
           contactName={contact?.name || remoteJid.split("@")[0]}
         />
       )}
+
+      {/* ─── Import Conversation Dialog ─── */}
+      <ImportConversationDialog
+        open={showImportDialog}
+        onClose={() => setShowImportDialog(false)}
+        sessionId={sessionId}
+        remoteJid={remoteJid}
+        waConversationId={waConversationId ?? null}
+        contactName={contact?.name || remoteJid.split("@")[0]}
+      />
 
       {/* ─── Image Lightbox ─── */}
       {lightboxUrl && (

@@ -5398,3 +5398,16 @@
 - [x] Paginação da timeline (load more com offset, limite de 50 por página)
 - [x] Idempotência na gravação de eventos (coluna dedupeKey com unique index)
 - [x] Testes obrigatórios cobrindo todos os cenários (14 testes passando)
+
+## Feature: Importar Conversa WhatsApp como Anotação (Mar 26)
+- [x] Backend: procedure de importação de conversa como anotação (tenantWriteProcedure)
+- [x] Backend: buscar mensagens de wa_messages por período (sem chamar API externa)
+- [x] Backend: formatar mensagens no padrão WhatsApp [HH:MM, DD/MM/AAAA] REMETENTE : CONTEÚDO
+- [x] Backend: filtrar tipos internos (protocolMessage, senderKeyDistribution, reactionMessage)
+- [x] Backend: salvar como nota do deal (se vinculado) ou nota interna da conversa
+- [x] Frontend: botão "Importar conversa como anotação" no header do WhatsAppChat
+- [x] Frontend: Dialog com seleção de período (Todas, Últimas 50, 24h, 48h)
+- [x] Frontend: botão no Inbox header da conversa (via WhatsAppChat integrado)
+- [x] Frontend: Toast de sucesso após importação
+- [x] Testes: 8 testes passando (validação, períodos, caminhos de erro)
+- [x] Validação: tsc 0 erros, testes passando, sync automático intacto
