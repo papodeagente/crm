@@ -5,7 +5,7 @@ import { emitEvent } from "../middleware/eventLog";
 import { getDb } from "../db";
 import { createInternalNote } from "../db";
 import { waMessages, crmUsers } from "../../drizzle/schema";
-import { eq, and, desc, gte, sql } from "drizzle-orm";
+import { eq, and, desc, gte, sql, or } from "drizzle-orm";
 import { formatDate, formatTime, SYSTEM_TIMEZONE } from "../../shared/dateUtils";
 
 export const inboxRouter = router({
@@ -104,9 +104,15 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
       }
 
       // ── Fetch messages from wa_messages (NO external API call) ──
+      // Use JID variants to match both old (12-digit) and new (13-digit) Brazilian phone formats
+      const { getAllJidVariants } = await import("../phoneUtils");
+      const jidVariants = getAllJidVariants(input.remoteJid);
+      const jidCondition = jidVariants.length === 1
+        ? eq(waMessages.remoteJid, jidVariants[0])
+        : or(...jidVariants.map(jid => eq(waMessages.remoteJid, jid)));
       const conditions = [
         eq(waMessages.sessionId, input.sessionId),
-        eq(waMessages.remoteJid, input.remoteJid),
+        jidCondition!,
         eq(waMessages.tenantId, tenantId),
       ];
       if (timeFilter) conditions.push(timeFilter);

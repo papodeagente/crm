@@ -135,6 +135,7 @@ function TimelineEvent({ event }: { event: any }) {
   const cat = getCategoryConfig(event.eventCategory || "audit");
   const icon = getActionIcon(event.action, event.eventCategory);
   const date = new Date(event.occurredAt);
+  const isNote = event.action === "note" || event.type === "note";
 
   return (
     <div className="flex gap-3 group">
@@ -150,9 +151,17 @@ function TimelineEvent({ event }: { event: any }) {
       <div className="flex-1 pb-4 min-w-0">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0 flex-1">
-            <p className="text-sm text-foreground leading-snug">
-              {event.description}
-            </p>
+            {isNote ? (
+              <div className="p-3 bg-purple-500/5 border border-purple-500/10 rounded-lg">
+                <p className="text-sm text-foreground whitespace-pre-wrap break-words">
+                  {event.description}
+                </p>
+              </div>
+            ) : (
+              <p className="text-sm text-foreground leading-snug">
+                {event.description}
+              </p>
+            )}
             <div className="flex items-center gap-2 mt-1 flex-wrap">
               {event.actorName && (
                 <span className="text-xs text-muted-foreground">

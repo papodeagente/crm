@@ -5428,3 +5428,7 @@
 - [x] Backend: corrigir erro ao importar conversa dentro da negociação (dealId path) — adicionado try-catch com log detalhado
 - [x] Backend: incluir transcrição de áudio no formato "[Áudio] Transcrição de áudio: [texto]"
 - [x] Frontend: exibição correta com whitespace-pre-wrap já existente na linha 2219
+
+## Bug Fix: Importação conversa v3 (Mar 26)
+- [x] DealDetail: importa apenas 1 mensagem — corrigido usando getAllJidVariants para buscar variantes de JID brasileiro
+- [x] Exibição da nota: adicionado whitespace-pre-wrap no DealTimeline para notas (action=note)
