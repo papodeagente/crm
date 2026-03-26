@@ -1,11 +1,12 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
-import { FileText, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
+import { FileText, Loader2, CheckCircle2, AlertCircle, Briefcase } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
+import { SearchableCombobox } from "@/components/ui/searchable-combobox";
 
 interface ImportConversationDialogProps {
   open: boolean;
@@ -15,6 +16,7 @@ interface ImportConversationDialogProps {
   dealId?: number | null;
   waConversationId?: number | null;
   contactName?: string;
+  contactId?: number;
 }
 
 type Period = "all" | "last50" | "24h" | "48h";
@@ -34,15 +36,43 @@ export default function ImportConversationDialog({
   dealId,
   waConversationId,
   contactName,
+  contactId,
 }: ImportConversationDialogProps) {
   const [period, setPeriod] = useState<Period>("last50");
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [result, setResult] = useState<{ messageCount?: number; title?: string; error?: string } | null>(null);
+  const [selectedDealId, setSelectedDealId] = useState<string>("");
 
+  // Whether we need a deal selector (Inbox context: no dealId provided)
+  const needsDealSelector = !dealId;
+
+  // Fetch deals list only when we need the selector
+  const deals = trpc.crm.deals.list.useQuery(
+    { limit: 200 },
+    { enabled: open && needsDealSelector }
+  );
+
+  const dealOptions = useMemo(() => {
+    const items = (deals.data as any)?.items || (Array.isArray(deals.data) ? deals.data : []);
+    return items.map((d: any) => ({
+      value: String(d.id),
+      label: d.title || `Negociação #${d.id}`,
+      sublabel: [d.contactName, d.accountName].filter(Boolean).join(" · ") || undefined,
+    }));
+  }, [deals.data]);
+
+  // Effective deal ID: prop or selected from combobox
+  const effectiveDealId = dealId || (selectedDealId ? Number(selectedDealId) : null);
 
   const importMutation = trpc.inbox.importConversationAsNote.useMutation();
 
   const handleImport = async () => {
+    // Validate: must have either dealId or waConversationId
+    if (!effectiveDealId && !waConversationId) {
+      toast.error("Selecione uma negociação para vincular a anotação.");
+      return;
+    }
+
     setStatus("loading");
     setResult(null);
     try {
@@ -50,7 +80,7 @@ export default function ImportConversationDialog({
         sessionId,
         remoteJid,
         period,
-        dealId: dealId ?? null,
+        dealId: effectiveDealId ?? null,
         waConversationId: waConversationId ?? null,
       });
       if (res.success) {
@@ -71,8 +101,15 @@ export default function ImportConversationDialog({
     setStatus("idle");
     setResult(null);
     setPeriod("last50");
+    setSelectedDealId("");
     onClose();
   };
+
+  const destinationLabel = effectiveDealId
+    ? "anotação na negociação"
+    : waConversationId
+    ? "nota interna da conversa"
+    : "anotação";
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && handleClose()}>
@@ -84,13 +121,43 @@ export default function ImportConversationDialog({
           </DialogTitle>
           <DialogDescription>
             {contactName
-              ? `Importar mensagens de ${contactName} como anotação${dealId ? " na negociação" : ""}.`
-              : `Importar mensagens como anotação${dealId ? " na negociação" : ""}.`}
+              ? `Importar mensagens de ${contactName} como ${destinationLabel}.`
+              : `Importar mensagens como ${destinationLabel}.`}
           </DialogDescription>
         </DialogHeader>
 
         {status === "idle" || status === "loading" ? (
           <>
+            {/* Deal selector when no dealId is provided (Inbox context) */}
+            {needsDealSelector && (
+              <div className="space-y-1.5">
+                <Label className="text-[13px] font-semibold text-muted-foreground flex items-center gap-1.5">
+                  <Briefcase className="h-3.5 w-3.5" />
+                  Vincular à negociação
+                </Label>
+                <SearchableCombobox
+                  options={dealOptions}
+                  value={selectedDealId}
+                  onValueChange={setSelectedDealId}
+                  placeholder="Buscar negociação..."
+                  searchPlaceholder="Digite o nome da negociação..."
+                  emptyText="Nenhuma negociação encontrada."
+                  loading={deals.isLoading}
+                  clearable
+                />
+                {!selectedDealId && waConversationId && (
+                  <p className="text-[11px] text-muted-foreground">
+                    Se nenhuma negociação for selecionada, a conversa será salva como nota interna.
+                  </p>
+                )}
+                {!selectedDealId && !waConversationId && (
+                  <p className="text-[11px] text-destructive">
+                    Selecione uma negociação para vincular a anotação.
+                  </p>
+                )}
+              </div>
+            )}
+
             <div className="py-2">
               <Label className="text-sm font-medium text-foreground mb-3 block">
                 Selecione o período:
@@ -122,7 +189,7 @@ export default function ImportConversationDialog({
             <div className="rounded-lg bg-muted/50 border border-border p-3">
               <p className="text-xs text-muted-foreground leading-relaxed">
                 As mensagens serão formatadas no padrão WhatsApp com data, hora e remetente, e salvas como
-                {dealId ? " anotação na negociação" : " nota interna da conversa"}.
+                {effectiveDealId ? " anotação na negociação" : waConversationId ? " nota interna da conversa" : " anotação"}.
                 Mensagens de sistema serão ignoradas automaticamente.
               </p>
             </div>
@@ -131,7 +198,10 @@ export default function ImportConversationDialog({
               <Button variant="outline" onClick={handleClose} disabled={status === "loading"}>
                 Cancelar
               </Button>
-              <Button onClick={handleImport} disabled={status === "loading"}>
+              <Button
+                onClick={handleImport}
+                disabled={status === "loading" || (needsDealSelector && !selectedDealId && !waConversationId)}
+              >
                 {status === "loading" ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />

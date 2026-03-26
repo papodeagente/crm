@@ -80,6 +80,8 @@ export interface WhatsAppChatProps {
   myAvatarUrl?: string;
   // Helpdesk
   waConversationId?: number;
+  /** Deal ID for import conversation as note */
+  dealId?: number;
   /** Called immediately when user sends a message — updates conversation store optimistically */
   onOptimisticSend?: (msg: { content: string; messageType?: string }) => void;
 }
@@ -1249,7 +1251,7 @@ function EditMessageModal({ currentText, onSave, onClose }: { currentText: strin
    MAIN CHAT COMPONENT
    ═══════════════════════════════════════════════════════ */
 
-export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDeal, onCreateContact, hasCrmContact, assignment, agents, onAssign, onStatusChange, myAvatarUrl, waConversationId, onOptimisticSend }: WhatsAppChatProps) {
+export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDeal, onCreateContact, hasCrmContact, assignment, agents, onAssign, onStatusChange, myAvatarUrl, waConversationId, dealId, onOptimisticSend }: WhatsAppChatProps) {
   const tenantId = useTenantId();
   const [showAgentDropdown, setShowAgentDropdown] = useState(false);
   const { lastMessage, lastStatusUpdate, lastMediaUpdate, lastConversationUpdate, lastTranscriptionUpdate, lastReaction, isConnected: socketConnected } = useSocket();
@@ -3033,8 +3035,10 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
         onClose={() => setShowImportDialog(false)}
         sessionId={sessionId}
         remoteJid={remoteJid}
+        dealId={dealId ?? null}
         waConversationId={waConversationId ?? null}
         contactName={contact?.name || remoteJid.split("@")[0]}
+        contactId={contact?.id}
       />
 
       {/* ─── Image Lightbox ─── */}

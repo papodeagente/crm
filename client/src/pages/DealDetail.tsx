@@ -3367,6 +3367,7 @@ function WhatsAppPanel({ contact, dealId, isFullscreen, onToggleFullscreen, onOp
               sessionId={activeSession.sessionId}
               remoteJid={remoteJid}
               myAvatarUrl={activeSession.user?.imgUrl}
+              dealId={dealId}
             />
           </div>
         ) : (

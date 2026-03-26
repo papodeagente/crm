@@ -5411,3 +5411,10 @@
 - [x] Frontend: Toast de sucesso após importação
 - [x] Testes: 8 testes passando (validação, períodos, caminhos de erro)
 - [x] Validação: tsc 0 erros, testes passando, sync automático intacto
+
+## Bug Fix: Importar Conversa - dealId/waConversationId não chegam ao backend (Mar 26)
+- [x] Corrigir passagem de dealId e waConversationId do frontend ao backend
+- [x] No DealDetail: garantir que dealId é passado ao ImportConversationDialog (via WhatsAppChat prop)
+- [x] No Inbox: adicionar seletor de negociação (SearchableCombobox) para vincular a conversa antes de importar
+- [x] Backend: validação quando dealId e waConversationId são null (toast + botão disabled)
+- [x] Testar importação: 0 erros TS, 8 testes importConversation passando
