@@ -5418,3 +5418,7 @@
 - [x] No Inbox: adicionar seletor de negociação (SearchableCombobox) para vincular a conversa antes de importar
 - [x] Backend: validação quando dealId e waConversationId são null (toast + botão disabled)
 - [x] Testar importação: 0 erros TS, 8 testes importConversation passando
+
+## Bug Fix: Layout bagunçado na conversa importada como anotação (Mar 26)
+- [x] Backend: formatar cada mensagem em sua própria linha com dupla quebra de linha (\n\n) entre elas
+- [x] Frontend: exibição da nota já usa whitespace-pre-wrap — quebras de linha preservadas

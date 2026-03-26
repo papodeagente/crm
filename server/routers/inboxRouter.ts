@@ -219,7 +219,7 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
         return { success: false, error: "Nenhuma mensagem válida encontrada (apenas mensagens de sistema)." };
       }
 
-      const noteBody = lines.join("\n");
+      const noteBody = lines.join("\n\n");
       const firstMsg = messages.find(m => !IGNORED_TYPES.has(m.messageType));
       const titleDate = firstMsg ? `${formatDate(firstMsg.timestamp)} ${formatTime(firstMsg.timestamp)}` : formatDate(new Date());
       const noteTitle = `Conversa WhatsApp — ${titleDate}`;
