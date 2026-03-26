@@ -18,7 +18,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import {
   ArrowRightLeft, RefreshCw, Pencil, ListPlus, ArrowRight,
-  Download, Trash2, X, Loader2, CheckCircle2, AlertTriangle,
+  Download, Trash2, X, Loader2, CheckCircle2, AlertTriangle, Send,
 } from "lucide-react";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
@@ -39,6 +39,7 @@ interface BulkActionsBarProps {
   accounts: Array<{ id: number; name: string }>;
   // Callbacks
   onActionComplete: () => void;
+  onWhatsApp?: () => void;
 }
 
 function buildSelectionInput(props: BulkActionsBarProps) {
@@ -280,6 +281,9 @@ export default function BulkActionsBar(props: BulkActionsBarProps) {
 
         {/* Actions */}
         <div className="flex items-center gap-1 flex-wrap">
+          {props.onWhatsApp && (
+            <ActionButton icon={<Send className="h-3.5 w-3.5" />} label="Disparar WhatsApp" onClick={props.onWhatsApp} disabled={isPending} whatsapp />
+          )}
           <ActionButton icon={<ArrowRightLeft className="h-3.5 w-3.5" />} label="Transferir" onClick={() => { resetModals(); setActiveModal("transfer"); }} disabled={isPending} />
           <ActionButton icon={<RefreshCw className="h-3.5 w-3.5" />} label="Alterar status" onClick={() => { resetModals(); setActiveModal("status"); }} disabled={isPending} />
           <ActionButton icon={<Pencil className="h-3.5 w-3.5" />} label="Adicionar ou Alterar" onClick={() => { resetModals(); setActiveModal("update"); }} disabled={isPending} />
@@ -539,17 +543,19 @@ export default function BulkActionsBar(props: BulkActionsBarProps) {
   );
 }
 
-function ActionButton({ icon, label, onClick, disabled, destructive }: {
-  icon: React.ReactNode; label: string; onClick: () => void; disabled?: boolean; destructive?: boolean;
+function ActionButton({ icon, label, onClick, disabled, destructive, whatsapp }: {
+  icon: React.ReactNode; label: string; onClick: () => void; disabled?: boolean; destructive?: boolean; whatsapp?: boolean;
 }) {
   return (
     <button
       onClick={onClick}
       disabled={disabled}
       className={`flex items-center gap-1.5 px-3 py-1.5 text-[13px] font-medium rounded-lg transition-all duration-150 disabled:opacity-40 ${
-        destructive
-          ? "text-red-300 hover:bg-red-500/20 hover:text-red-200"
-          : "text-white/90 hover:bg-white/10 hover:text-white"
+        whatsapp
+          ? "text-emerald-300 hover:bg-emerald-500/20 hover:text-emerald-200"
+          : destructive
+            ? "text-red-300 hover:bg-red-500/20 hover:text-red-200"
+            : "text-white/90 hover:bg-white/10 hover:text-white"
       }`}
     >
       {icon}

@@ -5312,3 +5312,8 @@
 - [x] Frontend: Modal Excluir com confirmação forte
 - [x] Frontend: Feedback de resultado após execução
 - [x] Testes: seleção, bulk actions, multi-tenant, permissões (15 testes passando)
+
+## Melhorias Visão Lista Pipeline (Mar 25)
+- [x] Botão "Disparar WhatsApp" na barra de ações em massa (BulkActionsBar)
+- [x] Coluna "Responsável" com avatar na tabela da visão lista
+- [x] Paginação na visão lista com controle de itens por página (25, 50, 100)

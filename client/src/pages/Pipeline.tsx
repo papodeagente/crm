@@ -83,6 +83,8 @@ export default function Pipeline() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [allMatchingFilter, setAllMatchingFilter] = useState(false);
   const [listTab, setListTab] = useState<"active" | "trash">("active");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(25);
   const dealFilters = useDealFilters();
   const [ownerFilter, setOwnerFilter] = useState<number | "all" | "mine">("mine");
   const saasMe = trpc.saasAuth.me.useQuery(undefined, { retry: 1, refetchOnWindowFocus: false, staleTime: 5 * 60 * 1000 });
@@ -313,6 +315,17 @@ export default function Pipeline() {
   }, [dealItems, statusFilter, sortMode]);
 
   const totalDeals = sortedDeals.length;
+
+  // Pagination
+  const totalPages = Math.max(1, Math.ceil(totalDeals / itemsPerPage));
+  const paginatedDeals = useMemo(() => {
+    if (viewMode !== "list") return sortedDeals;
+    const start = (currentPage - 1) * itemsPerPage;
+    return sortedDeals.slice(start, start + itemsPerPage);
+  }, [sortedDeals, currentPage, itemsPerPage, viewMode]);
+
+  // Reset page when filters change
+  useEffect(() => { setCurrentPage(1); }, [statusFilter, sortMode, dealFilters.filters, effectiveOwnerFilter, activePipeline?.id]);
 
   const handleDragStart = useCallback((e: React.DragEvent, dealId: number) => {
     setDraggedDealId(dealId);
@@ -687,22 +700,24 @@ export default function Pipeline() {
                   utils.crm.deals.list.invalidate();
                   utils.crm.deals.listDeleted.invalidate();
                 }}
+                onWhatsApp={() => setBulkDialogOpen(true)}
               />
             </div>
           )}
 
-          {listTab === "active" ? (
+          {listTab === "active" && (<>
             <Card className="border-0 shadow-sm rounded-2xl overflow-hidden">
               <table className="w-full text-[13px]">
                 <thead>
                   <tr className="border-b bg-muted/30">
                     <th className="p-3.5 w-10">
                       <Checkbox
-                        checked={sortedDeals.length > 0 && sortedDeals.every((d: any) => selectedDealIds.has(d.id))}
-                        onCheckedChange={() => toggleSelectAll(sortedDeals.map((d: any) => d.id))}
+                        checked={paginatedDeals.length > 0 && paginatedDeals.every((d: any) => selectedDealIds.has(d.id))}
+                        onCheckedChange={() => toggleSelectAll(paginatedDeals.map((d: any) => d.id))}
                       />
                     </th>
                     <th className="text-left p-3.5 font-semibold text-muted-foreground">Negociação</th>
+                    <th className="text-center p-3.5 font-semibold text-muted-foreground w-14">Resp.</th>
                     <th className="text-left p-3.5 font-semibold text-muted-foreground">Contato</th>
                     <th className="text-left p-3.5 font-semibold text-muted-foreground">Etapa</th>
                     <th className="text-left p-3.5 font-semibold text-muted-foreground">Status</th>
@@ -711,17 +726,31 @@ export default function Pipeline() {
                   </tr>
                 </thead>
                 <tbody>
-                  {sortedDeals.map((deal: any) => {
+                  {paginatedDeals.map((deal: any) => {
                     const contact = ((contacts.data as any)?.items || contacts.data || []).find((c: any) => c.id === deal.contactId);
                     const stage = (stages.data || []).find((s: any) => s.id === deal.stageId);
                     const style = getStatusStyle(deal.status);
                     const isSelected = selectedDealIds.has(deal.id);
+                    const owner = (crmUsers.data || []).find((u: any) => u.id === deal.ownerUserId);
+                    const ownerInitials = owner ? owner.name.split(" ").map((w: string) => w[0]).slice(0, 2).join("").toUpperCase() : "?";
                     return (
                       <tr key={deal.id} className={`border-b border-border/30 hover:bg-muted/20 transition-colors cursor-pointer ${isSelected ? "bg-primary/5" : ""}`}>
                         <td className="p-3.5" onClick={(e) => e.stopPropagation()}>
                           <Checkbox checked={isSelected} onCheckedChange={() => toggleSelectDeal(deal.id)} />
                         </td>
                         <td className="p-3.5 font-medium" onClick={() => setLocation(`/deal/${deal.id}`)}>{deal.title}</td>
+                        <td className="p-3.5 text-center" onClick={() => setLocation(`/deal/${deal.id}`)}>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <div className="inline-flex items-center justify-center h-7 w-7 rounded-full bg-primary/10 text-primary text-[10px] font-bold">
+                                {owner?.avatarUrl ? (
+                                  <img src={owner.avatarUrl} alt={owner.name} className="h-7 w-7 rounded-full object-cover" />
+                                ) : ownerInitials}
+                              </div>
+                            </TooltipTrigger>
+                            <TooltipContent side="top" className="text-xs">{owner?.name || "Sem responsável"}</TooltipContent>
+                          </Tooltip>
+                        </td>
                         <td className="p-3.5 text-muted-foreground" onClick={() => setLocation(`/deal/${deal.id}`)}>{contact?.name || "—"}</td>
                         <td className="p-3.5" onClick={() => setLocation(`/deal/${deal.id}`)}><Badge variant="secondary" className="text-[11px] rounded-lg">{stage?.name || "—"}</Badge></td>
                         <td className="p-3.5" onClick={() => setLocation(`/deal/${deal.id}`)}>
@@ -735,13 +764,78 @@ export default function Pipeline() {
                       </tr>
                     );
                   })}
-                  {sortedDeals.length === 0 && (
-                    <tr><td colSpan={7} className="p-12 text-center text-muted-foreground text-sm">Nenhuma negociação encontrada.</td></tr>
+                  {paginatedDeals.length === 0 && (
+                    <tr><td colSpan={8} className="p-12 text-center text-muted-foreground text-sm">Nenhuma negociação encontrada.</td></tr>
                   )}
                 </tbody>
               </table>
             </Card>
-          ) : (
+
+            {/* Pagination */}
+            {totalDeals > 0 && (
+              <div className="flex items-center justify-between mt-4 px-1">
+                <div className="flex items-center gap-2 text-[13px] text-muted-foreground">
+                  <span>Exibindo {((currentPage - 1) * itemsPerPage) + 1}–{Math.min(currentPage * itemsPerPage, totalDeals)} de {totalDeals}</span>
+                  <span className="text-border">|</span>
+                  <span>Itens por página:</span>
+                  <select
+                    value={itemsPerPage}
+                    onChange={(e) => { setItemsPerPage(Number(e.target.value)); setCurrentPage(1); }}
+                    className="bg-muted/50 border border-border/50 rounded-lg px-2 py-1 text-[13px] text-foreground focus:outline-none focus:ring-1 focus:ring-primary/30"
+                  >
+                    <option value={25}>25</option>
+                    <option value={50}>50</option>
+                    <option value={100}>100</option>
+                  </select>
+                </div>
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 w-8 p-0 rounded-lg"
+                    disabled={currentPage <= 1}
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+                    let page: number;
+                    if (totalPages <= 5) {
+                      page = i + 1;
+                    } else if (currentPage <= 3) {
+                      page = i + 1;
+                    } else if (currentPage >= totalPages - 2) {
+                      page = totalPages - 4 + i;
+                    } else {
+                      page = currentPage - 2 + i;
+                    }
+                    return (
+                      <Button
+                        key={page}
+                        variant={page === currentPage ? "default" : "outline"}
+                        size="sm"
+                        className={`h-8 w-8 p-0 rounded-lg text-[13px] ${page === currentPage ? "" : ""}`}
+                        onClick={() => setCurrentPage(page)}
+                      >
+                        {page}
+                      </Button>
+                    );
+                  })}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 w-8 p-0 rounded-lg"
+                    disabled={currentPage >= totalPages}
+                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
+          </>)}
+
+          {listTab !== "active" && (
             <Card className="border-0 shadow-sm rounded-2xl overflow-hidden">
               <table className="w-full text-[13px]">
                 <thead>
