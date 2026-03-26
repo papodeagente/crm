@@ -35,7 +35,8 @@ import TaskFormDialog, { getTaskTypeIcon, getTaskTypeLabel } from "@/components/
 import TaskActionPopover from "@/components/TaskActionPopover";
 import { formatDate, formatDateTime, formatTime } from "../../../shared/dateUtils";
 import { useSocket } from "@/hooks/useSocket";
-import { MessageCircle } from "lucide-react";
+import { MessageCircle, Send } from "lucide-react";
+import BulkWhatsAppDialog from "@/components/BulkWhatsAppDialog";
 
 type ViewMode = "kanban" | "list";
 type SortMode = "created_desc" | "created_asc" | "value_desc" | "value_asc";
@@ -89,6 +90,42 @@ export default function Pipeline() {
   const [showIndicators, setShowIndicators] = useState(false);
   const [celebration, setCelebration] = useState<{ open: boolean; title?: string; value?: string }>({ open: false });
   const [showTaskCalendar, setShowTaskCalendar] = useState(false);
+
+  // Bulk WhatsApp states
+  const [bulkDialogOpen, setBulkDialogOpen] = useState(false);
+  const [progressDialogOpen, setProgressDialogOpen] = useState(false);
+  const activeSession = trpc.crm.deals.activeSession.useQuery(undefined, { enabled: bulkDialogOpen });
+  const bulkSend = trpc.crm.deals.bulkWhatsApp.useMutation({
+    onSuccess: () => { setBulkDialogOpen(false); setProgressDialogOpen(true); toast.success("Disparo iniciado!"); },
+    onError: (e: any) => toast.error(e.message || "Erro ao iniciar disparo"),
+  });
+  const bulkProgress = trpc.crm.deals.bulkProgress.useQuery(undefined, { enabled: progressDialogOpen, refetchInterval: progressDialogOpen ? 2000 : false });
+  const cancelBulk = trpc.crm.deals.cancelBulk.useMutation({
+    onSuccess: () => toast.info("Envio cancelado"),
+    onError: (e: any) => toast.error(e.message),
+  });
+  const sessionConnected = activeSession.data?.status === "connected";
+  const sessionConnecting = activeSession.data?.status === "connecting";
+  const dealTemplateVars = [
+    { var: "{nome}", desc: "Nome do contato principal" },
+    { var: "{primeiro_nome}", desc: "Primeiro nome do contato" },
+    { var: "{email}", desc: "E-mail do contato" },
+    { var: "{telefone}", desc: "Telefone do contato" },
+    { var: "{negociacao}", desc: "Título da negociação" },
+    { var: "{valor}", desc: "Valor da negociação" },
+    { var: "{etapa}", desc: "Etapa do funil" },
+    { var: "{empresa}", desc: "Empresa do contato" },
+  ];
+  const dealPreviewReplacements: Record<string, string> = {
+    "{nome}": "João da Silva",
+    "{primeiro_nome}": "João",
+    "{email}": "joao@email.com",
+    "{telefone}": "(11) 99999-0000",
+    "{negociacao}": "Pacote Cancún",
+    "{valor}": "R$ 5.000,00",
+    "{etapa}": "Proposta Enviada",
+    "{empresa}": "Viagens ABC",
+  };
 
   // Listen for sale celebration events from DealDrawer
   useEffect(() => {
@@ -609,16 +646,24 @@ export default function Pipeline() {
               <div className="flex items-center gap-2 ml-auto">
                 <span className="text-[13px] text-muted-foreground font-medium">{selectedDealIds.size} selecionada(s)</span>
                 {listTab === "active" ? (
-                  <Button variant="destructive" size="sm" className="h-8 gap-1.5 text-[12px] rounded-lg" onClick={() => setShowDeleteConfirm(true)}>
-                    <Trash2 className="h-3.5 w-3.5" />
-                    Excluir
-                  </Button>
+                  <>
+                    <Button size="sm" className="h-8 gap-1.5 text-[12px] rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => setBulkDialogOpen(true)}>
+                      <Send className="h-3.5 w-3.5" />Disparar WhatsApp
+                    </Button>
+                    <Button variant="destructive" size="sm" className="h-8 gap-1.5 text-[12px] rounded-lg" onClick={() => setShowDeleteConfirm(true)}>
+                      <Trash2 className="h-3.5 w-3.5" />
+                      Excluir
+                    </Button>
+                  </>
                 ) : (
                   <Button variant="outline" size="sm" className="h-8 gap-1.5 text-[12px] rounded-lg" onClick={() => restoreDeals.mutate({ ids: Array.from(selectedDealIds) })}>
                     <RotateCcw className="h-3.5 w-3.5" />
                     Restaurar
                   </Button>
                 )}
+                <Button variant="ghost" size="sm" className="h-8 text-[12px] rounded-lg" onClick={() => setSelectedDealIds(new Set())}>
+                  Limpar seleção
+                </Button>
               </div>
             )}
           </div>
@@ -773,6 +818,34 @@ export default function Pipeline() {
         filters={dealFilters.filters}
         onApply={(f) => { dealFilters.setFilters(f); }}
         onClear={dealFilters.clear}
+      />
+
+      {/* Bulk WhatsApp Dialog */}
+      <BulkWhatsAppDialog
+        open={bulkDialogOpen}
+        onOpenChange={setBulkDialogOpen}
+        selectedCount={selectedDealIds.size}
+        sessionConnected={sessionConnected}
+        sessionConnecting={sessionConnecting}
+        templateVars={dealTemplateVars}
+        previewReplacements={dealPreviewReplacements}
+        onSend={(params) => {
+          bulkSend.mutate({
+            dealIds: Array.from(selectedDealIds),
+            messageTemplate: params.messageTemplate,
+            sessionId: activeSession.data?.sessionId || "",
+            delayMs: params.delayMs,
+            randomDelay: params.randomDelay,
+          });
+        }}
+        isSending={bulkSend.isPending}
+        progress={bulkProgress.data as any}
+        progressOpen={progressDialogOpen}
+        onProgressOpenChange={setProgressDialogOpen}
+        onCancel={() => cancelBulk.mutate()}
+        isCancelling={cancelBulk.isPending}
+        onClearSelection={() => setSelectedDealIds(new Set())}
+        entityLabel="negociações"
       />
     </div>
   );

@@ -5269,3 +5269,10 @@
 - [x] Colunas Contato (nome + telefone) e Etapa adicionadas na tabela
 - [x] listDeals com JOIN em contacts e pipelineStages
 - [x] 18 testes passando
+
+## Bug — Disparo WhatsApp em Negociações (Mar 25)
+- [x] Causa: menu "Negociações" leva para Pipeline.tsx (não Deals.tsx), e Pipeline.tsx não tinha BulkWhatsAppDialog
+- [x] Botão "Disparar WhatsApp" adicionado na barra de ações em lote da view lista do Pipeline.tsx
+- [x] BulkWhatsAppDialog integrado no Pipeline.tsx com endpoint crm.deals.bulkWhatsApp
+- [x] Variáveis: {nome}, {primeiro_nome}, {email}, {telefone}, {negociacao}, {valor}, {etapa}, {empresa}
+- [x] Botão "Limpar seleção" adicionado
