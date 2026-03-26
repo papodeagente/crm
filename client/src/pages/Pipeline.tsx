@@ -37,6 +37,7 @@ import { formatDate, formatDateTime, formatTime } from "../../../shared/dateUtil
 import { useSocket } from "@/hooks/useSocket";
 import { MessageCircle, Send } from "lucide-react";
 import BulkWhatsAppDialog from "@/components/BulkWhatsAppDialog";
+import BulkActionsBar from "@/components/BulkActionsBar";
 
 type ViewMode = "kanban" | "list";
 type SortMode = "created_desc" | "created_asc" | "value_desc" | "value_asc";
@@ -80,6 +81,7 @@ export default function Pipeline() {
   const [dragOverStageId, setDragOverStageId] = useState<number | null>(null);
   const [selectedDealIds, setSelectedDealIds] = useState<Set<number>>(new Set());
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [allMatchingFilter, setAllMatchingFilter] = useState(false);
   const [listTab, setListTab] = useState<"active" | "trash">("active");
   const dealFilters = useDealFilters();
   const [ownerFilter, setOwnerFilter] = useState<number | "all" | "mine">("mine");
@@ -642,31 +644,52 @@ export default function Pipeline() {
               </button>
             </div>
 
-            {selectedDealIds.size > 0 && (
+            {selectedDealIds.size > 0 && listTab === "trash" && (
               <div className="flex items-center gap-2 ml-auto">
                 <span className="text-[13px] text-muted-foreground font-medium">{selectedDealIds.size} selecionada(s)</span>
-                {listTab === "active" ? (
-                  <>
-                    <Button size="sm" className="h-8 gap-1.5 text-[12px] rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => setBulkDialogOpen(true)}>
-                      <Send className="h-3.5 w-3.5" />Disparar WhatsApp
-                    </Button>
-                    <Button variant="destructive" size="sm" className="h-8 gap-1.5 text-[12px] rounded-lg" onClick={() => setShowDeleteConfirm(true)}>
-                      <Trash2 className="h-3.5 w-3.5" />
-                      Excluir
-                    </Button>
-                  </>
-                ) : (
-                  <Button variant="outline" size="sm" className="h-8 gap-1.5 text-[12px] rounded-lg" onClick={() => restoreDeals.mutate({ ids: Array.from(selectedDealIds) })}>
-                    <RotateCcw className="h-3.5 w-3.5" />
-                    Restaurar
-                  </Button>
-                )}
+                <Button variant="outline" size="sm" className="h-8 gap-1.5 text-[12px] rounded-lg" onClick={() => restoreDeals.mutate({ ids: Array.from(selectedDealIds) })}>
+                  <RotateCcw className="h-3.5 w-3.5" />
+                  Restaurar
+                </Button>
                 <Button variant="ghost" size="sm" className="h-8 text-[12px] rounded-lg" onClick={() => setSelectedDealIds(new Set())}>
                   Limpar seleção
                 </Button>
               </div>
             )}
           </div>
+
+          {/* Bulk Actions Bar for active tab */}
+          {listTab === "active" && selectedDealIds.size > 0 && (
+            <div className="mb-3">
+              <BulkActionsBar
+                selectedCount={allMatchingFilter ? (totalDeals - ([] as number[]).length) : selectedDealIds.size}
+                allMatchingFilter={allMatchingFilter}
+                totalFilterCount={totalDeals}
+                onClearSelection={() => { setSelectedDealIds(new Set()); setAllMatchingFilter(false); }}
+                onSelectAllFilter={() => {
+                  setAllMatchingFilter(true);
+                  setSelectedDealIds(new Set(sortedDeals.map((d: any) => d.id)));
+                }}
+                selectedIds={Array.from(selectedDealIds)}
+                exclusionIds={[]}
+                filterSnapshot={{
+                  pipelineId: activePipeline?.id,
+                  status: statusFilter !== "all" ? statusFilter : undefined,
+                  ...dealFilters.filters,
+                  ...(effectiveOwnerFilter !== "all" ? { ownerUserId: effectiveOwnerFilter as number } : {}),
+                }}
+                stages={stages.data || []}
+                users={(crmUsers.data || []).map((u: any) => ({ id: u.id, name: u.name, userId: u.userId }))}
+                accounts={(allAccounts.data || []).map((a: any) => ({ id: a.id, name: a.name }))}
+                onActionComplete={() => {
+                  setSelectedDealIds(new Set());
+                  setAllMatchingFilter(false);
+                  utils.crm.deals.list.invalidate();
+                  utils.crm.deals.listDeleted.invalidate();
+                }}
+              />
+            </div>
+          )}
 
           {listTab === "active" ? (
             <Card className="border-0 shadow-sm rounded-2xl overflow-hidden">

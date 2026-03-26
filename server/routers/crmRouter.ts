@@ -8,6 +8,7 @@ import { getDb } from "../db";
 import { tenants } from "../../drizzle/schema";
 import { eq } from "drizzle-orm";
 import { resolveVisibilityFilter } from "../services/visibilityService";
+import * as bulkDealService from "../services/bulkDealService";
 import { startBulkSendCrm, getBulkSendProgress, cancelBulkSend, getActiveSessionForTenant, listCampaigns, getCampaignDetail, getCampaignMessages } from "../bulkMessage";
 
 export const crmRouter = router({
@@ -1058,6 +1059,197 @@ const tenantId = getTenantId(ctx); const { id, dealId, checkIn, checkOut, ...dat
           ))
           .orderBy(desc(contactConversionEvents.receivedAt));
       }),
+
+    // ─── BULK ACTIONS ───
+    bulkActions: router({
+      /** Resolve selection and return count for confirmation */
+      resolveCount: tenantProcedure
+        .input(z.object({
+          selectedIds: z.array(z.number()).optional(),
+          allMatchingFilter: z.boolean().optional(),
+          exclusionIds: z.array(z.number()).optional(),
+          filterSnapshot: z.object({
+            pipelineId: z.number().optional(),
+            stageId: z.number().optional(),
+            status: z.string().optional(),
+            titleSearch: z.string().optional(),
+            accountId: z.number().optional(),
+            leadSource: z.string().optional(),
+            ownerUserId: z.number().optional(),
+            dateFrom: z.string().optional(),
+            dateTo: z.string().optional(),
+            valueMin: z.number().optional(),
+            valueMax: z.number().optional(),
+          }).optional(),
+        }))
+        .query(async ({ ctx, input }) => {
+          const isAdmin = ctx.saasUser?.role === "admin";
+          const bCtx: bulkDealService.BulkActionContext = {
+            tenantId: getTenantId(ctx), userId: ctx.user.id,
+            userName: ctx.user.name || "Sistema", isAdmin,
+            saasUserId: ctx.saasUser?.userId,
+          };
+          const ids = await bulkDealService.resolveSelection(input, bCtx);
+          return { count: ids.length };
+        }),
+
+      transfer: tenantWriteProcedure
+        .input(z.object({
+          selectedIds: z.array(z.number()).optional(),
+          allMatchingFilter: z.boolean().optional(),
+          exclusionIds: z.array(z.number()).optional(),
+          filterSnapshot: z.object({
+            pipelineId: z.number().optional(), stageId: z.number().optional(),
+            status: z.string().optional(), titleSearch: z.string().optional(),
+            ownerUserId: z.number().optional(),
+          }).optional(),
+          newOwnerUserId: z.number(),
+        }))
+        .mutation(async ({ ctx, input }) => {
+          const isAdmin = ctx.saasUser?.role === "admin";
+          const bCtx: bulkDealService.BulkActionContext = {
+            tenantId: getTenantId(ctx), userId: ctx.user.id,
+            userName: ctx.user.name || "Sistema", isAdmin,
+            saasUserId: ctx.saasUser?.userId,
+          };
+          const ids = await bulkDealService.resolveSelection(input, bCtx);
+          if (ids.length === 0) return { success: true, totalSelected: 0, totalProcessed: 0, totalSkipped: 0, errors: [] };
+          return bulkDealService.bulkTransfer(ids, input.newOwnerUserId, bCtx);
+        }),
+
+      changeStatus: tenantWriteProcedure
+        .input(z.object({
+          selectedIds: z.array(z.number()).optional(),
+          allMatchingFilter: z.boolean().optional(),
+          exclusionIds: z.array(z.number()).optional(),
+          filterSnapshot: z.object({
+            pipelineId: z.number().optional(), stageId: z.number().optional(),
+            status: z.string().optional(), ownerUserId: z.number().optional(),
+          }).optional(),
+          newStatus: z.enum(["open", "won", "lost"]),
+          lossReasonId: z.number().optional(),
+          lossNotes: z.string().optional(),
+        }))
+        .mutation(async ({ ctx, input }) => {
+          const isAdmin = ctx.saasUser?.role === "admin";
+          const bCtx: bulkDealService.BulkActionContext = {
+            tenantId: getTenantId(ctx), userId: ctx.user.id,
+            userName: ctx.user.name || "Sistema", isAdmin,
+            saasUserId: ctx.saasUser?.userId,
+          };
+          const ids = await bulkDealService.resolveSelection(input, bCtx);
+          if (ids.length === 0) return { success: true, totalSelected: 0, totalProcessed: 0, totalSkipped: 0, errors: [] };
+          return bulkDealService.bulkChangeStatus(ids, input.newStatus, input.lossReasonId, input.lossNotes, bCtx);
+        }),
+
+      moveStage: tenantWriteProcedure
+        .input(z.object({
+          selectedIds: z.array(z.number()).optional(),
+          allMatchingFilter: z.boolean().optional(),
+          exclusionIds: z.array(z.number()).optional(),
+          filterSnapshot: z.object({
+            pipelineId: z.number().optional(), stageId: z.number().optional(),
+            status: z.string().optional(), ownerUserId: z.number().optional(),
+          }).optional(),
+          toStageId: z.number(),
+          toStageName: z.string(),
+        }))
+        .mutation(async ({ ctx, input }) => {
+          const isAdmin = ctx.saasUser?.role === "admin";
+          const bCtx: bulkDealService.BulkActionContext = {
+            tenantId: getTenantId(ctx), userId: ctx.user.id,
+            userName: ctx.user.name || "Sistema", isAdmin,
+            saasUserId: ctx.saasUser?.userId,
+          };
+          const ids = await bulkDealService.resolveSelection(input, bCtx);
+          if (ids.length === 0) return { success: true, totalSelected: 0, totalProcessed: 0, totalSkipped: 0, errors: [] };
+          return bulkDealService.bulkMoveStage(ids, input.toStageId, input.toStageName, bCtx);
+        }),
+
+      updateFields: tenantWriteProcedure
+        .input(z.object({
+          selectedIds: z.array(z.number()).optional(),
+          allMatchingFilter: z.boolean().optional(),
+          exclusionIds: z.array(z.number()).optional(),
+          filterSnapshot: z.object({
+            pipelineId: z.number().optional(), stageId: z.number().optional(),
+            status: z.string().optional(), ownerUserId: z.number().optional(),
+          }).optional(),
+          fields: z.object({
+            leadSource: z.string().optional(),
+            channelOrigin: z.string().optional(),
+            accountId: z.number().nullable().optional(),
+          }),
+        }))
+        .mutation(async ({ ctx, input }) => {
+          const isAdmin = ctx.saasUser?.role === "admin";
+          const bCtx: bulkDealService.BulkActionContext = {
+            tenantId: getTenantId(ctx), userId: ctx.user.id,
+            userName: ctx.user.name || "Sistema", isAdmin,
+            saasUserId: ctx.saasUser?.userId,
+          };
+          const ids = await bulkDealService.resolveSelection(input, bCtx);
+          if (ids.length === 0) return { success: true, totalSelected: 0, totalProcessed: 0, totalSkipped: 0, errors: [] };
+          return bulkDealService.bulkUpdateFields(ids, input.fields, bCtx);
+        }),
+
+      createTask: tenantWriteProcedure
+        .input(z.object({
+          selectedIds: z.array(z.number()).optional(),
+          allMatchingFilter: z.boolean().optional(),
+          exclusionIds: z.array(z.number()).optional(),
+          filterSnapshot: z.object({
+            pipelineId: z.number().optional(), stageId: z.number().optional(),
+            status: z.string().optional(), ownerUserId: z.number().optional(),
+          }).optional(),
+          title: z.string().min(1),
+          taskType: z.string().optional(),
+          dueAt: z.string().optional(),
+          priority: z.enum(["low", "medium", "high", "urgent"]).optional(),
+          description: z.string().optional(),
+          assignToOwner: z.boolean().optional(),
+        }))
+        .mutation(async ({ ctx, input }) => {
+          const isAdmin = ctx.saasUser?.role === "admin";
+          const bCtx: bulkDealService.BulkActionContext = {
+            tenantId: getTenantId(ctx), userId: ctx.user.id,
+            userName: ctx.user.name || "Sistema", isAdmin,
+            saasUserId: ctx.saasUser?.userId,
+          };
+          const ids = await bulkDealService.resolveSelection(input, bCtx);
+          if (ids.length === 0) return { success: true, totalSelected: 0, totalProcessed: 0, totalSkipped: 0, errors: [] };
+          return bulkDealService.bulkCreateTask(ids, {
+            title: input.title,
+            taskType: input.taskType,
+            dueAt: input.dueAt ? new Date(input.dueAt) : undefined,
+            priority: input.priority,
+            description: input.description,
+            assignToOwner: input.assignToOwner,
+          }, bCtx);
+        }),
+
+      export: tenantProcedure
+        .input(z.object({
+          selectedIds: z.array(z.number()).optional(),
+          allMatchingFilter: z.boolean().optional(),
+          exclusionIds: z.array(z.number()).optional(),
+          filterSnapshot: z.object({
+            pipelineId: z.number().optional(), stageId: z.number().optional(),
+            status: z.string().optional(), ownerUserId: z.number().optional(),
+          }).optional(),
+        }))
+        .query(async ({ ctx, input }) => {
+          const isAdmin = ctx.saasUser?.role === "admin";
+          const bCtx: bulkDealService.BulkActionContext = {
+            tenantId: getTenantId(ctx), userId: ctx.user.id,
+            userName: ctx.user.name || "Sistema", isAdmin,
+            saasUserId: ctx.saasUser?.userId,
+          };
+          const ids = await bulkDealService.resolveSelection(input, bCtx);
+          if (ids.length === 0) return { deals: [], totalExported: 0 };
+          return bulkDealService.bulkExport(ids, bCtx);
+        }),
+    }),
 
     // ─── DEAL PARTICIPANTS ───
     participants: router({

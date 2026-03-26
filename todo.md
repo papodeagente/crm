@@ -5287,3 +5287,28 @@
 - [x] Filtro "Meu relatório" mostrando apenas dados do próprio admin
 - [x] Backend: endpoints tRPC aceitam parâmetros de filtro (userId, teamId)
 - [x] Frontend: seletor de filtro visível apenas para administradores
+
+## Seleção em Massa e Ações em Lote — Pipeline Visão Lista (Mar 25)
+- [x] Backend: Serviço de resolução segura de seleção (selectedIds / allMatchingFilter + exclusionIds)
+- [x] Backend: Mutation bulk.transfer (transferir responsável em lote)
+- [x] Backend: Mutation bulk.changeStatus (alterar status em lote)
+- [x] Backend: Mutation bulk.updateFields (adicionar/alterar campos em lote)
+- [x] Backend: Mutation bulk.createTask (criar tarefa em lote)
+- [x] Backend: Mutation bulk.moveStage (mover etapa em lote)
+- [x] Backend: Mutation bulk.export (exportar selecionados)
+- [x] Backend: Mutation bulk.delete (excluir com soft-delete em lote)
+- [x] Backend: Auditoria EventLog para todas as ações em lote
+- [x] Backend: Validação multi-tenant e RBAC em todas as mutations
+- [x] Frontend: Checkbox individual por item na lista
+- [x] Frontend: Checkbox de seleção de todos da página
+- [x] Frontend: Opção "Selecionar todos os X itens deste filtro"
+- [x] Frontend: Barra de ações em massa no topo (contador, limpar, ações)
+- [x] Frontend: Modal Transferir (selecionar novo responsável)
+- [x] Frontend: Modal Alterar Status (selecionar status)
+- [x] Frontend: Modal Adicionar/Alterar (campos suportados)
+- [x] Frontend: Modal Criar Tarefa em lote
+- [x] Frontend: Modal Mover Etapa (selecionar etapa destino)
+- [x] Frontend: Exportar selecionados (CSV/Excel)
+- [x] Frontend: Modal Excluir com confirmação forte
+- [x] Frontend: Feedback de resultado após execução
+- [x] Testes: seleção, bulk actions, multi-tenant, permissões (15 testes passando)
