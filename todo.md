@@ -5494,3 +5494,27 @@
 - [x] Fix 12: syncContacts/syncUserConversations - routing Z-API
 - [x] Fix 13: initializeProviderSessions chamado na inicialização do servidor
 - [x] Testes vitest para validar routing Z-API
+
+## Ajuste de Tipos de Funil — 3 tipos ativos + descontinuar personalizado (Mar 27)
+
+### Backend
+- [x] Descontinuar tipo 'personalizado' — ocultar na criação, manter legado no banco
+- [x] Validação backend: bloquear criação de pipeline tipo 'personalizado'
+- [x] Router de análise pós-venda: indicadores operacionais filtrados por pos_venda
+- [x] Router de análise suporte: indicadores operacionais filtrados por suporte
+- [x] Garantir que análises comerciais filtrem apenas type='vendas'
+- [x] Indicadores pós-venda: qtd processos, valor gerenciado, ticket médio, finalizadas
+- [x] Indicadores suporte: qtd casos, valor impactado, ticket médio, motivos de ocorrência
+
+### Frontend
+- [x] Remover opção 'personalizado' da UI de criação/edição de funil
+- [x] Rotulagem clara: vendas (comercial), pós-venda (entrega), suporte (tratativas)
+- [x] Reestruturar navegação Análises: visão principal vendas + submenu Outros Relatórios
+- [x] Página Relatório de Pós-Venda em Análises > Outros Relatórios
+- [x] Página Relatório de Suporte em Análises > Outros Relatórios
+- [x] Garantir que indicadores não se misturem entre contextos
+
+### Testes
+- [x] Testes vitest: criação de pipeline por tipo, bloqueio de personalizado (21 testes passando)
+- [x] Testes vitest: relatórios filtrados por tipo de pipeline
+- [x] Testes vitest: isolamento multi-tenant nos relatórios

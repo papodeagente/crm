@@ -14,6 +14,7 @@ import {
   BarChart3, TrendingUp, TrendingDown, DollarSign, Target,
   Trophy, XCircle, Clock, Briefcase, Filter,
   ChevronRight, Loader2, AlertTriangle, Package, Users as UsersIcon, Activity, Megaphone,
+  Plane, LifeBuoy,
 } from "lucide-react";
 import DateRangeFilter, { useDateFilter } from "@/components/DateRangeFilter";
 import {
@@ -66,6 +67,8 @@ const REPORT_PAGES = [
   { label: "Produtos", path: "/analytics/products", icon: Package, description: "Análise de produtos vendidos" },
   { label: "Insights WhatsApp", path: "/insights", icon: BarChart3, description: "Métricas de mensagens e atendimento" },
   { label: "Fontes e Campanhas", path: "/analytics/sources-campaigns", icon: Megaphone, description: "Análise de origem por fonte, campanha e UTMs" },
+  { label: "Relatório de Pós-Venda", path: "/analytics/post-sale", icon: Plane, description: "Análise operacional da carteira em entrega" },
+  { label: "Relatório de Suporte", path: "/analytics/support", icon: LifeBuoy, description: "Análise operacional de casos e tratativas" },
 ];
 
 /* ─── Main Component ─── */
@@ -80,6 +83,11 @@ export default function Analytics() {
 
   // Data queries
   const pipelinesQ = trpc.crm.pipelines.list.useQuery({});
+  // Only show sales pipelines in the dropdown
+  const salesPipelines = useMemo(() =>
+    (pipelinesQ.data ?? []).filter(p => p.pipelineType === "sales"),
+    [pipelinesQ.data]
+  );
   const usersQ = trpc.admin.users.list.useQuery();
 
   const filterInput = useMemo(() => ({
@@ -87,6 +95,7 @@ export default function Analytics() {
     dateTo: dateFilter.dates.dateTo,
     pipelineId: selectedPipeline !== "all" ? Number(selectedPipeline) : undefined,
     ownerUserId: selectedUser !== "all" ? Number(selectedUser) : undefined,
+    pipelineType: "sales" as const,
   }), [dateFilter.dates, selectedPipeline, selectedUser]);
 
   const summaryQ = trpc.crmAnalytics.summary.useQuery(filterInput);
@@ -94,7 +103,7 @@ export default function Analytics() {
   const dealsByPeriodQ = trpc.crmAnalytics.dealsByPeriod.useQuery(filterInput);
 
   // Funnel pipeline: default to first pipeline, allow switching
-  const defaultPipelineId = pipelinesQ.data?.[0]?.id;
+  const defaultPipelineId = salesPipelines[0]?.id;
   const [funnelPipelineOverride, setFunnelPipelineOverride] = useState<string | null>(null);
   const funnelPipelineId = funnelPipelineOverride
     ? Number(funnelPipelineOverride)
@@ -201,8 +210,8 @@ export default function Analytics() {
                 <SelectValue placeholder="Todos os funis" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Todos os funis</SelectItem>
-                {pipelinesQ.data?.map(p => (
+                <SelectItem value="all">Todos os funis de vendas</SelectItem>
+                {salesPipelines.map(p => (
                   <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>
                 ))}
               </SelectContent>
@@ -428,7 +437,7 @@ export default function Analytics() {
                     <SelectValue placeholder="Selecione o funil" />
                   </SelectTrigger>
                   <SelectContent>
-                    {pipelinesQ.data?.map(p => (
+                    {salesPipelines.map(p => (
                       <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>
                     ))}
                   </SelectContent>

@@ -314,12 +314,12 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
         return crm.getPipelineById(getTenantId(ctx), input.id);
       }),
     create: tenantWriteProcedure
-      .input(z.object({ name: z.string().min(1), description: z.string().optional(), color: z.string().optional(), pipelineType: z.enum(["sales", "post_sale", "support", "custom"]).optional(), isDefault: z.boolean().optional() }))
+      .input(z.object({ name: z.string().min(1), description: z.string().optional(), color: z.string().optional(), pipelineType: z.enum(["sales", "post_sale", "support"]).optional(), isDefault: z.boolean().optional() }))
       .mutation(async ({ input, ctx }) => {
         return crm.createPipeline({ ...input, tenantId: getTenantId(ctx) });
       }),
     update: tenantWriteProcedure
-      .input(z.object({ id: z.number(), name: z.string().optional(), description: z.string().optional(), color: z.string().optional(), pipelineType: z.string().optional(), isDefault: z.boolean().optional(), isArchived: z.boolean().optional() }))
+      .input(z.object({ id: z.number(), name: z.string().optional(), description: z.string().optional(), color: z.string().optional(), pipelineType: z.enum(["sales", "post_sale", "support"]).optional(), isDefault: z.boolean().optional(), isArchived: z.boolean().optional() }))
       .mutation(async ({ input, ctx }) => {
 const tenantId = getTenantId(ctx); const { id, ...data } = input;
         return crm.updatePipeline(tenantId, id, data);

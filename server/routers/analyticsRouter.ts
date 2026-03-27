@@ -16,6 +16,7 @@ export const analyticsRouter = router({
       dateTo: z.string().optional(),
       pipelineId: z.number().optional(),
       ownerUserId: z.number().optional(),
+      pipelineType: z.enum(["sales", "post_sale", "support"]).optional(),
     }).optional())
     .query(async ({ input, ctx }) => {
       return getAnalyticsSummary({
@@ -24,6 +25,7 @@ export const analyticsRouter = router({
         dateTo: input?.dateTo,
         pipelineId: input?.pipelineId,
         ownerUserId: input?.ownerUserId,
+        pipelineType: input?.pipelineType,
       });
     }),
 
@@ -33,6 +35,7 @@ export const analyticsRouter = router({
       dateTo: z.string().optional(),
       pipelineId: z.number().optional(),
       ownerUserId: z.number().optional(),
+      pipelineType: z.enum(["sales", "post_sale", "support"]).optional(),
       limit: z.number().optional().default(5),
     }).optional())
     .query(async ({ input, ctx }) => {
@@ -42,6 +45,7 @@ export const analyticsRouter = router({
         dateTo: input?.dateTo,
         pipelineId: input?.pipelineId,
         ownerUserId: input?.ownerUserId,
+        pipelineType: input?.pipelineType,
       }, input?.limit ?? 5);
     }),
 
@@ -68,6 +72,7 @@ export const analyticsRouter = router({
       dateTo: z.string().optional(),
       pipelineId: z.number().optional(),
       ownerUserId: z.number().optional(),
+      pipelineType: z.enum(["sales", "post_sale", "support"]).optional(),
     }).optional())
     .query(async ({ input, ctx }) => {
       return getDealsByPeriod({
@@ -76,6 +81,7 @@ export const analyticsRouter = router({
         dateTo: input?.dateTo,
         pipelineId: input?.pipelineId,
         ownerUserId: input?.ownerUserId,
+        pipelineType: input?.pipelineType,
       });
     }),
 

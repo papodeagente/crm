@@ -72,7 +72,7 @@ export default function PipelineSettings() {
   // Pipeline dialogs
   const [showPipelineDialog, setShowPipelineDialog] = useState(false);
   const [editingPipeline, setEditingPipeline] = useState<PipelineData | null>(null);
-  const [pipelineForm, setPipelineForm] = useState({ name: "", description: "", color: "#10b981", pipelineType: "sales" });
+  const [pipelineForm, setPipelineForm] = useState<{ name: string; description: string; color: string; pipelineType: "sales" | "post_sale" | "support" }>({ name: "", description: "", color: "#10b981", pipelineType: "sales" });
 
   // Stage dialogs
   const [showStageDialog, setShowStageDialog] = useState(false);
@@ -182,13 +182,13 @@ export default function PipelineSettings() {
   }
   function openEditPipeline(p: PipelineData) {
     setEditingPipeline(p);
-    setPipelineForm({ name: p.name, description: p.description || "", color: p.color || "#10b981", pipelineType: p.pipelineType });
+    setPipelineForm({ name: p.name, description: p.description || "", color: p.color || "#10b981", pipelineType: (p.pipelineType === "post_sale" || p.pipelineType === "support" ? p.pipelineType : "sales") as "sales" | "post_sale" | "support" });
     setShowPipelineDialog(true);
   }
   function savePipeline() {
     if (!pipelineForm.name.trim()) return;
     if (editingPipeline) {
-      updatePipeline.mutate({ id: editingPipeline.id, ...pipelineForm });
+      updatePipeline.mutate({ id: editingPipeline.id, ...pipelineForm, pipelineType: pipelineForm.pipelineType as "sales" | "post_sale" | "support" });
     } else {
       createPipeline.mutate({ ...pipelineForm, pipelineType: pipelineForm.pipelineType as any });
     }
@@ -595,13 +595,12 @@ export default function PipelineSettings() {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label>Tipo</Label>
-                <Select value={pipelineForm.pipelineType} onValueChange={v => setPipelineForm(f => ({ ...f, pipelineType: v }))}>
+                <Select value={pipelineForm.pipelineType} onValueChange={v => setPipelineForm(f => ({ ...f, pipelineType: v as "sales" | "post_sale" | "support" }))}>
                   <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="sales">Vendas</SelectItem>
                     <SelectItem value="post_sale">Pós-Venda</SelectItem>
                     <SelectItem value="support">Suporte</SelectItem>
-                    <SelectItem value="custom">Personalizado</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

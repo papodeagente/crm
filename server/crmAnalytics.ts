@@ -13,6 +13,7 @@ export interface AnalyticsFilters {
   dateTo?: string;   // YYYY-MM-DD
   pipelineId?: number;
   ownerUserId?: number;
+  pipelineType?: string; // 'sales' | 'post_sale' | 'support'
 }
 
 export interface AnalyticsSummary {
@@ -75,12 +76,13 @@ export interface DealsByPeriod {
 }
 
 /* ─── Helpers ─── */
-function buildConditions(f: AnalyticsFilters) {
+function buildConditions(f: AnalyticsFilters, joinPipeline = false) {
   const conds: any[] = [eq(deals.tenantId, f.tenantId), isNull(deals.deletedAt)];
   if (f.dateFrom) conds.push(gte(deals.createdAt, new Date(f.dateFrom + "T00:00:00")));
   if (f.dateTo) conds.push(lte(deals.createdAt, new Date(f.dateTo + "T23:59:59")));
   if (f.pipelineId) conds.push(eq(deals.pipelineId, f.pipelineId));
   if (f.ownerUserId) conds.push(eq(deals.ownerUserId, f.ownerUserId));
+  if (f.pipelineType) conds.push(eq(pipelines.pipelineType, f.pipelineType as any));
   return and(...conds);
 }
 
@@ -91,12 +93,14 @@ export async function getAnalyticsSummary(f: AnalyticsFilters): Promise<Analytic
 
   const where = buildConditions(f);
 
-  const rows = await db.select({
+  let q = db.select({
     status: deals.status,
     cnt: sql<number>`COUNT(*)`,
     val: sql<number>`COALESCE(SUM(${deals.valueCents}), 0)`,
     avgCycle: sql<number>`COALESCE(AVG(DATEDIFF(${deals.updatedAt}, ${deals.createdAt})), 0)`,
-  }).from(deals).where(where).groupBy(deals.status);
+  }).from(deals);
+  if (f.pipelineType) q = q.innerJoin(pipelines, eq(deals.pipelineId, pipelines.id)) as any;
+  const rows = await q.where(where).groupBy(deals.status);
 
   let totalDeals = 0, openDeals = 0, wonDeals = 0, lostDeals = 0;
   let totalValueCents = 0, wonValueCents = 0, lostValueCents = 0, openValueCents = 0;
@@ -130,14 +134,19 @@ export async function getTopLossReasons(f: AnalyticsFilters, limit = 5): Promise
   if (f.pipelineId) conds.push(eq(deals.pipelineId, f.pipelineId));
   if (f.ownerUserId) conds.push(eq(deals.ownerUserId, f.ownerUserId));
 
-  const rows = await db.select({
+  let lossQ = db.select({
     reasonId: deals.lossReasonId,
     reasonName: sql<string>`COALESCE(${lossReasons.name}, 'Sem motivo')`,
     count: sql<number>`COUNT(*)`,
     valueCents: sql<number>`COALESCE(SUM(${deals.valueCents}), 0)`,
   })
     .from(deals)
-    .leftJoin(lossReasons, eq(deals.lossReasonId, lossReasons.id))
+    .leftJoin(lossReasons, eq(deals.lossReasonId, lossReasons.id));
+  if (f.pipelineType) {
+    conds.push(eq(pipelines.pipelineType, f.pipelineType as any));
+    lossQ = lossQ.innerJoin(pipelines, eq(deals.pipelineId, pipelines.id)) as any;
+  }
+  const rows = await lossQ
     .where(and(...conds))
     .groupBy(deals.lossReasonId, lossReasons.name)
     .orderBy(desc(sql`COUNT(*)`))
@@ -201,13 +210,14 @@ export async function getDealsByPeriod(f: AnalyticsFilters): Promise<DealsByPeri
   const where = buildConditions(f);
 
   const periodExpr = sql<string>`DATE_FORMAT(${deals.createdAt}, '%Y-%m-%d')`.as('period');
-  const rows = await db.select({
+  let q = db.select({
     period: periodExpr,
     status: deals.status,
     cnt: sql<number>`COUNT(*)`,
     val: sql<number>`COALESCE(SUM(${deals.valueCents}), 0)`,
-  })
-    .from(deals)
+  }).from(deals);
+  if (f.pipelineType) q = q.innerJoin(pipelines, eq(deals.pipelineId, pipelines.id)) as any;
+  const rows = await q
     .where(where)
     .groupBy(periodExpr, deals.status)
     .orderBy(periodExpr);
