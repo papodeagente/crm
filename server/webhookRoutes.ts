@@ -858,36 +858,73 @@ router.post("/api/webhooks/rdstation", async (req: Request, res: Response) => {
           if (!customDealTitle) customDealTitle = undefined;
         }
 
-        // 8. Resolve ownerUserId based on assignment mode
-        let resolvedOwnerUserId = config.defaultOwnerUserId ?? undefined;
+        // 8. Resolve ownerUserId based on explicit assignmentMode
+        let resolvedOwnerUserId: number | undefined = undefined;
+        const mode = config.assignmentMode || "random_all";
 
-        // If assignmentTeamId is set, pick a random active member from that team
-        if (config.assignmentTeamId && !config.defaultOwnerUserId) {
+        if (mode === "specific_user" && config.defaultOwnerUserId) {
+          // Mode 1: Specific user
+          resolvedOwnerUserId = config.defaultOwnerUserId;
+          console.log(`[RD Station Webhook] Specific user assignment: user #${resolvedOwnerUserId}`);
+
+        } else if (mode === "random_team" && config.assignmentTeamId) {
+          // Mode 3: Random among team members
           try {
-            const db = await getDb();
-            if (db) {
-              const members = await db
-                .select({ userId: teamMembers.userId })
-                .from(teamMembers)
-                .innerJoin(crmUsers, and(
-                  eq(crmUsers.id, teamMembers.userId),
-                  eq(crmUsers.tenantId, tenantId),
-                  eq(crmUsers.status, "active")
-                ))
-                .where(and(
-                  eq(teamMembers.teamId, config.assignmentTeamId),
-                  eq(teamMembers.tenantId, tenantId)
-                ));
-              if (members.length > 0) {
-                const randomIndex = Math.floor(Math.random() * members.length);
-                resolvedOwnerUserId = members[randomIndex]!.userId;
-                console.log(`[RD Station Webhook] Team random assignment: team #${config.assignmentTeamId}, picked user #${resolvedOwnerUserId} from ${members.length} members`);
-              } else {
-                console.warn(`[RD Station Webhook] Team #${config.assignmentTeamId} has no active members, falling back to round-robin`);
-              }
+            const members = await db
+              .select({ userId: teamMembers.userId })
+              .from(teamMembers)
+              .innerJoin(crmUsers, and(
+                eq(crmUsers.id, teamMembers.userId),
+                eq(crmUsers.tenantId, tenantId),
+                eq(crmUsers.status, "active")
+              ))
+              .where(and(
+                eq(teamMembers.teamId, config.assignmentTeamId),
+                eq(teamMembers.tenantId, tenantId)
+              ));
+            if (members.length > 0) {
+              // Persistent round-robin within team: find next user after lastRoundRobinUserId
+              const sortedIds = members.map(m => m.userId).sort((a, b) => a - b);
+              const lastId = config.lastRoundRobinUserId ?? 0;
+              const nextUser = sortedIds.find(id => id > lastId) ?? sortedIds[0]!;
+              resolvedOwnerUserId = nextUser;
+              // Persist the last assigned user for this config
+              await db.update(rdStationConfig)
+                .set({ lastRoundRobinUserId: nextUser })
+                .where(eq(rdStationConfig.id, config.id));
+              console.log(`[RD Station Webhook] Team round-robin: team #${config.assignmentTeamId}, picked user #${resolvedOwnerUserId} from ${sortedIds.length} members`);
+            } else {
+              console.warn(`[RD Station Webhook] Team #${config.assignmentTeamId} has no active members, falling back to random_all`);
             }
           } catch (teamErr: any) {
-            console.error(`[RD Station Webhook] Team assignment error: ${teamErr.message}, falling back to round-robin`);
+            console.error(`[RD Station Webhook] Team assignment error: ${teamErr.message}, falling back to random_all`);
+          }
+        }
+
+        // Mode 2 (random_all) or fallback from team with no members
+        if (!resolvedOwnerUserId) {
+          try {
+            // Persistent round-robin among ALL active users for this tenant
+            const allUsers = await db
+              .select({ id: crmUsers.id })
+              .from(crmUsers)
+              .where(and(eq(crmUsers.tenantId, tenantId), eq(crmUsers.status, "active")))
+              .orderBy(crmUsers.id);
+            if (allUsers.length > 0) {
+              const sortedIds = allUsers.map(u => u.id);
+              const lastId = config.lastRoundRobinUserId ?? 0;
+              const nextUser = sortedIds.find(id => id > lastId) ?? sortedIds[0]!;
+              resolvedOwnerUserId = nextUser;
+              // Persist the last assigned user for this config
+              await db.update(rdStationConfig)
+                .set({ lastRoundRobinUserId: nextUser })
+                .where(eq(rdStationConfig.id, config.id));
+              console.log(`[RD Station Webhook] Global round-robin: picked user #${resolvedOwnerUserId} from ${sortedIds.length} users`);
+            } else {
+              console.warn(`[RD Station Webhook] No active users for tenant ${tenantId}`);
+            }
+          } catch (rrErr: any) {
+            console.error(`[RD Station Webhook] Round-robin error: ${rrErr.message}`);
           }
         }
 

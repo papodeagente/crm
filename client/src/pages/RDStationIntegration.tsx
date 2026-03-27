@@ -34,6 +34,7 @@ interface ConfigFormData {
   defaultCampaign: string;
   defaultOwnerUserId: number | null;
   assignmentTeamId: number | null;
+  assignmentMode: "specific_user" | "random_all" | "random_team";
   autoWhatsAppEnabled: boolean;
   autoWhatsAppMessageTemplate: string;
   dealNameTemplate: string;
@@ -48,6 +49,7 @@ const DEFAULT_FORM: ConfigFormData = {
   defaultCampaign: "",
   defaultOwnerUserId: null,
   assignmentTeamId: null,
+  assignmentMode: "random_all",
   autoWhatsAppEnabled: false,
   autoWhatsAppMessageTemplate: "",
   dealNameTemplate: "",
@@ -229,6 +231,7 @@ export default function RDStationIntegration() {
       defaultCampaign: config.defaultCampaign || "",
       defaultOwnerUserId: config.defaultOwnerUserId ?? null,
       assignmentTeamId: config.assignmentTeamId ?? null,
+      assignmentMode: config.assignmentMode || "random_all",
       autoWhatsAppEnabled: config.autoWhatsAppEnabled ?? false,
       autoWhatsAppMessageTemplate: config.autoWhatsAppMessageTemplate || DEFAULT_TEMPLATE,
       dealNameTemplate: config.dealNameTemplate || "",
@@ -252,6 +255,7 @@ export default function RDStationIntegration() {
         defaultCampaign: form.defaultCampaign || null,
         defaultOwnerUserId: form.defaultOwnerUserId,
         assignmentTeamId: form.assignmentTeamId,
+        assignmentMode: form.assignmentMode,
         autoWhatsAppEnabled: form.autoWhatsAppEnabled,
         autoWhatsAppMessageTemplate: form.autoWhatsAppMessageTemplate || null,
         dealNameTemplate: form.dealNameTemplate || null,
@@ -266,6 +270,7 @@ export default function RDStationIntegration() {
         defaultCampaign: form.defaultCampaign || undefined,
         defaultOwnerUserId: form.defaultOwnerUserId ?? undefined,
         assignmentTeamId: form.assignmentTeamId ?? undefined,
+        assignmentMode: form.assignmentMode,
         autoWhatsAppEnabled: form.autoWhatsAppEnabled,
         autoWhatsAppMessageTemplate: form.autoWhatsAppMessageTemplate || undefined,
         dealNameTemplate: form.dealNameTemplate || undefined,
@@ -467,28 +472,28 @@ export default function RDStationIntegration() {
                       <span className="text-foreground font-medium">{config.defaultCampaign}</span>
                     </div>
                   )}
-                  {config.defaultOwnerUserId && (
+                  {(config.assignmentMode === "specific_user" || (!config.assignmentMode && config.defaultOwnerUserId)) && (
                     <div className="bg-muted/30 rounded px-2 py-1.5">
-                      <span className="text-muted-foreground">Responsável:</span>{" "}
+                      <span className="text-muted-foreground">Distribuição:</span>{" "}
                       <span className="text-foreground font-medium">
-                        {teamQuery.data?.find((m) => m.id === config.defaultOwnerUserId)?.name || `#${config.defaultOwnerUserId}`}
+                        Usuário específico: {teamQuery.data?.find((m) => m.id === config.defaultOwnerUserId)?.name || `#${config.defaultOwnerUserId}`}
                       </span>
                     </div>
                   )}
-                  {config.assignmentTeamId && !config.defaultOwnerUserId && (
+                  {(config.assignmentMode === "random_team" || (!config.assignmentMode && config.assignmentTeamId && !config.defaultOwnerUserId)) && (
                     <div className="bg-violet-500/10 rounded px-2 py-1.5">
                       <span className="text-muted-foreground">Distribuição:</span>{" "}
                       <span className="text-violet-400 font-medium">
                         <Users className="h-3 w-3 inline mr-1" />
                         {teamsQuery.data?.find((t: any) => t.id === config.assignmentTeamId)?.name || `Equipe #${config.assignmentTeamId}`}
-                        {" "}(aleatório)
+                        {" "}(round-robin)
                       </span>
                     </div>
                   )}
-                  {!config.defaultOwnerUserId && !config.assignmentTeamId && (
+                  {(config.assignmentMode === "random_all" || (!config.assignmentMode && !config.defaultOwnerUserId && !config.assignmentTeamId)) && (
                     <div className="bg-muted/30 rounded px-2 py-1.5">
                       <span className="text-muted-foreground">Distribuição:</span>{" "}
-                      <span className="text-foreground font-medium">Automático (round-robin)</span>
+                      <span className="text-foreground font-medium">Automático (round-robin geral)</span>
                     </div>
                   )}
                 </div>
@@ -744,17 +749,15 @@ export default function RDStationIntegration() {
               <div>
                 <Label className="text-xs">Modo de atribuição</Label>
                 <Select
-                  value={
-                    form.defaultOwnerUserId ? "user" :
-                    form.assignmentTeamId ? "team" : "auto"
-                  }
+                  value={form.assignmentMode}
                   onValueChange={(v) => {
-                    if (v === "auto") {
-                      setForm({ ...form, defaultOwnerUserId: null, assignmentTeamId: null });
-                    } else if (v === "user") {
-                      setForm({ ...form, assignmentTeamId: null });
-                    } else if (v === "team") {
-                      setForm({ ...form, defaultOwnerUserId: null });
+                    const mode = v as "specific_user" | "random_all" | "random_team";
+                    if (mode === "random_all") {
+                      setForm({ ...form, assignmentMode: mode, defaultOwnerUserId: null, assignmentTeamId: null });
+                    } else if (mode === "specific_user") {
+                      setForm({ ...form, assignmentMode: mode, assignmentTeamId: null });
+                    } else if (mode === "random_team") {
+                      setForm({ ...form, assignmentMode: mode, defaultOwnerUserId: null });
                     }
                   }}
                 >
@@ -762,15 +765,15 @@ export default function RDStationIntegration() {
                     <SelectValue placeholder="Selecione o modo" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="auto">Automático (round-robin geral)</SelectItem>
-                    <SelectItem value="user">Usuário específico</SelectItem>
-                    <SelectItem value="team">Aleatório por equipe</SelectItem>
+                    <SelectItem value="random_all">Automático (round-robin geral)</SelectItem>
+                    <SelectItem value="specific_user">Usuário específico</SelectItem>
+                    <SelectItem value="random_team">Aleatório por equipe</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
-              {/* Show user selector when mode is "user" */}
-              {(form.defaultOwnerUserId !== null && form.assignmentTeamId === null) && (
+              {/* Show user selector when mode is "specific_user" */}
+              {form.assignmentMode === "specific_user" && (
                 <div>
                   <Label className="text-xs">Responsável</Label>
                   <Select
@@ -789,8 +792,8 @@ export default function RDStationIntegration() {
                 </div>
               )}
 
-              {/* Show team selector when mode is "team" */}
-              {form.assignmentTeamId !== null ? (
+              {/* Show team selector when mode is "random_team" */}
+              {form.assignmentMode === "random_team" ? (
                 <div>
                   <Label className="text-xs">Equipe</Label>
                   <Select

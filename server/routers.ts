@@ -2945,6 +2945,7 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
         defaultCampaign: z.string().max(255).optional(),
         defaultOwnerUserId: z.number().optional(),
         assignmentTeamId: z.number().nullable().optional(),
+        assignmentMode: z.enum(["specific_user", "random_all", "random_team"]).default("random_all"),
         autoWhatsAppEnabled: z.boolean().default(false),
         autoWhatsAppMessageTemplate: z.string().optional(),
         dealNameTemplate: z.string().optional(),
@@ -2965,6 +2966,7 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
           defaultCampaign: input.defaultCampaign ?? null,
           defaultOwnerUserId: input.defaultOwnerUserId ?? null,
           assignmentTeamId: input.assignmentTeamId ?? null,
+          assignmentMode: input.assignmentMode,
           autoWhatsAppEnabled: input.autoWhatsAppEnabled,
           autoWhatsAppMessageTemplate: input.autoWhatsAppMessageTemplate ?? null,
           dealNameTemplate: input.dealNameTemplate ?? null,
@@ -2991,6 +2993,7 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
         defaultCampaign: z.string().max(255).nullable().optional(),
         defaultOwnerUserId: z.number().nullable().optional(),
         assignmentTeamId: z.number().nullable().optional(),
+        assignmentMode: z.enum(["specific_user", "random_all", "random_team"]).optional(),
         autoWhatsAppEnabled: z.boolean().optional(),
         autoWhatsAppMessageTemplate: z.string().nullable().optional(),
         dealNameTemplate: z.string().nullable().optional(),
@@ -3013,6 +3016,7 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
         if (updates.defaultCampaign !== undefined) setObj.defaultCampaign = updates.defaultCampaign;
         if (updates.defaultOwnerUserId !== undefined) setObj.defaultOwnerUserId = updates.defaultOwnerUserId;
         if (updates.assignmentTeamId !== undefined) setObj.assignmentTeamId = updates.assignmentTeamId;
+        if (updates.assignmentMode !== undefined) setObj.assignmentMode = updates.assignmentMode;
         if (updates.autoWhatsAppEnabled !== undefined) setObj.autoWhatsAppEnabled = updates.autoWhatsAppEnabled;
         if (updates.autoWhatsAppMessageTemplate !== undefined) setObj.autoWhatsAppMessageTemplate = updates.autoWhatsAppMessageTemplate;
         if (updates.dealNameTemplate !== undefined) setObj.dealNameTemplate = updates.dealNameTemplate;

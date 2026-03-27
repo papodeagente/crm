@@ -5534,3 +5534,22 @@
 ### Testes
 - [x] Testes vitest: labels contextuais por tipo de funil (33 testes passando)
 - [x] Validar que funil de vendas não é afetado
+
+## Fix: Distribuição de Leads no Webhook RD Station MKT (Mar 27)
+
+### Investigação
+- [x] Analisar webhook RD Station e lógica atual de distribuição de leads
+- [x] Identificar causa raiz: round-robin global (não por tenant), reseta no restart, e não tem modo explícito de distribuição
+
+### Implementação
+- [x] Modo 1: Distribuir para usuário específico (assignmentMode=specific_user)
+- [x] Modo 2: Distribuir aleatório entre todos os usuários (assignmentMode=random_all)
+- [x] Modo 3: Distribuir aleatório entre membros de uma equipe (assignmentMode=random_team)
+- [x] UI de configuração para escolher modo de distribuição (Select com 3 opções)
+- [x] Não alterar nada além dessa funcionalidade
+- [x] Adicionar campo assignmentMode e lastRoundRobinUserId no schema
+- [x] Persistir round-robin no banco por config (não mais em memória global)
+- [x] Migrar configs existentes para assignmentMode baseado nos campos atuais
+
+### Testes
+- [x] Testes vitest para os 3 modos de distribuição (16 testes passando)

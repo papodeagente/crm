@@ -1468,6 +1468,8 @@ export const rdStationConfig = mysqlTable("rd_station_config", {
   defaultCampaign: varchar("defaultCampaign", { length: 255 }),
   defaultOwnerUserId: int("defaultOwnerUserId"),
   assignmentTeamId: int("assignmentTeamId"),
+  assignmentMode: mysqlEnum("assignmentMode", ["specific_user", "random_all", "random_team"]).default("random_all").notNull(),
+  lastRoundRobinUserId: int("lastRoundRobinUserId"),
   autoWhatsAppEnabled: boolean("autoWhatsAppEnabled").default(false).notNull(),
   autoWhatsAppMessageTemplate: text("autoWhatsAppMessageTemplate"),
   dealNameTemplate: text("dealNameTemplate"),
