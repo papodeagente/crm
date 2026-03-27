@@ -70,7 +70,7 @@ export async function getHomeFilterOptions(tenantId: number) {
   if (!db) return { users: [], teams: [] };
 
   const [userRows] = await db.execute(sql`
-    SELECT id, name, email, role, avatarUrl
+    SELECT id, name, email, crm_user_role as role, avatarUrl
     FROM crm_users
     WHERE tenantId = ${tenantId} AND status = 'active'
     ORDER BY name ASC

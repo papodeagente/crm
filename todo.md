@@ -5560,3 +5560,12 @@
 - [x] Ajustar "Viagens em Gestão" e "Ticket Médio" para excluir canceladas
 - [x] Garantir que "Viagens canceladas" mostra o valor correto das perdas
 - [x] Testes vitest para validar a regra (6 testes passando)
+
+## Filtros Admin Home: Usuário Específico e Equipe (Mar 27)
+- [x] Analisar filtro atual do relatório admin na Home (Todos / Meus)
+- [x] Filtro "Usuário específico" já implementado (DropdownMenuSub)
+- [x] Filtro "Equipe" já implementado (DropdownMenuSub)
+- [x] Backend filtra corretamente por userId e teamId (homeService.ts)
+- [x] Filtros existentes "Todos" e "Meu relatório" mantidos
+- [x] Fix: query SQL usava coluna 'role' inexistente, corrigido para 'crm_user_role as role'
+- [x] Testes vitest para validar filtros (14 testes passando)
