@@ -118,12 +118,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <div className="flex items-center justify-center min-h-screen bg-background">
         <div className="flex flex-col items-center gap-8 p-8 max-w-md w-full">
           <div className="flex flex-col items-center gap-3">
-            <img
-              src="https://d2xsxph8kpxj0f.cloudfront.net/310519663249817763/EKvcVicuVoUxTnzjSKzgdk/OSICON_03b1c322.webp"
-              alt="ENTUR OS"
-              className="h-14 w-14 rounded-xl shadow-lg"
-            />
-            <ThemedLogo className="h-8 object-contain" />
+            <ThemedLogo className="h-10 object-contain" />
             <p className="text-sm text-muted-foreground text-center max-w-sm">
               Plataforma completa de CRM para agências de viagens. Faça login para acessar o painel.
             </p>
@@ -218,13 +213,8 @@ function DashboardLayoutContent({
                 <PanelLeft className="h-4 w-4 text-sidebar-muted-foreground" />
               </button>
               {!isCollapsed && (
-                <div className="flex items-center gap-2 min-w-0">
-                  <img
-                    src="https://d2xsxph8kpxj0f.cloudfront.net/310519663249817763/EKvcVicuVoUxTnzjSKzgdk/OSICON_03b1c322.webp"
-                    alt="ENTUR OS"
-                    className="h-7 w-7 rounded-md shrink-0"
-                  />
-                  <ThemedLogo className="h-5 object-contain" />
+                <div className="flex items-center gap-2 min-w-0 ml-5">
+                  <ThemedLogo className="h-4 object-contain" />
                 </div>
               )}
             </div>

@@ -3,7 +3,6 @@ import { ArrowRight, Play, Star } from "lucide-react";
 import { motion } from "motion/react";
 
 const MOCKUP_URL = "https://aceleradora.tur.br/teste/wp-content/uploads/2026/03/Captura-de-Tela-2026-03-22-as-13.21.01.png";
-const LOGO_URL = "https://d2xsxph8kpxj0f.cloudfront.net/310519663249817763/EKvcVicuVoUxTnzjSKzgdk/OSICON_03b1c322.webp";
 
 interface HeroSectionProps {
   onCTA: () => void;
@@ -30,9 +29,8 @@ export function HeroSection({ onCTA, onDemo }: HeroSectionProps) {
       {/* Nav */}
       <nav className="fixed top-0 left-0 right-0 z-50 bg-[#0a0a12]/70 backdrop-blur-2xl border-b border-white/[0.05]">
         <div className="max-w-7xl mx-auto px-5 sm:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <img src={LOGO_URL} alt="Entur OS" className="h-8 w-8 rounded-lg" />
-            <img src="https://d2xsxph8kpxj0f.cloudfront.net/310519663249817763/EKvcVicuVoUxTnzjSKzgdk/logo-dark-theme_021f3cb2.webp" alt="ENTUR OS" className="h-6 object-contain" />
+          <div className="flex items-center">
+            <img src="https://d2xsxph8kpxj0f.cloudfront.net/310519663249817763/EKvcVicuVoUxTnzjSKzgdk/logo-light_c3efa809.webp" alt="enturOS CRM" className="h-7 object-contain" />
           </div>
           <div className="hidden md:flex items-center gap-3">
             <Button

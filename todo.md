@@ -5765,3 +5765,14 @@
 
 ### Testes
 - [x] 11 testes Vitest: claim await, profile pics background fetch, query optimization, botão único, refetch interval
+
+## Atualização de Logos — enturOS CRM
+
+- [x] Upload das 3 imagens (logo preta, logo branca, favicon) para CDN
+- [x] Atualizar referências de logo no frontend (sidebar, login, landing, etc.) para usar versão clara/escura conforme tema
+- [x] Atualizar favicon do sistema (PNG + ICO)
+- [x] Verificar alinhamento e fundo transparente
+- [x] 14 testes Vitest passando para validar todas as URLs
+- [x] Remover ícone do favicon ao lado da logo em todas as telas (favicon apenas no navegador)
+- [x] Reduzir logo 20px e mover 20px para a direita na área logada do CRM (DashboardLayout + TopNavLayout)
+- [x] Limpar constantes LOGO_URL não utilizadas das landing pages

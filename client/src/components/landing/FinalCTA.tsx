@@ -2,7 +2,6 @@ import { Button } from "@/components/ui/button";
 import { ArrowRight } from "lucide-react";
 import { FadeIn } from "./FadeIn";
 
-const LOGO_URL = "https://d2xsxph8kpxj0f.cloudfront.net/310519663249817763/EKvcVicuVoUxTnzjSKzgdk/OSICON_03b1c322.webp";
 
 interface FinalCTAProps {
   onCTA: () => void;
@@ -45,9 +44,8 @@ export function FinalCTA({ onCTA }: FinalCTAProps) {
       {/* Footer */}
       <footer className="py-10 px-5 sm:px-8 border-t border-white/[0.05] bg-[#06060a]">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2.5">
-            <img src={LOGO_URL} alt="ENTUR OS" className="h-7 w-7 rounded-lg" />
-            <img src="https://d2xsxph8kpxj0f.cloudfront.net/310519663249817763/EKvcVicuVoUxTnzjSKzgdk/logo-dark-theme_021f3cb2.webp" alt="ENTUR OS" className="h-5 object-contain" />
+          <div className="flex items-center">
+            <img src="https://d2xsxph8kpxj0f.cloudfront.net/310519663249817763/EKvcVicuVoUxTnzjSKzgdk/logo-light_c3efa809.webp" alt="enturOS CRM" className="h-6 object-contain" />
           </div>
           <p className="text-xs text-white/20">
             &copy; {new Date().getFullYear()} Escola de Negócios do Turismo. Todos os direitos reservados.

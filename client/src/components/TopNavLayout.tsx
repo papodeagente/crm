@@ -395,13 +395,8 @@ function TopBar({ onSearchOpen, mobileMenuOpen, onToggleMobile }: {
       <header className="shrink-0 glass z-50 sticky top-0 border-b border-border">
         <div className="flex items-center h-[56px] px-4 lg:px-6 gap-2">
           {/* Logo */}
-          <Link href="/dashboard" className="flex items-center gap-1.5 shrink-0 mr-2">
-            <img
-              src="https://d2xsxph8kpxj0f.cloudfront.net/310519663249817763/EKvcVicuVoUxTnzjSKzgdk/OSICON_03b1c322.webp"
-              alt="ENTUR OS"
-              className="h-7 w-7 rounded-md"
-            />
-            <ThemedLogo className="hidden sm:block h-4 object-contain" />
+          <Link href="/dashboard" className="flex items-center shrink-0 mr-2 ml-5">
+            <ThemedLogo className="h-3 object-contain" />
           </Link>
 
           {/* Desktop Nav */}
