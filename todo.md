@@ -5553,3 +5553,10 @@
 
 ### Testes
 - [x] Testes vitest para os 3 modos de distribuição (16 testes passando)
+
+## Regra Pós-Venda: Subtrair valor ao marcar perda (Mar 27)
+- [x] Analisar como "Valor em Entrega" é calculado no relatório de pós-venda
+- [x] Ajustar cálculo: excluir deals com status "lost" do "Valor em Entrega"
+- [x] Ajustar "Viagens em Gestão" e "Ticket Médio" para excluir canceladas
+- [x] Garantir que "Viagens canceladas" mostra o valor correto das perdas
+- [x] Testes vitest para validar a regra (6 testes passando)

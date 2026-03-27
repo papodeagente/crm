@@ -64,27 +64,29 @@ export default function PostSaleReport() {
     return [
       {
         label: "Viagens em Gestão",
-        value: summary.totalDeals,
+        value: summary.totalDeals - summary.lostDeals,
         icon: Briefcase,
         color: "text-violet-500",
         bg: "bg-violet-500/10",
-        subtitle: `${summary.openDeals} em andamento`,
+        subtitle: `${summary.openDeals} em andamento \u00b7 ${summary.wonDeals} finalizadas`,
       },
       {
         label: "Valor em Entrega",
-        value: formatCompact(summary.totalValueCents),
+        value: formatCompact(summary.totalValueCents - summary.lostValueCents),
         icon: DollarSign,
         color: "text-emerald-500",
         bg: "bg-emerald-500/10",
-        subtitle: `${formatCompact(summary.openValueCents)} em aberto`,
+        subtitle: `${formatCompact(summary.openValueCents)} em aberto \u00b7 ${formatCompact(summary.wonValueCents)} finalizadas`,
       },
       {
         label: "Ticket Médio Entrega",
-        value: summary.totalDeals > 0 ? formatCompact(Math.round(summary.totalValueCents / summary.totalDeals)) : "R$ 0",
+        value: (summary.totalDeals - summary.lostDeals) > 0
+          ? formatCompact(Math.round((summary.totalValueCents - summary.lostValueCents) / (summary.totalDeals - summary.lostDeals)))
+          : "R$ 0",
         icon: TrendingUp,
         color: "text-cyan-500",
         bg: "bg-cyan-500/10",
-        subtitle: "Valor médio por viagem",
+        subtitle: "Valor médio por viagem (excl. canceladas)",
       },
       {
         label: "Finalizadas",
