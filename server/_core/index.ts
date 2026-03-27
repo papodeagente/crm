@@ -244,7 +244,15 @@ async function startServer() {
 
     // Auto-restore WhatsApp sessions that were connected before server restart
     // Delayed by 10s to let the server fully initialize first
-    setTimeout(() => {
+    setTimeout(async () => {
+      // CRITICAL: Initialize Z-API provider sessions from DB BEFORE auto-restore
+      // Without this, getZApiSession() returns null for all Z-API sessions after restart
+      try {
+        const { initializeProviderSessions } = await import("../providers/providerFactory");
+        await initializeProviderSessions();
+      } catch (e) {
+        console.error("[WA AutoRestore] Failed to initialize provider sessions:", e);
+      }
       console.log("[WA AutoRestore] Starting auto-restore of WhatsApp sessions...");
       whatsappManager.autoRestoreSessions().catch(e => {
         console.error("[WA AutoRestore] Error:", e);

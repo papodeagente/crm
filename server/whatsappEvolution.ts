@@ -89,11 +89,16 @@ class WhatsAppEvolutionManager extends EventEmitter {
     const cached = this.sessions.get(sessionId);
     if (cached && cached.status === "connected") return cached;
 
-    // Try to fetch from Evolution API directly
+    // Determine provider: check in-memory Z-API registry first, then DB
+    const isZapi = !!getZApiSession(sessionId);
+
+    // Try to fetch from the correct provider API
     try {
-      const inst = await evo.fetchInstance(sessionId);
+      const inst = isZapi
+        ? await zapiProvider.fetchInstance(sessionId)
+        : await evo.fetchInstance(sessionId);
       if (!inst) {
-        // Instance doesn't exist on Evolution API — mark as disconnected in DB
+        // Instance doesn't exist on provider API — mark as disconnected in DB
         // This handles legacy/phantom sessions that were never cleaned up
         const db = await getDb();
         if (db) {
@@ -306,13 +311,16 @@ class WhatsAppEvolutionManager extends EventEmitter {
   async disconnect(sessionId: string): Promise<void> {
     const session = this.sessions.get(sessionId);
     if (!session) return;
-
     try {
-      await evo.logoutInstance(session.instanceName);
-    } catch (e: any) {
+      const isZapiDc = !!getZApiSession(sessionId);
+      if (isZapiDc) {
+        await zapiProvider.logoutInstance(sessionId);
+      } else {
+        await evo.logoutInstance(session.instanceName);
+      }
+     } catch (e: any) {
       console.warn(`[EvoWA] Logout failed for ${session.instanceName}:`, e.message);
     }
-
     session.status = "disconnected";
     session.qrCode = null;
     session.qrDataUrl = null;
@@ -329,7 +337,12 @@ class WhatsAppEvolutionManager extends EventEmitter {
 
     if (session) {
       try {
-        await evo.deleteInstance(session.instanceName);
+        const isZapiDel = !!getZApiSession(sessionId);
+        if (isZapiDel) {
+          await zapiProvider.deleteInstance(sessionId);
+        } else {
+          await evo.deleteInstance(session.instanceName);
+        }
       } catch (e: any) {
         console.warn(`[EvoWA] Delete instance failed for ${session.instanceName}:`, e.message);
       }
@@ -529,30 +542,31 @@ class WhatsAppEvolutionManager extends EventEmitter {
     if (!session) throw new Error(`Sessão não encontrada.`);
     if (session.status !== "connected") throw new Error(`WhatsApp não está conectado.`);
     const number = this.jidToNumber(jid);
+    if (getZApiSession(sessionId)) return zapiProvider.sendSticker(sessionId, number, stickerUrl);
     return evo.sendSticker(session.instanceName, number, stickerUrl);
   }
-
   async sendLocation(sessionId: string, jid: string, latitude: number, longitude: number, name: string, address: string): Promise<any> {
     const session = this.sessions.get(sessionId);
     if (!session) throw new Error(`Sessão não encontrada.`);
     if (session.status !== "connected") throw new Error(`WhatsApp não está conectado.`);
     const number = this.jidToNumber(jid);
+    if (getZApiSession(sessionId)) return zapiProvider.sendLocation(sessionId, number, latitude, longitude, name, address);
     return evo.sendLocation(session.instanceName, number, latitude, longitude, name, address);
   }
-
   async sendContact(sessionId: string, jid: string, contacts: Array<{ fullName: string; wuid?: string; phoneNumber: string }>): Promise<any> {
     const session = this.sessions.get(sessionId);
     if (!session) throw new Error(`Sessão não encontrada.`);
     if (session.status !== "connected") throw new Error(`WhatsApp não está conectado.`);
     const number = this.jidToNumber(jid);
+    if (getZApiSession(sessionId)) return zapiProvider.sendContact(sessionId, number, contacts);
     return evo.sendContact(session.instanceName, number, contacts);
   }
-
   async sendPoll(sessionId: string, jid: string, name: string, values: string[], selectableCount: number = 1): Promise<any> {
     const session = this.sessions.get(sessionId);
     if (!session) throw new Error(`Sessão não encontrada.`);
     if (session.status !== "connected") throw new Error(`WhatsApp não está conectado.`);
     const number = this.jidToNumber(jid);
+    if (getZApiSession(sessionId)) return zapiProvider.sendPoll(sessionId, number, name, values, selectableCount);
     return evo.sendPoll(session.instanceName, number, name, values, selectableCount);
   }
 
@@ -624,6 +638,7 @@ class WhatsAppEvolutionManager extends EventEmitter {
     const session = this.sessions.get(sessionId);
     if (!session) throw new Error(`Sessão não encontrada.`);
     if (session.status !== "connected") throw new Error(`WhatsApp não está conectado.`);
+    if (getZApiSession(sessionId)) return zapiProvider.deleteMessageForEveryone(sessionId, remoteJid, messageId, fromMe);
     return evo.deleteMessageForEveryone(session.instanceName, remoteJid, messageId, fromMe);
   }
 
@@ -632,6 +647,7 @@ class WhatsAppEvolutionManager extends EventEmitter {
     if (!session) throw new Error(`Sessão não encontrada.`);
     if (session.status !== "connected") throw new Error(`WhatsApp não está conectado.`);
     const number = this.jidToNumber(jid);
+    if (getZApiSession(sessionId)) return zapiProvider.updateMessage(sessionId, number, messageId, newText);
     return evo.updateMessage(session.instanceName, number, messageId, newText);
   }
 
@@ -639,9 +655,8 @@ class WhatsAppEvolutionManager extends EventEmitter {
     const session = this.sessions.get(sessionId);
     if (!session || session.status !== "connected") return;
     const number = this.jidToNumber(jid);
-    const zapiSess = getZApiSession(sessionId);
-    if (zapiSess) {
-      // Z-API doesn't have a direct presence API, skip silently
+    if (getZApiSession(sessionId)) {
+      await zapiProvider.sendPresence(sessionId, number, presence);
       return;
     }
     await evo.sendPresence(session.instanceName, number, presence);
@@ -651,6 +666,7 @@ class WhatsAppEvolutionManager extends EventEmitter {
     const session = this.sessions.get(sessionId);
     if (!session) throw new Error(`Sessão não encontrada.`);
     if (session.status !== "connected") throw new Error(`WhatsApp não está conectado.`);
+    if (getZApiSession(sessionId)) { await zapiProvider.archiveChat(sessionId, remoteJid, archive); return; }
     await evo.archiveChat(session.instanceName, remoteJid, archive);
   }
 
@@ -659,6 +675,7 @@ class WhatsAppEvolutionManager extends EventEmitter {
     if (!session) throw new Error(`Sessão não encontrada.`);
     if (session.status !== "connected") throw new Error(`WhatsApp não está conectado.`);
     const number = this.jidToNumber(jid);
+    if (getZApiSession(sessionId)) { await zapiProvider.updateBlockStatus(sessionId, number, block ? "block" : "unblock"); return; }
     await evo.updateBlockStatus(session.instanceName, number, block ? "block" : "unblock");
   }
 
@@ -666,6 +683,7 @@ class WhatsAppEvolutionManager extends EventEmitter {
     const session = this.sessions.get(sessionId);
     if (!session) throw new Error(`Sessão não encontrada.`);
     if (session.status !== "connected") throw new Error(`WhatsApp não está conectado.`);
+    if (getZApiSession(sessionId)) return zapiProvider.checkIsWhatsApp(sessionId, numbers);
     return evo.checkIsWhatsApp(session.instanceName, numbers);
   }
 
@@ -673,20 +691,22 @@ class WhatsAppEvolutionManager extends EventEmitter {
     const session = this.sessions.get(sessionId);
     if (!session) throw new Error(`Sessão não encontrada.`);
     if (session.status !== "connected") throw new Error(`WhatsApp não está conectado.`);
+    if (getZApiSession(sessionId)) { await zapiProvider.markMessageAsUnread(sessionId, remoteJid, messageId); return; }
     await evo.markMessageAsUnread(session.instanceName, remoteJid, messageId);
   }
 
-  async fetchContactProfile(sessionId: string, jid: string): Promise<any> {
+   async fetchContactProfile(sessionId: string, jid: string): Promise<any> {
     const session = this.sessions.get(sessionId);
     if (!session) return null;
     const number = this.jidToNumber(jid);
+    if (getZApiSession(sessionId)) return zapiProvider.fetchProfile(sessionId, number);
     return evo.fetchProfile(session.instanceName, number);
   }
-
   async fetchContactBusinessProfile(sessionId: string, jid: string): Promise<any> {
     const session = this.sessions.get(sessionId);
     if (!session) return null;
     const number = this.jidToNumber(jid);
+    if (getZApiSession(sessionId)) return zapiProvider.fetchBusinessProfile(sessionId, number);
     return evo.fetchBusinessProfile(session.instanceName, number);
   }
 
@@ -696,6 +716,7 @@ class WhatsAppEvolutionManager extends EventEmitter {
     const session = this.sessions.get(sessionId);
     if (!session) throw new Error(`Sessão não encontrada.`);
     if (session.status !== "connected") throw new Error(`WhatsApp não está conectado.`);
+    if (getZApiSession(sessionId)) return zapiProvider.fetchAllGroups(sessionId);
     return evo.fetchAllGroups(session.instanceName);
   }
 
@@ -703,18 +724,21 @@ class WhatsAppEvolutionManager extends EventEmitter {
     const session = this.sessions.get(sessionId);
     if (!session) throw new Error(`Sessão não encontrada.`);
     if (session.status !== "connected") throw new Error(`WhatsApp não está conectado.`);
+    if (getZApiSession(sessionId)) return zapiProvider.createGroup(sessionId, subject, participants, description);
     return evo.createGroup(session.instanceName, subject, participants, description);
   }
 
   async getGroupInfo(sessionId: string, groupJid: string): Promise<any> {
     const session = this.sessions.get(sessionId);
     if (!session) return null;
+    if (getZApiSession(sessionId)) return zapiProvider.findGroupByJid(sessionId, groupJid);
     return evo.findGroupByJid(session.instanceName, groupJid);
   }
 
   async getGroupMembers(sessionId: string, groupJid: string): Promise<any[]> {
     const session = this.sessions.get(sessionId);
     if (!session) return [];
+    if (getZApiSession(sessionId)) return zapiProvider.findGroupMembers(sessionId, groupJid);
     return evo.findGroupMembers(session.instanceName, groupJid);
   }
 
@@ -722,48 +746,56 @@ class WhatsAppEvolutionManager extends EventEmitter {
     const session = this.sessions.get(sessionId);
     if (!session) throw new Error(`Sessão não encontrada.`);
     if (session.status !== "connected") throw new Error(`WhatsApp não está conectado.`);
+    if (getZApiSession(sessionId)) return zapiProvider.updateGroupMembers(sessionId, groupJid, action, participants);
     return evo.updateGroupMembers(session.instanceName, groupJid, action, participants);
   }
 
   async updateGroupSubject(sessionId: string, groupJid: string, subject: string): Promise<any> {
     const session = this.sessions.get(sessionId);
     if (!session) throw new Error(`Sessão não encontrada.`);
+    if (getZApiSession(sessionId)) return zapiProvider.updateGroupSubject(sessionId, groupJid, subject);
     return evo.updateGroupSubject(session.instanceName, groupJid, subject);
   }
 
   async updateGroupDescription(sessionId: string, groupJid: string, description: string): Promise<any> {
     const session = this.sessions.get(sessionId);
     if (!session) throw new Error(`Sessão não encontrada.`);
+    if (getZApiSession(sessionId)) return zapiProvider.updateGroupDescription(sessionId, groupJid, description);
     return evo.updateGroupDescription(session.instanceName, groupJid, description);
   }
 
   async getGroupInviteCode(sessionId: string, groupJid: string): Promise<string | null> {
     const session = this.sessions.get(sessionId);
     if (!session) return null;
+    if (getZApiSession(sessionId)) return zapiProvider.fetchInviteCode(sessionId, groupJid);
     return evo.fetchInviteCode(session.instanceName, groupJid);
   }
 
   async revokeGroupInviteCode(sessionId: string, groupJid: string): Promise<string | null> {
     const session = this.sessions.get(sessionId);
     if (!session) return null;
+    if (getZApiSession(sessionId)) return zapiProvider.revokeInviteCode(sessionId, groupJid);
     return evo.revokeInviteCode(session.instanceName, groupJid);
   }
 
   async updateGroupSetting(sessionId: string, groupJid: string, action: "announcement" | "not_announcement" | "locked" | "unlocked"): Promise<any> {
     const session = this.sessions.get(sessionId);
     if (!session) throw new Error(`Sessão não encontrada.`);
+    if (getZApiSession(sessionId)) return zapiProvider.updateGroupSetting(sessionId, groupJid, action);
     return evo.updateGroupSetting(session.instanceName, groupJid, action);
   }
 
   async toggleEphemeral(sessionId: string, groupJid: string, expiration: number): Promise<any> {
     const session = this.sessions.get(sessionId);
     if (!session) throw new Error(`Sessão não encontrada.`);
+    if (getZApiSession(sessionId)) return zapiProvider.toggleEphemeral(sessionId, groupJid, expiration);
     return evo.toggleEphemeral(session.instanceName, groupJid, expiration);
   }
 
   async leaveGroup(sessionId: string, groupJid: string): Promise<any> {
     const session = this.sessions.get(sessionId);
     if (!session) throw new Error(`Sessão não encontrada.`);
+    if (getZApiSession(sessionId)) return zapiProvider.leaveGroup(sessionId, groupJid);
     return evo.leaveGroup(session.instanceName, groupJid);
   }
 
@@ -773,6 +805,7 @@ class WhatsAppEvolutionManager extends EventEmitter {
     const session = this.sessions.get(sessionId);
     if (!session) return null;
     const number = this.jidToNumber(jid);
+    if (getZApiSession(sessionId)) return zapiProvider.getProfilePicture(sessionId, number);
     return evo.getProfilePicture(session.instanceName, number);
   }
 
@@ -806,7 +839,9 @@ class WhatsAppEvolutionManager extends EventEmitter {
         const promises = batch.map(async (jid) => {
           try {
             const number = this.jidToNumber(jid);
-            const url = await evo.getProfilePicture(session.instanceName, number);
+            const url = getZApiSession(sessionId)
+              ? await zapiProvider.getProfilePicture(sessionId, number)
+              : await evo.getProfilePicture(session.instanceName, number);
             result[jid] = url;
             this.profilePicCache.set(jid, { url, fetchedAt: now });
           } catch {
@@ -847,8 +882,14 @@ class WhatsAppEvolutionManager extends EventEmitter {
       const db = await getDb();
       if (!db) return { synced: 0, total: 0, resolved: 0 };
 
-      const contacts = await evo.findContacts(session.instanceName);
-      console.log(`[EvoWA Contacts] Fetched ${contacts.length} contacts from Evolution API`);
+      const isZapiContacts = !!getZApiSession(session.sessionId);
+      const contacts = isZapiContacts
+        ? await zapiProvider.findContacts(session.sessionId)
+        : await evo.findContacts(session.instanceName);
+      console.log(`[EvoWA Contacts] Fetched ${contacts.length} contacts from ${isZapiContacts ? 'Z-API' : 'Evolution API'}`);
+      if (isZapiContacts) {
+        // Z-API contacts may have different format, but zapiProvider normalizes them
+      }
 
       if (contacts.length === 0) return { synced: 0, total: 0, resolved: 0 };
 
@@ -1016,8 +1057,16 @@ class WhatsAppEvolutionManager extends EventEmitter {
       const rows = await db.select().from(whatsappSessions).where(eq(whatsappSessions.sessionId, sessionId)).limit(1);
       if (rows.length === 0) throw new Error("Session not found");
       const row = rows[0];
-      const instanceName = evo.getInstanceName(row.tenantId, row.userId);
-      const inst = await evo.fetchInstance(instanceName);
+      const isZapiSyncUser = row.provider === 'zapi' || !!getZApiSession(sessionId);
+      let inst: any;
+      let instanceName: string;
+      if (isZapiSyncUser) {
+        instanceName = `zapi-${sessionId}`;
+        inst = await zapiProvider.fetchInstance(sessionId);
+      } else {
+        instanceName = evo.getInstanceName(row.tenantId, row.userId);
+        inst = await evo.fetchInstance(instanceName);
+      }
       if (!inst || inst.connectionStatus !== "open") throw new Error("WhatsApp not connected");
       const state: EvolutionSessionState = {
         instanceName,
@@ -1031,7 +1080,7 @@ class WhatsAppEvolutionManager extends EventEmitter {
         lastConnectedAt: Date.now(),
       };
       this.sessions.set(sessionId, state);
-      this.instanceToSession.set(instanceName, sessionId);
+      if (!isZapiSyncUser) this.instanceToSession.set(instanceName, sessionId);
       await this.syncConversationsBackground(state, true);
       return { synced: 0, skipped: 0 }; // Counts are logged internally
     }
@@ -1080,12 +1129,17 @@ class WhatsAppEvolutionManager extends EventEmitter {
         console.warn(`[EvoWA Sync] Error reading tenant settings, defaulting to skipContactCreation=true:`, (e as Error).message);
       }
 
-      // Fetch all chats and contacts from Evolution API
+      // Fetch all chats and contacts from the correct provider
+      const isZapiSync = !!getZApiSession(session.sessionId);
       const [chats, contacts] = await Promise.all([
-        evo.findChats(session.instanceName),
-        evo.findContacts(session.instanceName),
+        isZapiSync ? zapiProvider.findChats(session.sessionId) : evo.findChats(session.instanceName),
+        isZapiSync ? zapiProvider.findContacts(session.sessionId) : evo.findContacts(session.instanceName),
       ]);
-      console.log(`[EvoWA Sync] Found ${chats.length} chats, ${contacts.length} contacts on Evolution API`);
+      console.log(`[EvoWA Sync] Found ${chats.length} chats, ${contacts.length} contacts on ${isZapiSync ? 'Z-API' : 'Evolution API'}`);
+      // For Z-API, also ensure webhook is configured after sync
+      if (isZapiSync) {
+        zapiProvider.ensureWebhook(session.sessionId).catch(() => {});
+      }
 
       // Build a UNIFIED name map from multiple sources:
       // Priority: contacts.pushName > chat.name > lastMessage.pushName (only if !fromMe)
@@ -1375,9 +1429,12 @@ class WhatsAppEvolutionManager extends EventEmitter {
             session.qrDataUrl = null;
             session.lastConnectedAt = Date.now();
 
-            // Fetch instance details for profile info
+            // Fetch instance details for profile info — use correct provider
+            const isZapiConn = !!getZApiSession(session.sessionId);
             try {
-              const inst = await evo.fetchInstance(session.instanceName);
+              const inst = isZapiConn
+                ? await zapiProvider.fetchInstance(session.sessionId)
+                : await evo.fetchInstance(session.instanceName);
               if (inst) {
                 session.user = {
                   id: inst.ownerJid || "",
@@ -1407,8 +1464,12 @@ class WhatsAppEvolutionManager extends EventEmitter {
             await this.updateSessionInDb(session.sessionId, session.userId, session.tenantId, "connected");
             this.emit("status", { sessionId: session.sessionId, status: "connected", user: session.user });
 
-            // Ensure webhook is correctly configured
-            evo.ensureWebhook(session.instanceName).catch(() => {});
+            // Ensure webhook is correctly configured — only for Evolution API
+            if (!isZapiConn) {
+              evo.ensureWebhook(session.instanceName).catch(() => {});
+            } else {
+              zapiProvider.ensureWebhook(session.sessionId).catch(() => {});
+            }
 
             // Sync conversations after connection
             // Check if this is first time (no messages in DB for this session)
@@ -1628,10 +1689,10 @@ class WhatsAppEvolutionManager extends EventEmitter {
     mediaInfo: { mediaUrl?: string | null; mediaMimeType?: string | null; mediaFileName?: string | null }
   ): Promise<void> {
     try {
-      const base64Data = await evo.getBase64FromMediaMessage(session.instanceName, messageId, {
-        remoteJid,
-        fromMe,
-      });
+      const isZapiMedia = !!getZApiSession(session.sessionId);
+      const base64Data = isZapiMedia
+        ? await zapiProvider.getBase64FromMediaMessage(session.sessionId, messageId, { remoteJid, fromMe })
+        : await evo.getBase64FromMediaMessage(session.instanceName, messageId, { remoteJid, fromMe });
       if (base64Data?.base64) {
         const ext = this.mimeToExt(base64Data.mimetype || mediaInfo.mediaMimeType || "application/octet-stream");
         const fileKey = `whatsapp-media/${session.sessionId}/${nanoid()}.${ext}`;
@@ -2052,10 +2113,10 @@ class WhatsAppEvolutionManager extends EventEmitter {
 
     for (const msg of messages) {
       try {
-        const base64Data = await evo.getBase64FromMediaMessage(session.instanceName, msg.messageId, {
-          remoteJid: msg.remoteJid,
-          fromMe: msg.fromMe,
-        });
+        const isZapiMediaBatch = !!getZApiSession(session.sessionId);
+        const base64Data = isZapiMediaBatch
+          ? await zapiProvider.getBase64FromMediaMessage(session.sessionId, msg.messageId, { remoteJid: msg.remoteJid, fromMe: msg.fromMe })
+          : await evo.getBase64FromMediaMessage(session.instanceName, msg.messageId, { remoteJid: msg.remoteJid, fromMe: msg.fromMe });
         if (base64Data?.base64) {
           const ext = this.mimeToExt(base64Data.mimetype || msg.mediaMimeType || "application/octet-stream");
           const fileKey = `whatsapp-media/${session.sessionId}/${nanoid()}.${ext}`;
@@ -2212,6 +2273,8 @@ class WhatsAppEvolutionManager extends EventEmitter {
         if (group.length > 1) {
           for (const row of group) {
             if (row.sessionId !== canonicalName) {
+              // Skip Z-API sessions from legacy cleanup
+              if (row.provider === 'zapi') continue;
               // Check if this legacy session actually exists on Evolution
               try {
                 const legacyInst = await evo.fetchInstance(row.sessionId);
@@ -2236,28 +2299,67 @@ class WhatsAppEvolutionManager extends EventEmitter {
       }
 
       // Only restore sessions that are still marked as 'connected' after cleanup.
-      // Instances without auth credentials (ownerJid) will be skipped below.
       const activeRows = await db.select()
         .from(whatsappSessions)
         .where(eq(whatsappSessions.status, "connected"));
 
       for (const row of activeRows) {
+        const isZapiRow = row.provider === "zapi";
         const instanceName = evo.getInstanceName(row.tenantId, row.userId);
-        // For legacy sessions where sessionId != instanceName, try the sessionId first
         const nameToCheck = row.sessionId === instanceName ? instanceName : row.sessionId;
 
         try {
+          // ─── Z-API sessions: use zapiProvider ───
+          if (isZapiRow) {
+            const zapiSess = getZApiSession(row.sessionId);
+            if (!zapiSess) {
+              console.log(`[EvoWA AutoRestore] Z-API session ${row.sessionId} not registered in memory, skipping`);
+              await db.update(whatsappSessions)
+                .set({ status: "disconnected" })
+                .where(eq(whatsappSessions.sessionId, row.sessionId));
+              continue;
+            }
+            const inst = await zapiProvider.fetchInstance(row.sessionId);
+            if (inst && inst.connectionStatus === "open") {
+              const state: EvolutionSessionState = {
+                instanceName: nameToCheck,
+                sessionId: row.sessionId,
+                userId: row.userId,
+                tenantId: row.tenantId,
+                status: "connected",
+                qrCode: null,
+                qrDataUrl: null,
+                user: inst.ownerJid ? {
+                  id: inst.ownerJid,
+                  name: inst.profileName || "",
+                  imgUrl: inst.profilePicUrl || undefined,
+                } : null,
+                lastConnectedAt: Date.now(),
+              };
+              this.sessions.set(row.sessionId, state);
+              this.instanceToSession.set(nameToCheck, row.sessionId);
+              await db.update(whatsappSessions)
+                .set({ status: "connected" })
+                .where(eq(whatsappSessions.sessionId, row.sessionId));
+              console.log(`[EvoWA AutoRestore] Z-API ${row.sessionId} -> connected`);
+              zapiProvider.ensureWebhook(row.sessionId).catch(() => {});
+              this.syncConversationsBackground(state, false);
+            } else {
+              console.log(`[EvoWA AutoRestore] Z-API ${row.sessionId} -> not connected (${inst?.connectionStatus || 'not found'}), marked disconnected`);
+              await db.update(whatsappSessions)
+                .set({ status: "disconnected" })
+                .where(eq(whatsappSessions.sessionId, row.sessionId));
+            }
+            continue;
+          }
+
+          // ─── Evolution API sessions ───
           let inst = await evo.fetchInstance(nameToCheck);
-          // If legacy name not found, try canonical name
           if (!inst && nameToCheck !== instanceName) {
             inst = await evo.fetchInstance(instanceName);
           }
 
           if (inst) {
-            // ONLY restore instances that are actually 'open' (connected) on Evolution.
-            // Instances with 'connecting' status enter QR code generation loops that
-            // nobody scans, overloading the server. Instances with 'close' have no
-            // active session. Both must wait for manual user reconnection via Inbox.
             if (inst.connectionStatus !== "open") {
               console.log(`[EvoWA AutoRestore] ${row.sessionId} -> ${nameToCheck} -> Evolution status '${inst.connectionStatus}', skipping (only 'open' restored)`);
               await db.update(whatsappSessions)
@@ -2289,15 +2391,12 @@ class WhatsAppEvolutionManager extends EventEmitter {
               .where(eq(whatsappSessions.sessionId, row.sessionId));
             console.log(`[EvoWA AutoRestore] ${row.sessionId} -> ${nameToCheck} -> connected`);
 
-            // Ensure webhook is correctly configured
             evo.ensureWebhook(nameToCheck).then(ok => {
               if (ok) console.log(`[EvoWA AutoRestore] Webhook verified for ${nameToCheck}`);
               else console.warn(`[EvoWA AutoRestore] Webhook fix failed for ${nameToCheck}`);
             }).catch(() => {});
             this.syncConversationsBackground(state, false);
           } else {
-            // Instance not found on Evolution — mark as deleted (not just disconnected)
-            // because there's nothing to reconnect to
             await db.update(whatsappSessions)
               .set({ status: "disconnected" })
               .where(eq(whatsappSessions.sessionId, row.sessionId));
@@ -2395,8 +2494,11 @@ class WhatsAppEvolutionManager extends EventEmitter {
         if (!remoteJid) continue;
 
         try {
-          // ── Step 4: Fetch messages from Evolution API (1 page, 20 msgs) ──
-          const messages = await evo.findMessages(session.instanceName, remoteJid, {
+          // ── Step 4: Fetch messages from correct provider (1 page, 20 msgs) ──
+          const isZapiQS = !!getZApiSession(session.sessionId);
+          const messages = isZapiQS
+            ? await zapiProvider.findMessages(session.sessionId, remoteJid, { limit: MAX_MSGS_PER_CHAT })
+            : await evo.findMessages(session.instanceName, remoteJid, {
             limit: MAX_MSGS_PER_CHAT,
             page: 1,
           });
@@ -2688,7 +2790,10 @@ class WhatsAppEvolutionManager extends EventEmitter {
           let hasMore = true;
 
           while (hasMore) {
-            const messages = await evo.findMessages(session.instanceName, remoteJid, {
+            const isZapiDS = !!getZApiSession(session.sessionId);
+            const messages = isZapiDS
+              ? await zapiProvider.findMessages(session.sessionId, remoteJid, { limit: 50 })
+              : await evo.findMessages(session.instanceName, remoteJid, {
               limit: 50,
               page,
             });
@@ -2886,7 +2991,10 @@ class WhatsAppEvolutionManager extends EventEmitter {
       return { status: 'already_in_progress' };
     }
 
-    const chats = await evo.findChats(session.instanceName);
+    const isZapiDeep = !!getZApiSession(session.sessionId);
+    const chats = isZapiDeep
+      ? await zapiProvider.findChats(session.sessionId)
+      : await evo.findChats(session.instanceName);
     const individualChats = chats.filter(chat => {
       const jid = chat.remoteJid;
       if (!jid) return false;
@@ -2940,7 +3048,10 @@ class WhatsAppEvolutionManager extends EventEmitter {
     if (!db) return;
 
     // Fetch chat list (sorted by most recent activity by default)
-    const chats = await evo.findChats(session.instanceName);
+    const isZapiFP = !!getZApiSession(session.sessionId);
+    const chats = isZapiFP
+      ? await zapiProvider.findChats(session.sessionId)
+      : await evo.findChats(session.instanceName);
     if (!chats || chats.length === 0) return;
 
     // Filter out groups and status, sort by most recent
@@ -2987,10 +3098,9 @@ class WhatsAppEvolutionManager extends EventEmitter {
         } catch {}
 
         // Only fetch page 1 (most recent 20 messages)
-        const messages = await evo.findMessages(session.instanceName, remoteJid, {
-          limit: 20,
-          page: 1,
-        });
+        const messages = isZapiFP
+          ? await zapiProvider.findMessages(session.sessionId, remoteJid, { limit: 20 })
+          : await evo.findMessages(session.instanceName, remoteJid, { limit: 20, page: 1 });
         if (!messages || messages.length === 0) continue;
 
         for (const msg of messages) {
@@ -3180,6 +3290,59 @@ class WhatsAppEvolutionManager extends EventEmitter {
       .where(eq(whatsappSessions.status, 'connected'));
 
     for (const row of rows) {
+      // Check if this is a Z-API session
+      const isZapiPoll = row.provider === 'zapi' || !!getZApiSession(row.sessionId);
+      
+      if (isZapiPoll) {
+        // Z-API session: use zapiProvider.fetchInstance
+        try {
+          const inst = await zapiProvider.fetchInstance(row.sessionId);
+          if (!inst) continue;
+          if (inst.connectionStatus !== 'open') {
+            console.log(`[EvoWA Polling] Z-API ${row.sessionId} -> status '${inst.connectionStatus}', marking disconnected`);
+            await db.update(whatsappSessions)
+              .set({ status: 'disconnected' })
+              .where(eq(whatsappSessions.sessionId, row.sessionId));
+            const session = this.sessions.get(row.sessionId);
+            if (session) session.status = 'disconnected';
+            this.emit('status', { sessionId: row.sessionId, status: 'disconnected' });
+            continue;
+          }
+          // Instance is 'open' — ensure session is in memory and sync
+          const session = this.sessions.get(row.sessionId);
+          const state: EvolutionSessionState = session || {
+            instanceName: `zapi-${row.sessionId}`,
+            sessionId: row.sessionId,
+            userId: row.userId,
+            tenantId: row.tenantId,
+            status: 'connected',
+            qrCode: null,
+            qrDataUrl: null,
+            user: inst.ownerJid ? {
+              id: inst.ownerJid,
+              name: inst.profileName || '',
+              imgUrl: inst.profilePicUrl || undefined,
+            } : null,
+            lastConnectedAt: Date.now(),
+            connectingStartedAt: null,
+          };
+          state.status = 'connected';
+          state.connectingStartedAt = null;
+          this.sessions.set(row.sessionId, state);
+          // Periodic sync for connected Z-API sessions
+          const lastSync = this.lastSyncTimestamps.get(row.sessionId) || 0;
+          if (now - lastSync > 8 * 60 * 1000) {
+            console.log(`[EvoWA Polling] Periodic sync for Z-API ${row.sessionId}`);
+            this.syncConversationsBackground(state, false);
+            this.lastSyncTimestamps.set(row.sessionId, now);
+          }
+        } catch (e: any) {
+          console.warn(`[EvoWA Polling] Error checking Z-API ${row.sessionId}:`, e.message);
+        }
+        continue;
+      }
+
+      // Evolution API session
       const instanceName = evo.getInstanceName(row.tenantId, row.userId);
       try {
         const inst = await evo.fetchInstance(instanceName);

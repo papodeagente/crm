@@ -29,6 +29,7 @@ vi.mock("./providers/zapiProvider", () => ({
       status: "SENT",
     }),
     sendReaction: vi.fn().mockResolvedValue({ success: true }),
+    sendPresence: vi.fn().mockResolvedValue(undefined),
   },
   getZApiSession: vi.fn(),
   registerZApiSession: vi.fn(),
@@ -280,7 +281,7 @@ describe("Z-API Routing in WhatsApp Manager", () => {
   });
 
   describe("sendPresenceUpdate routing", () => {
-    it("should skip presence for Z-API sessions (not supported)", async () => {
+    it("should route presence to Z-API for Z-API sessions", async () => {
       vi.mocked(getZApiSession).mockReturnValue({
         instanceId: "zapi-inst-123",
         token: "zapi-token-abc",
@@ -301,7 +302,8 @@ describe("Z-API Routing in WhatsApp Manager", () => {
 
       await whatsappManager.sendPresenceUpdate("crm-7-7", "5511999999999@s.whatsapp.net", "composing");
 
-      // Should NOT have called evo.sendPresence
+      // Should have called zapiProvider.sendPresence, NOT evo.sendPresence
+      expect(zapiProvider.sendPresence).toHaveBeenCalled();
       expect(evo.sendPresence).not.toHaveBeenCalled();
     });
   });

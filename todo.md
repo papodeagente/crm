@@ -5476,3 +5476,21 @@
 - [x] Frontend: botão exportar na página de Contatos
 - [x] Frontend: botão exportar na página de Negociações
 - [x] Frontend: botão exportar na página Matriz RFV
+
+## Bug Fix: Z-API não funciona para tenants não-admin (Mar 26)
+- [x] Investigar como Z-API é configurado por tenant (instanceId, token, clientToken)
+- [x] Identificar causa raiz: WhatsAppEvolutionManager hardcoded para Evolution API
+- [x] Fix 1: getSessionLive() - usar zapiProvider.fetchInstance para sessões Z-API
+- [x] Fix 2: handleWebhookEvent connection.update - usar zapiProvider.fetchInstance para perfil
+- [x] Fix 3: syncConversationsBackground - usar zapiProvider.findChats/findContacts para Z-API
+- [x] Fix 4: autoRestoreSessions - tratar sessões Z-API separadamente
+- [x] Fix 5: disconnect/deleteSession - usar zapiProvider para sessões Z-API
+- [x] Fix 6: deleteMessage/editMessage - routing Z-API
+- [x] Fix 7: archiveChat/blockContact/checkIsWhatsApp - routing Z-API
+- [x] Fix 8: sendSticker/sendLocation/sendContact/sendPoll - routing Z-API
+- [x] Fix 9: fetchContactProfile/fetchBusinessProfile/getProfilePicture - routing Z-API
+- [x] Fix 10: group operations - routing Z-API
+- [x] Fix 11: markAsUnread - routing Z-API
+- [x] Fix 12: syncContacts/syncUserConversations - routing Z-API
+- [x] Fix 13: initializeProviderSessions chamado na inicialização do servidor
+- [x] Testes vitest para validar routing Z-API
