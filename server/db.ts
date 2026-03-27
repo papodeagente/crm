@@ -1889,6 +1889,8 @@ export async function getWaConversationsList(
     assignmentFilterWc += ` AND wc.assignedUserId IS NULL`;
   }
 
+  // Optimized: subquery limits to N rows FIRST, then JOINs only those rows
+  // This avoids JOINing 2000+ rows when we only need 100
   const result = await db.execute(sql`
     SELECT 
       wc.id AS conversationId,
@@ -1917,21 +1919,24 @@ export async function getWaConversationsList(
       c.name AS contactName,
       c.email AS contactEmail,
       c.phone AS contactPhone
-    FROM wa_conversations wc
+    FROM (
+      SELECT * FROM wa_conversations
+      WHERE sessionId = ${sessionId}
+      AND tenantId = ${tenantId}
+      AND mergedIntoId IS NULL
+      ${sql.raw(assignmentFilterWc.replace(/wc\./g, ''))}
+      ${filter?.cursor ? sql`AND lastMessageAt < ${new Date(filter.cursor)}` : sql``}
+      ORDER BY lastMessageAt DESC
+      LIMIT ${filter?.limit ?? 100}
+      ${!filter?.cursor && (filter?.offset ?? 0) > 0 ? sql`OFFSET ${filter?.offset ?? 0}` : sql``}
+    ) wc
     LEFT JOIN conversation_assignments ca 
       ON ca.sessionId = wc.sessionId 
       AND ca.remoteJid = wc.remoteJid
       AND ca.tenantId = wc.tenantId
     LEFT JOIN crm_users agent ON agent.id = wc.assignedUserId
     LEFT JOIN contacts c ON c.id = wc.contactId
-    WHERE wc.sessionId = ${sessionId}
-    AND wc.tenantId = ${tenantId}
-    AND wc.mergedIntoId IS NULL
-    ${sql.raw(assignmentFilterWc)}
-    ${filter?.cursor ? sql`AND wc.lastMessageAt < ${new Date(filter.cursor)}` : sql``}
     ORDER BY wc.lastMessageAt DESC
-    LIMIT ${filter?.limit ?? 100}
-    ${!filter?.cursor && (filter?.offset ?? 0) > 0 ? sql`OFFSET ${filter?.offset ?? 0}` : sql``}
   `);
 
   const rows = (result as any)[0] || [];

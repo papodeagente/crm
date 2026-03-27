@@ -1004,8 +1004,33 @@ export const appRouter = router({
     profilePictures: sessionTenantProcedure
       .input(z.object({ sessionId: z.string(), jids: z.array(z.string()).max(100) }))
       .query(async ({ input, ctx }) => {
-        // Use fast DB query instead of N API calls to Evolution
-        return getProfilePicturesFromDb(input.sessionId, input.jids);
+        // Fast DB query first
+        const dbResult = await getProfilePicturesFromDb(input.sessionId, input.jids);
+        // Find JIDs missing pics in DB — fetch from API in background (max 10 per call)
+        const missingJids = input.jids.filter(j => !dbResult[j]).slice(0, 10);
+        if (missingJids.length > 0) {
+          // Fire-and-forget: fetch from API and save to DB for next time
+          (async () => {
+            try {
+              const apiResult = await whatsappManager.getProfilePictures(input.sessionId, missingJids);
+              const db = await getDb();
+              if (!db) return;
+              const { waContacts } = await import("../drizzle/schema");
+              for (const [jid, url] of Object.entries(apiResult)) {
+                if (url) {
+                  dbResult[jid] = url; // won't help this response but updates cache
+                  await db.update(waContacts)
+                    .set({ profilePictureUrl: url })
+                    .where(and(eq(waContacts.sessionId, input.sessionId), eq(waContacts.jid, jid)))
+                    .catch(() => {});
+                }
+              }
+            } catch (e) {
+              // Silently ignore — next request will retry
+            }
+          })();
+        }
+        return dbResult;
       }),
     uploadMedia: tenantWriteProcedure
       .input(z.object({ fileName: z.string(), fileBase64: z.string(), contentType: z.string() }))
@@ -1626,7 +1651,7 @@ export const appRouter = router({
       .mutation(async ({ ctx, input }) => {
         const tenantId = getTenantId(ctx);
         const userId = ctx.saasUser?.userId || ctx.user.id;
-        const result = claimConversation(tenantId, input.sessionId, input.remoteJid, userId);
+        const result = await claimConversation(tenantId, input.sessionId, input.remoteJid, userId);
         const io = getIo();
         if (io) {
           io.emit("conversationUpdated", {

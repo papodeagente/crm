@@ -1269,7 +1269,7 @@ export default function InboxPage() {
   const visibleJids = useMemo(() => convJids.slice(0, 100), [convJids]);
   const profilePicsQ = trpc.whatsapp.profilePictures.useQuery(
     { sessionId: activeSession?.sessionId || "", jids: visibleJids },
-    { enabled: !!activeSession?.sessionId && visibleJids.length > 0, staleTime: 30 * 60 * 1000, refetchInterval: false }
+    { enabled: !!activeSession?.sessionId && visibleJids.length > 0, staleTime: 60_000, refetchInterval: 30_000, refetchIntervalInBackground: false }
   );
 
   const profilePicMap = useMemo(() => (profilePicsQ.data || {}) as Record<string, string | null>, [profilePicsQ.data]);
@@ -1956,70 +1956,23 @@ export default function InboxPage() {
                         </div>
                       </div>
                     </div>
-                    {/* Hover action icons — clean overlay on the right side */}
-                    {!isAssigningThis && (
-                      <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 opacity-0 group-hover/q:opacity-100 transition-all duration-150">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (activeSession?.sessionId) {
-                              claimMutation.mutate({ sessionId: activeSession.sessionId, remoteJid: conv.remoteJid });
-                            }
-                          }}
-                          disabled={claimMutation.isPending}
-                          className="w-8 h-8 flex items-center justify-center rounded-full bg-wa-tint text-white shadow-lg shadow-wa-tint/30 hover:scale-110 transition-transform"
-                          title="Puxar para mim"
-                        >
-                          <HandMetal className="w-3.5 h-3.5" />
-                        </button>
-                        {isAdmin.isAdmin && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setAssigningQueueJid(conv.remoteJid);
-                            }}
-                            className="w-8 h-8 flex items-center justify-center rounded-full bg-blue-500 text-white shadow-lg shadow-blue-500/30 hover:scale-110 transition-transform"
-                            title="Atribuir a agente"
-                          >
-                            <UserPlus className="w-3.5 h-3.5" />
-                          </button>
-                        )}
-                      </div>
-                    )}
-                    {/* Agent assignment inline — slides in below */}
-                    {isAssigningThis && (
-                      <div className="mx-3 mb-1 flex items-center gap-1.5 p-1.5 bg-blue-500/5 border border-blue-500/20 rounded-lg animate-in slide-in-from-top-1 duration-150">
-                        <select
-                          value={selectedAgentForQueue || ""}
-                          onChange={(e) => setSelectedAgentForQueue(Number(e.target.value))}
-                          className="flex-1 px-2 py-1.5 bg-background border border-border rounded-md text-[12px] text-foreground outline-none focus:border-blue-400"
-                          autoFocus
-                        >
-                          <option value="">Selecionar agente...</option>
-                          {agents.map((a) => (
-                            <option key={a.id} value={a.id}>{a.name}</option>
-                          ))}
-                        </select>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (selectedAgentForQueue && activeSession?.sessionId) {
-                              assignFromQueueMut.mutate({ sessionId: activeSession.sessionId, remoteJid: conv.remoteJid, agentId: selectedAgentForQueue });
-                            }
-                          }}
-                          disabled={!selectedAgentForQueue || assignFromQueueMut.isPending}
-                          className="px-3 py-1.5 bg-blue-500 text-white text-[12px] font-medium rounded-md hover:bg-blue-600 transition-colors disabled:opacity-40"
-                        >
-                          {assignFromQueueMut.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "Confirmar"}
-                        </button>
-                        <button
-                          onClick={(e) => { e.stopPropagation(); setAssigningQueueJid(null); setSelectedAgentForQueue(null); }}
-                          className="w-7 h-7 flex items-center justify-center text-muted-foreground rounded-md hover:bg-muted transition-colors"
-                        >
-                          <X className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    )}
+                    {/* Single claim button — "Pegar Atendimento" */}
+                    <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 opacity-0 group-hover/q:opacity-100 transition-all duration-150">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (activeSession?.sessionId) {
+                            claimMutation.mutate({ sessionId: activeSession.sessionId, remoteJid: conv.remoteJid });
+                          }
+                        }}
+                        disabled={claimMutation.isPending}
+                        className="h-7 px-2.5 flex items-center gap-1.5 rounded-full bg-wa-tint text-white text-[11px] font-medium shadow-lg shadow-wa-tint/30 hover:scale-105 transition-transform"
+                        title="Pegar Atendimento"
+                      >
+                        {claimMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <HandMetal className="w-3 h-3" />}
+                        <span>Atender</span>
+                      </button>
+                    </div>
                   </div>
                   );
                 })

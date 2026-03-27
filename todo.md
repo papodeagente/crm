@@ -5745,3 +5745,23 @@
 
 ### Testes
 - [x] 23 testes Vitest para normalizeToUnixSeconds (13 cenários), deduplicação (3), batch limit (2), conversão canônica (3), webhook normalizer (2)
+
+## Inbox — Correções de UX e Performance
+
+### Fotos de Perfil
+- [x] Exibir fotos de perfil do WhatsApp na lista de conversas do Inbox
+- [x] Carregar fotos de forma lazy/assíncrona para não travar a lista
+- [x] Backend busca fotos via API Z-API quando DB retorna null (background fetch + cache progressivo)
+- [x] Refetch a cada 30s para mostrar fotos carregadas em background
+
+### Performance
+- [x] Otimizar carregamento inicial da lista de conversas (subquery antes de JOINs — 100 rows vs 2697)
+- [x] Sincronização em tempo real — já implementada via Socket.IO (Inbox + WhatsAppChat/Negociação)
+
+### Botões de Ação
+- [x] Remover botões duplicados na lista de conversas (verde de pegar atendimento + azul de adicionar contato)
+- [x] Manter apenas 1 botão funcional de "Pegar Atendimento" com ícone HandMetal
+- [x] Corrigir botão de pegar atendimento — adicionado `await` faltante na mutation `claim`
+
+### Testes
+- [x] 11 testes Vitest: claim await, profile pics background fetch, query optimization, botão único, refetch interval
