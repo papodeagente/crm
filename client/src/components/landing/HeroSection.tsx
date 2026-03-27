@@ -32,7 +32,7 @@ export function HeroSection({ onCTA, onDemo }: HeroSectionProps) {
         <div className="max-w-7xl mx-auto px-5 sm:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <img src={LOGO_URL} alt="Entur OS" className="h-8 w-8 rounded-lg" />
-            <img src="https://d2xsxph8kpxj0f.cloudfront.net/310519663249817763/EKvcVicuVoUxTnzjSKzgdk/OSVBRANCA_ea41014a.webp" alt="ENTUR OS" className="h-6 object-contain" />
+            <img src="https://d2xsxph8kpxj0f.cloudfront.net/310519663249817763/EKvcVicuVoUxTnzjSKzgdk/logo-dark-theme_021f3cb2.webp" alt="ENTUR OS" className="h-6 object-contain" />
           </div>
           <div className="hidden md:flex items-center gap-3">
             <Button

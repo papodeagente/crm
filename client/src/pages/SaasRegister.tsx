@@ -63,7 +63,7 @@ export default function SaasRegister() {
         <div className="hidden md:block">
           <div className="inline-flex items-center gap-2 mb-6">
             <img src="https://d2xsxph8kpxj0f.cloudfront.net/310519663249817763/EKvcVicuVoUxTnzjSKzgdk/OSICON_03b1c322.webp" alt="ENTUR OS" className="w-12 h-12 rounded-xl shadow-lg" />
-            <img src="https://d2xsxph8kpxj0f.cloudfront.net/310519663249817763/EKvcVicuVoUxTnzjSKzgdk/OSVBRANCA_ea41014a.webp" alt="ENTUR OS" className="h-8 object-contain" />
+            <img src="https://d2xsxph8kpxj0f.cloudfront.net/310519663249817763/EKvcVicuVoUxTnzjSKzgdk/logo-dark-theme_021f3cb2.webp" alt="ENTUR OS" className="h-8 object-contain" />
           </div>
           <h2 className="text-2xl font-bold text-white mb-2">
             O sistema que sua agência precisa
@@ -95,7 +95,7 @@ export default function SaasRegister() {
           <div className="md:hidden text-center mb-4">
             <div className="inline-flex items-center gap-2">
               <img src="https://d2xsxph8kpxj0f.cloudfront.net/310519663249817763/EKvcVicuVoUxTnzjSKzgdk/OSICON_03b1c322.webp" alt="ENTUR OS" className="w-8 h-8 rounded-lg" />
-              <img src="https://d2xsxph8kpxj0f.cloudfront.net/310519663249817763/EKvcVicuVoUxTnzjSKzgdk/OSVBRANCA_ea41014a.webp" alt="ENTUR OS" className="h-5 object-contain" />
+              <img src="https://d2xsxph8kpxj0f.cloudfront.net/310519663249817763/EKvcVicuVoUxTnzjSKzgdk/logo-dark-theme_021f3cb2.webp" alt="ENTUR OS" className="h-5 object-contain" />
             </div>
           </div>
           <div className="text-center mb-6">

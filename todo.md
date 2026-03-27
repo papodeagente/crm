@@ -5684,3 +5684,9 @@
 - [x] TaskAutomationSettings: adicionar scroll no dialog de automação com mensagem WhatsApp
 - [x] RfvMatrix: adicionar scroll no dialog inline de envio em massa
 - [x] Contacts: usa BulkWhatsAppDialog (já corrigido)
+
+## Substituição de Logos do Sistema
+- [x] Upload logos para CDN (OSBRANCA.webp para tema escuro, OS-PRETA.webp para tema claro)
+- [x] Auditar todos os locais que exibem logo no portal
+- [x] Substituir logo em cada componente com suporte a tema claro/escuro
+- [x] Favicon permanece inalterado

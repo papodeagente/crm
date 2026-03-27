@@ -349,7 +349,7 @@ export function PricingSection({ onSelectPlan }: PricingSectionProps) {
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2.5">
             <img src={LOGO_URL} alt="ENTUR OS" className="h-7 w-7 rounded-lg" />
-            <img src="https://d2xsxph8kpxj0f.cloudfront.net/310519663249817763/EKvcVicuVoUxTnzjSKzgdk/OSVBRANCA_ea41014a.webp" alt="ENTUR OS" className="h-5 object-contain" />
+            <img src="https://d2xsxph8kpxj0f.cloudfront.net/310519663249817763/EKvcVicuVoUxTnzjSKzgdk/logo-dark-theme_021f3cb2.webp" alt="ENTUR OS" className="h-5 object-contain" />
           </div>
           <p className="text-xs text-white/20">
             &copy; {new Date().getFullYear()} Escola de Negócios do Turismo. Todos os direitos reservados.

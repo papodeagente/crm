@@ -18,7 +18,7 @@ export function SolutionSection() {
               A solução
             </div>
             <img
-              src="https://d2xsxph8kpxj0f.cloudfront.net/310519663249817763/EKvcVicuVoUxTnzjSKzgdk/OSVBRANCA_ea41014a.webp"
+              src="https://d2xsxph8kpxj0f.cloudfront.net/310519663249817763/EKvcVicuVoUxTnzjSKzgdk/logo-dark-theme_021f3cb2.webp"
               alt="ENTUR OS"
               className="h-12 sm:h-14 lg:h-16 object-contain mx-auto mb-4"
             />

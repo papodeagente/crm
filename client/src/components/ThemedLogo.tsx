@@ -1,7 +1,7 @@
 import { useTheme } from "@/contexts/ThemeContext";
 
-const LOGO_DARK = "https://d2xsxph8kpxj0f.cloudfront.net/310519663249817763/EKvcVicuVoUxTnzjSKzgdk/OSVBRANCA_ea41014a.webp";
-const LOGO_LIGHT = "https://d2xsxph8kpxj0f.cloudfront.net/310519663249817763/EKvcVicuVoUxTnzjSKzgdk/OSCLARA_1c5f262e.webp";
+const LOGO_DARK = "https://d2xsxph8kpxj0f.cloudfront.net/310519663249817763/EKvcVicuVoUxTnzjSKzgdk/logo-dark-theme_021f3cb2.webp";
+const LOGO_LIGHT = "https://d2xsxph8kpxj0f.cloudfront.net/310519663249817763/EKvcVicuVoUxTnzjSKzgdk/logo-light-theme_c316c6d0.webp";
 
 interface ThemedLogoProps {
   className?: string;
