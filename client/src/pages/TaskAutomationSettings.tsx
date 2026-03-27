@@ -366,11 +366,11 @@ export default function TaskAutomationSettings() {
 
       {/* Create/Edit Dialog */}
       <Dialog open={showForm} onOpenChange={(open) => { if (!open) { setShowForm(false); resetForm(); } }}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
+        <DialogContent className="sm:max-w-lg max-h-[90vh] flex flex-col">
+          <DialogHeader className="shrink-0">
             <DialogTitle>{editingId ? "Editar automação" : "Nova automação de tarefa"}</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 py-2">
+          <div className="space-y-4 py-2 overflow-y-auto flex-1 min-h-0 pr-1">
             {/* Stage (read-only when creating from stage button) */}
             <div>
               <Label className="text-sm font-medium">Etapa do funil *</Label>
@@ -583,7 +583,7 @@ export default function TaskAutomationSettings() {
               />
             </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="shrink-0">
             <Button variant="outline" onClick={() => { setShowForm(false); resetForm(); }}>Cancelar</Button>
             <Button onClick={handleSave} disabled={createMut.isPending || updateMut.isPending}>
               {createMut.isPending || updateMut.isPending ? "Salvando..." : editingId ? "Salvar alterações" : "Criar automação"}

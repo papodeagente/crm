@@ -124,8 +124,8 @@ export default function BulkWhatsAppDialog({
     <>
       {/* ─── Send Dialog ─── */}
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
+        <DialogContent className="max-w-lg max-h-[90vh] flex flex-col">
+          <DialogHeader className="shrink-0">
             <DialogTitle className="flex items-center gap-2">
               <Send className="w-5 h-5 text-emerald-600" />
               Envio em Massa — WhatsApp
@@ -135,7 +135,7 @@ export default function BulkWhatsAppDialog({
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4">
+          <div className="space-y-4 overflow-y-auto flex-1 min-h-0 pr-1">
             {/* WhatsApp session status */}
             <div className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm ${
               sessionConnected
@@ -326,7 +326,7 @@ export default function BulkWhatsAppDialog({
             </div>
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="shrink-0">
             <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
             <Button
               onClick={handleSend}

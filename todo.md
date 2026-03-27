@@ -5677,3 +5677,10 @@
 - [x] Automações já criadas continuam funcionando
 - [x] Tags antigas preservadas
 - [x] Isolamento por tenant mantido
+
+## Scroll em Dialogs de Mensagem WhatsApp
+- [x] BulkWhatsAppDialog: adicionar scroll interno para botão enviar não sumir
+- [x] TaskFormDialog: já possuía max-h-[70vh] overflow-y-auto (OK)
+- [x] TaskAutomationSettings: adicionar scroll no dialog de automação com mensagem WhatsApp
+- [x] RfvMatrix: adicionar scroll no dialog inline de envio em massa
+- [x] Contacts: usa BulkWhatsAppDialog (já corrigido)
