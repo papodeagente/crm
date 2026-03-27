@@ -5,7 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Plus, Briefcase, MoreHorizontal, Trash2, TrendingUp, DollarSign, RotateCcw, AlertTriangle, Archive, Send } from "lucide-react";
+import { Plus, Briefcase, MoreHorizontal, Trash2, TrendingUp, DollarSign, RotateCcw, AlertTriangle, Archive, Send, Download, Loader2 } from "lucide-react";
+import { useExportDownload } from "@/hooks/useExport";
 import BulkWhatsAppDialog from "@/components/BulkWhatsAppDialog";
 import { useState, useMemo } from "react";
 import DateRangeFilter, { useDateFilter } from "@/components/DateRangeFilter";
@@ -19,6 +20,23 @@ const statusStyles: Record<string, { bg: string; text: string; dot: string; labe
   won: { bg: "bg-emerald-50", text: "text-emerald-700", dot: "bg-emerald-500", label: "Ganho" },
   lost: { bg: "bg-red-50", text: "text-red-700", dot: "bg-red-500", label: "Perdido" },
 };
+
+function ExportDealsButton() {
+  const { isExporting, handleExport } = useExportDownload();
+  const exportMutation = trpc.export.deals.useMutation();
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      className="h-9 gap-2 rounded-lg text-[13px]"
+      disabled={isExporting}
+      onClick={() => handleExport(() => exportMutation.mutateAsync(), "negociações")}
+    >
+      {isExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+      Exportar
+    </Button>
+  );
+}
 
 export default function Deals() {
   const [open, setOpen] = useState(false);
@@ -168,6 +186,9 @@ export default function Deals() {
             <Archive className="h-4 w-4" />
             Lixeira{deletedDeals.data?.length ? ` (${deletedDeals.data.length})` : ""}
           </Button>
+          {!showTrash && (
+            <ExportDealsButton />
+          )}
           {!showTrash && (
             <Dialog open={open} onOpenChange={setOpen}>
               <DialogTrigger asChild>

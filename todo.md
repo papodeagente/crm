@@ -5468,3 +5468,11 @@
 
 ## Ajuste Logo TopNav (Mar 26)
 - [x] Diminuir tamanho da logo (ícone h-7, texto h-4) e reduzir gap para alinhar com conteúdo
+
+## Exportação de Planilha Excel (Mar 26)
+- [x] Backend: instalar xlsx e criar procedure exportContacts (com campos personalizados)
+- [x] Backend: criar procedure exportDeals (com campos personalizados)
+- [x] Backend: criar procedure exportRfvMatrix
+- [x] Frontend: botão exportar na página de Contatos
+- [x] Frontend: botão exportar na página de Negociações
+- [x] Frontend: botão exportar na página Matriz RFV

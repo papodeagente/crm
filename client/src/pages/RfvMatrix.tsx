@@ -22,8 +22,9 @@ import {
   BarChart3, FileSpreadsheet, XCircle, Send, X,
   CheckSquare, Square, Loader2, Ban, CheckCircle2,
   AlertCircle, SkipForward, Filter, Clock, Heart,
-  Award, Plane, UserX, Bell,
+  Award, Plane, UserX, Bell, Download,
 } from "lucide-react";
+import { useExportDownload } from "@/hooks/useExport";
 
 // ─── Smart Filter Config ───
 const smartFilterConfig: Record<string, { label: string; description: string; icon: React.ReactNode; color: string; bg: string; border: string }> = {
@@ -125,6 +126,22 @@ const templateVars = [
   { var: "{publico}", desc: "Público RFV" },
   { var: "{valor}", desc: "Valor total (R$)" },
 ];
+
+function ExportRfvButton() {
+  const { isExporting, handleExport } = useExportDownload();
+  const exportMutation = trpc.export.rfv.useMutation();
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      disabled={isExporting}
+      onClick={() => handleExport(() => exportMutation.mutateAsync(), "contatos RFV")}
+    >
+      {isExporting ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <Download className="w-4 h-4 mr-1.5" />}
+      Exportar
+    </Button>
+  );
+}
 
 export default function RfvMatrix() {
   const [, setLocation] = useLocation();
@@ -414,6 +431,8 @@ export default function RfvMatrix() {
               <Upload className="w-4 h-4 mr-1.5" />
               Importar CSV
             </Button>
+
+            <ExportRfvButton />
 
             <Button
               variant="outline"

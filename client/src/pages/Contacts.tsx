@@ -4,7 +4,8 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Plus, Search, Users, Mail, Phone, MoreHorizontal, Trash2, Edit, Eye, RotateCcw, AlertTriangle, Archive, RefreshCw, Filter, X, Send } from "lucide-react";
+import { Plus, Search, Users, Mail, Phone, MoreHorizontal, Trash2, Edit, Eye, RotateCcw, AlertTriangle, Archive, RefreshCw, Filter, X, Send, Download, Loader2 } from "lucide-react";
+import { useExportDownload } from "@/hooks/useExport";
 import BulkWhatsAppDialog from "@/components/BulkWhatsAppDialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SearchableCombobox } from "@/components/ui/searchable-combobox";
@@ -22,6 +23,23 @@ const stageConfig: Record<string, { dot: string; label: string }> = {
   customer: { dot: "bg-emerald-500", label: "Cliente" },
   churned: { dot: "bg-red-500", label: "Churned" },
 };
+
+function ExportContactsButton() {
+  const { isExporting, handleExport } = useExportDownload();
+  const exportMutation = trpc.export.contacts.useMutation();
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      className="h-9 gap-2 rounded-lg text-[13px]"
+      disabled={isExporting}
+      onClick={() => handleExport(() => exportMutation.mutateAsync(), "contatos")}
+    >
+      {isExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+      Exportar
+    </Button>
+  );
+}
 
 export default function Contacts() {
   const [search, setSearch] = useState("");
@@ -183,6 +201,9 @@ export default function Contacts() {
             <Archive className="h-4 w-4" />
             Lixeira{deletedContacts.data?.length ? ` (${deletedContacts.data.length})` : ""}
           </Button>
+          {!showTrash && (
+            <ExportContactsButton />
+          )}
           {!showTrash && (
             <Dialog open={open} onOpenChange={setOpen}>
               <DialogTrigger asChild>

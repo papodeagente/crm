@@ -154,6 +154,7 @@ import { rfvRouter } from "./routers/rfvRouter";
 import { profileRouter } from "./routers/profileRouter";
 import { analyticsRouter } from "./routers/analyticsRouter";
 import { zapiAdminRouter } from "./routers/zapiAdminRouter";
+import { exportRouter } from "./routers/exportRouter";
 import { getHomeExecutive, getHomeTasks, getHomeRFV, getHomeOnboarding, toggleOnboardingStep, dismissOnboarding, isOnboardingDismissed, getHomeFilterOptions } from "./services/homeService";
 import {
   listLeadEvents,
@@ -2424,6 +2425,7 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
   zapiAdmin: zapiAdminRouter, // Super Admin Z-API Instance Management
   rfv: rfvRouter, // M13: Matriz RFV — Classificação Automática de Contatos
   crmAnalytics: analyticsRouter, // M14: Análises de Negociações (KPIs, Funil, Motivos de Perda)
+  export: exportRouter, // Exportação de planilhas (Contatos, Negociações, RFV)
   profile: profileRouter, // Perfil do usuário (avatar, nome, senha, Google Calendar)
 
   // ─── Contact Profile & Custom Fields ───
