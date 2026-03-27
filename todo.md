@@ -5640,3 +5640,40 @@
 - [x] Verificar que transcrição de áudio não foi alterada
 - [x] Verificar isolamento por tenant
 - [x] Verificar que sistema funciona sem IA configurada (estado seguro)
+
+## Automação de Tarefa WhatsApp por Etapa + Novas Tags Globais
+
+### Backend - Tags
+- [x] Identificar fonte central de tags dinâmicas existente
+- [x] Adicionar tag {nome_oportunidade} à fonte central
+- [x] Adicionar tag {produto_principal} à fonte central
+- [x] Implementar resolução de {nome_oportunidade} no interpolador de tags
+- [x] Implementar resolução de {produto_principal} (maior valor) no interpolador de tags
+- [x] Tratar ausência de produto sem quebrar envio
+
+### Backend - Automação por Etapa
+- [x] Estender automação de tarefa por etapa para suportar tipo WhatsApp
+- [x] Garantir que tarefa WhatsApp criada por automação aceite tags dinâmicas
+- [x] Reaproveitar lógica existente de tarefa WhatsApp manual
+
+### Frontend - UI
+- [x] Atualizar UI de automação por etapa para permitir tipo WhatsApp
+- [x] Exibir campo de mensagem com tags quando tipo WhatsApp selecionado
+- [x] Garantir novas tags apareçam em todas as caixas de disparo de mensagem
+- [x] Padronizar lista de tags disponíveis em todos os contextos
+
+### Testes
+- [x] Teste: tags antigas continuam funcionando
+- [x] Teste: {nome_oportunidade} resolve corretamente
+- [x] Teste: {produto_principal} com 1 produto
+- [x] Teste: {produto_principal} com múltiplos produtos (pega maior valor)
+- [x] Teste: {produto_principal} sem produto (não quebra)
+- [x] Teste: automação por etapa cria tarefa WhatsApp
+- [x] Teste: tarefas comuns não afetadas
+- [x] Teste: automações antigas continuam funcionando
+
+### Segurança e Não-Regressão
+- [x] Envio manual de mensagem continua funcionando
+- [x] Automações já criadas continuam funcionando
+- [x] Tags antigas preservadas
+- [x] Isolamento por tenant mantido

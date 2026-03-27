@@ -1942,6 +1942,7 @@ export async function createTaskAutomation(data: {
   deadlineTime?: string;
   assignToOwner?: boolean;
   assignToUserIds?: number[];
+    waMessageTemplate?: string | null;
   isActive?: boolean;
   orderIndex?: number;
 }) {
@@ -1958,6 +1959,7 @@ export async function createTaskAutomation(data: {
     deadlineTime: data.deadlineTime ?? "09:00",
     assignToOwner: data.assignToOwner ?? true,
     assignToUserIds: data.assignToUserIds ?? null,
+    waMessageTemplate: data.waMessageTemplate ?? null,
     isActive: data.isActive ?? true,
     orderIndex: data.orderIndex ?? 0,
   });
@@ -1973,6 +1975,7 @@ export async function updateTaskAutomation(id: number, tenantId: number, data: P
   deadlineTime: string;
   assignToOwner: boolean;
   assignToUserIds: number[] | null;
+  waMessageTemplate: string | null;
   isActive: boolean;
   orderIndex: number;
   stageId: number;
@@ -1997,7 +2000,7 @@ export async function executeTaskAutomations(
   tenantId: number,
   dealId: number,
   stageId: number,
-  deal: { ownerUserId?: number | null; boardingDate?: Date | string | null; returnDate?: Date | string | null },
+  deal: { ownerUserId?: number | null; boardingDate?: Date | string | null; returnDate?: Date | string | null; contactId?: number | null },
   createdByUserId?: number
 ) {
   const db = await getDb(); if (!db) return [];
@@ -2008,6 +2011,73 @@ export async function executeTaskAutomations(
   
   const createdTasks: number[] = [];
   const now = new Date();
+
+  // Pré-carregar dados do deal para interpolação de tags (lazy, só se necessário)
+  let dealMessageCtx: any = null;
+  async function getDealMessageContext() {
+    if (dealMessageCtx) return dealMessageCtx;
+    if (!db) return null;
+    try {
+      const { resolveMessageTags, getMainProductName } = await import("./messageTagResolver");
+      // Buscar dados do deal + contato + etapa
+      const dealRows = await db!.select({
+        title: deals.title,
+        valueCents: deals.valueCents,
+        contactId: deals.contactId,
+      }).from(deals).where(and(eq(deals.id, dealId), eq(deals.tenantId, tenantId))).limit(1);
+      const dealRow = dealRows[0];
+      if (!dealRow) return null;
+
+      // Buscar contato
+      let contactName = "", contactEmail = "", contactPhone = "";
+      const cId = dealRow.contactId || (deal as any).contactId;
+      if (cId) {
+        const contactRows = await db.select({
+          name: contacts.name, email: contacts.email, phone: contacts.phone,
+        }).from(contacts).where(and(eq(contacts.id, cId), eq(contacts.tenantId, tenantId))).limit(1);
+        if (contactRows[0]) {
+          contactName = contactRows[0].name || "";
+          contactEmail = contactRows[0].email || "";
+          contactPhone = contactRows[0].phone || "";
+        }
+      }
+
+      // Buscar etapa
+      let stageName = "";
+      const stageRows = await db.select({ name: pipelineStages.name })
+        .from(pipelineStages).where(eq(pipelineStages.id, stageId)).limit(1);
+      if (stageRows[0]) stageName = stageRows[0].name;
+
+      // Buscar empresa via deal.accountId
+      let companyName = "";
+      if (dealRow) {
+        const dealFull = await db.select({ accountId: deals.accountId })
+          .from(deals).where(and(eq(deals.id, dealId), eq(deals.tenantId, tenantId))).limit(1);
+        const accId = dealFull[0]?.accountId;
+        if (accId) {
+          const accRows = await db.select({ name: accounts.name })
+            .from(accounts).where(eq(accounts.id, accId)).limit(1);
+          if (accRows[0]) companyName = accRows[0].name;
+        }
+      }
+
+      // Buscar produto principal
+      const mainProductName = await getMainProductName(tenantId, dealId);
+
+      dealMessageCtx = {
+        contactId: cId,
+        contactName, contactEmail, contactPhone,
+        dealTitle: dealRow.title,
+        dealValueCents: dealRow.valueCents,
+        stageName, companyName, mainProductName,
+        resolveMessageTags,
+      };
+      return dealMessageCtx;
+    } catch (err) {
+      console.error("[TaskAutomation] Error loading deal context for tags:", err);
+      return null;
+    }
+  }
   
   for (const auto of automations) {
     // Calcular a data de prazo
@@ -2046,8 +2116,64 @@ export async function executeTaskAutomations(
     if (auto.assignToUserIds && auto.assignToUserIds.length > 0) {
       assigneeIds = Array.from(new Set([...assigneeIds, ...auto.assignToUserIds]));
     }
+
+    // ── Se for WhatsApp com template de mensagem, criar tarefa de disparo agendado ──
+    const isWhatsAppWithMessage = auto.taskType === "whatsapp" && auto.waMessageTemplate;
     
-    // Criar a tarefa
+    if (isWhatsAppWithMessage) {
+      try {
+        const ctx = await getDealMessageContext();
+        if (!ctx || !ctx.contactId) {
+          // Sem contato vinculado — criar tarefa normal (sem disparo)
+          console.warn(`[TaskAutomation] Deal #${dealId} sem contato para WhatsApp automático, criando tarefa normal`);
+        } else {
+          // Interpolar tags na mensagem
+          const { interpolateDealMessage } = await import("./messageTagResolver");
+          const resolvedMessage = interpolateDealMessage(auto.waMessageTemplate!, {
+            contactName: ctx.contactName,
+            contactEmail: ctx.contactEmail,
+            contactPhone: ctx.contactPhone,
+            dealTitle: ctx.dealTitle,
+            dealValueCents: ctx.dealValueCents,
+            stageName: ctx.stageName,
+            companyName: ctx.companyName,
+            mainProductName: ctx.mainProductName,
+          });
+
+          // Criar tarefa whatsapp_scheduled_send
+          const [taskResult] = await db.insert(tasks).values({
+            tenantId,
+            entityType: "deal",
+            entityId: dealId,
+            title: auto.taskTitle,
+            description: auto.taskDescription ?? undefined,
+            taskType: "whatsapp_scheduled_send",
+            dueAt: dueDate,
+            status: "pending",
+            createdByUserId: createdByUserId ?? undefined,
+            waMessageBody: resolvedMessage,
+            waContactId: ctx.contactId,
+            waScheduledAt: dueDate,
+            waStatus: "scheduled",
+          });
+
+          const taskId = taskResult.insertId;
+          createdTasks.push(taskId);
+
+          if (assigneeIds.length > 0) {
+            await db.insert(taskAssignees).values(
+              assigneeIds.map(uid => ({ tenantId, taskId, userId: uid }))
+            );
+          }
+          continue; // Pula a criação de tarefa normal abaixo
+        }
+      } catch (err) {
+        console.error(`[TaskAutomation] Error creating WA scheduled task for deal #${dealId}:`, err);
+        // Fallback: cria tarefa normal
+      }
+    }
+    
+    // Criar a tarefa (normal ou fallback)
     const [taskResult] = await db.insert(tasks).values({
       tenantId,
       entityType: "deal",

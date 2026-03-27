@@ -497,6 +497,8 @@ export const taskAutomations = mysqlTable("task_automations", {
   // Atribuir a quem? null = dono do deal
   assignToOwner: boolean("assignToOwner").default(true).notNull(),
   assignToUserIds: json("assignToUserIds").$type<number[]>(),
+  // Template de mensagem WhatsApp (usado quando taskType = "whatsapp")
+  waMessageTemplate: text("waMessageTemplate"),
   isActive: boolean("isActive").default(true).notNull(),
   orderIndex: int("orderIndex").default(0).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),

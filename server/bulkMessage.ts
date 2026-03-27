@@ -639,6 +639,7 @@ export function interpolateCrmTemplate(template: string, data: {
   dealValue?: number | null;
   stage?: string | null;
   company?: string | null;
+  mainProductName?: string | null;
 }): string {
   const firstName = data.name.split(" ")[0];
   const valor = data.dealValue
@@ -651,9 +652,11 @@ export function interpolateCrmTemplate(template: string, data: {
     .replace(/\{email\}/gi, data.email || "")
     .replace(/\{telefone\}/gi, data.phone || "")
     .replace(/\{negociacao\}/gi, data.dealTitle || "")
+    .replace(/\{nome_oportunidade\}/gi, data.dealTitle || "")
     .replace(/\{valor\}/gi, valor)
     .replace(/\{etapa\}/gi, data.stage || "")
-    .replace(/\{empresa\}/gi, data.company || "");
+    .replace(/\{empresa\}/gi, data.company || "")
+    .replace(/\{produto_principal\}/gi, data.mainProductName || "");
 }
 
 /**

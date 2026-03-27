@@ -1905,6 +1905,7 @@ const tenantId = getTenantId(ctx); const { id, dueAt, ...data } = input;
         deadlineTime: z.string().default("09:00"),
         assignToOwner: z.boolean().default(true),
         assignToUserIds: z.array(z.number()).optional(),
+        waMessageTemplate: z.string().nullable().optional(),
         isActive: z.boolean().default(true),
         orderIndex: z.number().default(0),
       }))
@@ -1923,6 +1924,7 @@ const tenantId = getTenantId(ctx); const { id, dueAt, ...data } = input;
         deadlineTime: z.string().optional(),
         assignToOwner: z.boolean().optional(),
         assignToUserIds: z.array(z.number()).nullable().optional(),
+        waMessageTemplate: z.string().nullable().optional(),
         isActive: z.boolean().optional(),
         orderIndex: z.number().optional(),
         stageId: z.number().optional(),

@@ -1,0 +1,57 @@
+ANALYSIS: WhatsApp Task Automation + New Tags
+
+=== CURRENT STATE ===
+
+1. TAG LISTS (duplicated in multiple files):
+   - client/src/pages/Contacts.tsx (lines 85-94): {nome}, {primeiro_nome}, {email}, {telefone}
+   - client/src/pages/Deals.tsx (lines 114-131): {nome}, {primeiro_nome}, {email}, {telefone}, {negociacao}, {valor}, {etapa}, {empresa}
+   - client/src/pages/Pipeline.tsx (lines 115-122): same as Deals
+   - client/src/pages/RDStationIntegration.tsx (line 1015): {nome}, {primeiro_nome}, {telefone}, {email}, {origem}, {campanha}
+
+2. INTERPOLATION FUNCTIONS (server-side):
+   - server/bulkMessage.ts:interpolateTemplate (line 118): RFV contacts - {nome}, {primeiro_nome}, {email}, {telefone}, {publico}, {valor}
+   - server/bulkMessage.ts:interpolateCrmTemplate (line 634): CRM contacts - {nome}, {primeiro_nome}, {email}, {telefone}, {negociacao}, {valor}, {etapa}, {empresa}
+   - client/src/pages/RDStationIntegration.tsx:interpolateTemplate (line 69): frontend preview only
+
+3. TASK AUTOMATION SCHEMA (drizzle/schema.ts line 481):
+   - taskAutomations table has: taskTitle, taskDescription, taskType (enum: whatsapp, phone, email, video, task)
+   - NO waMessageBody field - when taskType is "whatsapp", it just creates a regular task with that type label
+   - The task created does NOT have a message template
+
+4. EXECUTE TASK AUTOMATIONS (server/crmDb.ts line 1996):
+   - Creates tasks with title/description/taskType from automation config
+   - Does NOT handle WhatsApp message sending
+   - Just creates a task entry in the tasks table
+
+5. SCHEDULED WHATSAPP SERVICE (server/services/scheduledWhatsAppService.ts):
+   - Handles whatsapp_scheduled_send tasks
+   - Sends actual WhatsApp messages
+   - Uses waMessageBody from the task record
+   - Does NOT interpolate tags before sending (sends raw message body)
+
+=== PLAN ===
+
+STEP 1: Create shared/messageTags.ts - central tag definitions
+- CRM_MESSAGE_TAGS: all tags for CRM context (deals)
+- CONTACT_MESSAGE_TAGS: tags for contact context
+- New tags: {nome_oportunidade}, {produto_principal}
+
+STEP 2: Add waMessageTemplate column to taskAutomations table
+- When taskType is "whatsapp", this field stores the message template with tags
+
+STEP 3: Update executeTaskAutomations in crmDb.ts:
+- When automation has taskType "whatsapp" AND waMessageTemplate:
+  - Create a whatsapp_scheduled_send task instead of regular task
+  - Interpolate tags with deal data
+  - Set waMessageBody, waContactId, waScheduledAt, waStatus
+
+STEP 4: Create central interpolation function in shared or server:
+- interpolateDealMessageTags(template, dealData) 
+- Handles all existing tags + {nome_oportunidade} + {produto_principal}
+- {produto_principal} = name of highest-value product attached to deal
+
+STEP 5: Update all frontend tag lists to use shared constant
+- Contacts.tsx, Deals.tsx, Pipeline.tsx
+- TaskAutomationSettings.tsx (add message template field when type=whatsapp)
+
+STEP 6: Update existing interpolation functions to include new tags

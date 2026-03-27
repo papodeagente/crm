@@ -120,6 +120,13 @@
       "when": 1774635584081,
       "tag": "0071_cooing_gargoyle",
       "breakpoints": true
+    },
+    {
+      "idx": 72,
+      "version": "5",
+      "when": 1774637882557,
+      "tag": "0072_closed_james_howlett",
+      "breakpoints": true
     }
   ]
 }

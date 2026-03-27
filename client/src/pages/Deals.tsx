@@ -119,6 +119,8 @@ export default function Deals() {
     { var: "{valor}", desc: "Valor da negociação" },
     { var: "{etapa}", desc: "Etapa atual do funil" },
     { var: "{empresa}", desc: "Empresa do contato" },
+    { var: "{nome_oportunidade}", desc: "Nome/título da oportunidade (deal)" },
+    { var: "{produto_principal}", desc: "Produto de maior valor vinculado" },
   ];
   const dealPreviewReplacements: Record<string, string> = {
     "{nome}": "João da Silva",
@@ -129,6 +131,8 @@ export default function Deals() {
     "{valor}": "R$ 5.000,00",
     "{etapa}": "Cotação",
     "{empresa}": "Viagens ABC",
+    "{nome_oportunidade}": "Pacote Europa 2026",
+    "{produto_principal}": "Passagem Aérea Europa",
   };
 
   const defaultPipeline = pipelines.data?.[0];

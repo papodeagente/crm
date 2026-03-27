@@ -120,6 +120,8 @@ export default function Pipeline() {
     { var: "{valor}", desc: "Valor da negociação" },
     { var: "{etapa}", desc: "Etapa do funil" },
     { var: "{empresa}", desc: "Empresa do contato" },
+    { var: "{nome_oportunidade}", desc: "Nome/título da oportunidade (deal)" },
+    { var: "{produto_principal}", desc: "Produto de maior valor vinculado" },
   ];
   const dealPreviewReplacements: Record<string, string> = {
     "{nome}": "João da Silva",
@@ -130,6 +132,8 @@ export default function Pipeline() {
     "{valor}": "R$ 5.000,00",
     "{etapa}": "Proposta Enviada",
     "{empresa}": "Viagens ABC",
+    "{nome_oportunidade}": "Pacote Cancún",
+    "{produto_principal}": "Passagem Aérea Cancún",
   };
 
   // Listen for sale celebration events from DealDrawer

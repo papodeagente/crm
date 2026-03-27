@@ -11,11 +11,14 @@ import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { useTenantId } from "@/hooks/useTenantId";
+import { Textarea } from "@/components/ui/textarea";
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import {
   ArrowLeft, Plus, Pencil, Trash2, Zap, Clock,
   MessageCircle, Phone, Mail, Video, CheckSquare,
-  CalendarDays, Plane, RotateCcw, GripVertical,
+  CalendarDays, Plane, RotateCcw, GripVertical, Info,
 } from "lucide-react";
+import { CRM_DEAL_MESSAGE_TAGS, previewMessage } from "../../../shared/messageTags";
 
 const TASK_TYPE_OPTIONS = [
   { value: "whatsapp", label: "WhatsApp", icon: MessageCircle, color: "text-green-600" },
@@ -41,6 +44,7 @@ interface AutomationFormData {
   deadlineOffsetUnit: "minutes" | "hours" | "days";
   deadlineTime: string;
   assignToOwner: boolean;
+  waMessageTemplate: string;
   isActive: boolean;
 }
 
@@ -60,6 +64,7 @@ const defaultFormData: AutomationFormData = {
   deadlineOffsetUnit: "days",
   deadlineTime: "09:00",
   assignToOwner: true,
+  waMessageTemplate: "",
   isActive: true,
 };
 
@@ -158,6 +163,7 @@ export default function TaskAutomationSettings() {
       deadlineOffsetUnit: auto.deadlineOffsetUnit || "days",
       deadlineTime: auto.deadlineTime || "09:00",
       assignToOwner: auto.assignToOwner ?? true,
+      waMessageTemplate: auto.waMessageTemplate || "",
       isActive: auto.isActive ?? true,
     });
     setShowForm(true);
@@ -174,6 +180,10 @@ export default function TaskAutomationSettings() {
       return;
     }
 
+    const waTemplate = formData.taskType === "whatsapp" && formData.waMessageTemplate.trim()
+      ? formData.waMessageTemplate.trim()
+      : null;
+
     if (editingId) {
       updateMut.mutate({
         id: editingId, pipelineId: selectedPipelineId,
@@ -181,12 +191,14 @@ export default function TaskAutomationSettings() {
         taskType: formData.taskType as any,
         deadlineReference: formData.deadlineReference as any,
         taskDescription: formData.taskDescription || null,
+        waMessageTemplate: waTemplate,
       });
     } else {
       createMut.mutate({ pipelineId: selectedPipelineId,
         ...formData,
         taskType: formData.taskType as any,
         deadlineReference: formData.deadlineReference as any,
+        waMessageTemplate: waTemplate,
       });
     }
   }
@@ -324,6 +336,7 @@ export default function TaskAutomationSettings() {
                               <p className="text-xs text-muted-foreground">
                                 {getDeadlineLabel(auto.deadlineReference, auto.deadlineOffsetDays, auto.deadlineOffsetUnit)} {(auto.deadlineOffsetUnit || "days") === "days" ? `· às ${auto.deadlineTime || "09:00"}` : ""}
                                 {auto.assignToOwner && " · Atribuir ao responsável"}
+                                {auto.taskType === "whatsapp" && auto.waMessageTemplate && " · 📨 Envio automático"}
                               </p>
                             </div>
                             <div className="flex items-center gap-2 shrink-0">
@@ -420,6 +433,59 @@ export default function TaskAutomationSettings() {
                 </SelectContent>
               </Select>
             </div>
+
+            {/* WhatsApp Message Template (shown only when taskType is whatsapp) */}
+            {formData.taskType === "whatsapp" && (
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Label className="text-sm font-medium">Mensagem WhatsApp</Label>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent side="right" className="max-w-xs">
+                        <p className="text-xs">Se preenchida, a mensagem será enviada automaticamente via WhatsApp ao contato da negociação. Caso contrário, será criada apenas uma tarefa.</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </div>
+                <Textarea
+                  className="min-h-[100px] text-sm"
+                  value={formData.waMessageTemplate}
+                  onChange={(e) => setFormData({ ...formData, waMessageTemplate: e.target.value })}
+                  placeholder={`Olá {primeiro_nome}, tudo bem? \nSua negociação {negociacao} avançou para uma nova etapa!`}
+                />
+                {/* Tags disponíveis */}
+                <div className="flex flex-wrap gap-1.5">
+                  {CRM_DEAL_MESSAGE_TAGS.map((tag) => (
+                    <button
+                      key={tag.var}
+                      type="button"
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-muted text-xs text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors cursor-pointer"
+                      title={tag.desc}
+                      onClick={() => {
+                        setFormData((prev) => ({
+                          ...prev,
+                          waMessageTemplate: prev.waMessageTemplate + tag.var,
+                        }));
+                      }}
+                    >
+                      {tag.var}
+                    </button>
+                  ))}
+                </div>
+                {/* Preview */}
+                {formData.waMessageTemplate.trim() && (
+                  <div className="rounded-lg border bg-muted/30 p-3">
+                    <p className="text-xs font-medium text-muted-foreground mb-1">Pré-visualização:</p>
+                    <p className="text-sm whitespace-pre-wrap">
+                      {previewMessage(formData.waMessageTemplate, CRM_DEAL_MESSAGE_TAGS)}
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Deadline Reference */}
             <div>
