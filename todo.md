@@ -5518,3 +5518,19 @@
 - [x] Testes vitest: criação de pipeline por tipo, bloqueio de personalizado (21 testes passando)
 - [x] Testes vitest: relatórios filtrados por tipo de pipeline
 - [x] Testes vitest: isolamento multi-tenant nos relatórios
+
+## Melhoria Contextual: Botões de Negociação + Indicadores por Tipo de Funil (Mar 27)
+
+### Botões contextuais no card/detalhe da negociação
+- [x] Vendas: manter "Marcar perda" / "Marcar venda" (sem alteração)
+- [x] Pós-venda: alterar texto para "Viagem cancelada" / "Viagem finalizada"
+- [x] Suporte: alterar texto para "Não resolvido" / "Resolvido"
+- [x] Não alterar lógica interna dos botões (handlers, endpoints, status)
+
+### Indicadores nos dashboards
+- [x] Dashboard pós-venda: adicionar indicador "Viagens canceladas" (deals lost no funil pós-venda)
+- [x] Dashboard suporte: adicionar indicador "Não resolvido" (deals lost no funil suporte)
+
+### Testes
+- [x] Testes vitest: labels contextuais por tipo de funil (33 testes passando)
+- [x] Validar que funil de vendas não é afetado

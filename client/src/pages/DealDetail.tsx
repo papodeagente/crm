@@ -450,7 +450,9 @@ export default function DealDetail() {
                     }`}
                     variant="outline"
                   >
-                    {deal.status === "won" ? "GANHA" : "PERDIDA"}
+                    {deal.status === "won"
+                      ? (pipeline?.pipelineType === "post_sale" ? "FINALIZADA" : pipeline?.pipelineType === "support" ? "RESOLVIDO" : "GANHA")
+                      : (pipeline?.pipelineType === "post_sale" ? "CANCELADA" : pipeline?.pipelineType === "support" ? "NÃO RESOLVIDO" : "PERDIDA")}
                   </Badge>
                 )}
               </div>
@@ -467,7 +469,7 @@ export default function DealDetail() {
                   onClick={() => setShowLostDialog(true)}
                 >
                   <ThumbsDown className="h-4 w-4" />
-                  <span className="hidden sm:inline">Marcar perda</span>
+                  <span className="hidden sm:inline">{pipeline?.pipelineType === "post_sale" ? "Viagem cancelada" : pipeline?.pipelineType === "support" ? "Não resolvido" : "Marcar perda"}</span>
                 </Button>
                 <Button
                   size="sm"
@@ -475,7 +477,7 @@ export default function DealDetail() {
                   onClick={() => setShowWonDialog(true)}
                 >
                   <ThumbsUp className="h-4 w-4" />
-                  <span className="hidden sm:inline">Marcar venda</span>
+                  <span className="hidden sm:inline">{pipeline?.pipelineType === "post_sale" ? "Viagem finalizada" : pipeline?.pipelineType === "support" ? "Resolvido" : "Marcar venda"}</span>
                 </Button>
               </>
             )}
@@ -1441,16 +1443,20 @@ export default function DealDetail() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <ThumbsUp className="h-5 w-5 text-emerald-500" />
-              Marcar como venda
+              {pipeline?.pipelineType === "post_sale" ? "Finalizar viagem" : pipeline?.pipelineType === "support" ? "Marcar como resolvido" : "Marcar como venda"}
             </DialogTitle>
           </DialogHeader>
           <p className="text-sm text-muted-foreground">
-            Tem certeza que deseja marcar a negociação <strong>"{deal.title}"</strong> como ganha?
+            {pipeline?.pipelineType === "post_sale"
+              ? <>Tem certeza que deseja finalizar a viagem <strong>"{deal.title}"</strong>?</>
+              : pipeline?.pipelineType === "support"
+              ? <>Tem certeza que deseja marcar <strong>"{deal.title}"</strong> como resolvido?</>
+              : <>Tem certeza que deseja marcar a negociação <strong>"{deal.title}"</strong> como ganha?</>}
           </p>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setShowWonDialog(false)}>Cancelar</Button>
             <Button className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={handleMarkWon}>
-              Confirmar venda
+              {pipeline?.pipelineType === "post_sale" ? "Confirmar finalização" : pipeline?.pipelineType === "support" ? "Confirmar resolução" : "Confirmar venda"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1473,12 +1479,12 @@ export default function DealDetail() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <ThumbsDown className="h-5 w-5 text-red-500" />
-              Marcar como perda
+              {pipeline?.pipelineType === "post_sale" ? "Cancelar viagem" : pipeline?.pipelineType === "support" ? "Marcar como não resolvido" : "Marcar como perda"}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label className="text-sm font-medium">Motivo da perda <span className="text-red-500">*</span></Label>
+              <Label className="text-sm font-medium">{pipeline?.pipelineType === "post_sale" ? "Motivo do cancelamento" : pipeline?.pipelineType === "support" ? "Motivo" : "Motivo da perda"} <span className="text-red-500">*</span></Label>
               {lossReasonsList.length === 0 ? (
                 <p className="text-sm text-muted-foreground">Nenhum motivo cadastrado. Cadastre motivos em Configurações &gt; Comercial &gt; Motivos de Perda.</p>
               ) : (
@@ -1517,7 +1523,7 @@ export default function DealDetail() {
               <Textarea
                 value={lostReason}
                 onChange={(e) => setLostReason(e.target.value)}
-                placeholder="Detalhes adicionais sobre a perda..."
+                placeholder={pipeline?.pipelineType === "post_sale" ? "Detalhes adicionais sobre o cancelamento..." : pipeline?.pipelineType === "support" ? "Detalhes adicionais..." : "Detalhes adicionais sobre a perda..."}
                 className="min-h-[70px]"
               />
             </div>
@@ -1529,7 +1535,7 @@ export default function DealDetail() {
               onClick={handleMarkLost}
               disabled={!selectedLossReasonId}
             >
-              Confirmar perda
+              {pipeline?.pipelineType === "post_sale" ? "Confirmar cancelamento" : pipeline?.pipelineType === "support" ? "Confirmar" : "Confirmar perda"}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -92,7 +92,15 @@ export default function PostSaleReport() {
         icon: UserCheck,
         color: "text-green-500",
         bg: "bg-green-500/10",
-        subtitle: `${summary.lostDeals} canceladas`,
+        subtitle: `${((summary.wonDeals / (summary.wonDeals + summary.lostDeals || 1)) * 100).toFixed(0)}% de conclusão`,
+      },
+      {
+        label: "Viagens canceladas",
+        value: summary.lostDeals,
+        icon: Package,
+        color: "text-red-500",
+        bg: "bg-red-500/10",
+        subtitle: summary.lostValueCents > 0 ? `${formatCompact(summary.lostValueCents)} em valor` : "Nenhuma no período",
       },
     ];
   }, [summary]);

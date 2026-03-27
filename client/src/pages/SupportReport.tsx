@@ -8,7 +8,7 @@ import {
 } from "@/components/ui/select";
 import {
   LifeBuoy, ArrowLeft, Briefcase, Users as UsersIcon, DollarSign,
-  AlertTriangle, TrendingUp, Loader2, UserCheck, UserPlus, Filter,
+  AlertTriangle, TrendingUp, Loader2, UserCheck, UserPlus, Filter, XCircle,
 } from "lucide-react";
 import DateRangeFilter, { useDateFilter } from "@/components/DateRangeFilter";
 import {
@@ -91,7 +91,15 @@ export default function SupportReport() {
         icon: UserCheck,
         color: "text-green-500",
         bg: "bg-green-500/10",
-        subtitle: `${summary.lostDeals} encerrados sem resolução`,
+        subtitle: `${((summary.wonDeals / (summary.wonDeals + summary.lostDeals || 1)) * 100).toFixed(0)}% de resolução`,
+      },
+      {
+        label: "Não resolvido",
+        value: summary.lostDeals,
+        icon: XCircle,
+        color: "text-red-500",
+        bg: "bg-red-500/10",
+        subtitle: summary.lostValueCents > 0 ? `${formatCompact(summary.lostValueCents)} em valor` : "Nenhum no período",
       },
     ];
   }, [summary]);
