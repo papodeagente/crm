@@ -10,6 +10,7 @@ import {
   Import, BarChart3, Radio, ShieldCheck, X,
   CheckCircle2, Circle, Eye, ArrowRight,
   Filter, User, UsersRound, Building2, ChevronDown,
+  Brain, Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -269,6 +270,91 @@ const FILTER_ICONS: Record<FilterType, any> = {
   user: User,
   team: Building2,
 };
+
+/* ─── AI Forecast Button (inside forecast card) ─── */
+function AiForecastButton() {
+  const [open, setOpen] = useState(false);
+  const [enabled, setEnabled] = useState(false);
+
+  const forecastQ = trpc.home.aiForecast.useQuery(undefined, {
+    enabled,
+    staleTime: 5 * 60_000,
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
+
+  const handleClick = () => {
+    setOpen(true);
+    setEnabled(true);
+  };
+
+  const handleRefresh = () => {
+    forecastQ.refetch();
+  };
+
+  const aiText = forecastQ.data?.available
+    ? (typeof forecastQ.data.forecast === "string" ? forecastQ.data.forecast : JSON.stringify(forecastQ.data.forecast, null, 2))
+    : forecastQ.data?.error || null;
+
+  const noAiConfigured = forecastQ.error?.message === "NO_AI_CONFIGURED" || (!forecastQ.data?.available && forecastQ.data?.error);
+
+  return (
+    <>
+      <button
+        onClick={handleClick}
+        className="mt-2 flex items-center gap-1 text-[10px] text-primary hover:text-primary/80 font-semibold transition-colors"
+      >
+        <Brain className="h-3 w-3" />
+        Previsão inteligente
+      </button>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Brain className="h-5 w-5 text-primary" />
+              Previsão Inteligente com IA
+            </DialogTitle>
+            <DialogDescription>
+              Análise preditiva baseada nos seus dados de vendas do mês atual
+            </DialogDescription>
+          </DialogHeader>
+          <div className="mt-2">
+            {forecastQ.isLoading || forecastQ.isFetching ? (
+              <div className="flex items-center justify-center py-8 gap-2 text-muted-foreground">
+                <Loader2 className="h-5 w-5 animate-spin" />
+                <span className="text-sm">Analisando dados...</span>
+              </div>
+            ) : noAiConfigured ? (
+              <div className="text-sm text-muted-foreground bg-muted/30 rounded-xl p-4">
+                Configure uma integração de IA em Configurações &gt; Avançado &gt; Integrações para usar a previsão inteligente.
+              </div>
+            ) : forecastQ.error ? (
+              <div className="text-sm text-destructive bg-destructive/5 rounded-xl p-4">
+                Erro: {forecastQ.error.message}
+              </div>
+            ) : aiText ? (
+              <div className="text-sm text-foreground whitespace-pre-wrap leading-relaxed bg-muted/30 rounded-xl p-4 max-h-[400px] overflow-y-auto">
+                {aiText}
+              </div>
+            ) : null}
+          </div>
+          {forecastQ.data && !forecastQ.isLoading && !forecastQ.isFetching && (
+            <div className="flex justify-end mt-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleRefresh}
+              >
+                <Sparkles className="h-3.5 w-3.5 mr-1.5" />
+                Gerar nova análise
+              </Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
 
 /* ═══════════════════════════════════════════════════════════════
    MAIN HOME COMP
@@ -648,6 +734,8 @@ export default function Home() {
             <p className="text-[10px] text-muted-foreground mt-1.5">
               {exec ? `${formatCurrency(exec.wonValueCents)} vendido + projeção` : "fechamento do mês"}
             </p>
+            {/* AI Forecast button */}
+            <AiForecastButton />
           </div>
         </div>
       </section>

@@ -1,7 +1,7 @@
 import { eq, desc, and, or, like, lt, gt, isNotNull, sql, inArray } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 
-import { InsertUser, users, whatsappSessions, waMessages as messages, activityLogs, chatbotSettings, chatbotRules, conversationAssignments, crmUsers, teams, teamMembers, distributionRules, customFields, customFieldValues, waConversations, userPreferences, sessionShares, conversationEvents, internalNotes, quickReplies, waContacts, aiIntegrations, tenants, conversationLocks, waReactions } from "../drizzle/schema";
+import { InsertUser, users, whatsappSessions, waMessages as messages, activityLogs, chatbotSettings, chatbotRules, conversationAssignments, crmUsers, teams, teamMembers, distributionRules, customFields, customFieldValues, waConversations, userPreferences, sessionShares, conversationEvents, internalNotes, quickReplies, waContacts, aiIntegrations, aiTrainingConfigs, tenants, conversationLocks, waReactions } from "../drizzle/schema";
 import { ENV } from './_core/env';
 import { normalizeJid } from "./phoneUtils";
 
@@ -3460,4 +3460,230 @@ export async function getConversationLock(
     .limit(1);
 
   return lock ? { agentId: lock.agentId, agentName: lock.agentName, expiresAt: lock.expiresAt } : null;
+}
+
+
+// ════════════════════════════════════════════════════════════
+// AI TRAINING CONFIGS — CRUD helpers
+// ════════════════════════════════════════════════════════════
+
+export type AiConfigType = "suggestion" | "summary" | "analysis";
+
+export async function getAiTrainingConfig(tenantId: number, configType: AiConfigType) {
+  const db = await getDb();
+  if (!db) return null;
+  const rows = await db.select().from(aiTrainingConfigs)
+    .where(and(eq(aiTrainingConfigs.tenantId, tenantId), eq(aiTrainingConfigs.configType, configType)))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+export async function listAiTrainingConfigs(tenantId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(aiTrainingConfigs)
+    .where(eq(aiTrainingConfigs.tenantId, tenantId))
+    .orderBy(aiTrainingConfigs.configType);
+}
+
+export async function upsertAiTrainingConfig(data: {
+  tenantId: number;
+  configType: AiConfigType;
+  instructions: string;
+  updatedBy: number;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  // Check if exists
+  const existing = await getAiTrainingConfig(data.tenantId, data.configType);
+  if (existing) {
+    await db.update(aiTrainingConfigs)
+      .set({ instructions: data.instructions, updatedBy: data.updatedBy })
+      .where(and(eq(aiTrainingConfigs.tenantId, data.tenantId), eq(aiTrainingConfigs.configType, data.configType)));
+    return { id: existing.id, updated: true };
+  } else {
+    const result = await db.insert(aiTrainingConfigs).values({
+      tenantId: data.tenantId,
+      configType: data.configType,
+      instructions: data.instructions,
+      updatedBy: data.updatedBy,
+    });
+    return { id: Number(result[0].insertId), updated: false };
+  }
+}
+
+export async function deleteAiTrainingConfig(tenantId: number, configType: AiConfigType) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.delete(aiTrainingConfigs)
+    .where(and(eq(aiTrainingConfigs.tenantId, tenantId), eq(aiTrainingConfigs.configType, configType)));
+}
+
+// ════════════════════════════════════════════════════════════
+// CENTRALIZED AI CALL — Uses tenant's configured provider
+// ════════════════════════════════════════════════════════════
+
+export interface TenantAiCallOptions {
+  tenantId: number;
+  messages: Array<{ role: "system" | "user" | "assistant"; content: string }>;
+  maxTokens?: number;
+  /** Optional JSON schema for structured responses */
+  responseFormat?: {
+    type: "json_schema";
+    json_schema: {
+      name: string;
+      strict: boolean;
+      schema: Record<string, unknown>;
+    };
+  };
+}
+
+export interface TenantAiCallResult {
+  content: string;
+  provider: string;
+  model: string;
+}
+
+/**
+ * Centralized function to call AI using the tenant's configured provider.
+ * This replaces all direct invokeLLM calls for tenant-facing AI features.
+ * Falls back gracefully if no integration is configured.
+ */
+export async function callTenantAi(opts: TenantAiCallOptions): Promise<TenantAiCallResult> {
+  const integration = await getAnyActiveAiIntegration(opts.tenantId);
+  if (!integration) {
+    throw new Error("NO_AI_CONFIGURED");
+  }
+
+  const settings = await getTenantAiSettings(opts.tenantId);
+  const model = settings.defaultAiModel || integration.defaultModel;
+
+  if (integration.provider === "openai") {
+    return callOpenAiForTenant(integration.apiKey, model, opts);
+  } else {
+    return callAnthropicForTenant(integration.apiKey, model, opts);
+  }
+}
+
+async function callOpenAiForTenant(
+  apiKey: string,
+  model: string,
+  opts: TenantAiCallOptions,
+): Promise<TenantAiCallResult> {
+  const isReasoningModel = model.startsWith("gpt-5") || model.startsWith("o4") || model.startsWith("o3");
+  const systemRole = isReasoningModel ? "developer" : "system";
+  const tokenParam = isReasoningModel
+    ? { max_completion_tokens: opts.maxTokens ?? 1024 }
+    : { max_tokens: opts.maxTokens ?? 1024 };
+
+  const formattedMessages = opts.messages.map(m => ({
+    role: m.role === "system" ? systemRole : m.role,
+    content: m.content,
+  }));
+
+  const requestBody: Record<string, unknown> = {
+    model,
+    messages: formattedMessages,
+    ...tokenParam,
+  };
+
+  if (isReasoningModel) {
+    requestBody.reasoning_effort = "low";
+  }
+
+  if (opts.responseFormat) {
+    requestBody.response_format = opts.responseFormat;
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 60000);
+
+  try {
+    const res = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify(requestBody),
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body?.error?.message || `OpenAI API error: HTTP ${res.status}`);
+    }
+
+    const data = await res.json();
+    return {
+      content: data.choices?.[0]?.message?.content || "",
+      provider: "openai",
+      model: data.model || model,
+    };
+  } catch (err: any) {
+    clearTimeout(timeout);
+    if (err.name === "AbortError") {
+      throw new Error(`O modelo ${model} demorou demais para responder (timeout 60s).`);
+    }
+    throw err;
+  }
+}
+
+async function callAnthropicForTenant(
+  apiKey: string,
+  model: string,
+  opts: TenantAiCallOptions,
+): Promise<TenantAiCallResult> {
+  const systemMsg = opts.messages.find(m => m.role === "system");
+  const nonSystemMsgs = opts.messages.filter(m => m.role !== "system");
+
+  const body: Record<string, unknown> = {
+    model,
+    messages: nonSystemMsgs.map(m => ({ role: m.role, content: m.content })),
+    max_tokens: opts.maxTokens ?? 1024,
+  };
+
+  if (systemMsg) {
+    body.system = systemMsg.content;
+  }
+
+  // Anthropic doesn't support json_schema natively, but we can ask for JSON in the prompt
+  // The response_format hint is handled by the system prompt
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 60000);
+
+  try {
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+
+    if (!res.ok) {
+      const errBody = await res.json().catch(() => ({}));
+      throw new Error(errBody?.error?.message || `Anthropic API error: HTTP ${res.status}`);
+    }
+
+    const data = await res.json();
+    return {
+      content: data.content?.[0]?.text || "",
+      provider: "anthropic",
+      model: data.model || model,
+    };
+  } catch (err: any) {
+    clearTimeout(timeout);
+    if (err.name === "AbortError") {
+      throw new Error(`O modelo ${model} demorou demais para responder (timeout 60s).`);
+    }
+    throw err;
+  }
 }

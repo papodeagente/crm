@@ -1,7 +1,6 @@
 import { z } from "zod";
 import { router, tenantProcedure, getTenantId } from "../_core/trpc";
 import { TRPCError } from "@trpc/server";
-import { invokeLLM } from "../_core/llm";
 import {
   getLatestAnalysis,
   getAnalysisHistory,
@@ -10,7 +9,10 @@ import {
   countWhatsAppMessagesByDeal,
   getDealById,
   getContactById,
+  listDealHistory,
+  listTasks,
 } from "../crmDb";
+import { callTenantAi, getAiTrainingConfig } from "../db";
 
 export const aiAnalysisRouter = router({
   // Get latest analysis for a deal
@@ -29,7 +31,7 @@ export const aiAnalysisRouter = router({
       return getAnalysisHistory(tenantId, input.dealId);
     }),
 
-  // Analyze conversation with AI
+  // Analyze conversation with AI — now uses tenant's AI provider + deal history
   analyze: tenantProcedure
     .input(z.object({
       dealId: z.number(),
@@ -56,7 +58,7 @@ export const aiAnalysisRouter = router({
         throw new TRPCError({ code: "NOT_FOUND", message: "Negociação não encontrada" });
       }
 
-      // Get message count (note: params are dealId, tenantId)
+      // Get message count
       const msgCount = await countWhatsAppMessagesByDeal(input.dealId, tenantId);
       if (msgCount === 0) {
         throw new TRPCError({
@@ -65,20 +67,55 @@ export const aiAnalysisRouter = router({
         });
       }
 
-      // Get messages (note: params are dealId, tenantId, opts)
-      const result = await getWhatsAppMessagesByDeal(input.dealId, tenantId, { limit: 200 });
-      const messages = result.messages || [];
+      // Get messages
+      const msgResult = await getWhatsAppMessagesByDeal(input.dealId, tenantId, { limit: 200 });
+      const messages = msgResult.messages || [];
 
       // Get contact info
       let contactName = "Contato";
-      if (result.contact?.name) {
-        contactName = result.contact.name;
+      if (msgResult.contact?.name) {
+        contactName = msgResult.contact.name;
       } else if (deal.contactId) {
         const contact = await getContactById(tenantId, deal.contactId);
         if (contact) contactName = contact.name;
       }
 
-      // Format messages for LLM (already in chronological order from the query)
+      // ─── NEW: Get deal history (stage changes, field edits, etc.) ───
+      const historyEntries = await listDealHistory(tenantId, input.dealId);
+      const historyContext = historyEntries.length > 0
+        ? historyEntries.slice(0, 50).map((h: any) => {
+            const date = h.createdAt
+              ? new Date(h.createdAt).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })
+              : "data desconhecida";
+            let line = `[${date}] ${h.action}`;
+            if (h.fromStageName && h.toStageName) {
+              line += ` — De "${h.fromStageName}" para "${h.toStageName}"`;
+            }
+            if (h.fieldChanged) {
+              line += ` — Campo: ${h.fieldChanged}`;
+              if (h.oldValue) line += ` (de: ${h.oldValue})`;
+              if (h.newValue) line += ` (para: ${h.newValue})`;
+            }
+            if (h.description && !h.fromStageName) {
+              line += ` — ${h.description}`;
+            }
+            if (h.actorName) line += ` [por ${h.actorName}]`;
+            return line;
+          }).join("\n")
+        : "Nenhum histórico de movimentação registrado.";
+
+      // ─── NEW: Get deal tasks ───
+      const tasksResult = await listTasks(tenantId, { entityType: "deal", entityId: input.dealId, limit: 30 });
+      const tasksContext = tasksResult.tasks.length > 0
+        ? tasksResult.tasks.map((t: any) => {
+            const dueDate = t.dueDate
+              ? new Date(t.dueDate).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", dateStyle: "short" })
+              : "sem prazo";
+            return `- [${t.status}] ${t.title || t.taskType} — Prazo: ${dueDate}`;
+          }).join("\n")
+        : "Nenhuma tarefa registrada.";
+
+      // Format messages for LLM
       const formattedMessages = messages
         .map((msg: any) => {
           const time = msg.timestamp
@@ -90,9 +127,14 @@ export const aiAnalysisRouter = router({
         })
         .join("\n");
 
-      // Build the analysis prompt
+      // ─── NEW: Get custom training instructions ───
+      const trainingConfig = await getAiTrainingConfig(tenantId, "analysis");
+      const customInstructions = trainingConfig?.instructions || "";
+
+      // Build the analysis prompt with full context
       const systemPrompt = `Você é um especialista em análise de atendimento ao cliente para agências de turismo. 
 Analise a conversa WhatsApp abaixo entre um AGENTE (vendedor) e um CONTATO (cliente potencial).
+Você também receberá o HISTÓRICO COMPLETO da negociação (movimentações de etapa, alterações de campos, etc.) e as TAREFAS associadas.
 
 Avalie os seguintes critérios de 0 a 100:
 1. **Tom e Empatia** (toneScore): O agente foi cordial, empático e profissional?
@@ -101,14 +143,19 @@ Avalie os seguintes critérios de 0 a 100:
 4. **Fechamento** (closingScore): O agente conduziu bem a negociação para o fechamento? Usou técnicas de venda?
 
 Forneça também:
-- Um resumo geral do atendimento (2-3 frases)
+- Um resumo geral do atendimento (2-3 frases) considerando TODO o contexto (mensagens + histórico + tarefas)
 - Lista de pontos fortes (máximo 5)
 - Lista de pontos de melhoria (máximo 5)
 - Lista de sugestões acionáveis e específicas (máximo 5)
 - Lista de oportunidades perdidas durante a conversa (máximo 3)
 - Tempo médio estimado de resposta do agente
 
-IMPORTANTE: Responda EXCLUSIVAMENTE em português brasileiro. Seja específico e prático nas sugestões.
+IMPORTANTE: 
+- Responda EXCLUSIVAMENTE em português brasileiro
+- Seja específico e prático nas sugestões
+- Considere o histórico de movimentações para entender o ciclo de vida da negociação
+- Considere as tarefas para avaliar se o acompanhamento está adequado
+${customInstructions ? `\n--- INSTRUÇÕES PERSONALIZADAS DO GESTOR ---\n${customInstructions}` : ""}
 
 Responda no formato JSON conforme o schema fornecido.`;
 
@@ -118,17 +165,24 @@ Responda no formato JSON conforme o schema fornecido.`;
 - **Status**: ${deal.status}
 - **Contato**: ${contactName}
 
-## Conversa WhatsApp (${messages.length} mensagens)
+## Histórico de Movimentações (${historyEntries.length} eventos)
+${historyContext}
 
+## Tarefas da Negociação (${tasksResult.tasks.length} tarefas)
+${tasksContext}
+
+## Conversa WhatsApp (${messages.length} mensagens)
 ${formattedMessages}`;
 
       try {
-        const llmResponse = await invokeLLM({
+        const aiResult = await callTenantAi({
+          tenantId,
           messages: [
             { role: "system", content: systemPrompt },
             { role: "user", content: userPrompt },
           ],
-          response_format: {
+          maxTokens: 1200,
+          responseFormat: {
             type: "json_schema",
             json_schema: {
               name: "conversation_analysis",
@@ -175,13 +229,7 @@ ${formattedMessages}`;
           },
         });
 
-        const rawContent = llmResponse.choices?.[0]?.message?.content;
-        if (!rawContent) {
-          throw new Error("LLM retornou resposta vazia");
-        }
-        const content = typeof rawContent === "string" ? rawContent : JSON.stringify(rawContent);
-
-        const analysis = JSON.parse(content);
+        const analysis = JSON.parse(aiResult.content);
 
         // Save to database
         const saved = await saveAnalysis({
@@ -201,14 +249,20 @@ ${formattedMessages}`;
           missedOpportunities: analysis.missedOpportunities,
           responseTimeAvg: analysis.responseTimeAvg,
           messagesAnalyzed: messages.length,
-          rawAnalysis: content as string,
+          rawAnalysis: aiResult.content,
         });
 
         // Fetch the saved record to return
         const result = await getLatestAnalysis(tenantId, input.dealId);
-        return { cached: false, analysis: result };
+        return { cached: false, analysis: result, provider: aiResult.provider, model: aiResult.model };
       } catch (error: any) {
         console.error("[AI Analysis] Error:", error.message);
+        if (error.message === "NO_AI_CONFIGURED") {
+          throw new TRPCError({
+            code: "PRECONDITION_FAILED",
+            message: "Nenhum provedor de IA configurado. Acesse Integrações > IA para configurar.",
+          });
+        }
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: `Erro ao analisar conversa: ${error.message}`,

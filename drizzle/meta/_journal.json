@@ -113,6 +113,13 @@
       "when": 1774617600396,
       "tag": "0070_left_pet_avengers",
       "breakpoints": true
+    },
+    {
+      "idx": 71,
+      "version": "5",
+      "when": 1774635584081,
+      "tag": "0071_cooing_gargoyle",
+      "breakpoints": true
     }
   ]
 }

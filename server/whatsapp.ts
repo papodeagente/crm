@@ -17,7 +17,8 @@ import { EventEmitter } from "events";
 import { getDb, createNotification } from "./db";
 import { whatsappSessions, waMessages as messages, activityLogs, chatbotSettings, chatbotRules, waContacts } from "../drizzle/schema";
 import { eq, desc, and, gte, sql, isNotNull } from "drizzle-orm";
-import { invokeLLM } from "./_core/llm";
+import { callTenantAi } from "./db";
+import { invokeLLM } from "./_core/llm"; // kept as fallback for chatbot if no tenant AI
 // notifyOwner desativado — todas as notificações são apenas in-app
 import { storagePut } from "./storage";
 import { nanoid } from "nanoid";
@@ -1566,16 +1567,51 @@ class WhatsAppManager extends EventEmitter {
 
       const temp = parseFloat(s.temperature?.toString() || "0.70");
 
-      const response = await invokeLLM({
-        messages: [
-          { role: "system", content: systemPrompt },
-          ...conversationHistory,
-          { role: "user", content: incomingText },
-        ],
-      });
+      // Try tenant's AI provider first, fallback to built-in LLM
+      const sessionState = this.sessions.get(sessionId);
+      const chatbotTenantId = sessionState?.tenantId ?? 0;
+      let replyText: string | null = null;
 
-      const rawContent = response.choices?.[0]?.message?.content;
-      const replyText = typeof rawContent === 'string' ? rawContent : null;
+      if (chatbotTenantId > 0) {
+        try {
+          const aiResult = await callTenantAi({
+            tenantId: chatbotTenantId,
+            messages: [
+              { role: "system", content: systemPrompt },
+              ...conversationHistory,
+              { role: "user", content: incomingText },
+            ],
+            maxTokens: 500,
+          });
+          replyText = aiResult.content || null;
+        } catch (err: any) {
+          // If no AI configured, fallback to built-in LLM
+          if (err.message === "NO_AI_CONFIGURED") {
+            console.log("[Chatbot] No tenant AI configured, using built-in LLM");
+            const response = await invokeLLM({
+              messages: [
+                { role: "system", content: systemPrompt },
+                ...conversationHistory,
+                { role: "user", content: incomingText },
+              ],
+            });
+            const rawContent = response.choices?.[0]?.message?.content;
+            replyText = typeof rawContent === 'string' ? rawContent : null;
+          } else {
+            throw err;
+          }
+        }
+      } else {
+        const response = await invokeLLM({
+          messages: [
+            { role: "system", content: systemPrompt },
+            ...conversationHistory,
+            { role: "user", content: incomingText },
+          ],
+        });
+        const rawContent = response.choices?.[0]?.message?.content;
+        replyText = typeof rawContent === 'string' ? rawContent : null;
+      }
       if (replyText) {
         const chatbotResult = await sock.sendMessage(remoteJid, { text: replyText });
 

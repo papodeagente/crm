@@ -2305,3 +2305,27 @@ export const contactMerges = mysqlTable("contact_merges", {
 ]);
 export type ContactMerge = typeof contactMerges.$inferSelect;
 export type InsertContactMerge = typeof contactMerges.$inferInsert;
+
+
+// ════════════════════════════════════════════════════════════
+// AI TRAINING CONFIGS — Per-tenant AI training/customization
+// ════════════════════════════════════════════════════════════
+export const aiTrainingConfigs = mysqlTable("ai_training_configs", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  /** Which AI feature this config applies to */
+  configType: mysqlEnum("configType", ["suggestion", "summary", "analysis"]).notNull(),
+  /** Custom system prompt / training instructions */
+  instructions: text("instructions"),
+  /** Whether this training config is active */
+  isActive: boolean("isActive").default(true).notNull(),
+  /** Who last updated */
+  updatedBy: int("updatedBy"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (t) => [
+  index("aitc_tenant_idx").on(t.tenantId),
+  index("aitc_tenant_type_idx").on(t.tenantId, t.configType),
+]);
+export type AiTrainingConfig = typeof aiTrainingConfigs.$inferSelect;
+export type InsertAiTrainingConfig = typeof aiTrainingConfigs.$inferInsert;

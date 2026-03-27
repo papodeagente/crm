@@ -95,6 +95,7 @@ const settingsCategories: SettingsCategory[] = [
     title: "AVANÇADO",
     links: [
       { icon: Plug, label: "Integrações", path: "/integrations", adminOnly: true },
+      { icon: Sparkles, label: "Treinamento de IA", path: "/settings/ai-training", badge: "Novo", adminOnly: true },
       { icon: Database, label: "Importar do RD Station CRM", path: "/settings/import-rd-crm", badge: "Novo", adminOnly: true },
       { icon: Megaphone, label: "RD Station Marketing", path: "/settings/rdstation", adminOnly: true },
       { icon: BookOpen, label: "Documentação API", path: "/api-docs", adminOnly: true },

@@ -5569,3 +5569,74 @@
 - [x] Filtros existentes "Todos" e "Meu relatório" mantidos
 - [x] Fix: query SQL usava coluna 'role' inexistente, corrigido para 'crm_user_role as role'
 - [x] Testes vitest para validar filtros (14 testes passando)
+
+## Evolução IA Entur OS (Mar 27)
+
+### 1. Previsão do Mês na Home (inteligente)
+- [ ] Analisar lógica atual de previsão na Home
+- [ ] Refatorar para considerar: realizado + pipeline provável + ciclo de fechamento por usuário
+- [ ] Aplicar probabilidade de conversão baseada em histórico por responsável
+- [ ] Reduzir peso de negociações que tendem a fechar no mês seguinte
+- [ ] Exibir explicação resumida da previsão (realizado, provável, risco)
+
+### 2. Treinamento de IA em Configurações > Avançado
+- [ ] Criar tabela ai_training_config por tenant (schema + migration)
+- [ ] Criar endpoints CRUD para configurações de treinamento
+- [ ] Criar página UI em Configurações > Avançado
+- [ ] Bloco A: Treinamento de sugestão de respostas WhatsApp
+- [ ] Bloco B: Treinamento de resumo/relatório de conversa
+- [ ] Bloco C: Treinamento de análise de negociação
+
+### 3. Análise de IA na Negociação (histórico completo)
+- [ ] Analisar lógica atual de análise de IA na negociação
+- [ ] Refatorar para considerar todo o HISTÓRICO (etapas, tarefas, responsáveis, eventos)
+- [ ] Gerar relatório contextual com sinais de risco, objeções, próximos passos
+- [ ] Respeitar treinamento configurado em Configurações > Avançado
+
+### 4. Centralizar IA via Integrações
+- [ ] Analisar como IA é chamada hoje (provedor fixo? fallback oculto?)
+- [ ] Garantir que toda IA textual use exclusivamente o provedor de Integrações do tenant
+- [ ] Tratar cenário sem integração ativa: estado seguro + mensagem orientativa
+- [ ] NÃO alterar transcrição de áudio
+
+### 5. Atualizar sugestão de respostas e resumo
+- [ ] Sugestão de respostas: usar treinamento configurado
+- [ ] Resumo de conversa: usar treinamento configurado
+
+### 6. Testes
+- [ ] Testes vitest: previsão inteligente
+- [ ] Testes vitest: CRUD treinamento IA
+- [ ] Testes vitest: análise com histórico
+- [ ] Testes vitest: isolamento por tenant
+- [ ] Testes vitest: cenário sem integração ativa
+
+## Configuração de Provedores de IA — Centralização e Treinamento
+
+### Schema e Backend
+- [x] Criar tabela ai_training_configs para treinamento de IA por tenant
+- [x] DB helpers para CRUD de ai_training_configs
+- [x] Criar serviço centralizado callTenantAi() que resolve provedor do tenant
+- [x] Refatorar goalsAnalytics.ts para usar provedor do tenant (remover invokeLLM)
+- [x] Refatorar aiAnalysisRouter.ts para usar provedor do tenant (remover invokeLLM)
+- [x] Refatorar aiAnalysisRouter.ts para considerar histórico completo da negociação
+- [x] Refatorar previsão na Home para usar IA do tenant (previsão inteligente)
+- [x] Criar procedures tRPC para CRUD de ai_training_configs
+- [x] Criar procedure tRPC para previsão inteligente com IA
+
+### Frontend
+- [x] Criar página AiTrainingSettings.tsx em Configurações > Avançado
+- [x] Adicionar link na página de Settings para Treinamento de IA
+- [x] Registrar rota /settings/ai-training no App.tsx
+- [x] Atualizar Home.tsx para exibir previsão inteligente com IA
+- [x] Atualizar Análise de IA para mostrar histórico completo
+
+### Testes
+- [x] Testes Vitest para ai_training_configs CRUD
+- [x] Testes Vitest para callTenantAi centralizado
+- [x] Testes Vitest para previsão inteligente
+- [x] Testes Vitest para análise com histórico completo
+
+### Segurança e Não-Regressão
+- [x] Verificar que transcrição de áudio não foi alterada
+- [x] Verificar isolamento por tenant
+- [x] Verificar que sistema funciona sem IA configurada (estado seguro)

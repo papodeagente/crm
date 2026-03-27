@@ -128,6 +128,12 @@ import {
   getTenantAiSettings,
   updateTenantAiSettings,
   getAnyActiveAiIntegration,
+  // AI Training configs
+  getAiTrainingConfig,
+  listAiTrainingConfigs,
+  upsertAiTrainingConfig,
+  deleteAiTrainingConfig,
+  callTenantAi,
   // Conversation locks (Part 8)
   acquireConversationLock,
   releaseConversationLock,
@@ -2057,6 +2063,96 @@ export const appRouter = router({
       .mutation(async ({ ctx }) => {
         return dismissOnboarding(getTenantId(ctx), ctx.user!.id);
       }),
+    /** AI-powered intelligent forecast for the current month */
+    aiForecast: tenantProcedure
+      .input(z.object({ userId: z.number().optional(), teamId: z.number().optional() }).optional())
+      .query(async ({ ctx, input }) => {
+        const tenantId = getTenantId(ctx);
+        const isAdmin = ctx.saasUser?.role === "admin";
+        const userId = isAdmin ? input?.userId : ctx.saasUser?.userId;
+        const teamId = isAdmin ? input?.teamId : undefined;
+
+        // Get the executive data first (already has basic forecast)
+        const exec = await getHomeExecutive(tenantId, userId, teamId);
+
+        // Try to generate AI-powered forecast
+        try {
+          const trainingConfig = await getAiTrainingConfig(tenantId, "analysis");
+          const customInstructions = trainingConfig?.instructions || "";
+
+          const systemPrompt = `Você é um analista comercial sênior. Analise os dados de vendas do mês atual e gere uma previsão inteligente de fechamento.
+
+Seu papel:
+1. Calcular uma previsão conservadora, realista e otimista
+2. Considerar a taxa de conversão atual e o pipeline ativo
+3. Dar um veredicto claro sobre a saúde do mês
+4. Sugerir 2-3 ações prioritárias
+
+IMPORTANTE:
+- Responda EXCLUSIVAMENTE em português brasileiro
+- Seja direto e use números concretos
+- Considere que estamos no dia ${new Date().getDate()} do mês
+${customInstructions ? `\n--- INSTRUÇÕES PERSONALIZADAS DO GESTOR ---\n${customInstructions}` : ""}`;
+
+          const userPrompt = `## Dados do Mês Atual
+- Negociações ativas: ${exec.activeDeals}
+- Valor no pipeline: R$ ${(exec.activeValueCents / 100).toFixed(2)}
+- Negociações ganhas: ${exec.wonDeals}
+- Valor vendido: R$ ${(exec.wonValueCents / 100).toFixed(2)}
+- Negociações perdidas: ${exec.lostDeals}
+- Taxa de conversão: ${exec.conversionRate}%
+- Previsão simples (fórmula): R$ ${(exec.forecastCents / 100).toFixed(2)}
+- Negociações sem tarefa: ${exec.dealsWithoutTask}
+- Negociações esfriando: ${exec.coolingDeals}
+
+Gere a previsão inteligente no formato JSON.`;
+
+          const result = await callTenantAi({
+            tenantId,
+            messages: [
+              { role: "system", content: systemPrompt },
+              { role: "user", content: userPrompt },
+            ],
+            maxTokens: 800,
+            responseFormat: {
+              type: "json_schema",
+              json_schema: {
+                name: "ai_forecast",
+                strict: true,
+                schema: {
+                  type: "object",
+                  properties: {
+                    conservativeCents: { type: "integer", description: "Previsão conservadora em centavos" },
+                    realisticCents: { type: "integer", description: "Previsão realista em centavos" },
+                    optimisticCents: { type: "integer", description: "Previsão otimista em centavos" },
+                    verdict: { type: "string", enum: ["excellent", "good", "attention", "critical"], description: "Veredicto" },
+                    summary: { type: "string", description: "Resumo da previsão em 2-3 frases" },
+                    actions: { type: "array", items: { type: "string" }, description: "2-3 ações prioritárias" },
+                  },
+                  required: ["conservativeCents", "realisticCents", "optimisticCents", "verdict", "summary", "actions"],
+                  additionalProperties: false,
+                },
+              },
+            },
+          });
+
+          const parsed = JSON.parse(result.content);
+          return {
+            available: true,
+            provider: result.provider,
+            model: result.model,
+            forecast: parsed,
+            basicForecastCents: exec.forecastCents,
+          };
+        } catch (err: any) {
+          console.error("[Home AI Forecast] Error:", err.message);
+          return {
+            available: false,
+            error: err.message === "NO_AI_CONFIGURED" ? "no_ai" : "error",
+            basicForecastCents: exec.forecastCents,
+          };
+        }
+      }),
   }),
 
   // ─── User Preferences ───
@@ -3906,6 +4002,42 @@ REGRAS:
         }
       }),
 
+    // ── AI Training Configs CRUD ──
+    trainingConfigs: router({
+      list: tenantAdminProcedure
+        .query(async ({ ctx }) => {
+          return listAiTrainingConfigs(getTenantId(ctx));
+        }),
+
+      get: tenantAdminProcedure
+        .input(z.object({ configType: z.enum(["suggestion", "summary", "analysis"]) }))
+        .query(async ({ ctx, input }) => {
+          return getAiTrainingConfig(getTenantId(ctx), input.configType);
+        }),
+
+      upsert: tenantAdminProcedure
+        .input(z.object({
+          configType: z.enum(["suggestion", "summary", "analysis"]),
+          instructions: z.string().min(1).max(5000),
+        }))
+        .mutation(async ({ ctx, input }) => {
+          const userId = (ctx as any).user?.id ?? 0;
+          return upsertAiTrainingConfig({
+            tenantId: getTenantId(ctx),
+            configType: input.configType,
+            instructions: input.instructions,
+            updatedBy: userId,
+          });
+        }),
+
+      delete: tenantAdminProcedure
+        .input(z.object({ configType: z.enum(["suggestion", "summary", "analysis"]) }))
+        .mutation(async ({ ctx, input }) => {
+          await deleteAiTrainingConfig(getTenantId(ctx), input.configType);
+          return { success: true };
+        }),
+    }),
+
     // ── Summarize conversation with AI ──
     summarizeConversation: tenantProcedure
       .input(z.object({
@@ -3968,13 +4100,12 @@ REGRAS:
           return `[${time}] ${sender}: ${text}`;
         }).join("\n");
 
-        // Call LLM to generate summary
-        const { invokeLLM } = await import("./_core/llm");
-        const llmResponse = await invokeLLM({
-          messages: [
-            {
-              role: "system",
-              content: `Você é um assistente de atendimento ao cliente. Gere um resumo conciso da conversa de WhatsApp abaixo.
+        // Call tenant's AI provider to generate summary
+        try {
+          const summaryTraining = await getAiTrainingConfig(tenantId, "summary");
+          const customInstructions = summaryTraining?.instructions || "";
+
+          const systemContent = `Você é um assistente de atendimento ao cliente. Gere um resumo conciso da conversa de WhatsApp abaixo.
 
 O resumo deve conter:
 1. **Assunto principal** da conversa (1 linha)
@@ -3982,17 +4113,24 @@ O resumo deve conter:
 3. **Status atual** (aguardando resposta do cliente, aguardando ação do agente, resolvido, etc.)
 4. **Próximos passos** sugeridos (se houver)
 
-Seja direto e objetivo. Use português brasileiro. Máximo 200 palavras.`,
-            },
-            {
-              role: "user",
-              content: `Conversa (${messages.length} mensagens):\n\n${formatted}`,
-            },
-          ],
-        });
+Seja direto e objetivo. Use português brasileiro. Máximo 200 palavras.
+${customInstructions ? `\n--- INSTRUÇÕES PERSONALIZADAS ---\n${customInstructions}` : ""}`;
 
-        const summary = llmResponse?.choices?.[0]?.message?.content || "Não foi possível gerar o resumo.";
-        return { summary };
+          const aiResult = await callTenantAi({
+            tenantId,
+            messages: [
+              { role: "system", content: systemContent },
+              { role: "user", content: `Conversa (${messages.length} mensagens):\n\n${formatted}` },
+            ],
+            maxTokens: 500,
+          });
+          return { summary: aiResult.content || "Não foi possível gerar o resumo." };
+        } catch (err: any) {
+          if (err.message === "NO_AI_CONFIGURED") {
+            throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Nenhum provedor de IA configurado. Acesse Integrações > IA para configurar." });
+          }
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Erro ao gerar resumo: ${err.message}` });
+        }
       }),
   }),
 

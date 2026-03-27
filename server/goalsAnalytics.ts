@@ -6,7 +6,7 @@
 import { getDb } from "./db";
 import { sql, eq, and, gte, lte, desc, inArray } from "drizzle-orm";
 import { goals, deals, dealProducts, crmUsers } from "../drizzle/schema";
-import { invokeLLM } from "./_core/llm";
+import { callTenantAi, getAiTrainingConfig } from "./db";
 
 // ─── Types ───────────────────────────────────────────────────
 
@@ -339,13 +339,24 @@ ${productsContext}
 
 Gere a análise estratégica completa conforme o schema JSON.`;
 
+  // Get custom training instructions for analysis
+  const trainingConfig = await getAiTrainingConfig(tenantId, "analysis");
+  const customInstructions = trainingConfig?.instructions || "";
+
+  // Append custom instructions to system prompt if available
+  const fullSystemPrompt = customInstructions
+    ? `${systemPrompt}\n\n--- INSTRUÇÕES PERSONALIZADAS DO GESTOR ---\n${customInstructions}`
+    : systemPrompt;
+
   try {
-    const llmResponse = await invokeLLM({
+    const aiResult = await callTenantAi({
+      tenantId,
       messages: [
-        { role: "system", content: systemPrompt },
+        { role: "system", content: fullSystemPrompt },
         { role: "user", content: userPrompt },
       ],
-      response_format: {
+      maxTokens: 1500,
+      responseFormat: {
         type: "json_schema",
         json_schema: {
           name: "goals_ai_analysis",
@@ -405,12 +416,12 @@ Gere a análise estratégica completa conforme o schema JSON.`;
       },
     });
 
-    const rawContent = llmResponse.choices?.[0]?.message?.content;
-    if (!rawContent) throw new Error("LLM retornou resposta vazia");
-    const content = typeof rawContent === "string" ? rawContent : JSON.stringify(rawContent);
-    return JSON.parse(content) as AIGoalsAnalysis;
+    return JSON.parse(aiResult.content) as AIGoalsAnalysis;
   } catch (err: any) {
     console.error("[goalsAnalytics] AI Analysis error:", err.message);
+    if (err.message === "NO_AI_CONFIGURED") {
+      throw new Error("Nenhum provedor de IA configurado. Acesse Integrações > IA para configurar.");
+    }
     throw new Error(`Erro ao gerar análise IA: ${err.message}`);
   }
 }
