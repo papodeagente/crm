@@ -16,6 +16,7 @@
  */
 
 import type { WebhookPayload, WebhookEventType } from "../evolutionApi";
+import { normalizeToUnixSeconds } from "./zapiProvider";
 
 // ════════════════════════════════════════════════════════════
 // Z-API WEBHOOK PAYLOAD TYPES
@@ -287,7 +288,7 @@ export function normalizeZApiWebhook(
 
   const evoEvent = mapEventType(zapiEvent);
   const remoteJid = toRemoteJid(body.phone, body.chatId, body.isGroup);
-  const timestamp = body.momment || body.timestamp || Math.floor(Date.now() / 1000);
+  const timestamp = normalizeToUnixSeconds(body.momment || body.timestamp);
 
   switch (zapiEvent) {
     case "on-message-received": {

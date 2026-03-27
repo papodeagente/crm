@@ -18,7 +18,7 @@ import { whatsappSessions, waMessages, waConversations, waContacts, tenants, waC
 import { eq, and, sql, desc } from "drizzle-orm";
 import * as evo from "./evolutionApi";
 import { resolveInbound, updateConversationLastMessage } from "./conversationResolver";
-import { zapiProvider, getZApiSession } from "./providers/zapiProvider";
+import { zapiProvider, getZApiSession, normalizeToUnixSeconds } from "./providers/zapiProvider";
 import { storagePut } from "./storage";
 import { nanoid } from "nanoid";
 import { createNotification } from "./db";
@@ -405,7 +405,7 @@ class WhatsAppEvolutionManager extends EventEmitter {
             content: text,
             senderAgentId: senderAgentId || null,
             status: "sent",
-            timestamp: new Date(result.messageTimestamp ? result.messageTimestamp * 1000 : Date.now()),
+            timestamp: new Date(normalizeToUnixSeconds(result.messageTimestamp) * 1000),
           }).onDuplicateKeyUpdate({ set: { status: sql`status` } }).catch(() => {});
 
           // Update wa_conversations with the latest message
@@ -417,7 +417,7 @@ class WhatsAppEvolutionManager extends EventEmitter {
                 messageType: "conversation",
                 fromMe: true,
                 status: "sent",
-                timestamp: new Date(result.messageTimestamp ? result.messageTimestamp * 1000 : Date.now()),
+                timestamp: new Date(normalizeToUnixSeconds(result.messageTimestamp) * 1000),
                 incrementUnread: false,
               });
             }
@@ -498,7 +498,7 @@ class WhatsAppEvolutionManager extends EventEmitter {
             isVoiceNote: !!(mediaType === "audio" && opts?.ptt),
             senderAgentId: senderAgentId || null,
             status: "sent",
-            timestamp: new Date(result.messageTimestamp ? result.messageTimestamp * 1000 : Date.now()),
+            timestamp: new Date(normalizeToUnixSeconds(result.messageTimestamp) * 1000),
           }).onDuplicateKeyUpdate({ set: { status: sql`status` } }).catch(() => {});
 
           // Update wa_conversations with the latest message
@@ -510,7 +510,7 @@ class WhatsAppEvolutionManager extends EventEmitter {
                 messageType: (mediaType === "audio" && opts?.ptt) ? "pttMessage" : (typeMap[mediaType] || "documentMessage"),
                 fromMe: true,
                 status: "sent",
-                timestamp: new Date(result.messageTimestamp ? result.messageTimestamp * 1000 : Date.now()),
+                timestamp: new Date(normalizeToUnixSeconds(result.messageTimestamp) * 1000),
                 incrementUnread: false,
               });
             }
@@ -607,7 +607,7 @@ class WhatsAppEvolutionManager extends EventEmitter {
             content: text,
             senderAgentId: senderAgentId || null,
             status: "sent",
-            timestamp: new Date(result.messageTimestamp ? result.messageTimestamp * 1000 : Date.now()),
+            timestamp: new Date(normalizeToUnixSeconds(result.messageTimestamp) * 1000),
             quotedMessageId,
           }).onDuplicateKeyUpdate({ set: { status: sql`status` } }).catch(() => {});
 
@@ -620,7 +620,7 @@ class WhatsAppEvolutionManager extends EventEmitter {
                 messageType: "extendedTextMessage",
                 fromMe: true,
                 status: "sent",
-                timestamp: new Date(result.messageTimestamp ? result.messageTimestamp * 1000 : Date.now()),
+                timestamp: new Date(normalizeToUnixSeconds(result.messageTimestamp) * 1000),
                 incrementUnread: false,
               });
             }
@@ -821,8 +821,12 @@ class WhatsAppEvolutionManager extends EventEmitter {
     const now = Date.now();
     const uncachedJids: string[] = [];
 
+    // Limit total JIDs to prevent API overload
+    const MAX_JIDS = 100;
+    const limitedJids = jids.slice(0, MAX_JIDS);
+
     // Check cache first
-    for (const jid of jids) {
+    for (const jid of limitedJids) {
       const cached = this.profilePicCache.get(jid);
       if (cached && (now - cached.fetchedAt) < WhatsAppEvolutionManager.PROFILE_PIC_TTL) {
         result[jid] = cached.url;
@@ -1225,7 +1229,14 @@ class WhatsAppEvolutionManager extends EventEmitter {
         console.log(`[EvoWA Sync] Processing ${individualChats.length} individual chats (${newChatsCount} new, ${individualChats.length - newChatsCount} existing to update)`);
       }
 
+      // Process chats in batches to prevent DB connection pool exhaustion
+      let chatIndex = 0;
       for (const chat of chatsToProcess) {
+        // Every 50 chats, yield to event loop and let DB pool recover
+        if (chatIndex > 0 && chatIndex % 50 === 0) {
+          await new Promise(r => setTimeout(r, 100));
+        }
+        chatIndex++;
         try {
           const remoteJid = chat.remoteJid;
           // CRITICAL: Do NOT use chat.pushName or lastMessage.pushName blindly — they may contain the OWNER's name
@@ -1248,9 +1259,7 @@ class WhatsAppEvolutionManager extends EventEmitter {
             const messageId = msgKey?.id;
             const fromMe = msgKey?.fromMe || false;
             const messageType = lastMsg.messageType || "conversation";
-            const msgTimestamp = lastMsg.messageTimestamp
-              ? new Date(Number(lastMsg.messageTimestamp) * 1000)
-              : chat.updatedAt ? new Date(chat.updatedAt) : new Date();
+            const msgTimestamp = new Date(normalizeToUnixSeconds(lastMsg.messageTimestamp) * 1000);
 
             let content = "";
             if (lastMsg.message) {
@@ -1328,7 +1337,10 @@ class WhatsAppEvolutionManager extends EventEmitter {
             skipped++;
           }
         } catch (e: any) {
-          console.warn(`[EvoWA Sync] Error syncing chat ${chat.remoteJid}:`, e.message);
+          // Log error but don't spam — only log first 5 errors per sync cycle
+          if (synced + skipped + newChats < 5 || chatIndex % 100 === 0) {
+            console.warn(`[EvoWA Sync] Error syncing chat ${chat.remoteJid}:`, e.message);
+          }
         }
       }
 
@@ -1545,7 +1557,7 @@ class WhatsAppEvolutionManager extends EventEmitter {
       const remoteJid = key.remoteJid;
       const messageId = key.id;
       const pushName = data?.pushName || "";
-      const timestamp = data?.messageTimestamp ? Number(data.messageTimestamp) * 1000 : Date.now();
+      const timestamp = normalizeToUnixSeconds(data?.messageTimestamp) * 1000;
 
       const content = this.extractMessageContent(data);
 
@@ -1741,7 +1753,7 @@ class WhatsAppEvolutionManager extends EventEmitter {
       const messageId = key.id;
       const content = this.extractMessageContent(data);
       const messageType = data?.messageType || "conversation";
-      const timestamp = data?.messageTimestamp ? Number(data.messageTimestamp) * 1000 : Date.now();
+      const timestamp = normalizeToUnixSeconds(data?.messageTimestamp) * 1000;
 
       const db = await getDb();
       if (!db) return;
@@ -2516,7 +2528,7 @@ class WhatsAppEvolutionManager extends EventEmitter {
             if (!msgId) continue;
 
             // ── Step 3 (filter): Skip messages older than lastSyncTimestamp ──
-            const msgTs = Number(msg.messageTimestamp || 0);
+            const msgTs = normalizeToUnixSeconds(msg.messageTimestamp);
             if (lastSyncTimestamp > 0 && msgTs > 0 && msgTs <= lastSyncTimestamp) {
               totalFiltered++;
               continue;
@@ -2530,9 +2542,7 @@ class WhatsAppEvolutionManager extends EventEmitter {
 
             const fromMe = msg.key?.fromMe || false;
             const messageType = msg.messageType || 'conversation';
-            const timestamp = msgTs > 0
-              ? new Date(msgTs * 1000)
-              : new Date();
+            const timestamp = new Date(msgTs * 1000);
             const pushName = msg.pushName || null;
 
             const msgContent = msg.message;
@@ -2816,9 +2826,7 @@ class WhatsAppEvolutionManager extends EventEmitter {
 
               const fromMe = msg.key?.fromMe || false;
               const messageType = msg.messageType || 'conversation';
-              const timestamp = msg.messageTimestamp
-                ? new Date(Number(msg.messageTimestamp) * 1000)
-                : new Date();
+              const timestamp = new Date(normalizeToUnixSeconds(msg.messageTimestamp) * 1000);
               const pushName = msg.pushName || null;
 
               const msgContent = msg.message;
@@ -3114,9 +3122,7 @@ class WhatsAppEvolutionManager extends EventEmitter {
           const skipTypes = ['protocolMessage', 'senderKeyDistributionMessage', 'messageContextInfo', 'ephemeralMessage'];
           if (skipTypes.includes(messageType)) continue;
 
-          const timestamp = msg.messageTimestamp
-            ? new Date(Number(msg.messageTimestamp) * 1000)
-            : new Date();
+          const timestamp = new Date(normalizeToUnixSeconds(msg.messageTimestamp) * 1000);
           const pushName = msg.pushName || null;
 
           const msgContent = msg.message;

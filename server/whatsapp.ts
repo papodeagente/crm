@@ -24,6 +24,7 @@ import { storagePut } from "./storage";
 import { nanoid } from "nanoid";
 import { normalizeJid } from "./phoneUtils";
 import { resolveInbound, resolveOutbound, updateConversationLastMessage } from "./conversationResolver";
+import { normalizeToUnixSeconds } from "./providers/zapiProvider";
 
 const logger = pino({ level: "silent" });
 
@@ -623,7 +624,7 @@ class WhatsAppManager extends EventEmitter {
             messageType,
             content,
             status: fromMe ? "sent" : "received",
-            timestamp: new Date(((msg.messageTimestamp as number) || Date.now() / 1000) * 1000),
+            timestamp: new Date(normalizeToUnixSeconds(msg.messageTimestamp as number) * 1000),
           });
           synced++;
         }
@@ -768,7 +769,7 @@ class WhatsAppManager extends EventEmitter {
         }
 
         // Save message to DB (skip if already saved by sendTextMessage/sendMediaMessage)
-        const msgTimestamp = new Date(((msg.messageTimestamp as number) || Date.now() / 1000) * 1000);
+        const msgTimestamp = new Date(normalizeToUnixSeconds(msg.messageTimestamp as number) * 1000);
         try {
           const db = await getDb();
           if (db) {

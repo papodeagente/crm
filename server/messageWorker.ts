@@ -23,6 +23,7 @@ import { waMessages, waContacts, waConversations, waReactions } from "../drizzle
 import { resolveInbound, updateConversationLastMessage } from "./conversationResolver";
 import { storagePut } from "./storage";
 import { createNotification } from "./db";
+import { normalizeToUnixSeconds } from "./providers/zapiProvider";
 import * as evo from "./evolutionApi";
 import { resolveProviderForSession } from "./providers/providerFactory";
 import { nanoid } from "nanoid";
@@ -756,7 +757,7 @@ async function processNewMessage(session: SessionInfo, data: any, workerStartTim
     const remoteJid = key.remoteJid;
     const messageId = key.id;
     const pushName = data?.pushName || "";
-    const timestamp = data?.messageTimestamp ? Number(data.messageTimestamp) * 1000 : Date.now();
+    const timestamp = normalizeToUnixSeconds(data?.messageTimestamp) * 1000;
 
     const rawContent = extractMessageContent(data);
     const mediaInfo = extractMediaInfo(data);

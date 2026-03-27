@@ -93,6 +93,8 @@ async function zapiFetch(
   const url = `${ZAPI_BASE_URL}/instances/${instanceId}/token/${token}/${endpoint}`;
   const method = opts.method || "GET";
   const timeout = opts.timeout || 30000;
+  const maxRetries = opts.method === "GET" ? 3 : 2; // More retries for idempotent GETs
+  const retryDelays = [1000, 2000, 4000]; // Exponential backoff: 1s, 2s, 4s
 
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -101,39 +103,62 @@ async function zapiFetch(
     headers["Client-Token"] = clientToken;
   }
 
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeout);
-
-  try {
-    const response = await fetch(url, {
-      method,
-      headers,
-      body: opts.body ? JSON.stringify(opts.body) : undefined,
-      signal: controller.signal,
-    });
-
-    clearTimeout(timer);
-
-    if (!response.ok) {
-      const text = await response.text().catch(() => "");
-      throw new Error(`[Z-API] ${method} /${endpoint} returned ${response.status}: ${text}`);
+  let lastError: Error | null = null;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    if (attempt > 0) {
+      const delay = retryDelays[attempt - 1] || 4000;
+      console.warn(`[Z-API] Retry ${attempt}/${maxRetries} for ${method} /${endpoint} after ${delay}ms`);
+      await new Promise(r => setTimeout(r, delay));
     }
 
-    // Some endpoints return 204 No Content
-    if (response.status === 204) return null;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeout);
 
-    const contentType = response.headers.get("content-type") || "";
-    if (contentType.includes("application/json")) {
-      return response.json();
+    try {
+      const response = await fetch(url, {
+        method,
+        headers,
+        body: opts.body ? JSON.stringify(opts.body) : undefined,
+        signal: controller.signal,
+      });
+
+      clearTimeout(timer);
+
+      if (!response.ok) {
+        const text = await response.text().catch(() => "");
+        const status = response.status;
+        // Retry on 429 (rate limit) and 5xx (server errors)
+        if ((status === 429 || status >= 500) && attempt < maxRetries) {
+          lastError = new Error(`[Z-API] ${method} /${endpoint} returned ${status}: ${text}`);
+          continue; // Retry
+        }
+        throw new Error(`[Z-API] ${method} /${endpoint} returned ${status}: ${text}`);
+      }
+
+      // Some endpoints return 204 No Content
+      if (response.status === 204) return null;
+
+      const contentType = response.headers.get("content-type") || "";
+      if (contentType.includes("application/json")) {
+        return response.json();
+      }
+      return response.text();
+    } catch (err: any) {
+      clearTimeout(timer);
+      if (err.name === "AbortError") {
+        lastError = new Error(`[Z-API] ${method} /${endpoint} timed out after ${timeout}ms`);
+        if (attempt < maxRetries) continue; // Retry on timeout
+        throw lastError;
+      }
+      // Network errors (ECONNREFUSED, etc.) — retry
+      if (err.code === 'ECONNREFUSED' || err.code === 'ECONNRESET' || err.code === 'ETIMEDOUT') {
+        lastError = err;
+        if (attempt < maxRetries) continue;
+      }
+      throw err;
     }
-    return response.text();
-  } catch (err: any) {
-    clearTimeout(timer);
-    if (err.name === "AbortError") {
-      throw new Error(`[Z-API] ${method} /${endpoint} timed out after ${timeout}ms`);
-    }
-    throw err;
   }
+  throw lastError || new Error(`[Z-API] ${method} /${endpoint} failed after ${maxRetries} retries`);
 }
 
 /**
@@ -196,6 +221,24 @@ function isGroupJid(phoneOrJid: string): boolean {
 // RESPONSE TRANSLATORS — Z-API shapes → Canonical types
 // ════════════════════════════════════════════════════════════
 
+/**
+ * Normalize a timestamp to Unix seconds.
+ * Z-API is inconsistent: some fields return seconds, others milliseconds.
+ * If the value is > 1e12, it's milliseconds; otherwise it's seconds.
+ * Also validates the result is within a sane range (2000-2100).
+ */
+export function normalizeToUnixSeconds(raw: number | string | undefined | null): number {
+  if (raw == null) return Math.floor(Date.now() / 1000);
+  const num = typeof raw === 'string' ? parseInt(raw, 10) : Number(raw);
+  if (!num || isNaN(num) || num <= 0) return Math.floor(Date.now() / 1000);
+  // If > 1e12, it's milliseconds → convert to seconds
+  const seconds = num > 1e12 ? Math.floor(num / 1000) : Math.floor(num);
+  // Sanity check: must be between year 2000 and 2100
+  const year = new Date(seconds * 1000).getFullYear();
+  if (year < 2000 || year > 2100) return Math.floor(Date.now() / 1000);
+  return seconds;
+}
+
 function zapiSendResultToCanonical(zapiResult: any, phone: string): WASendResult {
   return {
     key: {
@@ -212,21 +255,22 @@ function zapiChatToCanonical(chat: any): WAChat {
   const phone = chat.phone || "";
   const isGroup = chat.isGroup === true;
   const remoteJid = phoneToJid(phone, isGroup);
+  const tsSec = chat.lastMessageTime ? normalizeToUnixSeconds(chat.lastMessageTime) : 0;
 
   return {
     remoteJid,
     name: chat.name || null,
-    lastMessage: chat.lastMessageTime
+    lastMessage: tsSec > 0
       ? {
           key: { id: "", fromMe: false, remoteJid },
           message: null,
-          messageTimestamp: parseInt(chat.lastMessageTime, 10) || 0,
+          messageTimestamp: tsSec,
           messageType: null,
           pushName: chat.name || null,
         }
       : null,
-    updatedAt: chat.lastMessageTime
-      ? new Date(parseInt(chat.lastMessageTime, 10) * 1000).toISOString()
+    updatedAt: tsSec > 0
+      ? new Date(tsSec * 1000).toISOString()
       : null,
     unreadCount: parseInt(chat.unread, 10) || chat.messagesUnread || 0,
   };
@@ -347,9 +391,7 @@ function zapiMessageToCanonical(msg: any): WAMessage {
     },
     message: zapiMessageContentToEvo(msg),
     messageType,
-    messageTimestamp: msg.momment
-      ? Math.floor(msg.momment / 1000) // Z-API uses ms, we use seconds
-      : Math.floor(Date.now() / 1000),
+    messageTimestamp: normalizeToUnixSeconds(msg.momment),
     pushName: msg.senderName || msg.chatName || null,
     status: zapiStatusToNumeric(msg.status),
   };

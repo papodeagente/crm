@@ -18,6 +18,7 @@ import { getDb } from "./db";
 import { waConversations, waMessages } from "../drizzle/schema";
 import { eq, and, sql, gt, desc } from "drizzle-orm";
 import * as evo from "./evolutionApi";
+import { normalizeToUnixSeconds } from "./providers/zapiProvider";
 import { resolveProviderForSession } from "./providers/providerFactory";
 import { resolveInbound, updateConversationLastMessage } from "./conversationResolver";
 import os from "os";
@@ -230,9 +231,7 @@ async function reconcileConversation(
     const skipTypes = ["protocolMessage", "senderKeyDistributionMessage", "messageContextInfo", "ephemeralMessage"];
     if (skipTypes.includes(messageType)) continue;
 
-    const timestamp = msg.messageTimestamp
-      ? new Date(Number(msg.messageTimestamp) * 1000)
-      : new Date();
+    const timestamp = new Date(normalizeToUnixSeconds(msg.messageTimestamp) * 1000);
 
     const pushName = msg.pushName || null;
     const msgContent = msg.message;

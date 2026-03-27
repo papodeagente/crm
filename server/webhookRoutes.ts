@@ -1323,6 +1323,30 @@ import {
 import { getZApiSession } from "./providers/zapiProvider";
 import { resolveProviderTypeForSession } from "./providers/providerFactory";
 
+// ── LRU deduplication cache for webhook events ──
+// Z-API can send duplicate events. We track recent messageIds to skip duplicates.
+const DEDUP_MAX_SIZE = 2000;
+const DEDUP_TTL_MS = 60_000; // 60 seconds
+const webhookDedup = new Map<string, number>(); // key → timestamp
+
+function isDuplicateWebhook(key: string): boolean {
+  const now = Date.now();
+  // Evict expired entries when map grows large
+  if (webhookDedup.size > DEDUP_MAX_SIZE) {
+    const entries = Array.from(webhookDedup.entries());
+    for (const [k, ts] of entries) {
+      if (now - ts > DEDUP_TTL_MS) webhookDedup.delete(k);
+      if (webhookDedup.size <= DEDUP_MAX_SIZE * 0.7) break;
+    }
+  }
+  if (webhookDedup.has(key)) {
+    const ts = webhookDedup.get(key)!;
+    if (now - ts < DEDUP_TTL_MS) return true;
+  }
+  webhookDedup.set(key, now);
+  return false;
+}
+
 async function handleZApiWebhook(req: Request, res: Response) {
   const startTime = Date.now();
   try {
@@ -1379,6 +1403,16 @@ async function handleZApiWebhook(req: Request, res: Response) {
     }
 
     console.log(`[Webhook /zapi] Normalized: ${zapiEvent} → ${normalized.event} | Instance: ${instanceName} | JID: ${normalized.data?.key?.remoteJid || 'N/A'}`);
+
+    // Deduplication: skip if we've seen this exact event recently
+    const msgId = normalized.data?.key?.id;
+    if (msgId) {
+      const dedupKey = `${sessionId}:${normalized.event}:${msgId}`;
+      if (isDuplicateWebhook(dedupKey)) {
+        console.log(`[Webhook /zapi] Duplicate skipped: ${dedupKey}`);
+        return res.status(200).json({ received: true, duplicate: true });
+      }
+    }
 
     // Route to the same handler as Evolution webhooks
     // Events that should be enqueued for async processing via BullMQ

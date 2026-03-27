@@ -5690,3 +5690,58 @@
 - [x] Auditar todos os locais que exibem logo no portal
 - [x] Substituir logo em cada componente com suporte a tema claro/escuro
 - [x] Favicon permanece inalterado
+
+## Auditoria WhatsApp Z-API (Completa)
+
+### Backend
+- [ ] Auditar conexão/autenticação Z-API (estabilidade, reconexão)
+- [ ] Auditar webhooks (idempotência, ordem de eventos, concorrência)
+- [ ] Auditar prevenção de duplicação de mensagens
+- [ ] Auditar prevenção de conversas paralelas indevidas
+- [ ] Auditar normalização de números (DDI, DDD, 9º dígito, internacionais)
+- [ ] Auditar queries de mensagens e conversas (índices, N+1, joins)
+- [ ] Auditar cache de fotos de perfil (expiração, invalidação, batch loading)
+- [ ] Auditar segurança multi-tenant (filtros obrigatórios, isolamento)
+- [ ] Auditar vínculo contato/deal correto
+- [ ] Auditar resolução de nomes (CRM > contexto > recebido > número)
+
+### Frontend
+- [ ] Auditar lista de conversas (performance, memoização, re-renders)
+- [ ] Auditar chat aberto (virtualização, scroll, flicker)
+- [ ] Auditar avatares/fotos de perfil (cache, fallback, recarregamento)
+- [ ] Auditar sincronização em tempo real (latência, badges, preview)
+- [ ] Auditar fidelidade visual ao WhatsApp Web
+
+### Correções
+- [ ] Aplicar correções backend encontradas na auditoria
+- [ ] Aplicar correções frontend encontradas na auditoria
+- [ ] Testes Vitest de regressão
+- [ ] Documentar problemas, correções e pontos de risco
+
+## Auditoria Z-API — Correções de Robustez
+
+### Bug Crítico: Timestamps
+- [x] Criar função `normalizeToUnixSeconds()` para auto-detecção de formato (ms vs s)
+- [x] Corrigir `zapiChatToCanonical` — lastMessageTime era tratado como segundos mas Z-API retorna ms
+- [x] Corrigir `zapiMessageToCanonical` — usar normalizeToUnixSeconds
+- [x] Corrigir `zapiWebhookNormalizer` — normalizar momment/timestamp do webhook
+- [x] Corrigir `whatsappEvolution.ts` — 10+ pontos com `messageTimestamp * 1000` sem normalização
+- [x] Corrigir `messageWorker.ts` — timestamp de mensagens processadas pelo worker
+- [x] Corrigir `messageReconciliation.ts` — timestamp de mensagens reconciliadas
+- [x] Corrigir `whatsapp.ts` (Baileys) — 2 pontos com timestamp sem normalização
+- [x] Eliminar bug "year 58000+" que causava falha de INSERT no MySQL (DATETIME out of range)
+
+### Retry com Backoff
+- [x] Verificar `zapiFetch` — já implementado (1s, 2s, 4s backoff para 429/5xx/timeout/network errors)
+
+### Deduplicação de Webhooks
+- [x] Implementar cache LRU com TTL de 60s para eventos de webhook Z-API
+- [x] Deduplicar por `sessionId:event:messageId` antes de enfileirar/processar
+- [x] Eviction automática quando cache > 2000 entries
+
+### Batching & Limites
+- [x] Limitar `getProfilePictures` a max 100 JIDs por chamada
+- [x] Reduzir spam de logs de erro no sync loop (max 5 erros + a cada 100 chats)
+
+### Testes
+- [x] 23 testes Vitest para normalizeToUnixSeconds (13 cenários), deduplicação (3), batch limit (2), conversão canônica (3), webhook normalizer (2)
