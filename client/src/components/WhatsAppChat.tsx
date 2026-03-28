@@ -1901,10 +1901,8 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
   // Send text (with or without reply)
   const handleSend = useCallback(() => {
     if (!messageText.trim() || isSending) return;
-    const number = contact?.phone?.replace(/\D/g, "") || "";
-    if (!number) return;
 
-    // Internal note mode: send as note instead of WA message
+    // Internal note mode: send as note instead of WA message (no phone number needed)
     if (isNoteMode && waConversationId) {
       createNoteMut.mutate({
         waConversationId,
@@ -1922,6 +1920,10 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
       if (textareaRef.current) textareaRef.current.style.height = "42px";
       return;
     }
+
+    // Regular WA message: requires phone number
+    const number = contact?.phone?.replace(/\D/g, "") || "";
+    if (!number) return;
 
     if (replyTarget) {
       sendTextWithQuote.mutate({

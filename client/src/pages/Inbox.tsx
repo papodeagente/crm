@@ -1522,6 +1522,11 @@ export default function InboxPage() {
         assignedUserId: null,
         assignmentStatus: status || "resolved",
       });
+    } else if (type === "reopened") {
+      convStore.updateAssignment(key, {
+        assignedUserId: null,
+        assignmentStatus: "open",
+      });
     } else if (type === "status_change") {
       convStore.updateAssignment(key, {
         assignmentStatus: status || null,

@@ -1006,29 +1006,28 @@ export const appRouter = router({
       .query(async ({ input, ctx }) => {
         // Fast DB query first
         const dbResult = await getProfilePicturesFromDb(input.sessionId, input.jids);
-        // Find JIDs missing pics in DB — fetch from API in background (max 10 per call)
-        const missingJids = input.jids.filter(j => !dbResult[j]).slice(0, 10);
+        // Find JIDs missing pics in DB — fetch from API and AWAIT results (max 25 per call)
+        const missingJids = input.jids.filter(j => !dbResult[j]).slice(0, 25);
         if (missingJids.length > 0) {
-          // Fire-and-forget: fetch from API and save to DB for next time
-          (async () => {
-            try {
-              const apiResult = await whatsappManager.getProfilePictures(input.sessionId, missingJids);
-              const db = await getDb();
-              if (!db) return;
-              const { waContacts } = await import("../drizzle/schema");
-              for (const [jid, url] of Object.entries(apiResult)) {
-                if (url) {
-                  dbResult[jid] = url; // won't help this response but updates cache
-                  await db.update(waContacts)
+          try {
+            const apiResult = await whatsappManager.getProfilePictures(input.sessionId, missingJids);
+            const db = await getDb();
+            for (const [jid, url] of Object.entries(apiResult)) {
+              if (url) {
+                dbResult[jid] = url; // Update the response with the fetched URL
+                // Save to DB in background for next time
+                if (db) {
+                  const { waContacts } = await import("../drizzle/schema");
+                  db.update(waContacts)
                     .set({ profilePictureUrl: url })
                     .where(and(eq(waContacts.sessionId, input.sessionId), eq(waContacts.jid, jid)))
                     .catch(() => {});
                 }
               }
-            } catch (e) {
-              // Silently ignore — next request will retry
             }
-          })();
+          } catch (e) {
+            // Silently ignore — return DB results only
+          }
         }
         return dbResult;
       }),

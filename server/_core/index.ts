@@ -118,6 +118,11 @@ async function startServer() {
     });
   });
 
+  // Forward conversation status changes (reopen, etc.) from EventEmitter to Socket.IO
+  whatsappManager.on("conversationUpdated", (data) => {
+    io.emit("conversationUpdated", data);
+  });
+
   io.on("connection", (socket) => {
     console.log("Socket.IO client connected:", socket.id);
     socket.on("disconnect", () => {

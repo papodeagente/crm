@@ -21,7 +21,7 @@ import { resolveInbound, updateConversationLastMessage } from "./conversationRes
 import { zapiProvider, getZApiSession, normalizeToUnixSeconds } from "./providers/zapiProvider";
 import { storagePut } from "./storage";
 import { nanoid } from "nanoid";
-import { createNotification } from "./db";
+import { createNotification, logConversationEvent } from "./db";
 
 // ════════════════════════════════════════════════════════════
 // TYPES
@@ -1614,6 +1614,73 @@ class WhatsAppEvolutionManager extends EventEmitter {
             timestamp: new Date(timestamp),
             incrementUnread: !fromMe,
           });
+
+          // *** AUTO-REOPEN: If conversation is resolved/closed and a NEW inbound message arrives, reopen it ***
+          if (!fromMe) {
+            try {
+              const db2 = await getDb();
+              if (db2) {
+                const { conversationAssignments } = await import("../drizzle/schema");
+                // Check current conversation status
+                const [conv] = await db2.select({
+                  id: waConversations.id,
+                  status: waConversations.status,
+                  assignedUserId: waConversations.assignedUserId,
+                }).from(waConversations)
+                  .where(eq(waConversations.id, resolved.conversationId))
+                  .limit(1);
+
+                if (conv && (conv.status === "resolved" || conv.status === "closed")) {
+                  const lastAgentId = conv.assignedUserId;
+                  console.log(`[EvoWA Reopen] Conversation ${resolved.conversationId} was ${conv.status}, reopening to queue. Last agent: ${lastAgentId || 'none'}`);
+
+                  // Reopen wa_conversations: set status to open, clear assignment, set queuedAt
+                  await db2.update(waConversations)
+                    .set({
+                      status: "open",
+                      assignedUserId: null,
+                      assignedTeamId: null,
+                      queuedAt: new Date(),
+                    })
+                    .where(eq(waConversations.id, resolved.conversationId));
+
+                  // Reopen conversation_assignments too
+                  await db2.update(conversationAssignments)
+                    .set({ status: "open", resolvedAt: null })
+                    .where(and(
+                      eq(conversationAssignments.tenantId, session.tenantId),
+                      eq(conversationAssignments.sessionId, session.sessionId),
+                      eq(conversationAssignments.remoteJid, remoteJid)
+                    ));
+
+                  // Log the reopen event with last agent info
+                  await logConversationEvent(
+                    session.tenantId, resolved.conversationId, session.sessionId, remoteJid,
+                    "reopened",
+                    {
+                      metadata: {
+                        reason: "inbound_message_after_resolve",
+                        lastAgentUserId: lastAgentId,
+                        reopenedAt: new Date().toISOString(),
+                      },
+                    }
+                  );
+
+                  // Emit socket event so Inbox updates in real-time
+                  this.emit("conversationUpdated", {
+                    sessionId: session.sessionId,
+                    tenantId: session.tenantId,
+                    remoteJid,
+                    conversationId: resolved.conversationId,
+                    type: "reopened",
+                    lastAgentUserId: lastAgentId,
+                  });
+                }
+              }
+            } catch (reopenErr) {
+              console.warn("[EvoWA] Error checking/reopening conversation:", reopenErr);
+            }
+          }
         }
       } catch (e) {
         console.warn("[EvoWA] Conversation resolver error:", e);

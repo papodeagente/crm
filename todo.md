@@ -5776,3 +5776,28 @@
 - [x] Remover ícone do favicon ao lado da logo em todas as telas (favicon apenas no navegador)
 - [x] Reduzir logo 20px e mover 20px para a direita na área logada do CRM (DashboardLayout + TopNavLayout)
 - [x] Limpar constantes LOGO_URL não utilizadas das landing pages
+
+## WhatsApp — Melhorias de UX e Funcionalidade (Mar 27)
+
+### Fotos de Perfil
+- [x] Investigar e corrigir definitivamente por que fotos de perfil não aparecem no Inbox
+- [x] Backend agora faz await na busca de fotos via API (não mais fire-and-forget)
+- [x] Aumentado batch de 10 para 25 JIDs por chamada
+- [x] Garantir que fotos carreguem de forma confiável (fallback visual SVG quando não disponível)
+
+### Experiência WhatsApp Web
+- [x] Visual do chat semelhante ao WhatsApp Web (bolhas, cores, timestamps, status de leitura) — já implementado
+- [x] Sincronização em tempo real — Socket.IO para mensagens instantâneas (Inbox + Negociação)
+- [x] Performance — query otimizada com subquery (JOINs apenas 100 rows vs 2697)
+
+### Reabertura Automática de Conversas
+- [x] Quando contato com atendimento finalizado volta a falar, reabrir na fila automaticamente
+- [x] Indicar quem foi o último atendente na conversa reaberta (logConversationEvent + socket emit)
+- [x] Socket forwarding de conversationUpdated para atualizar Inbox em tempo real
+
+### Notas Internas
+- [x] Corrigir funcionamento das notas internas — bug: verificação de telefone bloqueava criação de nota
+- [x] Movido check isNoteMode para ANTES da validação de telefone no handleSend
+
+### Testes
+- [x] 12 testes Vitest passando para todas as correções
