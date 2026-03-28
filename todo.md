@@ -6074,7 +6074,7 @@
 - [x] Integrar com sino de notificações existente (departure_soon ativado por padrão nas preferências)
 - [x] Escrever testes vitest (13 testes passando)
 ## Card de Embarques no Dashboard com Popup Detalhado
-- [ ] Analisar padrão de popup existente (sem tarefas/esfriando) no Dashboard
-- [ ] Adicionar card de embarques nos KPIs da Visão Executiva
-- [ ] Implementar popup/dialog detalhado ao clicar no card de embarques
-- [ ] Testar e validar
+- [x] Analisar padrão de popup existente (sem tarefas/esfriando) no Dashboard
+- [x] Adicionar card de embarques nos KPIs da Visão Executiva (banner clicável com badges de urgência)
+- [x] Implementar popup/dialog detalhado ao clicar no card de embarques
+- [x] Testar e validar (22 testes passando)

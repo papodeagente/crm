@@ -367,6 +367,7 @@ export default function Home() {
   // Modals
   const [noTaskModalOpen, setNoTaskModalOpen] = useState(false);
   const [coolingModalOpen, setCoolingModalOpen] = useState(false);
+  const [departureModalOpen, setDepartureModalOpen] = useState(false);
 
   // ─── Filter State (admin only) ───
   const [filter, setFilter] = useState<HomeFilter>({ type: "all", label: "Todos" });
@@ -744,6 +745,77 @@ export default function Home() {
             <AiForecastButton />
           </div>
         </div>
+
+        {/* Second row: Embarques card */}
+        {departures && departures.length > 0 && (
+          <div className="mt-3">
+            <button
+              onClick={() => setDepartureModalOpen(true)}
+              className="surface relative p-4 text-left group hover:scale-[1.01] transition-all duration-300 cursor-pointer w-full"
+            >
+              <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-sky-400 to-blue-500" />
+              <div className="flex items-center gap-4">
+                <div className="h-12 w-12 rounded-xl flex items-center justify-center bg-sky-500/10 shrink-0">
+                  <Plane className="h-5 w-5 text-sky-500" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] font-bold text-sky-600 dark:text-sky-400 uppercase tracking-wider">Próximos Embarques</span>
+                    <span className="text-[10px] bg-sky-500/15 text-sky-500 px-2 py-0.5 rounded-full font-bold">
+                      {departures.length}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">
+                    {(() => {
+                      const today = departures.filter((d: any) => {
+                        const bd = new Date(d.boardingDate);
+                        const diff = Math.ceil((bd.getTime() - Date.now()) / (1000*60*60*24));
+                        return diff <= 0;
+                      }).length;
+                      const thisWeek = departures.filter((d: any) => {
+                        const bd = new Date(d.boardingDate);
+                        const diff = Math.ceil((bd.getTime() - Date.now()) / (1000*60*60*24));
+                        return diff > 0 && diff <= 7;
+                      }).length;
+                      const parts = [];
+                      if (today > 0) parts.push(`${today} hoje`);
+                      if (thisWeek > 0) parts.push(`${thisWeek} esta semana`);
+                      return parts.length > 0 ? parts.join(' · ') : 'Viagens com data de embarque';
+                    })()}
+                  </p>
+                </div>
+                <div className="flex items-center gap-3 shrink-0">
+                  {/* Mini urgency badges */}
+                  {(() => {
+                    const todayCount = departures.filter((d: any) => {
+                      const diff = Math.ceil((new Date(d.boardingDate).getTime() - Date.now()) / (1000*60*60*24));
+                      return diff <= 0;
+                    }).length;
+                    const soonCount = departures.filter((d: any) => {
+                      const diff = Math.ceil((new Date(d.boardingDate).getTime() - Date.now()) / (1000*60*60*24));
+                      return diff > 0 && diff <= 3;
+                    }).length;
+                    return (
+                      <div className="flex items-center gap-1.5">
+                        {todayCount > 0 && (
+                          <span className="text-[10px] font-bold text-red-500 bg-red-500/10 px-2 py-0.5 rounded-full">
+                            {todayCount} hoje
+                          </span>
+                        )}
+                        {soonCount > 0 && (
+                          <span className="text-[10px] font-bold text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded-full">
+                            {soonCount} em 3d
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })()}
+                  <span className="text-[10px] text-muted-foreground group-hover:text-foreground transition-colors">Ver todos <ChevronRight className="inline h-3 w-3" /></span>
+                </div>
+              </div>
+            </button>
+          </div>
+        )}
       </section>
 
       {/* ─── TRIAL COUNTDOWN BANNER ─── */}
@@ -869,103 +941,7 @@ export default function Home() {
         </section>
       </div>
 
-      {/* ═══════════════════════════════════════════════════
-          BLOCO 4 — PRÓXIMOS EMBARQUES
-          ═══════════════════════════════════════════════════ */}
-      {departures && departures.length > 0 && (
-        <section className="mb-6 sm:mb-8">
-          <div className="surface p-5">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
-              <div className="flex items-center gap-2.5">
-                <div className="h-9 w-9 rounded-xl flex items-center justify-center bg-sky-500/10 shrink-0">
-                  <Plane className="h-4.5 w-4.5 text-sky-500" />
-                </div>
-                <div>
-                  <h2 className="text-[14px] font-bold text-foreground tracking-tight">Próximos Embarques</h2>
-                  <p className="text-[11px] text-muted-foreground">Vendas fechadas com data de embarque</p>
-                </div>
-              </div>
-              <span className="text-[10px] bg-sky-500/15 text-sky-500 px-2 py-0.5 rounded-full font-bold">
-                {departures.length} embarque{departures.length > 1 ? "s" : ""}
-              </span>
-            </div>
 
-            <div className="divide-y divide-border/40">
-              {departures.map((dep: any) => {
-                const boardDate = dep.boardingDate ? new Date(dep.boardingDate) : null;
-                const retDate = dep.returnDate ? new Date(dep.returnDate) : null;
-                const now = new Date();
-                const daysUntil = boardDate ? Math.ceil((boardDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)) : null;
-
-                let urgencyClass = "text-sky-500 bg-sky-500/10";
-                let urgencyLabel = daysUntil !== null ? `${daysUntil}d` : "";
-                if (daysUntil !== null) {
-                  if (daysUntil <= 0) {
-                    urgencyClass = "text-red-500 bg-red-500/10";
-                    urgencyLabel = "Hoje";
-                  } else if (daysUntil <= 3) {
-                    urgencyClass = "text-amber-500 bg-amber-500/10";
-                    urgencyLabel = `${daysUntil}d`;
-                  } else if (daysUntil <= 7) {
-                    urgencyClass = "text-orange-500 bg-orange-500/10";
-                    urgencyLabel = `${daysUntil}d`;
-                  }
-                }
-
-                return (
-                  <Link key={dep.id} href={`/deals/${dep.id}`}>
-                    <div className="flex items-center gap-3 py-3 px-1 hover:bg-muted/30 rounded-lg transition-colors cursor-pointer group">
-                      {/* Urgency badge */}
-                      <div className={`h-10 w-10 rounded-xl flex items-center justify-center shrink-0 ${urgencyClass}`}>
-                        <span className="text-[11px] font-extrabold">{urgencyLabel}</span>
-                      </div>
-
-                      {/* Deal info */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <p className="text-[13px] font-semibold text-foreground truncate">{dep.title}</p>
-                        </div>
-                        <div className="flex items-center gap-3 mt-0.5 flex-wrap">
-                          {dep.contactName && (
-                            <span className="text-[11px] text-muted-foreground flex items-center gap-1">
-                              <User className="h-3 w-3" />
-                              {dep.contactName}
-                            </span>
-                          )}
-                          {boardDate && (
-                            <span className="text-[11px] text-muted-foreground flex items-center gap-1">
-                              <CalendarDays className="h-3 w-3" />
-                              {boardDate.toLocaleDateString(SYSTEM_LOCALE, { day: "2-digit", month: "short", year: "numeric", timeZone: SYSTEM_TIMEZONE })}
-                            </span>
-                          )}
-                          {retDate && (
-                            <span className="text-[11px] text-muted-foreground flex items-center gap-1">
-                              <MapPin className="h-3 w-3" />
-                              Retorno: {retDate.toLocaleDateString(SYSTEM_LOCALE, { day: "2-digit", month: "short", timeZone: SYSTEM_TIMEZONE })}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Value + Owner */}
-                      <div className="text-right shrink-0 hidden sm:block">
-                        {dep.valueCents > 0 && (
-                          <p className="text-[13px] font-bold text-foreground">{formatCurrency(dep.valueCents)}</p>
-                        )}
-                        {dep.ownerName && (
-                          <p className="text-[10px] text-muted-foreground mt-0.5">{dep.ownerName}</p>
-                        )}
-                      </div>
-
-                      <ChevronRight className="h-4 w-4 text-muted-foreground/30 group-hover:text-primary shrink-0 transition-colors" />
-                    </div>
-                  </Link>
-                );
-              })}
-            </div>
-          </div>
-        </section>
-      )}
 
       {/* ═══════════════════════════════════════════════════
           BLOCO 5 — CHECKLIST DIDÁTICO DE ONBOARDING
@@ -1083,6 +1059,105 @@ export default function Home() {
         icon={Flame}
         iconColor="bg-red-500/10 text-red-500"
       />
+
+      {/* Departure Detail Modal */}
+      <Dialog open={departureModalOpen} onOpenChange={setDepartureModalOpen}>
+        <DialogContent className="max-w-2xl max-h-[85vh]">
+          <DialogHeader>
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-xl flex items-center justify-center bg-sky-500/10 text-sky-500">
+                <Plane className="h-5 w-5" />
+              </div>
+              <div>
+                <DialogTitle className="text-lg">Próximos Embarques</DialogTitle>
+                <DialogDescription className="text-[12px]">
+                  {departures?.length ?? 0} viagen{(departures?.length ?? 0) !== 1 ? 's' : ''} com embarque nos próximos dias
+                </DialogDescription>
+              </div>
+            </div>
+          </DialogHeader>
+          <ScrollArea className="max-h-[60vh] mt-2">
+            {(!departures || departures.length === 0) ? (
+              <div className="py-8 text-center text-muted-foreground text-sm">Nenhum embarque próximo encontrado</div>
+            ) : (
+              <div className="space-y-1">
+                {departures.map((dep: any) => {
+                  const boardDate = dep.boardingDate ? new Date(dep.boardingDate) : null;
+                  const retDate = dep.returnDate ? new Date(dep.returnDate) : null;
+                  const now = new Date();
+                  const daysUntil = boardDate ? Math.ceil((boardDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)) : null;
+
+                  let urgencyClass = "text-sky-500 bg-sky-500/10";
+                  let urgencyLabel = daysUntil !== null ? `${daysUntil}d` : "";
+                  let urgencyRing = "";
+                  if (daysUntil !== null) {
+                    if (daysUntil <= 0) {
+                      urgencyClass = "text-red-500 bg-red-500/10";
+                      urgencyLabel = "Hoje";
+                      urgencyRing = "ring-2 ring-red-500/30";
+                    } else if (daysUntil <= 3) {
+                      urgencyClass = "text-amber-500 bg-amber-500/10";
+                      urgencyLabel = `${daysUntil}d`;
+                      urgencyRing = "ring-2 ring-amber-500/20";
+                    } else if (daysUntil <= 7) {
+                      urgencyClass = "text-orange-500 bg-orange-500/10";
+                      urgencyLabel = `${daysUntil}d`;
+                    }
+                  }
+
+                  return (
+                    <Link key={dep.id} href={`/deals/${dep.id}`}>
+                      <div className={`flex items-center gap-3 py-3 px-3 rounded-xl cursor-pointer hover:bg-muted/50 transition-colors group ${urgencyRing}`}>
+                        {/* Urgency badge */}
+                        <div className={`h-11 w-11 rounded-xl flex items-center justify-center shrink-0 ${urgencyClass}`}>
+                          <span className="text-[12px] font-extrabold">{urgencyLabel}</span>
+                        </div>
+
+                        {/* Deal info */}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[13px] font-semibold text-foreground truncate">{dep.title}</p>
+                          <div className="flex items-center gap-3 mt-1 flex-wrap">
+                            {dep.contactName && (
+                              <span className="text-[11px] text-muted-foreground flex items-center gap-1">
+                                <User className="h-3 w-3" />
+                                {dep.contactName}
+                              </span>
+                            )}
+                            {boardDate && (
+                              <span className="text-[11px] text-muted-foreground flex items-center gap-1">
+                                <CalendarDays className="h-3 w-3" />
+                                Embarque: {boardDate.toLocaleDateString(SYSTEM_LOCALE, { day: '2-digit', month: 'short', year: 'numeric', timeZone: SYSTEM_TIMEZONE })}
+                              </span>
+                            )}
+                            {retDate && (
+                              <span className="text-[11px] text-muted-foreground flex items-center gap-1">
+                                <MapPin className="h-3 w-3" />
+                                Retorno: {retDate.toLocaleDateString(SYSTEM_LOCALE, { day: '2-digit', month: 'short', timeZone: SYSTEM_TIMEZONE })}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Value + Owner */}
+                        <div className="text-right shrink-0">
+                          {dep.valueCents > 0 && (
+                            <p className="text-[13px] font-bold text-foreground">{formatCurrency(dep.valueCents)}</p>
+                          )}
+                          {dep.ownerName && (
+                            <p className="text-[10px] text-muted-foreground mt-0.5">{dep.ownerName}</p>
+                          )}
+                        </div>
+
+                        <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/40 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
