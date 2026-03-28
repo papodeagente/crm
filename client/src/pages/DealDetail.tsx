@@ -281,6 +281,23 @@ export default function DealDetail() {
   const [lostReason, setLostReason] = useState("");
   const [selectedLossReasonId, setSelectedLossReasonId] = useState<number | null>(null);
 
+  /* ─── Delete deal dialog ─── */
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const deleteDealMut = trpc.crm.deals.bulkDelete.useMutation({
+    onSuccess: () => {
+      toast.success("Negociação movida para a lixeira");
+      setShowDeleteDialog(false);
+      setLocation("/deals");
+    },
+    onError: (err: any) => {
+      toast.error(err.message || "Erro ao excluir negociação");
+    },
+  });
+  const handleDeleteDeal = () => {
+    if (!deal) return;
+    deleteDealMut.mutate({ ids: [deal.id] });
+  };
+
   /* ─── Pipeline change dialog ─── */
   const [showPipelineDialog, setShowPipelineDialog] = useState(false);
   const [selectedPipelineId, setSelectedPipelineId] = useState<number | null>(null);
@@ -462,6 +479,21 @@ export default function DealDetail() {
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
+            {/* Trash button - always visible */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="border-muted-foreground/20 text-muted-foreground hover:border-red-300 hover:text-red-600 hover:bg-red-50 dark:hover:border-red-500/40 dark:hover:text-red-400 dark:hover:bg-red-500/10 h-8 w-8 p-0"
+                  onClick={() => setShowDeleteDialog(true)}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Excluir negociação</TooltipContent>
+            </Tooltip>
+
             {deal.status === "open" && (
               <>
                 <Button
@@ -1478,6 +1510,39 @@ export default function DealDetail() {
         dealTitle={deal.title}
         dealValue={deal.valueCents ? new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(deal.valueCents / 100) : undefined}
       />
+
+      {/* ── Delete Confirmation Dialog ── */}
+      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <Trash2 className="h-5 w-5" />
+              Excluir negociação
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Tem certeza que deseja excluir <strong>{deal?.title}</strong>? A negociação será movida para a lixeira e poderá ser restaurada posteriormente.
+          </p>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" size="sm" onClick={() => setShowDeleteDialog(false)} disabled={deleteDealMut.isPending}>
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={handleDeleteDeal}
+              disabled={deleteDealMut.isPending}
+              className="gap-1.5"
+            >
+              {deleteDealMut.isPending ? (
+                <><Loader2 className="h-4 w-4 animate-spin" /> Excluindo...</>
+              ) : (
+                <><Trash2 className="h-4 w-4" /> Sim, excluir</>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* ── Lost Dialog ── */}
       <Dialog open={showLostDialog} onOpenChange={(open) => {

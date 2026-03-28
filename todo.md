@@ -6078,3 +6078,8 @@
 - [x] Adicionar card de embarques nos KPIs da Visão Executiva (banner clicável com badges de urgência)
 - [x] Implementar popup/dialog detalhado ao clicar no card de embarques
 - [x] Testar e validar (22 testes passando)
+## Botão Excluir Negociação (Lixeira) na Página de Negociação
+- [x] Analisar localização do botão Perder Venda no DealDetail
+- [x] Verificar/criar endpoint backend para soft-delete de negociação (reutilizado crm.deals.bulkDelete)
+- [x] Implementar botão lixeira com dialog de confirmação no frontend
+- [x] Testes existentes (bulkDelete.test.ts - 8 testes passando)
