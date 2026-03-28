@@ -24,7 +24,7 @@ import { resolveInbound, updateConversationLastMessage } from "./conversationRes
 import { storagePut } from "./storage";
 import { createNotification } from "./db";
 import { normalizeToUnixSeconds } from "./providers/zapiProvider";
-import * as evo from "./evolutionApi";
+// Z-API removed — Z-API only
 import { resolveProviderForSession } from "./providers/providerFactory";
 import { nanoid } from "nanoid";
 import type { MessageEventPayload } from "./messageQueue";
@@ -254,8 +254,8 @@ function mimeToExt(mime: string): string {
 // ── Determine message type from payload ───────────────────────
 
 /**
- * Determine the actual message type from the Evolution API payload.
- * The messageType field from Evolution may not always be accurate,
+ * Determine the actual message type from the Z-API payload.
+ * The messageType field from Z-API may not always be accurate,
  * so we also inspect the message object directly.
  */
 function resolveMessageType(data: any): string {
@@ -656,7 +656,7 @@ export async function processMessageEvent(payload: MessageEventPayload): Promise
       // Delegate unknown events back to the manager
       const { whatsappManager } = await import("./whatsappEvolution");
       await whatsappManager.handleWebhookEvent({
-        event: event as import("./evolutionApi").WebhookEventType,
+        event: event as string,
         instance: instanceName,
         data,
       });
@@ -984,7 +984,7 @@ async function processStatusUpdate(session: SessionInfo, data: any): Promise<voi
     if (!db) return;
 
     for (const update of updates) {
-      // Support both Evolution API formats:
+      // Support both Z-API formats:
       // Format A (Baileys/internal): { key: { id, remoteJid, fromMe }, update: { status: number } }
       // Format B (Evolution v2 webhook): { keyId, remoteJid, fromMe, status: string, messageId }
       const messageId = update?.key?.id || update?.keyId || update?.messageId;
@@ -1167,12 +1167,8 @@ async function downloadAndStoreMedia(
         remoteJid,
         fromMe,
       });
-    } catch {
-      // Fallback to direct Evolution API
-      base64Data = await evo.getBase64FromMediaMessage(session.instanceName, messageId, {
-        remoteJid,
-        fromMe,
-      });
+    } catch (err: any) {
+      console.warn(`[MessageWorker] Provider getBase64 failed for msg ${messageId}:`, err.message);
     }
     if (base64Data?.base64) {
       const ext = mimeToExt(base64Data.mimetype || mediaInfo.mediaMimeType || "application/octet-stream");

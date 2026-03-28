@@ -15,7 +15,18 @@
  * the same data.key, data.message, data.messageTimestamp structure.
  */
 
-import type { WebhookPayload, WebhookEventType } from "../evolutionApi";
+// Types previously from evolutionApi — now defined locally
+export type WebhookEventType =
+  | "messages.upsert"
+  | "messages.update"
+  | "messages.delete"
+  | "connection.update"
+  | "qrcode.updated"
+  | "send.message"
+  | "contacts.upsert"
+  | "groups.update";
+
+import type { WebhookPayload } from "../whatsappEvolution";
 import { normalizeToUnixSeconds } from "./zapiProvider";
 
 // ════════════════════════════════════════════════════════════

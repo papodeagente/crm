@@ -1,7 +1,7 @@
 /**
  * Tests for Z-API routing in WhatsApp message sending.
  * Validates that sendTextMessage and sendMediaMessage correctly route
- * to Z-API provider when session is registered as Z-API.
+ * to Z-API provider (the only provider).
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
@@ -34,32 +34,6 @@ vi.mock("./providers/zapiProvider", () => ({
   getZApiSession: vi.fn(),
   registerZApiSession: vi.fn(),
   unregisterZApiSession: vi.fn(),
-}));
-
-// Mock Evolution API
-vi.mock("./evolutionApi", () => ({
-  sendText: vi.fn().mockResolvedValue({
-    key: { id: "evo-msg-123", remoteJid: "5511999999999@s.whatsapp.net", fromMe: true },
-    messageTimestamp: 1700000000,
-    status: "SENT",
-  }),
-  sendMedia: vi.fn().mockResolvedValue({
-    key: { id: "evo-media-456", remoteJid: "5511999999999@s.whatsapp.net", fromMe: true },
-    messageTimestamp: 1700000000,
-    status: "SENT",
-  }),
-  sendAudio: vi.fn().mockResolvedValue({
-    key: { id: "evo-audio-789", remoteJid: "5511999999999@s.whatsapp.net", fromMe: true },
-    messageTimestamp: 1700000000,
-    status: "SENT",
-  }),
-  sendTextWithQuote: vi.fn().mockResolvedValue({
-    key: { id: "evo-quote-101", remoteJid: "5511999999999@s.whatsapp.net", fromMe: true },
-    messageTimestamp: 1700000000,
-    status: "SENT",
-  }),
-  sendReaction: vi.fn().mockResolvedValue({ success: true }),
-  sendPresence: vi.fn().mockResolvedValue({}),
 }));
 
 // Mock DB
@@ -97,19 +71,16 @@ vi.mock("../drizzle/schema", () => ({
 describe("Z-API Routing in WhatsApp Manager", () => {
   let getZApiSession: any;
   let zapiProvider: any;
-  let evo: any;
 
   beforeEach(async () => {
     vi.clearAllMocks();
     const zapiMod = await import("./providers/zapiProvider");
     getZApiSession = zapiMod.getZApiSession;
     zapiProvider = zapiMod.zapiProvider;
-    evo = await import("./evolutionApi");
   });
 
   describe("sendTextMessage routing", () => {
-    it("should route to Z-API when session is registered as Z-API", async () => {
-      // Setup: getZApiSession returns config for this session
+    it("should route to Z-API when session is registered", async () => {
       vi.mocked(getZApiSession).mockReturnValue({
         instanceId: "zapi-inst-123",
         token: "zapi-token-abc",
@@ -118,7 +89,6 @@ describe("Z-API Routing in WhatsApp Manager", () => {
 
       const { whatsappManager } = await import("./whatsappEvolution");
 
-      // Register a connected session
       whatsappManager.setSessionState("crm-1-1", {
         instanceName: "crm-1-1",
         sessionId: "crm-1-1",
@@ -133,14 +103,11 @@ describe("Z-API Routing in WhatsApp Manager", () => {
 
       await whatsappManager.sendTextMessage("crm-1-1", "5511999999999@s.whatsapp.net", "Hello Z-API!");
 
-      // Should have called zapiProvider.sendText
       expect(zapiProvider.sendText).toHaveBeenCalledWith("crm-1-1", "5511999999999", "Hello Z-API!");
-      // Should NOT have called evo.sendText
-      expect(evo.sendText).not.toHaveBeenCalled();
     });
 
-    it("should route to Evolution when session is NOT registered as Z-API", async () => {
-      // Setup: getZApiSession returns undefined (not a Z-API session)
+    it("should still route to Z-API even when session has no Z-API config (fallback)", async () => {
+      // Z-API is the only provider now — all sessions route to Z-API
       vi.mocked(getZApiSession).mockReturnValue(undefined);
 
       const { whatsappManager } = await import("./whatsappEvolution");
@@ -157,12 +124,10 @@ describe("Z-API Routing in WhatsApp Manager", () => {
         lastConnectedAt: Date.now(),
       });
 
-      await whatsappManager.sendTextMessage("crm-2-2", "5511888888888@s.whatsapp.net", "Hello Evolution!");
+      await whatsappManager.sendTextMessage("crm-2-2", "5511888888888@s.whatsapp.net", "Hello Z-API!");
 
-      // Should have called evo.sendText
-      expect(evo.sendText).toHaveBeenCalledWith("crm-2-2", "5511888888888", "Hello Evolution!");
-      // Should NOT have called zapiProvider.sendText
-      expect(zapiProvider.sendText).not.toHaveBeenCalled();
+      // All messages now route to Z-API
+      expect(zapiProvider.sendText).toHaveBeenCalledWith("crm-2-2", "5511888888888", "Hello Z-API!");
     });
 
     it("should throw error for non-existent session", async () => {
@@ -193,7 +158,7 @@ describe("Z-API Routing in WhatsApp Manager", () => {
   });
 
   describe("sendMediaMessage routing", () => {
-    it("should route media to Z-API when session is Z-API", async () => {
+    it("should route media to Z-API", async () => {
       vi.mocked(getZApiSession).mockReturnValue({
         instanceId: "zapi-inst-123",
         token: "zapi-token-abc",
@@ -219,10 +184,9 @@ describe("Z-API Routing in WhatsApp Manager", () => {
       );
 
       expect(zapiProvider.sendMedia).toHaveBeenCalled();
-      expect(evo.sendMedia).not.toHaveBeenCalled();
     });
 
-    it("should route audio to Z-API when session is Z-API and ptt", async () => {
+    it("should route audio to Z-API with ptt", async () => {
       vi.mocked(getZApiSession).mockReturnValue({
         instanceId: "zapi-inst-123",
         token: "zapi-token-abc",
@@ -248,12 +212,11 @@ describe("Z-API Routing in WhatsApp Manager", () => {
       );
 
       expect(zapiProvider.sendAudio).toHaveBeenCalled();
-      expect(evo.sendAudio).not.toHaveBeenCalled();
     });
   });
 
   describe("sendReaction routing", () => {
-    it("should route reaction to Z-API when session is Z-API", async () => {
+    it("should route reaction to Z-API", async () => {
       vi.mocked(getZApiSession).mockReturnValue({
         instanceId: "zapi-inst-123",
         token: "zapi-token-abc",
@@ -276,12 +239,11 @@ describe("Z-API Routing in WhatsApp Manager", () => {
       await whatsappManager.sendReaction("crm-6-6", key, "👍");
 
       expect(zapiProvider.sendReaction).toHaveBeenCalledWith("crm-6-6", key, "👍");
-      expect(evo.sendReaction).not.toHaveBeenCalled();
     });
   });
 
   describe("sendPresenceUpdate routing", () => {
-    it("should route presence to Z-API for Z-API sessions", async () => {
+    it("should route presence to Z-API", async () => {
       vi.mocked(getZApiSession).mockReturnValue({
         instanceId: "zapi-inst-123",
         token: "zapi-token-abc",
@@ -302,14 +264,12 @@ describe("Z-API Routing in WhatsApp Manager", () => {
 
       await whatsappManager.sendPresenceUpdate("crm-7-7", "5511999999999@s.whatsapp.net", "composing");
 
-      // Should have called zapiProvider.sendPresence, NOT evo.sendPresence
       expect(zapiProvider.sendPresence).toHaveBeenCalled();
-      expect(evo.sendPresence).not.toHaveBeenCalled();
     });
   });
 
   describe("Webhook RD Station scenario", () => {
-    it("should correctly send via Z-API when webhook triggers auto-WhatsApp on Z-API session", async () => {
+    it("should correctly send via Z-API when webhook triggers auto-WhatsApp", async () => {
       vi.mocked(getZApiSession).mockReturnValue({
         instanceId: "zapi-inst-999",
         token: "zapi-token-xyz",
@@ -329,16 +289,11 @@ describe("Z-API Routing in WhatsApp Manager", () => {
         lastConnectedAt: Date.now(),
       });
 
-      // Simulate what the webhook does
       const jid = "5511999887766@s.whatsapp.net";
       const message = "Olá João! Recebemos seu cadastro.";
       const result = await whatsappManager.sendTextMessage("crm-10-10", jid, message);
 
-      // Should have routed to Z-API
       expect(zapiProvider.sendText).toHaveBeenCalledWith("crm-10-10", "5511999887766", message);
-      expect(evo.sendText).not.toHaveBeenCalled();
-
-      // Result should have canonical format
       expect(result.key.id).toBe("zapi-msg-123");
       expect(result.status).toBe("SENT");
     });

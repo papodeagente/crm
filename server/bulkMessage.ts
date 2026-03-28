@@ -7,15 +7,15 @@ import { getDb } from "./db";
 import { rfvContacts, whatsappSessions, bulkCampaigns, bulkCampaignMessages } from "../drizzle/schema";
 import { eq, and, inArray, desc, sql, count, isNull } from "drizzle-orm";
 import { whatsappManager as baileysManager } from "./whatsapp";
-import { whatsappManager as evolutionManager } from "./whatsappEvolution";
+import { whatsappManager as zapiManager } from "./whatsappEvolution";
 
 // ─── Dual-manager helper ───
-// Sessions may be managed by Baileys (legacy) or Evolution API (SaaS tenants).
+// Sessions may be managed by Baileys (legacy) or Z-API (SaaS tenants).
 // This helper checks both managers to find the active session.
 function getSessionFromAnyManager(sessionId: string): { status: string; socket?: any } | undefined {
-  // Try Evolution API first (most common for SaaS tenants)
-  const evoSession = evolutionManager.getSession(sessionId);
-  if (evoSession) return evoSession;
+  // Try Z-API first (most common for SaaS tenants)
+  const zapiSession = zapiManager.getSession(sessionId);
+  if (zapiSession) return zapiSession;
   // Fall back to Baileys
   const baileysSession = baileysManager.getSession(sessionId);
   if (baileysSession) return baileysSession;
@@ -23,19 +23,19 @@ function getSessionFromAnyManager(sessionId: string): { status: string; socket?:
 }
 
 async function sendTextMessageViaAnyManager(sessionId: string, jid: string, text: string): Promise<any> {
-  // Try Evolution API first
-  const evoSession = evolutionManager.getSession(sessionId);
-  if (evoSession && evoSession.status === "connected") {
-    return evolutionManager.sendTextMessage(sessionId, jid, text);
+  // Try Z-API first
+  const zapiSession = zapiManager.getSession(sessionId);
+  if (zapiSession && zapiSession.status === "connected") {
+    return zapiManager.sendTextMessage(sessionId, jid, text);
   }
   // Fall back to Baileys
   return baileysManager.sendTextMessage(sessionId, jid, text);
 }
 
 async function connectViaAnyManager(sessionId: string, userId: number, tenantId: number): Promise<any> {
-  // Try Evolution API first (SaaS tenants use crm- prefix)
+  // Try Z-API first (SaaS tenants use crm- prefix)
   if (sessionId.startsWith("crm-")) {
-    return evolutionManager.connect(sessionId, userId, tenantId);
+    return zapiManager.connect(sessionId, userId, tenantId);
   }
   // Fall back to Baileys
   return baileysManager.connect(sessionId, userId, tenantId);

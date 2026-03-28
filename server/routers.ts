@@ -249,7 +249,7 @@ export const appRouter = router({
   // ─── WhatsApp API (existing) ───
   whatsapp: router({
     connect: tenantWriteProcedure
-      .input(z.object({ provider: z.enum(["evolution", "zapi"]).optional() }).optional())
+      .input(z.object({ provider: z.enum(["zapi"]).optional() }).optional())
       .mutation(async ({ input, ctx }) => {
         // Each CRM user gets exactly ONE WhatsApp instance
         // No sessionId needed — system generates it automatically
@@ -257,7 +257,6 @@ export const appRouter = router({
         const { assertFeatureAccess } = await import("./services/planLimitsService");
         await assertFeatureAccess(tenantId, "whatsappEmbedded");
         const userId = ctx.saasUser?.userId || ctx.user.id;
-        const requestedProvider = input?.provider || "evolution";
 
         // Block connection if user has an active session share
         if (tenantId > 0) {
@@ -271,79 +270,45 @@ export const appRouter = router({
         }
 
         // ─── Z-API PROVIDER ───
-        if (requestedProvider === "zapi") {
-          const { getZapiInstanceForTenant } = await import("./services/zapiProvisioningService");
-          const { registerZApiSession } = await import("./providers/zapiProvider");
-          const { zapiProvider } = await import("./providers/zapiProvider");
-          const { getInstanceName } = await import("./evolutionApi");
+        const { getZapiInstanceForTenant } = await import("./services/zapiProvisioningService");
+        const { registerZApiSession } = await import("./providers/zapiProvider");
+        const { zapiProvider } = await import("./providers/zapiProvider");
 
-          const zapiInstance = await getZapiInstanceForTenant(tenantId);
-          if (!zapiInstance) {
-            throw new TRPCError({
-              code: "BAD_REQUEST",
-              message: "Nenhuma instância Z-API provisionada para este tenant. Solicite ao administrador.",
-            });
-          }
-
-          const sessionId = getInstanceName(tenantId, userId);
-
-          // Register Z-API session credentials
-          registerZApiSession(sessionId, {
-            instanceId: zapiInstance.zapiInstanceId,
-            token: zapiInstance.zapiToken,
-            clientToken: zapiInstance.zapiClientToken || undefined,
+        const zapiInstance = await getZapiInstanceForTenant(tenantId);
+        if (!zapiInstance) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Nenhuma instância Z-API provisionada para este tenant. Solicite ao administrador.",
           });
+        }
 
-          // Check if already connected via Z-API
-          try {
-            const existingInst = await zapiProvider.fetchInstance(sessionId);
-            if (existingInst?.connectionStatus === "open") {
-              // Already connected — update DB and return
-              const db = await getDb();
-              const [existingSession] = await db!.select({ id: whatsappSessions.id })
-                .from(whatsappSessions)
-                .where(eq(whatsappSessions.sessionId, sessionId))
-                .limit(1);
-              
-              const sessionData = {
-                status: "connected" as const,
-                provider: "zapi" as const,
-                providerInstanceId: zapiInstance.zapiInstanceId,
-                providerToken: zapiInstance.zapiToken,
-                providerClientToken: zapiInstance.zapiClientToken,
-                phoneNumber: existingInst.phoneNumber || null,
-              };
+        const sessionId = `crm-${tenantId}-${userId}`;
 
-              if (existingSession) {
-                await db!.update(whatsappSessions).set(sessionData).where(eq(whatsappSessions.sessionId, sessionId));
-              } else {
-                await db!.insert(whatsappSessions).values({ sessionId, userId, tenantId, ...sessionData });
-              }
+        // Register Z-API session credentials
+        registerZApiSession(sessionId, {
+          instanceId: zapiInstance.zapiInstanceId,
+          token: zapiInstance.zapiToken,
+          clientToken: zapiInstance.zapiClientToken || undefined,
+        });
 
-              return { sessionId, status: "connected", qrDataUrl: null, user: null };
-            }
-          } catch (e) {
-            // Instance might not exist yet on Z-API side, continue to QR
-          }
-
-          // Generate QR code via Z-API
-          try {
-            const qrResult = await zapiProvider.connectInstance(sessionId);
-            const qrDataUrl = qrResult?.base64 || null;
-
-            // Save/update session in DB with Z-API provider info
+        // Check if already connected via Z-API
+        try {
+          const existingInst = await zapiProvider.fetchInstance(sessionId);
+          if (existingInst?.connectionStatus === "open") {
+            // Already connected — update DB and return
             const db = await getDb();
             const [existingSession] = await db!.select({ id: whatsappSessions.id })
               .from(whatsappSessions)
               .where(eq(whatsappSessions.sessionId, sessionId))
               .limit(1);
-
+            
             const sessionData = {
-              status: "connecting" as const,
+              status: "connected" as const,
               provider: "zapi" as const,
               providerInstanceId: zapiInstance.zapiInstanceId,
               providerToken: zapiInstance.zapiToken,
               providerClientToken: zapiInstance.zapiClientToken,
+              phoneNumber: existingInst.phoneNumber || null,
             };
 
             if (existingSession) {
@@ -352,59 +317,59 @@ export const appRouter = router({
               await db!.insert(whatsappSessions).values({ sessionId, userId, tenantId, ...sessionData });
             }
 
-            // Also update in-memory session for WebSocket/polling
-            whatsappManager.setSessionState(sessionId, {
-              instanceName: sessionId,
-              sessionId,
-              userId,
-              tenantId,
-              status: "connecting",
-              qrCode: qrDataUrl,
-              qrDataUrl,
-              user: null,
-              lastConnectedAt: null,
-              connectingStartedAt: Date.now(),
-            });
-
-            return { sessionId, status: "connecting", qrDataUrl, user: null };
-          } catch (e: any) {
-            throw new TRPCError({
-              code: "INTERNAL_SERVER_ERROR",
-              message: `Erro ao gerar QR Code via Z-API: ${e.message}`,
-            });
+            return { sessionId, status: "connected", qrDataUrl: null, user: null };
           }
+        } catch (e) {
+          // Instance might not exist yet on Z-API side, continue to QR
         }
 
-        // ─── EVOLUTION PROVIDER (default) ───
-        const state = await whatsappManager.connectUser(userId, tenantId);
-        
-        // If already connected, return immediately
-        if (state.status === "connected") {
-          return { sessionId: state.sessionId, status: state.status, qrDataUrl: null, user: state.user };
-        }
-        
-        // Wait up to 15 seconds for QR code to be generated
-        const startWait = Date.now();
-        const MAX_WAIT_MS = 15_000;
-        while (Date.now() - startWait < MAX_WAIT_MS) {
-          const current = whatsappManager.getSession(state.sessionId);
-          if (!current) break;
-          if (current.qrDataUrl) {
-            return { sessionId: current.sessionId, status: current.status, qrDataUrl: current.qrDataUrl, user: current.user };
+        // Generate QR code via Z-API
+        try {
+          const qrResult = await zapiProvider.connectInstance(sessionId);
+          const qrDataUrl = qrResult?.base64 || null;
+
+          // Save/update session in DB with Z-API provider info
+          const db = await getDb();
+          const [existingSession] = await db!.select({ id: whatsappSessions.id })
+            .from(whatsappSessions)
+            .where(eq(whatsappSessions.sessionId, sessionId))
+            .limit(1);
+
+          const sessionData = {
+            status: "connecting" as const,
+            provider: "zapi" as const,
+            providerInstanceId: zapiInstance.zapiInstanceId,
+            providerToken: zapiInstance.zapiToken,
+            providerClientToken: zapiInstance.zapiClientToken,
+          };
+
+          if (existingSession) {
+            await db!.update(whatsappSessions).set(sessionData).where(eq(whatsappSessions.sessionId, sessionId));
+          } else {
+            await db!.insert(whatsappSessions).values({ sessionId, userId, tenantId, ...sessionData });
           }
-          if (current.status === "connected") {
-            return { sessionId: current.sessionId, status: current.status, qrDataUrl: null, user: current.user };
-          }
-          await new Promise(r => setTimeout(r, 500));
+
+          // Also update in-memory session for WebSocket/polling
+          whatsappManager.setSessionState(sessionId, {
+            instanceName: sessionId,
+            sessionId,
+            userId,
+            tenantId,
+            status: "connecting",
+            qrCode: qrDataUrl,
+            qrDataUrl,
+            user: null,
+            lastConnectedAt: null,
+            connectingStartedAt: Date.now(),
+          });
+
+          return { sessionId, status: "connecting", qrDataUrl, user: null };
+        } catch (e: any) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: `Erro ao gerar QR Code via Z-API: ${e.message}`,
+          });
         }
-        
-        const finalState = whatsappManager.getSession(state.sessionId);
-        return {
-          sessionId: state.sessionId,
-          status: finalState?.status || state.status,
-          qrDataUrl: finalState?.qrDataUrl || null,
-          user: finalState?.user || null,
-        };
       }),
     disconnect: sessionTenantProcedure
       .input(z.object({ sessionId: z.string() }))
@@ -1044,7 +1009,6 @@ export const appRouter = router({
     getMediaUrl: sessionTenantProcedure
       .input(z.object({ sessionId: z.string(), messageId: z.string() }))
       .mutation(async ({ input, ctx }) => {
-        const { getBase64FromMediaMessage } = await import("./evolutionApi");
         const { resolveProviderForSession } = await import("./providers/providerFactory");
         const db = await getDb();
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
@@ -1071,12 +1035,8 @@ export const appRouter = router({
             remoteJid: msg.remoteJid,
             fromMe: msg.fromMe,
           });
-        } catch {
-          // Fallback to direct Evolution API
-          base64Data = await getBase64FromMediaMessage(instanceName, input.messageId, {
-            remoteJid: msg.remoteJid,
-            fromMe: msg.fromMe,
-          });
+        } catch (err: any) {
+          console.warn(`[getMediaUrl] Provider getBase64 failed:`, err.message);
         }
         if (!base64Data?.base64) {
           // Mark as unavailable in DB so we don't keep retrying
@@ -1886,62 +1846,29 @@ export const appRouter = router({
               const provider = await resolveProvider(sess.sessionId);
               ok = await provider.ensureWebhook(sess.instanceName);
             } catch {
-              ok = await (await import("./evolutionApi")).ensureWebhook(sess.instanceName);
+              console.warn(`[fixWebhooks] Provider ensureWebhook failed for ${sess.instanceName}, skipping`);
+              ok = false;
             }
             results.push({ instance: sess.instanceName, ok });
           }
         }
         return { fixed: results.filter(r => r.ok).length, total: results.length, results };
       }),
-    // Provider metrics — observability per provider (Evolution vs Z-API)
+    // Provider metrics — observability (Z-API only)
     providerMetrics: tenantProcedure
       .query(async () => {
         const { getAllProviderMetrics, getSessionsByProvider } = await import("./providers/providerFactory");
         const metrics = getAllProviderMetrics();
-        const evoSessions = await getSessionsByProvider("evolution");
         const zapiSessions = await getSessionsByProvider("zapi");
         return {
           metrics,
           sessionCounts: {
-            evolution: evoSessions.length,
             zapi: zapiSessions.length,
           },
           sessions: {
-            evolution: evoSessions,
             zapi: zapiSessions,
           },
         };
-      }),
-    // Migrate a session to a different provider
-    // NOTE: Manual migration to Z-API is DISABLED. Z-API is only available via automatic provisioning.
-    // Only migration back to Evolution (rollback) is allowed through this endpoint.
-    migrateProvider: tenantWriteProcedure
-      .input(z.object({
-        sessionId: z.string(),
-        toProvider: z.enum(["evolution", "zapi"]),
-        zapiInstanceId: z.string().optional(),
-        zapiToken: z.string().optional(),
-        zapiClientToken: z.string().optional(),
-      }))
-      .mutation(async ({ input }) => {
-        // Block manual migration to Z-API — only automatic provisioning is allowed
-        if (input.toProvider === "zapi") {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: "A migração manual para Z-API foi desabilitada. A Z-API é provisionada automaticamente ao ativar um plano pago.",
-          });
-        }
-        const { migrateSessionProvider } = await import("./providers/providerFactory");
-        await migrateSessionProvider(input.sessionId, input.toProvider);
-        return { success: true, sessionId: input.sessionId, provider: input.toProvider };
-      }),
-    // Rollback a session to Evolution (emergency)
-    rollbackProvider: tenantWriteProcedure
-      .input(z.object({ sessionId: z.string() }))
-      .mutation(async ({ input }) => {
-        const { rollbackSessionToEvolution } = await import("./providers/providerFactory");
-        await rollbackSessionToEvolution(input.sessionId);
-        return { success: true, sessionId: input.sessionId, provider: "evolution" };
       }),
     // Z-API Provisioning — get provisioned instance for tenant
     zapiProvisioningStatus: tenantProcedure

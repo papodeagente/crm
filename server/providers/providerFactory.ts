@@ -1,18 +1,13 @@
 /**
- * Provider Factory — Resolves the correct WhatsAppProvider per session.
+ * Provider Factory — Z-API Only
  *
- * Resolution strategy (in order):
- * 1. Session-level: whatsapp_sessions.provider column (most granular)
- * 2. Tenant-level: tenants.defaultWaProvider column (future)
- * 3. Global fallback: WA_PROVIDER env var
- * 4. Default: "evolution"
+ * All sessions use Z-API. The factory resolves credentials per session
+ * and returns the instrumented Z-API provider.
  *
- * This allows progressive rollout: one session on Z-API while others stay on Evolution.
- * The factory also handles Z-API session registration (loading credentials from DB).
+ * Evolution API has been fully removed from the system.
  */
 
 import type { WhatsAppProvider, ProviderType, ProviderMetrics } from "./types";
-import { evolutionProvider } from "./evolutionProvider";
 import { zapiProvider, registerZApiSession, getZApiSession } from "./zapiProvider";
 import { instrumentProvider } from "./instrumentedProvider";
 import { getDb } from "../db";
@@ -20,28 +15,25 @@ import { whatsappSessions } from "../../drizzle/schema";
 import { eq } from "drizzle-orm";
 
 // ════════════════════════════════════════════════════════════
-// PROVIDER REGISTRY
+// PROVIDER REGISTRY — Z-API only
 // ════════════════════════════════════════════════════════════
 
-const providers: Record<ProviderType, WhatsAppProvider> = {
-  evolution: instrumentProvider(evolutionProvider),
-  zapi: instrumentProvider(zapiProvider),
+const instrumentedZapi = instrumentProvider(zapiProvider);
+
+const providers: Record<string, WhatsAppProvider> = {
+  zapi: instrumentedZapi,
+  // "evolution" key kept as alias so old DB rows don't crash lookups
+  evolution: instrumentedZapi,
 };
 
-/** Get provider by type */
-export function getProvider(type: ProviderType): WhatsAppProvider {
-  const provider = providers[type];
-  if (!provider) {
-    throw new Error(`[ProviderFactory] Unknown provider type: ${type}`);
-  }
-  return provider;
+/** Get provider by type — always returns Z-API */
+export function getProvider(_type?: ProviderType | string): WhatsAppProvider {
+  return instrumentedZapi;
 }
 
-/** Get the default provider type from env or fallback */
+/** Default provider is always zapi */
 export function getDefaultProviderType(): ProviderType {
-  const envProvider = process.env.WA_PROVIDER;
-  if (envProvider === "zapi") return "zapi";
-  return "evolution";
+  return "zapi";
 }
 
 // ════════════════════════════════════════════════════════════
@@ -56,17 +48,16 @@ const CACHE_TTL_MS = 60_000; // 1 minute
  * Resolve the WhatsAppProvider for a specific session.
  *
  * This is the PRIMARY entry point used by all consumers.
- * It checks the DB for the session's provider field, registers Z-API
- * credentials if needed, and returns the correct provider instance.
+ * It checks the DB for Z-API credentials and registers them if needed.
  *
  * @param sessionId - The canonical session ID (e.g. "crm-1-2")
- * @returns The WhatsAppProvider for this session
+ * @returns The WhatsAppProvider (always Z-API)
  */
 export async function resolveProviderForSession(sessionId: string): Promise<WhatsAppProvider> {
   // Check cache first
   const cached = sessionProviderCache.get(sessionId);
   if (cached && cached.expiresAt > Date.now()) {
-    return getProvider(cached.type);
+    return instrumentedZapi;
   }
 
   // Look up session in DB
@@ -83,16 +74,12 @@ export async function resolveProviderForSession(sessionId: string): Promise<What
     .limit(1);
 
   if (!session) {
-    // Session not found in DB — use default provider
-    const defaultType = getDefaultProviderType();
-    sessionProviderCache.set(sessionId, { type: defaultType, expiresAt: Date.now() + CACHE_TTL_MS });
-    return getProvider(defaultType);
+    sessionProviderCache.set(sessionId, { type: "zapi", expiresAt: Date.now() + CACHE_TTL_MS });
+    return instrumentedZapi;
   }
 
-  const providerType = (session.provider || getDefaultProviderType()) as ProviderType;
-
-  // If Z-API, ensure credentials are registered
-  if (providerType === "zapi" && session.providerInstanceId && session.providerToken) {
+  // Ensure Z-API credentials are registered
+  if (session.providerInstanceId && session.providerToken) {
     const existing = getZApiSession(sessionId);
     if (!existing) {
       registerZApiSession(sessionId, {
@@ -104,36 +91,22 @@ export async function resolveProviderForSession(sessionId: string): Promise<What
   }
 
   // Update cache
-  sessionProviderCache.set(sessionId, { type: providerType, expiresAt: Date.now() + CACHE_TTL_MS });
+  sessionProviderCache.set(sessionId, { type: "zapi", expiresAt: Date.now() + CACHE_TTL_MS });
 
-  return getProvider(providerType);
+  return instrumentedZapi;
 }
 
 /**
  * Resolve provider type for a session (without full provider instance).
- * Useful for quick checks without loading the full provider.
+ * Always returns "zapi".
  */
-export async function resolveProviderTypeForSession(sessionId: string): Promise<ProviderType> {
-  const cached = sessionProviderCache.get(sessionId);
-  if (cached && cached.expiresAt > Date.now()) {
-    return cached.type;
-  }
-
-  const dbConn2 = (await getDb())!;
-  const [session] = await dbConn2
-    .select({ provider: whatsappSessions.provider })
-    .from(whatsappSessions)
-    .where(eq(whatsappSessions.sessionId, sessionId))
-    .limit(1);
-
-  const type = (session?.provider || getDefaultProviderType()) as ProviderType;
-  sessionProviderCache.set(sessionId, { type, expiresAt: Date.now() + CACHE_TTL_MS });
-  return type;
+export async function resolveProviderTypeForSession(_sessionId: string): Promise<ProviderType> {
+  return "zapi";
 }
 
 /**
  * Invalidate the provider cache for a session.
- * Call this when the session's provider is changed (e.g. during migration).
+ * Call this when the session's credentials change.
  */
 export function invalidateProviderCache(sessionId: string): void {
   sessionProviderCache.delete(sessionId);
@@ -145,46 +118,32 @@ export function clearProviderCache(): void {
 }
 
 // ════════════════════════════════════════════════════════════
-// MIGRATION HELPERS — For controlled rollout
+// MIGRATION HELPERS — Kept for backward compatibility
 // ════════════════════════════════════════════════════════════
 
 /**
- * Migrate a single session from one provider to another.
+ * Migrate a single session to Z-API (the only supported provider).
  * Updates the DB and invalidates cache.
- *
- * @param sessionId - Session to migrate
- * @param toProvider - Target provider type
- * @param zapiConfig - Z-API credentials (required when migrating to zapi)
  */
 export async function migrateSessionProvider(
   sessionId: string,
-  toProvider: ProviderType,
+  _toProvider: ProviderType,
   zapiConfig?: { instanceId: string; token: string; clientToken?: string }
 ): Promise<void> {
-  if (toProvider === "zapi" && !zapiConfig) {
-    throw new Error("[ProviderFactory] Z-API credentials required when migrating to zapi");
-  }
-
   const updateData: Record<string, any> = {
-    provider: toProvider,
+    provider: "zapi",
   };
 
-  if (toProvider === "zapi" && zapiConfig) {
+  if (zapiConfig) {
     updateData.providerInstanceId = zapiConfig.instanceId;
     updateData.providerToken = zapiConfig.token;
     updateData.providerClientToken = zapiConfig.clientToken || null;
 
-    // Register Z-API session
     registerZApiSession(sessionId, {
       instanceId: zapiConfig.instanceId,
       token: zapiConfig.token,
       clientToken: zapiConfig.clientToken,
     });
-  } else {
-    // Migrating back to evolution — clear Z-API fields
-    updateData.providerInstanceId = null;
-    updateData.providerToken = null;
-    updateData.providerClientToken = null;
   }
 
   const dbConn3 = (await getDb())!;
@@ -193,46 +152,39 @@ export async function migrateSessionProvider(
     .set(updateData)
     .where(eq(whatsappSessions.sessionId, sessionId));
 
-  // Invalidate cache
   invalidateProviderCache(sessionId);
 
-  console.log(`[ProviderFactory] Session "${sessionId}" migrated to "${toProvider}"`);
+  console.log(`[ProviderFactory] Session "${sessionId}" configured with Z-API`);
 }
 
-/**
- * Rollback a session to Evolution provider.
- * Quick helper for emergency rollback.
- */
-export async function rollbackSessionToEvolution(sessionId: string): Promise<void> {
-  await migrateSessionProvider(sessionId, "evolution");
+/** @deprecated Evolution API removed — this is a no-op */
+export async function rollbackSessionToEvolution(_sessionId: string): Promise<void> {
+  console.warn("[ProviderFactory] rollbackSessionToEvolution is deprecated — Evolution API removed");
 }
 
 /**
  * Get all sessions using a specific provider.
- * Useful for monitoring rollout progress.
  */
-export async function getSessionsByProvider(providerType: ProviderType): Promise<string[]> {
+export async function getSessionsByProvider(_providerType: ProviderType): Promise<string[]> {
   const dbConn4 = (await getDb())!;
   const sessions = await dbConn4
     .select({ sessionId: whatsappSessions.sessionId })
-    .from(whatsappSessions)
-    .where(eq(whatsappSessions.provider, providerType));
+    .from(whatsappSessions);
 
   return sessions.map((s: { sessionId: string }) => s.sessionId);
 }
 
 // ════════════════════════════════════════════════════════════
-// OBSERVABILITY — Per-provider metrics
+// OBSERVABILITY — Provider metrics (Z-API only)
 // ════════════════════════════════════════════════════════════
 
-const metricsStore: Record<ProviderType, ProviderMetrics> = {
-  evolution: createEmptyMetrics("evolution"),
+const metricsStore: Record<string, ProviderMetrics> = {
   zapi: createEmptyMetrics("zapi"),
 };
 
-function createEmptyMetrics(provider: ProviderType): ProviderMetrics {
+function createEmptyMetrics(provider: string): ProviderMetrics {
   return {
-    provider,
+    provider: provider as ProviderType,
     totalRequests: 0,
     totalErrors: 0,
     totalTimeouts: 0,
@@ -245,15 +197,14 @@ function createEmptyMetrics(provider: ProviderType): ProviderMetrics {
 
 /**
  * Record a provider operation for metrics.
- * Call this from the instrumented wrapper (see observability phase).
  */
 export function recordProviderMetric(
-  provider: ProviderType,
+  _provider: ProviderType,
   operation: string,
   latencyMs: number,
   error?: string
 ): void {
-  const m = metricsStore[provider];
+  const m = metricsStore.zapi;
   if (!m) return;
 
   m.totalRequests++;
@@ -279,22 +230,20 @@ export function recordProviderMetric(
   if (error) op.errors++;
 }
 
-/** Get metrics for a specific provider */
-export function getProviderMetrics(provider: ProviderType): ProviderMetrics {
-  return { ...metricsStore[provider] };
+/** Get metrics for Z-API provider */
+export function getProviderMetrics(_provider?: ProviderType): ProviderMetrics {
+  return { ...metricsStore.zapi };
 }
 
 /** Get metrics for all providers */
-export function getAllProviderMetrics(): Record<ProviderType, ProviderMetrics> {
+export function getAllProviderMetrics(): Record<string, ProviderMetrics> {
   return {
-    evolution: getProviderMetrics("evolution"),
     zapi: getProviderMetrics("zapi"),
   };
 }
 
 /** Reset metrics (for testing) */
 export function resetProviderMetrics(): void {
-  metricsStore.evolution = createEmptyMetrics("evolution");
   metricsStore.zapi = createEmptyMetrics("zapi");
 }
 
@@ -316,8 +265,7 @@ export async function initializeProviderSessions(): Promise<void> {
         providerToken: whatsappSessions.providerToken,
         providerClientToken: whatsappSessions.providerClientToken,
       })
-      .from(whatsappSessions)
-      .where(eq(whatsappSessions.provider, "zapi"));
+      .from(whatsappSessions);
 
     let registered = 0;
     for (const session of zapiSessions) {

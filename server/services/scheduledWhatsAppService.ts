@@ -19,8 +19,7 @@ import { eq, and, lte, sql, isNull, or } from "drizzle-orm";
 import { resolveConversation } from "../conversationResolver";
 import { assignConversation } from "../db";
 import { getActiveSessionForTenant } from "../bulkMessage";
-import { whatsappManager as baileysManager } from "../whatsapp";
-import { whatsappManager as evolutionManager } from "../whatsappEvolution";
+import { whatsappManager } from "../whatsappEvolution";
 import { randomUUID } from "crypto";
 
 // ─── Constants ───
@@ -53,13 +52,13 @@ export interface RescheduleInput {
   messageBody?: string;
 }
 
-// ─── Send text via any connected manager ───
+// ─── Send text via WhatsApp manager (Z-API only) ───
 async function sendTextViaAnyManager(sessionId: string, jid: string, text: string): Promise<any> {
-  const evoSession = evolutionManager.getSession(sessionId);
-  if (evoSession && evoSession.status === "connected") {
-    return evolutionManager.sendTextMessage(sessionId, jid, text);
+  const session = whatsappManager.getSession(sessionId);
+  if (session && session.status === "connected") {
+    return whatsappManager.sendTextMessage(sessionId, jid, text);
   }
-  return baileysManager.sendTextMessage(sessionId, jid, text);
+  throw new Error(`Sessão ${sessionId} não está conectada`);
 }
 
 // ─── Phone to JID ───

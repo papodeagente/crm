@@ -2,7 +2,7 @@
  * Safe Message Reconciliation
  *
  * Lightweight background task that reconciles recent messages
- * from Evolution API to prevent message loss.
+ * from Z-API API to prevent message loss.
  *
  * Strict limits:
  * - Max 20 conversations per cycle (only those with activity in last 24h)
@@ -17,14 +17,14 @@
 import { getDb } from "./db";
 import { waConversations, waMessages } from "../drizzle/schema";
 import { eq, and, sql, gt, desc } from "drizzle-orm";
-import * as evo from "./evolutionApi";
+// Z-API API removed — Z-API only
 import { normalizeToUnixSeconds } from "./providers/zapiProvider";
 import { resolveProviderForSession } from "./providers/providerFactory";
 import { resolveInbound, updateConversationLastMessage } from "./conversationResolver";
 import os from "os";
 
 // ─── CONSTANTS ──────────────────────────────────────────────
-// Reduced from 10 to 5 conversations per cycle to lower Evolution API load
+// Reduced from 10 to 5 conversations per cycle to lower Z-API API load
 const MAX_CONVERSATIONS_PER_CYCLE = 5;
 const MAX_MESSAGES_PER_CONVERSATION = 15;
 // Increased from 5 to 10 minutes to reduce API call frequency
@@ -202,12 +202,9 @@ async function reconcileConversation(
       limit: MAX_MESSAGES_PER_CONVERSATION,
       page: 1,
     });
-  } catch {
-    // Fallback to direct Evolution API if provider resolution fails
-    messages = await evo.findMessages(session.instanceName, conv.remoteJid, {
-      limit: MAX_MESSAGES_PER_CONVERSATION,
-      page: 1,
-    });
+  } catch (err: any) {
+    console.warn(`[Reconciliation] Provider findMessages failed for ${conv.remoteJid}:`, err.message);
+    messages = [];
   }
 
   if (!messages || messages.length === 0) return { skipped: 0, inserted: 0 };

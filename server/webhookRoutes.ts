@@ -1193,115 +1193,19 @@ router.post("/api/webhooks/rdstation", async (req: Request, res: Response) => {
   }
 });
 
-// ─── Evolution API Webhook ─────────────────────────────
-// Receives events from Evolution API (messages, connection updates, QR codes)
-
-// Handler shared by both routes
-async function handleEvolutionWebhook(req: Request, res: Response) {
-  const startTime = Date.now();
-  try {
-    const body = req.body;
-    console.log(`[TRACE][WEBHOOK_RECEIVED] timestamp: ${startTime} | event: ${body?.event} | instance: ${body?.instance} | msgId: ${body?.data?.key?.id || 'N/A'}`);
-    if (!body || !body.event) {
-      console.warn("[Webhook /evolution] Invalid payload:", JSON.stringify(body)?.substring(0, 200));
-      return res.status(400).json({ error: "Invalid webhook payload" });
-    }
-
-    // Log apikey mismatch as warning but DO NOT reject with 403.
-    // Evolution API sends its global apikey in the webhook payload, which may differ
-    // from our EVOLUTION_API_KEY (e.g. instance-level key vs global key).
-    // Rejecting here caused 403 for legitimate webhook calls from connected instances.
-    const expectedKey = process.env.EVOLUTION_API_KEY;
-    const receivedKey = body.apikey || req.headers["apikey"] || req.headers["x-api-key"];
-    if (expectedKey && receivedKey && receivedKey !== expectedKey) {
-      console.warn(`[Webhook /evolution] API key mismatch from ${req.ip} (received: ${String(receivedKey).substring(0, 8)}...) — accepting anyway`);
-    }
-
-    // Detailed logging for debugging
-    const remoteJid = body.data?.key?.remoteJid || body.data?.remoteJid || 'unknown';
-    const fromMe = body.data?.key?.fromMe;
-    const msgContent = body.data?.message?.conversation || body.data?.message?.extendedTextMessage?.text || '';
-    console.log(`[Webhook /evolution] Event: ${body.event} | Instance: ${body.instance} | JID: ${remoteJid} | fromMe: ${fromMe} | Content: ${msgContent.substring(0, 40)} | Path: ${req.path}`);
-
-    // Import the Evolution WhatsApp manager
-    const { whatsappManager } = await import("./whatsappEvolution");
-
-    // Route the event to the manager — DON'T await to respond faster
-    // The webhook handler should return 200 ASAP to avoid Evolution API retries
-    const eventPayload = {
-      event: body.event,
-      instance: body.instance,
-      data: body.data,
-      destination: body.destination,
-      date_time: body.date_time,
-      server_url: body.server_url,
-      apikey: body.apikey,
-    };
-
-    // Events that should be enqueued for async processing via BullMQ
-    const queueableEvents = [
-      'messages.upsert', 'send.message',
-      'messages.update',  // Status updates (sent/delivered/read ticks)
-      'messages.delete',  // Message deletions
-    ];
-
-    if (queueableEvents.includes(body.event)) {
-      const { enqueueMessageEvent, isQueueEnabled } = await import("./messageQueue");
-      
-      if (isQueueEnabled()) {
-        // Try to enqueue — if successful, respond immediately
-        const enqueued = await enqueueMessageEvent({
-          tenantId: 0, // Will be resolved by worker from session
-          sessionId: '', // Will be resolved by worker from instanceName
-          instanceName: body.instance,
-          event: body.event,
-          data: body.data,
-          receivedAt: Date.now(),
-        });
-
-        if (enqueued) {
-          const enqueueTime = Date.now();
-          console.log(`[TRACE][ENQUEUED] timestamp: ${enqueueTime} | delta_from_receive: ${enqueueTime - startTime}ms | event: ${body.event} | msgId: ${body?.data?.key?.id || 'N/A'}`);
-          console.log(`[Webhook /evolution] Enqueued ${body.event} in ${enqueueTime - startTime}ms (queue)`);
-          return res.status(200).json({ received: true, queued: true });
-        }
-      }
-
-      // Fallback: process async in-process (original behavior)
-      whatsappManager.handleWebhookEvent(eventPayload).catch(e =>
-        console.error(`[Webhook /evolution] Async processing error for ${body.event}:`, e.message)
-      );
-      console.log(`[Webhook /evolution] Responded in ${Date.now() - startTime}ms (sync fallback)`);
-      return res.status(200).json({ received: true });
-    }
-
-    // For other events (connection, qr, etc.), process async to avoid timeout.
-    // Evolution API has short webhook timeouts (~10s) and will retry/mark as failed
-    // if we take too long. connection.update can take 50s+ due to sync operations.
-    whatsappManager.handleWebhookEvent(eventPayload).catch(e =>
-      console.error(`[Webhook /evolution] Async processing error for ${body.event}:`, e.message)
-    );
-    console.log(`[Webhook /evolution] Responded in ${Date.now() - startTime}ms (async)`);
-    return res.status(200).json({ received: true });
-  } catch (error: any) {
-    console.error(`[Webhook /evolution] Error after ${Date.now() - startTime}ms:`, error.message);
-    return res.status(200).json({ received: true, error: error.message });
-  }
-}
-
-// Base route (webhookByEvents: false)
-router.post("/api/webhooks/evolution", handleEvolutionWebhook);
-
-// Wildcard route for webhookByEvents: true
-// Evolution API appends event name as path suffix, e.g.:
-//   /api/webhooks/evolution/messages-upsert
-//   /api/webhooks/evolution/messages-update
-//   /api/webhooks/evolution/connection-update
-//   /api/webhooks/evolution/send-message
-router.post("/api/webhooks/evolution/:eventType", handleEvolutionWebhook);
+// ─── Evolution API Webhook REMOVED ─────────────────────
+// Evolution API has been fully removed. All WhatsApp traffic now goes through Z-API.
+// The Evolution webhook routes (/api/webhooks/evolution) have been deprecated.
+// Legacy Evolution webhook calls will receive a 410 Gone response.
+router.post("/api/webhooks/evolution", (_req: Request, res: Response) => {
+  return res.status(410).json({ error: "Evolution API has been removed. Use Z-API webhooks." });
+});
+router.post("/api/webhooks/evolution/:eventType", (_req: Request, res: Response) => {
+  return res.status(410).json({ error: "Evolution API has been removed. Use Z-API webhooks." });
+});
 
 // ─── Z-API Webhook ──────────────────────────────────────
-// Receives events from Z-API and normalizes them to Evolution format
+// Receives events from Z-API and normalizes them to the internal webhook format
 // so the existing whatsappManager.handleWebhookEvent() works unchanged.
 //
 // Routes:

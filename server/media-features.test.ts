@@ -16,9 +16,9 @@ describe("getMediaUrl endpoint", () => {
 
 // Test the getBase64FromMediaMessage function
 describe("getBase64FromMediaMessage", () => {
-  it("should be exported from evolutionApi", async () => {
-    const evo = await import("./evolutionApi");
-    expect(typeof evo.getBase64FromMediaMessage).toBe("function");
+  it("should be exported from zapiProvider", async () => {
+    const { zapiProvider } = await import("./providers/zapiProvider");
+    expect(typeof zapiProvider.getBase64FromMediaMessage).toBe("function");
   });
 });
 

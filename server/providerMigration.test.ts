@@ -1,13 +1,12 @@
 /**
- * Tests for WhatsApp Provider Migration — Evolution API → Z-API
+ * Tests for WhatsApp Provider — Z-API Only
  *
  * Covers:
- * - Provider interface contract compliance
+ * - Provider interface contract compliance (Z-API)
  * - Provider factory resolution
  * - Webhook normalization (Z-API → canonical format)
  * - Consumer migration (fallback pattern)
  * - Metrics/observability
- * - Migration helpers
  */
 import { describe, it, expect, beforeEach } from "vitest";
 
@@ -16,31 +15,6 @@ import { describe, it, expect, beforeEach } from "vitest";
 // ════════════════════════════════════════════════════════════
 
 describe("Provider Interface Contract", () => {
-  it("evolutionProvider implements WhatsAppProvider interface", async () => {
-    const { evolutionProvider } = await import("./providers/evolutionProvider");
-    // Check all required methods exist
-    const requiredMethods = [
-      "createInstance", "connectInstance", "deleteInstance", "fetchAllInstances",
-      "fetchInstance", "restartInstance", "logoutInstance",
-      "sendText", "sendMedia", "sendReaction", "sendContact", "sendLocation",
-      "sendSticker", "sendAudio", "sendTextWithQuote",
-      "findChats", "findMessages", "findContacts",
-      "archiveChat", "markMessageAsUnread", "markMessageAsRead",
-      "updateBlockStatus", "checkIsWhatsApp",
-      "fetchAllGroups", "findGroupByJid", "createGroup",
-      "updateGroupMembers", "updateGroupSubject", "updateGroupDescription",
-      "fetchInviteCode", "revokeInviteCode", "updateGroupSetting",
-      "toggleEphemeral", "leaveGroup",
-      "getBase64FromMediaMessage",
-      "healthCheck", "findWebhook", "setWebhook", "ensureWebhook",
-      "normalizeWebhookPayload",
-    ];
-    for (const method of requiredMethods) {
-      expect(typeof (evolutionProvider as any)[method]).toBe("function");
-    }
-    expect(evolutionProvider.type).toBe("evolution");
-  });
-
   it("zapiProvider implements WhatsAppProvider interface", async () => {
     const { zapiProvider } = await import("./providers/zapiProvider");
     const requiredMethods = [
@@ -52,9 +26,6 @@ describe("Provider Interface Contract", () => {
       "archiveChat", "markMessageAsUnread", "markMessageAsRead",
       "updateBlockStatus", "checkIsWhatsApp",
       "fetchAllGroups", "findGroupByJid", "createGroup",
-      "updateGroupMembers", "updateGroupSubject", "updateGroupDescription",
-      "fetchInviteCode", "revokeInviteCode", "updateGroupSetting",
-      "toggleEphemeral", "leaveGroup",
       "getBase64FromMediaMessage",
       "healthCheck", "findWebhook", "setWebhook", "ensureWebhook",
       "normalizeWebhookPayload",
@@ -64,14 +35,6 @@ describe("Provider Interface Contract", () => {
     }
     expect(zapiProvider.type).toBe("zapi");
   });
-
-  it("both providers have same method signatures (same keys)", async () => {
-    const { evolutionProvider } = await import("./providers/evolutionProvider");
-    const { zapiProvider } = await import("./providers/zapiProvider");
-    const evoKeys = Object.keys(evolutionProvider).sort();
-    const zapiKeys = Object.keys(zapiProvider).sort();
-    expect(zapiKeys).toEqual(evoKeys);
-  });
 });
 
 // ════════════════════════════════════════════════════════════
@@ -79,13 +42,6 @@ describe("Provider Interface Contract", () => {
 // ════════════════════════════════════════════════════════════
 
 describe("Provider Factory", () => {
-  it("getProvider returns evolution provider", async () => {
-    const { getProvider } = await import("./providers/providerFactory");
-    const provider = getProvider("evolution");
-    expect(provider).toBeDefined();
-    expect(provider.type).toBe("evolution");
-  });
-
   it("getProvider returns zapi provider", async () => {
     const { getProvider } = await import("./providers/providerFactory");
     const provider = getProvider("zapi");
@@ -93,18 +49,11 @@ describe("Provider Factory", () => {
     expect(provider.type).toBe("zapi");
   });
 
-  it("getProvider throws for unknown provider", async () => {
-    const { getProvider } = await import("./providers/providerFactory");
-    expect(() => getProvider("unknown" as any)).toThrow("Unknown provider type");
-  });
-
-  it("getDefaultProviderType defaults to evolution", async () => {
+  it("getDefaultProviderType defaults to zapi", async () => {
     const { getDefaultProviderType } = await import("./providers/providerFactory");
-    // Without WA_PROVIDER env, should default to evolution
-    const original = process.env.WA_PROVIDER;
-    delete process.env.WA_PROVIDER;
-    expect(getDefaultProviderType()).toBe("evolution");
-    if (original) process.env.WA_PROVIDER = original;
+    const type = getDefaultProviderType();
+    // Now that Evolution is removed, default should be zapi
+    expect(type).toBe("zapi");
   });
 
   it("getDefaultProviderType respects WA_PROVIDER env", async () => {
@@ -235,38 +184,7 @@ describe("Z-API Webhook Normalization", () => {
 // 4. CONSUMER MIGRATION — Fallback pattern verification
 // ════════════════════════════════════════════════════════════
 
-describe("Consumer Migration — Fallback Pattern", () => {
-  it("messageReconciliation imports resolveProviderForSession", async () => {
-    const fs = await import("fs");
-    const content = fs.readFileSync("server/messageReconciliation.ts", "utf-8");
-    expect(content).toContain('import { resolveProviderForSession } from "./providers/providerFactory"');
-    // Verify fallback pattern exists
-    expect(content).toContain("resolveProviderForSession(session.sessionId)");
-    expect(content).toContain("provider.findMessages(session.instanceName");
-    // Verify fallback to direct evo
-    expect(content).toContain("evo.findMessages(session.instanceName");
-  });
-
-  it("messageWorker imports resolveProviderForSession", async () => {
-    const fs = await import("fs");
-    const content = fs.readFileSync("server/messageWorker.ts", "utf-8");
-    expect(content).toContain('import { resolveProviderForSession } from "./providers/providerFactory"');
-    expect(content).toContain("resolveProviderForSession(session.sessionId)");
-    expect(content).toContain("provider.getBase64FromMediaMessage(session.instanceName");
-    // Verify fallback
-    expect(content).toContain("evo.getBase64FromMediaMessage(session.instanceName");
-  });
-
-  it("audioTranscriptionWorker imports resolveProviderForSession", async () => {
-    const fs = await import("fs");
-    const content = fs.readFileSync("server/audioTranscriptionWorker.ts", "utf-8");
-    expect(content).toContain('import { resolveProviderForSession } from "./providers/providerFactory"');
-    expect(content).toContain("resolveProviderForSession(sessionId)");
-    expect(content).toContain("provider.getBase64FromMediaMessage(instanceName");
-    // Verify fallback
-    expect(content).toContain("evo.getBase64FromMediaMessage(instanceName");
-  });
-
+describe("Consumer Migration — Provider Factory Usage", () => {
   it("routers.ts uses provider factory for getMediaUrl", async () => {
     const fs = await import("fs");
     const content = fs.readFileSync("server/routers.ts", "utf-8");
@@ -293,11 +211,11 @@ describe("Provider Metrics", () => {
 
   it("recordProviderMetric records correctly", async () => {
     const { recordProviderMetric, getProviderMetrics } = await import("./providers/providerFactory");
-    recordProviderMetric("evolution", "sendText", 150);
-    recordProviderMetric("evolution", "sendText", 250);
-    recordProviderMetric("evolution", "findChats", 500, "timeout");
+    recordProviderMetric("zapi", "sendText", 150);
+    recordProviderMetric("zapi", "sendText", 250);
+    recordProviderMetric("zapi", "findChats", 500, "timeout");
 
-    const metrics = getProviderMetrics("evolution");
+    const metrics = getProviderMetrics("zapi");
     expect(metrics.totalRequests).toBe(3);
     expect(metrics.totalErrors).toBe(1);
     expect(metrics.totalTimeouts).toBe(1);
@@ -306,20 +224,18 @@ describe("Provider Metrics", () => {
     expect(metrics.operations["findChats"].errors).toBe(1);
   });
 
-  it("getAllProviderMetrics returns both providers", async () => {
+  it("getAllProviderMetrics returns zapi", async () => {
     const { getAllProviderMetrics } = await import("./providers/providerFactory");
     const all = getAllProviderMetrics();
-    expect(all).toHaveProperty("evolution");
     expect(all).toHaveProperty("zapi");
-    expect(all.evolution.provider).toBe("evolution");
     expect(all.zapi.provider).toBe("zapi");
   });
 
   it("resetProviderMetrics clears all data", async () => {
     const { recordProviderMetric, resetProviderMetrics, getProviderMetrics } = await import("./providers/providerFactory");
-    recordProviderMetric("evolution", "sendText", 100);
+    recordProviderMetric("zapi", "sendText", 100);
     resetProviderMetrics();
-    const metrics = getProviderMetrics("evolution");
+    const metrics = getProviderMetrics("zapi");
     expect(metrics.totalRequests).toBe(0);
     expect(metrics.totalErrors).toBe(0);
   });
@@ -330,12 +246,11 @@ describe("Provider Metrics", () => {
 // ════════════════════════════════════════════════════════════
 
 describe("Instrumented Provider", () => {
-  it("instrumentProvider wraps provider without changing type", async () => {
+  it("instrumentProvider wraps zapiProvider without changing type", async () => {
     const { instrumentProvider } = await import("./providers/instrumentedProvider");
-    const { evolutionProvider } = await import("./providers/evolutionProvider");
-    const instrumented = instrumentProvider(evolutionProvider);
-    expect(instrumented.type).toBe("evolution");
-    // Should still have all methods
+    const { zapiProvider } = await import("./providers/zapiProvider");
+    const instrumented = instrumentProvider(zapiProvider);
+    expect(instrumented.type).toBe("zapi");
     expect(typeof instrumented.sendText).toBe("function");
     expect(typeof instrumented.findChats).toBe("function");
   });
@@ -375,7 +290,6 @@ describe("Database Schema — Provider Fields", () => {
   it("whatsappSessions schema has provider fields", async () => {
     const { whatsappSessions } = await import("../drizzle/schema");
     const columns = Object.keys(whatsappSessions);
-    // The schema object should have these column definitions
     expect(columns).toContain("provider");
     expect(columns).toContain("providerInstanceId");
     expect(columns).toContain("providerToken");
@@ -397,7 +311,7 @@ describe("Webhook Routes", () => {
 });
 
 // ════════════════════════════════════════════════════════════
-// 10. ROUTER ENDPOINTS — Migration/rollback/metrics
+// 10. ROUTER ENDPOINTS — Metrics
 // ════════════════════════════════════════════════════════════
 
 describe("Router Endpoints", () => {
@@ -406,19 +320,5 @@ describe("Router Endpoints", () => {
     const content = fs.readFileSync("server/routers.ts", "utf-8");
     expect(content).toContain("providerMetrics:");
     expect(content).toContain("getAllProviderMetrics");
-  });
-
-  it("routers.ts has migrateProvider endpoint", async () => {
-    const fs = await import("fs");
-    const content = fs.readFileSync("server/routers.ts", "utf-8");
-    expect(content).toContain("migrateProvider:");
-    expect(content).toContain("migrateSessionProvider");
-  });
-
-  it("routers.ts has rollbackProvider endpoint", async () => {
-    const fs = await import("fs");
-    const content = fs.readFileSync("server/routers.ts", "utf-8");
-    expect(content).toContain("rollbackProvider:");
-    expect(content).toContain("rollbackSessionToEvolution");
   });
 });

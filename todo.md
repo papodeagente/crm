@@ -5917,3 +5917,97 @@
 - [x] Corrigir SQL: crm_user_role AS role, ISNULL() em vez de NULLS LAST
 - [x] Testar todas as rotas via curl/browser (9/9 endpoints OK)
 - [x] Salvar checkpoint
+
+## Migração Definitiva WhatsApp → Z-API Only
+
+### Escopo 1 — Remoção da Evolution API
+- [ ] Auditar todos os arquivos com referências à Evolution API
+- [ ] Remover serviços, configs, toggles, providers, adaptadores Evolution
+- [ ] Remover jobs, handlers, endpoints Evolution
+- [ ] Remover referências de UI, textos, opções de seleção Evolution
+- [ ] Remover lógica condicional, fallbacks, webhooks Evolution
+- [ ] Remover seeds/defaults ligados à Evolution API
+
+### Escopo 2 — Padronização Z-API Only
+- [ ] Padronizar criação de instância, auth, conexão, desconexão
+- [ ] Padronizar QR Code, status de sessão
+- [ ] Padronizar envio/recebimento de mensagens
+- [ ] Padronizar sincronização em tempo real, histórico
+- [ ] Padronizar fotos de perfil, grupos, recibos/status
+- [ ] Padronizar webhooks de eventos, reconciliação
+
+### Escopo 3 — Experiência WhatsApp Web
+- [ ] Melhorar fluidez, sync rápida, renderização estável
+- [ ] Fotos dos contatos aparecendo normalmente
+- [ ] Lista de conversas consistente, ordenação por última interação
+- [ ] Preview de última mensagem confiável
+- [ ] Indicadores visuais de conexão e estado do canal
+- [ ] Melhor tratamento de reconexão, menor latência
+
+### Escopo 4 — Compatibilidade Total
+- [ ] Verificar inbox, conversa em tempo real, chat na negociação
+- [ ] Verificar envio manual, mídia, histórico, fotos de perfil
+- [ ] Verificar automações, tarefas, tags, templates
+- [ ] Verificar análise de IA, resumo, sugestões, logs, auditoria
+
+### Escopo 5-6 — Painel de Planos e Entitlements
+- [ ] Schema: plans, plan_features, tenant_entitlements, entitlement_overrides
+- [ ] Backend: entitlement engine consolidado
+- [ ] Backend: validação server-side de features por plano
+- [ ] Frontend: Painel de Features por Plano no Super Admin
+
+### Escopo 7-8 — Provisionamento Z-API
+- [ ] Backend: provisionamento automático por pagamento (Hotmart/Stripe)
+- [ ] Backend: provisionamento manual pelo Super Admin
+- [ ] Schema: provisioning_logs, wa_instances
+- [ ] Frontend: Tela de Provisionamento no Super Admin
+
+### Escopo 9 — Vinculação Planos ao WhatsApp
+- [ ] Bloqueio por plano (tenant sem entitlement não conecta)
+- [ ] Limites de números por plano
+- [ ] UI de bloqueio com explicação clara
+
+### Escopo 10 — Performance e Estabilidade
+- [ ] Otimizar tempo de sincronização e latência
+- [ ] Eliminar duplicidade de mensagens
+- [ ] Otimizar consultas pesadas, polling, race conditions
+- [ ] Melhorar reconexão e retries
+
+### Escopo 11 — Fotos de Perfil
+- [ ] Captura via Z-API, cache, atualização, fallback
+- [ ] Exibição consistente em lista, header, negociação
+
+### Escopo 12 — Webhooks e Idempotência
+- [ ] Validação de origem, autenticação, idempotência
+- [ ] Deduplicação, rastreabilidade, retries seguros
+
+### Escopo 13 — Logs e Auditoria
+- [ ] Auditoria de criação/revogação de instância
+- [ ] Auditoria de mudança de entitlement, compras, bloqueios
+
+### Escopo 14 — Migração de Dados
+- [ ] Normalizar provider para Z-API nos registros existentes
+- [ ] Limpar estados órfãos da Evolution API
+
+### Escopo 15 — Testes
+- [ ] Testes de entitlements, provisionamento, segurança
+- [ ] Testes de isolamento por tenant
+- [ ] Testes de compatibilidade (inbox, chat, envio, mídia)
+
+## Remoção da Evolution API
+- [x] Remover evolutionApi.ts e evolutionProvider.ts do sistema
+- [x] Atualizar providerFactory.ts para Z-API only (manter alias "evolution" para compatibilidade DB)
+- [x] Atualizar types.ts — ProviderType agora é apenas "zapi"
+- [x] Simplificar connect mutation em routers.ts (remover branch Evolution)
+- [x] Atualizar scheduledWhatsAppService.ts — renomear evolutionManager para whatsappManager
+- [x] Atualizar schema.ts — default do provider mudou de "evolution" para "zapi"
+- [x] Migração DB — todas as sessões "evolution" migradas para "zapi"
+- [x] Reescrever providerMigration.test.ts sem referências Evolution
+- [x] Reescrever zapiRouting.test.ts sem referências Evolution
+- [x] Reescrever rateLimitFix.test.ts sem referências Evolution
+- [x] Reescrever providerUI.test.ts para Z-API only
+- [x] Corrigir media-features.test.ts — import zapiProvider ao invés de evolutionApi
+- [x] Remover providerSelect.test.ts (Evolution-specific)
+- [x] Criar zapiApi.test.ts substituindo evolutionApi.test.ts
+- [x] Todos os 68 testes passando (6 arquivos de teste)
+- [x] webhookRoutes.ts mantém endpoint deprecated /api/webhooks/evolution retornando 410

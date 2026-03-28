@@ -14,7 +14,7 @@
 // ════════════════════════════════════════════════════════════
 
 /** Identifies which provider backs a given session */
-export type ProviderType = "evolution" | "zapi";
+export type ProviderType = "zapi";
 
 /** Instance/connection info returned by the provider */
 export interface WAInstance {

@@ -7,8 +7,8 @@
  * 
  * Audio download strategies (in order):
  * 1. mediaUrl from DB (Z-API provides permanent URLs, S3 URLs from downloadAndStoreMedia)
- * 2. getBase64FromMediaMessage via provider (Evolution API)
- * 3. Direct Evolution API fallback
+ * 2. getBase64FromMediaMessage via provider (Z-API)
+ * 3. Direct Z-API fallback
  * 
  * Flow:
  * 1. Audio message detected → job enqueued to BullMQ (or sync fallback)
@@ -32,7 +32,7 @@ import { getDb } from "./db";
 import { eq, and } from "drizzle-orm";
 import { waMessages } from "../drizzle/schema";
 import { getActiveAiIntegration, getTenantAiSettings } from "./db";
-import * as evo from "./evolutionApi";
+// Z-API removed — Z-API only
 import { resolveProviderForSession } from "./providers/providerFactory";
 import { storagePut } from "./storage";
 
@@ -234,7 +234,7 @@ async function processTranscriptionJob(data: AudioTranscriptionJob): Promise<voi
       audioBuffer = Buffer.from(await audioRes.arrayBuffer());
     }
 
-    // Strategy 2: getBase64FromMediaMessage via provider (Evolution API)
+    // Strategy 2: getBase64FromMediaMessage via provider (Z-API)
     if (!audioBuffer) {
       let mediaResult: { base64: string; mimetype: string; fileName?: string } | null = null;
       try {
@@ -243,12 +243,8 @@ async function processTranscriptionJob(data: AudioTranscriptionJob): Promise<voi
           remoteJid,
           fromMe,
         });
-      } catch {
-        // Fallback to direct Evolution API
-        mediaResult = await evo.getBase64FromMediaMessage(instanceName, externalMessageId, {
-          remoteJid,
-          fromMe,
-        });
+      } catch (err: any) {
+        console.warn(`[AudioTranscription] Provider getBase64 failed for msg ${messageId}:`, err.message);
       }
       if (mediaResult?.base64) {
         audioBuffer = Buffer.from(mediaResult.base64, "base64");
