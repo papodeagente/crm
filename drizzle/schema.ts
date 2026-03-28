@@ -2331,3 +2331,26 @@ export const aiTrainingConfigs = mysqlTable("ai_training_configs", {
 ]);
 export type AiTrainingConfig = typeof aiTrainingConfigs.$inferSelect;
 export type InsertAiTrainingConfig = typeof aiTrainingConfigs.$inferInsert;
+
+// ════════════════════════════════════════════════════════════
+// DEAL FILES — Repositório de arquivos vinculados a negociações
+// ════════════════════════════════════════════════════════════
+export const dealFiles = mysqlTable("deal_files", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  dealId: int("dealId").notNull(),
+  fileName: varchar("fileName", { length: 512 }).notNull(),
+  fileKey: varchar("fileKey", { length: 1024 }).notNull(),
+  url: text("url").notNull(),
+  mimeType: varchar("mimeType", { length: 128 }),
+  sizeBytes: bigint("sizeBytes", { mode: "number" }).default(0),
+  description: varchar("description", { length: 512 }),
+  uploadedBy: int("uploadedBy"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  deletedAt: timestamp("deletedAt"),
+}, (t) => [
+  index("df_tenant_idx").on(t.tenantId),
+  index("df_deal_idx").on(t.tenantId, t.dealId),
+]);
+export type DealFile = typeof dealFiles.$inferSelect;
+export type InsertDealFile = typeof dealFiles.$inferInsert;

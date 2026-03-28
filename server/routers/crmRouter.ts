@@ -2,6 +2,9 @@ import { z } from "zod";
 import { tenantProcedure, tenantWriteProcedure, getTenantId, router } from "../_core/trpc";
 import { TRPCError } from "@trpc/server";
 import * as crm from "../crmDb";
+import { listDealFiles, createDealFile, deleteDealFile, getDealFile, countDealFiles } from "../db";
+import { storagePut } from "../storage";
+import { nanoid } from "nanoid";
 import { emitEvent } from "../middleware/eventLog";
 import { createNotification } from "../db";
 import { getDb } from "../db";
@@ -1373,6 +1376,59 @@ const tenantId = getTenantId(ctx); const { id, dealId, checkIn, checkOut, ...dat
             actorUserId: ctx.user.id, actorName: ctx.user.name || "Sistema",
           });
           return { success: true };
+        }),
+    }),
+
+    // ─── DEAL FILES (Repositório de Arquivos) ───
+    files: router({
+      list: tenantProcedure
+        .input(z.object({ dealId: z.number() }))
+        .query(async ({ input, ctx }) => {
+          return listDealFiles(getTenantId(ctx), input.dealId);
+        }),
+      count: tenantProcedure
+        .input(z.object({ dealId: z.number() }))
+        .query(async ({ input, ctx }) => {
+          return countDealFiles(getTenantId(ctx), input.dealId);
+        }),
+      upload: tenantWriteProcedure
+        .input(z.object({
+          dealId: z.number(),
+          fileName: z.string(),
+          fileBase64: z.string(),
+          contentType: z.string(),
+          sizeBytes: z.number().optional(),
+          description: z.string().optional(),
+        }))
+        .mutation(async ({ ctx, input }) => {
+          const tid = getTenantId(ctx);
+          const fileBuffer = Buffer.from(input.fileBase64, "base64");
+          const ext = input.fileName.split(".").pop() || "bin";
+          const fileKey = `deal-files/${tid}/${input.dealId}/${nanoid()}.${ext}`;
+          const { url } = await storagePut(fileKey, fileBuffer, input.contentType);
+          const result = await createDealFile({
+            tenantId: tid,
+            dealId: input.dealId,
+            fileName: input.fileName,
+            fileKey,
+            url,
+            mimeType: input.contentType,
+            sizeBytes: input.sizeBytes || fileBuffer.length,
+            description: input.description || null,
+            uploadedBy: ctx.user.id,
+          });
+          return { id: result.id, url, fileName: input.fileName };
+        }),
+      delete: tenantWriteProcedure
+        .input(z.object({ id: z.number(), dealId: z.number() }))
+        .mutation(async ({ ctx, input }) => {
+          await deleteDealFile(getTenantId(ctx), input.id);
+          return { success: true };
+        }),
+      get: tenantProcedure
+        .input(z.object({ id: z.number() }))
+        .query(async ({ input, ctx }) => {
+          return getDealFile(getTenantId(ctx), input.id);
         }),
     }),
   }),

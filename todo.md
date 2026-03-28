@@ -6014,3 +6014,20 @@
 
 ## Reordenação do Menu
 - [x] Mover item Inbox para entre Negociação e Contatos no menu lateral
+
+## Auditoria LGPD Completa
+- [ ] Fase 1: Mapeamento da arquitetura, schema, integrações e fluxos de dados pessoais
+- [ ] Fase 2: Diagnóstico — inventário de tratamento, papéis, bases legais, princípios, direitos do titular
+- [ ] Fase 3: Matriz de conformidade LGPD e matriz de riscos
+- [ ] Fase 4: Plano de remediação priorizado e implementação segura
+- [ ] Fase 5: Testes e validação pós-correções
+- [ ] Fase 6: Relatório final completo (executivo + técnico + matrizes)
+
+## Repositório de Arquivos em Negociações
+- [x] Criar tabela deal_files no schema (tenantId, dealId, fileName, fileKey, url, mimeType, sizeBytes, uploadedBy)
+- [x] Gerar migration SQL e aplicar no banco
+- [x] Criar db helpers para CRUD de deal_files
+- [x] Criar routers tRPC: list, upload, download, delete
+- [x] Criar componente DealFiles com upload, listagem e download
+- [x] Inserir item ARQUIVOS no menu de Negociações entre Produtos/Serviços e Participantes
+- [x] Escrever testes vitest para os routers de deal_files

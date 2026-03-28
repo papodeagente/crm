@@ -19,7 +19,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "
 import { toast } from "sonner";
 import {
   ArrowLeft, Building2, Calendar, Check, CheckCheck, ChevronDown, ChevronRight, ChevronUp,
-  Clock, Copy, DollarSign, Edit2, ExternalLink, FileText, Flag, GripVertical,
+  Clock, Copy, DollarSign, Edit2, ExternalLink, FileText, Flag, FolderOpen, GripVertical,
   History, Loader2, Mail, MapPin, MessageCircle, MessageSquarePlus, Mic, MoreHorizontal,
   Package, Phone, Plane, Play, Plus, Send, ShoppingBag, ThumbsDown, ThumbsUp,
   Trash2, User, Users, X, AlertCircle, ClipboardList, Paperclip, Tag,
@@ -27,6 +27,7 @@ import {
   PanelLeftOpen, Maximize2, Minimize2
 } from "lucide-react";
 import TaskFormDialog from "@/components/TaskFormDialog";
+import DealFilesPanel from "@/components/DealFilesPanel";
 import TaskActionPopover from "@/components/TaskActionPopover";
 import SaleCelebration from "@/components/SaleCelebration";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -122,6 +123,7 @@ export default function DealDetail() {
   );
   const productsQ = trpc.crm.deals.products.list.useQuery({ dealId }, { enabled: dealId > 0 });
   const participantsQ = trpc.crm.deals.participants.list.useQuery({ dealId }, { enabled: dealId > 0 });
+  const filesCountQ = trpc.crm.deals.files.count.useQuery({ dealId }, { enabled: dealId > 0 });
   const historyQ = trpc.crm.deals.history.list.useQuery({ dealId }, { enabled: dealId > 0 });
   const tasksRawQ = trpc.crm.tasks.list.useQuery(
     { entityType: "deal", entityId: dealId },
@@ -228,7 +230,7 @@ export default function DealDetail() {
   const [waSidebarDrawerOpen, setWaSidebarDrawerOpen] = useState(false);
 
   /* ─── Content tabs ─── */
-  const [activeTab, setActiveTab] = useState<"history" | "tasks" | "products" | "participants" | "whatsapp" | "ai-analysis">("history");
+  const [activeTab, setActiveTab] = useState<"history" | "tasks" | "products" | "files" | "participants" | "whatsapp" | "ai-analysis">("history");
 
   const isWhatsAppTab = activeTab === "whatsapp";
 
@@ -1263,6 +1265,7 @@ export default function DealDetail() {
               { key: "history" as const, label: "Histórico", shortLabel: "Hist.", icon: History },
               { key: "tasks" as const, label: "Tarefas", shortLabel: "Tarefas", icon: ClipboardList, count: tasksList.length },
               { key: "products" as const, label: "Produtos e Serviços", shortLabel: "Produtos", icon: ShoppingBag, count: (productsQ.data || []).length },
+              { key: "files" as const, label: "Arquivos", shortLabel: "Arquivos", icon: FolderOpen, count: filesCountQ.data || 0 },
               { key: "participants" as const, label: "Participantes", shortLabel: "Partic.", icon: Users, count: (participantsQ.data || []).length },
               { key: "whatsapp" as const, label: "WhatsApp", shortLabel: "WA", icon: MessageCircle, count: waMessagesCountQ.data || 0 },
               { key: "ai-analysis" as const, label: "Análise IA", shortLabel: "IA", icon: Sparkles },
@@ -1311,6 +1314,12 @@ export default function DealDetail() {
                 products={productsQ.data || []}
                 dealId={dealId}
                 onRefresh={() => { productsQ.refetch(); dealQ.refetch(); }}
+              />
+            )}
+            {activeTab === "files" && (
+              <DealFilesPanel
+                dealId={dealId}
+                onRefresh={() => filesCountQ.refetch()}
               />
             )}
             {activeTab === "participants" && (

@@ -1,4 +1,4 @@
-import { eq, desc, and, or, like, lt, gt, isNotNull, sql, inArray } from "drizzle-orm";
+import { eq, desc, and, or, like, lt, gt, isNotNull, isNull, sql, inArray } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 
 import { InsertUser, users, whatsappSessions, waMessages as messages, activityLogs, chatbotSettings, chatbotRules, conversationAssignments, crmUsers, teams, teamMembers, distributionRules, customFields, customFieldValues, waConversations, userPreferences, sessionShares, conversationEvents, internalNotes, quickReplies, waContacts, aiIntegrations, aiTrainingConfigs, tenants, conversationLocks, waReactions } from "../drizzle/schema";
@@ -3691,4 +3691,51 @@ async function callAnthropicForTenant(
     }
     throw err;
   }
+}
+
+
+// ════════════════════════════════════════════════════════════
+// DEAL FILES — Repositório de arquivos vinculados a negociações
+// ════════════════════════════════════════════════════════════
+import { dealFiles, type InsertDealFile } from "../drizzle/schema";
+
+export async function listDealFiles(tenantId: number, dealId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(dealFiles)
+    .where(and(eq(dealFiles.tenantId, tenantId), eq(dealFiles.dealId, dealId), isNull(dealFiles.deletedAt)))
+    .orderBy(desc(dealFiles.createdAt));
+}
+
+export async function createDealFile(data: InsertDealFile) {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  const [result] = await db.insert(dealFiles).values(data).$returningId();
+  return result;
+}
+
+export async function deleteDealFile(tenantId: number, fileId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  // Soft-delete
+  await db.update(dealFiles)
+    .set({ deletedAt: new Date() })
+    .where(and(eq(dealFiles.id, fileId), eq(dealFiles.tenantId, tenantId)));
+}
+
+export async function getDealFile(tenantId: number, fileId: number) {
+  const db = await getDb();
+  if (!db) return null;
+  const [file] = await db.select().from(dealFiles)
+    .where(and(eq(dealFiles.id, fileId), eq(dealFiles.tenantId, tenantId), isNull(dealFiles.deletedAt)))
+    .limit(1);
+  return file || null;
+}
+
+export async function countDealFiles(tenantId: number, dealId: number) {
+  const db = await getDb();
+  if (!db) return 0;
+  const [result] = await db.select({ count: sql<number>`count(*)` }).from(dealFiles)
+    .where(and(eq(dealFiles.tenantId, tenantId), eq(dealFiles.dealId, dealId), isNull(dealFiles.deletedAt)));
+  return result?.count || 0;
 }
