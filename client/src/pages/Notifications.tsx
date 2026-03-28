@@ -5,7 +5,7 @@ import { Switch } from "@/components/ui/switch";
 import {
   Bell, MessageSquare, ArrowRightLeft, UserPlus, ClipboardList, Briefcase,
   Check, CheckCheck, TrendingUp, Settings2, Clock, Cake, Heart,
-  Wifi, WifiOff, AlertTriangle, Zap, UserCheck, X,
+  Wifi, WifiOff, AlertTriangle, Zap, UserCheck, X, Plane,
 } from "lucide-react";
 import { formatDate } from "../../../shared/dateUtils";
 import { useLocation } from "wouter";
@@ -123,6 +123,14 @@ const typeConfig: Record<string, { icon: any; bg: string; iconBg: string; iconCo
     iconColor: "text-cyan-400",
     label: "Automação",
   },
+  departure_soon: {
+    icon: Plane,
+    bg: "border-l-4 border-l-sky-500",
+    iconBg: "bg-sky-500/15",
+    iconColor: "text-sky-400",
+    label: "Embarque Próximo",
+    route: (id) => `/deals/${id}`,
+  },
 };
 
 // ─── Preference Categories ───
@@ -134,7 +142,8 @@ const PREF_CATEGORIES = [
       { key: "deal_created", label: "Novas negociações", description: "Quando uma nova negociação é criada", icon: Briefcase, isDefault: true },
       { key: "rfv_filter_alert", label: "Alertas da Matriz RFV", description: "Quando contatos entram em novos segmentos RFV", icon: TrendingUp, isDefault: true },
       { key: "task_due_soon", label: "Tarefas vencendo em 3 horas", description: "Alerta quando uma tarefa está prestes a vencer", icon: Clock, isDefault: true },
-      { key: "birthday", label: "Aniversariantes do dia", description: "Contatos que fazem aniversário hoje", icon: Cake, isDefault: true },
+      { key: "birthday", label: "Aniversáriantes do dia", description: "Contatos que fazem aniversário hoje", icon: Cake, isDefault: true },
+      { key: "departure_soon", label: "Embarques próximos", description: "Alerta sobre viagens com embarque nos próximos 7 dias", icon: Plane, isDefault: true },
     ],
   },
   {

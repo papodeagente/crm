@@ -2220,6 +2220,7 @@ Gere a previsão inteligente no formato JSON.`;
           rfv_filter_alert: true,
           task_due_soon: true,
           birthday: true,
+          departure_soon: true,
           // Optional (off by default)
           deal_moved: false,
           contact_created: false,

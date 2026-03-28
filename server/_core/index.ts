@@ -234,6 +234,9 @@ async function startServer() {
     // Start task due soon notification scheduler (tasks due within 3h)
     import("../taskDueScheduler").then(m => m.startTaskDueScheduler());
 
+    // Start departure notification scheduler (embarques próximos)
+    import("../departureScheduler").then(m => m.startDepartureScheduler());
+
     // Start Z-API alert monitoring scheduler (disconnections + billing overdue)
     import("../zapiAlertScheduler").then(m => m.startZapiAlertScheduler());
 

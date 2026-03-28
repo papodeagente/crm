@@ -6068,3 +6068,13 @@
 - [x] Criar procedure backend para buscar próximos embarques (vendas fechadas com data de embarque)
 - [x] Implementar componente de Próximos Embarques no frontend do Dashboard
 - [x] Escrever testes vitest (9 testes passando)
+## Sistema de Notificação de Embarques Próximos
+- [x] Analisar sistema de notificações e scheduler existentes
+- [x] Implementar job agendado para detectar embarques próximos e criar notificações (departureScheduler.ts)
+- [x] Integrar com sino de notificações existente (departure_soon ativado por padrão nas preferências)
+- [x] Escrever testes vitest (13 testes passando)
+## Card de Embarques no Dashboard com Popup Detalhado
+- [ ] Analisar padrão de popup existente (sem tarefas/esfriando) no Dashboard
+- [ ] Adicionar card de embarques nos KPIs da Visão Executiva
+- [ ] Implementar popup/dialog detalhado ao clicar no card de embarques
+- [ ] Testar e validar
