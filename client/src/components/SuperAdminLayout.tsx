@@ -42,6 +42,13 @@ const navGroups: NavGroup[] = [
       { path: "/super-admin", label: "Gestão de Tenants", icon: Users },
     ],
   },
+  {
+    title: "Segurança",
+    defaultOpen: true,
+    items: [
+      { path: "/super-admin/management", label: "Super Admins", icon: Shield },
+    ],
+  },
 ];
 
 function NavGroupSection({

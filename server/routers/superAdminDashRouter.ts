@@ -24,11 +24,11 @@ function parseCookies(cookieHeader: string | undefined): Map<string, string> {
 const SAAS_COOKIE = "entur_saas_session";
 
 async function requireSuperAdmin(ctx: any) {
-  const { verifySaasSession, isSuperAdmin } = await import("../saasAuth");
+  const { verifySaasSession, isSuperAdminAsync } = await import("../saasAuth");
   const cookies = parseCookies(ctx.req.headers.cookie);
   const token = cookies.get(SAAS_COOKIE);
   const session = await verifySaasSession(token);
-  if (!session || !isSuperAdmin(session.email)) {
+  if (!session || !(await isSuperAdminAsync(session.email))) {
     throw new TRPCError({ code: "FORBIDDEN", message: "Acesso negado" });
   }
   return session;

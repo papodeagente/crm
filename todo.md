@@ -6042,3 +6042,12 @@
 - [x] Fase 7: Seção Entitlement no SuperAdminTenantDetail + rotas App.tsx + links SuperAdminLayout
 - [x] Fase 8: 21 testes obrigatórios (superAdminPlans.test.ts)
 - [x] Fase 9: Validação final (tsc=0, vitest=pass, billingAccessService intocado, tenantWriteProcedure intocado)
+
+## Administração de Super Admins
+- [x] Analisar estrutura existente (schema users, roles, SuperAdminLayout)
+- [x] Criar router backend: listar, adicionar, remover super admins (proteção bruno@entur.com.br)
+- [x] Migrar isSuperAdmin de hardcoded para dinâmico (isSuperAdminAsync consulta DB)
+- [x] Atualizar todos os routers para usar isSuperAdminAsync (6 arquivos)
+- [x] Criar frontend SuperAdminManagement.tsx com listagem, adição e remoção
+- [x] Registrar rota no App.tsx e link no SuperAdminLayout
+- [x] Escrever testes vitest (12 testes passando)

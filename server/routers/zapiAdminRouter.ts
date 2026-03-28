@@ -11,7 +11,7 @@
 import { z } from "zod";
 import { publicProcedure, router } from "../_core/trpc";
 import { TRPCError } from "@trpc/server";
-import { verifySaasSession, isSuperAdmin, SAAS_COOKIE } from "../saasAuth";
+import { verifySaasSession, isSuperAdminAsync, SAAS_COOKIE } from "../saasAuth";
 
 function parseCookies(cookieHeader: string | undefined): Map<string, string> {
   const map = new Map<string, string>();
@@ -27,7 +27,7 @@ async function requireSuperAdmin(ctx: any) {
   const cookies = parseCookies(ctx.req?.headers?.cookie);
   const token = cookies.get(SAAS_COOKIE);
   const session = token ? await verifySaasSession(token) : null;
-  if (!session || !isSuperAdmin(session.email)) {
+  if (!session || !(await isSuperAdminAsync(session.email))) {
     throw new TRPCError({ code: "FORBIDDEN", message: "Acesso negado" });
   }
   return session;

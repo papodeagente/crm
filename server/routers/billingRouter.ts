@@ -5,7 +5,7 @@ import { eq, desc } from "drizzle-orm";
 import { subscriptions, subscriptionEvents, tenants } from "../../drizzle/schema";
 import { getDb } from "../db";
 import { checkBillingAccess } from "../services/billingAccessService";
-import { verifySaasSession, isSuperAdmin, SAAS_COOKIE } from "../saasAuth";
+import { verifySaasSession, isSuperAdminAsync, SAAS_COOKIE } from "../saasAuth";
 import {
   getSaasOverview,
   getChurnMetrics,
@@ -63,7 +63,7 @@ export const billingRouter = router({
       const cookies = parseCookies(ctx.req.headers.cookie);
       const token = cookies.get(SAAS_COOKIE);
       const session = await verifySaasSession(token);
-      if (!session || !isSuperAdmin(session.email)) {
+      if (!session || !(await isSuperAdminAsync(session.email))) {
         throw new TRPCError({ code: "FORBIDDEN", message: "Acesso negado" });
       }
 
@@ -91,7 +91,7 @@ export const billingRouter = router({
       const cookies = parseCookies(ctx.req.headers.cookie);
       const token = cookies.get(SAAS_COOKIE);
       const session = await verifySaasSession(token);
-      if (!session || !isSuperAdmin(session.email)) {
+      if (!session || !(await isSuperAdminAsync(session.email))) {
         throw new TRPCError({ code: "FORBIDDEN", message: "Acesso negado" });
       }
 
@@ -126,7 +126,7 @@ export const billingRouter = router({
       const cookies = parseCookies(ctx.req.headers.cookie);
       const token = cookies.get(SAAS_COOKIE);
       const session = await verifySaasSession(token);
-      if (!session || !isSuperAdmin(session.email)) {
+      if (!session || !(await isSuperAdminAsync(session.email))) {
         throw new TRPCError({ code: "FORBIDDEN", message: "Acesso negado" });
       }
 
@@ -146,7 +146,7 @@ export const billingRouter = router({
       const cookies = parseCookies(ctx.req.headers.cookie);
       const token = cookies.get(SAAS_COOKIE);
       const session = await verifySaasSession(token);
-      if (!session || !isSuperAdmin(session.email)) {
+      if (!session || !(await isSuperAdminAsync(session.email))) {
         throw new TRPCError({ code: "FORBIDDEN", message: "Acesso negado" });
       }
 
@@ -186,7 +186,7 @@ export const billingRouter = router({
       const cookies = parseCookies(ctx.req.headers.cookie);
       const token = cookies.get(SAAS_COOKIE);
       const session = await verifySaasSession(token);
-      if (!session || !isSuperAdmin(session.email)) {
+      if (!session || !(await isSuperAdminAsync(session.email))) {
         throw new TRPCError({ code: "FORBIDDEN", message: "Acesso negado" });
       }
 

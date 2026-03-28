@@ -16,7 +16,7 @@ import {
   addonOfferCodes,
   tenants,
 } from "../../drizzle/schema";
-import { verifySaasSession, isSuperAdmin, SAAS_COOKIE } from "../saasAuth";
+import { verifySaasSession, isSuperAdminAsync, SAAS_COOKIE } from "../saasAuth";
 import { emitEvent } from "../middleware/eventLog";
 import { getEffectiveEntitlement } from "../services/planEntitlementService";
 
@@ -36,7 +36,7 @@ async function requireSuperAdmin(ctx: any) {
   const cookies = parseCookies(ctx.req?.headers?.cookie);
   const token = cookies.get(SAAS_COOKIE);
   const session = token ? await verifySaasSession(token) : null;
-  if (!session || !isSuperAdmin(session.email)) {
+  if (!session || !(await isSuperAdminAsync(session.email))) {
     throw new TRPCError({ code: "FORBIDDEN", message: "Acesso negado" });
   }
   return session;

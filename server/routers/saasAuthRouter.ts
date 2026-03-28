@@ -8,6 +8,7 @@ import {
   verifySaasSession,
   checkTenantAccess,
   isSuperAdmin,
+  isSuperAdminAsync,
   listAllTenantsAdmin,
   updateFreemiumPeriod,
   updateTenantPlan,
@@ -139,7 +140,7 @@ export const saasAuthRouter = router({
     return {
       ...session,
       avatarUrl,
-      isSuperAdmin: isSuperAdmin(session.email),
+      isSuperAdmin: await isSuperAdminAsync(session.email),
       access,
     };
   }),
@@ -200,7 +201,7 @@ export const saasAuthRouter = router({
       if (!session) {
         throw new TRPCError({ code: "UNAUTHORIZED", message: "Não autenticado" });
       }
-      if (session.role !== "admin" && !isSuperAdmin(session.email)) {
+      if (session.role !== "admin" && !(await isSuperAdminAsync(session.email))) {
         throw new TRPCError({ code: "FORBIDDEN", message: "Apenas administradores podem convidar usuários" });
       }
       // inviteUserToTenant imported statically at top
@@ -232,7 +233,7 @@ export const saasAuthRouter = router({
     const cookies = parseCookies(ctx.req.headers.cookie);
     const token = cookies.get(SAAS_COOKIE);
     const session = await verifySaasSession(token);
-    if (!session || !isSuperAdmin(session.email)) {
+    if (!session || !(await isSuperAdminAsync(session.email))) {
       throw new TRPCError({ code: "FORBIDDEN", message: "Acesso negado" });
     }
     return listAllTenantsAdmin();
@@ -248,7 +249,7 @@ export const saasAuthRouter = router({
       const cookies = parseCookies(ctx.req.headers.cookie);
       const token = cookies.get(SAAS_COOKIE);
       const session = await verifySaasSession(token);
-      if (!session || !isSuperAdmin(session.email)) {
+      if (!session || !(await isSuperAdminAsync(session.email))) {
         throw new TRPCError({ code: "FORBIDDEN", message: "Acesso negado" });
       }
       return updateFreemiumPeriod(input.tenantId, input.days);
@@ -264,7 +265,7 @@ export const saasAuthRouter = router({
       const cookies = parseCookies(ctx.req.headers.cookie);
       const token = cookies.get(SAAS_COOKIE);
       const session = await verifySaasSession(token);
-      if (!session || !isSuperAdmin(session.email)) {
+      if (!session || !(await isSuperAdminAsync(session.email))) {
         throw new TRPCError({ code: "FORBIDDEN", message: "Acesso negado" });
       }
       return updateTenantPlan(input.tenantId, input.plan);
@@ -279,7 +280,7 @@ export const saasAuthRouter = router({
       const cookies = parseCookies(ctx.req.headers.cookie);
       const token = cookies.get(SAAS_COOKIE);
       const session = await verifySaasSession(token);
-      if (!session || !isSuperAdmin(session.email)) {
+      if (!session || !(await isSuperAdminAsync(session.email))) {
         throw new TRPCError({ code: "FORBIDDEN", message: "Acesso negado" });
       }
       return listTenantUsersAdmin(input.tenantId);
@@ -295,7 +296,7 @@ export const saasAuthRouter = router({
       const cookies = parseCookies(ctx.req.headers.cookie);
       const token = cookies.get(SAAS_COOKIE);
       const session = await verifySaasSession(token);
-      if (!session || !isSuperAdmin(session.email)) {
+      if (!session || !(await isSuperAdminAsync(session.email))) {
         throw new TRPCError({ code: "FORBIDDEN", message: "Acesso negado" });
       }
       return updateUserStatusAdmin(input.userId, input.status);
@@ -311,7 +312,7 @@ export const saasAuthRouter = router({
       const cookies = parseCookies(ctx.req.headers.cookie);
       const token = cookies.get(SAAS_COOKIE);
       const session = await verifySaasSession(token);
-      if (!session || !isSuperAdmin(session.email)) {
+      if (!session || !(await isSuperAdminAsync(session.email))) {
         throw new TRPCError({ code: "FORBIDDEN", message: "Acesso negado" });
       }
       // Verify tenant exists and name matches
@@ -344,7 +345,7 @@ export const saasAuthRouter = router({
       const cookies = parseCookies(ctx.req.headers.cookie);
       const token = cookies.get(SAAS_COOKIE);
       const session = await verifySaasSession(token);
-      if (!session || !isSuperAdmin(session.email)) {
+      if (!session || !(await isSuperAdminAsync(session.email))) {
         throw new TRPCError({ code: "FORBIDDEN", message: "Acesso negado" });
       }
       const { getTenantMetricsAdmin } = await import("../saasAuth");
@@ -361,7 +362,7 @@ export const saasAuthRouter = router({
       const cookies = parseCookies(ctx.req.headers.cookie);
       const token = cookies.get(SAAS_COOKIE);
       const session = await verifySaasSession(token);
-      if (!session || !isSuperAdmin(session.email)) {
+      if (!session || !(await isSuperAdminAsync(session.email))) {
         throw new TRPCError({ code: "FORBIDDEN", message: "Acesso negado" });
       }
       const { getDb } = await import("../db");

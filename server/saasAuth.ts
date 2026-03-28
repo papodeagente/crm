@@ -323,10 +323,33 @@ export async function checkTenantAccess(tenantId: number): Promise<{
 // SUPERADMIN CHECK
 // ═══════════════════════════════════════
 
-const SUPERADMIN_EMAIL = "bruno@entur.com.br";
+const PROTECTED_SUPERADMIN_EMAIL = "bruno@entur.com.br";
 
+/**
+ * Sync check — always true for protected email, false for others.
+ * Most existing code uses this. For dynamic super admins, use isSuperAdminAsync.
+ */
 export function isSuperAdmin(email: string): boolean {
-  return email.toLowerCase() === SUPERADMIN_EMAIL;
+  if (email.toLowerCase() === PROTECTED_SUPERADMIN_EMAIL) return true;
+  return false;
+}
+
+/**
+ * Async version that checks the database for isSuperAdmin flag.
+ * Protected email always returns true without DB query.
+ */
+export async function isSuperAdminAsync(email: string): Promise<boolean> {
+  if (email.toLowerCase() === PROTECTED_SUPERADMIN_EMAIL) return true;
+  const db = await getDb();
+  if (!db) return false;
+  const { users } = await import("../drizzle/schema");
+  const { eq: eqOp, and: andOp } = await import("drizzle-orm");
+  const [user] = await db
+    .select({ isSuperAdmin: users.isSuperAdmin })
+    .from(users)
+    .where(andOp(eqOp(users.email, email.toLowerCase()), eqOp(users.isSuperAdmin, true)))
+    .limit(1);
+  return !!user;
 }
 
 // ═══════════════════════════════════════
