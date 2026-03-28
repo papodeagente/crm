@@ -1,7 +1,7 @@
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/NotFound";
-import { Route, Switch, Router } from "wouter";
+import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import TopNavLayout from "./components/TopNavLayout";
@@ -206,19 +206,15 @@ function AppRouter() {
   );
 }
 
-const BASE_PATH = import.meta.env.PROD ? "/crm" : "";
-
 function App() {
   return (
     <ErrorBoundary>
-      <Router base={BASE_PATH}>
-        <ThemeProvider defaultTheme="dark" switchable>
-          <TooltipProvider>
-            <Toaster />
-            <AppRouter />
-          </TooltipProvider>
-        </ThemeProvider>
-      </Router>
+      <ThemeProvider defaultTheme="dark" switchable>
+        <TooltipProvider>
+          <Toaster />
+          <AppRouter />
+        </TooltipProvider>
+      </ThemeProvider>
     </ErrorBoundary>
   );
 }

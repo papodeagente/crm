@@ -3386,7 +3386,7 @@ function WhatsAppPanel({ contact, dealId, isFullscreen, onToggleFullscreen, onOp
               {!activeSession ? "Conecte uma sessão na página WhatsApp" : `O número ${contact.phone} não foi encontrado`}
             </p>
             {!activeSession && (
-              <Button size="sm" variant="outline" className="mt-3" onClick={() => window.location.href = (import.meta.env.PROD ? "/crm" : "") + "/whatsapp"}>
+              <Button size="sm" variant="outline" className="mt-3" onClick={() => window.location.href = "/whatsapp"}>
                 Ir para WhatsApp
               </Button>
             )}

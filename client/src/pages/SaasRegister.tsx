@@ -20,7 +20,7 @@ export default function SaasRegister() {
   const registerMutation = trpc.saasAuth.register.useMutation({
     onSuccess: () => {
       toast.success("Conta criada com sucesso! Bem-vindo ao ENTUR OS!");
-      window.location.href = (import.meta.env.PROD ? "/crm" : "") + "/dashboard";
+      window.location.href = "/dashboard";
     },
     onError: (error) => {
       toast.error(error.message || "Erro ao criar conta");

@@ -26,7 +26,7 @@ export default function SaasLogin() {
     if (meQuery.isLoading) return;
     if (meQuery.data) {
       // User already has an active session — redirect to dashboard
-      window.location.href = (import.meta.env.PROD ? "/crm" : "") + "/dashboard";
+      window.location.href = "/dashboard";
       return;
     }
     // No session, show login form
@@ -36,7 +36,7 @@ export default function SaasLogin() {
   const loginMutation = trpc.saasAuth.login.useMutation({
     onSuccess: () => {
       toast.success("Login realizado com sucesso!");
-      window.location.href = (import.meta.env.PROD ? "/crm" : "") + "/dashboard";
+      window.location.href = "/dashboard";
     },
     onError: (error) => {
       if (error.message === "SUBSCRIPTION_EXPIRED") {
