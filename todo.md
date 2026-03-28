@@ -6051,3 +6051,7 @@
 - [x] Criar frontend SuperAdminManagement.tsx com listagem, adição e remoção
 - [x] Registrar rota no App.tsx e link no SuperAdminLayout
 - [x] Escrever testes vitest (12 testes passando)
+## Restaurar Anotações no Histórico da Negociação
+- [x] Analisar código atual do DealDetail e identificar o que foi removido
+- [x] Reimplementar campo de criação de anotação no histórico do atendimento (DealTimeline)
+- [x] Testar e validar (14 testes timeline passando)
