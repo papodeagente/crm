@@ -160,24 +160,36 @@ function AppRouter() {
                 <Route path="/settings/classification" component={ClassificationSettings} />
                 <Route path="/settings/ai-training" component={AiTrainingSettings} />
 
-                {/* Super Admin — all pages wrapped in SuperAdminLayout */}
-                <Route path="/super-admin/:rest*">
-                  <SuperAdminLayout>
-                    <Suspense fallback={<PageLoader />}>
-                      <Switch>
-                        <Route path="/super-admin" component={SuperAdmin} />
-                        <Route path="/super-admin/billing" component={SaasBillingDashboard} />
-                        <Route path="/super-admin/zapi" component={ZapiAdmin} />
-                        <Route path="/super-admin/dashboard" component={SuperAdminDashboard} />
-                        <Route path="/super-admin/tenants" component={SuperAdminTenants} />
-                        <Route path="/super-admin/tenant/:id" component={SuperAdminTenantDetail} />
-                        <Route path="/super-admin/adoption" component={SuperAdminAdoption} />
-                        <Route path="/super-admin/health" component={SuperAdminHealth} />
-                        <Route path="/super-admin/commercial" component={SuperAdminCommercial} />
-                        <Route path="/super-admin/strategic-help" component={SuperAdminStrategicHelp} />
-                      </Switch>
-                    </Suspense>
-                  </SuperAdminLayout>
+                {/* Super Admin — each route individually wrapped in SuperAdminLayout */}
+                <Route path="/super-admin">
+                  <SuperAdminLayout><SuperAdmin /></SuperAdminLayout>
+                </Route>
+                <Route path="/super-admin/billing">
+                  <SuperAdminLayout><SaasBillingDashboard /></SuperAdminLayout>
+                </Route>
+                <Route path="/super-admin/zapi">
+                  <SuperAdminLayout><ZapiAdmin /></SuperAdminLayout>
+                </Route>
+                <Route path="/super-admin/dashboard">
+                  <SuperAdminLayout><SuperAdminDashboard /></SuperAdminLayout>
+                </Route>
+                <Route path="/super-admin/tenants">
+                  <SuperAdminLayout><SuperAdminTenants /></SuperAdminLayout>
+                </Route>
+                <Route path="/super-admin/tenant/:id">
+                  <SuperAdminLayout><SuperAdminTenantDetail /></SuperAdminLayout>
+                </Route>
+                <Route path="/super-admin/adoption">
+                  <SuperAdminLayout><SuperAdminAdoption /></SuperAdminLayout>
+                </Route>
+                <Route path="/super-admin/health">
+                  <SuperAdminLayout><SuperAdminHealth /></SuperAdminLayout>
+                </Route>
+                <Route path="/super-admin/commercial">
+                  <SuperAdminLayout><SuperAdminCommercial /></SuperAdminLayout>
+                </Route>
+                <Route path="/super-admin/strategic-help">
+                  <SuperAdminLayout><SuperAdminStrategicHelp /></SuperAdminLayout>
                 </Route>
 
                 {/* Notifications */}

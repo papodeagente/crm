@@ -5908,3 +5908,12 @@
 - [x] Verificar testes existentes continuam passando (0 erros TS)
 - [x] Testar visualmente no browser (via curl/API - browser sandbox instável)
 - [x] Salvar checkpoint
+
+## Super Admin Dashboard — Correção 404 e Auditoria de Rotas
+- [x] Auditar todas as rotas do Super Admin no App.tsx
+- [x] Auditar todos os links no SuperAdminLayout sidebar
+- [x] Auditar links internos nas páginas (ex: tenant detail, perfil de tenant)
+- [x] Corrigir rotas com 404 — removido wrapper :rest* e usado rotas individuais no wouter
+- [x] Corrigir SQL: crm_user_role AS role, ISNULL() em vez de NULLS LAST
+- [x] Testar todas as rotas via curl/browser (9/9 endpoints OK)
+- [x] Salvar checkpoint

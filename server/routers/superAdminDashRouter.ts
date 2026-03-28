@@ -798,9 +798,9 @@ export const superAdminDashRouter = router({
       const db = await getDatabase();
 
       const [rows] = await db.execute(sql`
-        SELECT id, name, email, role, status, lastActiveAt, lastLoginAt, createdAt
+        SELECT id, name, email, crm_user_role AS role, status, lastActiveAt, lastLoginAt, createdAt
         FROM crm_users WHERE tenantId = ${input.tenantId}
-        ORDER BY lastActiveAt DESC NULLS LAST
+        ORDER BY ISNULL(lastActiveAt), lastActiveAt DESC
         LIMIT 100
       `) as any;
 
