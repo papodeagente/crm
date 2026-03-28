@@ -308,7 +308,7 @@ export default function TopNavLayout({ children }: { children: React.ReactNode }
   // This useEffect MUST be before any conditional returns to respect React hooks rules
   useEffect(() => {
     if (!loading && !user) {
-      window.location.href = "/login";
+      window.location.href = (import.meta.env.PROD ? "/crm" : "") + "/login";
     }
   }, [loading, user]);
 

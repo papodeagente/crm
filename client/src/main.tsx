@@ -132,7 +132,7 @@ queryClient.getMutationCache().subscribe(event => {
 const trpcClient = trpc.createClient({
   links: [
     httpBatchLink({
-      url: "/api/trpc",
+      url: import.meta.env.PROD ? "/crm/api/trpc" : "/api/trpc",
       transformer: superjson,
       async fetch(input, init) {
         // Auth requests ALWAYS go through — never blocked by circuit breaker

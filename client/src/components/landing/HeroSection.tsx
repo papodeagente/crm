@@ -36,7 +36,7 @@ export function HeroSection({ onCTA, onDemo }: HeroSectionProps) {
             <Button
               variant="ghost"
               className="text-sm text-white/60 hover:text-white hover:bg-white/5"
-              onClick={() => window.location.href = "/login"}
+              onClick={() => window.location.href = (import.meta.env.PROD ? "/crm" : "") + "/login"}
             >
               Entrar
             </Button>

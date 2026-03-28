@@ -107,7 +107,7 @@ class SocketManager {
     if (this.socket) return;
     console.log("[Socket] Creating singleton connection");
     const socket = io(window.location.origin, {
-      path: "/api/socket.io",
+      path: import.meta.env.PROD ? "/crm/api/socket.io" : "/api/socket.io",
       transports: ["websocket", "polling"],
       reconnection: true,
       reconnectionAttempts: Infinity,
