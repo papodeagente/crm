@@ -1064,8 +1064,37 @@ const tenantId = getTenantId(ctx); const { id, dealId, checkIn, checkOut, ...dat
           includeWhatsApp: input.includeWhatsApp,
         });
 
-          // Notes are already included via deal_history (action='note', eventCategory='note')
-        // created by crm.notes.create → crm.createDealHistory. No separate merge needed.
+        // Merge notes from crm_notes that DON'T already have a matching deal_history entry.
+        // crm.notes.create (manual notes) writes BOTH crm_notes + deal_history, so those are already
+        // in the timeline via deal_history. But importConversationAsNote and other flows may create
+        // crm_notes entries whose deal_history counterpart has NO noteId in metadataJson, so we
+        // need to include those.
+        if (!input.categories || input.categories.length === 0 || input.categories.includes('note')) {
+          const notes = await crm.listNotes(getTenantId(ctx), 'deal', input.dealId);
+          // Collect noteIds already referenced in deal_history events
+          const existingNoteIds = new Set<number>();
+          for (const ev of result.events) {
+            const meta = ev.metadataJson as any;
+            if (meta?.noteId) existingNoteIds.add(Number(meta.noteId));
+          }
+          // Only add notes not already present via deal_history
+          notes.forEach((n: any) => {
+            if (existingNoteIds.has(n.id)) return; // skip duplicates
+            result.events.push({
+              id: `note-${n.id}`,
+              type: 'note',
+              action: 'note',
+              description: n.body,
+              actorName: n.createdByName || 'Anotação',
+              actorUserId: n.createdBy,
+              eventCategory: 'note',
+              eventSource: 'user',
+              metadataJson: { noteId: n.id },
+              occurredAt: n.createdAt,
+              createdAt: n.createdAt,
+            });
+          });
+        }
 
         // Also merge conversion events if no category filter or 'conversion' is in categories
         if (!input.categories || input.categories.length === 0 || input.categories.includes('conversion')) {

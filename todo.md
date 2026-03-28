@@ -6059,3 +6059,7 @@
 - [x] Investigar causa da duplicação (nota na tabela notes + deal_history)
 - [x] Corrigir para exibir apenas um registro por anotação (removido merge duplicado de notes no timeline)
 - [x] Testar e validar (14 testes timeline passando)
+## Restaurar Conversas Importadas do WhatsApp no Histórico
+- [x] Investigar como conversas importadas eram armazenadas (notes vs deal_history)
+- [x] Restaurar merge seletivo para notas que não têm correspondência no deal_history (deduplicar por noteId)
+- [x] Testar e validar (14 timeline + 8 importConversation testes passando)
