@@ -69,6 +69,13 @@ const Landing = lazyWithRetry(() => import("./pages/Landing"));
 const SuperAdmin = lazyWithRetry(() => import("./pages/SuperAdmin"));
 const SaasBillingDashboard = lazyWithRetry(() => import("./pages/SaasBillingDashboard"));
 const ZapiAdmin = lazyWithRetry(() => import("./pages/ZapiAdmin"));
+const SuperAdminDashboard = lazyWithRetry(() => import("./pages/SuperAdminDashboard"));
+const SuperAdminTenants = lazyWithRetry(() => import("./pages/SuperAdminTenants"));
+const SuperAdminTenantDetail = lazyWithRetry(() => import("./pages/SuperAdminTenantDetail"));
+const SuperAdminAdoption = lazyWithRetry(() => import("./pages/SuperAdminAdoption"));
+const SuperAdminHealth = lazyWithRetry(() => import("./pages/SuperAdminHealth"));
+const SuperAdminCommercial = lazyWithRetry(() => import("./pages/SuperAdminCommercial"));
+const SuperAdminStrategicHelp = lazyWithRetry(() => import("./pages/SuperAdminStrategicHelp"));
 const ForgotPassword = lazyWithRetry(() => import("./pages/ForgotPassword"));
 const ResetPassword = lazyWithRetry(() => import("./pages/ResetPassword"));
 
@@ -152,10 +159,19 @@ function AppRouter() {
                 <Route path="/settings/classification" component={ClassificationSettings} />
                 <Route path="/settings/ai-training" component={AiTrainingSettings} />
 
-                {/* Super Admin */}
+                {/* Super Admin (legacy) */}
                 <Route path="/super-admin" component={SuperAdmin} />
                 <Route path="/super-admin/billing" component={SaasBillingDashboard} />
                 <Route path="/super-admin/zapi" component={ZapiAdmin} />
+
+                {/* Super Admin Dashboard (new) */}
+                <Route path="/super-admin/dashboard" component={SuperAdminDashboard} />
+                <Route path="/super-admin/tenants" component={SuperAdminTenants} />
+                <Route path="/super-admin/tenant/:id" component={SuperAdminTenantDetail} />
+                <Route path="/super-admin/adoption" component={SuperAdminAdoption} />
+                <Route path="/super-admin/health" component={SuperAdminHealth} />
+                <Route path="/super-admin/commercial" component={SuperAdminCommercial} />
+                <Route path="/super-admin/strategic-help" component={SuperAdminStrategicHelp} />
 
                 {/* Notifications */}
                 <Route path="/notifications" component={NotificationsPage} />

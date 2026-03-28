@@ -1,6 +1,7 @@
 import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
+import { superAdminDashRouter } from "./routers/superAdminDashRouter";
 import { publicProcedure, tenantProcedure, tenantWriteProcedure, tenantAdminProcedure, sessionTenantProcedure, sessionTenantWriteProcedure, sessionTenantAdminProcedure, getTenantId, router } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
@@ -4170,6 +4171,7 @@ ${customInstructions ? `\n--- INSTRUÇÕES PERSONALIZADAS ---\n${customInstructi
     }),
   }),
 
+  superAdminDash: superAdminDashRouter,
 });
 
 export type AppRouter = typeof appRouter;

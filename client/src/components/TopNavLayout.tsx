@@ -547,9 +547,9 @@ function TopBar({ onSearchOpen, mobileMenuOpen, onToggleMobile }: {
                   Configurações
                 </DropdownMenuItem>
                 {saasMe?.isSuperAdmin && (
-                  <DropdownMenuItem onClick={() => setLocation("/super-admin")} className="cursor-pointer rounded-lg px-3 py-2 text-[13px] gap-2.5">
-                    <Shield className="h-3.5 w-3.5 text-purple-400" />
-                    Super Admin
+<DropdownMenuItem onClick={() => setLocation("/super-admin/dashboard")} className="cursor-pointer rounded-lg px-3 py-2 text-[13px] gap-2.5">
+                     <Shield className="h-3.5 w-3.5 text-purple-400" />
+                     Super Admin
                   </DropdownMenuItem>
                 )}
                 <DropdownMenuItem onClick={(e) => { e.preventDefault(); themeCtx.toggleTheme?.(); }} className="cursor-pointer rounded-lg px-3 py-2 text-[13px] gap-2.5">

@@ -5801,3 +5801,81 @@
 
 ### Testes
 - [x] 12 testes Vitest passando para todas as correções
+
+## Dashboard Super Admin — Implementação Completa (Mar 28)
+
+### 1. Visão Geral (Dashboard Executivo)
+- [ ] Cards KPIs: tenants ativos, usuários, negociações, vendas, conversão, ticket médio, WhatsApp, MRR, churn
+- [ ] Gráficos: evolução tenants, receita, uso, negociações, WhatsApp, distribuição por plano
+- [ ] Blocos de atenção: queda de uso, erros integração, WA desconectado, baixa adoção
+
+### 2. Gestão de Tenants
+- [ ] Tabela completa com filtros avançados (plano, status, data, uso, WA, IA)
+- [ ] Colunas: nome, plano, status, criação, último uso, usuários, negociações, valor, conversão, saúde, risco
+- [ ] Ações: abrir detalhe, ver métricas, ver integrações, ver WA
+
+### 3. Detalhe do Tenant
+- [ ] Resumo executivo: plano, status, tempo de vida, usuários, vendas, ticket médio
+- [ ] Maturidade de uso: CRM, funil, tarefas, WA, automações, relatórios, IA, integrações
+- [ ] Sinais de risco e oportunidades de crescimento
+- [ ] Timeline operacional
+
+### 4. Adoção de Produto
+- [ ] Indicadores por funcionalidade (CRM, contatos, funil, tarefas, WA, IA, etc.)
+- [ ] Métricas: quantos tenants usam, frequência, crescimento/queda
+
+### 5. Saúde Operacional
+- [ ] Monitoramento: erros login, rate limit, tempo resposta, jobs, webhooks, WA
+- [ ] Blocos: incidentes críticos, alertas, tenants impactados
+
+### 6. Comercial e Expansão
+- [ ] Trial: próximo vencimento, alto/baixo uso, chance conversão
+- [ ] Upgrade: limite plano, muitos usuários, alto volume WA/CRM
+- [ ] Classificação: risco alto/moderado, saudável, potencial expansão/upsell
+
+### 7. Central de Ajuda Estratégica
+- [ ] Recomendações automáticas por tenant: próximo passo, gargalo, feature subutilizada
+- [ ] Ações sugeridas de consultoria
+
+### Infraestrutura
+- [ ] Backend: procedures tRPC com proteção superAdmin
+- [ ] Navegação: menu exclusivo Super Admin com 7 sub-páginas
+- [ ] Testes: segurança, permissão, isolamento, renderização, performance
+
+## Super Admin Dashboard v2 — Painel Completo de Gestão SaaS
+
+### Backend (superAdminDashRouter)
+- [x] Router superAdminDash com 9 procedures protegidas por super admin
+- [x] Procedure overview: KPIs consolidados (tenants, users, deals, WA, MRR)
+- [x] Procedure overviewCharts: gráficos de evolução mensal (12 meses)
+- [x] Procedure alerts: alertas de WA desconectado, inatividade, inadimplência, baixa adoção
+- [x] Procedure tenantsList: lista paginada com métricas por tenant (filtros, busca, ordenação)
+- [x] Procedure tenantDetail: diagnóstico completo com maturidade e riscos
+- [x] Procedure featureAdoption: taxa de adoção por feature (CRM, WA, IA, etc.)
+- [x] Procedure operationalHealth: saúde operacional (jobs, WA, integrações, webhooks)
+- [x] Procedure commercialExpansion: trials, upgrade candidates, churn risk
+- [x] Procedure strategicHelp: recomendações inteligentes por tenant
+- [x] Procedure tenantUsers: lista de usuários por tenant
+- [x] Corrigir SQL: chatbot_settings não tem tenantId (join via whatsapp_sessions)
+- [x] Corrigir SQL: webhook_config não tem lastError
+- [x] Registrar superAdminDash no appRouter
+
+### Frontend (7 páginas novas)
+- [x] SuperAdminDashboard: visão geral com KPIs, gráficos, alertas
+- [x] SuperAdminTenants: lista filtrada/paginada de tenants com métricas
+- [x] SuperAdminTenantDetail: diagnóstico completo com radar de maturidade
+- [x] SuperAdminAdoption: análise de adoção de features com barras de progresso
+- [x] SuperAdminHealth: saúde operacional com indicadores visuais
+- [x] SuperAdminCommercial: expansão comercial (trials, upgrades, churn risk)
+- [x] SuperAdminStrategicHelp: central de ajuda estratégica com recomendações por tenant
+
+### Navegação e Rotas
+- [x] SuperAdminLayout com sidebar dedicada para as 7 áreas
+- [x] Registrar 7 novas rotas no App.tsx (/super-admin/dashboard, /tenants, etc.)
+- [x] Atualizar link do dropdown do usuário para /super-admin/dashboard
+
+### Testes
+- [x] 17 testes vitest passando (segurança + acesso + dados)
+- [x] Testes de rejeição para usuários não autenticados (3 testes)
+- [x] Testes de rejeição para usuários não-super-admin (7 testes)
+- [x] Testes de acesso para super admin (7 testes)
