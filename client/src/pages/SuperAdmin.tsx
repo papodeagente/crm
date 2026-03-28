@@ -123,7 +123,7 @@ export default function SuperAdmin() {
   // Auth check
   if (meQuery.isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
+      <div className="min-h-[40vh] flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
       </div>
     );
@@ -131,13 +131,12 @@ export default function SuperAdmin() {
 
   if (!meQuery.data?.isSuperAdmin) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
+      <div className="min-h-[40vh] flex items-center justify-center">
         <Card className="max-w-md border-border">
           <CardContent className="p-8 text-center">
             <Shield className="w-12 h-12 text-red-500 mx-auto mb-4" />
             <h2 className="text-xl font-bold mb-2 text-foreground">Acesso Restrito</h2>
             <p className="text-muted-foreground mb-4">Esta área é exclusiva para administradores do sistema.</p>
-            <Button onClick={() => navigate("/dashboard")}>Voltar ao Dashboard</Button>
           </CardContent>
         </Card>
       </div>
@@ -197,42 +196,14 @@ export default function SuperAdmin() {
   };
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="space-y-6 pb-8">
       {/* Header */}
-      <div className="border-b border-border sticky top-0 z-40 bg-card/95 backdrop-blur-xl">
-        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <button onClick={() => navigate("/dashboard")} className="text-muted-foreground hover:text-foreground transition-colors">
-              <ArrowLeft className="w-5 h-5" />
-            </button>
-            <div className="flex items-center gap-2">
-              <span className="font-bold text-lg">Super Admin</span>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => navigate("/super-admin/zapi")}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 transition-colors text-sm font-medium"
-            >
-              <Wifi className="w-4 h-4" />
-              Z-API
-            </button>
-            <button
-              onClick={() => navigate("/super-admin/billing")}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-purple-500/10 text-purple-400 hover:bg-purple-500/20 transition-colors text-sm font-medium"
-            >
-              <DollarSign className="w-4 h-4" />
-              Dashboard Financeiro
-            </button>
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Shield className="w-4 h-4 text-purple-400" />
-              {meQuery.data?.email}
-            </div>
-          </div>
-        </div>
+      <div>
+        <h1 className="text-2xl font-bold text-foreground">Gestão de Tenants</h1>
+        <p className="text-sm text-muted-foreground mt-1">Administração de agências, usuários e assinaturas</p>
       </div>
 
-      <div className="max-w-7xl mx-auto px-6 py-8">
+      <div className="space-y-6">
         {/* Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
           {[

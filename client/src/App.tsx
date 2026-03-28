@@ -76,6 +76,7 @@ const SuperAdminAdoption = lazyWithRetry(() => import("./pages/SuperAdminAdoptio
 const SuperAdminHealth = lazyWithRetry(() => import("./pages/SuperAdminHealth"));
 const SuperAdminCommercial = lazyWithRetry(() => import("./pages/SuperAdminCommercial"));
 const SuperAdminStrategicHelp = lazyWithRetry(() => import("./pages/SuperAdminStrategicHelp"));
+import SuperAdminLayout from "./components/SuperAdminLayout";
 const ForgotPassword = lazyWithRetry(() => import("./pages/ForgotPassword"));
 const ResetPassword = lazyWithRetry(() => import("./pages/ResetPassword"));
 
@@ -159,19 +160,25 @@ function AppRouter() {
                 <Route path="/settings/classification" component={ClassificationSettings} />
                 <Route path="/settings/ai-training" component={AiTrainingSettings} />
 
-                {/* Super Admin (legacy) */}
-                <Route path="/super-admin" component={SuperAdmin} />
-                <Route path="/super-admin/billing" component={SaasBillingDashboard} />
-                <Route path="/super-admin/zapi" component={ZapiAdmin} />
-
-                {/* Super Admin Dashboard (new) */}
-                <Route path="/super-admin/dashboard" component={SuperAdminDashboard} />
-                <Route path="/super-admin/tenants" component={SuperAdminTenants} />
-                <Route path="/super-admin/tenant/:id" component={SuperAdminTenantDetail} />
-                <Route path="/super-admin/adoption" component={SuperAdminAdoption} />
-                <Route path="/super-admin/health" component={SuperAdminHealth} />
-                <Route path="/super-admin/commercial" component={SuperAdminCommercial} />
-                <Route path="/super-admin/strategic-help" component={SuperAdminStrategicHelp} />
+                {/* Super Admin — all pages wrapped in SuperAdminLayout */}
+                <Route path="/super-admin/:rest*">
+                  <SuperAdminLayout>
+                    <Suspense fallback={<PageLoader />}>
+                      <Switch>
+                        <Route path="/super-admin" component={SuperAdmin} />
+                        <Route path="/super-admin/billing" component={SaasBillingDashboard} />
+                        <Route path="/super-admin/zapi" component={ZapiAdmin} />
+                        <Route path="/super-admin/dashboard" component={SuperAdminDashboard} />
+                        <Route path="/super-admin/tenants" component={SuperAdminTenants} />
+                        <Route path="/super-admin/tenant/:id" component={SuperAdminTenantDetail} />
+                        <Route path="/super-admin/adoption" component={SuperAdminAdoption} />
+                        <Route path="/super-admin/health" component={SuperAdminHealth} />
+                        <Route path="/super-admin/commercial" component={SuperAdminCommercial} />
+                        <Route path="/super-admin/strategic-help" component={SuperAdminStrategicHelp} />
+                      </Switch>
+                    </Suspense>
+                  </SuperAdminLayout>
+                </Route>
 
                 {/* Notifications */}
                 <Route path="/notifications" component={NotificationsPage} />

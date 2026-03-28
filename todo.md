@@ -5879,3 +5879,32 @@
 - [x] Testes de rejeição para usuários não autenticados (3 testes)
 - [x] Testes de rejeição para usuários não-super-admin (7 testes)
 - [x] Testes de acesso para super admin (7 testes)
+
+## Super Admin Dashboard v3 — Responsividade + Integração Completa
+
+### Auditoria e Mapeamento
+- [x] Auditar páginas existentes: Z-API, financeiro SaaS/MRR, lista de usuários, SuperAdmin antigo
+- [x] Mapear rotas e componentes que precisam ser conectados ao painel
+
+### Integração de Funcionalidades Existentes
+- [x] Conectar gestão Z-API (tenants com Z-API) ao painel Super Admin
+- [x] Conectar painel financeiro SaaS (MRR, assinaturas, indicadores) ao painel Super Admin
+- [x] Conectar lista de usuários com acesso ao perfil individual ao painel Super Admin
+- [x] Conectar funcionalidades do SuperAdmin antigo (gestão de tenants, exclusão)
+- [x] Atualizar SuperAdminLayout sidebar com links para todas as áreas
+
+### Responsividade
+- [x] Melhorar responsividade do SuperAdminDashboard (Overview)
+- [x] Melhorar responsividade do SuperAdminTenants
+- [x] Melhorar responsividade do SuperAdminTenantDetail
+- [x] Melhorar responsividade do SuperAdminAdoption
+- [x] Melhorar responsividade do SuperAdminHealth
+- [x] Melhorar responsividade do SuperAdminCommercial
+- [x] Melhorar responsividade do SuperAdminStrategicHelp
+- [x] Melhorar responsividade do SuperAdminLayout (sidebar mobile)
+- [x] Remover headers/botões "Voltar" redundantes das páginas legadas (Z-API, Financeiro, Gestão)
+
+### Testes e Entrega
+- [x] Verificar testes existentes continuam passando (0 erros TS)
+- [x] Testar visualmente no browser (via curl/API - browser sandbox instável)
+- [x] Salvar checkpoint

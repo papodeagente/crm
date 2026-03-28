@@ -286,7 +286,7 @@ export default function ZapiAdmin() {
   // Auth check
   if (meQuery.isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
+      <div className="min-h-[40vh] flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
       </div>
     );
@@ -294,7 +294,7 @@ export default function ZapiAdmin() {
 
   if (!meQuery.data?.isSuperAdmin) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
+      <div className="min-h-[40vh] flex items-center justify-center">
         <Card className="w-96">
           <CardContent className="pt-6 text-center">
             <Shield className="w-12 h-12 mx-auto mb-4 text-red-400" />
@@ -302,9 +302,6 @@ export default function ZapiAdmin() {
             <p className="text-muted-foreground text-sm">
               Apenas Super Administradores podem acessar esta página.
             </p>
-            <Button className="mt-4" onClick={() => navigate("/dashboard")}>
-              Voltar ao Dashboard
-            </Button>
           </CardContent>
         </Card>
       </div>
@@ -316,64 +313,53 @@ export default function ZapiAdmin() {
   const totalAlerts = alertCounts?.total ?? 0;
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="space-y-6 pb-8">
       {/* Header */}
-      <div className="border-b border-border sticky top-0 z-40 bg-card/95 backdrop-blur-xl">
-        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">Gestão Z-API</h1>
+            <p className="text-sm text-muted-foreground mt-1">Instâncias, provisionamento e alertas</p>
+          </div>
+          {totalAlerts > 0 && (
             <button
-              onClick={() => navigate("/super-admin")}
-              className="text-muted-foreground hover:text-foreground transition-colors"
+              onClick={() => setActiveTab("alerts")}
+              className="relative flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-500/15 border border-red-500/30 text-red-400 text-xs font-medium hover:bg-red-500/25 transition-colors"
             >
-              <ArrowLeft className="w-5 h-5" />
+              <BellRing className="w-3.5 h-3.5" />
+              {totalAlerts} alerta{totalAlerts !== 1 ? "s" : ""}
             </button>
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-emerald-500/15 flex items-center justify-center">
-                <Zap className="w-4 h-4 text-emerald-400" />
-              </div>
-              <span className="font-bold text-lg">Z-API Admin</span>
-            </div>
-            {/* Alert badge in header */}
-            {totalAlerts > 0 && (
-              <button
-                onClick={() => setActiveTab("alerts")}
-                className="relative flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-500/15 border border-red-500/30 text-red-400 text-xs font-medium hover:bg-red-500/25 transition-colors"
-              >
-                <BellRing className="w-3.5 h-3.5" />
-                {totalAlerts} alerta{totalAlerts !== 1 ? "s" : ""}
-              </button>
-            )}
-          </div>
-          <div className="flex items-center gap-3">
-            <Button
-              size="sm"
-              className="bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5"
-              onClick={() => setProvisionDialog({ tenantId: 0, tenantName: "" })}
-            >
-              <Plus className="w-4 h-4" />
-              <span className="hidden sm:inline">Liberar Z-API</span>
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                instancesQuery.refetch();
-                statsQuery.refetch();
-                tenantsWithoutQuery.refetch();
-                alertsQuery.refetch();
-                alertCountsQuery.refetch();
-                toast.info("Dados atualizados!");
-              }}
-              className="gap-1.5"
-            >
-              <RefreshCw className="w-4 h-4" />
-              <span className="hidden sm:inline">Atualizar</span>
-            </Button>
-          </div>
+          )}
+        </div>
+        <div className="flex items-center gap-2 self-start">
+          <Button
+            size="sm"
+            className="bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5"
+            onClick={() => setProvisionDialog({ tenantId: 0, tenantName: "" })}
+          >
+            <Plus className="w-4 h-4" />
+            <span className="hidden sm:inline">Liberar Z-API</span>
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              instancesQuery.refetch();
+              statsQuery.refetch();
+              tenantsWithoutQuery.refetch();
+              alertsQuery.refetch();
+              alertCountsQuery.refetch();
+              toast.info("Dados atualizados!");
+            }}
+            className="gap-1.5"
+          >
+            <RefreshCw className="w-4 h-4" />
+            <span className="hidden sm:inline">Atualizar</span>
+          </Button>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-6 py-8">
+      <div className="space-y-6">
         {/* Stats Cards */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
           {[

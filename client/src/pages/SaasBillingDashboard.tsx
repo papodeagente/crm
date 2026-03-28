@@ -33,7 +33,7 @@ export default function SaasBillingDashboard() {
 
   if (meQuery.isLoading || dashboardQuery.isLoading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="min-h-[40vh] flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-purple-400" />
       </div>
     );
@@ -41,7 +41,7 @@ export default function SaasBillingDashboard() {
 
   if (!meQuery.data?.isSuperAdmin) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="min-h-[40vh] flex items-center justify-center">
         <p className="text-muted-foreground">Acesso negado</p>
       </div>
     );
@@ -83,41 +83,26 @@ export default function SaasBillingDashboard() {
   const maxTenants = Math.max(...evolution.map(e => e.totalTenants), 1);
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="space-y-6 pb-8">
       {/* Header */}
-      <div className="border-b border-border sticky top-0 z-40 bg-card/95 backdrop-blur-xl">
-        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <button onClick={() => navigate("/super-admin")} className="text-muted-foreground hover:text-foreground transition-colors">
-              <ArrowLeft className="w-5 h-5" />
-            </button>
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-violet-600 rounded-lg flex items-center justify-center">
-                <BarChart3 className="w-4 h-4 text-white" />
-              </div>
-              <span className="font-bold text-lg">Dashboard Financeiro</span>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => dashboardQuery.refetch()}
-              disabled={dashboardQuery.isFetching}
-              className="gap-2"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${dashboardQuery.isFetching ? "animate-spin" : ""}`} />
-              Atualizar
-            </Button>
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Shield className="w-4 h-4 text-purple-400" />
-              {meQuery.data?.email}
-            </div>
-          </div>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Dashboard Financeiro</h1>
+          <p className="text-sm text-muted-foreground mt-1">Indicadores financeiros, MRR e assinaturas do SaaS</p>
         </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => dashboardQuery.refetch()}
+          disabled={dashboardQuery.isFetching}
+          className="gap-2 self-start"
+        >
+          <RefreshCw className={`w-3.5 h-3.5 ${dashboardQuery.isFetching ? "animate-spin" : ""}`} />
+          Atualizar
+        </Button>
       </div>
 
-      <div className="max-w-7xl mx-auto px-6 py-8 space-y-8">
+      <div className="space-y-6">
 
         {/* ═══ Row 1: KPI Cards ═══ */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
