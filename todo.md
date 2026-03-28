@@ -6063,3 +6063,8 @@
 - [x] Investigar como conversas importadas eram armazenadas (notes vs deal_history)
 - [x] Restaurar merge seletivo para notas que não têm correspondência no deal_history (deduplicar por noteId)
 - [x] Testar e validar (14 timeline + 8 importConversation testes passando)
+## Próximos Embarques no Dashboard Início
+- [x] Analisar schema de deals/trips para entender campos de data de embarque
+- [x] Criar procedure backend para buscar próximos embarques (vendas fechadas com data de embarque)
+- [x] Implementar componente de Próximos Embarques no frontend do Dashboard
+- [x] Escrever testes vitest (9 testes passando)

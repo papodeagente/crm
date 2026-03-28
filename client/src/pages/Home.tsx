@@ -10,7 +10,7 @@ import {
   Import, BarChart3, Radio, ShieldCheck, X,
   CheckCircle2, Circle, Eye, ArrowRight,
   Filter, User, UsersRound, Building2, ChevronDown,
-  Brain, Loader2,
+  Brain, Loader2, Plane, CalendarDays, MapPin,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -410,6 +410,11 @@ export default function Home() {
     staleTime: 60000,
     refetchIntervalInBackground: false,
   });
+  const departuresQ = trpc.home.upcomingDepartures.useQuery(execFilterInput, {
+    refetchInterval: REFETCH_INTERVAL,
+    staleTime: 60000,
+    refetchIntervalInBackground: false,
+  });
   const onboardingQ = trpc.home.onboarding.useQuery(undefined, {
     staleTime: 120000,
   });
@@ -424,6 +429,7 @@ export default function Home() {
   const exec = execQ.data;
   const tasks = tasksQ.data;
   const rfv = rfvQ.data;
+  const departures = departuresQ.data;
   const onboarding = onboardingQ.data;
   const loading = execQ.isLoading;
   const filterOptions = filterOptionsQ.data;
@@ -863,9 +869,107 @@ export default function Home() {
         </section>
       </div>
 
-      {/* ═══════════════════════════════════════════════════════
-          BLOCO 4 — CHECKLIST DIDÁTICO DE ONBOARDING
-          ═══════════════════════════════════════════════════════ */}
+      {/* ═══════════════════════════════════════════════════
+          BLOCO 4 — PRÓXIMOS EMBARQUES
+          ═══════════════════════════════════════════════════ */}
+      {departures && departures.length > 0 && (
+        <section className="mb-6 sm:mb-8">
+          <div className="surface p-5">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="h-9 w-9 rounded-xl flex items-center justify-center bg-sky-500/10 shrink-0">
+                  <Plane className="h-4.5 w-4.5 text-sky-500" />
+                </div>
+                <div>
+                  <h2 className="text-[14px] font-bold text-foreground tracking-tight">Próximos Embarques</h2>
+                  <p className="text-[11px] text-muted-foreground">Vendas fechadas com data de embarque</p>
+                </div>
+              </div>
+              <span className="text-[10px] bg-sky-500/15 text-sky-500 px-2 py-0.5 rounded-full font-bold">
+                {departures.length} embarque{departures.length > 1 ? "s" : ""}
+              </span>
+            </div>
+
+            <div className="divide-y divide-border/40">
+              {departures.map((dep: any) => {
+                const boardDate = dep.boardingDate ? new Date(dep.boardingDate) : null;
+                const retDate = dep.returnDate ? new Date(dep.returnDate) : null;
+                const now = new Date();
+                const daysUntil = boardDate ? Math.ceil((boardDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)) : null;
+
+                let urgencyClass = "text-sky-500 bg-sky-500/10";
+                let urgencyLabel = daysUntil !== null ? `${daysUntil}d` : "";
+                if (daysUntil !== null) {
+                  if (daysUntil <= 0) {
+                    urgencyClass = "text-red-500 bg-red-500/10";
+                    urgencyLabel = "Hoje";
+                  } else if (daysUntil <= 3) {
+                    urgencyClass = "text-amber-500 bg-amber-500/10";
+                    urgencyLabel = `${daysUntil}d`;
+                  } else if (daysUntil <= 7) {
+                    urgencyClass = "text-orange-500 bg-orange-500/10";
+                    urgencyLabel = `${daysUntil}d`;
+                  }
+                }
+
+                return (
+                  <Link key={dep.id} href={`/deals/${dep.id}`}>
+                    <div className="flex items-center gap-3 py-3 px-1 hover:bg-muted/30 rounded-lg transition-colors cursor-pointer group">
+                      {/* Urgency badge */}
+                      <div className={`h-10 w-10 rounded-xl flex items-center justify-center shrink-0 ${urgencyClass}`}>
+                        <span className="text-[11px] font-extrabold">{urgencyLabel}</span>
+                      </div>
+
+                      {/* Deal info */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="text-[13px] font-semibold text-foreground truncate">{dep.title}</p>
+                        </div>
+                        <div className="flex items-center gap-3 mt-0.5 flex-wrap">
+                          {dep.contactName && (
+                            <span className="text-[11px] text-muted-foreground flex items-center gap-1">
+                              <User className="h-3 w-3" />
+                              {dep.contactName}
+                            </span>
+                          )}
+                          {boardDate && (
+                            <span className="text-[11px] text-muted-foreground flex items-center gap-1">
+                              <CalendarDays className="h-3 w-3" />
+                              {boardDate.toLocaleDateString(SYSTEM_LOCALE, { day: "2-digit", month: "short", year: "numeric", timeZone: SYSTEM_TIMEZONE })}
+                            </span>
+                          )}
+                          {retDate && (
+                            <span className="text-[11px] text-muted-foreground flex items-center gap-1">
+                              <MapPin className="h-3 w-3" />
+                              Retorno: {retDate.toLocaleDateString(SYSTEM_LOCALE, { day: "2-digit", month: "short", timeZone: SYSTEM_TIMEZONE })}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Value + Owner */}
+                      <div className="text-right shrink-0 hidden sm:block">
+                        {dep.valueCents > 0 && (
+                          <p className="text-[13px] font-bold text-foreground">{formatCurrency(dep.valueCents)}</p>
+                        )}
+                        {dep.ownerName && (
+                          <p className="text-[10px] text-muted-foreground mt-0.5">{dep.ownerName}</p>
+                        )}
+                      </div>
+
+                      <ChevronRight className="h-4 w-4 text-muted-foreground/30 group-hover:text-primary shrink-0 transition-colors" />
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* ═══════════════════════════════════════════════════
+          BLOCO 5 — CHECKLIST DIDÁTICO DE ONBOARDING
+          ═════════════════════════════════════════════════ */}
       {onboarding && !onboarding.dismissed && onboarding.steps && onboarding.steps.length > 0 && (
         <section className="mb-8">
           <div className="surface p-5 relative overflow-hidden">

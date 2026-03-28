@@ -164,7 +164,7 @@ import { profileRouter } from "./routers/profileRouter";
 import { analyticsRouter } from "./routers/analyticsRouter";
 import { zapiAdminRouter } from "./routers/zapiAdminRouter";
 import { exportRouter } from "./routers/exportRouter";
-import { getHomeExecutive, getHomeTasks, getHomeRFV, getHomeOnboarding, toggleOnboardingStep, dismissOnboarding, isOnboardingDismissed, getHomeFilterOptions } from "./services/homeService";
+import { getHomeExecutive, getHomeTasks, getHomeRFV, getHomeOnboarding, toggleOnboardingStep, dismissOnboarding, isOnboardingDismissed, getHomeFilterOptions, getUpcomingDepartures } from "./services/homeService";
 import {
   listLeadEvents,
   countLeadEvents,
@@ -2016,6 +2016,15 @@ export const appRouter = router({
     dismissOnboarding: tenantProcedure
       .mutation(async ({ ctx }) => {
         return dismissOnboarding(getTenantId(ctx), ctx.user!.id);
+      }),
+    /** Próximos embarques: vendas fechadas com data de embarque futura */
+    upcomingDepartures: tenantProcedure
+      .input(z.object({ userId: z.number().optional(), teamId: z.number().optional(), limit: z.number().optional() }).optional())
+      .query(async ({ ctx, input }) => {
+        const isAdmin = ctx.saasUser?.role === "admin";
+        const userId = isAdmin ? input?.userId : ctx.saasUser?.userId;
+        const teamId = isAdmin ? input?.teamId : undefined;
+        return getUpcomingDepartures(getTenantId(ctx), userId, teamId, input?.limit ?? 20);
       }),
     /** AI-powered intelligent forecast for the current month */
     aiForecast: tenantProcedure

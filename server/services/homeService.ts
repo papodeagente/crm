@@ -592,3 +592,70 @@ export async function isOnboardingDismissed(tenantId: number) {
 
   return (rows as unknown as any[])[0]?.prefValue === 'true';
 }
+
+
+// ═══════════════════════════════════════
+// UPCOMING DEPARTURES (Próximos Embarques)
+// Deals with status "won" and boardingDate >= today, ordered by nearest first
+// ═══════════════════════════════════════
+
+export async function getUpcomingDepartures(
+  tenantId: number,
+  userId?: number,
+  teamId?: number,
+  limit = 20,
+) {
+  const db = await getDb();
+  if (!db) return [];
+
+  let userIds: number[] | undefined;
+  if (teamId) {
+    userIds = await getTeamMemberIds(tenantId, teamId);
+    if (userIds.length === 0) return [];
+  }
+
+  const ownerFilter = buildOwnerFilter(userId, userIds);
+
+  const [rows] = await db.execute(sql`
+    SELECT
+      d.id,
+      d.title,
+      d.valueCents,
+      d.boardingDate,
+      d.returnDate,
+      d.ownerUserId,
+      d.contactId,
+      c.name   AS contactName,
+      c.phone  AS contactPhone,
+      u.name   AS ownerName,
+      p.name   AS pipelineName,
+      s.name   AS stageName
+    FROM deals d
+    LEFT JOIN crm_contacts c ON c.id = d.contactId AND c.tenantId = ${tenantId}
+    LEFT JOIN crm_users u ON u.id = d.ownerUserId AND u.tenantId = ${tenantId}
+    LEFT JOIN crm_pipelines p ON p.id = d.pipelineId AND p.tenantId = ${tenantId}
+    LEFT JOIN crm_pipeline_stages s ON s.id = d.stageId
+    WHERE d.tenantId = ${tenantId}
+      AND d.status = 'won'
+      AND d.boardingDate IS NOT NULL
+      AND d.boardingDate >= CURDATE()
+      AND d.deletedAt IS NULL
+      ${ownerFilter}
+    ORDER BY d.boardingDate ASC
+    LIMIT ${limit}
+  `);
+
+  return (rows as unknown as any[]).map((r: any) => ({
+    id: r.id,
+    title: r.title,
+    valueCents: Number(r.valueCents || 0),
+    boardingDate: r.boardingDate ? new Date(r.boardingDate).getTime() : null,
+    returnDate: r.returnDate ? new Date(r.returnDate).getTime() : null,
+    contactName: r.contactName || null,
+    contactPhone: r.contactPhone || null,
+    ownerName: r.ownerName || null,
+    ownerUserId: r.ownerUserId ? Number(r.ownerUserId) : null,
+    pipelineName: r.pipelineName || null,
+    stageName: r.stageName || null,
+  }));
+}
