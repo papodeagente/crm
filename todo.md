@@ -6031,3 +6031,14 @@
 - [x] Criar componente DealFiles com upload, listagem e download
 - [x] Inserir item ARQUIVOS no menu de Negociações entre Produtos/Serviços e Participantes
 - [x] Escrever testes vitest para os routers de deal_files
+
+## Dashboard de Gestão de Planos (Super Admin)
+- [x] Fase 1: Mapear arquivos existentes (schema, planLimitsService, webhook, layout)
+- [x] Fase 2: Criar 4 tabelas Drizzle (plan_definitions, plan_features, tenant_addons, tenant_entitlement_overrides) + seed
+- [x] Fase 3: Criar planEntitlementService.ts + adaptar planLimitsService.ts (sem alterar assinaturas)
+- [x] Fase 4: Criar superAdminPlansRouter.ts com todas as procedures + registrar em routers.ts
+- [x] Fase 5: Adaptar webhook Hotmart para add-ons (bloco condicional isolado em try/catch)
+- [x] Fase 6: Frontend SuperAdminPlans.tsx (3 abas: Planos, Features, Add-ons)
+- [x] Fase 7: Seção Entitlement no SuperAdminTenantDetail + rotas App.tsx + links SuperAdminLayout
+- [x] Fase 8: 21 testes obrigatórios (superAdminPlans.test.ts)
+- [x] Fase 9: Validação final (tsc=0, vitest=pass, billingAccessService intocado, tenantWriteProcedure intocado)

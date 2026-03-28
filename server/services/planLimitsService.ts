@@ -1,7 +1,8 @@
 /**
  * Plan Limits Service
  * Enforcement centralizado de limites e restrições por plano.
- * Usa a definição de shared/plans.ts como fonte da verdade.
+ * Usa a definição de shared/plans.ts como fonte da verdade,
+ * enriquecida por getEffectiveEntitlement (add-ons + overrides).
  */
 
 import { eq, and, sql } from "drizzle-orm";
@@ -9,6 +10,7 @@ import { getDb } from "../db";
 import { tenants, crmUsers } from "../../drizzle/schema";
 import { getPlanDefinition, planHasFeature, getMinPlanForFeature, type PlanId, type PlanFeatures } from "../../shared/plans";
 import { TRPCError } from "@trpc/server";
+import { getEffectiveEntitlement } from "./planEntitlementService";
 
 // ─── Tenant Plan Lookup ────────────────────────────────────────────
 
@@ -44,20 +46,31 @@ export async function canAddUser(tenantId: number): Promise<{ allowed: boolean; 
   const def = getPlanDefinition(plan);
   const currentCount = await countTenantUsers(tenantId);
 
-  if (def.maxUsers === -1) {
+  // Resolve effective limit: base plan + add-ons + overrides
+  let effectiveMaxUsers = def.maxUsers;
+  try {
+    const entitlement = await getEffectiveEntitlement(tenantId);
+    const baseLimit = entitlement.features["maxUsers"]?.limitValue ?? def.maxUsers;
+    const addonUsers = entitlement.addons.extraUsers;
+    effectiveMaxUsers = baseLimit + addonUsers;
+  } catch {
+    // Fallback to static definition — never break enforcement
+  }
+
+  if (effectiveMaxUsers === -1) {
     return { allowed: true, currentCount, limit: -1 };
   }
 
-  if (currentCount >= def.maxUsers) {
+  if (currentCount >= effectiveMaxUsers) {
     return {
       allowed: false,
-      reason: `O plano ${def.name} permite no máximo ${def.maxUsers} usuário(s). Você já tem ${currentCount}. Faça upgrade para adicionar mais.`,
+      reason: `O plano ${def.name} permite no máximo ${effectiveMaxUsers} usuário(s). Você já tem ${currentCount}. Faça upgrade para adicionar mais.`,
       currentCount,
-      limit: def.maxUsers,
+      limit: effectiveMaxUsers,
     };
   }
 
-  return { allowed: true, currentCount, limit: def.maxUsers };
+  return { allowed: true, currentCount, limit: effectiveMaxUsers };
 }
 
 /** Guard: lança erro se não puder adicionar usuário */
@@ -73,7 +86,20 @@ export async function assertCanAddUser(tenantId: number): Promise<void> {
 /** Verifica se o tenant tem acesso a uma feature específica */
 export async function canAccessFeature(tenantId: number, feature: keyof PlanFeatures): Promise<boolean> {
   const plan = await getTenantPlan(tenantId);
-  return planHasFeature(plan, feature);
+  const staticAccess = planHasFeature(plan, feature);
+
+  // Check if entitlement overrides or add-ons grant access
+  try {
+    const entitlement = await getEffectiveEntitlement(tenantId);
+    const featureEntry = entitlement.features[feature];
+    if (featureEntry !== undefined) {
+      return featureEntry.isEnabled;
+    }
+  } catch {
+    // Fallback to static definition
+  }
+
+  return staticAccess;
 }
 
 /** Guard genérico: lança FORBIDDEN se tenant não tem acesso à feature */
@@ -118,15 +144,28 @@ export async function getTenantPlanSummary(tenantId: number) {
   const def = getPlanDefinition(plan);
   const currentUsers = await countTenantUsers(tenantId);
 
+  // Enrich with effective entitlement (add-ons + overrides)
+  let effectiveMaxUsers = def.maxUsers;
+  let effectiveMaxWA = def.maxWhatsAppAccounts;
+  let effectiveMaxAttendants = def.maxAttendantsPerAccount;
+  try {
+    const entitlement = await getEffectiveEntitlement(tenantId);
+    effectiveMaxUsers = (entitlement.features["maxUsers"]?.limitValue ?? def.maxUsers) + entitlement.addons.extraUsers;
+    effectiveMaxWA = (entitlement.features["maxWhatsAppAccounts"]?.limitValue ?? def.maxWhatsAppAccounts) + entitlement.addons.whatsappNumbers;
+    effectiveMaxAttendants = entitlement.features["maxAttendantsPerAccount"]?.limitValue ?? def.maxAttendantsPerAccount;
+  } catch {
+    // Fallback to static definition
+  }
+
   return {
     planId: def.id,
     planName: def.name,
     description: def.description,
     commercialCopy: def.commercialCopy,
-    maxUsers: def.maxUsers,
+    maxUsers: effectiveMaxUsers,
     currentUsers,
-    maxWhatsAppAccounts: def.maxWhatsAppAccounts,
-    maxAttendantsPerAccount: def.maxAttendantsPerAccount,
+    maxWhatsAppAccounts: effectiveMaxWA,
+    maxAttendantsPerAccount: effectiveMaxAttendants,
     features: def.features,
     priceInCents: def.priceInCents,
   };

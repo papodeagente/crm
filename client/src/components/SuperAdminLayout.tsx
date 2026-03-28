@@ -3,7 +3,7 @@ import { useLocation } from "wouter";
 import {
   LayoutDashboard, Building2, BarChart3, Activity, TrendingUp,
   Lightbulb, ArrowLeft, Shield, DollarSign, Phone, Users,
-  Menu, X, ChevronDown, ChevronRight
+  Menu, X, ChevronDown, ChevronRight, Package
 } from "lucide-react";
 
 type NavItem = {
@@ -37,6 +37,7 @@ const navGroups: NavGroup[] = [
     defaultOpen: true,
     items: [
       { path: "/super-admin/billing", label: "Financeiro / MRR", icon: DollarSign },
+      { path: "/super-admin/plans", label: "Gestão de Planos", icon: Package },
       { path: "/super-admin/zapi", label: "Gestão Z-API", icon: Phone },
       { path: "/super-admin", label: "Gestão de Tenants", icon: Users },
     ],

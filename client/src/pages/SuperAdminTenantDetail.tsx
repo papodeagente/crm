@@ -1,5 +1,6 @@
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import TenantEntitlementSection from "@/components/TenantEntitlementSection";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useLocation, useRoute } from "wouter";
@@ -377,6 +378,9 @@ export default function SuperAdminTenantDetail() {
           )}
         </CardContent>
       </Card>
+
+      {/* Entitlement Section */}
+      <TenantEntitlementSection tenantId={Number(params?.id)} tenantName={d.tenant.name} />
     </div>
   );
 }

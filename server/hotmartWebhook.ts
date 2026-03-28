@@ -1,5 +1,5 @@
-import { eq } from "drizzle-orm";
-import { tenants, crmUsers, subscriptions, subscriptionEvents } from "../drizzle/schema";
+import { eq, and } from "drizzle-orm";
+import { tenants, crmUsers, subscriptions, subscriptionEvents, addonOfferCodes, tenantAddons } from "../drizzle/schema";
 import { getDb } from "./db";
 import { hashPassword } from "./saasAuth";
 import { sendWelcomeEmail } from "./emailService";
@@ -579,6 +579,94 @@ export async function handleHotmartWebhook(req: Request, res: Response) {
       } catch (deprovErr: any) {
         console.error(`[Hotmart Webhook] ✗ Z-API deprovision error for tenant ${tenant.id}:`, deprovErr.message);
       }
+    }
+
+    // 8.7. Add-on handling — isolated try/catch, never breaks main flow
+    try {
+      if (offerCode) {
+        const addonMatch = await db.select()
+          .from(addonOfferCodes)
+          .where(eq(addonOfferCodes.hotmartOfferCode, offerCode))
+          .limit(1);
+
+        if (addonMatch.length > 0) {
+          const addonDef = addonMatch[0];
+          const isActivation = ["PURCHASE_COMPLETE", "PURCHASE_APPROVED"].includes(event);
+          const isCancellation = ["PURCHASE_CANCELED", "PURCHASE_REFUNDED", "PURCHASE_CHARGEBACK"].includes(event);
+
+          if (isActivation && transactionId) {
+            // Idempotency: check if addon already exists for this transaction
+            const existingAddon = await db.select()
+              .from(tenantAddons)
+              .where(eq(tenantAddons.hotmartTransactionId, transactionId))
+              .limit(1);
+
+            if (existingAddon.length === 0) {
+              await db.insert(tenantAddons).values({
+                tenantId: tenant.id,
+                addonType: addonDef.addonType,
+                quantity: 1,
+                hotmartTransactionId: transactionId,
+                hotmartOfferCode: offerCode,
+                status: "active",
+              });
+              console.log(`[Hotmart Webhook] Add-on ${addonDef.addonType} activated for tenant ${tenant.id} (txn: ${transactionId})`);
+
+              // EventLog
+              try {
+                const { emitEvent } = await import("./middleware/eventLog");
+                await emitEvent({
+                  tenantId: tenant.id,
+                  actorType: "system",
+                  entityType: "tenant_addon",
+                  action: "addon_activated_hotmart",
+                  afterJson: { addonType: addonDef.addonType, transactionId, offerCode },
+                });
+              } catch (evtErr: any) {
+                console.error(`[Hotmart Webhook] EventLog error for addon:`, evtErr.message);
+              }
+            } else {
+              console.log(`[Hotmart Webhook] Add-on already exists for txn ${transactionId} — skipping`);
+            }
+          }
+
+          if (isCancellation && transactionId) {
+            // Cancel addon by transaction ID
+            const addonToCancel = await db.select()
+              .from(tenantAddons)
+              .where(and(
+                eq(tenantAddons.hotmartTransactionId, transactionId),
+                eq(tenantAddons.status, "active"),
+              ))
+              .limit(1);
+
+            if (addonToCancel.length > 0) {
+              await db.update(tenantAddons).set({
+                status: "cancelled",
+                updatedAt: new Date(),
+              }).where(eq(tenantAddons.id, addonToCancel[0].id));
+              console.log(`[Hotmart Webhook] Add-on ${addonToCancel[0].addonType} cancelled for tenant ${tenant.id} (txn: ${transactionId})`);
+
+              try {
+                const { emitEvent } = await import("./middleware/eventLog");
+                await emitEvent({
+                  tenantId: tenant.id,
+                  actorType: "system",
+                  entityType: "tenant_addon",
+                  entityId: addonToCancel[0].id,
+                  action: "addon_cancelled_hotmart",
+                  afterJson: { addonType: addonToCancel[0].addonType, transactionId, event },
+                });
+              } catch (evtErr: any) {
+                console.error(`[Hotmart Webhook] EventLog error for addon cancel:`, evtErr.message);
+              }
+            }
+          }
+        }
+      }
+    } catch (addonErr: any) {
+      console.error(`[Hotmart Webhook] Add-on processing error (non-blocking):`, addonErr.message);
+      // Non-blocking: add-on failure never breaks the main billing flow
     }
 
     // 9. Mark event as processed

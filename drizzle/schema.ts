@@ -2354,3 +2354,103 @@ export const dealFiles = mysqlTable("deal_files", {
 ]);
 export type DealFile = typeof dealFiles.$inferSelect;
 export type InsertDealFile = typeof dealFiles.$inferInsert;
+
+
+// ════════════════════════════════════════════════════════════
+// PLAN MANAGEMENT (Super Admin Dashboard)
+// ════════════════════════════════════════════════════════════
+
+export const planDefinitions = mysqlTable("plan_definitions", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 100 }).notNull(),
+  slug: varchar("slug", { length: 50 }).notNull(),
+  isActive: boolean("is_active").default(true).notNull(),
+  isPublic: boolean("is_public").default(true).notNull(),
+  priceCents: int("price_cents").default(0).notNull(),
+  billingCycle: mysqlEnum("billing_cycle", ["monthly", "annual"]).default("monthly").notNull(),
+  hotmartOfferCode: varchar("hotmart_offer_code", { length: 100 }),
+  description: text("description"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (t) => [
+  uniqueIndex("uq_plan_slug").on(t.slug),
+]);
+
+export type PlanDefinition = typeof planDefinitions.$inferSelect;
+export type InsertPlanDefinition = typeof planDefinitions.$inferInsert;
+
+export const planFeatures = mysqlTable("plan_features", {
+  id: int("id").autoincrement().primaryKey(),
+  planId: int("plan_id").notNull(),
+  featureKey: varchar("feature_key", { length: 100 }).notNull(),
+  isEnabled: boolean("is_enabled").default(true).notNull(),
+  limitValue: int("limit_value"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (t) => [
+  uniqueIndex("uq_plan_feature").on(t.planId, t.featureKey),
+  index("idx_pf_plan").on(t.planId),
+]);
+
+export type PlanFeature = typeof planFeatures.$inferSelect;
+export type InsertPlanFeature = typeof planFeatures.$inferInsert;
+
+export const tenantAddons = mysqlTable("tenant_addons", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenant_id").notNull(),
+  addonType: mysqlEnum("addon_type", [
+    "whatsapp_number",
+    "extra_user",
+    "extra_storage_gb",
+  ]).notNull(),
+  quantity: int("quantity").default(1).notNull(),
+  hotmartTransactionId: varchar("hotmart_transaction_id", { length: 200 }),
+  hotmartOfferCode: varchar("hotmart_offer_code", { length: 100 }),
+  activatedByUserId: int("activated_by_user_id"),
+  status: mysqlEnum("status", ["active", "cancelled", "expired"]).default("active").notNull(),
+  expiresAt: timestamp("expires_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (t) => [
+  index("idx_ta_tenant").on(t.tenantId),
+  index("idx_ta_tenant_type").on(t.tenantId, t.addonType),
+  index("idx_ta_transaction").on(t.hotmartTransactionId),
+]);
+
+export type TenantAddon = typeof tenantAddons.$inferSelect;
+export type InsertTenantAddon = typeof tenantAddons.$inferInsert;
+
+export const tenantEntitlementOverrides = mysqlTable("tenant_entitlement_overrides", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenant_id").notNull(),
+  featureKey: varchar("feature_key", { length: 100 }).notNull(),
+  isEnabled: boolean("is_enabled").notNull(),
+  limitValue: int("limit_value"),
+  reason: varchar("reason", { length: 500 }).notNull(),
+  expiresAt: timestamp("expires_at"),
+  createdBy: int("created_by").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (t) => [
+  uniqueIndex("uq_override").on(t.tenantId, t.featureKey),
+  index("idx_ov_tenant").on(t.tenantId),
+]);
+
+export type TenantEntitlementOverride = typeof tenantEntitlementOverrides.$inferSelect;
+export type InsertTenantEntitlementOverride = typeof tenantEntitlementOverrides.$inferInsert;
+
+// Add-on offer codes (links Hotmart offer codes to addon types)
+export const addonOfferCodes = mysqlTable("addon_offer_codes", {
+  id: int("id").autoincrement().primaryKey(),
+  addonType: mysqlEnum("addon_type", [
+    "whatsapp_number",
+    "extra_user",
+    "extra_storage_gb",
+  ]).notNull(),
+  hotmartOfferCode: varchar("hotmart_offer_code", { length: 100 }).notNull(),
+  priceCents: int("price_cents").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (t) => [
+  uniqueIndex("uq_addon_offer").on(t.addonType, t.hotmartOfferCode),
+]);
+
+export type AddonOfferCode = typeof addonOfferCodes.$inferSelect;
+export type InsertAddonOfferCode = typeof addonOfferCodes.$inferInsert;

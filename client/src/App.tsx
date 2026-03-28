@@ -76,6 +76,7 @@ const SuperAdminAdoption = lazyWithRetry(() => import("./pages/SuperAdminAdoptio
 const SuperAdminHealth = lazyWithRetry(() => import("./pages/SuperAdminHealth"));
 const SuperAdminCommercial = lazyWithRetry(() => import("./pages/SuperAdminCommercial"));
 const SuperAdminStrategicHelp = lazyWithRetry(() => import("./pages/SuperAdminStrategicHelp"));
+const SuperAdminPlans = lazyWithRetry(() => import("./pages/SuperAdminPlans"));
 import SuperAdminLayout from "./components/SuperAdminLayout";
 const ForgotPassword = lazyWithRetry(() => import("./pages/ForgotPassword"));
 const ResetPassword = lazyWithRetry(() => import("./pages/ResetPassword"));
@@ -190,6 +191,9 @@ function AppRouter() {
                 </Route>
                 <Route path="/super-admin/strategic-help">
                   <SuperAdminLayout><SuperAdminStrategicHelp /></SuperAdminLayout>
+                </Route>
+                <Route path="/super-admin/plans">
+                  <SuperAdminLayout><SuperAdminPlans /></SuperAdminLayout>
                 </Route>
 
                 {/* Notifications */}
