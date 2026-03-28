@@ -6055,3 +6055,7 @@
 - [x] Analisar código atual do DealDetail e identificar o que foi removido
 - [x] Reimplementar campo de criação de anotação no histórico do atendimento (DealTimeline)
 - [x] Testar e validar (14 testes timeline passando)
+## Corrigir Duplicação de Anotação na Timeline
+- [x] Investigar causa da duplicação (nota na tabela notes + deal_history)
+- [x] Corrigir para exibir apenas um registro por anotação (removido merge duplicado de notes no timeline)
+- [x] Testar e validar (14 testes timeline passando)

@@ -1064,25 +1064,8 @@ const tenantId = getTenantId(ctx); const { id, dealId, checkIn, checkOut, ...dat
           includeWhatsApp: input.includeWhatsApp,
         });
 
-        // Also merge notes if no category filter or 'note' is in categories
-        if (!input.categories || input.categories.length === 0 || input.categories.includes('note')) {
-          const notes = await crm.listNotes(getTenantId(ctx), 'deal', input.dealId);
-          notes.forEach((n: any) => {
-            result.events.push({
-              id: `note-${n.id}`,
-              type: 'note',
-              action: 'note',
-              description: n.body,
-              actorName: n.createdByName || 'Anota\u00e7\u00e3o',
-              actorUserId: n.createdBy,
-              eventCategory: 'note',
-              eventSource: 'user',
-              metadataJson: { noteId: n.id },
-              occurredAt: n.createdAt,
-              createdAt: n.createdAt,
-            });
-          });
-        }
+          // Notes are already included via deal_history (action='note', eventCategory='note')
+        // created by crm.notes.create → crm.createDealHistory. No separate merge needed.
 
         // Also merge conversion events if no category filter or 'conversion' is in categories
         if (!input.categories || input.categories.length === 0 || input.categories.includes('conversion')) {
