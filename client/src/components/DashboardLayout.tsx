@@ -52,8 +52,9 @@ const menuSections: MenuSection[] = [
   {
     label: "CRM",
     items: [
-      { icon: Users, label: "Contatos", path: "/contacts" },
       { icon: Briefcase, label: "Negócios", path: "/deals" },
+      { icon: Inbox, label: "Inbox", path: "/inbox" },
+      { icon: Users, label: "Contatos", path: "/contacts" },
       { icon: Target, label: "Funil", path: "/pipeline" },
       { icon: Plane, label: "Viagens", path: "/trips" },
       { icon: ClipboardList, label: "Tarefas", path: "/tasks" },
@@ -62,7 +63,6 @@ const menuSections: MenuSection[] = [
   {
     label: "Comunicação",
     items: [
-      { icon: Inbox, label: "Inbox", path: "/inbox" },
       { icon: Send, label: "WhatsApp", path: "/whatsapp" },
       { icon: Bot, label: "Chatbot IA", path: "/chatbot" },
       { icon: Users, label: "Supervisão", path: "/supervision", adminOnly: true },

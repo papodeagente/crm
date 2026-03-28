@@ -6011,3 +6011,6 @@
 - [x] Criar zapiApi.test.ts substituindo evolutionApi.test.ts
 - [x] Todos os 68 testes passando (6 arquivos de teste)
 - [x] webhookRoutes.ts mantém endpoint deprecated /api/webhooks/evolution retornando 410
+
+## Reordenação do Menu
+- [x] Mover item Inbox para entre Negociação e Contatos no menu lateral

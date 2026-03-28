@@ -33,24 +33,24 @@ interface NavItem {
 const navItems: NavItem[] = [
   { icon: Home, label: "Início", path: "/dashboard", matchPaths: ["/dashboard"] },
   { icon: Briefcase, label: "Negociações", path: "/pipeline", matchPaths: ["/pipeline", "/deal"] },
+  { icon: Inbox, label: "Inbox", path: "/inbox", matchPaths: ["/inbox"] },
   { icon: Users, label: "Contatos", path: "/contacts", matchPaths: ["/contacts"] },
   { icon: CheckSquare, label: "Tarefas", path: "/tasks", matchPaths: ["/tasks"] },
 
   { icon: TrendingUp, label: "RFV", path: "/rfv", matchPaths: ["/rfv", "/campaigns"] },
   { icon: BarChart3, label: "Análises", path: "/analytics", matchPaths: ["/analytics", "/insights", "/goals"] },
-  { icon: Inbox, label: "Inbox", path: "/inbox", matchPaths: ["/inbox"] },
 ];
 
 /* ─── Quick Nav Pages ─── */
 const quickNavPages = [
   { icon: Home, label: "Início", path: "/dashboard" },
   { icon: Briefcase, label: "Negociações", path: "/pipeline" },
+  { icon: Inbox, label: "Inbox", path: "/inbox" },
   { icon: Users, label: "Contatos", path: "/contacts" },
   { icon: CheckSquare, label: "Tarefas", path: "/tasks" },
 
   { icon: TrendingUp, label: "RFV", path: "/rfv" },
   { icon: BarChart3, label: "Análises", path: "/analytics" },
-  { icon: Inbox, label: "Inbox", path: "/inbox" },
   { icon: Bell, label: "Notificações", path: "/notifications" },
   { icon: Settings, label: "Configurações", path: "/settings" },
 ];
