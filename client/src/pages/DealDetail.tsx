@@ -24,7 +24,7 @@ import {
   Package, Phone, Plane, Play, Plus, Send, ShoppingBag, ThumbsDown, ThumbsUp,
   Trash2, User, Users, X, AlertCircle, ClipboardList, Paperclip, Tag,
   Sparkles, BarChart3, TrendingUp, TrendingDown, Star, Target, Lightbulb, RefreshCw, Award, Search,
-  PanelLeftOpen, Maximize2, Minimize2
+  PanelLeftOpen, Maximize2, Minimize2, UserPlus
 } from "lucide-react";
 import TaskFormDialog from "@/components/TaskFormDialog";
 import DealFilesPanel from "@/components/DealFilesPanel";
@@ -2835,16 +2835,67 @@ function ParticipantsPanel({ participants, contacts, dealId, onRefresh }: any) {
   const [showAdd, setShowAdd] = useState(false);
   const [selectedContact, setSelectedContact] = useState("");
   const [selectedRole, setSelectedRole] = useState("traveler");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [mode, setMode] = useState<"select" | "create">("select");
+  const [newName, setNewName] = useState("");
+  const [newPhone, setNewPhone] = useState("");
+  const [newEmail, setNewEmail] = useState("");
+  const [creating, setCreating] = useState(false);
+  const searchRef = useRef<HTMLInputElement>(null);
 
   const addParticipant = trpc.crm.deals.participants.add.useMutation({
-    onSuccess: () => { onRefresh(); setShowAdd(false); toast.success("Participante adicionado"); },
+    onSuccess: () => { onRefresh(); resetAndClose(); toast.success("Participante adicionado"); },
   });
   const removeParticipant = trpc.crm.deals.participants.remove.useMutation({
     onSuccess: () => { onRefresh(); toast.success("Participante removido"); },
   });
+  const createContactMut = trpc.crm.contacts.create.useMutation();
 
   const existingIds = participants.map((p: any) => p.contactId);
   const availableContacts = (contacts || []).filter((c: any) => !existingIds.includes(c.id));
+
+  // Real-time filtering as user types
+  const filteredContacts = useMemo(() => {
+    if (!searchTerm.trim()) return availableContacts;
+    const term = searchTerm.toLowerCase();
+    return availableContacts.filter((c: any) =>
+      (c.name || "").toLowerCase().includes(term) ||
+      (c.phone || "").toLowerCase().includes(term) ||
+      (c.email || "").toLowerCase().includes(term)
+    );
+  }, [availableContacts, searchTerm]);
+
+  const resetAndClose = () => {
+    setShowAdd(false);
+    setSelectedContact("");
+    setSelectedRole("traveler");
+    setSearchTerm("");
+    setMode("select");
+    setNewName("");
+    setNewPhone("");
+    setNewEmail("");
+    setCreating(false);
+  };
+
+  const handleCreateAndAdd = async () => {
+    if (!newName.trim()) return;
+    setCreating(true);
+    try {
+      const created = await createContactMut.mutateAsync({
+        name: newName.trim(),
+        phone: newPhone.trim() || undefined,
+        email: newEmail.trim() || undefined,
+      });
+      if (created?.id) {
+        await addParticipant.mutateAsync({
+          dealId, contactId: created.id, role: selectedRole as any,
+        });
+      }
+    } catch (err: any) {
+      toast.error(err?.message || "Erro ao criar contato");
+      setCreating(false);
+    }
+  };
 
   return (
     <div className="p-5 space-y-4">
@@ -2889,40 +2940,176 @@ function ParticipantsPanel({ participants, contacts, dealId, onRefresh }: any) {
         </div>
       )}
 
-      <Dialog open={showAdd} onOpenChange={setShowAdd}>
-        <DialogContent className="sm:max-w-sm">
-          <DialogHeader><DialogTitle>Adicionar Participante</DialogTitle></DialogHeader>
-          <div className="space-y-3">
-            <SearchableCombobox
-              options={availableContacts.map((c: any) => ({
-                value: String(c.id),
-                label: c.name,
-                sublabel: c.phone || c.email || undefined,
-              }))}
-              value={selectedContact}
-              onValueChange={setSelectedContact}
-              placeholder="Buscar contato..."
-              searchPlaceholder="Digite o nome do contato..."
-            />
-            <Select value={selectedRole} onValueChange={setSelectedRole}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {Object.entries(roleLabels).map(([k, v]) => (
-                  <SelectItem key={k} value={k}>{v}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setShowAdd(false)}>Cancelar</Button>
-            <Button
-              disabled={!selectedContact}
-              onClick={() => addParticipant.mutate({
-                dealId, contactId: parseInt(selectedContact), role: selectedRole as any,
-              })}
-            >
-              Adicionar
-            </Button>
+      <Dialog open={showAdd} onOpenChange={(open) => { if (!open) resetAndClose(); else setShowAdd(true); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{mode === "select" ? "Adicionar Participante" : "Criar Novo Contato"}</DialogTitle>
+          </DialogHeader>
+
+          {mode === "select" ? (
+            <div className="space-y-3">
+              {/* Real-time search input */}
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  ref={searchRef}
+                  placeholder="Buscar por nome, telefone ou email..."
+                  className="pl-9 h-10"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  autoFocus
+                />
+                {searchTerm && (
+                  <button
+                    onClick={() => setSearchTerm("")}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
+
+              {/* Contact list with scroll */}
+              <div className="max-h-[240px] overflow-y-auto border rounded-lg divide-y">
+                {filteredContacts.length === 0 ? (
+                  <div className="text-center py-6 text-muted-foreground">
+                    <Users className="h-8 w-8 mx-auto mb-2 opacity-20" />
+                    <p className="text-sm">Nenhum contato encontrado</p>
+                    {searchTerm && (
+                      <p className="text-xs mt-1">Tente outro termo ou crie um novo contato</p>
+                    )}
+                  </div>
+                ) : (
+                  filteredContacts.map((c: any) => (
+                    <button
+                      key={c.id}
+                      onClick={() => setSelectedContact(String(c.id))}
+                      className={`w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-accent/50 transition-colors ${
+                        selectedContact === String(c.id) ? "bg-primary/10 border-l-2 border-l-primary" : ""
+                      }`}
+                    >
+                      <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                        <User className="h-3.5 w-3.5 text-primary" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{c.name}</p>
+                        <p className="text-xs text-muted-foreground truncate">
+                          {[c.phone, c.email].filter(Boolean).join(" · ") || "Sem dados adicionais"}
+                        </p>
+                      </div>
+                      {selectedContact === String(c.id) && (
+                        <div className="w-5 h-5 rounded-full bg-primary flex items-center justify-center shrink-0">
+                          <Check className="h-3 w-3 text-primary-foreground" />
+                        </div>
+                      )}
+                    </button>
+                  ))
+                )}
+              </div>
+
+              {/* Quick create button */}
+              <button
+                onClick={() => {
+                  setMode("create");
+                  setNewName(searchTerm);
+                }}
+                className="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-primary hover:bg-primary/5 rounded-lg border border-dashed border-primary/30 transition-colors"
+              >
+                <Plus className="h-4 w-4" />
+                <span>Criar novo contato{searchTerm ? ` "${searchTerm}"` : ""}</span>
+              </button>
+
+              {/* Role selector */}
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Papel do participante</Label>
+                <Select value={selectedRole} onValueChange={setSelectedRole}>
+                  <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(roleLabels).map(([k, v]) => (
+                      <SelectItem key={k} value={k}>{v}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          ) : (
+            /* ─── Create New Contact Form ─── */
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 p-2 bg-blue-500/10 rounded-lg text-xs text-blue-600 dark:text-blue-400">
+                <UserPlus className="h-4 w-4 shrink-0" />
+                <span>Preencha os dados para criar um novo contato e adicioná-lo como participante.</span>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs">Nome *</Label>
+                <Input
+                  placeholder="Nome do contato"
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  className="h-9"
+                  autoFocus
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs">Telefone</Label>
+                <Input
+                  placeholder="(00) 00000-0000"
+                  value={newPhone}
+                  onChange={(e) => setNewPhone(e.target.value)}
+                  className="h-9"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs">Email</Label>
+                <Input
+                  placeholder="email@exemplo.com"
+                  value={newEmail}
+                  onChange={(e) => setNewEmail(e.target.value)}
+                  className="h-9"
+                  type="email"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Papel do participante</Label>
+                <Select value={selectedRole} onValueChange={setSelectedRole}>
+                  <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(roleLabels).map(([k, v]) => (
+                      <SelectItem key={k} value={k}>{v}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="gap-2">
+            {mode === "create" && (
+              <Button variant="ghost" onClick={() => setMode("select")} className="mr-auto">
+                <ArrowLeft className="h-4 w-4 mr-1" /> Voltar
+              </Button>
+            )}
+            <Button variant="ghost" onClick={resetAndClose}>Cancelar</Button>
+            {mode === "select" ? (
+              <Button
+                disabled={!selectedContact || addParticipant.isPending}
+                onClick={() => addParticipant.mutate({
+                  dealId, contactId: parseInt(selectedContact), role: selectedRole as any,
+                })}
+              >
+                {addParticipant.isPending ? "Adicionando..." : "Adicionar"}
+              </Button>
+            ) : (
+              <Button
+                disabled={!newName.trim() || creating}
+                onClick={handleCreateAndAdd}
+              >
+                {creating ? "Criando..." : "Criar e Adicionar"}
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

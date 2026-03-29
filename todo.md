@@ -6101,3 +6101,8 @@
 - [x] Agrupar campos personalizados de negociação na área de dados da negociação (inline após Status)
 - [x] Adicionar campos personalizados de negociação aos filtros de busca (backend + frontend DealFiltersPanel)
 - [x] Testes validados (22 testes passando: 8 bulkDelete + 14 timeline)
+## Melhoria Campo Participantes na Negociação
+- [x] Analisar implementação atual do campo Participantes no DealDetail
+- [x] Permitir criar contato rapidamente inline antes de inserir como participante (mini-form com nome, telefone, email)
+- [x] Otimizar filtro de busca para filtrar em tempo real conforme digita (busca por nome, telefone, email)
+- [x] Testar e validar (8 testes passando)
