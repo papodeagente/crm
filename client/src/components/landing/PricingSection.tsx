@@ -1,8 +1,9 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { FadeIn } from "./FadeIn";
-import { Check, ArrowRight, X, MessageSquare, Crown, Loader2 } from "lucide-react";
+import { Check, ArrowRight, X, MessageSquare, Crown, Loader2, ChevronDown } from "lucide-react";
 import { trpc } from "@/lib/trpc";
+import { AnimatePresence, motion } from "motion/react";
 import type { PublicPlan } from "../../../../server/services/publicPlansService";
 
 const SCALE_WHATSAPP_URL = "https://wa.me/551151982627?text=Quero%20conhecer%20o%20Plano%20Elite%20do%20Entur%20OS.%20Pode%20me%20ajudar%3F";
@@ -184,6 +185,8 @@ export function PricingSection({ onSelectPlan }: PricingSectionProps) {
     refetchOnWindowFocus: false,
   });
 
+  const [showComparison, setShowComparison] = useState(false);
+
   const plans = useMemo(() => {
     const data = plansQuery.data;
     if (!data || !Array.isArray(data) || data.length === 0) return FALLBACK_PLANS;
@@ -328,19 +331,33 @@ export function PricingSection({ onSelectPlan }: PricingSectionProps) {
           })}
         </div>
 
-        {/* ─── Comparison Table ─── */}
+        {/* ─── Comparison Table (collapsible) ─── */}
         <FadeIn delay={0.4}>
-          <div className="mt-20">
-            <div className="text-center mb-10">
-              <h3 className="text-2xl sm:text-3xl font-bold text-white mb-3">
+          <div className="mt-16">
+            <div className="text-center">
+              <Button
+                variant="ghost"
+                className="text-white/60 hover:text-white hover:bg-white/5 gap-2 text-sm font-medium mx-auto"
+                onClick={() => setShowComparison((v) => !v)}
+              >
                 Compare os planos
-              </h3>
-              <p className="text-sm text-white/40 max-w-lg mx-auto">
-                Veja exatamente o que cada plano oferece para escolher o ideal para sua agência.
+                <ChevronDown className={`w-4 h-4 transition-transform duration-300 ${showComparison ? "rotate-180" : ""}`} />
+              </Button>
+              <p className="text-xs text-white/30 mt-1">
+                Veja exatamente o que cada plano oferece
               </p>
             </div>
 
-            <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl overflow-hidden backdrop-blur-sm">
+            <AnimatePresence>
+            {showComparison && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.35, ease: "easeInOut" }}
+              className="overflow-hidden"
+            >
+            <div className="mt-6 bg-white/[0.02] border border-white/[0.06] rounded-2xl overflow-hidden backdrop-blur-sm">
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
@@ -464,6 +481,9 @@ export function PricingSection({ onSelectPlan }: PricingSectionProps) {
                 })}
               </div>
             </div>
+            </motion.div>
+            )}
+            </AnimatePresence>
           </div>
         </FadeIn>
       </div>

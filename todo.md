@@ -6224,3 +6224,5 @@
 - [x] Reduzir tamanho da logo na navbar em mobile
 ## Ajuste Hero: Trocar imagem em destaque
 - [x] Substituir mockup do Hero pela screenshot do pipeline real enviada pelo usuário
+## Ajuste Planos: Tabela comparativa colapsável
+- [x] Transformar tabela "Compare os planos" em botão que expande/colapsa
