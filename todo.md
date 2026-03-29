@@ -6226,3 +6226,10 @@
 - [x] Substituir mockup do Hero pela screenshot do pipeline real enviada pelo usuário
 ## Ajuste Planos: Tabela comparativa colapsável
 - [x] Transformar tabela "Compare os planos" em botão que expande/colapsa
+## Edições visuais do usuário na LP
+- [x] ProblemSection: "Orçamentos que somem" → "Clientes que somem"
+- [x] DifferentialsSection: "Funil visual de vendas" → "Funil de vendas específico" + nova descrição
+- [x] DifferentialsSection: "Automação por etapa" → "Central de automações"
+- [x] DifferentialsSection: "Pós-venda como funil" → "Pós-venda automatizado"
+- [x] TourismSection: "8.000 agentes treinados e mais de 30 versões" → "15.000 agentes treinados"
+- [x] HeroSection: "8.000 agentes" → "15.000 agentes" (aplicado automaticamente)

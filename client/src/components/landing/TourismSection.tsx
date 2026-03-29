@@ -72,7 +72,7 @@ export function TourismSection() {
         <FadeIn delay={0.6}>
           <p className="text-center text-base text-white/40 max-w-2xl mx-auto leading-relaxed">
             Criado pela Escola de Negócios do Turismo
-            com base em 8.000 agentes treinados e mais de 30 versões do sistema.
+            com base em 15.000 agentes treinados.
           </p>
         </FadeIn>
       </div>

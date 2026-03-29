@@ -114,7 +114,7 @@ export function HeroSection({ onRegister }: HeroSectionProps) {
                   ))}
                 </div>
                 <p className="text-xs text-white/40">
-                  Mais de <span className="text-white/60 font-medium">8.000 agentes</span> treinados pela Escola de Negócios do Turismo
+                  Mais de <span className="text-white/60 font-medium">15.000 agentes</span> treinados pela Escola de Negócios do Turismo
                 </p>
               </div>
             </div>

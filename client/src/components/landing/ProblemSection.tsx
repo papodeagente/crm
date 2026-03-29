@@ -4,7 +4,7 @@ import { MessageSquareX, BellOff, EyeOff } from "lucide-react";
 const problems = [
   {
     icon: MessageSquareX,
-    title: "Orçamentos que somem",
+    title: "Clientes que somem",
     description:
       "O cliente pede cotação pelo WhatsApp. Você envia. Ele some. Você esquece. A venda morre.",
   },
@@ -59,7 +59,7 @@ export function ProblemSection() {
 
         <FadeIn delay={0.5}>
           <p className="text-center text-base sm:text-lg text-violet-300/80 max-w-3xl mx-auto leading-relaxed font-medium">
-            Depois de treinar mais de 8.000 agentes, a Escola de Negócios
+            Depois de treinar mais de 15.000 agentes, a Escola de Negócios
             do Turismo construiu o sistema que resolve esses três problemas.
           </p>
         </FadeIn>

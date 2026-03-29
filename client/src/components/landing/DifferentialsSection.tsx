@@ -13,9 +13,9 @@ import {
 const differentials = [
   {
     icon: LayoutDashboard,
-    title: "Funil visual de vendas",
+    title: "Funil de vendas específico",
     description:
-      "Cada orçamento vira um card no funil. Você vê quem está parado, quem precisa de retorno e quanto dinheiro está em jogo.",
+      "O funil de vendas do Entur OS é pensado especificamente na rotina da agência de viagens, por isso gere mais resultado.",
   },
   {
     icon: MessageCircle,
@@ -25,7 +25,7 @@ const differentials = [
   },
   {
     icon: Zap,
-    title: "Automação por etapa",
+    title: "Central de automações",
     description:
       "Quando o cliente avança no funil, o sistema cria tarefas, envia mensagens e muda o responsável. Configure uma vez.",
   },
@@ -37,7 +37,7 @@ const differentials = [
   },
   {
     icon: Plane,
-    title: "Pós-venda como funil",
+    title: "Pós-venda automatizado",
     description:
       "A venda não acaba na reserva. Funil de pós-venda acompanha cada viagem: da documentação ao retorno do cliente.",
   },
