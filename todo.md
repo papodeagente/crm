@@ -6131,3 +6131,10 @@
 - [x] Botão Sincronizar Google Calendar (manual)
 - [x] Botão Conectar Google Calendar (redireciona /profile se sem token)
 - [x] 10 testes Vitest obrigatórios passando
+## Agenda: Reposicionar + Criar Compromisso Manual
+- [x] Reposicionar AgendaCalendar acima de Prioridades de Ação na Home.tsx
+- [x] Criar endpoint agenda.createAppointment (tenantWriteProcedure) para compromissos manuais
+- [x] Criar tabela crm_appointments no schema Drizzle + migration SQL
+- [x] Implementar modal de criação de compromisso no AgendaCalendar (título, data/hora, duração, descrição)
+- [x] Compromissos manuais aparecem na agenda com cor distinta
+- [x] Atualizar testes Vitest para cobrir novo endpoint (20 testes passando)

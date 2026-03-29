@@ -822,6 +822,11 @@ export default function Home() {
       {/* ─── TRIAL COUNTDOWN BANNER ─── */}
       <TrialCountdownBanner />
 
+      {/* ═══════════════════════════════════════════════════
+          BLOCO 1.5 — AGENDA UNIFICADA
+          ═════════════════════════════════════════════════ */}
+      <AgendaCalendar filterUserId={execFilterInput?.userId} filterTeamId={execFilterInput?.teamId} />
+
       {/* ═══════════════════════════════════════════════════════
           BLOCO 2 + 3 — PRIORIDADES + OPORTUNIDADES (side by side)
           ═══════════════════════════════════════════════════════ */}
@@ -942,10 +947,7 @@ export default function Home() {
         </section>
       </div>
 
-      {/* ═══════════════════════════════════════════════════
-          BLOCO 4 — AGENDA UNIFICADA
-          ═════════════════════════════════════════════════ */}
-      <AgendaCalendar filterUserId={execFilterInput?.userId} filterTeamId={execFilterInput?.teamId} />
+
 
       {/* ═══════════════════════════════════════════════════
           BLOCO 5 — CHECKLIST DIDÁTICO DE ONBOARDING

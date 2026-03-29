@@ -148,6 +148,13 @@
       "when": 1774787539362,
       "tag": "0075_chunky_junta",
       "breakpoints": true
+    },
+    {
+      "idx": 76,
+      "version": "5",
+      "when": 1774795596099,
+      "tag": "0076_strange_darkhawk",
+      "breakpoints": true
     }
   ]
 }

@@ -4144,6 +4144,51 @@ ${customInstructions ? `\n--- INSTRUÇÕES PERSONALIZADAS ---\n${customInstructi
         const userId = ctx.saasUser?.userId || ctx.user!.id;
         return getGoogleCalendarStatus(getTenantId(ctx), userId);
       }),
+    createAppointment: tenantWriteProcedure
+      .input(z.object({
+        title: z.string().min(1).max(500),
+        description: z.string().max(5000).optional(),
+        startAt: z.number(),  // UTC timestamp ms
+        endAt: z.number(),    // UTC timestamp ms
+        allDay: z.boolean().optional(),
+        location: z.string().max(500).optional(),
+        color: z.string().max(20).optional(),
+        dealId: z.number().optional(),
+        contactId: z.number().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const { createAppointment } = await import("./services/agendaService");
+        const userId = ctx.saasUser?.userId || ctx.user!.id;
+        return createAppointment(getTenantId(ctx), userId, input);
+      }),
+    updateAppointment: tenantWriteProcedure
+      .input(z.object({
+        id: z.number(),
+        title: z.string().min(1).max(500).optional(),
+        description: z.string().max(5000).optional(),
+        startAt: z.number().optional(),
+        endAt: z.number().optional(),
+        allDay: z.boolean().optional(),
+        location: z.string().max(500).optional(),
+        color: z.string().max(20).optional(),
+        dealId: z.number().optional(),
+        contactId: z.number().optional(),
+        isCompleted: z.boolean().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const { updateAppointment } = await import("./services/agendaService");
+        const userId = ctx.saasUser?.userId || ctx.user!.id;
+        const isAdmin = ctx.saasUser?.role === "admin";
+        return updateAppointment(getTenantId(ctx), userId, isAdmin, input);
+      }),
+    deleteAppointment: tenantWriteProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        const { deleteAppointment } = await import("./services/agendaService");
+        const userId = ctx.saasUser?.userId || ctx.user!.id;
+        const isAdmin = ctx.saasUser?.role === "admin";
+        return deleteAppointment(getTenantId(ctx), userId, isAdmin, input.id);
+      }),
   }),
 
   superAdminDash: superAdminDashRouter,

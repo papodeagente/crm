@@ -1,28 +1,35 @@
 /**
  * AgendaCalendar — Unified Calendar for CRM Dashboard
  *
- * Merges CRM tasks and Google Calendar events into a single view.
- * Supports Day / Week / Month views with mobile-first responsiveness.
+ * Merges CRM tasks, Google Calendar events, and manual CRM appointments
+ * into a single view. Supports Day / Week / Month views.
  *
  * Colors:
  *  - CRM tasks: primary/violet
  *  - Google Calendar: #4285F4 (Google blue)
+ *  - CRM Appointments: emerald
  *  - Overdue: red border
  *  - Completed: opacity-50 + line-through
  */
 
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useIsAdmin } from "@/components/AdminOnlyGuard";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
 import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import {
   Calendar as CalendarIcon,
   ChevronLeft,
   ChevronRight,
   RefreshCw,
-  ExternalLink,
   Clock,
   CheckSquare,
   MessageCircle,
@@ -35,6 +42,10 @@ import {
   CalendarRange,
   LayoutGrid,
   LinkIcon,
+  Plus,
+  MapPin,
+  Trash2,
+  Check,
 } from "lucide-react";
 import { formatTime, SYSTEM_TIMEZONE, SYSTEM_LOCALE } from "../../../shared/dateUtils";
 
@@ -46,7 +57,7 @@ type ViewMode = "day" | "week" | "month";
 
 interface AgendaItem {
   id: string;
-  source: "crm" | "google";
+  source: "crm" | "google" | "appointment";
   title: string;
   description?: string | null;
   startAt: number;
@@ -65,6 +76,7 @@ interface AgendaItem {
   htmlLink?: string | null;
   userId?: number;
   calendarEmail?: string | null;
+  color?: string | null;
 }
 
 // ═══════════════════════════════════════
@@ -84,6 +96,26 @@ const MONTH_NAMES = [
   "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
   "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
 ];
+
+const APPOINTMENT_COLORS: { value: string; label: string; tw: string }[] = [
+  { value: "emerald", label: "Verde", tw: "bg-emerald-500" },
+  { value: "blue", label: "Azul", tw: "bg-blue-500" },
+  { value: "purple", label: "Roxo", tw: "bg-purple-500" },
+  { value: "amber", label: "Amarelo", tw: "bg-amber-500" },
+  { value: "rose", label: "Rosa", tw: "bg-rose-500" },
+  { value: "cyan", label: "Ciano", tw: "bg-cyan-500" },
+];
+
+function getApptColorClasses(color?: string | null) {
+  switch (color) {
+    case "blue": return { bg: "bg-blue-500/10", text: "text-blue-600 dark:text-blue-400", border: "border-blue-500/20", dot: "bg-blue-500" };
+    case "purple": return { bg: "bg-purple-500/10", text: "text-purple-600 dark:text-purple-400", border: "border-purple-500/20", dot: "bg-purple-500" };
+    case "amber": return { bg: "bg-amber-500/10", text: "text-amber-600 dark:text-amber-400", border: "border-amber-500/20", dot: "bg-amber-500" };
+    case "rose": return { bg: "bg-rose-500/10", text: "text-rose-600 dark:text-rose-400", border: "border-rose-500/20", dot: "bg-rose-500" };
+    case "cyan": return { bg: "bg-cyan-500/10", text: "text-cyan-600 dark:text-cyan-400", border: "border-cyan-500/20", dot: "bg-cyan-500" };
+    default: return { bg: "bg-emerald-500/10", text: "text-emerald-600 dark:text-emerald-400", border: "border-emerald-500/20", dot: "bg-emerald-500" };
+  }
+}
 
 // ═══════════════════════════════════════
 // DATE HELPERS
@@ -107,7 +139,7 @@ function addDays(date: Date, days: number): Date {
 
 function startOfWeek(date: Date): Date {
   const d = new Date(date);
-  const day = d.getDay(); // 0=Sun
+  const day = d.getDay();
   d.setDate(d.getDate() - day);
   d.setHours(0, 0, 0, 0);
   return d;
@@ -137,19 +169,48 @@ function formatTimeShort(ts: number): string {
   return d.toLocaleTimeString(SYSTEM_LOCALE, { hour: "2-digit", minute: "2-digit", timeZone: SYSTEM_TIMEZONE });
 }
 
+function toLocalInputDatetime(date: Date): string {
+  const local = new Date(date.toLocaleString("en-US", { timeZone: SYSTEM_TIMEZONE }));
+  const y = local.getFullYear();
+  const m = String(local.getMonth() + 1).padStart(2, "0");
+  const d = String(local.getDate()).padStart(2, "0");
+  const h = String(local.getHours()).padStart(2, "0");
+  const min = String(local.getMinutes()).padStart(2, "0");
+  return `${y}-${m}-${d}T${h}:${min}`;
+}
+
+function toLocalInputDate(date: Date): string {
+  const local = new Date(date.toLocaleString("en-US", { timeZone: SYSTEM_TIMEZONE }));
+  const y = local.getFullYear();
+  const m = String(local.getMonth() + 1).padStart(2, "0");
+  const d = String(local.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
 // ═══════════════════════════════════════
 // AGENDA EVENT PILL
 // ═══════════════════════════════════════
 
-function AgendaEventPill({ item }: { item: AgendaItem }) {
+function AgendaEventPill({ item, onClickAppt }: { item: AgendaItem; onClickAppt?: (item: AgendaItem) => void }) {
   const isGoogle = item.source === "google";
-  const Icon = isGoogle ? CalendarIcon : (TASK_TYPE_ICONS[item.taskType || "task"] || CheckSquare);
+  const isAppt = item.source === "appointment";
+  const Icon = isGoogle
+    ? CalendarIcon
+    : isAppt
+      ? Clock
+      : (TASK_TYPE_ICONS[item.taskType || "task"] || CheckSquare);
 
   const baseClasses = "flex items-center gap-1.5 px-2 py-1 rounded-lg text-[11px] leading-tight transition-all cursor-pointer group";
 
-  const colorClasses = isGoogle
-    ? "bg-[#4285F4]/10 text-[#4285F4] hover:bg-[#4285F4]/20 border border-[#4285F4]/20"
-    : "bg-primary/10 text-primary hover:bg-primary/20 border border-primary/20";
+  let colorClasses: string;
+  if (isGoogle) {
+    colorClasses = "bg-[#4285F4]/10 text-[#4285F4] hover:bg-[#4285F4]/20 border border-[#4285F4]/20";
+  } else if (isAppt) {
+    const c = getApptColorClasses(item.color);
+    colorClasses = `${c.bg} ${c.text} hover:opacity-80 border ${c.border}`;
+  } else {
+    colorClasses = "bg-primary/10 text-primary hover:bg-primary/20 border border-primary/20";
+  }
 
   const overdueClasses = item.isOverdue ? "!border-red-500/60 !bg-red-500/10 !text-red-600 dark:!text-red-400" : "";
   const completedClasses = item.isCompleted ? "opacity-50 line-through" : "";
@@ -165,6 +226,11 @@ function AgendaEventPill({ item }: { item: AgendaItem }) {
     </div>
   );
 
+  // Appointments open edit modal
+  if (isAppt && onClickAppt) {
+    return <div onClick={() => onClickAppt(item)}>{content}</div>;
+  }
+
   // CRM tasks link to deal/contact; Google events open in new tab
   if (isGoogle && item.htmlLink) {
     return (
@@ -174,11 +240,11 @@ function AgendaEventPill({ item }: { item: AgendaItem }) {
     );
   }
 
-  if (!isGoogle && item.entityType === "deal" && item.entityId) {
+  if (!isGoogle && !isAppt && item.entityType === "deal" && item.entityId) {
     return <Link href={`/deal/${item.entityId}`} className="block">{content}</Link>;
   }
 
-  if (!isGoogle && item.entityType === "contact" && item.entityId) {
+  if (!isGoogle && !isAppt && item.entityType === "contact" && item.entityId) {
     return <Link href={`/contacts/${item.entityId}`} className="block">{content}</Link>;
   }
 
@@ -189,11 +255,10 @@ function AgendaEventPill({ item }: { item: AgendaItem }) {
 // DAY VIEW
 // ═══════════════════════════════════════
 
-function DayView({ items, date }: { items: AgendaItem[]; date: Date }) {
+function DayView({ items, date, onClickAppt, onClickHour }: { items: AgendaItem[]; date: Date; onClickAppt?: (item: AgendaItem) => void; onClickHour?: (hour: number) => void }) {
   const allDayItems = items.filter(i => i.allDay);
   const timedItems = items.filter(i => !i.allDay).sort((a, b) => a.startAt - b.startAt);
 
-  // Group timed items by hour
   const hourGroups: Record<number, AgendaItem[]> = {};
   timedItems.forEach(item => {
     const hour = new Date(item.startAt).getHours();
@@ -202,7 +267,6 @@ function DayView({ items, date }: { items: AgendaItem[]; date: Date }) {
   });
 
   const hours = Array.from({ length: 24 }, (_, i) => i);
-  // Only show hours that have events, plus surrounding context
   const activeHours = new Set<number>();
   Object.keys(hourGroups).forEach(h => {
     const hour = Number(h);
@@ -211,7 +275,6 @@ function DayView({ items, date }: { items: AgendaItem[]; date: Date }) {
     activeHours.add(Math.min(23, hour + 1));
   });
 
-  // If no events, show business hours (8-18)
   if (activeHours.size === 0) {
     for (let h = 8; h <= 18; h++) activeHours.add(h);
   }
@@ -220,29 +283,35 @@ function DayView({ items, date }: { items: AgendaItem[]; date: Date }) {
 
   return (
     <div className="space-y-1">
-      {/* All-day events */}
       {allDayItems.length > 0 && (
         <div className="mb-3">
           <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1.5 px-1">Dia inteiro</p>
           <div className="space-y-1">
-            {allDayItems.map(item => <AgendaEventPill key={item.id} item={item} />)}
+            {allDayItems.map(item => <AgendaEventPill key={item.id} item={item} onClickAppt={onClickAppt} />)}
           </div>
         </div>
       )}
 
-      {/* Timed events */}
       <div className="space-y-0">
         {visibleHours.map(hour => (
-          <div key={hour} className="flex gap-2 min-h-[32px]">
+          <div
+            key={hour}
+            className="flex gap-2 min-h-[32px] group/hour cursor-pointer hover:bg-muted/30 rounded transition-colors"
+            onClick={() => !hourGroups[hour]?.length && onClickHour?.(hour)}
+          >
             <div className="w-10 text-[10px] text-muted-foreground font-medium text-right pt-1 shrink-0">
               {String(hour).padStart(2, "0")}:00
             </div>
-            <div className="flex-1 border-t border-border/30 pt-1 pb-1">
+            <div className="flex-1 border-t border-border/30 pt-1 pb-1 relative">
               {hourGroups[hour] ? (
                 <div className="space-y-1">
-                  {hourGroups[hour].map(item => <AgendaEventPill key={item.id} item={item} />)}
+                  {hourGroups[hour].map(item => <AgendaEventPill key={item.id} item={item} onClickAppt={onClickAppt} />)}
                 </div>
-              ) : null}
+              ) : (
+                <div className="opacity-0 group-hover/hour:opacity-100 transition-opacity text-[10px] text-muted-foreground flex items-center gap-1 pt-0.5">
+                  <Plus className="h-3 w-3" /> Novo compromisso
+                </div>
+              )}
             </div>
           </div>
         ))}
@@ -262,11 +331,10 @@ function DayView({ items, date }: { items: AgendaItem[]; date: Date }) {
 // WEEK VIEW
 // ═══════════════════════════════════════
 
-function WeekView({ items, weekStart }: { items: AgendaItem[]; weekStart: Date }) {
+function WeekView({ items, weekStart, onClickAppt }: { items: AgendaItem[]; weekStart: Date; onClickAppt?: (item: AgendaItem) => void }) {
   const today = toLocalDate(new Date());
   const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
 
-  // Group items by day
   const dayGroups: Record<string, AgendaItem[]> = {};
   days.forEach(d => { dayGroups[formatDateISO(d)] = []; });
 
@@ -296,7 +364,7 @@ function WeekView({ items, weekStart }: { items: AgendaItem[]; weekStart: Date }
             </div>
             <div className="space-y-0.5">
               {dayItems.slice(0, 4).map(item => (
-                <AgendaEventPill key={item.id} item={item} />
+                <AgendaEventPill key={item.id} item={item} onClickAppt={onClickAppt} />
               ))}
               {dayItems.length > 4 && (
                 <p className="text-[9px] text-muted-foreground text-center font-medium">+{dayItems.length - 4} mais</p>
@@ -313,13 +381,12 @@ function WeekView({ items, weekStart }: { items: AgendaItem[]; weekStart: Date }
 // MONTH VIEW
 // ═══════════════════════════════════════
 
-function MonthView({ items, date }: { items: AgendaItem[]; date: Date }) {
+function MonthView({ items, date, onClickAppt }: { items: AgendaItem[]; date: Date; onClickAppt?: (item: AgendaItem) => void }) {
   const today = toLocalDate(new Date());
   const monthStart = startOfMonth(date);
   const monthEnd = endOfMonth(date);
   const calendarStart = startOfWeek(monthStart);
 
-  // Build 6 weeks of days
   const weeks: Date[][] = [];
   let current = calendarStart;
   for (let w = 0; w < 6; w++) {
@@ -329,11 +396,9 @@ function MonthView({ items, date }: { items: AgendaItem[]; date: Date }) {
       current = addDays(current, 1);
     }
     weeks.push(week);
-    // Stop if we've passed the month
     if (current > addDays(monthEnd, 7)) break;
   }
 
-  // Group items by day
   const dayGroups: Record<string, AgendaItem[]> = {};
   items.forEach(item => {
     const itemDate = new Date(item.startAt);
@@ -344,7 +409,6 @@ function MonthView({ items, date }: { items: AgendaItem[]; date: Date }) {
 
   return (
     <div>
-      {/* Header */}
       <div className="grid grid-cols-7 mb-1">
         {WEEKDAY_NAMES_SHORT.map(name => (
           <div key={name} className="text-center text-[9px] font-bold text-muted-foreground uppercase tracking-wider py-1">
@@ -353,11 +417,10 @@ function MonthView({ items, date }: { items: AgendaItem[]; date: Date }) {
         ))}
       </div>
 
-      {/* Weeks */}
       <div className="grid gap-px bg-border/20 rounded-lg overflow-hidden">
         {weeks.map((week, wi) => (
           <div key={wi} className="grid grid-cols-7 gap-px">
-            {week.map((day, di) => {
+            {week.map((day) => {
               const key = formatDateISO(day);
               const isToday = isSameDay(day, today);
               const isCurrentMonth = day.getMonth() === date.getMonth();
@@ -378,12 +441,20 @@ function MonthView({ items, date }: { items: AgendaItem[]; date: Date }) {
                   <div className="space-y-0.5">
                     {dayItems.slice(0, 3).map(item => {
                       const isGoogle = item.source === "google";
-                      const dotColor = item.isOverdue ? "bg-red-500" : isGoogle ? "bg-[#4285F4]" : "bg-primary";
+                      const isAppt = item.source === "appointment";
+                      const dotColor = item.isOverdue
+                        ? "bg-red-500"
+                        : isGoogle
+                          ? "bg-[#4285F4]"
+                          : isAppt
+                            ? getApptColorClasses(item.color).dot
+                            : "bg-primary";
                       return (
                         <div
                           key={item.id}
-                          className={`flex items-center gap-1 text-[9px] leading-tight truncate ${item.isCompleted ? "opacity-40 line-through" : ""}`}
+                          className={`flex items-center gap-1 text-[9px] leading-tight truncate cursor-pointer hover:opacity-80 ${item.isCompleted ? "opacity-40 line-through" : ""}`}
                           title={item.title}
+                          onClick={() => isAppt && onClickAppt?.(item)}
                         >
                           <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${dotColor}`} />
                           <span className="truncate text-foreground">{item.title}</span>
@@ -401,6 +472,285 @@ function MonthView({ items, date }: { items: AgendaItem[]; date: Date }) {
         ))}
       </div>
     </div>
+  );
+}
+
+// ═══════════════════════════════════════
+// CREATE/EDIT APPOINTMENT MODAL
+// ═══════════════════════════════════════
+
+interface AppointmentModalProps {
+  open: boolean;
+  onClose: () => void;
+  editItem?: AgendaItem | null;
+  defaultDate?: Date;
+  defaultHour?: number;
+  onSaved: () => void;
+}
+
+function AppointmentModal({ open, onClose, editItem, defaultDate, defaultHour, onSaved }: AppointmentModalProps) {
+  const isEdit = !!editItem;
+  const editId = editItem ? Number(editItem.id.replace("appt-", "")) : undefined;
+
+  // Form state
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [startStr, setStartStr] = useState("");
+  const [endStr, setEndStr] = useState("");
+  const [allDay, setAllDay] = useState(false);
+  const [location, setLocation] = useState("");
+  const [color, setColor] = useState("emerald");
+
+  // Reset form when modal opens
+  useMemo(() => {
+    if (!open) return;
+    if (editItem) {
+      setTitle(editItem.title);
+      setDescription(editItem.description || "");
+      setAllDay(editItem.allDay);
+      setLocation(editItem.location || "");
+      setColor(editItem.color || "emerald");
+      if (editItem.allDay) {
+        setStartStr(toLocalInputDate(new Date(editItem.startAt)));
+        setEndStr(toLocalInputDate(new Date(editItem.endAt)));
+      } else {
+        setStartStr(toLocalInputDatetime(new Date(editItem.startAt)));
+        setEndStr(toLocalInputDatetime(new Date(editItem.endAt)));
+      }
+    } else {
+      setTitle("");
+      setDescription("");
+      setAllDay(false);
+      setLocation("");
+      setColor("emerald");
+      const base = defaultDate || toLocalDate(new Date());
+      const hour = defaultHour ?? base.getHours();
+      const start = new Date(base);
+      start.setHours(hour, 0, 0, 0);
+      const end = new Date(start.getTime() + 60 * 60 * 1000);
+      setStartStr(toLocalInputDatetime(start));
+      setEndStr(toLocalInputDatetime(end));
+    }
+  }, [open, editItem, defaultDate, defaultHour]);
+
+  const createMut = trpc.agenda.createAppointment.useMutation({
+    onSuccess: () => { onSaved(); onClose(); },
+  });
+
+  const updateMut = trpc.agenda.updateAppointment.useMutation({
+    onSuccess: () => { onSaved(); onClose(); },
+  });
+
+  const deleteMut = trpc.agenda.deleteAppointment.useMutation({
+    onSuccess: () => { onSaved(); onClose(); },
+  });
+
+  const isPending = createMut.isPending || updateMut.isPending || deleteMut.isPending;
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!title.trim()) return;
+
+    const startAt = new Date(startStr).getTime();
+    let endAt = new Date(endStr).getTime();
+    if (allDay) {
+      // For all-day, set end to end of day
+      const endDate = new Date(endStr);
+      endDate.setHours(23, 59, 59, 999);
+      endAt = endDate.getTime();
+    }
+    if (endAt <= startAt) endAt = startAt + 60 * 60 * 1000;
+
+    const payload = {
+      title: title.trim(),
+      description: description.trim() || undefined,
+      startAt,
+      endAt,
+      allDay,
+      location: location.trim() || undefined,
+      color,
+    };
+
+    if (isEdit && editId) {
+      updateMut.mutate({ id: editId, ...payload });
+    } else {
+      createMut.mutate(payload);
+    }
+  };
+
+  const handleDelete = () => {
+    if (!editId) return;
+    if (confirm("Excluir este compromisso?")) {
+      deleteMut.mutate({ id: editId });
+    }
+  };
+
+  const handleToggleComplete = () => {
+    if (!editId) return;
+    updateMut.mutate({ id: editId, isCompleted: !editItem?.isCompleted });
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="sm:max-w-[480px]">
+        <DialogHeader>
+          <DialogTitle className="text-[15px]">
+            {isEdit ? "Editar Compromisso" : "Novo Compromisso"}
+          </DialogTitle>
+          <DialogDescription className="text-[12px]">
+            {isEdit ? "Altere os dados do compromisso" : "Crie um compromisso na sua agenda CRM"}
+          </DialogDescription>
+        </DialogHeader>
+
+        <form onSubmit={handleSubmit} className="space-y-4 mt-2">
+          {/* Title */}
+          <div className="space-y-1.5">
+            <Label htmlFor="appt-title" className="text-[12px]">Título *</Label>
+            <Input
+              id="appt-title"
+              placeholder="Ex: Reunião com cliente, Follow-up..."
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              className="h-9 text-[13px]"
+              autoFocus
+              required
+            />
+          </div>
+
+          {/* All Day Toggle */}
+          <div className="flex items-center gap-2">
+            <Switch
+              id="appt-allday"
+              checked={allDay}
+              onCheckedChange={setAllDay}
+            />
+            <Label htmlFor="appt-allday" className="text-[12px] cursor-pointer">Dia inteiro</Label>
+          </div>
+
+          {/* Date/Time */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="appt-start" className="text-[12px]">Início</Label>
+              <Input
+                id="appt-start"
+                type={allDay ? "date" : "datetime-local"}
+                value={allDay ? startStr.split("T")[0] : startStr}
+                onChange={(e) => {
+                  setStartStr(e.target.value);
+                  // Auto-adjust end if start is after end
+                  if (!allDay) {
+                    const s = new Date(e.target.value).getTime();
+                    const eVal = new Date(endStr).getTime();
+                    if (s >= eVal) {
+                      setEndStr(toLocalInputDatetime(new Date(s + 60 * 60 * 1000)));
+                    }
+                  }
+                }}
+                className="h-9 text-[13px]"
+                required
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="appt-end" className="text-[12px]">{allDay ? "Fim" : "Término"}</Label>
+              <Input
+                id="appt-end"
+                type={allDay ? "date" : "datetime-local"}
+                value={allDay ? endStr.split("T")[0] : endStr}
+                onChange={(e) => setEndStr(e.target.value)}
+                className="h-9 text-[13px]"
+                required
+              />
+            </div>
+          </div>
+
+          {/* Location */}
+          <div className="space-y-1.5">
+            <Label htmlFor="appt-location" className="text-[12px] flex items-center gap-1">
+              <MapPin className="h-3 w-3" /> Local (opcional)
+            </Label>
+            <Input
+              id="appt-location"
+              placeholder="Ex: Escritório, Google Meet, Zoom..."
+              value={location}
+              onChange={(e) => setLocation(e.target.value)}
+              className="h-9 text-[13px]"
+            />
+          </div>
+
+          {/* Color */}
+          <div className="space-y-1.5">
+            <Label className="text-[12px]">Cor</Label>
+            <div className="flex items-center gap-2">
+              {APPOINTMENT_COLORS.map(c => (
+                <button
+                  key={c.value}
+                  type="button"
+                  onClick={() => setColor(c.value)}
+                  className={`w-6 h-6 rounded-full ${c.tw} transition-all ${
+                    color === c.value ? "ring-2 ring-offset-2 ring-offset-background ring-foreground/50 scale-110" : "opacity-60 hover:opacity-100"
+                  }`}
+                  title={c.label}
+                />
+              ))}
+            </div>
+          </div>
+
+          {/* Description */}
+          <div className="space-y-1.5">
+            <Label htmlFor="appt-desc" className="text-[12px]">Descrição (opcional)</Label>
+            <Textarea
+              id="appt-desc"
+              placeholder="Detalhes adicionais..."
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              className="text-[13px] min-h-[60px] resize-none"
+              rows={2}
+            />
+          </div>
+
+          {/* Actions */}
+          <div className="flex items-center justify-between pt-2">
+            <div className="flex items-center gap-2">
+              {isEdit && (
+                <>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 text-[12px] text-red-500 hover:text-red-600 hover:bg-red-500/10 gap-1"
+                    onClick={handleDelete}
+                    disabled={isPending}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    Excluir
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className={`h-8 text-[12px] gap-1 ${editItem?.isCompleted ? "text-amber-500" : "text-emerald-500"}`}
+                    onClick={handleToggleComplete}
+                    disabled={isPending}
+                  >
+                    <Check className="h-3.5 w-3.5" />
+                    {editItem?.isCompleted ? "Reabrir" : "Concluir"}
+                  </Button>
+                </>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <Button type="button" variant="ghost" size="sm" className="h-8 text-[12px]" onClick={onClose} disabled={isPending}>
+                Cancelar
+              </Button>
+              <Button type="submit" size="sm" className="h-8 text-[12px] gap-1" disabled={isPending || !title.trim()}>
+                {isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                {isEdit ? "Salvar" : "Criar"}
+              </Button>
+            </div>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -425,6 +775,11 @@ export default function AgendaCalendar({ filterUserId, filterTeamId }: AgendaCal
 
   const [currentDate, setCurrentDate] = useState(() => toLocalDate(new Date()));
 
+  // Modal state
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editItem, setEditItem] = useState<AgendaItem | null>(null);
+  const [defaultHour, setDefaultHour] = useState<number | undefined>(undefined);
+
   // Compute date range based on view mode
   const { from, to } = useMemo(() => {
     if (viewMode === "day") {
@@ -436,10 +791,8 @@ export default function AgendaCalendar({ filterUserId, filterTeamId }: AgendaCal
       const we = addDays(ws, 6);
       return { from: formatDateISO(ws), to: formatDateISO(we) };
     }
-    // month
     const ms = startOfMonth(currentDate);
     const me = endOfMonth(currentDate);
-    // Include surrounding days for calendar grid
     const calStart = startOfWeek(ms);
     const calEnd = addDays(me, 6 - me.getDay());
     return { from: formatDateISO(calStart), to: formatDateISO(calEnd) };
@@ -511,9 +864,24 @@ export default function AgendaCalendar({ filterUserId, filterTeamId }: AgendaCal
   // Counts
   const crmCount = items.filter(i => i.source === "crm").length;
   const gcalCount = items.filter(i => i.source === "google").length;
+  const apptCount = items.filter(i => i.source === "appointment").length;
   const overdueCount = items.filter(i => i.isOverdue).length;
 
   const isGoogleConnected = googleStatusQ.data?.connected ?? false;
+
+  // Handlers
+  const openCreateModal = useCallback((hour?: number) => {
+    setEditItem(null);
+    setDefaultHour(hour);
+    setModalOpen(true);
+  }, []);
+
+  const openEditModal = useCallback((item: AgendaItem) => {
+    if (item.source !== "appointment") return;
+    setEditItem(item);
+    setDefaultHour(undefined);
+    setModalOpen(true);
+  }, []);
 
   return (
     <section className="mb-6 sm:mb-8">
@@ -528,6 +896,7 @@ export default function AgendaCalendar({ filterUserId, filterTeamId }: AgendaCal
               <h2 className="text-[14px] font-bold text-foreground tracking-tight">Agenda</h2>
               <p className="text-[11px] text-muted-foreground">
                 Tarefas CRM
+                {apptCount > 0 && " + Compromissos"}
                 {isGoogleConnected && " + Google Calendar"}
               </p>
             </div>
@@ -538,6 +907,11 @@ export default function AgendaCalendar({ filterUserId, filterTeamId }: AgendaCal
             {crmCount > 0 && (
               <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-bold">
                 {crmCount} tarefa{crmCount > 1 ? "s" : ""}
+              </span>
+            )}
+            {apptCount > 0 && (
+              <span className="text-[10px] bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-2 py-0.5 rounded-full font-bold">
+                {apptCount} compromisso{apptCount > 1 ? "s" : ""}
               </span>
             )}
             {gcalCount > 0 && (
@@ -551,6 +925,17 @@ export default function AgendaCalendar({ filterUserId, filterTeamId }: AgendaCal
                 {overdueCount} atrasada{overdueCount > 1 ? "s" : ""}
               </span>
             )}
+
+            {/* Create Appointment Button */}
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 text-[11px] gap-1 border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10"
+              onClick={() => openCreateModal()}
+            >
+              <Plus className="h-3 w-3" />
+              Compromisso
+            </Button>
 
             {/* Google Calendar Sync */}
             {isGoogleConnected ? (
@@ -637,17 +1022,21 @@ export default function AgendaCalendar({ filterUserId, filterTeamId }: AgendaCal
           </div>
         ) : (
           <>
-            {viewMode === "day" && <DayView items={items} date={currentDate} />}
-            {viewMode === "week" && <WeekView items={items} weekStart={startOfWeek(currentDate)} />}
-            {viewMode === "month" && <MonthView items={items} date={currentDate} />}
+            {viewMode === "day" && <DayView items={items} date={currentDate} onClickAppt={openEditModal} onClickHour={(h) => openCreateModal(h)} />}
+            {viewMode === "week" && <WeekView items={items} weekStart={startOfWeek(currentDate)} onClickAppt={openEditModal} />}
+            {viewMode === "month" && <MonthView items={items} date={currentDate} onClickAppt={openEditModal} />}
           </>
         )}
 
         {/* Legend */}
-        <div className="flex items-center gap-4 mt-3 pt-3 border-t border-border/30">
+        <div className="flex items-center gap-4 mt-3 pt-3 border-t border-border/30 flex-wrap">
           <div className="flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-full bg-primary" />
             <span className="text-[10px] text-muted-foreground">Tarefas CRM</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-emerald-500" />
+            <span className="text-[10px] text-muted-foreground">Compromissos</span>
           </div>
           {isGoogleConnected && (
             <div className="flex items-center gap-1.5">
@@ -663,6 +1052,16 @@ export default function AgendaCalendar({ filterUserId, filterTeamId }: AgendaCal
           )}
         </div>
       </div>
+
+      {/* Appointment Modal */}
+      <AppointmentModal
+        open={modalOpen}
+        onClose={() => { setModalOpen(false); setEditItem(null); }}
+        editItem={editItem}
+        defaultDate={currentDate}
+        defaultHour={defaultHour}
+        onSaved={() => agendaQ.refetch()}
+      />
     </section>
   );
 }

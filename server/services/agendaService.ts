@@ -19,8 +19,8 @@ import { sql } from "drizzle-orm";
 // ═══════════════════════════════════════
 
 export interface AgendaItem {
-  id: string;                  // "task-123" or "gcal-456"
-  source: "crm" | "google";
+  id: string;                  // "task-123" or "gcal-456" or "appt-789"
+  source: "crm" | "google" | "appointment";
   title: string;
   description?: string | null;
   startAt: number;             // UTC timestamp ms
@@ -39,6 +39,24 @@ export interface AgendaItem {
   htmlLink?: string | null;    // Google Calendar link
   userId?: number;             // owner / assignee
   calendarEmail?: string | null;
+  color?: string | null;       // appointment color
+}
+
+export interface CreateAppointmentInput {
+  title: string;
+  description?: string;
+  startAt: number;     // UTC timestamp ms
+  endAt: number;       // UTC timestamp ms
+  allDay?: boolean;
+  location?: string;
+  color?: string;
+  dealId?: number;
+  contactId?: number;
+}
+
+export interface UpdateAppointmentInput extends Partial<CreateAppointmentInput> {
+  id: number;
+  isCompleted?: boolean;
 }
 
 export interface AgendaFilter {
@@ -163,8 +181,54 @@ export async function getUnifiedAgenda(
     calendarEmail: e.sourceCalendarId,
   }));
 
+  // ── CRM Appointments (manual) ──
+  const apptUserFilter = buildApptUserFilter(filter.userId, userIds);
+
+  const [apptRows] = await db.execute(sql`
+    SELECT a.id, a.title, a.description, a.startAt, a.endAt, a.allDay,
+           a.location, a.color, a.dealId, a.contactId, a.isCompleted, a.completedAt,
+           a.userId,
+           d.title AS dealTitle,
+           c.name  AS contactName
+    FROM crm_appointments a
+    LEFT JOIN deals d ON a.dealId IS NOT NULL AND d.id = a.dealId AND d.tenantId = ${tenantId}
+    LEFT JOIN contacts c ON a.contactId IS NOT NULL AND c.id = a.contactId AND c.tenantId = ${tenantId}
+    WHERE a.tenantId = ${tenantId}
+      AND a.deletedAt IS NULL
+      ${apptUserFilter}
+      AND a.startAt < DATE_ADD(${toDate}, INTERVAL 1 DAY)
+      AND a.endAt >= ${fromDate}
+    ORDER BY a.startAt ASC
+  `);
+
+  const apptItems: AgendaItem[] = (apptRows as unknown as any[]).map((a: any) => {
+    const startMs = new Date(a.startAt).getTime();
+    const endMs = new Date(a.endAt).getTime();
+    const isCompleted = !!a.isCompleted;
+    const isOverdue = !isCompleted && endMs < now;
+    return {
+      id: `appt-${a.id}`,
+      source: "appointment" as const,
+      title: a.title,
+      description: a.description,
+      startAt: startMs,
+      endAt: endMs,
+      allDay: !!a.allDay,
+      status: isCompleted ? "done" : "pending",
+      isOverdue,
+      isCompleted,
+      location: a.location,
+      dealTitle: a.dealTitle,
+      contactName: a.contactName,
+      entityType: a.dealId ? "deal" : a.contactId ? "contact" : undefined,
+      entityId: a.dealId || a.contactId || undefined,
+      userId: a.userId,
+      color: a.color,
+    };
+  });
+
   // ── Merge & sort by startAt ──
-  const merged = [...crmItems, ...gcalItems].sort((a, b) => a.startAt - b.startAt);
+  const merged = [...crmItems, ...gcalItems, ...apptItems].sort((a, b) => a.startAt - b.startAt);
   return merged;
 }
 
@@ -365,4 +429,141 @@ function buildGcalUserFilter(userId?: number, userIds?: number[]) {
     return sql`AND userId = ${userId}`;
   }
   return sql``;
+}
+
+function buildApptUserFilter(userId?: number, userIds?: number[]) {
+  if (userIds && userIds.length > 0) {
+    const idList = userIds.join(",");
+    return sql.raw(`AND a.userId IN (${idList})`);
+  }
+  if (userId) {
+    return sql`AND a.userId = ${userId}`;
+  }
+  return sql``;
+}
+
+// ═══════════════════════════════════════
+// 5. CREATE APPOINTMENT
+// ═══════════════════════════════════════
+
+export async function createAppointment(
+  tenantId: number,
+  userId: number,
+  input: CreateAppointmentInput,
+): Promise<{ id: number }> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const startAt = new Date(input.startAt);
+  const endAt = new Date(input.endAt);
+
+  const [result] = await db.execute(sql`
+    INSERT INTO crm_appointments
+      (tenantId, userId, title, description, startAt, endAt, allDay, location, color, dealId, contactId)
+    VALUES
+      (${tenantId}, ${userId}, ${input.title}, ${input.description || null},
+       ${startAt}, ${endAt}, ${input.allDay ?? false}, ${input.location || null},
+       ${input.color || "emerald"}, ${input.dealId || null}, ${input.contactId || null})
+  `);
+
+  const insertId = (result as any).insertId;
+  console.log(`[Agenda] Created appointment ${insertId} for user ${userId} (tenant ${tenantId})`);
+  return { id: insertId };
+}
+
+// ═══════════════════════════════════════
+// 6. UPDATE APPOINTMENT
+// ═══════════════════════════════════════
+
+export async function updateAppointment(
+  tenantId: number,
+  userId: number,
+  isAdmin: boolean,
+  input: UpdateAppointmentInput,
+): Promise<{ success: boolean }> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  // Verify ownership (non-admin can only edit own)
+  if (!isAdmin) {
+    const [rows] = await db.execute(sql`
+      SELECT id FROM crm_appointments
+      WHERE id = ${input.id} AND tenantId = ${tenantId} AND userId = ${userId} AND deletedAt IS NULL
+    `);
+    if ((rows as unknown as any[]).length === 0) {
+      throw new Error("Appointment not found or access denied");
+    }
+  }
+
+  const sets: string[] = [];
+  const vals: any[] = [];
+
+  if (input.title !== undefined) { sets.push("title = ?"); vals.push(input.title); }
+  if (input.description !== undefined) { sets.push("description = ?"); vals.push(input.description || null); }
+  if (input.startAt !== undefined) { sets.push("startAt = ?"); vals.push(new Date(input.startAt)); }
+  if (input.endAt !== undefined) { sets.push("endAt = ?"); vals.push(new Date(input.endAt)); }
+  if (input.allDay !== undefined) { sets.push("allDay = ?"); vals.push(input.allDay); }
+  if (input.location !== undefined) { sets.push("location = ?"); vals.push(input.location || null); }
+  if (input.color !== undefined) { sets.push("color = ?"); vals.push(input.color); }
+  if (input.dealId !== undefined) { sets.push("dealId = ?"); vals.push(input.dealId || null); }
+  if (input.contactId !== undefined) { sets.push("contactId = ?"); vals.push(input.contactId || null); }
+  if (input.isCompleted !== undefined) {
+    sets.push("isCompleted = ?");
+    vals.push(input.isCompleted);
+    sets.push("completedAt = ?");
+    vals.push(input.isCompleted ? new Date() : null);
+  }
+
+  if (sets.length === 0) return { success: true };
+
+  // Build parameterized update using sql template
+  const allVals = [...vals, input.id, tenantId];
+  const setClause = sets.join(", ");
+  const placeholders = allVals.map(v => {
+    if (v === null) return "NULL";
+    if (v instanceof Date) return `'${v.toISOString().slice(0, 19).replace("T", " ")}'`;
+    if (typeof v === "boolean") return v ? "1" : "0";
+    if (typeof v === "number") return String(v);
+    return `'${String(v).replace(/'/g, "''")}'`;
+  });
+  // Replace ? placeholders with actual values
+  let rawSql = `UPDATE crm_appointments SET ${setClause} WHERE id = ? AND tenantId = ?`;
+  for (const pv of placeholders) {
+    rawSql = rawSql.replace("?", pv);
+  }
+  await db.execute(sql.raw(rawSql));
+
+  return { success: true };
+}
+
+// ═══════════════════════════════════════
+// 7. DELETE APPOINTMENT (soft)
+// ═══════════════════════════════════════
+
+export async function deleteAppointment(
+  tenantId: number,
+  userId: number,
+  isAdmin: boolean,
+  appointmentId: number,
+): Promise<{ success: boolean }> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  if (!isAdmin) {
+    const [rows] = await db.execute(sql`
+      SELECT id FROM crm_appointments
+      WHERE id = ${appointmentId} AND tenantId = ${tenantId} AND userId = ${userId} AND deletedAt IS NULL
+    `);
+    if ((rows as unknown as any[]).length === 0) {
+      throw new Error("Appointment not found or access denied");
+    }
+  }
+
+  await db.execute(sql`
+    UPDATE crm_appointments SET deletedAt = NOW()
+    WHERE id = ${appointmentId} AND tenantId = ${tenantId}
+  `);
+
+  console.log(`[Agenda] Deleted appointment ${appointmentId} for user ${userId} (tenant ${tenantId})`);
+  return { success: true };
 }

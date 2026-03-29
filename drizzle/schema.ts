@@ -2485,3 +2485,35 @@ export const googleCalendarEvents = mysqlTable("google_calendar_events", {
 
 export type GoogleCalendarEvent = typeof googleCalendarEvents.$inferSelect;
 export type InsertGoogleCalendarEvent = typeof googleCalendarEvents.$inferInsert;
+
+
+// ════════════════════════════════════════════════════════════
+// CRM APPOINTMENTS (manual calendar entries)
+// ════════════════════════════════════════════════════════════
+
+export const crmAppointments = mysqlTable("crm_appointments", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  userId: int("userId").notNull(),          // owner / creator
+  title: varchar("title", { length: 500 }).notNull(),
+  description: text("description"),
+  startAt: timestamp("startAt").notNull(),
+  endAt: timestamp("endAt").notNull(),
+  allDay: boolean("allDay").default(false).notNull(),
+  location: varchar("location", { length: 500 }),
+  color: varchar("color", { length: 20 }).default("emerald"),  // UI accent color
+  dealId: int("dealId"),                    // optional link to a deal
+  contactId: int("contactId"),              // optional link to a contact
+  isCompleted: boolean("isCompleted").default(false).notNull(),
+  completedAt: timestamp("completedAt"),
+  deletedAt: timestamp("deletedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (t) => [
+  index("ca_tenant_user_range_idx").on(t.tenantId, t.userId, t.startAt, t.endAt),
+  index("ca_tenant_range_idx").on(t.tenantId, t.startAt, t.endAt),
+  index("ca_tenant_deal_idx").on(t.tenantId, t.dealId),
+]);
+
+export type CrmAppointment = typeof crmAppointments.$inferSelect;
+export type InsertCrmAppointment = typeof crmAppointments.$inferInsert;
