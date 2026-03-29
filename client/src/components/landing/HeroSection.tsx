@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { ArrowRight, Star } from "lucide-react";
 import { motion } from "motion/react";
 
-const MOCKUP_URL = "https://aceleradora.tur.br/teste/wp-content/uploads/2026/03/Captura-de-Tela-2026-03-22-as-13.21.01.png";
+const MOCKUP_URL = "https://d2xsxph8kpxj0f.cloudfront.net/310519663249817763/EKvcVicuVoUxTnzjSKzgdk/hero-pipeline_cbec88a2.png";
 const LOGO_URL = "https://d2xsxph8kpxj0f.cloudfront.net/310519663249817763/EKvcVicuVoUxTnzjSKzgdk/logo-light_c3efa809.webp";
 
 interface HeroSectionProps {

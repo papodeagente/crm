@@ -6222,3 +6222,5 @@
 - [x] Remover botão "Testar grátis" da navbar, manter apenas "Entrar"
 ## Ajuste Navbar: Logo mais discreta em mobile
 - [x] Reduzir tamanho da logo na navbar em mobile
+## Ajuste Hero: Trocar imagem em destaque
+- [x] Substituir mockup do Hero pela screenshot do pipeline real enviada pelo usuário
