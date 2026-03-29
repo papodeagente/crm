@@ -921,6 +921,19 @@ export default function DealDetail() {
                   label="Status"
                   value={deal.status === "open" ? "Aberta" : deal.status === "won" ? "Ganha" : "Perdida"}
                 />
+                {/* ── Campos Personalizados da Negociação (inline) ── */}
+                {(customFieldsQ.data as any[])?.length > 0 && (
+                  <div className="mt-3 pt-3 border-t border-border/30">
+                    <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Campos personalizados</p>
+                    <CustomFieldsSidebar
+                      fields={customFieldsQ.data || []}
+                      values={customValuesQ.data || []}
+                      dealId={dealId}
+                      entityType="deal"
+                      onRefresh={() => customValuesQ.refetch()}
+                    />
+                  </div>
+                )}
               </div>
             </SidebarSection>
 
@@ -1010,6 +1023,19 @@ export default function DealDetail() {
                       <span className="text-xs text-muted-foreground capitalize">{contact.lifecycleStage}</span>
                     </div>
                   )}
+                  {/* ── Campos Personalizados do Contato (inline) ── */}
+                  {(contactCustomFieldsQ.data as any[])?.length > 0 && (
+                    <div className="mt-3 pt-3 border-t border-border/30">
+                      <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Campos personalizados</p>
+                      <CustomFieldsSidebar
+                        fields={contactCustomFieldsQ.data || []}
+                        values={contactCustomValuesQ.data || []}
+                        dealId={deal.contactId!}
+                        entityType="contact"
+                        onRefresh={() => contactCustomValuesQ.refetch()}
+                      />
+                    </div>
+                  )}
                 </div>
               ) : (
                 <button
@@ -1031,25 +1057,40 @@ export default function DealDetail() {
               onToggle={() => toggleSection("company")}
             >
               {account ? (
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-lg bg-secondary flex items-center justify-center shrink-0">
-                    <Building2 className="h-4 w-4 text-muted-foreground" />
+                <div className="space-y-2.5">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-lg bg-secondary flex items-center justify-center shrink-0">
+                      <Building2 className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                    <p className="text-sm font-medium flex-1">{account.name}</p>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => { setShowEditAccountDialog(true); setAccountDraft({ name: account.name }); }}
+                        className="p-1 hover:bg-muted/60 rounded" title="Editar empresa"
+                      >
+                        <Edit2 className="h-3.5 w-3.5 text-muted-foreground" />
+                      </button>
+                      <button
+                        onClick={() => { updateDeal.mutate({ id: deal.id, accountId: null }); }}
+                        className="p-1 hover:bg-red-100 dark:hover:bg-red-500/10 rounded" title="Desvincular empresa"
+                      >
+                        <X className="h-3.5 w-3.5 text-red-500" />
+                      </button>
+                    </div>
                   </div>
-                  <p className="text-sm font-medium flex-1">{account.name}</p>
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={() => { setShowEditAccountDialog(true); setAccountDraft({ name: account.name }); }}
-                      className="p-1 hover:bg-muted/60 rounded" title="Editar empresa"
-                    >
-                      <Edit2 className="h-3.5 w-3.5 text-muted-foreground" />
-                    </button>
-                    <button
-                      onClick={() => { updateDeal.mutate({ id: deal.id, accountId: null }); }}
-                      className="p-1 hover:bg-red-100 dark:hover:bg-red-500/10 rounded" title="Desvincular empresa"
-                    >
-                      <X className="h-3.5 w-3.5 text-red-500" />
-                    </button>
-                  </div>
+                  {/* ── Campos Personalizados da Empresa (inline) ── */}
+                  {(companyCustomFieldsQ.data as any[])?.length > 0 && (
+                    <div className="mt-3 pt-3 border-t border-border/30">
+                      <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Campos personalizados</p>
+                      <CustomFieldsSidebar
+                        fields={companyCustomFieldsQ.data || []}
+                        values={companyCustomValuesQ.data || []}
+                        dealId={deal.accountId!}
+                        entityType="company"
+                        onRefresh={() => companyCustomValuesQ.refetch()}
+                      />
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div>
@@ -1187,60 +1228,11 @@ export default function DealDetail() {
               </>
             )}
 
-            {/* ── Campos Personalizados: Negociação ── */}
-            <SidebarSection
-              title="Campos da Negociação"
-              open={sidebarSections.custom}
-              onToggle={() => toggleSection("custom")}
-            >
-              <CustomFieldsSidebar
-                fields={customFieldsQ.data || []}
-                values={customValuesQ.data || []}
-                dealId={dealId}
-                entityType="deal"
-                onRefresh={() => customValuesQ.refetch()}
-              />
-            </SidebarSection>
+            {/* Campos da Negociação agora estão dentro da seção Negociação */}
 
-            {/* ── Campos Personalizados: Contato ── */}
-            {deal?.contactId && (contactCustomFieldsQ.data as any[])?.length > 0 && (
-              <>
-                <SidebarDivider />
-                <SidebarSection
-                  title="Campos do Contato"
-                  open={sidebarSections.contactCustom || false}
-                  onToggle={() => toggleSection("contactCustom" as any)}
-                >
-                  <CustomFieldsSidebar
-                    fields={contactCustomFieldsQ.data || []}
-                    values={contactCustomValuesQ.data || []}
-                    dealId={deal.contactId}
-                    entityType="contact"
-                    onRefresh={() => contactCustomValuesQ.refetch()}
-                  />
-                </SidebarSection>
-              </>
-            )}
+            {/* Campos do Contato agora estão dentro da seção Contatos */}
 
-            {/* ── Campos Personalizados: Empresa ── */}
-            {deal?.accountId && (companyCustomFieldsQ.data as any[])?.length > 0 && (
-              <>
-                <SidebarDivider />
-                <SidebarSection
-                  title="Campos da Empresa"
-                  open={sidebarSections.companyCustom || false}
-                  onToggle={() => toggleSection("companyCustom" as any)}
-                >
-                  <CustomFieldsSidebar
-                    fields={companyCustomFieldsQ.data || []}
-                    values={companyCustomValuesQ.data || []}
-                    dealId={deal.accountId}
-                    entityType="company"
-                    onRefresh={() => companyCustomValuesQ.refetch()}
-                  />
-                </SidebarSection>
-              </>
-            )}
+            {/* Campos da Empresa agora estão dentro da seção Empresa */}
           </div>
         </aside>
         )}

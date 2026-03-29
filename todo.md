@@ -6094,3 +6094,10 @@
 - [x] Atualizar Trash.tsx para exibir coluna "Expira em" com badge colorido por urgência
 - [x] Atualizar banner informativo sobre exclusão automática após 30 dias
 - [x] Escrever testes vitest (6 testes passando)
+## Reorganização de Campos na Negociação
+- [x] Analisar estrutura atual: DealDetail, perfil de contato, campos personalizados e filtros
+- [x] Agrupar campos de contato (nome, email, telefone + campos personalizados de contato) no perfil de contato dentro da negociação
+- [x] Garantir que campos personalizados de contato apareçam também no perfil do contato separado (já existia em ContactProfile.tsx)
+- [x] Agrupar campos personalizados de negociação na área de dados da negociação (inline após Status)
+- [x] Adicionar campos personalizados de negociação aos filtros de busca (backend + frontend DealFiltersPanel)
+- [x] Testes validados (22 testes passando: 8 bulkDelete + 14 timeline)

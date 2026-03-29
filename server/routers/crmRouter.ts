@@ -434,6 +434,7 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
         cooling: z.boolean().optional(),
         coolingDays: z.number().optional(),
         ownerUserId: z.number().optional(),
+        customFieldFilters: z.array(z.object({ fieldId: z.number(), value: z.string() })).optional(),
       }))
       .query(async ({ ctx, input }) => {
         const isAdmin = ctx.saasUser?.role === "admin";

@@ -31,6 +31,7 @@ export interface DealFilters {
   noTasks?: boolean;
   cooling?: boolean;
   coolingDays?: number;
+  customFieldFilters?: { fieldId: number; value: string }[];
 }
 
 const EMPTY_FILTERS: DealFilters = {};
@@ -56,6 +57,7 @@ export function useDealFilters() {
     if (filters.lastActivityDateFrom || filters.lastActivityDateTo) count++;
     if (filters.noTasks) count++;
     if (filters.cooling) count++;
+    if (filters.customFieldFilters?.length) count += filters.customFieldFilters.length;
     return count;
   }, [filters]);
 
@@ -151,6 +153,7 @@ export default function DealFiltersPanel({
   const campaigns = trpc.crm.campaigns.list.useQuery({});
   const products = trpc.productCatalog.products.list.useQuery({});
   const utmValues = trpc.utmAnalytics.filterValues.useQuery();
+  const dealCustomFields = trpc.customFields.list.useQuery({ entity: "deal" });
 
   const set = (key: keyof DealFilters, value: any) => {
     setLocal((prev) => ({ ...prev, [key]: value || undefined }));
@@ -381,6 +384,64 @@ export default function DealFiltersPanel({
                 className="h-9"
               />
             </div>
+
+            {/* ─── Campos Personalizados da Negociação ─── */}
+            {(dealCustomFields.data as any[])?.length > 0 && (
+              <>
+                <div className="border-t" />
+                <div className="space-y-3">
+                  <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Campos Personalizados</Label>
+                  {(dealCustomFields.data as any[]).map((field: any) => {
+                    const existing = (local.customFieldFilters || []).find((f) => f.fieldId === field.id);
+                    const value = existing?.value || "";
+                    const updateCF = (v: string) => {
+                      const current = local.customFieldFilters || [];
+                      if (!v) {
+                        setLocal((prev) => ({ ...prev, customFieldFilters: current.filter((f) => f.fieldId !== field.id) }));
+                      } else {
+                        const idx = current.findIndex((f) => f.fieldId === field.id);
+                        if (idx >= 0) {
+                          const updated = [...current];
+                          updated[idx] = { fieldId: field.id, value: v };
+                          setLocal((prev) => ({ ...prev, customFieldFilters: updated }));
+                        } else {
+                          setLocal((prev) => ({ ...prev, customFieldFilters: [...current, { fieldId: field.id, value: v }] }));
+                        }
+                      }
+                    };
+                    if (field.type === "select" && field.options?.length > 0) {
+                      return (
+                        <div key={field.id} className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">{field.label}</Label>
+                          <Select value={value || "all"} onValueChange={(v) => updateCF(v === "all" ? "" : v)}>
+                            <SelectTrigger className="h-9">
+                              <SelectValue placeholder="Todos" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="all">Todos</SelectItem>
+                              {field.options.map((opt: string) => (
+                                <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      );
+                    }
+                    return (
+                      <div key={field.id} className="space-y-1">
+                        <Label className="text-xs text-muted-foreground">{field.label}</Label>
+                        <Input
+                          placeholder={`Filtrar por ${field.label.toLowerCase()}...`}
+                          className="h-9"
+                          value={value}
+                          onChange={(e) => updateCF(e.target.value)}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            )}
 
             {/* Spacer for footer */}
             <div className="h-6" />

@@ -336,6 +336,7 @@ export async function listDeals(tenantId: number, opts?: {
   coolingDays?: number;
   ownerUserId?: number;
   ownerUserIds?: number[];
+  customFieldFilters?: { fieldId: number; value: string }[];
 }) {
   const db = await getDb(); if (!db) return [];
   const conditions: any[] = [eq(deals.tenantId, tenantId)];
@@ -377,6 +378,14 @@ export async function listDeals(tenantId: number, opts?: {
     conditions.push(inArray(deals.ownerUserId, opts.ownerUserIds));
   } else if (opts?.ownerUserId) {
     conditions.push(eq(deals.ownerUserId, opts.ownerUserId));
+  }
+  // Custom field filters
+  if (opts?.customFieldFilters && opts.customFieldFilters.length > 0) {
+    for (const cf of opts.customFieldFilters) {
+      conditions.push(
+        sql`${deals.id} IN (SELECT entityId FROM custom_field_values WHERE tenantId = ${tenantId} AND entityType = 'deal' AND fieldId = ${cf.fieldId} AND value LIKE ${'%' + cf.value + '%'})`
+      );
+    }
   }
   // Cooling filter — no activity in last N days
   if (opts?.cooling) {
@@ -451,7 +460,7 @@ export async function updateDeal(tenantId: number, id: number, data: Partial<{ t
   const db = await getDb(); if (!db) return;
   await db.update(deals).set({ ...data, lastActivityAt: new Date() }).where(and(eq(deals.id, id), eq(deals.tenantId, tenantId)));
 }
-export async function countDeals(tenantId: number, status?: string, opts?: { pipelineId?: number; stageId?: number; titleSearch?: string; dateFrom?: string; dateTo?: string; ownerUserId?: number; ownerUserIds?: number[] }) {
+export async function countDeals(tenantId: number, status?: string, opts?: { pipelineId?: number; stageId?: number; titleSearch?: string; dateFrom?: string; dateTo?: string; ownerUserId?: number; ownerUserIds?: number[]; customFieldFilters?: { fieldId: number; value: string }[] }) {
   const db = await getDb(); if (!db) return 0;
   const conditions: any[] = [eq(deals.tenantId, tenantId), isNull(deals.deletedAt)];
   if (status) conditions.push(eq(deals.status, status as any));
@@ -464,6 +473,14 @@ export async function countDeals(tenantId: number, status?: string, opts?: { pip
     conditions.push(inArray(deals.ownerUserId, opts.ownerUserIds));
   } else if (opts?.ownerUserId) {
     conditions.push(eq(deals.ownerUserId, opts.ownerUserId));
+  }
+  // Custom field filters
+  if (opts?.customFieldFilters && opts.customFieldFilters.length > 0) {
+    for (const cf of opts.customFieldFilters) {
+      conditions.push(
+        sql`${deals.id} IN (SELECT entityId FROM custom_field_values WHERE tenantId = ${tenantId} AND entityType = 'deal' AND fieldId = ${cf.fieldId} AND value LIKE ${'%' + cf.value + '%'})`
+      );
+    }
   }
   const rows = await db.select({ count: sql<number>`count(*)` }).from(deals).where(and(...conditions));
   return rows[0]?.count || 0;
