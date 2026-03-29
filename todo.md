@@ -6083,3 +6083,8 @@
 - [x] Verificar/criar endpoint backend para soft-delete de negociação (reutilizado crm.deals.bulkDelete)
 - [x] Implementar botão lixeira com dialog de confirmação no frontend
 - [x] Testes existentes (bulkDelete.test.ts - 8 testes passando)
+## Página de Lixeira no CRM
+- [x] Analisar backend existente (listDeletedDeals, restoreDeals, hardDeleteDeals)
+- [x] Criar página frontend Trash.tsx com abas (Negociações/Contatos), busca, restauração e exclusão permanente (admin)
+- [x] Registrar rota /trash no App.tsx e link Lixeira no menu lateral (CRM)
+- [x] Testes validados (bulkDelete.test.ts - 8 testes passando)

@@ -27,7 +27,7 @@ import { useIsMobile } from "@/hooks/useMobile";
 import {
   LayoutDashboard, LogOut, PanelLeft, MessageSquare, Send, Bot, Settings,
   Users, Building2, Target, Inbox, FileText, Globe, BarChart3, GraduationCap,
-  Plug, Activity, Shield, Briefcase, Plane, ClipboardList, Bell, Crown, Sparkles,
+  Plug, Activity, Shield, Briefcase, Plane, ClipboardList, Bell, Crown, Sparkles, Trash2,
 } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
@@ -58,6 +58,7 @@ const menuSections: MenuSection[] = [
       { icon: Target, label: "Funil", path: "/pipeline" },
       { icon: Plane, label: "Viagens", path: "/trips" },
       { icon: ClipboardList, label: "Tarefas", path: "/tasks" },
+      { icon: Trash2, label: "Lixeira", path: "/trash" },
     ],
   },
   {

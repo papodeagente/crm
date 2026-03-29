@@ -54,6 +54,7 @@ const Campaigns = lazyWithRetry(() => import("./pages/Campaigns"));
 const Profile = lazyWithRetry(() => import("./pages/Profile"));
 const CampaignDetail = lazyWithRetry(() => import("./pages/CampaignDetail"));
 const Supervision = lazyWithRetry(() => import("./pages/Supervision"));
+const Trash = lazyWithRetry(() => import("./pages/Trash"));
 const Analytics = lazyWithRetry(() => import("./pages/Analytics"));
 const GoalsReport = lazyWithRetry(() => import("./pages/GoalsReport"));
 const CRMLive = lazyWithRetry(() => import("./pages/CRMLive"));
@@ -199,6 +200,9 @@ function AppRouter() {
                 <Route path="/super-admin/management">
                   <SuperAdminLayout><SuperAdminManagement /></SuperAdminLayout>
                 </Route>
+
+                {/* Trash */}
+                <Route path="/trash" component={Trash} />
 
                 {/* Notifications */}
                 <Route path="/notifications" component={NotificationsPage} />
