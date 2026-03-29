@@ -6220,3 +6220,5 @@
 - [x] Tornar botões "Entrar" e "Testar grátis" visíveis em mobile na navbar
 ## Ajuste Navbar: Remover botão "Testar grátis" do topo
 - [x] Remover botão "Testar grátis" da navbar, manter apenas "Entrar"
+## Ajuste Navbar: Logo mais discreta em mobile
+- [x] Reduzir tamanho da logo na navbar em mobile

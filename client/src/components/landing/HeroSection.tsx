@@ -34,7 +34,7 @@ export function HeroSection({ onRegister }: HeroSectionProps) {
       <nav className="fixed top-0 left-0 right-0 z-50 bg-[#0a0a12]/70 backdrop-blur-2xl border-b border-white/[0.05]">
         <div className="max-w-7xl mx-auto px-5 sm:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center">
-            <img src={LOGO_URL} alt="enturOS CRM" className="h-7 object-contain" />
+            <img src={LOGO_URL} alt="enturOS CRM" className="h-5 sm:h-7 object-contain" />
           </div>
           <div className="flex items-center">
             <Button
