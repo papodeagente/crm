@@ -6176,3 +6176,5 @@
 - [x] View Mês: barras coloridas com borda lateral, +N overflow
 - [x] Performance: staleTime, refetchInterval, useMemo, useCallback
 - [x] Testes Vitest atualizados para redesign (30 testes passando)
+## Remover Agenda da Tela Início
+- [x] Remover AgendaCalendar da Home.tsx

@@ -26,7 +26,6 @@ import {
   DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent,
 } from "@/components/ui/dropdown-menu";
 import TrialCountdownBanner from "@/components/TrialCountdownBanner";
-import AgendaCalendar from "@/components/AgendaCalendar";
 
 /* ─── Polling interval for real-time sync (60 seconds) ─── */
 const REFETCH_INTERVAL = 60_000;
@@ -822,10 +821,6 @@ export default function Home() {
       {/* ─── TRIAL COUNTDOWN BANNER ─── */}
       <TrialCountdownBanner />
 
-      {/* ═══════════════════════════════════════════════════
-          BLOCO 1.5 — AGENDA UNIFICADA
-          ═════════════════════════════════════════════════ */}
-      <AgendaCalendar filterUserId={execFilterInput?.userId} filterTeamId={execFilterInput?.teamId} />
 
       {/* ═══════════════════════════════════════════════════════
           BLOCO 2 + 3 — PRIORIDADES + OPORTUNIDADES (side by side)
