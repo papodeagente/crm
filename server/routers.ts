@@ -4144,6 +4144,25 @@ ${customInstructions ? `\n--- INSTRUÇÕES PERSONALIZADAS ---\n${customInstructi
         const userId = ctx.saasUser?.userId || ctx.user!.id;
         return getGoogleCalendarStatus(getTenantId(ctx), userId);
       }),
+    // List tenant users for participant picker
+    tenantUsers: tenantProcedure
+      .query(async ({ ctx }) => {
+        const crm = await import("./crmDb");
+        const users = await crm.listCrmUsers(getTenantId(ctx));
+        return (users || []).map((u: any) => ({
+          userId: u.userId,
+          name: u.name || u.email || `Usuário #${u.userId}`,
+          email: u.email || null,
+          role: u.role || "user",
+        }));
+      }),
+    // Get participants for a specific appointment
+    getParticipants: tenantProcedure
+      .input(z.object({ appointmentId: z.number() }))
+      .query(async ({ ctx, input }) => {
+        const { getAppointmentParticipants } = await import("./services/agendaService");
+        return getAppointmentParticipants(getTenantId(ctx), input.appointmentId);
+      }),
     createAppointment: tenantWriteProcedure
       .input(z.object({
         title: z.string().min(1).max(500),
@@ -4155,6 +4174,7 @@ ${customInstructions ? `\n--- INSTRUÇÕES PERSONALIZADAS ---\n${customInstructi
         color: z.string().max(20).optional(),
         dealId: z.number().optional(),
         contactId: z.number().optional(),
+        participantIds: z.array(z.number()).optional(),
       }))
       .mutation(async ({ ctx, input }) => {
         const { createAppointment } = await import("./services/agendaService");
@@ -4174,6 +4194,7 @@ ${customInstructions ? `\n--- INSTRUÇÕES PERSONALIZADAS ---\n${customInstructi
         dealId: z.number().optional(),
         contactId: z.number().optional(),
         isCompleted: z.boolean().optional(),
+        participantIds: z.array(z.number()).optional(),
       }))
       .mutation(async ({ ctx, input }) => {
         const { updateAppointment } = await import("./services/agendaService");

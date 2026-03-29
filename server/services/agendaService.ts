@@ -40,6 +40,7 @@ export interface AgendaItem {
   userId?: number;             // owner / assignee
   calendarEmail?: string | null;
   color?: string | null;       // appointment color
+  participants?: Array<{ userId: number; name: string }>;  // appointment participants
 }
 
 export interface CreateAppointmentInput {
@@ -52,11 +53,13 @@ export interface CreateAppointmentInput {
   color?: string;
   dealId?: number;
   contactId?: number;
+  participantIds?: number[];  // other users to include
 }
 
 export interface UpdateAppointmentInput extends Partial<CreateAppointmentInput> {
   id: number;
   isCompleted?: boolean;
+  participantIds?: number[];  // replace all participants
 }
 
 export interface AgendaFilter {
@@ -181,16 +184,17 @@ export async function getUnifiedAgenda(
     calendarEmail: e.sourceCalendarId,
   }));
 
-  // ── CRM Appointments (manual) ──
+  // ── CRM Appointments (manual) — include appointments where user is owner OR participant ──
   const apptUserFilter = buildApptUserFilter(filter.userId, userIds);
 
   const [apptRows] = await db.execute(sql`
-    SELECT a.id, a.title, a.description, a.startAt, a.endAt, a.allDay,
+    SELECT DISTINCT a.id, a.title, a.description, a.startAt, a.endAt, a.allDay,
            a.location, a.color, a.dealId, a.contactId, a.isCompleted, a.completedAt,
            a.userId,
            d.title AS dealTitle,
            c.name  AS contactName
     FROM crm_appointments a
+    LEFT JOIN crm_appointment_participants cap ON cap.appointmentId = a.id
     LEFT JOIN deals d ON a.dealId IS NOT NULL AND d.id = a.dealId AND d.tenantId = ${tenantId}
     LEFT JOIN contacts c ON a.contactId IS NOT NULL AND c.id = a.contactId AND c.tenantId = ${tenantId}
     WHERE a.tenantId = ${tenantId}
@@ -200,6 +204,24 @@ export async function getUnifiedAgenda(
       AND a.endAt >= ${fromDate}
     ORDER BY a.startAt ASC
   `);
+
+  // Fetch participants for each appointment
+  const apptIds = (apptRows as unknown as any[]).map((a: any) => a.id);
+  let participantsMap: Record<number, Array<{ userId: number; name: string }>> = {};
+  if (apptIds.length > 0) {
+    const idList = apptIds.join(",");
+    const [partRows] = await db.execute(sql.raw(`
+      SELECT cap.appointmentId, cap.userId, COALESCE(su.name, u.name, 'Usuário') AS name
+      FROM crm_appointment_participants cap
+      LEFT JOIN crm_users su ON su.userId = cap.userId AND su.tenantId = ${tenantId}
+      LEFT JOIN users u ON u.id = cap.userId
+      WHERE cap.appointmentId IN (${idList})
+    `));
+    for (const row of (partRows as unknown as any[])) {
+      if (!participantsMap[row.appointmentId]) participantsMap[row.appointmentId] = [];
+      participantsMap[row.appointmentId].push({ userId: row.userId, name: row.name });
+    }
+  }
 
   const apptItems: AgendaItem[] = (apptRows as unknown as any[]).map((a: any) => {
     const startMs = new Date(a.startAt).getTime();
@@ -224,6 +246,7 @@ export async function getUnifiedAgenda(
       entityId: a.dealId || a.contactId || undefined,
       userId: a.userId,
       color: a.color,
+      participants: participantsMap[a.id] || [],
     };
   });
 
@@ -434,10 +457,10 @@ function buildGcalUserFilter(userId?: number, userIds?: number[]) {
 function buildApptUserFilter(userId?: number, userIds?: number[]) {
   if (userIds && userIds.length > 0) {
     const idList = userIds.join(",");
-    return sql.raw(`AND a.userId IN (${idList})`);
+    return sql.raw(`AND (a.userId IN (${idList}) OR cap.userId IN (${idList}))`);
   }
   if (userId) {
-    return sql`AND a.userId = ${userId}`;
+    return sql`AND (a.userId = ${userId} OR cap.userId = ${userId})`;
   }
   return sql``;
 }
@@ -467,7 +490,18 @@ export async function createAppointment(
   `);
 
   const insertId = (result as any).insertId;
-  console.log(`[Agenda] Created appointment ${insertId} for user ${userId} (tenant ${tenantId})`);
+
+  // Insert participants (always include creator)
+  const participantSet = new Set(input.participantIds || []);
+  participantSet.add(userId); // creator is always a participant
+  for (const pid of Array.from(participantSet)) {
+    await db.execute(sql`
+      INSERT IGNORE INTO crm_appointment_participants (appointmentId, userId, tenantId)
+      VALUES (${insertId}, ${pid}, ${tenantId})
+    `);
+  }
+
+  console.log(`[Agenda] Created appointment ${insertId} for user ${userId} (tenant ${tenantId}) with ${participantSet.size} participants`);
   return { id: insertId };
 }
 
@@ -512,6 +546,31 @@ export async function updateAppointment(
     vals.push(input.isCompleted);
     sets.push("completedAt = ?");
     vals.push(input.isCompleted ? new Date() : null);
+  }
+
+  if (sets.length === 0 && input.participantIds === undefined) return { success: true };
+
+  // Update participants if provided
+  if (input.participantIds !== undefined) {
+    // Get the appointment owner
+    const [ownerRows] = await db.execute(sql`
+      SELECT userId FROM crm_appointments WHERE id = ${input.id} AND tenantId = ${tenantId}
+    `);
+    const ownerId = (ownerRows as unknown as any[])[0]?.userId;
+    const participantSet = new Set(input.participantIds);
+    if (ownerId) participantSet.add(ownerId); // owner always stays
+
+    // Remove old participants
+    await db.execute(sql`
+      DELETE FROM crm_appointment_participants WHERE appointmentId = ${input.id}
+    `);
+    // Insert new participants
+    for (const pid of Array.from(participantSet)) {
+      await db.execute(sql`
+        INSERT IGNORE INTO crm_appointment_participants (appointmentId, userId, tenantId)
+        VALUES (${input.id}, ${pid}, ${tenantId})
+      `);
+    }
   }
 
   if (sets.length === 0) return { success: true };
@@ -566,4 +625,30 @@ export async function deleteAppointment(
 
   console.log(`[Agenda] Deleted appointment ${appointmentId} for user ${userId} (tenant ${tenantId})`);
   return { success: true };
+}
+
+// ═══════════════════════════════════════
+// 8. GET APPOINTMENT PARTICIPANTS
+// ═══════════════════════════════════════
+
+export async function getAppointmentParticipants(
+  tenantId: number,
+  appointmentId: number,
+): Promise<Array<{ userId: number; name: string }>> {
+  const db = await getDb();
+  if (!db) return [];
+
+  const [rows] = await db.execute(sql`
+    SELECT cap.userId, COALESCE(su.name, u.name, 'Usuário') AS name
+    FROM crm_appointment_participants cap
+    LEFT JOIN crm_users su ON su.userId = cap.userId AND su.tenantId = ${tenantId}
+    LEFT JOIN users u ON u.id = cap.userId
+    WHERE cap.appointmentId = ${appointmentId} AND cap.tenantId = ${tenantId}
+    ORDER BY cap.createdAt ASC
+  `);
+
+  return (rows as unknown as any[]).map((r: any) => ({
+    userId: Number(r.userId),
+    name: r.name,
+  }));
 }

@@ -2517,3 +2517,21 @@ export const crmAppointments = mysqlTable("crm_appointments", {
 
 export type CrmAppointment = typeof crmAppointments.$inferSelect;
 export type InsertCrmAppointment = typeof crmAppointments.$inferInsert;
+
+// ════════════════════════════════════════════════════════════
+// CRM APPOINTMENT PARTICIPANTS
+// ════════════════════════════════════════════════════════════
+
+export const crmAppointmentParticipants = mysqlTable("crm_appointment_participants", {
+  id: int("id").autoincrement().primaryKey(),
+  appointmentId: int("appointmentId").notNull(),
+  userId: int("userId").notNull(),
+  tenantId: int("tenantId").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (t) => [
+  uniqueIndex("cap_appt_user_uniq").on(t.appointmentId, t.userId),
+  index("cap_user_idx").on(t.tenantId, t.userId),
+]);
+
+export type CrmAppointmentParticipant = typeof crmAppointmentParticipants.$inferSelect;
+export type InsertCrmAppointmentParticipant = typeof crmAppointmentParticipants.$inferInsert;

@@ -6138,3 +6138,30 @@
 - [x] Implementar modal de criação de compromisso no AgendaCalendar (título, data/hora, duração, descrição)
 - [x] Compromissos manuais aparecem na agenda com cor distinta
 - [x] Atualizar testes Vitest para cobrir novo endpoint (20 testes passando)
+## Finalizar Integração Google Calendar
+- [ ] Analisar fluxo OAuth existente (googleCalendar.ts, tokens, profile page)
+- [ ] Corrigir/completar fluxo OAuth Google Calendar (redirect, callback, salvar tokens)
+- [ ] Corrigir/completar serviço de sincronização de eventos (agendaService.ts)
+- [ ] Implementar/corrigir UI de conexão, desconexão e sincronização na agenda e perfil
+- [ ] Garantir que eventos do Google Calendar apareçam na agenda unificada
+- [ ] Atualizar testes Vitest
+## Integração Google Calendar OAuth2 Real
+- [ ] Solicitar secrets GOOGLE_CLIENT_ID e GOOGLE_CLIENT_SECRET
+- [ ] Criar googleCalendarService.ts com OAuth2 real (authorize URL, callback, token refresh, API calls)
+- [ ] Registrar rotas Express /api/google/authorize e /api/google/callback
+- [ ] Atualizar agendaService.ts syncGoogleCalendar para usar OAuth2 real
+- [ ] Atualizar profileRouter para usar OAuth2 real (conectar/desconectar)
+- [ ] UI Profile: instruções claras de como configurar Google Cloud + botão OAuth real
+- [ ] UI Agenda: sync real com tokens do usuário
+- [ ] Admin visualiza agenda de todos os usuários via filtro na Home
+- [ ] Cada usuário tem sua própria integração independente
+- [ ] Testes Vitest atualizados para cobrir OAuth2
+## Participantes em Compromissos da Agenda
+- [x] Criar tabela crm_appointment_participants (schema Drizzle + migration SQL)
+- [x] Endpoint agenda.tenantUsers para listar usuários da tenant (seletor de participantes)
+- [x] Atualizar agendaService: incluir participantes no CRUD de compromissos
+- [x] Atualizar endpoints createAppointment/updateAppointment para aceitar lista de participantes
+- [x] Compromissos aparecem na agenda de todos os participantes marcados
+- [x] UI: seletor de participantes no modal de compromisso (busca usuários da tenant)
+- [x] UI: exibir avatares/nomes dos participantes no pill do compromisso
+- [x] Testes Vitest atualizados (30 testes passando)

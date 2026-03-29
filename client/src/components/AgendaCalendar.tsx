@@ -46,6 +46,9 @@ import {
   MapPin,
   Trash2,
   Check,
+  Users,
+  X,
+  Search,
 } from "lucide-react";
 import { formatTime, SYSTEM_TIMEZONE, SYSTEM_LOCALE } from "../../../shared/dateUtils";
 
@@ -77,6 +80,7 @@ interface AgendaItem {
   userId?: number;
   calendarEmail?: string | null;
   color?: string | null;
+  participants?: Array<{ userId: number; name: string }>;
 }
 
 // ═══════════════════════════════════════
@@ -215,10 +219,18 @@ function AgendaEventPill({ item, onClickAppt }: { item: AgendaItem; onClickAppt?
   const overdueClasses = item.isOverdue ? "!border-red-500/60 !bg-red-500/10 !text-red-600 dark:!text-red-400" : "";
   const completedClasses = item.isCompleted ? "opacity-50 line-through" : "";
 
+  const hasParticipants = isAppt && item.participants && item.participants.length > 1;
+
   const content = (
     <div className={`${baseClasses} ${colorClasses} ${overdueClasses} ${completedClasses}`}>
       <Icon className="h-3 w-3 shrink-0" />
       <span className="truncate font-medium">{item.title}</span>
+      {hasParticipants && (
+        <span className="flex items-center gap-0.5 shrink-0 opacity-70" title={item.participants!.map(p => p.name).join(", ")}>
+          <Users className="h-2.5 w-2.5" />
+          <span className="text-[9px]">{item.participants!.length}</span>
+        </span>
+      )}
       {!item.allDay && (
         <span className="text-[9px] opacity-70 shrink-0 ml-auto">{formatTimeShort(item.startAt)}</span>
       )}
@@ -489,6 +501,7 @@ interface AppointmentModalProps {
 }
 
 function AppointmentModal({ open, onClose, editItem, defaultDate, defaultHour, onSaved }: AppointmentModalProps) {
+  const { user } = useAuth();
   const isEdit = !!editItem;
   const editId = editItem ? Number(editItem.id.replace("appt-", "")) : undefined;
 
@@ -500,6 +513,17 @@ function AppointmentModal({ open, onClose, editItem, defaultDate, defaultHour, o
   const [allDay, setAllDay] = useState(false);
   const [location, setLocation] = useState("");
   const [color, setColor] = useState("emerald");
+
+  // Participants state
+  const [selectedParticipants, setSelectedParticipants] = useState<Array<{ userId: number; name: string }>>([]);
+  const [participantSearch, setParticipantSearch] = useState("");
+  const [showParticipantPicker, setShowParticipantPicker] = useState(false);
+
+  // Fetch tenant users for participant picker
+  const tenantUsersQ = trpc.agenda.tenantUsers.useQuery(undefined, {
+    enabled: open,
+    staleTime: 60_000,
+  });
 
   // Reset form when modal opens
   useMemo(() => {
@@ -517,6 +541,8 @@ function AppointmentModal({ open, onClose, editItem, defaultDate, defaultHour, o
         setStartStr(toLocalInputDatetime(new Date(editItem.startAt)));
         setEndStr(toLocalInputDatetime(new Date(editItem.endAt)));
       }
+      // Load existing participants
+      setSelectedParticipants(editItem.participants || []);
     } else {
       setTitle("");
       setDescription("");
@@ -530,8 +556,16 @@ function AppointmentModal({ open, onClose, editItem, defaultDate, defaultHour, o
       const end = new Date(start.getTime() + 60 * 60 * 1000);
       setStartStr(toLocalInputDatetime(start));
       setEndStr(toLocalInputDatetime(end));
+      // Default: current user as participant
+      if (user) {
+        setSelectedParticipants([{ userId: user.id, name: user.name || "Eu" }]);
+      } else {
+        setSelectedParticipants([]);
+      }
     }
-  }, [open, editItem, defaultDate, defaultHour]);
+    setParticipantSearch("");
+    setShowParticipantPicker(false);
+  }, [open, editItem, defaultDate, defaultHour, user]);
 
   const createMut = trpc.agenda.createAppointment.useMutation({
     onSuccess: () => { onSaved(); onClose(); },
@@ -561,6 +595,8 @@ function AppointmentModal({ open, onClose, editItem, defaultDate, defaultHour, o
     }
     if (endAt <= startAt) endAt = startAt + 60 * 60 * 1000;
 
+    const participantIds = selectedParticipants.map(p => p.userId);
+
     const payload = {
       title: title.trim(),
       description: description.trim() || undefined,
@@ -569,6 +605,7 @@ function AppointmentModal({ open, onClose, editItem, defaultDate, defaultHour, o
       allDay,
       location: location.trim() || undefined,
       color,
+      participantIds,
     };
 
     if (isEdit && editId) {
@@ -693,6 +730,97 @@ function AppointmentModal({ open, onClose, editItem, defaultDate, defaultHour, o
                 />
               ))}
             </div>
+          </div>
+
+          {/* Participants */}
+          <div className="space-y-1.5">
+            <Label className="text-[12px] flex items-center gap-1">
+              <Users className="h-3 w-3" /> Participantes
+            </Label>
+            {/* Selected participants */}
+            <div className="flex flex-wrap gap-1.5 min-h-[28px]">
+              {selectedParticipants.map(p => (
+                <span
+                  key={p.userId}
+                  className="inline-flex items-center gap-1 bg-muted px-2 py-0.5 rounded-full text-[11px] font-medium"
+                >
+                  <span className="w-4 h-4 rounded-full bg-primary/20 text-primary flex items-center justify-center text-[9px] font-bold shrink-0">
+                    {p.name.charAt(0).toUpperCase()}
+                  </span>
+                  <span className="truncate max-w-[100px]">{p.name}</span>
+                  {p.userId !== user?.id && (
+                    <button
+                      type="button"
+                      className="text-muted-foreground hover:text-foreground ml-0.5"
+                      onClick={() => setSelectedParticipants(prev => prev.filter(x => x.userId !== p.userId))}
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  )}
+                </span>
+              ))}
+              <button
+                type="button"
+                className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground px-2 py-0.5 rounded-full border border-dashed border-border hover:border-foreground/30 transition-colors"
+                onClick={() => setShowParticipantPicker(!showParticipantPicker)}
+              >
+                <Plus className="h-3 w-3" />
+                Adicionar
+              </button>
+            </div>
+            {/* Participant search picker */}
+            {showParticipantPicker && (
+              <div className="border border-border rounded-lg bg-popover p-2 space-y-2">
+                <div className="relative">
+                  <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
+                  <Input
+                    placeholder="Buscar usuário..."
+                    value={participantSearch}
+                    onChange={(e) => setParticipantSearch(e.target.value)}
+                    className="h-7 text-[12px] pl-7"
+                    autoFocus
+                  />
+                </div>
+                <div className="max-h-[120px] overflow-y-auto space-y-0.5">
+                  {(tenantUsersQ.data || []).filter(u => {
+                    // Exclude already selected
+                    if (selectedParticipants.some(p => p.userId === u.userId)) return false;
+                    // Filter by search
+                    if (participantSearch) {
+                      const q = participantSearch.toLowerCase();
+                      return u.name.toLowerCase().includes(q) || (u.email || "").toLowerCase().includes(q);
+                    }
+                    return true;
+                  }).map(u => (
+                    <button
+                      key={u.userId}
+                      type="button"
+                      className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-muted text-left transition-colors"
+                      onClick={() => {
+                        setSelectedParticipants(prev => [...prev, { userId: u.userId, name: u.name }]);
+                        setParticipantSearch("");
+                      }}
+                    >
+                      <span className="w-5 h-5 rounded-full bg-primary/20 text-primary flex items-center justify-center text-[10px] font-bold shrink-0">
+                        {u.name.charAt(0).toUpperCase()}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="text-[12px] font-medium truncate">{u.name}</p>
+                        {u.email && <p className="text-[10px] text-muted-foreground truncate">{u.email}</p>}
+                      </div>
+                    </button>
+                  ))}
+                  {tenantUsersQ.isLoading && (
+                    <div className="flex items-center justify-center py-2">
+                      <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+                    </div>
+                  )}
+                  {!tenantUsersQ.isLoading && (tenantUsersQ.data || []).filter(u => !selectedParticipants.some(p => p.userId === u.userId)).length === 0 && (
+                    <p className="text-[11px] text-muted-foreground text-center py-2">Nenhum usuário disponível</p>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Description */}
