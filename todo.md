@@ -6218,3 +6218,5 @@
 - [x] Checklist: nenhuma outra página alterada
 ## Bug Fix: Botão Login sumindo em mobile na Landing Page
 - [x] Tornar botões "Entrar" e "Testar grátis" visíveis em mobile na navbar
+## Ajuste Navbar: Remover botão "Testar grátis" do topo
+- [x] Remover botão "Testar grátis" da navbar, manter apenas "Entrar"

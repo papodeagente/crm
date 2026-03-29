@@ -36,20 +36,13 @@ export function HeroSection({ onRegister }: HeroSectionProps) {
           <div className="flex items-center">
             <img src={LOGO_URL} alt="enturOS CRM" className="h-7 object-contain" />
           </div>
-          <div className="flex items-center gap-2 sm:gap-3">
+          <div className="flex items-center">
             <Button
               variant="ghost"
-              className="text-sm text-white/60 hover:text-white hover:bg-white/5 px-2 sm:px-4"
+              className="text-sm text-white/60 hover:text-white hover:bg-white/5"
               onClick={() => window.location.href = "/login"}
             >
               Entrar
-            </Button>
-            <Button
-              className="text-sm bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white border-0 px-3 sm:px-4"
-              onClick={onRegister}
-            >
-              <span className="hidden sm:inline">Testar grátis por 7 dias</span>
-              <span className="sm:hidden">Testar grátis</span>
             </Button>
           </div>
         </div>
