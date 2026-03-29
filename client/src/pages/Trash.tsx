@@ -12,7 +12,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { toast } from "sonner";
 import {
   Trash2, RotateCcw, Archive, Briefcase, Users, Search,
-  AlertTriangle, Loader2, DollarSign,
+  AlertTriangle, Loader2, DollarSign, Clock,
 } from "lucide-react";
 
 type Tab = "deals" | "contacts";
@@ -105,6 +105,24 @@ export default function Trash() {
 
   const fmt = (d: any) => d ? new Date(d).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "-";
   const fmtCurrency = (c: number | null) => c ? new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(c / 100) : "-";
+
+  /** Calculate days elapsed since deletion and days remaining until auto-purge (30 days) */
+  const PURGE_AFTER_DAYS = 30;
+  const getDaysInfo = (deletedAt: any) => {
+    if (!deletedAt) return { elapsed: 0, remaining: PURGE_AFTER_DAYS, pct: 0 };
+    const now = new Date();
+    const deleted = new Date(deletedAt);
+    const elapsed = Math.floor((now.getTime() - deleted.getTime()) / (1000 * 60 * 60 * 24));
+    const remaining = Math.max(0, PURGE_AFTER_DAYS - elapsed);
+    const pct = Math.min(100, Math.round((elapsed / PURGE_AFTER_DAYS) * 100));
+    return { elapsed, remaining, pct };
+  };
+  const getUrgencyColor = (remaining: number) => {
+    if (remaining <= 3) return "text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-900/30 border-red-200 dark:border-red-800/40";
+    if (remaining <= 7) return "text-amber-600 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/30 border-amber-200 dark:border-amber-800/40";
+    if (remaining <= 14) return "text-yellow-600 dark:text-yellow-400 bg-yellow-100 dark:bg-yellow-900/30 border-yellow-200 dark:border-yellow-800/40";
+    return "text-blue-600 dark:text-blue-400 bg-blue-100 dark:bg-blue-900/30 border-blue-200 dark:border-blue-800/40";
+  };
 
   const dealsCount = deletedDeals.data?.length || 0;
   const contactsCount = deletedContacts.data?.length || 0;
@@ -208,9 +226,7 @@ export default function Trash() {
       <div className="flex items-center gap-2 p-3 bg-amber-50 dark:bg-amber-950/30 rounded-xl border border-amber-200 dark:border-amber-800/40">
         <Archive className="h-4 w-4 text-amber-600 shrink-0" />
         <span className="text-[13px] text-amber-800 dark:text-amber-300">
-          {activeTab === "deals"
-            ? "Negociacoes na lixeira podem ser restauradas. A exclusao permanente e restrita a administradores."
-            : "Contatos na lixeira podem ser restaurados. A exclusao permanente e restrita a administradores."}
+          Itens na lixeira sao excluidos automaticamente apos {PURGE_AFTER_DAYS} dias. Restaure antes do prazo para recupera-los.
         </span>
       </div>
 
@@ -229,6 +245,7 @@ export default function Trash() {
                     <th className="text-left p-3.5 font-semibold text-muted-foreground">Valor</th>
                     <th className="text-left p-3.5 font-semibold text-muted-foreground">Status</th>
                     <th className="text-left p-3.5 font-semibold text-muted-foreground">Excluido em</th>
+                    <th className="text-left p-3.5 font-semibold text-muted-foreground">Expira em</th>
                     <th className="p-3.5 w-24"></th>
                   </>
                 ) : (
@@ -237,6 +254,7 @@ export default function Trash() {
                     <th className="text-left p-3.5 font-semibold text-muted-foreground">Email</th>
                     <th className="text-left p-3.5 font-semibold text-muted-foreground">Telefone</th>
                     <th className="text-left p-3.5 font-semibold text-muted-foreground">Excluido em</th>
+                    <th className="text-left p-3.5 font-semibold text-muted-foreground">Expira em</th>
                     <th className="p-3.5 w-24"></th>
                   </>
                 )}
@@ -245,14 +263,14 @@ export default function Trash() {
             <tbody>
               {isLoading ? (
                 <tr>
-                  <td colSpan={6} className="p-12 text-center text-muted-foreground text-sm">
+                  <td colSpan={7} className="p-12 text-center text-muted-foreground text-sm">
                     <Loader2 className="h-5 w-5 animate-spin mx-auto mb-2" />
                     Carregando...
                   </td>
                 </tr>
               ) : currentList.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="p-12 text-center text-muted-foreground">
+                  <td colSpan={7} className="p-12 text-center text-muted-foreground">
                     <Archive className="h-10 w-10 mx-auto mb-3 text-muted-foreground/30" />
                     <p className="text-sm font-medium">Lixeira vazia</p>
                     <p className="text-xs mt-1">
@@ -296,6 +314,25 @@ export default function Trash() {
                           </span>
                         </td>
                         <td className="p-3.5 text-muted-foreground">{fmt(item.deletedAt)}</td>
+                        <td className="p-3.5">
+                          {(() => {
+                            const info = getDaysInfo(item.deletedAt);
+                            return (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold border ${getUrgencyColor(info.remaining)}`}>
+                                    <Clock className="h-3 w-3" />
+                                    {info.remaining}d
+                                  </span>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>{info.elapsed} dia(s) na lixeira</p>
+                                  <p>Sera excluido automaticamente em {info.remaining} dia(s)</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            );
+                          })()}
+                        </td>
                       </>
                     ) : (
                       <>
@@ -308,6 +345,25 @@ export default function Trash() {
                         <td className="p-3.5 text-muted-foreground truncate max-w-[200px]">{item.email || "-"}</td>
                         <td className="p-3.5 text-muted-foreground">{item.phone || "-"}</td>
                         <td className="p-3.5 text-muted-foreground">{fmt(item.deletedAt)}</td>
+                        <td className="p-3.5">
+                          {(() => {
+                            const info = getDaysInfo(item.deletedAt);
+                            return (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold border ${getUrgencyColor(info.remaining)}`}>
+                                    <Clock className="h-3 w-3" />
+                                    {info.remaining}d
+                                  </span>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>{info.elapsed} dia(s) na lixeira</p>
+                                  <p>Sera excluido automaticamente em {info.remaining} dia(s)</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            );
+                          })()}
+                        </td>
                       </>
                     )}
                     <td className="p-3.5">

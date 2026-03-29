@@ -240,6 +240,9 @@ async function startServer() {
     // Start Z-API alert monitoring scheduler (disconnections + billing overdue)
     import("../zapiAlertScheduler").then(m => m.startZapiAlertScheduler());
 
+    // Start trash auto-purge scheduler (hard-delete items older than 30 days)
+    import("../trashAutoPurgeScheduler").then(m => m.startTrashAutoPurgeScheduler());
+
     // Start scheduled WhatsApp send worker (checks every 30s for due tasks)
     import("../services/scheduledWhatsAppService").then(m => m.startScheduledWhatsAppWorker()).catch(e => {
       console.warn("[WA-Scheduled] Failed to start worker:", e.message);

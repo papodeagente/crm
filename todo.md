@@ -6088,3 +6088,9 @@
 - [x] Criar página frontend Trash.tsx com abas (Negociações/Contatos), busca, restauração e exclusão permanente (admin)
 - [x] Registrar rota /trash no App.tsx e link Lixeira no menu lateral (CRM)
 - [x] Testes validados (bulkDelete.test.ts - 8 testes passando)
+## Exclusão Automática da Lixeira (30 dias) + Contagem de Dias
+- [x] Analisar schema (deletedAt) e scheduler pattern existente
+- [x] Criar scheduler trashAutoPurge para hard-delete após 30 dias (execução diária)
+- [x] Atualizar Trash.tsx para exibir coluna "Expira em" com badge colorido por urgência
+- [x] Atualizar banner informativo sobre exclusão automática após 30 dias
+- [x] Escrever testes vitest (6 testes passando)
