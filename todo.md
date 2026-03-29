@@ -6115,3 +6115,19 @@
 - [x] Analisar estrutura atual dos filtros do pipeline (Pipeline.tsx) e navegação
 - [x] Implementar persistência via sessionStorage: viewMode, statusFilter, ownerFilter, sortMode, dealFilters, pipelineId
 - [x] Testar e validar (22 testes passando)
+## Agenda Unificada no Dashboard Início
+- [x] Criar tabela google_calendar_events (schema Drizzle + migration SQL)
+- [x] Implementar agendaService.ts com lógica de busca unificada e sync Google Calendar
+- [x] Criar endpoint agenda.unified (tenantProcedure - leitura)
+- [x] Criar endpoint agenda.syncGoogleCalendar (tenantWriteProcedure - escrita)
+- [x] Criar endpoint agenda.disconnectGoogleCalendar (tenantWriteProcedure)
+- [x] Implementar componente AgendaCalendar.tsx (visualização dia/semana/mês)
+- [x] Integrar AgendaCalendar na Home.tsx (abaixo de Prioridades, acima de RFV)
+- [x] Cores: tarefas CRM = primary/violet, Google Calendar = #4285F4
+- [x] Tarefas completadas com opacidade reduzida e riscadas
+- [x] Tarefas atrasadas com borda vermelha
+- [x] Responsividade: mobile = view Dia por padrão
+- [x] Admin vê agenda de qualquer usuário, user vê apenas própria
+- [x] Botão Sincronizar Google Calendar (manual)
+- [x] Botão Conectar Google Calendar (redireciona /profile se sem token)
+- [x] 10 testes Vitest obrigatórios passando

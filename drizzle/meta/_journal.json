@@ -141,6 +141,13 @@
       "when": 1774723805352,
       "tag": "0074_deep_rattler",
       "breakpoints": true
+    },
+    {
+      "idx": 75,
+      "version": "5",
+      "when": 1774787539362,
+      "tag": "0075_chunky_junta",
+      "breakpoints": true
     }
   ]
 }

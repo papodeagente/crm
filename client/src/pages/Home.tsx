@@ -26,6 +26,7 @@ import {
   DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent,
 } from "@/components/ui/dropdown-menu";
 import TrialCountdownBanner from "@/components/TrialCountdownBanner";
+import AgendaCalendar from "@/components/AgendaCalendar";
 
 /* ─── Polling interval for real-time sync (60 seconds) ─── */
 const REFETCH_INTERVAL = 60_000;
@@ -941,7 +942,10 @@ export default function Home() {
         </section>
       </div>
 
-
+      {/* ═══════════════════════════════════════════════════
+          BLOCO 4 — AGENDA UNIFICADA
+          ═════════════════════════════════════════════════ */}
+      <AgendaCalendar filterUserId={execFilterInput?.userId} filterTeamId={execFilterInput?.teamId} />
 
       {/* ═══════════════════════════════════════════════════
           BLOCO 5 — CHECKLIST DIDÁTICO DE ONBOARDING

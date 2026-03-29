@@ -2454,3 +2454,34 @@ export const addonOfferCodes = mysqlTable("addon_offer_codes", {
 
 export type AddonOfferCode = typeof addonOfferCodes.$inferSelect;
 export type InsertAddonOfferCode = typeof addonOfferCodes.$inferInsert;
+
+// ════════════════════════════════════════════════════════════
+// GOOGLE CALENDAR EVENTS (synced from Google Calendar API)
+// ════════════════════════════════════════════════════════════
+
+export const googleCalendarEvents = mysqlTable("google_calendar_events", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  userId: int("userId").notNull(),
+  googleEventId: varchar("googleEventId", { length: 512 }).notNull(),
+  title: varchar("title", { length: 500 }).notNull(),
+  description: text("description"),
+  startAt: timestamp("startAt").notNull(),
+  endAt: timestamp("endAt").notNull(),
+  allDay: boolean("allDay").default(false),
+  location: varchar("location", { length: 500 }),
+  status: varchar("status", { length: 50 }).default("confirmed"),
+  htmlLink: varchar("htmlLink", { length: 1000 }),
+  sourceCalendarId: varchar("sourceCalendarId", { length: 500 }),
+  rawJson: json("rawJson"),
+  syncedAt: timestamp("syncedAt").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (t) => [
+  uniqueIndex("idx_gcal_tenant_user_event").on(t.tenantId, t.userId, t.googleEventId),
+  index("idx_gcal_tenant_user_range").on(t.tenantId, t.userId, t.startAt, t.endAt),
+  index("idx_gcal_tenant_range").on(t.tenantId, t.startAt, t.endAt),
+]);
+
+export type GoogleCalendarEvent = typeof googleCalendarEvents.$inferSelect;
+export type InsertGoogleCalendarEvent = typeof googleCalendarEvents.$inferInsert;

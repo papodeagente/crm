@@ -4110,6 +4110,42 @@ ${customInstructions ? `\n--- INSTRUÇÕES PERSONALIZADAS ---\n${customInstructi
     }),
   }),
 
+  // ─── Agenda Unificada (Home Calendar) ───
+  agenda: router({
+    unified: tenantProcedure
+      .input(z.object({
+        from: z.string(), // YYYY-MM-DD
+        to: z.string(),   // YYYY-MM-DD
+        userId: z.number().optional(),
+        teamId: z.number().optional(),
+      }))
+      .query(async ({ ctx, input }) => {
+        const { getUnifiedAgenda } = await import("./services/agendaService");
+        const isAdmin = ctx.saasUser?.role === "admin";
+        const userId = isAdmin ? input.userId : ctx.saasUser?.userId;
+        const teamId = isAdmin ? input.teamId : undefined;
+        return getUnifiedAgenda(getTenantId(ctx), { from: input.from, to: input.to, userId, teamId });
+      }),
+    syncGoogle: tenantWriteProcedure
+      .mutation(async ({ ctx }) => {
+        const { syncGoogleCalendar } = await import("./services/agendaService");
+        const userId = ctx.saasUser?.userId || ctx.user!.id;
+        return syncGoogleCalendar(getTenantId(ctx), userId);
+      }),
+    disconnectGoogle: tenantWriteProcedure
+      .mutation(async ({ ctx }) => {
+        const { disconnectGoogleCalendar } = await import("./services/agendaService");
+        const userId = ctx.saasUser?.userId || ctx.user!.id;
+        return disconnectGoogleCalendar(getTenantId(ctx), userId);
+      }),
+    googleStatus: tenantProcedure
+      .query(async ({ ctx }) => {
+        const { getGoogleCalendarStatus } = await import("./services/agendaService");
+        const userId = ctx.saasUser?.userId || ctx.user!.id;
+        return getGoogleCalendarStatus(getTenantId(ctx), userId);
+      }),
+  }),
+
   superAdminDash: superAdminDashRouter,
   superAdminPlans: superAdminPlansRouter,
   superAdminManagement: superAdminManagementRouter,
