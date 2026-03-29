@@ -22,10 +22,10 @@ export function StickyCTA({ onClick }: StickyCTAProps) {
   return (
     <div className="fixed bottom-0 left-0 right-0 z-50 md:hidden bg-[#0a0a12]/95 backdrop-blur-xl border-t border-white/[0.08] p-3 safe-area-bottom">
       <Button
-        className="w-full h-12 bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white font-semibold text-sm border-0 shadow-lg shadow-violet-500/25"
+        className="w-full h-12 bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white font-semibold text-sm border-0 shadow-lg shadow-violet-500/25 rounded-xl"
         onClick={onClick}
       >
-        Quero recuperar minhas vendas <ArrowRight className="w-4 h-4 ml-1.5" />
+        Testar grátis <ArrowRight className="w-4 h-4 ml-1.5" />
       </Button>
     </div>
   );

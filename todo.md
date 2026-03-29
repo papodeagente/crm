@@ -6194,3 +6194,25 @@
 - [x] Checklist: tenantWriteProcedure NÃO alterado
 - [x] Checklist: webhook Hotmart NÃO alterado
 - [x] Checklist: schema plan_definitions/plan_features atualizado (commercialCopy + displayOrder adicionados)
+## Reescrita da Landing Page (Copy Vendedora + Planos Dinâmicos)
+- [x] Analisar LandingPage atual, componentes landing, rotas e assets
+- [x] Criar/adaptar endpoint plans.public (publicProcedure, dados seguros)
+- [x] SEÇÃO 1: Hero com copy vendedora
+- [x] SEÇÃO 2: O Problema (3 cards)
+- [x] SEÇÃO 3: A Solução (ENTUR OS)
+- [x] SEÇÃO 4: Diferenciais (6 cards, id=como-funciona)
+- [x] SEÇÃO 5: Feito para Turismo (4 cards)
+- [x] SEÇÃO 6: Resultados (3 cards sem foto)
+- [x] SEÇÃO 7: Planos dinâmicos do banco + tabela comparativa
+- [x] SEÇÃO 8: CTA Final
+- [x] SEÇÃO 9: Footer (manter existente)
+- [x] Remover: simulador, vídeo em breve, depoimentos fictícios, planos hardcoded
+- [x] Design: fundo escuro, eyebrows accent, CTAs gradiente, cards bg-white/5
+- [x] Animações fade-in ao scroll (motion/react)
+- [x] Responsividade mobile-first
+- [x] 10 testes Vitest obrigatórios passando
+- [x] Checklist: billingAccessService NÃO alterado
+- [x] Checklist: tenantWriteProcedure NÃO alterado
+- [x] Checklist: webhook Hotmart NÃO alterado
+- [x] Checklist: shared/plans.ts mantido como fallback
+- [x] Checklist: nenhuma outra página alterada

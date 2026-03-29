@@ -1,15 +1,19 @@
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Play, Star } from "lucide-react";
+import { ArrowRight, Star } from "lucide-react";
 import { motion } from "motion/react";
 
 const MOCKUP_URL = "https://aceleradora.tur.br/teste/wp-content/uploads/2026/03/Captura-de-Tela-2026-03-22-as-13.21.01.png";
+const LOGO_URL = "https://d2xsxph8kpxj0f.cloudfront.net/310519663249817763/EKvcVicuVoUxTnzjSKzgdk/logo-light_c3efa809.webp";
 
 interface HeroSectionProps {
-  onCTA: () => void;
-  onDemo: () => void;
+  onRegister: () => void;
 }
 
-export function HeroSection({ onCTA, onDemo }: HeroSectionProps) {
+export function HeroSection({ onRegister }: HeroSectionProps) {
+  const scrollToComoFunciona = () => {
+    document.getElementById("como-funciona")?.scrollIntoView({ behavior: "smooth" });
+  };
+
   return (
     <section className="relative min-h-screen flex items-center overflow-hidden">
       {/* Background */}
@@ -30,7 +34,7 @@ export function HeroSection({ onCTA, onDemo }: HeroSectionProps) {
       <nav className="fixed top-0 left-0 right-0 z-50 bg-[#0a0a12]/70 backdrop-blur-2xl border-b border-white/[0.05]">
         <div className="max-w-7xl mx-auto px-5 sm:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center">
-            <img src="https://d2xsxph8kpxj0f.cloudfront.net/310519663249817763/EKvcVicuVoUxTnzjSKzgdk/logo-light_c3efa809.webp" alt="enturOS CRM" className="h-7 object-contain" />
+            <img src={LOGO_URL} alt="enturOS CRM" className="h-7 object-contain" />
           </div>
           <div className="hidden md:flex items-center gap-3">
             <Button
@@ -41,10 +45,10 @@ export function HeroSection({ onCTA, onDemo }: HeroSectionProps) {
               Entrar
             </Button>
             <Button
-              className="text-sm bg-white/10 hover:bg-white/15 text-white border border-white/10 backdrop-blur-sm"
-              onClick={onCTA}
+              className="text-sm bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white border-0"
+              onClick={onRegister}
             >
-              Acessar ENTUR OS
+              Testar grátis por 7 dias
             </Button>
           </div>
         </div>
@@ -61,37 +65,39 @@ export function HeroSection({ onCTA, onDemo }: HeroSectionProps) {
           >
             <div className="inline-flex items-center gap-2 bg-violet-500/10 text-violet-300 px-4 py-1.5 rounded-full text-sm font-medium mb-6 border border-violet-500/15">
               <span className="w-1.5 h-1.5 bg-violet-400 rounded-full animate-pulse" />
-              Sistema operacional para agências de viagens
+              Criado pela Escola de Negócios do Turismo
             </div>
 
             <h1 className="text-4xl sm:text-5xl lg:text-[3.5rem] font-bold leading-[1.1] mb-6 tracking-tight text-white">
-              A maioria das agências{" "}
+              Sua agência perde vendas{" "}
               <span className="bg-gradient-to-r from-violet-400 via-purple-400 to-fuchsia-400 bg-clip-text text-transparent">
-                perde vendas todos os dias.
+                toda semana.
               </span>{" "}
-              E nem percebe.
+              <br className="hidden sm:block" />
+              O problema não é preço.
             </h1>
 
             <p className="text-lg text-white/45 mb-8 leading-relaxed max-w-xl">
-              Clientes pedem orçamento, dizem que vão pensar e simplesmente desaparecem.
-              O problema não é preço. <span className="text-white/70 font-medium">É que a agência não consegue acompanhar todas as negociações.</span>
+              É não ter um processo comercial. Orçamentos somem no WhatsApp,
+              follow-ups não acontecem, e vendas morrem em silêncio.{" "}
+              <span className="text-white/70 font-medium">O ENTUR OS resolve isso.</span>
             </p>
 
             <div className="flex flex-col sm:flex-row gap-3 mb-8">
               <Button
                 size="lg"
-                className="h-14 px-8 text-base bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white border-0 shadow-xl shadow-violet-500/20 transition-all duration-300 hover:shadow-violet-500/30 hover:scale-[1.02]"
-                onClick={onCTA}
+                className="h-14 px-8 text-base bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white border-0 shadow-xl shadow-violet-500/20 transition-all duration-300 hover:shadow-violet-500/30 hover:scale-[1.02] rounded-xl"
+                onClick={onRegister}
               >
-                Quero ver como funciona <ArrowRight className="w-5 h-5 ml-2" />
+                Testar grátis por 7 dias <ArrowRight className="w-5 h-5 ml-2" />
               </Button>
               <Button
                 size="lg"
                 variant="outline"
-                className="h-14 px-6 text-base border-white/10 text-white/70 hover:bg-white/5 hover:text-white bg-transparent"
-                onClick={onDemo}
+                className="h-14 px-6 text-base border-white/10 text-white/70 hover:bg-white/5 hover:text-white bg-transparent rounded-xl"
+                onClick={scrollToComoFunciona}
               >
-                <Play className="w-4 h-4 mr-2 fill-current" /> Assistir demonstração
+                Ver como funciona
               </Button>
             </div>
 
@@ -114,7 +120,7 @@ export function HeroSection({ onCTA, onDemo }: HeroSectionProps) {
                   ))}
                 </div>
                 <p className="text-xs text-white/40">
-                  <span className="text-white/60 font-medium">+8.000 agentes</span> treinados pela Escola de Negócios do Turismo
+                  Mais de <span className="text-white/60 font-medium">8.000 agentes</span> treinados pela Escola de Negócios do Turismo
                 </p>
               </div>
             </div>
@@ -138,7 +144,7 @@ export function HeroSection({ onCTA, onDemo }: HeroSectionProps) {
                 </div>
                 <img
                   src={MOCKUP_URL}
-                  alt="ENTUR OS - Dashboard"
+                  alt="ENTUR OS - Pipeline de Vendas"
                   className="w-full"
                   loading="eager"
                 />

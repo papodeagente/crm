@@ -1,83 +1,54 @@
 import { useEffect } from "react";
 import { useLocation } from "wouter";
 import { HeroSection } from "@/components/landing/HeroSection";
-import { EnemySection } from "@/components/landing/EnemySection";
-import { RevelationSection } from "@/components/landing/RevelationSection";
+import { ProblemSection } from "@/components/landing/ProblemSection";
 import { SolutionSection } from "@/components/landing/SolutionSection";
-import { HowItWorks } from "@/components/landing/HowItWorks";
-import { SocialProof } from "@/components/landing/SocialProof";
-import { DifferentiatorSection } from "@/components/landing/DifferentiatorSection";
-import { DemoSection } from "@/components/landing/DemoSection";
+import { DifferentialsSection } from "@/components/landing/DifferentialsSection";
+import { TourismSection } from "@/components/landing/TourismSection";
+import { ResultsSection } from "@/components/landing/ResultsSection";
 import { PricingSection } from "@/components/landing/PricingSection";
-import { SectionCTA } from "@/components/landing/SectionCTA";
+import { FinalCTA } from "@/components/landing/FinalCTA";
 import { StickyCTA } from "@/components/landing/StickyCTA";
-import { SalesSimulator } from "@/components/landing/SalesSimulator";
 
 export default function Landing() {
   const [, navigate] = useLocation();
 
   useEffect(() => {
-    document.title = "Entur OS";
+    document.title = "Entur OS — CRM para Agências de Viagens";
   }, []);
-
-  const scrollToPlanos = () => {
-    document.getElementById("planos")?.scrollIntoView({ behavior: "smooth" });
-  };
 
   const goToRegister = (plan?: string) => {
     navigate(plan ? `/register?plan=${plan}` : "/register");
   };
 
-  const scrollToDemo = () => {
-    document.getElementById("demo")?.scrollIntoView({ behavior: "smooth" });
-  };
-
   return (
     <div className="min-h-screen bg-[#0a0a12] text-white overflow-x-hidden">
-      {/* 1. Hero */}
-      <HeroSection onCTA={scrollToPlanos} onDemo={scrollToDemo} />
+      {/* SEÇÃO 1 — Hero */}
+      <HeroSection onRegister={() => goToRegister()} />
 
-      {/* Simulador simples */}
-      <SalesSimulator onCTA={scrollToPlanos} />
+      {/* SEÇÃO 2 — O Problema */}
+      <ProblemSection />
 
-      {/* CTA between sections */}
-      <SectionCTA text="Quero organizar minhas vendas" onClick={scrollToPlanos} variant="secondary" />
-
-      {/* 2. Seção do Inimigo */}
-      <EnemySection />
-
-      {/* 3. Seção de Revelação */}
-      <RevelationSection />
-
-      {/* CTA between sections */}
-      <SectionCTA text="Quero ver como funciona o ENTUR OS" onClick={scrollToPlanos} />
-
-      {/* 4. Introdução da Solução */}
+      {/* SEÇÃO 3 — A Solução */}
       <SolutionSection />
 
-      {/* 5. Como Funciona */}
-      <HowItWorks />
+      {/* SEÇÃO 4 — Diferenciais (id=como-funciona) */}
+      <DifferentialsSection onRegister={() => goToRegister()} />
 
-      {/* CTA between sections */}
-      <SectionCTA text="Quero estruturar meu processo comercial" onClick={scrollToPlanos} variant="secondary" />
+      {/* SEÇÃO 5 — Feito para Turismo */}
+      <TourismSection />
 
-      {/* 6. Prova Social */}
-      <SocialProof />
+      {/* SEÇÃO 6 — Resultados */}
+      <ResultsSection />
 
-      {/* 7. Diferencial */}
-      <DifferentiatorSection />
-
-      {/* CTA between sections */}
-      <SectionCTA text="Quero um sistema feito para turismo" onClick={scrollToPlanos} />
-
-      {/* 8. Demonstração */}
-      <DemoSection />
-
-      {/* 9. Planos e Preços */}
+      {/* SEÇÃO 7 — Planos (dinâmicos do banco) */}
       <PricingSection onSelectPlan={goToRegister} />
 
+      {/* SEÇÃO 8 — CTA Final + Footer */}
+      <FinalCTA onRegister={() => goToRegister()} />
+
       {/* Sticky CTA Mobile */}
-      <StickyCTA onClick={scrollToPlanos} />
+      <StickyCTA onClick={() => goToRegister()} />
     </div>
   );
 }

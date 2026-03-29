@@ -4114,6 +4114,11 @@ ${customInstructions ? `\n--- INSTRUÇÕES PERSONALIZADAS ---\n${customInstructi
       const plans = await getPublicPlans();
       return { plans, featureDescriptions: getFeatureDescriptions() };
     }),
+    /** Endpoint público seguro para landing page — sem IDs internos nem dados de billing */
+    public: publicProcedure.query(async () => {
+      const { getPublicPlans } = await import("./services/publicPlansService");
+      return getPublicPlans();
+    }),
   }),
 
   // ─── Agenda Unificada (Home Calendar) ───

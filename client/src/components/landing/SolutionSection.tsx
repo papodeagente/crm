@@ -1,11 +1,11 @@
 import { FadeIn } from "./FadeIn";
-import { Sparkles } from "lucide-react";
 
+const LOGO_URL = "https://d2xsxph8kpxj0f.cloudfront.net/310519663249817763/EKvcVicuVoUxTnzjSKzgdk/logo-light_c3efa809.webp";
 const MOCKUP_URL = "https://aceleradora.tur.br/teste/wp-content/uploads/2026/03/ChatGPT-Image-22-de-mar.-de-2026-14_07_25.png";
 
 export function SolutionSection() {
   return (
-    <section className="py-20 sm:py-28 px-5 sm:px-8 relative overflow-hidden">
+    <section className="py-24 sm:py-32 px-5 sm:px-8 relative overflow-hidden">
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[600px] bg-gradient-to-r from-violet-600/10 via-purple-600/8 to-indigo-600/10 rounded-full blur-[120px]" />
       </div>
@@ -13,17 +13,21 @@ export function SolutionSection() {
       <div className="max-w-5xl mx-auto relative z-10">
         <FadeIn>
           <div className="text-center mb-12">
-            <div className="inline-flex items-center gap-2 bg-emerald-500/10 text-emerald-300 px-4 py-1.5 rounded-full text-sm font-medium mb-5 border border-emerald-500/15">
-              <Sparkles className="w-4 h-4" />
+            <p className="text-sm font-medium text-violet-400 uppercase tracking-wider mb-5">
               A solução
-            </div>
+            </p>
             <img
-              src="https://d2xsxph8kpxj0f.cloudfront.net/310519663249817763/EKvcVicuVoUxTnzjSKzgdk/logo-light_c3efa809.webp"
+              src={LOGO_URL}
               alt="ENTUR OS"
-              className="h-12 sm:h-14 lg:h-16 object-contain mx-auto mb-4"
+              className="h-12 sm:h-14 lg:h-16 object-contain mx-auto mb-5"
             />
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white tracking-tight leading-tight mb-4">
+              CRM de verdade para agências de viagens.
+            </h2>
             <p className="text-lg text-white/45 max-w-2xl mx-auto leading-relaxed">
-              O sistema operacional que organiza vendas, WhatsApp, pós-venda e inteligência comercial da sua agência em um só lugar.
+              Funil de vendas, WhatsApp integrado, automação comercial
+              e inteligência de dados — tudo num sistema feito exclusivamente
+              para turismo.
             </p>
           </div>
         </FadeIn>
