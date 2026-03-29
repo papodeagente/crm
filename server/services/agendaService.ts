@@ -209,17 +209,18 @@ export async function getUnifiedAgenda(
   const apptIds = (apptRows as unknown as any[]).map((a: any) => a.id);
   let participantsMap: Record<number, Array<{ userId: number; name: string }>> = {};
   if (apptIds.length > 0) {
-    const idList = apptIds.join(",");
-    const [partRows] = await db.execute(sql.raw(`
+    // Build safe IN clause with individual sql params
+    const inClause = apptIds.map((_: any, i: number) => i === 0 ? sql`${apptIds[0]}` : sql`${apptIds[i]}`).reduce((acc: any, v: any) => sql`${acc}, ${v}`);
+    const [partRows] = await db.execute(sql`
       SELECT cap.appointmentId, cap.userId, COALESCE(su.name, u.name, 'Usuário') AS name
       FROM crm_appointment_participants cap
       LEFT JOIN crm_users su ON su.userId = cap.userId AND su.tenantId = ${tenantId}
       LEFT JOIN users u ON u.id = cap.userId
-      WHERE cap.appointmentId IN (${idList})
-    `));
+      WHERE cap.appointmentId IN (${inClause})
+    `);
     for (const row of (partRows as unknown as any[])) {
       if (!participantsMap[row.appointmentId]) participantsMap[row.appointmentId] = [];
-      participantsMap[row.appointmentId].push({ userId: row.userId, name: row.name });
+      participantsMap[row.appointmentId].push({ userId: Number(row.userId), name: row.name });
     }
   }
 

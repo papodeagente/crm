@@ -6165,3 +6165,14 @@
 - [x] UI: seletor de participantes no modal de compromisso (busca usuários da tenant)
 - [x] UI: exibir avatares/nomes dos participantes no pill do compromisso
 - [x] Testes Vitest atualizados (30 testes passando)
+## Bugs + Redesign UX Premium da Agenda
+- [x] BUG: Tarefas CRM não aparecem no calendário (era erro na query de participantes que crashava toda a unified)
+- [x] BUG: Compromissos criados não aparecem no calendário (mesmo bug - sql.raw sem params)
+- [x] Diagnosticar queries do agendaService (unified, createAppointment)
+- [x] Corrigir queries de tarefas e compromissos no backend
+- [x] Redesign UX premium do AgendaCalendar (legibilidade, performance, design)
+- [x] View Dia: timeline real com slots de hora, indicador de hora atual, blocos de evento
+- [x] View Semana: grid 7 colunas com eventos compactos e hoje destacado
+- [x] View Mês: barras coloridas com borda lateral, +N overflow
+- [x] Performance: staleTime, refetchInterval, useMemo, useCallback
+- [x] Testes Vitest atualizados para redesign (30 testes passando)
