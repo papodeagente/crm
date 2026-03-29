@@ -6178,3 +6178,19 @@
 - [x] Testes Vitest atualizados para redesign (30 testes passando)
 ## Remover Agenda da Tela Início
 - [x] Remover AgendaCalendar da Home.tsx
+## Planos Dinâmicos do Banco de Dados (plan_definitions + plan_features)
+- [x] FASE 1: Criar server/services/dynamicPlanService.ts (cache TTL 5min, fallback shared/plans.ts)
+- [x] FASE 2: Refatorar planLimitsService.ts para usar dynamicPlanService (mesmas assinaturas)
+- [x] FASE 3: Criar endpoint plans.active (publicProcedure, leitura pública)
+- [x] FASE 4: Adicionar invalidatePlanCache() nos endpoints SuperAdmin de CRUD de planos (create, update, setFeature)
+- [x] FASE 5.1: Landing Page (PricingSection) consome planos do banco
+- [x] FASE 5.2: Página /upgrade consome planos do banco
+- [x] FASE 5.3: SaasRegister.tsx — não importa shared/plans, já ok
+- [x] FASE 5.4: BillingBanner.tsx — não importa shared/plans, já ok
+- [x] FASE 5.5: UpgradeModal.tsx consome planos do banco
+- [x] FASE 6: Manter shared/plans.ts como fallback com comentário explicativo
+- [x] 12 testes Vitest obrigatórios passando
+- [x] Checklist: billingAccessService.ts NÃO alterado
+- [x] Checklist: tenantWriteProcedure NÃO alterado
+- [x] Checklist: webhook Hotmart NÃO alterado
+- [x] Checklist: schema plan_definitions/plan_features atualizado (commercialCopy + displayOrder adicionados)

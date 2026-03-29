@@ -19,6 +19,7 @@ import {
 import { verifySaasSession, isSuperAdminAsync, SAAS_COOKIE } from "../saasAuth";
 import { emitEvent } from "../middleware/eventLog";
 import { getEffectiveEntitlement } from "../services/planEntitlementService";
+import { invalidatePlanCache } from "../services/dynamicPlanService";
 
 // ─── Cookie parser ─────────────────────────────────────────────────
 function parseCookies(cookieHeader?: string): Map<string, string> {
@@ -152,6 +153,7 @@ export const superAdminPlansRouter = router({
         }));
         await db.insert(planFeatures).values(featureSeeds);
 
+        invalidatePlanCache();
         return { id: newPlan.id, slug: input.slug };
       }),
 
@@ -201,6 +203,7 @@ export const superAdminPlansRouter = router({
         if (input.isPublic !== undefined) updateData.isPublic = input.isPublic;
 
         await db.update(planDefinitions).set(updateData).where(eq(planDefinitions.id, input.planId));
+        invalidatePlanCache();
         return { success: true };
       }),
 
@@ -251,6 +254,7 @@ export const superAdminPlansRouter = router({
           afterJson: { planId: input.planId, featureKey: input.featureKey, isEnabled: input.isEnabled, limitValue: input.limitValue },
         });
 
+        invalidatePlanCache();
         return { success: true };
       }),
 

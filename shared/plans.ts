@@ -1,6 +1,13 @@
 /**
- * Definição centralizada dos planos do ENTUR OS.
- * Usado tanto no frontend (limites, labels) quanto no backend (enforcement).
+ * FALLBACK ESTÁTICO — Definição centralizada dos planos do ENTUR OS.
+ *
+ * IMPORTANTE: O sistema agora consome planos dinamicamente do banco de dados
+ * via `server/services/dynamicPlanService.ts`. Este arquivo serve apenas como
+ * FALLBACK caso o banco esteja vazio ou inacessível.
+ *
+ * Para alterar planos, use o painel SuperAdmin > Gestão de Planos.
+ * As alterações no banco são refletidas automaticamente em todo o sistema
+ * (cache TTL 5min, invalidado imediatamente após CRUD no SuperAdmin).
  *
  * Nomenclatura comercial:
  *   Essencial (id: "start")  → estrutura e controle para começar

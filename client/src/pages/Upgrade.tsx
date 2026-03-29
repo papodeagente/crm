@@ -1,75 +1,90 @@
+import { useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useLocation } from "wouter";
-import { Plane, Lock, Check, ArrowRight, Crown, Building2, Zap, Rocket, Clock, ExternalLink, MessageSquare, Target, Headphones, Users } from "lucide-react";
+import { Plane, Lock, Check, ArrowRight, Crown, Building2, Zap, Rocket, Clock, ExternalLink, MessageSquare, Loader2 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
-import { PLANS, PLAN_ORDER, FEATURE_DESCRIPTIONS, type PlanId, type PlanFeatures } from "../../../shared/plans";
 
 const SCALE_WHATSAPP_URL = "https://wa.me/551151982627?text=Quero%20conhecer%20o%20Plano%20Elite%20do%20Entur%20OS.%20Pode%20me%20ajudar%3F";
 
-const planIcons: Record<PlanId, any> = {
-  start: Zap,
-  growth: Rocket,
-  scale: Building2,
-};
+// ─── Types ───
+interface DynamicPlan {
+  id: string;
+  dbId: number;
+  name: string;
+  description: string;
+  commercialCopy: string;
+  priceInCents: number;
+  billingCycle: string;
+  isActive: boolean;
+  isPublic: boolean;
+  hotmartOfferCode: string | null;
+  displayOrder: number;
+  maxUsers: number;
+  maxWhatsAppAccounts: number;
+  maxAttendantsPerAccount: number;
+  features: Record<string, boolean>;
+}
 
-const planColors: Record<PlanId, { border: string; bg: string; text: string; badge: string; btn: string }> = {
-  start: {
+// ─── Styling per plan index ───
+const planIconsByIndex = [Zap, Rocket, Building2];
+const planColorsByIndex = [
+  {
     border: "border-purple-500/30",
     bg: "bg-purple-500/15",
     text: "text-purple-400",
     badge: "bg-purple-500/15 text-purple-400",
     btn: "bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-500 hover:to-purple-600 shadow-lg shadow-purple-900/30",
   },
-  growth: {
+  {
     border: "border-violet-500/40",
     bg: "bg-violet-500/15",
     text: "text-violet-400",
     badge: "bg-violet-500/15 text-violet-400",
     btn: "bg-gradient-to-r from-violet-600 to-violet-700 hover:from-violet-500 hover:to-violet-600 shadow-lg shadow-violet-900/30",
   },
-  scale: {
+  {
     border: "border-amber-500/30",
     bg: "bg-amber-500/15",
     text: "text-amber-400",
     badge: "bg-amber-500/15 text-amber-400",
     btn: "bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 shadow-lg shadow-amber-900/30",
   },
+];
+
+const COMPARISON_FEATURE_KEYS = [
+  { key: "crmCore", label: "CRM completo" },
+  { key: "communityAccess", label: "Comunidade Acelera Turismo" },
+  { key: "whatsappEmbedded", label: "WhatsApp integrado" },
+  { key: "segmentedBroadcast", label: "Disparo segmentado" },
+  { key: "rfvEnabled", label: "Matriz RFV" },
+  { key: "salesAutomation", label: "Automação de vendas" },
+  { key: "prioritySupport", label: "Suporte prioritário" },
+];
+
+// Hotmart checkout URLs mapped by plan slug
+const hotmartUrls: Record<string, string> = {
+  start: "https://pay.hotmart.com/S104799458W?off=axm3bvsz",
+  growth: "https://pay.hotmart.com/S104799458W?off=pubryjat",
+  scale: "",
 };
 
-function getFeatureList(planId: PlanId): string[] {
-  const plan = PLANS[planId];
+function getFeatureList(plan: DynamicPlan): string[] {
   const items: string[] = [];
-
-  // Users
-  items.push(plan.maxUsers === 1 ? "1 usuário" : `Até ${plan.maxUsers} usuários`);
-
-  // WhatsApp
+  items.push(plan.maxUsers === 1 ? "1 usuário" : plan.maxUsers === -1 ? "Usuários ilimitados" : `Até ${plan.maxUsers} usuários`);
   if (plan.features.whatsappEmbedded) {
     items.push(`WhatsApp integrado (${plan.maxAttendantsPerAccount} atendentes)`);
   } else {
     items.push("Sem WhatsApp integrado");
   }
-
-  // CRM
   items.push("CRM completo (contatos, negociações, funil, tarefas)");
-
-  // Features específicas
   if (plan.features.segmentedBroadcast) items.push("Disparo segmentado de mensagens");
   if (plan.features.rfvEnabled) items.push("Classificação Estratégica (Matriz RFV)");
   if (plan.features.salesAutomation) items.push("Central de Automação de vendas");
   if (plan.features.prioritySupport) items.push("Suporte prioritário");
   if (plan.features.communityAccess) items.push("Comunidade Acelera Turismo");
-
   return items;
 }
-
-// Hotmart checkout URLs
-const hotmartUrls: Record<PlanId, string> = {
-  start: "https://pay.hotmart.com/S104799458W?off=axm3bvsz",
-  growth: "https://pay.hotmart.com/S104799458W?off=pubryjat",
-  scale: "",
-};
 
 export default function Upgrade() {
   const [, navigate] = useLocation();
@@ -79,10 +94,27 @@ export default function Upgrade() {
     staleTime: 5 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
   });
+  const plansQuery = trpc.plan.active.useQuery(undefined, {
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
+
   const billing = billingQuery.data;
   const isRestricted = billing?.level === "restricted";
   const isTrialing = billing?.billingStatus === "trialing";
   const currentPlan = billing?.plan || "start";
+
+  const plans = useMemo(() => plansQuery.data?.plans ?? [], [plansQuery.data]);
+  const featureDescriptions = useMemo(() => plansQuery.data?.featureDescriptions ?? {}, [plansQuery.data]);
+
+  if (plansQuery.isLoading) {
+    return (
+      <div className="min-h-screen bg-[#0a0a12] flex items-center justify-center">
+        <Loader2 className="w-8 h-8 text-violet-400 animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#0a0a12] flex flex-col items-center justify-center p-4">
@@ -141,18 +173,21 @@ export default function Upgrade() {
         </div>
 
         {/* Plans */}
-        <div className="grid md:grid-cols-3 gap-5">
-          {PLAN_ORDER.map((planId) => {
-            const plan = PLANS[planId];
-            const isCurrent = currentPlan === planId;
-            const isPopular = planId === "growth";
-            const PlanIcon = planIcons[planId];
-            const colors = planColors[planId];
-            const features = getFeatureList(planId);
+        <div className={`grid ${plans.length === 2 ? "md:grid-cols-2 max-w-3xl mx-auto" : "md:grid-cols-3"} gap-5`}>
+          {plans.map((plan: DynamicPlan, idx: number) => {
+            const isCurrent = currentPlan === plan.id;
+            const isPopular = idx === 1 && plans.length >= 3;
+            const PlanIcon = planIconsByIndex[Math.min(idx, planIconsByIndex.length - 1)];
+            const colors = planColorsByIndex[Math.min(idx, planColorsByIndex.length - 1)];
+            const features = getFeatureList(plan);
+            const isContactOnly = plan.priceInCents === 0;
+            const checkoutUrl = plan.hotmartOfferCode
+              ? `https://pay.hotmart.com/S104799458W?off=${plan.hotmartOfferCode}`
+              : hotmartUrls[plan.id] || "";
 
             return (
               <Card
-                key={planId}
+                key={plan.id}
                 className={`${isPopular ? `border-2 ${colors.border} shadow-xl shadow-violet-900/10` : `border border-gray-800 shadow-lg shadow-black/20`} bg-[#12121e] relative overflow-hidden`}
               >
                 {isPopular && (
@@ -176,7 +211,7 @@ export default function Upgrade() {
                     )}
                   </div>
                   <div className="flex items-baseline gap-1">
-                    {plan.priceInCents > 0 ? (
+                    {!isContactOnly ? (
                       <>
                         <span className="text-3xl font-bold text-white">R${(plan.priceInCents / 100).toFixed(0)}</span>
                         <span className="text-gray-500">/mês</span>
@@ -198,7 +233,7 @@ export default function Upgrade() {
                       </div>
                     ))}
                   </div>
-                  {planId === "scale" ? (
+                  {isContactOnly ? (
                     <Button
                       variant="outline"
                       className="w-full h-10 border-amber-500/30 text-amber-300 hover:bg-amber-900/20 hover:text-amber-200 font-medium"
@@ -210,7 +245,10 @@ export default function Upgrade() {
                   ) : (
                     <Button
                       className={`w-full h-10 text-white font-medium ${colors.btn}`}
-                      onClick={() => window.open(hotmartUrls[planId], "_blank")}
+                      onClick={() => {
+                        if (checkoutUrl) window.open(checkoutUrl, "_blank");
+                        else navigate("/upgrade");
+                      }}
                     >
                       {isCurrent ? "Renovar assinatura" : "Assinar agora"} <ArrowRight className="w-4 h-4 ml-2" />
                     </Button>
@@ -222,61 +260,65 @@ export default function Upgrade() {
         </div>
 
         {/* Comparison table */}
-        <div className="mt-12 bg-[#12121e] border border-gray-800 rounded-xl p-6 overflow-x-auto">
-          <h2 className="text-xl font-bold text-white mb-6 text-center">Compare os planos</h2>
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-gray-800">
-                <th className="text-left py-3 px-2 text-gray-400 font-medium">Recurso</th>
-                {PLAN_ORDER.map(id => (
-                  <th key={id} className="text-center py-3 px-2 text-gray-300 font-semibold">
-                    {PLANS[id].name}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              <tr className="border-b border-gray-800/50">
-                <td className="py-3 px-2 text-gray-300">Usuários</td>
-                {PLAN_ORDER.map(id => (
-                  <td key={id} className="text-center py-3 px-2 text-gray-400">
-                    {PLANS[id].maxUsers === -1 ? "Ilimitado" : PLANS[id].maxUsers}
-                  </td>
-                ))}
-              </tr>
-              <tr className="border-b border-gray-800/50">
-                <td className="py-3 px-2 text-gray-300">Atendentes WhatsApp</td>
-                {PLAN_ORDER.map(id => (
-                  <td key={id} className="text-center py-3 px-2 text-gray-400">
-                    {PLANS[id].maxAttendantsPerAccount === 0 ? "—" : PLANS[id].maxAttendantsPerAccount}
-                  </td>
-                ))}
-              </tr>
-              <tr className="border-b border-gray-800/50">
-                <td className="py-3 px-2 text-gray-300">Preço</td>
-                {PLAN_ORDER.map(id => (
-                  <td key={id} className="text-center py-3 px-2 text-white font-semibold">
-                    {PLANS[id].priceInCents > 0 ? `R$${(PLANS[id].priceInCents / 100).toFixed(0)}/mês` : "Sob consulta"}
-                  </td>
-                ))}
-              </tr>
-              {(Object.keys(FEATURE_DESCRIPTIONS) as (keyof PlanFeatures)[]).map(featureKey => (
-                <tr key={featureKey} className="border-b border-gray-800/50">
-                  <td className="py-3 px-2 text-gray-300">{FEATURE_DESCRIPTIONS[featureKey].title}</td>
-                  {PLAN_ORDER.map(id => (
-                    <td key={id} className="text-center py-3 px-2">
-                      {PLANS[id].features[featureKey] ? (
-                        <Check className="w-4 h-4 text-emerald-400 mx-auto" />
-                      ) : (
-                        <span className="text-gray-600">—</span>
-                      )}
+        {plans.length > 0 && (
+          <div className="mt-12 bg-[#12121e] border border-gray-800 rounded-xl p-6 overflow-x-auto">
+            <h2 className="text-xl font-bold text-white mb-6 text-center">Compare os planos</h2>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-800">
+                  <th className="text-left py-3 px-2 text-gray-400 font-medium">Recurso</th>
+                  {plans.map((p: DynamicPlan) => (
+                    <th key={p.id} className="text-center py-3 px-2 text-gray-300 font-semibold">
+                      {p.name}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                <tr className="border-b border-gray-800/50">
+                  <td className="py-3 px-2 text-gray-300">Usuários</td>
+                  {plans.map((p: DynamicPlan) => (
+                    <td key={p.id} className="text-center py-3 px-2 text-gray-400">
+                      {p.maxUsers === -1 ? "Ilimitado" : p.maxUsers}
                     </td>
                   ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                <tr className="border-b border-gray-800/50">
+                  <td className="py-3 px-2 text-gray-300">Atendentes WhatsApp</td>
+                  {plans.map((p: DynamicPlan) => (
+                    <td key={p.id} className="text-center py-3 px-2 text-gray-400">
+                      {p.maxAttendantsPerAccount === 0 ? "—" : p.maxAttendantsPerAccount}
+                    </td>
+                  ))}
+                </tr>
+                <tr className="border-b border-gray-800/50">
+                  <td className="py-3 px-2 text-gray-300">Preço</td>
+                  {plans.map((p: DynamicPlan) => (
+                    <td key={p.id} className="text-center py-3 px-2 text-white font-semibold">
+                      {p.priceInCents > 0 ? `R$${(p.priceInCents / 100).toFixed(0)}/mês` : "Sob consulta"}
+                    </td>
+                  ))}
+                </tr>
+                {COMPARISON_FEATURE_KEYS.map((row) => (
+                  <tr key={row.key} className="border-b border-gray-800/50">
+                    <td className="py-3 px-2 text-gray-300">
+                      {(featureDescriptions as any)[row.key]?.title || row.label}
+                    </td>
+                    {plans.map((p: DynamicPlan) => (
+                      <td key={p.id} className="text-center py-3 px-2">
+                        {p.features[row.key] ? (
+                          <Check className="w-4 h-4 text-emerald-400 mx-auto" />
+                        ) : (
+                          <span className="text-gray-600">—</span>
+                        )}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
 
         {/* Info text */}
         <div className="text-center mt-6 space-y-2">

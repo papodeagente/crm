@@ -4108,6 +4108,12 @@ ${customInstructions ? `\n--- INSTRUÇÕES PERSONALIZADAS ---\n${customInstructi
       const { canAddUser } = await import("./services/planLimitsService");
       return canAddUser(getTenantId(ctx));
     }),
+    /** Retorna todos os planos ativos e públicos (do banco com cache, ou fallback estático) */
+    active: publicProcedure.query(async () => {
+      const { getPublicPlans, getFeatureDescriptions } = await import("./services/dynamicPlanService");
+      const plans = await getPublicPlans();
+      return { plans, featureDescriptions: getFeatureDescriptions() };
+    }),
   }),
 
   // ─── Agenda Unificada (Home Calendar) ───

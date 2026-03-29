@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { FadeIn } from "./FadeIn";
-import { Check, ArrowRight, X, MessageSquare, Crown } from "lucide-react";
-import { PLANS, PLAN_ORDER, FEATURE_DESCRIPTIONS, type PlanId, type PlanFeatures } from "../../../../shared/plans";
+import { Check, ArrowRight, X, MessageSquare, Crown, Loader2 } from "lucide-react";
+import { trpc } from "@/lib/trpc";
 
 const SCALE_WHATSAPP_URL = "https://wa.me/551151982627?text=Quero%20conhecer%20o%20Plano%20Elite%20do%20Entur%20OS.%20Pode%20me%20ajudar%3F";
 
@@ -10,21 +10,131 @@ interface PricingSectionProps {
   onSelectPlan: (plan?: string) => void;
 }
 
-// Feature rows for comparison table
-const COMPARISON_ROWS: { label: string; key?: keyof PlanFeatures; type: "feature" | "limit"; getValue?: (planId: PlanId) => string }[] = [
-  { label: "CRM completo (contatos, negociações, funil, tarefas)", key: "crmCore", type: "feature" },
-  { label: "Comunidade Acelera Turismo", key: "communityAccess", type: "feature" },
-  { label: "Usuários", type: "limit", getValue: (id) => PLANS[id].maxUsers === -1 ? "Ilimitado" : `${PLANS[id].maxUsers}` },
-  { label: "WhatsApp integrado ao CRM", key: "whatsappEmbedded", type: "feature" },
-  { label: "Contas de WhatsApp", type: "limit", getValue: (id) => PLANS[id].maxWhatsAppAccounts === 0 ? "—" : `${PLANS[id].maxWhatsAppAccounts}` },
-  { label: "Atendentes por conta", type: "limit", getValue: (id) => PLANS[id].maxAttendantsPerAccount === 0 ? "—" : `${PLANS[id].maxAttendantsPerAccount}` },
-  { label: "Disparo segmentado de mensagens", key: "segmentedBroadcast", type: "feature" },
-  { label: "Matriz RFV (Classificação Estratégica)", key: "rfvEnabled", type: "feature" },
-  { label: "Automação de vendas", key: "salesAutomation", type: "feature" },
-  { label: "Suporte prioritário", key: "prioritySupport", type: "feature" },
+// ─── Types from dynamic plan service ─────────────────────────────
+interface DynamicPlan {
+  id: string;
+  dbId: number;
+  name: string;
+  description: string;
+  commercialCopy: string;
+  priceInCents: number;
+  billingCycle: string;
+  isActive: boolean;
+  isPublic: boolean;
+  hotmartOfferCode: string | null;
+  displayOrder: number;
+  maxUsers: number;
+  maxWhatsAppAccounts: number;
+  maxAttendantsPerAccount: number;
+  features: Record<string, boolean>;
+}
+
+// ─── Plan card styling per index (1st=subtle, 2nd=highlighted, 3rd=gold) ───
+const cardStyles = [
+  {
+    wrapper: "bg-white/[0.03] border border-white/[0.08] rounded-2xl p-6 sm:p-8 flex flex-col h-full backdrop-blur-sm",
+    nameClass: "text-sm font-medium text-white/40 uppercase tracking-wider mb-2",
+    priceClass: "text-4xl font-bold text-white",
+    copyClass: "text-sm text-white/50 mt-3",
+    divider: "border-t border-white/[0.06] pt-6 mb-6 flex-1",
+    sectionLabel: "text-xs font-medium text-white/50 uppercase tracking-wider mb-4",
+    checkColor: "text-emerald-400",
+    itemColor: "text-sm text-white/60",
+    btnClass: "w-full h-12 bg-white/[0.06] hover:bg-white/[0.10] text-white border border-white/[0.10] hover:border-white/[0.15] transition-all duration-300",
+    isHighlighted: false,
+    notIncludedDivider: "mt-4 pt-4 border-t border-white/[0.04]",
+  },
+  {
+    wrapper: "bg-gradient-to-b from-violet-500/[0.08] to-purple-500/[0.03] border-2 border-violet-500/25 rounded-2xl p-6 sm:p-8 flex flex-col h-full relative backdrop-blur-sm shadow-xl shadow-violet-900/10",
+    nameClass: "text-sm font-medium text-violet-400 uppercase tracking-wider mb-2",
+    priceClass: "text-4xl font-bold text-white",
+    copyClass: "text-sm text-white/50 mt-3",
+    divider: "border-t border-violet-500/10 pt-6 mb-6 flex-1",
+    sectionLabel: "text-xs font-medium text-violet-400/70 uppercase tracking-wider mb-4",
+    checkColor: "text-violet-400",
+    itemColor: "text-sm text-white/80",
+    btnClass: "w-full h-12 bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white border-0 shadow-lg shadow-violet-500/25 transition-all duration-300 hover:shadow-violet-500/35",
+    isHighlighted: true,
+    notIncludedDivider: "mt-4 pt-4 border-t border-violet-500/[0.08]",
+  },
+  {
+    wrapper: "bg-gradient-to-b from-amber-500/[0.04] to-transparent border border-amber-500/10 rounded-2xl p-6 sm:p-8 flex flex-col h-full backdrop-blur-sm",
+    nameClass: "text-sm font-medium text-amber-400/70 uppercase tracking-wider mb-2",
+    priceClass: "text-4xl font-bold text-white",
+    copyClass: "text-sm text-white/50 mt-3",
+    divider: "border-t border-amber-500/[0.08] pt-6 mb-6 flex-1",
+    sectionLabel: "text-xs font-medium text-amber-400/60 uppercase tracking-wider mb-4",
+    checkColor: "text-amber-400",
+    itemColor: "text-sm text-white/80",
+    btnClass: "w-full h-12 bg-gradient-to-r from-amber-500/20 to-orange-500/20 hover:from-amber-500/30 hover:to-orange-500/30 text-amber-300 border border-amber-500/20 hover:border-amber-500/30 transition-all duration-300",
+    isHighlighted: false,
+    notIncludedDivider: "mt-4 pt-4 border-t border-amber-500/[0.06]",
+  },
+];
+
+function getIncludedFeatures(plan: DynamicPlan): string[] {
+  const items: string[] = [];
+  if (plan.features.crmCore) items.push("CRM completo (contatos, negociações, funil, tarefas)");
+  if (plan.features.communityAccess) items.push("Comunidade Acelera Turismo");
+  items.push(plan.maxUsers === 1 ? "1 usuário" : plan.maxUsers === -1 ? "Usuários ilimitados" : `Até ${plan.maxUsers} usuários`);
+  if (plan.features.whatsappEmbedded) {
+    items.push("WhatsApp integrado ao CRM");
+    if (plan.maxWhatsAppAccounts > 0) items.push(`${plan.maxWhatsAppAccounts} conta${plan.maxWhatsAppAccounts > 1 ? "s" : ""} WhatsApp com até ${plan.maxAttendantsPerAccount} atendentes`);
+  }
+  if (plan.features.segmentedBroadcast) items.push("Disparo segmentado de mensagens");
+  if (plan.features.rfvEnabled) items.push("Matriz RFV (Classificação Estratégica)");
+  if (plan.features.salesAutomation) items.push("Automação de vendas");
+  if (plan.features.prioritySupport) items.push("Suporte prioritário");
+  return items;
+}
+
+function getNotIncludedFeatures(plan: DynamicPlan, allPlans: DynamicPlan[]): string[] {
+  // Collect all features from the most complete plan
+  const topPlan = allPlans[allPlans.length - 1];
+  if (!topPlan) return [];
+  const missing: string[] = [];
+  if (!plan.features.whatsappEmbedded && topPlan.features.whatsappEmbedded) missing.push("WhatsApp no CRM");
+  if (!plan.features.segmentedBroadcast && topPlan.features.segmentedBroadcast) missing.push("Disparo segmentado");
+  if (!plan.features.rfvEnabled && topPlan.features.rfvEnabled) missing.push("Matriz RFV");
+  if (!plan.features.salesAutomation && topPlan.features.salesAutomation) missing.push("Automação de vendas");
+  if (!plan.features.prioritySupport && topPlan.features.prioritySupport) missing.push("Suporte prioritário");
+  return missing;
+}
+
+// Feature comparison rows built dynamically
+const COMPARISON_FEATURE_KEYS = [
+  { key: "crmCore", label: "CRM completo (contatos, negociações, funil, tarefas)" },
+  { key: "communityAccess", label: "Comunidade Acelera Turismo" },
+  { key: "whatsappEmbedded", label: "WhatsApp integrado ao CRM" },
+  { key: "segmentedBroadcast", label: "Disparo segmentado de mensagens" },
+  { key: "rfvEnabled", label: "Matriz RFV (Classificação Estratégica)" },
+  { key: "salesAutomation", label: "Automação de vendas" },
+  { key: "prioritySupport", label: "Suporte prioritário" },
 ];
 
 export function PricingSection({ onSelectPlan }: PricingSectionProps) {
+  const plansQuery = trpc.plan.active.useQuery(undefined, {
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
+
+  const plans = useMemo(() => plansQuery.data?.plans ?? [], [plansQuery.data]);
+
+  if (plansQuery.isLoading) {
+    return (
+      <section id="planos" className="py-24 sm:py-32 px-5 sm:px-8 relative overflow-hidden">
+        <div className="flex items-center justify-center py-20">
+          <Loader2 className="w-8 h-8 text-violet-400 animate-spin" />
+        </div>
+      </section>
+    );
+  }
+
+  if (!plans.length) return null;
+
+  const isLastPlanContactOnly = plans.length > 0 && plans[plans.length - 1].priceInCents === 0;
+
   return (
     <>
       <section id="planos" className="py-24 sm:py-32 px-5 sm:px-8 relative overflow-hidden">
@@ -48,186 +158,86 @@ export function PricingSection({ onSelectPlan }: PricingSectionProps) {
           </FadeIn>
 
           {/* ─── Plan Cards ─── */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8">
-            {/* ESSENCIAL */}
-            <FadeIn delay={0.1}>
-              <div className="bg-white/[0.03] border border-white/[0.08] rounded-2xl p-6 sm:p-8 flex flex-col h-full backdrop-blur-sm">
-                <div className="mb-6">
-                  <p className="text-sm font-medium text-white/40 uppercase tracking-wider mb-2">Essencial</p>
-                  <div className="flex items-baseline gap-1">
-                    <span className="text-4xl font-bold text-white">R$ 97</span>
-                    <span className="text-white/30 text-sm">/mês</span>
+          <div className={`grid grid-cols-1 ${plans.length === 2 ? "md:grid-cols-2 max-w-3xl mx-auto" : plans.length >= 3 ? "md:grid-cols-3" : ""} gap-6 lg:gap-8`}>
+            {plans.map((plan, idx) => {
+              const style = cardStyles[Math.min(idx, cardStyles.length - 1)];
+              const included = getIncludedFeatures(plan);
+              const notIncluded = getNotIncludedFeatures(plan, plans);
+              const isContactOnly = plan.priceInCents === 0;
+              const prevPlan = idx > 0 ? plans[idx - 1] : null;
+
+              return (
+                <FadeIn key={plan.id} delay={0.1 * (idx + 1)}>
+                  <div className={style.wrapper}>
+                    {style.isHighlighted && (
+                      <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                        <span className="bg-gradient-to-r from-violet-600 to-purple-600 text-white text-xs font-semibold px-4 py-1.5 rounded-full shadow-lg shadow-violet-500/25 flex items-center gap-1.5">
+                          <Crown className="w-3 h-3" /> Mais popular
+                        </span>
+                      </div>
+                    )}
+
+                    <div className="mb-6">
+                      <p className={style.nameClass}>{plan.name}</p>
+                      <div className="flex items-baseline gap-1">
+                        {isContactOnly ? (
+                          <span className={style.priceClass}>Sob consulta</span>
+                        ) : (
+                          <>
+                            <span className={style.priceClass}>R$ {(plan.priceInCents / 100).toFixed(0)}</span>
+                            <span className="text-white/30 text-sm">/mês</span>
+                          </>
+                        )}
+                      </div>
+                      {plan.commercialCopy && <p className={style.copyClass}>{plan.commercialCopy}</p>}
+                    </div>
+
+                    <div className={style.divider}>
+                      <p className={style.sectionLabel}>
+                        {prevPlan ? `Tudo do ${prevPlan.name}, mais:` : "Inclui:"}
+                      </p>
+                      <ul className="space-y-3">
+                        {included.map((item, i) => (
+                          <li key={i} className={`flex items-start gap-2.5 ${style.itemColor}`}>
+                            <Check className={`w-4 h-4 ${style.checkColor} mt-0.5 shrink-0`} />
+                            <span>{item}</span>
+                          </li>
+                        ))}
+                      </ul>
+                      {notIncluded.length > 0 && (
+                        <div className={style.notIncludedDivider}>
+                          <p className="text-xs font-medium text-white/30 uppercase tracking-wider mb-3">Não inclui:</p>
+                          <ul className="space-y-2">
+                            {notIncluded.map((item, i) => (
+                              <li key={i} className="flex items-start gap-2.5 text-sm text-white/25">
+                                <X className="w-4 h-4 text-white/15 mt-0.5 shrink-0" />
+                                <span>{item}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+
+                    {isContactOnly ? (
+                      <Button
+                        className={style.btnClass}
+                        onClick={() => window.open(SCALE_WHATSAPP_URL, "_blank")}
+                      >
+                        <MessageSquare className="w-4 h-4 mr-2" /> Falar com consultor
+                      </Button>
+                    ) : (
+                      <Button
+                        className={style.btnClass}
+                        onClick={() => onSelectPlan(plan.id)}
+                      >
+                        Começar agora <ArrowRight className="w-4 h-4 ml-2" />
+                      </Button>
+                    )}
                   </div>
-                  <p className="text-sm text-white/50 mt-3">{PLANS.start.commercialCopy}</p>
-                </div>
-
-                <div className="border-t border-white/[0.06] pt-6 mb-6 flex-1">
-                  <p className="text-xs font-medium text-white/50 uppercase tracking-wider mb-4">Inclui:</p>
-                  <ul className="space-y-3">
-                    <li className="flex items-start gap-2.5 text-sm text-white/60">
-                      <Check className="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" />
-                      <span>CRM completo (contatos, negociações, funil, tarefas)</span>
-                    </li>
-                    <li className="flex items-start gap-2.5 text-sm text-white/60">
-                      <Check className="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" />
-                      <span>Histórico comercial</span>
-                    </li>
-                    <li className="flex items-start gap-2.5 text-sm text-white/60">
-                      <Check className="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" />
-                      <span>Dashboard com indicadores</span>
-                    </li>
-                    <li className="flex items-start gap-2.5 text-sm text-white/60">
-                      <Check className="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" />
-                      <span>Comunidade Acelera Turismo</span>
-                    </li>
-                    <li className="flex items-start gap-2.5 text-sm text-white/60">
-                      <Check className="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" />
-                      <span>1 usuário</span>
-                    </li>
-                  </ul>
-                  <div className="mt-4 pt-4 border-t border-white/[0.04]">
-                    <p className="text-xs font-medium text-white/30 uppercase tracking-wider mb-3">Não inclui:</p>
-                    <ul className="space-y-2">
-                      <li className="flex items-start gap-2.5 text-sm text-white/25">
-                        <X className="w-4 h-4 text-white/15 mt-0.5 shrink-0" />
-                        <span>WhatsApp no CRM</span>
-                      </li>
-                      <li className="flex items-start gap-2.5 text-sm text-white/25">
-                        <X className="w-4 h-4 text-white/15 mt-0.5 shrink-0" />
-                        <span>Disparo segmentado</span>
-                      </li>
-                      <li className="flex items-start gap-2.5 text-sm text-white/25">
-                        <X className="w-4 h-4 text-white/15 mt-0.5 shrink-0" />
-                        <span>Matriz RFV</span>
-                      </li>
-                      <li className="flex items-start gap-2.5 text-sm text-white/25">
-                        <X className="w-4 h-4 text-white/15 mt-0.5 shrink-0" />
-                        <span>Automação de vendas</span>
-                      </li>
-                    </ul>
-                  </div>
-                </div>
-
-                <Button
-                  className="w-full h-12 bg-white/[0.06] hover:bg-white/[0.10] text-white border border-white/[0.10] hover:border-white/[0.15] transition-all duration-300"
-                  onClick={() => onSelectPlan("start")}
-                >
-                  Começar agora <ArrowRight className="w-4 h-4 ml-2" />
-                </Button>
-              </div>
-            </FadeIn>
-
-            {/* PRO */}
-            <FadeIn delay={0.2}>
-              <div className="bg-gradient-to-b from-violet-500/[0.08] to-purple-500/[0.03] border-2 border-violet-500/25 rounded-2xl p-6 sm:p-8 flex flex-col h-full relative backdrop-blur-sm shadow-xl shadow-violet-900/10">
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                  <span className="bg-gradient-to-r from-violet-600 to-purple-600 text-white text-xs font-semibold px-4 py-1.5 rounded-full shadow-lg shadow-violet-500/25 flex items-center gap-1.5">
-                    <Crown className="w-3 h-3" /> Mais popular
-                  </span>
-                </div>
-
-                <div className="mb-6">
-                  <p className="text-sm font-medium text-violet-400 uppercase tracking-wider mb-2">Pro</p>
-                  <div className="flex items-baseline gap-1">
-                    <span className="text-4xl font-bold text-white">R$ 297</span>
-                    <span className="text-white/30 text-sm">/mês</span>
-                  </div>
-                  <p className="text-sm text-white/50 mt-3">{PLANS.growth.commercialCopy}</p>
-                </div>
-
-                <div className="border-t border-violet-500/10 pt-6 mb-6 flex-1">
-                  <p className="text-xs font-medium text-violet-400/70 uppercase tracking-wider mb-4">Tudo do Essencial, mais:</p>
-                  <ul className="space-y-3">
-                    <li className="flex items-start gap-2.5 text-sm text-white/80">
-                      <Check className="w-4 h-4 text-violet-400 mt-0.5 shrink-0" />
-                      <span className="font-medium">WhatsApp integrado ao CRM</span>
-                    </li>
-                    <li className="flex items-start gap-2.5 text-sm text-white/60">
-                      <Check className="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" />
-                      <span>1 conta WhatsApp com até 4 atendentes</span>
-                    </li>
-                    <li className="flex items-start gap-2.5 text-sm text-white/80">
-                      <Check className="w-4 h-4 text-violet-400 mt-0.5 shrink-0" />
-                      <span className="font-medium">Disparo segmentado de mensagens</span>
-                    </li>
-                    <li className="flex items-start gap-2.5 text-sm text-white/80">
-                      <Check className="w-4 h-4 text-violet-400 mt-0.5 shrink-0" />
-                      <span className="font-medium">Matriz RFV (Classificação Estratégica)</span>
-                    </li>
-                    <li className="flex items-start gap-2.5 text-sm text-white/80">
-                      <Check className="w-4 h-4 text-violet-400 mt-0.5 shrink-0" />
-                      <span className="font-medium">Automação de vendas</span>
-                    </li>
-                    <li className="flex items-start gap-2.5 text-sm text-white/60">
-                      <Check className="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" />
-                      <span>Até 4 usuários</span>
-                    </li>
-                  </ul>
-                  <div className="mt-4 pt-4 border-t border-violet-500/[0.08]">
-                    <p className="text-xs font-medium text-white/30 uppercase tracking-wider mb-3">Não inclui:</p>
-                    <ul className="space-y-2">
-                      <li className="flex items-start gap-2.5 text-sm text-white/25">
-                        <X className="w-4 h-4 text-white/15 mt-0.5 shrink-0" />
-                        <span>Suporte prioritário</span>
-                      </li>
-                    </ul>
-                  </div>
-                </div>
-
-                <Button
-                  className="w-full h-12 bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white border-0 shadow-lg shadow-violet-500/25 transition-all duration-300 hover:shadow-violet-500/35"
-                  onClick={() => onSelectPlan("growth")}
-                >
-                  Começar agora <ArrowRight className="w-4 h-4 ml-2" />
-                </Button>
-              </div>
-            </FadeIn>
-
-            {/* ELITE */}
-            <FadeIn delay={0.3}>
-              <div className="bg-gradient-to-b from-amber-500/[0.04] to-transparent border border-amber-500/10 rounded-2xl p-6 sm:p-8 flex flex-col h-full backdrop-blur-sm">
-                <div className="mb-6">
-                  <p className="text-sm font-medium text-amber-400/70 uppercase tracking-wider mb-2">Elite</p>
-                  <div className="flex items-baseline gap-1">
-                    <span className="text-4xl font-bold text-white">Sob consulta</span>
-                  </div>
-                  <p className="text-sm text-white/50 mt-3">{PLANS.scale.commercialCopy}</p>
-                </div>
-
-                <div className="border-t border-amber-500/[0.08] pt-6 mb-6 flex-1">
-                  <p className="text-xs font-medium text-amber-400/50 uppercase tracking-wider mb-4">Tudo do Pro, mais:</p>
-                  <ul className="space-y-3">
-                    <li className="flex items-start gap-2.5 text-sm text-white/80">
-                      <Check className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
-                      <span className="font-medium">Até 15 usuários</span>
-                    </li>
-                    <li className="flex items-start gap-2.5 text-sm text-white/80">
-                      <Check className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
-                      <span className="font-medium">Suporte prioritário</span>
-                    </li>
-                    <li className="flex items-start gap-2.5 text-sm text-white/60">
-                      <Check className="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" />
-                      <span>Onboarding personalizado</span>
-                    </li>
-                    <li className="flex items-start gap-2.5 text-sm text-white/60">
-                      <Check className="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" />
-                      <span>Consultoria comercial dedicada</span>
-                    </li>
-                    <li className="flex items-start gap-2.5 text-sm text-white/60">
-                      <Check className="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" />
-                      <span>SLA de atendimento</span>
-                    </li>
-                  </ul>
-                </div>
-
-                <Button
-                  className="w-full h-12 bg-gradient-to-r from-amber-500/20 to-orange-500/20 hover:from-amber-500/30 hover:to-orange-500/30 text-amber-300 border border-amber-500/20 hover:border-amber-500/30 transition-all duration-300"
-                  onClick={() => window.open(SCALE_WHATSAPP_URL, "_blank")}
-                >
-                  <MessageSquare className="w-4 h-4 mr-2" /> Falar com consultor
-                </Button>
-              </div>
-            </FadeIn>
+                </FadeIn>
+              );
+            })}
           </div>
 
           {/* ─── Comparison Table ─── */}
@@ -248,42 +258,62 @@ export function PricingSection({ onSelectPlan }: PricingSectionProps) {
                     <thead>
                       <tr className="border-b border-white/[0.06]">
                         <th className="text-left py-4 px-5 text-white/40 font-medium w-[40%]">Recurso</th>
-                        <th className="text-center py-4 px-4 w-[20%]">
-                          <span className="text-white/60 font-semibold">Essencial</span>
-                          <p className="text-xs text-white/25 mt-0.5">R$ 97/mês</p>
-                        </th>
-                        <th className="text-center py-4 px-4 w-[20%] bg-violet-500/[0.06]">
-                          <span className="text-violet-400 font-bold">Pro</span>
-                          <p className="text-xs text-violet-400/50 mt-0.5">R$ 297/mês</p>
-                        </th>
-                        <th className="text-center py-4 px-4 w-[20%]">
-                          <span className="text-amber-400/80 font-semibold">Elite</span>
-                          <p className="text-xs text-amber-400/30 mt-0.5">Sob consulta</p>
-                        </th>
+                        {plans.map((plan, idx) => {
+                          const isProCol = idx === 1;
+                          return (
+                            <th key={plan.id} className={`text-center py-4 px-4 ${isProCol ? "bg-violet-500/[0.06]" : ""}`} style={{ width: `${60 / plans.length}%` }}>
+                              <span className={isProCol ? "text-violet-400 font-bold" : idx === plans.length - 1 ? "text-amber-400/80 font-semibold" : "text-white/60 font-semibold"}>
+                                {plan.name}
+                              </span>
+                              <p className={`text-xs mt-0.5 ${isProCol ? "text-violet-400/50" : idx === plans.length - 1 ? "text-amber-400/30" : "text-white/25"}`}>
+                                {plan.priceInCents > 0 ? `R$ ${(plan.priceInCents / 100).toFixed(0)}/mês` : "Sob consulta"}
+                              </p>
+                            </th>
+                          );
+                        })}
                       </tr>
                     </thead>
                     <tbody>
-                      {COMPARISON_ROWS.map((row, i) => (
-                        <tr key={i} className="border-b border-white/[0.04] last:border-0">
+                      {/* Limit rows */}
+                      <tr className="border-b border-white/[0.04]">
+                        <td className="py-3.5 px-5 text-white/50">Usuários</td>
+                        {plans.map((plan, idx) => (
+                          <td key={plan.id} className={`text-center py-3.5 px-4 ${idx === 1 ? "bg-violet-500/[0.04]" : ""}`}>
+                            <span className="text-white/70 font-medium">
+                              {plan.maxUsers === -1 ? "Ilimitado" : `${plan.maxUsers}`}
+                            </span>
+                          </td>
+                        ))}
+                      </tr>
+                      <tr className="border-b border-white/[0.04]">
+                        <td className="py-3.5 px-5 text-white/50">Contas de WhatsApp</td>
+                        {plans.map((plan, idx) => (
+                          <td key={plan.id} className={`text-center py-3.5 px-4 ${idx === 1 ? "bg-violet-500/[0.04]" : ""}`}>
+                            <span className={plan.maxWhatsAppAccounts === 0 ? "text-white/20" : "text-white/70 font-medium"}>
+                              {plan.maxWhatsAppAccounts === 0 ? "—" : `${plan.maxWhatsAppAccounts}`}
+                            </span>
+                          </td>
+                        ))}
+                      </tr>
+                      <tr className="border-b border-white/[0.04]">
+                        <td className="py-3.5 px-5 text-white/50">Atendentes por conta</td>
+                        {plans.map((plan, idx) => (
+                          <td key={plan.id} className={`text-center py-3.5 px-4 ${idx === 1 ? "bg-violet-500/[0.04]" : ""}`}>
+                            <span className={plan.maxAttendantsPerAccount === 0 ? "text-white/20" : "text-white/70 font-medium"}>
+                              {plan.maxAttendantsPerAccount === 0 ? "—" : `${plan.maxAttendantsPerAccount}`}
+                            </span>
+                          </td>
+                        ))}
+                      </tr>
+                      {/* Feature rows */}
+                      {COMPARISON_FEATURE_KEYS.map((row) => (
+                        <tr key={row.key} className="border-b border-white/[0.04] last:border-0">
                           <td className="py-3.5 px-5 text-white/50">{row.label}</td>
-                          {PLAN_ORDER.map((planId) => {
-                            const isProCol = planId === "growth";
-                            const cellBg = isProCol ? "bg-violet-500/[0.04]" : "";
-
-                            if (row.type === "limit" && row.getValue) {
-                              const val = row.getValue(planId);
-                              return (
-                                <td key={planId} className={`text-center py-3.5 px-4 ${cellBg}`}>
-                                  <span className={val === "—" ? "text-white/20" : "text-white/70 font-medium"}>
-                                    {val}
-                                  </span>
-                                </td>
-                              );
-                            }
-
-                            const hasFeature = row.key ? PLANS[planId].features[row.key] : false;
+                          {plans.map((plan, idx) => {
+                            const isProCol = idx === 1;
+                            const hasFeature = plan.features[row.key] ?? false;
                             return (
-                              <td key={planId} className={`text-center py-3.5 px-4 ${cellBg}`}>
+                              <td key={plan.id} className={`text-center py-3.5 px-4 ${isProCol ? "bg-violet-500/[0.04]" : ""}`}>
                                 {hasFeature ? (
                                   <div className="flex items-center justify-center">
                                     <div className="w-6 h-6 rounded-full bg-emerald-500/10 flex items-center justify-center">
@@ -307,35 +337,41 @@ export function PricingSection({ onSelectPlan }: PricingSectionProps) {
                 </div>
 
                 {/* CTA row */}
-                <div className="border-t border-white/[0.06] grid grid-cols-[40%_20%_20%_20%]">
+                <div className={`border-t border-white/[0.06] grid`} style={{ gridTemplateColumns: `40% ${plans.map(() => `${60 / plans.length}%`).join(" ")}` }}>
                   <div className="py-5 px-5" />
-                  <div className="py-5 px-4 flex items-center justify-center">
-                    <Button
-                      size="sm"
-                      className="bg-white/[0.06] hover:bg-white/[0.10] text-white border border-white/[0.10] text-xs"
-                      onClick={() => onSelectPlan("start")}
-                    >
-                      Assinar
-                    </Button>
-                  </div>
-                  <div className="py-5 px-4 flex items-center justify-center bg-violet-500/[0.06]">
-                    <Button
-                      size="sm"
-                      className="bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white text-xs shadow-lg shadow-violet-500/20"
-                      onClick={() => onSelectPlan("growth")}
-                    >
-                      Assinar Pro
-                    </Button>
-                  </div>
-                  <div className="py-5 px-4 flex items-center justify-center">
-                    <Button
-                      size="sm"
-                      className="bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/15 text-xs"
-                      onClick={() => window.open(SCALE_WHATSAPP_URL, "_blank")}
-                    >
-                      Consultar
-                    </Button>
-                  </div>
+                  {plans.map((plan, idx) => {
+                    const isProCol = idx === 1;
+                    const isContactOnly = plan.priceInCents === 0;
+                    return (
+                      <div key={plan.id} className={`py-5 px-4 flex items-center justify-center ${isProCol ? "bg-violet-500/[0.06]" : ""}`}>
+                        {isContactOnly ? (
+                          <Button
+                            size="sm"
+                            className={idx === plans.length - 1 ? "bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/15 text-xs" : "bg-white/[0.06] hover:bg-white/[0.10] text-white border border-white/[0.10] text-xs"}
+                            onClick={() => window.open(SCALE_WHATSAPP_URL, "_blank")}
+                          >
+                            Consultar
+                          </Button>
+                        ) : isProCol ? (
+                          <Button
+                            size="sm"
+                            className="bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white text-xs shadow-lg shadow-violet-500/20"
+                            onClick={() => onSelectPlan(plan.id)}
+                          >
+                            Assinar {plan.name}
+                          </Button>
+                        ) : (
+                          <Button
+                            size="sm"
+                            className="bg-white/[0.06] hover:bg-white/[0.10] text-white border border-white/[0.10] text-xs"
+                            onClick={() => onSelectPlan(plan.id)}
+                          >
+                            Assinar
+                          </Button>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             </div>

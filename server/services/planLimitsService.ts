@@ -1,16 +1,26 @@
 /**
  * Plan Limits Service
  * Enforcement centralizado de limites e restrições por plano.
- * Usa a definição de shared/plans.ts como fonte da verdade,
- * enriquecida por getEffectiveEntitlement (add-ons + overrides).
+ * 
+ * REFATORADO: Agora usa dynamicPlanService (banco + cache TTL 5min)
+ * como fonte da verdade, enriquecida por getEffectiveEntitlement (add-ons + overrides).
+ * shared/plans.ts é usado apenas como fallback dentro do dynamicPlanService.
+ * 
+ * ASSINATURAS MANTIDAS: Nenhuma assinatura de função foi alterada.
+ * Todos os consumidores existentes continuam funcionando sem mudanças.
  */
 
 import { eq, and, sql } from "drizzle-orm";
 import { getDb } from "../db";
 import { tenants, crmUsers } from "../../drizzle/schema";
-import { getPlanDefinition, planHasFeature, getMinPlanForFeature, type PlanId, type PlanFeatures } from "../../shared/plans";
+import { type PlanFeatures } from "../../shared/plans";
 import { TRPCError } from "@trpc/server";
 import { getEffectiveEntitlement } from "./planEntitlementService";
+import {
+  getDynamicPlanDefinition,
+  dynamicPlanHasFeature,
+  getDynamicMinPlanForFeature,
+} from "./dynamicPlanService";
 
 // ─── Tenant Plan Lookup ────────────────────────────────────────────
 
@@ -43,7 +53,7 @@ export async function countTenantUsers(tenantId: number): Promise<number> {
 /** Verifica se o tenant pode adicionar mais um usuário */
 export async function canAddUser(tenantId: number): Promise<{ allowed: boolean; reason?: string; currentCount: number; limit: number }> {
   const plan = await getTenantPlan(tenantId);
-  const def = getPlanDefinition(plan);
+  const def = await getDynamicPlanDefinition(plan);
   const currentCount = await countTenantUsers(tenantId);
 
   // Resolve effective limit: base plan + add-ons + overrides
@@ -54,7 +64,7 @@ export async function canAddUser(tenantId: number): Promise<{ allowed: boolean; 
     const addonUsers = entitlement.addons.extraUsers;
     effectiveMaxUsers = baseLimit + addonUsers;
   } catch {
-    // Fallback to static definition — never break enforcement
+    // Fallback to dynamic definition — never break enforcement
   }
 
   if (effectiveMaxUsers === -1) {
@@ -86,7 +96,7 @@ export async function assertCanAddUser(tenantId: number): Promise<void> {
 /** Verifica se o tenant tem acesso a uma feature específica */
 export async function canAccessFeature(tenantId: number, feature: keyof PlanFeatures): Promise<boolean> {
   const plan = await getTenantPlan(tenantId);
-  const staticAccess = planHasFeature(plan, feature);
+  const dynamicAccess = await dynamicPlanHasFeature(plan, feature);
 
   // Check if entitlement overrides or add-ons grant access
   try {
@@ -96,17 +106,17 @@ export async function canAccessFeature(tenantId: number, feature: keyof PlanFeat
       return featureEntry.isEnabled;
     }
   } catch {
-    // Fallback to static definition
+    // Fallback to dynamic definition
   }
 
-  return staticAccess;
+  return dynamicAccess;
 }
 
 /** Guard genérico: lança FORBIDDEN se tenant não tem acesso à feature */
 export async function assertFeatureAccess(tenantId: number, feature: keyof PlanFeatures): Promise<void> {
   const hasAccess = await canAccessFeature(tenantId, feature);
   if (!hasAccess) {
-    const minPlan = getMinPlanForFeature(feature);
+    const minPlan = await getDynamicMinPlanForFeature(feature);
     throw new TRPCError({
       code: "FORBIDDEN",
       message: `PLAN_FEATURE_BLOCKED:${feature}:${minPlan.name}`,
@@ -141,7 +151,7 @@ export async function canAccessSegmentedBroadcast(tenantId: number): Promise<boo
 /** Retorna um resumo completo dos limites e features do tenant */
 export async function getTenantPlanSummary(tenantId: number) {
   const plan = await getTenantPlan(tenantId);
-  const def = getPlanDefinition(plan);
+  const def = await getDynamicPlanDefinition(plan);
   const currentUsers = await countTenantUsers(tenantId);
 
   // Enrich with effective entitlement (add-ons + overrides)
@@ -154,7 +164,7 @@ export async function getTenantPlanSummary(tenantId: number) {
     effectiveMaxWA = (entitlement.features["maxWhatsAppAccounts"]?.limitValue ?? def.maxWhatsAppAccounts) + entitlement.addons.whatsappNumbers;
     effectiveMaxAttendants = entitlement.features["maxAttendantsPerAccount"]?.limitValue ?? def.maxAttendantsPerAccount;
   } catch {
-    // Fallback to static definition
+    // Fallback to dynamic definition
   }
 
   return {

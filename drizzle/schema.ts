@@ -2370,6 +2370,8 @@ export const planDefinitions = mysqlTable("plan_definitions", {
   billingCycle: mysqlEnum("billing_cycle", ["monthly", "annual"]).default("monthly").notNull(),
   hotmartOfferCode: varchar("hotmart_offer_code", { length: 100 }),
   description: text("description"),
+  commercialCopy: text("commercial_copy"),
+  displayOrder: int("display_order").default(0).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (t) => [
