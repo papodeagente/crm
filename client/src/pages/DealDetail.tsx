@@ -230,7 +230,7 @@ export default function DealDetail() {
   const [waSidebarDrawerOpen, setWaSidebarDrawerOpen] = useState(false);
 
   /* ─── Content tabs ─── */
-  const [activeTab, setActiveTab] = useState<"history" | "tasks" | "products" | "files" | "participants" | "whatsapp" | "ai-analysis">("history");
+  const [activeTab, setActiveTab] = useState<"history" | "tasks" | "products" | "files" | "participants" | "whatsapp">("history");
 
   const isWhatsAppTab = activeTab === "whatsapp";
 
@@ -1292,7 +1292,7 @@ export default function DealDetail() {
               { key: "files" as const, label: "Arquivos", shortLabel: "Arquivos", icon: FolderOpen, count: filesCountQ.data || 0 },
               { key: "participants" as const, label: "Participantes", shortLabel: "Partic.", icon: Users, count: (participantsQ.data || []).length },
               { key: "whatsapp" as const, label: "WhatsApp", shortLabel: "WA", icon: MessageCircle, count: waMessagesCountQ.data || 0 },
-              { key: "ai-analysis" as const, label: "Análise IA", shortLabel: "IA", icon: Sparkles },
+
             ].map((tab) => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.key;
@@ -1363,9 +1363,7 @@ export default function DealDetail() {
                 onOpenSidebar={() => setWaSidebarDrawerOpen(true)}
               />
             )}
-            {activeTab === "ai-analysis" && (
-              <AiAnalysisPanel dealId={dealId} contactName={contact?.name || "Contato"} />
-            )}
+
           </div>
         </div>
       </div>

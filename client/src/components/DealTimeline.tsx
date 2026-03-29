@@ -12,6 +12,8 @@ import {
   ArrowDownUp, Package, UserPlus, UserMinus, Pencil, Trash2,
   RotateCcw, Clock, Bot, Globe, ChevronDown, Filter,
   MessageCircle, Zap, FileText, MessageSquarePlus, Send,
+  Sparkles, Loader2, RefreshCw, Award, BarChart3, TrendingUp,
+  TrendingDown, Star, AlertCircle, Lightbulb, History, X,
 } from "lucide-react";
 import {
   Collapsible,
@@ -251,6 +253,7 @@ export function DealTimeline({ dealId }: { dealId: number }) {
   const [limit, setLimit] = useState(50);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [newNote, setNewNote] = useState("");
+  const [showAiAnalysis, setShowAiAnalysis] = useState(false);
 
   const utils = trpc.useUtils();
   const createNote = trpc.crm.notes.create.useMutation({
@@ -365,12 +368,23 @@ export function DealTimeline({ dealId }: { dealId: number }) {
               <ChevronDown className={`h-3 w-3 transition-transform ${filtersOpen ? "rotate-180" : ""}`} />
             </Button>
           </CollapsibleTrigger>
-          {activeCategories.length > 0 && (
-            <Button variant="ghost" size="sm" className="text-xs h-7 text-muted-foreground"
-              onClick={() => setActiveCategories([])}>
-              Limpar
+          <div className="flex items-center gap-1">
+            {activeCategories.length > 0 && (
+              <Button variant="ghost" size="sm" className="text-xs h-7 text-muted-foreground"
+                onClick={() => setActiveCategories([])}>
+                Limpar
+              </Button>
+            )}
+            <Button
+              variant={showAiAnalysis ? "default" : "ghost"}
+              size="sm"
+              className={`gap-1.5 text-xs h-7 ${showAiAnalysis ? "bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white" : ""}`}
+              onClick={() => setShowAiAnalysis(!showAiAnalysis)}
+            >
+              <Sparkles className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Análise IA</span>
             </Button>
-          )}
+          </div>
         </div>
         <CollapsibleContent>
           <div className="px-4 py-3 border-b border-border/50 bg-muted/30">
@@ -397,6 +411,13 @@ export function DealTimeline({ dealId }: { dealId: number }) {
           </div>
         </CollapsibleContent>
       </Collapsible>
+
+      {/* AI Analysis Panel */}
+      {showAiAnalysis && (
+        <div className="border-b border-border/50">
+          <AiAnalysisInline dealId={dealId} onClose={() => setShowAiAnalysis(false)} />
+        </div>
+      )}
 
       {/* Create note */}
       <div className="px-4 py-3 border-b border-border/50">
@@ -484,6 +505,253 @@ export function DealTimeline({ dealId }: { dealId: number }) {
           )}
         </div>
       </ScrollArea>
+    </div>
+  );
+}
+
+// ─── Score Circle ───
+function ScoreCircle({ score, label, size = "md" }: { score: number; label: string; size?: "sm" | "md" | "lg" }) {
+  const radius = size === "lg" ? 40 : size === "sm" ? 16 : 28;
+  const stroke = size === "lg" ? 6 : size === "sm" ? 3 : 4;
+  const circumference = 2 * Math.PI * radius;
+  const offset = circumference - (score / 10) * circumference;
+  const dim = (radius + stroke) * 2;
+  const color = score >= 8 ? "text-emerald-500" : score >= 6 ? "text-yellow-500" : score >= 4 ? "text-orange-500" : "text-red-500";
+  const fontSize = size === "lg" ? "text-2xl" : size === "sm" ? "text-[10px]" : "text-sm";
+  return (
+    <div className="flex flex-col items-center gap-1">
+      <div className="relative" style={{ width: dim, height: dim }}>
+        <svg className="transform -rotate-90" width={dim} height={dim}>
+          <circle cx={radius + stroke} cy={radius + stroke} r={radius} fill="none" stroke="currentColor" strokeWidth={stroke} className="text-border" />
+          <circle cx={radius + stroke} cy={radius + stroke} r={radius} fill="none" stroke="currentColor" strokeWidth={stroke} strokeDasharray={circumference} strokeDashoffset={offset} strokeLinecap="round" className={color} style={{ transition: "stroke-dashoffset 0.8s ease" }} />
+        </svg>
+        <div className="absolute inset-0 flex items-center justify-center">
+          <span className={`font-bold ${fontSize} ${color}`}>{score.toFixed(1)}</span>
+        </div>
+      </div>
+      {label && <span className="text-[10px] text-muted-foreground text-center leading-tight">{label}</span>}
+    </div>
+  );
+}
+
+function formatFullDateTime(ts: number | string) {
+  const d = new Date(ts);
+  return d.toLocaleString("pt-BR", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+
+// ─── AI Analysis Inline Component ───
+function AiAnalysisInline({ dealId, onClose }: { dealId: number; onClose: () => void }) {
+  const [showHistory, setShowHistory] = useState(false);
+
+  const latestQ = trpc.aiAnalysis.getLatest.useQuery({ dealId });
+  const historyQ = trpc.aiAnalysis.getHistory.useQuery({ dealId }, { enabled: showHistory });
+  const analyzeMut = trpc.aiAnalysis.analyze.useMutation({
+    onSuccess: () => {
+      latestQ.refetch();
+      historyQ.refetch();
+      toast.success("Análise concluída!");
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
+  const analysis = latestQ.data;
+
+  return (
+    <div className="p-4 space-y-4 bg-gradient-to-b from-violet-500/5 to-transparent">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
+            <Sparkles className="h-4 w-4 text-white" />
+          </div>
+          <div>
+            <h3 className="text-sm font-semibold">Análise de IA</h3>
+            <p className="text-[10px] text-muted-foreground">Avaliação automática do atendimento</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-1.5">
+          {analysis && (
+            <Button size="sm" variant="ghost" onClick={() => setShowHistory(!showHistory)} className="text-xs h-7 gap-1">
+              <History className="h-3 w-3" />
+              <span className="hidden sm:inline">Anteriores</span>
+            </Button>
+          )}
+          <Button
+            size="sm"
+            onClick={() => analyzeMut.mutate({ dealId, forceNew: !!analysis })}
+            disabled={analyzeMut.isPending}
+            className="h-7 text-xs bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white gap-1"
+          >
+            {analyzeMut.isPending ? (
+              <><Loader2 className="h-3 w-3 animate-spin" /> Analisando...</>
+            ) : analysis ? (
+              <><RefreshCw className="h-3 w-3" /> Re-analisar</>
+            ) : (
+              <><Sparkles className="h-3 w-3" /> Analisar</>
+            )}
+          </Button>
+          <Button size="sm" variant="ghost" onClick={onClose} className="h-7 w-7 p-0">
+            <X className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      </div>
+
+      {/* Loading */}
+      {analyzeMut.isPending && (
+        <div className="flex flex-col items-center py-8">
+          <div className="h-12 w-12 rounded-full bg-gradient-to-br from-violet-500/20 to-purple-600/20 flex items-center justify-center animate-pulse">
+            <Sparkles className="h-6 w-6 text-violet-500 animate-spin" style={{ animationDuration: "3s" }} />
+          </div>
+          <p className="text-xs font-medium mt-3">Analisando conversa...</p>
+        </div>
+      )}
+
+      {/* Empty */}
+      {!analysis && !analyzeMut.isPending && (
+        <div className="flex flex-col items-center py-6 text-muted-foreground">
+          <Sparkles className="h-8 w-8 opacity-40 mb-2" />
+          <p className="text-xs">Clique em "Analisar" para avaliar o atendimento</p>
+        </div>
+      )}
+
+      {/* Results */}
+      {analysis && !analyzeMut.isPending && (
+        <div className="space-y-3">
+          {/* Scores */}
+          <div className="bg-card rounded-lg border border-border p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <Award className="h-3.5 w-3.5 text-primary" />
+              <h4 className="text-xs font-semibold">Pontuação</h4>
+              <span className="text-[9px] text-muted-foreground ml-auto">
+                {analysis.messagesAnalyzed} msgs · {analysis.createdAt ? formatFullDateTime(analysis.createdAt) : ""}
+              </span>
+            </div>
+            <div className="flex items-center justify-center gap-4 flex-wrap">
+              <ScoreCircle score={analysis.overallScore || 0} label="Geral" size="md" />
+              <div className="flex gap-3 flex-wrap justify-center">
+                <ScoreCircle score={analysis.toneScore || 0} label="Tom" size="sm" />
+                <ScoreCircle score={analysis.responsivenessScore || 0} label="Resposta" size="sm" />
+                <ScoreCircle score={analysis.clarityScore || 0} label="Clareza" size="sm" />
+                <ScoreCircle score={analysis.closingScore || 0} label="Fechamento" size="sm" />
+              </div>
+            </div>
+            {analysis.responseTimeAvg && (
+              <div className="flex items-center justify-center gap-1 mt-3 text-[10px] text-muted-foreground">
+                <Clock className="h-3 w-3" />
+                Tempo médio: <strong className="text-foreground">{analysis.responseTimeAvg}</strong>
+              </div>
+            )}
+          </div>
+
+          {/* Summary */}
+          {analysis.summary && (
+            <div className="bg-card rounded-lg border border-border p-3">
+              <div className="flex items-center gap-1.5 mb-2">
+                <BarChart3 className="h-3.5 w-3.5 text-primary" />
+                <h4 className="text-xs font-semibold">Resumo</h4>
+              </div>
+              <p className="text-xs text-muted-foreground leading-relaxed">{analysis.summary}</p>
+            </div>
+          )}
+
+          {/* Strengths & Improvements */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {(analysis.strengths as string[] | null)?.length ? (
+              <div className="bg-card rounded-lg border border-border p-3">
+                <div className="flex items-center gap-1.5 mb-2">
+                  <TrendingUp className="h-3.5 w-3.5 text-emerald-500" />
+                  <h4 className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">Pontos Fortes</h4>
+                </div>
+                <ul className="space-y-1">
+                  {(analysis.strengths as string[]).map((s, i) => (
+                    <li key={i} className="flex items-start gap-1.5 text-[11px]">
+                      <Star className="h-3 w-3 text-emerald-500 mt-0.5 shrink-0" />
+                      <span className="text-muted-foreground">{s}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+            {(analysis.improvements as string[] | null)?.length ? (
+              <div className="bg-card rounded-lg border border-border p-3">
+                <div className="flex items-center gap-1.5 mb-2">
+                  <TrendingDown className="h-3.5 w-3.5 text-orange-500" />
+                  <h4 className="text-xs font-semibold text-orange-600 dark:text-orange-400">Melhorias</h4>
+                </div>
+                <ul className="space-y-1">
+                  {(analysis.improvements as string[]).map((s, i) => (
+                    <li key={i} className="flex items-start gap-1.5 text-[11px]">
+                      <AlertCircle className="h-3 w-3 text-orange-500 mt-0.5 shrink-0" />
+                      <span className="text-muted-foreground">{s}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+          </div>
+
+          {/* Suggestions */}
+          {(analysis.suggestions as string[] | null)?.length ? (
+            <div className="bg-card rounded-lg border border-border p-3">
+              <div className="flex items-center gap-1.5 mb-2">
+                <Lightbulb className="h-3.5 w-3.5 text-yellow-500" />
+                <h4 className="text-xs font-semibold">Sugestões</h4>
+              </div>
+              <div className="space-y-1.5">
+                {(analysis.suggestions as string[]).map((s, i) => (
+                  <div key={i} className="flex items-start gap-2 text-[11px]">
+                    <span className="h-4 w-4 rounded-full bg-yellow-500/10 flex items-center justify-center shrink-0 mt-0.5">
+                      <span className="text-[9px] font-bold text-yellow-600 dark:text-yellow-400">{i + 1}</span>
+                    </span>
+                    <span className="text-muted-foreground">{s}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
+
+          {/* Missed Opportunities */}
+          {(analysis.missedOpportunities as string[] | null)?.length ? (
+            <div className="bg-card rounded-lg border border-border p-3">
+              <div className="flex items-center gap-1.5 mb-2">
+                <Target className="h-3.5 w-3.5 text-red-500" />
+                <h4 className="text-xs font-semibold text-red-600 dark:text-red-400">Oportunidades Perdidas</h4>
+              </div>
+              <ul className="space-y-1">
+                {(analysis.missedOpportunities as string[]).map((s, i) => (
+                  <li key={i} className="flex items-start gap-1.5 text-[11px]">
+                    <Target className="h-3 w-3 text-red-500 mt-0.5 shrink-0" />
+                    <span className="text-muted-foreground">{s}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+        </div>
+      )}
+
+      {/* History */}
+      {showHistory && (historyQ.data || []).length > 1 && (
+        <div className="bg-card rounded-lg border border-border p-3">
+          <div className="flex items-center gap-1.5 mb-2">
+            <History className="h-3.5 w-3.5 text-primary" />
+            <h4 className="text-xs font-semibold">Análises Anteriores</h4>
+          </div>
+          <div className="space-y-1.5">
+            {(historyQ.data || []).map((a: any) => (
+              <div key={a.id} className="flex items-center gap-2 p-2 rounded-md border border-border/50 hover:bg-muted/30 transition-colors">
+                <ScoreCircle score={a.overallScore || 0} label="" size="sm" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-[10px] font-medium truncate">{a.summary?.slice(0, 60)}...</p>
+                  <p className="text-[9px] text-muted-foreground">
+                    {a.messagesAnalyzed} msgs · {a.createdAt ? formatFullDateTime(a.createdAt) : ""}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

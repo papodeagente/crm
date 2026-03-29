@@ -6106,3 +6106,8 @@
 - [x] Permitir criar contato rapidamente inline antes de inserir como participante (mini-form com nome, telefone, email)
 - [x] Otimizar filtro de busca para filtrar em tempo real conforme digita (busca por nome, telefone, email)
 - [x] Testar e validar (8 testes passando)
+## Mover Análise de IA para Histórico
+- [x] Localizar botão Análise de IA e aba Histórico no DealDetail
+- [x] Mover botão/conteúdo de Análise de IA para dentro da aba Histórico (botão na barra de filtros do DealTimeline)
+- [x] Remover aba Análise de IA do menu principal de abas (14 testes timeline passando)
+- [x] Testar e validar (14 testes timeline passando)
