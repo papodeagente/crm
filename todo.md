@@ -6216,3 +6216,5 @@
 - [x] Checklist: webhook Hotmart NÃO alterado
 - [x] Checklist: shared/plans.ts mantido como fallback
 - [x] Checklist: nenhuma outra página alterada
+## Bug Fix: Botão Login sumindo em mobile na Landing Page
+- [x] Tornar botões "Entrar" e "Testar grátis" visíveis em mobile na navbar
