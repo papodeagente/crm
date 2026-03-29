@@ -214,7 +214,7 @@ export default function BulkActionsBar(props: BulkActionsBarProps) {
       if (!result?.deals?.length) { toast.warning("Nenhuma negociação para exportar"); setIsProcessing(false); return; }
       
       // Generate CSV
-      const headers = ["ID", "Título", "Status", "Valor (R$)", "Etapa", "Responsável", "Contato ID", "Empresa ID", "Criado em"];
+      const headers = ["ID", "Título", "Status", "Valor (R$)", "Etapa", "Responsável", "Passageiro ID", "Empresa ID", "Criado em"];
       const rows = result.deals.map((d: any) => [
         d.id,
         `"${(d.title || "").replace(/"/g, '""')}"`,
@@ -523,7 +523,7 @@ export default function BulkActionsBar(props: BulkActionsBarProps) {
                   Atenção: Todos os itens do filtro serão afetados.
                 </span>
               )}
-              <span className="block mt-1">Os contatos vinculados não serão apagados.</span>
+              <span className="block mt-1">Os passageiros vinculados não serão apagados.</span>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

@@ -48,7 +48,7 @@ const defaultConfig: ImportConfig = {
 const dataCategories = [
   { key: "importPipelines" as const, icon: GitBranch, label: "Funis de vendas", desc: "Funis e etapas do pipeline", summaryKey: "pipelines" },
   { key: "importUsers" as const, icon: UserCog, label: "Usuários", desc: "Usuários e responsáveis do RD", summaryKey: "users" },
-  { key: "importContacts" as const, icon: Users, label: "Contatos", desc: "Pessoas e informações de contato", summaryKey: "contacts" },
+  { key: "importContacts" as const, icon: Users, label: "Passageiros", desc: "Pessoas e informações de passageiros", summaryKey: "contacts" },
   { key: "importOrganizations" as const, icon: Building2, label: "Empresas", desc: "Organizações e contas", summaryKey: "organizations" },
   { key: "importDeals" as const, icon: Target, label: "Negociações", desc: "Deals com valores e status", summaryKey: "deals" },
   { key: "importProducts" as const, icon: Package, label: "Produtos", desc: "Catálogo de produtos/serviços", summaryKey: "products" },
@@ -66,7 +66,7 @@ const categoryLabels: Record<string, string> = {
   lossReasons: "Motivos de Perda",
   products: "Produtos",
   organizations: "Empresas",
-  contacts: "Contatos",
+  contacts: "Passageiros",
   deals: "Negociações",
   tasks: "Tarefas",
   validation: "Validação",

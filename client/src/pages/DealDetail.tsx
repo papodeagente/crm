@@ -183,16 +183,16 @@ export default function DealDetail() {
     onError: () => toast.error("Erro ao atualizar"),
   });
   const updateContact = trpc.crm.contacts.update.useMutation({
-    onSuccess: () => { contactQ.refetch(); toast.success("Contato atualizado"); },
-    onError: () => toast.error("Erro ao atualizar contato"),
+    onSuccess: () => { contactQ.refetch(); toast.success("Passageiro atualizado"); },
+    onError: () => toast.error("Erro ao atualizar passageiro"),
   });
   const createContact = trpc.crm.contacts.create.useMutation({
     onSuccess: (data) => {
       if (data?.id) updateDeal.mutate({ id: dealId, contactId: data.id });
       contactsQ.refetch();
-      toast.success("Contato criado e vinculado");
+      toast.success("Passageiro criado e vinculado");
     },
-    onError: () => toast.error("Erro ao criar contato"),
+    onError: () => toast.error("Erro ao criar passageiro"),
   });
   const updateAccount = trpc.crm.accounts.update.useMutation({
     onSuccess: () => { accountQ.refetch(); toast.success("Empresa atualizada"); },
@@ -688,9 +688,9 @@ export default function DealDetail() {
 
               <div className="border-b border-border" />
 
-              {/* ── Contato compacto ── */}
+              {/* ── Passageiro compacto ── */}
               <div className="py-2">
-                <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Contato</p>
+                <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Passageiro</p>
                 {contact ? (
                   <div className="space-y-1">
                     <div className="flex items-center gap-1.5">
@@ -713,7 +713,7 @@ export default function DealDetail() {
                     )}
                   </div>
                 ) : (
-                  <p className="text-muted-foreground italic">Sem contato</p>
+                  <p className="text-muted-foreground italic">Sem passageiro</p>
                 )}
               </div>
 
@@ -804,14 +804,14 @@ export default function DealDetail() {
                 </div>
                 <div className="border-b border-border" />
                 <div className="py-2">
-                  <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Contato</p>
+                  <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Passageiro</p>
                   {contact ? (
                     <div className="space-y-1">
                       <span className="font-medium text-foreground">{contact.name}</span>
                       {contact.phone && <p className="text-muted-foreground">{contact.phone}</p>}
                     </div>
                   ) : (
-                    <p className="text-muted-foreground italic">Sem contato</p>
+                    <p className="text-muted-foreground italic">Sem passageiro</p>
                   )}
                 </div>
                 <div className="border-b border-border" />
@@ -979,9 +979,9 @@ export default function DealDetail() {
 
             <SidebarDivider />
 
-            {/* ── Contatos ── */}
+            {/* ── Passageiro ── */}
             <SidebarSection
-              title="Contatos"
+              title="Passageiro"
               open={sidebarSections.contact}
               onToggle={() => toggleSection("contact")}
             >
@@ -999,13 +999,13 @@ export default function DealDetail() {
                     <div className="flex items-center gap-1">
                       <button
                         onClick={() => { setShowEditContactDialog(true); setContactDraft({ name: contact.name, phone: contact.phone || "", email: contact.email || "" }); }}
-                        className="p-1 hover:bg-muted/60 rounded" title="Editar contato"
+                        className="p-1 hover:bg-muted/60 rounded" title="Editar passageiro"
                       >
                         <Edit2 className="h-3.5 w-3.5 text-muted-foreground" />
                       </button>
                       <button
                         onClick={() => { updateDeal.mutate({ id: deal.id, contactId: null }); }}
-                        className="p-1 hover:bg-red-100 dark:hover:bg-red-500/10 rounded" title="Desvincular contato"
+                        className="p-1 hover:bg-red-100 dark:hover:bg-red-500/10 rounded" title="Desvincular passageiro"
                       >
                         <X className="h-3.5 w-3.5 text-red-500" />
                       </button>
@@ -1023,7 +1023,15 @@ export default function DealDetail() {
                       <span className="text-xs text-muted-foreground capitalize">{contact.lifecycleStage}</span>
                     </div>
                   )}
-                  {/* ── Campos Personalizados do Contato (inline) ── */}
+                  {/* ── Botão Adicionar Passageiro ── */}
+                  <button
+                    onClick={() => { setShowContactDialog(true); setContactMode("create"); setContactDraft({ name: "", phone: "", email: "" }); setSelectedContactId(null); }}
+                    className="flex items-center gap-1.5 text-xs text-primary hover:text-primary/80 transition-colors mt-2"
+                  >
+                    <Plus className="h-3 w-3" />
+                    Adicionar passageiro
+                  </button>
+                  {/* ── Campos Personalizados do Passageiro (inline) ── */}
                   {(contactCustomFieldsQ.data as any[])?.length > 0 && (
                     <div className="mt-3 pt-3 border-t border-border/30">
                       <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Campos personalizados</p>
@@ -1043,7 +1051,7 @@ export default function DealDetail() {
                   className="flex items-center gap-1.5 text-sm text-primary hover:text-primary/80 transition-colors"
                 >
                   <Plus className="h-3.5 w-3.5" />
-                  Adicionar contato
+                  Adicionar passageiro
                 </button>
               )}
             </SidebarSection>
@@ -1230,7 +1238,7 @@ export default function DealDetail() {
 
             {/* Campos da Negociação agora estão dentro da seção Negociação */}
 
-            {/* Campos do Contato agora estão dentro da seção Contatos */}
+            {/* Campos do Passageiro agora estão dentro da seção Passageiro */}
 
             {/* Campos da Empresa agora estão dentro da seção Empresa */}
           </div>
@@ -1290,7 +1298,7 @@ export default function DealDetail() {
               { key: "tasks" as const, label: "Tarefas", shortLabel: "Tarefas", icon: ClipboardList, count: tasksList.length },
               { key: "products" as const, label: "Produtos e Serviços", shortLabel: "Produtos", icon: ShoppingBag, count: (productsQ.data || []).length },
               { key: "files" as const, label: "Arquivos", shortLabel: "Arquivos", icon: FolderOpen, count: filesCountQ.data || 0 },
-              { key: "participants" as const, label: "Participantes", shortLabel: "Partic.", icon: Users, count: (participantsQ.data || []).length },
+              
               { key: "whatsapp" as const, label: "WhatsApp", shortLabel: "WA", icon: MessageCircle, count: waMessagesCountQ.data || 0 },
 
             ].map((tab) => {
@@ -1412,9 +1420,9 @@ export default function DealDetail() {
 
             <SidebarDivider />
 
-            {/* ── Contato ── */}
+            {/* ── Passageiro ── */}
             <SidebarSection
-              title="Contato"
+              title="Passageiro"
               open={sidebarSections.contact}
               onToggle={() => toggleSection("contact")}
             >
@@ -1425,7 +1433,7 @@ export default function DealDetail() {
                   {contact.email && <ContactInfoRow icon={Mail} value={contact.email} copyable />}
                 </div>
               ) : (
-                <p className="text-xs text-muted-foreground">Nenhum contato associado</p>
+                <p className="text-xs text-muted-foreground">Nenhum passageiro associado</p>
               )}
             </SidebarSection>
 
@@ -1679,13 +1687,13 @@ export default function DealDetail() {
         </DialogContent>
       </Dialog>
 
-      {/* ═══ Dialog: Adicionar Contato ═══ */}
+      {/* ═══ Dialog: Adicionar Passageiro ═══ */}
       <Dialog open={showContactDialog} onOpenChange={setShowContactDialog}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <User className="h-5 w-5 text-primary" />
-              Adicionar Contato
+              Adicionar Passageiro
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
@@ -1705,7 +1713,7 @@ export default function DealDetail() {
               <div className="space-y-3">
                 <div>
                   <label className="text-xs font-medium text-muted-foreground">Nome *</label>
-                  <Input value={contactDraft.name} onChange={(e) => setContactDraft(d => ({ ...d, name: e.target.value }))} placeholder="Nome do contato" />
+                  <Input value={contactDraft.name} onChange={(e) => setContactDraft(d => ({ ...d, name: e.target.value }))} placeholder="Nome do passageiro" />
                 </div>
                 <div>
                   <label className="text-xs font-medium text-muted-foreground">Telefone</label>
@@ -1727,8 +1735,8 @@ export default function DealDetail() {
                   }))}
                   value={selectedContactId ? String(selectedContactId) : ""}
                   onValueChange={(v) => setSelectedContactId(Number(v))}
-                  placeholder="Buscar contato..."
-                  searchPlaceholder="Digite o nome do contato..."
+                  placeholder="Buscar passageiro..."
+                  searchPlaceholder="Digite o nome do passageiro..."
                 />
               </div>
             )}
@@ -1741,7 +1749,7 @@ export default function DealDetail() {
                   if (!contactDraft.name.trim()) { toast.error("Nome é obrigatório"); return; }
                   createContact.mutate({ name: contactDraft.name.trim(), phone: contactDraft.phone || undefined, email: contactDraft.email || undefined });
                 } else {
-                  if (!selectedContactId) { toast.error("Selecione um contato"); return; }
+                  if (!selectedContactId) { toast.error("Selecione um passageiro"); return; }
                   updateDeal.mutate({ id: dealId, contactId: selectedContactId });
                 }
                 setShowContactDialog(false);
@@ -1754,13 +1762,13 @@ export default function DealDetail() {
         </DialogContent>
       </Dialog>
 
-      {/* ═══ Dialog: Editar Contato ═══ */}
+      {/* ═══ Dialog: Editar Passageiro ═══ */}
       <Dialog open={showEditContactDialog} onOpenChange={setShowEditContactDialog}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Edit2 className="h-5 w-5 text-primary" />
-              Editar Contato
+              Editar Passageiro
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
@@ -3041,7 +3049,7 @@ function ParticipantsPanel({ participants, contacts, dealId, onRefresh }: any) {
               <div className="space-y-1.5">
                 <Label className="text-xs">Nome *</Label>
                 <Input
-                  placeholder="Nome do contato"
+                  placeholder="Nome do passageiro"
                   value={newName}
                   onChange={(e) => setNewName(e.target.value)}
                   className="h-9"
@@ -3434,8 +3442,8 @@ function WhatsAppPanel({ contact, dealId, isFullscreen, onToggleFullscreen, onOp
     return (
       <div className="flex flex-col items-center justify-center h-full py-16 text-muted-foreground">
         <User className="h-12 w-12 mb-3 opacity-20" />
-        <p className="text-sm font-medium">Nenhum contato associado</p>
-        <p className="text-xs mt-1">Associe um contato na sidebar para ver a conversa do WhatsApp</p>
+        <p className="text-sm font-medium">Nenhum passageiro associado</p>
+        <p className="text-xs mt-1">Associe um passageiro na sidebar para ver a conversa do WhatsApp</p>
       </div>
     );
   }
@@ -3444,8 +3452,8 @@ function WhatsAppPanel({ contact, dealId, isFullscreen, onToggleFullscreen, onOp
     return (
       <div className="flex flex-col items-center justify-center h-full py-16 text-muted-foreground">
         <Phone className="h-12 w-12 mb-3 opacity-20" />
-        <p className="text-sm font-medium">Contato sem telefone</p>
-        <p className="text-xs mt-1">Adicione um número de telefone ao contato "{contact.name}"</p>
+        <p className="text-sm font-medium">Passageiro sem telefone</p>
+        <p className="text-xs mt-1">Adicione um número de telefone ao passageiro "{contact.name}"</p>
       </div>
     );
   }
@@ -3495,7 +3503,7 @@ function WhatsAppPanel({ contact, dealId, isFullscreen, onToggleFullscreen, onOp
           Chat ao Vivo
         </button>
         <div className="flex-1" />
-        <span className="text-[10px] text-muted-foreground hidden sm:inline">Contato: {contact.name} · {contact.phone}</span>
+        <span className="text-[10px] text-muted-foreground hidden sm:inline">Passageiro: {contact.name} · {contact.phone}</span>
         {/* Mobile: button to open sidebar drawer */}
         {onOpenSidebar && (
           <button
@@ -3529,7 +3537,7 @@ function WhatsAppPanel({ contact, dealId, isFullscreen, onToggleFullscreen, onOp
             <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
               <MessageCircle className="h-12 w-12 mb-3 opacity-20" />
               <p className="text-sm font-medium">Nenhuma mensagem encontrada</p>
-              <p className="text-xs mt-1">As mensagens do WhatsApp com este contato aparecerão aqui</p>
+              <p className="text-xs mt-1">As mensagens do WhatsApp com este passageiro aparecerão aqui</p>
             </div>
           ) : (
             <>

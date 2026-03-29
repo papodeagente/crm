@@ -1,6 +1,6 @@
 /**
  * BulkWhatsAppDialog — Componente reutilizável para disparo em massa via WhatsApp.
- * Usado nas páginas de Contatos, Negociações e RFV.
+ * Usado nas páginas de Passageiros, Negociações e RFV.
  */
 import { useState, useRef, useEffect, useCallback } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
@@ -53,7 +53,7 @@ interface BulkWhatsAppDialogProps {
   onCancel: () => void;
   isCancelling: boolean;
   onClearSelection: () => void;
-  /** Label for the entity type (e.g., "contatos", "negociações") */
+  /** Label for the entity type (e.g., "passageiros", "negociações") */
   entityLabel?: string;
 }
 
@@ -73,7 +73,7 @@ export default function BulkWhatsAppDialog({
   onCancel,
   isCancelling,
   onClearSelection,
-  entityLabel = "contatos",
+  entityLabel = "passageiros",
 }: BulkWhatsAppDialogProps) {
   const [messageTemplate, setMessageTemplate] = useState("");
   const [delayMode, setDelayMode] = useState<"random" | "fixed">("random");

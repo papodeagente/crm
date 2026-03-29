@@ -275,7 +275,7 @@ export default function SuperAdmin() {
                     <th className="text-left p-4 font-medium">Billing</th>
                     <th className="text-left p-4 font-medium">Usuários</th>
                     <th className="text-center p-4 font-medium" title="Negociações em andamento / total"><Handshake className="w-4 h-4 mx-auto text-muted-foreground" /></th>
-                    <th className="text-center p-4 font-medium" title="Contatos"><Contact className="w-4 h-4 mx-auto text-muted-foreground" /></th>
+                    <th className="text-center p-4 font-medium" title="Passageiros"><Contact className="w-4 h-4 mx-auto text-muted-foreground" /></th>
                     <th className="text-center p-4 font-medium" title="WhatsApp conectado"><Wifi className="w-4 h-4 mx-auto text-muted-foreground" /></th>
                     <th className="text-right p-4 font-medium" title="Vendido no mês"><DollarSign className="w-4 h-4 ml-auto text-muted-foreground" /></th>
                     <th className="text-left p-4 font-medium">Criado em</th>

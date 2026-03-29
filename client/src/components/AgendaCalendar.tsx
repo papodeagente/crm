@@ -776,7 +776,7 @@ function AppointmentModal({ open, onClose, editItem, defaultDate, defaultHour, o
           {/* Participants */}
           <div className="space-y-1.5">
             <Label className="text-[12px] font-semibold flex items-center gap-1">
-              <Users className="h-3 w-3" /> Participantes
+              <Users className="h-3 w-3" /> Passageiros
             </Label>
             <div className="flex flex-wrap gap-1.5 min-h-[32px]">
               {selectedParticipants.map(p => (

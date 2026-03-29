@@ -33,7 +33,7 @@ const differentials = [
     icon: Users,
     title: "Matriz RFV",
     description:
-      "Classifica contatos por recência, frequência e valor. Saiba quem pode indicar, quem está esfriando e quem abordar agora.",
+      "Classifica passageiros por recência, frequência e valor. Saiba quem pode indicar, quem está esfriando e quem abordar agora.",
   },
   {
     icon: Plane,

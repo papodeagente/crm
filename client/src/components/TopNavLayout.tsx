@@ -34,7 +34,7 @@ const navItems: NavItem[] = [
   { icon: Home, label: "Início", path: "/dashboard", matchPaths: ["/dashboard"] },
   { icon: Briefcase, label: "Negociações", path: "/pipeline", matchPaths: ["/pipeline", "/deal"] },
   { icon: Inbox, label: "Inbox", path: "/inbox", matchPaths: ["/inbox"] },
-  { icon: Users, label: "Contatos", path: "/contacts", matchPaths: ["/contacts"] },
+  { icon: Users, label: "Passageiros", path: "/contacts", matchPaths: ["/contacts"] },
   { icon: CheckSquare, label: "Tarefas", path: "/tasks", matchPaths: ["/tasks"] },
 
   { icon: TrendingUp, label: "RFV", path: "/rfv", matchPaths: ["/rfv", "/campaigns"] },
@@ -46,7 +46,7 @@ const quickNavPages = [
   { icon: Home, label: "Início", path: "/dashboard" },
   { icon: Briefcase, label: "Negociações", path: "/pipeline" },
   { icon: Inbox, label: "Inbox", path: "/inbox" },
-  { icon: Users, label: "Contatos", path: "/contacts" },
+  { icon: Users, label: "Passageiros", path: "/contacts" },
   { icon: CheckSquare, label: "Tarefas", path: "/tasks" },
 
   { icon: TrendingUp, label: "RFV", path: "/rfv" },
@@ -199,7 +199,7 @@ function SearchPalette({ open, onClose }: { open: boolean; onClose: () => void }
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Buscar contatos, negociações, tarefas..."
+              placeholder="Buscar passageiros, negociações, tarefas..."
               className="flex-1 h-12 bg-transparent text-[14px] text-foreground placeholder:text-muted-foreground outline-none"
             />
             <kbd className="hidden sm:inline-flex h-5 items-center gap-0.5 rounded border border-border bg-muted px-1.5 text-[10px] font-medium text-muted-foreground">
@@ -214,7 +214,7 @@ function SearchPalette({ open, onClose }: { open: boolean; onClose: () => void }
               <div className="flex items-center gap-1.5 px-4 pt-3 pb-1">
                 {contactCount > 0 && (
                   <span className="text-[10px] font-semibold uppercase tracking-wider text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
-                    {contactCount} contato{contactCount > 1 ? "s" : ""}
+                    {contactCount} passageiro{contactCount > 1 ? "s" : ""}
                   </span>
                 )}
                 {dealCount > 0 && (

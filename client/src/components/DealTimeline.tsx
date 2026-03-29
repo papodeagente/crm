@@ -28,7 +28,7 @@ const CATEGORIES = [
   { key: "task", label: "Tarefas", icon: CheckSquare, color: "text-amber-500", bgColor: "bg-amber-500/10" },
   { key: "note", label: "Anotações", icon: StickyNote, color: "text-purple-500", bgColor: "bg-purple-500/10" },
   { key: "product", label: "Produtos", icon: Package, color: "text-orange-500", bgColor: "bg-orange-500/10" },
-  { key: "assignment", label: "Participantes", icon: UserPlus, color: "text-cyan-500", bgColor: "bg-cyan-500/10" },
+  { key: "assignment", label: "Passageiros", icon: UserPlus, color: "text-cyan-500", bgColor: "bg-cyan-500/10" },
   { key: "conversion", label: "Conversões", icon: Target, color: "text-pink-500", bgColor: "bg-pink-500/10" },
   { key: "audit", label: "Auditoria", icon: FileText, color: "text-gray-500", bgColor: "bg-gray-500/10" },
   { key: "automation", label: "Automação", icon: Zap, color: "text-yellow-500", bgColor: "bg-yellow-500/10" },

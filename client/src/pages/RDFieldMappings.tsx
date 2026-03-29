@@ -229,7 +229,7 @@ export default function RDFieldMappings() {
                             "bg-amber-500/10 text-amber-600 border-amber-200"
                           }`}
                         >
-                          {m.targetEntity === "deal" ? "Negociação" : m.targetEntity === "contact" ? "Contato" : "Empresa"}
+                          {m.targetEntity === "deal" ? "Negociação" : m.targetEntity === "contact" ? "Passageiro" : "Empresa"}
                         </Badge>
                         <Badge variant={m.enturFieldType === "standard" ? "secondary" : "outline"} className="text-[9px]">
                           {m.enturFieldType === "standard" ? "Padrão" : "Personalizado"}
@@ -457,7 +457,7 @@ function MappingDialog({
             </div>
             <div className="grid grid-cols-3 gap-2">
               {(["deal", "contact", "company"] as const).map((entity) => {
-                const labels = { deal: "Negociação", contact: "Contato", company: "Empresa" };
+                const labels = { deal: "Negociação", contact: "Passageiro", company: "Empresa" };
                 const colors = { deal: "bg-blue-500/10 text-blue-600 border-blue-200", contact: "bg-emerald-500/10 text-emerald-600 border-emerald-200", company: "bg-amber-500/10 text-amber-600 border-amber-200" };
                 return (
                   <button
@@ -501,7 +501,7 @@ function MappingDialog({
                 <label className="text-xs font-medium text-muted-foreground">Selecione o campo padrão</label>
                 {filteredStandardFields.length === 0 ? (
                   <div className="mt-2 p-3 bg-muted/30 rounded-lg text-center">
-                    <p className="text-xs text-muted-foreground">Nenhum campo padrão disponível para {targetEntity === "deal" ? "Negociação" : targetEntity === "contact" ? "Contato" : "Empresa"}</p>
+                    <p className="text-xs text-muted-foreground">Nenhum campo padrão disponível para {targetEntity === "deal" ? "Negociação" : targetEntity === "contact" ? "Passageiro" : "Empresa"}</p>
                   </div>
                 ) : (
                   <Select value={enturFieldKey} onValueChange={setEnturFieldKey}>
@@ -519,7 +519,7 @@ function MappingDialog({
                 <label className="text-xs font-medium text-muted-foreground">Selecione o campo personalizado</label>
                 {filteredCustomFields.length === 0 ? (
                   <div className="mt-2 p-3 bg-muted/30 rounded-lg text-center">
-                    <p className="text-xs text-muted-foreground">Nenhum campo personalizado de {targetEntity === "deal" ? "Negociação" : targetEntity === "contact" ? "Contato" : "Empresa"}</p>
+                    <p className="text-xs text-muted-foreground">Nenhum campo personalizado de {targetEntity === "deal" ? "Negociação" : targetEntity === "contact" ? "Passageiro" : "Empresa"}</p>
                     <p className="text-[10px] text-muted-foreground mt-1">Crie campos personalizados em Configurações → Campos Personalizados</p>
                   </div>
                 ) : (

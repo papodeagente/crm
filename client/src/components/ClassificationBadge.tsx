@@ -49,7 +49,7 @@ const CLASSIFICATION_CONFIG: Record<StageClassification, {
     borderClass: "border-blue-200 dark:border-blue-700",
     dotClass: "bg-blue-500",
     Icon: UserPlus,
-    description: "Contato qualificado em prospecção",
+    description: "Passageiro qualificado em prospecção",
   },
   oportunidade: {
     label: "Oportunidade",

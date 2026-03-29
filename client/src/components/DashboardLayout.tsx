@@ -54,7 +54,7 @@ const menuSections: MenuSection[] = [
     items: [
       { icon: Briefcase, label: "Negócios", path: "/deals" },
       { icon: Inbox, label: "Inbox", path: "/inbox" },
-      { icon: Users, label: "Contatos", path: "/contacts" },
+      { icon: Users, label: "Passageiros", path: "/contacts" },
       { icon: Target, label: "Funil", path: "/pipeline" },
       { icon: Plane, label: "Viagens", path: "/trips" },
       { icon: ClipboardList, label: "Tarefas", path: "/tasks" },

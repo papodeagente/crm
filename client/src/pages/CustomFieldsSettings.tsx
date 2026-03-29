@@ -52,7 +52,7 @@ const FIELD_TYPES = [
 ];
 
 const ENTITIES = [
-  { value: "contact", label: "Contatos" },
+  { value: "contact", label: "Passageiros" },
   { value: "deal", label: "Negociações" },
   { value: "company", label: "Empresas" },
 ];
@@ -236,7 +236,7 @@ function FieldFormDialog({
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-foreground">Visível no Perfil</p>
-                <p className="text-xs text-muted-foreground">Aparece na página de perfil do contato</p>
+                <p className="text-xs text-muted-foreground">Aparece na página de perfil do passageiro</p>
               </div>
               <Switch checked={isVisibleOnProfile} onCheckedChange={setIsVisibleOnProfile} />
             </div>

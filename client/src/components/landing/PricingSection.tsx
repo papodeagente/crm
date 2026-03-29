@@ -27,7 +27,7 @@ const FALLBACK_PLANS: PublicPlan[] = [
     color: null,
     limits: { maxUsers: 1, maxWhatsAppAccounts: 0, maxAttendantsPerAccount: 0 },
     features: [
-      { key: "crmCore", label: "CRM completo (contatos, negociações, funil, tarefas)", isEnabled: true },
+      { key: "crmCore", label: "CRM completo (passageiros, negociações, funil, tarefas)", isEnabled: true },
       { key: "communityAccess", label: "Comunidade Acelera Turismo", isEnabled: true },
       { key: "whatsappEmbedded", label: "WhatsApp integrado ao CRM", isEnabled: false },
       { key: "segmentedBroadcast", label: "Disparo segmentado de mensagens", isEnabled: false },
@@ -49,7 +49,7 @@ const FALLBACK_PLANS: PublicPlan[] = [
     color: null,
     limits: { maxUsers: 5, maxWhatsAppAccounts: 1, maxAttendantsPerAccount: 3 },
     features: [
-      { key: "crmCore", label: "CRM completo (contatos, negociações, funil, tarefas)", isEnabled: true },
+      { key: "crmCore", label: "CRM completo (passageiros, negociações, funil, tarefas)", isEnabled: true },
       { key: "communityAccess", label: "Comunidade Acelera Turismo", isEnabled: true },
       { key: "whatsappEmbedded", label: "WhatsApp integrado ao CRM", isEnabled: true },
       { key: "segmentedBroadcast", label: "Disparo segmentado de mensagens", isEnabled: true },
@@ -71,7 +71,7 @@ const FALLBACK_PLANS: PublicPlan[] = [
     color: null,
     limits: { maxUsers: -1, maxWhatsAppAccounts: 3, maxAttendantsPerAccount: 10 },
     features: [
-      { key: "crmCore", label: "CRM completo (contatos, negociações, funil, tarefas)", isEnabled: true },
+      { key: "crmCore", label: "CRM completo (passageiros, negociações, funil, tarefas)", isEnabled: true },
       { key: "communityAccess", label: "Comunidade Acelera Turismo", isEnabled: true },
       { key: "whatsappEmbedded", label: "WhatsApp integrado ao CRM", isEnabled: true },
       { key: "segmentedBroadcast", label: "Disparo segmentado de mensagens", isEnabled: true },
@@ -127,7 +127,7 @@ const cardStyles = [
 
 // ─── Feature comparison keys ─────────────────────────────────────
 const COMPARISON_FEATURE_KEYS = [
-  { key: "crmCore", label: "CRM completo (contatos, negociações, funil, tarefas)" },
+  { key: "crmCore", label: "CRM completo (passageiros, negociações, funil, tarefas)" },
   { key: "communityAccess", label: "Comunidade Acelera Turismo" },
   { key: "whatsappEmbedded", label: "WhatsApp integrado ao CRM" },
   { key: "segmentedBroadcast", label: "Disparo segmentado de mensagens" },
@@ -145,7 +145,7 @@ function getIncludedFeatures(plan: PublicPlan): string[] {
   const items: string[] = [];
   const featureMap = new Map(plan.features.map((f) => [f.key, f.isEnabled]));
 
-  if (featureMap.get("crmCore")) items.push("CRM completo (contatos, negociações, funil, tarefas)");
+  if (featureMap.get("crmCore")) items.push("CRM completo (passageiros, negociações, funil, tarefas)");
   if (featureMap.get("communityAccess")) items.push("Comunidade Acelera Turismo");
 
   const { maxUsers, maxWhatsAppAccounts, maxAttendantsPerAccount } = plan.limits;

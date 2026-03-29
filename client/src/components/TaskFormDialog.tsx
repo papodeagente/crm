@@ -263,7 +263,7 @@ export default function TaskFormDialog({
         return;
       }
       if (!resolvedContactId) {
-        toast.error("Negociação sem contato vinculado. Vincule um contato antes de agendar.");
+        toast.error("Negociação sem passageiro vinculado. Vincule um passageiro antes de agendar.");
         return;
       }
 
@@ -442,7 +442,7 @@ export default function TaskFormDialog({
                 <div className="flex items-center gap-3 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20">
                   <AlertCircle className="h-4 w-4 text-amber-600 shrink-0" />
                   <span className="text-[13px] text-amber-700">
-                    Negociação sem contato vinculado. Vincule um contato antes de agendar.
+                    Negociação sem passageiro vinculado. Vincule um passageiro antes de agendar.
                   </span>
                 </div>
               )}
@@ -488,7 +488,7 @@ export default function TaskFormDialog({
               <Input
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder={`WhatsApp para ${resolvedContactName || "contato"}`}
+                placeholder={`WhatsApp para ${resolvedContactName || "passageiro"}`}
                 className="h-10 rounded-xl border-border/60"
               />
             </div>

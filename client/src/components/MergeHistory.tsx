@@ -72,7 +72,7 @@ export default function MergeHistory({ contactId }: MergeHistoryProps) {
     onSuccess: () => {
       utils.crm.contacts.mergeHistory.invalidate({ contactId });
       utils.crm.contacts.get.invalidate({ id: contactId });
-      toast.success("Merge revertido com sucesso. Os contatos foram restaurados.");
+      toast.success("Merge revertido com sucesso. Os passageiros foram restaurados.");
     },
     onError: (err) => toast.error(err.message || "Erro ao reverter merge"),
   });
@@ -85,7 +85,7 @@ export default function MergeHistory({ contactId }: MergeHistoryProps) {
       <CardHeader className="pb-3">
         <CardTitle className="text-base font-semibold flex items-center gap-2">
           <GitMerge className="h-4 w-4 text-primary" />
-          Unificações de Contato ({merges.length})
+          Unificações de Passageiro ({merges.length})
           {pendingMerges.length > 0 && (
             <Badge variant="outline" className="text-[10px] bg-amber-500/10 text-amber-400 border-amber-500/30 ml-1">
               {pendingMerges.length} pendente{pendingMerges.length > 1 ? "s" : ""}
@@ -102,7 +102,7 @@ export default function MergeHistory({ contactId }: MergeHistoryProps) {
           <div className="text-center py-8">
             <GitMerge className="h-8 w-8 text-muted-foreground/30 mx-auto mb-2" />
             <p className="text-sm text-muted-foreground">Nenhuma unificação registrada</p>
-            <p className="text-xs text-muted-foreground mt-1">Unificações ocorrem automaticamente quando o sistema detecta contatos duplicados</p>
+            <p className="text-xs text-muted-foreground mt-1">Unificações ocorrem automaticamente quando o sistema detecta passageiros duplicados</p>
           </div>
         ) : (
           <div className="space-y-2">
@@ -157,8 +157,8 @@ export default function MergeHistory({ contactId }: MergeHistoryProps) {
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-medium text-foreground">
                           {isPrimary
-                            ? `Contato #${otherContactId} unificado aqui`
-                            : `Unificado no contato #${otherContactId}`
+                            ? `Passageiro #${otherContactId} unificado aqui`
+                            : `Unificado no passageiro #${otherContactId}`
                           }
                         </span>
                         {statusBadge(merge.status)}
@@ -188,11 +188,11 @@ export default function MergeHistory({ contactId }: MergeHistoryProps) {
                     <div className="px-3 pb-3 pt-0 border-t border-border/20">
                       <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs mt-2">
                         <div>
-                          <span className="text-muted-foreground">Contato Principal</span>
+                          <span className="text-muted-foreground">Passageiro Principal</span>
                           <p className="text-foreground font-medium">#{merge.primaryContactId}</p>
                         </div>
                         <div>
-                          <span className="text-muted-foreground">Contato Secundário</span>
+                          <span className="text-muted-foreground">Passageiro Secundário</span>
                           <p className="text-foreground font-medium">#{merge.secondaryContactId}</p>
                         </div>
                         {merge.reason && (
@@ -253,7 +253,7 @@ export default function MergeHistory({ contactId }: MergeHistoryProps) {
                                 <AlertDialogTitle>Confirmar Unificação</AlertDialogTitle>
                                 <AlertDialogDescription>
                                   Ao confirmar, a unificação se torna permanente e não poderá mais ser revertida.
-                                  Os dados do contato #{merge.secondaryContactId} foram movidos para o contato #{merge.primaryContactId}.
+                                  Os dados do passageiro #{merge.secondaryContactId} foram movidos para o passageiro #{merge.primaryContactId}.
                                 </AlertDialogDescription>
                               </AlertDialogHeader>
                               <AlertDialogFooter>
@@ -285,8 +285,8 @@ export default function MergeHistory({ contactId }: MergeHistoryProps) {
                               <AlertDialogHeader>
                                 <AlertDialogTitle>Reverter Unificação</AlertDialogTitle>
                                 <AlertDialogDescription>
-                                  Ao reverter, o contato #{merge.secondaryContactId} será restaurado com seus dados originais.
-                                  Negociações, tarefas e conversões serão devolvidas ao contato original.
+                                  Ao reverter, o passageiro #{merge.secondaryContactId} será restaurado com seus dados originais.
+                                  Negociações, tarefas e conversões serão devolvidas ao passageiro original.
                                 </AlertDialogDescription>
                               </AlertDialogHeader>
                               <AlertDialogFooter>

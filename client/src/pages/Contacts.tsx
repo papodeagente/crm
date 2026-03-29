@@ -33,7 +33,7 @@ function ExportContactsButton() {
       size="sm"
       className="h-9 gap-2 rounded-lg text-[13px]"
       disabled={isExporting}
-      onClick={() => handleExport(() => exportMutation.mutateAsync(), "contatos")}
+      onClick={() => handleExport(() => exportMutation.mutateAsync(), "passageiros")}
     >
       {isExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
       Exportar
@@ -82,10 +82,10 @@ export default function Contacts() {
   const sessionConnected = activeSession.data?.status === "connected";
   const sessionConnecting = activeSession.data?.status === "connecting";
   const contactTemplateVars = [
-    { var: "{nome}", desc: "Nome completo do contato" },
+    { var: "{nome}", desc: "Nome completo do passageiro" },
     { var: "{primeiro_nome}", desc: "Primeiro nome" },
-    { var: "{email}", desc: "E-mail do contato" },
-    { var: "{telefone}", desc: "Telefone do contato" },
+    { var: "{email}", desc: "E-mail do passageiro" },
+    { var: "{telefone}", desc: "Telefone do passageiro" },
   ];
   const contactPreviewReplacements: Record<string, string> = {
     "{nome}": "João da Silva",
@@ -114,11 +114,11 @@ export default function Contacts() {
       }
       utils.crm.contacts.list.invalidate();
       setOpen(false); setName(""); setEmail(""); setPhone(""); setCustomFieldValues({});
-      toast.success("Contato criado!");
+      toast.success("Passageiro criado!");
     },
   });
   const deleteContact = trpc.crm.contacts.delete.useMutation({
-    onSuccess: () => { utils.crm.contacts.list.invalidate(); utils.crm.contacts.listDeleted.invalidate(); toast.success("Contato movido para a lixeira."); },
+    onSuccess: () => { utils.crm.contacts.list.invalidate(); utils.crm.contacts.listDeleted.invalidate(); toast.success("Passageiro movido para a lixeira."); },
   });
   const bulkDelete = trpc.crm.contacts.bulkDelete.useMutation({
     onSuccess: (data) => {
@@ -126,7 +126,7 @@ export default function Contacts() {
       utils.crm.contacts.listDeleted.invalidate();
       setSelectedIds(new Set());
       setConfirmDelete(false);
-      toast.success(`${data.count} contato(s) movido(s) para a lixeira`);
+      toast.success(`${data.count} passageiro(s) movido(s) para a lixeira`);
     },
     onError: (err) => toast.error(err.message),
   });
@@ -135,7 +135,7 @@ export default function Contacts() {
       utils.crm.contacts.list.invalidate();
       utils.crm.contacts.listDeleted.invalidate();
       setSelectedIds(new Set());
-      toast.success(`${data.count} contato(s) restaurado(s)`);
+      toast.success(`${data.count} passageiro(s) restaurado(s)`);
     },
     onError: (err) => toast.error(err.message),
   });
@@ -145,7 +145,7 @@ export default function Contacts() {
       utils.crm.contacts.listDeleted.invalidate();
       setSelectedIds(new Set());
       setConfirmHardDelete(false);
-      toast.success(`${data.count} contato(s) excluído(s) permanentemente`);
+      toast.success(`${data.count} passageiro(s) excluído(s) permanentemente`);
     },
     onError: (err) => toast.error(err.message),
   });
@@ -179,8 +179,8 @@ export default function Contacts() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-[20px] font-semibold tracking-tight text-foreground">Contatos</h1>
-          <p className="text-[13px] text-muted-foreground/70 mt-0.5">{total} contato{total !== 1 ? "s" : ""}</p>
+          <h1 className="text-[20px] font-semibold tracking-tight text-foreground">Passageiros</h1>
+          <p className="text-[13px] text-muted-foreground/70 mt-0.5">{total} passageiro{total !== 1 ? "s" : ""}</p>
         </div>
         <div className="flex items-center gap-2">
           <DateRangeFilter
@@ -208,12 +208,12 @@ export default function Contacts() {
             <Dialog open={open} onOpenChange={setOpen}>
               <DialogTrigger asChild>
                 <Button className="h-9 gap-2 px-4 rounded-lg bg-primary hover:bg-primary/90 text-[13px] font-medium shadow-sm transition-colors">
-                  <Plus className="h-4 w-4" />Novo Contato
+                  <Plus className="h-4 w-4" />Novo Passageiro
                 </Button>
               </DialogTrigger>
               <DialogContent className="sm:max-w-[440px] rounded-xl">
                 <DialogHeader>
-                  <DialogTitle className="text-[16px] font-semibold">Novo Contato</DialogTitle>
+                  <DialogTitle className="text-[16px] font-semibold">Novo Passageiro</DialogTitle>
                 </DialogHeader>
                 <div className="space-y-4 pt-2">
                   <div>
@@ -247,7 +247,7 @@ export default function Contacts() {
                     disabled={!name || createContact.isPending}
                     onClick={() => createContact.mutate({ name, email: email || undefined, phone: phone || undefined })}
                   >
-                    {createContact.isPending ? "Criando..." : "Criar Contato"}
+                    {createContact.isPending ? "Criando..." : "Criar Passageiro"}
                   </Button>
                 </div>
               </DialogContent>
@@ -264,7 +264,7 @@ export default function Contacts() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/50" />
               <Input
                 className="pl-9 h-9 rounded-lg bg-muted/30 border-0 text-[13px] placeholder:text-muted-foreground/50 focus-visible:ring-1 focus-visible:ring-primary/30"
-                placeholder="Buscar contatos..."
+                placeholder="Buscar passageiros..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
@@ -377,7 +377,7 @@ export default function Contacts() {
       {showTrash && (
         <div className="flex items-center gap-2 p-3 bg-amber-50 dark:bg-amber-950/30 rounded-xl border border-amber-200 dark:border-amber-800/40">
           <Archive className="h-4 w-4 text-amber-600" />
-          <span className="text-[13px] font-medium text-amber-800 dark:text-amber-300">Lixeira de Contatos</span>
+          <span className="text-[13px] font-medium text-amber-800 dark:text-amber-300">Lixeira de Passageiros</span>
           <span className="text-[12px] text-amber-600 dark:text-amber-400 ml-1">Itens na lixeira podem ser restaurados ou excluídos permanentemente (admin).</span>
         </div>
       )}
@@ -413,7 +413,7 @@ export default function Contacts() {
                 ) : (
                   <>
                     <Users className="h-8 w-8 mx-auto mb-2 text-muted-foreground/20" />
-                    <p className="text-[13px]">Nenhum contato encontrado</p>
+                    <p className="text-[13px]">Nenhum passageiro encontrado</p>
                   </>
                 )}
               </td></tr>
@@ -495,7 +495,7 @@ export default function Contacts() {
       {!showTrash && totalPages > 1 && (
         <div className="flex items-center justify-between px-4 py-3 border-t border-border/30">
           <p className="text-xs text-muted-foreground">
-            Mostrando {page * pageSize + 1}–{Math.min((page + 1) * pageSize, totalCount)} de {totalCount} contatos
+            Mostrando {page * pageSize + 1}–{Math.min((page + 1) * pageSize, totalCount)} de {totalCount} passageiros
           </p>
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" disabled={page === 0} onClick={() => setPage(p => p - 1)}>
@@ -515,12 +515,12 @@ export default function Contacts() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2.5 text-lg text-destructive">
               <AlertTriangle className="h-5 w-5" />
-              Excluir {selectedIds.size} contato(s)?
+              Excluir {selectedIds.size} passageiro(s)?
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 pt-2">
             <p className="text-[13px] text-muted-foreground">
-              Os contatos serão movidos para a lixeira. As <strong>negociações vinculadas não serão afetadas</strong>. Você pode restaurá-los a qualquer momento.
+              Os passageiros serão movidos para a lixeira. As <strong>negociações vinculadas não serão afetadas</strong>. Você pode restaurá-los a qualquer momento.
             </p>
             <div className="flex gap-2 justify-end">
               <Button variant="outline" className="rounded-lg" onClick={() => setConfirmDelete(false)}>Cancelar</Button>
@@ -543,7 +543,7 @@ export default function Contacts() {
           </DialogHeader>
           <div className="space-y-4 pt-2">
             <p className="text-[13px] text-muted-foreground">
-              Esta ação é <strong>irreversível</strong>. Os contatos serão excluídos permanentemente do banco de dados.
+              Esta ação é <strong>irreversível</strong>. Os passageiros serão excluídos permanentemente do banco de dados.
             </p>
             <div className="flex gap-2 justify-end">
               <Button variant="outline" className="rounded-lg" onClick={() => setConfirmHardDelete(false)}>Cancelar</Button>
@@ -580,7 +580,7 @@ export default function Contacts() {
         onCancel={() => cancelBulk.mutate()}
         isCancelling={cancelBulk.isPending}
         onClearSelection={() => setSelectedIds(new Set())}
-        entityLabel="contatos"
+        entityLabel="passageiros"
       />
     </div>
   );

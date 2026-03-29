@@ -111,7 +111,7 @@ export function SalesSimulator({ onCTA }: SalesSimulatorProps) {
                     <div className="bg-violet-500/[0.05] border border-violet-500/15 rounded-xl p-5">
                       <p className="text-sm text-white/60 leading-relaxed">
                         <span className="text-white font-medium">Essas vendas não estão perdidas.</span>{" "}
-                        Elas apenas ficaram esquecidas na sua base de contatos.
+                        Elas apenas ficaram esquecidas na sua base de passageiros.
                       </p>
                       <p className="text-sm text-white/50 leading-relaxed mt-3">
                         O <span className="text-violet-300 font-semibold">ENTUR OS</span> usa a{" "}

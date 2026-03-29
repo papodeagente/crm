@@ -696,7 +696,7 @@ const MessageBubble = memo(({
         borderLeft: '4px solid var(--wa-tint)',
         padding: '5px 12px 7px 8px',
       }}>
-        <p className="text-[12.5px] font-medium" style={{ color: 'var(--wa-tint)' }}>{quotedMsg.fromMe ? "Você" : "Contato"}</p>
+        <p className="text-[12.5px] font-medium" style={{ color: 'var(--wa-tint)' }}>{quotedMsg.fromMe ? "Você" : "Passageiro"}</p>
         <p className="text-[12.5px] truncate max-w-full sm:max-w-[300px]" style={{ color: 'var(--wa-text-secondary)' }}>{quotedContent}</p>
       </div>
     );
@@ -726,7 +726,7 @@ const MessageBubble = memo(({
           <Contact className="w-8 h-8 text-wa-tint" />
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium">{msg.content}</p>
-            <p className="text-[11px] text-muted-foreground">Contato</p>
+            <p className="text-[11px] text-muted-foreground">Passageiro</p>
           </div>
         </div>
       );
@@ -1011,7 +1011,7 @@ function AttachMenu({ onSelect, onClose }: { onSelect: (type: string) => void; o
     { type: "camera", icon: Camera, label: "Câmera", color: "#EC4899" },
     { type: "document", icon: FileText, label: "Documento", color: "#6366F1" },
     { type: "location", icon: MapPin, label: "Localização", color: "#10B981" },
-    { type: "contact", icon: Contact, label: "Contato", color: "#3B82F6" },
+    { type: "contact", icon: Contact, label: "Passageiro", color: "#3B82F6" },
     { type: "poll", icon: BarChart3, label: "Enquete", color: "#F59E0B" },
   ];
 
@@ -1151,7 +1151,7 @@ function ContactModal({ onSend, onClose }: { onSend: (contacts: Array<{ fullName
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={onClose}>
       <div className="bg-card rounded-xl shadow-2xl border border-border w-[400px] max-w-[90vw] p-5" onClick={e => e.stopPropagation()}>
         <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-          <Contact className="w-5 h-5 text-wa-tint" /> Enviar Contato
+          <Contact className="w-5 h-5 text-wa-tint" /> Enviar Passageiro
         </h3>
         <div className="space-y-3">
           <input type="text" placeholder="Nome completo" value={fullName} onChange={e => setFullName(e.target.value)}
@@ -1662,10 +1662,10 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
 
   const sendContactMut = trpc.whatsapp.sendContact.useMutation({
     onMutate: () => {
-      onOptimisticSend?.({ content: "👤 Contato", messageType: "contactMessage" });
+      onOptimisticSend?.({ content: "👤 Passageiro", messageType: "contactMessage" });
     },
-    onSuccess: () => { messagesQ.refetch(); toast.success("Contato enviado"); },
-    onError: () => toast.error("Erro ao enviar contato"),
+    onSuccess: () => { messagesQ.refetch(); toast.success("Passageiro enviado"); },
+    onError: () => toast.error("Erro ao enviar passageiro"),
   });
 
   const sendPollMut = trpc.whatsapp.sendPoll.useMutation({
@@ -2232,7 +2232,7 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
           )}
         </div>
         <div className="flex-1 min-w-0 cursor-pointer">
-          <p className="text-[16px] font-normal truncate leading-[21px]" style={{ color: 'var(--wa-text-primary)' }}>{contact?.name || "Contato"}</p>
+          <p className="text-[16px] font-normal truncate leading-[21px]" style={{ color: 'var(--wa-text-primary)' }}>{contact?.name || "Passageiro"}</p>
           <p className="text-[13px] truncate leading-[20px]" style={{ color: 'var(--wa-text-secondary)' }}>{contact?.phone || ""}</p>
         </div>
         <div className="flex items-center gap-[2px]">
@@ -2337,11 +2337,11 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
             </div>
           )}
           {onCreateContact && !hasCrmContact && (
-            <InstantTooltip label="Criar contato no CRM">
+            <InstantTooltip label="Criar passageiro no CRM">
               <button onClick={onCreateContact}
                 className="flex items-center gap-1.5 px-2.5 py-1.5 bg-wa-tint hover:opacity-90 text-white text-xs font-medium rounded-full transition-all mr-1">
                 <UserPlus className="w-[14px] h-[14px]" />
-                <span className="hidden sm:inline">Criar Contato</span>
+                <span className="hidden sm:inline">Criar Passageiro</span>
               </button>
             </InstantTooltip>
           )}
@@ -2738,7 +2738,7 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
           <div className="rounded-[8px] overflow-hidden flex items-stretch" style={{ backgroundColor: 'var(--wa-input-bg)' }}>
             <div style={{ width: 4, backgroundColor: 'var(--wa-tint)', flexShrink: 0 }} />
             <div className="flex-1 px-[12px] py-[7px] min-w-0">
-              <p className="text-[12.5px] font-medium" style={{ color: 'var(--wa-tint)' }}>{replyTarget.fromMe ? "Voc\u00ea" : contact?.name || "Contato"}</p>
+              <p className="text-[12.5px] font-medium" style={{ color: 'var(--wa-tint)' }}>{replyTarget.fromMe ? "Voc\u00ea" : contact?.name || "Passageiro"}</p>
               <p className="text-[13px] truncate" style={{ color: 'var(--wa-text-secondary)' }}>{replyTarget.content}</p>
             </div>
             <button onClick={() => setReplyTarget(null)} className="px-[12px] flex items-center justify-center hover:opacity-70 transition-opacity">

@@ -6233,3 +6233,9 @@
 - [x] DifferentialsSection: "Pós-venda como funil" → "Pós-venda automatizado"
 - [x] TourismSection: "8.000 agentes treinados e mais de 30 versões" → "15.000 agentes treinados"
 - [x] HeroSection: "8.000 agentes" → "15.000 agentes" (aplicado automaticamente)
+## Renomear Contato → Passageiro (nomenclatura turismo)
+- [x] Menu principal: trocar "Contatos" por "Passageiros"
+- [x] Dentro da negociação: trocar "Contato" por "Passageiro"
+- [x] Remover menu/seção "Participantes" dentro de negociação
+- [x] Adicionar botão "Adicionar passageiro" abaixo do passageiro na negociação
+- [x] Atualizar demais referências de "Contato/Contatos" visíveis na UI

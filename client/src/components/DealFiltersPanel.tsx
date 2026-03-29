@@ -291,9 +291,9 @@ export default function DealFiltersPanel({
               onToChange={(v) => set("dateTo", v)}
             />
 
-            {/* ─── Data de Último Contato ─── */}
+            {/* ─── Data de Última Interação ─── */}
             <DateSection
-              label="Data de Último Contato"
+              label="Data de Última Interação"
               fromValue={local.lastActivityDateFrom}
               toValue={local.lastActivityDateTo}
               onFromChange={(v) => set("lastActivityDateFrom", v)}

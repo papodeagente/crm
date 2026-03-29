@@ -89,10 +89,10 @@ function formatConversationTime(date: string | Date | null | undefined): string 
 function formatPhoneNumber(jid: string): string {
   if (!jid) return "Desconhecido";
   // LID JIDs don't contain phone numbers - show friendly label
-  if (jid.endsWith("@lid")) return "Contato WhatsApp";
+  if (jid.endsWith("@lid")) return "Passageiro WhatsApp";
   const phone = jid.split("@")[0];
   // Skip non-numeric strings (corrupted JIDs)
-  if (!/^\d+$/.test(phone)) return "Contato WhatsApp";
+  if (!/^\d+$/.test(phone)) return "Passageiro WhatsApp";
   if (phone.startsWith("55") && phone.length >= 12) {
     const ddd = phone.substring(2, 4);
     const num = phone.substring(4);
@@ -1363,7 +1363,7 @@ export default function InboxPage() {
     // 6. For LID JIDs, try to show a resolved phone number instead of the LID
     if (jid.endsWith("@lid")) {
       if (waContact?.phoneNumber) return formatPhoneNumber(waContact.phoneNumber);
-      return "Contato WhatsApp";
+      return "Passageiro WhatsApp";
     }
     // 7. Format the phone number from the JID
     return formatPhoneNumber(jid);
@@ -1826,7 +1826,7 @@ export default function InboxPage() {
           {([
             { id: "mine" as InboxTab, label: "Meus Chats", badge: myConvsCount },
             { id: "queue" as InboxTab, label: "Fila", badge: queueCount },
-            { id: "contacts" as InboxTab, label: "Contatos", badge: 0 },
+            { id: "contacts" as InboxTab, label: "Passageiros", badge: 0 },
             ...(isAdmin ? [{ id: "all" as InboxTab, label: "Todas", badge: 0 }] : []),
           ]).map((tab) => {
             const active = activeTab === tab.id;
@@ -2078,7 +2078,7 @@ export default function InboxPage() {
         <CreateDealDialog
           open={showCreateDeal}
           onClose={() => setShowCreateDeal(false)}
-          contactName={selectedContact?.name || "Contato"}
+          contactName={selectedContact?.name || "Passageiro"}
           contactPhone={selectedJid?.split("@")[0] || ""}
           contactJid={selectedJid || ""}
           sessionId={activeSession.sessionId}

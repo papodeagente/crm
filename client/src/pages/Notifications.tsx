@@ -42,7 +42,7 @@ const typeConfig: Record<string, { icon: any; bg: string; iconBg: string; iconCo
     bg: "border-l-4 border-l-violet-500",
     iconBg: "bg-violet-500/15",
     iconColor: "text-violet-400",
-    label: "Contato",
+    label: "Passageiro",
     route: (id) => `/contacts?id=${id}`,
   },
   task_created: {
