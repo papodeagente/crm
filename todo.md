@@ -6111,3 +6111,7 @@
 - [x] Mover botão/conteúdo de Análise de IA para dentro da aba Histórico (botão na barra de filtros do DealTimeline)
 - [x] Remover aba Análise de IA do menu principal de abas (14 testes timeline passando)
 - [x] Testar e validar (14 testes timeline passando)
+## Persistência de Filtros do Pipeline
+- [x] Analisar estrutura atual dos filtros do pipeline (Pipeline.tsx) e navegação
+- [x] Implementar persistência via sessionStorage: viewMode, statusFilter, ownerFilter, sortMode, dealFilters, pipelineId
+- [x] Testar e validar (22 testes passando)

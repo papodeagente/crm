@@ -70,11 +70,17 @@ function formatCurrency(cents: number) {
 // formatDate and formatDateTime imported from shared/dateUtils (UTC-3)
 
 export default function Pipeline() {
-  const [viewMode, setViewMode] = useState<ViewMode>("kanban");
+  const [viewMode, setViewMode] = useState<ViewMode>(() => {
+    try { const v = sessionStorage.getItem("pipelineViewMode"); return (v === "kanban" || v === "list") ? v : "kanban"; } catch { return "kanban"; }
+  });
   const [selectedPipelineId, setSelectedPipelineId] = useState<number | null>(null);
-  const [statusFilter, setStatusFilter] = useState<string>("open");
+  const [statusFilter, setStatusFilter] = useState<string>(() => {
+    try { return sessionStorage.getItem("pipelineStatusFilter") || "open"; } catch { return "open"; }
+  });
   const [pipelineInitialized, setPipelineInitialized] = useState(false);
-  const [sortMode, setSortMode] = useState<SortMode>("created_desc");
+  const [sortMode, setSortMode] = useState<SortMode>(() => {
+    try { const v = sessionStorage.getItem("pipelineSortMode"); return (v as SortMode) || "created_desc"; } catch { return "created_desc"; }
+  });
   const [showCreateDeal, setShowCreateDeal] = useState(false);
   const [showTaskForm, setShowTaskForm] = useState<{ dealId?: number; dealTitle?: string; editTask?: any; editAssigneeIds?: number[]; showDealSelector?: boolean } | null>(null);
   const [, setLocation] = useLocation();
@@ -87,7 +93,15 @@ export default function Pipeline() {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(25);
   const dealFilters = useDealFilters();
-  const [ownerFilter, setOwnerFilter] = useState<number | "all" | "mine">("mine");
+  const [ownerFilter, setOwnerFilter] = useState<number | "all" | "mine">(() => {
+    try {
+      const v = sessionStorage.getItem("pipelineOwnerFilter");
+      if (!v) return "mine";
+      if (v === "all" || v === "mine") return v;
+      const n = Number(v);
+      return isNaN(n) ? "mine" : n;
+    } catch { return "mine"; }
+  });
   const saasMe = trpc.saasAuth.me.useQuery(undefined, { retry: 1, refetchOnWindowFocus: false, staleTime: 5 * 60 * 1000 });
   const isAdmin = saasMe.data?.role === "admin" || saasMe.data?.isSuperAdmin;
   // Resolve "mine" to the actual userId for the backend filter
@@ -199,6 +213,12 @@ export default function Pipeline() {
       sessionStorage.setItem("lastVisitedPipelineId", String(selectedPipelineId));
     }
   }, [selectedPipelineId]);
+
+  // Persist pipeline filters to sessionStorage for navigation persistence
+  useEffect(() => { try { sessionStorage.setItem("pipelineViewMode", viewMode); } catch {} }, [viewMode]);
+  useEffect(() => { try { sessionStorage.setItem("pipelineStatusFilter", statusFilter); } catch {} }, [statusFilter]);
+  useEffect(() => { try { sessionStorage.setItem("pipelineOwnerFilter", String(ownerFilter)); } catch {} }, [ownerFilter]);
+  useEffect(() => { try { sessionStorage.setItem("pipelineSortMode", sortMode); } catch {} }, [sortMode]);
   const activePipeline = selectedPipelineId
     ? pipelines.data?.find((p: any) => p.id === selectedPipelineId)
     : pipelines.data?.[0];

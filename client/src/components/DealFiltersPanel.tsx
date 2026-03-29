@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -38,8 +38,25 @@ const EMPTY_FILTERS: DealFilters = {};
 
 // ─── Hook ───
 export function useDealFilters() {
-  const [filters, setFilters] = useState<DealFilters>(EMPTY_FILTERS);
+  const [filters, setFilters] = useState<DealFilters>(() => {
+    try {
+      const saved = sessionStorage.getItem("pipelineDealFilters");
+      return saved ? JSON.parse(saved) : EMPTY_FILTERS;
+    } catch { return EMPTY_FILTERS; }
+  });
   const [isOpen, setIsOpen] = useState(false);
+
+  // Persist filters to sessionStorage whenever they change
+  useEffect(() => {
+    try {
+      const hasFilters = Object.keys(filters).length > 0 && JSON.stringify(filters) !== '{}';
+      if (hasFilters) {
+        sessionStorage.setItem("pipelineDealFilters", JSON.stringify(filters));
+      } else {
+        sessionStorage.removeItem("pipelineDealFilters");
+      }
+    } catch { /* ignore */ }
+  }, [filters]);
 
   const activeCount = useMemo(() => {
     let count = 0;
@@ -61,7 +78,10 @@ export function useDealFilters() {
     return count;
   }, [filters]);
 
-  const clear = useCallback(() => setFilters(EMPTY_FILTERS), []);
+  const clear = useCallback(() => {
+    setFilters(EMPTY_FILTERS);
+    try { sessionStorage.removeItem("pipelineDealFilters"); } catch { /* ignore */ }
+  }, []);
 
   return { filters, setFilters, isOpen, setIsOpen, activeCount, clear };
 }
