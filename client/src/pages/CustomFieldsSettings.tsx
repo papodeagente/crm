@@ -274,7 +274,7 @@ export default function CustomFieldsSettings() {
       setEditingField(null);
       toast.success("Campo criado com sucesso");
     },
-    onError: () => toast.error("Erro ao criar campo"),
+    onError: (err) => toast.error(`Erro ao criar campo: ${err.message}`),
   });
 
   const updateField = trpc.customFields.update.useMutation({
@@ -284,7 +284,7 @@ export default function CustomFieldsSettings() {
       setEditingField(null);
       toast.success("Campo atualizado");
     },
-    onError: () => toast.error("Erro ao atualizar campo"),
+    onError: (err) => toast.error(`Erro ao atualizar campo: ${err.message}`),
   });
 
   const deleteField = trpc.customFields.delete.useMutation({
@@ -293,7 +293,7 @@ export default function CustomFieldsSettings() {
       setDeleteConfirm(null);
       toast.success("Campo excluído");
     },
-    onError: () => toast.error("Erro ao excluir campo"),
+    onError: (err) => toast.error(`Erro ao excluir campo: ${err.message}`),
   });
 
   const reorderFields = trpc.customFields.reorder.useMutation({
