@@ -1710,6 +1710,16 @@ function parseOptionsJson(val: unknown): any[] | null {
   return null;
 }
 
+function normalizeCustomField(r: any) {
+  return {
+    ...r,
+    optionsJson: parseOptionsJson(r.optionsJson),
+    isRequired: !!r.isRequired,
+    isVisibleOnForm: !!r.isVisibleOnForm,
+    isVisibleOnProfile: !!r.isVisibleOnProfile,
+  };
+}
+
 export async function listCustomFields(tenantId: number, entity: string) {
   const db = await getDb();
   if (!db) return [];
@@ -1721,7 +1731,7 @@ export async function listCustomFields(tenantId: number, entity: string) {
   `)) as unknown as any[];
 
   const list = rows?.[0] || [];
-  return list.map((r: any) => ({ ...r, optionsJson: parseOptionsJson(r.optionsJson) }));
+  return list.map(normalizeCustomField);
 }
 
 export async function getCustomFieldById(tenantId: number, id: number) {
@@ -1733,8 +1743,7 @@ export async function getCustomFieldById(tenantId: number, id: number) {
   `)) as unknown as any[];
 
   const row = rows?.[0]?.[0] || null;
-  if (row) row.optionsJson = parseOptionsJson(row.optionsJson);
-  return row;
+  return row ? normalizeCustomField(row) : null;
 }
 
 export async function createCustomField(data: {
@@ -1760,8 +1769,7 @@ export async function createCustomField(data: {
 
   const rows = (await db.execute(sql`SELECT * FROM custom_fields WHERE tenantId = ${data.tenantId} AND name = ${data.name} AND entity = ${data.entity} ORDER BY id DESC LIMIT 1`)) as unknown as any[];
   const row = rows?.[0]?.[0] || null;
-  if (row) row.optionsJson = parseOptionsJson(row.optionsJson);
-  return row;
+  return row ? normalizeCustomField(row) : null;
 }
 
 export async function updateCustomField(tenantId: number, id: number, data: {
@@ -1832,7 +1840,7 @@ export async function getCustomFieldValues(tenantId: number, entityType: string,
   `)) as unknown as any[];
 
   const list = rows?.[0] || [];
-  return list.map((r: any) => ({ ...r, optionsJson: parseOptionsJson(r.optionsJson) }));
+  return list.map(normalizeCustomField);
 }
 
 export async function setCustomFieldValue(tenantId: number, fieldId: number, entityType: string, entityId: number, value: string | null) {
