@@ -148,7 +148,9 @@ function MetricCard({ icon: Icon, label, value, sub, color }: {
 function CustomFieldInput({ field, value, onChange }: {
   field: CustomFieldDef; value: string; onChange: (v: string) => void;
 }) {
-  const options: string[] = Array.isArray(field.optionsJson) ? field.optionsJson : [];
+  let parsedOpts = field.optionsJson;
+  if (typeof parsedOpts === "string") { try { parsedOpts = JSON.parse(parsedOpts); } catch { parsedOpts = null; } }
+  const options: string[] = Array.isArray(parsedOpts) ? parsedOpts : [];
 
   switch (field.fieldType) {
     case "text":
