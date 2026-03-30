@@ -1772,20 +1772,29 @@ export async function updateCustomField(tenantId: number, id: number, data: {
   const db = await getDb();
   if (!db) return null;
 
-  await db.execute(sql`
-    UPDATE custom_fields SET
-      label = COALESCE(${data.label ?? null}, label),
-      fieldType = COALESCE(${data.fieldType ?? null}, fieldType),
-      optionsJson = ${data.optionsJson !== undefined ? (data.optionsJson ? JSON.stringify(data.optionsJson) : null) : sql`optionsJson`},
-      defaultValue = ${data.defaultValue !== undefined ? data.defaultValue : sql`defaultValue`},
-      placeholder = ${data.placeholder !== undefined ? data.placeholder : sql`placeholder`},
-      isRequired = COALESCE(${data.isRequired !== undefined ? data.isRequired : null}, isRequired),
-      isVisibleOnForm = COALESCE(${data.isVisibleOnForm !== undefined ? data.isVisibleOnForm : null}, isVisibleOnForm),
-      isVisibleOnProfile = COALESCE(${data.isVisibleOnProfile !== undefined ? data.isVisibleOnProfile : null}, isVisibleOnProfile),
-      sortOrder = COALESCE(${data.sortOrder ?? null}, sortOrder),
-      groupName = ${data.groupName !== undefined ? data.groupName : sql`groupName`}
-    WHERE id = ${id} AND tenantId = ${tenantId}
-  `);
+  const optionsValue = data.optionsJson !== undefined
+    ? (data.optionsJson ? (typeof data.optionsJson === 'string' ? data.optionsJson : JSON.stringify(data.optionsJson)) : null)
+    : undefined;
+
+  try {
+    await db.execute(sql`
+      UPDATE custom_fields SET
+        label = COALESCE(${data.label ?? null}, label),
+        fieldType = COALESCE(${data.fieldType ?? null}, fieldType),
+        optionsJson = ${optionsValue !== undefined ? optionsValue : sql`optionsJson`},
+        defaultValue = ${data.defaultValue !== undefined ? data.defaultValue : sql`defaultValue`},
+        placeholder = ${data.placeholder !== undefined ? data.placeholder : sql`placeholder`},
+        isRequired = COALESCE(${data.isRequired !== undefined ? (data.isRequired ? 1 : 0) : null}, isRequired),
+        isVisibleOnForm = COALESCE(${data.isVisibleOnForm !== undefined ? (data.isVisibleOnForm ? 1 : 0) : null}, isVisibleOnForm),
+        isVisibleOnProfile = COALESCE(${data.isVisibleOnProfile !== undefined ? (data.isVisibleOnProfile ? 1 : 0) : null}, isVisibleOnProfile),
+        sortOrder = COALESCE(${data.sortOrder ?? null}, sortOrder),
+        groupName = ${data.groupName !== undefined ? data.groupName : sql`groupName`}
+      WHERE id = ${id} AND tenantId = ${tenantId}
+    `);
+  } catch (err) {
+    console.error("[updateCustomField] SQL error:", err, { tenantId, id, data });
+    throw err;
+  }
 
   return getCustomFieldById(tenantId, id);
 }
