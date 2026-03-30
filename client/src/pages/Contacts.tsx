@@ -4,19 +4,20 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Plus, Search, Users, Mail, Phone, MoreHorizontal, Trash2, Edit, Eye, RotateCcw, AlertTriangle, Archive, RefreshCw, Filter, X, Send, Download, Loader2 } from "lucide-react";
+import { Plus, Search, Users, Mail, Phone, MoreHorizontal, Trash2, Edit, Eye, RotateCcw, AlertTriangle, Archive, RefreshCw, X, Send, Download, Loader2 } from "lucide-react";
 import { useExportDownload } from "@/hooks/useExport";
 import BulkWhatsAppDialog from "@/components/BulkWhatsAppDialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SearchableCombobox } from "@/components/ui/searchable-combobox";
 import { useState, useMemo } from "react";
 import CustomFieldRenderer, { customFieldValuesToArray, initCustomFieldValues } from "@/components/CustomFieldRenderer";
-import DateRangeFilter, { useDateFilter } from "@/components/DateRangeFilter";
+import ContactFiltersPanel, { useContactFilters, ContactFilterButton } from "@/components/ContactFiltersPanel";
 import { formatDate } from "../../../shared/dateUtils";
 import { Link } from "wouter";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { useAuth } from "@/_core/hooks/useAuth";
+
 const stageConfig: Record<string, { dot: string; label: string }> = {
   lead: { dot: "bg-blue-500", label: "Lead" },
   prospect: { dot: "bg-amber-500", label: "Prospect" },
@@ -57,15 +58,28 @@ export default function Contacts() {
   const utils = trpc.useUtils();
   const { user } = useAuth();
   const isAdmin = user?.role === "admin";
-  const dateFilter = useDateFilter("all");
-  const [customFieldFilters, setCustomFieldFilters] = useState<{ fieldId: number; value: string }[]>([]);
-  const [showFieldFilter, setShowFieldFilter] = useState(false);
-  const [filterFieldId, setFilterFieldId] = useState<number | null>(null);
-  const [filterValue, setFilterValue] = useState("");
+  const contactFilters = useContactFilters();
 
   const [page, setPage] = useState(0);
   const pageSize = 50;
-  const contacts = trpc.crm.contacts.list.useQuery({ search: search || undefined, limit: pageSize, offset: page * pageSize, dateFrom: dateFilter.dates.dateFrom, dateTo: dateFilter.dates.dateTo, customFieldFilters: customFieldFilters.length > 0 ? customFieldFilters : undefined });
+
+  // Build query params from filters
+  const queryParams = useMemo(() => {
+    const f = contactFilters.filters;
+    return {
+      search: f.nameSearch || search || undefined,
+      stage: f.stage || undefined,
+      email: f.email || undefined,
+      phone: f.phone || undefined,
+      limit: pageSize,
+      offset: page * pageSize,
+      dateFrom: f.dateFrom || undefined,
+      dateTo: f.dateTo || undefined,
+      customFieldFilters: f.customFieldFilters?.length ? f.customFieldFilters : undefined,
+    };
+  }, [contactFilters.filters, search, page, pageSize]);
+
+  const contacts = trpc.crm.contacts.list.useQuery(queryParams);
   const deletedContacts = trpc.crm.contacts.listDeleted.useQuery({ limit: 100 }, { enabled: showTrash });
 
   // Bulk WhatsApp
@@ -180,17 +194,12 @@ export default function Contacts() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-[20px] font-semibold tracking-tight text-foreground">Passageiros</h1>
-          <p className="text-[13px] text-muted-foreground/70 mt-0.5">{total} passageiro{total !== 1 ? "s" : ""}</p>
+          <p className="text-[13px] text-muted-foreground/70 mt-0.5">{total} passageiro{total !== 1 ? "s" : ""}{contactFilters.activeCount > 0 ? ` (filtrado)` : ""}</p>
         </div>
         <div className="flex items-center gap-2">
-          <DateRangeFilter
-            preset={dateFilter.preset}
-            onPresetChange={dateFilter.setPreset}
-            customFrom={dateFilter.customFrom}
-            onCustomFromChange={dateFilter.setCustomFrom}
-            customTo={dateFilter.customTo}
-            onCustomToChange={dateFilter.setCustomTo}
-            onReset={dateFilter.reset}
+          <ContactFilterButton
+            activeCount={contactFilters.activeCount}
+            onClick={() => contactFilters.setIsOpen(true)}
           />
           <Button
             variant={showTrash ? "default" : "outline"}
@@ -222,7 +231,7 @@ export default function Contacts() {
                   </div>
                   <div>
                     <Label className="text-[12px] font-medium text-muted-foreground">Email</Label>
-                    <Input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="email@exemplo.com" type="email" className="mt-1.5 h-10 rounded-lg" />
+                    <Input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="email@exemplo.com" className="mt-1.5 h-10 rounded-lg" />
                   </div>
                   <div>
                     <Label className="text-[12px] font-medium text-muted-foreground">Telefone</Label>
@@ -256,86 +265,75 @@ export default function Contacts() {
         </div>
       </div>
 
-      {/* Search + Custom Field Filters */}
+      {/* Search bar */}
       {!showTrash && (
-        <div className="space-y-3">
-          <div className="flex items-center gap-2">
-            <div className="relative max-w-sm flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/50" />
-              <Input
-                className="pl-9 h-9 rounded-lg bg-muted/30 border-0 text-[13px] placeholder:text-muted-foreground/50 focus-visible:ring-1 focus-visible:ring-primary/30"
-                placeholder="Buscar passageiros..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-            </div>
-            <Button
-              variant={showFieldFilter ? "default" : "outline"}
-              size="sm"
-              className="h-9 gap-1.5 rounded-lg text-[13px]"
-              onClick={() => setShowFieldFilter(!showFieldFilter)}
-            >
-              <Filter className="h-3.5 w-3.5" />
-              Filtrar por campo{customFieldFilters.length > 0 ? ` (${customFieldFilters.length})` : ""}
-            </Button>
+        <div className="flex items-center gap-2">
+          <div className="relative max-w-sm flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/50" />
+            <Input
+              className="pl-9 h-9 rounded-lg bg-muted/30 border-0 text-[13px] placeholder:text-muted-foreground/50 focus-visible:ring-1 focus-visible:ring-primary/30"
+              placeholder="Buscar passageiros..."
+              value={search}
+              onChange={(e) => { setSearch(e.target.value); setPage(0); }}
+            />
           </div>
-
-          {/* Custom field filter panel */}
-          {showFieldFilter && (contactCustomFields.data as any[])?.length > 0 && (
-            <div className="p-3 bg-muted/30 rounded-xl border border-border/40 space-y-2">
-              <div className="flex items-center gap-2">
-                <SearchableCombobox
-                  options={(contactCustomFields.data as any[] || []).map((f: any) => ({
-                    value: String(f.id),
-                    label: f.label,
-                  }))}
-                  value={filterFieldId ? String(filterFieldId) : ""}
-                  onValueChange={(v) => setFilterFieldId(Number(v))}
-                  placeholder="Selecione um campo"
-                  searchPlaceholder="Buscar campo..."
-                  className="h-8 text-[12px] w-48"
-                />
-                <Input
-                  className="h-8 text-[12px] flex-1 max-w-xs"
-                  placeholder="Valor do filtro..."
-                  value={filterValue}
-                  onChange={(e) => setFilterValue(e.target.value)}
-                />
-                <Button
-                  size="sm"
-                  className="h-8 text-[12px]"
-                  disabled={!filterFieldId || !filterValue.trim()}
-                  onClick={() => {
-                    if (filterFieldId && filterValue.trim()) {
-                      setCustomFieldFilters(prev => [...prev, { fieldId: filterFieldId, value: filterValue.trim() }]);
-                      setFilterFieldId(null);
-                      setFilterValue("");
-                      setPage(0);
-                    }
-                  }}
-                >
-                  Adicionar filtro
-                </Button>
-              </div>
-              {/* Active filters */}
-              {customFieldFilters.length > 0 && (
-                <div className="flex flex-wrap gap-1.5">
-                  {customFieldFilters.map((cf, idx) => {
-                    const field = (contactCustomFields.data as any[])?.find((f: any) => f.id === cf.fieldId);
-                    return (
-                      <span key={idx} className="inline-flex items-center gap-1 px-2 py-1 bg-primary/10 text-primary rounded-md text-[11px]">
-                        {field?.label || `#${cf.fieldId}`}: {cf.value}
-                        <button onClick={() => { setCustomFieldFilters(prev => prev.filter((_, i) => i !== idx)); setPage(0); }} className="hover:bg-primary/20 rounded-sm p-0.5">
-                          <X className="h-3 w-3" />
-                        </button>
-                      </span>
-                    );
-                  })}
-                  <button onClick={() => { setCustomFieldFilters([]); setPage(0); }} className="text-[11px] text-muted-foreground hover:text-foreground">
-                    Limpar todos
+          {/* Active filter badges */}
+          {contactFilters.activeCount > 0 && (
+            <div className="flex flex-wrap items-center gap-1.5">
+              {contactFilters.filters.nameSearch && (
+                <span className="inline-flex items-center gap-1 px-2 py-1 bg-blue-500/10 text-blue-600 dark:text-blue-400 rounded-md text-[11px]">
+                  Nome: {contactFilters.filters.nameSearch}
+                  <button onClick={() => contactFilters.setFilters(prev => { const n = { ...prev }; delete n.nameSearch; return n; })} className="hover:bg-blue-500/20 rounded-sm p-0.5">
+                    <X className="h-3 w-3" />
                   </button>
-                </div>
+                </span>
               )}
+              {contactFilters.filters.email && (
+                <span className="inline-flex items-center gap-1 px-2 py-1 bg-blue-500/10 text-blue-600 dark:text-blue-400 rounded-md text-[11px]">
+                  Email: {contactFilters.filters.email}
+                  <button onClick={() => contactFilters.setFilters(prev => { const n = { ...prev }; delete n.email; return n; })} className="hover:bg-blue-500/20 rounded-sm p-0.5">
+                    <X className="h-3 w-3" />
+                  </button>
+                </span>
+              )}
+              {contactFilters.filters.phone && (
+                <span className="inline-flex items-center gap-1 px-2 py-1 bg-blue-500/10 text-blue-600 dark:text-blue-400 rounded-md text-[11px]">
+                  Telefone: {contactFilters.filters.phone}
+                  <button onClick={() => contactFilters.setFilters(prev => { const n = { ...prev }; delete n.phone; return n; })} className="hover:bg-blue-500/20 rounded-sm p-0.5">
+                    <X className="h-3 w-3" />
+                  </button>
+                </span>
+              )}
+              {contactFilters.filters.stage && (
+                <span className="inline-flex items-center gap-1 px-2 py-1 bg-blue-500/10 text-blue-600 dark:text-blue-400 rounded-md text-[11px]">
+                  Estágio: {stageConfig[contactFilters.filters.stage]?.label || contactFilters.filters.stage}
+                  <button onClick={() => contactFilters.setFilters(prev => { const n = { ...prev }; delete n.stage; return n; })} className="hover:bg-blue-500/20 rounded-sm p-0.5">
+                    <X className="h-3 w-3" />
+                  </button>
+                </span>
+              )}
+              {(contactFilters.filters.dateFrom || contactFilters.filters.dateTo) && (
+                <span className="inline-flex items-center gap-1 px-2 py-1 bg-blue-500/10 text-blue-600 dark:text-blue-400 rounded-md text-[11px]">
+                  Período: {contactFilters.filters.dateFrom || "..."} — {contactFilters.filters.dateTo || "..."}
+                  <button onClick={() => contactFilters.setFilters(prev => { const n = { ...prev }; delete n.dateFrom; delete n.dateTo; return n; })} className="hover:bg-blue-500/20 rounded-sm p-0.5">
+                    <X className="h-3 w-3" />
+                  </button>
+                </span>
+              )}
+              {contactFilters.filters.customFieldFilters?.map((cf, idx) => (
+                <span key={`cf-${idx}`} className="inline-flex items-center gap-1 px-2 py-1 bg-violet-500/10 text-violet-600 dark:text-violet-400 rounded-md text-[11px]">
+                  Campo #{cf.fieldId}: {cf.value}
+                  <button onClick={() => contactFilters.setFilters(prev => ({
+                    ...prev,
+                    customFieldFilters: (prev.customFieldFilters || []).filter((_, i) => i !== idx),
+                  }))} className="hover:bg-violet-500/20 rounded-sm p-0.5">
+                    <X className="h-3 w-3" />
+                  </button>
+                </span>
+              ))}
+              <button onClick={() => { contactFilters.clear(); setPage(0); }} className="text-[11px] text-muted-foreground hover:text-foreground ml-1">
+                Limpar todos
+              </button>
             </div>
           )}
         </div>
@@ -414,6 +412,9 @@ export default function Contacts() {
                   <>
                     <Users className="h-8 w-8 mx-auto mb-2 text-muted-foreground/20" />
                     <p className="text-[13px]">Nenhum passageiro encontrado</p>
+                    {contactFilters.activeCount > 0 && (
+                      <p className="text-[12px] text-muted-foreground/40 mt-1">Tente ajustar os filtros</p>
+                    )}
                   </>
                 )}
               </td></tr>
@@ -554,6 +555,15 @@ export default function Contacts() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Contact Filters Panel (Sheet) */}
+      <ContactFiltersPanel
+        open={contactFilters.isOpen}
+        onOpenChange={contactFilters.setIsOpen}
+        filters={contactFilters.filters}
+        onApply={(f) => { contactFilters.setFilters(f); setPage(0); }}
+        onClear={() => { contactFilters.clear(); setPage(0); }}
+      />
 
       {/* Bulk WhatsApp Dialog */}
       <BulkWhatsAppDialog

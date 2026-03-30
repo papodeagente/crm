@@ -167,6 +167,9 @@ export async function listContacts(tenantId: number, opts?: { search?: string; s
   const conditions: any[] = [eq(contacts.tenantId, tenantId)];
   if (!opts?.includeDeleted) conditions.push(isNull(contacts.deletedAt));
   if (opts?.search) conditions.push(like(contacts.name, `%${opts.search}%`));
+  if (opts?.stage) conditions.push(eq(contacts.lifecycleStage, opts.stage as any));
+  if ((opts as any)?.email) conditions.push(like(contacts.email, `%${(opts as any).email}%`));
+  if ((opts as any)?.phone) conditions.push(like(contacts.phone, `%${(opts as any).phone}%`));
   if (opts?.dateFrom) conditions.push(gte(contacts.createdAt, new Date(opts.dateFrom + "T00:00:00")));
   if (opts?.dateTo) conditions.push(lte(contacts.createdAt, new Date(opts.dateTo + "T23:59:59")));
   if (opts?.ownerUserIds && opts.ownerUserIds.length > 0) {
@@ -224,6 +227,9 @@ export async function countContacts(tenantId: number, opts?: { search?: string; 
   const db = await getDb(); if (!db) return 0;
   const conditions: any[] = [eq(contacts.tenantId, tenantId), isNull(contacts.deletedAt)];
   if (opts?.search) conditions.push(like(contacts.name, `%${opts.search}%`));
+  if (opts?.stage) conditions.push(eq(contacts.lifecycleStage, opts.stage as any));
+  if ((opts as any)?.email) conditions.push(like(contacts.email, `%${(opts as any).email}%`));
+  if ((opts as any)?.phone) conditions.push(like(contacts.phone, `%${(opts as any).phone}%`));
   if (opts?.dateFrom) conditions.push(gte(contacts.createdAt, new Date(opts.dateFrom + "T00:00:00")));
   if (opts?.dateTo) conditions.push(lte(contacts.createdAt, new Date(opts.dateTo + "T23:59:59")));
   if (opts?.ownerUserIds && opts.ownerUserIds.length > 0) {

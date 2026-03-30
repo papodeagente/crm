@@ -6269,3 +6269,11 @@
 - [x] Corrigir fontes roxas/lilás no fundo escuro da Landing Page — priorizar branco
 - [x] Revisar cores de texto em componentes do dashboard/settings no modo escuro
 - [x] Garantir contraste adequado em todos os textos do sistema
+
+## Filtro de Contatos (padrão Pipeline)
+
+- [x] Analisar filtro de negociações (Pipeline) como referência
+- [x] Analisar página de contatos atual e backend de campos personalizados
+- [x] Implementar backend: endpoint de filtragem de contatos com campos personalizados
+- [x] Implementar frontend: painel lateral de filtros na página de contatos (igual Pipeline)
+- [x] Testes vitest para o novo endpoint de filtragem (13 testes passando)

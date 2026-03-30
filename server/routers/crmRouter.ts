@@ -18,7 +18,7 @@ export const crmRouter = router({
   // ─── CONTACTS ───
   contacts: router({
     list: tenantProcedure
-      .input(z.object({ search: z.string().optional(), stage: z.string().optional(), limit: z.number().default(50), offset: z.number().default(0), dateFrom: z.string().optional(), dateTo: z.string().optional(), customFieldFilters: z.array(z.object({ fieldId: z.number(), value: z.string() })).optional() }))
+      .input(z.object({ search: z.string().optional(), stage: z.string().optional(), email: z.string().optional(), phone: z.string().optional(), limit: z.number().default(50), offset: z.number().default(0), dateFrom: z.string().optional(), dateTo: z.string().optional(), customFieldFilters: z.array(z.object({ fieldId: z.number(), value: z.string() })).optional() }))
       .query(async ({ ctx, input }) => {
         const isAdmin = ctx.saasUser?.role === "admin";
         const userId = ctx.saasUser?.userId || ctx.user!.id;
