@@ -2764,7 +2764,7 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
             <select
               value={noteCategory}
               onChange={(e) => setNoteCategory(e.target.value)}
-              className="text-[11px] bg-amber-100 border border-amber-300 rounded-md px-1.5 py-0.5 text-amber-800 outline-none cursor-pointer"
+              className="text-[11px] bg-amber-100 dark:bg-amber-900/40 border border-amber-300 dark:border-amber-700 rounded-md px-1.5 py-0.5 text-amber-800 dark:text-amber-200 outline-none cursor-pointer"
             >
               <option value="other">Geral</option>
               <option value="client">Cliente</option>
@@ -2777,9 +2777,9 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
               value={notePriority}
               onChange={(e) => setNotePriority(e.target.value)}
               className={`text-[11px] border rounded-md px-1.5 py-0.5 outline-none cursor-pointer ${
-                notePriority === "urgent" ? "bg-red-100 border-red-300 text-red-800" :
-                notePriority === "high" ? "bg-orange-100 border-orange-300 text-orange-800" :
-                "bg-amber-100 border-amber-300 text-amber-800"
+                notePriority === "urgent" ? "bg-red-100 dark:bg-red-900/40 border-red-300 dark:border-red-700 text-red-800 dark:text-red-200" :
+                notePriority === "high" ? "bg-orange-100 dark:bg-orange-900/40 border-orange-300 dark:border-orange-700 text-orange-800 dark:text-orange-200" :
+                "bg-amber-100 dark:bg-amber-900/40 border-amber-300 dark:border-amber-700 text-amber-800 dark:text-amber-200"
               }`}
             >
               <option value="normal">Normal</option>
@@ -2820,7 +2820,7 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
       )}
 
       {/* ─── Input Area (WhatsApp Web style) ─── */}
-      <div className={`px-[10px] py-[5px] z-10 shrink-0 transition-colors ${isNoteMode ? "bg-amber-50" : ""}`} style={isNoteMode ? {} : { backgroundColor: 'var(--wa-chat-compose-bg)' }}>
+      <div className={`px-[10px] py-[5px] z-10 shrink-0 transition-colors ${isNoteMode ? "bg-amber-50 dark:bg-amber-950/30" : ""}`} style={isNoteMode ? {} : { backgroundColor: 'var(--wa-chat-compose-bg)' }}>
         {isRecording ? (
           <VoiceRecorder onSend={handleVoiceSend} onCancel={() => setIsRecording(false)} />
         ) : (
@@ -2938,7 +2938,7 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
                     {filtered.map((agent: any) => (
                       <button
                         key={agent.id}
-                        className="w-full text-left px-3 py-2 hover:bg-amber-50 transition-colors border-b border-amber-100/30 last:border-0 flex items-center gap-2"
+                        className="w-full text-left px-3 py-2 hover:bg-amber-50 dark:hover:bg-amber-900/30 transition-colors border-b border-amber-100/30 dark:border-amber-800/30 last:border-0 flex items-center gap-2"
                         onClick={() => {
                           // Replace @query with @AgentName
                           const beforeMention = messageText.substring(0, mentionCursorPos - (mentionQuery?.length || 0) - 1);
@@ -2997,7 +2997,7 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
                 placeholder={isNoteMode ? "Escreva uma nota interna (só a equipe vê)..." : "Mensagem"} rows={1}
                 className={`w-full rounded-[8px] px-[12px] py-[9px] text-[15px] outline-none resize-none leading-[20px] transition-colors ${
                   isNoteMode
-                    ? "bg-amber-100 border-amber-300 text-amber-900 focus:border-amber-400 border placeholder:text-amber-600/50"
+                    ? "bg-amber-100 dark:bg-amber-900/40 border-amber-300 dark:border-amber-700 text-amber-900 dark:text-amber-200 focus:border-amber-400 dark:focus:border-amber-600 border placeholder:text-amber-600/50 dark:placeholder:text-amber-500"
                     : "border-none"
                 }`}
                 style={isNoteMode ? { height: "42px", maxHeight: "140px" } : { height: "42px", maxHeight: "140px", backgroundColor: 'var(--wa-input-bg)', color: 'var(--wa-text-primary)' }}

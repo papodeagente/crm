@@ -223,7 +223,7 @@ function SearchPalette({ open, onClose }: { open: boolean; onClose: () => void }
                   </span>
                 )}
                 {taskCount > 0 && (
-                  <span className="text-[10px] font-semibold uppercase tracking-wider text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-amber-600 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/40 px-2 py-0.5 rounded-full">
                     {taskCount} tarefa{taskCount > 1 ? "s" : ""}
                   </span>
                 )}
@@ -258,9 +258,9 @@ function SearchPalette({ open, onClose }: { open: boolean; onClose: () => void }
                   }`}
                 >
                   <div className={`h-8 w-8 rounded-lg flex items-center justify-center shrink-0 ${
-                    item.type === "contact" ? "bg-emerald-50" :
-                    item.type === "deal" ? "bg-indigo-50" :
-                    item.type === "task" ? "bg-amber-50" :
+                    item.type === "contact" ? "bg-emerald-50 dark:bg-emerald-900/40" :
+                    item.type === "deal" ? "bg-indigo-50 dark:bg-indigo-900/40" :
+                    item.type === "task" ? "bg-amber-50 dark:bg-amber-900/40" :
                     "bg-muted/60"
                   }`}>
                     <item.icon className={`h-4 w-4 ${item.iconColor}`} />

@@ -6286,3 +6286,12 @@
 ## Bug: Tag {produto_principal}
 
 - [x] Corrigir tag {produto_principal} para puxar o nome do produto de maior valor da negociação
+
+## Contraste texto vermelho na Automação de Vendas
+
+- [x] Corrigir texto vermelho/laranja ilegível no card explicativo da Automação de Vendas — garantir contraste adequado
+- [x] Corrigir contraste dark mode em ProviderManager (badges de status, botão deprovision, dialog)
+- [x] Corrigir contraste dark mode em TopNavLayout (badges de busca, ícones de tipo)
+- [x] Corrigir contraste dark mode em TransferDialog (textarea de nota)
+- [x] Corrigir contraste dark mode em UpgradeModal (badge de plano)
+- [x] Corrigir contraste dark mode em WhatsAppChat (selects de nota, input de nota, menu de agentes IA)
