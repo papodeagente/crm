@@ -19,7 +19,7 @@ import { tenantZapiInstances, whatsappSessions, tenants } from "../../drizzle/sc
 
 // ─── Configuration ───
 const ZAPI_BASE_URL = "https://api.z-api.io";
-const WEBHOOK_BASE_URL = process.env.ZAPI_WEBHOOK_BASE_URL || "https://crm.acelerador.tur.br";
+const WEBHOOK_BASE_URL = process.env.ZAPI_WEBHOOK_BASE_URL || "https://crm.enturos.com";
 const PARTNER_TOKEN = () => process.env.ZAPI_PARTNER_TOKEN || "";
 const CLIENT_TOKEN = () => process.env.ZAPI_CLIENT_TOKEN || "";
 

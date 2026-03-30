@@ -2,7 +2,7 @@ import { Resend } from "resend";
 
 const resend = new Resend(process.env.RESEND_API_KEY || "");
 
-const FROM_EMAIL = process.env.EMAIL_FROM || "Entur OS <noreply@acelerador.tur.br>";
+const FROM_EMAIL = process.env.EMAIL_FROM || "Entur OS <noreply@enturos.com>";
 const APP_NAME = "Entur OS";
 
 // ═══════════════════════════════════════

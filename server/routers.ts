@@ -2371,7 +2371,7 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
             phone: input.phone,
             role: input.role,
             inviterName: ctx.user.name || "Administrador",
-            origin: input.origin || "https://crm.acelerador.tur.br",
+            origin: input.origin || "https://crm.enturos.com",
           });
           return { success: true, userId: result.userId, emailSent: result.emailSent };
         } catch (e: any) {
