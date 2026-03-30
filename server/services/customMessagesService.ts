@@ -1,4 +1,4 @@
-import { eq, and, asc, sql } from "drizzle-orm";
+import { eq, and, asc } from "drizzle-orm";
 import { getDb } from "../db";
 import { customMessages, type InsertCustomMessage } from "../../drizzle/schema";
 
@@ -41,12 +41,8 @@ export async function listCustomMessagesByCategory(tenantId: number, category: s
 export async function createCustomMessage(data: InsertCustomMessage) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
-  const result = (await db.execute(sql`
-    INSERT INTO custom_messages (tenantId, category, title, content, orderIndex, isActive, createdBy, createdAt, updatedAt)
-    VALUES (${data.tenantId}, ${data.category}, ${data.title}, ${data.content}, ${data.orderIndex ?? 0}, ${data.isActive ? 1 : 0}, ${data.createdBy}, ${now}, ${now})
-  `)) as any;
-  return { id: result[0]?.insertId ?? 0 };
+  const [result] = await db.insert(customMessages).values(data);
+  return { id: result.insertId };
 }
 
 export async function updateCustomMessage(
