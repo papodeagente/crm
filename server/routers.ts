@@ -4250,6 +4250,7 @@ ${customInstructions ? `\n--- INSTRUÇÕES PERSONALIZADAS ---\n${customInstructi
           title: input.title,
           content: input.content,
           orderIndex: input.orderIndex ?? 0,
+          isActive: true,
           createdBy: ctx.user!.id,
         });
       }),
