@@ -90,9 +90,11 @@ function FieldFormDialog({
   const [isVisibleOnForm, setIsVisibleOnForm] = useState(field?.isVisibleOnForm ?? true);
   const [isVisibleOnProfile, setIsVisibleOnProfile] = useState(field?.isVisibleOnProfile ?? true);
   const [groupName, setGroupName] = useState(field?.groupName || "");
-  const [optionsText, setOptionsText] = useState(
-    Array.isArray(field?.optionsJson) ? field.optionsJson.join("\n") : ""
-  );
+  const [optionsText, setOptionsText] = useState(() => {
+    let opts = field?.optionsJson;
+    if (typeof opts === "string") { try { opts = JSON.parse(opts); } catch { opts = null; } }
+    return Array.isArray(opts) ? opts.join("\n") : "";
+  });
   const [autoSlug, setAutoSlug] = useState(!field);
 
   const needsOptions = fieldType === "select" || fieldType === "multiselect";

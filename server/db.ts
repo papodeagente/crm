@@ -1702,6 +1702,14 @@ export async function getContactDeals(tenantId: number, contactId: number) {
 // CUSTOM FIELDS CRUD
 // ════════════════════════════════════════════════════════════
 
+function parseOptionsJson(val: unknown): any[] | null {
+  if (Array.isArray(val)) return val;
+  if (typeof val === "string" && val.trim()) {
+    try { return JSON.parse(val); } catch { return null; }
+  }
+  return null;
+}
+
 export async function listCustomFields(tenantId: number, entity: string) {
   const db = await getDb();
   if (!db) return [];
@@ -1712,7 +1720,8 @@ export async function listCustomFields(tenantId: number, entity: string) {
     ORDER BY sortOrder ASC, id ASC
   `)) as unknown as any[];
 
-  return rows?.[0] || [];
+  const list = rows?.[0] || [];
+  return list.map((r: any) => ({ ...r, optionsJson: parseOptionsJson(r.optionsJson) }));
 }
 
 export async function getCustomFieldById(tenantId: number, id: number) {
@@ -1723,7 +1732,9 @@ export async function getCustomFieldById(tenantId: number, id: number) {
     SELECT * FROM custom_fields WHERE tenantId = ${tenantId} AND id = ${id} LIMIT 1
   `)) as unknown as any[];
 
-  return rows?.[0]?.[0] || null;
+  const row = rows?.[0]?.[0] || null;
+  if (row) row.optionsJson = parseOptionsJson(row.optionsJson);
+  return row;
 }
 
 export async function createCustomField(data: {
@@ -1748,7 +1759,9 @@ export async function createCustomField(data: {
   `);
 
   const rows = (await db.execute(sql`SELECT * FROM custom_fields WHERE tenantId = ${data.tenantId} AND name = ${data.name} AND entity = ${data.entity} ORDER BY id DESC LIMIT 1`)) as unknown as any[];
-  return rows?.[0]?.[0] || null;
+  const row = rows?.[0]?.[0] || null;
+  if (row) row.optionsJson = parseOptionsJson(row.optionsJson);
+  return row;
 }
 
 export async function updateCustomField(tenantId: number, id: number, data: {
@@ -1809,7 +1822,8 @@ export async function getCustomFieldValues(tenantId: number, entityType: string,
     ORDER BY cf.sortOrder ASC
   `)) as unknown as any[];
 
-  return rows?.[0] || [];
+  const list = rows?.[0] || [];
+  return list.map((r: any) => ({ ...r, optionsJson: parseOptionsJson(r.optionsJson) }));
 }
 
 export async function setCustomFieldValue(tenantId: number, fieldId: number, entityType: string, entityId: number, value: string | null) {
