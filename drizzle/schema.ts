@@ -2537,3 +2537,37 @@ export const crmAppointmentParticipants = mysqlTable("crm_appointment_participan
 
 export type CrmAppointmentParticipant = typeof crmAppointmentParticipants.$inferSelect;
 export type InsertCrmAppointmentParticipant = typeof crmAppointmentParticipants.$inferInsert;
+
+
+// ════════════════════════════════════════════════════════════
+// CUSTOM MESSAGES — Mensagens Personalizadas por Categoria (Comunicação)
+// ════════════════════════════════════════════════════════════
+
+export const customMessageCategoryEnum = mysqlEnum("custom_msg_category", [
+  "primeiro_contato",
+  "reativacao",
+  "pedir_indicacao",
+  "receber_indicado",
+  "recuperacao_vendas",
+  "objecoes",
+  "outros",
+]);
+
+export const customMessages = mysqlTable("custom_messages", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  category: varchar("category", { length: 64 }).notNull(),
+  title: varchar("title", { length: 255 }).notNull(),
+  content: text("content").notNull(),
+  orderIndex: int("orderIndex").default(0).notNull(),
+  isActive: boolean("isActive").default(true).notNull(),
+  createdBy: int("createdBy").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (t) => [
+  index("cm_tenant_idx").on(t.tenantId),
+  index("cm_tenant_category_idx").on(t.tenantId, t.category),
+]);
+
+export type CustomMessage = typeof customMessages.$inferSelect;
+export type InsertCustomMessage = typeof customMessages.$inferInsert;

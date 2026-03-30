@@ -55,6 +55,7 @@ const Profile = lazyWithRetry(() => import("./pages/Profile"));
 const CampaignDetail = lazyWithRetry(() => import("./pages/CampaignDetail"));
 const Supervision = lazyWithRetry(() => import("./pages/Supervision"));
 const Trash = lazyWithRetry(() => import("./pages/Trash"));
+const CustomMessages = lazyWithRetry(() => import("./pages/CustomMessages"));
 const Analytics = lazyWithRetry(() => import("./pages/Analytics"));
 const GoalsReport = lazyWithRetry(() => import("./pages/GoalsReport"));
 const CRMLive = lazyWithRetry(() => import("./pages/CRMLive"));
@@ -162,6 +163,7 @@ function AppRouter() {
                 <Route path="/settings/stage-owner-rules" component={StageOwnerRuleSettings} />
                 <Route path="/settings/classification" component={ClassificationSettings} />
                 <Route path="/settings/ai-training" component={AiTrainingSettings} />
+                <Route path="/settings/custom-messages" component={CustomMessages} />
 
                 {/* Super Admin — each route individually wrapped in SuperAdminLayout */}
                 <Route path="/super-admin">

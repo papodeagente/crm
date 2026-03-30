@@ -10,6 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Send, Loader2, CheckCircle2, AlertCircle, SkipForward, Ban } from "lucide-react";
+import QuickMessagesPicker from "@/components/QuickMessagesPicker";
 
 interface TemplateVar {
   var: string;
@@ -158,7 +159,18 @@ export default function BulkWhatsAppDialog({
 
             {/* Message template */}
             <div className="space-y-2">
-              <Label>Mensagem</Label>
+              <div className="flex items-center justify-between">
+                <Label>Mensagem</Label>
+                <QuickMessagesPicker
+                  onSelect={(content) => {
+                    setMessageTemplate(content);
+                    textareaRef.current?.focus();
+                  }}
+                  variant="text"
+                  side="bottom"
+                  align="end"
+                />
+              </div>
               <Textarea
                 ref={textareaRef}
                 value={messageTemplate}

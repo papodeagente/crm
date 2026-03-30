@@ -16,6 +16,7 @@ import {
   X, Phone, Mail, Video, MessageSquare, CheckSquare, Send, Clock, AlertCircle,
 } from "lucide-react";
 import { toast } from "sonner";
+import QuickMessagesPicker from "@/components/QuickMessagesPicker";
 export const taskTypeOptions = [
   { value: "task", label: "Tarefa", icon: CheckSquare },
   { value: "whatsapp", label: "WhatsApp", icon: MessageSquare },
@@ -449,9 +450,17 @@ export default function TaskFormDialog({
 
               {/* Message body */}
               <div className="space-y-1.5">
-                <Label className="text-[13px] font-semibold text-foreground">
-                  Mensagem do WhatsApp <span className="text-destructive">*</span>
-                </Label>
+                <div className="flex items-center justify-between">
+                  <Label className="text-[13px] font-semibold text-foreground">
+                    Mensagem do WhatsApp <span className="text-destructive">*</span>
+                  </Label>
+                  <QuickMessagesPicker
+                    onSelect={(content) => setWaMessageBody(content)}
+                    variant="text"
+                    side="bottom"
+                    align="end"
+                  />
+                </div>
                 <Textarea
                   value={waMessageBody}
                   onChange={(e) => setWaMessageBody(e.target.value)}

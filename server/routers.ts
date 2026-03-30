@@ -4223,6 +4223,61 @@ ${customInstructions ? `\n--- INSTRUÇÕES PERSONALIZADAS ---\n${customInstructi
       }),
   }),
 
+  // ─── Custom Messages (Mensagens Personalizadas) ───
+  customMessages: router({
+    list: tenantProcedure.query(async ({ ctx }) => {
+      const { listCustomMessages } = await import("./services/customMessagesService");
+      return listCustomMessages(getTenantId(ctx));
+    }),
+    listByCategory: tenantProcedure
+      .input(z.object({ category: z.string() }))
+      .query(async ({ ctx, input }) => {
+        const { listCustomMessagesByCategory } = await import("./services/customMessagesService");
+        return listCustomMessagesByCategory(getTenantId(ctx), input.category);
+      }),
+    create: tenantWriteProcedure
+      .input(z.object({
+        category: z.string(),
+        title: z.string().min(1).max(255),
+        content: z.string().min(1),
+        orderIndex: z.number().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const { createCustomMessage } = await import("./services/customMessagesService");
+        return createCustomMessage({
+          tenantId: getTenantId(ctx),
+          category: input.category,
+          title: input.title,
+          content: input.content,
+          orderIndex: input.orderIndex ?? 0,
+          createdBy: ctx.user!.id,
+        });
+      }),
+    update: tenantWriteProcedure
+      .input(z.object({
+        id: z.number(),
+        title: z.string().min(1).max(255).optional(),
+        content: z.string().min(1).optional(),
+        category: z.string().optional(),
+        orderIndex: z.number().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const { updateCustomMessage } = await import("./services/customMessagesService");
+        const { id, ...data } = input;
+        return updateCustomMessage(getTenantId(ctx), id, data);
+      }),
+    delete: tenantWriteProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        const { deleteCustomMessage } = await import("./services/customMessagesService");
+        return deleteCustomMessage(getTenantId(ctx), input.id);
+      }),
+    categories: publicProcedure.query(async () => {
+      const { CUSTOM_MESSAGE_CATEGORIES } = await import("./services/customMessagesService");
+      return CUSTOM_MESSAGE_CATEGORIES;
+    }),
+  }),
+
   superAdminDash: superAdminDashRouter,
   superAdminPlans: superAdminPlansRouter,
   superAdminManagement: superAdminManagementRouter,

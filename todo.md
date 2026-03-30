@@ -6245,3 +6245,14 @@
 - [x] Formulário na LP para capturar nome/email antes de redirecionar ao checkout Hotmart
 - [x] Passar nome e email preenchidos para o link do checkout Hotmart
 - [x] Atualizar CTAs da seção de planos na LP conforme tipo de plano
+## Mensagens Personalizadas (Custom Messages)
+- [x] Schema: tabela custom_messages (id, tenantId, category, title, content, orderIndex, isActive, createdAt, updatedAt)
+- [x] Backend: CRUD procedures para mensagens personalizadas (list, create, update, delete)
+- [x] Settings: página "Mensagens personalizadas" no menu Comunicação
+- [x] Categorias: Primeiro contato, Reativação, Pedir indicação, Receber indicado, Recuperação de vendas, Objeções, Outros
+- [x] Componente QuickMessagesPicker reutilizável com navegação por categorias
+- [x] Integrar QuickMessages no WhatsAppChat (Inbox + Negociação)
+- [x] Integrar QuickMessages no BulkWhatsAppDialog (disparo em massa passageiros/negociações/RFV)
+- [x] Integrar QuickMessages no TaskFormDialog (tarefas com mensagem WhatsApp)
+- [x] Suporte a variáveis dinâmicas: {nome}, {destino}, etc.
+- [x] Testes Vitest para o serviço (11 testes passando)

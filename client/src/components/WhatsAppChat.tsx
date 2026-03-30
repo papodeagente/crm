@@ -17,6 +17,7 @@ import { formatTime, SYSTEM_TIMEZONE, SYSTEM_LOCALE } from "../../../shared/date
 import TransferDialog from "./TransferDialog";
 import InstantTooltip from "@/components/InstantTooltip";
 import AiSuggestionPanel from "@/components/AiSuggestionPanel";
+import QuickMessagesPicker from "@/components/QuickMessagesPicker";
 import RichMessageRenderer, { isRichMessageType } from "@/components/RichMessageRenderer";
 import { useTenantId } from "@/hooks/useTenantId";
 
@@ -2856,6 +2857,20 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
               </button>
               </InstantTooltip>
               {showAttach && <AttachMenu onSelect={handleAttachSelect} onClose={() => setShowAttach(false)} />}
+            </div>
+
+            {/* Quick Messages picker */}
+            <div className="relative shrink-0 self-end">
+              <QuickMessagesPicker
+                onSelect={(content) => {
+                  setMessageText(content);
+                  textareaRef.current?.focus();
+                }}
+                variant="icon"
+                side="top"
+                align="start"
+                className="w-[42px] h-[42px] rounded-full"
+              />
             </div>
 
             {/* AI Suggestion button */}
