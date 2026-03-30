@@ -62,8 +62,8 @@ export default function SaasLogin() {
     return (
       <div className="min-h-screen bg-[#0a0a12] flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
-          <Loader2 className="w-8 h-8 animate-spin text-purple-500" />
-          <p className="text-sm text-gray-400">Verificando sessão...</p>
+          <Loader2 className="w-8 h-8 animate-spin text-white/60" />
+          <p className="text-sm text-white/50">Verificando sessão...</p>
         </div>
       </div>
     );
@@ -84,21 +84,21 @@ export default function SaasLogin() {
           <div className="inline-flex items-center gap-2 mb-2">
             <img src="https://d2xsxph8kpxj0f.cloudfront.net/310519663249817763/EKvcVicuVoUxTnzjSKzgdk/logo-light_c3efa809.webp" alt="enturOS CRM" className="h-9 object-contain" />
           </div>
-          <p className="text-sm text-gray-400">Sistema operacional para agências de viagens</p>
+          <p className="text-sm text-white/50">Sistema operacional para agências de viagens</p>
         </div>
 
         {/* Card */}
         <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-8">
           <div className="text-center mb-6">
             <h1 className="text-xl font-semibold text-white">Entrar na sua conta</h1>
-            <p className="text-sm text-gray-400 mt-1">
+            <p className="text-sm text-white/50 mt-1">
               Digite seu email e senha para acessar
             </p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="email" className="text-sm font-medium text-gray-300">Email</Label>
+              <Label htmlFor="email" className="text-sm font-medium text-white/70">Email</Label>
               <Input
                 id="email"
                 type="email"
@@ -110,7 +110,7 @@ export default function SaasLogin() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password" className="text-sm font-medium text-gray-300">Senha</Label>
+              <Label htmlFor="password" className="text-sm font-medium text-white/70">Senha</Label>
               <div className="relative">
                 <Input
                   id="password"
@@ -135,7 +135,7 @@ export default function SaasLogin() {
               <button
                 type="button"
                 onClick={() => navigate("/forgot-password")}
-                className="text-xs text-purple-400 hover:text-purple-300 hover:underline transition-colors"
+                className="text-xs text-white/50 hover:text-white/70 hover:underline transition-colors"
               >
                 Esqueci minha senha
               </button>
@@ -155,11 +155,11 @@ export default function SaasLogin() {
           </form>
 
           <div className="mt-6 text-center">
-            <p className="text-sm text-gray-400">
+            <p className="text-sm text-white/50">
               Não tem uma conta?{" "}
               <button
                 onClick={() => navigate("/register")}
-                className="text-purple-400 hover:text-purple-300 font-medium hover:underline transition-colors"
+                className="text-white/70 hover:text-white font-medium hover:underline transition-colors"
               >
                 Criar conta grátis
               </button>
@@ -167,11 +167,11 @@ export default function SaasLogin() {
           </div>
         </div>
 
-        <p className="text-center text-xs text-gray-600 mt-6">
+        <p className="text-center text-xs text-white/30 mt-6">
           Ao entrar, você concorda com nossos{" "}
-          <a href="#" className="underline hover:text-gray-400 transition-colors">Termos de Uso</a>{" "}
+          <a href="#" className="underline hover:text-white/50 transition-colors">Termos de Uso</a>{" "}
           e{" "}
-          <a href="#" className="underline hover:text-gray-400 transition-colors">Política de Privacidade</a>
+          <a href="#" className="underline hover:text-white/50 transition-colors">Política de Privacidade</a>
         </p>
       </div>
     </div>

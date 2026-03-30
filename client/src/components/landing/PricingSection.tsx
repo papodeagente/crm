@@ -99,12 +99,12 @@ const cardStyles = [
   },
   {
     wrapper: "bg-gradient-to-b from-violet-500/[0.08] to-purple-500/[0.03] border-2 border-violet-500/25 rounded-2xl p-6 sm:p-8 flex flex-col h-full relative backdrop-blur-sm shadow-xl shadow-violet-900/10",
-    nameClass: "text-sm font-medium text-violet-400 uppercase tracking-wider mb-2",
+    nameClass: "text-sm font-medium text-white/70 uppercase tracking-wider mb-2",
     priceClass: "text-4xl font-bold text-white",
     copyClass: "text-sm text-white/50 mt-3",
     divider: "border-t border-violet-500/10 pt-6 mb-6 flex-1",
-    sectionLabel: "text-xs font-medium text-violet-400/70 uppercase tracking-wider mb-4",
-    checkColor: "text-violet-400",
+    sectionLabel: "text-xs font-medium text-white/50 uppercase tracking-wider mb-4",
+    checkColor: "text-emerald-400",
     itemColor: "text-sm text-white/80",
     btnClass: "w-full h-12 bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white border-0 shadow-lg shadow-violet-500/25 transition-all duration-300 hover:shadow-violet-500/35 rounded-xl",
     isHighlighted: true,
@@ -381,7 +381,7 @@ export function PricingSection({ onSelectPlan }: PricingSectionProps) {
             <div className="text-center mb-14">
               <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white mb-4 tracking-tight leading-tight">
                 Escolha o plano{" "}
-                <span className="bg-gradient-to-r from-violet-400 via-purple-400 to-fuchsia-400 bg-clip-text text-transparent">
+                <span className="bg-gradient-to-r from-[#FFC7AC] via-[#FF614C] to-[#FF2B61] bg-clip-text text-transparent">
                   da sua agência
                 </span>
               </h2>
@@ -503,10 +503,10 @@ export function PricingSection({ onSelectPlan }: PricingSectionProps) {
                           const isLastCol = plan.slug === "scale";
                           return (
                             <th key={plan.slug} className={`text-center py-4 px-4 ${isPopularCol ? "bg-violet-500/[0.06]" : ""}`} style={{ width: `${60 / plans.length}%` }}>
-                              <span className={isPopularCol ? "text-violet-400 font-bold" : isLastCol ? "text-amber-400/80 font-semibold" : "text-white/60 font-semibold"}>
+                              <span className={isPopularCol ? "text-white font-bold" : isLastCol ? "text-amber-400/80 font-semibold" : "text-white/60 font-semibold"}>
                                 {plan.name}
                               </span>
-                              <p className={`text-xs mt-0.5 ${isPopularCol ? "text-violet-400/50" : isLastCol ? "text-amber-400/30" : "text-white/25"}`}>
+                              <p className={`text-xs mt-0.5 ${isPopularCol ? "text-white/40" : isLastCol ? "text-amber-400/30" : "text-white/25"}`}>
                                 {plan.priceCents > 0 ? `R$ ${(plan.priceCents / 100).toFixed(0)}/mês` : "Sob consulta"}
                               </p>
                             </th>

@@ -20,7 +20,7 @@ export function FinalCTA({ onRegister }: FinalCTAProps) {
           <FadeIn>
             <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white mb-6 tracking-tight leading-tight">
               Sua agência vai continuar{" "}
-              <span className="bg-gradient-to-r from-violet-400 via-purple-400 to-fuchsia-400 bg-clip-text text-transparent">
+              <span className="bg-gradient-to-r from-[#FFC7AC] via-[#FF614C] to-[#FF2B61] bg-clip-text text-transparent">
                 perdendo vendas
               </span>{" "}
               no WhatsApp?

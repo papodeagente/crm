@@ -6263,3 +6263,9 @@
 - [x] Passar contexto (deal, contact, products) para todos os pontos de integração
 - [x] UI para inserir variáveis ao criar/editar mensagens na Settings
 - [x] Testes Vitest para substituição de variáveis (18 testes passando)
+
+## Correção de Legibilidade no Modo Escuro
+
+- [x] Corrigir fontes roxas/lilás no fundo escuro da Landing Page — priorizar branco
+- [x] Revisar cores de texto em componentes do dashboard/settings no modo escuro
+- [x] Garantir contraste adequado em todos os textos do sistema

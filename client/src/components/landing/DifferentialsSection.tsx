@@ -62,7 +62,7 @@ export function DifferentialsSection({ onRegister }: DifferentialsSectionProps) 
       <div className="max-w-6xl mx-auto relative z-10">
         <FadeIn>
           <div className="text-center mb-14">
-            <p className="text-sm font-medium text-violet-400 uppercase tracking-wider mb-4">
+            <p className="text-sm font-medium text-white/60 uppercase tracking-wider mb-4">
               O que muda na sua operação
             </p>
             <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white tracking-tight leading-tight">
@@ -76,9 +76,9 @@ export function DifferentialsSection({ onRegister }: DifferentialsSectionProps) 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8 mb-14">
           {differentials.map((item, idx) => (
             <FadeIn key={idx} delay={0.08 * (idx + 1)}>
-              <div className="bg-white/[0.03] border border-white/[0.08] rounded-2xl p-6 sm:p-8 h-full hover:border-violet-500/20 transition-colors duration-300 group">
-                <div className="w-12 h-12 rounded-xl bg-violet-500/10 flex items-center justify-center mb-5 group-hover:bg-violet-500/15 transition-colors duration-300">
-                  <item.icon className="w-6 h-6 text-violet-400" />
+              <div className="bg-white/[0.03] border border-white/[0.08] rounded-2xl p-6 sm:p-8 h-full hover:border-white/[0.15] transition-colors duration-300 group">
+                <div className="w-12 h-12 rounded-xl bg-white/[0.06] flex items-center justify-center mb-5 group-hover:bg-white/[0.10] transition-colors duration-300">
+                  <item.icon className="w-6 h-6 text-white/70" />
                 </div>
                 <h3 className="text-lg font-semibold text-white mb-3">
                   {item.title}
