@@ -6239,3 +6239,9 @@
 - [x] Remover menu/seção "Participantes" dentro de negociação
 - [x] Adicionar botão "Adicionar passageiro" abaixo do passageiro na negociação
 - [x] Atualizar demais referências de "Contato/Contatos" visíveis na UI
+## Trial 7 dias com plano Basic + Checkout Hotmart para Pro/Elite
+- [x] Trial de 7 dias deve usar plano Basic com funcionalidades configuradas
+- [x] Planos Pro e Elite: botões redirecionam para checkout Hotmart
+- [x] Formulário na LP para capturar nome/email antes de redirecionar ao checkout Hotmart
+- [x] Passar nome e email preenchidos para o link do checkout Hotmart
+- [x] Atualizar CTAs da seção de planos na LP conforme tipo de plano

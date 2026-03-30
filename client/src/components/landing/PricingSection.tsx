@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { FadeIn } from "./FadeIn";
-import { Check, ArrowRight, X, MessageSquare, Crown, Loader2, ChevronDown } from "lucide-react";
+import { Check, ArrowRight, X, MessageSquare, Crown, Loader2, ChevronDown, User, Mail } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { AnimatePresence, motion } from "motion/react";
 import type { PublicPlan } from "../../../../server/services/publicPlansService";
@@ -45,7 +45,7 @@ const FALLBACK_PLANS: PublicPlan[] = [
     billingCycle: "monthly",
     isPopular: true,
     sortOrder: 1,
-    checkoutUrl: null,
+    checkoutUrl: "https://pay.hotmart.com/S104799458W?off=pubryjat",
     color: null,
     limits: { maxUsers: 5, maxWhatsAppAccounts: 1, maxAttendantsPerAccount: 3 },
     features: [
@@ -63,11 +63,11 @@ const FALLBACK_PLANS: PublicPlan[] = [
     name: "Elite",
     description: "Escala e prioridade para operações robustas",
     commercialCopy: "Para operações com múltiplos atendentes e suporte dedicado.",
-    priceCents: 0,
+    priceCents: 79700,
     billingCycle: "monthly",
     isPopular: false,
     sortOrder: 2,
-    checkoutUrl: null,
+    checkoutUrl: "https://pay.hotmart.com/S104799458W?off=1wkp05db",
     color: null,
     limits: { maxUsers: -1, maxWhatsAppAccounts: 3, maxAttendantsPerAccount: 10 },
     features: [
@@ -178,6 +178,115 @@ function getNotIncludedFeatures(plan: PublicPlan, allPlans: PublicPlan[]): strin
   return missing;
 }
 
+// ─── Helper: build Hotmart checkout URL with pre-filled data ────
+function buildCheckoutUrl(baseUrl: string, name: string, email: string): string {
+  const url = new URL(baseUrl);
+  if (name.trim()) url.searchParams.set("name", name.trim());
+  if (email.trim()) url.searchParams.set("email", email.trim());
+  return url.toString();
+}
+
+// ─── Checkout Dialog Component ──────────────────────────────────
+function CheckoutDialog({
+  plan,
+  onClose,
+}: {
+  plan: PublicPlan;
+  onClose: () => void;
+}) {
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!plan.checkoutUrl) return;
+    const url = buildCheckoutUrl(plan.checkoutUrl, name, email);
+    window.open(url, "_blank");
+    onClose();
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <motion.div
+        initial={{ scale: 0.95, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.95, opacity: 0 }}
+        transition={{ duration: 0.2 }}
+        className="bg-[#12121e] border border-white/10 rounded-2xl p-6 sm:p-8 max-w-md w-full shadow-2xl"
+      >
+        <div className="text-center mb-6">
+          <div className="w-12 h-12 rounded-full bg-gradient-to-r from-violet-600 to-fuchsia-600 flex items-center justify-center mx-auto mb-4">
+            <Crown className="w-6 h-6 text-white" />
+          </div>
+          <h3 className="text-xl font-bold text-white">
+            Assinar plano {plan.name}
+          </h3>
+          <p className="text-sm text-white/50 mt-2">
+            Preencha seus dados para agilizar o checkout
+          </p>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="text-sm font-medium text-white/60 mb-1.5 block">Seu nome</label>
+            <div className="relative">
+              <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" />
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="João Silva"
+                className="w-full h-11 pl-10 pr-4 bg-white/5 border border-white/10 rounded-xl text-white placeholder:text-white/25 focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/20 outline-none transition-all text-sm"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="text-sm font-medium text-white/60 mb-1.5 block">Seu email</label>
+            <div className="relative">
+              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" />
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="seu@email.com"
+                className="w-full h-11 pl-10 pr-4 bg-white/5 border border-white/10 rounded-xl text-white placeholder:text-white/25 focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/20 outline-none transition-all text-sm"
+              />
+            </div>
+          </div>
+
+          <div className="pt-2 space-y-3">
+            <Button
+              type="submit"
+              className="w-full h-12 bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white font-medium shadow-lg shadow-violet-500/25 rounded-xl transition-all"
+            >
+              Ir para o checkout <ArrowRight className="w-4 h-4 ml-2" />
+            </Button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="w-full text-sm text-white/40 hover:text-white/60 transition-colors py-2"
+            >
+              Cancelar
+            </button>
+          </div>
+        </form>
+
+        <p className="text-xs text-white/25 text-center mt-4">
+          Pagamento seguro via Hotmart. Você será redirecionado.
+        </p>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+// ─── Main Component ─────────────────────────────────────────────
 export function PricingSection({ onSelectPlan }: PricingSectionProps) {
   const plansQuery = trpc.plan.public.useQuery(undefined, {
     staleTime: 10 * 60 * 1000,
@@ -186,13 +295,50 @@ export function PricingSection({ onSelectPlan }: PricingSectionProps) {
   });
 
   const [showComparison, setShowComparison] = useState(false);
+  const [checkoutPlan, setCheckoutPlan] = useState<PublicPlan | null>(null);
 
   const plans = useMemo(() => {
     const data = plansQuery.data;
     if (!data || !Array.isArray(data) || data.length === 0) return FALLBACK_PLANS;
-    // Sort by sortOrder, limit to 4
     return [...data].sort((a, b) => a.sortOrder - b.sortOrder).slice(0, 4);
   }, [plansQuery.data]);
+
+  // Determine CTA action per plan
+  const handlePlanCTA = (plan: PublicPlan) => {
+    // Basic/start plan → go to register (7-day trial)
+    if (plan.slug === "start") {
+      onSelectPlan(plan.slug);
+      return;
+    }
+    // Scale/Elite with price 0 → WhatsApp
+    if (plan.priceCents === 0 && plan.slug === "scale") {
+      window.open(SCALE_WHATSAPP_URL, "_blank");
+      return;
+    }
+    // Pro/Elite with checkout URL → open dialog to capture name/email
+    if (plan.checkoutUrl) {
+      setCheckoutPlan(plan);
+      return;
+    }
+    // Fallback → register
+    onSelectPlan(plan.slug);
+  };
+
+  // Get CTA label per plan
+  const getCTALabel = (plan: PublicPlan) => {
+    if (plan.slug === "start") return "Testar grátis por 7 dias";
+    if (plan.priceCents === 0 && plan.slug === "scale") return "Falar com consultor";
+    if (plan.checkoutUrl) return "Assinar agora";
+    return "Testar grátis por 7 dias";
+  };
+
+  // Get CTA icon per plan
+  const getCTAIcon = (plan: PublicPlan) => {
+    if (plan.priceCents === 0 && plan.slug === "scale") return <MessageSquare className="w-4 h-4 mr-2" />;
+    return <ArrowRight className="w-4 h-4 ml-2" />;
+  };
+
+  const isIconBefore = (plan: PublicPlan) => plan.priceCents === 0 && plan.slug === "scale";
 
   // Show skeleton while loading
   if (plansQuery.isLoading) {
@@ -206,7 +352,7 @@ export function PricingSection({ onSelectPlan }: PricingSectionProps) {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="bg-white/[0.03] border border-white/[0.08] rounded-2xl p-8 animate-pulse">
+              <div key={i} className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-8 animate-pulse">
                 <div className="h-4 w-20 bg-white/5 rounded mb-4" />
                 <div className="h-8 w-32 bg-white/5 rounded mb-3" />
                 <div className="h-3 w-full bg-white/5 rounded mb-6" />
@@ -224,269 +370,260 @@ export function PricingSection({ onSelectPlan }: PricingSectionProps) {
   }
 
   return (
-    <section id="planos" className="py-24 sm:py-32 px-5 sm:px-8 relative overflow-hidden">
-      <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[600px] bg-gradient-to-b from-violet-600/15 via-purple-600/10 to-transparent rounded-full blur-[120px]" />
-      </div>
-
-      <div className="max-w-5xl mx-auto relative z-10">
-        <FadeIn>
-          <div className="text-center mb-14">
-            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white mb-4 tracking-tight leading-tight">
-              Escolha o plano{" "}
-              <span className="bg-gradient-to-r from-violet-400 via-purple-400 to-fuchsia-400 bg-clip-text text-transparent">
-                da sua agência
-              </span>
-            </h2>
-            <p className="text-lg text-white/40 max-w-xl mx-auto">
-              Teste grátis por 7 dias. Sem cartão. Cancele quando quiser.
-            </p>
-          </div>
-        </FadeIn>
-
-        {/* ─── Plan Cards ─── */}
-        <div className={`grid grid-cols-1 ${plans.length === 2 ? "md:grid-cols-2 max-w-3xl mx-auto" : plans.length >= 3 ? "md:grid-cols-3" : ""} gap-6 lg:gap-8`}>
-          {plans.map((plan, idx) => {
-            const style = cardStyles[Math.min(idx, cardStyles.length - 1)];
-            const isPopular = plan.isPopular;
-            const activeStyle = isPopular ? cardStyles[1] : style;
-            const included = getIncludedFeatures(plan);
-            const notIncluded = getNotIncludedFeatures(plan, plans);
-            const isContactOnly = plan.priceCents === 0;
-            const price = formatPrice(plan.priceCents);
-            const prevPlan = idx > 0 ? plans[idx - 1] : null;
-
-            return (
-              <FadeIn key={plan.slug} delay={0.1 * (idx + 1)}>
-                <div className={activeStyle.wrapper}>
-                  {isPopular && (
-                    <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                      <span className="bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white text-xs font-semibold px-4 py-1.5 rounded-full shadow-lg shadow-violet-500/25 flex items-center gap-1.5">
-                        <Crown className="w-3 h-3" /> Mais popular
-                      </span>
-                    </div>
-                  )}
-
-                  <div className="mb-6">
-                    <p className={activeStyle.nameClass}>{plan.name}</p>
-                    <div className="flex items-baseline gap-1">
-                      <span className={activeStyle.priceClass}>{price.main}</span>
-                      {price.suffix && <span className="text-white/30 text-sm">{price.suffix}</span>}
-                    </div>
-                    {plan.commercialCopy && <p className={activeStyle.copyClass}>{plan.commercialCopy}</p>}
-                  </div>
-
-                  <div className={activeStyle.divider}>
-                    <p className={activeStyle.sectionLabel}>
-                      {prevPlan ? `Tudo do ${prevPlan.name}, mais:` : "Inclui:"}
-                    </p>
-                    <ul className="space-y-3">
-                      {included.map((item, i) => (
-                        <li key={i} className={`flex items-start gap-2.5 ${activeStyle.itemColor}`}>
-                          <Check className={`w-4 h-4 ${activeStyle.checkColor} mt-0.5 shrink-0`} />
-                          <span>{item}</span>
-                        </li>
-                      ))}
-                    </ul>
-                    {notIncluded.length > 0 && (
-                      <div className={activeStyle.notIncludedDivider}>
-                        <p className="text-xs font-medium text-white/30 uppercase tracking-wider mb-3">Não inclui:</p>
-                        <ul className="space-y-2">
-                          {notIncluded.map((item, i) => (
-                            <li key={i} className="flex items-start gap-2.5 text-sm text-white/25">
-                              <X className="w-4 h-4 text-white/15 mt-0.5 shrink-0" />
-                              <span>{item}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                  </div>
-
-                  {isContactOnly ? (
-                    <Button
-                      className={activeStyle.btnClass}
-                      onClick={() => window.open(SCALE_WHATSAPP_URL, "_blank")}
-                    >
-                      <MessageSquare className="w-4 h-4 mr-2" /> Falar com consultor
-                    </Button>
-                  ) : plan.checkoutUrl ? (
-                    <Button
-                      className={activeStyle.btnClass}
-                      onClick={() => window.open(plan.checkoutUrl!, "_blank")}
-                    >
-                      Começar agora <ArrowRight className="w-4 h-4 ml-2" />
-                    </Button>
-                  ) : (
-                    <Button
-                      className={activeStyle.btnClass}
-                      onClick={() => onSelectPlan(plan.slug)}
-                    >
-                      Testar grátis por 7 dias <ArrowRight className="w-4 h-4 ml-2" />
-                    </Button>
-                  )}
-                </div>
-              </FadeIn>
-            );
-          })}
+    <>
+      <section id="planos" className="py-24 sm:py-32 px-5 sm:px-8 relative overflow-hidden">
+        <div className="absolute inset-0 pointer-events-none">
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[600px] bg-gradient-to-b from-violet-600/15 via-purple-600/10 to-transparent rounded-full blur-[120px]" />
         </div>
 
-        {/* ─── Comparison Table (collapsible) ─── */}
-        <FadeIn delay={0.4}>
-          <div className="mt-16">
-            <div className="text-center">
-              <Button
-                variant="ghost"
-                className="text-white/60 hover:text-white hover:bg-white/5 gap-2 text-sm font-medium mx-auto"
-                onClick={() => setShowComparison((v) => !v)}
-              >
-                Compare os planos
-                <ChevronDown className={`w-4 h-4 transition-transform duration-300 ${showComparison ? "rotate-180" : ""}`} />
-              </Button>
-              <p className="text-xs text-white/30 mt-1">
-                Veja exatamente o que cada plano oferece
+        <div className="max-w-5xl mx-auto relative z-10">
+          <FadeIn>
+            <div className="text-center mb-14">
+              <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white mb-4 tracking-tight leading-tight">
+                Escolha o plano{" "}
+                <span className="bg-gradient-to-r from-violet-400 via-purple-400 to-fuchsia-400 bg-clip-text text-transparent">
+                  da sua agência
+                </span>
+              </h2>
+              <p className="text-lg text-white/40 max-w-xl mx-auto">
+                Teste grátis por 7 dias no plano Essencial. Sem cartão. Cancele quando quiser.
               </p>
             </div>
+          </FadeIn>
 
-            <AnimatePresence>
-            {showComparison && (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: "auto", opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              transition={{ duration: 0.35, ease: "easeInOut" }}
-              className="overflow-hidden"
-            >
-            <div className="mt-6 bg-white/[0.02] border border-white/[0.06] rounded-2xl overflow-hidden backdrop-blur-sm">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-white/[0.06]">
-                      <th className="text-left py-4 px-5 text-white/40 font-medium w-[40%]">Recurso</th>
-                      {plans.map((plan) => {
-                        const isPopularCol = plan.isPopular;
-                        const isLastCol = plan.slug === "scale";
-                        return (
-                          <th key={plan.slug} className={`text-center py-4 px-4 ${isPopularCol ? "bg-violet-500/[0.06]" : ""}`} style={{ width: `${60 / plans.length}%` }}>
-                            <span className={isPopularCol ? "text-violet-400 font-bold" : isLastCol ? "text-amber-400/80 font-semibold" : "text-white/60 font-semibold"}>
-                              {plan.name}
-                            </span>
-                            <p className={`text-xs mt-0.5 ${isPopularCol ? "text-violet-400/50" : isLastCol ? "text-amber-400/30" : "text-white/25"}`}>
-                              {plan.priceCents > 0 ? `R$ ${(plan.priceCents / 100).toFixed(0)}/mês` : "Sob consulta"}
-                            </p>
-                          </th>
-                        );
-                      })}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {/* Limit rows */}
-                    <tr className="border-b border-white/[0.04]">
-                      <td className="py-3.5 px-5 text-white/50">Usuários</td>
-                      {plans.map((plan) => (
-                        <td key={plan.slug} className={`text-center py-3.5 px-4 ${plan.isPopular ? "bg-violet-500/[0.04]" : ""}`}>
-                          <span className="text-white/70 font-medium">
-                            {plan.limits.maxUsers === -1 ? "Ilimitado" : `${plan.limits.maxUsers}`}
-                          </span>
-                        </td>
-                      ))}
-                    </tr>
-                    <tr className="border-b border-white/[0.04]">
-                      <td className="py-3.5 px-5 text-white/50">Contas de WhatsApp</td>
-                      {plans.map((plan) => (
-                        <td key={plan.slug} className={`text-center py-3.5 px-4 ${plan.isPopular ? "bg-violet-500/[0.04]" : ""}`}>
-                          <span className={plan.limits.maxWhatsAppAccounts === 0 ? "text-white/20" : "text-white/70 font-medium"}>
-                            {plan.limits.maxWhatsAppAccounts === 0 ? "—" : `${plan.limits.maxWhatsAppAccounts}`}
-                          </span>
-                        </td>
-                      ))}
-                    </tr>
-                    <tr className="border-b border-white/[0.04]">
-                      <td className="py-3.5 px-5 text-white/50">Atendentes por conta</td>
-                      {plans.map((plan) => (
-                        <td key={plan.slug} className={`text-center py-3.5 px-4 ${plan.isPopular ? "bg-violet-500/[0.04]" : ""}`}>
-                          <span className={plan.limits.maxAttendantsPerAccount === 0 ? "text-white/20" : "text-white/70 font-medium"}>
-                            {plan.limits.maxAttendantsPerAccount === 0 ? "—" : `${plan.limits.maxAttendantsPerAccount}`}
-                          </span>
-                        </td>
-                      ))}
-                    </tr>
-                    {/* Feature rows */}
-                    {COMPARISON_FEATURE_KEYS.map((row) => (
-                      <tr key={row.key} className="border-b border-white/[0.04] last:border-0">
-                        <td className="py-3.5 px-5 text-white/50">{row.label}</td>
+          {/* ─── Plan Cards ─── */}
+          <div className={`grid grid-cols-1 ${plans.length === 2 ? "md:grid-cols-2 max-w-3xl mx-auto" : plans.length >= 3 ? "md:grid-cols-3" : ""} gap-6 lg:gap-8`}>
+            {plans.map((plan, idx) => {
+              const style = cardStyles[Math.min(idx, cardStyles.length - 1)];
+              const isPopular = plan.isPopular;
+              const activeStyle = isPopular ? cardStyles[1] : style;
+              const included = getIncludedFeatures(plan);
+              const notIncluded = getNotIncludedFeatures(plan, plans);
+              const price = formatPrice(plan.priceCents);
+              const prevPlan = idx > 0 ? plans[idx - 1] : null;
+
+              return (
+                <FadeIn key={plan.slug} delay={0.1 * (idx + 1)}>
+                  <div className={activeStyle.wrapper}>
+                    {isPopular && (
+                      <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                        <span className="bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white text-xs font-semibold px-4 py-1.5 rounded-full shadow-lg shadow-violet-500/25 flex items-center gap-1.5">
+                          <Crown className="w-3 h-3" /> Mais popular
+                        </span>
+                      </div>
+                    )}
+
+                    <div className="mb-6">
+                      <p className={activeStyle.nameClass}>{plan.name}</p>
+                      <div className="flex items-baseline gap-1">
+                        <span className={activeStyle.priceClass}>{price.main}</span>
+                        {price.suffix && <span className="text-white/30 text-sm">{price.suffix}</span>}
+                      </div>
+                      {plan.slug === "start" && (
+                        <p className="text-xs text-emerald-400/80 mt-1.5 font-medium">7 dias grátis para testar</p>
+                      )}
+                      {plan.commercialCopy && <p className={activeStyle.copyClass}>{plan.commercialCopy}</p>}
+                    </div>
+
+                    <div className={activeStyle.divider}>
+                      <p className={activeStyle.sectionLabel}>
+                        {prevPlan ? `Tudo do ${prevPlan.name}, mais:` : "Inclui:"}
+                      </p>
+                      <ul className="space-y-3">
+                        {included.map((item, i) => (
+                          <li key={i} className={`flex items-start gap-2.5 ${activeStyle.itemColor}`}>
+                            <Check className={`w-4 h-4 ${activeStyle.checkColor} mt-0.5 shrink-0`} />
+                            <span>{item}</span>
+                          </li>
+                        ))}
+                      </ul>
+                      {notIncluded.length > 0 && (
+                        <div className={activeStyle.notIncludedDivider}>
+                          <p className="text-xs font-medium text-white/30 uppercase tracking-wider mb-3">Não inclui:</p>
+                          <ul className="space-y-2">
+                            {notIncluded.map((item, i) => (
+                              <li key={i} className="flex items-start gap-2.5 text-sm text-white/25">
+                                <X className="w-4 h-4 text-white/15 mt-0.5 shrink-0" />
+                                <span>{item}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+
+                    <Button
+                      className={activeStyle.btnClass}
+                      onClick={() => handlePlanCTA(plan)}
+                    >
+                      {isIconBefore(plan) && getCTAIcon(plan)}
+                      {getCTALabel(plan)}
+                      {!isIconBefore(plan) && getCTAIcon(plan)}
+                    </Button>
+                  </div>
+                </FadeIn>
+              );
+            })}
+          </div>
+
+          {/* ─── Comparison Table (collapsible) ─── */}
+          <FadeIn delay={0.4}>
+            <div className="mt-16">
+              <div className="text-center">
+                <Button
+                  variant="ghost"
+                  className="text-white/60 hover:text-white hover:bg-white/5 gap-2 text-sm font-medium mx-auto"
+                  onClick={() => setShowComparison((v) => !v)}
+                >
+                  Compare os planos
+                  <ChevronDown className={`w-4 h-4 transition-transform duration-300 ${showComparison ? "rotate-180" : ""}`} />
+                </Button>
+                <p className="text-xs text-white/30 mt-1">
+                  Veja exatamente o que cada plano oferece
+                </p>
+              </div>
+
+              <AnimatePresence>
+              {showComparison && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.35, ease: "easeInOut" }}
+                className="overflow-hidden"
+              >
+              <div className="mt-6 bg-white/[0.02] border border-white/[0.06] rounded-2xl overflow-hidden backdrop-blur-sm">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-white/[0.06]">
+                        <th className="text-left py-4 px-5 text-white/40 font-medium w-[40%]">Recurso</th>
                         {plans.map((plan) => {
-                          const featureMap = new Map(plan.features.map((f) => [f.key, f.isEnabled]));
-                          const hasFeature = featureMap.get(row.key) ?? false;
+                          const isPopularCol = plan.isPopular;
+                          const isLastCol = plan.slug === "scale";
                           return (
-                            <td key={plan.slug} className={`text-center py-3.5 px-4 ${plan.isPopular ? "bg-violet-500/[0.04]" : ""}`}>
-                              {hasFeature ? (
-                                <div className="flex items-center justify-center">
-                                  <div className="w-6 h-6 rounded-full bg-emerald-500/10 flex items-center justify-center">
-                                    <Check className="w-3.5 h-3.5 text-emerald-400" />
-                                  </div>
-                                </div>
-                              ) : (
-                                <div className="flex items-center justify-center">
-                                  <div className="w-6 h-6 rounded-full bg-white/[0.03] flex items-center justify-center">
-                                    <X className="w-3.5 h-3.5 text-white/15" />
-                                  </div>
-                                </div>
-                              )}
-                            </td>
+                            <th key={plan.slug} className={`text-center py-4 px-4 ${isPopularCol ? "bg-violet-500/[0.06]" : ""}`} style={{ width: `${60 / plans.length}%` }}>
+                              <span className={isPopularCol ? "text-violet-400 font-bold" : isLastCol ? "text-amber-400/80 font-semibold" : "text-white/60 font-semibold"}>
+                                {plan.name}
+                              </span>
+                              <p className={`text-xs mt-0.5 ${isPopularCol ? "text-violet-400/50" : isLastCol ? "text-amber-400/30" : "text-white/25"}`}>
+                                {plan.priceCents > 0 ? `R$ ${(plan.priceCents / 100).toFixed(0)}/mês` : "Sob consulta"}
+                              </p>
+                            </th>
                           );
                         })}
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody>
+                      {/* Limit rows */}
+                      <tr className="border-b border-white/[0.04]">
+                        <td className="py-3.5 px-5 text-white/50">Usuários</td>
+                        {plans.map((plan) => (
+                          <td key={plan.slug} className={`text-center py-3.5 px-4 ${plan.isPopular ? "bg-violet-500/[0.04]" : ""}`}>
+                            <span className="text-white/70 font-medium">
+                              {plan.limits.maxUsers === -1 ? "Ilimitado" : `${plan.limits.maxUsers}`}
+                            </span>
+                          </td>
+                        ))}
+                      </tr>
+                      <tr className="border-b border-white/[0.04]">
+                        <td className="py-3.5 px-5 text-white/50">Contas de WhatsApp</td>
+                        {plans.map((plan) => (
+                          <td key={plan.slug} className={`text-center py-3.5 px-4 ${plan.isPopular ? "bg-violet-500/[0.04]" : ""}`}>
+                            <span className={plan.limits.maxWhatsAppAccounts === 0 ? "text-white/20" : "text-white/70 font-medium"}>
+                              {plan.limits.maxWhatsAppAccounts === 0 ? "—" : `${plan.limits.maxWhatsAppAccounts}`}
+                            </span>
+                          </td>
+                        ))}
+                      </tr>
+                      <tr className="border-b border-white/[0.04]">
+                        <td className="py-3.5 px-5 text-white/50">Atendentes por conta</td>
+                        {plans.map((plan) => (
+                          <td key={plan.slug} className={`text-center py-3.5 px-4 ${plan.isPopular ? "bg-violet-500/[0.04]" : ""}`}>
+                            <span className={plan.limits.maxAttendantsPerAccount === 0 ? "text-white/20" : "text-white/70 font-medium"}>
+                              {plan.limits.maxAttendantsPerAccount === 0 ? "—" : `${plan.limits.maxAttendantsPerAccount}`}
+                            </span>
+                          </td>
+                        ))}
+                      </tr>
+                      {/* Feature rows */}
+                      {COMPARISON_FEATURE_KEYS.map((row) => (
+                        <tr key={row.key} className="border-b border-white/[0.04] last:border-0">
+                          <td className="py-3.5 px-5 text-white/50">{row.label}</td>
+                          {plans.map((plan) => {
+                            const featureMap = new Map(plan.features.map((f) => [f.key, f.isEnabled]));
+                            const hasFeature = featureMap.get(row.key) ?? false;
+                            return (
+                              <td key={plan.slug} className={`text-center py-3.5 px-4 ${plan.isPopular ? "bg-violet-500/[0.04]" : ""}`}>
+                                {hasFeature ? (
+                                  <div className="flex items-center justify-center">
+                                    <div className="w-6 h-6 rounded-full bg-emerald-500/10 flex items-center justify-center">
+                                      <Check className="w-3.5 h-3.5 text-emerald-400" />
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div className="flex items-center justify-center">
+                                    <div className="w-6 h-6 rounded-full bg-white/[0.03] flex items-center justify-center">
+                                      <X className="w-3.5 h-3.5 text-white/15" />
+                                    </div>
+                                  </div>
+                                )}
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
 
-              {/* CTA row */}
-              <div className="border-t border-white/[0.06] grid" style={{ gridTemplateColumns: `40% ${plans.map(() => `${60 / plans.length}%`).join(" ")}` }}>
-                <div className="py-5 px-5" />
-                {plans.map((plan) => {
-                  const isContactOnly = plan.priceCents === 0;
-                  const isPopularCol = plan.isPopular;
-                  const isLastCol = plan.slug === "scale";
-                  return (
-                    <div key={plan.slug} className={`py-5 px-4 flex items-center justify-center ${isPopularCol ? "bg-violet-500/[0.06]" : ""}`}>
-                      {isContactOnly ? (
-                        <Button
-                          size="sm"
-                          className={isLastCol ? "bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/15 text-xs" : "bg-white/[0.06] hover:bg-white/[0.10] text-white border border-white/[0.10] text-xs"}
-                          onClick={() => window.open(SCALE_WHATSAPP_URL, "_blank")}
-                        >
-                          Consultar
-                        </Button>
-                      ) : isPopularCol ? (
-                        <Button
-                          size="sm"
-                          className="bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white text-xs shadow-lg shadow-violet-500/20"
-                          onClick={() => plan.checkoutUrl ? window.open(plan.checkoutUrl, "_blank") : onSelectPlan(plan.slug)}
-                        >
-                          Assinar {plan.name}
-                        </Button>
-                      ) : (
-                        <Button
-                          size="sm"
-                          className="bg-white/[0.06] hover:bg-white/[0.10] text-white border border-white/[0.10] text-xs"
-                          onClick={() => plan.checkoutUrl ? window.open(plan.checkoutUrl, "_blank") : onSelectPlan(plan.slug)}
-                        >
-                          Assinar
-                        </Button>
-                      )}
-                    </div>
-                  );
-                })}
+                {/* CTA row */}
+                <div className="border-t border-white/[0.06] grid" style={{ gridTemplateColumns: `40% ${plans.map(() => `${60 / plans.length}%`).join(" ")}` }}>
+                  <div className="py-5 px-5" />
+                  {plans.map((plan) => {
+                    const isPopularCol = plan.isPopular;
+                    const isLastCol = plan.slug === "scale";
+                    return (
+                      <div key={plan.slug} className={`py-5 px-4 flex items-center justify-center ${isPopularCol ? "bg-violet-500/[0.06]" : ""}`}>
+                        {isPopularCol ? (
+                          <Button
+                            size="sm"
+                            className="bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white text-xs shadow-lg shadow-violet-500/20"
+                            onClick={() => handlePlanCTA(plan)}
+                          >
+                            Assinar {plan.name}
+                          </Button>
+                        ) : (
+                          <Button
+                            size="sm"
+                            className={isLastCol ? "bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/15 text-xs" : "bg-white/[0.06] hover:bg-white/[0.10] text-white border border-white/[0.10] text-xs"}
+                            onClick={() => handlePlanCTA(plan)}
+                          >
+                            {plan.slug === "start" ? "Testar grátis" : plan.priceCents === 0 ? "Consultar" : `Assinar`}
+                          </Button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
+              </motion.div>
+              )}
+              </AnimatePresence>
             </div>
-            </motion.div>
-            )}
-            </AnimatePresence>
-          </div>
-        </FadeIn>
-      </div>
-    </section>
+          </FadeIn>
+        </div>
+      </section>
+
+      {/* ─── Checkout Dialog (overlay) ─── */}
+      <AnimatePresence>
+        {checkoutPlan && (
+          <CheckoutDialog
+            plan={checkoutPlan}
+            onClose={() => setCheckoutPlan(null)}
+          />
+        )}
+      </AnimatePresence>
+    </>
   );
 }

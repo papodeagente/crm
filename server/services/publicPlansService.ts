@@ -51,7 +51,7 @@ export function invalidatePublicPlanCache() {
 // ─── Feature key → human label ───────────────────────────────────
 function featureKeyToLabel(key: string): string {
   const labels: Record<string, string> = {
-    crmCore: "CRM completo (contatos, negociações, funil, tarefas)",
+    crmCore: "CRM completo (passageiros, negociações, funil, tarefas)",
     communityAccess: "Comunidade Acelera Turismo",
     whatsappEmbedded: "WhatsApp integrado ao CRM",
     segmentedBroadcast: "Disparo segmentado de mensagens",
@@ -166,7 +166,7 @@ export async function getPublicPlans(): Promise<PublicPlan[]> {
           isPopular: p.slug === "growth", // growth/Pro is the popular plan
           sortOrder: p.displayOrder ?? idx,
           checkoutUrl: p.hotmartOfferCode
-            ? `https://pay.hotmart.com/${p.hotmartOfferCode}`
+            ? `https://pay.hotmart.com/S104799458W?off=${p.hotmartOfferCode}`
             : null,
           color: null,
           limits: {
