@@ -68,7 +68,6 @@ export default function Contacts() {
     const f = contactFilters.filters;
     return {
       search: f.nameSearch || search || undefined,
-      stage: f.stage || undefined,
       email: f.email || undefined,
       phone: f.phone || undefined,
       limit: pageSize,
@@ -304,14 +303,7 @@ export default function Contacts() {
                   </button>
                 </span>
               )}
-              {contactFilters.filters.stage && (
-                <span className="inline-flex items-center gap-1 px-2 py-1 bg-blue-500/10 text-blue-600 dark:text-blue-400 rounded-md text-[11px]">
-                  Estágio: {stageConfig[contactFilters.filters.stage]?.label || contactFilters.filters.stage}
-                  <button onClick={() => contactFilters.setFilters(prev => { const n = { ...prev }; delete n.stage; return n; })} className="hover:bg-blue-500/20 rounded-sm p-0.5">
-                    <X className="h-3 w-3" />
-                  </button>
-                </span>
-              )}
+
               {(contactFilters.filters.dateFrom || contactFilters.filters.dateTo) && (
                 <span className="inline-flex items-center gap-1 px-2 py-1 bg-blue-500/10 text-blue-600 dark:text-blue-400 rounded-md text-[11px]">
                   Período: {contactFilters.filters.dateFrom || "..."} — {contactFilters.filters.dateTo || "..."}

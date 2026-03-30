@@ -4,9 +4,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import DateRangeFilter, { useDateFilter, getPresetDates, type DatePreset } from "@/components/DateRangeFilter";
-import { Filter, X, RotateCcw } from "lucide-react";
+import { Filter, RotateCcw } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 
 // ─── Types ───
@@ -14,7 +14,6 @@ export interface ContactFilters {
   nameSearch?: string;
   email?: string;
   phone?: string;
-  stage?: string;
   dateFrom?: string;
   dateTo?: string;
   customFieldFilters?: { fieldId: number; value: string }[];
@@ -27,12 +26,15 @@ export function useContactFilters() {
   const [filters, setFilters] = useState<ContactFilters>(() => {
     try {
       const saved = sessionStorage.getItem("contactFilters");
-      return saved ? JSON.parse(saved) : EMPTY_FILTERS;
+      if (!saved) return EMPTY_FILTERS;
+      const parsed = JSON.parse(saved);
+      // Remove legacy 'stage' key if present
+      if ("stage" in parsed) delete parsed.stage;
+      return parsed;
     } catch { return EMPTY_FILTERS; }
   });
   const [isOpen, setIsOpen] = useState(false);
 
-  // Persist filters to sessionStorage whenever they change
   useEffect(() => {
     try {
       const hasFilters = Object.keys(filters).length > 0 && JSON.stringify(filters) !== '{}';
@@ -49,7 +51,6 @@ export function useContactFilters() {
     if (filters.nameSearch) count++;
     if (filters.email) count++;
     if (filters.phone) count++;
-    if (filters.stage) count++;
     if (filters.dateFrom || filters.dateTo) count++;
     if (filters.customFieldFilters?.length) count += filters.customFieldFilters.length;
     return count;
@@ -120,6 +121,79 @@ function DateSection({ label, fromValue, toValue, onFromChange, onToChange }: {
   );
 }
 
+// ─── Checkbox Group for select fields ───
+function CheckboxGroup({ field, selectedValues, onChange }: {
+  field: { id: number; label: string; options: string[] };
+  selectedValues: string[];
+  onChange: (values: string[]) => void;
+}) {
+  const toggle = (opt: string) => {
+    if (selectedValues.includes(opt)) {
+      onChange(selectedValues.filter((v) => v !== opt));
+    } else {
+      onChange([...selectedValues, opt]);
+    }
+  };
+
+  return (
+    <div className="space-y-2">
+      <Label className="text-xs text-muted-foreground font-medium">{field.label}</Label>
+      <div className="space-y-1.5 pl-0.5">
+        {field.options.map((opt) => (
+          <label
+            key={opt}
+            className="flex items-center gap-2.5 py-1 px-2 rounded-md hover:bg-muted/50 cursor-pointer transition-colors"
+          >
+            <Checkbox
+              checked={selectedValues.includes(opt)}
+              onCheckedChange={() => toggle(opt)}
+              className="h-4 w-4"
+            />
+            <span className="text-[13px] text-foreground">{opt}</span>
+          </label>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── Boolean Checkbox Group ───
+function BooleanCheckboxGroup({ field, selectedValue, onChange }: {
+  field: { id: number; label: string };
+  selectedValue: string;
+  onChange: (value: string) => void;
+}) {
+  const options = [
+    { value: "true", label: "Sim" },
+    { value: "false", label: "Não" },
+  ];
+
+  const toggle = (val: string) => {
+    onChange(selectedValue === val ? "" : val);
+  };
+
+  return (
+    <div className="space-y-2">
+      <Label className="text-xs text-muted-foreground font-medium">{field.label}</Label>
+      <div className="space-y-1.5 pl-0.5">
+        {options.map((opt) => (
+          <label
+            key={opt.value}
+            className="flex items-center gap-2.5 py-1 px-2 rounded-md hover:bg-muted/50 cursor-pointer transition-colors"
+          >
+            <Checkbox
+              checked={selectedValue === opt.value}
+              onCheckedChange={() => toggle(opt.value)}
+              className="h-4 w-4"
+            />
+            <span className="text-[13px] text-foreground">{opt.label}</span>
+          </label>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ─── Main Panel ───
 export default function ContactFiltersPanel({
   open,
@@ -134,20 +208,57 @@ export default function ContactFiltersPanel({
   onApply: (filters: ContactFilters) => void;
   onClear: () => void;
 }) {
-  // Local state for editing before applying
   const [local, setLocal] = useState<ContactFilters>(filters);
 
-  // Sync when opened
   const handleOpenChange = (open: boolean) => {
     if (open) setLocal(filters);
     onOpenChange(open);
   };
 
-  // Data for selects
   const contactCustomFields = trpc.customFields.list.useQuery({ entity: "contact" });
 
   const set = (key: keyof ContactFilters, value: any) => {
     setLocal((prev) => ({ ...prev, [key]: value || undefined }));
+  };
+
+  // Helper: parse pipe-separated values for multi-select custom fields
+  const getSelectedCFValues = (fieldId: number): string[] => {
+    const existing = (local.customFieldFilters || []).find((f) => f.fieldId === fieldId);
+    if (!existing?.value) return [];
+    return existing.value.split("|").filter(Boolean);
+  };
+
+  const updateCFMulti = (fieldId: number, values: string[]) => {
+    const current = local.customFieldFilters || [];
+    if (values.length === 0) {
+      setLocal((prev) => ({ ...prev, customFieldFilters: current.filter((f) => f.fieldId !== fieldId) }));
+    } else {
+      const joined = values.join("|");
+      const idx = current.findIndex((f) => f.fieldId === fieldId);
+      if (idx >= 0) {
+        const updated = [...current];
+        updated[idx] = { fieldId, value: joined };
+        setLocal((prev) => ({ ...prev, customFieldFilters: updated }));
+      } else {
+        setLocal((prev) => ({ ...prev, customFieldFilters: [...current, { fieldId, value: joined }] }));
+      }
+    }
+  };
+
+  const updateCFSingle = (fieldId: number, value: string) => {
+    const current = local.customFieldFilters || [];
+    if (!value) {
+      setLocal((prev) => ({ ...prev, customFieldFilters: current.filter((f) => f.fieldId !== fieldId) }));
+    } else {
+      const idx = current.findIndex((f) => f.fieldId === fieldId);
+      if (idx >= 0) {
+        const updated = [...current];
+        updated[idx] = { fieldId, value };
+        setLocal((prev) => ({ ...prev, customFieldFilters: updated }));
+      } else {
+        setLocal((prev) => ({ ...prev, customFieldFilters: [...current, { fieldId, value }] }));
+      }
+    }
   };
 
   const handleApply = () => {
@@ -206,23 +317,6 @@ export default function ContactFiltersPanel({
               />
             </div>
 
-            {/* ─── Estágio ─── */}
-            <div className="space-y-2">
-              <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Estágio</Label>
-              <Select value={local.stage || "all"} onValueChange={(v) => set("stage", v === "all" ? undefined : v)}>
-                <SelectTrigger className="h-9">
-                  <SelectValue placeholder="Todos" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos</SelectItem>
-                  <SelectItem value="lead">Lead</SelectItem>
-                  <SelectItem value="prospect">Prospect</SelectItem>
-                  <SelectItem value="customer">Cliente</SelectItem>
-                  <SelectItem value="churned">Churned</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
             <div className="border-t" />
 
             {/* ─── Data de Criação ─── */}
@@ -238,69 +332,42 @@ export default function ContactFiltersPanel({
             {(contactCustomFields.data as any[])?.length > 0 && (
               <>
                 <div className="border-t" />
-                <div className="space-y-3">
+                <div className="space-y-4">
                   <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Campos Personalizados</Label>
                   {(contactCustomFields.data as any[]).map((field: any) => {
-                    const existing = (local.customFieldFilters || []).find((f) => f.fieldId === field.id);
-                    const value = existing?.value || "";
-                    const updateCF = (v: string) => {
-                      const current = local.customFieldFilters || [];
-                      if (!v) {
-                        setLocal((prev) => ({ ...prev, customFieldFilters: current.filter((f) => f.fieldId !== field.id) }));
-                      } else {
-                        const idx = current.findIndex((f) => f.fieldId === field.id);
-                        if (idx >= 0) {
-                          const updated = [...current];
-                          updated[idx] = { fieldId: field.id, value: v };
-                          setLocal((prev) => ({ ...prev, customFieldFilters: updated }));
-                        } else {
-                          setLocal((prev) => ({ ...prev, customFieldFilters: [...current, { fieldId: field.id, value: v }] }));
-                        }
-                      }
-                    };
+                    // Select fields → checkbox group with all options
                     if (field.type === "select" && field.options?.length > 0) {
                       return (
-                        <div key={field.id} className="space-y-1">
-                          <Label className="text-xs text-muted-foreground">{field.label}</Label>
-                          <Select value={value || "all"} onValueChange={(v) => updateCF(v === "all" ? "" : v)}>
-                            <SelectTrigger className="h-9">
-                              <SelectValue placeholder="Todos" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="all">Todos</SelectItem>
-                              {field.options.map((opt: string) => (
-                                <SelectItem key={opt} value={opt}>{opt}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
+                        <CheckboxGroup
+                          key={field.id}
+                          field={field}
+                          selectedValues={getSelectedCFValues(field.id)}
+                          onChange={(values) => updateCFMulti(field.id, values)}
+                        />
                       );
                     }
+                    // Boolean fields → checkbox Sim/Não
                     if (field.type === "boolean") {
+                      const existing = (local.customFieldFilters || []).find((f) => f.fieldId === field.id);
                       return (
-                        <div key={field.id} className="space-y-1">
-                          <Label className="text-xs text-muted-foreground">{field.label}</Label>
-                          <Select value={value || "all"} onValueChange={(v) => updateCF(v === "all" ? "" : v)}>
-                            <SelectTrigger className="h-9">
-                              <SelectValue placeholder="Todos" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="all">Todos</SelectItem>
-                              <SelectItem value="true">Sim</SelectItem>
-                              <SelectItem value="false">Não</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
+                        <BooleanCheckboxGroup
+                          key={field.id}
+                          field={field}
+                          selectedValue={existing?.value || ""}
+                          onChange={(v) => updateCFSingle(field.id, v)}
+                        />
                       );
                     }
+                    // Text/other fields → input
+                    const existing = (local.customFieldFilters || []).find((f) => f.fieldId === field.id);
                     return (
                       <div key={field.id} className="space-y-1">
-                        <Label className="text-xs text-muted-foreground">{field.label}</Label>
+                        <Label className="text-xs text-muted-foreground font-medium">{field.label}</Label>
                         <Input
                           placeholder={`Filtrar por ${field.label.toLowerCase()}...`}
                           className="h-9"
-                          value={value}
-                          onChange={(e) => updateCF(e.target.value)}
+                          value={existing?.value || ""}
+                          onChange={(e) => updateCFSingle(field.id, e.target.value)}
                         />
                       </div>
                     );

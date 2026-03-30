@@ -6277,3 +6277,8 @@
 - [x] Implementar backend: endpoint de filtragem de contatos com campos personalizados
 - [x] Implementar frontend: painel lateral de filtros na página de contatos (igual Pipeline)
 - [x] Testes vitest para o novo endpoint de filtragem (13 testes passando)
+
+## Ajustes no Filtro de Contatos
+
+- [x] Remover campo "Estágio" do painel de filtros de contatos
+- [x] Campos personalizados tipo select/boolean: exibir opções como checkboxes selecionáveis
