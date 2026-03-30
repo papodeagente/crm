@@ -6282,3 +6282,7 @@
 
 - [x] Remover campo "Estágio" do painel de filtros de contatos
 - [x] Campos personalizados tipo select/boolean: exibir opções como checkboxes selecionáveis
+
+## Bug: Tag {produto_principal}
+
+- [x] Corrigir tag {produto_principal} para puxar o nome do produto de maior valor da negociação
