@@ -17,7 +17,7 @@ import { formatTime, SYSTEM_TIMEZONE, SYSTEM_LOCALE } from "../../../shared/date
 import TransferDialog from "./TransferDialog";
 import InstantTooltip from "@/components/InstantTooltip";
 import AiSuggestionPanel from "@/components/AiSuggestionPanel";
-import QuickMessagesPicker from "@/components/QuickMessagesPicker";
+import QuickMessagesPicker, { type MessageContext } from "@/components/QuickMessagesPicker";
 import RichMessageRenderer, { isRichMessageType } from "@/components/RichMessageRenderer";
 import { useTenantId } from "@/hooks/useTenantId";
 
@@ -83,6 +83,11 @@ export interface WhatsAppChatProps {
   waConversationId?: number;
   /** Deal ID for import conversation as note */
   dealId?: number;
+  /** Deal context for variable substitution in quick messages */
+  dealTitle?: string;
+  dealValueCents?: number;
+  dealStageName?: string;
+  companyName?: string;
   /** Called immediately when user sends a message — updates conversation store optimistically */
   onOptimisticSend?: (msg: { content: string; messageType?: string }) => void;
 }
@@ -1252,7 +1257,7 @@ function EditMessageModal({ currentText, onSave, onClose }: { currentText: strin
    MAIN CHAT COMPONENT
    ═══════════════════════════════════════════════════════ */
 
-export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDeal, onCreateContact, hasCrmContact, assignment, agents, onAssign, onStatusChange, myAvatarUrl, waConversationId, dealId, onOptimisticSend }: WhatsAppChatProps) {
+export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDeal, onCreateContact, hasCrmContact, assignment, agents, onAssign, onStatusChange, myAvatarUrl, waConversationId, dealId, dealTitle, dealValueCents, dealStageName, companyName, onOptimisticSend }: WhatsAppChatProps) {
   const tenantId = useTenantId();
   const [showAgentDropdown, setShowAgentDropdown] = useState(false);
   const { lastMessage, lastStatusUpdate, lastMediaUpdate, lastConversationUpdate, lastTranscriptionUpdate, lastReaction, isConnected: socketConnected } = useSocket();
@@ -2870,6 +2875,16 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
                 side="top"
                 align="start"
                 className="w-[42px] h-[42px] rounded-full"
+                context={{
+                  contactName: contact?.name,
+                  contactEmail: contact?.email,
+                  contactPhone: contact?.phone,
+                  dealId: dealId,
+                  dealTitle: dealTitle,
+                  dealValueCents: dealValueCents,
+                  dealStageName: dealStageName,
+                  companyName: companyName,
+                } as MessageContext}
               />
             </div>
 

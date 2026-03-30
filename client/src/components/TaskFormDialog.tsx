@@ -16,7 +16,7 @@ import {
   X, Phone, Mail, Video, MessageSquare, CheckSquare, Send, Clock, AlertCircle,
 } from "lucide-react";
 import { toast } from "sonner";
-import QuickMessagesPicker from "@/components/QuickMessagesPicker";
+import QuickMessagesPicker, { type MessageContext } from "@/components/QuickMessagesPicker";
 export const taskTypeOptions = [
   { value: "task", label: "Tarefa", icon: CheckSquare },
   { value: "whatsapp", label: "WhatsApp", icon: MessageSquare },
@@ -459,6 +459,12 @@ export default function TaskFormDialog({
                     variant="text"
                     side="bottom"
                     align="end"
+                    context={{
+                      contactName: resolvedContactName || propContactName,
+                      contactPhone: resolvedContactPhone || propContactPhone,
+                      dealId: effectiveDealId || undefined,
+                      dealTitle: effectiveDealTitle || dealTitle,
+                    } as MessageContext}
                   />
                 </div>
                 <Textarea

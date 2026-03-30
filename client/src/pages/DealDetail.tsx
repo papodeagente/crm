@@ -3628,12 +3628,16 @@ function WhatsAppPanel({ contact, dealId, isFullscreen, onToggleFullscreen, onOp
         activeSession && remoteJid ? (
           <div className="flex-1 min-h-0 relative">
             <WhatsAppChat
-              contact={contact}
-              sessionId={activeSession.sessionId}
-              remoteJid={remoteJid}
-              myAvatarUrl={activeSession.user?.imgUrl}
-              dealId={dealId}
-            />
+               contact={contact}
+               sessionId={activeSession.sessionId}
+               remoteJid={remoteJid}
+               myAvatarUrl={activeSession.user?.imgUrl}
+               dealId={dealId}
+               dealTitle={deal?.title}
+               dealValueCents={deal?.valueCents}
+               dealStageName={currentStage?.name}
+               companyName={account?.name}
+             />
           </div>
         ) : (
           <div className="flex flex-col items-center justify-center flex-1 text-muted-foreground">

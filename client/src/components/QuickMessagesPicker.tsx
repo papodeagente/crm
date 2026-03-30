@@ -29,6 +29,78 @@ import {
 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
+/* ─── Variable definitions ─── */
+export const MESSAGE_VARIABLES = [
+  { key: "{nome}", label: "Nome completo", description: "Nome completo do passageiro" },
+  { key: "{primeiro_nome}", label: "Primeiro nome", description: "Primeiro nome do passageiro" },
+  { key: "{email}", label: "Email", description: "Email do passageiro" },
+  { key: "{telefone}", label: "Telefone", description: "Telefone do passageiro" },
+  { key: "{negociacao}", label: "Negociação", description: "Título da negociação" },
+  { key: "{valor}", label: "Valor", description: "Valor da negociação (R$)" },
+  { key: "{etapa}", label: "Etapa", description: "Etapa atual do funil" },
+  { key: "{empresa}", label: "Empresa", description: "Nome da empresa vinculada" },
+  { key: "{nome_oportunidade}", label: "Oportunidade", description: "Nome da oportunidade/deal" },
+  { key: "{produto_principal}", label: "Produto principal", description: "Produto de maior valor na negociação" },
+] as const;
+
+export type MessageVariableKey = typeof MESSAGE_VARIABLES[number]["key"];
+
+/** Context data for variable substitution */
+export interface MessageContext {
+  /** Contact/passenger data */
+  contactName?: string | null;
+  contactEmail?: string | null;
+  contactPhone?: string | null;
+  /** Deal data */
+  dealId?: number | null;
+  dealTitle?: string | null;
+  dealValueCents?: number | null;
+  dealStageName?: string | null;
+  /** Company/account data */
+  companyName?: string | null;
+}
+
+/** Substitute all variables in a message template using the provided context + products */
+export function substituteVariables(
+  content: string,
+  ctx: MessageContext,
+  products?: Array<{ name: string; unitPriceCents: number; quantity: number }>,
+): string {
+  const firstName = ctx.contactName?.split(" ")[0] || "";
+  const fmtValue = ctx.dealValueCents != null
+    ? new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(ctx.dealValueCents / 100)
+    : "";
+
+  // Find the product with the highest total value (unitPrice * quantity)
+  let mainProduct = "";
+  if (products && products.length > 0) {
+    const sorted = [...products].sort(
+      (a, b) => (b.unitPriceCents * b.quantity) - (a.unitPriceCents * a.quantity),
+    );
+    mainProduct = sorted[0].name;
+  }
+
+  const replacements: Record<string, string> = {
+    "{nome}": ctx.contactName || "",
+    "{primeiro_nome}": firstName,
+    "{email}": ctx.contactEmail || "",
+    "{telefone}": ctx.contactPhone || "",
+    "{negociacao}": ctx.dealTitle || "",
+    "{valor}": fmtValue,
+    "{etapa}": ctx.dealStageName || "",
+    "{empresa}": ctx.companyName || "",
+    "{nome_oportunidade}": ctx.dealTitle || "",
+    "{produto_principal}": mainProduct,
+  };
+
+  let result = content;
+  for (const [variable, value] of Object.entries(replacements)) {
+    result = result.replaceAll(variable, value);
+  }
+  return result;
+}
+
+/* ─── Category definitions ─── */
 const CATEGORIES = [
   { value: "primeiro_contato", label: "Primeiro contato", icon: HandshakeIcon, color: "text-blue-400" },
   { value: "reativacao", label: "Reativação", icon: RotateCcw, color: "text-amber-400" },
@@ -49,6 +121,8 @@ interface QuickMessagesPickerProps {
   side?: "top" | "bottom" | "left" | "right";
   /** Alignment of the popover */
   align?: "start" | "center" | "end";
+  /** Context for variable substitution */
+  context?: MessageContext;
 }
 
 export default function QuickMessagesPicker({
@@ -57,6 +131,7 @@ export default function QuickMessagesPicker({
   className = "",
   side = "top",
   align = "start",
+  context,
 }: QuickMessagesPickerProps) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -66,6 +141,13 @@ export default function QuickMessagesPicker({
     enabled: open,
     staleTime: 30_000,
   });
+
+  // Fetch deal products when dealId is available (for {produto_principal})
+  const dealId = context?.dealId;
+  const { data: dealProducts } = trpc.crm.deals.products.list.useQuery(
+    { dealId: dealId! },
+    { enabled: open && !!dealId, staleTime: 60_000 },
+  );
 
   const filtered = useMemo(() => {
     let list = messages as any[];
@@ -91,7 +173,16 @@ export default function QuickMessagesPicker({
   }, [messages]);
 
   function handleSelect(content: string) {
-    onSelect(content);
+    // Substitute variables if context is provided
+    const products = (dealProducts as any[])?.map((p: any) => ({
+      name: p.name,
+      unitPriceCents: p.unitPriceCents || 0,
+      quantity: p.quantity || 1,
+    }));
+    const substituted = context
+      ? substituteVariables(content, context, products)
+      : content;
+    onSelect(substituted);
     setOpen(false);
     setSearch("");
     setSelectedCategory(null);
@@ -103,6 +194,22 @@ export default function QuickMessagesPicker({
       setSearch("");
       setSelectedCategory(null);
     }
+  }
+
+  /** Preview a message content with variable substitution applied */
+  function previewContent(content: string): string {
+    if (!context) return content;
+    const products = (dealProducts as any[])?.map((p: any) => ({
+      name: p.name,
+      unitPriceCents: p.unitPriceCents || 0,
+      quantity: p.quantity || 1,
+    }));
+    return substituteVariables(content, context, products);
+  }
+
+  /** Check if content has variables */
+  function hasVariables(content: string): boolean {
+    return MESSAGE_VARIABLES.some((v) => content.includes(v.key));
   }
 
   const hasMessages = messages.length > 0;
@@ -211,20 +318,31 @@ export default function QuickMessagesPicker({
                       <p className="text-xs text-muted-foreground">Nenhuma mensagem encontrada</p>
                     </div>
                   ) : (
-                    filtered.map((msg: any) => (
-                      <button
-                        key={msg.id}
-                        onClick={() => handleSelect(msg.content)}
-                        className="w-full text-left px-3 py-2 hover:bg-accent/50 transition-colors group"
-                      >
-                        <p className="text-sm font-medium truncate group-hover:text-primary transition-colors">
-                          {msg.title}
-                        </p>
-                        <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">
-                          {msg.content}
-                        </p>
-                      </button>
-                    ))
+                    filtered.map((msg: any) => {
+                      const hasVars = hasVariables(msg.content);
+                      const preview = previewContent(msg.content);
+                      return (
+                        <button
+                          key={msg.id}
+                          onClick={() => handleSelect(msg.content)}
+                          className="w-full text-left px-3 py-2 hover:bg-accent/50 transition-colors group"
+                        >
+                          <div className="flex items-center gap-1.5">
+                            <p className="text-sm font-medium truncate group-hover:text-primary transition-colors flex-1">
+                              {msg.title}
+                            </p>
+                            {hasVars && (
+                              <Badge variant="outline" className="text-[9px] h-4 px-1 shrink-0 border-blue-500/30 text-blue-400">
+                                variáveis
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">
+                            {hasVars && context ? preview : msg.content}
+                          </p>
+                        </button>
+                      );
+                    })
                   )}
                 </div>
               )}

@@ -335,9 +335,38 @@ export default function CustomMessagesPage() {
                 rows={6}
                 className="resize-none"
               />
-              <p className="text-[11px] text-muted-foreground">
-                Dica: Use variáveis como {"{nome}"}, {"{destino}"}, {"{valor}"} para personalizar automaticamente.
-              </p>
+              <div className="mt-2 p-3 rounded-lg bg-muted/50 border border-border">
+                <p className="text-[11px] font-medium text-muted-foreground mb-2">Variáveis disponíveis (clique para inserir):</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {[
+                    { var: "{nome}", desc: "Nome completo" },
+                    { var: "{primeiro_nome}", desc: "Primeiro nome" },
+                    { var: "{email}", desc: "Email" },
+                    { var: "{telefone}", desc: "Telefone" },
+                    { var: "{negociacao}", desc: "Título da negociação" },
+                    { var: "{valor}", desc: "Valor da negociação" },
+                    { var: "{etapa}", desc: "Etapa do funil" },
+                    { var: "{empresa}", desc: "Empresa/Conta" },
+                    { var: "{nome_oportunidade}", desc: "Nome da oportunidade" },
+                    { var: "{produto_principal}", desc: "Produto de maior valor" },
+                  ].map((v) => (
+                    <button
+                      key={v.var}
+                      type="button"
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-primary/10 text-primary text-[11px] font-mono hover:bg-primary/20 transition-colors cursor-pointer"
+                      title={v.desc}
+                      onClick={() => {
+                        setForm((f) => ({
+                          ...f,
+                          content: f.content + v.var,
+                        }));
+                      }}
+                    >
+                      {v.var}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
           <DialogFooter>

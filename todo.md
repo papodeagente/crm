@@ -6256,3 +6256,10 @@
 - [x] Integrar QuickMessages no TaskFormDialog (tarefas com mensagem WhatsApp)
 - [x] Suporte a variáveis dinâmicas: {nome}, {destino}, etc.
 - [x] Testes Vitest para o serviço (11 testes passando)
+## Variáveis Dinâmicas nas Mensagens Personalizadas
+- [x] Implementar substituição automática de 10 variáveis: {nome}, {primeiro_nome}, {email}, {telefone}, {negociacao}, {valor}, {etapa}, {empresa}, {nome_oportunidade}, {produto_principal}
+- [x] {produto_principal} deve puxar o nome do produto de maior valor da negociação
+- [x] Atualizar QuickMessagesPicker para substituir variáveis ao selecionar mensagem
+- [x] Passar contexto (deal, contact, products) para todos os pontos de integração
+- [x] UI para inserir variáveis ao criar/editar mensagens na Settings
+- [x] Testes Vitest para substituição de variáveis (18 testes passando)
