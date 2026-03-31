@@ -53,7 +53,7 @@ export interface ZapiInstanceInfo {
 
 // ─── Partner API HTTP Client ───
 async function zapiPartnerFetch(
-  method: "GET" | "POST" | "DELETE",
+  method: "GET" | "POST" | "PUT" | "DELETE",
   path: string,
   body?: Record<string, any>
 ): Promise<any> {
@@ -154,12 +154,21 @@ async function updateInstanceSubscription(instanceId: string, token: string): Pr
 }
 
 /**
- * List all instances from partner account
+ * List all instances from partner account with automatic pagination.
  * Uses GET /instances?page=X&pageSize=Y (per Z-API Partner docs)
  */
-async function listInstances(page = 1, pageSize = 20): Promise<any[]> {
-  const result = await zapiPartnerFetch("GET", `/instances?page=${page}&pageSize=${pageSize}`);
-  return result?.content || [];
+async function listInstances(): Promise<any[]> {
+  const all: any[] = [];
+  let page = 1;
+  while (true) {
+    const result = await zapiPartnerFetch("GET", `/instances?page=${page}&pageSize=20`);
+    const content = result?.content || [];
+    all.push(...content);
+    const totalPages = result?.totalPage || 1;
+    if (page >= totalPages || content.length === 0) break;
+    page++;
+  }
+  return all;
 }
 
 // ─── Main Provisioning Logic ───
@@ -368,17 +377,74 @@ export async function hasZapiInstance(tenantId: number): Promise<boolean> {
 }
 
 /**
- * Sync Z-API instances from Partner API with local DB
- * Useful for reconciliation
+ * Sync Z-API instances from Partner API with local DB.
+ * Compares remote state with tenant_zapi_instances and reports mismatches.
+ * Does NOT auto-fix — returns a report for manual review.
  */
-export async function syncPartnerInstances(): Promise<{ synced: number; errors: number }> {
+export async function syncPartnerInstances(): Promise<{
+  synced: number;
+  errors: number;
+  report: Array<{
+    tenantId: number;
+    instanceName: string;
+    zapiInstanceId: string;
+    dbStatus: string;
+    zapiConnected: boolean;
+    webhookCorrect: boolean;
+    issue?: string;
+  }>;
+}> {
+  const report: Array<any> = [];
   try {
+    const db = await getDb();
+    if (!db) return { synced: 0, errors: 1, report: [] };
+
     const remoteInstances = await listInstances();
     console.log(`[ZapiProvisioning] Partner account has ${remoteInstances.length} instance(s)`);
-    return { synced: remoteInstances.length, errors: 0 };
+
+    // Build remote lookup
+    const remoteLookup = new Map<string, any>();
+    for (const inst of remoteInstances) {
+      remoteLookup.set(inst.id, inst);
+    }
+
+    // Check each local active instance against remote
+    const localInstances = await db
+      .select()
+      .from(tenantZapiInstances)
+      .where(eq(tenantZapiInstances.status, "active"));
+
+    for (const local of localInstances) {
+      const remote = remoteLookup.get(local.zapiInstanceId);
+      const zapiConnected = remote ? (remote.phoneConnected && remote.whatsappConnected) : false;
+      const webhookCorrect = remote
+        ? (remote.receivedAndDeliveryCallbackUrl || "").includes("crm.enturos.com")
+        : false;
+
+      let issue: string | undefined;
+      if (!remote) issue = "Instance not found in Z-API Partner API";
+      else if (!zapiConnected) issue = "Instance disconnected on Z-API";
+      else if (!webhookCorrect) issue = `Webhook pointing to wrong server: ${remote.receivedAndDeliveryCallbackUrl}`;
+
+      report.push({
+        tenantId: local.tenantId,
+        instanceName: local.instanceName,
+        zapiInstanceId: local.zapiInstanceId,
+        dbStatus: local.status,
+        zapiConnected,
+        webhookCorrect,
+        issue,
+      });
+
+      if (issue) {
+        console.warn(`[ZapiProvisioning] Tenant ${local.tenantId} (${local.instanceName}): ${issue}`);
+      }
+    }
+
+    return { synced: localInstances.length, errors: 0, report };
   } catch (error: any) {
     console.error(`[ZapiProvisioning] Sync failed:`, error.message);
-    return { synced: 0, errors: 1 };
+    return { synced: 0, errors: 1, report };
   }
 }
 

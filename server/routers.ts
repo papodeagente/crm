@@ -301,6 +301,14 @@ export const appRouter = router({
           });
         }
 
+        // Validate that the Z-API instance is still active (not cancelled/expired)
+        if (zapiInstance.status !== "active") {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: `Instância Z-API está ${zapiInstance.status}. Solicite ao administrador para reativar.`,
+          });
+        }
+
         const sessionId = `crm-${tenantId}-${userId}`;
 
         // Register Z-API session credentials

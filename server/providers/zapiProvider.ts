@@ -1522,8 +1522,10 @@ export class ZApiProvider implements WhatsAppProvider {
         method: "PUT",
         body: { value: url, notifySentByMe: true },
       });
+      console.log(`[Z-API] Webhook set for ${instanceName} → ${url}`);
       return true;
-    } catch {
+    } catch (e: any) {
+      console.warn(`[Z-API] setWebhook failed for ${instanceName}:`, e.message);
       return false;
     }
   }
