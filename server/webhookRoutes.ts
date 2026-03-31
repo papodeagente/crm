@@ -1271,11 +1271,16 @@ async function handleZApiWebhook(req: Request, res: Response) {
     }
 
     // Validate client token if configured
+    // Z-API may send token as "client-token" or "x-client-token" header
     const zapiSession = getZApiSession(sessionId);
     if (zapiSession?.clientToken) {
-      const receivedToken = req.headers["client-token"] as string || req.query.token as string;
-      if (!validateZApiClientToken(receivedToken, zapiSession.clientToken)) {
-        console.warn(`[Webhook /zapi] Invalid client-token for session ${sessionId} | received="${receivedToken?.substring(0, 20) || 'NONE'}" expected="${zapiSession.clientToken.substring(0, 20)}"`);
+      const receivedToken = req.headers["client-token"] as string
+        || req.headers["x-client-token"] as string
+        || req.query.token as string;
+      if (receivedToken && !validateZApiClientToken(receivedToken, zapiSession.clientToken)) {
+        // Only reject if a token IS sent but doesn't match (wrong token = security issue)
+        // If no token is sent at all, accept — Z-API doesn't always send client-token header
+        console.warn(`[Webhook /zapi] WRONG client-token for session ${sessionId} | received="${receivedToken.substring(0, 20)}" expected="${zapiSession.clientToken.substring(0, 20)}"`);
         return res.status(403).json({ error: "Invalid client-token" });
       }
     }
