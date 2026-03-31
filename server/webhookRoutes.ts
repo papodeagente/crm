@@ -1367,6 +1367,7 @@ async function handleZApiWebhook(req: Request, res: Response) {
 /** Detect Z-API event type from body content when not in URL path */
 function detectZApiEventFromBody(body: any): ZApiWebhookEvent {
   if (body?.connected !== undefined) return body.connected ? "on-connection" : "on-disconnect";
+  if (body?.type === "PresenceChatCallback") return "on-chat-presence";
   if (body?.status && body?.ids) return "on-whatsapp-message-status-changes";
   if (body?.fromMe === true) return "on-message-send";
   if (body?.phone || body?.chatId) return "on-message-received";

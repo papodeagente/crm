@@ -104,6 +104,7 @@ async function createInstance(name: string, sessionId: string): Promise<ZapiCrea
     disconnectedCallbackUrl: `${webhookBase}/on-disconnected`,
     connectedCallbackUrl: `${webhookBase}/on-connected`,
     messageStatusCallbackUrl: `${webhookBase}/on-whatsapp-message-status-changes`,
+    presenceChatCallbackUrl: `${webhookBase}/on-chat-presence`,
     receivedAndDeliveryCallbackUrl: `${webhookBase}`,
     callRejectAuto: false,
     autoReadMessage: false,
@@ -140,10 +141,24 @@ async function cancelInstance(instanceId: string, token: string): Promise<void> 
 }
 
 /**
- * List all instances from partner account
+ * Update/upgrade a Z-API instance subscription
+ * Docs: https://developer.z-api.io/partner/update-instance
+ * PUT /instances/{id}/token/{token}/integrator/on-demand/subscription/update
  */
-async function listInstances(): Promise<any[]> {
-  const result = await zapiPartnerFetch("GET", "/instances/integrator/on-demand");
+async function updateInstanceSubscription(instanceId: string, token: string): Promise<void> {
+  await zapiPartnerFetch(
+    "PUT",
+    `/instances/${instanceId}/token/${token}/integrator/on-demand/subscription/update`
+  );
+  console.log(`[ZapiProvisioning] Instance ${instanceId} subscription updated`);
+}
+
+/**
+ * List all instances from partner account
+ * Uses GET /instances?page=X&pageSize=Y (per Z-API Partner docs)
+ */
+async function listInstances(page = 1, pageSize = 20): Promise<any[]> {
+  const result = await zapiPartnerFetch("GET", `/instances?page=${page}&pageSize=${pageSize}`);
   return result?.content || [];
 }
 
@@ -364,5 +379,40 @@ export async function syncPartnerInstances(): Promise<{ synced: number; errors: 
   } catch (error: any) {
     console.error(`[ZapiProvisioning] Sync failed:`, error.message);
     return { synced: 0, errors: 1 };
+  }
+}
+
+/**
+ * Upgrade a tenant's Z-API instance subscription.
+ * Used when tenant changes plan and needs instance capabilities updated.
+ */
+export async function upgradeZapiInstance(tenantId: number): Promise<{ success: boolean; error?: string }> {
+  const db = await getDb();
+  if (!db) return { success: false, error: "Database unavailable" };
+
+  try {
+    const instances = await db
+      .select()
+      .from(tenantZapiInstances)
+      .where(
+        and(
+          eq(tenantZapiInstances.tenantId, tenantId),
+          eq(tenantZapiInstances.status, "active")
+        )
+      );
+
+    if (instances.length === 0) {
+      return { success: false, error: "No active instance found" };
+    }
+
+    for (const inst of instances) {
+      await updateInstanceSubscription(inst.zapiInstanceId, inst.zapiToken);
+    }
+
+    console.log(`[ZapiProvisioning] ✓ Upgraded ${instances.length} instance(s) for tenant ${tenantId}`);
+    return { success: true };
+  } catch (error: any) {
+    console.error(`[ZapiProvisioning] ✗ Upgrade failed for tenant ${tenantId}:`, error.message);
+    return { success: false, error: error.message };
   }
 }

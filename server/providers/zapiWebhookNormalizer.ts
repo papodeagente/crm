@@ -24,7 +24,8 @@ export type WebhookEventType =
   | "qrcode.updated"
   | "send.message"
   | "contacts.upsert"
-  | "groups.update";
+  | "groups.update"
+  | "presence.update";
 
 import type { WebhookPayload } from "../whatsappEvolution";
 import { normalizeToUnixSeconds } from "./zapiProvider";
@@ -95,6 +96,7 @@ export type ZApiWebhookEvent =
   | "on-whatsapp-message-revoked"
   | "on-connection"
   | "on-disconnect"
+  | "on-chat-presence"
   | "unknown";
 
 /**
@@ -420,6 +422,22 @@ export function normalizeZApiWebhook(
       };
     }
 
+    case "on-chat-presence": {
+      // Z-API PresenceChatCallback payload:
+      // { phone, status: "COMPOSING"|"PAUSED"|"RECORDING"|"AVAILABLE"|"UNAVAILABLE", type: "PresenceChatCallback" }
+      const presencePhone = body.phone || "";
+      const presenceJid = presencePhone ? `${presencePhone}@s.whatsapp.net` : "";
+      return {
+        event: "presence.update" as any,
+        instance: instanceName,
+        data: {
+          remoteJid: presenceJid,
+          phone: presencePhone,
+          status: (body as any).status || "PAUSED",
+        },
+      };
+    }
+
     default:
       console.warn(`[ZApiNormalizer] Unknown Z-API event: ${zapiEvent}`);
       return null;
@@ -440,6 +458,7 @@ export function detectZApiEventFromPath(path: string): ZApiWebhookEvent {
   if (path.includes("on-whatsapp-message-revoked")) return "on-whatsapp-message-revoked";
   if (path.includes("on-disconnect")) return "on-disconnect";
   if (path.includes("on-connection")) return "on-connection";
+  if (path.includes("on-chat-presence")) return "on-chat-presence";
   return "unknown";
 }
 
