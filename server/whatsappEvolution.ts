@@ -1545,6 +1545,7 @@ class WhatsAppEvolutionManager extends EventEmitter {
       const remoteJid = key.remoteJid;
       const messageId = key.id;
       const pushName = data?.pushName || "";
+      const senderPhoto: string | null = data?._zapiSenderPhoto || null;
       const timestamp = normalizeToUnixSeconds(data?.messageTimestamp) * 1000;
 
       const content = this.extractMessageContent(data);
@@ -1706,24 +1707,29 @@ class WhatsAppEvolutionManager extends EventEmitter {
         );
       }
 
-      // 2. Update wa_contacts with pushName
-      if (pushName && !fromMe) {
-        const cleanedPush = pushName.replace(/[\s\-\(\)\+]/g, '');
-        const isRealName = !/^\d+$/.test(cleanedPush) && pushName !== 'Voc\u00ea' && pushName !== 'You';
-        if (isRealName) {
+      // 2. Update wa_contacts with pushName and/or profilePictureUrl
+      if (!fromMe) {
+        const cleanedPush = pushName ? pushName.replace(/[\s\-\(\)\+]/g, '') : '';
+        const isRealName = pushName && cleanedPush && !/^\d+$/.test(cleanedPush) && pushName !== 'Você' && pushName !== 'You';
+        // Upsert if we have a real name OR a profile photo
+        if (isRealName || senderPhoto) {
+          const updateFields: Record<string, any> = {};
+          if (isRealName) updateFields.pushName = sql`${pushName}`;
+          if (senderPhoto) updateFields.profilePictureUrl = sql`${senderPhoto}`;
+
           db.insert(waContacts).values({
             sessionId: session.sessionId,
             jid: remoteJid,
             phoneNumber: remoteJid.endsWith('@s.whatsapp.net') ? remoteJid : null,
-            pushName,
+            pushName: isRealName ? pushName : null,
             savedName: null,
             verifiedName: null,
-            profilePictureUrl: null,
+            profilePictureUrl: senderPhoto,
           }).onDuplicateKeyUpdate({
-            set: { pushName: sql`${pushName}` },
+            set: updateFields,
           }).catch(() =>
             db.update(waContacts)
-              .set({ pushName })
+              .set({ ...(isRealName ? { pushName } : {}), ...(senderPhoto ? { profilePictureUrl: senderPhoto } : {}) })
               .where(and(
                 eq(waContacts.sessionId, session.sessionId),
                 eq(waContacts.jid, remoteJid)
@@ -3147,7 +3153,7 @@ class WhatsAppEvolutionManager extends EventEmitter {
               this.downloadAndStoreMedia(session, msgId, remoteJid, fromMe, syncMediaInfo).catch(() => {});
             }
 
-            // Update wa_contacts with pushName
+            // Update wa_contacts with pushName (don't overwrite existing profilePictureUrl)
             if (pushName && !fromMe && isRealName(pushName)) {
               db.insert(waContacts).values({
                 sessionId: session.sessionId,
@@ -3158,7 +3164,7 @@ class WhatsAppEvolutionManager extends EventEmitter {
                 verifiedName: null,
                 profilePictureUrl: null,
               }).onDuplicateKeyUpdate({
-                set: { pushName: sql`${pushName}` },
+                set: { pushName: sql`${pushName}` }, // Don't touch profilePictureUrl here — sync has no photo
               }).catch(() => {});
             }
 

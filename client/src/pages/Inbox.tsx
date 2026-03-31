@@ -1440,6 +1440,8 @@ export default function InboxPage() {
         if (result.data) convStore.hydrate(result.data as ConvEntry[]);
         console.log(`[TRACE][NEW_CONV_REFETCH_DONE] timestamp: ${Date.now()} | msgId: ${_traceMsgId}`);
       });
+      // Refresh contacts map so new contact name/picture show immediately
+      waContactsMapQ.refetch();
     }
 
     // ────────────────────────────────────────────────────────────────────────────────

@@ -314,6 +314,7 @@ class ConversationStore {
     status?: string;
     isSync?: boolean;
     messageId?: string;
+    pushName?: string;
   }, activeKey: string | null): boolean {
     const key = makeConvKey(msg.sessionId, msg.remoteJid);
     if (!key || !msg.remoteJid) return false;
@@ -388,6 +389,17 @@ class ConversationStore {
 
     const newPreview = msg.content || existing.lastMessage;
 
+    // Update contactPushName if the socket message carries a real name we don't have yet
+    let updatedPushName = existing.contactPushName;
+    if (msg.pushName && !msg.fromMe) {
+      const cleaned = msg.pushName.replace(/[\s\-\(\)\+]/g, '');
+      const isReal = cleaned && !/^\d+$/.test(cleaned) && msg.pushName !== 'Você' && msg.pushName !== 'You';
+      const existingIsPhone = !existing.contactPushName || /^\d+$/.test(existing.contactPushName.replace(/[\s\-\(\)\+]/g, ''));
+      if (isReal && existingIsPhone) {
+        updatedPushName = msg.pushName;
+      }
+    }
+
     // Create updated entry (immutable)
     const updated: ConvEntry = {
       ...existing,
@@ -397,6 +409,7 @@ class ConversationStore {
       lastTimestamp: new Date(msgTimestamp),
       lastStatus: newStatus,
       unreadCount: newUnread,
+      contactPushName: updatedPushName,
       // Track the messageId of the last outgoing message for status update verification
       _lastOutgoingMessageId: msg.fromMe && msg.messageId ? msg.messageId : existing._lastOutgoingMessageId,
       _optimistic: false,

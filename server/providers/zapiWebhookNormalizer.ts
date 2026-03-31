@@ -329,6 +329,8 @@ export function normalizeZApiWebhook(
             documentUrl: body.document?.documentUrl,
             stickerUrl: body.sticker?.stickerUrl,
           },
+          // Sender's WhatsApp profile picture (for wa_contacts upsert)
+          _zapiSenderPhoto: (body as any).senderPhoto || (body as any).photo || null,
         },
       };
     }
