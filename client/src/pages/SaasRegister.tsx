@@ -67,22 +67,22 @@ export default function SaasRegister() {
           <h2 className="text-2xl font-bold text-white mb-2">
             O sistema que sua agência precisa
           </h2>
-          <p className="text-gray-400 mb-8">
+          <p className="text-white/50 mb-8">
             Comece agora com 7 dias grátis. Sem cartão de crédito.
           </p>
           <div className="space-y-3">
             {benefits.map((benefit, i) => (
               <div key={i} className="flex items-center gap-3">
-                <div className="w-5 h-5 rounded-full bg-purple-500/20 flex items-center justify-center flex-shrink-0">
-                  <Check className="w-3 h-3 text-purple-400" />
+                <div className="w-5 h-5 rounded-full bg-emerald-500/20 flex items-center justify-center flex-shrink-0">
+                  <Check className="w-3 h-3 text-emerald-400" />
                 </div>
-                <span className="text-gray-300 text-sm">{benefit}</span>
+                <span className="text-white/70 text-sm">{benefit}</span>
               </div>
             ))}
           </div>
-          <div className="mt-8 p-4 bg-purple-500/10 rounded-xl border border-purple-500/20">
-            <p className="text-sm text-purple-300 font-medium">Planos a partir de R$97/mês</p>
-            <p className="text-xs text-purple-400/70 mt-1">
+          <div className="mt-8 p-4 bg-white/[0.04] rounded-xl border border-white/10">
+            <p className="text-sm text-white/80 font-medium">Planos a partir de R$97/mês</p>
+            <p className="text-xs text-white/50 mt-1">
               Após os 7 dias de teste, assine via Hotmart para continuar com acesso completo.
               Escolha entre Essencial, Pro ou Elite.
             </p>
@@ -98,14 +98,14 @@ export default function SaasRegister() {
           </div>
           <div className="text-center mb-6">
             <h1 className="text-xl font-semibold text-white">Criar conta grátis</h1>
-            <p className="text-sm text-gray-400 mt-1">
+            <p className="text-sm text-white/50 mt-1">
               7 dias de acesso completo, sem cartão de crédito
             </p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-3">
             <div className="space-y-1.5">
-              <Label htmlFor="companyName" className="text-sm font-medium text-gray-300">Nome da agência</Label>
+              <Label htmlFor="companyName" className="text-sm font-medium text-white/70">Nome da agência</Label>
               <Input
                 id="companyName"
                 placeholder="Minha Agência de Viagens"
@@ -116,7 +116,7 @@ export default function SaasRegister() {
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="userName" className="text-sm font-medium text-gray-300">Seu nome</Label>
+              <Label htmlFor="userName" className="text-sm font-medium text-white/70">Seu nome</Label>
               <Input
                 id="userName"
                 placeholder="João Silva"
@@ -128,7 +128,7 @@ export default function SaasRegister() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label htmlFor="email" className="text-sm font-medium text-gray-300">Email</Label>
+                <Label htmlFor="email" className="text-sm font-medium text-white/70">Email</Label>
                 <Input
                   id="email"
                   type="email"
@@ -140,7 +140,7 @@ export default function SaasRegister() {
                 />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="phone" className="text-sm font-medium text-gray-300">Telefone</Label>
+                <Label htmlFor="phone" className="text-sm font-medium text-white/70">Telefone</Label>
                 <Input
                   id="phone"
                   placeholder="(11) 99999-9999"
@@ -151,7 +151,7 @@ export default function SaasRegister() {
               </div>
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="password" className="text-sm font-medium text-gray-300">Senha</Label>
+              <Label htmlFor="password" className="text-sm font-medium text-white/70">Senha</Label>
               <div className="relative">
                 <Input
                   id="password"
@@ -173,7 +173,7 @@ export default function SaasRegister() {
               </div>
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="confirmPassword" className="text-sm font-medium text-gray-300">Confirmar senha</Label>
+              <Label htmlFor="confirmPassword" className="text-sm font-medium text-white/70">Confirmar senha</Label>
               <Input
                 id="confirmPassword"
                 type={showPassword ? "text" : "password"}
@@ -199,11 +199,11 @@ export default function SaasRegister() {
           </form>
 
           <div className="mt-4 text-center">
-            <p className="text-sm text-gray-400">
+            <p className="text-sm text-white/50">
               Já tem uma conta?{" "}
               <button
                 onClick={() => navigate("/login")}
-                className="text-purple-400 hover:text-purple-300 font-medium hover:underline transition-colors"
+                className="text-white/70 hover:text-white font-medium hover:underline transition-colors"
               >
                 Fazer login
               </button>

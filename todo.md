@@ -6263,3 +6263,35 @@
 - [x] Passar contexto (deal, contact, products) para todos os pontos de integração
 - [x] UI para inserir variáveis ao criar/editar mensagens na Settings
 - [x] Testes Vitest para substituição de variáveis (18 testes passando)
+
+## Correção de Legibilidade no Modo Escuro
+
+- [x] Corrigir fontes roxas/lilás no fundo escuro da Landing Page — priorizar branco
+- [x] Revisar cores de texto em componentes do dashboard/settings no modo escuro
+- [x] Garantir contraste adequado em todos os textos do sistema
+
+## Filtro de Contatos (padrão Pipeline)
+
+- [x] Analisar filtro de negociações (Pipeline) como referência
+- [x] Analisar página de contatos atual e backend de campos personalizados
+- [x] Implementar backend: endpoint de filtragem de contatos com campos personalizados
+- [x] Implementar frontend: painel lateral de filtros na página de contatos (igual Pipeline)
+- [x] Testes vitest para o novo endpoint de filtragem (13 testes passando)
+
+## Ajustes no Filtro de Contatos
+
+- [x] Remover campo "Estágio" do painel de filtros de contatos
+- [x] Campos personalizados tipo select/boolean: exibir opções como checkboxes selecionáveis
+
+## Bug: Tag {produto_principal}
+
+- [x] Corrigir tag {produto_principal} para puxar o nome do produto de maior valor da negociação
+
+## Contraste texto vermelho na Automação de Vendas
+
+- [x] Corrigir texto vermelho/laranja ilegível no card explicativo da Automação de Vendas — garantir contraste adequado
+- [x] Corrigir contraste dark mode em ProviderManager (badges de status, botão deprovision, dialog)
+- [x] Corrigir contraste dark mode em TopNavLayout (badges de busca, ícones de tipo)
+- [x] Corrigir contraste dark mode em TransferDialog (textarea de nota)
+- [x] Corrigir contraste dark mode em UpgradeModal (badge de plano)
+- [x] Corrigir contraste dark mode em WhatsAppChat (selects de nota, input de nota, menu de agentes IA)

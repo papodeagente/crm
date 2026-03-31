@@ -609,7 +609,8 @@ function findBestSession(sessions: any[], tenantId: number): { sessionId: string
 // GENERIC CRM BULK SEND — Contacts & Deals
 // ═══════════════════════════════════════════════════════
 
-import { contacts as contactsTable, deals as dealsTable } from "../drizzle/schema";
+import { contacts as contactsTable, deals as dealsTable, dealProducts as dealProductsTable } from "../drizzle/schema";
+import { getMainProductName } from "./messageTagResolver";
 
 export interface CrmBulkSendRequest {
   tenantId: number;
@@ -686,6 +687,7 @@ export async function startBulkSendCrm(request: CrmBulkSendRequest): Promise<{ j
   let resolvedContacts: Array<{
     id: number; name: string; email: string | null; phone: string | null;
     dealTitle?: string | null; dealValue?: number | null; stage?: string | null; company?: string | null;
+    mainProductName?: string | null;
   }> = [];
 
   if (source === "contacts") {
@@ -747,11 +749,19 @@ export async function startBulkSendCrm(request: CrmBulkSendRequest): Promise<{ j
       const contact = contactMap.get(deal.contactId);
       if (!contact) continue;
       seenContacts.add(deal.contactId);
+      // Buscar produto principal da negociação
+      let mainProductName: string | null = null;
+      try {
+        mainProductName = await getMainProductName(tenantId, deal.dealId);
+      } catch (err) {
+        console.error(`[BulkSend] Error fetching main product for deal ${deal.dealId}:`, err);
+      }
       resolvedContacts.push({
         ...contact,
         dealTitle: deal.dealTitle,
         dealValue: deal.dealValue,
         stage: deal.stageName || undefined,
+        mainProductName,
       });
     }
   }

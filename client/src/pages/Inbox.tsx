@@ -358,9 +358,11 @@ StatusDot.displayName = "StatusDot";
 
 const ConversationItem = memo(({
   conv, isActive, contactName, pictureUrl, onClick, waitLabel, showTimer, showFinish, onFinish,
+  onTransfer, onAssignClick,
 }: {
   conv: ConvItem; isActive: boolean; contactName: string; pictureUrl?: string | null; onClick: () => void;
   waitLabel?: string; showTimer?: boolean; showFinish?: boolean; onFinish?: () => void;
+  onTransfer?: () => void; onAssignClick?: () => void;
 }) => {
   const fromMe = conv.lastFromMe === true || conv.lastFromMe === 1;
   const unread = Number(conv.unreadCount) || 0;
@@ -376,13 +378,23 @@ const ConversationItem = memo(({
           ? "bg-[var(--wa-active)]"
           : "hover:bg-[var(--wa-hover)]"
       }`}
-      style={{ paddingLeft: 13, paddingRight: 15 }}
+      style={{
+        paddingLeft: isActive ? 9 : 13,
+        paddingRight: 10,
+        borderLeft: isActive ? '4px solid var(--wa-tint)' : '4px solid transparent',
+      }}
     >
-      {/* Avatar */}
+      {/* Avatar with WhatsApp icon badge */}
       <div className="py-[10px] pr-[13px] relative shrink-0">
         <WaAvatar name={contactName} size={49} pictureUrl={pictureUrl} />
+        {/* WhatsApp icon badge — bottom-right of avatar */}
+        <div className="absolute bottom-[8px] right-[10px] w-[16px] h-[16px] rounded-full flex items-center justify-center" style={{ backgroundColor: '#25d366', border: '2px solid var(--wa-panel)' }}>
+          <svg viewBox="0 0 24 24" width="9" height="9" fill="white">
+            <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/>
+          </svg>
+        </div>
         {conv.assignmentStatus && conv.assignmentStatus !== "open" && (
-          <div className="absolute bottom-[10px] right-[12px]">
+          <div className="absolute top-[8px] right-[10px]">
             <StatusDot status={conv.assignmentStatus} />
           </div>
         )}
@@ -396,26 +408,24 @@ const ConversationItem = memo(({
           }`}>
             {contactName}
           </span>
+          {/* Urgency timer inline with time */}
+          {isWaitingResponse && (
+            <span className="text-[11px] shrink-0 mr-1" style={{ color: 'var(--wa-tint)' }}>
+              <UrgencyTimer since={conv.lastTimestamp!} compact />
+            </span>
+          )}
           <span className={`text-[12px] leading-[14px] shrink-0 ${
             unread > 0 ? "text-[var(--wa-unread)]" : "text-[var(--wa-text-secondary)]"
           }`}>
             {time}
           </span>
         </div>
-        {/* Row 2: Ticks + Preview + Badge */}
+        {/* Row 2: Ticks + Preview + Actions */}
         <div className="flex items-center gap-[3px] mt-[2px]">
           <StatusTick status={conv.lastStatus} fromMe={fromMe} />
-          <span className={`text-[14px] truncate flex-1 leading-[20px] ${
-            unread > 0 ? "text-[var(--wa-text-secondary)]" : "text-[var(--wa-text-secondary)]"
-          }`}>
+          <span className="text-[14px] truncate flex-1 leading-[20px] text-[var(--wa-text-secondary)]">
             {preview || "Sem mensagens"}
           </span>
-          {/* Agent badge */}
-          <AgentBadge name={conv.assignedAgentName} avatarUrl={conv.assignedAgentAvatar} />
-          {/* Waiting response timer */}
-          {isWaitingResponse && (
-            <UrgencyTimer since={conv.lastTimestamp!} compact />
-          )}
           {/* Urgency timer for queue items */}
           {waitLabel && !showTimer && (
             <span className="text-[10px] text-amber-400 bg-amber-400/10 px-1.5 py-0.5 rounded-md font-medium flex items-center gap-0.5 shrink-0">
@@ -428,7 +438,28 @@ const ConversationItem = memo(({
               {unread > 99 ? "99+" : unread}
             </span>
           )}
-          {/* Finish attendance button */}
+          {/* Action buttons — MKT style: transfer + assign always visible */}
+          {onTransfer && (
+            <InstantTooltip label="Transferir">
+              <button
+                onClick={(e) => { e.stopPropagation(); onTransfer(); }}
+                className="w-[26px] h-[26px] flex items-center justify-center rounded-full hover:bg-[var(--wa-tint)]/10 transition-colors shrink-0"
+              >
+                <ArrowRightLeft className="w-[14px] h-[14px]" style={{ color: 'var(--wa-text-secondary)' }} />
+              </button>
+            </InstantTooltip>
+          )}
+          {onAssignClick && (
+            <InstantTooltip label={conv.assignedAgentName ? `Atribuído: ${conv.assignedAgentName}` : "Atribuir"}>
+              <button
+                onClick={(e) => { e.stopPropagation(); onAssignClick(); }}
+                className="w-[26px] h-[26px] flex items-center justify-center rounded-full hover:bg-[var(--wa-tint)]/10 transition-colors shrink-0"
+              >
+                <Users className="w-[14px] h-[14px]" style={{ color: conv.assignedAgentName ? 'var(--wa-tint)' : 'var(--wa-text-secondary)' }} />
+              </button>
+            </InstantTooltip>
+          )}
+          {/* Finish attendance button — on hover */}
           {showFinish && onFinish && (
             <button
               onClick={(e) => { e.stopPropagation(); onFinish(); }}
@@ -1073,7 +1104,7 @@ function NoSession() {
    MAIN INBOX PAGE
    ═══════════════════════════════════════════════════════ */
 
-type InboxTab = "mine" | "queue" | "contacts" | "all";
+type InboxTab = "mine" | "queue" | "contacts" | "all" | "finished";
 type AgentFilter = "all" | "unread" | "mine" | "unassigned";
 
 export default function InboxPage() {
@@ -1093,6 +1124,7 @@ export default function InboxPage() {
   const [showCreateContact, setShowCreateContact] = useState(false);
   const [showNewChat, setShowNewChat] = useState(false);
   const [showAssignPanel, setShowAssignPanel] = useState(false);
+  const [showHeaderMenu, setShowHeaderMenu] = useState(false);
   const [isMuted, setIsMuted] = useState(() => {
     try { return localStorage.getItem(MUTE_KEY) === "true"; } catch { return false; }
   });
@@ -1189,12 +1221,15 @@ export default function InboxPage() {
         assignedUserId: myUserId,
         assignmentStatus: "open",
       });
-      // Also refetch conversations to get full data if not in store yet
-      conversationsQ.refetch();
+      // Delay refetch to avoid overwriting the optimistic update with stale DB data
+      setTimeout(() => conversationsQ.refetch(), 2500);
       toast.success("Conversa atribuída a você");
     },
     onError: (e) => toast.error(e.message || "Erro ao puxar conversa"),
   });
+
+  // Auto-open agent assignment dropdown in WhatsAppChat
+  const [autoOpenAssign, setAutoOpenAssign] = useState(false);
 
   // Assign from queue to specific agent (admin only)
   const [assigningQueueJid, setAssigningQueueJid] = useState<string | null>(null);
@@ -1428,6 +1463,7 @@ export default function InboxPage() {
       status: (lastMessage as any).status,  // Backend now sends status in socket event
       isSync: (lastMessage as any).isSync,
       messageId: lastMessage.messageId || undefined,  // Track which message the lastStatus belongs to
+      pushName: (lastMessage as any).pushName || undefined,
     }, selectedKeyRef.current);
     const _traceStoreEnd = Date.now();
     console.log(`[TRACE][STORE_UPDATED] timestamp: ${_traceStoreEnd} | delta: ${_traceStoreEnd - _traceStoreStart}ms | handled: ${handled} | msgId: ${_traceMsgId}`);
@@ -1440,6 +1476,8 @@ export default function InboxPage() {
         if (result.data) convStore.hydrate(result.data as ConvEntry[]);
         console.log(`[TRACE][NEW_CONV_REFETCH_DONE] timestamp: ${Date.now()} | msgId: ${_traceMsgId}`);
       });
+      // Refresh contacts map so new contact name/picture show immediately
+      waContactsMapQ.refetch();
     }
 
     // ────────────────────────────────────────────────────────────────────────────────
@@ -1603,6 +1641,9 @@ export default function InboxPage() {
     } else if (activeTab === "contacts") {
       // Contacts tab uses its own data source
       return [];
+    } else if (activeTab === "finished") {
+      // Finished tab uses its own filtering below
+      return [];
     }
     // "all" tab shows everything
     // Secondary filter (within tab)
@@ -1633,6 +1674,23 @@ export default function InboxPage() {
     }
     return convs;
   }, [queueQ.data, search, activeTab, getDisplayName]);
+
+  // Finished conversations (resolved/closed) filtered by search
+  const filteredFinishedConvs = useMemo(() => {
+    if (activeTab !== "finished") return [];
+    let convs = dedupedConvs.filter((c) =>
+      c.assignmentStatus === "resolved" || c.assignmentStatus === "closed"
+    );
+    if (search) {
+      const s = search.toLowerCase();
+      convs = convs.filter((c) => {
+        const name = getDisplayName(c.remoteJid, c).toLowerCase();
+        const phone = c.remoteJid.split("@")[0];
+        return name.includes(s) || phone.includes(s);
+      });
+    }
+    return convs;
+  }, [dedupedConvs, search, activeTab, getDisplayName, convStore.version]);
 
   // WA Contacts filtered by search
   const filteredWaContacts = useMemo(() => {
@@ -1760,45 +1818,95 @@ export default function InboxPage() {
           sessionId={activeSession?.sessionId || ""}
         />
 
-        {/* ── Header (WhatsApp Web style) ── */}
-        <div className="flex items-center justify-between shrink-0 h-[59px] px-4" style={{ backgroundColor: 'var(--wa-panel-header)' }}>
+        {/* ── Header — "Conversas" + filtro + contagem (MKT style) ── */}
+        <div className="flex items-center justify-between shrink-0 h-[59px] px-4" style={{ backgroundColor: 'var(--wa-panel-header)', borderBottom: '1px solid var(--wa-divider)' }}>
           <div className="flex items-center gap-2">
-            {isConnected && <div className="w-[10px] h-[10px] rounded-full bg-[var(--wa-tint)]" />}
-            {!isConnected && <div className="w-[10px] h-[10px] rounded-full bg-amber-400 animate-pulse" />}
+            {isConnected ? <div className="w-[8px] h-[8px] rounded-full bg-[var(--wa-tint)]" /> : <div className="w-[8px] h-[8px] rounded-full bg-amber-400 animate-pulse" />}
+            <span className="text-[18px] font-semibold" style={{ color: 'var(--wa-text-primary)' }}>Conversas</span>
           </div>
           <div className="flex items-center gap-[2px]">
-            <InstantTooltip label={isMuted ? "Som desativado" : "Som ativado"}>
+            <div className="flex items-center gap-1 px-2 py-1 rounded-lg" style={{ color: 'var(--wa-text-secondary)' }}>
+              <span className="text-[14px] font-medium">{dedupedConvs.length}</span>
+            </div>
+            <div className="relative">
               <button
-                onClick={toggleMute}
-                className="w-[40px] h-[40px] flex items-center justify-center rounded-full hover:bg-[var(--wa-hover)] transition-colors"
+                onClick={() => setShowHeaderMenu(!showHeaderMenu)}
+                className="w-[36px] h-[36px] flex items-center justify-center rounded-full hover:bg-[var(--wa-hover)] transition-colors"
               >
-                {isMuted ? <VolumeX className="w-[20px] h-[20px]" style={{ color: 'var(--wa-text-secondary)' }} /> : <Volume2 className="w-[20px] h-[20px]" style={{ color: 'var(--wa-text-secondary)' }} />}
+                <MoreVertical className="w-[18px] h-[18px]" style={{ color: 'var(--wa-text-secondary)' }} />
               </button>
-            </InstantTooltip>
-            <InstantTooltip label={syncContactsMut.isPending ? "Sincronizando..." : "Sincronizar contatos"}>
-              <button
-                onClick={() => {
-                  if (!activeSession?.sessionId) { toast.error("Nenhuma sessão ativa"); return; }
-                  syncContactsMut.mutate({ sessionId: activeSession.sessionId });
-                }}
-                disabled={syncContactsMut.isPending}
-                className="w-[40px] h-[40px] flex items-center justify-center rounded-full hover:bg-[var(--wa-hover)] transition-colors"
-              >
-                <RefreshCw className={`w-[20px] h-[20px] ${syncContactsMut.isPending ? "animate-spin" : ""}`} style={{ color: 'var(--wa-text-secondary)' }} />
-              </button>
-            </InstantTooltip>
-            <InstantTooltip label="Nova conversa">
-              <button onClick={() => setShowNewChat(true)} className="w-[40px] h-[40px] flex items-center justify-center rounded-full hover:bg-[var(--wa-hover)] transition-colors">
-                <MessageCircle className="w-[20px] h-[20px]" style={{ color: 'var(--wa-text-secondary)' }} />
-              </button>
-            </InstantTooltip>
-            <button className="w-[40px] h-[40px] flex items-center justify-center rounded-full hover:bg-[var(--wa-hover)] transition-colors">
-              <MoreVertical className="w-[20px] h-[20px]" style={{ color: 'var(--wa-text-secondary)' }} />
-            </button>
+              {showHeaderMenu && (
+                <div className="absolute top-full right-0 mt-1 w-52 bg-card border border-border rounded-xl shadow-xl z-50 overflow-hidden">
+                  <button
+                    onClick={() => { toggleMute(); setShowHeaderMenu(false); }}
+                    className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-muted/50 transition-colors text-left text-[13px]"
+                    style={{ color: 'var(--wa-text-primary)' }}
+                  >
+                    {isMuted ? <VolumeX className="w-4 h-4" style={{ color: 'var(--wa-text-secondary)' }} /> : <Volume2 className="w-4 h-4" style={{ color: 'var(--wa-text-secondary)' }} />}
+                    {isMuted ? "Ativar som" : "Desativar som"}
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (!activeSession?.sessionId) { toast.error("Nenhuma sessão ativa"); return; }
+                      syncContactsMut.mutate({ sessionId: activeSession.sessionId });
+                      setShowHeaderMenu(false);
+                    }}
+                    disabled={syncContactsMut.isPending}
+                    className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-muted/50 transition-colors text-left text-[13px]"
+                    style={{ color: 'var(--wa-text-primary)' }}
+                  >
+                    <RefreshCw className={`w-4 h-4 ${syncContactsMut.isPending ? "animate-spin" : ""}`} style={{ color: 'var(--wa-text-secondary)' }} />
+                    {syncContactsMut.isPending ? "Sincronizando..." : "Sincronizar contatos"}
+                  </button>
+                  <button
+                    onClick={() => { setShowNewChat(true); setShowHeaderMenu(false); }}
+                    className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-muted/50 transition-colors text-left text-[13px]"
+                    style={{ color: 'var(--wa-text-primary)' }}
+                  >
+                    <MessageCircle className="w-4 h-4" style={{ color: 'var(--wa-text-secondary)' }} />
+                    Nova conversa
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
-        {/* ── Search Bar (WhatsApp Web style) ── */}
+        {/* ── Filter Tabs (MKT text style — tabs BEFORE search) ── */}
+        <div className="flex items-center shrink-0 px-[10px] gap-[6px] py-[8px] overflow-x-auto scrollbar-none" style={{ backgroundColor: 'var(--wa-panel)' }}>
+          {([
+            { id: "mine" as InboxTab, label: "Meus", badge: myConvsCount },
+            { id: "queue" as InboxTab, label: "Fila", badge: queueCount },
+            { id: "all" as InboxTab, label: "Todos", badge: 0 },
+            { id: "finished" as InboxTab, label: "Finalizados", badge: 0 },
+            { id: "contacts" as InboxTab, label: "Contatos", badge: 0 },
+          ]).map((tab) => {
+            const active = activeTab === tab.id;
+            // Hide "Todos" for non-admins
+            if (tab.id === "all" && !isAdmin) return null;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => { setActiveTab(tab.id); setFilter("all"); }}
+                className={`flex items-center justify-center gap-[4px] px-[10px] py-[6px] text-[13px] transition-all duration-150 whitespace-nowrap ${
+                  active
+                    ? "text-[var(--wa-text-primary)] font-semibold"
+                    : "text-[var(--wa-text-secondary)] hover:text-[var(--wa-text-primary)]"
+                }`}
+              >
+                {tab.badge > 0 && <span className="text-[var(--wa-tint)]">·</span>}
+                <span>{tab.label}</span>
+                {tab.badge > 0 && (
+                  <span className="text-[11px] font-bold text-[var(--wa-text-secondary)]">
+                    {tab.badge > 99 ? "99+" : tab.badge}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* ── Search Bar (below tabs — MKT style) ── */}
         <div className="shrink-0 py-[6px] px-[12px]" style={{ backgroundColor: 'var(--wa-panel)' }}>
           <div className="flex items-center rounded-lg h-[35px] px-[8px]" style={{ backgroundColor: 'var(--wa-search-bg)' }}>
             <Search
@@ -1806,7 +1914,9 @@ export default function InboxPage() {
               style={{ width: 16, height: 16, color: searchFocused ? 'var(--wa-tint)' : 'var(--wa-text-secondary)' }}
             />
             <input
-              type="text" placeholder="Pesquisar" value={search}
+              type="text"
+              placeholder={activeTab === "contacts" ? "Buscar por nome ou telefone..." : "Pesquisar conversa..."}
+              value={search}
               onChange={(e) => setSearch(e.target.value)}
               onFocus={() => setSearchFocused(true)}
               onBlur={() => setSearchFocused(false)}
@@ -1819,51 +1929,6 @@ export default function InboxPage() {
               </button>
             )}
           </div>
-        </div>
-
-        {/* ── Filter Tabs (WhatsApp Web pill style) ── */}
-        <div className="flex items-center shrink-0 px-[10px] gap-[6px] py-[8px]" style={{ backgroundColor: 'var(--wa-panel)' }}>
-          {([
-            { id: "mine" as InboxTab, label: "Meus Chats", badge: myConvsCount },
-            { id: "queue" as InboxTab, label: "Fila", badge: queueCount },
-            { id: "contacts" as InboxTab, label: "Passageiros", badge: 0 },
-            ...(isAdmin ? [{ id: "all" as InboxTab, label: "Todas", badge: 0 }] : []),
-          ]).map((tab) => {
-            const active = activeTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => { setActiveTab(tab.id); setFilter("all"); }}
-                className={`flex items-center justify-center gap-[5px] px-[12px] py-[6px] text-[13px] transition-all duration-150 rounded-full whitespace-nowrap ${
-                  active
-                    ? "bg-[var(--wa-tint)]/15 text-[var(--wa-tint)] font-medium"
-                    : "text-[var(--wa-text-secondary)] hover:bg-[var(--wa-hover)]"
-                }`}
-              >
-                <span>{tab.label}</span>
-                {tab.badge > 0 && (
-                  <span className={`text-[11px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-[4px] ${
-                    active ? "bg-[var(--wa-tint)] text-white" : "bg-[var(--wa-search-bg)] text-[var(--wa-text-secondary)]"
-                  }`}>
-                    {tab.badge > 99 ? "99+" : tab.badge}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-          {/* Unread filter — only for mine/all tabs */}
-          {(activeTab === "mine" || activeTab === "all") && (
-            <button
-              onClick={() => setFilter(filter === "unread" ? "all" : "unread")}
-              className={`flex items-center gap-[5px] px-[12px] py-[6px] text-[13px] transition-all duration-150 rounded-full whitespace-nowrap ml-auto ${
-                filter === "unread"
-                  ? "bg-[var(--wa-tint)]/15 text-[var(--wa-tint)] font-medium"
-                  : "text-[var(--wa-text-secondary)] hover:bg-[var(--wa-hover)]"
-              }`}
-            >
-              Não lidas
-            </button>
-          )}
         </div>
 
         {/* ── Content List (depends on active tab) ── */}
@@ -1899,6 +1964,8 @@ export default function InboxPage() {
                     showTimer={activeTab === "mine"}
                     showFinish={activeTab === "mine"}
                     onFinish={() => handleFinishAttendance(conv.remoteJid)}
+                    onTransfer={() => handleSelectConv(conv.remoteJid)}
+                    onAssignClick={() => { handleSelectConv(conv.remoteJid); setAutoOpenAssign(true); }}
                   />
                   );
                 })
@@ -1985,6 +2052,38 @@ export default function InboxPage() {
             </>
           )}
 
+          {/* FINISHED tab: show resolved/closed conversations */}
+          {activeTab === "finished" && (
+            <>
+              {conversationsQ.isLoading ? (
+                <div className="flex items-center justify-center py-16">
+                  <Loader2 className="w-6 h-6 text-wa-tint animate-spin" />
+                </div>
+              ) : filteredFinishedConvs.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
+                  <CheckCircle2 className="w-12 h-12 text-muted-foreground/15 mb-3" />
+                  <p className="text-[14px] text-muted-foreground">
+                    {search ? "Nenhuma conversa encontrada" : "Nenhuma conversa finalizada"}
+                  </p>
+                </div>
+              ) : (
+                filteredFinishedConvs.map((conv) => {
+                  const ck = conv.conversationKey || makeConvKey(conv.sessionId || activeSession?.sessionId || "", conv.remoteJid);
+                  return (
+                    <ConversationItem
+                      key={ck}
+                      conv={conv}
+                      isActive={selectedKey === ck}
+                      contactName={getDisplayName(conv.remoteJid, conv)}
+                      pictureUrl={profilePicMap[conv.remoteJid]}
+                      onClick={() => handleSelectConv(conv.remoteJid)}
+                    />
+                  );
+                })
+              )}
+            </>
+          )}
+
           {/* CONTACTS tab: show WA contacts */}
           {activeTab === "contacts" && (
             <>
@@ -2001,30 +2100,26 @@ export default function InboxPage() {
                   <p className="text-[12px] text-muted-foreground/60 mt-1">Sincronize os contatos na página WhatsApp</p>
                 </div>
               ) : (
-                <>
-                  <div className="px-4 py-2">
-                    <p className="text-[11px] text-muted-foreground uppercase tracking-wider font-medium">
-                      {filteredWaContacts.length} contatos do WhatsApp
-                    </p>
-                  </div>
-                  {filteredWaContacts.map((contact) => (
-                    <button
-                      key={contact.jid}
-                      onClick={() => handleSelectConv(contact.jid)}
-                      className="w-full flex items-center px-[10px] hover:bg-[var(--wa-hover)] transition-all duration-100 text-left"
-                    >
-                      <div className="py-[6px] pr-[13px]">
-                        <WaAvatar name={contact.displayName} size={49} pictureUrl={profilePicMap[contact.jid]} />
-                      </div>
-                      <div className="flex-1 min-w-0 py-[10px]" style={{ borderBottom: '1px solid var(--wa-divider)' }}>
+                filteredWaContacts.map((contact) => (
+                  <button
+                    key={contact.jid}
+                    onClick={() => handleSelectConv(contact.jid)}
+                    className="w-full flex items-center px-[10px] hover:bg-[var(--wa-hover)] transition-all duration-100 text-left"
+                  >
+                    <div className="py-[6px] pr-[13px]">
+                      <WaAvatar name={contact.displayName} size={49} pictureUrl={profilePicMap[contact.jid]} />
+                    </div>
+                    <div className="flex-1 min-w-0 py-[10px] flex items-center" style={{ borderBottom: '1px solid var(--wa-divider)' }}>
+                      <div className="flex-1 min-w-0">
                         <p className="text-[17px] truncate leading-[21px]" style={{ color: 'var(--wa-text-primary)' }}>{contact.displayName}</p>
                         <p className="text-[14px] truncate leading-[20px] mt-[2px]" style={{ color: 'var(--wa-text-secondary)' }}>
                           {contact.phoneNumber ? formatPhoneNumber(contact.phoneNumber) : formatPhoneNumber(contact.jid)}
                         </p>
                       </div>
-                    </button>
-                  ))}
-                </>
+                      <MessageSquare className="w-[18px] h-[18px] shrink-0 ml-2" style={{ color: 'var(--wa-text-secondary)' }} />
+                    </div>
+                  </button>
+                ))
               )}
             </>
           )}
@@ -2059,6 +2154,8 @@ export default function InboxPage() {
               onStatusChange={handleStatusChange}
               myAvatarUrl={activeSession.user?.imgUrl}
               waConversationId={selectedWaConversationId}
+              autoOpenAssign={autoOpenAssign}
+              onAutoOpenAssignConsumed={() => setAutoOpenAssign(false)}
               onOptimisticSend={(msg) => {
                 if (!activeSession?.sessionId || !selectedJid) return;
                 convStore.handleOptimisticSend({

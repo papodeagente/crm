@@ -32,15 +32,15 @@ const planColorsByIndex = [
   {
     border: "border-purple-500/30",
     bg: "bg-purple-500/15",
-    text: "text-purple-400",
-    badge: "bg-purple-500/15 text-purple-400",
+    text: "text-white/70",
+    badge: "bg-white/10 text-white/70",
     btn: "bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-500 hover:to-purple-600 shadow-lg shadow-purple-900/30",
   },
   {
     border: "border-violet-500/40",
     bg: "bg-violet-500/15",
-    text: "text-violet-400",
-    badge: "bg-violet-500/15 text-violet-400",
+    text: "text-white/70",
+    badge: "bg-white/10 text-white/70",
     btn: "bg-gradient-to-r from-violet-600 to-violet-700 hover:from-violet-500 hover:to-violet-600 shadow-lg shadow-violet-900/30",
   },
   {
@@ -111,7 +111,7 @@ export default function Upgrade() {
   if (plansQuery.isLoading) {
     return (
       <div className="min-h-screen bg-[#0a0a12] flex items-center justify-center">
-        <Loader2 className="w-8 h-8 text-violet-400 animate-spin" />
+        <Loader2 className="w-8 h-8 text-white/60 animate-spin" />
       </div>
     );
   }
@@ -143,20 +143,20 @@ export default function Upgrade() {
               <h1 className="text-3xl font-bold text-white mb-2">
                 Continue usando o Entur OS
               </h1>
-              <p className="text-gray-400 max-w-lg mx-auto">
+              <p className="text-white/50 max-w-lg mx-auto">
                 {billing?.message || "Assine um plano para continuar gerenciando suas vendas e clientes sem interrupção."}
               </p>
             </>
           ) : isTrialing ? (
             <>
-              <div className="inline-flex items-center gap-2 bg-purple-500/10 text-purple-400 px-4 py-2 rounded-full text-sm font-medium mb-4 border border-purple-500/20">
+              <div className="inline-flex items-center gap-2 bg-white/[0.06] text-white/70 px-4 py-2 rounded-full text-sm font-medium mb-4 border border-white/10">
                 <Clock className="w-4 h-4" />
                 Período de teste ativo
               </div>
               <h1 className="text-3xl font-bold text-white mb-2">
                 Escolha o plano ideal para sua agência
               </h1>
-              <p className="text-gray-400 max-w-lg mx-auto">
+              <p className="text-white/50 max-w-lg mx-auto">
                 Garanta acesso contínuo ao Entur OS. Assine antes do fim do período de teste.
               </p>
             </>
@@ -165,7 +165,7 @@ export default function Upgrade() {
               <h1 className="text-3xl font-bold text-white mb-2">
                 Escolha o plano ideal
               </h1>
-              <p className="text-gray-400 max-w-lg mx-auto">
+              <p className="text-white/50 max-w-lg mx-auto">
                 Potencialize sua agência de viagens com as ferramentas certas
               </p>
             </>
@@ -214,13 +214,13 @@ export default function Upgrade() {
                     {!isContactOnly ? (
                       <>
                         <span className="text-3xl font-bold text-white">R${(plan.priceInCents / 100).toFixed(0)}</span>
-                        <span className="text-gray-500">/mês</span>
+                        <span className="text-white/40">/mês</span>
                       </>
                     ) : (
                       <span className="text-3xl font-bold text-white">Sob consulta</span>
                     )}
                   </div>
-                  <p className="text-xs text-gray-500 mt-1">{plan.commercialCopy}</p>
+                  <p className="text-xs text-white/40 mt-1">{plan.commercialCopy}</p>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="space-y-2">
@@ -229,7 +229,7 @@ export default function Upgrade() {
                         <div className={`w-4 h-4 rounded-full ${colors.bg} flex items-center justify-center flex-shrink-0`}>
                           <Check className={`w-2.5 h-2.5 ${colors.text}`} />
                         </div>
-                        <span className="text-sm text-gray-300">{feature}</span>
+                        <span className="text-sm text-white/70">{feature}</span>
                       </div>
                     ))}
                   </div>
@@ -266,9 +266,9 @@ export default function Upgrade() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-800">
-                  <th className="text-left py-3 px-2 text-gray-400 font-medium">Recurso</th>
+                  <th className="text-left py-3 px-2 text-white/50 font-medium">Recurso</th>
                   {plans.map((p: DynamicPlan) => (
-                    <th key={p.id} className="text-center py-3 px-2 text-gray-300 font-semibold">
+                    <th key={p.id} className="text-center py-3 px-2 text-white/80 font-semibold">
                       {p.name}
                     </th>
                   ))}
@@ -276,23 +276,23 @@ export default function Upgrade() {
               </thead>
               <tbody>
                 <tr className="border-b border-gray-800/50">
-                  <td className="py-3 px-2 text-gray-300">Usuários</td>
+                  <td className="py-3 px-2 text-white/60">Usuários</td>
                   {plans.map((p: DynamicPlan) => (
-                    <td key={p.id} className="text-center py-3 px-2 text-gray-400">
+                    <td key={p.id} className="text-center py-3 px-2 text-white/50">
                       {p.maxUsers === -1 ? "Ilimitado" : p.maxUsers}
                     </td>
                   ))}
                 </tr>
                 <tr className="border-b border-gray-800/50">
-                  <td className="py-3 px-2 text-gray-300">Atendentes WhatsApp</td>
+                  <td className="py-3 px-2 text-white/60">Atendentes WhatsApp</td>
                   {plans.map((p: DynamicPlan) => (
-                    <td key={p.id} className="text-center py-3 px-2 text-gray-400">
+                    <td key={p.id} className="text-center py-3 px-2 text-white/50">
                       {p.maxAttendantsPerAccount === 0 ? "—" : p.maxAttendantsPerAccount}
                     </td>
                   ))}
                 </tr>
                 <tr className="border-b border-gray-800/50">
-                  <td className="py-3 px-2 text-gray-300">Preço</td>
+                  <td className="py-3 px-2 text-white/60">Preço</td>
                   {plans.map((p: DynamicPlan) => (
                     <td key={p.id} className="text-center py-3 px-2 text-white font-semibold">
                       {p.priceInCents > 0 ? `R$${(p.priceInCents / 100).toFixed(0)}/mês` : "Sob consulta"}
@@ -301,7 +301,7 @@ export default function Upgrade() {
                 </tr>
                 {COMPARISON_FEATURE_KEYS.map((row) => (
                   <tr key={row.key} className="border-b border-gray-800/50">
-                    <td className="py-3 px-2 text-gray-300">
+                    <td className="py-3 px-2 text-white/60">
                       {(featureDescriptions as any)[row.key]?.title || row.label}
                     </td>
                     {plans.map((p: DynamicPlan) => (
@@ -322,13 +322,13 @@ export default function Upgrade() {
 
         {/* Info text */}
         <div className="text-center mt-6 space-y-2">
-          <p className="text-xs text-gray-600">
+          <p className="text-xs text-white/30">
             Pagamento processado pela Hotmart. Você pode cancelar a qualquer momento.
           </p>
           {!isRestricted && (
             <button
               onClick={() => navigate("/dashboard")}
-              className="text-sm text-gray-500 hover:text-gray-300 hover:underline"
+              className="text-sm text-white/40 hover:text-white/60 hover:underline"
             >
               Voltar para o dashboard
             </button>

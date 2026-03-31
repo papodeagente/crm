@@ -7,7 +7,7 @@ import {
   Mic, MicOff, Paperclip, Pause, Phone, Play, Search, Send, Smile,
   Video, X, Camera, FileText, ArrowDown, Volume2, Loader2, ChevronDown,
   UserPlus, Briefcase, Users, Reply, Trash2, Pencil, Forward, MapPin,
-  Contact, BarChart3, Copy, Ban, StickyNote, ArrowRightLeft, History, Sparkles, Brain, MessageCircle
+  Contact, BarChart3, Copy, Ban, StickyNote, ArrowRightLeft, History, Sparkles, Brain, MessageCircle, MoreVertical
 } from "lucide-react";
 import ImportConversationDialog from "@/components/ImportConversationDialog";
 import Picker from "@emoji-mart/react";
@@ -90,6 +90,10 @@ export interface WhatsAppChatProps {
   companyName?: string;
   /** Called immediately when user sends a message — updates conversation store optimistically */
   onOptimisticSend?: (msg: { content: string; messageType?: string }) => void;
+  /** When true, auto-open the agent assignment dropdown */
+  autoOpenAssign?: boolean;
+  /** Called after auto-open is consumed */
+  onAutoOpenAssignConsumed?: () => void;
 }
 
 /* ─── WhatsApp Text Formatting ─── */
@@ -1257,9 +1261,17 @@ function EditMessageModal({ currentText, onSave, onClose }: { currentText: strin
    MAIN CHAT COMPONENT
    ═══════════════════════════════════════════════════════ */
 
-export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDeal, onCreateContact, hasCrmContact, assignment, agents, onAssign, onStatusChange, myAvatarUrl, waConversationId, dealId, dealTitle, dealValueCents, dealStageName, companyName, onOptimisticSend }: WhatsAppChatProps) {
+export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDeal, onCreateContact, hasCrmContact, assignment, agents, onAssign, onStatusChange, myAvatarUrl, waConversationId, dealId, dealTitle, dealValueCents, dealStageName, companyName, onOptimisticSend, autoOpenAssign, onAutoOpenAssignConsumed }: WhatsAppChatProps) {
   const tenantId = useTenantId();
   const [showAgentDropdown, setShowAgentDropdown] = useState(false);
+
+  // Auto-open agent dropdown when triggered from ConversationItem
+  useEffect(() => {
+    if (autoOpenAssign) {
+      setShowAgentDropdown(true);
+      onAutoOpenAssignConsumed?.();
+    }
+  }, [autoOpenAssign]);
   const { lastMessage, lastStatusUpdate, lastMediaUpdate, lastConversationUpdate, lastTranscriptionUpdate, lastReaction, isConnected: socketConnected } = useSocket();
   const [messageText, setMessageText] = useState("");
   const [showAttach, setShowAttach] = useState(false);
@@ -1287,6 +1299,7 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
   const [showQuickReplies, setShowQuickReplies] = useState(false);
   const [quickReplyFilter, setQuickReplyFilter] = useState("");
   const [showAiSuggestion, setShowAiSuggestion] = useState(false);
+  const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [showSummary, setShowSummary] = useState(false);
   const [showAgentNames, setShowAgentNames] = useState(true); // Show agent names before messages by default
 
@@ -2225,7 +2238,7 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
 
   return (
     <div className="flex flex-col h-full overflow-hidden relative">
-      {/* ─── Header (WhatsApp Web style) ─── */}
+      {/* ─── Header (MKT style — name + WhatsApp subtitle + simplified icons) ─── */}
       <div className="flex items-center gap-[15px] px-[16px] h-[59px] shrink-0 z-10" style={{ backgroundColor: 'var(--wa-panel-header)', borderBottom: '1px solid var(--wa-divider)' }}>
         <div className="w-[40px] h-[40px] rounded-full shrink-0 overflow-hidden cursor-pointer">
           {contact?.avatarUrl ? (
@@ -2238,28 +2251,28 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
           )}
         </div>
         <div className="flex-1 min-w-0 cursor-pointer">
-          <p className="text-[16px] font-normal truncate leading-[21px]" style={{ color: 'var(--wa-text-primary)' }}>{contact?.name || "Passageiro"}</p>
-          <p className="text-[13px] truncate leading-[20px]" style={{ color: 'var(--wa-text-secondary)' }}>{contact?.phone || ""}</p>
+          <p className="text-[16px] font-medium truncate leading-[21px]" style={{ color: 'var(--wa-text-primary)' }}>{contact?.name || "Passageiro"}</p>
+          <div className="flex items-center gap-1.5 text-[13px] leading-[20px] truncate" style={{ color: 'var(--wa-text-secondary)' }}>
+            <svg viewBox="0 0 24 24" width="12" height="12" className="shrink-0" fill="#25d366">
+              <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/>
+            </svg>
+            <span className="shrink-0">WhatsApp</span>
+            <span className="shrink-0">💬</span>
+            <span className="truncate">{contact?.phone ? `+${contact.phone.replace(/\D/g, '')}` : ""}</span>
+          </div>
         </div>
         <div className="flex items-center gap-[2px]">
-          {/* Assignment badge — always visible when agents are available */}
+          {/* Assignment button — opens agent dropdown */}
           {(assignment || agents?.length) && (
             <div className="relative">
-              <button
-                onClick={() => setShowAgentDropdown(!showAgentDropdown)}
-                className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-full transition-all mr-1 ${
-                  assignment?.assignedAgentName
-                    ? "bg-wa-tint/10 text-wa-tint hover:bg-wa-tint/20"
-                    : "bg-muted text-muted-foreground hover:bg-muted/80"
-                }`}
-                title={assignment?.assignedAgentName ? `Atribuído a ${assignment.assignedAgentName}` : "Atribuir atendente"}
-              >
-                <Users className="w-[14px] h-[14px]" />
-                <span className="hidden sm:inline max-w-[80px] truncate">
-                  {assignment?.assignedAgentName || "Atribuir"}
-                </span>
-                <ChevronDown className="w-[12px] h-[12px]" />
-              </button>
+              <InstantTooltip label={assignment?.assignedAgentName ? `Atribuído: ${assignment.assignedAgentName}` : "Atribuir"}>
+                <button
+                  onClick={() => setShowAgentDropdown(!showAgentDropdown)}
+                  className="w-[40px] h-[40px] flex items-center justify-center rounded-full hover:bg-[var(--wa-hover)] transition-colors"
+                >
+                  <Users className="w-[20px] h-[20px]" style={{ color: assignment?.assignedAgentName ? 'var(--wa-tint)' : 'var(--wa-text-secondary)' }} />
+                </button>
+              </InstantTooltip>
               {/* Agent assignment dropdown */}
               {showAgentDropdown && (
                 <div className="absolute top-full right-0 mt-1 w-56 bg-card border border-border rounded-xl shadow-xl z-50 overflow-hidden">
@@ -2342,80 +2355,76 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
               )}
             </div>
           )}
-          {onCreateContact && !hasCrmContact && (
-            <InstantTooltip label="Criar passageiro no CRM">
-              <button onClick={onCreateContact}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 bg-wa-tint hover:opacity-90 text-white text-xs font-medium rounded-full transition-all mr-1">
-                <UserPlus className="w-[14px] h-[14px]" />
-                <span className="hidden sm:inline">Criar Passageiro</span>
-              </button>
-            </InstantTooltip>
-          )}
-          {onCreateDeal && (
-            <InstantTooltip label="Criar negociação">
-              <button onClick={onCreateDeal}
-                className="w-[40px] h-[40px] flex items-center justify-center hover:bg-[var(--wa-hover)] rounded-full transition-colors">
-                <Briefcase className="w-[20px] h-[20px]" style={{ color: 'var(--wa-text-secondary)' }} />
-              </button>
-            </InstantTooltip>
-          )}
-          {/* Transfer button */}
-          {waConversationId && (
-            <InstantTooltip label="Transferir conversa">
-              <button
-                onClick={() => setShowTransfer(true)}
-                className="w-[40px] h-[40px] flex items-center justify-center hover:bg-[var(--wa-hover)] rounded-full transition-colors"
-              >
-                <ArrowRightLeft className="w-[20px] h-[20px]" style={{ color: 'var(--wa-text-secondary)' }} />
-              </button>
-            </InstantTooltip>
-          )}
-          {/* Import conversation as note */}
-          <InstantTooltip label="Importar conversa como anotação">
-            <button
-              onClick={() => setShowImportDialog(true)}
-              className="w-[40px] h-[40px] flex items-center justify-center hover:bg-[var(--wa-hover)] rounded-full transition-colors"
-            >
-              <FileText className="w-[20px] h-[20px]" style={{ color: 'var(--wa-text-secondary)' }} />
-            </button>
-          </InstantTooltip>
-          {/* Timeline toggle */}
-          <InstantTooltip label="Timeline de eventos">
-            <button
-              onClick={() => setShowTimeline(!showTimeline)}
-              className={`w-[40px] h-[40px] flex items-center justify-center rounded-full transition-colors ${
-                showTimeline ? "bg-[var(--wa-tint)]/15 text-[var(--wa-tint)]" : "hover:bg-[var(--wa-hover)]"
-              }`}
-            >
-              <History className="w-[20px] h-[20px]" style={showTimeline ? { color: 'var(--wa-tint)' } : { color: 'var(--wa-text-secondary)' }} />
-            </button>
-          </InstantTooltip>
-          {/* AI Summary button */}
-          <InstantTooltip label="Resumo IA da conversa">
-            <button
-              onClick={handleSummarize}
-              disabled={summaryLoading}
-              className={`w-[40px] h-[40px] flex items-center justify-center rounded-full transition-colors ${
-                showSummary ? "bg-violet-500/15 text-violet-500" : "hover:bg-[var(--wa-hover)]"
-              }`}
-            >
-              {summaryLoading ? (
-                <Loader2 className="w-[20px] h-[20px] animate-spin" style={{ color: 'var(--wa-tint)' }} />
-              ) : (
-                <Brain className="w-[20px] h-[20px]" style={showSummary ? { color: '#8b5cf6' } : { color: 'var(--wa-text-secondary)' }} />
-              )}
-            </button>
-          </InstantTooltip>
+          {/* Search button */}
           <InstantTooltip label="Buscar na conversa">
             <button className="w-[40px] h-[40px] flex items-center justify-center hover:bg-[var(--wa-hover)] rounded-full transition-colors">
               <Search className="w-[20px] h-[20px]" style={{ color: 'var(--wa-text-secondary)' }} />
             </button>
           </InstantTooltip>
-          <InstantTooltip label="Menu">
-            <button className="w-[40px] h-[40px] flex items-center justify-center hover:bg-[var(--wa-hover)] rounded-full transition-colors">
-              <ChevronDown className="w-[20px] h-[20px]" style={{ color: 'var(--wa-text-secondary)' }} />
-            </button>
-          </InstantTooltip>
+          {/* More menu — contains all other actions */}
+          <div className="relative">
+            <InstantTooltip label="Menu">
+              <button
+                onClick={() => setShowMoreMenu(!showMoreMenu)}
+                className="w-[40px] h-[40px] flex items-center justify-center hover:bg-[var(--wa-hover)] rounded-full transition-colors"
+              >
+                <MoreVertical className="w-[20px] h-[20px]" style={{ color: 'var(--wa-text-secondary)' }} />
+              </button>
+            </InstantTooltip>
+            {showMoreMenu && (
+              <div className="absolute top-full right-0 mt-1 w-56 bg-card border border-border rounded-xl shadow-xl z-50 overflow-hidden">
+                {onCreateContact && !hasCrmContact && (
+                  <button
+                    onClick={() => { onCreateContact(); setShowMoreMenu(false); }}
+                    className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-muted/50 transition-colors text-left text-[13px] text-foreground"
+                  >
+                    <UserPlus className="w-4 h-4 text-muted-foreground" />
+                    Criar Passageiro
+                  </button>
+                )}
+                {onCreateDeal && (
+                  <button
+                    onClick={() => { onCreateDeal(); setShowMoreMenu(false); }}
+                    className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-muted/50 transition-colors text-left text-[13px] text-foreground"
+                  >
+                    <Briefcase className="w-4 h-4 text-muted-foreground" />
+                    Criar Negociação
+                  </button>
+                )}
+                {waConversationId && (
+                  <button
+                    onClick={() => { setShowTransfer(true); setShowMoreMenu(false); }}
+                    className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-muted/50 transition-colors text-left text-[13px] text-foreground"
+                  >
+                    <ArrowRightLeft className="w-4 h-4 text-muted-foreground" />
+                    Transferir Conversa
+                  </button>
+                )}
+                <button
+                  onClick={() => { setShowImportDialog(true); setShowMoreMenu(false); }}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-muted/50 transition-colors text-left text-[13px] text-foreground"
+                >
+                  <FileText className="w-4 h-4 text-muted-foreground" />
+                  Importar como Anotação
+                </button>
+                <button
+                  onClick={() => { setShowTimeline(!showTimeline); setShowMoreMenu(false); }}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-muted/50 transition-colors text-left text-[13px] text-foreground"
+                >
+                  <History className="w-4 h-4 text-muted-foreground" />
+                  {showTimeline ? "Ocultar Timeline" : "Timeline de Eventos"}
+                </button>
+                <button
+                  onClick={() => { handleSummarize(); setShowMoreMenu(false); }}
+                  disabled={summaryLoading}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-muted/50 transition-colors text-left text-[13px] text-foreground"
+                >
+                  <Brain className="w-4 h-4 text-muted-foreground" />
+                  {summaryLoading ? "Gerando Resumo..." : "Resumo IA"}
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -2764,7 +2773,7 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
             <select
               value={noteCategory}
               onChange={(e) => setNoteCategory(e.target.value)}
-              className="text-[11px] bg-amber-100 border border-amber-300 rounded-md px-1.5 py-0.5 text-amber-800 outline-none cursor-pointer"
+              className="text-[11px] bg-amber-100 dark:bg-amber-900/40 border border-amber-300 dark:border-amber-700 rounded-md px-1.5 py-0.5 text-amber-800 dark:text-amber-200 outline-none cursor-pointer"
             >
               <option value="other">Geral</option>
               <option value="client">Cliente</option>
@@ -2777,9 +2786,9 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
               value={notePriority}
               onChange={(e) => setNotePriority(e.target.value)}
               className={`text-[11px] border rounded-md px-1.5 py-0.5 outline-none cursor-pointer ${
-                notePriority === "urgent" ? "bg-red-100 border-red-300 text-red-800" :
-                notePriority === "high" ? "bg-orange-100 border-orange-300 text-orange-800" :
-                "bg-amber-100 border-amber-300 text-amber-800"
+                notePriority === "urgent" ? "bg-red-100 dark:bg-red-900/40 border-red-300 dark:border-red-700 text-red-800 dark:text-red-200" :
+                notePriority === "high" ? "bg-orange-100 dark:bg-orange-900/40 border-orange-300 dark:border-orange-700 text-orange-800 dark:text-orange-200" :
+                "bg-amber-100 dark:bg-amber-900/40 border-amber-300 dark:border-amber-700 text-amber-800 dark:text-amber-200"
               }`}
             >
               <option value="normal">Normal</option>
@@ -2820,7 +2829,7 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
       )}
 
       {/* ─── Input Area (WhatsApp Web style) ─── */}
-      <div className={`px-[10px] py-[5px] z-10 shrink-0 transition-colors ${isNoteMode ? "bg-amber-50" : ""}`} style={isNoteMode ? {} : { backgroundColor: 'var(--wa-chat-compose-bg)' }}>
+      <div className={`px-[10px] py-[5px] z-10 shrink-0 transition-colors ${isNoteMode ? "bg-amber-50 dark:bg-amber-950/30" : ""}`} style={isNoteMode ? {} : { backgroundColor: 'var(--wa-chat-compose-bg)' }}>
         {isRecording ? (
           <VoiceRecorder onSend={handleVoiceSend} onCancel={() => setIsRecording(false)} />
         ) : (
@@ -2938,7 +2947,7 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
                     {filtered.map((agent: any) => (
                       <button
                         key={agent.id}
-                        className="w-full text-left px-3 py-2 hover:bg-amber-50 transition-colors border-b border-amber-100/30 last:border-0 flex items-center gap-2"
+                        className="w-full text-left px-3 py-2 hover:bg-amber-50 dark:hover:bg-amber-900/30 transition-colors border-b border-amber-100/30 dark:border-amber-800/30 last:border-0 flex items-center gap-2"
                         onClick={() => {
                           // Replace @query with @AgentName
                           const beforeMention = messageText.substring(0, mentionCursorPos - (mentionQuery?.length || 0) - 1);
@@ -2997,7 +3006,7 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
                 placeholder={isNoteMode ? "Escreva uma nota interna (só a equipe vê)..." : "Mensagem"} rows={1}
                 className={`w-full rounded-[8px] px-[12px] py-[9px] text-[15px] outline-none resize-none leading-[20px] transition-colors ${
                   isNoteMode
-                    ? "bg-amber-100 border-amber-300 text-amber-900 focus:border-amber-400 border placeholder:text-amber-600/50"
+                    ? "bg-amber-100 dark:bg-amber-900/40 border-amber-300 dark:border-amber-700 text-amber-900 dark:text-amber-200 focus:border-amber-400 dark:focus:border-amber-600 border placeholder:text-amber-600/50 dark:placeholder:text-amber-500"
                     : "border-none"
                 }`}
                 style={isNoteMode ? { height: "42px", maxHeight: "140px" } : { height: "42px", maxHeight: "140px", backgroundColor: 'var(--wa-input-bg)', color: 'var(--wa-text-primary)' }}

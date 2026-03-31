@@ -57,14 +57,14 @@ export function HeroSection({ onRegister }: HeroSectionProps) {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.7, ease: [0.25, 0.46, 0.45, 0.94] }}
           >
-            <div className="inline-flex items-center gap-2 bg-violet-500/10 text-violet-300 px-4 py-1.5 rounded-full text-sm font-medium mb-6 border border-violet-500/15">
-              <span className="w-1.5 h-1.5 bg-violet-400 rounded-full animate-pulse" />
+            <div className="inline-flex items-center gap-2 bg-white/[0.06] text-white/80 px-4 py-1.5 rounded-full text-sm font-medium mb-6 border border-white/10">
+              <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse" />
               Criado pela Escola de Negócios do Turismo
             </div>
 
             <h1 className="text-4xl sm:text-5xl lg:text-[3.5rem] font-bold leading-[1.1] mb-6 tracking-tight text-white">
               Sua agência perde vendas{" "}
-              <span className="bg-gradient-to-r from-violet-400 via-purple-400 to-fuchsia-400 bg-clip-text text-transparent">
+              <span className="bg-gradient-to-r from-[#FFC7AC] via-[#FF614C] to-[#FF2B61] bg-clip-text text-transparent">
                 toda semana.
               </span>{" "}
               <br className="hidden sm:block" />

@@ -242,13 +242,13 @@ export default function TaskAutomationSettings() {
       </div>
 
       {/* Info Banner */}
-      <Card className="mb-6 border-amber-200 bg-amber-50/50">
+      <Card className="mb-6 border-amber-400/60 bg-white dark:bg-white">
         <CardContent className="p-4">
           <div className="flex items-start gap-3">
             <Zap className="h-5 w-5 text-amber-600 mt-0.5 shrink-0" />
             <div>
               <p className="text-sm font-medium text-amber-900">Como funciona a automação de tarefas</p>
-              <p className="text-xs text-amber-700 mt-1">
+              <p className="text-xs text-amber-800 mt-1">
                 Quando uma negociação é movida para uma etapa do funil, o sistema cria automaticamente as tarefas configuradas.
                 O prazo pode ser calculado com base na <strong>data atual</strong>, na <strong>data do embarque</strong> ou na <strong>data do retorno</strong> da negociação.
                 Use valores negativos para criar tarefas com prazo ANTES da data de referência (ex: -30 = 30 dias antes do embarque).

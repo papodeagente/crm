@@ -379,7 +379,7 @@ export async function getHotmartHealth(): Promise<HotmartHealth> {
     ));
 
   const hottokConfigured = !!process.env.HOTMART_HOTTOK;
-  const webhookUrl = `${process.env.VITE_APP_URL || "https://crm.acelerador.tur.br"}/api/webhooks/hotmart`;
+  const webhookUrl = `${process.env.VITE_APP_URL || "https://crm.enturos.com"}/api/webhooks/hotmart`;
 
   // Determine health status
   let status: HotmartHealth["status"] = "no_events";

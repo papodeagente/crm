@@ -214,10 +214,10 @@ export default function ProviderManager({ session }: ProviderManagerProps) {
                           variant="outline"
                           className={`text-[10px] px-1.5 py-0 h-5 ${
                             provisioningQuery.data.instance.status === "active"
-                              ? "border-green-200 text-green-700 bg-green-50"
+                              ? "border-green-200 text-green-700 bg-green-50 dark:border-green-700 dark:text-green-300 dark:bg-green-900/40"
                               : provisioningQuery.data.instance.status === "pending"
-                              ? "border-yellow-200 text-yellow-700 bg-yellow-50"
-                              : "border-red-200 text-red-700 bg-red-50"
+                              ? "border-yellow-200 text-yellow-700 bg-yellow-50 dark:border-yellow-700 dark:text-yellow-300 dark:bg-yellow-900/40"
+                              : "border-red-200 text-red-700 bg-red-50 dark:border-red-700 dark:text-red-300 dark:bg-red-900/40"
                           }`}
                         >
                           {provisioningQuery.data.instance.status === "active" ? "Ativa" :
@@ -276,7 +276,7 @@ export default function ProviderManager({ session }: ProviderManagerProps) {
                 <div className="pt-1">
                   <Button
                     variant="outline"
-                    className="h-9 rounded-lg text-[12px] border-red-200 text-red-600 hover:bg-red-50 gap-1.5"
+                    className="h-9 rounded-lg text-[12px] border-red-200 dark:border-red-700 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 gap-1.5"
                     onClick={() => setDeprovisionDialogOpen(true)}
                   >
                     <XCircle className="h-3.5 w-3.5" />
@@ -331,10 +331,10 @@ export default function ProviderManager({ session }: ProviderManagerProps) {
                 <p className="text-[13px]">
                   Esta ação irá cancelar e remover a instância Z-API provisionada para este tenant.
                 </p>
-                <div className="rounded-lg bg-red-50 border border-red-200/60 p-3">
+                <div className="rounded-lg bg-red-50 dark:bg-red-950/30 border border-red-200/60 dark:border-red-700/40 p-3">
                   <div className="flex gap-2 items-start">
-                    <XCircle className="h-4 w-4 text-red-500 shrink-0 mt-0.5" />
-                    <div className="text-[11px] text-red-700 space-y-1">
+                    <XCircle className="h-4 w-4 text-red-500 dark:text-red-400 shrink-0 mt-0.5" />
+                    <div className="text-[11px] text-red-700 dark:text-red-300 space-y-1">
                       <p className="font-medium">O que acontece:</p>
                       <ul className="list-disc list-inside space-y-0.5">
                         <li>A instância Z-API será cancelada na plataforma</li>

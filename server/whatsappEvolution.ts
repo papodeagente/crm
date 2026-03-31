@@ -468,6 +468,39 @@ class WhatsAppEvolutionManager extends EventEmitter {
     const number = this.jidToNumber(jid);
     return zapiProvider.sendSticker(sessionId, number, stickerUrl);
   }
+  async sendLink(sessionId: string, jid: string, linkUrl: string, opts?: { message?: string; image?: string; title?: string; linkDescription?: string }): Promise<any> {
+    const session = this.sessions.get(sessionId);
+    if (!session) throw new Error(`Sessão não encontrada.`);
+    if (session.status !== "connected") throw new Error(`WhatsApp não está conectado.`);
+    const number = this.jidToNumber(jid);
+    const result = await zapiProvider.sendLink(sessionId, number, linkUrl, opts);
+
+    // Save sent message to DB
+    if (result?.key?.id) {
+      try {
+        const db = await getDb();
+        if (db) {
+          const remoteJid = result.key.remoteJid || `${number}@s.whatsapp.net`;
+          await db.insert(waMessages).values({
+            sessionId: session.sessionId,
+            tenantId: session.tenantId,
+            messageId: result.key.id,
+            remoteJid,
+            fromMe: true,
+            messageType: "conversation",
+            content: opts?.message || linkUrl,
+            status: "sent",
+            timestamp: new Date(normalizeToUnixSeconds(result.messageTimestamp) * 1000),
+          }).onDuplicateKeyUpdate({ set: { status: sql`status` } }).catch(() => {});
+        }
+      } catch (e) {
+        console.error("[SendLink] Failed to save sent message to DB:", e);
+      }
+    }
+
+    return result;
+  }
+
   async sendLocation(sessionId: string, jid: string, latitude: number, longitude: number, name: string, address: string): Promise<any> {
     const session = this.sessions.get(sessionId);
     if (!session) throw new Error(`Sessão não encontrada.`);
@@ -574,6 +607,41 @@ class WhatsAppEvolutionManager extends EventEmitter {
     await zapiProvider.archiveChat(sessionId, remoteJid, archive);
   }
 
+  async pinChat(sessionId: string, remoteJid: string, pin: boolean): Promise<void> {
+    const session = this.sessions.get(sessionId);
+    if (!session) throw new Error(`Sessão não encontrada.`);
+    if (session.status !== "connected") throw new Error(`WhatsApp não está conectado.`);
+    await zapiProvider.pinChat(sessionId, remoteJid, pin);
+  }
+
+  async muteChat(sessionId: string, remoteJid: string, mute: boolean): Promise<void> {
+    const session = this.sessions.get(sessionId);
+    if (!session) throw new Error(`Sessão não encontrada.`);
+    if (session.status !== "connected") throw new Error(`WhatsApp não está conectado.`);
+    await zapiProvider.muteChat(sessionId, remoteJid, mute);
+  }
+
+  async deleteChat(sessionId: string, remoteJid: string): Promise<void> {
+    const session = this.sessions.get(sessionId);
+    if (!session) throw new Error(`Sessão não encontrada.`);
+    if (session.status !== "connected") throw new Error(`WhatsApp não está conectado.`);
+    await zapiProvider.deleteChat(sessionId, remoteJid);
+  }
+
+  async pinMessage(sessionId: string, remoteJid: string, messageId: string, pin: boolean): Promise<void> {
+    const session = this.sessions.get(sessionId);
+    if (!session) throw new Error(`Sessão não encontrada.`);
+    if (session.status !== "connected") throw new Error(`WhatsApp não está conectado.`);
+    await zapiProvider.pinMessage(sessionId, remoteJid, messageId, pin);
+  }
+
+  async forwardMessage(sessionId: string, fromJid: string, toJid: string, messageId: string): Promise<any> {
+    const session = this.sessions.get(sessionId);
+    if (!session) throw new Error(`Sessão não encontrada.`);
+    if (session.status !== "connected") throw new Error(`WhatsApp não está conectado.`);
+    return zapiProvider.forwardMessage(sessionId, fromJid, toJid, messageId);
+  }
+
   async blockContact(sessionId: string, jid: string, block: boolean): Promise<void> {
     const session = this.sessions.get(sessionId);
     if (!session) throw new Error(`Sessão não encontrada.`);
@@ -607,6 +675,50 @@ class WhatsAppEvolutionManager extends EventEmitter {
     if (!session) return null;
     const number = this.jidToNumber(jid);
     return zapiProvider.fetchBusinessProfile(sessionId, number);
+  }
+
+  // ─── PROFILE MANAGEMENT ───
+
+  async updateProfileName(sessionId: string, name: string): Promise<boolean> {
+    const session = this.sessions.get(sessionId);
+    if (!session) throw new Error(`Sessão não encontrada.`);
+    if (session.status !== "connected") throw new Error(`WhatsApp não está conectado.`);
+    return zapiProvider.updateProfileName(sessionId, name);
+  }
+
+  async updateProfileDescription(sessionId: string, description: string): Promise<boolean> {
+    const session = this.sessions.get(sessionId);
+    if (!session) throw new Error(`Sessão não encontrada.`);
+    if (session.status !== "connected") throw new Error(`WhatsApp não está conectado.`);
+    return zapiProvider.updateProfileDescription(sessionId, description);
+  }
+
+  async getDeviceInfo(sessionId: string): Promise<any> {
+    const session = this.sessions.get(sessionId);
+    if (!session) throw new Error(`Sessão não encontrada.`);
+    if (session.status !== "connected") throw new Error(`WhatsApp não está conectado.`);
+    return zapiProvider.getDeviceInfo(sessionId);
+  }
+
+  async getBlockedContacts(sessionId: string): Promise<any[]> {
+    const session = this.sessions.get(sessionId);
+    if (!session) throw new Error(`Sessão não encontrada.`);
+    if (session.status !== "connected") throw new Error(`WhatsApp não está conectado.`);
+    return zapiProvider.getBlockedContacts(sessionId);
+  }
+
+  async getMessageQueue(sessionId: string): Promise<{ count: number; messages: any[] }> {
+    const session = this.sessions.get(sessionId);
+    if (!session) throw new Error(`Sessão não encontrada.`);
+    if (session.status !== "connected") throw new Error(`WhatsApp não está conectado.`);
+    return zapiProvider.getMessageQueue(sessionId);
+  }
+
+  async clearMessageQueue(sessionId: string): Promise<boolean> {
+    const session = this.sessions.get(sessionId);
+    if (!session) throw new Error(`Sessão não encontrada.`);
+    if (session.status !== "connected") throw new Error(`WhatsApp não está conectado.`);
+    return zapiProvider.clearMessageQueue(sessionId);
   }
 
   // ─── GROUPS ───
@@ -1396,6 +1508,21 @@ class WhatsAppEvolutionManager extends EventEmitter {
           await this.handleContactsUpsert(session, payload.data);
         }
         break;
+
+      case "presence.update":
+        // Typing/recording indicator from Z-API PresenceChatCallback
+        // Emit via Socket.IO so the inbox shows "digitando..." / "gravando..."
+        if (session) {
+          const presenceData = payload.data;
+          const presenceStatus = presenceData?.status?.toLowerCase() || "paused";
+          this.emit("presence", {
+            sessionId: session.sessionId,
+            tenantId: session.tenantId,
+            remoteJid: presenceData?.remoteJid || "",
+            status: presenceStatus, // composing, paused, recording, available, unavailable
+          });
+        }
+        break;
     }
   }
 
@@ -1418,6 +1545,7 @@ class WhatsAppEvolutionManager extends EventEmitter {
       const remoteJid = key.remoteJid;
       const messageId = key.id;
       const pushName = data?.pushName || "";
+      const senderPhoto: string | null = data?._zapiSenderPhoto || null;
       const timestamp = normalizeToUnixSeconds(data?.messageTimestamp) * 1000;
 
       const content = this.extractMessageContent(data);
@@ -1579,24 +1707,29 @@ class WhatsAppEvolutionManager extends EventEmitter {
         );
       }
 
-      // 2. Update wa_contacts with pushName
-      if (pushName && !fromMe) {
-        const cleanedPush = pushName.replace(/[\s\-\(\)\+]/g, '');
-        const isRealName = !/^\d+$/.test(cleanedPush) && pushName !== 'Voc\u00ea' && pushName !== 'You';
-        if (isRealName) {
+      // 2. Update wa_contacts with pushName and/or profilePictureUrl
+      if (!fromMe) {
+        const cleanedPush = pushName ? pushName.replace(/[\s\-\(\)\+]/g, '') : '';
+        const isRealName = pushName && cleanedPush && !/^\d+$/.test(cleanedPush) && pushName !== 'Você' && pushName !== 'You';
+        // Upsert if we have a real name OR a profile photo
+        if (isRealName || senderPhoto) {
+          const updateFields: Record<string, any> = {};
+          if (isRealName) updateFields.pushName = sql`${pushName}`;
+          if (senderPhoto) updateFields.profilePictureUrl = sql`${senderPhoto}`;
+
           db.insert(waContacts).values({
             sessionId: session.sessionId,
             jid: remoteJid,
             phoneNumber: remoteJid.endsWith('@s.whatsapp.net') ? remoteJid : null,
-            pushName,
+            pushName: isRealName ? pushName : null,
             savedName: null,
             verifiedName: null,
-            profilePictureUrl: null,
+            profilePictureUrl: senderPhoto,
           }).onDuplicateKeyUpdate({
-            set: { pushName: sql`${pushName}` },
+            set: updateFields,
           }).catch(() =>
             db.update(waContacts)
-              .set({ pushName })
+              .set({ ...(isRealName ? { pushName } : {}), ...(senderPhoto ? { profilePictureUrl: senderPhoto } : {}) })
               .where(and(
                 eq(waContacts.sessionId, session.sessionId),
                 eq(waContacts.jid, remoteJid)
@@ -3020,7 +3153,7 @@ class WhatsAppEvolutionManager extends EventEmitter {
               this.downloadAndStoreMedia(session, msgId, remoteJid, fromMe, syncMediaInfo).catch(() => {});
             }
 
-            // Update wa_contacts with pushName
+            // Update wa_contacts with pushName (don't overwrite existing profilePictureUrl)
             if (pushName && !fromMe && isRealName(pushName)) {
               db.insert(waContacts).values({
                 sessionId: session.sessionId,
@@ -3031,7 +3164,7 @@ class WhatsAppEvolutionManager extends EventEmitter {
                 verifiedName: null,
                 profilePictureUrl: null,
               }).onDuplicateKeyUpdate({
-                set: { pushName: sql`${pushName}` },
+                set: { pushName: sql`${pushName}` }, // Don't touch profilePictureUrl here — sync has no photo
               }).catch(() => {});
             }
 

@@ -175,6 +175,9 @@ export interface WhatsAppProvider {
   /** Generate a new QR code for an existing instance */
   connectInstance(instanceName: string): Promise<WAQrCode>;
 
+  /** Get a phone code for connecting (alternative to QR code) */
+  getPhoneCode(instanceName: string, phone: string): Promise<string>;
+
   /** Fetch instance details (returns null if not found) */
   fetchInstance(instanceName: string): Promise<WAInstance | null>;
 
@@ -195,17 +198,20 @@ export interface WhatsAppProvider {
   /** Send text message */
   sendText(instanceName: string, number: string, text: string): Promise<WASendResult>;
 
-  /** Send media (image, video, audio, document) */
+  /** Send media (image, video, audio, document, gif) */
   sendMedia(
     instanceName: string,
     number: string,
     mediaUrl: string,
-    mediaType: "image" | "video" | "audio" | "document",
+    mediaType: "image" | "video" | "audio" | "document" | "gif",
     opts?: { caption?: string; fileName?: string; mimetype?: string }
   ): Promise<WASendResult>;
 
   /** Send audio as voice note (PTT) */
   sendAudio(instanceName: string, number: string, audioUrl: string): Promise<WASendResult>;
+
+  /** Send PTV (video message, like voice note but for video) */
+  sendPtv(instanceName: string, number: string, videoUrl: string): Promise<WASendResult>;
 
   /** Send text replying to a specific message */
   sendTextWithQuote(
@@ -213,6 +219,14 @@ export interface WhatsAppProvider {
     number: string,
     text: string,
     quoted: { key: { id: string }; message: { conversation: string } }
+  ): Promise<WASendResult>;
+
+  /** Send link with preview (image, title, description) */
+  sendLink(
+    instanceName: string,
+    number: string,
+    linkUrl: string,
+    opts?: { message?: string; image?: string; title?: string; linkDescription?: string }
   ): Promise<WASendResult>;
 
   // ─── Chat Sync ───
@@ -264,11 +278,29 @@ export interface WhatsAppProvider {
   /** Archive/unarchive a chat */
   archiveChat(instanceName: string, remoteJid: string, archive: boolean): Promise<void>;
 
+  /** Pin/unpin a chat */
+  pinChat(instanceName: string, remoteJid: string, pin: boolean): Promise<void>;
+
+  /** Mute/unmute a chat */
+  muteChat(instanceName: string, remoteJid: string, mute: boolean): Promise<void>;
+
+  /** Delete an entire chat */
+  deleteChat(instanceName: string, remoteJid: string): Promise<void>;
+
+  /** Pin/unpin a message */
+  pinMessage(instanceName: string, remoteJid: string, messageId: string, pin: boolean): Promise<void>;
+
+  /** Forward a message to another chat */
+  forwardMessage(instanceName: string, fromJid: string, toJid: string, messageId: string): Promise<WASendResult>;
+
   /** Block/unblock a contact */
   updateBlockStatus(instanceName: string, number: string, status: "block" | "unblock"): Promise<void>;
 
   /** Check if numbers have WhatsApp */
   checkIsWhatsApp(instanceName: string, numbers: string[]): Promise<WANumberCheck[]>;
+
+  /** Batch check if numbers have WhatsApp (more efficient for large lists) */
+  checkIsWhatsAppBatch(instanceName: string, phones: string[]): Promise<WANumberCheck[]>;
 
   // ─── Reactions & Rich Messages ───
 
@@ -339,6 +371,24 @@ export interface WhatsAppProvider {
 
   /** Fetch business profile */
   fetchBusinessProfile(instanceName: string, number: string): Promise<any>;
+
+  /** Update own WhatsApp profile name */
+  updateProfileName(instanceName: string, name: string): Promise<boolean>;
+
+  /** Update own WhatsApp profile description/bio */
+  updateProfileDescription(instanceName: string, description: string): Promise<boolean>;
+
+  /** Get device info (connected phone) */
+  getDeviceInfo(instanceName: string): Promise<any>;
+
+  /** Get blocked contacts list */
+  getBlockedContacts(instanceName: string): Promise<WAContact[]>;
+
+  /** Get message queue status */
+  getMessageQueue(instanceName: string): Promise<{ count: number; messages: any[] }>;
+
+  /** Clear message queue */
+  clearMessageQueue(instanceName: string): Promise<boolean>;
 
   // ─── Groups ───
 

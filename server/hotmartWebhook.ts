@@ -243,7 +243,7 @@ async function autoCreateTenantFromPurchase(opts: {
   }
 
   // Send welcome email with credentials
-  const loginUrl = opts.loginUrl || "https://crm.acelerador.tur.br/login";
+  const loginUrl = opts.loginUrl || "https://crm.enturos.com/login";
   const planDisplayName = PLAN_DISPLAY_NAMES[opts.plan] || opts.plan;
 
   try {

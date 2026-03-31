@@ -171,7 +171,7 @@ export default function TransferDialog({
               onChange={(e) => setNote(e.target.value)}
               placeholder="Nota para o agente destino (opcional)..."
               rows={2}
-              className="w-full pl-9 pr-3 py-2.5 bg-amber-50 border border-amber-200 rounded-lg text-[14px] text-amber-900 placeholder:text-amber-400 outline-none resize-none focus:border-amber-400 transition-colors"
+              className="w-full pl-9 pr-3 py-2.5 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-700 rounded-lg text-[14px] text-amber-900 dark:text-amber-200 placeholder:text-amber-400 dark:placeholder:text-amber-500 outline-none resize-none focus:border-amber-400 dark:focus:border-amber-600 transition-colors"
             />
           </div>
         </div>

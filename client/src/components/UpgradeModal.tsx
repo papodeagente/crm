@@ -141,7 +141,7 @@ export function UpgradeModal({ open, onClose, feature, title, description }: Upg
                 <div>
                   <DialogTitle className="text-lg">{displayTitle}</DialogTitle>
                   {minPlan && (
-                    <Badge variant="outline" className="mt-1 text-xs border-amber-300 text-amber-700 bg-amber-50">
+                    <Badge variant="outline" className="mt-1 text-xs border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/40">
                       <Crown className="h-3 w-3 mr-1" />
                       Plano {minPlan.name}
                     </Badge>

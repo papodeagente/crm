@@ -469,6 +469,18 @@ export class ZApiProvider implements WhatsAppProvider {
     };
   }
 
+  /**
+   * Get a phone code for connecting WhatsApp (alternative to QR code).
+   * Docs: https://developer.z-api.io/instance/phone-code
+   * Endpoint: GET /phone-code/{phone}
+   * Returns a numeric code that the user enters in their WhatsApp app.
+   */
+  async getPhoneCode(instanceName: string, phone: string): Promise<string> {
+    const cleanPhone = phone.replace(/\D/g, "");
+    const result = await zapiFetch(instanceName, `phone-code/${cleanPhone}`);
+    return result?.code || result?.value || "";
+  }
+
   async fetchInstance(instanceName: string): Promise<WAInstance | null> {
     try {
       const status = await zapiFetch(instanceName, "status");
@@ -476,14 +488,39 @@ export class ZApiProvider implements WhatsAppProvider {
 
       if (!status) return null;
 
+      // Enrich with profile data when connected
+      // /me returns instance metadata (webhooks, payment status, etc.)
+      // /profile-name and /profile-picture return WhatsApp profile data
+      let profileName: string | null = null;
+      let profilePicUrl: string | null = null;
+      let phone = status.phone || null;
+
+      if (status.connected && phone) {
+        try {
+          // GET /profile-picture requires ?phone= param even for own picture (docs: expires in 48h)
+          const [nameResult, picResult] = await Promise.allSettled([
+            zapiFetch(instanceName, "profile-name"),
+            zapiFetch(instanceName, `profile-picture?phone=${phone}`),
+          ]);
+          if (nameResult.status === "fulfilled" && nameResult.value) {
+            profileName = nameResult.value?.name || nameResult.value?.value || null;
+          }
+          if (picResult.status === "fulfilled" && picResult.value) {
+            profilePicUrl = picResult.value?.link || null;
+          }
+        } catch {
+          // Profile data is optional, don't fail fetchInstance
+        }
+      }
+
       return {
         instanceId: session?.instanceId || instanceName,
         name: instanceName,
         connectionStatus: status.connected ? "open" : "close",
-        ownerJid: status.phone ? phoneToJid(status.phone) : null,
-        profileName: null, // Z-API /status doesn't return profile name
-        profilePicUrl: null,
-        phoneNumber: status.phone || null,
+        ownerJid: phone ? phoneToJid(phone) : null,
+        profileName,
+        profilePicUrl,
+        phoneNumber: phone,
       };
     } catch {
       return null;
@@ -521,7 +558,9 @@ export class ZApiProvider implements WhatsAppProvider {
   }
 
   async restartInstance(instanceName: string): Promise<void> {
-    await zapiFetch(instanceName, "restore-session");
+    // Z-API: GET /restart (not POST /restore-session)
+    // Docs: https://developer.z-api.io/instance/restart
+    await zapiFetch(instanceName, "restart");
   }
 
   // ─── Messaging ───
@@ -539,7 +578,7 @@ export class ZApiProvider implements WhatsAppProvider {
     instanceName: string,
     number: string,
     mediaUrl: string,
-    mediaType: "image" | "video" | "audio" | "document",
+    mediaType: "image" | "video" | "audio" | "document" | "gif",
     opts?: { caption?: string; fileName?: string; mimetype?: string }
   ): Promise<WASendResult> {
     const phone = jidToPhone(number);
@@ -554,11 +593,19 @@ export class ZApiProvider implements WhatsAppProvider {
         break;
       case "video":
         endpoint = "send-video";
-        body = { phone, video: mediaUrl, caption: opts?.caption };
+        // async: true lets Z-API process large videos in background without timeout
+        body = { phone, video: mediaUrl, caption: opts?.caption, async: true };
         break;
       case "audio":
         endpoint = "send-audio";
-        body = { phone, audio: mediaUrl };
+        // async: true lets Z-API process large audios in background without timeout
+        body = { phone, audio: mediaUrl, async: true };
+        break;
+      case "gif":
+        // Z-API: POST /send-gif — animated GIF messages
+        // Docs: https://developer.z-api.io/message/send-message-gif
+        endpoint = "send-gif";
+        body = { phone, gif: mediaUrl, caption: opts?.caption };
         break;
       case "document": {
         // Z-API requires extension in the URL path
@@ -580,7 +627,18 @@ export class ZApiProvider implements WhatsAppProvider {
     const phone = jidToPhone(number);
     const result = await zapiFetch(instanceName, "send-audio", {
       method: "POST",
-      body: { phone, audio: audioUrl, waveform: true },
+      body: { phone, audio: audioUrl, waveform: true, async: true },
+    });
+    return zapiSendResultToCanonical(result, phone);
+  }
+
+  async sendPtv(instanceName: string, number: string, videoUrl: string): Promise<WASendResult> {
+    const phone = jidToPhone(number);
+    // Z-API: POST /send-ptv — video message (like voice note but video)
+    // Docs: https://developer.z-api.io/message/send-message-ptv
+    const result = await zapiFetch(instanceName, "send-ptv", {
+      method: "POST",
+      body: { phone, ptv: videoUrl, async: true },
     });
     return zapiSendResultToCanonical(result, phone);
   }
@@ -598,6 +656,37 @@ export class ZApiProvider implements WhatsAppProvider {
         phone,
         message: text,
         messageId: quoted.key.id, // Z-API uses messageId for quoting
+      },
+    });
+    return zapiSendResultToCanonical(result, phone);
+  }
+
+  /**
+   * Send a link with preview via Z-API POST /send-link
+   * Docs: https://developer.z-api.io/message/send-message-link
+   * Note: Link is only clickable if the recipient has the sender's number saved
+   */
+  async sendLink(
+    instanceName: string,
+    number: string,
+    linkUrl: string,
+    opts?: { message?: string; image?: string; title?: string; linkDescription?: string }
+  ): Promise<WASendResult> {
+    const phone = jidToPhone(number);
+    // Z-API requires the linkUrl to be appended at the end of the message text
+    let message = opts?.message || "";
+    if (!message.includes(linkUrl)) {
+      message = message ? `${message} ${linkUrl}` : linkUrl;
+    }
+    const result = await zapiFetch(instanceName, "send-link", {
+      method: "POST",
+      body: {
+        phone,
+        message,
+        image: opts?.image || "",
+        linkUrl,
+        title: opts?.title || "",
+        linkDescription: opts?.linkDescription || "",
       },
     });
     return zapiSendResultToCanonical(result, phone);
@@ -631,21 +720,42 @@ export class ZApiProvider implements WhatsAppProvider {
   }
 
   async findContacts(instanceName: string): Promise<WAContact[]> {
-    const result = await zapiFetch(instanceName, "contacts");
-    const contacts = Array.isArray(result) ? result : [];
-    return contacts.map(zapiContactToCanonical);
+    // Z-API supports pagination: GET /contacts?page=X&pageSize=Y
+    // Ref: https://developer.z-api.io/contacts/get-contacts
+    const allContacts: WAContact[] = [];
+    let page = 1;
+    const pageSize = 100;
+    let hasMore = true;
+
+    while (hasMore) {
+      const result = await zapiFetch(instanceName, `contacts?page=${page}&pageSize=${pageSize}`);
+      const contacts = Array.isArray(result) ? result : [];
+      allContacts.push(...contacts.map(zapiContactToCanonical));
+      hasMore = contacts.length === pageSize;
+      page++;
+      if (page > 50) break; // Safety limit
+    }
+
+    return allContacts;
   }
 
   async findMessages(
     instanceName: string,
     remoteJid: string,
-    opts?: { limit?: number; page?: number }
+    opts?: { limit?: number; page?: number; lastMessageId?: string }
   ): Promise<WAMessage[]> {
     const phone = jidToPhone(remoteJid);
     const amount = opts?.limit || 20;
 
-    // Z-API: GET /chat-messages/{phone}?amount=X
-    const result = await zapiFetch(instanceName, `chat-messages/${phone}?amount=${amount}`);
+    // Z-API: GET /chat-messages/{phone}?amount=X&lastMessageId=Y
+    // Docs: https://developer.z-api.io/chats/get-message-chats
+    // Without lastMessageId, always returns the latest N messages.
+    // With lastMessageId, returns N messages older than the given message.
+    let url = `chat-messages/${phone}?amount=${amount}`;
+    if (opts?.lastMessageId) {
+      url += `&lastMessageId=${encodeURIComponent(opts.lastMessageId)}`;
+    }
+    const result = await zapiFetch(instanceName, url);
     const messages = Array.isArray(result) ? result : [];
 
     return messages.map(zapiMessageToCanonical);
@@ -664,10 +774,14 @@ export class ZApiProvider implements WhatsAppProvider {
     }
   }
 
-  async markMessageAsUnread(_instanceName: string, _remoteJid: string, _messageId: string): Promise<void> {
-    // Z-API doesn't have a "mark as unread" endpoint.
-    // This is a no-op for Z-API.
-    console.warn("[Z-API] markMessageAsUnread is not supported by Z-API");
+  async markMessageAsUnread(instanceName: string, remoteJid: string, _messageId: string): Promise<void> {
+    // Z-API supports unread via POST /modify-chat with action "unread"
+    // Ref: https://developer.z-api.io/chats/archive-chat (same endpoint, different action)
+    const phone = jidToPhone(remoteJid);
+    await zapiFetch(instanceName, "modify-chat", {
+      method: "POST",
+      body: { phone, action: "unread" },
+    });
   }
 
   async deleteMessageForEveryone(
@@ -677,7 +791,8 @@ export class ZApiProvider implements WhatsAppProvider {
     fromMe: boolean
   ): Promise<void> {
     const phone = jidToPhone(remoteJid);
-    // Z-API uses DELETE with query params
+    // Z-API: DELETE /messages with query params
+    // Docs: https://developer.z-api.io/message/delete-message
     await zapiFetch(
       instanceName,
       `messages?messageId=${encodeURIComponent(messageId)}&phone=${phone}&owner=${fromMe}`,
@@ -718,6 +833,58 @@ export class ZApiProvider implements WhatsAppProvider {
     });
   }
 
+  async pinChat(instanceName: string, remoteJid: string, pin: boolean): Promise<void> {
+    const phone = jidToPhone(remoteJid);
+    // Z-API: POST /modify-chat action:"pin"/"unpin"
+    // Docs: https://developer.z-api.io/chats/archive-chat
+    await zapiFetch(instanceName, "modify-chat", {
+      method: "POST",
+      body: { phone, action: pin ? "pin" : "unpin" },
+    });
+  }
+
+  async muteChat(instanceName: string, remoteJid: string, mute: boolean): Promise<void> {
+    const phone = jidToPhone(remoteJid);
+    // Z-API: POST /modify-chat action:"mute"/"unmute"
+    // Docs: https://developer.z-api.io/chats/archive-chat
+    await zapiFetch(instanceName, "modify-chat", {
+      method: "POST",
+      body: { phone, action: mute ? "mute" : "unmute" },
+    });
+  }
+
+  async deleteChat(instanceName: string, remoteJid: string): Promise<void> {
+    const phone = jidToPhone(remoteJid);
+    // Z-API: POST /modify-chat action:"delete"
+    // Docs: https://developer.z-api.io/chats/archive-chat
+    await zapiFetch(instanceName, "modify-chat", {
+      method: "POST",
+      body: { phone, action: "delete" },
+    });
+  }
+
+  async pinMessage(instanceName: string, remoteJid: string, messageId: string, pin: boolean): Promise<void> {
+    const phone = jidToPhone(remoteJid);
+    // Z-API: POST /pin-message
+    // Docs: https://developer.z-api.io/message/pin-message
+    await zapiFetch(instanceName, "pin-message", {
+      method: "POST",
+      body: { phone, messageId, messageAction: pin ? "pin" : "unpin" },
+    });
+  }
+
+  async forwardMessage(instanceName: string, fromJid: string, toJid: string, messageId: string): Promise<WASendResult> {
+    const phone = jidToPhone(toJid);
+    const messagePhone = jidToPhone(fromJid);
+    // Z-API: POST /forward-message
+    // Docs: https://developer.z-api.io/message/forward-message
+    const result = await zapiFetch(instanceName, "forward-message", {
+      method: "POST",
+      body: { phone, messageId, messagePhone },
+    });
+    return zapiSendResultToCanonical(result, phone);
+  }
+
   async updateBlockStatus(instanceName: string, number: string, status: "block" | "unblock"): Promise<void> {
     const phone = jidToPhone(number);
     await zapiFetch(instanceName, "contacts/modify-blocked", {
@@ -742,6 +909,27 @@ export class ZApiProvider implements WhatsAppProvider {
       }
     }
     return results;
+  }
+
+  async checkIsWhatsAppBatch(instanceName: string, phones: string[]): Promise<WANumberCheck[]> {
+    // Z-API: POST /phone-exists-batch — validate multiple numbers at once
+    // Docs: https://developer.z-api.io/contacts/batch-phone-exists
+    const cleanPhones = phones.map((p) => jidToPhone(p).replace(/\D/g, ""));
+    try {
+      const result = await zapiFetch(instanceName, "phone-exists-batch", {
+        method: "POST",
+        body: { phones: cleanPhones },
+      });
+      const items = Array.isArray(result) ? result : result?.results || [];
+      return items.map((item: any) => ({
+        exists: item?.exists === true,
+        jid: phoneToJid(item?.phone || ""),
+        number: item?.phone || "",
+      }));
+    } catch {
+      // Fallback to individual checks
+      return this.checkIsWhatsApp(instanceName, phones);
+    }
   }
 
   // ─── Reactions & Rich Messages ───
@@ -790,16 +978,29 @@ export class ZApiProvider implements WhatsAppProvider {
     contact: Array<{ fullName: string; wuid?: string; phoneNumber: string }>
   ): Promise<WASendResult> {
     const phone = jidToPhone(number);
-    // Z-API sends one contact at a time; for multiple, use send-multiple-contacts
-    const first = contact[0];
-    if (!first) throw new Error("[Z-API] sendContact requires at least one contact");
+    if (!contact.length) throw new Error("[Z-API] sendContact requires at least one contact");
 
-    const result = await zapiFetch(instanceName, "send-contact", {
+    if (contact.length === 1) {
+      // Single contact: POST /send-contact
+      // Docs: https://developer.z-api.io/message/send-message-contact
+      const c = contact[0];
+      const result = await zapiFetch(instanceName, "send-contact", {
+        method: "POST",
+        body: { phone, contactName: c.fullName, contactPhone: c.phoneNumber },
+      });
+      return zapiSendResultToCanonical(result, phone);
+    }
+
+    // Multiple contacts: POST /send-contacts (plural)
+    // Docs: https://developer.z-api.io/message/send-message-contacts
+    const result = await zapiFetch(instanceName, "send-contacts", {
       method: "POST",
       body: {
         phone,
-        contactName: first.fullName,
-        contactPhone: first.phoneNumber,
+        contacts: contact.map((c) => ({
+          contactName: c.fullName,
+          contactPhone: c.phoneNumber,
+        })),
       },
     });
     return zapiSendResultToCanonical(result, phone);
@@ -810,18 +1011,19 @@ export class ZApiProvider implements WhatsAppProvider {
     number: string,
     name: string,
     values: string[],
-    _selectableCount: number = 1
+    selectableCount: number = 1
   ): Promise<WASendResult> {
     const phone = jidToPhone(number);
-    // Z-API may not have a direct poll endpoint; use send-option-list as fallback
-    const result = await zapiFetch(instanceName, "send-option-list", {
+    // Z-API native poll: POST /send-poll
+    // Docs: https://developer.z-api.io/message/send-message-poll
+    const result = await zapiFetch(instanceName, "send-poll", {
       method: "POST",
       body: {
         phone,
-        optionList: {
-          title: name,
-          buttonLabel: "Votar",
-          options: values.map((v, i) => ({ id: String(i + 1), description: "", title: v })),
+        poll: {
+          name,
+          selectableCount,
+          values,
         },
       },
     });
@@ -903,6 +1105,180 @@ export class ZApiProvider implements WhatsAppProvider {
   async fetchBusinessProfile(instanceName: string, number: string): Promise<any> {
     // Z-API doesn't have a separate business profile endpoint
     return this.fetchProfile(instanceName, number);
+  }
+
+  /**
+   * Get the instance's own profile picture.
+   * Docs: https://developer.z-api.io/contacts/get-profile-picture
+   * GET /profile-picture?phone={ownPhone} — URL expires in 48h
+   */
+  async getOwnProfilePicture(instanceName: string): Promise<string | null> {
+    try {
+      // Need connected phone to query own picture
+      const status = await zapiFetch(instanceName, "status");
+      const phone = status?.phone;
+      if (!phone) return null;
+      const result = await zapiFetch(instanceName, `profile-picture?phone=${phone}`);
+      return result?.link || null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Update the instance's own profile picture.
+   * Docs: https://developer.z-api.io/instance/profile-picture
+   * PUT /profile-picture { value: "https://url-da-imagem.jpg" }
+   */
+  async updateOwnProfilePicture(instanceName: string, imageUrl: string): Promise<boolean> {
+    try {
+      await zapiFetch(instanceName, "profile-picture", {
+        method: "PUT",
+        body: { value: imageUrl },
+      });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  // ─── Profile Management ───
+
+  async updateProfileName(instanceName: string, name: string): Promise<boolean> {
+    // Z-API: PUT /profile-name
+    // Docs: https://developer.z-api.io/instance/profile-name
+    try {
+      await zapiFetch(instanceName, "profile-name", {
+        method: "PUT",
+        body: { value: name },
+      });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  async updateProfileDescription(instanceName: string, description: string): Promise<boolean> {
+    // Z-API: PUT /profile-description
+    // Docs: https://developer.z-api.io/instance/profile-description
+    try {
+      await zapiFetch(instanceName, "profile-description", {
+        method: "PUT",
+        body: { value: description },
+      });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  async getDeviceInfo(instanceName: string): Promise<any> {
+    // Z-API: GET /device
+    // Docs: https://developer.z-api.io/instance/device
+    try {
+      return await zapiFetch(instanceName, "device");
+    } catch {
+      return null;
+    }
+  }
+
+  async getBlockedContacts(instanceName: string): Promise<WAContact[]> {
+    // Z-API: GET /contacts/blocked
+    // Docs: https://developer.z-api.io/contacts/get-blocked-contacts
+    try {
+      const result = await zapiFetch(instanceName, "contacts/blocked");
+      const contacts = Array.isArray(result) ? result : [];
+      return contacts.map(zapiContactToCanonical);
+    } catch {
+      return [];
+    }
+  }
+
+  async getMessageQueue(instanceName: string): Promise<{ count: number; messages: any[] }> {
+    // Z-API: GET /queue
+    // Docs: https://developer.z-api.io/queue/get-queue
+    try {
+      const result = await zapiFetch(instanceName, "queue");
+      const messages = Array.isArray(result) ? result : result?.messages || [];
+      return { count: messages.length, messages };
+    } catch {
+      return { count: 0, messages: [] };
+    }
+  }
+
+  async clearMessageQueue(instanceName: string): Promise<boolean> {
+    // Z-API: DELETE /queue
+    // Docs: https://developer.z-api.io/queue/delete-queue
+    try {
+      await zapiFetch(instanceName, "queue", { method: "DELETE" });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  // ─── Product Catalog (WhatsApp Business) ───
+
+  /**
+   * List products from WhatsApp Business catalog.
+   * Uses V2 (POST-based) to avoid HTTP 414 with long cursor strings.
+   * Docs: https://developer.z-api.io/business/get-products-v2
+   * POST /catalogs { nextCursor? }
+   */
+  async getCatalogProducts(instanceName: string, nextCursor?: string): Promise<{ products: any[]; nextCursor?: string; cartEnabled?: boolean }> {
+    try {
+      const result = await zapiFetch(instanceName, "catalogs", {
+        method: "POST",
+        body: nextCursor ? { nextCursor } : {},
+      });
+      return {
+        products: result?.products || [],
+        nextCursor: result?.nextCursor || undefined,
+        cartEnabled: result?.cartEnabled,
+      };
+    } catch {
+      return { products: [] };
+    }
+  }
+
+  /**
+   * Send a product from the catalog to a contact.
+   * Docs: https://developer.z-api.io/message/send-message-product
+   * POST /send-product { phone, catalogPhone, productId }
+   */
+  async sendProduct(instanceName: string, number: string, catalogPhone: string, productId: string): Promise<WASendResult> {
+    const phone = jidToPhone(number);
+    const result = await zapiFetch(instanceName, "send-product", {
+      method: "POST",
+      body: { phone, catalogPhone, productId },
+    });
+    return zapiSendResultToCanonical(result, phone);
+  }
+
+  /**
+   * Send full catalog link to a contact.
+   * Docs: https://developer.z-api.io/message/send-message-catalog
+   * POST /send-catalog { phone, catalogPhone, message?, title?, catalogDescription?, translation? }
+   */
+  async sendCatalog(
+    instanceName: string,
+    number: string,
+    catalogPhone: string,
+    opts?: { message?: string; title?: string; catalogDescription?: string }
+  ): Promise<WASendResult> {
+    const phone = jidToPhone(number);
+    const result = await zapiFetch(instanceName, "send-catalog", {
+      method: "POST",
+      body: {
+        phone,
+        catalogPhone,
+        translation: "PT",
+        message: opts?.message || "",
+        title: opts?.title || "",
+        catalogDescription: opts?.catalogDescription || "",
+      },
+    });
+    return zapiSendResultToCanonical(result, phone);
   }
 
   // ─── Groups ───
@@ -1032,15 +1408,54 @@ export class ZApiProvider implements WhatsAppProvider {
 
   async getBase64FromMediaMessage(
     _instanceName: string,
-    _messageId: string,
-    _options?: { remoteJid?: string; fromMe?: boolean; convertToMp4?: boolean }
+    messageId: string,
+    options?: { remoteJid?: string; fromMe?: boolean; convertToMp4?: boolean }
   ): Promise<WAMediaResult | null> {
     // Z-API provides direct URLs in webhook payloads (imageUrl, audioUrl, etc.)
-    // There's no need to call a separate endpoint to get media.
-    // This method is kept for interface compatibility but should rarely be needed.
-    // If called, we'd need the original webhook data which we don't have here.
-    console.warn("[Z-API] getBase64FromMediaMessage: Z-API provides direct URLs in webhooks. Use those instead.");
-    return null;
+    // These URLs are saved to waMessages.mediaUrl by the messageWorker.
+    // This fallback looks up the URL from DB and downloads the media.
+    try {
+      const { getDb } = await import("../db");
+      const { waMessages } = await import("../../drizzle/schema");
+      const { eq, and } = await import("drizzle-orm");
+      const db = await getDb();
+      if (!db || !messageId) return null;
+
+      // Look up the message to get its mediaUrl
+      const conditions = [eq(waMessages.messageId, messageId)];
+      if (options?.remoteJid) {
+        conditions.push(eq(waMessages.remoteJid, options.remoteJid));
+      }
+      const [msg] = await db.select({
+        mediaUrl: waMessages.mediaUrl,
+        mediaMimeType: waMessages.mediaMimeType,
+        mediaFileName: waMessages.mediaFileName,
+      }).from(waMessages).where(and(...conditions)).limit(1);
+
+      if (!msg?.mediaUrl) return null;
+
+      // Download the media from the URL
+      const response = await fetch(msg.mediaUrl, {
+        signal: AbortSignal.timeout(30000),
+      });
+      if (!response.ok) {
+        console.warn(`[Z-API] getBase64FromMediaMessage: download failed (${response.status}) for ${msg.mediaUrl.substring(0, 80)}`);
+        return null;
+      }
+
+      const buffer = Buffer.from(await response.arrayBuffer());
+      const base64 = buffer.toString("base64");
+      const mimetype = msg.mediaMimeType || response.headers.get("content-type") || "application/octet-stream";
+
+      return {
+        base64,
+        mimetype,
+        fileName: msg.mediaFileName || undefined,
+      };
+    } catch (err: any) {
+      console.warn(`[Z-API] getBase64FromMediaMessage failed: ${err.message}`);
+      return null;
+    }
   }
 
   // ─── Health & Webhooks ───
@@ -1080,10 +1495,11 @@ export class ZApiProvider implements WhatsAppProvider {
 
   async findWebhook(instanceName: string): Promise<WAWebhookConfig | null> {
     // Z-API doesn't have a "get webhook" endpoint.
-    // We return a synthetic config based on what we know.
+    // We return a synthetic config based on the sessionId (= instanceName).
+    const baseUrl = process.env.ZAPI_WEBHOOK_BASE_URL || "https://crm.enturos.com";
     return {
       enabled: true,
-      url: process.env.ZAPI_WEBHOOK_BASE_URL || "",
+      url: `${baseUrl}/api/webhooks/zapi/${instanceName}`,
       events: [
         "ReceivedCallBack",
         "DeliveryCallback",
@@ -1095,7 +1511,10 @@ export class ZApiProvider implements WhatsAppProvider {
   }
 
   async setWebhook(instanceName: string, opts?: { url?: string; events?: string[] }): Promise<boolean> {
-    const url = opts?.url || process.env.ZAPI_WEBHOOK_BASE_URL || "";
+    // Build the correct webhook URL using the sessionId (= instanceName).
+    // This matches the per-event URLs set during provisioning in zapiProvisioningService.ts.
+    const baseUrl = process.env.ZAPI_WEBHOOK_BASE_URL || "https://crm.enturos.com";
+    const url = opts?.url || `${baseUrl}/api/webhooks/zapi/${instanceName}`;
     if (!url) return false;
 
     try {

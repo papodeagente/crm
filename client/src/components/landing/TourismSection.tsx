@@ -38,13 +38,13 @@ export function TourismSection() {
       <div className="max-w-5xl mx-auto relative z-10">
         <FadeIn>
           <div className="text-center mb-14">
-            <p className="text-sm font-medium text-violet-400 uppercase tracking-wider mb-4">
+            <p className="text-sm font-medium text-white/60 uppercase tracking-wider mb-4">
               Feito para turismo
             </p>
             <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white tracking-tight leading-tight">
               Não é um CRM adaptado.{" "}
               <br className="hidden sm:block" />
-              <span className="bg-gradient-to-r from-violet-400 via-purple-400 to-fuchsia-400 bg-clip-text text-transparent">
+              <span className="bg-gradient-to-r from-[#FFC7AC] via-[#FF614C] to-[#FF2B61] bg-clip-text text-transparent">
                 Foi construído para vender viagens.
               </span>
             </h2>
@@ -55,8 +55,8 @@ export function TourismSection() {
           {cards.map((card, idx) => (
             <FadeIn key={idx} delay={0.1 * (idx + 1)}>
               <div className="bg-white/[0.03] border border-white/[0.08] rounded-2xl p-6 sm:p-8 h-full hover:border-white/[0.12] transition-colors duration-300">
-                <div className="w-12 h-12 rounded-xl bg-violet-500/10 flex items-center justify-center mb-5">
-                  <card.icon className="w-6 h-6 text-violet-400" />
+                <div className="w-12 h-12 rounded-xl bg-white/[0.06] flex items-center justify-center mb-5">
+                  <card.icon className="w-6 h-6 text-white/70" />
                 </div>
                 <h3 className="text-lg font-semibold text-white mb-3">
                   {card.title}

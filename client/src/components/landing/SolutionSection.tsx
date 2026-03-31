@@ -13,7 +13,7 @@ export function SolutionSection() {
       <div className="max-w-5xl mx-auto relative z-10">
         <FadeIn>
           <div className="text-center mb-12">
-            <p className="text-sm font-medium text-violet-400 uppercase tracking-wider mb-5">
+            <p className="text-sm font-medium text-white/60 uppercase tracking-wider mb-5">
               A solução
             </p>
             <img

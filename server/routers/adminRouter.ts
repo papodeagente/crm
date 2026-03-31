@@ -54,7 +54,7 @@ export const adminRouter = router({
             phone: input.phone,
             role: input.role,
             inviterName: ctx.user.name || "Administrador",
-            origin: input.origin || "https://crm.acelerador.tur.br",
+            origin: input.origin || "https://crm.enturos.com",
           });
           await emitEvent({ tenantId: getTenantId(ctx), actorUserId: ctx.user.id, entityType: "crm_user", entityId: result?.userId, action: "create" });
           return { id: result.userId };

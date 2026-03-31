@@ -100,6 +100,17 @@ async function startServer() {
     });
   });
 
+  // Forward presence/typing events to Socket.IO clients
+  whatsappManager.on("presence", (data) => {
+    io.emit("whatsapp:presence", {
+      sessionId: data.sessionId,
+      tenantId: data.tenantId,
+      remoteJid: data.remoteJid,
+      status: data.status, // composing, paused, recording, available, unavailable
+      timestamp: Date.now(),
+    });
+  });
+
   // Forward message status updates to Socket.IO clients (delivered, read, played)
   whatsappManager.on("message:status", (data) => {
     // Part 16: Debug logging

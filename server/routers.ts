@@ -8,6 +8,7 @@ import { publicProcedure, tenantProcedure, tenantWriteProcedure, tenantAdminProc
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { whatsappManager } from "./whatsappEvolution";
+import { zapiProvider } from "./providers/zapiProvider";
 import { getIo } from "./socketSingleton";
 import {
   getSessionsByUser,
@@ -404,13 +405,32 @@ export const appRouter = router({
         const session = await whatsappManager.getSessionLive(input.sessionId);
         return { status: session?.status || "disconnected", qrDataUrl: session?.qrDataUrl || null, user: session?.user || null };
       }),
-    // Request pairing code as alternative to QR code
+    // Request pairing code as alternative to QR code (Z-API phone-code)
     requestPairingCode: sessionTenantProcedure
       .input(z.object({ sessionId: z.string(), phoneNumber: z.string().min(8).max(20) }))
       .mutation(async ({ ctx, input }) => {
-        // Evolution API does not support pairing codes directly.
-        // Connection is done via QR code only.
-        throw new TRPCError({ code: "BAD_REQUEST", message: "A conexão via código de pareamento não está disponível com a Evolution API. Use o QR Code para conectar." });
+        const code = await zapiProvider.getPhoneCode(input.sessionId, input.phoneNumber);
+        if (!code) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Não foi possível gerar o código de pareamento. Verifique se a instância está ativa." });
+        }
+        return { code };
+      }),
+    // Get own profile picture URL
+    getInstanceProfilePicture: sessionTenantProcedure
+      .input(z.object({ sessionId: z.string() }))
+      .query(async ({ input }) => {
+        const url = await zapiProvider.getOwnProfilePicture(input.sessionId);
+        return { url };
+      }),
+    // Update own profile picture
+    updateInstanceProfilePicture: sessionTenantProcedure
+      .input(z.object({ sessionId: z.string(), imageUrl: z.string().url() }))
+      .mutation(async ({ input }) => {
+        const success = await zapiProvider.updateOwnProfilePicture(input.sessionId, input.imageUrl);
+        if (!success) {
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Não foi possível atualizar a foto de perfil." });
+        }
+        return { success: true };
       }),
     sessions: tenantProcedure.query(async ({ ctx }) => {
       // Each user has their own WhatsApp instance (Evolution API)
@@ -565,6 +585,54 @@ export const appRouter = router({
         const result = await whatsappManager.sendTextWithQuote(input.sessionId, input.number, input.message, input.quotedMessageId, input.quotedText, agentId);
         return { success: true, messageId: result?.key?.id };
       }),
+    sendLink: sessionTenantWriteProcedure
+      .input(z.object({
+        sessionId: z.string(),
+        number: z.string().min(1),
+        linkUrl: z.string().url(),
+        message: z.string().optional(),
+        image: z.string().url().optional(),
+        title: z.string().optional(),
+        linkDescription: z.string().optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const result = await whatsappManager.sendLink(input.sessionId, input.number, input.linkUrl, {
+          message: input.message,
+          image: input.image,
+          title: input.title,
+          linkDescription: input.linkDescription,
+        });
+        return { success: true, messageId: result?.key?.id };
+      }),
+    // Product catalog (WhatsApp Business)
+    getCatalogProducts: sessionTenantProcedure
+      .input(z.object({ sessionId: z.string(), nextCursor: z.string().optional() }))
+      .query(async ({ input }) => {
+        return zapiProvider.getCatalogProducts(input.sessionId, input.nextCursor);
+      }),
+    sendProduct: sessionTenantWriteProcedure
+      .input(z.object({ sessionId: z.string(), number: z.string().min(1), catalogPhone: z.string().min(1), productId: z.string().min(1) }))
+      .mutation(async ({ input }) => {
+        const result = await zapiProvider.sendProduct(input.sessionId, input.number, input.catalogPhone, input.productId);
+        return { success: true, messageId: result?.key?.id };
+      }),
+    sendCatalog: sessionTenantWriteProcedure
+      .input(z.object({
+        sessionId: z.string(),
+        number: z.string().min(1),
+        catalogPhone: z.string().min(1),
+        message: z.string().optional(),
+        title: z.string().optional(),
+        catalogDescription: z.string().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const result = await zapiProvider.sendCatalog(input.sessionId, input.number, input.catalogPhone, {
+          message: input.message,
+          title: input.title,
+          catalogDescription: input.catalogDescription,
+        });
+        return { success: true, messageId: result?.key?.id };
+      }),
     deleteMessage: sessionTenantWriteProcedure
       .input(z.object({
         sessionId: z.string(),
@@ -653,6 +721,35 @@ export const appRouter = router({
         await whatsappManager.archiveChat(input.sessionId, input.remoteJid, input.archive);
         return { success: true };
       }),
+    pinChat: sessionTenantWriteProcedure
+      .input(z.object({ sessionId: z.string(), remoteJid: z.string(), pin: z.boolean() }))
+      .mutation(async ({ input, ctx }) => {
+        await whatsappManager.pinChat(input.sessionId, input.remoteJid, input.pin);
+        return { success: true };
+      }),
+    muteChat: sessionTenantWriteProcedure
+      .input(z.object({ sessionId: z.string(), remoteJid: z.string(), mute: z.boolean() }))
+      .mutation(async ({ input, ctx }) => {
+        await whatsappManager.muteChat(input.sessionId, input.remoteJid, input.mute);
+        return { success: true };
+      }),
+    deleteChat: sessionTenantWriteProcedure
+      .input(z.object({ sessionId: z.string(), remoteJid: z.string() }))
+      .mutation(async ({ input, ctx }) => {
+        await whatsappManager.deleteChat(input.sessionId, input.remoteJid);
+        return { success: true };
+      }),
+    pinMessage: sessionTenantWriteProcedure
+      .input(z.object({ sessionId: z.string(), remoteJid: z.string(), messageId: z.string(), pin: z.boolean() }))
+      .mutation(async ({ input, ctx }) => {
+        await whatsappManager.pinMessage(input.sessionId, input.remoteJid, input.messageId, input.pin);
+        return { success: true };
+      }),
+    forwardMessage: sessionTenantWriteProcedure
+      .input(z.object({ sessionId: z.string(), fromJid: z.string(), toJid: z.string(), messageId: z.string() }))
+      .mutation(async ({ input, ctx }) => {
+        return whatsappManager.forwardMessage(input.sessionId, input.fromJid, input.toJid, input.messageId);
+      }),
     blockContact: sessionTenantWriteProcedure
       .input(z.object({ sessionId: z.string(), number: z.string().min(1), block: z.boolean() }))
       .mutation(async ({ input, ctx }) => {
@@ -679,6 +776,40 @@ export const appRouter = router({
       .input(z.object({ sessionId: z.string(), jid: z.string() }))
       .query(async ({ input, ctx }) => {
         return whatsappManager.fetchContactBusinessProfile(input.sessionId, input.jid);
+      }),
+    // ─── Profile Management ───
+    updateProfileName: sessionTenantWriteProcedure
+      .input(z.object({ sessionId: z.string(), name: z.string().min(1).max(25) }))
+      .mutation(async ({ input }) => {
+        const success = await whatsappManager.updateProfileName(input.sessionId, input.name);
+        return { success };
+      }),
+    updateProfileDescription: sessionTenantWriteProcedure
+      .input(z.object({ sessionId: z.string(), description: z.string().max(500) }))
+      .mutation(async ({ input }) => {
+        const success = await whatsappManager.updateProfileDescription(input.sessionId, input.description);
+        return { success };
+      }),
+    getDeviceInfo: sessionTenantProcedure
+      .input(z.object({ sessionId: z.string() }))
+      .query(async ({ input }) => {
+        return whatsappManager.getDeviceInfo(input.sessionId);
+      }),
+    getBlockedContacts: sessionTenantProcedure
+      .input(z.object({ sessionId: z.string() }))
+      .query(async ({ input }) => {
+        return whatsappManager.getBlockedContacts(input.sessionId);
+      }),
+    getMessageQueue: sessionTenantProcedure
+      .input(z.object({ sessionId: z.string() }))
+      .query(async ({ input }) => {
+        return whatsappManager.getMessageQueue(input.sessionId);
+      }),
+    clearMessageQueue: sessionTenantWriteProcedure
+      .input(z.object({ sessionId: z.string() }))
+      .mutation(async ({ input }) => {
+        const success = await whatsappManager.clearMessageQueue(input.sessionId);
+        return { success };
       }),
     // ─── CONVERSATION LOCKS (Part 8) ───
     acquireLock: tenantWriteProcedure
@@ -1664,10 +1795,22 @@ export const appRouter = router({
       .mutation(async ({ ctx, input }) => {
         const tenantId = getTenantId(ctx);
         const fromUserId = ctx.saasUser?.userId || ctx.user.id;
-        return transferConversationWithNote(
+        const result = await transferConversationWithNote(
           tenantId, input.sessionId, input.remoteJid,
           fromUserId, input.toUserId, input.toTeamId, input.note
         );
+        const io = getIo();
+        if (io) {
+          io.emit("conversationUpdated", {
+            type: "transfer",
+            sessionId: input.sessionId,
+            remoteJid: input.remoteJid,
+            assignedUserId: input.toUserId,
+            assignedTeamId: input.toTeamId ?? null,
+            timestamp: Date.now(),
+          });
+        }
+        return result;
       }),
     }),
 
@@ -2371,7 +2514,7 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
             phone: input.phone,
             role: input.role,
             inviterName: ctx.user.name || "Administrador",
-            origin: input.origin || "https://crm.acelerador.tur.br",
+            origin: input.origin || "https://crm.enturos.com",
           });
           return { success: true, userId: result.userId, emailSent: result.emailSent };
         } catch (e: any) {
