@@ -1275,7 +1275,7 @@ async function handleZApiWebhook(req: Request, res: Response) {
     if (zapiSession?.clientToken) {
       const receivedToken = req.headers["client-token"] as string || req.query.token as string;
       if (!validateZApiClientToken(receivedToken, zapiSession.clientToken)) {
-        console.warn(`[Webhook /zapi] Invalid client-token for session ${sessionId}`);
+        console.warn(`[Webhook /zapi] Invalid client-token for session ${sessionId} | received="${receivedToken?.substring(0, 20) || 'NONE'}" expected="${zapiSession.clientToken.substring(0, 20)}"`);
         return res.status(403).json({ error: "Invalid client-token" });
       }
     }
