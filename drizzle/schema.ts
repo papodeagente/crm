@@ -1270,6 +1270,8 @@ export const waConversations = mysqlTable("wa_conversations", {
   firstResponseAt: timestamp("firstResponseAt"),
   slaDeadlineAt: timestamp("slaDeadlineAt"),
   waChannelId: int("waChannelId"), // Part 2: links to wa_channels for channel-based identity
+  isPinned: boolean("isPinned").default(false).notNull(),
+  isArchived: boolean("isArchived").default(false).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 }, (t) => [
@@ -2021,7 +2023,10 @@ export const quickReplies = mysqlTable("quick_replies", {
   shortcut: varchar("shortcut", { length: 32 }).notNull(),
   title: varchar("title", { length: 128 }).notNull(),
   content: text("content").notNull(),
+  contentType: mysqlEnum("contentType", ["text", "image", "video", "audio", "document"]).default("text").notNull(),
+  mediaUrl: varchar("mediaUrl", { length: 1024 }),
   category: varchar("category", { length: 64 }),
+  usageCount: int("usageCount").default(0).notNull(),
   createdBy: int("createdBy").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
@@ -2571,3 +2576,52 @@ export const customMessages = mysqlTable("custom_messages", {
 
 export type CustomMessage = typeof customMessages.$inferSelect;
 export type InsertCustomMessage = typeof customMessages.$inferInsert;
+
+// ════════════════════════════════════════════════════════════
+// INBOX — Conversation Tags
+// ════════════════════════════════════════════════════════════
+export const conversationTags = mysqlTable("conversation_tags", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  name: varchar("name", { length: 100 }).notNull(),
+  color: varchar("color", { length: 20 }).default("#6366f1").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (t) => [
+  uniqueIndex("ct_tenant_name_idx").on(t.tenantId, t.name),
+]);
+export type ConversationTag = typeof conversationTags.$inferSelect;
+export type InsertConversationTag = typeof conversationTags.$inferInsert;
+
+// Junction: wa_conversations ↔ conversation_tags
+export const waConversationTagLinks = mysqlTable("wa_conversation_tag_links", {
+  id: int("id").autoincrement().primaryKey(),
+  waConversationId: int("waConversationId").notNull(),
+  tagId: int("tagId").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (t) => [
+  uniqueIndex("wctl_conv_tag_idx").on(t.waConversationId, t.tagId),
+  index("wctl_tag_idx").on(t.tagId),
+]);
+
+// ════════════════════════════════════════════════════════════
+// INBOX — Scheduled Messages
+// ════════════════════════════════════════════════════════════
+export const scheduledMessages = mysqlTable("scheduled_messages", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  sessionId: varchar("sessionId", { length: 128 }).notNull(),
+  remoteJid: varchar("remoteJid", { length: 128 }).notNull(),
+  content: text("content").notNull(),
+  contentType: mysqlEnum("contentType", ["text", "image", "video", "audio", "document"]).default("text").notNull(),
+  mediaUrl: varchar("mediaUrl", { length: 1024 }),
+  scheduledAt: timestamp("scheduledAt").notNull(),
+  status: mysqlEnum("status", ["pending", "sent", "failed", "cancelled"]).default("pending").notNull(),
+  sentAt: timestamp("sentAt"),
+  createdBy: int("createdBy"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (t) => [
+  index("sm_tenant_status_idx").on(t.tenantId, t.status),
+  index("sm_scheduled_idx").on(t.scheduledAt),
+]);
+export type ScheduledMessage = typeof scheduledMessages.$inferSelect;
+export type InsertScheduledMessage = typeof scheduledMessages.$inferInsert;

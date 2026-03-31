@@ -9,7 +9,8 @@ import {
   Check, CheckCheck, Clock, Phone, Loader2,
   MessageCircle, Briefcase, Plus, X, Volume2, VolumeX,
   UserPlus, Lock, Users, UserCheck, UserX, ArrowRightLeft,
-  CircleDot, ChevronDown, WifiOff, RefreshCw, CheckCircle2, LogOut
+  CircleDot, ChevronDown, WifiOff, RefreshCw, CheckCircle2, LogOut,
+  Pin, Archive
 } from "lucide-react";
 import { formatTime } from "../../../shared/dateUtils";
 import { toast } from "sonner";
@@ -326,7 +327,18 @@ interface ConvItem {
   contactEmail?: string | null;
   contactPhone?: string | null;
   queuedAt?: string | Date | null;
+  // Pin / Archive / Priority
+  isPinned?: boolean | number;
+  isArchived?: boolean | number;
 }
+
+// Priority colors for badges
+const PRIORITY_COLORS: Record<string, { bg: string; text: string; label: string }> = {
+  urgent: { bg: "bg-red-500/15", text: "text-red-500", label: "Urgente" },
+  high: { bg: "bg-orange-500/15", text: "text-orange-500", label: "Alta" },
+  medium: { bg: "bg-blue-500/15", text: "text-blue-500", label: "Média" },
+  low: { bg: "bg-muted", text: "text-muted-foreground", label: "Baixa" },
+};
 
 const AgentBadge = memo(({ name, avatarUrl }: { name?: string | null; avatarUrl?: string | null }) => {
   if (!name) return null;
@@ -397,11 +409,21 @@ const ConversationItem = memo(({
       <div className="flex-1 min-w-0">
         {/* Row 1: Name + badges + time */}
         <div className="flex items-center justify-between gap-2">
-          <span className={`text-[15px] truncate flex-1 min-w-0 leading-tight ${
-            unread > 0 ? "text-foreground font-medium" : "text-foreground font-normal"
-          }`}>
-            {contactName}
-          </span>
+          <div className="flex items-center gap-1 flex-1 min-w-0">
+            {(conv.isPinned === true || conv.isPinned === 1) && (
+              <Pin className="w-3 h-3 text-primary shrink-0 -rotate-45" />
+            )}
+            <span className={`text-[15px] truncate leading-tight ${
+              unread > 0 ? "text-foreground font-medium" : "text-foreground font-normal"
+            }`}>
+              {contactName}
+            </span>
+            {conv.assignmentPriority && conv.assignmentPriority !== "low" && (
+              <span className={`text-[9px] px-1 py-[1px] rounded font-semibold shrink-0 ${PRIORITY_COLORS[conv.assignmentPriority]?.bg || ""} ${PRIORITY_COLORS[conv.assignmentPriority]?.text || ""}`}>
+                {PRIORITY_COLORS[conv.assignmentPriority]?.label || conv.assignmentPriority}
+              </span>
+            )}
+          </div>
           <div className="flex items-center gap-1.5 shrink-0">
             {isWaitingResponse && (
               <span className="flex items-center gap-1 text-[10px] font-medium tabular-nums text-emerald-400">
@@ -1658,6 +1680,8 @@ export default function InboxPage() {
     // Secondary filter (within tab)
     if (filter === "unread") convs = convs.filter((c) => Number(c.unreadCount) > 0);
     // Search filter
+    // Hide archived conversations
+    convs = convs.filter((c) => !(c.isArchived === true || c.isArchived === 1));
     if (search) {
       const s = search.toLowerCase();
       convs = convs.filter((c) => {
@@ -1666,6 +1690,13 @@ export default function InboxPage() {
         return name.includes(s) || phone.includes(s);
       });
     }
+    // Sort: pinned first, then by lastTimestamp desc
+    convs.sort((a, b) => {
+      const aPinned = a.isPinned === true || a.isPinned === 1 ? 1 : 0;
+      const bPinned = b.isPinned === true || b.isPinned === 1 ? 1 : 0;
+      if (aPinned !== bPinned) return bPinned - aPinned;
+      return 0; // preserve existing lastTimestamp sort from store
+    });
     return convs;
   }, [dedupedConvs, search, filter, activeTab, getDisplayName, myUserId, convStore.version]);
 

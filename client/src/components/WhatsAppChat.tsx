@@ -7,7 +7,8 @@ import {
   Mic, MicOff, Paperclip, Pause, Phone, Play, Search, Send, Smile,
   Video, X, Camera, FileText, ArrowDown, Volume2, Loader2, ChevronDown,
   UserPlus, Briefcase, Users, Reply, Trash2, Pencil, Forward, MapPin,
-  Contact, BarChart3, Copy, Ban, StickyNote, ArrowRightLeft, History, Sparkles, Brain, MessageCircle, MoreVertical
+  Contact, BarChart3, Copy, Ban, StickyNote, ArrowRightLeft, History, Sparkles, Brain, MessageCircle, MoreVertical,
+  Pin, Archive, Tag, CalendarClock, AlertTriangle
 } from "lucide-react";
 import ImportConversationDialog from "@/components/ImportConversationDialog";
 import Picker from "@emoji-mart/react";
@@ -1302,6 +1303,12 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [showSummary, setShowSummary] = useState(false);
   const [showAgentNames, setShowAgentNames] = useState(true); // Show agent names before messages by default
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
+  const [scheduleDate, setScheduleDate] = useState("");
+  const [scheduleTime, setScheduleTime] = useState("");
+  const [showTagsPanel, setShowTagsPanel] = useState(false);
+  const [newTagName, setNewTagName] = useState("");
+  const [newTagColor, setNewTagColor] = useState("#6366f1");
 
   // Build agentMap from agents prop for displaying agent names on messages
   const agentMap = useMemo(() => {
@@ -1367,8 +1374,9 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
   const quickRepliesQ = trpc.whatsapp.quickReplies.list.useQuery({},
     { staleTime: 5 * 60 * 1000 }
   );
+  const incrementQrUsage = trpc.whatsapp.quickReplies.incrementUsage.useMutation();
   const filteredQuickReplies = useMemo(() => {
-    const replies = (quickRepliesQ.data || []) as Array<{ id: number; shortcut: string; title: string; content: string; category?: string | null }>;
+    const replies = (quickRepliesQ.data || []) as Array<{ id: number; shortcut: string; title: string; content: string; category?: string | null; contentType?: string; mediaUrl?: string; usageCount?: number }>;
     if (!quickReplyFilter) return replies.slice(0, 10);
     const f = quickReplyFilter.toLowerCase();
     return replies.filter(r => r.shortcut.toLowerCase().includes(f) || r.title.toLowerCase().includes(f)).slice(0, 10);
@@ -1693,6 +1701,49 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
     },
     onSuccess: () => { messagesQ.refetch(); toast.success("Enquete enviada"); },
     onError: () => toast.error("Erro ao enviar enquete"),
+  });
+
+  // ─── Pin / Archive / Priority / Tags / Schedule ───
+  const pinMut = trpc.whatsapp.conversationOps.pin.useMutation({
+    onSuccess: () => toast.success("Conversa atualizada"),
+    onError: (e) => toast.error(e.message),
+  });
+  const archiveMut = trpc.whatsapp.conversationOps.archive.useMutation({
+    onSuccess: () => toast.success("Conversa arquivada"),
+    onError: (e) => toast.error(e.message),
+  });
+  const setPriorityMut = trpc.whatsapp.conversationOps.setPriority.useMutation({
+    onSuccess: () => toast.success("Prioridade atualizada"),
+    onError: (e) => toast.error(e.message),
+  });
+
+  // Tags
+  const tagsQ = trpc.whatsapp.conversationTags.list.useQuery(undefined, { staleTime: 5 * 60 * 1000 });
+  const convTagsQ = trpc.whatsapp.conversationTags.getForConversation.useQuery(
+    { waConversationId: waConversationId || 0 },
+    { enabled: !!waConversationId }
+  );
+  const createTagMut = trpc.whatsapp.conversationTags.create.useMutation({
+    onSuccess: () => { tagsQ.refetch(); setNewTagName(""); },
+  });
+  const addTagMut = trpc.whatsapp.conversationTags.addToConversation.useMutation({
+    onSuccess: () => convTagsQ.refetch(),
+  });
+  const removeTagMut = trpc.whatsapp.conversationTags.removeFromConversation.useMutation({
+    onSuccess: () => convTagsQ.refetch(),
+  });
+
+  // Scheduled messages
+  const scheduledQ = trpc.whatsapp.scheduledMessages.list.useQuery(
+    { status: "pending" },
+    { enabled: showScheduleModal }
+  );
+  const createScheduledMut = trpc.whatsapp.scheduledMessages.create.useMutation({
+    onSuccess: () => { scheduledQ.refetch(); toast.success("Mensagem agendada"); setShowScheduleModal(false); },
+    onError: (e) => toast.error(e.message),
+  });
+  const cancelScheduledMut = trpc.whatsapp.scheduledMessages.cancel.useMutation({
+    onSuccess: () => { scheduledQ.refetch(); toast.success("Agendamento cancelado"); },
   });
 
   // ─── Notification sound ───
@@ -2422,6 +2473,63 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
                   <Brain className="w-4 h-4 text-muted-foreground" />
                   {summaryLoading ? "Gerando Resumo..." : "Resumo IA"}
                 </button>
+                {/* Divider */}
+                <div className="border-t border-border my-1" />
+                {/* Pin */}
+                <button
+                  onClick={() => { pinMut.mutate({ sessionId, remoteJid, pin: true }); setShowMoreMenu(false); }}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-muted/50 transition-colors text-left text-[13px] text-foreground"
+                >
+                  <Pin className="w-4 h-4 text-muted-foreground -rotate-45" />
+                  Fixar Conversa
+                </button>
+                {/* Archive */}
+                <button
+                  onClick={() => { archiveMut.mutate({ sessionId, remoteJid, archive: true }); setShowMoreMenu(false); }}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-muted/50 transition-colors text-left text-[13px] text-foreground"
+                >
+                  <Archive className="w-4 h-4 text-muted-foreground" />
+                  Arquivar Conversa
+                </button>
+                {/* Tags */}
+                <button
+                  onClick={() => { setShowTagsPanel(!showTagsPanel); setShowMoreMenu(false); }}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-muted/50 transition-colors text-left text-[13px] text-foreground"
+                >
+                  <Tag className="w-4 h-4 text-muted-foreground" />
+                  Tags
+                </button>
+                {/* Priority */}
+                <div className="px-3 py-2 border-t border-border">
+                  <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">Prioridade</p>
+                  <div className="flex flex-wrap gap-1">
+                    {(["low", "medium", "high", "urgent"] as const).map(p => {
+                      const labels: Record<string, string> = { low: "Baixa", medium: "Média", high: "Alta", urgent: "Urgente" };
+                      const colors: Record<string, string> = { low: "bg-muted text-muted-foreground", medium: "bg-blue-500/10 text-blue-600", high: "bg-orange-500/10 text-orange-600", urgent: "bg-red-500/10 text-red-600" };
+                      return (
+                        <button
+                          key={p}
+                          onClick={() => { setPriorityMut.mutate({ sessionId, remoteJid, priority: p }); setShowMoreMenu(false); }}
+                          className={`px-2 py-0.5 rounded-full text-[11px] font-medium transition-colors ${
+                            assignment?.assignmentPriority === p
+                              ? colors[p] + " ring-1 ring-current/20"
+                              : "bg-muted/50 text-muted-foreground hover:bg-muted"
+                          }`}
+                        >
+                          {labels[p]}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+                {/* Schedule message */}
+                <button
+                  onClick={() => { setShowScheduleModal(true); setShowMoreMenu(false); }}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-muted/50 transition-colors text-left text-[13px] text-foreground border-t border-border"
+                >
+                  <CalendarClock className="w-4 h-4 text-muted-foreground" />
+                  Agendar Mensagem
+                </button>
               </div>
             )}
           </div>
@@ -2989,12 +3097,16 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
                         setMessageText(qr.content);
                         setShowQuickReplies(false);
                         setQuickReplyFilter("");
+                        incrementQrUsage.mutate({ id: qr.id });
                         textareaRef.current?.focus();
                       }}
                     >
                       <div className="flex items-center gap-2">
-                        <span className="text-[11px] font-mono text-wa-tint bg-wa-tint/10 px-1.5 py-0.5 rounded">/{qr.shortcut}</span>
+                        <span className="text-[11px] font-mono text-primary bg-primary/10 px-1.5 py-0.5 rounded">/{qr.shortcut}</span>
                         <span className="text-[13px] font-medium text-foreground truncate">{qr.title}</span>
+                        {qr.contentType && qr.contentType !== "text" && (
+                          <span className="text-[9px] bg-muted text-muted-foreground px-1 py-0.5 rounded">{qr.contentType}</span>
+                        )}
                       </div>
                       <p className="text-[12px] text-muted-foreground mt-0.5 truncate">{qr.content.substring(0, 80)}</p>
                     </button>
@@ -3081,6 +3193,164 @@ export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDe
         contactName={contact?.name || remoteJid.split("@")[0]}
         contactId={contact?.id}
       />
+
+      {/* ─── Tags Panel (slide-in from right) ─── */}
+      {showTagsPanel && waConversationId && (
+        <div className="absolute top-0 right-0 w-72 h-full bg-card border-l border-border z-40 flex flex-col shadow-xl animate-in slide-in-from-right duration-200">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+            <h3 className="text-sm font-semibold">Tags da Conversa</h3>
+            <button onClick={() => setShowTagsPanel(false)} className="p-1 hover:bg-muted rounded"><X className="w-4 h-4" /></button>
+          </div>
+          {/* Current tags */}
+          <div className="px-4 py-3 border-b border-border">
+            <p className="text-[11px] text-muted-foreground mb-2">Tags atuais:</p>
+            <div className="flex flex-wrap gap-1">
+              {(convTagsQ.data as any[] || []).map((tag: any) => (
+                <span key={tag.id} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium text-white" style={{ backgroundColor: tag.color }}>
+                  {tag.name}
+                  <button onClick={() => removeTagMut.mutate({ waConversationId, tagId: tag.id })} className="hover:opacity-70">
+                    <X className="w-3 h-3" />
+                  </button>
+                </span>
+              ))}
+              {(!convTagsQ.data || (convTagsQ.data as any[]).length === 0) && (
+                <span className="text-[11px] text-muted-foreground">Nenhuma tag</span>
+              )}
+            </div>
+          </div>
+          {/* Available tags */}
+          <div className="flex-1 overflow-y-auto px-4 py-3">
+            <p className="text-[11px] text-muted-foreground mb-2">Adicionar tag:</p>
+            <div className="space-y-1">
+              {(tagsQ.data as any[] || []).map((tag: any) => {
+                const isLinked = (convTagsQ.data as any[] || []).some((ct: any) => ct.id === tag.id);
+                return (
+                  <button
+                    key={tag.id}
+                    disabled={isLinked}
+                    onClick={() => addTagMut.mutate({ waConversationId, tagId: tag.id })}
+                    className={`w-full flex items-center gap-2 px-2 py-1.5 rounded text-left text-[12px] transition-colors ${
+                      isLinked ? "opacity-40 cursor-not-allowed" : "hover:bg-muted"
+                    }`}
+                  >
+                    <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: tag.color }} />
+                    {tag.name}
+                    {isLinked && <Check className="w-3 h-3 ml-auto text-muted-foreground" />}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          {/* Create new tag */}
+          <div className="px-4 py-3 border-t border-border">
+            <div className="flex items-center gap-2">
+              <input
+                type="color" value={newTagColor} onChange={(e) => setNewTagColor(e.target.value)}
+                className="w-6 h-6 rounded cursor-pointer border-0 p-0"
+              />
+              <input
+                value={newTagName} onChange={(e) => setNewTagName(e.target.value)}
+                placeholder="Nova tag..."
+                className="flex-1 text-[12px] bg-muted/50 rounded px-2 py-1 outline-none focus:ring-1 ring-primary"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && newTagName.trim()) {
+                    createTagMut.mutate({ name: newTagName.trim(), color: newTagColor });
+                  }
+                }}
+              />
+              <button
+                disabled={!newTagName.trim()}
+                onClick={() => newTagName.trim() && createTagMut.mutate({ name: newTagName.trim(), color: newTagColor })}
+                className="text-[11px] text-primary font-medium hover:underline disabled:opacity-40"
+              >
+                Criar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Schedule Message Modal ─── */}
+      {showScheduleModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowScheduleModal(false)}>
+          <div className="bg-card border border-border rounded-xl shadow-2xl w-[420px] max-w-[95vw] overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+              <h3 className="text-[15px] font-semibold flex items-center gap-2">
+                <CalendarClock className="w-5 h-5 text-primary" />
+                Agendar Mensagem
+              </h3>
+              <button onClick={() => setShowScheduleModal(false)} className="p-1 hover:bg-muted rounded"><X className="w-4 h-4" /></button>
+            </div>
+            <div className="px-5 py-4 space-y-4">
+              <div>
+                <label className="text-[12px] font-medium text-muted-foreground">Mensagem</label>
+                <textarea
+                  value={messageText}
+                  onChange={(e) => setMessageText(e.target.value)}
+                  placeholder="Escreva a mensagem..."
+                  rows={3}
+                  className="w-full mt-1 rounded-lg bg-muted/50 border border-border px-3 py-2 text-[13px] outline-none focus:ring-1 ring-primary resize-none"
+                />
+              </div>
+              <div className="flex gap-3">
+                <div className="flex-1">
+                  <label className="text-[12px] font-medium text-muted-foreground">Data</label>
+                  <input type="date" value={scheduleDate} onChange={(e) => setScheduleDate(e.target.value)}
+                    className="w-full mt-1 rounded-lg bg-muted/50 border border-border px-3 py-2 text-[13px] outline-none focus:ring-1 ring-primary" />
+                </div>
+                <div className="flex-1">
+                  <label className="text-[12px] font-medium text-muted-foreground">Hora</label>
+                  <input type="time" value={scheduleTime} onChange={(e) => setScheduleTime(e.target.value)}
+                    className="w-full mt-1 rounded-lg bg-muted/50 border border-border px-3 py-2 text-[13px] outline-none focus:ring-1 ring-primary" />
+                </div>
+              </div>
+              {/* Pending scheduled messages for this conversation */}
+              {scheduledQ.data && (scheduledQ.data as any[]).filter((s: any) => s.remoteJid === remoteJid).length > 0 && (
+                <div>
+                  <p className="text-[11px] font-semibold text-muted-foreground mb-1">Agendadas para este contato:</p>
+                  <div className="space-y-1 max-h-32 overflow-y-auto">
+                    {(scheduledQ.data as any[]).filter((s: any) => s.remoteJid === remoteJid).map((s: any) => (
+                      <div key={s.id} className="flex items-center justify-between bg-muted/50 rounded px-2 py-1.5 text-[11px]">
+                        <div className="min-w-0 flex-1">
+                          <span className="text-muted-foreground">{new Date(s.scheduledAt).toLocaleString("pt-BR")}</span>
+                          <p className="truncate text-foreground">{s.content}</p>
+                        </div>
+                        <button
+                          onClick={() => cancelScheduledMut.mutate({ id: s.id })}
+                          className="text-red-500 hover:text-red-600 shrink-0 ml-2"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="flex justify-end gap-2 px-5 py-3 border-t border-border">
+              <button onClick={() => setShowScheduleModal(false)} className="px-4 py-2 text-[13px] text-muted-foreground hover:bg-muted rounded-lg">
+                Cancelar
+              </button>
+              <button
+                disabled={!messageText.trim() || !scheduleDate || !scheduleTime || createScheduledMut.isPending}
+                onClick={() => {
+                  const scheduledAt = new Date(`${scheduleDate}T${scheduleTime}`);
+                  if (scheduledAt <= new Date()) { toast.error("Data deve ser no futuro"); return; }
+                  createScheduledMut.mutate({
+                    sessionId,
+                    remoteJid,
+                    content: messageText.trim(),
+                    scheduledAt: scheduledAt.toISOString(),
+                  });
+                }}
+                className="px-4 py-2 text-[13px] bg-primary text-white rounded-lg font-medium hover:opacity-90 disabled:opacity-40"
+              >
+                {createScheduledMut.isPending ? "Agendando..." : "Agendar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ─── Image Lightbox ─── */}
       {lightboxUrl && (

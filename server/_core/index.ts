@@ -233,6 +233,13 @@ async function startServer() {
       console.warn("[AudioTranscription] Failed to initialize worker:", e.message);
     });
 
+    // Initialize scheduled message worker (if Redis available)
+    import("../scheduledMessageWorker").then(m => {
+      m.initScheduledMessageWorker();
+    }).catch(e => {
+      console.warn("[ScheduledMsg] Failed to initialize worker:", e.message);
+    });
+
     // Start date-based automation scheduler
     import("../dateAutomationScheduler").then(m => m.startDateAutomationScheduler());
 
