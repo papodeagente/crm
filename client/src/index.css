@@ -138,6 +138,18 @@
   --wa-msg-shadow: rgba(0,0,0,0.06);
   --wa-chat-compose-bg: #f0f2f5;
   --wa-doodle-url: url('https://d2xsxph8kpxj0f.cloudfront.net/310519663249817763/EKvcVicuVoUxTnzjSKzgdk/wa-bg-light_474b376c.png');
+
+  /* Inbox Design System — Light */
+  --inbox-glass-bg: #ffffff;
+  --inbox-glass-border: #e9edef;
+  --inbox-conv-active-bg: rgba(96, 15, 237, 0.06);
+  --inbox-conv-active-border: rgba(96, 15, 237, 0.15);
+  --inbox-conv-active-shadow: 0 0 20px rgba(96, 15, 237, 0.04);
+  --inbox-glow-1: rgba(96, 15, 237, 0.03);
+  --inbox-glow-2: rgba(0, 168, 132, 0.02);
+  --inbox-badge-shadow: 0 0 8px rgba(96, 15, 237, 0.2);
+  --inbox-focus-ring: rgba(96, 15, 237, 0.15);
+  --inbox-focus-border: rgba(96, 15, 237, 0.3);
 }
 
 /* ─── ENTUR OS — Dark Theme (Brand Colors) ─── */
@@ -207,6 +219,18 @@
   --wa-msg-shadow: rgba(0,0,0,0.13);
   --wa-chat-compose-bg: #202c33;
   --wa-doodle-url: url('https://d2xsxph8kpxj0f.cloudfront.net/310519663249817763/EKvcVicuVoUxTnzjSKzgdk/wa-bg-light_474b376c.png');
+
+  /* Inbox Design System — Dark */
+  --inbox-glass-bg: #1b2228;
+  --inbox-glass-border: #2a3942;
+  --inbox-conv-active-bg: rgba(96, 15, 237, 0.08);
+  --inbox-conv-active-border: rgba(96, 15, 237, 0.2);
+  --inbox-conv-active-shadow: 0 0 24px rgba(96, 15, 237, 0.06);
+  --inbox-glow-1: rgba(96, 15, 237, 0.04);
+  --inbox-glow-2: rgba(0, 168, 132, 0.03);
+  --inbox-badge-shadow: 0 0 10px rgba(96, 15, 237, 0.3);
+  --inbox-focus-ring: rgba(96, 15, 237, 0.12);
+  --inbox-focus-border: rgba(96, 15, 237, 0.4);
 }
 
 @layer base {
@@ -271,6 +295,160 @@
       padding-right: 2.5rem;
       max-width: 1440px;
     }
+  }
+
+  /* ═══ INBOX DESIGN SYSTEM (cloned from MKT, adapted for CRM colors) ═══ */
+
+  /* Conversation list item — card style with rounded corners */
+  .inbox-conv-item {
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    border-radius: 12px;
+    margin: 2px 6px;
+    border: 1px solid transparent;
+    position: relative;
+  }
+  .inbox-conv-item:hover {
+    background: var(--wa-hover);
+    border-color: var(--wa-divider);
+  }
+  .inbox-conv-item.active {
+    background: var(--inbox-conv-active-bg);
+    border-color: var(--inbox-conv-active-border);
+    box-shadow: var(--inbox-conv-active-shadow);
+  }
+
+  /* Glass header/panels */
+  .inbox-header {
+    background: var(--inbox-glass-bg);
+    border-bottom: 1px solid var(--inbox-glass-border);
+    backdrop-filter: blur(16px);
+  }
+
+  /* Search with focus glow */
+  .inbox-search {
+    background: var(--wa-search-bg);
+    border: 1px solid var(--wa-divider);
+    border-radius: 12px;
+    transition: all 0.2s;
+  }
+  .inbox-search:focus-within {
+    border-color: var(--inbox-focus-border);
+    box-shadow: 0 0 0 3px var(--inbox-focus-ring);
+  }
+
+  /* Tab pill — active state */
+  .inbox-tab {
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    border-radius: 8px;
+    border: 1px solid transparent;
+  }
+  .inbox-tab:hover {
+    background: var(--wa-hover);
+  }
+  .inbox-tab.active {
+    background: rgba(96, 15, 237, 0.12);
+    color: #600FED;
+    border-color: rgba(96, 15, 237, 0.08);
+  }
+  .dark .inbox-tab.active {
+    background: rgba(96, 15, 237, 0.15);
+    color: #a78bfa;
+  }
+
+  /* Unread badge with gradient + glow */
+  .inbox-unread-badge {
+    background: linear-gradient(135deg, #600FED, #7c3aed);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    border-radius: 9999px;
+    min-width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 5px;
+    line-height: 1;
+    box-shadow: var(--inbox-badge-shadow);
+  }
+
+  /* Chat background with subtle glow */
+  .inbox-chat-bg {
+    background-color: var(--wa-chat-bg);
+    background-image:
+      radial-gradient(ellipse 600px 400px at 20% 50%, var(--inbox-glow-1), transparent),
+      radial-gradient(ellipse 500px 300px at 80% 30%, var(--inbox-glow-2), transparent);
+  }
+
+  /* Avatar ring for active conversations */
+  .inbox-avatar-ring {
+    box-shadow: 0 0 0 2px var(--wa-panel), 0 0 0 3px transparent;
+    transition: box-shadow 0.2s;
+  }
+  .inbox-conv-item.active .inbox-avatar-ring {
+    box-shadow: 0 0 0 2px var(--wa-panel), 0 0 0 3.5px rgba(96, 15, 237, 0.3);
+  }
+  .dark .inbox-conv-item.active .inbox-avatar-ring {
+    box-shadow: 0 0 0 2px var(--wa-panel), 0 0 0 3.5px rgba(96, 15, 237, 0.4);
+  }
+
+  /* Action buttons in conversation items */
+  .inbox-action-btn {
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    transition: all 0.15s;
+    color: var(--wa-text-secondary);
+    flex-shrink: 0;
+  }
+  .inbox-action-btn:hover {
+    background: rgba(96, 15, 237, 0.1);
+    color: #600FED;
+  }
+  .dark .inbox-action-btn:hover {
+    background: rgba(96, 15, 237, 0.15);
+    color: #a78bfa;
+  }
+
+  /* Claim / action button — primary filled */
+  .inbox-claim-btn {
+    height: 30px;
+    padding: 0 12px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    border-radius: 8px;
+    background: linear-gradient(135deg, #600FED, #7c3aed);
+    color: white;
+    font-size: 11px;
+    font-weight: 600;
+    box-shadow: 0 2px 8px rgba(96, 15, 237, 0.3);
+    transition: all 0.15s;
+  }
+  .inbox-claim-btn:hover {
+    transform: scale(1.02);
+    box-shadow: 0 4px 12px rgba(96, 15, 237, 0.4);
+  }
+  .inbox-claim-btn:active {
+    transform: scale(0.98);
+  }
+
+  /* Empty state icon container */
+  .inbox-empty-icon {
+    width: 64px;
+    height: 64px;
+    border-radius: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(96, 15, 237, 0.08);
+    margin-bottom: 16px;
+  }
+  .dark .inbox-empty-icon {
+    background: rgba(96, 15, 237, 0.12);
   }
 
   /* ENTUR OS surface card — theme-aware */
