@@ -446,7 +446,7 @@ const ConversationItem = memo(({
               <InstantTooltip label="Transferir">
                 <button
                   onClick={(e) => { e.stopPropagation(); onTransfer(); }}
-                  className="inbox-action-btn opacity-0 group-hover/conv:opacity-100"
+                  className="w-7 h-7 flex items-center justify-center rounded-md shrink-0 text-muted-foreground hover:bg-primary/10 hover:text-primary transition-all opacity-0 group-hover/conv:opacity-100"
                 >
                   <ArrowRightLeft className="w-3.5 h-3.5" />
                 </button>
@@ -456,7 +456,7 @@ const ConversationItem = memo(({
               <InstantTooltip label={conv.assignedAgentName ? `Atribuído: ${conv.assignedAgentName}` : "Atribuir"}>
                 <button
                   onClick={(e) => { e.stopPropagation(); onAssignClick(); }}
-                  className="inbox-action-btn opacity-0 group-hover/conv:opacity-100"
+                  className="w-7 h-7 flex items-center justify-center rounded-md shrink-0 text-muted-foreground hover:bg-primary/10 hover:text-primary transition-all opacity-0 group-hover/conv:opacity-100"
                   style={{ color: conv.assignedAgentName ? 'var(--primary)' : undefined }}
                 >
                   <Users className="w-3.5 h-3.5" />
@@ -467,7 +467,7 @@ const ConversationItem = memo(({
               <InstantTooltip label="Finalizar">
                 <button
                   onClick={(e) => { e.stopPropagation(); onFinish(); }}
-                  className="inbox-action-btn opacity-0 group-hover/conv:opacity-100 !text-emerald-400"
+                  className="w-7 h-7 flex items-center justify-center rounded-md shrink-0 text-emerald-400 hover:bg-emerald-500/15 transition-all opacity-0 group-hover/conv:opacity-100"
                 >
                   <CheckCircle2 className="w-3.5 h-3.5" />
                 </button>
@@ -1820,7 +1820,7 @@ export default function InboxPage() {
         />
 
         {/* ── Header (glassmorphism) ── */}
-        <div className="h-14 flex items-center justify-between px-4 shrink-0 inbox-header">
+        <div className="h-14 flex items-center justify-between px-4 shrink-0 border-b border-border">
           <h2 className="text-[15px] font-semibold text-foreground tracking-tight">Conversas</h2>
           <div className="flex items-center gap-1.5">
             <button
