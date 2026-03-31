@@ -1221,12 +1221,15 @@ export default function InboxPage() {
         assignedUserId: myUserId,
         assignmentStatus: "open",
       });
-      // Also refetch conversations to get full data if not in store yet
-      conversationsQ.refetch();
+      // Delay refetch to avoid overwriting the optimistic update with stale DB data
+      setTimeout(() => conversationsQ.refetch(), 2500);
       toast.success("Conversa atribuída a você");
     },
     onError: (e) => toast.error(e.message || "Erro ao puxar conversa"),
   });
+
+  // Auto-open agent assignment dropdown in WhatsAppChat
+  const [autoOpenAssign, setAutoOpenAssign] = useState(false);
 
   // Assign from queue to specific agent (admin only)
   const [assigningQueueJid, setAssigningQueueJid] = useState<string | null>(null);
@@ -1962,7 +1965,7 @@ export default function InboxPage() {
                     showFinish={activeTab === "mine"}
                     onFinish={() => handleFinishAttendance(conv.remoteJid)}
                     onTransfer={() => handleSelectConv(conv.remoteJid)}
-                    onAssignClick={() => handleSelectConv(conv.remoteJid)}
+                    onAssignClick={() => { handleSelectConv(conv.remoteJid); setAutoOpenAssign(true); }}
                   />
                   );
                 })
@@ -2151,6 +2154,8 @@ export default function InboxPage() {
               onStatusChange={handleStatusChange}
               myAvatarUrl={activeSession.user?.imgUrl}
               waConversationId={selectedWaConversationId}
+              autoOpenAssign={autoOpenAssign}
+              onAutoOpenAssignConsumed={() => setAutoOpenAssign(false)}
               onOptimisticSend={(msg) => {
                 if (!activeSession?.sessionId || !selectedJid) return;
                 convStore.handleOptimisticSend({

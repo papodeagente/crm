@@ -90,6 +90,10 @@ export interface WhatsAppChatProps {
   companyName?: string;
   /** Called immediately when user sends a message — updates conversation store optimistically */
   onOptimisticSend?: (msg: { content: string; messageType?: string }) => void;
+  /** When true, auto-open the agent assignment dropdown */
+  autoOpenAssign?: boolean;
+  /** Called after auto-open is consumed */
+  onAutoOpenAssignConsumed?: () => void;
 }
 
 /* ─── WhatsApp Text Formatting ─── */
@@ -1257,9 +1261,17 @@ function EditMessageModal({ currentText, onSave, onClose }: { currentText: strin
    MAIN CHAT COMPONENT
    ═══════════════════════════════════════════════════════ */
 
-export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDeal, onCreateContact, hasCrmContact, assignment, agents, onAssign, onStatusChange, myAvatarUrl, waConversationId, dealId, dealTitle, dealValueCents, dealStageName, companyName, onOptimisticSend }: WhatsAppChatProps) {
+export default function WhatsAppChat({ contact, sessionId, remoteJid, onCreateDeal, onCreateContact, hasCrmContact, assignment, agents, onAssign, onStatusChange, myAvatarUrl, waConversationId, dealId, dealTitle, dealValueCents, dealStageName, companyName, onOptimisticSend, autoOpenAssign, onAutoOpenAssignConsumed }: WhatsAppChatProps) {
   const tenantId = useTenantId();
   const [showAgentDropdown, setShowAgentDropdown] = useState(false);
+
+  // Auto-open agent dropdown when triggered from ConversationItem
+  useEffect(() => {
+    if (autoOpenAssign) {
+      setShowAgentDropdown(true);
+      onAutoOpenAssignConsumed?.();
+    }
+  }, [autoOpenAssign]);
   const { lastMessage, lastStatusUpdate, lastMediaUpdate, lastConversationUpdate, lastTranscriptionUpdate, lastReaction, isConnected: socketConnected } = useSocket();
   const [messageText, setMessageText] = useState("");
   const [showAttach, setShowAttach] = useState(false);

@@ -1795,10 +1795,22 @@ export const appRouter = router({
       .mutation(async ({ ctx, input }) => {
         const tenantId = getTenantId(ctx);
         const fromUserId = ctx.saasUser?.userId || ctx.user.id;
-        return transferConversationWithNote(
+        const result = await transferConversationWithNote(
           tenantId, input.sessionId, input.remoteJid,
           fromUserId, input.toUserId, input.toTeamId, input.note
         );
+        const io = getIo();
+        if (io) {
+          io.emit("conversationUpdated", {
+            type: "transfer",
+            sessionId: input.sessionId,
+            remoteJid: input.remoteJid,
+            assignedUserId: input.toUserId,
+            assignedTeamId: input.toTeamId ?? null,
+            timestamp: Date.now(),
+          });
+        }
+        return result;
       }),
     }),
 

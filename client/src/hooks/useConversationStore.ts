@@ -198,6 +198,16 @@ class ConversationStore {
             }
           }
           
+          // Preserve assignment data if the server returned null/undefined
+          // (DB may lag behind optimistic updates or socket events)
+          if (existing.assignedUserId && !entry.assignedUserId) {
+            entry = {
+              ...entry,
+              assignedUserId: existing.assignedUserId,
+              assignmentStatus: existing.assignmentStatus,
+            };
+          }
+
           // If the existing entry is optimistic (user just sent a message),
           // preserve the optimistic state and local timestamp
           if (existing._optimistic) {
