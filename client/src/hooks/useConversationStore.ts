@@ -83,6 +83,8 @@ export interface ConvEntry {
   contactEmail?: string | null;
   contactPhone?: string | null;
   queuedAt?: string | Date | null;
+  isPinned?: boolean | number;
+  isArchived?: boolean | number;
   /** The messageId of the last outgoing message — used to verify status updates belong to this message */
   _lastOutgoingMessageId?: string;
   /** Tracks if the last update was from an optimistic send (local, not yet confirmed) */

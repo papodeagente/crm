@@ -118,6 +118,22 @@ import {
   getQuickReplies,
   createQuickReply,
   deleteQuickReply,
+  updateQuickReply,
+  incrementQuickReplyUsage,
+  // Conversation Tags
+  listConversationTags,
+  createConversationTag,
+  deleteConversationTag,
+  getTagsForConversation,
+  addTagToConversation,
+  removeTagFromConversation,
+  // Pin / Archive
+  pinConversation,
+  archiveConversation,
+  // Scheduled Messages
+  listScheduledMessages,
+  createScheduledMessage,
+  cancelScheduledMessage,
   getProfilePicturesFromDb,
   transferConversationWithNote,
   // AI Integrations
@@ -1925,11 +1941,36 @@ export const appRouter = router({
         content: z.string().min(1),
         teamId: z.number().optional(),
         category: z.string().optional(),
+        contentType: z.enum(["text", "image", "video", "audio", "document"]).optional(),
+        mediaUrl: z.string().max(1024).optional(),
       }))
       .mutation(async ({ ctx, input }) => {
         const tenantId = getTenantId(ctx);
         const userId = ctx.saasUser?.userId || ctx.user.id;
         return createQuickReply(tenantId, { ...input, createdBy: userId });
+      }),
+    update: tenantWriteProcedure
+      .input(z.object({
+        id: z.number(),
+        shortcut: z.string().min(1).max(32).optional(),
+        title: z.string().min(1).max(128).optional(),
+        content: z.string().min(1).optional(),
+        category: z.string().optional(),
+        contentType: z.enum(["text", "image", "video", "audio", "document"]).optional(),
+        mediaUrl: z.string().max(1024).optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const tenantId = getTenantId(ctx);
+        const { id, ...data } = input;
+        await updateQuickReply(tenantId, id, data);
+        return { success: true };
+      }),
+    incrementUsage: tenantProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        const tenantId = getTenantId(ctx);
+        await incrementQuickReplyUsage(tenantId, input.id);
+        return { success: true };
       }),
     delete: tenantWriteProcedure
       .input(z.object({ id: z.number() }))
@@ -1938,6 +1979,137 @@ export const appRouter = router({
         await deleteQuickReply(tenantId, input.id);
         return { success: true };
       }),
+    }),
+
+    // ─── Conversation Tags ───
+    conversationTags: router({
+      list: tenantProcedure.query(async ({ ctx }) => {
+        return listConversationTags(getTenantId(ctx));
+      }),
+      create: tenantWriteProcedure
+        .input(z.object({
+          name: z.string().min(1).max(100),
+          color: z.string().max(20).optional(),
+        }))
+        .mutation(async ({ ctx, input }) => {
+          return createConversationTag(getTenantId(ctx), input.name, input.color);
+        }),
+      delete: tenantWriteProcedure
+        .input(z.object({ id: z.number() }))
+        .mutation(async ({ ctx, input }) => {
+          await deleteConversationTag(getTenantId(ctx), input.id);
+          return { success: true };
+        }),
+      getForConversation: tenantProcedure
+        .input(z.object({ waConversationId: z.number() }))
+        .query(async ({ input }) => {
+          return getTagsForConversation(input.waConversationId);
+        }),
+      addToConversation: tenantWriteProcedure
+        .input(z.object({ waConversationId: z.number(), tagId: z.number() }))
+        .mutation(async ({ input }) => {
+          await addTagToConversation(input.waConversationId, input.tagId);
+          return { success: true };
+        }),
+      removeFromConversation: tenantWriteProcedure
+        .input(z.object({ waConversationId: z.number(), tagId: z.number() }))
+        .mutation(async ({ input }) => {
+          await removeTagFromConversation(input.waConversationId, input.tagId);
+          return { success: true };
+        }),
+    }),
+
+    // ─── Conversation Ops (Pin / Archive / Priority) ───
+    conversationOps: router({
+      pin: sessionTenantWriteProcedure
+        .input(z.object({
+          sessionId: z.string(),
+          remoteJid: z.string(),
+          pin: z.boolean(),
+        }))
+        .mutation(async ({ ctx, input }) => {
+          await pinConversation(getTenantId(ctx), input.sessionId, input.remoteJid, input.pin);
+          return { success: true };
+        }),
+      archive: sessionTenantWriteProcedure
+        .input(z.object({
+          sessionId: z.string(),
+          remoteJid: z.string(),
+          archive: z.boolean(),
+        }))
+        .mutation(async ({ ctx, input }) => {
+          await archiveConversation(getTenantId(ctx), input.sessionId, input.remoteJid, input.archive);
+          return { success: true };
+        }),
+      setPriority: sessionTenantWriteProcedure
+        .input(z.object({
+          sessionId: z.string(),
+          remoteJid: z.string(),
+          priority: z.enum(["low", "medium", "high", "urgent"]),
+        }))
+        .mutation(async ({ ctx, input }) => {
+          const tenantId = getTenantId(ctx);
+          const db = await getDb();
+          if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+          const { conversationAssignments } = await import("../drizzle/schema");
+          await db.update(conversationAssignments)
+            .set({ priority: input.priority })
+            .where(and(
+              eq(conversationAssignments.tenantId, tenantId),
+              eq(conversationAssignments.sessionId, input.sessionId),
+              eq(conversationAssignments.remoteJid, input.remoteJid),
+            ));
+          return { success: true };
+        }),
+    }),
+
+    // ─── Scheduled Messages ───
+    scheduledMessages: router({
+      list: sessionTenantProcedure
+        .input(z.object({ status: z.string().optional() }).optional())
+        .query(async ({ ctx, input }) => {
+          return listScheduledMessages(getTenantId(ctx), input?.status);
+        }),
+      create: sessionTenantWriteProcedure
+        .input(z.object({
+          sessionId: z.string(),
+          remoteJid: z.string(),
+          content: z.string().min(1),
+          contentType: z.enum(["text", "image", "video", "audio", "document"]).optional(),
+          mediaUrl: z.string().max(1024).optional(),
+          scheduledAt: z.string(),
+        }))
+        .mutation(async ({ ctx, input }) => {
+          const tenantId = getTenantId(ctx);
+          const userId = ctx.saasUser?.userId || ctx.user?.id;
+          const result = await createScheduledMessage(tenantId, {
+            ...input,
+            scheduledAt: new Date(input.scheduledAt),
+            createdBy: userId,
+          });
+          // Enqueue BullMQ job if worker is available
+          try {
+            const { enqueueScheduledMessage } = await import("./scheduledMessageWorker");
+            if (result?.id) {
+              await enqueueScheduledMessage(result.id, new Date(input.scheduledAt));
+            }
+          } catch {
+            // Worker not yet initialized — sweep will pick it up
+          }
+          return result;
+        }),
+      cancel: sessionTenantWriteProcedure
+        .input(z.object({ id: z.number() }))
+        .mutation(async ({ ctx, input }) => {
+          await cancelScheduledMessage(getTenantId(ctx), input.id);
+          try {
+            const { cancelScheduledJob } = await import("./scheduledMessageWorker");
+            await cancelScheduledJob(input.id);
+          } catch {
+            // Worker not available
+          }
+          return { success: true };
+        }),
     }),
   }),
 

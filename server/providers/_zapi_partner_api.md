@@ -25,8 +25,9 @@
 - Nota: Instância continua ativa até expirar (30 dias do ciclo)
 
 ### 4. Listar Instâncias
-- **GET** (método correto a confirmar - GET retorna 405)
+- **GET** `https://api.z-api.io/instances?page=1&pageSize=20`
 - Headers: `Authorization: Bearer {partner_token}`
+- Query params: `page` (número da página), `pageSize` (itens por página), `query` (busca por nome/id), `middleware` (web|mobile)
 - Response: `{ total, totalPage, pageSize, page, content: [{ id, token, name, due, paymentStatus, phoneConnected, whatsappConnected, ... }] }`
 
 ## Fluxo de Provisionamento

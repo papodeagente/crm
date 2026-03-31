@@ -1,7 +1,7 @@
 import { eq, desc, and, or, like, lt, gt, isNotNull, isNull, sql, inArray } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 
-import { InsertUser, users, whatsappSessions, waMessages as messages, activityLogs, chatbotSettings, chatbotRules, conversationAssignments, crmUsers, teams, teamMembers, distributionRules, customFields, customFieldValues, waConversations, userPreferences, sessionShares, conversationEvents, internalNotes, quickReplies, waContacts, aiIntegrations, aiTrainingConfigs, tenants, conversationLocks, waReactions } from "../drizzle/schema";
+import { InsertUser, users, whatsappSessions, waMessages as messages, activityLogs, chatbotSettings, chatbotRules, conversationAssignments, crmUsers, teams, teamMembers, distributionRules, customFields, customFieldValues, waConversations, userPreferences, sessionShares, conversationEvents, internalNotes, quickReplies, waContacts, aiIntegrations, aiTrainingConfigs, tenants, conversationLocks, waReactions, conversationTags, waConversationTagLinks, scheduledMessages } from "../drizzle/schema";
 import { ENV } from './_core/env';
 import { normalizeJid } from "./phoneUtils";
 
@@ -1943,6 +1943,8 @@ export async function getWaConversationsList(
       wc.slaDeadlineAt,
       wc.assignedUserId AS assignedUserId,
       wc.assignedTeamId AS assignedTeamId,
+      wc.isPinned,
+      wc.isArchived,
       ca.status AS assignmentStatus,
       ca.priority AS assignmentPriority,
       agent.name AS assignedAgentName,
@@ -1955,19 +1957,20 @@ export async function getWaConversationsList(
       WHERE sessionId = ${sessionId}
       AND tenantId = ${tenantId}
       AND mergedIntoId IS NULL
+      AND isArchived = 0
       ${sql.raw(assignmentFilterWc.replace(/wc\./g, ''))}
       ${filter?.cursor ? sql`AND lastMessageAt < ${new Date(filter.cursor)}` : sql``}
-      ORDER BY lastMessageAt DESC
+      ORDER BY isPinned DESC, lastMessageAt DESC
       LIMIT ${filter?.limit ?? 100}
       ${!filter?.cursor && (filter?.offset ?? 0) > 0 ? sql`OFFSET ${filter?.offset ?? 0}` : sql``}
     ) wc
-    LEFT JOIN conversation_assignments ca 
-      ON ca.sessionId = wc.sessionId 
+    LEFT JOIN conversation_assignments ca
+      ON ca.sessionId = wc.sessionId
       AND ca.remoteJid = wc.remoteJid
       AND ca.tenantId = wc.tenantId
     LEFT JOIN crm_users agent ON agent.id = wc.assignedUserId
     LEFT JOIN contacts c ON c.id = wc.contactId
-    ORDER BY wc.lastMessageAt DESC
+    ORDER BY wc.isPinned DESC, wc.lastMessageAt DESC
   `);
 
   const rows = (result as any)[0] || [];
@@ -3104,23 +3107,18 @@ export async function getQueueStats(tenantId: number, sessionId: string) {
 // HELPDESK — Quick Replies
 // ════════════════════════════════════════════════════════════
 
-export async function getQuickReplies(tenantId: number, teamId?: number) {
+export async function getQuickReplies(tenantId: number, teamId?: number, category?: string) {
   const db = await getDb();
   if (!db) return [];
-  if (teamId) {
-    return db.select().from(quickReplies)
-      .where(and(
-        eq(quickReplies.tenantId, tenantId),
-        or(eq(quickReplies.teamId, teamId), sql`${quickReplies.teamId} IS NULL`)
-      ))
-      .orderBy(quickReplies.shortcut);
-  }
+  const conditions = [eq(quickReplies.tenantId, tenantId)];
+  if (teamId) conditions.push(or(eq(quickReplies.teamId, teamId), sql`${quickReplies.teamId} IS NULL`)!);
+  if (category) conditions.push(eq(quickReplies.category, category));
   return db.select().from(quickReplies)
-    .where(eq(quickReplies.tenantId, tenantId))
-    .orderBy(quickReplies.shortcut);
+    .where(and(...conditions))
+    .orderBy(desc(quickReplies.usageCount), quickReplies.shortcut);
 }
 
-export async function createQuickReply(tenantId: number, data: { shortcut: string; title: string; content: string; teamId?: number; category?: string; createdBy: number }) {
+export async function createQuickReply(tenantId: number, data: { shortcut: string; title: string; content: string; contentType?: string; mediaUrl?: string; teamId?: number; category?: string; createdBy: number }) {
   const db = await getDb();
   if (!db) return null;
   const [result] = await db.insert(quickReplies).values({
@@ -3128,11 +3126,33 @@ export async function createQuickReply(tenantId: number, data: { shortcut: strin
     shortcut: data.shortcut,
     title: data.title,
     content: data.content,
+    contentType: (data.contentType as any) || "text",
+    mediaUrl: data.mediaUrl,
     teamId: data.teamId,
     category: data.category,
     createdBy: data.createdBy,
   }).$returningId();
   return result;
+}
+
+export async function updateQuickReply(tenantId: number, id: number, data: { shortcut?: string; title?: string; content?: string; contentType?: string; mediaUrl?: string; category?: string }) {
+  const db = await getDb();
+  if (!db) return;
+  const updates: Record<string, any> = {};
+  if (data.shortcut !== undefined) updates.shortcut = data.shortcut;
+  if (data.title !== undefined) updates.title = data.title;
+  if (data.content !== undefined) updates.content = data.content;
+  if (data.contentType !== undefined) updates.contentType = data.contentType;
+  if (data.mediaUrl !== undefined) updates.mediaUrl = data.mediaUrl;
+  if (data.category !== undefined) updates.category = data.category;
+  if (Object.keys(updates).length === 0) return;
+  await db.update(quickReplies).set(updates).where(and(eq(quickReplies.tenantId, tenantId), eq(quickReplies.id, id)));
+}
+
+export async function incrementQuickReplyUsage(tenantId: number, id: number) {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(quickReplies).set({ usageCount: sql`${quickReplies.usageCount} + 1` }).where(and(eq(quickReplies.tenantId, tenantId), eq(quickReplies.id, id)));
 }
 
 export async function deleteQuickReply(tenantId: number, id: number) {
@@ -3141,6 +3161,143 @@ export async function deleteQuickReply(tenantId: number, id: number) {
   await db.delete(quickReplies).where(and(
     eq(quickReplies.tenantId, tenantId),
     eq(quickReplies.id, id),
+  ));
+}
+
+// ════════════════════════════════════════════════════════════
+// INBOX — Conversation Tags
+// ════════════════════════════════════════════════════════════
+
+export async function listConversationTags(tenantId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(conversationTags).where(eq(conversationTags.tenantId, tenantId)).orderBy(conversationTags.name);
+}
+
+export async function createConversationTag(tenantId: number, name: string, color?: string) {
+  const db = await getDb();
+  if (!db) return null;
+  const [result] = await db.insert(conversationTags).values({ tenantId, name, color: color || "#6366f1" }).$returningId();
+  return result;
+}
+
+export async function deleteConversationTag(tenantId: number, id: number) {
+  const db = await getDb();
+  if (!db) return;
+  // Remove all links first
+  await db.delete(waConversationTagLinks).where(eq(waConversationTagLinks.tagId, id));
+  await db.delete(conversationTags).where(and(eq(conversationTags.tenantId, tenantId), eq(conversationTags.id, id)));
+}
+
+export async function getTagsForConversation(waConversationId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select({ id: conversationTags.id, name: conversationTags.name, color: conversationTags.color })
+    .from(waConversationTagLinks)
+    .innerJoin(conversationTags, eq(waConversationTagLinks.tagId, conversationTags.id))
+    .where(eq(waConversationTagLinks.waConversationId, waConversationId));
+}
+
+export async function addTagToConversation(waConversationId: number, tagId: number) {
+  const db = await getDb();
+  if (!db) return;
+  try {
+    await db.insert(waConversationTagLinks).values({ waConversationId, tagId });
+  } catch (e: any) {
+    if (e?.code === "ER_DUP_ENTRY") return; // already linked
+    throw e;
+  }
+}
+
+export async function removeTagFromConversation(waConversationId: number, tagId: number) {
+  const db = await getDb();
+  if (!db) return;
+  await db.delete(waConversationTagLinks).where(and(
+    eq(waConversationTagLinks.waConversationId, waConversationId),
+    eq(waConversationTagLinks.tagId, tagId),
+  ));
+}
+
+// ════════════════════════════════════════════════════════════
+// INBOX — Pin / Archive
+// ════════════════════════════════════════════════════════════
+
+export async function pinConversation(tenantId: number, sessionId: string, remoteJid: string, pin: boolean) {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(waConversations).set({ isPinned: pin }).where(and(
+    eq(waConversations.tenantId, tenantId),
+    eq(waConversations.sessionId, sessionId),
+    eq(waConversations.remoteJid, remoteJid),
+  ));
+}
+
+export async function archiveConversation(tenantId: number, sessionId: string, remoteJid: string, archive: boolean) {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(waConversations).set({ isArchived: archive }).where(and(
+    eq(waConversations.tenantId, tenantId),
+    eq(waConversations.sessionId, sessionId),
+    eq(waConversations.remoteJid, remoteJid),
+  ));
+}
+
+// ════════════════════════════════════════════════════════════
+// INBOX — Scheduled Messages
+// ════════════════════════════════════════════════════════════
+
+export async function listScheduledMessages(tenantId: number, status?: string) {
+  const db = await getDb();
+  if (!db) return [];
+  const conditions = [eq(scheduledMessages.tenantId, tenantId)];
+  if (status) conditions.push(eq(scheduledMessages.status, status as any));
+  return db.select().from(scheduledMessages).where(and(...conditions)).orderBy(scheduledMessages.scheduledAt);
+}
+
+export async function createScheduledMessage(tenantId: number, data: { sessionId: string; remoteJid: string; content: string; contentType?: string; mediaUrl?: string; scheduledAt: Date; createdBy?: number }) {
+  const db = await getDb();
+  if (!db) return null;
+  const [result] = await db.insert(scheduledMessages).values({
+    tenantId,
+    sessionId: data.sessionId,
+    remoteJid: data.remoteJid,
+    content: data.content,
+    contentType: (data.contentType as any) || "text",
+    mediaUrl: data.mediaUrl,
+    scheduledAt: data.scheduledAt,
+    createdBy: data.createdBy,
+  }).$returningId();
+  return result;
+}
+
+export async function cancelScheduledMessage(tenantId: number, id: number) {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(scheduledMessages).set({ status: "cancelled" }).where(and(
+    eq(scheduledMessages.tenantId, tenantId),
+    eq(scheduledMessages.id, id),
+    eq(scheduledMessages.status, "pending"),
+  ));
+}
+
+export async function markScheduledMessageSent(id: number) {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(scheduledMessages).set({ status: "sent", sentAt: new Date() }).where(eq(scheduledMessages.id, id));
+}
+
+export async function markScheduledMessageFailed(id: number) {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(scheduledMessages).set({ status: "failed" }).where(eq(scheduledMessages.id, id));
+}
+
+export async function getPendingScheduledMessages() {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(scheduledMessages).where(and(
+    eq(scheduledMessages.status, "pending"),
+    sql`${scheduledMessages.scheduledAt} <= NOW()`,
   ));
 }
 
