@@ -160,12 +160,12 @@ function getMessagePreview(content: string | null, messageType: string | null): 
 const StatusTick = memo(({ status, fromMe }: { status: string | null; fromMe: boolean }) => {
   if (!fromMe) return null;
   switch (status) {
-    case "sending": return <Clock className="w-[16px] h-[16px] shrink-0 animate-pulse" style={{ color: 'var(--wa-text-secondary)' }} />;
-    case "pending": return <Clock className="w-[16px] h-[16px] shrink-0" style={{ color: 'var(--wa-text-secondary)' }} />;
-    case "sent": return <Check className="w-[16px] h-[16px] shrink-0" style={{ color: 'var(--wa-text-secondary)' }} />;
-    case "delivered": return <CheckCheck className="w-[16px] h-[16px] shrink-0" style={{ color: 'var(--wa-text-secondary)' }} />;
-    case "read": case "played": return <CheckCheck className="w-[16px] h-[16px] shrink-0" style={{ color: 'var(--wa-tick-read)' }} />;
-    default: return <Check className="w-[16px] h-[16px] shrink-0" style={{ color: 'var(--wa-text-secondary)' }} />;
+    case "sending": return <Clock className="w-[16px] h-[16px] shrink-0 animate-pulse" />;
+    case "pending": return <Clock className="w-[16px] h-[16px] shrink-0" />;
+    case "sent": return <Check className="w-[16px] h-[16px] shrink-0" />;
+    case "delivered": return <CheckCheck className="w-[16px] h-[16px] shrink-0" />;
+    case "read": case "played": return <CheckCheck className="w-[16px] h-[16px] shrink-0 text-blue-400" />;
+    default: return <Check className="w-[16px] h-[16px] shrink-0" />;
   }
 });
 StatusTick.displayName = "StatusTick";
@@ -333,11 +333,11 @@ const AgentBadge = memo(({ name, avatarUrl }: { name?: string | null; avatarUrl?
   const initials = name.split(" ").map(w => w[0]).join("").substring(0, 2).toUpperCase();
   return (
     <div className="flex items-center gap-1 shrink-0" title={`Atribuído a ${name}`}>
-      <div className="w-[18px] h-[18px] rounded-full bg-wa-tint/20 flex items-center justify-center overflow-hidden">
+      <div className="w-[18px] h-[18px] rounded-full bg-primary/20 flex items-center justify-center overflow-hidden">
         {avatarUrl ? (
           <img src={avatarUrl} alt={name} className="w-full h-full object-cover" />
         ) : (
-          <span className="text-[9px] font-bold text-wa-tint">{initials}</span>
+          <span className="text-[9px] font-bold text-primary">{initials}</span>
         )}
       </div>
     </div>
@@ -381,7 +381,7 @@ const ConversationItem = memo(({
           <WaAvatar name={contactName} size={46} pictureUrl={pictureUrl} />
         </div>
         {/* WhatsApp channel badge */}
-        <div className="absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-full bg-[#25D366] flex items-center justify-center ring-2 ring-[var(--wa-panel)]">
+        <div className="absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-full bg-[#25D366] flex items-center justify-center ring-2 ring-background">
           <svg className="w-3 h-3 text-white" viewBox="0 0 24 24" fill="currentColor">
             <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/>
           </svg>
@@ -457,7 +457,7 @@ const ConversationItem = memo(({
                 <button
                   onClick={(e) => { e.stopPropagation(); onAssignClick(); }}
                   className="inbox-action-btn opacity-0 group-hover/conv:opacity-100"
-                  style={{ color: conv.assignedAgentName ? 'var(--wa-tint)' : undefined }}
+                  style={{ color: conv.assignedAgentName ? 'var(--primary)' : undefined }}
                 >
                   <Users className="w-3.5 h-3.5" />
                 </button>
@@ -556,7 +556,7 @@ function CreateContactDialog({
       <div className="bg-card rounded-2xl shadow-2xl w-full max-w-md mx-4 border border-border/50" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-full bg-wa-tint flex items-center justify-center">
+            <div className="w-9 h-9 rounded-full bg-primary flex items-center justify-center">
               <UserPlus className="w-[18px] h-[18px] text-white" />
             </div>
             <h3 className="text-[16px] font-semibold text-foreground">Novo Contato</h3>
@@ -567,7 +567,7 @@ function CreateContactDialog({
         </div>
         <div className="px-5 py-4 space-y-4">
           <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-xl">
-            <Phone className="w-5 h-5 text-wa-tint" />
+            <Phone className="w-5 h-5 text-primary" />
             <div>
               <p className="text-xs text-muted-foreground">Telefone (WhatsApp)</p>
               <p className="text-sm font-medium text-foreground">{formattedPhone}</p>
@@ -578,7 +578,7 @@ function CreateContactDialog({
             <input
               type="text" value={name} onChange={(e) => setName(e.target.value)}
               placeholder="Nome do contato"
-              className="w-full px-3 py-2.5 border border-border rounded-xl text-sm text-foreground bg-background focus:outline-none focus:border-wa-tint focus:ring-1 focus:ring-wa-tint/30 transition-colors"
+              className="w-full px-3 py-2.5 border border-border rounded-xl text-sm text-foreground bg-background focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/30 transition-colors"
               autoFocus
             />
           </div>
@@ -587,7 +587,7 @@ function CreateContactDialog({
             <input
               type="email" value={email} onChange={(e) => setEmail(e.target.value)}
               placeholder="email@exemplo.com"
-              className="w-full px-3 py-2.5 border border-border rounded-xl text-sm text-foreground bg-background focus:outline-none focus:border-wa-tint focus:ring-1 focus:ring-wa-tint/30 transition-colors"
+              className="w-full px-3 py-2.5 border border-border rounded-xl text-sm text-foreground bg-background focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/30 transition-colors"
             />
           </div>
           <div>
@@ -596,7 +596,7 @@ function CreateContactDialog({
               value={notes} onChange={(e) => setNotes(e.target.value)}
               placeholder="Observações sobre o contato..."
               rows={2}
-              className="w-full px-3 py-2.5 border border-border rounded-xl text-sm text-foreground bg-background focus:outline-none focus:border-wa-tint focus:ring-1 focus:ring-wa-tint/30 resize-none transition-colors"
+              className="w-full px-3 py-2.5 border border-border rounded-xl text-sm text-foreground bg-background focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/30 resize-none transition-colors"
             />
           </div>
           {/* Custom Fields */}
@@ -620,7 +620,7 @@ function CreateContactDialog({
           <button
             onClick={handleCreate}
             disabled={creating || !name.trim()}
-            className="px-4 py-2 text-sm text-white bg-wa-tint hover:opacity-90 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            className="px-4 py-2 text-sm text-white bg-primary hover:opacity-90 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           >
             {creating && <Loader2 className="w-4 h-4 animate-spin" />}
             Criar Contato
@@ -961,9 +961,9 @@ function NewChatPanel({
   if (!open) return null;
 
   return (
-    <div className="absolute inset-0 z-20 flex flex-col bg-wa-panel" style={{ animation: "slideInLeft 0.2s ease-out" }}>
+    <div className="absolute inset-0 z-20 flex flex-col bg-card" style={{ animation: "slideInLeft 0.2s ease-out" }}>
       {/* Header */}
-      <div className="flex items-center gap-4 shrink-0 h-[59px] px-4 bg-wa-panel-header border-b border-wa-divider">
+      <div className="flex items-center gap-4 shrink-0 h-[59px] px-4 bg-card border-b border-border">
         <button
           onClick={() => { onClose(); setSearchTerm(""); setPhoneInput(""); setResolveError(""); }}
           className="w-[28px] h-[28px] flex items-center justify-center text-foreground hover:opacity-80 transition-opacity"
@@ -974,8 +974,8 @@ function NewChatPanel({
       </div>
 
       {/* Search */}
-      <div className="shrink-0 px-3 py-[7px] bg-wa-panel">
-        <div className="flex items-center rounded-lg overflow-hidden h-[35px] bg-wa-search-bg px-3">
+      <div className="shrink-0 px-3 py-[7px] bg-card">
+        <div className="flex items-center rounded-lg overflow-hidden h-[35px] bg-muted px-3">
           <Search className="shrink-0 w-4 h-4 text-muted-foreground" />
           <input
             type="text" placeholder="Pesquisar contatos" value={searchTerm}
@@ -987,7 +987,7 @@ function NewChatPanel({
       </div>
 
       {/* Phone input */}
-      <div className="shrink-0 px-4 py-3 border-b border-wa-divider">
+      <div className="shrink-0 px-4 py-3 border-b border-border">
         <label className="text-[12px] text-muted-foreground uppercase tracking-wide font-medium mb-2 block">Digitar número</label>
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-1 px-3 py-2 bg-muted rounded-lg text-sm text-muted-foreground shrink-0">
@@ -997,10 +997,10 @@ function NewChatPanel({
             type="tel" placeholder="(84) 99999-9999" value={phoneInput}
             onChange={(e) => { setPhoneInput(e.target.value); setResolveError(""); }}
             onKeyDown={(e) => { if (e.key === "Enter") handlePhoneSubmit(); }}
-            className="flex-1 px-3 py-2 border border-border rounded-lg text-sm text-foreground bg-background focus:outline-none focus:border-wa-tint focus:ring-1 focus:ring-wa-tint/30 transition-colors"
+            className="flex-1 px-3 py-2 border border-border rounded-lg text-sm text-foreground bg-background focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/30 transition-colors"
           />
           <button onClick={handlePhoneSubmit} disabled={resolving || phoneInput.replace(/\D/g, "").length < 8}
-            className="px-3 py-2 bg-wa-tint text-white rounded-lg text-sm font-medium hover:opacity-90 transition-all disabled:opacity-50 flex items-center gap-1">
+            className="px-3 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:opacity-90 transition-all disabled:opacity-50 flex items-center gap-1">
             {resolving ? <Loader2 className="w-4 h-4 animate-spin" /> : <MessageCircle className="w-4 h-4" />}
           </button>
         </div>
@@ -1009,11 +1009,11 @@ function NewChatPanel({
 
       {/* Contacts list */}
       <div className="shrink-0 px-4 pt-3 pb-1">
-        <p className="text-[12px] text-wa-tint uppercase tracking-wide font-medium">Contatos do CRM ({contacts.length})</p>
+        <p className="text-[12px] text-primary uppercase tracking-wide font-medium">Contatos do CRM ({contacts.length})</p>
       </div>
       <div className="flex-1 overflow-y-auto scrollbar-thin" style={{ overscrollBehavior: "contain" }}>
         {contactsQ.isLoading ? (
-          <div className="flex items-center justify-center py-12"><Loader2 className="w-5 h-5 text-wa-tint animate-spin" /></div>
+          <div className="flex items-center justify-center py-12"><Loader2 className="w-5 h-5 text-primary animate-spin" /></div>
         ) : contacts.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
             <Phone className="w-10 h-10 text-muted-foreground/20 mb-2" />
@@ -1022,10 +1022,10 @@ function NewChatPanel({
         ) : contacts.map((contact) => (
           <button
             key={contact.id} onClick={() => handleSelectContact(contact)} disabled={resolving}
-            className="w-full flex items-center gap-3 px-4 py-[10px] hover:bg-wa-hover transition-colors text-left disabled:opacity-60"
+            className="w-full flex items-center gap-3 px-4 py-[10px] hover:bg-accent transition-colors text-left disabled:opacity-60"
           >
             <WaAvatar name={contact.name} size={49} />
-            <div className="flex-1 min-w-0 border-b border-wa-divider py-[6px]">
+            <div className="flex-1 min-w-0 border-b border-border py-[6px]">
               <p className="text-[15px] text-foreground truncate">{contact.name}</p>
               <p className="text-[13px] text-muted-foreground truncate">
                 {contact.phone || "Sem telefone"}{contact.accountName ? ` · ${contact.accountName}` : ""}
@@ -1036,9 +1036,9 @@ function NewChatPanel({
       </div>
 
       {resolving && (
-        <div className="absolute inset-0 z-30 bg-wa-panel/70 backdrop-blur-sm flex items-center justify-center">
+        <div className="absolute inset-0 z-30 bg-background/70 backdrop-blur-sm flex items-center justify-center">
           <div className="flex flex-col items-center gap-3">
-            <Loader2 className="w-8 h-8 text-wa-tint animate-spin" />
+            <Loader2 className="w-8 h-8 text-primary animate-spin" />
             <p className="text-[14px] text-muted-foreground">Verificando no WhatsApp...</p>
           </div>
         </div>
@@ -1060,21 +1060,21 @@ function NewChatPanel({
 
 function EmptyChat() {
   return (
-    <div className="flex-1 flex flex-col items-center justify-center" style={{ backgroundColor: 'var(--wa-search-bg)' }}>
+    <div className="flex-1 flex flex-col items-center justify-center bg-background">
       <div className="text-center max-w-[500px] px-8">
-        <div className="w-[320px] h-[188px] mx-auto mb-[28px] rounded-full bg-[var(--wa-tint)]/5 flex items-center justify-center">
-          <MessageSquare className="w-16 h-16" style={{ color: 'var(--wa-tint)', opacity: 0.4 }} />
+        <div className="w-[320px] h-[188px] mx-auto mb-[28px] rounded-full bg-primary/5 flex items-center justify-center">
+          <MessageSquare className="w-16 h-16 text-primary/40" />
         </div>
-        <h1 className="text-[32px] font-light leading-tight mb-[14px]" style={{ color: 'var(--wa-text-primary)' }}>
+        <h1 className="text-[32px] font-light leading-tight mb-[14px] text-foreground">
           Entur WhatsApp
         </h1>
-        <p className="text-[14px] leading-[20px]" style={{ color: 'var(--wa-text-secondary)' }}>
+        <p className="text-[14px] leading-[20px] text-muted-foreground">
           Envie e receba mensagens sem precisar manter o celular conectado.
           <br />
           Use em até 4 aparelhos vinculados e 1 celular ao mesmo tempo.
         </p>
         <div className="mt-[40px] pt-[16px]">
-          <p className="text-[13px] flex items-center justify-center gap-[6px]" style={{ color: 'var(--wa-text-secondary)', opacity: 0.6 }}>
+          <p className="text-[13px] flex items-center justify-center gap-[6px] text-muted-foreground/60">
             <Lock className="w-[13px] h-[13px]" />
             Suas mensagens pessoais são protegidas com criptografia de ponta a ponta
           </p>
@@ -1092,15 +1092,15 @@ function NoSession() {
   return (
     <div className="flex h-full items-center justify-center bg-background">
       <div className="text-center max-w-md px-6">
-        <div className="w-20 h-20 rounded-full bg-wa-tint/10 flex items-center justify-center mx-auto mb-4">
-          <MessageSquare className="w-10 h-10 text-wa-tint" />
+        <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
+          <MessageSquare className="w-10 h-10 text-primary" />
         </div>
         <h2 className="text-xl font-medium text-foreground mb-2">WhatsApp não conectado</h2>
         <p className="text-[14px] text-muted-foreground mb-4">
           Conecte seu WhatsApp para enviar e receber mensagens diretamente pelo sistema.
         </p>
         <a href="/whatsapp"
-          className="inline-flex items-center gap-2 px-4 py-2.5 bg-wa-tint text-white rounded-xl text-sm font-medium hover:opacity-90 transition-all">
+          className="inline-flex items-center gap-2 px-4 py-2.5 bg-primary text-white rounded-xl text-sm font-medium hover:opacity-90 transition-all">
           <Phone className="w-4 h-4" />
           Conectar WhatsApp
         </a>
@@ -1793,7 +1793,7 @@ export default function InboxPage() {
   }
 
   return (
-    <div className="flex flex-col h-full overflow-hidden" style={{ backgroundColor: 'var(--wa-chat-bg)' }}>
+    <div className="flex flex-col h-full overflow-hidden bg-background">
       {/* ═══ RECONNECTION BANNER ═══ */}
       {!isConnected && activeSession && (
         <div className="shrink-0 flex items-center justify-between px-4 py-[6px]" style={{ backgroundColor: '#ffc107', color: '#3b3a32' }}>
@@ -1809,15 +1809,7 @@ export default function InboxPage() {
       <div className="flex flex-1 overflow-hidden">
       {/* ═══ LEFT PANEL: Conversations List ═══ */}
       <div
-        className={`flex flex-col ${showMobileChat ? "hidden md:flex" : "flex"}`}
-        style={{
-          width: "100%",
-          maxWidth: "420px",
-          minWidth: "320px",
-          borderRight: '1px solid var(--wa-divider)',
-          position: "relative",
-          backgroundColor: 'var(--wa-panel)',
-        }}
+        className={`w-full md:w-[360px] lg:w-[380px] flex flex-col border-r border-border shrink-0 inbox-glass ${showMobileChat ? "hidden md:flex" : "flex"}`}
       >
         {/* New Chat Panel (slide-over) */}
         <NewChatPanel
@@ -1885,7 +1877,7 @@ export default function InboxPage() {
         </div>
 
         {/* ── Search Bar (glassmorphism) ── */}
-        <div className="px-3 py-2 shrink-0" style={{ backgroundColor: 'var(--inbox-glass-bg)' }}>
+        <div className="px-3 py-2 shrink-0">
           <div className="relative inbox-search">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/50" />
             <input
@@ -1908,7 +1900,7 @@ export default function InboxPage() {
         </div>
 
         {/* ── Tabs (pill style like MKT) ── */}
-        <div className="flex items-center gap-1 px-3 py-1.5 shrink-0 border-b border-border/50" style={{ backgroundColor: 'var(--inbox-glass-bg)' }}>
+        <div className="flex items-center gap-1 px-3 py-1.5 shrink-0 border-b border-border/50">
           {([
             { id: "mine" as InboxTab, label: "Meus", badge: myConvsCount, icon: InboxIcon },
             { id: "queue" as InboxTab, label: "Fila", badge: queueCount, icon: ListOrdered },
@@ -1923,7 +1915,11 @@ export default function InboxPage() {
               <button
                 key={tab.id}
                 onClick={() => { setActiveTab(tab.id); setFilter("all"); }}
-                className={`inbox-tab flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-medium whitespace-nowrap ${active ? "active" : "text-muted-foreground hover:text-foreground"}`}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[12px] font-medium transition-all ${
+                  active
+                    ? "bg-primary/15 text-primary"
+                    : "text-muted-foreground hover:text-foreground hover:bg-accent"
+                }`}
               >
                 <TabIcon className="w-3.5 h-3.5" />
                 {tab.label}
@@ -1944,18 +1940,18 @@ export default function InboxPage() {
             <>
               {conversationsQ.isLoading || sessionsQ.isLoading ? (
                 <div className="flex items-center justify-center py-16">
-                  <Loader2 className="w-6 h-6 text-wa-tint animate-spin" />
+                  <Loader2 className="w-6 h-6 text-primary animate-spin" />
                 </div>
               ) : filteredConvs.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-20 px-8 text-center">
                   <div className="inbox-empty-icon">
                     <MessageSquare className="w-6 h-6 text-primary/60" />
                   </div>
-                  <p className="text-[14px] font-medium" style={{ color: 'var(--wa-text-primary)' }}>
+                  <p className="text-[14px] font-medium">
                     {search ? "Nenhuma conversa encontrada" : activeTab === "mine" ? "Nenhuma conversa atribuída a você" : "Nenhuma conversa ainda"}
                   </p>
                   {activeTab === "mine" && !search && (
-                    <p className="text-[12px] mt-1.5" style={{ color: 'var(--wa-text-secondary)' }}>Puxe conversas da Fila para começar a atender</p>
+                    <p className="text-[12px] mt-1.5">Puxe conversas da Fila para começar a atender</p>
                   )}
                 </div>
               ) : (
@@ -1986,86 +1982,77 @@ export default function InboxPage() {
             <>
               {queueQ.isLoading ? (
                 <div className="flex items-center justify-center py-16">
-                  <Loader2 className="w-6 h-6 text-wa-tint animate-spin" />
+                  <Loader2 className="w-6 h-6 text-primary animate-spin" />
                 </div>
               ) : filteredQueueConvs.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-20 px-8 text-center">
                   <div className="inbox-empty-icon">
                     <Timer className="w-6 h-6 text-primary/60" />
                   </div>
-                  <p className="text-[14px] font-medium" style={{ color: 'var(--wa-text-primary)' }}>
+                  <p className="text-[14px] font-medium">
                     {search ? "Nenhuma conversa encontrada na fila" : "Fila vazia"}
                   </p>
-                  <p className="text-[12px] mt-1.5" style={{ color: 'var(--wa-text-secondary)' }}>Novas mensagens sem agente aparecerão aqui</p>
+                  <p className="text-[12px] mt-1.5">Novas mensagens sem agente aparecerão aqui</p>
                 </div>
               ) : (
                 filteredQueueConvs.map((conv) => {
                   const waitTime = conv.queuedAt || conv.lastTimestamp;
-                  const isAssigningThis = assigningQueueJid === conv.remoteJid;
+                  const ck = makeConvKey(conv.sessionId || activeSession?.sessionId || "", conv.remoteJid);
+                  const isActiveQueue = selectedKey === ck;
                   return (
-                  <div key={conv.remoteJid} className="group/q relative">
-                    <div
-                      onClick={() => handleSelectQueueConv(conv.remoteJid)}
-                      className="flex items-center cursor-pointer transition-all duration-150 hover:bg-[var(--wa-hover)]"
-                      style={{
-                        paddingLeft: 4,
-                        paddingRight: 8,
-                        borderLeft: selectedKey === makeConvKey(conv.sessionId || activeSession?.sessionId || "", conv.remoteJid) ? '3px solid var(--wa-tint)' : '3px solid transparent',
-                        backgroundColor: selectedKey === makeConvKey(conv.sessionId || activeSession?.sessionId || "", conv.remoteJid)
-                          ? 'var(--wa-active)' : undefined,
-                      }}
-                    >
-                      <div className="py-[8px] px-[10px] relative shrink-0">
+                  <div
+                    key={conv.remoteJid}
+                    onClick={() => handleSelectQueueConv(conv.remoteJid)}
+                    className={`inbox-conv-item flex items-center gap-3 px-3.5 py-3 cursor-pointer ${isActiveQueue ? "active" : ""}`}
+                  >
+                    <div className="relative shrink-0">
+                      <div className="inbox-avatar-ring rounded-full">
                         <WaAvatar name={getDisplayName(conv.remoteJid, conv)} size={46} pictureUrl={profilePicMap[conv.remoteJid]} />
-                        {/* WhatsApp badge */}
-                        <div className="absolute bottom-[6px] right-[7px] w-[15px] h-[15px] rounded-full flex items-center justify-center shadow-sm" style={{ backgroundColor: '#25d366', border: '2px solid var(--wa-panel)' }}>
-                          <svg viewBox="0 0 24 24" width="8" height="8" fill="white">
-                            <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/>
-                          </svg>
-                        </div>
                       </div>
-                      <div className="flex-1 min-w-0 py-[10px]" style={{ borderBottom: '1px solid var(--wa-divider)' }}>
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="text-[15px] truncate leading-[20px] flex-1 min-w-0 font-medium" style={{ color: 'var(--wa-text-primary)' }}>
-                            {getDisplayName(conv.remoteJid, conv)}
-                          </span>
-                          <div className="flex items-center gap-1.5 shrink-0">
-                            {waitTime && (
-                              <span className="text-[10px] px-1.5 py-[1px] rounded-[4px] font-medium" style={{ color: 'var(--wa-tint)', backgroundColor: 'color-mix(in srgb, var(--wa-tint) 10%, transparent)' }}>
-                                <UrgencyTimer since={waitTime} compact />
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-[4px] mt-[3px]">
-                          <span className="text-[13px] truncate flex-1 leading-[18px]" style={{ color: 'var(--wa-text-secondary)' }}>
-                            {getMessagePreview(conv.lastMessage, conv.lastMessageType) || "Sem mensagens"}
-                          </span>
-                          {Number(conv.unreadCount) > 0 && (
-                            <span className="text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-[5px] shrink-0 text-white shadow-sm" style={{ backgroundColor: 'var(--wa-tint)' }}>
-                              {Number(conv.unreadCount) > 99 ? "99+" : conv.unreadCount}
+                      <div className="absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-full bg-[#25D366] flex items-center justify-center ring-2 ring-background">
+                        <svg className="w-3 h-3 text-white" viewBox="0 0 24 24" fill="currentColor">
+                          <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/>
+                        </svg>
+                      </div>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[15px] text-foreground truncate font-medium leading-tight">
+                          {getDisplayName(conv.remoteJid, conv)}
+                        </span>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {waitTime && (
+                            <span className="flex items-center gap-1 text-[10px] font-medium tabular-nums text-emerald-400">
+                              <div className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                              <UrgencyTimer since={waitTime} compact />
                             </span>
                           )}
                         </div>
                       </div>
+                      <div className="flex items-center justify-between gap-2 mt-1">
+                        <span className="text-[13.5px] truncate leading-snug text-muted-foreground">
+                          {getMessagePreview(conv.lastMessage, conv.lastMessageType) || "Sem mensagens"}
+                        </span>
+                        {Number(conv.unreadCount) > 0 && (
+                          <span className="inbox-unread-badge shrink-0">
+                            {Number(conv.unreadCount) > 99 ? "99+" : conv.unreadCount}
+                          </span>
+                        )}
+                      </div>
                     </div>
-                    {/* Claim button — "Atender" */}
-                    <div className="absolute right-3 top-1/2 -translate-y-1/2 opacity-0 group-hover/q:opacity-100 transition-all duration-200">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (activeSession?.sessionId) {
-                            claimMutation.mutate({ sessionId: activeSession.sessionId, remoteJid: conv.remoteJid });
-                          }
-                        }}
-                        disabled={claimMutation.isPending}
-                        className="inbox-claim-btn"
-                        title="Pegar Atendimento"
-                      >
-                        {claimMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <HandMetal className="w-3.5 h-3.5" />}
-                        <span>Atender</span>
-                      </button>
-                    </div>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (activeSession?.sessionId) {
+                          claimMutation.mutate({ sessionId: activeSession.sessionId, remoteJid: conv.remoteJid });
+                        }
+                      }}
+                      disabled={claimMutation.isPending}
+                      className="shrink-0 px-2.5 py-1.5 text-[11px] font-medium bg-primary/15 text-primary rounded-md hover:bg-primary/25 transition-colors"
+                      title="Atender conversa"
+                    >
+                      {claimMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <UserPlus className="w-3.5 h-3.5" />}
+                    </button>
                   </div>
                   );
                 })
@@ -2078,14 +2065,14 @@ export default function InboxPage() {
             <>
               {conversationsQ.isLoading ? (
                 <div className="flex items-center justify-center py-16">
-                  <Loader2 className="w-6 h-6 text-wa-tint animate-spin" />
+                  <Loader2 className="w-6 h-6 text-primary animate-spin" />
                 </div>
               ) : filteredFinishedConvs.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-20 px-8 text-center">
                   <div className="inbox-empty-icon">
                     <CheckCircle2 className="w-6 h-6 text-primary/60" />
                   </div>
-                  <p className="text-[14px] font-medium" style={{ color: 'var(--wa-text-primary)' }}>
+                  <p className="text-[14px] font-medium">
                     {search ? "Nenhuma conversa encontrada" : "Nenhuma conversa finalizada"}
                   </p>
                 </div>
@@ -2112,46 +2099,41 @@ export default function InboxPage() {
             <>
               {waContactsForTabQ.isLoading ? (
                 <div className="flex items-center justify-center py-16">
-                  <Loader2 className="w-6 h-6 text-wa-tint animate-spin" />
+                  <Loader2 className="w-6 h-6 text-primary animate-spin" />
                 </div>
               ) : filteredWaContacts.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-20 px-8 text-center">
                   <div className="inbox-empty-icon">
                     <Contact2 className="w-6 h-6 text-primary/60" />
                   </div>
-                  <p className="text-[14px] font-medium" style={{ color: 'var(--wa-text-primary)' }}>
+                  <p className="text-[14px] font-medium">
                     {search ? "Nenhum contato encontrado" : "Nenhum contato do WhatsApp"}
                   </p>
-                  <p className="text-[12px] mt-1.5" style={{ color: 'var(--wa-text-secondary)' }}>Sincronize os contatos na página WhatsApp</p>
+                  <p className="text-[12px] mt-1.5">Sincronize os contatos na página WhatsApp</p>
                 </div>
               ) : (
                 filteredWaContacts.map((contact) => (
-                  <button
+                  <div
                     key={contact.jid}
+                    className="flex items-center gap-3 px-3.5 py-3 cursor-pointer hover:bg-accent/50 transition-colors border-b border-border/30"
                     onClick={() => handleSelectConv(contact.jid)}
-                    className="group/ct w-full flex items-center px-[10px] hover:bg-[var(--wa-hover)] transition-all duration-150 text-left"
                   >
-                    <div className="py-[8px] px-[10px] relative shrink-0">
-                      <WaAvatar name={contact.displayName} size={44} pictureUrl={profilePicMap[contact.jid]} />
-                      {/* WhatsApp badge */}
-                      <div className="absolute bottom-[6px] right-[7px] w-[14px] h-[14px] rounded-full flex items-center justify-center shadow-sm" style={{ backgroundColor: '#25d366', border: '2px solid var(--wa-panel)' }}>
-                        <svg viewBox="0 0 24 24" width="7" height="7" fill="white">
+                    <div className="relative shrink-0">
+                      <WaAvatar name={contact.displayName} size={42} pictureUrl={profilePicMap[contact.jid]} />
+                      <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-[#25D366] flex items-center justify-center ring-2 ring-background">
+                        <svg className="w-2.5 h-2.5 text-white" viewBox="0 0 24 24" fill="currentColor">
                           <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/>
                         </svg>
                       </div>
                     </div>
-                    <div className="flex-1 min-w-0 py-[10px] flex items-center" style={{ borderBottom: '1px solid var(--wa-divider)' }}>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-[15px] truncate leading-[20px] font-normal" style={{ color: 'var(--wa-text-primary)' }}>{contact.displayName}</p>
-                        <p className="text-[12px] truncate leading-[16px] mt-[2px]" style={{ color: 'var(--wa-text-secondary)' }}>
-                          {contact.phoneNumber ? formatPhoneNumber(contact.phoneNumber) : formatPhoneNumber(contact.jid)}
-                        </p>
-                      </div>
-                      <div className="w-[30px] h-[30px] rounded-[8px] flex items-center justify-center shrink-0 ml-2 opacity-0 group-hover/ct:opacity-100 transition-all duration-150" style={{ backgroundColor: 'color-mix(in srgb, var(--wa-tint) 10%, transparent)' }}>
-                        <MessageSquare className="w-[14px] h-[14px]" style={{ color: 'var(--wa-tint)' }} />
-                      </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[14px] text-foreground truncate">{contact.displayName}</p>
+                      <p className="text-[12px] text-muted-foreground">
+                        {contact.phoneNumber ? formatPhoneNumber(contact.phoneNumber) : formatPhoneNumber(contact.jid)}
+                      </p>
                     </div>
-                  </button>
+                    <MessageSquare className="w-4 h-4 text-muted-foreground/40 shrink-0" />
+                  </div>
                 ))
               )}
             </>
@@ -2160,7 +2142,7 @@ export default function InboxPage() {
       </div>
 
       {/* ═══ RIGHT PANEL: Chat Area ═══ */}
-      <div className={`flex-1 flex flex-col min-w-0 ${!showMobileChat ? "hidden md:flex" : "flex"}`}>
+      <div className={`flex-1 flex flex-col bg-background min-w-0 ${!showMobileChat ? "hidden md:flex" : "flex"}`}>
         {!selectedKey || !activeSession ? (
           <EmptyChat />
         ) : (
