@@ -1428,6 +1428,7 @@ export default function InboxPage() {
       status: (lastMessage as any).status,  // Backend now sends status in socket event
       isSync: (lastMessage as any).isSync,
       messageId: lastMessage.messageId || undefined,  // Track which message the lastStatus belongs to
+      pushName: (lastMessage as any).pushName || undefined,
     }, selectedKeyRef.current);
     const _traceStoreEnd = Date.now();
     console.log(`[TRACE][STORE_UPDATED] timestamp: ${_traceStoreEnd} | delta: ${_traceStoreEnd - _traceStoreStart}ms | handled: ${handled} | msgId: ${_traceMsgId}`);

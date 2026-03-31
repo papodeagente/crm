@@ -181,7 +181,7 @@ function buildMessageObject(body: ZApiMessagePayload): Record<string, any> {
   }
 
   if (body.audio) {
-    const key = body.audio.ptt ? "audioMessage" : "audioMessage";
+    const key = body.audio.ptt ? "pttMessage" : "audioMessage";
     msg[key] = {
       url: body.audio.audioUrl,
       mimetype: body.audio.mimeType || "audio/ogg; codecs=opus",

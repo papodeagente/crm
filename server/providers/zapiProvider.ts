@@ -869,17 +869,18 @@ export class ZApiProvider implements WhatsAppProvider {
     // Docs: https://developer.z-api.io/message/pin-message
     await zapiFetch(instanceName, "pin-message", {
       method: "POST",
-      body: { phone, messageId, status: pin },
+      body: { phone, messageId, messageAction: pin ? "pin" : "unpin" },
     });
   }
 
   async forwardMessage(instanceName: string, fromJid: string, toJid: string, messageId: string): Promise<WASendResult> {
     const phone = jidToPhone(toJid);
+    const messagePhone = jidToPhone(fromJid);
     // Z-API: POST /forward-message
     // Docs: https://developer.z-api.io/message/forward-message
     const result = await zapiFetch(instanceName, "forward-message", {
       method: "POST",
-      body: { phone, messageId },
+      body: { phone, messageId, messagePhone },
     });
     return zapiSendResultToCanonical(result, phone);
   }
