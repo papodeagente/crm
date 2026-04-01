@@ -127,18 +127,28 @@ function mapEventType(zapiEvent: ZApiWebhookEvent): WebhookEventType {
  * Evolution uses "5511999999999@s.whatsapp.net"
  */
 function toRemoteJid(phone?: string, chatId?: string, isGroup?: boolean): string {
-  if (chatId) {
-    // Already has @g.us or @c.us suffix
-    if (chatId.includes("@g.us")) return chatId;
-    if (chatId.includes("@c.us")) return chatId.replace("@c.us", "@s.whatsapp.net");
-    if (chatId.includes("@s.whatsapp.net")) return chatId;
-    // Raw number
-    return `${chatId}@s.whatsapp.net`;
-  }
+  // Priority 1: phone field (most reliable per Z-API docs)
   if (phone) {
     const cleaned = phone.replace(/\D/g, "");
-    if (isGroup) return `${cleaned}@g.us`;
-    return `${cleaned}@s.whatsapp.net`;
+    if (cleaned) {
+      if (isGroup) return `${cleaned}@g.us`;
+      return `${cleaned}@s.whatsapp.net`;
+    }
+  }
+  // Priority 2: chatId (may contain @c.us or @g.us suffix)
+  if (chatId) {
+    if (chatId.includes("@g.us")) return chatId;
+    if (chatId.includes("@c.us")) {
+      const num = chatId.replace("@c.us", "");
+      if (num) return `${num}@s.whatsapp.net`;
+    }
+    if (chatId.includes("@s.whatsapp.net")) {
+      const num = chatId.replace("@s.whatsapp.net", "");
+      if (num) return chatId;
+    }
+    // Raw number without suffix
+    const cleaned = chatId.replace(/\D/g, "");
+    if (cleaned) return `${cleaned}@s.whatsapp.net`;
   }
   return "unknown@s.whatsapp.net";
 }

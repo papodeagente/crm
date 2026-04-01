@@ -1262,6 +1262,7 @@ async function handleZApiWebhook(req: Request, res: Response) {
     }
 
     console.log(`[Webhook /zapi] Received | Session: ${sessionId} | Path: ${req.path} | Event: ${eventType || 'auto-detect'}`);
+    console.log(`[Webhook /zapi] RAW PAYLOAD | phone: ${body?.phone || 'EMPTY'} | chatId: ${body?.chatId || 'EMPTY'} | messageId: ${body?.messageId || 'EMPTY'} | fromMe: ${body?.fromMe} | type: ${body?.type || 'EMPTY'} | keys: ${Object.keys(body || {}).join(',')}`);
 
     // Verify this session is actually using Z-API provider
     const providerType = await resolveProviderTypeForSession(sessionId);
@@ -1374,7 +1375,10 @@ function detectZApiEventFromBody(body: any): ZApiWebhookEvent {
   if (body?.connected !== undefined) return body.connected ? "on-connection" : "on-disconnect";
   if (body?.type === "PresenceChatCallback") return "on-chat-presence";
   if (body?.status && body?.ids) return "on-whatsapp-message-status-changes";
+  if (body?.type === "MessageStatusCallback") return "on-whatsapp-message-status-changes";
   if (body?.fromMe === true) return "on-message-send";
+  if (body?.type === "DeliveryCallback") return "on-message-send";
+  if (body?.type === "ReceivedCallback") return "on-message-received";
   if (body?.phone || body?.chatId) return "on-message-received";
   return "unknown";
 }
