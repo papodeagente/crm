@@ -904,13 +904,18 @@ class WhatsAppEvolutionManager extends EventEmitter {
           if (!c.remoteJid) continue;
           const pushName = c.pushName || null;
           const profilePictureUrl = c.profilePicUrl || null;
+          const contactLid = c.lid || null;
 
           if (existingJids.has(c.remoteJid)) {
             // Update existing contact if pushName changed
-            if (pushName) {
+            if (pushName || contactLid) {
+              const updateData: any = {};
+              if (pushName) updateData.pushName = pushName;
+              if (profilePictureUrl) updateData.profilePictureUrl = profilePictureUrl;
+              if (contactLid) updateData.lid = contactLid;
               updates.push(
                 db.update(waContacts)
-                  .set({ pushName, profilePictureUrl })
+                  .set(updateData)
                   .where(and(
                     eq(waContacts.sessionId, session.sessionId),
                     eq(waContacts.jid, c.remoteJid)
@@ -921,14 +926,18 @@ class WhatsAppEvolutionManager extends EventEmitter {
             }
           } else {
             // Insert new contact
+            const phoneNumber = c.remoteJid.endsWith('@s.whatsapp.net')
+              ? c.remoteJid.replace('@s.whatsapp.net', '')
+              : null;
             inserts.push({
               sessionId: session.sessionId,
               jid: c.remoteJid,
-              phoneNumber: c.remoteJid.endsWith('@s.whatsapp.net') ? c.remoteJid : null,
+              phoneNumber,
               pushName,
               savedName: null,
               verifiedName: null,
               profilePictureUrl,
+              lid: contactLid,
             });
             synced++;
           }
@@ -1535,7 +1544,29 @@ class WhatsAppEvolutionManager extends EventEmitter {
 
       if (key.remoteJid === "status@broadcast") return;
       if (key.remoteJid.endsWith("@g.us")) return; // Skip groups
-      if (key.remoteJid.endsWith("@lid")) return; // Skip LID
+
+      // LID resolution: if remoteJid is a LID, try to resolve to phone via wa_contacts
+      if (key.remoteJid.endsWith("@lid")) {
+        const db2 = await getDb();
+        if (db2) {
+          const lidMatch = await db2.select({ phoneNumber: waContacts.phoneNumber })
+            .from(waContacts)
+            .where(and(
+              eq(waContacts.sessionId, session.sessionId),
+              eq(waContacts.lid, key.remoteJid),
+              sql`${waContacts.phoneNumber} IS NOT NULL AND ${waContacts.phoneNumber} != ''`
+            ))
+            .limit(1);
+
+          if (lidMatch.length > 0 && lidMatch[0].phoneNumber) {
+            const resolvedJid = `${lidMatch[0].phoneNumber}@s.whatsapp.net`;
+            console.log(`[Evolution] LID resolved: ${key.remoteJid} → ${resolvedJid}`);
+            key.remoteJid = resolvedJid;
+          } else {
+            console.log(`[Evolution] LID unresolved: ${key.remoteJid} — processing with LID JID`);
+          }
+        }
+      }
 
       const messageType = data?.messageType || "conversation";
       const skipTypes = ["protocolMessage", "senderKeyDistributionMessage", "messageContextInfo", "ephemeralMessage"];

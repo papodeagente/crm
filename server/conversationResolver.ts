@@ -304,11 +304,15 @@ export async function resolveConversation(
   // IMPORTANT: Use normalizePhone for the CANONICAL KEY (deduplication),
   // but preserve the raw remoteJid for storage (used for sending replies).
   // The raw JID is what WhatsApp actually recognizes.
+  const isLid = remoteJid.endsWith("@lid");
   const jidDigits = remoteJid.replace(/@.*$/, "").replace(/\D/g, "");
-  const phone = normalizePhone(jidDigits);
+  const phone = isLid
+    ? { phoneE164: "", digitsOnly: jidDigits, last11BR: "", valid: false, reason: "lid_identifier" as const }
+    : normalizePhone(jidDigits);
 
   // Usar phoneE164 digits como chave canônica (deduplication only)
-  const keyDigits = phone.valid ? phone.digitsOnly : jidDigits;
+  // For LID JIDs, prefix with "lid:" to avoid collision with real phone numbers
+  const keyDigits = phone.valid ? phone.digitsOnly : (isLid ? `lid:${jidDigits}` : jidDigits);
   const conversationKey = buildConversationKey(sessionId, keyDigits);
 
   // Buscar conversa existente por conversationKey
@@ -491,13 +495,17 @@ export async function resolveInbound(
   pushName?: string | null,
   options?: { skipContactCreation?: boolean },
 ): Promise<ResolvedConversation> {
-  // Use raw JID for storage, but normalize phone for canonical key/deduplication
+  // LID detection: @lid JIDs are WhatsApp Linked IDs, NOT phone numbers.
+  // Don't run normalizePhone on LID digits — they are opaque identifiers.
+  const isLid = remoteJid.endsWith("@lid");
   const jidDigits = remoteJid.replace(/@.*$/, "").replace(/\D/g, "");
-  const phone = normalizePhone(jidDigits);
+  const phone = isLid
+    ? { phoneE164: "", digitsOnly: jidDigits, last11BR: "", valid: false, reason: "lid_identifier" as const }
+    : normalizePhone(jidDigits);
 
   let contactId: number | null = null;
 
-  // Resolver contato se telefone válido
+  // Resolver contato se telefone válido (skip for LID — no valid phone)
   if (phone.valid) {
     try {
       const contactResult = await resolveContact(tenantId, phone.phoneE164, pushName, { skipCreation: options?.skipContactCreation });
@@ -521,6 +529,7 @@ export async function resolveInbound(
     identityId: identity.identityId,
     isNewConversation: conversation.isNew,
     isNewIdentity: identity.isNew,
+    isLid,
   });
 
   return {
@@ -528,7 +537,7 @@ export async function resolveInbound(
     contactId,
     identityId: identity.identityId,
     conversationKey: conversation.conversationKey,
-    phoneE164: phone.valid ? phone.phoneE164 : `+${jidDigits}`,
+    phoneE164: phone.valid ? phone.phoneE164 : (isLid ? `lid:${jidDigits}` : `+${jidDigits}`),
     isNew: conversation.isNew,
   };
 }

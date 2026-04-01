@@ -674,10 +674,36 @@ async function processNewMessage(session: SessionInfo, data: any, workerStartTim
     const key = data?.key;
     if (!key?.remoteJid) return;
 
-    // Skip groups, broadcast, LID
+    // Skip groups, broadcast
     if (key.remoteJid === "status@broadcast") return;
     if (key.remoteJid.endsWith("@g.us")) return;
-    if (key.remoteJid.endsWith("@lid")) return;
+
+    // LID resolution: if remoteJid is a LID, try to resolve to phone via wa_contacts
+    if (key.remoteJid.endsWith("@lid")) {
+      const db2 = await getDb();
+      if (db2) {
+        const lidMatch = await db2.select({ phoneNumber: waContacts.phoneNumber })
+          .from(waContacts)
+          .where(and(
+            eq(waContacts.sessionId, sessionId),
+            eq(waContacts.lid, key.remoteJid),
+            sql`${waContacts.phoneNumber} IS NOT NULL AND ${waContacts.phoneNumber} != ''`
+          ))
+          .limit(1);
+
+        if (lidMatch.length > 0 && lidMatch[0].phoneNumber) {
+          const resolvedJid = `${lidMatch[0].phoneNumber}@s.whatsapp.net`;
+          console.log(`[Worker] LID resolved: ${key.remoteJid} → ${resolvedJid}`);
+          key.remoteJid = resolvedJid;
+          data._resolvedFromLid = data.key.remoteJid; // preserve original
+          data.key.remoteJid = resolvedJid;
+        } else {
+          // No mapping found — still process the message with LID JID
+          // It will be stored and can be resolved later when contacts are synced
+          console.log(`[Worker] LID unresolved: ${key.remoteJid} — processing with LID JID`);
+        }
+      }
+    }
 
     // Resolve the actual message type from the payload
     const messageType = resolveMessageType(data);
@@ -888,24 +914,32 @@ async function processNewMessage(session: SessionInfo, data: any, workerStartTim
       );
     }
 
-    // 5b. Update wa_contacts with pushName
+    // 5b. Update wa_contacts with pushName + LID mapping
     if (pushName && !fromMe) {
       const cleanedPush = pushName.replace(/[\s\-\(\)\+]/g, '');
       const isRealName = !/^\d+$/.test(cleanedPush) && pushName !== 'Você' && pushName !== 'You';
       if (isRealName) {
+        const phoneNumber = remoteJid.endsWith('@s.whatsapp.net')
+          ? remoteJid.replace('@s.whatsapp.net', '')
+          : null;
+        const lidValue = remoteJid.endsWith('@lid') ? remoteJid : (data._resolvedFromLid || null);
         db.insert(waContacts).values({
           sessionId,
           jid: remoteJid,
-          phoneNumber: remoteJid.endsWith('@s.whatsapp.net') ? remoteJid : null,
+          phoneNumber,
           pushName,
           savedName: null,
           verifiedName: null,
           profilePictureUrl: null,
+          lid: lidValue,
         }).onDuplicateKeyUpdate({
-          set: { pushName: sql`${pushName}` },
+          set: {
+            pushName: sql`${pushName}`,
+            ...(lidValue ? { lid: lidValue } : {}),
+          },
         }).catch(() =>
           db.update(waContacts)
-            .set({ pushName })
+            .set({ pushName, ...(lidValue ? { lid: lidValue } : {}) })
             .where(and(
               eq(waContacts.sessionId, sessionId),
               eq(waContacts.jid, remoteJid)

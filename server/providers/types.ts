@@ -80,6 +80,7 @@ export interface WAContact {
   remoteJid: string;
   pushName: string | null;
   profilePicUrl: string | null;
+  lid?: string | null; // WhatsApp Linked ID (@lid format)
 }
 
 /** A message from the provider (normalized) */

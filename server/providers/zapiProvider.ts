@@ -278,10 +278,13 @@ function zapiChatToCanonical(chat: any): WAChat {
 
 function zapiContactToCanonical(contact: any): WAContact {
   const phone = contact.phone || contact.id || "";
+  // Z-API contacts may include a LID (Linked ID) field
+  const lid = contact.lid || contact.chatLid || null;
   return {
     remoteJid: phoneToJid(phone),
     pushName: contact.name || contact.notify || null,
     profilePicUrl: contact.profileThumbnail || contact.imgUrl || null,
+    lid: lid ? (lid.includes("@lid") ? lid : `${lid}@lid`) : null,
   };
 }
 

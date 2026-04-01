@@ -16,7 +16,7 @@ import {
   type InboundLeadPayload,
 } from "./leadProcessor";
 import { getDb } from "./db";
-import { eventLog, trackingTokens, rdStationConfig, rdStationWebhookLog, whatsappSessions, rdStationConfigTasks, productCatalog, dealProducts, tasks, webhookConfig, metaIntegrationConfig, teamMembers, crmUsers } from "../drizzle/schema";
+import { eventLog, trackingTokens, rdStationConfig, rdStationWebhookLog, whatsappSessions, rdStationConfigTasks, productCatalog, dealProducts, tasks, webhookConfig, metaIntegrationConfig, teamMembers, crmUsers, waContacts } from "../drizzle/schema";
 import { createDealProduct, createTask, recalcDealValue } from "./crmDb";
 import { eq, and, sql } from "drizzle-orm";
 import { ENV } from "./_core/env";
@@ -1310,6 +1310,39 @@ async function handleZApiWebhook(req: Request, res: Response) {
     if (!normalized) {
       console.log(`[Webhook /zapi] Event filtered out (group/broadcast/unknown): ${zapiEvent}`);
       return res.status(200).json({ received: true, filtered: true });
+    }
+
+    // ── LID→phone resolution ──
+    // Z-API may send LID (Linked ID) instead of phone number.
+    // Try to resolve LID to a real phone JID via wa_contacts table.
+    const remoteJid = normalized.data?.key?.remoteJid;
+    if (remoteJid && remoteJid.endsWith("@lid")) {
+      try {
+        const db = await getDb();
+        if (db) {
+          // Look up wa_contacts for a phone number matching this LID
+          const lidMatch = await db.select({ phoneNumber: waContacts.phoneNumber })
+            .from(waContacts)
+            .where(and(
+              eq(waContacts.sessionId, sessionId),
+              eq(waContacts.lid, remoteJid),
+              sql`${waContacts.phoneNumber} IS NOT NULL AND ${waContacts.phoneNumber} != ''`
+            ))
+            .limit(1);
+
+          if (lidMatch.length > 0 && lidMatch[0].phoneNumber) {
+            const resolvedJid = `${lidMatch[0].phoneNumber}@s.whatsapp.net`;
+            console.log(`[Webhook /zapi] LID resolved: ${remoteJid} → ${resolvedJid}`);
+            normalized.data.key.remoteJid = resolvedJid;
+            // Store original LID for reference
+            normalized.data._resolvedFromLid = remoteJid;
+          } else {
+            console.log(`[Webhook /zapi] LID not resolved (no mapping): ${remoteJid} — will store with LID JID`);
+          }
+        }
+      } catch (e: any) {
+        console.warn(`[Webhook /zapi] LID resolution error:`, e.message);
+      }
     }
 
     console.log(`[Webhook /zapi] Normalized: ${zapiEvent} → ${normalized.event} | Instance: ${instanceName} | JID: ${normalized.data?.key?.remoteJid || 'N/A'}`);

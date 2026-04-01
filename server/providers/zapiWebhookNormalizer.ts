@@ -129,15 +129,21 @@ function mapEventType(zapiEvent: ZApiWebhookEvent): WebhookEventType {
 function toRemoteJid(phone?: string, chatId?: string, isGroup?: boolean): string {
   // Priority 1: phone field (most reliable per Z-API docs)
   if (phone) {
+    // Z-API LID support: phone may be "152625974657081@lid"
+    // Preserve the @lid suffix — it's a valid WhatsApp Linked ID
+    if (phone.endsWith("@lid")) {
+      return phone; // Return as-is, e.g. "152625974657081@lid"
+    }
     const cleaned = phone.replace(/\D/g, "");
     if (cleaned) {
       if (isGroup) return `${cleaned}@g.us`;
       return `${cleaned}@s.whatsapp.net`;
     }
   }
-  // Priority 2: chatId (may contain @c.us or @g.us suffix)
+  // Priority 2: chatId (may contain @c.us, @g.us, or @lid suffix)
   if (chatId) {
     if (chatId.includes("@g.us")) return chatId;
+    if (chatId.endsWith("@lid")) return chatId; // Preserve LID
     if (chatId.includes("@c.us")) {
       const num = chatId.replace("@c.us", "");
       if (num) return `${num}@s.whatsapp.net`;
@@ -342,6 +348,9 @@ export function normalizeZApiWebhook(
           },
           // Sender's WhatsApp profile picture (for wa_contacts upsert)
           _zapiSenderPhoto: (body as any).senderPhoto || (body as any).photo || null,
+          // Original Z-API phone/chatLid for LID→phone resolution
+          _zapiOriginalPhone: body.phone || null,
+          _zapiChatLid: (body as any).chatLid || null,
         },
       };
     }
@@ -371,6 +380,8 @@ export function normalizeZApiWebhook(
             documentUrl: body.document?.documentUrl,
             stickerUrl: body.sticker?.stickerUrl,
           },
+          _zapiOriginalPhone: body.phone || null,
+          _zapiChatLid: (body as any).chatLid || null,
         },
       };
     }
