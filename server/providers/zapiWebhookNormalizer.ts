@@ -306,8 +306,9 @@ export function normalizeZApiWebhook(
   // Skip group messages (system already filters these)
   if (body.isGroup) return null;
 
-  // Skip broadcast/newsletter
+  // Skip broadcast/newsletter/status updates
   if (body.broadcast || body.isNewsletter) return null;
+  if (body.phone === "status@broadcast" || body.isStatusReply) return null;
 
   const evoEvent = mapEventType(zapiEvent);
   const remoteJid = toRemoteJid(body.phone, body.chatId, body.isGroup);
