@@ -153,7 +153,7 @@ export default function ConversionHistory({ contactId }: ConversionHistoryProps)
                               className="flex items-center gap-1 text-primary hover:underline"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                navigate(`/deals/${conv.dealId}`);
+                                navigate(`/deal/${conv.dealId}`);
                               }}
                             >
                               <Link2 className="h-2.5 w-2.5" />
@@ -246,7 +246,7 @@ export default function ConversionHistory({ contactId }: ConversionHistoryProps)
                                   className="flex items-center gap-1 text-xs text-primary hover:underline"
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    navigate(`/deals/${conv.dealId}`);
+                                    navigate(`/deal/${conv.dealId}`);
                                   }}
                                 >
                                   <Link2 className="h-3 w-3" />

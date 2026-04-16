@@ -419,7 +419,7 @@ export const ONBOARDING_STEPS = [
   { key: "stages", label: "Configurar etapas do funil", href: "/settings/pipelines", description: "Defina as etapas que suas negociações percorrem" },
   { key: "products", label: "Cadastrar produtos", href: "/settings/products", description: "Adicione seus produtos e serviços ao catálogo" },
   { key: "loss_reasons", label: "Cadastrar motivos de perda", href: "/settings/loss-reasons", description: "Defina os motivos pelos quais negociações são perdidas" },
-  { key: "import", label: "Importar contatos e negociações", href: "/settings/import", description: "Importe sua base de dados existente" },
+  { key: "import", label: "Importar contatos e negociações", href: "/settings/import-rd-crm", description: "Importe sua base de dados existente" },
   { key: "custom_fields", label: "Configurar campos personalizados", href: "/settings/custom-fields", description: "Crie campos específicos para seu negócio" },
   { key: "goals", label: "Configurar metas", href: "/settings/goals", description: "Defina metas de vendas para sua equipe" },
   { key: "automations", label: "Configurar automações", href: "/settings/automations", description: "Automatize tarefas repetitivas do CRM" },

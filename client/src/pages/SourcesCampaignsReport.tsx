@@ -447,7 +447,7 @@ export default function SourcesCampaignsReport() {
                       <TableRow
                         key={deal.id}
                         className="cursor-pointer hover:bg-muted/50"
-                        onClick={() => navigate(`/deals/${deal.id}`)}
+                        onClick={() => navigate(`/deal/${deal.id}`)}
                       >
                         <TableCell>
                           <div>

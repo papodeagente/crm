@@ -125,7 +125,7 @@ function TaskItem({ task }: { task: any }) {
     return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", timeZone: SYSTEM_TIMEZONE }) + " " + time;
   })();
 
-  const entityHref = task.entityType === "deal" ? `/deal/${task.entityId}` : task.entityType === "contact" ? `/contacts/${task.entityId}` : "#";
+  const entityHref = task.entityType === "deal" ? `/deal/${task.entityId}` : task.entityType === "contact" ? `/contact/${task.entityId}` : "#";
   
   // Build subtitle: dealTitle + contactName + accountName
   const subtitleParts: string[] = [];
@@ -1107,7 +1107,7 @@ export default function Home() {
                   }
 
                   return (
-                    <Link key={dep.id} href={`/deals/${dep.id}`}>
+                    <Link key={dep.id} href={`/deal/${dep.id}`}>
                       <div className={`flex items-center gap-3 py-3 px-3 rounded-xl cursor-pointer hover:bg-muted/50 transition-colors group ${urgencyRing}`}>
                         {/* Urgency badge */}
                         <div className={`h-11 w-11 rounded-xl flex items-center justify-center shrink-0 ${urgencyClass}`}>

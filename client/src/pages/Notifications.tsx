@@ -19,7 +19,7 @@ const typeConfig: Record<string, { icon: any; bg: string; iconBg: string; iconCo
     iconBg: "bg-emerald-500/15",
     iconColor: "text-emerald-400",
     label: "WhatsApp",
-    route: () => "/settings/inbox",
+    route: () => "/inbox",
   },
   deal_moved: {
     icon: ArrowRightLeft,
@@ -43,7 +43,7 @@ const typeConfig: Record<string, { icon: any; bg: string; iconBg: string; iconCo
     iconBg: "bg-violet-500/15",
     iconColor: "text-violet-400",
     label: "Passageiro",
-    route: (id) => `/contacts?id=${id}`,
+    route: (id) => `/contact/${id}`,
   },
   task_created: {
     icon: ClipboardList,
@@ -75,7 +75,7 @@ const typeConfig: Record<string, { icon: any; bg: string; iconBg: string; iconCo
     iconBg: "bg-pink-500/15",
     iconColor: "text-pink-400",
     label: "Aniversário",
-    route: (id) => `/contacts?id=${id}`,
+    route: (id) => `/contact/${id}`,
   },
   wedding_anniversary: {
     icon: Heart,
@@ -83,7 +83,7 @@ const typeConfig: Record<string, { icon: any; bg: string; iconBg: string; iconCo
     iconBg: "bg-rose-500/15",
     iconColor: "text-rose-400",
     label: "Casamento",
-    route: (id) => `/contacts?id=${id}`,
+    route: (id) => `/contact/${id}`,
   },
   new_lead: {
     icon: UserCheck,
@@ -106,7 +106,7 @@ const typeConfig: Record<string, { icon: any; bg: string; iconBg: string; iconCo
     iconBg: "bg-red-500/15",
     iconColor: "text-red-400",
     label: "WhatsApp",
-    route: () => "/settings/inbox",
+    route: () => "/inbox",
   },
   whatsapp_warning: {
     icon: AlertTriangle,
@@ -114,7 +114,7 @@ const typeConfig: Record<string, { icon: any; bg: string; iconBg: string; iconCo
     iconBg: "bg-yellow-500/15",
     iconColor: "text-yellow-400",
     label: "WhatsApp",
-    route: () => "/settings/inbox",
+    route: () => "/inbox",
   },
   automation_triggered: {
     icon: Zap,
@@ -129,7 +129,7 @@ const typeConfig: Record<string, { icon: any; bg: string; iconBg: string; iconCo
     iconBg: "bg-sky-500/15",
     iconColor: "text-sky-400",
     label: "Embarque Próximo",
-    route: (id) => `/deals/${id}`,
+    route: (id) => `/deal/${id}`,
   },
 };
 

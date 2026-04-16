@@ -274,7 +274,7 @@ function EventBlock({ item, onClickAppt, compact }: { item: AgendaItem; onClickA
     return <Link href={`/deal/${item.entityId}`} className="block">{inner}</Link>;
   }
   if (item.source === "crm" && item.entityType === "contact" && item.entityId) {
-    return <Link href={`/contacts/${item.entityId}`} className="block">{inner}</Link>;
+    return <Link href={`/contact/${item.entityId}`} className="block">{inner}</Link>;
   }
   return <div>{inner}</div>;
 }
