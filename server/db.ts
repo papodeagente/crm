@@ -1,5 +1,5 @@
 import { eq, desc, and, or, like, lt, gt, isNotNull, isNull, sql, inArray } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/mysql2";
+import { drizzle } from "drizzle-orm/node-postgres";
 
 import { InsertUser, users, whatsappSessions, waMessages as messages, activityLogs, chatbotSettings, chatbotRules, conversationAssignments, crmUsers, teams, teamMembers, distributionRules, customFields, customFieldValues, waConversations, userPreferences, sessionShares, conversationEvents, internalNotes, quickReplies, waContacts, aiIntegrations, aiTrainingConfigs, tenants, conversationLocks, waReactions, conversationTags, waConversationTagLinks, scheduledMessages } from "../drizzle/schema";
 import { ENV } from './_core/env';
@@ -9,7 +9,7 @@ let _db: ReturnType<typeof drizzle> | null = null;
 
 /**
  * Convert timestamp strings from db.execute() to Date objects.
- * mysql2 with timezone: '+00:00' returns TIMESTAMP/DATETIME as strings like "2026-03-16 15:07:00" (UTC).
+ * node-postgres may return TIMESTAMP columns as strings like "2026-03-16 15:07:00" (UTC).
  * Without conversion, browsers parse these as local time (missing Z suffix), causing timezone offset.
  * Converting to Date objects lets superjson serialize them with type metadata,
  * so the frontend receives proper Date objects that are timezone-aware.
@@ -51,10 +51,7 @@ export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
     try {
       _db = drizzle({
-        connection: {
-          uri: process.env.DATABASE_URL,
-          timezone: '+00:00',
-        },
+        connection: process.env.DATABASE_URL,
       });
     } catch (error) {
       console.warn("[Database] Failed to connect:", error);
@@ -114,7 +111,8 @@ export async function upsertUser(user: InsertUser): Promise<void> {
       updateSet.lastSignedIn = new Date();
     }
 
-    await db.insert(users).values(values).onDuplicateKeyUpdate({
+    await db.insert(users).values(values).onConflictDoUpdate({
+      target: users.openId,
       set: updateSet,
     });
   } catch (error) {
@@ -389,7 +387,7 @@ export async function getConversationsList(sessionId: string) {
         SELECT m4.pushName FROM messages m4 
         WHERE m4.sessionId = ${sessionId} 
         AND m4.remoteJid = m.remoteJid
-        AND m4.fromMe = 0 
+        AND m4.fromMe = false
         AND m4.pushName IS NOT NULL 
         AND m4.pushName != ''
         ORDER BY m4.id DESC LIMIT 1
@@ -398,7 +396,7 @@ export async function getConversationsList(sessionId: string) {
         SELECT COUNT(*) FROM messages m2 
         WHERE m2.sessionId = ${sessionId} 
         AND m2.remoteJid = m.remoteJid
-        AND m2.fromMe = 0 
+        AND m2.fromMe = false
         AND (m2.status IS NULL OR m2.status = 'received')
         AND m2.messageType NOT IN (${sql.raw(skipTypesSQL)})
       ) AS unreadCount,
@@ -424,7 +422,7 @@ export async function getConversationsList(sessionId: string) {
     ORDER BY m.timestamp DESC
   `);
   
-  const rows = (result as any)[0] || [];
+  const rows = result as any[];
   return dedupConversations(fixTimestampFields(rows));
 }
 
@@ -595,7 +593,7 @@ export async function finishAttendance(tenantId: number, sessionId: string, remo
         eq(conversationAssignments.sessionId, sessionId),
         eq(conversationAssignments.remoteJid, jid)
       ));
-    const caAffected = (caResult as any)[0]?.affectedRows ?? 0;
+    const caAffected = (caResult as any).rowCount ?? 0;
     if (caAffected > 0) {
       console.log(`[finishAttendance] conversation_assignments resolved: ${caAffected} rows (jid: ${jid})`);
       break;
@@ -612,7 +610,7 @@ export async function finishAttendance(tenantId: number, sessionId: string, remo
         eq(waConversations.sessionId, sessionId),
         eq(waConversations.remoteJid, jid)
       ));
-    wcAffected = (wcResult as any)[0]?.affectedRows ?? 0;
+    wcAffected = (wcResult as any).rowCount ?? 0;
     if (wcAffected > 0) {
       console.log(`[finishAttendance] wa_conversations resolved: ${wcAffected} rows (jid: ${jid})`);
       break;
@@ -762,7 +760,7 @@ export async function getConversationsListMultiAgent(sessionId: string, tenantId
         SELECT m4.pushName FROM messages m4 
         WHERE m4.sessionId = ${sessionId} 
         AND m4.remoteJid = m.remoteJid
-        AND m4.fromMe = 0 
+        AND m4.fromMe = false
         AND m4.pushName IS NOT NULL 
         AND m4.pushName != ''
         ORDER BY m4.id DESC LIMIT 1
@@ -771,7 +769,7 @@ export async function getConversationsListMultiAgent(sessionId: string, tenantId
         SELECT COUNT(*) FROM messages m2 
         WHERE m2.sessionId = ${sessionId} 
         AND m2.remoteJid = m.remoteJid
-        AND m2.fromMe = 0 
+        AND m2.fromMe = false
         AND (m2.status IS NULL OR m2.status = 'received')
         AND m2.messageType NOT IN (${sql.raw(skipTypesSQL)})
       ) AS unreadCount,
@@ -809,7 +807,7 @@ export async function getConversationsListMultiAgent(sessionId: string, tenantId
     ORDER BY m.timestamp DESC
   `);
   
-   const rows = (result as any)[0] || [];
+   const rows = result as any[];
   return dedupConversations(fixTimestampFields(rows));
 }
 // Round-robin assignment: get next agent for a tenant
@@ -833,7 +831,7 @@ export async function getNextRoundRobinAgent(tenantId: number): Promise<number |
     ORDER BY assignmentCount ASC, cu.id ASC
     LIMIT 1
   `);
-  const rows = (result as any)[0];
+  const rows = result as any[];
   return rows?.[0]?.id || null;
 }
 
@@ -890,7 +888,7 @@ export async function getDashboardMetrics(tenantId: number, userId?: number, pip
         ? sql`AND d_inner.deletedAt IS NULL`
         : sql`AND d_inner.status = 'open'`;
 
-  const [result] = await db.execute(sql`
+  const result = await db.execute(sql`
     SELECT
       -- Deals filtered by status
       (SELECT COUNT(*) FROM deals d_inner
@@ -924,7 +922,7 @@ export async function getDashboardMetrics(tenantId: number, userId?: number, pip
         JOIN pipelines p ON p.id = d_inner.pipelineId AND p.pipelineType = 'post_sale'
         JOIN pipeline_stages ps ON ps.id = d_inner.stageId
         WHERE d_inner.tenantId = ${tenantId} AND d_inner.status = 'open' AND d_inner.deletedAt IS NULL
-        AND ps.isWon = 0 AND ps.isLost = 0
+        AND ps.isWon = false AND ps.isLost = false
         AND LOWER(ps.name) NOT LIKE '%finalizada%'
         ${ownerFilter} ${dealDateFilter}) AS activeTrips,
       -- Trips last 30 days
@@ -932,7 +930,7 @@ export async function getDashboardMetrics(tenantId: number, userId?: number, pip
         JOIN pipelines p ON p.id = d_inner.pipelineId AND p.pipelineType = 'post_sale'
         JOIN pipeline_stages ps ON ps.id = d_inner.stageId
         WHERE d_inner.tenantId = ${tenantId} AND d_inner.status = 'open' AND d_inner.deletedAt IS NULL
-        AND ps.isWon = 0 AND ps.isLost = 0
+        AND ps.isWon = false AND ps.isLost = false
         AND LOWER(ps.name) NOT LIKE '%finalizada%'
         ${ownerFilter} ${dealDateFilter}
         AND d_inner.createdAt >= ${thirtyDaysAgo}) AS tripsLast30,
@@ -941,7 +939,7 @@ export async function getDashboardMetrics(tenantId: number, userId?: number, pip
         JOIN pipelines p ON p.id = d_inner.pipelineId AND p.pipelineType = 'post_sale'
         JOIN pipeline_stages ps ON ps.id = d_inner.stageId
         WHERE d_inner.tenantId = ${tenantId} AND d_inner.status = 'open' AND d_inner.deletedAt IS NULL
-        AND ps.isWon = 0 AND ps.isLost = 0
+        AND ps.isWon = false AND ps.isLost = false
         AND LOWER(ps.name) NOT LIKE '%finalizada%'
         ${ownerFilter} ${dealDateFilter}
         AND d_inner.createdAt >= ${sixtyDaysAgo} AND d_inner.createdAt < ${thirtyDaysAgo}) AS tripsPrev30,
@@ -961,7 +959,7 @@ export async function getDashboardMetrics(tenantId: number, userId?: number, pip
         WHERE d_inner.tenantId = ${tenantId} AND d_inner.deletedAt IS NULL ${statusFilter} ${pipelineFilter} ${ownerFilter} ${dealDateFilter}) AS totalDealValueCents
   `);
 
-  const row = (result as any)[0] || {};
+  const row = (result as any[])[0] || {};
 
   function calcChange(current: number, previous: number): number {
     if (previous === 0) return current > 0 ? 100 : 0;
@@ -1004,7 +1002,7 @@ export async function getPipelineSummary(tenantId: number, userId?: number, pipe
         ? sql`AND d.deletedAt IS NULL`
         : sql`AND d.status = 'open'`;
 
-  const [rows] = await db.execute(sql`
+  const rows = await db.execute(sql`
     SELECT
       ps.id AS stageId,
       ps.name AS stageName,
@@ -1045,7 +1043,7 @@ export async function getRecentActivity(tenantId: number, limit = 8, dateFrom?: 
   if (dateTo) dateConditions.push(sql`AND createdAt <= ${new Date(dateTo + "T23:59:59")}`);
   const dateFilter = dateConditions.length > 0 ? sql.join(dateConditions, sql` `) : sql``;
 
-  const [rows] = await db.execute(sql`
+  const rows = await db.execute(sql`
     SELECT id, dealId, action, description, fromStageName, toStageName,
            actorName, createdAt
     FROM deal_history
@@ -1081,7 +1079,7 @@ export async function getUpcomingTasks(tenantId: number, userId?: number, limit 
   const todayEnd = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000);
 
   // Tasks that are: (1) due today and open/in_progress, OR (2) overdue (past due, still open)
-  const [rows] = await db.execute(sql`
+  const rows = await db.execute(sql`
     SELECT t.id, t.title, t.dueAt, t.priority, t.status,
            t.entityType, t.entityId, t.taskType
     FROM crm_tasks t
@@ -1134,7 +1132,7 @@ export async function globalSearch(tenantId: number, query: string, limit = 5) {
   const searchTerm = `%${query.trim()}%`;
 
   // Search contacts (name, email, phone)
-  const [contactRows] = await db.execute(sql`
+  const contactRows = await db.execute(sql`
     SELECT id, name, email, phone, type, lifecycleStage
     FROM contacts
     WHERE tenantId = ${tenantId}
@@ -1144,7 +1142,7 @@ export async function globalSearch(tenantId: number, query: string, limit = 5) {
   `);
 
   // Search deals (title)
-  const [dealRows] = await db.execute(sql`
+  const dealRows = await db.execute(sql`
     SELECT d.id, d.title, d.valueCents, d.status,
            ps.name AS stageName
     FROM deals d
@@ -1156,7 +1154,7 @@ export async function globalSearch(tenantId: number, query: string, limit = 5) {
   `);
 
   // Search tasks (title)
-  const [taskRows] = await db.execute(sql`
+  const taskRows = await db.execute(sql`
     SELECT id, title, dueAt, priority, status, entityType, entityId
     FROM crm_tasks
     WHERE tenantId = ${tenantId}
@@ -1221,7 +1219,7 @@ export async function globalSearchWithVisibility(
     ? sql`AND ownerUserId IN (${sql.join(visibility.contactOwnerIds.map(id => sql`${id}`), sql`, `)})`
     : sql``;
 
-  const [contactRows] = await db.execute(sql`
+  const contactRows = await db.execute(sql`
     SELECT id, name, email, phone, type, lifecycleStage
     FROM contacts
     WHERE tenantId = ${tenantId}
@@ -1236,7 +1234,7 @@ export async function globalSearchWithVisibility(
     ? sql`AND d.ownerUserId IN (${sql.join(visibility.dealOwnerIds.map(id => sql`${id}`), sql`, `)})`
     : sql``;
 
-  const [dealRows] = await db.execute(sql`
+  const dealRows = await db.execute(sql`
     SELECT d.id, d.title, d.valueCents, d.status,
            ps.name AS stageName
     FROM deals d
@@ -1248,7 +1246,7 @@ export async function globalSearchWithVisibility(
     LIMIT ${limit}
   `);
 
-  const [taskRows] = await db.execute(sql`
+  const taskRows = await db.execute(sql`
     SELECT id, title, dueAt, priority, status, entityType, entityId
     FROM crm_tasks
     WHERE tenantId = ${tenantId}
@@ -1299,7 +1297,7 @@ export async function createNotification(tenantId: number, data: {
   const db = await getDb();
   if (!db) return null;
 
-  const [result] = await db.execute(sql`
+  const result = await db.execute(sql`
     INSERT INTO notifications (tenantId, type, title, body, entityType, entityId)
     VALUES (${tenantId}, ${data.type}, ${data.title}, ${data.body || null}, ${data.entityType || null}, ${data.entityId || null})
   `);
@@ -1316,7 +1314,7 @@ export async function getNotifications(tenantId: number, opts?: { onlyUnread?: b
 
   let rows: any;
   if (opts?.onlyUnread) {
-    [rows] = await db.execute(sql`
+    rows = await db.execute(sql`
       SELECT id, tenantId, type, title, body, entityType, entityId, isRead, createdAt
       FROM notifications
       WHERE tenantId = ${tenantId} AND isRead = false ${cursorClause}
@@ -1324,7 +1322,7 @@ export async function getNotifications(tenantId: number, opts?: { onlyUnread?: b
       LIMIT ${limit}
     `);
   } else {
-    [rows] = await db.execute(sql`
+    rows = await db.execute(sql`
       SELECT id, tenantId, type, title, body, entityType, entityId, isRead, createdAt
       FROM notifications
       WHERE tenantId = ${tenantId} ${cursorClause}
@@ -1350,7 +1348,7 @@ export async function getUnreadNotificationCount(tenantId: number): Promise<numb
   const db = await getDb();
   if (!db) return 0;
 
-  const [rows] = await db.execute(sql`
+  const rows = await db.execute(sql`
     SELECT COUNT(*) AS cnt FROM notifications
     WHERE tenantId = ${tenantId} AND isRead = false
   `);
@@ -1384,11 +1382,12 @@ export async function markAllNotificationsRead(tenantId: number) {
 export async function createTeam(tenantId: number, data: { name: string; description?: string; color?: string; maxMembers?: number }) {
   const db = await getDb();
   if (!db) return null;
-  const [result] = await db.execute(sql`
+  const result = await db.execute(sql`
     INSERT INTO teams (tenantId, name, description, color, maxMembers)
     VALUES (${tenantId}, ${data.name}, ${data.description || null}, ${data.color || "#6366f1"}, ${data.maxMembers || 50})
+    RETURNING id
   `);
-  const insertId = (result as any).insertId;
+  const insertId = (result as any[])[0]?.id;
   return { id: insertId, tenantId, ...data };
 }
 
@@ -1429,14 +1428,14 @@ export async function deleteTeam(id: number, tenantId: number) {
 export async function getTeamWithMembers(teamId: number, tenantId: number) {
   const db = await getDb();
   if (!db) return null;
-  const [teamRows] = await db.execute(sql`
+  const teamRows = await db.execute(sql`
     SELECT id, tenantId, name, description, color, maxMembers, createdAt, updatedAt
     FROM teams WHERE id = ${teamId} AND tenantId = ${tenantId} LIMIT 1
   `);
   const team = (teamRows as unknown as any[])[0];
   if (!team) return null;
   
-  const [memberRows] = await db.execute(sql`
+  const memberRows = await db.execute(sql`
     SELECT tm.id AS membershipId, tm.userId, tm.role, tm.createdAt,
            cu.name, cu.email, cu.avatarUrl, cu.status
     FROM team_members tm
@@ -1468,16 +1467,17 @@ export async function addTeamMember(tenantId: number, teamId: number, userId: nu
   const db = await getDb();
   if (!db) return null;
   // Check if already a member
-  const [existing] = await db.execute(sql`
+  const existing = await db.execute(sql`
     SELECT id FROM team_members WHERE tenantId = ${tenantId} AND teamId = ${teamId} AND userId = ${userId} LIMIT 1
   `);
   if ((existing as unknown as any[]).length > 0) return { alreadyMember: true };
   
-  const [result] = await db.execute(sql`
+  const result = await db.execute(sql`
     INSERT INTO team_members (tenantId, teamId, userId, role)
     VALUES (${tenantId}, ${teamId}, ${userId}, ${role})
+    RETURNING id
   `);
-  return { id: (result as any).insertId, tenantId, teamId, userId, role };
+  return { id: (result as any[])[0]?.id, tenantId, teamId, userId, role };
 }
 
 export async function removeTeamMember(tenantId: number, teamId: number, userId: number) {
@@ -1504,9 +1504,9 @@ export async function updateTeamMemberRole(tenantId: number, teamId: number, use
 export async function getAgentsWithTeams(tenantId: number) {
   const db = await getDb();
   if (!db) return [];
-  const [rows] = await db.execute(sql`
+  const rows = await db.execute(sql`
     SELECT cu.id, cu.name, cu.email, cu.phone, cu.avatarUrl, cu.status, cu.crm_user_role, cu.lastLoginAt, cu.createdAt,
-      (SELECT GROUP_CONCAT(CONCAT(t.id, ':', t.name, ':', COALESCE(t.color, '#6366f1')) SEPARATOR '|')
+      (SELECT STRING_AGG(t.id || ':' || t.name || ':' || COALESCE(t.color, '#6366f1'), '|')
        FROM team_members tm JOIN teams t ON t.id = tm.teamId
        WHERE tm.userId = cu.id AND tm.tenantId = ${tenantId}
       ) AS teamsList,
@@ -1550,7 +1550,7 @@ export async function updateAgentStatus(tenantId: number, userId: number, status
 export async function getDistributionRules(tenantId: number) {
   const db = await getDb();
   if (!db) return [];
-  const [rows] = await db.execute(sql`
+  const rows = await db.execute(sql`
     SELECT dr.*, t.name AS teamName, t.color AS teamColor
     FROM distribution_rules dr
     LEFT JOIN teams t ON t.id = dr.teamId
@@ -1593,12 +1593,13 @@ export async function createDistributionRule(tenantId: number, data: {
     await db.execute(sql`UPDATE distribution_rules SET isDefault = false WHERE tenantId = ${tenantId}`);
   }
   
-  const [result] = await db.execute(sql`
+  const result = await db.execute(sql`
     INSERT INTO distribution_rules (tenantId, name, description, strategy, teamId, isActive, isDefault, priority, configJson)
-    VALUES (${tenantId}, ${data.name}, ${data.description || null}, ${data.strategy}, ${data.teamId || null}, 
+    VALUES (${tenantId}, ${data.name}, ${data.description || null}, ${data.strategy}, ${data.teamId || null},
             ${data.isActive !== false}, ${data.isDefault || false}, ${data.priority || 0}, ${data.configJson ? JSON.stringify(data.configJson) : null})
+    RETURNING id
   `);
-  return { id: (result as any).insertId, tenantId, ...data };
+  return { id: (result as any[])[0]?.id, tenantId, ...data };
 }
 
 export async function updateDistributionRule(id: number, tenantId: number, data: {
@@ -1973,7 +1974,7 @@ export async function getWaConversationsList(
     ORDER BY wc.isPinned DESC, wc.lastMessageAt DESC
   `);
 
-  const rows = (result as any)[0] || [];
+  const rows = result as any[];
   return dedupConversations(fixTimestampFields(rows));
 }
 
@@ -2040,12 +2041,12 @@ export async function getMessageStatusMetrics(sessionId: string, periodDays: num
 
   const dateCondition = dateFrom || dateTo
     ? sql`${dateFrom ? sql`AND timestamp >= ${new Date(dateFrom + "T00:00:00")}` : sql``} ${dateTo ? sql`AND timestamp <= ${new Date(dateTo + "T23:59:59")}` : sql``}`
-    : sql`AND timestamp >= DATE_SUB(NOW(), INTERVAL ${periodDays} DAY)`;
+    : sql`AND timestamp >= NOW() - INTERVAL '1 day' * ${periodDays}`;
 
   const result = await db.execute(sql`
-    SELECT 
-      CASE 
-        WHEN fromMe = 1 THEN COALESCE(status, 'sent')
+    SELECT
+      CASE
+        WHEN fromMe = true THEN COALESCE(status, 'sent')
         ELSE 'received'
       END AS statusGroup,
       COUNT(*) AS count
@@ -2058,7 +2059,7 @@ export async function getMessageStatusMetrics(sessionId: string, periodDays: num
     GROUP BY statusGroup
     ORDER BY count DESC
   `);
-  return (result as any)[0] || [];
+  return result as any[];
 }
 
 /**
@@ -2069,16 +2070,16 @@ export async function getMessageVolumeOverTime(sessionId: string, periodDays: nu
   const db = await getDb();
   if (!db) return [];
 
-  const dateFormat = granularity === "hour" ? "%Y-%m-%d %H:00" : "%Y-%m-%d";
+  const dateFormat = granularity === "hour" ? "YYYY-MM-DD HH24:00" : "YYYY-MM-DD";
   const dateCondition = dateFrom || dateTo
     ? sql`${dateFrom ? sql`AND timestamp >= ${new Date(dateFrom + "T00:00:00")}` : sql``} ${dateTo ? sql`AND timestamp <= ${new Date(dateTo + "T23:59:59")}` : sql``}`
-    : sql`AND timestamp >= DATE_SUB(NOW(), INTERVAL ${periodDays} DAY)`;
+    : sql`AND timestamp >= NOW() - INTERVAL '1 day' * ${periodDays}`;
 
   const result = await db.execute(sql`
-    SELECT 
-      DATE_FORMAT(timestamp, ${dateFormat}) AS timeBucket,
-      SUM(CASE WHEN fromMe = 1 THEN 1 ELSE 0 END) AS sent,
-      SUM(CASE WHEN fromMe = 0 THEN 1 ELSE 0 END) AS received,
+    SELECT
+      TO_CHAR(timestamp, ${dateFormat}) AS timeBucket,
+      SUM(CASE WHEN fromMe = true THEN 1 ELSE 0 END) AS sent,
+      SUM(CASE WHEN fromMe = false THEN 1 ELSE 0 END) AS received,
       COUNT(*) AS total
     FROM messages
     WHERE sessionId = ${sessionId}
@@ -2089,7 +2090,7 @@ export async function getMessageVolumeOverTime(sessionId: string, periodDays: nu
     GROUP BY timeBucket
     ORDER BY timeBucket ASC
   `);
-  return (result as any)[0] || [];
+  return result as any[];
 }
 
 /**
@@ -2101,10 +2102,10 @@ export async function getDeliveryRateMetrics(sessionId: string, periodDays: numb
 
   const dateCondition = dateFrom || dateTo
     ? sql`${dateFrom ? sql`AND timestamp >= ${new Date(dateFrom + "T00:00:00")}` : sql``} ${dateTo ? sql`AND timestamp <= ${new Date(dateTo + "T23:59:59")}` : sql``}`
-    : sql`AND timestamp >= DATE_SUB(NOW(), INTERVAL ${periodDays} DAY)`;
+    : sql`AND timestamp >= NOW() - INTERVAL '1 day' * ${periodDays}`;
 
   const result = await db.execute(sql`
-    SELECT 
+    SELECT
       COUNT(*) AS totalSent,
       SUM(CASE WHEN status IN ('delivered','read','played') THEN 1 ELSE 0 END) AS delivered,
       SUM(CASE WHEN status IN ('read','played') THEN 1 ELSE 0 END) AS readCount,
@@ -2113,13 +2114,13 @@ export async function getDeliveryRateMetrics(sessionId: string, periodDays: numb
       SUM(CASE WHEN status = 'sent' OR status IS NULL THEN 1 ELSE 0 END) AS pending
     FROM messages
     WHERE sessionId = ${sessionId}
-      AND fromMe = 1
+      AND fromMe = true
       ${dateCondition}
       AND remoteJid NOT LIKE '%@g.us'
       AND remoteJid != 'status@broadcast'
       AND messageType NOT IN ('protocolMessage','senderKeyDistributionMessage','messageContextInfo','reactionMessage','ephemeralMessage','deviceSentMessage','bcallMessage','callLogMesssage','keepInChatMessage','encReactionMessage','editedMessage','viewOnceMessageV2Extension')
   `);
-  const rows = (result as any)[0] || [];
+  const rows = result as any[];
   return rows[0] || null;
 }
 
@@ -2150,7 +2151,7 @@ export async function getRecentMessageActivity(sessionId: string, limit: number 
     ORDER BY m.timestamp DESC
     LIMIT ${limit}
   `);
-  return (result as any)[0] || [];
+  return result as any[];
 }
 
 /**
@@ -2162,14 +2163,14 @@ export async function getMessageTypeDistribution(sessionId: string, periodDays: 
 
   const dateCondition = dateFrom || dateTo
     ? sql`${dateFrom ? sql`AND timestamp >= ${new Date(dateFrom + "T00:00:00")}` : sql``} ${dateTo ? sql`AND timestamp <= ${new Date(dateTo + "T23:59:59")}` : sql``}`
-    : sql`AND timestamp >= DATE_SUB(NOW(), INTERVAL ${periodDays} DAY)`;
+    : sql`AND timestamp >= NOW() - INTERVAL '1 day' * ${periodDays}`;
 
   const result = await db.execute(sql`
-    SELECT 
+    SELECT
       messageType,
       COUNT(*) AS count,
-      SUM(CASE WHEN fromMe = 1 THEN 1 ELSE 0 END) AS sentCount,
-      SUM(CASE WHEN fromMe = 0 THEN 1 ELSE 0 END) AS receivedCount
+      SUM(CASE WHEN fromMe = true THEN 1 ELSE 0 END) AS sentCount,
+      SUM(CASE WHEN fromMe = false THEN 1 ELSE 0 END) AS receivedCount
     FROM messages
     WHERE sessionId = ${sessionId}
       ${dateCondition}
@@ -2179,7 +2180,7 @@ export async function getMessageTypeDistribution(sessionId: string, periodDays: 
     GROUP BY messageType
     ORDER BY count DESC
   `);
-  return (result as any)[0] || [];
+  return result as any[];
 }
 
 /**
@@ -2191,23 +2192,23 @@ export async function getTopContactsByVolume(sessionId: string, periodDays: numb
 
   const dateCondition = dateFrom || dateTo
     ? sql`${dateFrom ? sql`AND m.timestamp >= ${new Date(dateFrom + "T00:00:00")}` : sql``} ${dateTo ? sql`AND m.timestamp <= ${new Date(dateTo + "T23:59:59")}` : sql``}`
-    : sql`AND m.timestamp >= DATE_SUB(NOW(), INTERVAL ${periodDays} DAY)`;
+    : sql`AND m.timestamp >= NOW() - INTERVAL '1 day' * ${periodDays}`;
 
   const result = await db.execute(sql`
-    SELECT 
+    SELECT
       m.remoteJid,
       (
-        SELECT m2.pushName FROM messages m2 
-        WHERE m2.sessionId = ${sessionId} 
+        SELECT m2.pushName FROM messages m2
+        WHERE m2.sessionId = ${sessionId}
         AND m2.remoteJid = m.remoteJid
-        AND m2.fromMe = 0 
-        AND m2.pushName IS NOT NULL 
+        AND m2.fromMe = false
+        AND m2.pushName IS NOT NULL
         AND m2.pushName != ''
         ORDER BY m2.id DESC LIMIT 1
       ) AS contactName,
       COUNT(*) AS totalMessages,
-      SUM(CASE WHEN m.fromMe = 1 THEN 1 ELSE 0 END) AS sent,
-      SUM(CASE WHEN m.fromMe = 0 THEN 1 ELSE 0 END) AS received,
+      SUM(CASE WHEN m.fromMe = true THEN 1 ELSE 0 END) AS sent,
+      SUM(CASE WHEN m.fromMe = false THEN 1 ELSE 0 END) AS received,
       MAX(m.timestamp) AS lastActivity
     FROM messages m
     WHERE m.sessionId = ${sessionId}
@@ -2219,7 +2220,7 @@ export async function getTopContactsByVolume(sessionId: string, periodDays: numb
     ORDER BY totalMessages DESC
     LIMIT ${limit}
   `);
-  return (result as any)[0] || [];
+  return result as any[];
 }
 
 /**
@@ -2231,37 +2232,37 @@ export async function getResponseTimeMetrics(sessionId: string, periodDays: numb
 
   const inDateCondition = dateFrom || dateTo
     ? sql`${dateFrom ? sql`AND m_in.timestamp >= ${new Date(dateFrom + "T00:00:00")}` : sql``} ${dateTo ? sql`AND m_in.timestamp <= ${new Date(dateTo + "T23:59:59")}` : sql``}`
-    : sql`AND m_in.timestamp >= DATE_SUB(NOW(), INTERVAL ${periodDays} DAY)`;
+    : sql`AND m_in.timestamp >= NOW() - INTERVAL '1 day' * ${periodDays}`;
 
   const result = await db.execute(sql`
-    SELECT 
+    SELECT
       COUNT(*) AS totalConversations,
       AVG(response_time_seconds) AS avgResponseTimeSec,
       MIN(response_time_seconds) AS minResponseTimeSec,
       MAX(response_time_seconds) AS maxResponseTimeSec,
       PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY response_time_seconds) AS medianResponseTimeSec
     FROM (
-      SELECT 
+      SELECT
         m_in.remoteJid,
         m_in.id AS inbound_id,
         m_in.timestamp AS inbound_time,
         MIN(m_out.timestamp) AS first_reply_time,
-        TIMESTAMPDIFF(SECOND, m_in.timestamp, MIN(m_out.timestamp)) AS response_time_seconds
+        EXTRACT(EPOCH FROM (MIN(m_out.timestamp) - m_in.timestamp))::int AS response_time_seconds
       FROM messages m_in
       INNER JOIN messages m_out ON m_out.sessionId = m_in.sessionId
         AND m_out.remoteJid = m_in.remoteJid
-        AND m_out.fromMe = 1
+        AND m_out.fromMe = true
         AND m_out.timestamp > m_in.timestamp
-        AND m_out.timestamp <= DATE_ADD(m_in.timestamp, INTERVAL 24 HOUR)
+        AND m_out.timestamp <= m_in.timestamp + INTERVAL '24 hours'
       WHERE m_in.sessionId = ${sessionId}
-        AND m_in.fromMe = 0
+        AND m_in.fromMe = false
         ${inDateCondition}
         AND m_in.remoteJid NOT LIKE '%@g.us'
         AND m_in.remoteJid != 'status@broadcast'
       GROUP BY m_in.remoteJid, m_in.id, m_in.timestamp
     ) response_data
   `);
-  const rows = (result as any)[0] || [];
+  const rows = result as any[];
   return rows[0] || null;
 }
 
@@ -2356,16 +2357,16 @@ export async function getDashboardWhatsAppMetrics(tenantId: number) {
   const now = new Date();
   const fourteenDaysAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
 
-  const [totalResult] = await db.execute(sql`
+  const totalResult = await db.execute(sql`
     SELECT
       COUNT(*) as totalMessages,
-      SUM(CASE WHEN fromMe = 1 THEN 1 ELSE 0 END) as sentMessages,
-      SUM(CASE WHEN fromMe = 0 THEN 1 ELSE 0 END) as receivedMessages
+      SUM(CASE WHEN fromMe = true THEN 1 ELSE 0 END) as sentMessages,
+      SUM(CASE WHEN fromMe = false THEN 1 ELSE 0 END) as receivedMessages
     FROM ${messages}
     WHERE tenantId = ${tenantId}
   `);
 
-  const [convResult] = await db.execute(sql`
+  const convResult = await db.execute(sql`
     SELECT
       COUNT(*) as totalConversations,
       SUM(CASE WHEN unreadCount > 0 THEN 1 ELSE 0 END) as unreadConversations
@@ -2373,11 +2374,11 @@ export async function getDashboardWhatsAppMetrics(tenantId: number) {
     WHERE tenantId = ${tenantId}
   `);
 
-  const [msgsByDay] = await db.execute(sql`
+  const msgsByDay = await db.execute(sql`
     SELECT
       DATE(timestamp) as dt,
-      SUM(CASE WHEN fromMe = 1 THEN 1 ELSE 0 END) as sent,
-      SUM(CASE WHEN fromMe = 0 THEN 1 ELSE 0 END) as received
+      SUM(CASE WHEN fromMe = true THEN 1 ELSE 0 END) as sent,
+      SUM(CASE WHEN fromMe = false THEN 1 ELSE 0 END) as received
     FROM ${messages}
     WHERE tenantId = ${tenantId} AND timestamp >= ${fourteenDaysAgo}
     GROUP BY DATE(timestamp)
@@ -2408,7 +2409,7 @@ export async function getDashboardDealsTimeline(tenantId: number, days = 30) {
 
   const startDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
 
-  const [rows] = await db.execute(sql`
+  const rows = await db.execute(sql`
     SELECT
       DATE(createdAt) as dt,
       COUNT(*) as newDeals,
@@ -2436,7 +2437,7 @@ export async function getDashboardConversionRates(tenantId: number) {
   const db = await getDb();
   if (!db) return { totalDeals: 0, wonDeals: 0, lostDeals: 0, openDeals: 0, conversionRate: 0, avgDealValueCents: 0, topLeadSources: [] as { source: string; count: number }[] };
 
-  const [statusResult] = await db.execute(sql`
+  const statusResult = await db.execute(sql`
     SELECT
       COUNT(*) as totalDeals,
       SUM(CASE WHEN status = 'won' THEN 1 ELSE 0 END) as wonDeals,
@@ -2448,7 +2449,7 @@ export async function getDashboardConversionRates(tenantId: number) {
     WHERE tenantId = ${tenantId} AND deletedAt IS NULL
   `);
 
-  const [leadSources] = await db.execute(sql`
+  const leadSources = await db.execute(sql`
     SELECT
       COALESCE(leadSource, 'direto') as source,
       COUNT(*) as cnt
@@ -2487,7 +2488,7 @@ export async function getDashboardFunnelData(tenantId: number, pipelineId?: numb
     ? sql`AND p.id = ${pipelineId}`
     : sql``;
 
-  const [pipelineRows] = await db.execute(sql`
+  const pipelineRows = await db.execute(sql`
     SELECT p.id, p.name FROM pipelines p
     WHERE p.tenantId = ${tenantId} ${pipelineFilter}
     ORDER BY p.id ASC
@@ -2497,7 +2498,7 @@ export async function getDashboardFunnelData(tenantId: number, pipelineId?: numb
   const pipeline = (pipelineRows as unknown as any[])[0];
   if (!pipeline) return { pipelineName: "", stages: [] };
 
-  const [stageRows] = await db.execute(sql`
+  const stageRows = await db.execute(sql`
     SELECT
       ps.id, ps.name, ps.color, ps.orderIndex, ps.isWon, ps.isLost,
       COUNT(d.id) as dealCount,
@@ -2528,7 +2529,7 @@ export async function getDashboardAllPipelines(tenantId: number) {
   const db = await getDb();
   if (!db) return [];
 
-  const [rows] = await db.execute(sql`
+  const rows = await db.execute(sql`
     SELECT id, name FROM pipelines WHERE tenantId = ${tenantId} ORDER BY id ASC
   `);
 
@@ -2616,9 +2617,9 @@ export async function createSessionShare(
     targetUserId,
     sharedBy,
     status: "active",
-  });
+  }).returning({ id: sessionShares.id });
 
-  return { id: Number(result[0].insertId) };
+  return { id: Number(result[0].id) };
 }
 
 /**
@@ -2692,7 +2693,7 @@ export async function createInternalNote(
     category: category || "other",
     priority: priority || "normal",
     isCustomerGlobalNote: isCustomerGlobalNote || false,
-  }).$returningId();
+  }).returning({ id: internalNotes.id });
   // Also log as event
   await db.insert(conversationEvents).values({
     tenantId,
@@ -2732,7 +2733,7 @@ export async function getInternalNotes(tenantId: number, waConversationId: numbe
   // WITHOUT timezone info. Drizzle select().from() treats these as UTC, so we must do
   // the same: append 'Z' to force UTC interpretation, matching how messages are handled.
   // Without 'Z', new Date(str) interprets as server local time (EDT), causing a 4h shift.
-  const rows = (result as any)[0] || [];
+  const rows = result as any[];
   return rows.map((row: any) => ({
     ...row,
     createdAt: row.createdAt instanceof Date
@@ -2748,7 +2749,7 @@ export async function getCustomerGlobalNotes(tenantId: number, remoteJid: string
   const db = await getDb();
   if (!db) return [];
   const result = await db.execute(sql`
-    SELECT 
+    SELECT
       n.id,
       n.waConversationId,
       n.content,
@@ -2766,7 +2767,7 @@ export async function getCustomerGlobalNotes(tenantId: number, remoteJid: string
   `);
   // Convert string timestamps to Date objects for proper Superjson serialization.
   // Append 'Z' to treat as UTC (matching Drizzle select().from() behavior for messages).
-  const rows = (result as any)[0] || [];
+  const rows = result as any[];
   return rows.map((row: any) => ({
     ...row,
     createdAt: row.createdAt instanceof Date
@@ -2836,7 +2837,7 @@ export async function getConversationEvents(tenantId: number, waConversationId: 
     AND e.waConversationId = ${waConversationId}
     ORDER BY e.createdAt ASC
   `);
-  return (result as any)[0] || [];
+  return result as any[];
 }
 
 export async function logConversationEvent(
@@ -2912,7 +2913,7 @@ export async function getQueueConversations(sessionId: string, tenantId: number,
     ORDER BY COALESCE(wc.queuedAt, lm.timestamp, wc.lastMessageAt, wc.createdAt) DESC
     LIMIT ${limit}
   `);
-  return dedupConversations(fixTimestampFields((result as any)[0] || []));
+  return dedupConversations(fixTimestampFields(result as any[]));
 }
 
 export async function claimConversation(tenantId: number, sessionId: string, remoteJid: string, userId: number) {
@@ -2968,7 +2969,7 @@ export async function getAgentWorkload(tenantId: number, sessionId: string) {
       cu.avatarUrl AS agentAvatar,
       cu.status AS agentStatus,
       cu.lastActiveAt AS lastActiveAt,
-      CASE WHEN cu.lastActiveAt >= DATE_SUB(NOW(), INTERVAL 5 MINUTE) THEN 1 ELSE 0 END AS isOnline,
+      CASE WHEN cu.lastActiveAt >= NOW() - INTERVAL '5 minutes' THEN 1 ELSE 0 END AS isOnline,
       COUNT(CASE WHEN wc.status IN ('open', 'pending') THEN 1 END) AS activeConversations,
       COUNT(CASE WHEN wc.unreadCount > 0 THEN 1 END) AS unreadConversations,
       MIN(wc.lastMessageAt) AS oldestConversation,
@@ -2985,7 +2986,7 @@ export async function getAgentWorkload(tenantId: number, sessionId: string) {
     GROUP BY cu.id, cu.name, cu.email, cu.avatarUrl, cu.status, cu.lastActiveAt
     ORDER BY isOnline DESC, activeConversations DESC
   `);
-  return (result as any)[0] || [];
+  return result as any[];
 }
 
 export async function getAgentConversations(tenantId: number, sessionId: string, agentId: number, limit = 10) {
@@ -3026,7 +3027,7 @@ export async function getAgentConversations(tenantId: number, sessionId: string,
     ORDER BY COALESCE(lm.timestamp, wc.lastMessageAt, wc.createdAt) DESC
     LIMIT ${limit}
   `);
-  return dedupConversations(fixTimestampFields((result as any)[0] || []));
+  return dedupConversations(fixTimestampFields(result as any[]));
 }
 
 export async function getQueueStats(tenantId: number, sessionId: string) {
@@ -3058,7 +3059,7 @@ export async function getQueueStats(tenantId: number, sessionId: string) {
     AND wc.mergedIntoId IS NULL
     AND (wc.unreadCount > 0 OR wc.queuedAt IS NOT NULL)
   `);
-  const countRows = (countResult as any)[0] || [];
+  const countRows = countResult as any[];
   // Get queue items with details — derive preview from wa_messages
   const itemsResult = await db.execute(sql`
     SELECT 
@@ -3095,7 +3096,7 @@ export async function getQueueStats(tenantId: number, sessionId: string) {
   `);
   // Fix timestamp strings from db.execute for both count and items
   const fixedCount = fixTimestampFields(countRows);
-  const fixedItems = dedupConversations(fixTimestampFields((itemsResult as any)[0] || []));
+  const fixedItems = dedupConversations(fixTimestampFields(itemsResult as any[]));
   return {
     total: Number(fixedCount[0]?.total || 0),
     oldest: fixedCount[0]?.oldestEntry || null,
@@ -3131,7 +3132,7 @@ export async function createQuickReply(tenantId: number, data: { shortcut: strin
     teamId: data.teamId,
     category: data.category,
     createdBy: data.createdBy,
-  }).$returningId();
+  }).returning({ id: quickReplies.id });
   return result;
 }
 
@@ -3177,7 +3178,7 @@ export async function listConversationTags(tenantId: number) {
 export async function createConversationTag(tenantId: number, name: string, color?: string) {
   const db = await getDb();
   if (!db) return null;
-  const [result] = await db.insert(conversationTags).values({ tenantId, name, color: color || "#6366f1" }).$returningId();
+  const [result] = await db.insert(conversationTags).values({ tenantId, name, color: color || "#6366f1" }).returning({ id: conversationTags.id });
   return result;
 }
 
@@ -3266,7 +3267,7 @@ export async function createScheduledMessage(tenantId: number, data: { sessionId
     mediaUrl: data.mediaUrl,
     scheduledAt: data.scheduledAt,
     createdBy: data.createdBy,
-  }).$returningId();
+  }).returning({ id: scheduledMessages.id });
   return result;
 }
 
@@ -3433,8 +3434,8 @@ export async function createAiIntegration(data: {
     defaultModel: data.defaultModel,
     isActive: data.isActive ?? true,
     createdBy: data.createdBy,
-  });
-  return { id: Number(result[0].insertId) };
+  }).returning({ id: aiIntegrations.id });
+  return { id: Number(result[0].id) };
 }
 
 export async function updateAiIntegration(tenantId: number, id: number, data: {
@@ -3701,8 +3702,8 @@ export async function upsertAiTrainingConfig(data: {
       configType: data.configType,
       instructions: data.instructions,
       updatedBy: data.updatedBy,
-    });
-    return { id: Number(result[0].insertId), updated: false };
+    }).returning({ id: aiTrainingConfigs.id });
+    return { id: Number(result[0].id), updated: false };
   }
 }
 
@@ -3898,7 +3899,7 @@ export async function listDealFiles(tenantId: number, dealId: number) {
 export async function createDealFile(data: InsertDealFile) {
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
-  const [result] = await db.insert(dealFiles).values(data).$returningId();
+  const [result] = await db.insert(dealFiles).values(data).returning({ id: dealFiles.id });
   return result;
 }
 

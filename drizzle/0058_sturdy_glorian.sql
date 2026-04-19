@@ -1,1 +1,0 @@
-ALTER TABLE `rd_field_mappings` ADD `targetEntity` enum('deal','contact','company') DEFAULT 'deal' NOT NULL;

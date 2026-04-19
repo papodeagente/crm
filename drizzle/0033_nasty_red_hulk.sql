@@ -1,1 +1,0 @@
-ALTER TABLE `whatsapp_sessions` MODIFY COLUMN `status` enum('connecting','connected','disconnected','deleted') NOT NULL DEFAULT 'disconnected';

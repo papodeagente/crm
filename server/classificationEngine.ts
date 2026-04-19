@@ -86,7 +86,7 @@ export async function createDefaultPipelines(tenantId: number): Promise<{ salesP
     color: "#3b82f6",
     pipelineType: "sales",
     isDefault: true,
-  }).$returningId();
+  }).returning({ id: pipelines.id });
 
   // Create Sales Pipeline Stages
   for (const stage of SALES_PIPELINE_STAGES) {
@@ -105,7 +105,7 @@ export async function createDefaultPipelines(tenantId: number): Promise<{ salesP
     color: "#22c55e",
     pipelineType: "post_sale",
     isDefault: false,
-  }).$returningId();
+  }).returning({ id: pipelines.id });
 
   // Create Post-Sale Pipeline Stages
   const postSaleStageIds: number[] = [];
@@ -114,7 +114,7 @@ export async function createDefaultPipelines(tenantId: number): Promise<{ salesP
       tenantId,
       pipelineId: postSalePipeline.id,
       ...stage,
-    }).$returningId();
+    }).returning({ id: pipelineStages.id });
     postSaleStageIds.push(stageResult.id);
   }
 

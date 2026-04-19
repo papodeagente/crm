@@ -349,7 +349,7 @@ class WhatsAppEvolutionManager extends EventEmitter {
             senderAgentId: senderAgentId || null,
             status: "sent",
             timestamp: new Date(normalizeToUnixSeconds(result.messageTimestamp) * 1000),
-          }).onDuplicateKeyUpdate({ set: { status: sql`status` } }).catch(() => {});
+          }).onConflictDoNothing().catch(() => {});
 
           // Update wa_conversations with the latest message
           try {
@@ -427,7 +427,7 @@ class WhatsAppEvolutionManager extends EventEmitter {
             senderAgentId: senderAgentId || null,
             status: "sent",
             timestamp: new Date(normalizeToUnixSeconds(result.messageTimestamp) * 1000),
-          }).onDuplicateKeyUpdate({ set: { status: sql`status` } }).catch(() => {});
+          }).onConflictDoNothing().catch(() => {});
 
           // Update wa_conversations with the latest message
           try {
@@ -491,7 +491,7 @@ class WhatsAppEvolutionManager extends EventEmitter {
             content: opts?.message || linkUrl,
             status: "sent",
             timestamp: new Date(normalizeToUnixSeconds(result.messageTimestamp) * 1000),
-          }).onDuplicateKeyUpdate({ set: { status: sql`status` } }).catch(() => {});
+          }).onConflictDoNothing().catch(() => {});
         }
       } catch (e) {
         console.error("[SendLink] Failed to save sent message to DB:", e);
@@ -553,7 +553,7 @@ class WhatsAppEvolutionManager extends EventEmitter {
             status: "sent",
             timestamp: new Date(normalizeToUnixSeconds(result.messageTimestamp) * 1000),
             quotedMessageId,
-          }).onDuplicateKeyUpdate({ set: { status: sql`status` } }).catch(() => {});
+          }).onConflictDoNothing().catch(() => {});
 
           // Update wa_conversations with the latest message
           try {
@@ -944,8 +944,9 @@ class WhatsAppEvolutionManager extends EventEmitter {
         }
 
         if (inserts.length > 0) {
-          await db.insert(waContacts).values(inserts).onDuplicateKeyUpdate({
-            set: { pushName: sql`VALUES(pushName)` },
+          await db.insert(waContacts).values(inserts).onConflictDoUpdate({
+            target: [waContacts.sessionId, waContacts.jid],
+            set: { pushName: sql`EXCLUDED."pushName"` },
           }).catch(() => {
             // Fallback: insert one by one
             return Promise.all(inserts.map(ins =>
@@ -1297,7 +1298,7 @@ class WhatsAppEvolutionManager extends EventEmitter {
                   pushName: fromMe ? null : (lastMsg.pushName || pushName || null),
                   status: msgStatus,
                   timestamp: msgTimestamp,
-                }).onDuplicateKeyUpdate({ set: { status: sql`status` } });
+                }).onConflictDoNothing();
               }
             }
 
@@ -1619,7 +1620,7 @@ class WhatsAppEvolutionManager extends EventEmitter {
         mediaDuration: mediaInfo.mediaDuration || null,
         isVoiceNote: mediaInfo.isVoiceNote || false,
         quotedMessageId: mediaInfo.quotedMessageId || null,
-      }).onDuplicateKeyUpdate({ set: { status: sql`status` } });
+      }).onConflictDoNothing();
 
       // Resolve conversation (update last message, unread count)
       try {
@@ -1756,7 +1757,8 @@ class WhatsAppEvolutionManager extends EventEmitter {
             savedName: null,
             verifiedName: null,
             profilePictureUrl: senderPhoto,
-          }).onDuplicateKeyUpdate({
+          }).onConflictDoUpdate({
+            target: [waContacts.sessionId, waContacts.jid],
             set: updateFields,
           }).catch(() =>
             db.update(waContacts)
@@ -1871,7 +1873,7 @@ class WhatsAppEvolutionManager extends EventEmitter {
         pushName: null,
         status: "sent",
         timestamp: new Date(timestamp),
-      }).onDuplicateKeyUpdate({ set: { status: sql`status` } });
+      }).onConflictDoNothing();
 
       try {
         const resolved = await resolveInbound(session.tenantId, session.sessionId, remoteJid, undefined, { skipContactCreation: true });
@@ -1966,25 +1968,25 @@ class WhatsAppEvolutionManager extends EventEmitter {
         // This prevents status updates for older messages from corrupting the preview.
         if (remoteJid && fromMe && messageId) {
           const result = await db.execute(
-            sql`UPDATE wa_conversations SET lastStatus = ${newStatus}
-                WHERE sessionId = ${session.sessionId}
-                AND remoteJid = ${remoteJid}
-                AND lastFromMe = 1
+            sql`UPDATE wa_conversations SET "lastStatus" = ${newStatus}
+                WHERE "sessionId" = ${session.sessionId}
+                AND "remoteJid" = ${remoteJid}
+                AND "lastFromMe" = true
                 AND EXISTS (
                   SELECT 1 FROM messages m
-                  WHERE m.sessionId = ${session.sessionId}
-                  AND m.remoteJid = ${remoteJid}
-                  AND m.messageId = ${messageId}
-                  AND m.fromMe = 1
+                  WHERE m."sessionId" = ${session.sessionId}
+                  AND m."remoteJid" = ${remoteJid}
+                  AND m."messageId" = ${messageId}
+                  AND m."fromMe" = true
                   AND m.id = (
                     SELECT MAX(m2.id) FROM messages m2
-                    WHERE m2.sessionId = ${session.sessionId}
-                    AND m2.remoteJid = ${remoteJid}
-                    AND m2.fromMe = 1
+                    WHERE m2."sessionId" = ${session.sessionId}
+                    AND m2."remoteJid" = ${remoteJid}
+                    AND m2."fromMe" = true
                   )
                 )`
           );
-          const affected = (result as any)[0]?.affectedRows ?? 0;
+          const affected = (result as any).rowCount ?? 0;
           if (affected > 0) {
             console.log(`[EvoWA] wa_conversations.lastStatus updated: ${remoteJid} -> ${newStatus}`);
           }
@@ -2059,7 +2061,8 @@ class WhatsAppEvolutionManager extends EventEmitter {
             savedName: savedName || null,
             verifiedName: null,
             profilePictureUrl: profilePicUrl,
-          }).onDuplicateKeyUpdate({
+          }).onConflictDoUpdate({
+            target: [waContacts.sessionId, waContacts.jid],
             set: {
               ...(pushName ? { pushName: sql`${pushName}` } : {}),
               ...(savedName ? { savedName: sql`${savedName}` } : {}),
@@ -2612,9 +2615,9 @@ class WhatsAppEvolutionManager extends EventEmitter {
             try {
               for (let i = 0; i < insertBatch.length; i += 20) {
                 const subBatch = insertBatch.slice(i, i + 20);
-                await db.insert(waMessages).values(subBatch).onDuplicateKeyUpdate({ set: { status: sql`status` } }).catch(async () => {
+                await db.insert(waMessages).values(subBatch).onConflictDoNothing().catch(async () => {
                   for (const item of subBatch) {
-                    await db.insert(waMessages).values(item).onDuplicateKeyUpdate({ set: { status: sql`status` } }).catch(() => {});
+                    await db.insert(waMessages).values(item).onConflictDoNothing().catch(() => {});
                   }
                 });
               }
@@ -2890,9 +2893,9 @@ class WhatsAppEvolutionManager extends EventEmitter {
               try {
                 for (let i = 0; i < insertBatch.length; i += 20) {
                   const subBatch = insertBatch.slice(i, i + 20);
-                  await db.insert(waMessages).values(subBatch).onDuplicateKeyUpdate({ set: { status: sql`status` } }).catch(async () => {
+                  await db.insert(waMessages).values(subBatch).onConflictDoNothing().catch(async () => {
                     for (const item of subBatch) {
-                      await db.insert(waMessages).values(item).onDuplicateKeyUpdate({ set: { status: sql`status` } }).catch(() => {});
+                      await db.insert(waMessages).values(item).onConflictDoNothing().catch(() => {});
                     }
                   });
                 }
@@ -3135,14 +3138,14 @@ class WhatsAppEvolutionManager extends EventEmitter {
             // Use raw SQL INSERT IGNORE to determine if message is truly new
             // affectedRows = 1 means new insert, affectedRows = 0 means duplicate
             const insertResult = await db.execute(
-              sql`INSERT IGNORE INTO messages (sessionId, tenantId, messageId, remoteJid, fromMe, messageType, content, pushName, status, timestamp, mediaUrl, mediaMimeType, mediaFileName, mediaDuration, isVoiceNote, quotedMessageId) VALUES (${session.sessionId}, ${session.tenantId}, ${msgId}, ${remoteJid}, ${fromMe}, ${messageType}, ${content || null}, ${fromMe ? null : (pushName || null)}, ${msgStatus}, ${timestamp}, ${permanentMediaUrl}, ${syncMediaInfo.mediaMimeType || null}, ${syncMediaInfo.mediaFileName || null}, ${syncMediaInfo.mediaDuration || null}, ${syncMediaInfo.isVoiceNote || false}, ${syncMediaInfo.quotedMessageId || null})`
+              sql`INSERT INTO messages ("sessionId", "tenantId", "messageId", "remoteJid", "fromMe", "messageType", content, "pushName", status, timestamp, "mediaUrl", "mediaMimeType", "mediaFileName", "mediaDuration", "isVoiceNote", "quotedMessageId") VALUES (${session.sessionId}, ${session.tenantId}, ${msgId}, ${remoteJid}, ${fromMe}, ${messageType}, ${content || null}, ${fromMe ? null : (pushName || null)}, ${msgStatus}, ${timestamp}, ${permanentMediaUrl}, ${syncMediaInfo.mediaMimeType || null}, ${syncMediaInfo.mediaFileName || null}, ${syncMediaInfo.mediaDuration || null}, ${syncMediaInfo.isVoiceNote || false}, ${syncMediaInfo.quotedMessageId || null}) ON CONFLICT ("sessionId", "messageId") DO NOTHING`
             );
 
             existingMsgIds.add(msgId);
 
-            // affectedRows = 1 means genuinely new message, 0 means duplicate was ignored
-            const affectedRows = (insertResult as any)[0]?.affectedRows ?? (insertResult as any).affectedRows ?? 0;
-            const isNew = affectedRows > 0;
+            // rowCount = 1 means genuinely new message, 0 means duplicate was ignored
+            const rowCount = (insertResult as any).rowCount ?? 0;
+            const isNew = rowCount > 0;
 
             // Only count and emit if the message is actually NEW
             if (isNew) {
@@ -3194,7 +3197,8 @@ class WhatsAppEvolutionManager extends EventEmitter {
                 savedName: null,
                 verifiedName: null,
                 profilePictureUrl: null,
-              }).onDuplicateKeyUpdate({
+              }).onConflictDoUpdate({
+                target: [waContacts.sessionId, waContacts.jid],
                 set: { pushName: sql`${pushName}` }, // Don't touch profilePictureUrl here — sync has no photo
               }).catch(() => {});
             }
@@ -3445,7 +3449,7 @@ class WhatsAppEvolutionManager extends EventEmitter {
         phoneNumber,
         status: "active",
         connectedAt: new Date(),
-      }).$returningId();
+      }).returning({ id: waChannels.id });
 
       // Log channel change event (Part 9)
       await db.insert(channelChangeEvents).values({

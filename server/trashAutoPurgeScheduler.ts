@@ -28,20 +28,20 @@ export async function purgeExpiredTrashItems(): Promise<{
 
   try {
     // Hard-delete deals that have been in trash for more than 30 days
-    const [dealResult] = await db.execute(sql`
+    const dealResult = await db.execute(sql`
       DELETE FROM deals
-      WHERE deletedAt IS NOT NULL
-        AND deletedAt < DATE_SUB(NOW(), INTERVAL ${PURGE_AFTER_DAYS} DAY)
+      WHERE "deletedAt" IS NOT NULL
+        AND "deletedAt" < NOW() - INTERVAL '1 day' * ${PURGE_AFTER_DAYS}
     `);
-    purgedDeals = (dealResult as any).affectedRows || 0;
+    purgedDeals = (dealResult as any).rowCount || 0;
 
     // Hard-delete contacts that have been in trash for more than 30 days
-    const [contactResult] = await db.execute(sql`
+    const contactResult = await db.execute(sql`
       DELETE FROM crm_contacts
-      WHERE deletedAt IS NOT NULL
-        AND deletedAt < DATE_SUB(NOW(), INTERVAL ${PURGE_AFTER_DAYS} DAY)
+      WHERE "deletedAt" IS NOT NULL
+        AND "deletedAt" < NOW() - INTERVAL '1 day' * ${PURGE_AFTER_DAYS}
     `);
-    purgedContacts = (contactResult as any).affectedRows || 0;
+    purgedContacts = (contactResult as any).rowCount || 0;
   } catch (err) {
     console.error("[TrashAutoPurge] Error during purge:", err);
   }

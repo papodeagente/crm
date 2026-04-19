@@ -184,7 +184,7 @@ export async function startBulkSend(request: BulkSendRequest): Promise<{ jobId: 
   const campaignName = request.campaignName || `Campanha ${new Date().toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })} ${new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" })}`;
 
   // Create campaign record in DB
-  const [campaignResult] = await db.insert(bulkCampaigns).values({
+  const campaignResult = await db.insert(bulkCampaigns).values({
     tenantId,
     userId,
     userName: userName || null,
@@ -199,9 +199,9 @@ export async function startBulkSend(request: BulkSendRequest): Promise<{ jobId: 
     failedCount: 0,
     skippedCount: 0,
     status: "running",
-  });
+  }).returning({ id: bulkCampaigns.id });
 
-  const campaignId = campaignResult.insertId;
+  const campaignId = campaignResult[0].id;
 
   // Pre-create all message records as "pending"
   const messageRecords = contacts.map((contact) => ({
@@ -774,7 +774,7 @@ export async function startBulkSendCrm(request: CrmBulkSendRequest): Promise<{ j
   const campaignName = request.campaignName || `${source === "deals" ? "Negociações" : "Contatos"} ${new Date().toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })} ${new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" })}`;
 
   // Create campaign record
-  const [campaignResult] = await db.insert(bulkCampaigns).values({
+  const campaignResult = await db.insert(bulkCampaigns).values({
     tenantId,
     userId,
     userName: userName || null,
@@ -789,9 +789,9 @@ export async function startBulkSendCrm(request: CrmBulkSendRequest): Promise<{ j
     failedCount: 0,
     skippedCount: 0,
     status: "running",
-  });
+  }).returning({ id: bulkCampaigns.id });
 
-  const campaignId = campaignResult.insertId;
+  const campaignId = campaignResult[0].id;
 
   // Pre-create all message records as "pending"
   const messageRecords = resolvedContacts.map((contact) => ({

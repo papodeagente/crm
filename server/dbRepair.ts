@@ -46,10 +46,10 @@ async function repairConversationPreviews(): Promise<{ fixed: number; errors: st
     const typeList = NON_PREVIEW_TYPES.map(t => `'${t}'`).join(",");
 
     // Find conversations with non-preview lastMessageType
-    const [affected] = await db.execute(sql.raw(`
-      SELECT id, sessionId, remoteJid, lastMessageType
+    const affected = await db.execute(sql.raw(`
+      SELECT id, "sessionId", "remoteJid", "lastMessageType"
       FROM wa_conversations
-      WHERE lastMessageType IN (${typeList})
+      WHERE "lastMessageType" IN (${typeList})
     `));
 
     const rows = Array.isArray(affected) ? affected : [];
@@ -61,12 +61,12 @@ async function repairConversationPreviews(): Promise<{ fixed: number; errors: st
     for (const conv of rows as any[]) {
       try {
         // Find the actual last non-protocol message for this conversation
-        const [msgRows] = await db.execute(sql.raw(`
-          SELECT content, messageType, fromMe, timestamp, status
+        const msgRows = await db.execute(sql.raw(`
+          SELECT content, "messageType", "fromMe", timestamp, status
           FROM messages
-          WHERE sessionId = '${conv.sessionId}'
-            AND remoteJid = '${conv.remoteJid}'
-            AND messageType NOT IN (${typeList})
+          WHERE "sessionId" = '${conv.sessionId}'
+            AND "remoteJid" = '${conv.remoteJid}'
+            AND "messageType" NOT IN (${typeList})
           ORDER BY timestamp DESC
           LIMIT 1
         `));
@@ -77,11 +77,11 @@ async function repairConversationPreviews(): Promise<{ fixed: number; errors: st
           const escapedContent = msg.content ? `'${String(msg.content).replace(/'/g, "''").replace(/\\/g, "\\\\")}'` : "NULL";
           await db.execute(sql.raw(`
             UPDATE wa_conversations
-            SET lastMessage = ${escapedContent},
-                lastMessageType = '${msg.messageType}',
-                lastFromMe = ${msg.fromMe ? 1 : 0},
-                lastTimestamp = '${msg.timestamp}',
-                lastMessageStatus = ${msg.status ? `'${msg.status}'` : "NULL"}
+            SET "lastMessage" = ${escapedContent},
+                "lastMessageType" = '${msg.messageType}',
+                "lastFromMe" = ${msg.fromMe ? 'true' : 'false'},
+                "lastTimestamp" = '${msg.timestamp}',
+                "lastMessageStatus" = ${msg.status ? `'${msg.status}'` : "NULL"}
             WHERE id = ${conv.id}
           `));
           fixed++;
@@ -114,25 +114,25 @@ async function resetFailedTranscriptions(): Promise<{ failed: number; pending: n
 
   try {
     // Reset failed transcriptions
-    const [failedResult] = await db.execute(sql.raw(`
+    const failedResult = await db.execute(sql.raw(`
       UPDATE messages
       SET audio_transcription_status = NULL,
           audio_transcription = NULL
       WHERE audio_transcription_status = 'failed'
-        AND messageType IN ('audioMessage', 'pttMessage')
+        AND "messageType" IN ('audioMessage', 'pttMessage')
     `));
-    failedCount = (failedResult as any)?.affectedRows || 0;
+    failedCount = (failedResult as any)?.rowCount || 0;
 
     // Reset stuck pending (older than 10 minutes)
-    const [pendingResult] = await db.execute(sql.raw(`
+    const pendingResult = await db.execute(sql.raw(`
       UPDATE messages
       SET audio_transcription_status = NULL,
           audio_transcription = NULL
       WHERE audio_transcription_status = 'pending'
-        AND messageType IN ('audioMessage', 'pttMessage')
-        AND updatedAt < DATE_SUB(NOW(), INTERVAL 10 MINUTE)
+        AND "messageType" IN ('audioMessage', 'pttMessage')
+        AND "updatedAt" < NOW() - INTERVAL '10 minutes'
     `));
-    pendingCount = (pendingResult as any)?.affectedRows || 0;
+    pendingCount = (pendingResult as any)?.rowCount || 0;
   } catch (e: any) {
     errors.push(`Transcription reset failed: ${e.message}`);
   }

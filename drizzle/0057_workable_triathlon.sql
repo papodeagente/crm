@@ -1,1 +1,0 @@
-ALTER TABLE `task_automations` ADD `deadlineOffsetUnit` enum('minutes','hours','days') DEFAULT 'days' NOT NULL;

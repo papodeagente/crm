@@ -216,7 +216,7 @@ export async function resolveContact(
     type: "person",
   });
 
-  const insertId = (result as any)[0]?.insertId;
+  const insertId = (result as any).id ?? (result as any)[0]?.id;
   return { contactId: insertId, isNew: true };
 }
 
@@ -278,7 +278,7 @@ export async function resolveIdentity(
     confidenceScore: 80,
   });
 
-  const insertId = (result as any)[0]?.insertId;
+  const insertId = (result as any).id ?? (result as any)[0]?.id;
   return { identityId: insertId, isNew: true };
 }
 
@@ -377,12 +377,12 @@ export async function resolveConversation(
       unreadCount: 0,
     });
 
-    const insertId = (result as any)[0]?.insertId;
+    const insertId = (result as any).id ?? (result as any)[0]?.id;
     return { conversationId: insertId, isNew: true, conversationKey };
   } catch (err: any) {
-    // ER_DUP_ENTRY (1062) — another request created the conversation first.
+    // PostgreSQL unique_violation (23505) — another request created the conversation first.
     // Re-fetch and return the existing one.
-    if (err?.errno === 1062 || err?.code === "ER_DUP_ENTRY") {
+    if (err?.code === "23505" || err?.errno === 1062 || err?.code === "ER_DUP_ENTRY") {
       console.log(`[ConvResolver] Race condition handled for key ${conversationKey} — re-fetching existing`);
       const [raceWinner] = await db.select({ id: waConversations.id })
         .from(waConversations)
@@ -577,17 +577,17 @@ export async function reconcileGhostThreads(
 
   // Encontrar phoneE164 com mais de uma conversa
   const duplicates = await db.execute(sql`
-    SELECT phoneE164, COUNT(*) as cnt, GROUP_CONCAT(id ORDER BY id ASC) as ids
+    SELECT "phoneE164", COUNT(*) as cnt, STRING_AGG(CAST(id AS TEXT), ',' ORDER BY id ASC) as ids
     FROM wa_conversations
-    WHERE tenantId = ${tenantId}
-    AND sessionId = ${sessionId}
-    AND phoneE164 IS NOT NULL
-    AND mergedIntoId IS NULL
-    GROUP BY phoneE164
-    HAVING cnt > 1
+    WHERE "tenantId" = ${tenantId}
+    AND "sessionId" = ${sessionId}
+    AND "phoneE164" IS NOT NULL
+    AND "mergedIntoId" IS NULL
+    GROUP BY "phoneE164"
+    HAVING COUNT(*) > 1
   `);
 
-  const rows = (duplicates as any)[0] || [];
+  const rows = (duplicates as any) || [];
   const details: Array<{ canonical: number; ghosts: number[] }> = [];
   let mergedCount = 0;
 
@@ -623,11 +623,11 @@ export async function reconcileGhostThreads(
     // Recalcular unreadCount da conversa canônica
     const unreadResult = await db.execute(sql`
       SELECT COUNT(*) as cnt FROM messages
-      WHERE waConversationId = ${canonicalId}
-      AND fromMe = 0
+      WHERE "waConversationId" = ${canonicalId}
+      AND "fromMe" = false
       AND (status IS NULL OR status = 'received')
     `);
-    const unreadCount = ((unreadResult as any)[0]?.[0]?.cnt) || 0;
+    const unreadCount = ((unreadResult as any)[0]?.cnt) || 0;
 
     await db.update(waConversations)
       .set({ unreadCount })
@@ -664,7 +664,7 @@ export async function migrateExistingData(tenantId: number): Promise<{ conversat
            MAX(timestamp) as lastTs,
            (SELECT m2.pushName FROM messages m2 
             WHERE m2.sessionId = m.sessionId AND m2.remoteJid = m.remoteJid 
-            AND m2.fromMe = 0 AND m2.pushName IS NOT NULL AND m2.pushName != ''
+            AND m2."fromMe" = false AND m2."pushName" IS NOT NULL AND m2."pushName" != ''
             ORDER BY m2.id DESC LIMIT 1) as pushName
     FROM messages m
     WHERE tenantId = ${tenantId}
@@ -674,7 +674,7 @@ export async function migrateExistingData(tenantId: number): Promise<{ conversat
     GROUP BY sessionId, remoteJid
   `);
 
-  const rows = (distinctConvs as any)[0] || [];
+  const rows = (distinctConvs as any) || [];
   let conversationsCreated = 0;
   let messagesLinked = 0;
   let identitiesCreated = 0;
@@ -696,7 +696,7 @@ export async function migrateExistingData(tenantId: number): Promise<{ conversat
           AND remoteJid = ${jid}
           AND waConversationId IS NULL
         `);
-        messagesLinked += ((updateResult as any)[0]?.affectedRows) || 0;
+        messagesLinked += ((updateResult as any).rowCount) || 0;
       }
 
       if (resolved.isNew) conversationsCreated++;
@@ -704,13 +704,13 @@ export async function migrateExistingData(tenantId: number): Promise<{ conversat
 
       // Atualizar última mensagem da conversa
       const lastMsg = await db.execute(sql`
-        SELECT content, messageType, fromMe, status, timestamp
+        SELECT content, "messageType", "fromMe", status, timestamp
         FROM messages
-        WHERE waConversationId = ${resolved.conversationId}
+        WHERE "waConversationId" = ${resolved.conversationId}
         ORDER BY timestamp DESC
         LIMIT 1
       `);
-      const lastMsgRow = (lastMsg as any)[0]?.[0];
+      const lastMsgRow = (lastMsg as any)[0];
       if (lastMsgRow) {
         await updateConversationLastMessage(resolved.conversationId, {
           content: lastMsgRow.content,
@@ -724,11 +724,11 @@ export async function migrateExistingData(tenantId: number): Promise<{ conversat
       // Calcular unreadCount
       const unreadResult = await db.execute(sql`
         SELECT COUNT(*) as cnt FROM messages
-        WHERE waConversationId = ${resolved.conversationId}
-        AND fromMe = 0
+        WHERE "waConversationId" = ${resolved.conversationId}
+        AND "fromMe" = false
         AND (status IS NULL OR status = 'received')
       `);
-      const unreadCount = ((unreadResult as any)[0]?.[0]?.cnt) || 0;
+      const unreadCount = ((unreadResult as any)[0]?.cnt) || 0;
       await db.update(waConversations)
         .set({ unreadCount })
         .where(eq(waConversations.id, resolved.conversationId));

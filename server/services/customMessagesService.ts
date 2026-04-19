@@ -41,8 +41,8 @@ export async function listCustomMessagesByCategory(tenantId: number, category: s
 export async function createCustomMessage(data: InsertCustomMessage) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  const [result] = await db.insert(customMessages).values(data);
-  return { id: result.insertId };
+  const result = await db.insert(customMessages).values(data).returning({ id: customMessages.id });
+  return { id: (result as any[])[0].id };
 }
 
 export async function updateCustomMessage(

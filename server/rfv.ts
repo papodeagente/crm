@@ -286,7 +286,7 @@ async function getSmartFilterContactIds(db: any, tenantId: number, filter: Smart
           AND d.returnDate IS NOT NULL
           AND d.returnDate BETWEEN ${windowStart} AND ${windowEnd}
       `);
-      const resultRows = (dealRows as unknown as any[][])[0] || [];
+      const resultRows = (dealRows as unknown as any[]) || [];
       return resultRows.map((r: any) => r.id);
     }
 
@@ -316,7 +316,7 @@ async function getSmartFilterContactIds(db: any, tenantId: number, filter: Smart
           AND d.status = 'lost'
           AND d.updatedAt >= ${ninetyDaysAgo}
       `);
-      const resultRows = (dealRows as unknown as any[][])[0] || [];
+      const resultRows = (dealRows as unknown as any[]) || [];
       return resultRows.map((r: any) => r.id);
     }
 
@@ -367,7 +367,7 @@ export async function getSmartFilterCounts(tenantId: number) {
       ) AS abordagem_nao_cliente
   `);
 
-  const row = (result as unknown as any[][])[0]?.[0] || {};
+  const row = (result as unknown as any[])?.[0] || {};
   return {
     potencial_ex_cliente: Number(row.potencial_ex_cliente || 0),
     potencial_indicador: Number(row.potencial_indicador || 0),
@@ -554,7 +554,7 @@ export async function upsertRfvContact(tenantId: number, data: {
       createdAt: data.createdAt || new Date(),
     });
 
-    const insertId = (result as any)[0]?.insertId;
+    const insertId = (result as any).id ?? (result as any)[0]?.id;
     const inserted = await db.select().from(rfvContacts).where(eq(rfvContacts.id, insertId)).limit(1);
     return inserted[0];
   }
@@ -588,7 +588,7 @@ export async function recalculateRfvFromDeals(tenantId: number) {
     GROUP BY c.id, c.name, c.email, c.phone, c.createdAt
   `);
 
-  const rows = (contactDeals as unknown as any[][])[0] || [];
+  const rows = (contactDeals as unknown as any[]) || [];
   const now = new Date();
   const statusMap: Record<string, string> = { open: "em andamento", won: "vendido", lost: "perdido" };
 
@@ -668,32 +668,19 @@ export async function resetAgencyRfvData(tenantId: number) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
-  // Delete in batches of 500
-  let totalDeleted = 0;
-  let batchDeleted = 0;
+  // Delete all action logs for tenant
+  const logResult = await db.execute(sql`
+    DELETE FROM contact_action_logs
+    WHERE "tenantId" = ${tenantId}
+  `);
+  const totalDeleted = (logResult as any).rowCount || 0;
 
-  // First delete action logs
-  do {
-    const result = await db.execute(sql`
-      DELETE FROM contact_action_logs 
-      WHERE tenantId = ${tenantId} 
-      LIMIT 500
-    `);
-    batchDeleted = (result as any)[0]?.affectedRows || 0;
-    totalDeleted += batchDeleted;
-  } while (batchDeleted > 0);
-
-  // Then delete rfv contacts
-  let contactsDeleted = 0;
-  do {
-    const result = await db.execute(sql`
-      DELETE FROM rfv_contacts 
-      WHERE tenantId = ${tenantId} 
-      LIMIT 500
-    `);
-    batchDeleted = (result as any)[0]?.affectedRows || 0;
-    contactsDeleted += batchDeleted;
-  } while (batchDeleted > 0);
+  // Delete all rfv contacts for tenant
+  const contactResult = await db.execute(sql`
+    DELETE FROM rfv_contacts
+    WHERE "tenantId" = ${tenantId}
+  `);
+  const contactsDeleted = (contactResult as any).rowCount || 0;
 
   return { logsDeleted: totalDeleted, contactsDeleted };
 }

@@ -28,7 +28,7 @@ export async function createTenant(data: { name: string; plan?: "free" | "pro" |
   const freemiumDays = data.freemiumDays ?? 7; // Default 7-day trial for new tenants
   const freemiumExpiresAt = new Date(Date.now() + freemiumDays * 24 * 60 * 60 * 1000);
   const isLegacy = data.isLegacy ?? false;
-  const [result] = await db.insert(tenants).values({ name: data.name, plan: data.plan || "start", status: "active", billingStatus: "trialing", isLegacy, ownerUserId: data.ownerUserId, hotmartEmail: data.hotmartEmail, freemiumDays, freemiumExpiresAt }).$returningId();
+  const [result] = await db.insert(tenants).values({ name: data.name, plan: data.plan || "start", status: "active", billingStatus: "trialing", isLegacy, ownerUserId: data.ownerUserId, hotmartEmail: data.hotmartEmail, freemiumDays, freemiumExpiresAt }).returning({ id: tenants.id });
   // Auto-create default pipelines for new tenant
   try {
     const { createDefaultPipelines } = await import("./classificationEngine");
@@ -67,7 +67,7 @@ export async function listTenants() {
 // ═══════════════════════════════════════
 export async function createCrmUser(data: { tenantId: number; name: string; email: string; phone?: string; createdBy?: number }) {
   const db = await getDb(); if (!db) return null;
-  const [result] = await db.insert(crmUsers).values(data).$returningId();
+  const [result] = await db.insert(crmUsers).values(data).returning({ id: crmUsers.id });
   return result;
 }
 export async function getCrmUserById(tenantId: number, id: number) {
@@ -98,7 +98,7 @@ export async function deleteCrmUser(tenantId: number, id: number) {
 // ═══════════════════════════════════════
 export async function createTeam(data: { tenantId: number; name: string }) {
   const db = await getDb(); if (!db) return null;
-  const [result] = await db.insert(teams).values(data).$returningId();
+  const [result] = await db.insert(teams).values(data).returning({ id: teams.id });
   return result;
 }
 export async function listTeams(tenantId: number) {
@@ -123,7 +123,7 @@ export async function removeTeamMember(tenantId: number, userId: number, teamId:
 // ═══════════════════════════════════════
 export async function createRole(data: { tenantId: number; slug: string; name: string; isSystemRole?: boolean; description?: string }) {
   const db = await getDb(); if (!db) return null;
-  const [result] = await db.insert(roles).values(data).$returningId();
+  const [result] = await db.insert(roles).values(data).returning({ id: roles.id });
   return result;
 }
 export async function listRoles(tenantId: number) {
@@ -154,7 +154,7 @@ export async function createContact(data: { tenantId: number; name: string; type
     const normalized = normalizeBrazilianPhone(data.phone);
     if (normalized) data.phone = `+${normalized}`;
   }
-  const [result] = await db.insert(contacts).values(data).$returningId();
+  const [result] = await db.insert(contacts).values(data).returning({ id: contacts.id });
   return result;
 }
 export async function getContactById(tenantId: number, id: number) {
@@ -204,20 +204,20 @@ export async function deleteContact(tenantId: number, id: number) {
 export async function bulkSoftDeleteContacts(tenantId: number, ids: number[]) {
   const db = await getDb(); if (!db) return 0;
   if (ids.length === 0) return 0;
-  const result = await db.update(contacts).set({ deletedAt: new Date() }).where(and(eq(contacts.tenantId, tenantId), inArray(contacts.id, ids)));
-  return (result as any)[0]?.affectedRows ?? ids.length;
+  await db.update(contacts).set({ deletedAt: new Date() }).where(and(eq(contacts.tenantId, tenantId), inArray(contacts.id, ids)));
+  return ids.length;
 }
 export async function hardDeleteContacts(tenantId: number, ids: number[]) {
   const db = await getDb(); if (!db) return 0;
   if (ids.length === 0) return 0;
-  const result = await db.delete(contacts).where(and(eq(contacts.tenantId, tenantId), inArray(contacts.id, ids)));
-  return (result as any)[0]?.affectedRows ?? ids.length;
+  await db.delete(contacts).where(and(eq(contacts.tenantId, tenantId), inArray(contacts.id, ids)));
+  return ids.length;
 }
 export async function restoreContacts(tenantId: number, ids: number[]) {
   const db = await getDb(); if (!db) return 0;
   if (ids.length === 0) return 0;
-  const result = await db.update(contacts).set({ deletedAt: null }).where(and(eq(contacts.tenantId, tenantId), inArray(contacts.id, ids)));
-  return (result as any)[0]?.affectedRows ?? ids.length;
+  await db.update(contacts).set({ deletedAt: null }).where(and(eq(contacts.tenantId, tenantId), inArray(contacts.id, ids)));
+  return ids.length;
 }
 export async function listDeletedContacts(tenantId: number, limit = 50) {
   const db = await getDb(); if (!db) return [];
@@ -253,7 +253,7 @@ export async function countContacts(tenantId: number, opts?: { search?: string; 
 // ═══════════════════════════════════════
 export async function createPipeline(data: { tenantId: number; name: string; isDefault?: boolean }) {
   const db = await getDb(); if (!db) return null;
-  const [result] = await db.insert(pipelines).values(data).$returningId();
+  const [result] = await db.insert(pipelines).values(data).returning({ id: pipelines.id });
   return result;
 }
 export async function listPipelines(tenantId: number, includeArchived = false) {
@@ -265,7 +265,7 @@ export async function listPipelines(tenantId: number, includeArchived = false) {
 }
 export async function createStage(data: { tenantId: number; pipelineId: number; name: string; orderIndex: number; probabilityDefault?: number; isWon?: boolean; isLost?: boolean }) {
   const db = await getDb(); if (!db) return null;
-  const [result] = await db.insert(pipelineStages).values(data).$returningId();
+  const [result] = await db.insert(pipelineStages).values(data).returning({ id: pipelineStages.id });
   return result;
 }
 export async function listStages(tenantId: number, pipelineId: number) {
@@ -308,11 +308,11 @@ export async function createDeal(data: { tenantId: number; title: string; contac
   if (data.dedupeKey !== undefined) cleanData.dedupeKey = data.dedupeKey;
   if (data.status !== undefined) cleanData.status = data.status;
   try {
-    const [result] = await db.insert(deals).values(cleanData as typeof deals.$inferInsert).$returningId();
+    const [result] = await db.insert(deals).values(cleanData as typeof deals.$inferInsert).returning({ id: deals.id });
     return result;
   } catch (error: any) {
     console.error('[createDeal] Failed to insert deal:', error?.message || error);
-    throw new Error(`Erro ao criar negociação: ${error?.code === 'ER_DUP_ENTRY' ? 'Registro duplicado' : error?.code === 'ER_DATA_TOO_LONG' ? 'Dados muito longos para um dos campos' : 'Erro no banco de dados. Tente novamente.'}`);
+    throw new Error(`Erro ao criar negociação: ${error?.code === '23505' ? 'Registro duplicado' : error?.code === '22001' ? 'Dados muito longos para um dos campos' : 'Erro no banco de dados. Tente novamente.'}`);
   }
 }
 export async function getDealById(tenantId: number, id: number) {
@@ -396,7 +396,7 @@ export async function listDeals(tenantId: number, opts?: {
   // Cooling filter — no activity in last N days
   if (opts?.cooling) {
     const days = opts.coolingDays || 7;
-    conditions.push(sql`${deals.lastActivityAt} < DATE_SUB(NOW(), INTERVAL ${days} DAY)`);
+    conditions.push(sql`${deals.lastActivityAt} < NOW() - INTERVAL '1 day' * ${days}`);
     conditions.push(eq(deals.status, "open"));
   }
   return db.select({
@@ -443,20 +443,20 @@ export async function listDeals(tenantId: number, opts?: {
 export async function bulkSoftDeleteDeals(tenantId: number, ids: number[]) {
   const db = await getDb(); if (!db) return 0;
   if (ids.length === 0) return 0;
-  const result = await db.update(deals).set({ deletedAt: new Date() }).where(and(eq(deals.tenantId, tenantId), inArray(deals.id, ids)));
-  return (result as any)[0]?.affectedRows ?? ids.length;
+  await db.update(deals).set({ deletedAt: new Date() }).where(and(eq(deals.tenantId, tenantId), inArray(deals.id, ids)));
+  return ids.length;
 }
 export async function hardDeleteDeals(tenantId: number, ids: number[]) {
   const db = await getDb(); if (!db) return 0;
   if (ids.length === 0) return 0;
-  const result = await db.delete(deals).where(and(eq(deals.tenantId, tenantId), inArray(deals.id, ids)));
-  return (result as any)[0]?.affectedRows ?? ids.length;
+  await db.delete(deals).where(and(eq(deals.tenantId, tenantId), inArray(deals.id, ids)));
+  return ids.length;
 }
 export async function restoreDeals(tenantId: number, ids: number[]) {
   const db = await getDb(); if (!db) return 0;
   if (ids.length === 0) return 0;
-  const result = await db.update(deals).set({ deletedAt: null }).where(and(eq(deals.tenantId, tenantId), inArray(deals.id, ids)));
-  return (result as any)[0]?.affectedRows ?? ids.length;
+  await db.update(deals).set({ deletedAt: null }).where(and(eq(deals.tenantId, tenantId), inArray(deals.id, ids)));
+  return ids.length;
 }
 export async function listDeletedDeals(tenantId: number, limit = 50) {
   const db = await getDb(); if (!db) return [];
@@ -522,7 +522,7 @@ export async function getAccountById(tenantId: number, id: number) {
 }
 export async function createAccount(data: { tenantId: number; name: string; primaryContactId?: number; ownerUserId?: number; teamId?: number; createdBy?: number }) {
   const db = await getDb(); if (!db) return null;
-  const [result] = await db.insert(accounts).values(data).$returningId();
+  const [result] = await db.insert(accounts).values(data).returning({ id: accounts.id });
   return result;
 }
 export async function updateAccount(tenantId: number, id: number, data: Partial<{ name: string; primaryContactId: number; ownerUserId: number; updatedBy: number }>) {
@@ -547,7 +547,7 @@ export async function createDealProduct(data: { tenantId: number; dealId: number
   const unit = data.unitPriceCents || 0;
   const discount = data.discountCents || 0;
   const finalPrice = data.finalPriceCents ?? (qty * unit - discount);
-  const [result] = await db.insert(dealProducts).values({ ...data, finalPriceCents: finalPrice }).$returningId();
+  const [result] = await db.insert(dealProducts).values({ ...data, finalPriceCents: finalPrice }).returning({ id: dealProducts.id });
   return result;
 }
 export async function listDealProducts(tenantId: number, dealId: number) {
@@ -592,7 +592,7 @@ export async function createDealHistory(data: {
   dedupeKey?: string; occurredAt?: Date;
 }) {
   const db = await getDb(); if (!db) return null;
-  const [result] = await db.insert(dealHistory).values(data).$returningId();
+  const [result] = await db.insert(dealHistory).values(data).returning({ id: dealHistory.id });
   return result;
 }
 
@@ -733,7 +733,7 @@ function categorizeAction(action: string): string {
 // ═══════════════════════════════════════
 export async function addDealParticipant(data: { tenantId: number; dealId: number; contactId: number; role?: "decision_maker" | "traveler" | "payer" | "companion" | "other" }) {
   const db = await getDb(); if (!db) return null;
-  const [result] = await db.insert(dealParticipants).values(data).$returningId();
+  const [result] = await db.insert(dealParticipants).values(data).returning({ id: dealParticipants.id });
   return result;
 }
 export async function listDealParticipants(tenantId: number, dealId: number) {
@@ -750,7 +750,7 @@ export async function removeDealParticipant(tenantId: number, id: number) {
 // ═══════════════════════════════════════
 export async function createTrip(data: { tenantId: number; dealId?: number; destinationSummary?: string; startDate?: Date; endDate?: Date; ownerUserId?: number; createdBy?: number }) {
   const db = await getDb(); if (!db) return null;
-  const [result] = await db.insert(trips).values(data).$returningId();
+  const [result] = await db.insert(trips).values(data).returning({ id: trips.id });
   return result;
 }
 export async function listTrips(tenantId: number) {
@@ -768,7 +768,7 @@ export async function getTripById(tenantId: number, id: number) {
 // ═══════════════════════════════════════
 export async function createTask(data: { tenantId: number; entityType: string; entityId: number; title: string; taskType?: string; dueAt?: Date; assignedToUserId?: number; createdByUserId?: number; priority?: "low" | "medium" | "high" | "urgent"; description?: string }) {
   const db = await getDb(); if (!db) return null;
-  const [result] = await db.insert(tasks).values(data).$returningId();
+  const [result] = await db.insert(tasks).values(data).returning({ id: tasks.id });
   // Auto-assign creator as default assignee
   if (result && data.createdByUserId) {
     await db.insert(taskAssignees).values({ taskId: result.id, userId: data.createdByUserId, tenantId: data.tenantId });
@@ -943,7 +943,7 @@ export async function getPendingTaskCountsByDeal(tenantId: number) {
 // ═══════════════════════════════════════
 export async function createNote(data: { tenantId: number; entityType: string; entityId: number; body: string; createdByUserId?: number }) {
   const db = await getDb(); if (!db) return null;
-  const [result] = await db.insert(crmNotes).values(data).$returningId();
+  const [result] = await db.insert(crmNotes).values(data).returning({ id: crmNotes.id });
   return result;
 }
 export async function listNotes(tenantId: number, entityType: string, entityId: number) {
@@ -956,7 +956,7 @@ export async function listNotes(tenantId: number, entityType: string, entityId: 
 // ═══════════════════════════════════════
 export async function createChannel(data: { tenantId: number; type: "whatsapp" | "instagram" | "email" | "webchat"; name?: string; connectionId?: string }) {
   const db = await getDb(); if (!db) return null;
-  const [result] = await db.insert(channels).values(data).$returningId();
+  const [result] = await db.insert(channels).values(data).returning({ id: channels.id });
   return result;
 }
 export async function listChannels(tenantId: number) {
@@ -965,7 +965,7 @@ export async function listChannels(tenantId: number) {
 }
 export async function createConversation(data: { tenantId: number; channelId: number; contactId?: number; providerThreadId?: string; assignedToUserId?: number }) {
   const db = await getDb(); if (!db) return null;
-  const [result] = await db.insert(conversations).values(data).$returningId();
+  const [result] = await db.insert(conversations).values(data).returning({ id: conversations.id });
   return result;
 }
 export async function listConversations(tenantId: number, opts?: { status?: string; channelId?: number; limit?: number; offset?: number }) {
@@ -986,7 +986,7 @@ export async function updateConversation(tenantId: number, id: number, data: Par
 }
 export async function createInboxMessage(data: { tenantId: number; conversationId: number; direction: "inbound" | "outbound"; bodyText?: string; senderLabel?: string; providerMessageId?: string }) {
   const db = await getDb(); if (!db) return null;
-  const [result] = await db.insert(inboxMessages).values({ ...data, sentAt: new Date(), status: data.direction === "outbound" ? "sent" : "delivered" }).$returningId();
+  const [result] = await db.insert(inboxMessages).values({ ...data, sentAt: new Date(), status: data.direction === "outbound" ? "sent" : "delivered" }).returning({ id: inboxMessages.id });
   await db.update(conversations).set({ lastMessageAt: new Date() }).where(eq(conversations.id, data.conversationId));
   return result;
 }
@@ -1010,7 +1010,7 @@ export async function countConversations(tenantId: number, status?: string, opts
 // ═══════════════════════════════════════
 export async function createProposal(data: { tenantId: number; dealId: number; totalCents?: number; createdBy?: number }) {
   const db = await getDb(); if (!db) return null;
-  const [result] = await db.insert(proposals).values(data).$returningId();
+  const [result] = await db.insert(proposals).values(data).returning({ id: proposals.id });
   return result;
 }
 export async function listProposals(tenantId: number, opts?: { dealId?: number; status?: string }) {
@@ -1030,7 +1030,7 @@ export async function updateProposal(tenantId: number, id: number, data: Partial
 }
 export async function createProposalItem(data: { tenantId: number; proposalId: number; title: string; description?: string; qty?: number; unitPriceCents?: number; totalCents?: number }) {
   const db = await getDb(); if (!db) return null;
-  const [result] = await db.insert(proposalItems).values(data).$returningId();
+  const [result] = await db.insert(proposalItems).values(data).returning({ id: proposalItems.id });
   return result;
 }
 export async function listProposalItems(tenantId: number, proposalId: number) {
@@ -1043,7 +1043,7 @@ export async function listProposalTemplates(tenantId: number) {
 }
 export async function createProposalTemplate(data: { tenantId: number; name: string; htmlBody?: string; variablesJson?: any }) {
   const db = await getDb(); if (!db) return null;
-  const [result] = await db.insert(proposalTemplates).values(data).$returningId();
+  const [result] = await db.insert(proposalTemplates).values(data).returning({ id: proposalTemplates.id });
   return result;
 }
 
@@ -1052,7 +1052,7 @@ export async function createProposalTemplate(data: { tenantId: number; name: str
 // ═══════════════════════════════════════
 export async function createPortalUser(data: { tenantId: number; contactId: number; email: string }) {
   const db = await getDb(); if (!db) return null;
-  const [result] = await db.insert(portalUsers).values(data).$returningId();
+  const [result] = await db.insert(portalUsers).values(data).returning({ id: portalUsers.id });
   return result;
 }
 export async function listPortalTickets(tenantId: number, opts?: { contactId?: number; status?: string }) {
@@ -1063,7 +1063,7 @@ export async function listPortalTickets(tenantId: number, opts?: { contactId?: n
 }
 export async function createPortalTicket(data: { tenantId: number; contactId: number; subject: string; tripId?: number; priority?: "low" | "medium" | "high" | "urgent" }) {
   const db = await getDb(); if (!db) return null;
-  const [result] = await db.insert(portalTickets).values(data).$returningId();
+  const [result] = await db.insert(portalTickets).values(data).returning({ id: portalTickets.id });
   return result;
 }
 
@@ -1072,7 +1072,7 @@ export async function createPortalTicket(data: { tenantId: number; contactId: nu
 // ═══════════════════════════════════════
 export async function createGoal(data: { tenantId: number; name?: string; scope?: "user" | "company"; periodStart: Date; periodEnd: Date; metricKey: string; targetValue: number; teamId?: number; userId?: number; companyId?: number }) {
   const db = await getDb(); if (!db) return null;
-  const [result] = await db.insert(goals).values(data).$returningId();
+  const [result] = await db.insert(goals).values(data).returning({ id: goals.id });
   return result;
 }
 export async function listGoals(tenantId: number) {
@@ -1131,27 +1131,27 @@ async function calculateGoalProgress(db: any, goal: any): Promise<number> {
 
     if (metricKey === 'total_sold') {
       // Sum valueCents of won deals within the period
-      const [rows] = await db.execute(
+      const rows = await db.execute(
         sql`SELECT COALESCE(SUM(d.valueCents), 0) as total FROM deals d WHERE ${sql.raw(whereClause)} AND d.status = 'won'`
       );
-      return Number((rows as any)[0]?.total ?? 0);
+      return Number((rows as any[])[0]?.total ?? 0);
     }
 
     if (metricKey === 'deals_count') {
       // Count all deals created within the period
-      const [rows] = await db.execute(
+      const rows = await db.execute(
         sql`SELECT COUNT(*) as total FROM deals d WHERE ${sql.raw(whereClause)}`
       );
-      return Number((rows as any)[0]?.total ?? 0);
+      return Number((rows as any[])[0]?.total ?? 0);
     }
 
     if (metricKey === 'conversion_rate') {
       // Conversion rate = (won deals / total deals) * 100
-      const [rows] = await db.execute(
+      const rows = await db.execute(
         sql`SELECT COUNT(*) as total, SUM(CASE WHEN d.status = 'won' THEN 1 ELSE 0 END) as won FROM deals d WHERE ${sql.raw(whereClause)}`
       );
-      const total = Number((rows as any)[0]?.total ?? 0);
-      const won = Number((rows as any)[0]?.won ?? 0);
+      const total = Number((rows as any[])[0]?.total ?? 0);
+      const won = Number((rows as any[])[0]?.won ?? 0);
       if (total === 0) return 0;
       return Math.round((won / total) * 100 * 10) / 10; // one decimal place
     }
@@ -1192,7 +1192,7 @@ export async function listAlerts(tenantId: number, opts?: { status?: string }) {
 }
 export async function createAlert(data: { tenantId: number; type: string; entityType?: string; entityId?: number; payloadJson?: any }) {
   const db = await getDb(); if (!db) return null;
-  const [result] = await db.insert(alerts).values(data).$returningId();
+  const [result] = await db.insert(alerts).values(data).returning({ id: alerts.id });
   return result;
 }
 
@@ -1201,7 +1201,7 @@ export async function createAlert(data: { tenantId: number; type: string; entity
 // ═══════════════════════════════════════
 export async function createCourse(data: { tenantId: number; title: string; description?: string; coverUrl?: string }) {
   const db = await getDb(); if (!db) return null;
-  const [result] = await db.insert(courses).values(data).$returningId();
+  const [result] = await db.insert(courses).values(data).returning({ id: courses.id });
   return result;
 }
 export async function listCourses(tenantId: number) {
@@ -1215,7 +1215,7 @@ export async function getCourseById(tenantId: number, id: number) {
 }
 export async function createLesson(data: { tenantId: number; courseId: number; title: string; contentBody?: string; contentUrl?: string; orderIndex: number }) {
   const db = await getDb(); if (!db) return null;
-  const [result] = await db.insert(lessons).values(data).$returningId();
+  const [result] = await db.insert(lessons).values(data).returning({ id: lessons.id });
   return result;
 }
 export async function listLessons(tenantId: number, courseId: number) {
@@ -1224,7 +1224,7 @@ export async function listLessons(tenantId: number, courseId: number) {
 }
 export async function enrollUser(data: { tenantId: number; userId: number; courseId: number }) {
   const db = await getDb(); if (!db) return null;
-  const [result] = await db.insert(enrollments).values(data).$returningId();
+  const [result] = await db.insert(enrollments).values(data).returning({ id: enrollments.id });
   return result;
 }
 export async function listEnrollments(tenantId: number, userId: number) {
@@ -1237,7 +1237,7 @@ export async function listEnrollments(tenantId: number, userId: number) {
 // ═══════════════════════════════════════
 export async function createIntegration(data: { tenantId: number; provider: string; name: string }) {
   const db = await getDb(); if (!db) return null;
-  const [result] = await db.insert(integrations).values(data).$returningId();
+  const [result] = await db.insert(integrations).values(data).returning({ id: integrations.id });
   return result;
 }
 export async function listIntegrations(tenantId: number) {
@@ -1246,7 +1246,7 @@ export async function listIntegrations(tenantId: number) {
 }
 export async function createJob(data: { tenantId: number; type: string; payloadJson?: any }) {
   const db = await getDb(); if (!db) return null;
-  const [result] = await db.insert(jobs).values(data).$returningId();
+  const [result] = await db.insert(jobs).values(data).returning({ id: jobs.id });
   return result;
 }
 export async function listJobs(tenantId: number, opts?: { status?: string }) {
@@ -1261,7 +1261,7 @@ export async function listWebhooks(tenantId: number) {
 }
 export async function createWebhook(data: { tenantId: number; provider: string; endpoint: string; secretHash?: string }) {
   const db = await getDb(); if (!db) return null;
-  const [result] = await db.insert(webhooks).values(data).$returningId();
+  const [result] = await db.insert(webhooks).values(data).returning({ id: webhooks.id });
   return result;
 }
 
@@ -1331,7 +1331,7 @@ export async function createPipelineAutomation(data: {
   copyProducts?: boolean; copyParticipants?: boolean; copyCustomFields?: boolean;
 }) {
   const db = await getDb(); if (!db) return null;
-  const [result] = await db.insert(pipelineAutomations).values(data as any).$returningId();
+  const [result] = await db.insert(pipelineAutomations).values(data as any).returning({ id: pipelineAutomations.id });
   return result;
 }
 export async function listPipelineAutomations(tenantId: number, sourcePipelineId?: number) {
@@ -1446,7 +1446,7 @@ export async function getProductCategoryById(tenantId: number, id: number) {
 }
 export async function createProductCategory(data: { tenantId: number; name: string; icon?: string; color?: string; parentId?: number; sortOrder?: number }) {
   const db = await getDb(); if (!db) return null;
-  const [result] = await db.insert(productCategories).values(data).$returningId();
+  const [result] = await db.insert(productCategories).values(data).returning({ id: productCategories.id });
   return result;
 }
 export async function updateProductCategory(tenantId: number, id: number, data: Partial<{ name: string; icon: string; color: string; parentId: number | null; sortOrder: number }>) {
@@ -1483,7 +1483,7 @@ export async function createCatalogProduct(data: {
   imageUrl?: string; sku?: string; isActive?: boolean; detailsJson?: any;
 }) {
   const db = await getDb(); if (!db) return null;
-  const [result] = await db.insert(productCatalog).values(data).$returningId();
+  const [result] = await db.insert(productCatalog).values(data).returning({ id: productCatalog.id });
   return result;
 }
 export async function updateCatalogProduct(tenantId: number, id: number, data: Partial<{
@@ -1527,7 +1527,7 @@ export async function getProductAnalyticsMostSold(tenantId: number, limit = 10) 
     ORDER BY totalQuantity DESC
     LIMIT ${limit}
   `);
-  return (rows as any)[0] || [];
+  return rows as any[] || [];
 }
 
 /** Most lost products: products in deals with status='lost' */
@@ -1545,7 +1545,7 @@ export async function getProductAnalyticsMostLost(tenantId: number, limit = 10) 
     ORDER BY totalQuantity DESC
     LIMIT ${limit}
   `);
-  return (rows as any)[0] || [];
+  return rows as any[] || [];
 }
 
 /** Most requested products: all products across all deals regardless of status */
@@ -1563,7 +1563,7 @@ export async function getProductAnalyticsMostRequested(tenantId: number, limit =
     ORDER BY totalQuantity DESC
     LIMIT ${limit}
   `);
-  return (rows as any)[0] || [];
+  return rows as any[] || [];
 }
 
 /** Revenue by product type (category) */
@@ -1580,7 +1580,7 @@ export async function getProductAnalyticsRevenueByType(tenantId: number) {
     GROUP BY dp.category
     ORDER BY totalRevenueCents DESC
   `);
-  return (rows as any)[0] || [];
+  return rows as any[] || [];
 }
 
 /** Conversion rate by product: won vs total deals containing each product */
@@ -1599,7 +1599,7 @@ export async function getProductAnalyticsConversionRate(tenantId: number, limit 
     ORDER BY conversionRate DESC
     LIMIT ${limit}
   `);
-  return (rows as any)[0] || [];
+  return rows as any[] || [];
 }
 
 /** Product analytics summary: total products, active, avg price, total revenue */
@@ -1618,7 +1618,7 @@ export async function getProductAnalyticsSummary(tenantId: number) {
     INNER JOIN deals d ON dp.dealId = d.id AND dp.tenantId = d.tenantId
     WHERE dp.tenantId = ${tenantId} AND d.status = 'won'
   `);
-  const rev = ((revRows as any)[0] || [])[0] || {};
+  const rev = (revRows as any[])[0] || {};
 
   return {
     totalProducts: catRow?.total || 0,
@@ -1642,7 +1642,7 @@ export async function getProductAnalyticsTopDestinations(tenantId: number, limit
     ORDER BY productCount DESC
     LIMIT ${limit}
   `);
-  return (rows as any)[0] || [];
+  return rows as any[] || [];
 }
 
 
@@ -1815,7 +1815,7 @@ export async function saveAnalysis(data: {
     improvements: data.improvements || [],
     suggestions: data.suggestions || [],
     missedOpportunities: data.missedOpportunities || [],
-  }).$returningId();
+  }).returning({ id: aiConversationAnalyses.id });
   return result;
 }
 
@@ -1830,7 +1830,7 @@ export async function listLeadSources(tenantId: number, includeDeleted = false) 
 }
 export async function createLeadSource(data: { tenantId: number; name: string; color?: string }) {
   const db = await getDb(); if (!db) return null;
-  const [result] = await db.insert(leadSources).values(data).$returningId();
+  const [result] = await db.insert(leadSources).values(data).returning({ id: leadSources.id });
   return result;
 }
 export async function updateLeadSource(id: number, data: { name?: string; color?: string; isActive?: boolean }) {
@@ -1866,7 +1866,7 @@ export async function listCampaigns(tenantId: number, sourceId?: number, include
 }
 export async function createCampaign(data: { tenantId: number; sourceId?: number; name: string; color?: string }) {
   const db = await getDb(); if (!db) return null;
-  const [result] = await db.insert(campaigns).values(data).$returningId();
+  const [result] = await db.insert(campaigns).values(data).returning({ id: campaigns.id });
   return result;
 }
 export async function updateCampaign(id: number, data: { name?: string; color?: string; sourceId?: number | null; isActive?: boolean }) {
@@ -1901,7 +1901,7 @@ export async function listLossReasons(tenantId: number, includeDeleted = false) 
 }
 export async function createLossReason(data: { tenantId: number; name: string; description?: string }) {
   const db = await getDb(); if (!db) return null;
-  const [result] = await db.insert(lossReasons).values(data).$returningId();
+  const [result] = await db.insert(lossReasons).values(data).returning({ id: lossReasons.id });
   return result;
 }
 export async function updateLossReason(id: number, data: { name?: string; description?: string; isActive?: boolean }) {
@@ -1985,8 +1985,8 @@ export async function createTaskAutomation(data: {
     waMessageTemplate: data.waMessageTemplate ?? null,
     isActive: data.isActive ?? true,
     orderIndex: data.orderIndex ?? 0,
-  });
-  return { id: result.insertId };
+  }).returning({ id: taskAutomations.id });
+  return { id: result.id };
 }
 
 export async function updateTaskAutomation(id: number, tenantId: number, data: Partial<{
@@ -2178,9 +2178,9 @@ export async function executeTaskAutomations(
             waContactId: ctx.contactId,
             waScheduledAt: dueDate,
             waStatus: "scheduled",
-          });
+          }).returning({ id: tasks.id });
 
-          const taskId = taskResult.insertId;
+          const taskId = taskResult.id;
           createdTasks.push(taskId);
 
           if (assigneeIds.length > 0) {
@@ -2207,9 +2207,9 @@ export async function executeTaskAutomations(
       dueAt: dueDate,
       status: "pending",
       createdByUserId: createdByUserId ?? undefined,
-    });
-    
-    const taskId = taskResult.insertId;
+    }).returning({ id: tasks.id });
+
+    const taskId = taskResult.id;
     createdTasks.push(taskId);
     
     // Atribuir responsáveis
@@ -2264,7 +2264,7 @@ export async function createStageOwnerRule(data: {
       .where(eq(stageOwnerRules.id, existing[0].id));
     return existing[0].id;
   }
-  const [result] = await db.insert(stageOwnerRules).values(data).$returningId();
+  const [result] = await db.insert(stageOwnerRules).values(data).returning({ id: stageOwnerRules.id });
   return result.id;
 }
 
@@ -2326,7 +2326,7 @@ export async function createDateAutomation(data: {
   isActive?: boolean;
 }) {
   const db = await getDb(); if (!db) return null;
-  const [result] = await db.insert(dateAutomations).values(data as any).$returningId();
+  const [result] = await db.insert(dateAutomations).values(data as any).returning({ id: dateAutomations.id });
   return result;
 }
 

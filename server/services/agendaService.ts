@@ -76,7 +76,7 @@ export interface AgendaFilter {
 async function getTeamMemberIds(tenantId: number, teamId: number): Promise<number[]> {
   const db = await getDb();
   if (!db) return [];
-  const [rows] = await db.execute(sql`
+  const rows = await db.execute(sql`
     SELECT userId FROM team_members WHERE tenantId = ${tenantId} AND teamId = ${teamId}
   `);
   return (rows as unknown as any[]).map((r: any) => Number(r.userId));
@@ -106,7 +106,7 @@ export async function getUnifiedAgenda(
   // ── CRM Tasks ──
   const userFilter = buildTaskUserFilter(filter.userId, userIds);
 
-  const [taskRows] = await db.execute(sql`
+  const taskRows = await db.execute(sql`
     SELECT t.id, t.title, t.dueAt, t.priority, t.status, t.taskType,
            t.entityType, t.entityId, t.description,
            t.assignedToUserId,
@@ -121,8 +121,8 @@ export async function getUnifiedAgenda(
     WHERE t.tenantId = ${tenantId}
       ${userFilter}
       AND (
-        (t.dueAt IS NOT NULL AND t.dueAt >= ${fromDate} AND t.dueAt < DATE_ADD(${toDate}, INTERVAL 1 DAY))
-        OR (t.dueAt IS NULL AND t.createdAt >= ${fromDate} AND t.createdAt < DATE_ADD(${toDate}, INTERVAL 1 DAY))
+        (t.dueAt IS NOT NULL AND t.dueAt >= ${fromDate} AND t.dueAt < ${toDate}::date + INTERVAL '1 day')
+        OR (t.dueAt IS NULL AND t.createdAt >= ${fromDate} AND t.createdAt < ${toDate}::date + INTERVAL '1 day')
       )
     ORDER BY t.dueAt ASC, t.priority DESC
   `);
@@ -156,13 +156,13 @@ export async function getUnifiedAgenda(
   // ── Google Calendar Events ──
   const gcalUserFilter = buildGcalUserFilter(filter.userId, userIds);
 
-  const [gcalRows] = await db.execute(sql`
+  const gcalRows = await db.execute(sql`
     SELECT id, title, description, startAt, endAt, allDay, location, status, htmlLink,
            userId, sourceCalendarId
     FROM google_calendar_events
     WHERE tenantId = ${tenantId}
       ${gcalUserFilter}
-      AND startAt < DATE_ADD(${toDate}, INTERVAL 1 DAY)
+      AND startAt < ${toDate}::date + INTERVAL '1 day'
       AND endAt >= ${fromDate}
     ORDER BY startAt ASC
   `);
@@ -187,7 +187,7 @@ export async function getUnifiedAgenda(
   // ── CRM Appointments (manual) — include appointments where user is owner OR participant ──
   const apptUserFilter = buildApptUserFilter(filter.userId, userIds);
 
-  const [apptRows] = await db.execute(sql`
+  const apptRows = await db.execute(sql`
     SELECT DISTINCT a.id, a.title, a.description, a.startAt, a.endAt, a.allDay,
            a.location, a.color, a.dealId, a.contactId, a.isCompleted, a.completedAt,
            a.userId,
@@ -200,7 +200,7 @@ export async function getUnifiedAgenda(
     WHERE a.tenantId = ${tenantId}
       AND a.deletedAt IS NULL
       ${apptUserFilter}
-      AND a.startAt < DATE_ADD(${toDate}, INTERVAL 1 DAY)
+      AND a.startAt < ${toDate}::date + INTERVAL '1 day'
       AND a.endAt >= ${fromDate}
     ORDER BY a.startAt ASC
   `);
@@ -211,7 +211,7 @@ export async function getUnifiedAgenda(
   if (apptIds.length > 0) {
     // Build safe IN clause with individual sql params
     const inClause = apptIds.map((_: any, i: number) => i === 0 ? sql`${apptIds[0]}` : sql`${apptIds[i]}`).reduce((acc: any, v: any) => sql`${acc}, ${v}`);
-    const [partRows] = await db.execute(sql`
+    const partRows = await db.execute(sql`
       SELECT cap.appointmentId, cap.userId, COALESCE(su.name, u.name, 'Usuário') AS name
       FROM crm_appointment_participants cap
       LEFT JOIN crm_users su ON su.userId = cap.userId AND su.tenantId = ${tenantId}
@@ -268,9 +268,9 @@ export async function syncGoogleCalendar(
   if (!db) return { synced: 0, error: "Database not available" };
 
   // Check if user has Google Calendar token
-  const [tokenRows] = await db.execute(sql`
+  const tokenRows = await db.execute(sql`
     SELECT id, calendarEmail FROM google_calendar_tokens
-    WHERE tenantId = ${tenantId} AND userId = ${userId} AND isActive = 1
+    WHERE tenantId = ${tenantId} AND userId = ${userId} AND isActive = true
     LIMIT 1
   `);
   const tokens = tokenRows as unknown as any[];
@@ -314,7 +314,7 @@ export async function syncGoogleCalendar(
       const startAt = new Date(startDateTime);
       const endAt = endDateTime ? new Date(endDateTime) : new Date(startAt.getTime() + 60 * 60 * 1000);
 
-      // Upsert: INSERT ... ON DUPLICATE KEY UPDATE
+      // Upsert: INSERT ... ON CONFLICT DO UPDATE
       await db.execute(sql`
         INSERT INTO google_calendar_events
           (tenantId, userId, googleEventId, title, description, startAt, endAt, allDay, location, status, htmlLink, sourceCalendarId, rawJson, syncedAt)
@@ -322,17 +322,17 @@ export async function syncGoogleCalendar(
           (${tenantId}, ${userId}, ${googleEventId}, ${evt.summary || "(Sem título)"}, ${evt.description || null},
            ${startAt}, ${endAt}, ${isAllDay}, ${evt.location || null}, ${evt.status || "confirmed"},
            ${evt.htmlLink || null}, ${calendarEmail}, ${JSON.stringify(evt)}, ${syncedAt})
-        ON DUPLICATE KEY UPDATE
-          title = VALUES(title),
-          description = VALUES(description),
-          startAt = VALUES(startAt),
-          endAt = VALUES(endAt),
-          allDay = VALUES(allDay),
-          location = VALUES(location),
-          status = VALUES(status),
-          htmlLink = VALUES(htmlLink),
-          rawJson = VALUES(rawJson),
-          syncedAt = VALUES(syncedAt)
+        ON CONFLICT (tenantId, userId, googleEventId) DO UPDATE SET
+          title = EXCLUDED.title,
+          description = EXCLUDED.description,
+          startAt = EXCLUDED.startAt,
+          endAt = EXCLUDED.endAt,
+          allDay = EXCLUDED.allDay,
+          location = EXCLUDED.location,
+          status = EXCLUDED.status,
+          htmlLink = EXCLUDED.htmlLink,
+          rawJson = EXCLUDED.rawJson,
+          syncedAt = EXCLUDED.syncedAt
       `);
       syncCount++;
     }
@@ -380,7 +380,7 @@ export async function disconnectGoogleCalendar(
   // Deactivate token
   await db.execute(sql`
     UPDATE google_calendar_tokens
-    SET isActive = 0
+    SET isActive = false
     WHERE tenantId = ${tenantId} AND userId = ${userId}
   `);
 
@@ -399,16 +399,16 @@ export async function getGoogleCalendarStatus(
   const db = await getDb();
   if (!db) return { connected: false };
 
-  const [tokenRows] = await db.execute(sql`
+  const tokenRows = await db.execute(sql`
     SELECT calendarEmail FROM google_calendar_tokens
-    WHERE tenantId = ${tenantId} AND userId = ${userId} AND isActive = 1
+    WHERE tenantId = ${tenantId} AND userId = ${userId} AND isActive = true
     LIMIT 1
   `);
   const tokens = tokenRows as unknown as any[];
   if (tokens.length === 0) return { connected: false };
 
   // Get last sync time
-  const [syncRows] = await db.execute(sql`
+  const syncRows = await db.execute(sql`
     SELECT MAX(syncedAt) AS lastSync FROM google_calendar_events
     WHERE tenantId = ${tenantId} AND userId = ${userId}
   `);
@@ -481,24 +481,26 @@ export async function createAppointment(
   const startAt = new Date(input.startAt);
   const endAt = new Date(input.endAt);
 
-  const [result] = await db.execute(sql`
+  const result = await db.execute(sql`
     INSERT INTO crm_appointments
       (tenantId, userId, title, description, startAt, endAt, allDay, location, color, dealId, contactId)
     VALUES
       (${tenantId}, ${userId}, ${input.title}, ${input.description || null},
        ${startAt}, ${endAt}, ${input.allDay ?? false}, ${input.location || null},
        ${input.color || "emerald"}, ${input.dealId || null}, ${input.contactId || null})
+    RETURNING id
   `);
 
-  const insertId = (result as any).insertId;
+  const insertId = (result as any[])[0].id;
 
   // Insert participants (always include creator)
   const participantSet = new Set(input.participantIds || []);
   participantSet.add(userId); // creator is always a participant
   for (const pid of Array.from(participantSet)) {
     await db.execute(sql`
-      INSERT IGNORE INTO crm_appointment_participants (appointmentId, userId, tenantId)
+      INSERT INTO crm_appointment_participants (appointmentId, userId, tenantId)
       VALUES (${insertId}, ${pid}, ${tenantId})
+      ON CONFLICT DO NOTHING
     `);
   }
 
@@ -521,7 +523,7 @@ export async function updateAppointment(
 
   // Verify ownership (non-admin can only edit own)
   if (!isAdmin) {
-    const [rows] = await db.execute(sql`
+    const rows = await db.execute(sql`
       SELECT id FROM crm_appointments
       WHERE id = ${input.id} AND tenantId = ${tenantId} AND userId = ${userId} AND deletedAt IS NULL
     `);
@@ -554,7 +556,7 @@ export async function updateAppointment(
   // Update participants if provided
   if (input.participantIds !== undefined) {
     // Get the appointment owner
-    const [ownerRows] = await db.execute(sql`
+    const ownerRows = await db.execute(sql`
       SELECT userId FROM crm_appointments WHERE id = ${input.id} AND tenantId = ${tenantId}
     `);
     const ownerId = (ownerRows as unknown as any[])[0]?.userId;
@@ -568,8 +570,9 @@ export async function updateAppointment(
     // Insert new participants
     for (const pid of Array.from(participantSet)) {
       await db.execute(sql`
-        INSERT IGNORE INTO crm_appointment_participants (appointmentId, userId, tenantId)
+        INSERT INTO crm_appointment_participants (appointmentId, userId, tenantId)
         VALUES (${input.id}, ${pid}, ${tenantId})
+        ON CONFLICT DO NOTHING
       `);
     }
   }
@@ -610,7 +613,7 @@ export async function deleteAppointment(
   if (!db) throw new Error("Database not available");
 
   if (!isAdmin) {
-    const [rows] = await db.execute(sql`
+    const rows = await db.execute(sql`
       SELECT id FROM crm_appointments
       WHERE id = ${appointmentId} AND tenantId = ${tenantId} AND userId = ${userId} AND deletedAt IS NULL
     `);
@@ -639,7 +642,7 @@ export async function getAppointmentParticipants(
   const db = await getDb();
   if (!db) return [];
 
-  const [rows] = await db.execute(sql`
+  const rows = await db.execute(sql`
     SELECT cap.userId, COALESCE(su.name, u.name, 'Usuário') AS name
     FROM crm_appointment_participants cap
     LEFT JOIN crm_users su ON su.userId = cap.userId AND su.tenantId = ${tenantId}

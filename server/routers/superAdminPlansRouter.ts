@@ -142,7 +142,7 @@ export const superAdminPlansRouter = router({
           billingCycle: input.billingCycle,
           hotmartOfferCode: input.hotmartOfferCode ?? null,
           description: input.description ?? null,
-        }).$returningId();
+        }).returning({ id: planDefinitions.id });
 
         // Seed default features (all disabled, no limits)
         const featureSeeds = FEATURE_KEYS.map((fk) => ({
@@ -562,7 +562,7 @@ export const superAdminPlansRouter = router({
           status: "active",
           expiresAt,
           activatedByUserId: 0, // super admin
-        }).$returningId();
+        }).returning({ id: tenantAddons.id });
 
         await emitEvent({
           tenantId: input.tenantId,

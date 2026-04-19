@@ -1,1 +1,0 @@
-ALTER TABLE `rd_station_config` ADD `assignmentTeamId` int;

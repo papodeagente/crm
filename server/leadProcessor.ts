@@ -445,7 +445,7 @@ async function upsertContact(
     source: data.source,
     lifecycleStage: "lead",
     tagsJson: [`lead:${data.source}`],
-  }).$returningId();
+  }).returning({ id: contacts.id });
 
   return { id: result!.id, isNew: true, matchType: "new_contact" };
 }
@@ -545,7 +545,7 @@ export async function processInboundLead(
       dedupeKey,
       payload: payload as any,
       status: "processing",
-    }).$returningId();
+    }).returning({ id: leadEventLog.id });
     eventLogId = logResult!.id;
   }
 
@@ -975,7 +975,7 @@ export async function upsertWebhookConfig(tenantId: number, secret: string) {
     return { ...existing, webhookSecret: secret };
   }
 
-  const [result] = await db.insert(webhookConfig).values({ tenantId, webhookSecret: secret }).$returningId();
+  const [result] = await db.insert(webhookConfig).values({ tenantId, webhookSecret: secret }).returning({ id: webhookConfig.id });
   return { id: result!.id, tenantId, webhookSecret: secret };
 }
 
@@ -1006,7 +1006,7 @@ export async function upsertMetaConfig(
     return { ...existing, ...data };
   }
 
-  const [result] = await db.insert(metaIntegrationConfig).values({ tenantId, ...data }).$returningId();
+  const [result] = await db.insert(metaIntegrationConfig).values({ tenantId, ...data }).returning({ id: metaIntegrationConfig.id });
   return { id: result!.id, tenantId, ...data };
 }
 

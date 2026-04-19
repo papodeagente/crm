@@ -266,7 +266,7 @@ export async function mergeContacts(
     movedTaskIds,
     movedConversionEventIds: movedConversionIds,
     reversible: true,
-  }).$returningId();
+  }).returning({ id: contactMerges.id });
 
   return {
     mergeId: mergeRecord!.id,
@@ -467,7 +467,7 @@ export async function recordConversionEvent(data: ConversionEventData): Promise<
     dealDecision: data.dealDecision,
     dealDecisionReason: data.dealDecisionReason,
     idempotencyKey: data.idempotencyKey,
-  }).$returningId();
+  }).returning({ id: contactConversionEvents.id });
 
   return result?.id || null;
 }

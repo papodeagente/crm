@@ -1,2 +1,0 @@
-ALTER TABLE `rd_station_config` ADD `assignmentMode` enum('specific_user','random_all','random_team') DEFAULT 'random_all' NOT NULL;--> statement-breakpoint
-ALTER TABLE `rd_station_config` ADD `lastRoundRobinUserId` int;

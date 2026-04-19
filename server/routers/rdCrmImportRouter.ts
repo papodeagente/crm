@@ -76,16 +76,16 @@ async function flushProgressToDb(tenantId: number, userId: number): Promise<void
     const db = await getDb();
     if (!db) return;
     await db.execute(sql.raw(`
-      INSERT INTO import_progress (tenantId, userId, importType, status, phase, currentStep, totalSteps, completedSteps, currentCategory, categoryTotal, categoryDone, results, error, startedAt, fetchPhase, fetchedRecords, totalRecordsEstimate, processedRecords, lastActivityAt, validation)
-      VALUES (${tenantId}, ${userId}, 'rdcrm', '${p.status}', ${escSql(p.phase)}, ${escSql(p.currentStep)}, ${p.totalSteps}, ${p.completedSteps}, ${escSql(p.currentCategory)}, ${p.categoryTotal}, ${p.categoryDone}, ${escSql(JSON.stringify(p.results || {}))}, ${p.error ? escSql(p.error) : 'NULL'}, ${p.startedAt}, ${p.fetchPhase ? 1 : 0}, ${p.fetchedRecords}, ${p.totalRecordsEstimate}, ${p.processedRecords}, ${p.lastActivityAt}, ${p.validation ? escSql(JSON.stringify(p.validation)) : 'NULL'})
-      ON DUPLICATE KEY UPDATE
-        status = VALUES(status), phase = VALUES(phase), currentStep = VALUES(currentStep),
-        totalSteps = VALUES(totalSteps), completedSteps = VALUES(completedSteps),
-        currentCategory = VALUES(currentCategory), categoryTotal = VALUES(categoryTotal),
-        categoryDone = VALUES(categoryDone), results = VALUES(results), error = VALUES(error),
-        fetchPhase = VALUES(fetchPhase), fetchedRecords = VALUES(fetchedRecords),
-        totalRecordsEstimate = VALUES(totalRecordsEstimate), processedRecords = VALUES(processedRecords),
-        lastActivityAt = VALUES(lastActivityAt), validation = VALUES(validation)
+      INSERT INTO import_progress ("tenantId", "userId", "importType", status, phase, "currentStep", "totalSteps", "completedSteps", "currentCategory", "categoryTotal", "categoryDone", results, error, "startedAt", "fetchPhase", "fetchedRecords", "totalRecordsEstimate", "processedRecords", "lastActivityAt", validation)
+      VALUES (${tenantId}, ${userId}, 'rdcrm', '${p.status}', ${escSql(p.phase)}, ${escSql(p.currentStep)}, ${p.totalSteps}, ${p.completedSteps}, ${escSql(p.currentCategory)}, ${p.categoryTotal}, ${p.categoryDone}, ${escSql(JSON.stringify(p.results || {}))}, ${p.error ? escSql(p.error) : 'NULL'}, ${p.startedAt}, ${p.fetchPhase ? 'true' : 'false'}, ${p.fetchedRecords}, ${p.totalRecordsEstimate}, ${p.processedRecords}, ${p.lastActivityAt}, ${p.validation ? escSql(JSON.stringify(p.validation)) : 'NULL'})
+      ON CONFLICT ("tenantId", "userId", "importType") DO UPDATE SET
+        status = EXCLUDED.status, phase = EXCLUDED.phase, "currentStep" = EXCLUDED."currentStep",
+        "totalSteps" = EXCLUDED."totalSteps", "completedSteps" = EXCLUDED."completedSteps",
+        "currentCategory" = EXCLUDED."currentCategory", "categoryTotal" = EXCLUDED."categoryTotal",
+        "categoryDone" = EXCLUDED."categoryDone", results = EXCLUDED.results, error = EXCLUDED.error,
+        "fetchPhase" = EXCLUDED."fetchPhase", "fetchedRecords" = EXCLUDED."fetchedRecords",
+        "totalRecordsEstimate" = EXCLUDED."totalRecordsEstimate", "processedRecords" = EXCLUDED."processedRecords",
+        "lastActivityAt" = EXCLUDED."lastActivityAt", validation = EXCLUDED.validation
     `));
   } catch (e: any) {
     console.error("[RD Import] Failed to flush progress to DB:", e.message?.substring(0, 120));
@@ -160,8 +160,8 @@ async function readProgressFromDb(tenantId: number, userId: number): Promise<Imp
   try {
     const db = await getDb();
     if (!db) return null;
-    const [rows]: any = await db.execute(
-      sql.raw(`SELECT * FROM import_progress WHERE tenantId = ${tenantId} AND userId = ${userId} AND importType = 'rdcrm' LIMIT 1`)
+    const rows: any = await db.execute(
+      sql.raw(`SELECT * FROM import_progress WHERE "tenantId" = ${tenantId} AND "userId" = ${userId} AND "importType" = 'rdcrm' LIMIT 1`)
     );
     if (!rows || rows.length === 0) return null;
     const row = rows[0] || rows;
@@ -205,12 +205,12 @@ async function ensureRdExternalIdColumns() {
   for (const table of tables) {
     try {
       await db.execute(sql.raw(
-        `ALTER TABLE \`${table}\` ADD COLUMN \`rdExternalId\` VARCHAR(64) NULL`
+        `ALTER TABLE "${table}" ADD COLUMN "rdExternalId" VARCHAR(64) NULL`
       ));
       console.log(`[RD Import] Added rdExternalId column to ${table}`);
     } catch (e: any) {
       // Column already exists — ignore
-      if (!e.message?.includes("Duplicate column")) {
+      if (!e.message?.includes("already exists") && !e.message?.includes("Duplicate column")) {
         console.log(`[RD Import] rdExternalId on ${table}: ${e.message?.substring(0, 80)}`);
       }
     }
@@ -233,7 +233,7 @@ async function ensureRdExternalIdColumns() {
 
   for (const [table, indexName, cols] of indexPairs) {
     try {
-      await db.execute(sql.raw(`CREATE INDEX \`${indexName}\` ON \`${table}\` (${cols})`));
+      await db.execute(sql.raw(`CREATE INDEX IF NOT EXISTS "${indexName}" ON "${table}" (${cols.split(', ').map((c: string) => `"${c.trim()}"`).join(', ')})`));
     } catch {}
   }
 }
@@ -243,8 +243,8 @@ async function findByRdExternalId(table: string, tenantId: number, rdExternalId:
   const db = await getDb();
   if (!db) return null;
   try {
-    const [rows]: any = await db.execute(
-      sql.raw(`SELECT id FROM \`${table}\` WHERE tenantId = ${tenantId} AND rdExternalId = '${rdExternalId.replace(/'/g, "''")}' LIMIT 1`)
+    const rows: any = await db.execute(
+      sql.raw(`SELECT id FROM "${table}" WHERE "tenantId" = ${tenantId} AND "rdExternalId" = '${rdExternalId.replace(/'/g, "''")}' LIMIT 1`)
     );
     if (rows && rows.length > 0) return rows[0].id;
   } catch {}
@@ -257,7 +257,7 @@ async function setRdExternalId(table: string, id: number, rdExternalId: string) 
   if (!db) return;
   try {
     await db.execute(
-      sql.raw(`UPDATE \`${table}\` SET rdExternalId = '${rdExternalId.replace(/'/g, "''")}' WHERE id = ${id}`)
+      sql.raw(`UPDATE "${table}" SET "rdExternalId" = '${rdExternalId.replace(/'/g, "''")}' WHERE id = ${id}`)
     );
   } catch {}
 }
@@ -554,8 +554,8 @@ async function runSpreadsheetImport(
       const db = await getDb();
       if (db) {
         try {
-          const [ec]: any = await db.execute(
-            sql.raw(`SELECT id, email, phone, name FROM contacts WHERE tenantId = ${tenantId} AND deletedAt IS NULL`)
+          const ec: any = await db.execute(
+            sql.raw(`SELECT id, email, phone, name FROM contacts WHERE "tenantId" = ${tenantId} AND "deletedAt" IS NULL`)
           );
           if (ec) for (const c of ec) {
             if (c.email) contactByEmail.set(c.email.toLowerCase().trim(), c.id);
@@ -564,8 +564,8 @@ async function runSpreadsheetImport(
           }
         } catch {}
         try {
-          const [ea]: any = await db.execute(
-            sql.raw(`SELECT id, name FROM accounts WHERE tenantId = ${tenantId} AND deletedAt IS NULL`)
+          const ea: any = await db.execute(
+            sql.raw(`SELECT id, name FROM accounts WHERE "tenantId" = ${tenantId} AND "deletedAt" IS NULL`)
           );
           if (ea) for (const a of ea) {
             if (a.name) accountByName.set(a.name.toLowerCase().trim(), a.id);
@@ -606,20 +606,20 @@ async function runSpreadsheetImport(
               try {
                 // Ensure "Cargo" custom field exists
                 let cargoFieldId: number | undefined;
-                const [cfRows]: any = await db.execute(
-                  sql.raw(`SELECT id FROM custom_fields WHERE tenantId = ${tenantId} AND name = 'cargo' AND entity = 'contact' LIMIT 1`)
+                const cfRows: any = await db.execute(
+                  sql.raw(`SELECT id FROM custom_fields WHERE "tenantId" = ${tenantId} AND name = 'cargo' AND entity = 'contact' LIMIT 1`)
                 );
                 if (cfRows && cfRows.length > 0) {
                   cargoFieldId = cfRows[0].id;
                 } else {
-                  const [ins]: any = await db.execute(
-                    sql.raw(`INSERT INTO custom_fields (tenantId, entity, name, label, fieldType, sortOrder) VALUES (${tenantId}, 'contact', 'cargo', 'Cargo', 'text', 0)`)
+                  const ins: any = await db.execute(
+                    sql.raw(`INSERT INTO custom_fields ("tenantId", entity, name, label, "fieldType", "sortOrder") VALUES (${tenantId}, 'contact', 'cargo', 'Cargo', 'text', 0) RETURNING id`)
                   );
-                  cargoFieldId = ins?.insertId;
+                  cargoFieldId = ins?.[0]?.id;
                 }
                 if (cargoFieldId) {
                   await db.execute(
-                    sql.raw(`INSERT INTO custom_field_values (tenantId, fieldId, entityType, entityId, value) VALUES (${tenantId}, ${cargoFieldId}, 'contact', ${id}, '${cargo.replace(/'/g, "''")}')`)
+                    sql.raw(`INSERT INTO custom_field_values ("tenantId", "fieldId", "entityType", "entityId", value) VALUES (${tenantId}, ${cargoFieldId}, 'contact', ${id}, '${cargo.replace(/'/g, "''")}')`)
                   );
                 }
               } catch {}
@@ -741,16 +741,16 @@ async function runSpreadsheetImport(
         for (const col of customFieldColumns) {
           try {
             const slug = col.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
-            const [existing]: any = await db.execute(
-              sql.raw(`SELECT id FROM custom_fields WHERE tenantId = ${tenantId} AND name = '${slug}' AND entity = 'deal' LIMIT 1`)
+            const existing: any = await db.execute(
+              sql.raw(`SELECT id FROM custom_fields WHERE "tenantId" = ${tenantId} AND name = '${slug}' AND entity = 'deal' LIMIT 1`)
             );
             if (existing && existing.length > 0) {
               customFieldIdMap.set(col, existing[0].id);
             } else {
-              const [ins]: any = await db.execute(
-                sql.raw(`INSERT INTO custom_fields (tenantId, entity, name, label, fieldType, sortOrder, groupName) VALUES (${tenantId}, 'deal', '${slug}', '${col.replace(/'/g, "''")}', 'text', 0, 'Importação RD')`)
+              const ins: any = await db.execute(
+                sql.raw(`INSERT INTO custom_fields ("tenantId", entity, name, label, "fieldType", "sortOrder", "groupName") VALUES (${tenantId}, 'deal', '${slug}', '${col.replace(/'/g, "''")}', 'text', 0, 'Importação RD') RETURNING id`)
               );
-              if (ins?.insertId) customFieldIdMap.set(col, ins.insertId);
+              if (ins?.[0]?.id) customFieldIdMap.set(col, ins[0].id);
             }
           } catch {}
         }
@@ -933,7 +933,7 @@ async function runSpreadsheetImport(
                 if (val != null && val.trim()) {
                   try {
                     await db.execute(
-                      sql.raw(`INSERT INTO custom_field_values (tenantId, fieldId, entityType, entityId, value) VALUES (${tenantId}, ${fieldId}, 'deal', ${dealId}, '${val.trim().replace(/'/g, "''")}')`)
+                      sql.raw(`INSERT INTO custom_field_values ("tenantId", "fieldId", "entityType", "entityId", value) VALUES (${tenantId}, ${fieldId}, 'deal', ${dealId}, '${val.trim().replace(/'/g, "''")}')`)
                     );
                   } catch {}
                 }
@@ -951,7 +951,7 @@ async function runSpreadsheetImport(
             if (Object.keys(rdCustomFields).length > 0 && db) {
               try {
                 await db.execute(
-                  sql.raw(`UPDATE deals SET rdCustomFields = '${JSON.stringify(rdCustomFields).replace(/'/g, "''")}' WHERE id = ${dealId}`)
+                  sql.raw(`UPDATE deals SET "rdCustomFields" = '${JSON.stringify(rdCustomFields).replace(/'/g, "''")}' WHERE id = ${dealId}`)
                 );
               } catch {}
             }
@@ -1048,8 +1048,8 @@ async function runImport(
       await db.execute(sql.raw(`DELETE FROM pipeline_stages WHERE tenantId = ${tenantId} AND pipelineId IN (SELECT id FROM pipelines WHERE tenantId = ${tenantId} AND rdExternalId IS NOT NULL)`));
       await db.execute(sql.raw(`DELETE FROM pipelines WHERE tenantId = ${tenantId} AND rdExternalId IS NOT NULL`));
       // Also delete pipelines that match RD Station names but don't have rdExternalId (old imports)
-      await db.execute(sql.raw(`DELETE FROM pipeline_stages WHERE tenantId = ${tenantId} AND pipelineId IN (SELECT id FROM pipelines WHERE tenantId = ${tenantId} AND isDefault = 0 AND name NOT IN ('Funil de Vendas', 'Funil de Pós-Venda'))`));
-      await db.execute(sql.raw(`DELETE FROM pipelines WHERE tenantId = ${tenantId} AND isDefault = 0 AND name NOT IN ('Funil de Vendas', 'Funil de Pós-Venda')`));
+      await db.execute(sql.raw(`DELETE FROM pipeline_stages WHERE tenantId = ${tenantId} AND pipelineId IN (SELECT id FROM pipelines WHERE tenantId = ${tenantId} AND "isDefault" = false AND name NOT IN ('Funil de Vendas', 'Funil de Pós-Venda'))`));
+      await db.execute(sql.raw(`DELETE FROM pipelines WHERE tenantId = ${tenantId} AND "isDefault" = false AND name NOT IN ('Funil de Vendas', 'Funil de Pós-Venda')`));
       await db.execute(sql.raw(`DELETE FROM product_catalog WHERE tenantId = ${tenantId} AND rdExternalId IS NOT NULL`));
       await db.execute(sql.raw(`DELETE FROM lead_sources WHERE tenantId = ${tenantId} AND rdExternalId IS NOT NULL`));
       await db.execute(sql.raw(`DELETE FROM campaigns WHERE tenantId = ${tenantId} AND rdExternalId IS NOT NULL`));
@@ -2028,34 +2028,34 @@ async function runImport(
 
     try {
       // Count records in Entur OS
-      const [contactCount]: any = await db.execute(
-        sql.raw(`SELECT COUNT(*) as cnt FROM contacts WHERE tenantId = ${tenantId} AND source = 'rd_station_crm' AND deletedAt IS NULL`)
+      const contactCount: any = await db.execute(
+        sql.raw(`SELECT COUNT(*) as cnt FROM contacts WHERE "tenantId" = ${tenantId} AND source = 'rd_station_crm' AND "deletedAt" IS NULL`)
       );
       validation.enturCounts.contacts = contactCount?.[0]?.cnt || 0;
 
-      const [dealCount]: any = await db.execute(
-        sql.raw(`SELECT COUNT(*) as cnt FROM deals WHERE tenantId = ${tenantId} AND leadSource = 'rd_station_crm' AND deletedAt IS NULL`)
+      const dealCount: any = await db.execute(
+        sql.raw(`SELECT COUNT(*) as cnt FROM deals WHERE "tenantId" = ${tenantId} AND "leadSource" = 'rd_station_crm' AND "deletedAt" IS NULL`)
       );
       validation.enturCounts.deals = dealCount?.[0]?.cnt || 0;
 
-      const [taskCount]: any = await db.execute(
-        sql.raw(`SELECT COUNT(*) as cnt FROM crm_tasks WHERE tenantId = ${tenantId}`)
+      const taskCount: any = await db.execute(
+        sql.raw(`SELECT COUNT(*) as cnt FROM crm_tasks WHERE "tenantId" = ${tenantId}`)
       );
       validation.enturCounts.tasks = taskCount?.[0]?.cnt || 0;
 
-      const [pipelineCount]: any = await db.execute(
-        sql.raw(`SELECT COUNT(*) as cnt FROM pipelines WHERE tenantId = ${tenantId}`)
+      const pipelineCount: any = await db.execute(
+        sql.raw(`SELECT COUNT(*) as cnt FROM pipelines WHERE "tenantId" = ${tenantId}`)
       );
       validation.enturCounts.pipelines = pipelineCount?.[0]?.cnt || 0;
 
-      const [accountCount]: any = await db.execute(
-        sql.raw(`SELECT COUNT(*) as cnt FROM accounts WHERE tenantId = ${tenantId}`)
+      const accountCount: any = await db.execute(
+        sql.raw(`SELECT COUNT(*) as cnt FROM accounts WHERE "tenantId" = ${tenantId}`)
       );
       validation.enturCounts.accounts = accountCount?.[0]?.cnt || 0;
 
       // Check for deals without contacts
-      const [dealsNoContact]: any = await db.execute(
-        sql.raw(`SELECT COUNT(*) as cnt FROM deals WHERE tenantId = ${tenantId} AND leadSource = 'rd_station_crm' AND contactId IS NULL AND deletedAt IS NULL`)
+      const dealsNoContact: any = await db.execute(
+        sql.raw(`SELECT COUNT(*) as cnt FROM deals WHERE "tenantId" = ${tenantId} AND "leadSource" = 'rd_station_crm' AND "contactId" IS NULL AND "deletedAt" IS NULL`)
       );
       const noContactCount = dealsNoContact?.[0]?.cnt || 0;
       if (noContactCount > 0) {
@@ -2063,8 +2063,8 @@ async function runImport(
       }
 
       // Check for duplicate pipelines (same name, same tenant)
-      const [dupePipelines]: any = await db.execute(
-        sql.raw(`SELECT name, COUNT(*) as cnt FROM pipelines WHERE tenantId = ${tenantId} GROUP BY name HAVING cnt > 1`)
+      const dupePipelines: any = await db.execute(
+        sql.raw(`SELECT name, COUNT(*) as cnt FROM pipelines WHERE "tenantId" = ${tenantId} GROUP BY name HAVING COUNT(*) > 1`)
       );
       if (dupePipelines && dupePipelines.length > 0) {
         for (const dp of dupePipelines) {
@@ -2073,8 +2073,8 @@ async function runImport(
       }
 
       // Check for duplicate contacts (same email)
-      const [dupeContacts]: any = await db.execute(
-        sql.raw(`SELECT email, COUNT(*) as cnt FROM contacts WHERE tenantId = ${tenantId} AND source = 'rd_station_crm' AND deletedAt IS NULL AND email IS NOT NULL AND email != '' GROUP BY email HAVING cnt > 1 LIMIT 10`)
+      const dupeContacts: any = await db.execute(
+        sql.raw(`SELECT email, COUNT(*) as cnt FROM contacts WHERE "tenantId" = ${tenantId} AND source = 'rd_station_crm' AND "deletedAt" IS NULL AND email IS NOT NULL AND email != '' GROUP BY email HAVING COUNT(*) > 1 LIMIT 10`)
       );
       if (dupeContacts && dupeContacts.length > 0) {
         validation.mismatches.push(`${dupeContacts.length}+ emails de contatos duplicados encontrados`);

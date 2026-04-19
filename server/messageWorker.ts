@@ -734,7 +734,8 @@ async function processNewMessage(session: SessionInfo, data: any, workerStartTim
               emoji,
               fromMe: key.fromMe || false,
               timestamp: new Date(),
-            }).onDuplicateKeyUpdate({
+            }).onConflictDoUpdate({
+              target: [waReactions.sessionId, waReactions.targetMessageId, waReactions.senderJid],
               set: { emoji, timestamp: new Date() },
             });
             console.log(`[Worker] Reaction stored: ${emoji} on ${targetMsgId} from ${senderJid}`);
@@ -835,7 +836,7 @@ async function processNewMessage(session: SessionInfo, data: any, workerStartTim
       isVoiceNote: mediaInfo.isVoiceNote || false,
       quotedMessageId: mediaInfo.quotedMessageId || null,
       structuredData: structuredData || null,
-    }).onDuplicateKeyUpdate({ set: { status: sql`status` } });
+    }).onConflictDoNothing();
     const insertEnd = Date.now();
     console.log(`[TRACE][DB_INSERT] timestamp: ${insertEnd} | delta: ${insertEnd - insertStart}ms | msgId: ${messageId}`);
 
@@ -932,7 +933,8 @@ async function processNewMessage(session: SessionInfo, data: any, workerStartTim
           verifiedName: null,
           profilePictureUrl: null,
           lid: lidValue,
-        }).onDuplicateKeyUpdate({
+        }).onConflictDoUpdate({
+          target: [waContacts.sessionId, waContacts.jid],
           set: {
             pushName: sql`${pushName}`,
             ...(lidValue ? { lid: lidValue } : {}),
@@ -1079,25 +1081,25 @@ async function processStatusUpdate(session: SessionInfo, data: any): Promise<voi
       // We verify by checking that the message's id matches the MAX(id) for that conversation+fromMe=1.
       if (remoteJid && fromMe && messageId) {
         const result = await db.execute(
-          sql`UPDATE wa_conversations SET lastStatus = ${newStatus}
-              WHERE sessionId = ${sessionId}
-              AND remoteJid = ${remoteJid}
-              AND lastFromMe = 1
+          sql`UPDATE wa_conversations SET "lastStatus" = ${newStatus}
+              WHERE "sessionId" = ${sessionId}
+              AND "remoteJid" = ${remoteJid}
+              AND "lastFromMe" = true
               AND EXISTS (
                 SELECT 1 FROM messages m
-                WHERE m.sessionId = ${sessionId}
-                AND m.remoteJid = ${remoteJid}
-                AND m.messageId = ${messageId}
-                AND m.fromMe = 1
+                WHERE m."sessionId" = ${sessionId}
+                AND m."remoteJid" = ${remoteJid}
+                AND m."messageId" = ${messageId}
+                AND m."fromMe" = true
                 AND m.id = (
                   SELECT MAX(m2.id) FROM messages m2
-                  WHERE m2.sessionId = ${sessionId}
-                  AND m2.remoteJid = ${remoteJid}
-                  AND m2.fromMe = 1
+                  WHERE m2."sessionId" = ${sessionId}
+                  AND m2."remoteJid" = ${remoteJid}
+                  AND m2."fromMe" = true
                 )
               )`
         );
-        const affected = (result as any)[0]?.affectedRows ?? 0;
+        const affected = (result as any).rowCount ?? 0;
         if (affected > 0) {
           console.log(`[Worker] wa_conversations.lastStatus updated: ${remoteJid} -> ${newStatus}`);
         }

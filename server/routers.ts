@@ -240,7 +240,7 @@ export const appRouter = router({
         try {
           const db = await getDb();
           if (db && opts.ctx.user.email) {
-            const [crmUser] = await db.execute(
+            const crmUser = await db.execute(
               sql`SELECT id, tenantId FROM crm_users WHERE email = ${opts.ctx.user.email} LIMIT 1`
             );
             const row = (crmUser as unknown as any[])[0];
@@ -500,7 +500,7 @@ export const appRouter = router({
             try {
               const db = await getDb();
               if (db) {
-                const [ownerRows] = await db.execute(sql`SELECT name FROM crm_users WHERE id = ${activeShare.sourceUserId} LIMIT 1`);
+                const ownerRows = await db.execute(sql`SELECT name FROM crm_users WHERE id = ${activeShare.sourceUserId} LIMIT 1`);
                 const ownerRow = (ownerRows as unknown as any[])[0];
                 if (ownerRow?.name) sharedByName = String(ownerRow.name);
               }
@@ -1341,9 +1341,9 @@ export const appRouter = router({
             for (const conv of contaminated) {
               if (!nameMap.has(conv.remoteJid)) {
                 const msgRows = await db.execute(
-                  sql`SELECT pushName FROM messages WHERE sessionId = ${session.sessionId} AND remoteJid = ${conv.remoteJid} AND fromMe = 0 AND pushName IS NOT NULL AND pushName != '' AND pushName != ${ownerName} ORDER BY id DESC LIMIT 1`
+                  sql`SELECT pushName FROM messages WHERE sessionId = ${session.sessionId} AND remoteJid = ${conv.remoteJid} AND fromMe = false AND pushName IS NOT NULL AND pushName != '' AND pushName != ${ownerName} ORDER BY id DESC LIMIT 1`
                 );
-                const msgData = (msgRows as any)[0];
+                const msgData = msgRows as any[];
                 if (msgData?.[0]?.pushName) {
                   nameMap.set(conv.remoteJid, msgData[0].pushName);
                 }
@@ -1464,7 +1464,7 @@ export const appRouter = router({
                 )`
         );
 
-        const toDelete = (syncedContacts as any)[0] || [];
+        const toDelete = (syncedContacts as any[]) || [];
         const count = toDelete.length;
 
         if (input.dryRun) {
@@ -1526,7 +1526,7 @@ export const appRouter = router({
         if (!db) return shares.map(s => ({ ...s, targetUserName: null, sourceUserName: null, sharedByName: null }));
         const userIds = Array.from(new Set([...shares.map(s => s.targetUserId), ...shares.map(s => s.sourceUserId), ...shares.map(s => s.sharedBy)]));
         if (userIds.length === 0) return [];
-        const [userRows] = await db.execute(sql`SELECT id, name, email FROM crm_users WHERE id IN (${sql.join(userIds.map(id => sql`${id}`), sql`, `)})`);
+        const userRows = await db.execute(sql`SELECT id, name, email FROM crm_users WHERE id IN (${sql.join(userIds.map(id => sql`${id}`), sql`, `)})`);
         const userMap = new Map((userRows as unknown as any[]).map((u: any) => [Number(u.id), { name: String(u.name), email: String(u.email) }]));
         return shares.map(s => ({
           ...s,
@@ -1632,7 +1632,7 @@ export const appRouter = router({
           let ownerName: string | null = null;
           if (db) {
             try {
-              const [rows] = await db.execute(sql`SELECT name FROM crm_users WHERE id = ${s.userId} LIMIT 1`);
+              const rows = await db.execute(sql`SELECT name FROM crm_users WHERE id = ${s.userId} LIMIT 1`);
               const row = (rows as unknown as any[])[0];
               if (row?.name) ownerName = String(row.name);
             } catch { /* ignore */ }
@@ -1659,7 +1659,7 @@ export const appRouter = router({
         try {
           const db = await getDb();
           if (db) {
-            const [rows] = await db.execute(sql`SELECT name FROM crm_users WHERE id = ${share.sourceUserId} LIMIT 1`);
+            const rows = await db.execute(sql`SELECT name FROM crm_users WHERE id = ${share.sourceUserId} LIMIT 1`);
             const row = (rows as unknown as any[])[0];
             if (row?.name) ownerName = String(row.name);
           }
@@ -3001,7 +3001,7 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
           token,
           name: input.name,
           allowedDomains: input.allowedDomains || null,
-        }).$returningId();
+        }).returning({ id: trackingTokens.id });
         return { id: result!.id, token, name: input.name };
       }),
 
@@ -3200,7 +3200,7 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
         const [result] = await db.insert(rdStationConfig).values({
           tenantId: getTenantId(ctx),
           webhookToken: token,
-        }).$returningId();
+        }).returning({ id: rdStationConfig.id });
 
         const rows = await db
           .select()
@@ -3354,7 +3354,7 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
           autoWhatsAppMessageTemplate: input.autoWhatsAppMessageTemplate ?? null,
           dealNameTemplate: input.dealNameTemplate ?? null,
           autoProductId: input.autoProductId ?? null,
-        }).$returningId();
+        }).returning({ id: rdStationConfig.id });
 
         const rows = await db
           .select()
@@ -3581,7 +3581,7 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
           dueTime: input.dueTime ?? null,
           priority: input.priority,
           orderIndex: nextOrder,
-        }).$returningId();
+        }).returning({ id: rdStationConfigTasks.id });
 
         const rows = await db.select().from(rdStationConfigTasks).where(eq(rdStationConfigTasks.id, result!.id)).limit(1);
         return rows[0]!;
@@ -3694,7 +3694,7 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
           enturFieldType: input.enturFieldType,
           enturFieldKey: input.enturFieldKey || null,
           enturCustomFieldId: input.enturCustomFieldId || null,
-        }).$returningId();
+        }).returning({ id: rdFieldMappings.id });
         return { id: result!.id };
       }),
 

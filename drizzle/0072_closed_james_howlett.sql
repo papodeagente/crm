@@ -1,1 +1,0 @@
-ALTER TABLE `task_automations` ADD `waMessageTemplate` text;

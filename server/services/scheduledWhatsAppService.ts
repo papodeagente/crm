@@ -119,7 +119,7 @@ export async function createScheduledWhatsApp(input: CreateScheduledWhatsAppInpu
     waContactId: input.contactId,
     waChannelId: input.channelId || null,
     waRetryCount: 0,
-  }).$returningId();
+  }).returning({ id: tasks.id });
 
   // Audit: deal history
   if (input.dealId) {

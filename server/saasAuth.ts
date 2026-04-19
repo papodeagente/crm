@@ -102,7 +102,7 @@ export async function registerTenantAndUser(data: {
     hotmartEmail: data.email,
     freemiumDays: trialDays,
     freemiumExpiresAt: trialExpiresAt,
-  }).$returningId();
+  }).returning({ id: tenants.id });
 
   const tenantId = tenantResult.id;
 
@@ -118,7 +118,7 @@ export async function registerTenantAndUser(data: {
     passwordHash,
     role: "admin",
     status: "active",
-  }).$returningId();
+  }).returning({ id: crmUsers.id });
 
   // Update tenant owner
   await db.update(tenants).set({ ownerUserId: userResult.id }).where(eq(tenants.id, tenantId));
@@ -598,7 +598,7 @@ export async function inviteUserToTenant(data: {
     passwordHash,
     role: data.role || "user",
     status: "invited",
-  }).$returningId();
+  }).returning({ id: crmUsers.id });
 
   // Get tenant name
   const tenantRows = await db.select().from(tenants).where(eq(tenants.id, data.tenantId)).limit(1);

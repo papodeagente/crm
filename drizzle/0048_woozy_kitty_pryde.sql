@@ -1,1 +1,0 @@
-ALTER TABLE `wa_conversations` ADD `waChannelId` int;

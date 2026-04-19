@@ -60,28 +60,28 @@ export async function checkUpcomingDepartures(): Promise<{ notificationsCreated:
 
   try {
     // Find all deals with status "won", boardingDate within the next 8 days, not deleted
-    const [rows] = await db.execute(sql`
+    const result = await db.execute(sql`
       SELECT
         d.id,
-        d.tenantId,
+        d."tenantId",
         d.title,
-        d.boardingDate,
-        d.returnDate,
-        d.ownerUserId,
-        d.contactId,
-        c.name AS contactName,
-        u.name AS ownerName
+        d."boardingDate",
+        d."returnDate",
+        d."ownerUserId",
+        d."contactId",
+        c.name AS "contactName",
+        u.name AS "ownerName"
       FROM deals d
-      LEFT JOIN crm_contacts c ON c.id = d.contactId AND c.tenantId = d.tenantId
-      LEFT JOIN crm_users u ON u.id = d.ownerUserId AND u.tenantId = d.tenantId
+      LEFT JOIN crm_contacts c ON c.id = d."contactId" AND c."tenantId" = d."tenantId"
+      LEFT JOIN crm_users u ON u.id = d."ownerUserId" AND u."tenantId" = d."tenantId"
       WHERE d.status = 'won'
-        AND d.boardingDate IS NOT NULL
-        AND d.boardingDate >= CURDATE()
-        AND d.boardingDate <= DATE_ADD(CURDATE(), INTERVAL 8 DAY)
-        AND d.deletedAt IS NULL
+        AND d."boardingDate" IS NOT NULL
+        AND d."boardingDate" >= CURRENT_DATE
+        AND d."boardingDate" <= CURRENT_DATE + INTERVAL '8 days'
+        AND d."deletedAt" IS NULL
     `);
 
-    const deals = rows as unknown as any[];
+    const deals = result as unknown as any[];
 
     for (const deal of deals) {
       const boardingDate = new Date(deal.boardingDate);

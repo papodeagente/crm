@@ -58,7 +58,7 @@ export const superAdminDashRouter = router({
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
 
     // Single consolidated query for all KPIs
-    const [result] = await db.execute(sql`
+    const result = await db.execute(sql`
       SELECT
         -- Tenants
         (SELECT COUNT(*) FROM tenants WHERE status = 'active') AS tenantsActive,
@@ -97,7 +97,7 @@ export const superAdminDashRouter = router({
         (SELECT COUNT(*) FROM crm_tasks WHERE createdAt >= ${monthStart}) AS tasksCreatedMonth,
         
         -- AI usage (chatbot_settings via whatsapp_sessions join)
-        (SELECT COUNT(DISTINCT ws2.tenantId) FROM chatbot_settings cs JOIN whatsapp_sessions ws2 ON ws2.sessionId = cs.sessionId WHERE cs.enabled = 1) AS tenantsWithAI,
+        (SELECT COUNT(DISTINCT ws2.tenantId) FROM chatbot_settings cs JOIN whatsapp_sessions ws2 ON ws2.sessionId = cs.sessionId WHERE cs.enabled = true) AS tenantsWithAI,
         
         -- Subscriptions MRR
         (SELECT COALESCE(SUM(priceInCents), 0) FROM subscriptions WHERE status = 'active') AS mrrCents,
@@ -157,32 +157,32 @@ export const superAdminDashRouter = router({
     const db = await getDatabase();
 
     // Tenants created per month (last 12 months)
-    const [tenantsPerMonth] = await db.execute(sql`
-      SELECT DATE_FORMAT(createdAt, '%Y-%m') AS month, COUNT(*) AS count
+    const tenantsPerMonth = await db.execute(sql`
+      SELECT TO_CHAR("createdAt", 'YYYY-MM') AS month, COUNT(*) AS count
       FROM tenants
-      WHERE createdAt >= DATE_SUB(NOW(), INTERVAL 12 MONTH)
+      WHERE createdAt >= NOW() - INTERVAL '12 months'
       GROUP BY month ORDER BY month
     `) as any;
 
     // Deals created per month (last 12 months)
-    const [dealsPerMonth] = await db.execute(sql`
-      SELECT DATE_FORMAT(createdAt, '%Y-%m') AS month, COUNT(*) AS count,
+    const dealsPerMonth = await db.execute(sql`
+      SELECT TO_CHAR("createdAt", 'YYYY-MM') AS month, COUNT(*) AS count,
              SUM(CASE WHEN status = 'won' THEN COALESCE(valueCents, 0) ELSE 0 END) AS wonCents
       FROM deals
-      WHERE createdAt >= DATE_SUB(NOW(), INTERVAL 12 MONTH) AND deletedAt IS NULL
+      WHERE createdAt >= NOW() - INTERVAL '12 months' AND deletedAt IS NULL
       GROUP BY month ORDER BY month
     `) as any;
 
     // WA messages per month (last 6 months)
-    const [waPerMonth] = await db.execute(sql`
-      SELECT DATE_FORMAT(createdAt, '%Y-%m') AS month, COUNT(*) AS count
+    const waPerMonth = await db.execute(sql`
+      SELECT TO_CHAR("createdAt", 'YYYY-MM') AS month, COUNT(*) AS count
       FROM messages
-      WHERE createdAt >= DATE_SUB(NOW(), INTERVAL 6 MONTH)
+      WHERE createdAt >= NOW() - INTERVAL '6 months'
       GROUP BY month ORDER BY month
     `) as any;
 
     // Plan distribution
-    const [planDist] = await db.execute(sql`
+    const planDist = await db.execute(sql`
       SELECT plan, COUNT(*) AS count FROM tenants WHERE status = 'active' GROUP BY plan
     `) as any;
 
@@ -204,7 +204,7 @@ export const superAdminDashRouter = router({
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
 
     // Tenants with WA disconnected
-    const [waDisconnected] = await db.execute(sql`
+    const waDisconnected = await db.execute(sql`
       SELECT t.id, t.name, t.plan FROM tenants t
       WHERE t.status = 'active'
         AND EXISTS (SELECT 1 FROM whatsapp_sessions ws WHERE ws.tenantId = t.id)
@@ -213,7 +213,7 @@ export const superAdminDashRouter = router({
     `) as any;
 
     // Tenants with no recent activity
-    const [noActivity] = await db.execute(sql`
+    const noActivity = await db.execute(sql`
       SELECT t.id, t.name, t.plan FROM tenants t
       WHERE t.status = 'active'
         AND NOT EXISTS (SELECT 1 FROM crm_users cu WHERE cu.tenantId = t.id AND cu.lastActiveAt >= ${thirtyDaysAgo})
@@ -221,14 +221,14 @@ export const superAdminDashRouter = router({
     `) as any;
 
     // Tenants with overdue billing
-    const [overdue] = await db.execute(sql`
+    const overdue = await db.execute(sql`
       SELECT t.id, t.name, t.plan, t.billingStatus FROM tenants t
       WHERE t.billingStatus IN ('past_due', 'restricted')
       LIMIT 20
     `) as any;
 
     // Tenants with many users but low deal count
-    const [lowAdoption] = await db.execute(sql`
+    const lowAdoption = await db.execute(sql`
       SELECT t.id, t.name, t.plan,
         (SELECT COUNT(*) FROM crm_users cu WHERE cu.tenantId = t.id AND cu.status = 'active') AS userCount,
         (SELECT COUNT(*) FROM deals d WHERE d.tenantId = t.id AND d.deletedAt IS NULL AND d.createdAt >= ${thirtyDaysAgo}) AS recentDeals
@@ -279,10 +279,10 @@ export const superAdminDashRouter = router({
       const whereClause = conditions.join(" AND ");
 
       // Count total
-      const [countResult] = await db.execute(sql.raw(`
+      const countResult = await db.execute(sql.raw(`
         SELECT COUNT(*) AS total FROM tenants t WHERE ${whereClause}
       `)) as any;
-      const total = Number((countResult || [])[0]?.total || 0);
+      const total = Number((countResult as any)?.[0]?.total || 0);
 
       // Main query with metrics
       const sortCol = input.sortBy === "name" ? "t.name" 
@@ -293,7 +293,7 @@ export const superAdminDashRouter = router({
         : "t.createdAt";
       const sortDirection = input.sortDir === "asc" ? "ASC" : "DESC";
 
-      const [rows] = await db.execute(sql.raw(`
+      const rows = await db.execute(sql.raw(`
         SELECT
           t.id, t.name, t.plan, t.status, t.billingStatus, t.createdAt, t.freemiumDays, t.freemiumExpiresAt,
           COALESCE(u.userCount, 0) AS userCount,
@@ -331,7 +331,7 @@ export const superAdminDashRouter = router({
           FROM whatsapp_sessions GROUP BY tenantId
         ) w ON w.tenantId = t.id
         LEFT JOIN (
-          SELECT ws2.tenantId, COUNT(*) AS aiEnabled FROM chatbot_settings cs JOIN whatsapp_sessions ws2 ON ws2.sessionId = cs.sessionId WHERE cs.enabled = 1 GROUP BY ws2.tenantId
+          SELECT ws2.tenantId, COUNT(*) AS aiEnabled FROM chatbot_settings cs JOIN whatsapp_sessions ws2 ON ws2.sessionId = cs.sessionId WHERE cs.enabled = true GROUP BY ws2.tenantId
         ) ai ON ai.tenantId = t.id
         LEFT JOIN (
           SELECT tenantId, COUNT(*) AS integCount FROM integrations WHERE status = 'active' GROUP BY tenantId
@@ -389,7 +389,7 @@ export const superAdminDashRouter = router({
       const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
       const tid = input.tenantId;
 
-      const [result] = await db.execute(sql`
+      const result = await db.execute(sql`
         SELECT
           t.id, t.name, t.plan, t.status, t.billingStatus, t.createdAt, t.freemiumDays, t.freemiumExpiresAt,
           
@@ -423,13 +423,13 @@ export const superAdminDashRouter = router({
           (SELECT COUNT(*) FROM integrations WHERE tenantId = ${tid} AND status = 'active') AS integrationsActive,
           
           -- AI (via whatsapp_sessions join)
-          (SELECT COUNT(*) FROM chatbot_settings cs JOIN whatsapp_sessions ws2 ON ws2.sessionId = cs.sessionId WHERE ws2.tenantId = ${tid} AND cs.enabled = 1) AS aiEnabled,
+          (SELECT COUNT(*) FROM chatbot_settings cs JOIN whatsapp_sessions ws2 ON ws2.sessionId = cs.sessionId WHERE ws2.tenantId = ${tid} AND cs.enabled = true) AS aiEnabled,
           
           -- Pipelines
           (SELECT COUNT(*) FROM pipelines WHERE tenantId = ${tid}) AS pipelinesCount,
           
           -- Automations
-          (SELECT COUNT(*) FROM pipeline_automations WHERE tenantId = ${tid} AND isActive = 1) AS automationsActive,
+          (SELECT COUNT(*) FROM pipeline_automations WHERE tenantId = ${tid} AND isActive = true) AS automationsActive,
           
           -- Proposals
           (SELECT COUNT(*) FROM proposals WHERE tenantId = ${tid}) AS proposalsTotal,
@@ -554,15 +554,15 @@ export const superAdminDashRouter = router({
 
     const monthStart = new Date(Date.UTC(new Date().getFullYear(), new Date().getMonth(), 1));
 
-    const [result] = await db.execute(sql`
+    const result = await db.execute(sql`
       SELECT
         (SELECT COUNT(DISTINCT tenantId) FROM contacts WHERE deletedAt IS NULL) AS tenantsWithContacts,
         (SELECT COUNT(DISTINCT tenantId) FROM deals WHERE deletedAt IS NULL) AS tenantsWithDeals,
         (SELECT COUNT(DISTINCT tenantId) FROM pipelines) AS tenantsWithPipelines,
         (SELECT COUNT(DISTINCT tenantId) FROM crm_tasks) AS tenantsWithTasks,
-        (SELECT COUNT(DISTINCT tenantId) FROM pipeline_automations WHERE isActive = 1) AS tenantsWithAutomations,
+        (SELECT COUNT(DISTINCT tenantId) FROM pipeline_automations WHERE isActive = true) AS tenantsWithAutomations,
         (SELECT COUNT(DISTINCT tenantId) FROM whatsapp_sessions WHERE status = 'connected') AS tenantsWithWA,
-        (SELECT COUNT(DISTINCT ws2.tenantId) FROM chatbot_settings cs JOIN whatsapp_sessions ws2 ON ws2.sessionId = cs.sessionId WHERE cs.enabled = 1) AS tenantsWithAI,
+        (SELECT COUNT(DISTINCT ws2.tenantId) FROM chatbot_settings cs JOIN whatsapp_sessions ws2 ON ws2.sessionId = cs.sessionId WHERE cs.enabled = true) AS tenantsWithAI,
         (SELECT COUNT(DISTINCT tenantId) FROM integrations WHERE status = 'active') AS tenantsWithIntegrations,
         (SELECT COUNT(DISTINCT tenantId) FROM proposals) AS tenantsWithProposals,
         (SELECT COUNT(DISTINCT tenantId) FROM courses) AS tenantsWithAcademy,
@@ -603,7 +603,7 @@ export const superAdminDashRouter = router({
 
     const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
-    const [result] = await db.execute(sql`
+    const result = await db.execute(sql`
       SELECT
         -- Jobs
         (SELECT COUNT(*) FROM jobs WHERE status = 'failed' AND createdAt >= ${oneDayAgo}) AS jobsFailed24h,
@@ -646,7 +646,7 @@ export const superAdminDashRouter = router({
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
 
     // Trial tenants with details
-    const [trials] = await db.execute(sql`
+    const trials = await db.execute(sql`
       SELECT t.id, t.name, t.plan, t.freemiumExpiresAt, t.createdAt,
         (SELECT COUNT(*) FROM crm_users cu WHERE cu.tenantId = t.id AND cu.status = 'active') AS userCount,
         (SELECT COUNT(*) FROM deals d WHERE d.tenantId = t.id AND d.deletedAt IS NULL) AS dealsCount,
@@ -658,7 +658,7 @@ export const superAdminDashRouter = router({
     `) as any;
 
     // Tenants with upgrade potential (high usage on low plan)
-    const [upgradeCandiates] = await db.execute(sql`
+    const upgradeCandiates = await db.execute(sql`
       SELECT t.id, t.name, t.plan,
         (SELECT COUNT(*) FROM crm_users cu WHERE cu.tenantId = t.id AND cu.status = 'active') AS userCount,
         (SELECT COUNT(*) FROM deals d WHERE d.tenantId = t.id AND d.deletedAt IS NULL) AS dealsCount,
@@ -671,7 +671,7 @@ export const superAdminDashRouter = router({
     `) as any;
 
     // Churn risk (active but no recent activity)
-    const [churnRisk] = await db.execute(sql`
+    const churnRisk = await db.execute(sql`
       SELECT t.id, t.name, t.plan,
         (SELECT MAX(cu.lastActiveAt) FROM crm_users cu WHERE cu.tenantId = t.id) AS lastActivity,
         (SELECT COUNT(*) FROM crm_users cu WHERE cu.tenantId = t.id AND cu.status = 'active') AS userCount
@@ -715,7 +715,7 @@ export const superAdminDashRouter = router({
       const tid = input.tenantId;
       const monthStart = new Date(Date.UTC(new Date().getFullYear(), new Date().getMonth(), 1));
 
-      const [result] = await db.execute(sql`
+      const result = await db.execute(sql`
         SELECT
           t.name, t.plan,
           (SELECT COUNT(*) FROM crm_users WHERE tenantId = ${tid} AND status = 'active') AS usersActive,
@@ -726,9 +726,9 @@ export const superAdminDashRouter = router({
           (SELECT COUNT(*) FROM contacts WHERE tenantId = ${tid} AND deletedAt IS NULL) AS contacts,
           (SELECT COUNT(*) FROM crm_tasks WHERE tenantId = ${tid} AND createdAt >= ${monthStart}) AS tasksMonth,
           (SELECT COUNT(*) FROM pipelines WHERE tenantId = ${tid}) AS pipelines,
-          (SELECT COUNT(*) FROM pipeline_automations WHERE tenantId = ${tid} AND isActive = 1) AS automations,
+          (SELECT COUNT(*) FROM pipeline_automations WHERE tenantId = ${tid} AND isActive = true) AS automations,
           (SELECT COUNT(*) FROM whatsapp_sessions WHERE tenantId = ${tid} AND status = 'connected') AS waConnected,
-          (SELECT COUNT(*) FROM chatbot_settings cs JOIN whatsapp_sessions ws2 ON ws2.sessionId = cs.sessionId WHERE ws2.tenantId = ${tid} AND cs.enabled = 1) AS aiEnabled,
+          (SELECT COUNT(*) FROM chatbot_settings cs JOIN whatsapp_sessions ws2 ON ws2.sessionId = cs.sessionId WHERE ws2.tenantId = ${tid} AND cs.enabled = true) AS aiEnabled,
           (SELECT COUNT(*) FROM integrations WHERE tenantId = ${tid} AND status = 'active') AS integrations,
           (SELECT COUNT(*) FROM proposals WHERE tenantId = ${tid}) AS proposals
         FROM tenants t WHERE t.id = ${tid}
@@ -800,7 +800,7 @@ export const superAdminDashRouter = router({
       const [rows] = await db.execute(sql`
         SELECT id, name, email, crm_user_role AS role, status, lastActiveAt, lastLoginAt, createdAt
         FROM crm_users WHERE tenantId = ${input.tenantId}
-        ORDER BY ISNULL(lastActiveAt), lastActiveAt DESC
+        ORDER BY "lastActiveAt" IS NULL, "lastActiveAt" DESC
         LIMIT 100
       `) as any;
 

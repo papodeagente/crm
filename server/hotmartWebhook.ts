@@ -200,7 +200,7 @@ async function autoCreateTenantFromPurchase(opts: {
     hotmartEmail: opts.buyerEmail,
     freemiumDays: 0,
     freemiumExpiresAt: null,
-  }).$returningId();
+  }).returning({ id: tenants.id });
 
   const tenantId = tenantResult.id;
 
@@ -213,7 +213,7 @@ async function autoCreateTenantFromPurchase(opts: {
     passwordHash,
     role: "admin",
     status: "active",
-  }).$returningId();
+  }).returning({ id: crmUsers.id });
 
   // Set owner
   await db.update(tenants).set({ ownerUserId: userResult.id }).where(eq(tenants.id, tenantId));
@@ -374,7 +374,7 @@ export async function handleHotmartWebhook(req: Request, res: Response) {
       rawPayload: payload as any,
       processed: false,
       idempotencyKey,
-    }).$returningId();
+    }).returning({ id: subscriptionEvents.id });
     eventLogId = eventResult.id;
 
     console.log(`[Hotmart Webhook] Event logged with ID: ${eventLogId}`);
@@ -402,7 +402,7 @@ export async function handleHotmartWebhook(req: Request, res: Response) {
             processed: true,
             processedAt: new Date(),
             errorMessage: `Failed to auto-create tenant for: ${buyerEmail}`,
-          }).where(eq(subscriptionEvents.id, eventLogId));
+          }).where(eq(subscriptionEvents.id, eventLogId!));
           return res.status(500).json({ error: "Failed to create tenant" });
         }
 
@@ -424,7 +424,7 @@ export async function handleHotmartWebhook(req: Request, res: Response) {
           processed: true,
           processedAt: new Date(),
           errorMessage: `No tenant found for email: ${buyerEmail} (event: ${event})`,
-        }).where(eq(subscriptionEvents.id, eventLogId));
+        }).where(eq(subscriptionEvents.id, eventLogId!));
 
         console.warn(`[Hotmart Webhook] No tenant for ${buyerEmail} and event ${event} is not a purchase — skipping`);
         return res.status(200).json({ status: "no_tenant_found", email: buyerEmail });
@@ -440,7 +440,7 @@ export async function handleHotmartWebhook(req: Request, res: Response) {
     // Update event with tenant reference
     await db.update(subscriptionEvents).set({
       tenantId: tenant.id,
-    }).where(eq(subscriptionEvents.id, eventLogId));
+    }).where(eq(subscriptionEvents.id, eventLogId!));
 
     // 6. Skip billing enforcement for legacy tenants (grandfathered)
     if (tenant.isLegacy) {
@@ -448,7 +448,7 @@ export async function handleHotmartWebhook(req: Request, res: Response) {
         processed: true,
         processedAt: new Date(),
         errorMessage: "Legacy tenant — billing event logged but not enforced",
-      }).where(eq(subscriptionEvents.id, eventLogId));
+      }).where(eq(subscriptionEvents.id, eventLogId!));
 
       console.log(`[Hotmart Webhook] Legacy tenant ${tenant.id} — event logged, no enforcement`);
       return res.status(200).json({ status: "legacy_tenant_logged", tenantId: tenant.id });
@@ -506,7 +506,7 @@ export async function handleHotmartWebhook(req: Request, res: Response) {
       const [newSub] = await db.insert(subscriptions).values({
         tenantId: tenant.id,
         ...subData,
-      }).$returningId();
+      }).returning({ id: subscriptions.id });
       subscriptionId = newSub.id;
     }
 
@@ -674,7 +674,7 @@ export async function handleHotmartWebhook(req: Request, res: Response) {
       subscriptionId,
       processed: true,
       processedAt: new Date(),
-    }).where(eq(subscriptionEvents.id, eventLogId));
+    }).where(eq(subscriptionEvents.id, eventLogId!));
 
     const elapsed = Date.now() - startTime;
     console.log(`[Hotmart Webhook] ✓ Tenant ${tenant.id} → ${internalStatus} (${event}) [${elapsed}ms]`);
