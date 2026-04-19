@@ -18,9 +18,9 @@ FROM base AS production
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/drizzle ./drizzle
-COPY --from=build /app/drizzle.config.ts ./drizzle.config.ts
+COPY --from=build /app/scripts ./scripts
 COPY package.json tsconfig.json ./
 
 ENV NODE_ENV=production
 EXPOSE 3000
-CMD ["node", "dist/index.js"]
+CMD ["sh", "-c", "node scripts/migrate.mjs && node scripts/seed-admin.mjs && node dist/index.js"]
