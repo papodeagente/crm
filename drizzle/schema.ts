@@ -981,7 +981,7 @@ export const portalTickets = pgTable("portal_tickets", {
   priority: priorityEnum("priority").default("medium").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
-}, (t) => [index("pt_tenant_idx").on(t.tenantId)]);
+}, (t) => [index("ptk_tenant_idx").on(t.tenantId)]);
 
 // ════════════════════════════════════════════════════════════
 // M5 — GESTÃO
@@ -2381,10 +2381,10 @@ export const contactMerges = pgTable("contact_merges", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 }, (t) => [
-  index("cm_tenant_idx").on(t.tenantId),
-  index("cm_primary_idx").on(t.tenantId, t.primaryContactId),
-  index("cm_secondary_idx").on(t.tenantId, t.secondaryContactId),
-  index("cm_status_idx").on(t.tenantId, t.status),
+  index("cmerge_tenant_idx").on(t.tenantId),
+  index("cmerge_primary_idx").on(t.tenantId, t.primaryContactId),
+  index("cmerge_secondary_idx").on(t.tenantId, t.secondaryContactId),
+  index("cmerge_status_idx").on(t.tenantId, t.status),
 ]);
 export type ContactMerge = typeof contactMerges.$inferSelect;
 export type InsertContactMerge = typeof contactMerges.$inferInsert;

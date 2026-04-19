@@ -23,4 +23,4 @@ COPY package.json tsconfig.json ./
 
 ENV NODE_ENV=production
 EXPOSE 3000
-CMD ["sh", "-c", "npx drizzle-kit generate 2>/dev/null; npx drizzle-kit migrate 2>/dev/null; node dist/index.js"]
+CMD ["sh", "-c", "npx drizzle-kit migrate && node dist/index.js"]
