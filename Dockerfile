@@ -23,4 +23,4 @@ COPY package.json tsconfig.json ./
 
 ENV NODE_ENV=production
 EXPOSE 3000
-CMD ["sh", "-c", "node scripts/migrate.mjs && node scripts/seed-admin.mjs && node dist/index.js"]
+CMD ["sh", "-c", "echo '[Startup] Running migrations...' && node scripts/migrate.mjs && echo '[Startup] Running seed...' && node scripts/seed-admin.mjs && echo '[Startup] Starting app...' && node dist/index.js"]

@@ -61,8 +61,14 @@ async function migrate() {
 
     console.log(`[Migrate] Applying: ${hash} (${statements.length} statements)`);
 
-    for (const stmt of statements) {
-      await client.query(stmt);
+    for (let i = 0; i < statements.length; i++) {
+      try {
+        await client.query(statements[i]);
+      } catch (err) {
+        console.error(`[Migrate] Statement ${i + 1}/${statements.length} failed:`, err.message);
+        console.error(`[Migrate] SQL:`, statements[i].substring(0, 200));
+        throw err;
+      }
     }
 
     await client.query(
@@ -79,5 +85,6 @@ async function migrate() {
 
 migrate().catch(e => {
   console.error('[Migrate] Error:', e.message);
+  console.error('[Migrate] Stack:', e.stack);
   process.exit(1);
 });
