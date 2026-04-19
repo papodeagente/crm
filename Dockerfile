@@ -17,8 +17,10 @@ RUN pnpm build
 FROM base AS production
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
-COPY package.json ./
+COPY --from=build /app/drizzle ./drizzle
+COPY --from=build /app/drizzle.config.ts ./drizzle.config.ts
+COPY package.json tsconfig.json ./
 
 ENV NODE_ENV=production
 EXPOSE 3000
-CMD ["node", "dist/index.js"]
+CMD ["sh", "-c", "npx drizzle-kit generate 2>/dev/null; npx drizzle-kit migrate 2>/dev/null; node dist/index.js"]
