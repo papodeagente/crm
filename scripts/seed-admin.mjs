@@ -38,10 +38,10 @@ async function seed() {
 
   // Create super admin user
   const userRes = await client.query(`
-    INSERT INTO crm_users ("tenantId", name, email, "passwordHash", role, status, "isSuperAdmin", "createdAt", "updatedAt")
-    VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())
+    INSERT INTO crm_users ("tenantId", name, email, "passwordHash", "crm_user_role", status, "createdAt", "updatedAt")
+    VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
     RETURNING id
-  `, [tenantId, 'Bruno Barbosa', 'bruno@entur.com.br', passwordHash, 'admin', 'active', true]);
+  `, [tenantId, 'Bruno Barbosa', 'bruno@entur.com.br', passwordHash, 'admin', 'active']);
 
   const userId = userRes.rows[0].id;
   console.log('[Seed] Super admin created:', userId);

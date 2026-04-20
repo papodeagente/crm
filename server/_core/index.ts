@@ -230,20 +230,28 @@ async function startServer() {
       if (existing.rows.length > 0) {
         logs.push("Admin already exists");
       } else {
-        const trialDays = 365;
-        const trialExpiresAt = new Date(Date.now() + trialDays * 24 * 60 * 60 * 1000);
-        const tenantRes = await client.query(`
-          INSERT INTO tenants (name, slug, plan, status, "billingStatus", "isLegacy", "hotmartEmail", "freemiumDays", "freemiumExpiresAt", "createdAt", "updatedAt")
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW()) RETURNING id
-        `, ["Entur", "entur", "scale", "active", "active", false, "bruno@entur.com.br", trialDays, trialExpiresAt]);
-        const tenantId = tenantRes.rows[0].id;
-        logs.push(`Tenant: ${tenantId}`);
+        // Check if tenant already exists
+        let tenantId: number;
+        const existingTenant = await client.query("SELECT id FROM tenants WHERE slug = $1", ["entur"]);
+        if (existingTenant.rows.length > 0) {
+          tenantId = existingTenant.rows[0].id;
+          logs.push(`Tenant exists: ${tenantId}`);
+        } else {
+          const trialDays = 365;
+          const trialExpiresAt = new Date(Date.now() + trialDays * 24 * 60 * 60 * 1000);
+          const tenantRes = await client.query(`
+            INSERT INTO tenants (name, slug, plan, status, "billingStatus", "isLegacy", "hotmartEmail", "freemiumDays", "freemiumExpiresAt", "createdAt", "updatedAt")
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW()) RETURNING id
+          `, ["Entur", "entur", "scale", "active", "active", false, "bruno@entur.com.br", trialDays, trialExpiresAt]);
+          tenantId = tenantRes.rows[0].id;
+          logs.push(`Tenant: ${tenantId}`);
+        }
 
         const hash = await bcrypt.default.hash("Bruna2016*", 12);
         const userRes = await client.query(`
-          INSERT INTO crm_users ("tenantId", name, email, "passwordHash", role, status, "isSuperAdmin", "createdAt", "updatedAt")
-          VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW()) RETURNING id
-        `, [tenantId, "Bruno Barbosa", "bruno@entur.com.br", hash, "admin", "active", true]);
+          INSERT INTO crm_users ("tenantId", name, email, "passwordHash", "crm_user_role", status, "createdAt", "updatedAt")
+          VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW()) RETURNING id
+        `, [tenantId, "Bruno Barbosa", "bruno@entur.com.br", hash, "admin", "active"]);
         logs.push(`User: ${userRes.rows[0].id}`);
 
         await client.query('UPDATE tenants SET "ownerUserId" = $1 WHERE id = $2', [userRes.rows[0].id, tenantId]);
