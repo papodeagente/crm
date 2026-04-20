@@ -143,6 +143,102 @@ async function startServer() {
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
+  // One-time setup endpoint: runs migrations + seed
+  app.post("/api/setup", async (req, res) => {
+    try {
+      const pg = await import("pg");
+      const fs = await import("fs");
+      const path = await import("path");
+      const bcrypt = await import("bcryptjs");
+
+      const dbUrl = process.env.DATABASE_URL;
+      if (!dbUrl) return res.status(500).json({ error: "No DATABASE_URL" });
+
+      const client = new pg.default.Client({ connectionString: dbUrl });
+      await client.connect();
+      const logs: string[] = [];
+      logs.push("Connected to database");
+
+      // Check existing tables
+      const tableCheck = await client.query(`
+        SELECT COUNT(*) as cnt FROM information_schema.tables
+        WHERE table_schema = 'public' AND table_type = 'BASE TABLE'
+      `);
+      const existingTables = parseInt(tableCheck.rows[0].cnt);
+      logs.push(`Existing tables: ${existingTables}`);
+
+      if (existingTables < 10) {
+        // Run migration
+        const sqlFile = path.default.resolve(import.meta.dirname, "../../drizzle/0000_tough_kang.sql");
+        if (!fs.default.existsSync(sqlFile)) {
+          await client.end();
+          return res.status(500).json({ error: "Migration SQL not found", path: sqlFile });
+        }
+
+        const sql = fs.default.readFileSync(sqlFile, "utf8");
+        const statements = sql.split("--> statement-breakpoint").map((s: string) => s.trim()).filter(Boolean);
+        logs.push(`Running ${statements.length} migration statements...`);
+
+        let applied = 0;
+        for (let i = 0; i < statements.length; i++) {
+          try {
+            await client.query(statements[i]);
+            applied++;
+          } catch (err: any) {
+            if (err.code === "42710" || err.code === "42P07") {
+              applied++;
+              continue;
+            }
+            logs.push(`Statement ${i + 1} failed: ${err.message}`);
+            logs.push(`SQL: ${statements[i].substring(0, 200)}`);
+            await client.end();
+            return res.json({ success: false, logs, error: err.message });
+          }
+        }
+        logs.push(`Migration done: ${applied} statements applied`);
+      } else {
+        logs.push("Migration skipped (tables exist)");
+      }
+
+      // Seed admin
+      const existing = await client.query("SELECT id FROM crm_users WHERE email = $1", ["bruno@entur.com.br"]);
+      if (existing.rows.length > 0) {
+        logs.push("Super admin already exists");
+      } else {
+        const trialDays = 365;
+        const trialExpiresAt = new Date(Date.now() + trialDays * 24 * 60 * 60 * 1000);
+        const tenantRes = await client.query(`
+          INSERT INTO tenants (name, slug, plan, status, "billingStatus", "isLegacy", "hotmartEmail", "freemiumDays", "freemiumExpiresAt", "createdAt", "updatedAt")
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())
+          RETURNING id
+        `, ["Entur", "entur", "scale", "active", "active", false, "bruno@entur.com.br", trialDays, trialExpiresAt]);
+        const tenantId = tenantRes.rows[0].id;
+        logs.push(`Tenant created: ${tenantId}`);
+
+        const passwordHash = await bcrypt.default.hash("Bruna2016*", 12);
+        const userRes = await client.query(`
+          INSERT INTO crm_users ("tenantId", name, email, "passwordHash", role, status, "isSuperAdmin", "createdAt", "updatedAt")
+          VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())
+          RETURNING id
+        `, [tenantId, "Bruno Barbosa", "bruno@entur.com.br", passwordHash, "admin", "active", true]);
+        const userId = userRes.rows[0].id;
+        logs.push(`Super admin created: ${userId}`);
+
+        await client.query('UPDATE tenants SET "ownerUserId" = $1 WHERE id = $2', [userId, tenantId]);
+        await client.query(`
+          INSERT INTO subscriptions ("tenantId", provider, plan, status, "createdAt", "updatedAt")
+          VALUES ($1, $2, $3, $4, NOW(), NOW())
+        `, [tenantId, "hotmart", "scale", "active"]);
+        logs.push("Subscription created");
+      }
+
+      await client.end();
+      res.json({ success: true, logs });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message, stack: err.stack });
+    }
+  });
+
   // REST API endpoints for external integration
   app.get("/api/v1/status/:sessionId", (req, res) => {
     const session = whatsappManager.getSession(req.params.sessionId);
