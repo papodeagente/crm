@@ -610,7 +610,7 @@ CREATE TABLE "date_automations" (
 	"name" varchar(255) NOT NULL,
 	"description" text,
 	"pipelineId" integer NOT NULL,
-	"dateField" dateField NOT NULL,
+	"dateField" "dateField" NOT NULL,
 	"condition" "condition" NOT NULL,
 	"offsetDays" integer DEFAULT 0 NOT NULL,
 	"sourceStageId" integer,
