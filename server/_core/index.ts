@@ -144,7 +144,41 @@ async function startServer() {
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
   // One-time setup endpoint: runs migrations + seed
-  app.post("/api/setup", async (req, res) => {
+  // GET = diagnose, POST = run
+  app.get("/api/setup", async (_req, res) => {
+    try {
+      const pg = await import("pg");
+      const fs = await import("fs");
+      const path = await import("path");
+      const dbUrl = process.env.DATABASE_URL;
+      const client = new pg.default.Client({ connectionString: dbUrl });
+      await client.connect();
+      const tableCheck = await client.query(`SELECT COUNT(*) as cnt FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE'`);
+      const tables = await client.query(`SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE' ORDER BY table_name LIMIT 20`);
+      const sqlPath = path.default.resolve(process.cwd(), "drizzle/0000_tough_kang.sql");
+      const sqlExists = fs.default.existsSync(sqlPath);
+      const cwd = process.cwd();
+      const dirname = import.meta.dirname;
+      const drizzleFiles = fs.default.existsSync(path.default.resolve(cwd, "drizzle")) ? fs.default.readdirSync(path.default.resolve(cwd, "drizzle")) : [];
+      await client.end();
+      res.json({
+        dbConnected: true,
+        dbUrl: dbUrl?.replace(/\/\/.*@/, "//***@"),
+        existingTables: parseInt(tableCheck.rows[0].cnt),
+        tableNames: tables.rows.map((r: any) => r.table_name),
+        sqlPath,
+        sqlExists,
+        cwd,
+        dirname,
+        drizzleFiles,
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post("/api/setup", async (_req, res) => {
+    const logs: string[] = [];
     try {
       const pg = await import("pg");
       const fs = await import("fs");
@@ -156,90 +190,71 @@ async function startServer() {
 
       const client = new pg.default.Client({ connectionString: dbUrl });
       await client.connect();
-      const logs: string[] = [];
-      logs.push("Connected to database");
+      logs.push("Connected");
 
-      // Check existing tables
-      const tableCheck = await client.query(`
-        SELECT COUNT(*) as cnt FROM information_schema.tables
-        WHERE table_schema = 'public' AND table_type = 'BASE TABLE'
-      `);
-      const existingTables = parseInt(tableCheck.rows[0].cnt);
-      logs.push(`Existing tables: ${existingTables}`);
+      // Run migration
+      const sqlFile = path.default.resolve(process.cwd(), "drizzle/0000_tough_kang.sql");
+      logs.push(`SQL path: ${sqlFile}`);
 
-      if (existingTables < 10) {
-        // Run migration
-        // In production bundle: dist/index.js -> need ../drizzle/
-        // In dev: server/_core/index.ts -> need ../../drizzle/
-        const sqlFile = process.env.NODE_ENV === "production"
-          ? path.default.resolve(import.meta.dirname, "../drizzle/0000_tough_kang.sql")
-          : path.default.resolve(import.meta.dirname, "../../drizzle/0000_tough_kang.sql");
-        if (!fs.default.existsSync(sqlFile)) {
-          await client.end();
-          return res.status(500).json({ error: "Migration SQL not found", path: sqlFile });
-        }
-
-        const sql = fs.default.readFileSync(sqlFile, "utf8");
-        const statements = sql.split("--> statement-breakpoint").map((s: string) => s.trim()).filter(Boolean);
-        logs.push(`Running ${statements.length} migration statements...`);
-
-        let applied = 0;
-        for (let i = 0; i < statements.length; i++) {
-          try {
-            await client.query(statements[i]);
-            applied++;
-          } catch (err: any) {
-            if (err.code === "42710" || err.code === "42P07") {
-              applied++;
-              continue;
-            }
-            logs.push(`Statement ${i + 1} failed: ${err.message}`);
-            logs.push(`SQL: ${statements[i].substring(0, 200)}`);
-            await client.end();
-            return res.json({ success: false, logs, error: err.message });
-          }
-        }
-        logs.push(`Migration done: ${applied} statements applied`);
-      } else {
-        logs.push("Migration skipped (tables exist)");
+      if (!fs.default.existsSync(sqlFile)) {
+        await client.end();
+        return res.json({ success: false, logs, error: "SQL file not found" });
       }
+
+      const sqlContent = fs.default.readFileSync(sqlFile, "utf8");
+      const statements = sqlContent.split("--> statement-breakpoint").map((s: string) => s.trim()).filter(Boolean);
+      logs.push(`Statements: ${statements.length}`);
+
+      let applied = 0;
+      let skipped = 0;
+      for (let i = 0; i < statements.length; i++) {
+        try {
+          await client.query(statements[i]);
+          applied++;
+        } catch (err: any) {
+          // Skip "already exists" errors
+          if (err.code === "42710" || err.code === "42P07") {
+            skipped++;
+            continue;
+          }
+          logs.push(`FAIL at ${i + 1}: [${err.code}] ${err.message}`);
+          logs.push(`SQL: ${statements[i].substring(0, 200)}`);
+          await client.end();
+          return res.json({ success: false, logs, applied, skipped, failedAt: i + 1 });
+        }
+      }
+      logs.push(`Migration done: ${applied} applied, ${skipped} skipped`);
 
       // Seed admin
       const existing = await client.query("SELECT id FROM crm_users WHERE email = $1", ["bruno@entur.com.br"]);
       if (existing.rows.length > 0) {
-        logs.push("Super admin already exists");
+        logs.push("Admin already exists");
       } else {
         const trialDays = 365;
         const trialExpiresAt = new Date(Date.now() + trialDays * 24 * 60 * 60 * 1000);
         const tenantRes = await client.query(`
           INSERT INTO tenants (name, slug, plan, status, "billingStatus", "isLegacy", "hotmartEmail", "freemiumDays", "freemiumExpiresAt", "createdAt", "updatedAt")
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())
-          RETURNING id
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW()) RETURNING id
         `, ["Entur", "entur", "scale", "active", "active", false, "bruno@entur.com.br", trialDays, trialExpiresAt]);
         const tenantId = tenantRes.rows[0].id;
-        logs.push(`Tenant created: ${tenantId}`);
+        logs.push(`Tenant: ${tenantId}`);
 
-        const passwordHash = await bcrypt.default.hash("Bruna2016*", 12);
+        const hash = await bcrypt.default.hash("Bruna2016*", 12);
         const userRes = await client.query(`
           INSERT INTO crm_users ("tenantId", name, email, "passwordHash", role, status, "isSuperAdmin", "createdAt", "updatedAt")
-          VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())
-          RETURNING id
-        `, [tenantId, "Bruno Barbosa", "bruno@entur.com.br", passwordHash, "admin", "active", true]);
-        const userId = userRes.rows[0].id;
-        logs.push(`Super admin created: ${userId}`);
+          VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW()) RETURNING id
+        `, [tenantId, "Bruno Barbosa", "bruno@entur.com.br", hash, "admin", "active", true]);
+        logs.push(`User: ${userRes.rows[0].id}`);
 
-        await client.query('UPDATE tenants SET "ownerUserId" = $1 WHERE id = $2', [userId, tenantId]);
-        await client.query(`
-          INSERT INTO subscriptions ("tenantId", provider, plan, status, "createdAt", "updatedAt")
-          VALUES ($1, $2, $3, $4, NOW(), NOW())
-        `, [tenantId, "hotmart", "scale", "active"]);
-        logs.push("Subscription created");
+        await client.query('UPDATE tenants SET "ownerUserId" = $1 WHERE id = $2', [userRes.rows[0].id, tenantId]);
+        await client.query(`INSERT INTO subscriptions ("tenantId", provider, plan, status, "createdAt", "updatedAt") VALUES ($1, $2, $3, $4, NOW(), NOW())`, [tenantId, "hotmart", "scale", "active"]);
+        logs.push("Seed complete");
       }
 
       await client.end();
       res.json({ success: true, logs });
     } catch (err: any) {
-      res.status(500).json({ error: err.message, stack: err.stack });
+      res.status(500).json({ error: err.message, logs });
     }
   });
 
