@@ -169,7 +169,11 @@ async function startServer() {
 
       if (existingTables < 10) {
         // Run migration
-        const sqlFile = path.default.resolve(import.meta.dirname, "../../drizzle/0000_tough_kang.sql");
+        // In production bundle: dist/index.js -> need ../drizzle/
+        // In dev: server/_core/index.ts -> need ../../drizzle/
+        const sqlFile = process.env.NODE_ENV === "production"
+          ? path.default.resolve(import.meta.dirname, "../drizzle/0000_tough_kang.sql")
+          : path.default.resolve(import.meta.dirname, "../../drizzle/0000_tough_kang.sql");
         if (!fs.default.existsSync(sqlFile)) {
           await client.end();
           return res.status(500).json({ error: "Migration SQL not found", path: sqlFile });
