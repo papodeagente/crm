@@ -269,17 +269,21 @@ export async function processScheduledWhatsAppTasks(): Promise<{ processed: numb
   // Step 1: Atomically lock eligible tasks (scheduled + due + not locked or stale lock)
   const lockResult = await db.execute(sql`
     UPDATE crm_tasks
-    SET waProcessingLockId = ${lockId},
-        waProcessingLockedAt = NOW(),
-        waStatus = 'processing'
-    WHERE taskType = ${TASK_TYPE}
-      AND waStatus IN ('scheduled')
-      AND waScheduledAt <= ${now}
-      AND (waProcessingLockId IS NULL OR waProcessingLockedAt < ${staleLockThreshold})
-    LIMIT 10
+    SET "waProcessingLockId" = ${lockId},
+        "waProcessingLockedAt" = NOW(),
+        "waStatus" = 'processing'
+    WHERE id IN (
+      SELECT id FROM crm_tasks
+      WHERE "taskType" = ${TASK_TYPE}
+        AND "waStatus" IN ('scheduled')
+        AND "waScheduledAt" <= ${now}
+        AND ("waProcessingLockId" IS NULL OR "waProcessingLockedAt" < ${staleLockThreshold})
+      LIMIT 10
+      FOR UPDATE SKIP LOCKED
+    )
   `);
 
-  const lockedCount = (lockResult as any)[0]?.affectedRows ?? 0;
+  const lockedCount = lockResult.rowCount ?? 0;
   if (lockedCount === 0) return { processed: 0, sent: 0, failed: 0 };
 
   // Step 2: Fetch locked tasks
