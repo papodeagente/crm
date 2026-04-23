@@ -38,16 +38,16 @@ import { formatDate, formatTime, formatDateTime, SYSTEM_TIMEZONE, SYSTEM_LOCALE,
 
 /* ─── Helpers ─── */
 const categoryLabels: Record<string, string> = {
-  flight: "Aéreo", hotel: "Hotel", tour: "Passeio", transfer: "Transfer",
-  insurance: "Seguro", cruise: "Cruzeiro", visa: "Visto", other: "Outro",
+  servico: "Servico", pacote: "Pacote", consulta: "Consulta", procedimento: "Procedimento",
+  assinatura: "Assinatura", produto: "Produto", other: "Outro",
 };
 const categoryIcons: Record<string, typeof Plane> = {
-  flight: Plane, hotel: Building2, tour: MapPin, transfer: GripVertical,
-  insurance: FileText, cruise: Plane, visa: FileText, other: Package,
+  servico: ClipboardList, pacote: Package, consulta: FileText, procedimento: MapPin,
+  assinatura: ShoppingBag, produto: ShoppingBag, other: Package,
 };
 const roleLabels: Record<string, string> = {
-  decision_maker: "Decisor", traveler: "Viajante", payer: "Pagador",
-  companion: "Acompanhante", other: "Outro",
+  decision_maker: "Decisor", client: "Cliente", payer: "Pagador",
+  dependent: "Dependente", other: "Outro",
 };
 const priorityConfig: Record<string, { label: string; color: string }> = {
   low: { label: "Baixa", color: "text-muted-foreground" },
@@ -183,16 +183,16 @@ export default function DealDetail() {
     onError: () => toast.error("Erro ao atualizar"),
   });
   const updateContact = trpc.crm.contacts.update.useMutation({
-    onSuccess: () => { contactQ.refetch(); toast.success("Passageiro atualizado"); },
-    onError: () => toast.error("Erro ao atualizar passageiro"),
+    onSuccess: () => { contactQ.refetch(); toast.success("Cliente atualizado"); },
+    onError: () => toast.error("Erro ao atualizar cliente"),
   });
   const createContact = trpc.crm.contacts.create.useMutation({
     onSuccess: (data) => {
       if (data?.id) updateDeal.mutate({ id: dealId, contactId: data.id });
       contactsQ.refetch();
-      toast.success("Passageiro criado e vinculado");
+      toast.success("Cliente criado e vinculado");
     },
-    onError: () => toast.error("Erro ao criar passageiro"),
+    onError: () => toast.error("Erro ao criar cliente"),
   });
   const updateAccount = trpc.crm.accounts.update.useMutation({
     onSuccess: () => { accountQ.refetch(); toast.success("Empresa atualizada"); },
@@ -503,7 +503,7 @@ export default function DealDetail() {
                   onClick={() => setShowLostDialog(true)}
                 >
                   <ThumbsDown className="h-4 w-4" />
-                  <span className="hidden sm:inline">{pipeline?.pipelineType === "post_sale" ? "Viagem cancelada" : pipeline?.pipelineType === "support" ? "Não resolvido" : "Marcar perda"}</span>
+                  <span className="hidden sm:inline">{pipeline?.pipelineType === "post_sale" ? "Servico cancelado" : pipeline?.pipelineType === "support" ? "Nao resolvido" : "Marcar perda"}</span>
                 </Button>
                 <Button
                   size="sm"
@@ -511,7 +511,7 @@ export default function DealDetail() {
                   onClick={() => setShowWonDialog(true)}
                 >
                   <ThumbsUp className="h-4 w-4" />
-                  <span className="hidden sm:inline">{pipeline?.pipelineType === "post_sale" ? "Viagem finalizada" : pipeline?.pipelineType === "support" ? "Resolvido" : "Marcar venda"}</span>
+                  <span className="hidden sm:inline">{pipeline?.pipelineType === "post_sale" ? "Servico finalizado" : pipeline?.pipelineType === "support" ? "Resolvido" : "Marcar venda"}</span>
                 </Button>
               </>
             )}
@@ -688,9 +688,9 @@ export default function DealDetail() {
 
               <div className="border-b border-border" />
 
-              {/* ── Passageiro compacto ── */}
+              {/* ── Cliente compacto ── */}
               <div className="py-2">
-                <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Passageiro</p>
+                <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Cliente</p>
                 {contact ? (
                   <div className="space-y-1">
                     <div className="flex items-center gap-1.5">
@@ -713,7 +713,7 @@ export default function DealDetail() {
                     )}
                   </div>
                 ) : (
-                  <p className="text-muted-foreground italic">Sem passageiro</p>
+                  <p className="text-muted-foreground italic">Sem cliente</p>
                 )}
               </div>
 
@@ -804,14 +804,14 @@ export default function DealDetail() {
                 </div>
                 <div className="border-b border-border" />
                 <div className="py-2">
-                  <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Passageiro</p>
+                  <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Cliente</p>
                   {contact ? (
                     <div className="space-y-1">
                       <span className="font-medium text-foreground">{contact.name}</span>
                       {contact.phone && <p className="text-muted-foreground">{contact.phone}</p>}
                     </div>
                   ) : (
-                    <p className="text-muted-foreground italic">Sem passageiro</p>
+                    <p className="text-muted-foreground italic">Sem cliente</p>
                   )}
                 </div>
                 <div className="border-b border-border" />
@@ -939,39 +939,39 @@ export default function DealDetail() {
 
             <SidebarDivider />
 
-            {/* ── Datas da Viagem ── */}
+            {/* ── Datas do Servico ── */}
             <SidebarSection
-              title="Datas da Viagem"
+              title="Datas do Servico"
               open={sidebarSections.travel}
               onToggle={() => toggleSection("travel")}
             >
               <div className="space-y-3">
                 <EditableSidebarField
-                  label="Data de Embarque"
-                  value={deal.boardingDate ? fmtDate(deal.boardingDate) : "—"}
-                  isEditing={editingDealField === "boardingDate"}
-                  onStartEdit={() => { setEditingDealField("boardingDate"); setDealFieldDraft(deal.boardingDate ? new Date(deal.boardingDate).toISOString().split("T")[0] : ""); }}
+                  label="Agendamento"
+                  value={deal.appointmentDate ? fmtDate(deal.appointmentDate) : "—"}
+                  isEditing={editingDealField === "appointmentDate"}
+                  onStartEdit={() => { setEditingDealField("appointmentDate"); setDealFieldDraft(deal.appointmentDate ? new Date(deal.appointmentDate).toISOString().split("T")[0] : ""); }}
                   draft={dealFieldDraft}
                   onDraftChange={setDealFieldDraft}
-                  onSave={() => { updateDeal.mutate({ id: deal.id, boardingDate: dealFieldDraft || null }); setEditingDealField(null); }}
+                  onSave={() => { updateDeal.mutate({ id: deal.id, appointmentDate: dealFieldDraft || null }); setEditingDealField(null); }}
                   onCancel={() => setEditingDealField(null)}
                   inputType="date"
                 />
                 <EditableSidebarField
-                  label="Data de Retorno"
-                  value={deal.returnDate ? fmtDate(deal.returnDate) : "—"}
-                  isEditing={editingDealField === "returnDate"}
-                  onStartEdit={() => { setEditingDealField("returnDate"); setDealFieldDraft(deal.returnDate ? new Date(deal.returnDate).toISOString().split("T")[0] : ""); }}
+                  label="Retorno/Revisao"
+                  value={deal.followUpDate ? fmtDate(deal.followUpDate) : "—"}
+                  isEditing={editingDealField === "followUpDate"}
+                  onStartEdit={() => { setEditingDealField("followUpDate"); setDealFieldDraft(deal.followUpDate ? new Date(deal.followUpDate).toISOString().split("T")[0] : ""); }}
                   draft={dealFieldDraft}
                   onDraftChange={setDealFieldDraft}
-                  onSave={() => { updateDeal.mutate({ id: deal.id, returnDate: dealFieldDraft || null }); setEditingDealField(null); }}
+                  onSave={() => { updateDeal.mutate({ id: deal.id, followUpDate: dealFieldDraft || null }); setEditingDealField(null); }}
                   onCancel={() => setEditingDealField(null)}
                   inputType="date"
                 />
-                {deal.boardingDate && deal.returnDate && new Date(deal.returnDate) > new Date(deal.boardingDate) && (
+                {deal.appointmentDate && deal.followUpDate && new Date(deal.followUpDate) > new Date(deal.appointmentDate) && (
                   <div className="flex items-center gap-1.5 text-xs text-muted-foreground bg-muted/40 rounded-lg px-2.5 py-1.5">
-                    <Plane className="h-3 w-3 text-primary/60" />
-                    {Math.ceil((new Date(deal.returnDate).getTime() - new Date(deal.boardingDate).getTime()) / (1000 * 60 * 60 * 24))} dias de viagem
+                    <Calendar className="h-3 w-3 text-primary/60" />
+                    {Math.ceil((new Date(deal.followUpDate).getTime() - new Date(deal.appointmentDate).getTime()) / (1000 * 60 * 60 * 24))} dias de servico
                   </div>
                 )}
               </div>
@@ -979,9 +979,9 @@ export default function DealDetail() {
 
             <SidebarDivider />
 
-            {/* ── Passageiro ── */}
+            {/* ── Cliente ── */}
             <SidebarSection
-              title="Passageiro"
+              title="Cliente"
               open={sidebarSections.contact}
               onToggle={() => toggleSection("contact")}
             >
@@ -999,13 +999,13 @@ export default function DealDetail() {
                     <div className="flex items-center gap-1">
                       <button
                         onClick={() => { setShowEditContactDialog(true); setContactDraft({ name: contact.name, phone: contact.phone || "", email: contact.email || "" }); }}
-                        className="p-1 hover:bg-muted/60 rounded" title="Editar passageiro"
+                        className="p-1 hover:bg-muted/60 rounded" title="Editar cliente"
                       >
                         <Edit2 className="h-3.5 w-3.5 text-muted-foreground" />
                       </button>
                       <button
                         onClick={() => { updateDeal.mutate({ id: deal.id, contactId: null }); }}
-                        className="p-1 hover:bg-red-100 dark:hover:bg-red-500/10 rounded" title="Desvincular passageiro"
+                        className="p-1 hover:bg-red-100 dark:hover:bg-red-500/10 rounded" title="Desvincular cliente"
                       >
                         <X className="h-3.5 w-3.5 text-red-500" />
                       </button>
@@ -1023,15 +1023,15 @@ export default function DealDetail() {
                       <span className="text-xs text-muted-foreground capitalize">{contact.lifecycleStage}</span>
                     </div>
                   )}
-                  {/* ── Botão Adicionar Passageiro ── */}
+                  {/* ── Botao Adicionar Cliente ── */}
                   <button
                     onClick={() => { setShowContactDialog(true); setContactMode("create"); setContactDraft({ name: "", phone: "", email: "" }); setSelectedContactId(null); }}
                     className="flex items-center gap-1.5 text-xs text-primary hover:text-primary/80 transition-colors mt-2"
                   >
                     <Plus className="h-3 w-3" />
-                    Adicionar passageiro
+                    Adicionar cliente
                   </button>
-                  {/* ── Campos Personalizados do Passageiro (inline) ── */}
+                  {/* ── Campos Personalizados do Cliente (inline) ── */}
                   {(contactCustomFieldsQ.data as any[])?.length > 0 && (
                     <div className="mt-3 pt-3 border-t border-border/30">
                       <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Campos personalizados</p>
@@ -1051,7 +1051,7 @@ export default function DealDetail() {
                   className="flex items-center gap-1.5 text-sm text-primary hover:text-primary/80 transition-colors"
                 >
                   <Plus className="h-3.5 w-3.5" />
-                  Adicionar passageiro
+                  Adicionar cliente
                 </button>
               )}
             </SidebarSection>
@@ -1238,7 +1238,7 @@ export default function DealDetail() {
 
             {/* Campos da Negociação agora estão dentro da seção Negociação */}
 
-            {/* Campos do Passageiro agora estão dentro da seção Passageiro */}
+            {/* Campos do Cliente agora estao dentro da secao Cliente */}
 
             {/* Campos da Empresa agora estão dentro da seção Empresa */}
           </div>
@@ -1420,9 +1420,9 @@ export default function DealDetail() {
 
             <SidebarDivider />
 
-            {/* ── Passageiro ── */}
+            {/* ── Cliente ── */}
             <SidebarSection
-              title="Passageiro"
+              title="Cliente"
               open={sidebarSections.contact}
               onToggle={() => toggleSection("contact")}
             >
@@ -1433,7 +1433,7 @@ export default function DealDetail() {
                   {contact.email && <ContactInfoRow icon={Mail} value={contact.email} copyable />}
                 </div>
               ) : (
-                <p className="text-xs text-muted-foreground">Nenhum passageiro associado</p>
+                <p className="text-xs text-muted-foreground">Nenhum cliente associado</p>
               )}
             </SidebarSection>
 
@@ -1482,15 +1482,15 @@ export default function DealDetail() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <ThumbsUp className="h-5 w-5 text-emerald-500" />
-              {pipeline?.pipelineType === "post_sale" ? "Finalizar viagem" : pipeline?.pipelineType === "support" ? "Marcar como resolvido" : "Marcar como venda"}
+              {pipeline?.pipelineType === "post_sale" ? "Finalizar servico" : pipeline?.pipelineType === "support" ? "Marcar como resolvido" : "Marcar como venda"}
             </DialogTitle>
           </DialogHeader>
           <p className="text-sm text-muted-foreground">
             {pipeline?.pipelineType === "post_sale"
-              ? <>Tem certeza que deseja finalizar a viagem <strong>"{deal.title}"</strong>?</>
+              ? <>Tem certeza que deseja finalizar o servico <strong>"{deal.title}"</strong>?</>
               : pipeline?.pipelineType === "support"
               ? <>Tem certeza que deseja marcar <strong>"{deal.title}"</strong> como resolvido?</>
-              : <>Tem certeza que deseja marcar a negociação <strong>"{deal.title}"</strong> como ganha?</>}
+              : <>Tem certeza que deseja marcar a negociacao <strong>"{deal.title}"</strong> como ganha?</>}
           </p>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setShowWonDialog(false)}>Cancelar</Button>
@@ -1551,7 +1551,7 @@ export default function DealDetail() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <ThumbsDown className="h-5 w-5 text-red-500" />
-              {pipeline?.pipelineType === "post_sale" ? "Cancelar viagem" : pipeline?.pipelineType === "support" ? "Marcar como não resolvido" : "Marcar como perda"}
+              {pipeline?.pipelineType === "post_sale" ? "Cancelar servico" : pipeline?.pipelineType === "support" ? "Marcar como nao resolvido" : "Marcar como perda"}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
@@ -1687,13 +1687,13 @@ export default function DealDetail() {
         </DialogContent>
       </Dialog>
 
-      {/* ═══ Dialog: Adicionar Passageiro ═══ */}
+      {/* ═══ Dialog: Adicionar Cliente ═══ */}
       <Dialog open={showContactDialog} onOpenChange={setShowContactDialog}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <User className="h-5 w-5 text-primary" />
-              Adicionar Passageiro
+              Adicionar Cliente
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
@@ -1713,7 +1713,7 @@ export default function DealDetail() {
               <div className="space-y-3">
                 <div>
                   <label className="text-xs font-medium text-muted-foreground">Nome *</label>
-                  <Input value={contactDraft.name} onChange={(e) => setContactDraft(d => ({ ...d, name: e.target.value }))} placeholder="Nome do passageiro" />
+                  <Input value={contactDraft.name} onChange={(e) => setContactDraft(d => ({ ...d, name: e.target.value }))} placeholder="Nome do cliente" />
                 </div>
                 <div>
                   <label className="text-xs font-medium text-muted-foreground">Telefone</label>
@@ -1735,8 +1735,8 @@ export default function DealDetail() {
                   }))}
                   value={selectedContactId ? String(selectedContactId) : ""}
                   onValueChange={(v) => setSelectedContactId(Number(v))}
-                  placeholder="Buscar passageiro..."
-                  searchPlaceholder="Digite o nome do passageiro..."
+                  placeholder="Buscar cliente..."
+                  searchPlaceholder="Digite o nome do cliente..."
                 />
               </div>
             )}
@@ -1749,7 +1749,7 @@ export default function DealDetail() {
                   if (!contactDraft.name.trim()) { toast.error("Nome é obrigatório"); return; }
                   createContact.mutate({ name: contactDraft.name.trim(), phone: contactDraft.phone || undefined, email: contactDraft.email || undefined });
                 } else {
-                  if (!selectedContactId) { toast.error("Selecione um passageiro"); return; }
+                  if (!selectedContactId) { toast.error("Selecione um cliente"); return; }
                   updateDeal.mutate({ id: dealId, contactId: selectedContactId });
                 }
                 setShowContactDialog(false);
@@ -1762,13 +1762,13 @@ export default function DealDetail() {
         </DialogContent>
       </Dialog>
 
-      {/* ═══ Dialog: Editar Passageiro ═══ */}
+      {/* ═══ Dialog: Editar Cliente ═══ */}
       <Dialog open={showEditContactDialog} onOpenChange={setShowEditContactDialog}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Edit2 className="h-5 w-5 text-primary" />
-              Editar Passageiro
+              Editar Cliente
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
@@ -2840,7 +2840,7 @@ function ProductsPanel({ products, dealId, onRefresh }: { products: any[]; dealI
 function ParticipantsPanel({ participants, contacts, dealId, onRefresh }: any) {
   const [showAdd, setShowAdd] = useState(false);
   const [selectedContact, setSelectedContact] = useState("");
-  const [selectedRole, setSelectedRole] = useState("traveler");
+  const [selectedRole, setSelectedRole] = useState("client");
   const [searchTerm, setSearchTerm] = useState("");
   const [mode, setMode] = useState<"select" | "create">("select");
   const [newName, setNewName] = useState("");
@@ -2874,7 +2874,7 @@ function ParticipantsPanel({ participants, contacts, dealId, onRefresh }: any) {
   const resetAndClose = () => {
     setShowAdd(false);
     setSelectedContact("");
-    setSelectedRole("traveler");
+    setSelectedRole("client");
     setSearchTerm("");
     setMode("select");
     setNewName("");
@@ -3049,7 +3049,7 @@ function ParticipantsPanel({ participants, contacts, dealId, onRefresh }: any) {
               <div className="space-y-1.5">
                 <Label className="text-xs">Nome *</Label>
                 <Input
-                  placeholder="Nome do passageiro"
+                  placeholder="Nome do cliente"
                   value={newName}
                   onChange={(e) => setNewName(e.target.value)}
                   className="h-9"
@@ -3442,8 +3442,8 @@ function WhatsAppPanel({ contact, dealId, isFullscreen, onToggleFullscreen, onOp
     return (
       <div className="flex flex-col items-center justify-center h-full py-16 text-muted-foreground">
         <User className="h-12 w-12 mb-3 opacity-20" />
-        <p className="text-sm font-medium">Nenhum passageiro associado</p>
-        <p className="text-xs mt-1">Associe um passageiro na sidebar para ver a conversa do WhatsApp</p>
+        <p className="text-sm font-medium">Nenhum cliente associado</p>
+        <p className="text-xs mt-1">Associe um cliente na sidebar para ver a conversa do WhatsApp</p>
       </div>
     );
   }
@@ -3452,8 +3452,8 @@ function WhatsAppPanel({ contact, dealId, isFullscreen, onToggleFullscreen, onOp
     return (
       <div className="flex flex-col items-center justify-center h-full py-16 text-muted-foreground">
         <Phone className="h-12 w-12 mb-3 opacity-20" />
-        <p className="text-sm font-medium">Passageiro sem telefone</p>
-        <p className="text-xs mt-1">Adicione um número de telefone ao passageiro "{contact.name}"</p>
+        <p className="text-sm font-medium">Cliente sem telefone</p>
+        <p className="text-xs mt-1">Adicione um numero de telefone ao cliente "{contact.name}"</p>
       </div>
     );
   }
@@ -3503,7 +3503,7 @@ function WhatsAppPanel({ contact, dealId, isFullscreen, onToggleFullscreen, onOp
           Chat ao Vivo
         </button>
         <div className="flex-1" />
-        <span className="text-[10px] text-muted-foreground hidden sm:inline">Passageiro: {contact.name} · {contact.phone}</span>
+        <span className="text-[10px] text-muted-foreground hidden sm:inline">Cliente: {contact.name} · {contact.phone}</span>
         {/* Mobile: button to open sidebar drawer */}
         {onOpenSidebar && (
           <button
@@ -3537,7 +3537,7 @@ function WhatsAppPanel({ contact, dealId, isFullscreen, onToggleFullscreen, onOp
             <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
               <MessageCircle className="h-12 w-12 mb-3 opacity-20" />
               <p className="text-sm font-medium">Nenhuma mensagem encontrada</p>
-              <p className="text-xs mt-1">As mensagens do WhatsApp com este passageiro aparecerão aqui</p>
+              <p className="text-xs mt-1">As mensagens do WhatsApp com este cliente aparecerão aqui</p>
             </div>
           ) : (
             <>

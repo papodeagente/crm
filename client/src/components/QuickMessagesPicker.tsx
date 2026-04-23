@@ -31,10 +31,10 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 
 /* ─── Variable definitions ─── */
 export const MESSAGE_VARIABLES = [
-  { key: "{nome}", label: "Nome completo", description: "Nome completo do passageiro" },
-  { key: "{primeiro_nome}", label: "Primeiro nome", description: "Primeiro nome do passageiro" },
-  { key: "{email}", label: "Email", description: "Email do passageiro" },
-  { key: "{telefone}", label: "Telefone", description: "Telefone do passageiro" },
+  { key: "{nome}", label: "Nome completo", description: "Nome completo do cliente" },
+  { key: "{primeiro_nome}", label: "Primeiro nome", description: "Primeiro nome do cliente" },
+  { key: "{email}", label: "Email", description: "Email do cliente" },
+  { key: "{telefone}", label: "Telefone", description: "Telefone do cliente" },
   { key: "{negociacao}", label: "Negociação", description: "Título da negociação" },
   { key: "{valor}", label: "Valor", description: "Valor da negociação (R$)" },
   { key: "{etapa}", label: "Etapa", description: "Etapa atual do funil" },

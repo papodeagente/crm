@@ -105,7 +105,7 @@ function CRMDashboard() {
   const h = homeData.data;
 
   const metrics = [
-    { label: "Passageiros", value: d?.totalContacts ?? 0, icon: Users, bg: "bg-blue-50 dark:bg-blue-500/10", iconColor: "text-blue-600 dark:text-blue-400" },
+    { label: "Clientes", value: d?.totalContacts ?? 0, icon: Users, bg: "bg-blue-50 dark:bg-blue-500/10", iconColor: "text-blue-600 dark:text-blue-400" },
     { label: "Em andamento", value: d?.openDeals ?? 0, icon: Briefcase, bg: "bg-amber-50 dark:bg-amber-500/10", iconColor: "text-amber-600 dark:text-amber-400" },
     { label: "Negócios Ganhos", value: d?.wonDeals ?? 0, icon: Trophy, bg: "bg-emerald-50 dark:bg-emerald-500/10", iconColor: "text-emerald-600 dark:text-emerald-400" },
     { label: "Conversas Abertas", value: d?.openConversations ?? 0, icon: Inbox, bg: "bg-violet-50 dark:bg-violet-500/10", iconColor: "text-violet-600 dark:text-violet-400" },
@@ -224,7 +224,7 @@ function CRMDashboard() {
                   </div>
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground uppercase tracking-wider">Viagens</p>
+                  <p className="text-xs text-muted-foreground uppercase tracking-wider">Servicos</p>
                   <div className="flex items-baseline gap-1.5 mt-1">
                     <span className="text-xl font-bold">{h.activeTrips}</span>
                     {h.activeTripsChange !== 0 && (

@@ -21,7 +21,7 @@ export function EnemySection() {
               <Ghost className="w-7 h-7 text-red-400" />
             </div>
             <h2 className="text-3xl sm:text-4xl font-bold text-white mb-4 tracking-tight">
-              O maior inimigo das vendas na agência{" "}
+              O maior inimigo das vendas no seu negócio{" "}
               <span className="text-red-400">é invisível</span>
             </h2>
             <div className="max-w-2xl mx-auto space-y-2">

@@ -477,7 +477,7 @@ export default function SaasBillingDashboard() {
             </CardHeader>
             <CardContent className="pt-2 space-y-3">
               <div className="flex items-center justify-between text-sm py-2 border-b border-border">
-                <span className="text-muted-foreground">Total de agências</span>
+                <span className="text-muted-foreground">Total de contas</span>
                 <span className="font-bold text-foreground">{overview.totalTenants}</span>
               </div>
               <div className="flex items-center justify-between text-sm py-2 border-b border-border">
@@ -538,7 +538,7 @@ export default function SaasBillingDashboard() {
                       <th className="text-left py-2 px-2 text-xs text-muted-foreground font-medium">Data</th>
                       <th className="text-left py-2 px-2 text-xs text-muted-foreground font-medium">Evento</th>
                       <th className="text-left py-2 px-2 text-xs text-muted-foreground font-medium">Status</th>
-                      <th className="text-left py-2 px-2 text-xs text-muted-foreground font-medium">Agência</th>
+                      <th className="text-left py-2 px-2 text-xs text-muted-foreground font-medium">Conta</th>
                       <th className="text-left py-2 px-2 text-xs text-muted-foreground font-medium">Email</th>
                       <th className="text-left py-2 px-2 text-xs text-muted-foreground font-medium">Processado</th>
                     </tr>

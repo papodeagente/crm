@@ -73,7 +73,7 @@ export function FunnelMap() {
               <Filter className="w-7 h-7 text-orange-400" />
             </div>
             <h2 className="text-3xl sm:text-4xl font-bold text-white mb-3 tracking-tight">
-              Onde sua agência está perdendo vendas todos os meses
+              Onde seu negócio está perdendo vendas todos os meses
             </h2>
             <p className="text-lg text-white/40">
               Visualize o vazamento em cada etapa do seu funil comercial

@@ -2,7 +2,7 @@ import { eq, and, or, desc, asc, like, sql, inArray, count, sum, gte, lt, lte, n
 import { getDb } from "./db";
 import {
   tenants, crmUsers, teams, teamMembers, roles, permissions, rolePermissions, userRoles, apiKeys,
-  contacts, accounts, deals, dealParticipants, pipelines, pipelineStages, pipelineAutomations, trips, tripItems,
+  contacts, accounts, deals, dealParticipants, pipelines, pipelineStages, pipelineAutomations, serviceDeliveries, serviceDeliveryItems,
   tasks, taskAssignees, crmNotes, crmAttachments, dealProducts, dealHistory,
   channels, conversations, inboxMessages,
   proposalTemplates, proposals, proposalItems, proposalSignatures,
@@ -276,7 +276,7 @@ export async function listStages(tenantId: number, pipelineId: number) {
 // ═══════════════════════════════════════
 // DEALS
 // ═══════════════════════════════════════
-export async function createDeal(data: { tenantId: number; title: string; contactId?: number; accountId?: number; pipelineId: number; stageId: number; valueCents?: number; ownerUserId?: number; teamId?: number; createdBy?: number; leadSource?: string; channelOrigin?: string; boardingDate?: Date | null; returnDate?: Date | null; utmSource?: string; utmMedium?: string; utmCampaign?: string; utmTerm?: string; utmContent?: string; utmJson?: any; rdCustomFields?: any; metaJson?: any; rawPayloadJson?: any; dedupeKey?: string; status?: string }) {
+export async function createDeal(data: { tenantId: number; title: string; contactId?: number; accountId?: number; pipelineId: number; stageId: number; valueCents?: number; ownerUserId?: number; teamId?: number; createdBy?: number; leadSource?: string; channelOrigin?: string; appointmentDate?: Date | null; followUpDate?: Date | null; utmSource?: string; utmMedium?: string; utmCampaign?: string; utmTerm?: string; utmContent?: string; utmJson?: any; rdCustomFields?: any; metaJson?: any; rawPayloadJson?: any; dedupeKey?: string; status?: string }) {
   const db = await getDb(); if (!db) return null;
   // Explicitly pick only known deal columns to prevent extra fields from leaking into the INSERT
   const cleanData: Record<string, any> = {
@@ -294,8 +294,8 @@ export async function createDeal(data: { tenantId: number; title: string; contac
   if (data.createdBy !== undefined) cleanData.createdBy = data.createdBy;
   if (data.leadSource !== undefined) cleanData.leadSource = data.leadSource;
   if (data.channelOrigin !== undefined) cleanData.channelOrigin = data.channelOrigin;
-  if (data.boardingDate !== undefined) cleanData.boardingDate = data.boardingDate;
-  if (data.returnDate !== undefined) cleanData.returnDate = data.returnDate;
+  if (data.appointmentDate !== undefined) cleanData.appointmentDate = data.appointmentDate;
+  if (data.followUpDate !== undefined) cleanData.followUpDate = data.followUpDate;
   if (data.utmSource !== undefined) cleanData.utmSource = data.utmSource;
   if (data.utmMedium !== undefined) cleanData.utmMedium = data.utmMedium;
   if (data.utmCampaign !== undefined) cleanData.utmCampaign = data.utmCampaign;
@@ -414,8 +414,8 @@ export async function listDeals(tenantId: number, opts?: {
     expectedCloseAt: deals.expectedCloseAt,
     channelOrigin: deals.channelOrigin,
     leadSource: deals.leadSource,
-    boardingDate: deals.boardingDate,
-    returnDate: deals.returnDate,
+    appointmentDate: deals.appointmentDate,
+    followUpDate: deals.followUpDate,
     lossReasonId: deals.lossReasonId,
     lossNotes: deals.lossNotes,
     utmCampaign: deals.utmCampaign,
@@ -462,7 +462,7 @@ export async function listDeletedDeals(tenantId: number, limit = 50) {
   const db = await getDb(); if (!db) return [];
   return db.select().from(deals).where(and(eq(deals.tenantId, tenantId), isNotNull(deals.deletedAt))).orderBy(desc(deals.deletedAt)).limit(limit);
 }
-export async function updateDeal(tenantId: number, id: number, data: Partial<{ title: string; pipelineId: number; stageId: number; status: "open" | "won" | "lost"; valueCents: number; probability: number; ownerUserId: number; updatedBy: number; contactId: number | null; accountId: number | null; expectedCloseAt: Date | null; channelOrigin: string | null; leadSource: string | null; boardingDate: Date | null; returnDate: Date | null; lossReasonId: number | null; lossNotes: string | null; utmCampaign: string | null; utmSource: string | null; utmMedium: string | null; utmTerm: string | null; utmContent: string | null; rdCustomFields: Record<string, string> | null }>) {
+export async function updateDeal(tenantId: number, id: number, data: Partial<{ title: string; pipelineId: number; stageId: number; status: "open" | "won" | "lost"; valueCents: number; probability: number; ownerUserId: number; updatedBy: number; contactId: number | null; accountId: number | null; expectedCloseAt: Date | null; channelOrigin: string | null; leadSource: string | null; appointmentDate: Date | null; followUpDate: Date | null; lossReasonId: number | null; lossNotes: string | null; utmCampaign: string | null; utmSource: string | null; utmMedium: string | null; utmTerm: string | null; utmContent: string | null; rdCustomFields: Record<string, string> | null }>) {
   const db = await getDb(); if (!db) return;
   await db.update(deals).set({ ...data, lastActivityAt: new Date() }).where(and(eq(deals.id, id), eq(deals.tenantId, tenantId)));
 }
@@ -541,7 +541,7 @@ export async function searchAccounts(tenantId: number, search: string, opts?: { 
 // ═══════════════════════════════════════
 // DEAL PRODUCTS
 // ═══════════════════════════════════════
-export async function createDealProduct(data: { tenantId: number; dealId: number; productId: number; name: string; description?: string; category?: "flight" | "hotel" | "tour" | "transfer" | "insurance" | "cruise" | "visa" | "other"; quantity?: number; unitPriceCents?: number; discountCents?: number; finalPriceCents?: number; supplier?: string; checkIn?: Date; checkOut?: Date; notes?: string }) {
+export async function createDealProduct(data: { tenantId: number; dealId: number; productId: number; name: string; description?: string; category?: "servico" | "pacote" | "consulta" | "procedimento" | "assinatura" | "produto" | "other"; quantity?: number; unitPriceCents?: number; discountCents?: number; finalPriceCents?: number; professional?: string; serviceStart?: Date; serviceEnd?: Date; notes?: string }) {
   const db = await getDb(); if (!db) return null;
   const qty = data.quantity || 1;
   const unit = data.unitPriceCents || 0;
@@ -554,7 +554,7 @@ export async function listDealProducts(tenantId: number, dealId: number) {
   const db = await getDb(); if (!db) return [];
   return db.select().from(dealProducts).where(and(eq(dealProducts.tenantId, tenantId), eq(dealProducts.dealId, dealId))).orderBy(desc(dealProducts.createdAt));
 }
-export async function updateDealProduct(tenantId: number, id: number, data: Partial<{ name: string; description: string; category: "flight" | "hotel" | "tour" | "transfer" | "insurance" | "cruise" | "visa" | "other"; quantity: number; unitPriceCents: number; discountCents: number; finalPriceCents: number; supplier: string; checkIn: Date; checkOut: Date; notes: string }>) {
+export async function updateDealProduct(tenantId: number, id: number, data: Partial<{ name: string; description: string; category: "servico" | "pacote" | "consulta" | "procedimento" | "assinatura" | "produto" | "other"; quantity: number; unitPriceCents: number; discountCents: number; finalPriceCents: number; professional: string; serviceStart: Date; serviceEnd: Date; notes: string }>) {
   const db = await getDb(); if (!db) return;
   await db.update(dealProducts).set(data).where(and(eq(dealProducts.id, id), eq(dealProducts.tenantId, tenantId)));
 }
@@ -731,7 +731,7 @@ function categorizeAction(action: string): string {
 // ═══════════════════════════════════════
 // DEAL PARTICIPANTS
 // ═══════════════════════════════════════
-export async function addDealParticipant(data: { tenantId: number; dealId: number; contactId: number; role?: "decision_maker" | "traveler" | "payer" | "companion" | "other" }) {
+export async function addDealParticipant(data: { tenantId: number; dealId: number; contactId: number; role?: "decision_maker" | "client" | "payer" | "dependent" | "other" }) {
   const db = await getDb(); if (!db) return null;
   const [result] = await db.insert(dealParticipants).values(data).returning({ id: dealParticipants.id });
   return result;
@@ -746,22 +746,26 @@ export async function removeDealParticipant(tenantId: number, id: number) {
 }
 
 // ═══════════════════════════════════════
-// TRIPS
+// SERVICE DELIVERIES
 // ═══════════════════════════════════════
-export async function createTrip(data: { tenantId: number; dealId?: number; destinationSummary?: string; startDate?: Date; endDate?: Date; ownerUserId?: number; createdBy?: number }) {
+export async function createServiceDelivery(data: { tenantId: number; dealId?: number; serviceSummary?: string; startDate?: Date; endDate?: Date; ownerUserId?: number; createdBy?: number }) {
   const db = await getDb(); if (!db) return null;
-  const [result] = await db.insert(trips).values(data).returning({ id: trips.id });
+  const [result] = await db.insert(serviceDeliveries).values(data).returning({ id: serviceDeliveries.id });
   return result;
 }
-export async function listTrips(tenantId: number) {
+export async function listServiceDeliveries(tenantId: number) {
   const db = await getDb(); if (!db) return [];
-  return db.select().from(trips).where(eq(trips.tenantId, tenantId)).orderBy(desc(trips.createdAt));
+  return db.select().from(serviceDeliveries).where(eq(serviceDeliveries.tenantId, tenantId)).orderBy(desc(serviceDeliveries.createdAt));
 }
-export async function getTripById(tenantId: number, id: number) {
+export async function getServiceDeliveryById(tenantId: number, id: number) {
   const db = await getDb(); if (!db) return null;
-  const rows = await db.select().from(trips).where(and(eq(trips.id, id), eq(trips.tenantId, tenantId))).limit(1);
+  const rows = await db.select().from(serviceDeliveries).where(and(eq(serviceDeliveries.id, id), eq(serviceDeliveries.tenantId, tenantId))).limit(1);
   return rows[0] || null;
 }
+// Backward-compatible aliases
+export const createTrip = createServiceDelivery;
+export const listTrips = listServiceDeliveries;
+export const getTripById = getServiceDeliveryById;
 
 // ═══════════════════════════════════════
 // TASKS
@@ -1061,7 +1065,7 @@ export async function listPortalTickets(tenantId: number, opts?: { contactId?: n
   if (opts?.contactId) conditions.push(eq(portalTickets.contactId, opts.contactId));
   return db.select().from(portalTickets).where(and(...conditions)).orderBy(desc(portalTickets.createdAt));
 }
-export async function createPortalTicket(data: { tenantId: number; contactId: number; subject: string; tripId?: number; priority?: "low" | "medium" | "high" | "urgent" }) {
+export async function createPortalTicket(data: { tenantId: number; contactId: number; subject: string; serviceDeliveryId?: number; priority?: "low" | "medium" | "high" | "urgent" }) {
   const db = await getDb(); if (!db) return null;
   const [result] = await db.insert(portalTickets).values(data).returning({ id: portalTickets.id });
   return result;
@@ -1403,7 +1407,7 @@ export async function executePipelineAutomation(tenantId: number, dealId: number
           tenantId, dealId: newDeal.id, productId: p.productId, name: p.name, description: p.description || undefined,
           category: p.category as any, quantity: p.quantity, unitPriceCents: p.unitPriceCents,
           discountCents: p.discountCents || 0, finalPriceCents: p.finalPriceCents || 0,
-          supplier: p.supplier || undefined, notes: p.notes || undefined,
+          professional: p.professional || undefined, notes: p.notes || undefined,
         });
       }
     }
@@ -1477,9 +1481,9 @@ export async function getCatalogProductById(tenantId: number, id: number) {
 }
 export async function createCatalogProduct(data: {
   tenantId: number; name: string; description?: string; categoryId?: number;
-  productType?: "flight" | "hotel" | "tour" | "transfer" | "insurance" | "cruise" | "visa" | "package" | "other";
+  productType?: "servico" | "pacote" | "consulta" | "procedimento" | "assinatura" | "produto" | "other";
   basePriceCents?: number; costPriceCents?: number; currency?: string;
-  supplier?: string; destination?: string; duration?: string;
+  professional?: string; location?: string; durationMinutes?: number;
   imageUrl?: string; sku?: string; isActive?: boolean; detailsJson?: any;
 }) {
   const db = await getDb(); if (!db) return null;
@@ -1488,9 +1492,9 @@ export async function createCatalogProduct(data: {
 }
 export async function updateCatalogProduct(tenantId: number, id: number, data: Partial<{
   name: string; description: string; categoryId: number | null;
-  productType: "flight" | "hotel" | "tour" | "transfer" | "insurance" | "cruise" | "visa" | "package" | "other";
+  productType: "servico" | "pacote" | "consulta" | "procedimento" | "assinatura" | "produto" | "other";
   basePriceCents: number; costPriceCents: number; currency: string;
-  supplier: string; destination: string; duration: string;
+  professional: string; location: string; durationMinutes: number;
   imageUrl: string; sku: string; isActive: boolean; detailsJson: any;
 }>) {
   const db = await getDb(); if (!db) return;
@@ -1629,21 +1633,23 @@ export async function getProductAnalyticsSummary(tenantId: number) {
   };
 }
 
-/** Top destinations by revenue */
-export async function getProductAnalyticsTopDestinations(tenantId: number, limit = 10) {
+/** Top locations by revenue */
+export async function getProductAnalyticsTopLocations(tenantId: number, limit = 10) {
   const db = await getDb(); if (!db) return [];
   const rows = await db.execute(sql`
-    SELECT pc.destination,
+    SELECT pc.location,
            COUNT(*) as productCount,
            SUM(pc.basePriceCents) as totalBasePriceCents
     FROM product_catalog pc
-    WHERE pc.tenantId = ${tenantId} AND pc.isActive = true AND pc.destination IS NOT NULL AND pc.destination != ''
-    GROUP BY pc.destination
+    WHERE pc.tenantId = ${tenantId} AND pc.isActive = true AND pc.location IS NOT NULL AND pc.location != ''
+    GROUP BY pc.location
     ORDER BY productCount DESC
     LIMIT ${limit}
   `);
   return rows as any[] || [];
 }
+// Backward-compatible alias
+export const getProductAnalyticsTopDestinations = getProductAnalyticsTopLocations;
 
 
 // ═══════════════════════════════════════
@@ -1960,7 +1966,7 @@ export async function createTaskAutomation(data: {
   taskTitle: string;
   taskDescription?: string;
   taskType?: "whatsapp" | "phone" | "email" | "video" | "task";
-  deadlineReference?: "current_date" | "boarding_date" | "return_date";
+  deadlineReference?: "current_date" | "appointment_date" | "follow_up_date";
   deadlineOffsetDays?: number;
   deadlineTime?: string;
   assignToOwner?: boolean;
@@ -1993,7 +1999,7 @@ export async function updateTaskAutomation(id: number, tenantId: number, data: P
   taskTitle: string;
   taskDescription: string | null;
   taskType: "whatsapp" | "phone" | "email" | "video" | "task";
-  deadlineReference: "current_date" | "boarding_date" | "return_date";
+  deadlineReference: "current_date" | "appointment_date" | "follow_up_date";
   deadlineOffsetDays: number;
   deadlineTime: string;
   assignToOwner: boolean;
@@ -2023,7 +2029,7 @@ export async function executeTaskAutomations(
   tenantId: number,
   dealId: number,
   stageId: number,
-  deal: { ownerUserId?: number | null; boardingDate?: Date | string | null; returnDate?: Date | string | null; contactId?: number | null },
+  deal: { ownerUserId?: number | null; appointmentDate?: Date | string | null; followUpDate?: Date | string | null; contactId?: number | null },
   createdByUserId?: number
 ) {
   const db = await getDb(); if (!db) return [];
@@ -2106,10 +2112,10 @@ export async function executeTaskAutomations(
     // Calcular a data de prazo
     let baseDate: Date;
     
-    if (auto.deadlineReference === "boarding_date" && deal.boardingDate) {
-      baseDate = new Date(deal.boardingDate);
-    } else if (auto.deadlineReference === "return_date" && deal.returnDate) {
-      baseDate = new Date(deal.returnDate);
+    if (auto.deadlineReference === "appointment_date" && deal.appointmentDate) {
+      baseDate = new Date(deal.appointmentDate);
+    } else if (auto.deadlineReference === "follow_up_date" && deal.followUpDate) {
+      baseDate = new Date(deal.followUpDate);
     } else {
       baseDate = new Date(now);
     }
@@ -2320,7 +2326,7 @@ export async function executeStageOwnerRule(
 // ═══════════════════════════════════════
 export async function createDateAutomation(data: {
   tenantId: number; name: string; description?: string; pipelineId: number;
-  dateField: "boardingDate" | "returnDate" | "expectedCloseAt" | "createdAt";
+  dateField: "appointmentDate" | "followUpDate" | "expectedCloseAt" | "createdAt";
   condition: "days_before" | "days_after" | "on_date"; offsetDays: number;
   sourceStageId?: number; targetStageId: number; dealStatusFilter?: "open" | "won" | "lost";
   isActive?: boolean;
@@ -2372,7 +2378,7 @@ export async function updateDateAutomationLastRun(id: number) {
  */
 export async function executeDateAutomation(auto: {
   id: number; tenantId: number; pipelineId: number;
-  dateField: "boardingDate" | "returnDate" | "expectedCloseAt" | "createdAt";
+  dateField: "appointmentDate" | "followUpDate" | "expectedCloseAt" | "createdAt";
   condition: "days_before" | "days_after" | "on_date"; offsetDays: number;
   sourceStageId: number | null; targetStageId: number; dealStatusFilter: string | null;
 }) {
@@ -2382,8 +2388,8 @@ export async function executeDateAutomation(auto: {
   const today = new Date(nowSP.getFullYear(), nowSP.getMonth(), nowSP.getDate());
 
   // Build the date column reference
-  const dateCol = auto.dateField === "boardingDate" ? deals.boardingDate
-    : auto.dateField === "returnDate" ? deals.returnDate
+  const dateCol = auto.dateField === "appointmentDate" ? deals.appointmentDate
+    : auto.dateField === "followUpDate" ? deals.followUpDate
     : auto.dateField === "expectedCloseAt" ? deals.expectedCloseAt
     : deals.createdAt;
 

@@ -22,12 +22,12 @@ export function SolutionSection() {
               className="h-12 sm:h-14 lg:h-16 object-contain mx-auto mb-5"
             />
             <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white tracking-tight leading-tight mb-4">
-              CRM de verdade para agências de viagens.
+              CRM de verdade para negocios locais.
             </h2>
             <p className="text-lg text-white/45 max-w-2xl mx-auto leading-relaxed">
               Funil de vendas, WhatsApp integrado, automação comercial
               e inteligência de dados — tudo num sistema feito exclusivamente
-              para turismo.
+              para negocios locais.
             </p>
           </div>
         </FadeIn>

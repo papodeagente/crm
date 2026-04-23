@@ -2,10 +2,10 @@ import { FadeIn } from "./FadeIn";
 import { Plane, Heart, Calendar, Users, MapPin, Sparkles } from "lucide-react";
 
 const DIFFERENTIALS = [
-  { icon: <MapPin className="w-6 h-6" />, title: "Planejamento", description: "Roteiros, destinos e logística que CRMs genéricos não entendem" },
-  { icon: <Users className="w-6 h-6" />, title: "Família", description: "Viagens envolvem múltiplos viajantes, preferências e necessidades" },
-  { icon: <Calendar className="w-6 h-6" />, title: "Datas", description: "Sazonalidade, alta temporada e janelas de oportunidade específicas" },
-  { icon: <Heart className="w-6 h-6" />, title: "Emoção", description: "Vender viagens é vender sonhos — o processo precisa refletir isso" },
+  { icon: <MapPin className="w-6 h-6" />, title: "Agendamento", description: "Controle de datas, horarios e locais que CRMs genericos nao oferecem" },
+  { icon: <Users className="w-6 h-6" />, title: "Clientes", description: "Gestao de clientes, dependentes e historico de atendimentos" },
+  { icon: <Calendar className="w-6 h-6" />, title: "Recorrencia", description: "Acompanhe retornos, revisoes e janelas de reativacao" },
+  { icon: <Heart className="w-6 h-6" />, title: "Relacionamento", description: "Fidelizacao, indicacoes e acompanhamento personalizado" },
 ];
 
 export function DifferentiatorSection() {
@@ -20,14 +20,14 @@ export function DifferentiatorSection() {
           <div className="text-center mb-12">
             <div className="inline-flex items-center gap-2 bg-fuchsia-500/10 text-fuchsia-300 px-4 py-1.5 rounded-full text-sm font-medium mb-5 border border-fuchsia-500/15">
               <Plane className="w-4 h-4" />
-              Feito para turismo
+              Feito para negocios locais
             </div>
             <h2 className="text-3xl sm:text-4xl font-bold text-white mb-4 tracking-tight">
               Não é um CRM genérico
             </h2>
             <p className="text-lg text-white/45 max-w-2xl mx-auto leading-relaxed">
-              Foi criado especificamente para o mercado de turismo.
-              Porque vender viagens envolve:
+              Foi criado especificamente para negocios locais.
+              Porque atender clientes envolve:
             </p>
           </div>
         </FadeIn>
@@ -53,7 +53,7 @@ export function DifferentiatorSection() {
             <div className="inline-flex items-center gap-2 bg-white/[0.04] border border-white/[0.08] rounded-xl px-6 py-3">
               <Sparkles className="w-4 h-4 text-violet-400" />
               <span className="text-sm text-white/50">
-                Criado pela <span className="text-white/70 font-medium">Escola de Negócios do Turismo</span> com base em +8.000 agentes treinados
+                Criado especificamente para <span className="text-white/70 font-medium">negócios locais</span> que querem crescer com processo
               </span>
             </div>
           </div>

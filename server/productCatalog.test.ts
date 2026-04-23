@@ -123,9 +123,9 @@ describe("productCatalog.products (read-only)", () => {
   it("lists products with type filter", async () => {
     const { ctx } = createAuthContext();
     const caller = appRouter.createCaller(ctx);
-    const result = await caller.productCatalog.products.list({ tenantId, productType: "package" });
+    const result = await caller.productCatalog.products.list({ tenantId, productType: "pacote" });
     expect(Array.isArray(result)).toBe(true);
-    result.forEach((p: any) => expect(p.productType).toBe("package"));
+    result.forEach((p: any) => expect(p.productType).toBe("pacote"));
   });
 
   it("products.get returns null for non-existent id", async () => {
@@ -213,10 +213,10 @@ describe("productCatalog.analytics", () => {
     expect(Array.isArray(result)).toBe(true);
   });
 
-  it("returns top destinations", async () => {
+  it("returns top locations", async () => {
     const { ctx } = createAuthContext();
     const caller = appRouter.createCaller(ctx);
-    const result = await caller.productCatalog.analytics.topDestinations({ tenantId });
+    const result = await caller.productCatalog.analytics.topLocations({ tenantId });
     expect(Array.isArray(result)).toBe(true);
   });
 });

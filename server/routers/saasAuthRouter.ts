@@ -32,6 +32,7 @@ export const saasAuthRouter = router({
       email: z.string().email("Email inválido"),
       password: z.string().min(6, "Senha deve ter pelo menos 6 caracteres"),
       phone: z.string().optional(),
+      segment: z.enum(["estetica", "odontologia", "advocacia", "salao", "clinica", "outro"]).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       try {

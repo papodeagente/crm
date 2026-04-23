@@ -73,11 +73,11 @@ describe("messageTagResolver - interpolateDealMessage", () => {
     contactName: "Maria Santos",
     contactEmail: "maria@test.com",
     contactPhone: "(84) 99999-1234",
-    dealTitle: "Pacote Cancún 2026",
+    dealTitle: "Pacote Estética Premium",
     dealValueCents: 750000,
     stageName: "Proposta Enviada",
-    companyName: "Viagens XYZ",
-    mainProductName: "Passagem Aérea Cancún",
+    companyName: "Studio Beleza",
+    mainProductName: "Limpeza de Pele",
   };
 
   it("resolves all original tags correctly", () => {
@@ -87,26 +87,26 @@ describe("messageTagResolver - interpolateDealMessage", () => {
     expect(result).toContain("Maria");
     expect(result).toContain("maria@test.com");
     expect(result).toContain("(84) 99999-1234");
-    expect(result).toContain("Pacote Cancún 2026");
+    expect(result).toContain("Pacote Estética Premium");
     expect(result).toContain("R$"); // formatted value
     expect(result).toContain("Proposta Enviada");
-    expect(result).toContain("Viagens XYZ");
+    expect(result).toContain("Studio Beleza");
   });
 
   it("{nome_oportunidade} resolves to deal title", () => {
     const result = interpolateDealMessage("Oportunidade: {nome_oportunidade}", fullCtx);
-    expect(result).toBe("Oportunidade: Pacote Cancún 2026");
+    expect(result).toBe("Oportunidade: Pacote Estética Premium");
   });
 
   it("{produto_principal} resolves to main product name", () => {
     const result = interpolateDealMessage("Produto: {produto_principal}", fullCtx);
-    expect(result).toBe("Produto: Passagem Aérea Cancún");
+    expect(result).toBe("Produto: Limpeza de Pele");
   });
 
   it("{produto_principal} with 1 product resolves correctly", () => {
-    const ctx: DealMessageContext = { ...fullCtx, mainProductName: "Hotel Resort" };
+    const ctx: DealMessageContext = { ...fullCtx, mainProductName: "Botox Facial" };
     const result = interpolateDealMessage("{produto_principal}", ctx);
-    expect(result).toBe("Hotel Resort");
+    expect(result).toBe("Botox Facial");
   });
 
   it("{produto_principal} without product does not break (empty string)", () => {
@@ -126,7 +126,7 @@ describe("messageTagResolver - interpolateDealMessage", () => {
     const result = interpolateDealMessage("{NOME} {Primeiro_Nome} {PRODUTO_PRINCIPAL}", fullCtx);
     expect(result).toContain("Maria Santos");
     expect(result).toContain("Maria");
-    expect(result).toContain("Passagem Aérea Cancún");
+    expect(result).toContain("Limpeza de Pele");
   });
 
   it("empty context produces empty replacements without errors", () => {
@@ -188,14 +188,14 @@ describe("task automation WhatsApp type", () => {
     const template = "Olá {primeiro_nome}! Sua negociação {nome_oportunidade} ({produto_principal}) avançou para {etapa}.";
     const ctx: DealMessageContext = {
       contactName: "Carlos Oliveira",
-      dealTitle: "Cruzeiro Caribe",
-      mainProductName: "Cabine Premium",
+      dealTitle: "Pacote Harmonização",
+      mainProductName: "Preenchimento Labial",
       stageName: "Documentação",
     };
     const result = interpolateDealMessage(template, ctx);
     expect(result).toContain("Carlos");
-    expect(result).toContain("Cruzeiro Caribe");
-    expect(result).toContain("Cabine Premium");
+    expect(result).toContain("Pacote Harmonização");
+    expect(result).toContain("Preenchimento Labial");
     expect(result).toContain("Documentação");
     expect(result).not.toContain("{");
   });

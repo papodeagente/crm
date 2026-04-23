@@ -48,7 +48,7 @@ export function MoneyCalculator({ onCTA }: MoneyCalculatorProps) {
               <Calculator className="w-7 h-7 text-amber-400" />
             </div>
             <h2 className="text-3xl sm:text-4xl font-bold text-white mb-3 tracking-tight">
-              Descubra quanto dinheiro pode estar parado na sua agência
+              Descubra quanto dinheiro pode estar parado no seu negócio
             </h2>
             <p className="text-lg text-white/40">
               Preencha os dados abaixo e veja uma estimativa das oportunidades perdidas

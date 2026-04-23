@@ -376,7 +376,7 @@ function ContactRenderer({ sd, content, fromMe }: { sd: StructuredData; content:
                 <User className="w-[18px] h-[18px]" style={{ color: accentColor }} />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-[13.5px] font-medium truncate">{c.displayName || "Passageiro"}</p>
+                <p className="text-[13.5px] font-medium truncate">{c.displayName || "Cliente"}</p>
                 {phone && <p className="text-[12px]" style={{ color: "var(--wa-text-secondary)" }}>{phone}</p>}
               </div>
             </div>
@@ -395,7 +395,7 @@ function ContactRenderer({ sd, content, fromMe }: { sd: StructuredData; content:
           <User className="w-[20px] h-[20px]" style={{ color: accentColor }} />
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-[14px] font-medium">{sd.displayName || content || "Passageiro"}</p>
+          <p className="text-[14px] font-medium">{sd.displayName || content || "Cliente"}</p>
           {phone && <p className="text-[12.5px]" style={{ color: "var(--wa-text-secondary)" }}>{phone}</p>}
         </div>
       </div>

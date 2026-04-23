@@ -595,11 +595,11 @@ export async function isOnboardingDismissed(tenantId: number) {
 
 
 // ═══════════════════════════════════════
-// UPCOMING DEPARTURES (Próximos Embarques)
-// Deals with status "won" and boardingDate >= today, ordered by nearest first
+// UPCOMING APPOINTMENTS (Próximos Atendimentos)
+// Deals with status "won" and appointmentDate >= today, ordered by nearest first
 // ═══════════════════════════════════════
 
-export async function getUpcomingDepartures(
+export async function getUpcomingAppointments(
   tenantId: number,
   userId?: number,
   teamId?: number,
@@ -621,27 +621,27 @@ export async function getUpcomingDepartures(
       d.id,
       d.title,
       d.valueCents,
-      d.boardingDate,
-      d.returnDate,
-      d.ownerUserId,
-      d.contactId,
-      c.name   AS contactName,
-      c.phone  AS contactPhone,
-      u.name   AS ownerName,
-      p.name   AS pipelineName,
-      s.name   AS stageName
+      d."appointmentDate",
+      d."followUpDate",
+      d."ownerUserId",
+      d."contactId",
+      c.name   AS "contactName",
+      c.phone  AS "contactPhone",
+      u.name   AS "ownerName",
+      p.name   AS "pipelineName",
+      s.name   AS "stageName"
     FROM deals d
-    LEFT JOIN crm_contacts c ON c.id = d.contactId AND c.tenantId = ${tenantId}
-    LEFT JOIN crm_users u ON u.id = d.ownerUserId AND u.tenantId = ${tenantId}
-    LEFT JOIN crm_pipelines p ON p.id = d.pipelineId AND p.tenantId = ${tenantId}
-    LEFT JOIN crm_pipeline_stages s ON s.id = d.stageId
-    WHERE d.tenantId = ${tenantId}
+    LEFT JOIN crm_contacts c ON c.id = d."contactId" AND c."tenantId" = ${tenantId}
+    LEFT JOIN crm_users u ON u.id = d."ownerUserId" AND u."tenantId" = ${tenantId}
+    LEFT JOIN pipelines p ON p.id = d."pipelineId" AND p."tenantId" = ${tenantId}
+    LEFT JOIN pipeline_stages s ON s.id = d."stageId"
+    WHERE d."tenantId" = ${tenantId}
       AND d.status = 'won'
-      AND d.boardingDate IS NOT NULL
-      AND d.boardingDate >= CURRENT_DATE
-      AND d.deletedAt IS NULL
+      AND d."appointmentDate" IS NOT NULL
+      AND d."appointmentDate" >= CURRENT_DATE
+      AND d."deletedAt" IS NULL
       ${ownerFilter}
-    ORDER BY d.boardingDate ASC
+    ORDER BY d."appointmentDate" ASC
     LIMIT ${limit}
   `);
 
@@ -649,8 +649,8 @@ export async function getUpcomingDepartures(
     id: r.id,
     title: r.title,
     valueCents: Number(r.valueCents || 0),
-    boardingDate: r.boardingDate ? new Date(r.boardingDate).getTime() : null,
-    returnDate: r.returnDate ? new Date(r.returnDate).getTime() : null,
+    appointmentDate: r.appointmentDate ? new Date(r.appointmentDate).getTime() : null,
+    followUpDate: r.followUpDate ? new Date(r.followUpDate).getTime() : null,
     contactName: r.contactName || null,
     contactPhone: r.contactPhone || null,
     ownerName: r.ownerName || null,
@@ -659,3 +659,6 @@ export async function getUpcomingDepartures(
     stageName: r.stageName || null,
   }));
 }
+
+// Backward-compatible alias
+export const getUpcomingDepartures = getUpcomingAppointments;

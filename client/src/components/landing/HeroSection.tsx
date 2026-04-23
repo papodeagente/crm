@@ -59,11 +59,11 @@ export function HeroSection({ onRegister }: HeroSectionProps) {
           >
             <div className="inline-flex items-center gap-2 bg-white/[0.06] text-white/80 px-4 py-1.5 rounded-full text-sm font-medium mb-6 border border-white/10">
               <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse" />
-              Criado pela Escola de Negócios do Turismo
+              CRM feito para negócios locais
             </div>
 
             <h1 className="text-4xl sm:text-5xl lg:text-[3.5rem] font-bold leading-[1.1] mb-6 tracking-tight text-white">
-              Sua agência perde vendas{" "}
+              Seu negócio perde vendas{" "}
               <span className="bg-gradient-to-r from-[#FFC7AC] via-[#FF614C] to-[#FF2B61] bg-clip-text text-transparent">
                 toda semana.
               </span>{" "}
@@ -114,7 +114,7 @@ export function HeroSection({ onRegister }: HeroSectionProps) {
                   ))}
                 </div>
                 <p className="text-xs text-white/40">
-                  Mais de <span className="text-white/60 font-medium">15.000 agentes</span> treinados pela Escola de Negócios do Turismo
+                  Mais de <span className="text-white/60 font-medium">500 negócios</span> já usam o ENTUR OS
                 </p>
               </div>
             </div>

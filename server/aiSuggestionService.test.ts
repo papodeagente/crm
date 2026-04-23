@@ -25,14 +25,14 @@ describe("classifyIntent", () => {
 
   it("classifies price requests", () => {
     expect(classifyIntent("Qual o valor do pacote?")).toBe("pedido_preco");
-    expect(classifyIntent("Quanto custa a viagem para Cancún?")).toBe("pedido_preco");
+    expect(classifyIntent("Quanto custa o procedimento?")).toBe("pedido_preco");
     expect(classifyIntent("Me manda o orçamento")).toBe("pedido_preco");
     expect(classifyIntent("Qual o preço?")).toBe("pedido_preco");
   });
 
   it("classifies deadline/date requests", () => {
     expect(classifyIntent("Quando tem vaga?")).toBe("pedido_prazo");
-    expect(classifyIntent("Qual a data de embarque?")).toBe("pedido_prazo");
+    expect(classifyIntent("Qual a data do atendimento?")).toBe("pedido_prazo");
     expect(classifyIntent("Tem disponibilidade em janeiro?")).toBe("pedido_prazo");
   });
 
@@ -44,7 +44,7 @@ describe("classifyIntent", () => {
 
   it("classifies closing intent", () => {
     expect(classifyIntent("Quero fechar, pode reservar")).toBe("fechamento");
-    expect(classifyIntent("Vamos confirmar a viagem")).toBe("fechamento");
+    expect(classifyIntent("Vamos confirmar o agendamento")).toBe("fechamento");
     expect(classifyIntent("Pode me mandar o pix?")).toBe("fechamento");
   });
 
@@ -62,12 +62,12 @@ describe("classifyIntent", () => {
 
   it("classifies return/follow-up", () => {
     expect(classifyIntent("Voltei! Ainda tem aquele pacote?")).toBe("retomada");
-    expect(classifyIntent("Lembra que conversamos sobre Cancún?")).toBe("retomada");
+    expect(classifyIntent("Lembra que conversamos sobre aquele serviço?")).toBe("retomada");
   });
 
   it("classifies questions as duvida", () => {
-    expect(classifyIntent("O hotel inclui café da manhã?")).toBe("duvida");
-    expect(classifyIntent("Como funciona o seguro viagem?")).toBe("duvida");
+    expect(classifyIntent("O pacote inclui retorno?")).toBe("duvida");
+    expect(classifyIntent("Como funciona o procedimento?")).toBe("duvida");
   });
 
   it("returns outro for unclassifiable messages", () => {
@@ -98,7 +98,7 @@ describe("parseAiResponse", () => {
   });
 
   it("handles plain text with double newlines", () => {
-    const raw = "Olá! Tudo bem?\n\nVi que você se interessou pelo pacote para Cancún.";
+    const raw = "Olá! Tudo bem?\n\nVi que você se interessou pelo nosso serviço.";
     const result = parseAiResponse(raw);
     expect(result.parts).toHaveLength(2);
     expect(result.full).toContain("Olá!");
@@ -146,7 +146,7 @@ describe("splitTextNaturally", () => {
   });
 
   it("splits long single paragraph by sentences", () => {
-    const text = "Olá! Tudo bem com você? Vi que você se interessou pelo nosso pacote para Cancún. Temos ótimas condições para esse mês. Posso te mandar mais detalhes?";
+    const text = "Olá! Tudo bem com você? Vi que você se interessou pelo nosso serviço. Temos ótimas condições para esse mês. Posso te mandar mais detalhes?";
     const parts = splitTextNaturally(text);
     expect(parts.length).toBeGreaterThan(1);
     // Each part should end with punctuation
@@ -163,7 +163,7 @@ describe("splitTextNaturally", () => {
   });
 
   it("splits by question marks when applicable", () => {
-    const text = "Você prefere hotel ou pousada? E qual período seria melhor para você?";
+    const text = "Você prefere manhã ou tarde? E qual período seria melhor para você?";
     const parts = splitTextNaturally(text);
     expect(parts.length).toBeGreaterThanOrEqual(1);
   });

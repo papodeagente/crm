@@ -33,11 +33,11 @@ export default function DuplicateAlert({ contactId, email, phone }: DuplicateAle
       utils.crm.contacts.get.invalidate({ id: contactId });
       utils.crm.contacts.mergeHistory.invalidate({ contactId });
       utils.crm.contacts.findDuplicates.invalidate({ contactId });
-      toast.success(`Passageiros unificados com sucesso. ${result.movedDeals} negociações e ${result.movedTasks} tarefas movidas.`);
+      toast.success(`Clientes unificados com sucesso. ${result.movedDeals} negociacoes e ${result.movedTasks} tarefas movidas.`);
       setMerging(null);
     },
     onError: (err) => {
-      toast.error(err.message || "Erro ao unificar passageiros");
+      toast.error(err.message || "Erro ao unificar clientes");
       setMerging(null);
     },
   });
@@ -55,7 +55,7 @@ export default function DuplicateAlert({ contactId, email, phone }: DuplicateAle
             Possíveis Duplicatas Encontradas
           </h3>
           <p className="text-xs text-muted-foreground mt-1">
-            O sistema encontrou {duplicates.length} passageiro{duplicates.length > 1 ? "s" : ""} com dados semelhantes.
+            O sistema encontrou {duplicates.length} cliente{duplicates.length > 1 ? "s" : ""} com dados semelhantes.
             Você pode unificar os registros para manter os dados organizados.
           </p>
 
@@ -71,7 +71,7 @@ export default function DuplicateAlert({ contactId, email, phone }: DuplicateAle
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-medium text-foreground truncate">
-                      {dup.name || `Passageiro #${dup.id}`}
+                      {dup.name || `Cliente #${dup.id}`}
                     </span>
                     <Badge variant="outline" className="text-[10px] shrink-0">
                       #{dup.id}
@@ -108,14 +108,14 @@ export default function DuplicateAlert({ contactId, email, phone }: DuplicateAle
                     </AlertDialogTrigger>
                     <AlertDialogContent>
                       <AlertDialogHeader>
-                        <AlertDialogTitle>Unificar Passageiros</AlertDialogTitle>
+                        <AlertDialogTitle>Unificar Clientes</AlertDialogTitle>
                         <AlertDialogDescription>
                           <span className="block mb-2">
-                            O passageiro atual (#{contactId}) será mantido como <strong>principal</strong>.
+                            O cliente atual (#{contactId}) sera mantido como <strong>principal</strong>.
                           </span>
                           <span className="block mb-2">
-                            Os dados do passageiro #{dup.id} ({dup.name}) serão movidos para cá:
-                            negociações, tarefas, conversões e conversas do WhatsApp.
+                            Os dados do cliente #{dup.id} ({dup.name}) serao movidos para ca:
+                            negociacoes, tarefas, conversoes e conversas do WhatsApp.
                           </span>
                           <span className="block text-amber-400">
                             Esta ação pode ser revertida enquanto o merge estiver pendente de revisão.
@@ -134,7 +134,7 @@ export default function DuplicateAlert({ contactId, email, phone }: DuplicateAle
                           }}
                         >
                           <GitMerge className="h-4 w-4 mr-2" />
-                          Unificar Passageiros
+                          Unificar Clientes
                         </AlertDialogAction>
                       </AlertDialogFooter>
                     </AlertDialogContent>

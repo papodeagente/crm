@@ -32,10 +32,10 @@ export function SocialProof() {
         <FadeIn>
           <div className="text-center mb-14">
             <h2 className="text-3xl sm:text-4xl font-bold text-white mb-3 tracking-tight">
-              Resultados reais de agências reais
+              Resultados reais de negocios reais
             </h2>
             <p className="text-lg text-white/40">
-              Veja o que agências como a sua conquistaram com processo comercial estruturado
+              Veja o que negocios como o seu conquistaram com processo comercial estruturado
             </p>
           </div>
         </FadeIn>

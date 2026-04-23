@@ -33,7 +33,7 @@ export function RevelationSection() {
                 </div>
                 <div>
                   <p className="text-white/70 text-lg leading-relaxed">
-                    Agências que vendem pouco <span className="text-white font-medium">não têm falta de clientes</span>.
+                    Negócios que vendem pouco <span className="text-white font-medium">não têm falta de clientes</span>.
                   </p>
                   <p className="text-white/40 mt-1">
                     Elas têm falta de processo comercial.
@@ -47,7 +47,7 @@ export function RevelationSection() {
                 </div>
                 <div>
                   <p className="text-white/70 text-lg leading-relaxed">
-                    Agências que mais crescem{" "}
+                    Negócios que mais crescem{" "}
                     <span className="text-white font-medium">acompanham cada cliente até a decisão final</span>.
                   </p>
                 </div>

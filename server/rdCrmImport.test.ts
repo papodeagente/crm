@@ -210,14 +210,14 @@ describe("RD Station CRM Import - fetchAllProducts", () => {
   it("fetches products", async () => {
     mockFetch.mockResolvedValueOnce(mockJsonResponse({
       products: [
-        { _id: "pr1", name: "Pacote Cancún", base_price: 3500, visible: true, created_at: "2024-01-01", updated_at: "2024-01-01" },
-        { _id: "pr2", name: "Seguro Viagem", base_price: 250, visible: false, created_at: "2024-01-01", updated_at: "2024-01-01" },
+        { _id: "pr1", name: "Pacote Estética", base_price: 3500, visible: true, created_at: "2024-01-01", updated_at: "2024-01-01" },
+        { _id: "pr2", name: "Consulta Avaliação", base_price: 250, visible: false, created_at: "2024-01-01", updated_at: "2024-01-01" },
       ],
     }));
 
     const products = await fetchAllProducts("valid-token");
     expect(products).toHaveLength(2);
-    expect(products[0].name).toBe("Pacote Cancún");
+    expect(products[0].name).toBe("Pacote Estética");
     expect(products[0].base_price).toBe(3500);
     expect(products[1].visible).toBe(false);
   });

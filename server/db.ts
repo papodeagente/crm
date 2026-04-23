@@ -857,7 +857,7 @@ export async function getDashboardMetrics(tenantId: number, userId?: number, pip
   const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
   const sixtyDaysAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
 
-  // Date range filter for deals, contacts, trips, tasks
+  // Date range filter for deals, contacts, service deliveries, tasks
   const dealDateFilter = dateFrom || dateTo
     ? sql`${dateFrom ? sql`AND d_inner.createdAt >= ${new Date(dateFrom + "T00:00:00")}` : sql``} ${dateTo ? sql`AND d_inner.createdAt <= ${new Date(dateTo + "T23:59:59")}` : sql``}`
     : sql``;
@@ -917,24 +917,15 @@ export async function getDashboardMetrics(tenantId: number, userId?: number, pip
         WHERE c.tenantId = ${tenantId} AND c.deletedAt IS NULL ${contactOwnerFilter} ${contactDateFilter}
         AND c.createdAt >= ${sixtyDaysAgo} AND c.createdAt < ${thirtyDaysAgo}) AS contactsPrev30,
 
-      -- Active trips: deals in post_sale pipeline EXCEPT stages where name contains 'finalizada' or isWon=true
+      -- Active service deliveries: deals in post_sale pipeline EXCEPT stages where name contains 'finalizada' or isWon=true
       (SELECT COUNT(*) FROM deals d_inner
         JOIN pipelines p ON p.id = d_inner.pipelineId AND p.pipelineType = 'post_sale'
         JOIN pipeline_stages ps ON ps.id = d_inner.stageId
         WHERE d_inner.tenantId = ${tenantId} AND d_inner.status = 'open' AND d_inner.deletedAt IS NULL
         AND ps.isWon = false AND ps.isLost = false
         AND LOWER(ps.name) NOT LIKE '%finalizada%'
-        ${ownerFilter} ${dealDateFilter}) AS activeTrips,
-      -- Trips last 30 days
-      (SELECT COUNT(*) FROM deals d_inner
-        JOIN pipelines p ON p.id = d_inner.pipelineId AND p.pipelineType = 'post_sale'
-        JOIN pipeline_stages ps ON ps.id = d_inner.stageId
-        WHERE d_inner.tenantId = ${tenantId} AND d_inner.status = 'open' AND d_inner.deletedAt IS NULL
-        AND ps.isWon = false AND ps.isLost = false
-        AND LOWER(ps.name) NOT LIKE '%finalizada%'
-        ${ownerFilter} ${dealDateFilter}
-        AND d_inner.createdAt >= ${thirtyDaysAgo}) AS tripsLast30,
-      -- Trips previous 30 days
+        ${ownerFilter} ${dealDateFilter}) AS activeServiceDeliveries,
+      -- Service deliveries last 30 days
       (SELECT COUNT(*) FROM deals d_inner
         JOIN pipelines p ON p.id = d_inner.pipelineId AND p.pipelineType = 'post_sale'
         JOIN pipeline_stages ps ON ps.id = d_inner.stageId
@@ -942,7 +933,16 @@ export async function getDashboardMetrics(tenantId: number, userId?: number, pip
         AND ps.isWon = false AND ps.isLost = false
         AND LOWER(ps.name) NOT LIKE '%finalizada%'
         ${ownerFilter} ${dealDateFilter}
-        AND d_inner.createdAt >= ${sixtyDaysAgo} AND d_inner.createdAt < ${thirtyDaysAgo}) AS tripsPrev30,
+        AND d_inner.createdAt >= ${thirtyDaysAgo}) AS serviceDeliveriesLast30,
+      -- Service deliveries previous 30 days
+      (SELECT COUNT(*) FROM deals d_inner
+        JOIN pipelines p ON p.id = d_inner.pipelineId AND p.pipelineType = 'post_sale'
+        JOIN pipeline_stages ps ON ps.id = d_inner.stageId
+        WHERE d_inner.tenantId = ${tenantId} AND d_inner.status = 'open' AND d_inner.deletedAt IS NULL
+        AND ps.isWon = false AND ps.isLost = false
+        AND LOWER(ps.name) NOT LIKE '%finalizada%'
+        ${ownerFilter} ${dealDateFilter}
+        AND d_inner.createdAt >= ${sixtyDaysAgo} AND d_inner.createdAt < ${thirtyDaysAgo}) AS serviceDeliveriesPrev30,
 
       -- Pending tasks for user
       (SELECT COUNT(*) FROM crm_tasks WHERE tenantId = ${tenantId} AND status IN ('pending', 'in_progress') ${taskAssigneeFilter} ${taskDateFilter}) AS pendingTasks,
@@ -971,8 +971,8 @@ export async function getDashboardMetrics(tenantId: number, userId?: number, pip
     activeDealsChange: calcChange(Number(row.dealsLast30) || 0, Number(row.dealsPrev30) || 0),
     totalContacts: Number(row.totalContacts) || 0,
     totalContactsChange: calcChange(Number(row.contactsLast30) || 0, Number(row.contactsPrev30) || 0),
-    activeTrips: Number(row.activeTrips) || 0,
-    activeTripsChange: calcChange(Number(row.tripsLast30) || 0, Number(row.tripsPrev30) || 0),
+    activeTrips: Number(row.activeServiceDeliveries) || 0,
+    activeTripsChange: calcChange(Number(row.serviceDeliveriesLast30) || 0, Number(row.serviceDeliveriesPrev30) || 0),
     pendingTasks: Number(row.pendingTasks) || 0,
     pendingTasksChange: calcChange(Number(row.tasksLast30) || 0, Number(row.tasksPrev30) || 0),
     totalDealValueCents: Number(row.totalDealValueCents) || 0,

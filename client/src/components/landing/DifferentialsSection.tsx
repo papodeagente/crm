@@ -15,7 +15,7 @@ const differentials = [
     icon: LayoutDashboard,
     title: "Funil de vendas específico",
     description:
-      "O funil de vendas do Entur OS é pensado especificamente na rotina da agência de viagens, por isso gere mais resultado.",
+      "O funil de vendas do Entur OS e pensado especificamente na rotina de negocios locais, por isso gera mais resultado.",
   },
   {
     icon: MessageCircle,
@@ -33,13 +33,13 @@ const differentials = [
     icon: Users,
     title: "Matriz RFV",
     description:
-      "Classifica passageiros por recência, frequência e valor. Saiba quem pode indicar, quem está esfriando e quem abordar agora.",
+      "Classifica clientes por recencia, frequencia e valor. Saiba quem pode indicar, quem esta esfriando e quem abordar agora.",
   },
   {
     icon: Plane,
     title: "Pós-venda automatizado",
     description:
-      "A venda não acaba na reserva. Funil de pós-venda acompanha cada viagem: da documentação ao retorno do cliente.",
+      "A venda nao acaba no fechamento. Funil de pos-venda acompanha cada servico: do agendamento ao retorno do cliente.",
   },
   {
     icon: Sparkles,

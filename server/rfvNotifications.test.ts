@@ -58,14 +58,14 @@ describe("RFV Notification Snapshot Logic", () => {
     const current = {
       potencial_ex_cliente: 15,
       potencial_indicador: 8,
-      potencial_indicador_pos_viagem: 3,
+      potencial_indicador_pos_atendimento: 3,
       potencial_indicador_fiel: 12,
       abordagem_nao_cliente: 20,
     };
     const previous = {
       potencial_ex_cliente: 10,
       potencial_indicador: 5,
-      potencial_indicador_pos_viagem: 3,
+      potencial_indicador_pos_atendimento: 3,
       potencial_indicador_fiel: 12,
       abordagem_nao_cliente: 15,
     };
@@ -91,7 +91,7 @@ describe("RFV Notification Snapshot Logic", () => {
     const current = {
       potencial_ex_cliente: 10,
       potencial_indicador: 5,
-      potencial_indicador_pos_viagem: 3,
+      potencial_indicador_pos_atendimento: 3,
       potencial_indicador_fiel: 7,
       abordagem_nao_cliente: 12,
     };
@@ -122,7 +122,7 @@ describe("RFV Notification Message Generation", () => {
   const FILTER_LABELS: Record<string, string> = {
     potencial_ex_cliente: "Potencial Ex-Cliente",
     potencial_indicador: "Potencial Indicador",
-    potencial_indicador_pos_viagem: "Pós Viagem",
+    potencial_indicador_pos_atendimento: "Pós Atendimento",
     potencial_indicador_fiel: "Indicador Fiel",
     abordagem_nao_cliente: "Abordagem Não Cliente",
   };

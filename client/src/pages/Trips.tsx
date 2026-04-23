@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Plane, MapPin, Calendar, User, DollarSign, ArrowRight, ChevronRight, Settings, Loader2, MoreHorizontal, Eye } from "lucide-react";
+import { Plus, ClipboardList, MapPin, Calendar, User, DollarSign, ArrowRight, ChevronRight, Settings, Loader2, MoreHorizontal, Eye } from "lucide-react";
 import { useState, useMemo } from "react";
 import { toast } from "sonner";
 import { useLocation, Link } from "wouter";
@@ -92,7 +92,7 @@ export default function Trips() {
       utils.crm.deals.list.invalidate();
       setShowCreate(false);
       setNewDealName("");
-      toast.success("Negociação criada no pós-venda");
+      toast.success("Negociacao criada no pos-venda");
     },
   });
 
@@ -114,12 +114,12 @@ export default function Trips() {
     return (
       <div className="page-content max-w-2xl mx-auto text-center py-20">
         <div className="h-16 w-16 rounded-2xl bg-sky-500/15 flex items-center justify-center mx-auto mb-4">
-          <Plane className="h-8 w-8 text-sky-400" />
+          <ClipboardList className="h-8 w-8 text-sky-400" />
         </div>
-        <h2 className="text-xl font-semibold text-foreground mb-2">Funil de Pós-Venda não configurado</h2>
+        <h2 className="text-xl font-semibold text-foreground mb-2">Funil de Pos-Venda nao configurado</h2>
         <p className="text-[13px] text-muted-foreground mb-6 max-w-md mx-auto">
-          Para usar a gestão de Viagens, crie um funil do tipo <strong>"Pós-Venda"</strong> em Configurações &gt; Funis & Etapas,
-          com as etapas da jornada do cliente (Documentação, Reservas, Pagamentos, etc.).
+          Para usar a gestao de Servicos, crie um funil do tipo <strong>"Pos-Venda"</strong> em Configuracoes &gt; Funis & Etapas,
+          com as etapas da jornada do cliente (Agendamento, Execucao, Acompanhamento, etc.).
         </p>
         <Button onClick={() => setLocation("/settings/pipelines")} className="gap-2">
           <Settings className="h-4 w-4" /> Configurar Funis
@@ -136,10 +136,10 @@ export default function Trips() {
           <div className="h-10 w-10 rounded-xl flex items-center justify-center" style={{
             background: "linear-gradient(135deg, oklch(0.55 0.20 220), oklch(0.60 0.20 260))"
           }}>
-            <Plane className="h-5 w-5 text-white" />
+            <ClipboardList className="h-5 w-5 text-white" />
           </div>
           <div>
-            <h1 className="text-xl font-semibold tracking-tight text-foreground">Viagens — Pós-Venda</h1>
+            <h1 className="text-xl font-semibold tracking-tight text-foreground">Servicos — Pos-Venda</h1>
             <p className="text-[13px] text-muted-foreground mt-0.5">
               Funil: <strong>{postSalePipeline.name}</strong> · {pipelineDeals.length} negociações ativas
             </p>
@@ -152,17 +152,17 @@ export default function Trips() {
           <Dialog open={showCreate} onOpenChange={setShowCreate}>
             <DialogTrigger asChild>
               <Button size="sm" className="gap-1.5 h-8">
-                <Plus className="h-3.5 w-3.5" /> Nova Viagem
+                <Plus className="h-3.5 w-3.5" /> Novo Servico
               </Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-[420px]">
               <DialogHeader>
-                <DialogTitle>Nova Negociação de Viagem</DialogTitle>
+                <DialogTitle>Nova Negociacao de Servico</DialogTitle>
               </DialogHeader>
               <div className="space-y-4 py-2">
                 <div>
-                  <Label>Nome / Destino</Label>
-                  <Input value={newDealName} onChange={e => setNewDealName(e.target.value)} placeholder="Ex: Cancún - João Silva" className="mt-1" />
+                  <Label>Nome / Servico</Label>
+                  <Input value={newDealName} onChange={e => setNewDealName(e.target.value)} placeholder="Ex: Limpeza de Pele - Joao Silva" className="mt-1" />
                 </div>
                 <div>
                   <Label>Etapa Inicial</Label>

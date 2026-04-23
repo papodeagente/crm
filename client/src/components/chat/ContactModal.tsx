@@ -20,7 +20,7 @@ export default function ContactModal({ onSend, onClose }: ContactModalProps) {
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={onClose}>
       <div className="bg-card rounded-xl shadow-2xl border border-border w-[400px] max-w-[90vw] p-5" onClick={e => e.stopPropagation()}>
         <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-          <Contact className="w-5 h-5 text-wa-tint" /> Enviar Passageiro
+          <Contact className="w-5 h-5 text-wa-tint" /> Enviar Cliente
         </h3>
         <div className="space-y-3">
           <input type="text" placeholder="Nome completo" value={fullName} onChange={e => setFullName(e.target.value)}

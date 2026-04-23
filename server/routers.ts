@@ -181,7 +181,7 @@ import { profileRouter } from "./routers/profileRouter";
 import { analyticsRouter } from "./routers/analyticsRouter";
 import { zapiAdminRouter } from "./routers/zapiAdminRouter";
 import { exportRouter } from "./routers/exportRouter";
-import { getHomeExecutive, getHomeTasks, getHomeRFV, getHomeOnboarding, toggleOnboardingStep, dismissOnboarding, isOnboardingDismissed, getHomeFilterOptions, getUpcomingDepartures } from "./services/homeService";
+import { getHomeExecutive, getHomeTasks, getHomeRFV, getHomeOnboarding, toggleOnboardingStep, dismissOnboarding, isOnboardingDismissed, getHomeFilterOptions, getUpcomingAppointments } from "./services/homeService";
 import {
   listLeadEvents,
   countLeadEvents,
@@ -2340,14 +2340,14 @@ export const appRouter = router({
       .mutation(async ({ ctx }) => {
         return dismissOnboarding(getTenantId(ctx), ctx.user!.id);
       }),
-    /** Próximos embarques: vendas fechadas com data de embarque futura */
+    /** Proximos atendimentos: vendas fechadas com data de atendimento futura */
     upcomingDepartures: tenantProcedure
       .input(z.object({ userId: z.number().optional(), teamId: z.number().optional(), limit: z.number().optional() }).optional())
       .query(async ({ ctx, input }) => {
         const isAdmin = ctx.saasUser?.role === "admin";
         const userId = isAdmin ? input?.userId : ctx.saasUser?.userId;
         const teamId = isAdmin ? input?.teamId : undefined;
-        return getUpcomingDepartures(getTenantId(ctx), userId, teamId, input?.limit ?? 20);
+        return getUpcomingAppointments(getTenantId(ctx), userId, teamId, input?.limit ?? 20);
       }),
     /** AI-powered intelligent forecast for the current month */
     aiForecast: tenantProcedure
@@ -2543,7 +2543,7 @@ Gere a previsão inteligente no formato JSON.`;
           rfv_filter_alert: true,
           task_due_soon: true,
           birthday: true,
-          departure_soon: true,
+          appointment_soon: true,
           // Optional (off by default)
           deal_moved: false,
           contact_created: false,
@@ -4509,6 +4509,13 @@ ${customInstructions ? `\n--- INSTRUÇÕES PERSONALIZADAS ---\n${customInstructi
         dealId: z.number().optional(),
         contactId: z.number().optional(),
         participantIds: z.array(z.number()).optional(),
+        serviceType: z.string().max(100).optional(),
+        status: z.enum(["scheduled", "confirmed", "in_progress", "completed", "cancelled", "no_show"]).optional(),
+        recurrenceRule: z.string().optional(),
+        notes: z.string().optional(),
+        price: z.number().optional(),
+        professionalId: z.number().optional(),
+        contactPhone: z.string().max(32).optional(),
       }))
       .mutation(async ({ ctx, input }) => {
         const { createAppointment } = await import("./services/agendaService");
@@ -4529,12 +4536,40 @@ ${customInstructions ? `\n--- INSTRUÇÕES PERSONALIZADAS ---\n${customInstructi
         contactId: z.number().optional(),
         isCompleted: z.boolean().optional(),
         participantIds: z.array(z.number()).optional(),
+        serviceType: z.string().max(100).optional(),
+        status: z.enum(["scheduled", "confirmed", "in_progress", "completed", "cancelled", "no_show"]).optional(),
+        recurrenceRule: z.string().optional(),
+        notes: z.string().optional(),
+        price: z.number().optional(),
+        professionalId: z.number().optional(),
+        contactPhone: z.string().max(32).optional(),
       }))
       .mutation(async ({ ctx, input }) => {
         const { updateAppointment } = await import("./services/agendaService");
         const userId = ctx.saasUser?.userId || ctx.user!.id;
         const isAdmin = ctx.saasUser?.role === "admin";
         return updateAppointment(getTenantId(ctx), userId, isAdmin, input);
+      }),
+    confirmAppointment: tenantWriteProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        const { updateAppointment } = await import("./services/agendaService");
+        const userId = ctx.saasUser?.userId || ctx.user!.id;
+        return updateAppointment(getTenantId(ctx), userId, true, { id: input.id, status: "confirmed" } as any);
+      }),
+    completeAppointment: tenantWriteProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        const { updateAppointment } = await import("./services/agendaService");
+        const userId = ctx.saasUser?.userId || ctx.user!.id;
+        return updateAppointment(getTenantId(ctx), userId, true, { id: input.id, status: "completed", isCompleted: true } as any);
+      }),
+    cancelAppointment: tenantWriteProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        const { updateAppointment } = await import("./services/agendaService");
+        const userId = ctx.saasUser?.userId || ctx.user!.id;
+        return updateAppointment(getTenantId(ctx), userId, true, { id: input.id, status: "cancelled" } as any);
       }),
     deleteAppointment: tenantWriteProcedure
       .input(z.object({ id: z.number() }))
@@ -4600,6 +4635,98 @@ ${customInstructions ? `\n--- INSTRUÇÕES PERSONALIZADAS ---\n${customInstructi
       const { CUSTOM_MESSAGE_CATEGORIES } = await import("./services/customMessagesService");
       return CUSTOM_MESSAGE_CATEGORIES;
     }),
+  }),
+
+  // ─── Referrals (Indicacoes) ───
+  referrals: router({
+    list: tenantProcedure
+      .input(z.object({
+        referrerId: z.number().optional(),
+        status: z.enum(["pending", "converted", "expired"]).optional(),
+        limit: z.number().optional(),
+      }).optional())
+      .query(async ({ ctx, input }) => {
+        const { listReferrals } = await import("./services/referralService");
+        return listReferrals(getTenantId(ctx), input || {});
+      }),
+    stats: tenantProcedure
+      .query(async ({ ctx }) => {
+        const { getReferralStats } = await import("./services/referralService");
+        return getReferralStats(getTenantId(ctx));
+      }),
+    create: tenantWriteProcedure
+      .input(z.object({
+        referrerId: z.number(),
+        referredId: z.number(),
+        dealId: z.number().optional(),
+        rewardType: z.enum(["discount", "credit", "gift", "none"]).optional(),
+        rewardValue: z.number().optional(),
+        notes: z.string().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const { createReferral } = await import("./services/referralService");
+        return createReferral({ tenantId: getTenantId(ctx), ...input });
+      }),
+    convert: tenantWriteProcedure
+      .input(z.object({ referralId: z.number(), dealId: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        const { convertReferral } = await import("./services/referralService");
+        return convertReferral(input.referralId, input.dealId);
+      }),
+    markRewardDelivered: tenantWriteProcedure
+      .input(z.object({ referralId: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        const { markRewardDelivered } = await import("./services/referralService");
+        return markRewardDelivered(input.referralId);
+      }),
+  }),
+
+  // ─── Client Packages (Pacotes de Sessoes) ───
+  packages: router({
+    list: tenantProcedure
+      .input(z.object({ contactId: z.number() }))
+      .query(async ({ ctx, input }) => {
+        const { getContactPackages } = await import("./services/packageService");
+        return getContactPackages(getTenantId(ctx), input.contactId);
+      }),
+    expiring: tenantProcedure
+      .query(async ({ ctx }) => {
+        const { getExpiringPackages } = await import("./services/packageService");
+        return getExpiringPackages(getTenantId(ctx));
+      }),
+    create: tenantWriteProcedure
+      .input(z.object({
+        contactId: z.number(),
+        productId: z.number().optional(),
+        name: z.string().min(1).max(255),
+        totalSessions: z.number().min(1),
+        priceTotal: z.number().optional(),
+        expiresAt: z.number().optional(), // timestamp ms
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const { createPackage } = await import("./services/packageService");
+        return createPackage({
+          tenantId: getTenantId(ctx),
+          contactId: input.contactId,
+          productId: input.productId,
+          name: input.name,
+          totalSessions: input.totalSessions,
+          priceTotal: input.priceTotal,
+          expiresAt: input.expiresAt ? new Date(input.expiresAt) : undefined,
+        });
+      }),
+    useSession: tenantWriteProcedure
+      .input(z.object({ packageId: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        const { useSession } = await import("./services/packageService");
+        return useSession(input.packageId, getTenantId(ctx));
+      }),
+    cancel: tenantWriteProcedure
+      .input(z.object({ packageId: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        const { cancelPackage } = await import("./services/packageService");
+        return cancelPackage(input.packageId, getTenantId(ctx));
+      }),
   }),
 
   superAdminDash: superAdminDashRouter,

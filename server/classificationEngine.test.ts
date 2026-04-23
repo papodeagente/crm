@@ -43,12 +43,12 @@ describe("Classification Engine Constants", () => {
   it("should have correct post-sale pipeline stages", () => {
     expect(POST_SALE_PIPELINE_STAGES).toHaveLength(7);
     expect(POST_SALE_PIPELINE_STAGES[0].name).toBe("Nova venda");
-    expect(POST_SALE_PIPELINE_STAGES[1].name).toBe("Aguardando embarque");
-    expect(POST_SALE_PIPELINE_STAGES[2].name).toBe("30D para embarque");
-    expect(POST_SALE_PIPELINE_STAGES[3].name).toBe("Pré viagem");
-    expect(POST_SALE_PIPELINE_STAGES[4].name).toBe("Em viagem");
-    expect(POST_SALE_PIPELINE_STAGES[5].name).toBe("Pós viagem");
-    expect(POST_SALE_PIPELINE_STAGES[6].name).toBe("Viagem finalizada");
+    expect(POST_SALE_PIPELINE_STAGES[1].name).toBe("Agendado");
+    expect(POST_SALE_PIPELINE_STAGES[2].name).toBe("Confirmado");
+    expect(POST_SALE_PIPELINE_STAGES[3].name).toBe("Em atendimento");
+    expect(POST_SALE_PIPELINE_STAGES[4].name).toBe("Follow-up");
+    expect(POST_SALE_PIPELINE_STAGES[5].name).toBe("Pós atendimento");
+    expect(POST_SALE_PIPELINE_STAGES[6].name).toBe("Finalizado");
   });
 
   it("should classify stages 1-2 as lead and 3-7 as oportunidade", () => {

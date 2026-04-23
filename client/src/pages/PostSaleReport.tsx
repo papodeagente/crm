@@ -63,7 +63,7 @@ export default function PostSaleReport() {
     if (!summary) return [];
     return [
       {
-        label: "Viagens em Gestão",
+        label: "Servicos em Gestao",
         value: summary.totalDeals - summary.lostDeals,
         icon: Briefcase,
         color: "text-violet-500",
@@ -86,7 +86,7 @@ export default function PostSaleReport() {
         icon: TrendingUp,
         color: "text-cyan-500",
         bg: "bg-cyan-500/10",
-        subtitle: "Valor médio por viagem (excl. canceladas)",
+        subtitle: "Valor medio por servico (excl. cancelados)",
       },
       {
         label: "Finalizadas",
@@ -97,7 +97,7 @@ export default function PostSaleReport() {
         subtitle: `${((summary.wonDeals / (summary.wonDeals + summary.lostDeals || 1)) * 100).toFixed(0)}% de conclusão`,
       },
       {
-        label: "Viagens canceladas",
+        label: "Servicos cancelados",
         value: summary.lostDeals,
         icon: Package,
         color: "text-red-500",
@@ -201,11 +201,11 @@ export default function PostSaleReport() {
             ))}
           </div>
 
-          {/* Chart: Viagens por Período */}
+          {/* Chart: Servicos por Periodo */}
           {chartData.length > 0 && (
             <Card className="border-border/50">
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-semibold">Viagens por Período</CardTitle>
+                <CardTitle className="text-sm font-semibold">Servicos por Periodo</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="h-[300px]">
@@ -236,7 +236,7 @@ export default function PostSaleReport() {
                 <div>
                   <p className="text-sm font-semibold mb-1">Sobre este relatório</p>
                   <p className="text-xs text-muted-foreground leading-relaxed">
-                    Este relatório apresenta a visão operacional da carteira de viagens em entrega.
+                    Este relatorio apresenta a visao operacional da carteira de servicos em entrega.
                     Os indicadores refletem apenas funis do tipo <strong>Pós-Venda</strong> e não
                     incluem métricas comerciais de vendas, conversão ou forecast. Use este painel
                     para acompanhar a jornada de entrega dos clientes.

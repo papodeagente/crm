@@ -31,42 +31,42 @@ function createAuthContext(): { ctx: TrpcContext } {
 // Mock homeService
 vi.mock("./services/homeService", async (importOriginal) => {
   const actual = await importOriginal() as Record<string, unknown>;
-  const futureBoardingDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-  const futureReturnDate = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
+  const futureAppointmentDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+  const futureFollowUpDate = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
   return {
     ...actual,
-    getUpcomingDepartures: vi.fn().mockResolvedValue([
+    getUpcomingAppointments: vi.fn().mockResolvedValue([
       {
         id: 101,
-        title: "Viagem Europa - João",
+        title: "Consulta Estética - João",
         valueCents: 1500000,
-        boardingDate: futureBoardingDate.getTime(),
-        returnDate: futureReturnDate.getTime(),
+        appointmentDate: futureAppointmentDate.getTime(),
+        followUpDate: futureFollowUpDate.getTime(),
         contactName: "João Silva",
         contactPhone: "+5511999999999",
-        ownerName: "Agente Maria",
+        ownerName: "Profissional Maria",
         ownerUserId: 1,
         pipelineName: "Pós-venda",
-        stageName: "Aguardando embarque",
+        stageName: "Agendado",
       },
       {
         id: 102,
-        title: "Cruzeiro Caribe - Ana",
+        title: "Procedimento Dental - Ana",
         valueCents: 800000,
-        boardingDate: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).getTime(),
-        returnDate: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).getTime(),
+        appointmentDate: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).getTime(),
+        followUpDate: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).getTime(),
         contactName: "Ana Costa",
         contactPhone: "+5521888888888",
-        ownerName: "Agente Pedro",
+        ownerName: "Profissional Pedro",
         ownerUserId: 2,
         pipelineName: "Pós-venda",
-        stageName: "30D para embarque",
+        stageName: "Confirmado",
       },
     ]),
   };
 });
 
-describe("home.upcomingDepartures", () => {
+describe("home.upcomingDepartures (appointments)", () => {
   let caller: ReturnType<typeof appRouter.createCaller>;
 
   beforeEach(() => {
@@ -75,24 +75,24 @@ describe("home.upcomingDepartures", () => {
     caller = appRouter.createCaller(ctx);
   });
 
-  it("should return upcoming departures for authenticated user", async () => {
+  it("should return upcoming appointments for authenticated user", async () => {
     const result = await caller.home.upcomingDepartures();
     expect(result).toHaveLength(2);
-    expect(result[0].title).toBe("Viagem Europa - João");
+    expect(result[0].title).toBe("Consulta Estética - João");
     expect(result[0].valueCents).toBe(1500000);
     expect(result[0].contactName).toBe("João Silva");
-    expect(result[0].boardingDate).toBeTruthy();
-    expect(result[0].returnDate).toBeTruthy();
+    expect(result[0].appointmentDate).toBeTruthy();
+    expect(result[0].followUpDate).toBeTruthy();
   });
 
-  it("should return departures with correct structure", async () => {
+  it("should return appointments with correct structure", async () => {
     const result = await caller.home.upcomingDepartures();
     const dep = result[0];
     expect(dep).toHaveProperty("id");
     expect(dep).toHaveProperty("title");
     expect(dep).toHaveProperty("valueCents");
-    expect(dep).toHaveProperty("boardingDate");
-    expect(dep).toHaveProperty("returnDate");
+    expect(dep).toHaveProperty("appointmentDate");
+    expect(dep).toHaveProperty("followUpDate");
     expect(dep).toHaveProperty("contactName");
     expect(dep).toHaveProperty("ownerName");
     expect(dep).toHaveProperty("pipelineName");
@@ -114,22 +114,22 @@ describe("home.upcomingDepartures", () => {
     expect(result).toHaveLength(2);
   });
 
-  it("should return departures ordered by boarding date (nearest first)", async () => {
+  it("should return appointments ordered by appointment date (nearest first)", async () => {
     const result = await caller.home.upcomingDepartures();
-    // The mock returns them in order, verify the second one has a closer boarding date
-    expect(result[1].title).toBe("Cruzeiro Caribe - Ana");
+    // The mock returns them in order, verify the second one has a closer appointment date
+    expect(result[1].title).toBe("Procedimento Dental - Ana");
   });
 
   it("should include owner information", async () => {
     const result = await caller.home.upcomingDepartures();
-    expect(result[0].ownerName).toBe("Agente Maria");
+    expect(result[0].ownerName).toBe("Profissional Maria");
     expect(result[0].ownerUserId).toBe(1);
   });
 
   it("should include pipeline and stage info", async () => {
     const result = await caller.home.upcomingDepartures();
     expect(result[0].pipelineName).toBe("Pós-venda");
-    expect(result[0].stageName).toBe("Aguardando embarque");
+    expect(result[0].stageName).toBe("Agendado");
   });
 
   it("should reject unauthenticated requests", async () => {

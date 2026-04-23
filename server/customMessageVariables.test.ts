@@ -57,16 +57,16 @@ describe("Custom Message Variable Substitution", () => {
     contactEmail: "maria@email.com",
     contactPhone: "5511999887766",
     dealId: 42,
-    dealTitle: "Pacote Europa 2026",
+    dealTitle: "Pacote Estética Premium",
     dealValueCents: 1500000, // R$ 15.000,00
     dealStageName: "Diagnóstico",
-    companyName: "Agência Viagens Top",
+    companyName: "Studio Beleza Total",
   };
 
   const products = [
-    { name: "Passagem Aérea SP-Paris", unitPriceCents: 500000, quantity: 2 },
-    { name: "Hotel Paris 5 noites", unitPriceCents: 300000, quantity: 1 },
-    { name: "Seguro Viagem", unitPriceCents: 50000, quantity: 2 },
+    { name: "Limpeza de Pele Profunda", unitPriceCents: 500000, quantity: 2 },
+    { name: "Hidratação Capilar", unitPriceCents: 300000, quantity: 1 },
+    { name: "Consulta Avaliação", unitPriceCents: 50000, quantity: 2 },
   ];
 
   it("should substitute {nome} with full contact name", () => {
@@ -91,7 +91,7 @@ describe("Custom Message Variable Substitution", () => {
 
   it("should substitute {negociacao} with deal title", () => {
     const result = substituteVariables("Negociação: {negociacao}", fullContext);
-    expect(result).toBe("Negociação: Pacote Europa 2026");
+    expect(result).toBe("Negociação: Pacote Estética Premium");
   });
 
   it("should substitute {valor} with formatted BRL currency", () => {
@@ -107,34 +107,34 @@ describe("Custom Message Variable Substitution", () => {
 
   it("should substitute {empresa} with company name", () => {
     const result = substituteVariables("Empresa: {empresa}", fullContext);
-    expect(result).toBe("Empresa: Agência Viagens Top");
+    expect(result).toBe("Empresa: Studio Beleza Total");
   });
 
   it("should substitute {nome_oportunidade} with deal title", () => {
     const result = substituteVariables("Oportunidade: {nome_oportunidade}", fullContext);
-    expect(result).toBe("Oportunidade: Pacote Europa 2026");
+    expect(result).toBe("Oportunidade: Pacote Estética Premium");
   });
 
   it("should substitute {produto_principal} with the highest-value product", () => {
-    // Passagem Aérea: 500000 * 2 = 1000000 (highest)
-    // Hotel Paris: 300000 * 1 = 300000
-    // Seguro: 50000 * 2 = 100000
+    // Limpeza de Pele Profunda: 500000 * 2 = 1000000 (highest)
+    // Hidratação Capilar: 300000 * 1 = 300000
+    // Consulta Avaliação: 50000 * 2 = 100000
     const result = substituteVariables(
       "Seu produto principal: {produto_principal}",
       fullContext,
       products,
     );
-    expect(result).toBe("Seu produto principal: Passagem Aérea SP-Paris");
+    expect(result).toBe("Seu produto principal: Limpeza de Pele Profunda");
   });
 
   it("should handle {produto_principal} with single product", () => {
-    const singleProduct = [{ name: "Cruzeiro Caribe", unitPriceCents: 800000, quantity: 1 }];
+    const singleProduct = [{ name: "Botox Facial", unitPriceCents: 800000, quantity: 1 }];
     const result = substituteVariables(
       "Produto: {produto_principal}",
       fullContext,
       singleProduct,
     );
-    expect(result).toBe("Produto: Cruzeiro Caribe");
+    expect(result).toBe("Produto: Botox Facial");
   });
 
   it("should leave {produto_principal} empty when no products", () => {
@@ -150,10 +150,10 @@ describe("Custom Message Variable Substitution", () => {
     const template = "Olá {primeiro_nome}, sua negociação {negociacao} no valor de {valor} está na etapa {etapa}. Produto principal: {produto_principal}";
     const result = substituteVariables(template, fullContext, products);
     expect(result).toContain("Maria");
-    expect(result).toContain("Pacote Europa 2026");
+    expect(result).toContain("Pacote Estética Premium");
     expect(result).toContain("R$");
     expect(result).toContain("Diagnóstico");
-    expect(result).toContain("Passagem Aérea SP-Paris");
+    expect(result).toContain("Limpeza de Pele Profunda");
   });
 
   it("should handle missing context gracefully with empty strings", () => {

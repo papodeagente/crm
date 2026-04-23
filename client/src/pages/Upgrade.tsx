@@ -54,7 +54,7 @@ const planColorsByIndex = [
 
 const COMPARISON_FEATURE_KEYS = [
   { key: "crmCore", label: "CRM completo" },
-  { key: "communityAccess", label: "Comunidade Acelera Turismo" },
+  { key: "communityAccess", label: "Comunidade exclusiva" },
   { key: "whatsappEmbedded", label: "WhatsApp integrado" },
   { key: "segmentedBroadcast", label: "Disparo segmentado" },
   { key: "rfvEnabled", label: "Matriz RFV" },
@@ -82,7 +82,7 @@ function getFeatureList(plan: DynamicPlan): string[] {
   if (plan.features.rfvEnabled) items.push("Classificação Estratégica (Matriz RFV)");
   if (plan.features.salesAutomation) items.push("Central de Automação de vendas");
   if (plan.features.prioritySupport) items.push("Suporte prioritário");
-  if (plan.features.communityAccess) items.push("Comunidade Acelera Turismo");
+  if (plan.features.communityAccess) items.push("Comunidade exclusiva");
   return items;
 }
 
@@ -154,7 +154,7 @@ export default function Upgrade() {
                 Período de teste ativo
               </div>
               <h1 className="text-3xl font-bold text-white mb-2">
-                Escolha o plano ideal para sua agência
+                Escolha o plano ideal para seu negocio
               </h1>
               <p className="text-white/50 max-w-lg mx-auto">
                 Garanta acesso contínuo ao Entur OS. Assine antes do fim do período de teste.
@@ -166,7 +166,7 @@ export default function Upgrade() {
                 Escolha o plano ideal
               </h1>
               <p className="text-white/50 max-w-lg mx-auto">
-                Potencialize sua agência de viagens com as ferramentas certas
+                Potencialize seu negocio com as ferramentas certas
               </p>
             </>
           )}

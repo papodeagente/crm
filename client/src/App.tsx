@@ -56,6 +56,8 @@ const CampaignDetail = lazyWithRetry(() => import("./pages/CampaignDetail"));
 const Supervision = lazyWithRetry(() => import("./pages/Supervision"));
 const Trash = lazyWithRetry(() => import("./pages/Trash"));
 const CustomMessages = lazyWithRetry(() => import("./pages/CustomMessages"));
+const Agenda = lazyWithRetry(() => import("./pages/Agenda"));
+const Referrals = lazyWithRetry(() => import("./pages/Referrals"));
 const Analytics = lazyWithRetry(() => import("./pages/Analytics"));
 const GoalsReport = lazyWithRetry(() => import("./pages/GoalsReport"));
 const CRMLive = lazyWithRetry(() => import("./pages/CRMLive"));
@@ -146,6 +148,8 @@ function AppRouter() {
                 <Route path="/proposals" component={Proposals} />
                 <Route path="/portal" component={Portal} />
                 <Route path="/trips" component={Trips} />
+                <Route path="/agenda" component={Agenda} />
+                <Route path="/referrals" component={Referrals} />
                 <Route path="/academy" component={Academy} />
                 <Route path="/integrations" component={Integrations} />
                 <Route path="/admin" component={Admin} />

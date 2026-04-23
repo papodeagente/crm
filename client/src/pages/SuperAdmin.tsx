@@ -107,9 +107,9 @@ export default function SuperAdmin() {
   const deleteTenantMutation = trpc.saasAuth.adminDeleteTenant.useMutation({
     onSuccess: (data) => {
       if (data.success) {
-        toast.success(`Agência excluída com sucesso! ${data.deletedTables.length} tabelas limpas.`);
+        toast.success(`Conta excluída com sucesso! ${data.deletedTables.length} tabelas limpas.`);
       } else {
-        toast.warning(`Agência excluída com ${data.errors.length} erros. Verifique o console.`);
+        toast.warning(`Conta excluída com ${data.errors.length} erros. Verifique o console.`);
         console.warn("[Delete Tenant] Errors:", data.errors);
       }
       tenantsQuery.refetch();
@@ -200,14 +200,14 @@ export default function SuperAdmin() {
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-foreground">Gestão de Tenants</h1>
-        <p className="text-sm text-muted-foreground mt-1">Administração de agências, usuários e assinaturas</p>
+        <p className="text-sm text-muted-foreground mt-1">Administração de contas, usuários e assinaturas</p>
       </div>
 
       <div className="space-y-6">
         {/* Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
           {[
-            { icon: <Building2 className="w-5 h-5" />, label: "Total de Agências", value: filteredTenants.length, color: "text-purple-400 bg-purple-500/10" },
+            { icon: <Building2 className="w-5 h-5" />, label: "Total de Contas", value: filteredTenants.length, color: "text-purple-400 bg-purple-500/10" },
             { icon: <Users className="w-5 h-5" />, label: "Total de Usuários", value: filteredTenants.reduce((acc: number, t: any) => acc + t.userCount, 0), color: "text-blue-400 bg-blue-500/10" },
             { icon: <Handshake className="w-5 h-5" />, label: "Negociações em Andamento", value: Array.from(metricsMap.values()).reduce((s, m) => s + m.dealsOpen, 0), color: "text-orange-400 bg-orange-500/10" },
             { icon: <TrendingUp className="w-5 h-5" />, label: "Vendido este Mês", value: formatCurrency(Array.from(metricsMap.values()).reduce((s, m) => s + m.wonThisMonthCents, 0)), color: "text-emerald-400 bg-emerald-500/10" },
@@ -259,7 +259,7 @@ export default function SuperAdmin() {
           <CardHeader className="pb-3">
             <CardTitle className="text-lg flex items-center gap-2">
               <Building2 className="w-5 h-5 text-purple-400" />
-              Agências ({filteredTenants.length})
+              Contas ({filteredTenants.length})
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
@@ -268,14 +268,14 @@ export default function SuperAdmin() {
                 <thead>
                   <tr className="border-b border-border text-muted-foreground">
                     <th className="text-left p-4 font-medium w-8"></th>
-                    <th className="text-left p-4 font-medium">Agência</th>
+                    <th className="text-left p-4 font-medium">Conta</th>
                     <th className="text-left p-4 font-medium">Email</th>
                     <th className="text-left p-4 font-medium">Plano</th>
                     <th className="text-left p-4 font-medium">Status</th>
                     <th className="text-left p-4 font-medium">Billing</th>
                     <th className="text-left p-4 font-medium">Usuários</th>
                     <th className="text-center p-4 font-medium" title="Negociações em andamento / total"><Handshake className="w-4 h-4 mx-auto text-muted-foreground" /></th>
-                    <th className="text-center p-4 font-medium" title="Passageiros"><Contact className="w-4 h-4 mx-auto text-muted-foreground" /></th>
+                    <th className="text-center p-4 font-medium" title="Clientes"><Contact className="w-4 h-4 mx-auto text-muted-foreground" /></th>
                     <th className="text-center p-4 font-medium" title="WhatsApp conectado"><Wifi className="w-4 h-4 mx-auto text-muted-foreground" /></th>
                     <th className="text-right p-4 font-medium" title="Vendido no mês"><DollarSign className="w-4 h-4 ml-auto text-muted-foreground" /></th>
                     <th className="text-left p-4 font-medium">Criado em</th>
@@ -419,7 +419,7 @@ export default function SuperAdmin() {
                                   variant="ghost"
                                   size="sm"
                                   className="h-8 w-8 p-0 text-red-400 hover:text-red-300 hover:bg-red-500/10"
-                                  title="Excluir agência permanentemente"
+                                  title="Excluir conta permanentemente"
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     setDeleteDialog({ tenantId: tenant.id, tenantName: tenant.name });
@@ -451,7 +451,7 @@ export default function SuperAdmin() {
                   {filteredTenants.length === 0 && (
                     <tr>
                       <td colSpan={13} className="p-8 text-center text-muted-foreground">
-                        Nenhuma agência encontrada
+                        Nenhuma conta encontrada
                       </td>
                     </tr>
                   )}
@@ -580,7 +580,7 @@ export default function SuperAdmin() {
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2 text-red-500">
               <AlertTriangle className="w-5 h-5" />
-              Excluir Agência Permanentemente
+              Excluir Conta Permanentemente
             </AlertDialogTitle>
             <AlertDialogDescription asChild>
               <div className="space-y-3">
@@ -598,24 +598,24 @@ export default function SuperAdmin() {
                         <li>Todos os usuários e permissões</li>
                         <li>Todos os produtos, propostas e tarefas</li>
                         <li>Todas as integrações e webhooks</li>
-                        <li>A própria conta da agência</li>
+                        <li>A própria conta do tenant</li>
                       </ul>
                     </div>
                     <p className="text-sm text-muted-foreground font-medium">
-                      Esta ação é <strong className="text-red-400">irreversível</strong>. Se a agência for recriada, começará completamente do zero.
+                      Esta ação é <strong className="text-red-400">irreversível</strong>. Se a conta for recriada, começará completamente do zero.
                     </p>
                   </>
                 )}
                 {deleteStep === 2 && (
                   <>
                     <p className="text-sm text-muted-foreground">
-                      Para confirmar, digite o nome exato da agência:
+                      Para confirmar, digite o nome exato da conta:
                     </p>
                     <div className="bg-accent/50 rounded-lg p-3 text-center">
                       <code className="text-foreground font-bold text-lg">{deleteDialog?.tenantName}</code>
                     </div>
                     <Input
-                      placeholder="Digite o nome da agência para confirmar"
+                      placeholder="Digite o nome da conta para confirmar"
                       value={deleteConfirmName}
                       onChange={(e) => setDeleteConfirmName(e.target.value)}
                       className="border-red-500/30 focus:border-red-500"
@@ -700,7 +700,7 @@ function TenantUsersPanel({ tenantId, tenantName,
       </div>
       {users.length === 0 ? (
         <div className="p-6 text-center text-muted-foreground text-sm">
-          Nenhum usuário cadastrado nesta agência
+          Nenhum usuário cadastrado nesta conta
         </div>
       ) : (
         <div className="divide-y divide-border/30">

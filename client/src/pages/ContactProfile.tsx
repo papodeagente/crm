@@ -22,6 +22,7 @@ import { toast } from "sonner";
 import ConversionHistory from "@/components/ConversionHistory";
 import MergeHistory from "@/components/MergeHistory";
 import DuplicateAlert from "@/components/DuplicateAlert";
+import { ContactPackageWidget } from "@/components/ContactPackageWidget";
 
 // ─── Types ───
 interface ContactMetrics {
@@ -836,6 +837,9 @@ export default function ContactProfile() {
               )}
             </CardContent>
           </Card>
+
+          {/* Pacotes de Sessões */}
+          <ContactPackageWidget contactId={contactId} />
         </div>
       </div>
 

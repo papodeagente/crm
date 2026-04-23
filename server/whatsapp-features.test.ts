@@ -133,8 +133,8 @@ describe("WhatsApp Features - Input Validation", () => {
         caller.whatsapp.sendPoll({
           sessionId: "test-session",
           number: "5511999999999",
-          name: "Qual destino?",
-          values: ["Cancún"],
+          name: "Qual serviço?",
+          values: ["Limpeza de Pele"],
           selectableCount: 1,
         })
       ).rejects.toThrow();
@@ -145,7 +145,7 @@ describe("WhatsApp Features - Input Validation", () => {
         caller.whatsapp.sendPoll({
           sessionId: "test-session",
           number: "5511999999999",
-          name: "Qual destino?",
+          name: "Qual serviço?",
           values: Array.from({ length: 13 }, (_, i) => `Opção ${i + 1}`),
           selectableCount: 1,
         })
@@ -157,8 +157,8 @@ describe("WhatsApp Features - Input Validation", () => {
         await caller.whatsapp.sendPoll({
           sessionId: "test-session",
           number: "5511999999999",
-          name: "Qual destino?",
-          values: ["Cancún", "Orlando", "Paris"],
+          name: "Qual serviço?",
+          values: ["Limpeza de Pele", "Botox", "Hidratação"],
           selectableCount: 1,
         });
       } catch (e: any) {

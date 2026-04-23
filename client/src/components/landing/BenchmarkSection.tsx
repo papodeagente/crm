@@ -13,7 +13,7 @@ interface BenchmarkSectionProps {
 const BENCHMARKS = [
   { label: "Conversão baixa", value: 8, color: "bg-red-500", textColor: "text-red-400" },
   { label: "Média do mercado", value: 15, color: "bg-amber-500", textColor: "text-amber-400" },
-  { label: "Agência estruturada", value: 25, color: "bg-emerald-500", textColor: "text-emerald-400" },
+  { label: "Negócio estruturado", value: 25, color: "bg-emerald-500", textColor: "text-emerald-400" },
 ];
 
 export function BenchmarkSection({ onCTA }: BenchmarkSectionProps) {
@@ -24,8 +24,8 @@ export function BenchmarkSection({ onCTA }: BenchmarkSectionProps) {
 
   const classification = useMemo(() => {
     if (parsedRate <= 0) return null;
-    if (parsedRate <= 10) return { label: "Abaixo do mercado", color: "text-red-400", message: "Sua agência está convertendo abaixo da média. Com processo estruturado, você pode triplicar essa taxa." };
-    if (parsedRate <= 18) return { label: "Na média do mercado", color: "text-amber-400", message: "Sua agência está na média, mas há espaço significativo para crescimento com processos melhores." };
+    if (parsedRate <= 10) return { label: "Abaixo do mercado", color: "text-red-400", message: "Seu negocio esta convertendo abaixo da media. Com processo estruturado, voce pode triplicar essa taxa." };
+    if (parsedRate <= 18) return { label: "Na media do mercado", color: "text-amber-400", message: "Seu negocio esta na media, mas ha espaco significativo para crescimento com processos melhores." };
     return { label: "Acima da média", color: "text-emerald-400", message: "Boa performance! O ENTUR OS pode ajudar a manter e escalar esses resultados." };
   }, [parsedRate]);
 
@@ -42,7 +42,7 @@ export function BenchmarkSection({ onCTA }: BenchmarkSectionProps) {
               <BarChart3 className="w-7 h-7 text-blue-400" />
             </div>
             <h2 className="text-3xl sm:text-4xl font-bold text-white mb-3 tracking-tight">
-              Como sua agência se compara ao mercado
+              Como seu negocio se compara ao mercado
             </h2>
             <p className="text-lg text-white/40">
               Informe sua taxa de conversão atual e veja onde você está
@@ -90,7 +90,7 @@ export function BenchmarkSection({ onCTA }: BenchmarkSectionProps) {
                         transition={{ delay: 0.1 }}
                       >
                         <div className="flex items-center gap-3 mb-1.5">
-                          <span className="text-sm text-white/70 w-40">Sua agência</span>
+                          <span className="text-sm text-white/70 w-40">Seu negocio</span>
                           <span className="text-sm font-bold text-violet-400">{parsedRate}%</span>
                         </div>
                         <div className="w-full bg-white/[0.04] rounded-lg h-8 overflow-hidden">
@@ -133,7 +133,7 @@ export function BenchmarkSection({ onCTA }: BenchmarkSectionProps) {
                     </div>
 
                     <p className="text-center text-sm text-white/50">
-                      Agências com processo estruturado convertem até <span className="text-white font-semibold">3x mais</span>.
+                      Negócios com processo estruturado convertem até <span className="text-white font-semibold">3x mais</span>.
                     </p>
 
                     <div className="text-center">

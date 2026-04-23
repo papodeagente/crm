@@ -510,7 +510,7 @@ export default function PipelineSettings() {
                 <p className="text-[12px] text-muted-foreground mt-1">
                   Quando uma negociação é marcada como <strong>ganha</strong> ou <strong>perdida</strong> em um funil de origem,
                   o sistema cria automaticamente uma nova negociação no funil de destino, copiando contato, produtos e participantes conforme configurado.
-                  Ideal para mover vendas ganhas para um funil de pós-venda/viagens.
+                  Ideal para mover vendas ganhas para um funil de pos-venda/servicos.
                 </p>
               </div>
             </div>

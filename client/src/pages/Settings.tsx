@@ -1,7 +1,7 @@
 import { useLocation } from "wouter";
 import {
   Settings, Inbox, MessageSquare, Bot, Headphones,
-  FileText, Globe, Plane,
+  FileText, Globe, ClipboardList,
   GraduationCap, Plug, Shield, BookOpen,
   ChevronRight, Users, Tag, GitBranch,
   Megaphone, Target, XCircle, Package,
@@ -114,7 +114,7 @@ const settingsCategories: SettingsCategory[] = [
   {
     title: "MÓDULOS",
     links: [
-      { icon: Plane, label: "Viagens", path: "/trips", comingSoon: true },
+      { icon: ClipboardList, label: "Servicos", path: "/trips", comingSoon: true },
       { icon: FileText, label: "Propostas", path: "/proposals", comingSoon: true },
       { icon: Globe, label: "Portal do Cliente", path: "/portal", comingSoon: true },
       { icon: GraduationCap, label: "Academy", path: "/academy", comingSoon: true },

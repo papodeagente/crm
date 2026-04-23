@@ -274,7 +274,7 @@ export default function Trash() {
                     <Archive className="h-10 w-10 mx-auto mb-3 text-muted-foreground/30" />
                     <p className="text-sm font-medium">Lixeira vazia</p>
                     <p className="text-xs mt-1">
-                      {search ? "Nenhum resultado para a busca." : `Nenhum ${activeTab === "deals" ? "negociacao" : "passageiro"} na lixeira.`}
+                      {search ? "Nenhum resultado para a busca." : `Nenhum ${activeTab === "deals" ? "negociacao" : "cliente"} na lixeira.`}
                     </p>
                   </td>
                 </tr>
@@ -424,8 +424,8 @@ export default function Trash() {
           <div className="space-y-3">
             <p className="text-sm text-muted-foreground">
               {hardDeleteTarget === "all"
-                ? `Tem certeza que deseja excluir permanentemente TODOS os ${currentList.length} ${activeTab === "deals" ? "negociacoes" : "passageiros"} da lixeira?`
-                : `Tem certeza que deseja excluir permanentemente ${selectedIds.size} ${activeTab === "deals" ? "negociacao(oes)" : "passageiro(s)"}?`}
+                ? `Tem certeza que deseja excluir permanentemente TODOS os ${currentList.length} ${activeTab === "deals" ? "negociacoes" : "clientes"} da lixeira?`
+                : `Tem certeza que deseja excluir permanentemente ${selectedIds.size} ${activeTab === "deals" ? "negociacao(oes)" : "cliente(s)"}?`}
             </p>
             <div className="flex items-center gap-2 p-3 bg-red-50 dark:bg-red-950/30 rounded-lg border border-red-200 dark:border-red-800/40">
               <AlertTriangle className="h-4 w-4 text-red-500 shrink-0" />

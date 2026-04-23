@@ -28,6 +28,7 @@ import {
   LayoutDashboard, LogOut, PanelLeft, MessageSquare, Send, Bot, Settings,
   Users, Building2, Target, Inbox, FileText, Globe, BarChart3, GraduationCap,
   Plug, Activity, Shield, Briefcase, Plane, ClipboardList, Bell, Crown, Sparkles, Trash2,
+  CalendarDays, Gift,
 } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
@@ -54,9 +55,11 @@ const menuSections: MenuSection[] = [
     items: [
       { icon: Briefcase, label: "Negócios", path: "/deals" },
       { icon: Inbox, label: "Inbox", path: "/inbox" },
-      { icon: Users, label: "Passageiros", path: "/contacts" },
+      { icon: Users, label: "Clientes", path: "/contacts" },
       { icon: Target, label: "Funil", path: "/pipeline" },
-      { icon: Plane, label: "Viagens", path: "/trips" },
+      { icon: CalendarDays, label: "Agenda", path: "/agenda" },
+      { icon: ClipboardList, label: "Servicos", path: "/trips" },
+      { icon: Gift, label: "Indicações", path: "/referrals" },
       { icon: ClipboardList, label: "Tarefas", path: "/tasks" },
       { icon: Trash2, label: "Lixeira", path: "/trash" },
     ],
@@ -121,7 +124,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <div className="flex flex-col items-center gap-3">
             <ThemedLogo className="h-10 object-contain" />
             <p className="text-sm text-muted-foreground text-center max-w-sm">
-              Plataforma completa de CRM para agências de viagens. Faça login para acessar o painel.
+              Plataforma completa de CRM para negocios locais. Faca login para acessar o painel.
             </p>
           </div>
           <Button

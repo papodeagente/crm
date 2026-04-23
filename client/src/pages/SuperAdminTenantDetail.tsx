@@ -198,7 +198,7 @@ export default function SuperAdminTenantDetail() {
             <CardTitle className="text-xs sm:text-sm font-medium text-muted-foreground">Métricas Detalhadas</CardTitle>
           </CardHeader>
           <CardContent className="px-3 sm:px-4 pb-3 sm:pb-4">
-            <MetricRow label="Passageiros" value={fmtNum(d.metrics.contactsTotal)} icon={Users} />
+            <MetricRow label="Clientes" value={fmtNum(d.metrics.contactsTotal)} icon={Users} />
             <MetricRow label="Tarefas (mês)" value={d.metrics.tasksCreatedMonth} icon={Activity} />
             <MetricRow label="Tarefas Concluídas" value={d.metrics.tasksDone} icon={CheckCircle} />
             <MetricRow label="WA Conectados" value={`${d.metrics.waConnected}/${d.metrics.waTotal}`} icon={Wifi} />

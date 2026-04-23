@@ -4,7 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useLocation } from "wouter";
-import { Loader2, Eye, EyeOff, Plane, Check } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Loader2, Eye, EyeOff, Check } from "lucide-react";
 import { toast } from "sonner";
 
 export default function SaasRegister() {
@@ -16,6 +17,7 @@ export default function SaasRegister() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [segment, setSegment] = useState("");
 
   const registerMutation = trpc.saasAuth.register.useMutation({
     onSuccess: () => {
@@ -37,12 +39,12 @@ export default function SaasRegister() {
       toast.error("A senha deve ter pelo menos 6 caracteres");
       return;
     }
-    registerMutation.mutate({ companyName, userName, email, password, phone: phone || undefined });
+    registerMutation.mutate({ companyName, userName, email, password, phone: phone || undefined, segment: segment || undefined });
   };
 
   const benefits = [
     "7 dias grátis para testar tudo",
-    "CRM completo para agências de viagens",
+    "CRM completo para negocios locais",
     "Pipeline de vendas ilimitado",
     "WhatsApp integrado com IA",
     "Gestão de contatos e empresas",
@@ -65,7 +67,7 @@ export default function SaasRegister() {
             <img src="https://d2xsxph8kpxj0f.cloudfront.net/310519663249817763/EKvcVicuVoUxTnzjSKzgdk/logo-light_c3efa809.webp" alt="enturOS CRM" className="h-10 object-contain" />
           </div>
           <h2 className="text-2xl font-bold text-white mb-2">
-            O sistema que sua agência precisa
+            O sistema que seu negocio precisa
           </h2>
           <p className="text-white/50 mb-8">
             Comece agora com 7 dias grátis. Sem cartão de crédito.
@@ -105,15 +107,31 @@ export default function SaasRegister() {
 
           <form onSubmit={handleSubmit} className="space-y-3">
             <div className="space-y-1.5">
-              <Label htmlFor="companyName" className="text-sm font-medium text-white/70">Nome da agência</Label>
+              <Label htmlFor="companyName" className="text-sm font-medium text-white/70">Nome do negocio</Label>
               <Input
                 id="companyName"
-                placeholder="Minha Agência de Viagens"
+                placeholder="Minha Clinica"
                 value={companyName}
                 onChange={(e) => setCompanyName(e.target.value)}
                 required
                 className="h-10 bg-white/5 border-white/10 text-white placeholder:text-gray-500 focus:border-purple-500 focus:ring-purple-500/20"
               />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium text-white/70">Segmento do negócio</Label>
+              <Select value={segment} onValueChange={setSegment}>
+                <SelectTrigger className="h-10 bg-white/5 border-white/10 text-white focus:border-purple-500 focus:ring-purple-500/20">
+                  <SelectValue placeholder="Selecione seu segmento" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="estetica">Estética / Beleza</SelectItem>
+                  <SelectItem value="odontologia">Odontologia</SelectItem>
+                  <SelectItem value="salao">Salão de Beleza</SelectItem>
+                  <SelectItem value="clinica">Clínica / Saúde</SelectItem>
+                  <SelectItem value="advocacia">Advocacia / Jurídico</SelectItem>
+                  <SelectItem value="outro">Outro</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="userName" className="text-sm font-medium text-white/70">Seu nome</Label>

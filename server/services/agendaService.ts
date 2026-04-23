@@ -54,6 +54,13 @@ export interface CreateAppointmentInput {
   dealId?: number;
   contactId?: number;
   participantIds?: number[];  // other users to include
+  serviceType?: string;
+  status?: string;
+  recurrenceRule?: string;
+  notes?: string;
+  price?: number;
+  professionalId?: number;
+  contactPhone?: string;
 }
 
 export interface UpdateAppointmentInput extends Partial<CreateAppointmentInput> {
@@ -483,11 +490,16 @@ export async function createAppointment(
 
   const result = await db.execute(sql`
     INSERT INTO crm_appointments
-      (tenantId, userId, title, description, startAt, endAt, allDay, location, color, dealId, contactId)
+      ("tenantId", "userId", title, description, "startAt", "endAt", "allDay", location, color,
+       "dealId", "contactId", "serviceType", status, "recurrenceRule", notes, price,
+       "professionalId", "contactPhone")
     VALUES
       (${tenantId}, ${userId}, ${input.title}, ${input.description || null},
        ${startAt}, ${endAt}, ${input.allDay ?? false}, ${input.location || null},
-       ${input.color || "emerald"}, ${input.dealId || null}, ${input.contactId || null})
+       ${input.color || "emerald"}, ${input.dealId || null}, ${input.contactId || null},
+       ${input.serviceType || null}, ${input.status || "scheduled"}, ${input.recurrenceRule || null},
+       ${input.notes || null}, ${input.price?.toString() || null},
+       ${input.professionalId || null}, ${input.contactPhone || null})
     RETURNING id
   `);
 
@@ -535,21 +547,28 @@ export async function updateAppointment(
   const sets: string[] = [];
   const vals: any[] = [];
 
-  if (input.title !== undefined) { sets.push("title = ?"); vals.push(input.title); }
-  if (input.description !== undefined) { sets.push("description = ?"); vals.push(input.description || null); }
-  if (input.startAt !== undefined) { sets.push("startAt = ?"); vals.push(new Date(input.startAt)); }
-  if (input.endAt !== undefined) { sets.push("endAt = ?"); vals.push(new Date(input.endAt)); }
-  if (input.allDay !== undefined) { sets.push("allDay = ?"); vals.push(input.allDay); }
-  if (input.location !== undefined) { sets.push("location = ?"); vals.push(input.location || null); }
-  if (input.color !== undefined) { sets.push("color = ?"); vals.push(input.color); }
-  if (input.dealId !== undefined) { sets.push("dealId = ?"); vals.push(input.dealId || null); }
-  if (input.contactId !== undefined) { sets.push("contactId = ?"); vals.push(input.contactId || null); }
+  if (input.title !== undefined) { sets.push('"title" = ?'); vals.push(input.title); }
+  if (input.description !== undefined) { sets.push('"description" = ?'); vals.push(input.description || null); }
+  if (input.startAt !== undefined) { sets.push('"startAt" = ?'); vals.push(new Date(input.startAt)); }
+  if (input.endAt !== undefined) { sets.push('"endAt" = ?'); vals.push(new Date(input.endAt)); }
+  if (input.allDay !== undefined) { sets.push('"allDay" = ?'); vals.push(input.allDay); }
+  if (input.location !== undefined) { sets.push('"location" = ?'); vals.push(input.location || null); }
+  if (input.color !== undefined) { sets.push('"color" = ?'); vals.push(input.color); }
+  if (input.dealId !== undefined) { sets.push('"dealId" = ?'); vals.push(input.dealId || null); }
+  if (input.contactId !== undefined) { sets.push('"contactId" = ?'); vals.push(input.contactId || null); }
   if (input.isCompleted !== undefined) {
-    sets.push("isCompleted = ?");
+    sets.push('"isCompleted" = ?');
     vals.push(input.isCompleted);
-    sets.push("completedAt = ?");
+    sets.push('"completedAt" = ?');
     vals.push(input.isCompleted ? new Date() : null);
   }
+  if (input.serviceType !== undefined) { sets.push('"serviceType" = ?'); vals.push(input.serviceType || null); }
+  if (input.status !== undefined) { sets.push('"status" = ?'); vals.push(input.status); }
+  if (input.recurrenceRule !== undefined) { sets.push('"recurrenceRule" = ?'); vals.push(input.recurrenceRule || null); }
+  if (input.notes !== undefined) { sets.push('"notes" = ?'); vals.push(input.notes || null); }
+  if (input.price !== undefined) { sets.push('"price" = ?'); vals.push(input.price); }
+  if (input.professionalId !== undefined) { sets.push('"professionalId" = ?'); vals.push(input.professionalId || null); }
+  if (input.contactPhone !== undefined) { sets.push('"contactPhone" = ?'); vals.push(input.contactPhone || null); }
 
   if (sets.length === 0 && input.participantIds === undefined) return { success: true };
 
@@ -590,7 +609,7 @@ export async function updateAppointment(
     return `'${String(v).replace(/'/g, "''")}'`;
   });
   // Replace ? placeholders with actual values
-  let rawSql = `UPDATE crm_appointments SET ${setClause} WHERE id = ? AND tenantId = ?`;
+  let rawSql = `UPDATE crm_appointments SET ${setClause} WHERE id = ? AND "tenantId" = ?`;
   for (const pv of placeholders) {
     rawSql = rawSql.replace("?", pv);
   }

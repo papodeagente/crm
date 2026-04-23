@@ -41,12 +41,12 @@ describe("Simplified Product Creation", () => {
     expect(product.id).toBeGreaterThan(0);
   });
 
-  it("creates product with name, price, cost, and supplier", async () => {
+  it("creates product with name, price, cost, and professional", async () => {
     const product = await caller.productCatalog.products.create({
-      name: "Pacote Paris 7 noites",
+      name: "Pacote Estético Completo",
       basePriceCents: 500000,
       costPriceCents: 350000,
-      supplier: "CVC",
+      professional: "Dra. Ana",
     });
     expect(product).toBeDefined();
     expect(product.id).toBeGreaterThan(0);
@@ -92,7 +92,7 @@ describe("Simplified Product Creation", () => {
       name: "Produto Verificação",
       basePriceCents: 150000,
       costPriceCents: 100000,
-      supplier: "Decolar",
+      professional: "Dr. Carlos",
     });
 
     const product = await caller.productCatalog.products.get({ id: created.id });
@@ -100,14 +100,14 @@ describe("Simplified Product Creation", () => {
     expect(product!.name).toBe("Produto Verificação");
     expect(product!.basePriceCents).toBe(150000);
     expect(product!.costPriceCents).toBe(100000);
-    expect(product!.supplier).toBe("Decolar");
+    expect(product!.professional).toBe("Dr. Carlos");
   });
 
   it("updates product preserving fields not sent", async () => {
     const created = await caller.productCatalog.products.create({
       name: "Produto Original",
       basePriceCents: 100000,
-      supplier: "Fornecedor A",
+      professional: "Profissional A",
     });
 
     await caller.productCatalog.products.update({
@@ -117,7 +117,7 @@ describe("Simplified Product Creation", () => {
 
     const updated = await caller.productCatalog.products.get({ id: created.id });
     expect(updated!.name).toBe("Produto Atualizado");
-    // Supplier should be preserved
-    expect(updated!.supplier).toBe("Fornecedor A");
+    // Professional should be preserved
+    expect(updated!.professional).toBe("Profissional A");
   });
 });

@@ -42,9 +42,9 @@ describe("deleteTenantCompletely", () => {
     const pipelinesIdx = source.indexOf('"pipelines"');
     expect(stagesIdx).toBeLessThan(pipelinesIdx);
     
-    const tripItemsIdx = source.indexOf('"trip_items"');
-    const tripsIdx = source.indexOf('"trips"');
-    expect(tripItemsIdx).toBeLessThan(tripsIdx);
+    const serviceDeliveryItemsIdx = source.indexOf('"service_delivery_items"');
+    const serviceDeliveriesIdx = source.indexOf('"service_deliveries"');
+    expect(serviceDeliveryItemsIdx).toBeLessThan(serviceDeliveriesIdx);
     
     const lessonsIdx = source.indexOf('"lessons"');
     const coursesIdx = source.indexOf('"courses"');

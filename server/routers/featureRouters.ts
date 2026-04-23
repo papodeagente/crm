@@ -60,7 +60,7 @@ export const portalRouter = router({
       .input(z.object({ contactId: z.number().optional(), status: z.string().optional() }))
       .query(async ({ input, ctx }) => crm.listPortalTickets(getTenantId(ctx), input)),
     create: tenantWriteProcedure
-      .input(z.object({ contactId: z.number(), subject: z.string().min(1), tripId: z.number().optional(), priority: z.enum(["low", "medium", "high", "urgent"]).optional() }))
+      .input(z.object({ contactId: z.number(), subject: z.string().min(1), serviceDeliveryId: z.number().optional(), priority: z.enum(["low", "medium", "high", "urgent"]).optional() }))
       .mutation(async ({ ctx, input }) => {
         const result = await crm.createPortalTicket({ ...input, tenantId: getTenantId(ctx) });
         await emitEvent({ tenantId: getTenantId(ctx), actorUserId: ctx.user.id, entityType: "portal_ticket", entityId: result?.id, action: "create" });

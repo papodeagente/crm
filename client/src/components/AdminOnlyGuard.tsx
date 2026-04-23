@@ -42,7 +42,7 @@ export function AdminOnlyGuard({ children, pageTitle }: AdminOnlyGuardProps) {
               {pageTitle
                 ? `A seção "${pageTitle}" pode ser visualizada, mas apenas administradores podem fazer alterações.`
                 : "Esta seção pode ser visualizada, mas apenas administradores podem fazer alterações."}
-              {" "}Solicite ao administrador da sua agência caso precise de alguma modificação.
+              {" "}Solicite ao administrador da sua conta caso precise de alguma modificação.
             </p>
           </div>
           <ShieldAlert className="h-5 w-5 text-amber-500/50 shrink-0" />

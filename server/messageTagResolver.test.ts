@@ -126,10 +126,10 @@ describe("MessageTagResolver", () => {
         "Olá {primeiro_nome}, seu produto principal é {produto_principal}",
         {
           contactName: "João Silva",
-          mainProductName: "Grupo Paris",
+          mainProductName: "Limpeza de Pele",
         }
       );
-      expect(result).toBe("Olá João, seu produto principal é Grupo Paris");
+      expect(result).toBe("Olá João, seu produto principal é Limpeza de Pele");
     });
 
     it("should replace {produto_principal} with empty string when no product", () => {
@@ -146,9 +146,9 @@ describe("MessageTagResolver", () => {
     it("should replace {produto_principal} case-insensitively", () => {
       const result = interpolateDealMessage(
         "{PRODUTO_PRINCIPAL} - {Produto_Principal}",
-        { mainProductName: "Turquia" }
+        { mainProductName: "Botox" }
       );
-      expect(result).toBe("Turquia - Turquia");
+      expect(result).toBe("Botox - Botox");
     });
 
     it("should resolve all tags including produto_principal", () => {
@@ -156,14 +156,14 @@ describe("MessageTagResolver", () => {
         "Olá {nome}, negociação {negociacao} com produto {produto_principal} no valor de {valor}",
         {
           contactName: "Ana Costa",
-          dealTitle: "Viagem Europa",
+          dealTitle: "Pacote Premium",
           dealValueCents: 359000,
-          mainProductName: "Grupo Paris",
+          mainProductName: "Limpeza de Pele",
         }
       );
       expect(result).toContain("Ana Costa");
-      expect(result).toContain("Viagem Europa");
-      expect(result).toContain("Grupo Paris");
+      expect(result).toContain("Pacote Premium");
+      expect(result).toContain("Limpeza de Pele");
       expect(result).toContain("R$");
     });
   });
@@ -175,16 +175,16 @@ describe("MessageTagResolver", () => {
 
     it("should return the only product when there's just one", () => {
       expect(findMainProduct([
-        { name: "Grupo Paris", finalPriceCents: 3590000, unitPriceCents: 3590000 },
-      ])).toBe("Grupo Paris");
+        { name: "Limpeza de Pele", finalPriceCents: 3590000, unitPriceCents: 3590000 },
+      ])).toBe("Limpeza de Pele");
     });
 
     it("should return the product with highest finalPriceCents", () => {
       expect(findMainProduct([
-        { name: "Milhas - Latam", finalPriceCents: 1210375, unitPriceCents: 2500 },
+        { name: "Pacote Premium", finalPriceCents: 1210375, unitPriceCents: 2500 },
         { name: "Comissão", finalPriceCents: 100000, unitPriceCents: 100000 },
         { name: "Taxas", finalPriceCents: 53360, unitPriceCents: 53360 },
-      ])).toBe("Milhas - Latam");
+      ])).toBe("Pacote Premium");
     });
 
     it("should fallback to unitPriceCents when finalPriceCents is null", () => {
@@ -208,11 +208,11 @@ describe("MessageTagResolver", () => {
         "Produto: {produto_principal}",
         { contactName: "João" },
         [
-          { name: "Grupo Paris", unitPriceCents: 3590000, quantity: 1 },
-          { name: "Seguro Viagem", unitPriceCents: 50000, quantity: 1 },
+          { name: "Limpeza de Pele", unitPriceCents: 3590000, quantity: 1 },
+          { name: "Hidratação Capilar", unitPriceCents: 50000, quantity: 1 },
         ]
       );
-      expect(result).toBe("Produto: Grupo Paris");
+      expect(result).toBe("Produto: Limpeza de Pele");
     });
 
     it("should select product with highest total value (unitPrice * quantity)", () => {
@@ -220,12 +220,12 @@ describe("MessageTagResolver", () => {
         "{produto_principal}",
         {},
         [
-          { name: "Milhas", unitPriceCents: 2500, quantity: 484 },
-          { name: "Hotel", unitPriceCents: 500000, quantity: 1 },
+          { name: "Sessão Laser", unitPriceCents: 2500, quantity: 484 },
+          { name: "Consulta", unitPriceCents: 500000, quantity: 1 },
         ]
       );
-      // Milhas: 2500 * 484 = 1,210,000 > Hotel: 500,000 * 1 = 500,000
-      expect(result).toBe("Milhas");
+      // Sessão Laser: 2500 * 484 = 1,210,000 > Consulta: 500,000 * 1 = 500,000
+      expect(result).toBe("Sessão Laser");
     });
 
     it("should return empty string when no products", () => {
@@ -255,13 +255,13 @@ describe("MessageTagResolver", () => {
           name: "João Silva",
           email: "joao@test.com",
           phone: "+5511999",
-          dealTitle: "Viagem Europa",
+          dealTitle: "Pacote Premium",
           dealValue: 3590000,
           stage: "Proposta",
-          mainProductName: "Grupo Paris",
+          mainProductName: "Limpeza de Pele",
         }
       );
-      expect(result).toBe("Olá João, seu produto é Grupo Paris");
+      expect(result).toBe("Olá João, seu produto é Limpeza de Pele");
     });
 
     it("should replace {produto_principal} with empty string when mainProductName is null", () => {

@@ -38,14 +38,12 @@ interface ProductCategory {
 }
 
 const PRODUCT_TYPES: Record<string, { label: string; icon: any; color: string; bgColor: string }> = {
-  flight: { label: "Aéreo", icon: Plane, color: "text-sky-400", bgColor: "bg-sky-500/15" },
-  hotel: { label: "Hospedagem", icon: Hotel, color: "text-amber-400", bgColor: "bg-amber-500/15" },
-  tour: { label: "Passeio", icon: Map, color: "text-emerald-400", bgColor: "bg-emerald-500/15" },
-  transfer: { label: "Transfer", icon: Bus, color: "text-violet-400", bgColor: "bg-violet-500/15" },
-  insurance: { label: "Seguro", icon: Shield, color: "text-rose-400", bgColor: "bg-rose-500/15" },
-  cruise: { label: "Cruzeiro", icon: Ship, color: "text-cyan-400", bgColor: "bg-cyan-500/15" },
-  visa: { label: "Visto", icon: Stamp, color: "text-orange-400", bgColor: "bg-orange-500/15" },
-  package: { label: "Pacote", icon: Package, color: "text-indigo-400", bgColor: "bg-indigo-500/15" },
+  servico: { label: "Servico", icon: Package, color: "text-sky-400", bgColor: "bg-sky-500/15" },
+  pacote: { label: "Pacote", icon: Package, color: "text-indigo-400", bgColor: "bg-indigo-500/15" },
+  consulta: { label: "Consulta", icon: Map, color: "text-emerald-400", bgColor: "bg-emerald-500/15" },
+  procedimento: { label: "Procedimento", icon: Shield, color: "text-rose-400", bgColor: "bg-rose-500/15" },
+  assinatura: { label: "Assinatura", icon: Tag, color: "text-violet-400", bgColor: "bg-violet-500/15" },
+  produto: { label: "Produto", icon: Box, color: "text-amber-400", bgColor: "bg-amber-500/15" },
   other: { label: "Outro", icon: Box, color: "text-slate-400", bgColor: "bg-slate-500/15" },
 };
 
@@ -296,8 +294,8 @@ function ProductFormDialog({
                     </Select>
                   </div>
                   <div>
-                    <Label>Destino</Label>
-                    <Input value={form.destination} onChange={(e) => setForm({ ...form, destination: e.target.value })} placeholder="Ex: Paris, França" />
+                    <Label>Local</Label>
+                    <Input value={form.destination} onChange={(e) => setForm({ ...form, destination: e.target.value })} placeholder="Ex: Unidade Centro" />
                   </div>
                   <div>
                     <Label>Duração</Label>

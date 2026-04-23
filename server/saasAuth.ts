@@ -77,6 +77,7 @@ export async function registerTenantAndUser(data: {
   email: string;
   password: string;
   phone?: string;
+  segment?: string;
 }) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
@@ -126,7 +127,7 @@ export async function registerTenantAndUser(data: {
   // Auto-create default pipelines for new tenant
   try {
     const { createDefaultPipelines } = await import("./classificationEngine");
-    await createDefaultPipelines(tenantId);
+    await createDefaultPipelines(tenantId, data.segment);
   } catch (e) {
     console.error("[Onboarding] Failed to create default pipelines for tenant", tenantId, e);
   }
@@ -804,9 +805,9 @@ export async function deleteTenantCompletely(tenantId: number): Promise<{
     "proposals",
     "proposal_templates",
 
-    // Trip items before trips
-    "trip_items",
-    "trips",
+    // Service delivery items before service deliveries
+    "service_delivery_items",
+    "service_deliveries",
 
     // Deals before pipelines
     "task_automations",

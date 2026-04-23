@@ -373,8 +373,11 @@ async function startServer() {
     // Start task due soon notification scheduler (tasks due within 3h)
     import("../taskDueScheduler").then(m => m.startTaskDueScheduler());
 
-    // Start departure notification scheduler (embarques próximos)
-    import("../departureScheduler").then(m => m.startDepartureScheduler());
+    // Appointment reminder scheduler (24h and 2h before)
+    import("../appointmentReminderScheduler").then(m => m.startAppointmentReminderScheduler());
+
+    // Recurring appointment generator (daily)
+    import("../services/recurringAppointmentService").then(m => m.startRecurringAppointmentScheduler());
 
     // Start Z-API alert monitoring scheduler (disconnections + billing overdue)
     import("../zapiAlertScheduler").then(m => m.startZapiAlertScheduler());

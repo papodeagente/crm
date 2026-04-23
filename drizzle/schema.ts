@@ -27,10 +27,10 @@ export const entityTypeEnum = pgEnum("entityType", ["contact", "deal", "company"
 export const entityEnum = pgEnum("entity", ["contact", "deal", "company"]);
 export const fieldTypeEnum = pgEnum("fieldType", ["text", "number", "date", "select", "multiselect", "checkbox", "textarea", "email", "phone", "url", "currency"]);
 export const conditionEnum = pgEnum("condition", ["days_before", "days_after", "on_date"]);
-export const dateFieldEnum = pgEnum("dateField", ["boardingDate", "returnDate", "expectedCloseAt", "createdAt"]);
+export const dateFieldEnum = pgEnum("dateField", ["appointmentDate", "followUpDate", "expectedCloseAt", "createdAt"]);
 export const dealStatusFilterEnum = pgEnum("dealStatusFilter", ["open", "won", "lost"]);
-export const deal_participants_roleEnum = pgEnum("deal_participants_role", ["decision_maker", "traveler", "payer", "companion", "other"]);
-export const categoryEnum = pgEnum("category", ["flight", "hotel", "tour", "transfer", "insurance", "cruise", "visa", "other"]);
+export const deal_participants_roleEnum = pgEnum("deal_participants_role", ["decision_maker", "client", "payer", "dependent", "other"]);
+export const categoryEnum = pgEnum("category", ["servico", "pacote", "consulta", "procedimento", "assinatura", "produto", "other"]);
 export const deals_statusEnum = pgEnum("deals_status", ["open", "won", "lost"]);
 export const strategyEnum = pgEnum("strategy", ["round_robin", "least_busy", "manual", "team_round_robin"]);
 export const enrollments_statusEnum = pgEnum("enrollments_status", ["enrolled", "in_progress", "completed"]);
@@ -48,7 +48,7 @@ export const pipelineTypeEnum = pgEnum("pipelineType", ["sales", "post_sale", "s
 export const billing_cycleEnum = pgEnum("billing_cycle", ["monthly", "annual"]);
 export const portal_tickets_statusEnum = pgEnum("portal_tickets_status", ["open", "in_progress", "resolved", "closed"]);
 export const portal_users_statusEnum = pgEnum("portal_users_status", ["active", "inactive"]);
-export const productTypeEnum = pgEnum("productType", ["flight", "hotel", "tour", "transfer", "insurance", "cruise", "visa", "package", "other"]);
+export const productTypeEnum = pgEnum("productType", ["servico", "pacote", "consulta", "procedimento", "assinatura", "produto", "other"]);
 export const proposals_statusEnum = pgEnum("proposals_status", ["draft", "sent", "viewed", "accepted", "rejected", "expired"]);
 export const contentTypeEnum = pgEnum("contentType", ["text", "image", "video", "audio", "document"]);
 export const enturFieldTypeEnum = pgEnum("enturFieldType", ["standard", "custom"]);
@@ -60,16 +60,16 @@ export const share_statusEnum = pgEnum("share_status", ["active", "revoked"]);
 export const planEnum = pgEnum("plan", ["free", "pro", "enterprise", "start", "growth", "scale"]);
 export const subscriptions_statusEnum = pgEnum("subscriptions_status", ["active", "trialing", "past_due", "cancelled", "expired"]);
 export const deadlineOffsetUnitEnum = pgEnum("deadlineOffsetUnit", ["minutes", "hours", "days"]);
-export const deadlineReferenceEnum = pgEnum("deadlineReference", ["current_date", "boarding_date", "return_date"]);
+export const deadlineReferenceEnum = pgEnum("deadlineReference", ["current_date", "appointment_date", "follow_up_date"]);
 export const taskTypeEnum = pgEnum("taskType", ["whatsapp", "phone", "email", "video", "task"]);
 export const team_members_roleEnum = pgEnum("team_members_role", ["member", "leader"]);
 export const tenant_addons_statusEnum = pgEnum("tenant_addons_status", ["active", "cancelled", "expired"]);
 export const zapi_instance_statusEnum = pgEnum("zapi_instance_status", ["active", "pending", "cancelled", "expired"]);
 export const billingStatusEnum = pgEnum("billingStatus", ["active", "trialing", "past_due", "restricted", "cancelled", "expired"]);
 export const tenants_statusEnum = pgEnum("tenants_status", ["active", "suspended", "cancelled"]);
-export const trip_items_typeEnum = pgEnum("trip_items_type", ["flight", "hotel", "tour", "transfer", "insurance", "other"]);
+export const service_delivery_items_typeEnum = pgEnum("trip_items_type", ["sessao", "consulta", "procedimento", "retorno", "avaliacao", "other"]);
 export const documentsStatusEnum = pgEnum("documentsStatus", ["pending", "partial", "complete"]);
-export const trips_statusEnum = pgEnum("trips_status", ["planning", "confirmed", "in_progress", "completed", "cancelled"]);
+export const service_deliveries_statusEnum = pgEnum("trips_status", ["scheduled", "confirmed", "in_progress", "completed", "cancelled"]);
 export const users_roleEnum = pgEnum("users_role", ["user", "admin"]);
 export const channel_statusEnum = pgEnum("channel_status", ["active", "inactive"]);
 export const wa_conversations_statusEnum = pgEnum("wa_conversations_status", ["open", "pending", "resolved", "closed"]);
@@ -540,8 +540,8 @@ export const deals = pgTable("deals", {
   waConversationId: integer("waConversationId"),
   lossReasonId: integer("lossReasonId"),
   lossNotes: text("lossNotes"),
-  boardingDate: timestamp("boardingDate"),
-  returnDate: timestamp("returnDate"),
+  appointmentDate: timestamp("appointmentDate"),
+  followUpDate: timestamp("followUpDate"),
   deletedAt: timestamp("deletedAt"),
   /** Conversion tracking fields */
   lastConversionAt: timestamp("lastConversionAt"),
@@ -647,11 +647,14 @@ export const productCatalog = pgTable("product_catalog", {
   costPriceCents: bigint("costPriceCents", { mode: "number" }).default(0),
   currency: varchar("currency", { length: 3 }).default("BRL"),
   supplier: varchar("supplier", { length: 255 }),
-  destination: varchar("destination", { length: 255 }),
-  duration: varchar("duration", { length: 128 }),
+  location: varchar("location", { length: 255 }),
+  durationMinutes: integer("durationMinutes"),
   imageUrl: text("imageUrl"),
   sku: varchar("sku", { length: 64 }),
   isActive: boolean("isActive").default(true).notNull(),
+  isRecurring: boolean("isRecurring").default(false).notNull(),
+  recurringIntervalDays: integer("recurringIntervalDays"),
+  sessionsIncluded: integer("sessionsIncluded"),
   detailsJson: json("detailsJson"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
@@ -680,8 +683,8 @@ export const dealProducts = pgTable("deal_products", {
   finalPriceCents: bigint("finalPriceCents", { mode: "number" }).default(0),          // (qty * unit) - discount
   currency: varchar("currency", { length: 3 }).default("BRL"),
   supplier: varchar("supplier", { length: 255 }),
-  checkIn: timestamp("checkIn"),
-  checkOut: timestamp("checkOut"),
+  serviceStart: timestamp("serviceStart"),
+  serviceEnd: timestamp("serviceEnd"),
   catalogProductId: integer("catalogProductId"),              // mantido para compatibilidade (deprecated)
   notes: text("notes"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -732,20 +735,20 @@ export const dealHistory = pgTable("deal_history", {
 ]);
 
 // ════════════════════════════════════════════════════════════
-// TRIPS (Pós-venda / M2 + M4)
+// SERVICE DELIVERIES (Pos-venda: entrega de servico)
 // ════════════════════════════════════════════════════════════
 
-export const trips = pgTable("trips", {
+export const serviceDeliveries = pgTable("service_deliveries", {
   id: serial("id").primaryKey(),
   tenantId: integer("tenantId").notNull(),
   dealId: integer("dealId"),
-  status: trips_statusEnum("status").default("planning").notNull(),
+  status: service_deliveries_statusEnum("status").default("scheduled").notNull(),
   startDate: timestamp("startDate"),
   endDate: timestamp("endDate"),
-  destinationSummary: text("destinationSummary"),
+  serviceSummary: text("serviceSummary"),
   totalValueCents: bigint("totalValueCents", { mode: "number" }).default(0),
   currency: varchar("currency", { length: 3 }).default("BRL"),
-  documentsStatus: documentsStatusEnum("documentsStatus").default("pending").notNull(),
+  progressStatus: documentsStatusEnum("documentsStatus").default("pending").notNull(),
   ownerUserId: integer("ownerUserId"),
   teamId: integer("teamId"),
   visibilityScope: visibilityScopeEnum("visibilityScope").default("global").notNull(),
@@ -753,20 +756,20 @@ export const trips = pgTable("trips", {
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
   createdBy: integer("createdBy"),
   updatedBy: integer("updatedBy"),
-}, (t) => [index("trips_tenant_idx").on(t.tenantId)]);
+}, (t) => [index("sd_tenant_idx").on(t.tenantId)]);
 
-export const tripItems = pgTable("trip_items", {
+export const serviceDeliveryItems = pgTable("service_delivery_items", {
   id: serial("id").primaryKey(),
   tenantId: integer("tenantId").notNull(),
-  tripId: integer("tripId").notNull(),
-  type: trip_items_typeEnum("type").default("other").notNull(),
+  serviceDeliveryId: integer("serviceDeliveryId").notNull(),
+  type: service_delivery_items_typeEnum("type").default("other").notNull(),
   title: varchar("title", { length: 255 }).notNull(),
-  supplier: varchar("supplier", { length: 255 }),
+  professional: varchar("professional", { length: 255 }),
   detailsJson: json("detailsJson"),
   priceCents: bigint("priceCents", { mode: "number" }).default(0),
   currency: varchar("currency", { length: 3 }).default("BRL"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-}, (t) => [index("ti_tenant_idx").on(t.tenantId)]);
+}, (t) => [index("sdi_tenant_idx").on(t.tenantId)]);
 
 // ════════════════════════════════════════════════════════════
 // ACTIVITIES (Tasks, Notes, Attachments)
@@ -1236,8 +1239,13 @@ export type Deal = typeof deals.$inferSelect;
 export type Pipeline = typeof pipelines.$inferSelect;
 export type PipelineStage = typeof pipelineStages.$inferSelect;
 export type PipelineAutomation = typeof pipelineAutomations.$inferSelect;
-export type Trip = typeof trips.$inferSelect;
-export type TripItem = typeof tripItems.$inferSelect;
+export type ServiceDelivery = typeof serviceDeliveries.$inferSelect;
+export type ServiceDeliveryItem = typeof serviceDeliveryItems.$inferSelect;
+// Backwards compat aliases
+export const trips = serviceDeliveries;
+export const tripItems = serviceDeliveryItems;
+export type Trip = ServiceDelivery;
+export type TripItem = ServiceDeliveryItem;
 export type Task = typeof tasks.$inferSelect;
 export type TaskAssignee = typeof taskAssignees.$inferSelect;
 export type CrmNote = typeof crmNotes.$inferSelect;
@@ -2566,6 +2574,8 @@ export type InsertGoogleCalendarEvent = typeof googleCalendarEvents.$inferInsert
 // CRM APPOINTMENTS (manual calendar entries)
 // ════════════════════════════════════════════════════════════
 
+export const appointmentStatusEnum = pgEnum("appointment_status", ["scheduled", "confirmed", "in_progress", "completed", "cancelled", "no_show"]);
+
 export const crmAppointments = pgTable("crm_appointments", {
   id: serial("id").primaryKey(),
   tenantId: integer("tenantId").notNull(),
@@ -2576,18 +2586,30 @@ export const crmAppointments = pgTable("crm_appointments", {
   endAt: timestamp("endAt").notNull(),
   allDay: boolean("allDay").default(false).notNull(),
   location: varchar("location", { length: 500 }),
-  color: varchar("color", { length: 20 }).default("emerald"),  // UI accent color
-  dealId: integer("dealId"),                    // optional link to a deal
-  contactId: integer("contactId"),              // optional link to a contact
+  color: varchar("color", { length: 20 }).default("emerald"),
+  dealId: integer("dealId"),
+  contactId: integer("contactId"),
+  // Novos campos para negocios locais
+  serviceType: varchar("serviceType", { length: 100 }),
+  status: appointmentStatusEnum("status").default("scheduled").notNull(),
+  recurrenceRule: text("recurrenceRule"),             // RRULE (RFC 5545)
+  recurrenceParentId: integer("recurrenceParentId"),  // FK appointment pai
+  reminderSentAt: timestamp("reminderSentAt"),
+  notes: text("notes"),
+  price: numeric("price", { precision: 12, scale: 2 }),
+  professionalId: integer("professionalId"),           // FK crm_users
+  contactPhone: varchar("contactPhone", { length: 32 }),
   isCompleted: boolean("isCompleted").default(false).notNull(),
   completedAt: timestamp("completedAt"),
   deletedAt: timestamp("deletedAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 }, (t) => [
-  index("ca_tenant_user_range_idx").on(t.tenantId, t.userId, t.startAt, t.endAt),
-  index("ca_tenant_range_idx").on(t.tenantId, t.startAt, t.endAt),
-  index("ca_tenant_deal_idx").on(t.tenantId, t.dealId),
+  index("appt_tenant_user_range_idx").on(t.tenantId, t.userId, t.startAt, t.endAt),
+  index("appt_tenant_range_idx").on(t.tenantId, t.startAt, t.endAt),
+  index("appt_tenant_deal_idx").on(t.tenantId, t.dealId),
+  index("appt_tenant_status_idx").on(t.tenantId, t.status),
+  index("appt_tenant_professional_idx").on(t.tenantId, t.professionalId),
 ]);
 
 export type CrmAppointment = typeof crmAppointments.$inferSelect;
@@ -2693,3 +2715,60 @@ export const scheduledMessages = pgTable("scheduled_messages", {
 ]);
 export type ScheduledMessage = typeof scheduledMessages.$inferSelect;
 export type InsertScheduledMessage = typeof scheduledMessages.$inferInsert;
+
+// ════════════════════════════════════════════════════════════
+// REFERRALS (Sistema de Indicacoes)
+// ════════════════════════════════════════════════════════════
+
+export const referralStatusEnum = pgEnum("referral_status", ["pending", "converted", "expired"]);
+export const referralRewardTypeEnum = pgEnum("referral_reward_type", ["discount", "credit", "gift", "none"]);
+
+export const referrals = pgTable("referrals", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenantId").notNull(),
+  referrerId: integer("referrerId").notNull(),     // FK contacts - quem indicou
+  referredId: integer("referredId").notNull(),      // FK contacts - quem foi indicado
+  dealId: integer("dealId"),                        // FK deals - negocio gerado
+  status: referralStatusEnum("status").default("pending").notNull(),
+  rewardType: referralRewardTypeEnum("rewardType").default("none").notNull(),
+  rewardValue: numeric("rewardValue", { precision: 12, scale: 2 }),
+  rewardDelivered: boolean("rewardDelivered").default(false).notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+}, (t) => [
+  index("ref_tenant_idx").on(t.tenantId),
+  index("ref_referrer_idx").on(t.tenantId, t.referrerId),
+  index("ref_referred_idx").on(t.tenantId, t.referredId),
+]);
+
+export type Referral = typeof referrals.$inferSelect;
+export type InsertReferral = typeof referrals.$inferInsert;
+
+// ════════════════════════════════════════════════════════════
+// CLIENT PACKAGES (Pacotes de Sessoes / Venda Recorrente)
+// ════════════════════════════════════════════════════════════
+
+export const clientPackageStatusEnum = pgEnum("client_package_status", ["active", "completed", "expired", "cancelled"]);
+
+export const clientPackages = pgTable("client_packages", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenantId").notNull(),
+  contactId: integer("contactId").notNull(),        // FK contacts
+  productId: integer("productId"),                   // FK product_catalog
+  name: varchar("name", { length: 255 }).notNull(),
+  totalSessions: integer("totalSessions").notNull(),
+  usedSessions: integer("usedSessions").default(0).notNull(),
+  status: clientPackageStatusEnum("status").default("active").notNull(),
+  priceTotal: numeric("priceTotal", { precision: 12, scale: 2 }),
+  expiresAt: timestamp("expiresAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+}, (t) => [
+  index("cp_tenant_idx").on(t.tenantId),
+  index("cp_contact_idx").on(t.tenantId, t.contactId),
+  index("cp_status_idx").on(t.tenantId, t.status),
+]);
+
+export type ClientPackage = typeof clientPackages.$inferSelect;
+export type InsertClientPackage = typeof clientPackages.$inferInsert;

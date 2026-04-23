@@ -19,7 +19,7 @@ export function FinalCTA({ onRegister }: FinalCTAProps) {
         <div className="max-w-3xl mx-auto text-center relative z-10">
           <FadeIn>
             <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white mb-6 tracking-tight leading-tight">
-              Sua agência vai continuar{" "}
+              Seu negócio vai continuar{" "}
               <span className="bg-gradient-to-r from-[#FFC7AC] via-[#FF614C] to-[#FF2B61] bg-clip-text text-transparent">
                 perdendo vendas
               </span>{" "}
@@ -56,7 +56,7 @@ export function FinalCTA({ onRegister }: FinalCTAProps) {
             <img src="https://d2xsxph8kpxj0f.cloudfront.net/310519663249817763/EKvcVicuVoUxTnzjSKzgdk/logo-light_c3efa809.webp" alt="enturOS CRM" className="h-6 object-contain" />
           </div>
           <p className="text-xs text-white/20">
-            &copy; {new Date().getFullYear()} Escola de Negócios do Turismo. Todos os direitos reservados.
+            &copy; {new Date().getFullYear()} ENTUR OS. Todos os direitos reservados.
           </p>
           <div className="flex gap-5 text-xs text-white/20">
             <a href="#" className="hover:text-white/40 transition-colors">Termos</a>

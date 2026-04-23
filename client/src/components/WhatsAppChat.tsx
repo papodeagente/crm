@@ -315,9 +315,9 @@ export default function WhatsAppChat({
     onError: () => toast.error("Erro ao enviar localização"),
   });
   const sendContactMut = trpc.whatsapp.sendContact.useMutation({
-    onMutate: () => { onOptimisticSend?.({ content: "👤 Passageiro", messageType: "contactMessage" }); },
-    onSuccess: () => { chat.refetchMessages(); toast.success("Passageiro enviado"); },
-    onError: () => toast.error("Erro ao enviar passageiro"),
+    onMutate: () => { onOptimisticSend?.({ content: "👤 Cliente", messageType: "contactMessage" }); },
+    onSuccess: () => { chat.refetchMessages(); toast.success("Cliente enviado"); },
+    onError: () => toast.error("Erro ao enviar cliente"),
   });
   const sendPollMut = trpc.whatsapp.sendPoll.useMutation({
     onMutate: () => { onOptimisticSend?.({ content: "📊 Enquete", messageType: "pollCreationMessage" }); },

@@ -50,13 +50,13 @@ const statusColors: Record<string, { bg: string; text: string; dot: string }> = 
 };
 
 const categoryLabels: Record<string, string> = {
-  flight: "Aéreo", hotel: "Hotel", tour: "Passeio", transfer: "Transfer",
-  insurance: "Seguro", cruise: "Cruzeiro", visa: "Visto", other: "Outro",
+  servico: "Servico", pacote: "Pacote", consulta: "Consulta", procedimento: "Procedimento",
+  assinatura: "Assinatura", produto: "Produto", other: "Outro",
 };
 
 const categoryIcons: Record<string, string> = {
-  flight: "\u2708\uFE0F", hotel: "\uD83C\uDFE8", tour: "\uD83D\uDDFA\uFE0F", transfer: "\uD83D\uDE90",
-  insurance: "\uD83D\uDEE1\uFE0F", cruise: "\uD83D\uDEA2", visa: "\uD83D\uDCCB", other: "\uD83D\uDCE6",
+  servico: "\uD83D\uDCCB", pacote: "\uD83D\uDCE6", consulta: "\uD83D\uDCDD", procedimento: "\u2695\uFE0F",
+  assinatura: "\uD83D\uDD04", produto: "\uD83D\uDED2", other: "\uD83D\uDCE6",
 };
 
 function getStatusStyle(status: string) {
@@ -145,7 +145,7 @@ export default function Pipeline() {
     "{negociacao}": "Pacote Cancún",
     "{valor}": "R$ 5.000,00",
     "{etapa}": "Proposta Enviada",
-    "{empresa}": "Viagens ABC",
+    "{empresa}": "Clinica Exemplo",
     "{nome_oportunidade}": "Pacote Cancún",
     "{produto_principal}": "Passagem Aérea Cancún",
   };
@@ -1476,8 +1476,8 @@ function DealDrawer({ dealId, onClose, contacts, accounts, stages }: {
                     <span>Qtd: {p.quantity || 1}</span>
                     <span>Unit: {formatCurrency(p.unitPriceCents || 0)}</span>
                     {p.discountCents > 0 && <span className="text-destructive">Desc: -{formatCurrency(p.discountCents)}</span>}
-                    {p.checkIn && <span>Check-in: {formatDate(p.checkIn)}</span>}
-                    {p.checkOut && <span>Check-out: {formatDate(p.checkOut)}</span>}
+                    {p.serviceStart && <span>Inicio do Servico: {formatDate(p.serviceStart)}</span>}
+                    {p.serviceEnd && <span>Fim do Servico: {formatDate(p.serviceEnd)}</span>}
                   </div>
                 </div>
               ))}
@@ -1731,7 +1731,7 @@ function AddProductForm({ dealId, onAdd }: { dealId: number; onAdd: (data: any) 
       <div className="grid grid-cols-2 gap-3">
         <div>
           <Label className="text-[12px] font-medium">Nome *</Label>
-          <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex: Voo SP \u2192 Cancún" className="mt-1 h-9 text-[13px] rounded-xl" />
+          <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex: Limpeza de Pele" className="mt-1 h-9 text-[13px] rounded-xl" />
         </div>
         <div>
           <Label className="text-[12px] font-medium">Categoria</Label>
@@ -1769,7 +1769,7 @@ function AddProductForm({ dealId, onAdd }: { dealId: number; onAdd: (data: any) 
 /* ─── Add Participant Form ─── */
 function AddParticipantForm({ contacts, existingIds, onAdd }: { contacts: any[]; existingIds: number[]; onAdd: (contactId: number, role: string) => void }) {
   const [contactId, setContactId] = useState("");
-  const [role, setRole] = useState("traveler");
+  const [role, setRole] = useState("client");
   const available = contacts.filter((c: any) => !existingIds.includes(c.id));
 
   return (
@@ -1787,10 +1787,10 @@ function AddParticipantForm({ contacts, existingIds, onAdd }: { contacts: any[];
         <Select value={role} onValueChange={setRole}>
           <SelectTrigger className="w-[150px] h-10 text-[13px] rounded-xl"><SelectValue /></SelectTrigger>
           <SelectContent className="rounded-xl">
-            <SelectItem value="traveler">Viajante</SelectItem>
+            <SelectItem value="client">Cliente</SelectItem>
             <SelectItem value="decision_maker">Decisor</SelectItem>
             <SelectItem value="payer">Pagador</SelectItem>
-            <SelectItem value="companion">Acompanhante</SelectItem>
+            <SelectItem value="dependent">Dependente</SelectItem>
             <SelectItem value="other">Outro</SelectItem>
           </SelectContent>
         </Select>
@@ -1828,9 +1828,9 @@ function CreateDealDialog({ open, onOpenChange, pipelineId, stages, contacts, ac
   const [leadSource, setLeadSource] = useState<string>("");
   const [campaign, setCampaign] = useState("");
 
-  // Travel dates
-  const [boardingDate, setBoardingDate] = useState("");
-  const [returnDate, setReturnDate] = useState("");
+  // Service dates
+  const [appointmentDate, setAppointmentDate] = useState("");
+  const [followUpDate, setFollowUpDate] = useState("");
 
   // Products
   const [selectedProducts, setSelectedProducts] = useState<Array<{ productId: number; name: string; quantity: number; unitPriceCents: number; productType: string }>>([]);
@@ -1892,7 +1892,7 @@ function CreateDealDialog({ open, onOpenChange, pipelineId, stages, contacts, ac
 
   function resetForm() {
     setTitle(""); setStageId(""); setLeadSource(""); setCampaign("");
-    setBoardingDate(""); setReturnDate("");
+    setAppointmentDate(""); setFollowUpDate("");
     setAccountId(""); setShowNewAccount(false); setNewAccountName("");
     setContactId(""); setShowNewContact(false); setNewContactName(""); setNewContactEmail(""); setNewContactPhone("");
     setShowCustomFields(false); setCustomFieldValues({});
@@ -1963,8 +1963,8 @@ function CreateDealDialog({ open, onOpenChange, pipelineId, stages, contacts, ac
         accountId: finalAccountId,
         leadSource: leadSource || undefined,
         channelOrigin: campaign || undefined,
-        boardingDate: boardingDate || null,
-        returnDate: returnDate || null,
+        appointmentDate: appointmentDate || null,
+        followUpDate: followUpDate || null,
         products: selectedProducts.length > 0 ? selectedProducts.map(p => ({
           productId: p.productId,
           quantity: p.quantity,
@@ -2045,35 +2045,35 @@ function CreateDealDialog({ open, onOpenChange, pipelineId, stages, contacts, ac
               </div>
             </div>
 
-            {/* ─── DATAS DA VIAGEM ─── */}
+            {/* ─── DATAS DO SERVICO ─── */}
             <div className="border border-border/40 rounded-xl p-4 bg-muted/20 space-y-3">
               <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-[0.1em] flex items-center gap-1.5">
-                <Plane className="h-3.5 w-3.5" /> Datas da Viagem
+                <CalendarIcon className="h-3.5 w-3.5" /> Datas do Servico
               </p>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <Label className="text-[12px] font-medium">Data de Embarque</Label>
+                  <Label className="text-[12px] font-medium">Agendamento</Label>
                   <DatePicker
-                    value={boardingDate}
-                    onChange={setBoardingDate}
+                    value={appointmentDate}
+                    onChange={setAppointmentDate}
                     placeholder="Selecionar data"
                     className="mt-1.5 h-10 rounded-xl"
                   />
                 </div>
                 <div>
-                  <Label className="text-[12px] font-medium">Data de Retorno</Label>
+                  <Label className="text-[12px] font-medium">Retorno/Revisao</Label>
                   <DatePicker
-                    value={returnDate}
-                    onChange={setReturnDate}
+                    value={followUpDate}
+                    onChange={setFollowUpDate}
                     placeholder="Selecionar data"
                     className="mt-1.5 h-10 rounded-xl"
                   />
                 </div>
               </div>
-              {boardingDate && returnDate && new Date(returnDate) > new Date(boardingDate) && (
+              {appointmentDate && followUpDate && new Date(followUpDate) > new Date(appointmentDate) && (
                 <p className="text-[11px] text-muted-foreground flex items-center gap-1">
                   <Clock className="h-3 w-3" />
-                  {Math.ceil((new Date(returnDate).getTime() - new Date(boardingDate).getTime()) / (1000 * 60 * 60 * 24))} dias de viagem
+                  {Math.ceil((new Date(followUpDate).getTime() - new Date(appointmentDate).getTime()) / (1000 * 60 * 60 * 24))} dias de servico
                 </p>
               )}
             </div>

@@ -10,7 +10,7 @@ import { eq, and, sql, desc, asc, like, isNull, or, lte, gte, between, inArray, 
 export const SMART_FILTERS = [
   "potencial_ex_cliente",
   "potencial_indicador",
-  "potencial_indicador_pos_viagem",
+  "potencial_indicador_pos_atendimento",
   "potencial_indicador_fiel",
   "abordagem_nao_cliente",
 ] as const;
@@ -26,9 +26,9 @@ export const SMART_FILTER_CONFIG: Record<SmartFilter, { label: string; descripti
     label: "Potencial Indicador",
     description: "Compra nos últimos 30 dias",
   },
-  potencial_indicador_pos_viagem: {
-    label: "Pós Viagem",
-    description: "30 dias após retorno da viagem",
+  potencial_indicador_pos_atendimento: {
+    label: "Pós Atendimento",
+    description: "30 dias após follow-up do atendimento",
   },
   potencial_indicador_fiel: {
     label: "Indicador Fiel",
@@ -269,9 +269,9 @@ async function getSmartFilterContactIds(db: any, tenantId: number, filter: Smart
       return rows.map((r: any) => r.id);
     }
 
-    case "potencial_indicador_pos_viagem": {
-      // 30 dias após a data de retorno da viagem (returnDate no deal)
-      // Busca contatos cujo deal tem returnDate entre 25-35 dias atrás (janela de ~30 dias)
+    case "potencial_indicador_pos_atendimento": {
+      // 30 dias após a data de follow-up do atendimento (followUpDate no deal)
+      // Busca contatos cujo deal tem followUpDate entre 25-35 dias atrás (janela de ~30 dias)
       const windowStart = new Date(now.getTime() - 35 * 24 * 60 * 60 * 1000);
       const windowEnd = new Date(now.getTime() - 25 * 24 * 60 * 60 * 1000);
 
@@ -283,8 +283,8 @@ async function getSmartFilterContactIds(db: any, tenantId: number, filter: Smart
         WHERE rc.tenantId = ${tenantId}
           AND rc.deletedAt IS NULL
           AND d.status = 'won'
-          AND d.returnDate IS NOT NULL
-          AND d.returnDate BETWEEN ${windowStart} AND ${windowEnd}
+          AND d."followUpDate" IS NOT NULL
+          AND d."followUpDate" BETWEEN ${windowStart} AND ${windowEnd}
       `);
       const resultRows = (dealRows as unknown as any[]) || [];
       return resultRows.map((r: any) => r.id);
@@ -352,9 +352,9 @@ export async function getSmartFilterCounts(tenantId: number) {
         SELECT COUNT(DISTINCT rc.id) FROM rfv_contacts rc
         INNER JOIN contacts c ON c.id = rc.contactId AND c.tenantId = ${tenantId}
         INNER JOIN deals d ON d.contactId = c.id AND d.tenantId = ${tenantId} AND d.deletedAt IS NULL
-        WHERE ${sql.raw(baseWhere)} AND d.status = 'won' AND d.returnDate IS NOT NULL
-          AND d.returnDate BETWEEN ${windowStart} AND ${windowEnd}
-      ) AS potencial_indicador_pos_viagem,
+        WHERE ${sql.raw(baseWhere)} AND d.status = 'won' AND d."followUpDate" IS NOT NULL
+          AND d."followUpDate" BETWEEN ${windowStart} AND ${windowEnd}
+      ) AS potencial_indicador_pos_atendimento,
       (
         SELECT COUNT(*) FROM rfv_contacts rc
         WHERE ${sql.raw(baseWhere)} AND rc.fScore > 1
@@ -371,7 +371,7 @@ export async function getSmartFilterCounts(tenantId: number) {
   return {
     potencial_ex_cliente: Number(row.potencial_ex_cliente || 0),
     potencial_indicador: Number(row.potencial_indicador || 0),
-    potencial_indicador_pos_viagem: Number(row.potencial_indicador_pos_viagem || 0),
+    potencial_indicador_pos_atendimento: Number(row.potencial_indicador_pos_atendimento || 0),
     potencial_indicador_fiel: Number(row.potencial_indicador_fiel || 0),
     abordagem_nao_cliente: Number(row.abordagem_nao_cliente || 0),
   };

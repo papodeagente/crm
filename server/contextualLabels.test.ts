@@ -2,7 +2,7 @@
  * Tests for contextual button labels by pipeline type.
  * Validates that:
  * 1. Sales pipelines keep original labels
- * 2. Post-sale pipelines show "Viagem cancelada" / "Viagem finalizada"
+ * 2. Post-sale pipelines show "Atendimento cancelado" / "Atendimento finalizado"
  * 3. Support pipelines show "Não resolvido" / "Resolvido"
  * 4. Dashboard indicators are correctly named per type
  * 5. Internal logic (status won/lost) is NOT changed
@@ -11,13 +11,13 @@ import { describe, it, expect } from "vitest";
 
 // ─── Label mapping function (mirrors DealDetail.tsx logic) ───
 function getLossLabel(pipelineType: string | undefined): string {
-  if (pipelineType === "post_sale") return "Viagem cancelada";
+  if (pipelineType === "post_sale") return "Atendimento cancelado";
   if (pipelineType === "support") return "Não resolvido";
   return "Marcar perda";
 }
 
 function getWonLabel(pipelineType: string | undefined): string {
-  if (pipelineType === "post_sale") return "Viagem finalizada";
+  if (pipelineType === "post_sale") return "Atendimento finalizado";
   if (pipelineType === "support") return "Resolvido";
   return "Marcar venda";
 }
@@ -34,13 +34,13 @@ function getStatusBadge(status: string, pipelineType: string | undefined): strin
 }
 
 function getLostDialogTitle(pipelineType: string | undefined): string {
-  if (pipelineType === "post_sale") return "Cancelar viagem";
+  if (pipelineType === "post_sale") return "Cancelar atendimento";
   if (pipelineType === "support") return "Marcar como não resolvido";
   return "Marcar como perda";
 }
 
 function getWonDialogTitle(pipelineType: string | undefined): string {
-  if (pipelineType === "post_sale") return "Finalizar viagem";
+  if (pipelineType === "post_sale") return "Finalizar atendimento";
   if (pipelineType === "support") return "Marcar como resolvido";
   return "Marcar como venda";
 }
@@ -59,7 +59,7 @@ function getConfirmWonLabel(pipelineType: string | undefined): string {
 
 // ─── Dashboard indicator label mapping ───
 function getPostSaleLostIndicator(): string {
-  return "Viagens canceladas";
+  return "Atendimentos cancelados";
 }
 
 function getSupportLostIndicator(): string {
@@ -102,12 +102,12 @@ describe("Contextual Button Labels", () => {
   });
 
   describe("Post-sale pipeline (contextual labels)", () => {
-    it("loss button should say 'Viagem cancelada'", () => {
-      expect(getLossLabel("post_sale")).toBe("Viagem cancelada");
+    it("loss button should say 'Atendimento cancelado'", () => {
+      expect(getLossLabel("post_sale")).toBe("Atendimento cancelado");
     });
 
-    it("won button should say 'Viagem finalizada'", () => {
-      expect(getWonLabel("post_sale")).toBe("Viagem finalizada");
+    it("won button should say 'Atendimento finalizado'", () => {
+      expect(getWonLabel("post_sale")).toBe("Atendimento finalizado");
     });
 
     it("won badge should say 'FINALIZADA'", () => {
@@ -118,12 +118,12 @@ describe("Contextual Button Labels", () => {
       expect(getStatusBadge("lost", "post_sale")).toBe("CANCELADA");
     });
 
-    it("lost dialog title should say 'Cancelar viagem'", () => {
-      expect(getLostDialogTitle("post_sale")).toBe("Cancelar viagem");
+    it("lost dialog title should say 'Cancelar atendimento'", () => {
+      expect(getLostDialogTitle("post_sale")).toBe("Cancelar atendimento");
     });
 
-    it("won dialog title should say 'Finalizar viagem'", () => {
-      expect(getWonDialogTitle("post_sale")).toBe("Finalizar viagem");
+    it("won dialog title should say 'Finalizar atendimento'", () => {
+      expect(getWonDialogTitle("post_sale")).toBe("Finalizar atendimento");
     });
 
     it("confirm loss should say 'Confirmar cancelamento'", () => {
@@ -188,8 +188,8 @@ describe("Contextual Button Labels", () => {
   });
 
   describe("Dashboard indicators", () => {
-    it("post-sale lost indicator should be 'Viagens canceladas'", () => {
-      expect(getPostSaleLostIndicator()).toBe("Viagens canceladas");
+    it("post-sale lost indicator should be 'Atendimentos cancelados'", () => {
+      expect(getPostSaleLostIndicator()).toBe("Atendimentos cancelados");
     });
 
     it("support lost indicator should be 'Não resolvido'", () => {

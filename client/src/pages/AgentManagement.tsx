@@ -539,8 +539,8 @@ function AgentsTab() {
                 onChange={(v) => visibilityUserId && setVisibility.mutate({ userId: visibilityUserId, deals: v as any })}
               />
               <VisibilitySelect
-                label="Passageiros"
-                description="Controla quais passageiros aparecem na lista"
+                label="Clientes"
+                description="Controla quais clientes aparecem na lista"
                 value={visibilityQ.data?.contacts || "geral"}
                 onChange={(v) => visibilityUserId && setVisibility.mutate({ userId: visibilityUserId, contacts: v as any })}
               />

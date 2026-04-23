@@ -27,10 +27,10 @@ export function formatConversationTime(date: string | Date | null | undefined): 
 export function formatPhoneNumber(jid: string): string {
   if (!jid) return "Desconhecido";
   // LID JIDs don't contain phone numbers - show friendly label
-  if (jid.endsWith("@lid")) return "Passageiro WhatsApp";
+  if (jid.endsWith("@lid")) return "Cliente WhatsApp";
   const phone = jid.split("@")[0];
   // Skip non-numeric strings (corrupted JIDs)
-  if (!/^\d+$/.test(phone)) return "Passageiro WhatsApp";
+  if (!/^\d+$/.test(phone)) return "Cliente WhatsApp";
   if (phone.startsWith("55") && phone.length >= 12) {
     const ddd = phone.substring(2, 4);
     const num = phone.substring(4);

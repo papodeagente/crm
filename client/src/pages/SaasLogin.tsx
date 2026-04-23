@@ -84,7 +84,7 @@ export default function SaasLogin() {
           <div className="inline-flex items-center gap-2 mb-2">
             <img src="https://d2xsxph8kpxj0f.cloudfront.net/310519663249817763/EKvcVicuVoUxTnzjSKzgdk/logo-light_c3efa809.webp" alt="enturOS CRM" className="h-9 object-contain" />
           </div>
-          <p className="text-sm text-white/50">Sistema operacional para agências de viagens</p>
+          <p className="text-sm text-white/50">CRM para negocios locais</p>
         </div>
 
         {/* Card */}

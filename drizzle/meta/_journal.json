@@ -8,6 +8,13 @@
       "when": 1776632807896,
       "tag": "0000_tough_kang",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1776719207896,
+      "tag": "0001_local_business_migration",
+      "breakpoints": true
     }
   ]
 }

@@ -2,7 +2,7 @@ import { z } from "zod";
 import { tenantProcedure, tenantWriteProcedure, getTenantId, router } from "../_core/trpc";
 import * as crm from "../crmDb";
 
-const productTypeEnum = z.enum(["flight", "hotel", "tour", "transfer", "insurance", "cruise", "visa", "package", "other"]);
+const productTypeEnum = z.enum(["servico", "pacote", "consulta", "procedimento", "assinatura", "produto", "other"]);
 
 export const productCatalogRouter = router({
   // ─── CATEGORIES ───
@@ -79,9 +79,9 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
         basePriceCents: z.number().default(0),
         costPriceCents: z.number().nullable().optional(),
         currency: z.string().max(3).optional(),
-        supplier: z.string().max(255).optional(),
-        destination: z.string().max(255).optional(),
-        duration: z.string().max(128).optional(),
+        professional: z.string().max(255).optional(),
+        location: z.string().max(255).optional(),
+        durationMinutes: z.number().optional(),
         imageUrl: z.string().optional(),
         sku: z.string().max(64).optional(),
         isActive: z.boolean().optional(),
@@ -106,9 +106,9 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
         basePriceCents: z.number().optional(),
         costPriceCents: z.number().optional(),
         currency: z.string().max(3).optional(),
-        supplier: z.string().max(255).optional(),
-        destination: z.string().max(255).optional(),
-        duration: z.string().max(128).optional(),
+        professional: z.string().max(255).optional(),
+        location: z.string().max(255).optional(),
+        durationMinutes: z.number().optional(),
         imageUrl: z.string().optional(),
         sku: z.string().max(64).optional(),
         isActive: z.boolean().optional(),
@@ -164,10 +164,10 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
       .query(async ({ input, ctx }) => {
         return crm.getProductAnalyticsConversionRate(getTenantId(ctx), input.limit);
       }),
-    topDestinations: tenantProcedure
+    topLocations: tenantProcedure
       .input(z.object({ limit: z.number().default(10) }))
       .query(async ({ input, ctx }) => {
-        return crm.getProductAnalyticsTopDestinations(getTenantId(ctx), input.limit);
+        return crm.getProductAnalyticsTopLocations(getTenantId(ctx), input.limit);
       }),
   }),
 });

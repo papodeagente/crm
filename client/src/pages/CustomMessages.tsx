@@ -321,7 +321,7 @@ export default function CustomMessagesPage() {
             <div className="space-y-1.5">
               <label className="text-sm font-medium">Título</label>
               <Input
-                placeholder="Ex: Boas-vindas ao novo passageiro"
+                placeholder="Ex: Boas-vindas ao novo cliente"
                 value={form.title}
                 onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
               />

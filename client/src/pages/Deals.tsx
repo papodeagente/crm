@@ -130,9 +130,9 @@ export default function Deals() {
     "{negociacao}": "Pacote Europa 2026",
     "{valor}": "R$ 5.000,00",
     "{etapa}": "Cotação",
-    "{empresa}": "Viagens ABC",
-    "{nome_oportunidade}": "Pacote Europa 2026",
-    "{produto_principal}": "Passagem Aérea Europa",
+    "{empresa}": "Clinica Exemplo",
+    "{nome_oportunidade}": "Limpeza de Pele - Joao",
+    "{produto_principal}": "Limpeza de Pele Profunda",
   };
 
   const defaultPipeline = pipelines.data?.[0];

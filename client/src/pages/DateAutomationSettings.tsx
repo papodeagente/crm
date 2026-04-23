@@ -18,10 +18,10 @@ import {
 } from "lucide-react";
 
 const DATE_FIELD_OPTIONS = [
-  { value: "boardingDate", label: "Data do embarque" },
-  { value: "returnDate", label: "Data do retorno" },
+  { value: "appointmentDate", label: "Data do agendamento" },
+  { value: "followUpDate", label: "Data de retorno/revisao" },
   { value: "expectedCloseAt", label: "Data de fechamento prevista" },
-  { value: "createdAt", label: "Data de criação" },
+  { value: "createdAt", label: "Data de criacao" },
 ];
 
 const CONDITION_OPTIONS = [
@@ -53,7 +53,7 @@ const defaultFormData: AutomationFormData = {
   name: "",
   description: "",
   pipelineId: 0,
-  dateField: "boardingDate",
+  dateField: "appointmentDate",
   condition: "days_before",
   offsetDays: 30,
   sourceStageId: null,
@@ -207,7 +207,7 @@ export default function DateAutomationSettings() {
               Automações por Data
             </h1>
             <p className="text-sm text-muted-foreground mt-1">
-              Mova negociações automaticamente entre etapas com base em datas (embarque, retorno, etc.)
+              Mova negociações automaticamente entre etapas com base em datas (agendamento, retorno, etc.)
             </p>
           </div>
         </div>
@@ -256,7 +256,7 @@ export default function DateAutomationSettings() {
               <CalendarClock className="h-12 w-12 mx-auto text-muted-foreground/40 mb-4" />
               <h3 className="text-lg font-semibold mb-2">Nenhuma automação por data</h3>
               <p className="text-sm text-muted-foreground mb-4">
-                Crie regras para mover negociações automaticamente com base em datas como embarque ou retorno.
+                Crie regras para mover negociações automaticamente com base em datas como agendamento ou retorno.
               </p>
               <Button onClick={openCreate} size="sm">
                 <Plus className="h-4 w-4 mr-1" /> Criar primeira automação
@@ -338,7 +338,7 @@ export default function DateAutomationSettings() {
           </CardHeader>
           <CardContent className="text-xs text-muted-foreground space-y-2">
             <p>As automações por data verificam periodicamente (a cada hora) as negociações e movem automaticamente para a etapa configurada quando a condição de data é atendida.</p>
-            <p><strong>Exemplo:</strong> "30 dias antes da data de embarque → mover para etapa 30D para embarque". Quando faltar 30 dias ou menos para o embarque, a negociação será movida automaticamente.</p>
+            <p><strong>Exemplo:</strong> "30 dias antes da data de agendamento → mover para etapa 30D para agendamento". Quando faltar 30 dias ou menos para o agendamento, a negociação será movida automaticamente.</p>
             <p>Você também pode executar manualmente clicando em "Executar agora" para processar todas as automações imediatamente.</p>
           </CardContent>
         </Card>
@@ -361,7 +361,7 @@ export default function DateAutomationSettings() {
               <Input
                 value={form.name}
                 onChange={(e) => setForm(f => ({ ...f, name: e.target.value }))}
-                placeholder="Ex: Mover para 30D antes do embarque"
+                placeholder="Ex: Mover para 30D antes do agendamento"
               />
             </div>
 

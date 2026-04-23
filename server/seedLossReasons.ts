@@ -15,22 +15,22 @@ export interface DefaultLossReason {
 export const DEFAULT_LOSS_REASONS: DefaultLossReason[] = [
   {
     name: "Orçamento incompatível",
-    description: "O valor da viagem ficou acima do que o cliente estava disposto ou podia investir.",
+    description: "O valor ficou acima do que o cliente estava disposto ou podia investir.",
   },
   {
     name: "Prioridade adiada",
-    description: "O cliente decidiu postergar a compra porque a viagem não era prioridade naquele momento.",
+    description: "O cliente decidiu postergar o serviço porque não era prioridade naquele momento.",
   },
   {
     name: "Data inviável",
-    description: "As datas desejadas não funcionavam para o cliente, acompanhantes ou operação da viagem.",
+    description: "As datas desejadas não funcionavam para o cliente ou para a operação.",
   },
   {
     name: "Proposta sem aderência",
-    description: "A solução apresentada não se encaixou no perfil, expectativa ou objetivo da viagem.",
+    description: "A solução apresentada não se encaixou no perfil, expectativa ou objetivo do cliente.",
   },
   {
-    name: "Indecisão do viajante",
+    name: "Indecisão do cliente",
     description: "O cliente não conseguiu avançar por insegurança, falta de definição ou excesso de dúvidas.",
   },
   {
@@ -39,23 +39,23 @@ export const DEFAULT_LOSS_REASONS: DefaultLossReason[] = [
   },
   {
     name: "Disponibilidade indisponível",
-    description: "Não havia disponibilidade de voo, hotel, serviço, bloqueio ou tarifa no momento da decisão.",
+    description: "Não havia disponibilidade de horário, profissional ou serviço no momento da decisão.",
   },
   {
     name: "Compra por outro canal",
-    description: "O cliente optou por fechar com concorrente, fornecedor direto, site ou outro canal.",
+    description: "O cliente optou por fechar com concorrente ou outro canal.",
   },
   {
     name: "Grupo sem consenso",
-    description: "A decisão dependia de outras pessoas e o grupo ou família não chegou a um acordo.",
+    description: "A decisão dependia de outras pessoas e não chegaram a um acordo.",
   },
   {
     name: "Exigência documental",
-    description: "A negociação travou por visto, passaporte, vacinas, documentação ou exigências do destino.",
+    description: "A negociação travou por documentação ou exigências específicas.",
   },
   {
-    name: "Mudança de plano de viagem",
-    description: "O cliente alterou destino, formato ou contexto da viagem e a negociação perdeu sentido.",
+    name: "Mudança de plano",
+    description: "O cliente alterou a necessidade ou contexto e a negociação perdeu sentido.",
   },
   {
     name: "Atendimento abandonado",
@@ -67,7 +67,7 @@ export const DEFAULT_LOSS_REASONS: DefaultLossReason[] = [
   },
   {
     name: "Rentabilidade inviável",
-    description: "A venda exigia condições que tornavam a operação financeiramente ruim para a agência.",
+    description: "A venda exigia condições que tornavam a operação financeiramente inviável.",
   },
   {
     name: "Cadastro ou negociação inválida",

@@ -27,8 +27,8 @@ const FALLBACK_PLANS: PublicPlan[] = [
     color: null,
     limits: { maxUsers: 1, maxWhatsAppAccounts: 0, maxAttendantsPerAccount: 0 },
     features: [
-      { key: "crmCore", label: "CRM completo (passageiros, negociações, funil, tarefas)", isEnabled: true },
-      { key: "communityAccess", label: "Comunidade Acelera Turismo", isEnabled: true },
+      { key: "crmCore", label: "CRM completo (clientes, negociações, funil, tarefas)", isEnabled: true },
+      { key: "communityAccess", label: "Comunidade exclusiva", isEnabled: true },
       { key: "whatsappEmbedded", label: "WhatsApp integrado ao CRM", isEnabled: false },
       { key: "segmentedBroadcast", label: "Disparo segmentado de mensagens", isEnabled: false },
       { key: "rfvEnabled", label: "Matriz RFV (Classificação Estratégica)", isEnabled: false },
@@ -40,7 +40,7 @@ const FALLBACK_PLANS: PublicPlan[] = [
     slug: "growth",
     name: "Pro",
     description: "Performance e automação para crescer",
-    commercialCopy: "Para agências que querem escalar com WhatsApp e automação.",
+    commercialCopy: "Para negócios que querem escalar com WhatsApp e automação.",
     priceCents: 24900,
     billingCycle: "monthly",
     isPopular: true,
@@ -49,8 +49,8 @@ const FALLBACK_PLANS: PublicPlan[] = [
     color: null,
     limits: { maxUsers: 5, maxWhatsAppAccounts: 1, maxAttendantsPerAccount: 3 },
     features: [
-      { key: "crmCore", label: "CRM completo (passageiros, negociações, funil, tarefas)", isEnabled: true },
-      { key: "communityAccess", label: "Comunidade Acelera Turismo", isEnabled: true },
+      { key: "crmCore", label: "CRM completo (clientes, negociações, funil, tarefas)", isEnabled: true },
+      { key: "communityAccess", label: "Comunidade exclusiva", isEnabled: true },
       { key: "whatsappEmbedded", label: "WhatsApp integrado ao CRM", isEnabled: true },
       { key: "segmentedBroadcast", label: "Disparo segmentado de mensagens", isEnabled: true },
       { key: "rfvEnabled", label: "Matriz RFV (Classificação Estratégica)", isEnabled: true },
@@ -71,8 +71,8 @@ const FALLBACK_PLANS: PublicPlan[] = [
     color: null,
     limits: { maxUsers: -1, maxWhatsAppAccounts: 3, maxAttendantsPerAccount: 10 },
     features: [
-      { key: "crmCore", label: "CRM completo (passageiros, negociações, funil, tarefas)", isEnabled: true },
-      { key: "communityAccess", label: "Comunidade Acelera Turismo", isEnabled: true },
+      { key: "crmCore", label: "CRM completo (clientes, negociações, funil, tarefas)", isEnabled: true },
+      { key: "communityAccess", label: "Comunidade exclusiva", isEnabled: true },
       { key: "whatsappEmbedded", label: "WhatsApp integrado ao CRM", isEnabled: true },
       { key: "segmentedBroadcast", label: "Disparo segmentado de mensagens", isEnabled: true },
       { key: "rfvEnabled", label: "Matriz RFV (Classificação Estratégica)", isEnabled: true },
@@ -127,8 +127,8 @@ const cardStyles = [
 
 // ─── Feature comparison keys ─────────────────────────────────────
 const COMPARISON_FEATURE_KEYS = [
-  { key: "crmCore", label: "CRM completo (passageiros, negociações, funil, tarefas)" },
-  { key: "communityAccess", label: "Comunidade Acelera Turismo" },
+  { key: "crmCore", label: "CRM completo (clientes, negociações, funil, tarefas)" },
+  { key: "communityAccess", label: "Comunidade exclusiva" },
   { key: "whatsappEmbedded", label: "WhatsApp integrado ao CRM" },
   { key: "segmentedBroadcast", label: "Disparo segmentado de mensagens" },
   { key: "rfvEnabled", label: "Matriz RFV (Classificação Estratégica)" },
@@ -145,8 +145,8 @@ function getIncludedFeatures(plan: PublicPlan): string[] {
   const items: string[] = [];
   const featureMap = new Map(plan.features.map((f) => [f.key, f.isEnabled]));
 
-  if (featureMap.get("crmCore")) items.push("CRM completo (passageiros, negociações, funil, tarefas)");
-  if (featureMap.get("communityAccess")) items.push("Comunidade Acelera Turismo");
+  if (featureMap.get("crmCore")) items.push("CRM completo (clientes, negociações, funil, tarefas)");
+  if (featureMap.get("communityAccess")) items.push("Comunidade exclusiva");
 
   const { maxUsers, maxWhatsAppAccounts, maxAttendantsPerAccount } = plan.limits;
   items.push(maxUsers === 1 ? "1 usuário" : maxUsers === -1 ? "Usuários ilimitados" : `Até ${maxUsers} usuários`);
@@ -382,7 +382,7 @@ export function PricingSection({ onSelectPlan }: PricingSectionProps) {
               <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white mb-4 tracking-tight leading-tight">
                 Escolha o plano{" "}
                 <span className="bg-gradient-to-r from-[#FFC7AC] via-[#FF614C] to-[#FF2B61] bg-clip-text text-transparent">
-                  da sua agência
+                  do seu negócio
                 </span>
               </h2>
               <p className="text-lg text-white/40 max-w-xl mx-auto">

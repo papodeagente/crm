@@ -32,7 +32,7 @@ export function ReportForm() {
           email,
           phone: whatsapp,
           source: "landing_page_report",
-          message: "Solicitou relatório automático da agência via LP",
+          message: "Solicitou relatório automático do negócio via LP",
           meta: { formType: "agency_report" },
         }),
       });
@@ -61,7 +61,7 @@ export function ReportForm() {
               <FileText className="w-7 h-7 text-violet-400" />
             </div>
             <h2 className="text-3xl sm:text-4xl font-bold text-white mb-3 tracking-tight">
-              Receba o diagnóstico completo da sua agência
+              Receba o diagnóstico completo do seu negócio
             </h2>
             <p className="text-lg text-white/40">
               Relatório personalizado com estimativa de vendas perdidas, benchmark e projeção de crescimento
@@ -118,7 +118,7 @@ export function ReportForm() {
                   {loading ? (
                     <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Gerando relatório...</>
                   ) : (
-                    <>Gerar meu relatório da agência <ArrowRight className="w-5 h-5 ml-2" /></>
+                    <>Gerar meu relatório do negócio <ArrowRight className="w-5 h-5 ml-2" /></>
                   )}
                 </Button>
 
@@ -149,10 +149,10 @@ export function ReportForm() {
                 </div>
                 <h3 className="text-2xl font-bold text-white mb-2">Relatório solicitado!</h3>
                 <p className="text-white/50 mb-4">
-                  Você receberá o diagnóstico completo da sua agência no email <span className="text-white/70">{email}</span> e também pelo WhatsApp.
+                  Você receberá o diagnóstico completo do seu negócio no email <span className="text-white/70">{email}</span> e também pelo WhatsApp.
                 </p>
                 <p className="text-sm text-white/30">
-                  Enquanto isso, explore as ferramentas interativas acima para conhecer melhor o potencial da sua agência.
+                  Enquanto isso, explore as ferramentas interativas acima para conhecer melhor o potencial do seu negócio.
                 </p>
               </motion.div>
             )}

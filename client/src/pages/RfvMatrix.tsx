@@ -45,7 +45,7 @@ const smartFilterConfig: Record<string, { label: string; description: string; ic
     border: "border-emerald-300 dark:border-emerald-700",
   },
   potencial_indicador_pos_viagem: {
-    label: "Pós Viagem",
+    label: "Pos Servico",
     description: "30 dias após retorno",
     icon: <Plane className="w-4 h-4" />,
     color: "text-sky-600",
@@ -1351,7 +1351,7 @@ export default function RfvMatrix() {
               Resetar Dados RFV
             </DialogTitle>
             <DialogDescription>
-              Esta ação irá excluir permanentemente todos os contatos RFV e logs de ação desta agência.
+              Esta ação irá excluir permanentemente todos os contatos RFV e logs de ação desta conta.
               Os dados do CRM (contatos, negociações) não serão afetados.
             </DialogDescription>
           </DialogHeader>

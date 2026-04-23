@@ -221,7 +221,7 @@ export default function ChatInput({
           <div className="rounded-[8px] overflow-hidden flex items-stretch" style={{ backgroundColor: 'var(--wa-input-bg)' }}>
             <div style={{ width: 4, backgroundColor: 'var(--wa-tint)', flexShrink: 0 }} />
             <div className="flex-1 px-[12px] py-[7px] min-w-0">
-              <p className="text-[12.5px] font-medium" style={{ color: 'var(--wa-tint)' }}>{replyTarget.fromMe ? "Você" : contact?.name || "Passageiro"}</p>
+              <p className="text-[12.5px] font-medium" style={{ color: 'var(--wa-tint)' }}>{replyTarget.fromMe ? "Voce" : contact?.name || "Cliente"}</p>
               <p className="text-[13px] truncate" style={{ color: 'var(--wa-text-secondary)' }}>{replyTarget.content}</p>
             </div>
             <button onClick={onClearReply} className="px-[12px] flex items-center justify-center hover:opacity-70 transition-opacity">

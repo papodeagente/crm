@@ -15,7 +15,7 @@ const items = [
   { type: "camera", icon: Camera, label: "Câmera", color: "#EC4899" },
   { type: "document", icon: FileText, label: "Documento", color: "#6366F1" },
   { type: "location", icon: MapPin, label: "Localização", color: "#10B981" },
-  { type: "contact", icon: Contact, label: "Passageiro", color: "#3B82F6" },
+  { type: "contact", icon: Contact, label: "Cliente", color: "#3B82F6" },
   { type: "poll", icon: BarChart3, label: "Enquete", color: "#F59E0B" },
 ];
 

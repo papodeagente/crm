@@ -237,16 +237,16 @@ const AUTOMATION_CATEGORIES: AutomationCategory[] = [
   },
   {
     id: "travel_dates",
-    title: "Para datas da viagem",
-    description: "Automações baseadas em datas de embarque, retorno e fechamento",
+    title: "Para datas do servico",
+    description: "Automacoes baseadas em datas de agendamento, retorno e fechamento",
     icon: Plane,
     color: "text-cyan-400",
     templates: [
       {
         id: "boarding_move",
-        title: "Mover etapa próximo ao embarque",
-        description: "Mova automaticamente a negociação para uma etapa específica quando estiver próximo da data de embarque.",
-        trigger: "Próximo ao embarque",
+        title: "Mover etapa proximo ao agendamento",
+        description: "Mova automaticamente a negociacao para uma etapa especifica quando estiver proximo da data de agendamento.",
+        trigger: "Proximo ao agendamento",
         action: "Mover etapa",
         category: "travel_dates",
         icon: Plane,
@@ -257,8 +257,8 @@ const AUTOMATION_CATEGORIES: AutomationCategory[] = [
       },
       {
         id: "return_move",
-        title: "Mover etapa após retorno",
-        description: "Mova a negociação para pós-viagem automaticamente quando a data de retorno chegar.",
+        title: "Mover etapa apos retorno",
+        description: "Mova a negociacao para pos-servico automaticamente quando a data de retorno chegar.",
         trigger: "Data de retorno",
         action: "Mover etapa",
         category: "travel_dates",
@@ -271,7 +271,7 @@ const AUTOMATION_CATEGORIES: AutomationCategory[] = [
       {
         id: "deadline_task",
         title: "Criar tarefa por data de referência",
-        description: "Crie tarefas com prazo relativo à data de embarque, retorno ou fechamento previsto.",
+        description: "Crie tarefas com prazo relativo a data de agendamento, retorno ou fechamento previsto.",
         trigger: "Data de referência",
         action: "Criar tarefa",
         category: "travel_dates",
@@ -293,8 +293,8 @@ const AUTOMATION_CATEGORIES: AutomationCategory[] = [
       {
         id: "post_sale_task",
         title: "Criar tarefa de pós-venda",
-        description: "Crie tarefas de acompanhamento pós-viagem para garantir a satisfação do cliente.",
-        trigger: "Viagem finalizada",
+        description: "Crie tarefas de acompanhamento pos-servico para garantir a satisfacao do cliente.",
+        trigger: "Servico finalizado",
         action: "Criar tarefa",
         category: "post_sale",
         icon: Heart,
@@ -305,9 +305,9 @@ const AUTOMATION_CATEGORIES: AutomationCategory[] = [
       },
       {
         id: "post_sale_classify",
-        title: "Classificar cliente após viagem",
-        description: "Atualize a classificação do contato automaticamente com base no histórico de viagens e compras.",
-        trigger: "Viagem finalizada",
+        title: "Classificar cliente apos servico",
+        description: "Atualize a classificacao do contato automaticamente com base no historico de servicos e compras.",
+        trigger: "Servico finalizado",
         action: "Classificar contato",
         category: "post_sale",
         icon: Heart,
@@ -341,8 +341,8 @@ const AUTOMATION_CATEGORIES: AutomationCategory[] = [
       {
         id: "referral_window",
         title: "Janela de indicação pós-venda",
-        description: "Identifique automaticamente o momento ideal para pedir indicações após uma viagem bem-sucedida.",
-        trigger: "Pós-viagem",
+        description: "Identifique automaticamente o momento ideal para pedir indicacoes apos um servico bem-sucedido.",
+        trigger: "Pos-servico",
         action: "Abrir janela de indicação",
         category: "relationship",
         icon: RotateCcw,
@@ -374,8 +374,8 @@ const TASK_TYPE_LABELS: Record<string, { label: string; icon: any }> = {
 };
 
 const DATE_FIELD_LABELS: Record<string, string> = {
-  boardingDate: "Data do embarque",
-  returnDate: "Data do retorno",
+  appointmentDate: "Data do agendamento",
+  followUpDate: "Data de retorno/revisao",
   expectedCloseAt: "Fechamento previsto",
   createdAt: "Data de criação",
 };

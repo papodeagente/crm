@@ -30,8 +30,8 @@ const TASK_TYPE_OPTIONS = [
 
 const DEADLINE_REF_OPTIONS = [
   { value: "current_date", label: "Data atual (ao mover)", icon: CalendarDays },
-  { value: "boarding_date", label: "Data do embarque", icon: Plane },
-  { value: "return_date", label: "Data do retorno", icon: RotateCcw },
+  { value: "boarding_date", label: "Data do agendamento", icon: Plane },
+  { value: "return_date", label: "Data do retorno/revisão", icon: RotateCcw },
 ];
 
 interface AutomationFormData {
@@ -250,8 +250,8 @@ export default function TaskAutomationSettings() {
               <p className="text-sm font-medium text-amber-900">Como funciona a automação de tarefas</p>
               <p className="text-xs text-amber-800 mt-1">
                 Quando uma negociação é movida para uma etapa do funil, o sistema cria automaticamente as tarefas configuradas.
-                O prazo pode ser calculado com base na <strong>data atual</strong>, na <strong>data do embarque</strong> ou na <strong>data do retorno</strong> da negociação.
-                Use valores negativos para criar tarefas com prazo ANTES da data de referência (ex: -30 = 30 dias antes do embarque).
+                O prazo pode ser calculado com base na <strong>data atual</strong>, na <strong>data do agendamento</strong> ou na <strong>data do retorno</strong> da negociação.
+                Use valores negativos para criar tarefas com prazo ANTES da data de referência (ex: -30 = 30 dias antes do agendamento).
               </p>
             </div>
           </div>
@@ -509,7 +509,7 @@ export default function TaskAutomationSettings() {
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground mt-1">
-                Use "Data do embarque" ou "Data do retorno" para tarefas do funil de pós-venda.
+                Use "Data do agendamento" ou "Data do retorno" para tarefas do funil de pós-venda.
               </p>
             </div>
 

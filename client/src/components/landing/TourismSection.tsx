@@ -1,31 +1,39 @@
 import { FadeIn } from "./FadeIn";
-import { MapPin, Package, GitBranch, BarChart3 } from "lucide-react";
+import { CalendarCheck, MessageCircle, UserPlus, Heart } from "lucide-react";
 
 const cards = [
   {
-    icon: MapPin,
-    title: "Destinos, datas, passageiros",
+    icon: CalendarCheck,
+    title: "Agendamento inteligente",
     description:
-      "Cada negociação tem campos de embarque, retorno, destino e passageiros. Não é um formulário genérico.",
+      "Controle datas de servico, retorno e revisao de cada cliente. Saiba exatamente quem atender e quando.",
   },
   {
-    icon: Package,
-    title: "Catálogo de produtos turísticos",
+    icon: MessageCircle,
+    title: "WhatsApp integrado",
     description:
-      "Cadastre pacotes, passeios e serviços com preço base e custo. Vincule direto à negociação.",
+      "Converse com seus clientes direto pelo CRM. Historico completo, mensagens rapidas e follow-up automatico.",
   },
   {
-    icon: GitBranch,
-    title: "Múltiplos funis por contexto",
+    icon: UserPlus,
+    title: "Indicacoes e captacao",
     description:
-      "Vendas para converter. Pós-venda para entregar. Suporte para resolver. Cada um com automações próprias.",
+      "Rastreie a origem de cada cliente — indicacao, Instagram, Google. Saiba de onde vem seus melhores resultados.",
   },
   {
-    icon: BarChart3,
-    title: "Relatórios que fazem sentido",
+    icon: Heart,
+    title: "Fidelizacao e recorrencia",
     description:
-      "Conversão por etapa, motivos de perda, fontes de leads, ticket médio por produto, rastreamento UTM.",
+      "Classifique clientes, acompanhe frequencia de retorno e crie campanhas para manter sua base ativa.",
   },
+];
+
+const segments = [
+  "Estetica",
+  "Odontologia",
+  "Salao",
+  "Advocacia",
+  "Clinicas",
 ];
 
 export function TourismSection() {
@@ -39,13 +47,13 @@ export function TourismSection() {
         <FadeIn>
           <div className="text-center mb-14">
             <p className="text-sm font-medium text-white/60 uppercase tracking-wider mb-4">
-              Feito para turismo
+              Feito para negocios locais
             </p>
             <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white tracking-tight leading-tight">
-              Não é um CRM adaptado.{" "}
+              CRM feito para negocios locais.{" "}
               <br className="hidden sm:block" />
               <span className="bg-gradient-to-r from-[#FFC7AC] via-[#FF614C] to-[#FF2B61] bg-clip-text text-transparent">
-                Foi construído para vender viagens.
+                Agendamento, WhatsApp, indicacoes e fidelizacao.
               </span>
             </h2>
           </div>
@@ -70,10 +78,22 @@ export function TourismSection() {
         </div>
 
         <FadeIn delay={0.6}>
-          <p className="text-center text-base text-white/40 max-w-2xl mx-auto leading-relaxed">
-            Criado pela Escola de Negócios do Turismo
-            com base em 15.000 agentes treinados.
-          </p>
+          <div className="text-center">
+            <div className="flex flex-wrap justify-center gap-3 mb-6">
+              {segments.map((seg) => (
+                <span
+                  key={seg}
+                  className="px-4 py-1.5 rounded-full text-sm font-medium bg-white/[0.06] text-white/60 border border-white/[0.08]"
+                >
+                  {seg}
+                </span>
+              ))}
+            </div>
+            <p className="text-base text-white/40 max-w-2xl mx-auto leading-relaxed">
+              Ideal para qualquer negocio local que precisa de agenda,
+              relacionamento e vendas organizadas.
+            </p>
+          </div>
         </FadeIn>
       </div>
     </section>

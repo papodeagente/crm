@@ -55,19 +55,28 @@ export const SALES_PIPELINE_STAGES = [
 
 export const POST_SALE_PIPELINE_STAGES = [
   { name: "Nova venda", orderIndex: 0, probabilityDefault: 100, color: "#3b82f6" },
-  { name: "Aguardando embarque", orderIndex: 1, probabilityDefault: 100, color: "#06b6d4" },
-  { name: "30D para embarque", orderIndex: 2, probabilityDefault: 100, color: "#8b5cf6" },
-  { name: "Pré viagem", orderIndex: 3, probabilityDefault: 100, color: "#f59e0b" },
-  { name: "Em viagem", orderIndex: 4, probabilityDefault: 100, color: "#22c55e" },
-  { name: "Pós viagem", orderIndex: 5, probabilityDefault: 100, color: "#f97316" },
-  { name: "Viagem finalizada", orderIndex: 6, probabilityDefault: 100, color: "#10b981" },
+  { name: "Agendado", orderIndex: 1, probabilityDefault: 100, color: "#06b6d4" },
+  { name: "Confirmado", orderIndex: 2, probabilityDefault: 100, color: "#8b5cf6" },
+  { name: "Em atendimento", orderIndex: 3, probabilityDefault: 100, color: "#f59e0b" },
+  { name: "Follow-up", orderIndex: 4, probabilityDefault: 100, color: "#22c55e" },
+  { name: "Pós atendimento", orderIndex: 5, probabilityDefault: 100, color: "#f97316" },
+  { name: "Finalizado", orderIndex: 6, probabilityDefault: 100, color: "#10b981" },
 ];
 
 // ═══════════════════════════════════════
 // TENANT ONBOARDING — Create default pipelines
 // ═══════════════════════════════════════
 
-export async function createDefaultPipelines(tenantId: number): Promise<{ salesPipelineId: number; postSalePipelineId: number } | null> {
+// Segment-specific pipeline names
+const SEGMENT_PIPELINE_NAMES: Record<string, { sales: string; postSale: string }> = {
+  estetica: { sales: "Funil de Vendas - Estética", postSale: "Pós-Atendimento - Estética" },
+  odontologia: { sales: "Funil de Vendas - Odontologia", postSale: "Pós-Atendimento - Odontologia" },
+  advocacia: { sales: "Funil de Vendas - Advocacia", postSale: "Pós-Atendimento - Advocacia" },
+  salao: { sales: "Funil de Vendas - Salão", postSale: "Pós-Atendimento - Salão" },
+  clinica: { sales: "Funil de Vendas - Clínica", postSale: "Pós-Atendimento - Clínica" },
+};
+
+export async function createDefaultPipelines(tenantId: number, segment?: string): Promise<{ salesPipelineId: number; postSalePipelineId: number } | null> {
   const db = await getDb();
   if (!db) return null;
 
@@ -79,9 +88,10 @@ export async function createDefaultPipelines(tenantId: number): Promise<{ salesP
   }
 
   // Create Sales Pipeline
+  const pipelineNames = segment && SEGMENT_PIPELINE_NAMES[segment] ? SEGMENT_PIPELINE_NAMES[segment] : { sales: "Funil de Vendas", postSale: "Funil de Pós-Venda" };
   const [salesPipeline] = await db.insert(pipelines).values({
     tenantId,
-    name: "Funil de Vendas",
+    name: pipelineNames.sales,
     description: "Pipeline principal de vendas com classificação automática de leads e oportunidades",
     color: "#3b82f6",
     pipelineType: "sales",
@@ -100,8 +110,8 @@ export async function createDefaultPipelines(tenantId: number): Promise<{ salesP
   // Create Post-Sale Pipeline
   const [postSalePipeline] = await db.insert(pipelines).values({
     tenantId,
-    name: "Funil de Pós-Venda",
-    description: "Pipeline de acompanhamento pós-venda com etapas de viagem",
+    name: pipelineNames.postSale,
+    description: "Pipeline de acompanhamento pós-venda com etapas de atendimento",
     color: "#22c55e",
     pipelineType: "post_sale",
     isDefault: false,

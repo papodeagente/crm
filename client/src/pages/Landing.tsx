@@ -14,7 +14,7 @@ export default function Landing() {
   const [, navigate] = useLocation();
 
   useEffect(() => {
-    document.title = "Entur OS — CRM para Agências de Viagens";
+    document.title = "Entur OS — CRM para Negocios Locais";
   }, []);
 
   const goToRegister = (plan?: string) => {
@@ -35,7 +35,7 @@ export default function Landing() {
       {/* SEÇÃO 4 — Diferenciais (id=como-funciona) */}
       <DifferentialsSection onRegister={() => goToRegister()} />
 
-      {/* SEÇÃO 5 — Feito para Turismo */}
+      {/* SECAO 5 — Feito para Negocios Locais */}
       <TourismSection />
 
       {/* SEÇÃO 6 — Resultados */}

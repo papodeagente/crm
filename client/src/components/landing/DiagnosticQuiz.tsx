@@ -42,7 +42,7 @@ export function DiagnosticQuiz({ onCTA }: DiagnosticQuizProps) {
               <Stethoscope className="w-7 h-7 text-violet-400" />
             </div>
             <h2 className="text-3xl sm:text-4xl font-bold text-white mb-3 tracking-tight">
-              Diagnóstico rápido da sua agência
+              Diagnóstico rápido do seu negócio
             </h2>
             <p className="text-lg text-white/40">
               Quantas dessas situações acontecem na sua rotina?
@@ -97,14 +97,14 @@ export function DiagnosticQuiz({ onCTA }: DiagnosticQuizProps) {
                       <div>
                         <p className="font-semibold text-white mb-1">
                           {checkedCount >= 2
-                            ? "Sua agência tem um vazamento silencioso de vendas."
-                            : "Sua agência pode estar perdendo oportunidades."}
+                            ? "Seu negócio tem um vazamento silencioso de vendas."
+                            : "Seu negócio pode estar perdendo oportunidades."}
                         </p>
                         <p className="text-sm text-white/50 mb-4">
                           {checkedCount >= 4
                             ? `Você marcou ${checkedCount} de 5 situações. Isso indica uma perda significativa de receita por falta de processo comercial.`
                             : checkedCount >= 2
-                            ? `Você marcou ${checkedCount} de 5 situações. Cada uma delas representa vendas que estão escapando da sua agência.`
+                            ? `Você marcou ${checkedCount} de 5 situações. Cada uma delas representa vendas que estão escapando do seu negócio.`
                             : `Mesmo ${checkedCount} situação já pode representar milhares de reais perdidos por mês.`}
                         </p>
                         <Button

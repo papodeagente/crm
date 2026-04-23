@@ -480,8 +480,8 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
         pipelineId: z.number(), stageId: z.number(),
         ownerUserId: z.number().optional(), teamId: z.number().optional(),
         leadSource: z.string().optional(), channelOrigin: z.string().optional(),
-        boardingDate: z.string().nullable().optional(),
-        returnDate: z.string().nullable().optional(),
+        appointmentDate: z.string().nullable().optional(),
+        followUpDate: z.string().nullable().optional(),
         products: z.array(z.object({
           productId: z.number(),
           quantity: z.number().default(1),
@@ -490,15 +490,15 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
         })).optional(),
       }))
       .mutation(async ({ ctx, input }) => {
-        const { products: productItems, boardingDate, returnDate, ...dealInput } = input;
+        const { products: productItems, appointmentDate, followUpDate, ...dealInput } = input;
         // REGRA 1: Auto-assign owner to the creating user if not specified
         const result = await crm.createDeal({
           ...dealInput,
           tenantId: getTenantId(ctx),
           ownerUserId: dealInput.ownerUserId || ctx.saasUser?.userId || ctx.user.id,
           createdBy: ctx.user.id,
-          boardingDate: boardingDate ? new Date(boardingDate) : null,
-          returnDate: returnDate ? new Date(returnDate) : null,
+          appointmentDate: appointmentDate ? new Date(appointmentDate) : null,
+          followUpDate: followUpDate ? new Date(followUpDate) : null,
         });
         // Log creation in deal history
         if (result?.id) {
@@ -531,7 +531,7 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
                 unitPriceCents: unitPrice,
                 discountCents: discount,
                 finalPriceCents: finalPrice,
-                supplier: catalogProduct.supplier || undefined,
+                professional: catalogProduct.professional || undefined,
               });
             }
             await crm.recalcDealValue(getTenantId(ctx), result.id);
@@ -558,8 +558,8 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
         leadSource: z.string().nullable().optional(),
         lossReasonId: z.number().nullable().optional(),
         lossNotes: z.string().nullable().optional(),
-        boardingDate: z.string().nullable().optional(),
-        returnDate: z.string().nullable().optional(),
+        appointmentDate: z.string().nullable().optional(),
+        followUpDate: z.string().nullable().optional(),
       }))
       .mutation(async ({ ctx, input }) => {
 const tenantId = getTenantId(ctx); const { id, ...data } = input;
@@ -577,13 +577,13 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
         }
         // Get current deal for history
         const currentDeal = await crm.getDealById(tenantId, id);
-        const { expectedCloseAt, boardingDate, returnDate, ...restData } = data;
+        const { expectedCloseAt, appointmentDate, followUpDate, ...restData } = data;
         const updatePayload: any = { ...restData, updatedBy: ctx.user.id };
-        if (boardingDate !== undefined) {
-          updatePayload.boardingDate = boardingDate ? new Date(boardingDate) : null;
+        if (appointmentDate !== undefined) {
+          updatePayload.appointmentDate = appointmentDate ? new Date(appointmentDate) : null;
         }
-        if (returnDate !== undefined) {
-          updatePayload.returnDate = returnDate ? new Date(returnDate) : null;
+        if (followUpDate !== undefined) {
+          updatePayload.followUpDate = followUpDate ? new Date(followUpDate) : null;
         }
         // Clear loss fields when reopening
         if (data.status === "open" || data.status === "won") {
@@ -729,7 +729,7 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
               getTenantId(ctx),
               input.dealId,
               input.toStageId,
-              { ownerUserId: deal.ownerUserId, boardingDate: deal.boardingDate, returnDate: deal.returnDate },
+              { ownerUserId: deal.ownerUserId, appointmentDate: deal.appointmentDate, followUpDate: deal.followUpDate },
               ctx.user.id
             );
             if (createdTaskIds.length > 0) {
@@ -829,7 +829,7 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
             getTenantId(ctx),
             input.dealId,
             input.newStageId,
-            { ownerUserId: deal.ownerUserId, boardingDate: deal.boardingDate, returnDate: deal.returnDate },
+            { ownerUserId: deal.ownerUserId, appointmentDate: deal.appointmentDate, followUpDate: deal.followUpDate },
             ctx.user.id
           );
           if (createdTaskIds.length > 0) {
@@ -955,19 +955,19 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
           quantity: z.number().default(1),
           unitPriceCents: z.number().optional(),  // override do preço (se não informado, usa base do catálogo)
           discountCents: z.number().optional(),
-          supplier: z.string().optional(),
-          checkIn: z.string().optional(), checkOut: z.string().optional(), notes: z.string().optional(),
+          professional: z.string().optional(),
+          serviceStart: z.string().optional(), serviceEnd: z.string().optional(), notes: z.string().optional(),
         }))
         .mutation(async ({ ctx, input }) => {
           // Buscar produto do catálogo para snapshot
           const catalogProduct = await crm.getCatalogProductById(getTenantId(ctx), input.productId);
           if (!catalogProduct) throw new TRPCError({ code: "NOT_FOUND", message: "Produto não encontrado no catálogo" });
           if (!catalogProduct.isActive) throw new TRPCError({ code: "BAD_REQUEST", message: "Produto desativado. Não é possível adicionar a novas negociações." });
-          
+
           const unitPrice = input.unitPriceCents ?? catalogProduct.basePriceCents;
           const discount = input.discountCents || 0;
           const finalPrice = input.quantity * unitPrice - discount;
-          
+
           const result = await crm.createDealProduct({
             tenantId: getTenantId(ctx),
             dealId: input.dealId,
@@ -979,9 +979,9 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
             unitPriceCents: unitPrice,
             discountCents: discount,
             finalPriceCents: finalPrice,
-            supplier: input.supplier || catalogProduct.supplier || undefined,
-            checkIn: input.checkIn ? new Date(input.checkIn) : undefined,
-            checkOut: input.checkOut ? new Date(input.checkOut) : undefined,
+            professional: input.professional || catalogProduct.professional || undefined,
+            serviceStart: input.serviceStart ? new Date(input.serviceStart) : undefined,
+            serviceEnd: input.serviceEnd ? new Date(input.serviceEnd) : undefined,
             notes: input.notes,
           });
           await crm.createDealHistory({
@@ -997,11 +997,11 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
         .input(z.object({
           id: z.number(), dealId: z.number(),
           quantity: z.number().optional(), unitPriceCents: z.number().optional(),
-          discountCents: z.number().optional(), supplier: z.string().optional(),
-          checkIn: z.string().optional(), checkOut: z.string().optional(), notes: z.string().optional(),
+          discountCents: z.number().optional(), professional: z.string().optional(),
+          serviceStart: z.string().optional(), serviceEnd: z.string().optional(), notes: z.string().optional(),
         }))
         .mutation(async ({ ctx, input }) => {
-const tenantId = getTenantId(ctx); const { id, dealId, checkIn, checkOut, ...data } = input;
+const tenantId = getTenantId(ctx); const { id, dealId, serviceStart, serviceEnd, ...data } = input;
           // Recalcular finalPriceCents se quantidade ou preço mudou
           const existing = await crm.getDealProduct(tenantId, id);
           const qty = data.quantity ?? existing?.quantity ?? 1;
@@ -1012,8 +1012,8 @@ const tenantId = getTenantId(ctx); const { id, dealId, checkIn, checkOut, ...dat
           await crm.updateDealProduct(tenantId, id, {
             ...data,
             finalPriceCents: finalPrice,
-            checkIn: checkIn ? new Date(checkIn) : undefined,
-            checkOut: checkOut ? new Date(checkOut) : undefined,
+            serviceStart: serviceStart ? new Date(serviceStart) : undefined,
+            serviceEnd: serviceEnd ? new Date(serviceEnd) : undefined,
           });
           await crm.createDealHistory({
             tenantId, dealId, action: "product_updated",
@@ -1368,7 +1368,7 @@ const tenantId = getTenantId(ctx); const { id, dealId, checkIn, checkOut, ...dat
       add: tenantWriteProcedure
         .input(z.object({
           dealId: z.number(), contactId: z.number(),
-          role: z.enum(["decision_maker", "traveler", "payer", "companion", "other"]).optional(),
+          role: z.enum(["decision_maker", "client", "payer", "dependent", "other"]).optional(),
         }))
         .mutation(async ({ ctx, input }) => {
           const result = await crm.addDealParticipant({ ...input, tenantId: getTenantId(ctx) });
@@ -1446,29 +1446,29 @@ const tenantId = getTenantId(ctx); const { id, dealId, checkIn, checkOut, ...dat
     }),
   }),
 
-  // ─── TRIPS ───
+  // ─── SERVICE DELIVERIES (formerly Trips) ───
   trips: router({
     list: tenantProcedure
-      
+
       .query(async ({ input, ctx }) => {
-        return crm.listTrips(getTenantId(ctx));
+        return crm.listServiceDeliveries(getTenantId(ctx));
       }),
     get: tenantProcedure
       .input(z.object({ id: z.number() }))
       .query(async ({ input, ctx }) => {
-        return crm.getTripById(getTenantId(ctx), input.id);
+        return crm.getServiceDeliveryById(getTenantId(ctx), input.id);
       }),
     create: tenantWriteProcedure
       .input(z.object({
-        dealId: z.number().optional(), destinationSummary: z.string().optional(),
+        dealId: z.number().optional(), serviceSummary: z.string().optional(),
         startDate: z.string().optional(), endDate: z.string().optional(), ownerUserId: z.number().optional(),
       }))
       .mutation(async ({ ctx, input }) => {
-        const result = await crm.createTrip({ ...input, tenantId: getTenantId(ctx), startDate: input.startDate ? new Date(input.startDate) : undefined,
+        const result = await crm.createServiceDelivery({ ...input, tenantId: getTenantId(ctx), startDate: input.startDate ? new Date(input.startDate) : undefined,
           endDate: input.endDate ? new Date(input.endDate) : undefined,
           createdBy: ctx.user.id,
         });
-        await emitEvent({ tenantId: getTenantId(ctx), actorUserId: ctx.user.id, entityType: "trip", entityId: result?.id, action: "create" });
+        await emitEvent({ tenantId: getTenantId(ctx), actorUserId: ctx.user.id, entityType: "service_delivery", entityId: result?.id, action: "create" });
         return result;
       }),
   }),
@@ -1968,7 +1968,7 @@ const tenantId = getTenantId(ctx); const { id, dueAt, ...data } = input;
         taskTitle: z.string().min(1),
         taskDescription: z.string().optional(),
         taskType: z.enum(["whatsapp", "phone", "email", "video", "task"]).default("task"),
-        deadlineReference: z.enum(["current_date", "boarding_date", "return_date"]).default("current_date"),
+        deadlineReference: z.enum(["current_date", "appointment_date", "follow_up_date"]).default("current_date"),
         deadlineOffsetDays: z.number().default(0),
         deadlineOffsetUnit: z.enum(["minutes", "hours", "days"]).default("days"),
         deadlineTime: z.string().default("09:00"),
@@ -1987,7 +1987,7 @@ const tenantId = getTenantId(ctx); const { id, dueAt, ...data } = input;
         taskTitle: z.string().min(1).optional(),
         taskDescription: z.string().nullable().optional(),
         taskType: z.enum(["whatsapp", "phone", "email", "video", "task"]).optional(),
-        deadlineReference: z.enum(["current_date", "boarding_date", "return_date"]).optional(),
+        deadlineReference: z.enum(["current_date", "appointment_date", "follow_up_date"]).optional(),
         deadlineOffsetDays: z.number().optional(),
         deadlineOffsetUnit: z.enum(["minutes", "hours", "days"]).optional(),
         deadlineTime: z.string().optional(),
@@ -2023,7 +2023,7 @@ const tenantId = getTenantId(ctx); const { id, dueAt, ...data } = input;
       .input(z.object({
         name: z.string().min(1), description: z.string().optional(),
         pipelineId: z.number(),
-        dateField: z.enum(["boardingDate", "returnDate", "expectedCloseAt", "createdAt"]),
+        dateField: z.enum(["appointmentDate", "followUpDate", "expectedCloseAt", "createdAt"]),
         condition: z.enum(["days_before", "days_after", "on_date"]),
         offsetDays: z.number().min(0).default(0),
         sourceStageId: z.number().optional(),
@@ -2038,7 +2038,7 @@ const tenantId = getTenantId(ctx); const { id, dueAt, ...data } = input;
       .input(z.object({
         id: z.number(),
         name: z.string().optional(), description: z.string().optional(),
-        dateField: z.enum(["boardingDate", "returnDate", "expectedCloseAt", "createdAt"]).optional(),
+        dateField: z.enum(["appointmentDate", "followUpDate", "expectedCloseAt", "createdAt"]).optional(),
         condition: z.enum(["days_before", "days_after", "on_date"]).optional(),
         offsetDays: z.number().min(0).optional(),
         sourceStageId: z.number().nullable().optional(),

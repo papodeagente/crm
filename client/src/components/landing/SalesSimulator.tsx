@@ -52,7 +52,7 @@ export function SalesSimulator({ onCTA }: SalesSimulatorProps) {
                 <TrendingUp className="w-6 h-6 text-violet-400" />
               </div>
               <h3 className="text-xl sm:text-2xl font-bold text-white mb-2 tracking-tight">
-                Quantos atendimentos sua agência faz por mês?
+                Quantos atendimentos seu negócio faz por mês?
               </h3>
             </div>
 
@@ -86,13 +86,13 @@ export function SalesSimulator({ onCTA }: SalesSimulatorProps) {
                     {/* Resultado dinâmico */}
                     <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-5">
                       <p className="text-sm text-white/50 leading-relaxed">
-                        Se sua agência atende <span className="text-white font-semibold">{atendimentos} clientes</span> por mês
+                        Se seu negócio atende <span className="text-white font-semibold">{atendimentos} clientes</span> por mês
                         e fecha cerca de <span className="text-white font-semibold">15% das vendas</span>,
                         isso significa que <span className="text-amber-400 font-semibold">{result.leadsNaoConvertidos} clientes não compraram</span>.
                       </p>
                       <p className="text-sm text-white/50 leading-relaxed mt-3">
                         Se apenas <span className="text-white font-semibold">10% desses clientes</span> voltarem a negociar,
-                        sua agência pode gerar:
+                        seu negócio pode gerar:
                       </p>
 
                       <div className="grid sm:grid-cols-2 gap-3 mt-4">
@@ -111,7 +111,7 @@ export function SalesSimulator({ onCTA }: SalesSimulatorProps) {
                     <div className="bg-violet-500/[0.05] border border-violet-500/15 rounded-xl p-5">
                       <p className="text-sm text-white/60 leading-relaxed">
                         <span className="text-white font-medium">Essas vendas não estão perdidas.</span>{" "}
-                        Elas apenas ficaram esquecidas na sua base de passageiros.
+                        Elas apenas ficaram esquecidas na sua base de clientes.
                       </p>
                       <p className="text-sm text-white/50 leading-relaxed mt-3">
                         O <span className="text-violet-300 font-semibold">ENTUR OS</span> usa a{" "}
@@ -127,7 +127,7 @@ export function SalesSimulator({ onCTA }: SalesSimulatorProps) {
                     {/* CTA Final */}
                     <div className="text-center pt-1">
                       <p className="text-sm text-white/40 mb-3">
-                        Essas vendas já passaram pela sua agência. Agora você precisa encontrá-las novamente.
+                        Essas vendas já passaram pela seu negócio. Agora você precisa encontrá-las novamente.
                       </p>
                       <Button
                         className="h-12 px-8 bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white font-semibold border-0 shadow-lg shadow-violet-500/20"

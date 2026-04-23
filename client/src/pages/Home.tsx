@@ -746,7 +746,7 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Second row: Embarques card */}
+        {/* Second row: Agendamentos card */}
         {departures && departures.length > 0 && (
           <div className="mt-3">
             <button
@@ -756,11 +756,11 @@ export default function Home() {
               <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-sky-400 to-blue-500" />
               <div className="flex items-center gap-4">
                 <div className="h-12 w-12 rounded-xl flex items-center justify-center bg-sky-500/10 shrink-0">
-                  <Plane className="h-5 w-5 text-sky-500" />
+                  <CalendarDays className="h-5 w-5 text-sky-500" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className="text-[11px] font-bold text-sky-600 dark:text-sky-400 uppercase tracking-wider">Próximos Embarques</span>
+                    <span className="text-[11px] font-bold text-sky-600 dark:text-sky-400 uppercase tracking-wider">Proximos Agendamentos</span>
                     <span className="text-[10px] bg-sky-500/15 text-sky-500 px-2 py-0.5 rounded-full font-bold">
                       {departures.length}
                     </span>
@@ -768,19 +768,19 @@ export default function Home() {
                   <p className="text-[11px] text-muted-foreground mt-0.5">
                     {(() => {
                       const today = departures.filter((d: any) => {
-                        const bd = new Date(d.boardingDate);
+                        const bd = new Date(d.appointmentDate);
                         const diff = Math.ceil((bd.getTime() - Date.now()) / (1000*60*60*24));
                         return diff <= 0;
                       }).length;
                       const thisWeek = departures.filter((d: any) => {
-                        const bd = new Date(d.boardingDate);
+                        const bd = new Date(d.appointmentDate);
                         const diff = Math.ceil((bd.getTime() - Date.now()) / (1000*60*60*24));
                         return diff > 0 && diff <= 7;
                       }).length;
                       const parts = [];
                       if (today > 0) parts.push(`${today} hoje`);
                       if (thisWeek > 0) parts.push(`${thisWeek} esta semana`);
-                      return parts.length > 0 ? parts.join(' · ') : 'Viagens com data de embarque';
+                      return parts.length > 0 ? parts.join(' · ') : 'Servicos com data agendada';
                     })()}
                   </p>
                 </div>
@@ -788,11 +788,11 @@ export default function Home() {
                   {/* Mini urgency badges */}
                   {(() => {
                     const todayCount = departures.filter((d: any) => {
-                      const diff = Math.ceil((new Date(d.boardingDate).getTime() - Date.now()) / (1000*60*60*24));
+                      const diff = Math.ceil((new Date(d.appointmentDate).getTime() - Date.now()) / (1000*60*60*24));
                       return diff <= 0;
                     }).length;
                     const soonCount = departures.filter((d: any) => {
-                      const diff = Math.ceil((new Date(d.boardingDate).getTime() - Date.now()) / (1000*60*60*24));
+                      const diff = Math.ceil((new Date(d.appointmentDate).getTime() - Date.now()) / (1000*60*60*24));
                       return diff > 0 && diff <= 3;
                     }).length;
                     return (
@@ -1067,24 +1067,24 @@ export default function Home() {
           <DialogHeader>
             <div className="flex items-center gap-3">
               <div className="h-10 w-10 rounded-xl flex items-center justify-center bg-sky-500/10 text-sky-500">
-                <Plane className="h-5 w-5" />
+                <CalendarDays className="h-5 w-5" />
               </div>
               <div>
-                <DialogTitle className="text-lg">Próximos Embarques</DialogTitle>
+                <DialogTitle className="text-lg">Proximos Agendamentos</DialogTitle>
                 <DialogDescription className="text-[12px]">
-                  {departures?.length ?? 0} viagen{(departures?.length ?? 0) !== 1 ? 's' : ''} com embarque nos próximos dias
+                  {departures?.length ?? 0} servico{(departures?.length ?? 0) !== 1 ? 's' : ''} agendados nos proximos dias
                 </DialogDescription>
               </div>
             </div>
           </DialogHeader>
           <ScrollArea className="max-h-[60vh] mt-2">
             {(!departures || departures.length === 0) ? (
-              <div className="py-8 text-center text-muted-foreground text-sm">Nenhum embarque próximo encontrado</div>
+              <div className="py-8 text-center text-muted-foreground text-sm">Nenhum agendamento proximo encontrado</div>
             ) : (
               <div className="space-y-1">
                 {departures.map((dep: any) => {
-                  const boardDate = dep.boardingDate ? new Date(dep.boardingDate) : null;
-                  const retDate = dep.returnDate ? new Date(dep.returnDate) : null;
+                  const boardDate = dep.appointmentDate ? new Date(dep.appointmentDate) : null;
+                  const retDate = dep.followUpDate ? new Date(dep.followUpDate) : null;
                   const now = new Date();
                   const daysUntil = boardDate ? Math.ceil((boardDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)) : null;
 
@@ -1127,13 +1127,13 @@ export default function Home() {
                             {boardDate && (
                               <span className="text-[11px] text-muted-foreground flex items-center gap-1">
                                 <CalendarDays className="h-3 w-3" />
-                                Embarque: {boardDate.toLocaleDateString(SYSTEM_LOCALE, { day: '2-digit', month: 'short', year: 'numeric', timeZone: SYSTEM_TIMEZONE })}
+                                Agendamento: {boardDate.toLocaleDateString(SYSTEM_LOCALE, { day: '2-digit', month: 'short', year: 'numeric', timeZone: SYSTEM_TIMEZONE })}
                               </span>
                             )}
                             {retDate && (
                               <span className="text-[11px] text-muted-foreground flex items-center gap-1">
                                 <MapPin className="h-3 w-3" />
-                                Retorno: {retDate.toLocaleDateString(SYSTEM_LOCALE, { day: '2-digit', month: 'short', timeZone: SYSTEM_TIMEZONE })}
+                                Retorno/Revisao: {retDate.toLocaleDateString(SYSTEM_LOCALE, { day: '2-digit', month: 'short', timeZone: SYSTEM_TIMEZONE })}
                               </span>
                             )}
                           </div>

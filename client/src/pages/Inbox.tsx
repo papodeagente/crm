@@ -331,7 +331,7 @@ export default function InboxPage() {
     // 6. For LID JIDs, try to show a resolved phone number instead of the LID
     if (jid.endsWith("@lid")) {
       if (waContact?.phoneNumber) return formatPhoneNumber(waContact.phoneNumber);
-      return "Passageiro WhatsApp";
+      return "Cliente WhatsApp";
     }
     // 7. Format the phone number from the JID
     return formatPhoneNumber(jid);
@@ -1123,7 +1123,7 @@ export default function InboxPage() {
         <CreateDealDialog
           open={showCreateDeal}
           onClose={() => setShowCreateDeal(false)}
-          contactName={selectedContact?.name || "Passageiro"}
+          contactName={selectedContact?.name || "Cliente"}
           contactPhone={selectedJid?.split("@")[0] || ""}
           contactJid={selectedJid || ""}
           sessionId={activeSession.sessionId}

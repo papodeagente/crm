@@ -468,12 +468,12 @@ export default function ClassificationSettings() {
             <div className="space-y-2">
               {[
                 { name: "Nova venda", color: "#3b82f6" },
-                { name: "Aguardando embarque", color: "#06b6d4" },
-                { name: "30D para embarque", color: "#8b5cf6" },
-                { name: "Pré viagem", color: "#f59e0b" },
-                { name: "Em viagem", color: "#22c55e" },
-                { name: "Pós viagem", color: "#f97316" },
-                { name: "Viagem finalizada", color: "#10b981" },
+                { name: "Aguardando agendamento", color: "#06b6d4" },
+                { name: "30D para servico", color: "#8b5cf6" },
+                { name: "Pre servico", color: "#f59e0b" },
+                { name: "Em atendimento", color: "#22c55e" },
+                { name: "Pos servico", color: "#f97316" },
+                { name: "Servico finalizado", color: "#10b981" },
               ].map((stage, i) => (
                 <div key={i} className="flex items-center gap-3 p-2.5 rounded-lg bg-muted/20 border border-border/20">
                   <div className="w-1.5 h-6 rounded-full" style={{ backgroundColor: stage.color }} />

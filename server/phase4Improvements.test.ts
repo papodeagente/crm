@@ -117,14 +117,14 @@ describe("AI Conversation Summary", () => {
     const audioMsg = {
       messageType: "audioMessage",
       content: null as string | null,
-      audioTranscription: "Olá, quero saber sobre o pacote para Cancún",
+      audioTranscription: "Olá, quero saber sobre o procedimento estético",
     };
     const isAudio = audioMsg.messageType === "audioMessage" || audioMsg.messageType === "pttMessage";
     const text = isAudio
       ? (audioMsg.audioTranscription ? `[Áudio transcrito: ${audioMsg.audioTranscription}]` : "[Áudio não transcrito]")
       : (audioMsg.content || "");
     expect(text).toContain("Áudio transcrito");
-    expect(text).toContain("Cancún");
+    expect(text).toContain("procedimento estético");
   });
 
   it("should show [Áudio não transcrito] when no transcription", () => {

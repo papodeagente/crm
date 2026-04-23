@@ -966,7 +966,7 @@ router.post("/api/webhooks/rdstation", async (req: Request, res: Response) => {
                 category: (product.productType === "package" ? "other" : product.productType) as any,
                 quantity: 1,
                 unitPriceCents: product.basePriceCents,
-                supplier: product.supplier ?? undefined,
+                professional: product.professional ?? undefined,
               });
               // Recalcular valor total da negociação após vincular o produto
               await recalcDealValue(tenantId, result.dealId);

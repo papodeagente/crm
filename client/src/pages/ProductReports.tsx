@@ -31,14 +31,12 @@ interface DestinationRow {
 }
 
 const PRODUCT_TYPES: Record<string, { label: string; icon: any; color: string; bgColor: string; chartColor: string }> = {
-  flight: { label: "Aéreo", icon: Plane, color: "text-sky-400", bgColor: "bg-sky-500/15", chartColor: "#38bdf8" },
-  hotel: { label: "Hospedagem", icon: Hotel, color: "text-amber-400", bgColor: "bg-amber-500/15", chartColor: "#fbbf24" },
-  tour: { label: "Passeio", icon: Map, color: "text-emerald-400", bgColor: "bg-emerald-500/15", chartColor: "#34d399" },
-  transfer: { label: "Transfer", icon: Bus, color: "text-violet-400", bgColor: "bg-violet-500/15", chartColor: "#a78bfa" },
-  insurance: { label: "Seguro", icon: Shield, color: "text-rose-400", bgColor: "bg-rose-500/15", chartColor: "#fb7185" },
-  cruise: { label: "Cruzeiro", icon: Ship, color: "text-cyan-400", bgColor: "bg-cyan-500/15", chartColor: "#22d3ee" },
-  visa: { label: "Visto", icon: Stamp, color: "text-orange-400", bgColor: "bg-orange-500/15", chartColor: "#fb923c" },
-  package: { label: "Pacote", icon: Package, color: "text-indigo-400", bgColor: "bg-indigo-500/15", chartColor: "#818cf8" },
+  servico: { label: "Servico", icon: Package, color: "text-sky-400", bgColor: "bg-sky-500/15", chartColor: "#38bdf8" },
+  pacote: { label: "Pacote", icon: Package, color: "text-indigo-400", bgColor: "bg-indigo-500/15", chartColor: "#818cf8" },
+  consulta: { label: "Consulta", icon: Map, color: "text-emerald-400", bgColor: "bg-emerald-500/15", chartColor: "#34d399" },
+  procedimento: { label: "Procedimento", icon: Shield, color: "text-rose-400", bgColor: "bg-rose-500/15", chartColor: "#fb7185" },
+  assinatura: { label: "Assinatura", icon: Stamp, color: "text-violet-400", bgColor: "bg-violet-500/15", chartColor: "#a78bfa" },
+  produto: { label: "Produto", icon: Box, color: "text-amber-400", bgColor: "bg-amber-500/15", chartColor: "#fbbf24" },
   other: { label: "Outro", icon: Box, color: "text-slate-400", bgColor: "bg-slate-500/15", chartColor: "#94a3b8" },
 };
 
@@ -394,8 +392,8 @@ export default function ProductReportsPage() {
                   <MapPin className="h-4 w-4 text-cyan-400" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-semibold text-foreground">Top Destinos</h3>
-                  <p className="text-[11px] text-muted-foreground">Destinos com mais produtos no catálogo</p>
+                  <h3 className="text-sm font-semibold text-foreground">Top Locais</h3>
+                  <p className="text-[11px] text-muted-foreground">Locais com mais produtos no catalogo</p>
                 </div>
               </div>
               <div className="space-y-2.5">

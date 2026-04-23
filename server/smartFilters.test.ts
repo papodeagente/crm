@@ -34,9 +34,9 @@ describe("Smart Filter Config", () => {
     expect(SMART_FILTER_CONFIG.potencial_indicador.description).toContain("30 dias");
   });
 
-  it("should include potencial_indicador_pos_viagem filter", () => {
-    expect(SMART_FILTERS).toContain("potencial_indicador_pos_viagem");
-    expect(SMART_FILTER_CONFIG.potencial_indicador_pos_viagem.description).toContain("retorno");
+  it("should include potencial_indicador_pos_atendimento filter", () => {
+    expect(SMART_FILTERS).toContain("potencial_indicador_pos_atendimento");
+    expect(SMART_FILTER_CONFIG.potencial_indicador_pos_atendimento.description).toContain("follow-up");
   });
 
   it("should include potencial_indicador_fiel filter", () => {

@@ -32,7 +32,7 @@ export function ProblemSection() {
               O diagnóstico
             </p>
             <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white tracking-tight leading-tight">
-              Toda agência tem clientes.{" "}
+              Todo negócio tem clientes.{" "}
               <br className="hidden sm:block" />
               Poucas têm processo.
             </h2>
@@ -59,8 +59,8 @@ export function ProblemSection() {
 
         <FadeIn delay={0.5}>
           <p className="text-center text-base sm:text-lg text-white/60 max-w-3xl mx-auto leading-relaxed font-medium">
-            Depois de treinar mais de 15.000 agentes, a Escola de Negócios
-            do Turismo construiu o sistema que resolve esses três problemas.
+            A ENTUR OS foi construído para resolver esses três problemas
+            e transformar a operação de negócios locais.
           </p>
         </FadeIn>
       </div>

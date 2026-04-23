@@ -71,7 +71,7 @@ export function GrowthSimulator({ onCTA }: GrowthSimulatorProps) {
               <TrendingUp className="w-7 h-7 text-emerald-400" />
             </div>
             <h2 className="text-3xl sm:text-4xl font-bold text-white mb-3 tracking-tight">
-              Como sua agência pode crescer com processo comercial estruturado
+              Como seu negócio pode crescer com processo comercial estruturado
             </h2>
             <p className="text-lg text-white/40">
               Simule o impacto do ENTUR OS nos próximos 12 meses
@@ -201,7 +201,7 @@ export function GrowthSimulator({ onCTA }: GrowthSimulatorProps) {
 
                     <div className="text-center p-4 bg-gradient-to-r from-emerald-500/[0.06] to-violet-500/[0.06] border border-emerald-500/10 rounded-xl">
                       <p className="text-white/70 text-sm mb-1">
-                        Com processo comercial estruturado, sua agência poderia gerar
+                        Com processo comercial estruturado, seu negócio poderia gerar
                       </p>
                       <p className="text-2xl font-bold text-emerald-400 mb-3">
                         {formatCurrency(result.difference)} a mais em 12 meses

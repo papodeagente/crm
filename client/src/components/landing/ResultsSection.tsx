@@ -3,7 +3,7 @@ import { Quote } from "lucide-react";
 
 const results = [
   {
-    text: "Agência com 3 agentes recuperou 40% dos orçamentos parados nos primeiros 60 dias usando os alertas de follow-up.",
+    text: "Negócio com 3 atendentes recuperou 40% dos orçamentos parados nos primeiros 60 dias usando os alertas de follow-up.",
   },
   {
     text: "Operação solo organizou 180 negociações em funil e identificou R$ 47 mil em vendas esquecidas na primeira semana.",
@@ -23,7 +23,7 @@ export function ResultsSection() {
               Resultados
             </p>
             <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white tracking-tight leading-tight">
-              O que muda quando a agência tem processo
+              O que muda quando o negócio tem processo
             </h2>
           </div>
         </FadeIn>

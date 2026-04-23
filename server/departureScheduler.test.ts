@@ -13,82 +13,82 @@ vi.mock("./db", async (importOriginal) => {
   };
 });
 
-describe("departureScheduler", () => {
+describe("appointmentScheduler", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     notifiedDepartures.clear();
   });
 
-  describe("getDepartureWindow", () => {
-    it("should return 'today' for departures happening today (0-1 day)", () => {
+  describe("getAppointmentWindow", () => {
+    it("should return 'today' for appointments happening today (0-1 day)", () => {
       const now = new Date("2025-06-15T10:00:00Z");
-      const boarding = new Date("2025-06-15T18:00:00Z"); // same day, 8h later
-      const result = getDepartureWindow(boarding, now);
+      const appointment = new Date("2025-06-15T18:00:00Z"); // same day, 8h later
+      const result = getDepartureWindow(appointment, now);
       expect(result).not.toBeNull();
       expect(result!.key).toBe("today");
       expect(result!.label).toBe("hoje");
-      expect(result!.emoji).toBe("🛫");
+      expect(result!.emoji).toBe("📅");
     });
 
-    it("should return '1d' for departures tomorrow (1-2 days)", () => {
+    it("should return '1d' for appointments tomorrow (1-2 days)", () => {
       const now = new Date("2025-06-15T10:00:00Z");
-      const boarding = new Date("2025-06-16T14:00:00Z"); // ~28h later
-      const result = getDepartureWindow(boarding, now);
+      const appointment = new Date("2025-06-16T14:00:00Z"); // ~28h later
+      const result = getDepartureWindow(appointment, now);
       expect(result).not.toBeNull();
       expect(result!.key).toBe("1d");
       expect(result!.label).toBe("amanhã");
       expect(result!.emoji).toBe("⚠️");
     });
 
-    it("should return '3d' for departures in 3 days (3-4 days)", () => {
+    it("should return '3d' for appointments in 3 days (3-4 days)", () => {
       const now = new Date("2025-06-15T10:00:00Z");
-      const boarding = new Date("2025-06-18T14:00:00Z"); // ~3.17 days
-      const result = getDepartureWindow(boarding, now);
+      const appointment = new Date("2025-06-18T14:00:00Z"); // ~3.17 days
+      const result = getDepartureWindow(appointment, now);
       expect(result).not.toBeNull();
       expect(result!.key).toBe("3d");
       expect(result!.label).toBe("em 3 dias");
       expect(result!.emoji).toBe("📅");
     });
 
-    it("should return '7d' for departures in 7 days (7-8 days)", () => {
+    it("should return '7d' for appointments in 7 days (7-8 days)", () => {
       const now = new Date("2025-06-15T10:00:00Z");
-      const boarding = new Date("2025-06-22T14:00:00Z"); // ~7.17 days
-      const result = getDepartureWindow(boarding, now);
+      const appointment = new Date("2025-06-22T14:00:00Z"); // ~7.17 days
+      const result = getDepartureWindow(appointment, now);
       expect(result).not.toBeNull();
       expect(result!.key).toBe("7d");
       expect(result!.label).toBe("em 7 dias");
-      expect(result!.emoji).toBe("✈️");
+      expect(result!.emoji).toBe("🗓️");
     });
 
-    it("should return null for departures in 2 days (between windows)", () => {
+    it("should return null for appointments in 2 days (between windows)", () => {
       const now = new Date("2025-06-15T10:00:00Z");
-      const boarding = new Date("2025-06-17T14:00:00Z"); // ~2.17 days
-      const result = getDepartureWindow(boarding, now);
+      const appointment = new Date("2025-06-17T14:00:00Z"); // ~2.17 days
+      const result = getDepartureWindow(appointment, now);
       expect(result).toBeNull();
     });
 
-    it("should return null for departures in 5 days (between windows)", () => {
+    it("should return null for appointments in 5 days (between windows)", () => {
       const now = new Date("2025-06-15T10:00:00Z");
-      const boarding = new Date("2025-06-20T14:00:00Z"); // ~5.17 days
-      const result = getDepartureWindow(boarding, now);
+      const appointment = new Date("2025-06-20T14:00:00Z"); // ~5.17 days
+      const result = getDepartureWindow(appointment, now);
       expect(result).toBeNull();
     });
 
-    it("should return null for past departures", () => {
+    it("should return null for past appointments", () => {
       const now = new Date("2025-06-15T10:00:00Z");
-      const boarding = new Date("2025-06-14T10:00:00Z"); // yesterday
-      const result = getDepartureWindow(boarding, now);
+      const appointment = new Date("2025-06-14T10:00:00Z"); // yesterday
+      const result = getDepartureWindow(appointment, now);
       expect(result).toBeNull();
     });
   });
 
-  describe("checkUpcomingDepartures", () => {
+  describe("checkUpcomingAppointments", () => {
     it("should return 0 notifications when no deals found", async () => {
       const result = await checkUpcomingDepartures();
       expect(result.notificationsCreated).toBe(0);
     });
 
-    it("should track notified departures to avoid duplicates", async () => {
+    it("should track notified appointments to avoid duplicates", async () => {
       // Simulate adding a tracking key
       notifiedDepartures.add("123:today");
       expect(notifiedDepartures.has("123:today")).toBe(true);
@@ -136,10 +136,10 @@ describe("departureScheduler", () => {
     it("should have correct emoji for each window", () => {
       const now = new Date("2025-06-15T12:00:00Z");
 
-      expect(getDepartureWindow(new Date("2025-06-15T18:00:00Z"), now)?.emoji).toBe("🛫");
+      expect(getDepartureWindow(new Date("2025-06-15T18:00:00Z"), now)?.emoji).toBe("📅");
       expect(getDepartureWindow(new Date("2025-06-16T18:00:00Z"), now)?.emoji).toBe("⚠️");
       expect(getDepartureWindow(new Date("2025-06-18T18:00:00Z"), now)?.emoji).toBe("📅");
-      expect(getDepartureWindow(new Date("2025-06-22T18:00:00Z"), now)?.emoji).toBe("✈️");
+      expect(getDepartureWindow(new Date("2025-06-22T18:00:00Z"), now)?.emoji).toBe("🗓️");
     });
   });
 });

@@ -249,7 +249,7 @@ const MessageBubble = memo(({
         borderLeft: '4px solid var(--wa-tint)',
         padding: '5px 12px 7px 8px',
       }}>
-        <p className="text-[12.5px] font-medium" style={{ color: 'var(--wa-tint)' }}>{quotedMsg.fromMe ? "Você" : "Passageiro"}</p>
+        <p className="text-[12.5px] font-medium" style={{ color: 'var(--wa-tint)' }}>{quotedMsg.fromMe ? "Voce" : "Cliente"}</p>
         <p className="text-[12.5px] truncate max-w-full sm:max-w-[300px]" style={{ color: 'var(--wa-text-secondary)' }}>{quotedContent}</p>
       </div>
     );
@@ -278,7 +278,7 @@ const MessageBubble = memo(({
           <Contact className="w-8 h-8 text-wa-tint" />
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium">{msg.content}</p>
-            <p className="text-[11px] text-muted-foreground">Passageiro</p>
+            <p className="text-[11px] text-muted-foreground">Cliente</p>
           </div>
         </div>
       );

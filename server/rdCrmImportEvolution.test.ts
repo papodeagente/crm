@@ -350,7 +350,7 @@ describe("Spreadsheet import — input validation and processing", () => {
   });
 
   it("generates deal title from row data when negociacao is empty", () => {
-    const row1 = { nome: "João Silva", negociacao: "Pacote Cancun" };
+    const row1 = { nome: "João Silva", negociacao: "Pacote Estética" };
     const row2 = { nome: "Maria Santos", negociacao: "" };
     const row3 = { nome: "Pedro", negociacao: undefined };
 
@@ -358,7 +358,7 @@ describe("Spreadsheet import — input validation and processing", () => {
     const title2 = row2.negociacao?.trim() || `${row2.nome.trim()} — Importação Planilha`;
     const title3 = row3.negociacao?.trim() || `${row3.nome.trim()} — Importação Planilha`;
 
-    expect(title1).toBe("Pacote Cancun");
+    expect(title1).toBe("Pacote Estética");
     expect(title2).toBe("Maria Santos — Importação Planilha");
     expect(title3).toBe("Pedro — Importação Planilha");
   });
@@ -390,7 +390,7 @@ describe("CSV template structure", () => {
   });
 
   it("CSV parsing handles semicolon delimiter correctly", () => {
-    const csvLine = "João Silva;joao@test.com;11999999999;Empresa X;Pacote Cancun;R$ 5.000,00;Novo Lead;Website;Black Friday;Observação importante";
+    const csvLine = "João Silva;joao@test.com;11999999999;Empresa X;Pacote Estética;R$ 5.000,00;Novo Lead;Website;Black Friday;Observação importante";
     const parts = csvLine.split(";");
     expect(parts.length).toBe(10);
     expect(parts[0]).toBe("João Silva");

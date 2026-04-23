@@ -128,7 +128,7 @@ export function classifyIntent(lastMessage: string): IntentCategory {
   }
 
   // Pedido de prazo
-  if (/\b(prazo|quando|data\b|disponib|vaga|per[ií]odo|checkin|check-in|checkout|check-out|embarque|sa[ií]da)/.test(msg)) {
+  if (/\b(prazo|quando|data\b|disponib|vaga|per[ií]odo|agendamento|horário|horario|atendimento|consulta|sa[ií]da)/.test(msg)) {
     return "pedido_prazo";
   }
 
@@ -366,12 +366,12 @@ export function buildStructuredContext(
 function extractTopics(messages: ConversationMessage[]): string {
   const keywords = new Set<string>();
   const topicPatterns = [
-    { pattern: /\b(pacote|viagem|destino|hotel|voo|passagem|resort|cruzeiro)\b/i, topic: "viagem/pacote" },
+    { pattern: /\b(pacote|serviço|procedimento|consulta|tratamento|sessão|assinatura)\b/i, topic: "serviço/pacote" },
     { pattern: /\b(preço|valor|orçamento|custo|pagamento|parcela)\b/i, topic: "valores" },
-    { pattern: /\b(data|período|quando|checkin|checkout|embarque)\b/i, topic: "datas" },
-    { pattern: /\b(documento|passaporte|visto|seguro)\b/i, topic: "documentação" },
-    { pattern: /\b(transfer|traslado|passeio|excursão)\b/i, topic: "serviços" },
-    { pattern: /\b(família|casal|lua de mel|aniversário|grupo)\b/i, topic: "ocasião" },
+    { pattern: /\b(data|período|quando|agendamento|horário|atendimento)\b/i, topic: "datas" },
+    { pattern: /\b(documento|exame|laudo|receita)\b/i, topic: "documentação" },
+    { pattern: /\b(profissional|especialista|médico|dentista|esteticista)\b/i, topic: "profissionais" },
+    { pattern: /\b(família|casal|aniversário|grupo)\b/i, topic: "ocasião" },
   ];
 
   for (const msg of messages) {

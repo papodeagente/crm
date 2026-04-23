@@ -32,8 +32,8 @@ function createAuthContext(): { ctx: TrpcContext } {
   return { ctx };
 }
 
-describe("Deal dates (boardingDate / returnDate)", () => {
-  it("deals.create input schema accepts boardingDate and returnDate", () => {
+describe("Deal dates (appointmentDate / followUpDate)", () => {
+  it("deals.create input schema accepts appointmentDate and followUpDate", () => {
     // Verify the input schema accepts the new fields without throwing
     const { ctx } = createAuthContext();
     const caller = appRouter.createCaller(ctx);
@@ -44,7 +44,7 @@ describe("Deal dates (boardingDate / returnDate)", () => {
     expect(typeof caller.crm.deals.create).toBe("function");
   });
 
-  it("deals.update input schema accepts boardingDate and returnDate", () => {
+  it("deals.update input schema accepts appointmentDate and followUpDate", () => {
     const { ctx } = createAuthContext();
     const caller = appRouter.createCaller(ctx);
 
@@ -62,7 +62,7 @@ describe("Deal dates (boardingDate / returnDate)", () => {
     expect(caller.crm.taskAutomations.delete).toBeDefined();
   });
 
-  it("deadline reference options include boarding_date and return_date", () => {
+  it("deadline reference options include appointment_date and follow_up_date", () => {
     // The schema enum for deadlineReference should include these values
     // We verify by checking the task automation create procedure accepts them
     const { ctx } = createAuthContext();
