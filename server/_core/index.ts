@@ -281,6 +281,47 @@ async function startServer() {
     }
   });
 
+  // Run arbitrary SQL migration via POST body
+  app.post("/api/run-sql", express.json({ limit: "1mb" }), async (req, res) => {
+    try {
+      const { sql: sqlInput, secret } = req.body;
+      if (secret !== "CrmSecure2026!") return res.status(403).json({ error: "Forbidden" });
+      if (!sqlInput) return res.status(400).json({ error: "No sql provided" });
+
+      const pg = await import("pg");
+      const dbUrl = process.env.DATABASE_URL;
+      if (!dbUrl) return res.status(500).json({ error: "No DATABASE_URL" });
+
+      const client = new pg.default.Client({ connectionString: dbUrl });
+      await client.connect();
+
+      const statements = sqlInput.split("--> statement-breakpoint").map((s: string) => s.trim()).filter(Boolean);
+      const logs: string[] = [`Statements: ${statements.length}`];
+      let applied = 0, skipped = 0;
+
+      for (let i = 0; i < statements.length; i++) {
+        try {
+          await client.query(statements[i]);
+          applied++;
+        } catch (err: any) {
+          if (err.code === "42710" || err.code === "42P07" || err.code === "42701") {
+            skipped++;
+            continue;
+          }
+          logs.push(`FAIL stmt ${i + 1}: [${err.code}] ${err.message}`);
+          logs.push(`SQL: ${statements[i].substring(0, 200)}`);
+          await client.end();
+          return res.json({ success: false, logs, applied, skipped });
+        }
+      }
+
+      await client.end();
+      res.json({ success: true, logs: [...logs, `Done: ${applied} applied, ${skipped} skipped`] });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // REST API endpoints for external integration
   app.get("/api/v1/status/:sessionId", (req, res) => {
     const session = whatsappManager.getSession(req.params.sessionId);
