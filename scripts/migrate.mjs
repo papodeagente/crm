@@ -12,9 +12,7 @@ if (!DATABASE_URL) {
 console.log('[Migrate] Connecting to database...');
 console.log('[Migrate] Host:', DATABASE_URL.replace(/\/\/.*@/, '//***@'));
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const drizzleDir = path.resolve(__dirname, '..', 'drizzle');
-
+const drizzleDir = path.resolve(process.cwd(), 'drizzle');
 const client = new pg.Client({ connectionString: DATABASE_URL });
 
 async function migrate() {
@@ -26,53 +24,56 @@ async function migrate() {
     throw err;
   }
 
-  // Check if tables already exist
-  const tableCheck = await client.query(`
-    SELECT COUNT(*) as cnt FROM information_schema.tables
-    WHERE table_schema = 'public' AND table_type = 'BASE TABLE'
-  `);
-  const existingTables = parseInt(tableCheck.rows[0].cnt);
-  console.log('[Migrate] Existing tables:', existingTables);
-
-  if (existingTables > 10) {
-    console.log('[Migrate] Tables already exist, skipping migration');
-    await client.end();
-    return;
+  // Read migration files from journal
+  const journalPath = path.join(drizzleDir, 'meta', '_journal.json');
+  let migrationFiles = [];
+  if (fs.existsSync(journalPath)) {
+    const journal = JSON.parse(fs.readFileSync(journalPath, 'utf8'));
+    migrationFiles = (journal.entries || []).map(e => `${e.tag}.sql`);
+  } else {
+    migrationFiles = fs.readdirSync(drizzleDir).filter(f => f.endsWith('.sql')).sort();
   }
 
-  // Read migration SQL directly
-  const sqlFile = path.join(drizzleDir, '0000_tough_kang.sql');
-  if (!fs.existsSync(sqlFile)) {
-    console.error('[Migrate] SQL file not found:', sqlFile);
-    process.exit(1);
-  }
+  console.log(`[Migrate] Found ${migrationFiles.length} migration files`);
 
-  const sql = fs.readFileSync(sqlFile, 'utf8');
-  const statements = sql.split('--> statement-breakpoint').map(s => s.trim()).filter(Boolean);
-  console.log(`[Migrate] Running ${statements.length} statements...`);
+  let totalApplied = 0;
+  let totalSkipped = 0;
 
-  let applied = 0;
-  for (let i = 0; i < statements.length; i++) {
-    try {
-      await client.query(statements[i]);
-      applied++;
-      if (applied % 50 === 0) {
-        console.log(`[Migrate] Progress: ${applied}/${statements.length}`);
-      }
-    } catch (err) {
-      console.error(`[Migrate] Statement ${i + 1} FAILED: ${err.message}`);
-      console.error(`[Migrate] SQL: ${statements[i].substring(0, 300)}`);
-      // Skip "already exists" errors
-      if (err.code === '42710' || err.code === '42P07') {
-        console.log('[Migrate] Skipping (already exists)');
-        applied++;
-        continue;
-      }
-      throw err;
+  for (const sqlFileName of migrationFiles) {
+    const sqlFile = path.join(drizzleDir, sqlFileName);
+    if (!fs.existsSync(sqlFile)) {
+      console.log(`[Migrate] SKIP: ${sqlFileName} not found`);
+      continue;
     }
+
+    const sql = fs.readFileSync(sqlFile, 'utf8');
+    const statements = sql.split('--> statement-breakpoint').map(s => s.trim()).filter(Boolean);
+    console.log(`[Migrate] ${sqlFileName}: ${statements.length} statements`);
+
+    let applied = 0;
+    let skipped = 0;
+    for (let i = 0; i < statements.length; i++) {
+      try {
+        await client.query(statements[i]);
+        applied++;
+      } catch (err) {
+        // Skip "already exists" errors
+        if (err.code === '42710' || err.code === '42P07' || err.code === '42701') {
+          skipped++;
+          continue;
+        }
+        console.error(`[Migrate] ${sqlFileName} stmt ${i + 1} FAILED: ${err.message}`);
+        console.error(`[Migrate] SQL: ${statements[i].substring(0, 300)}`);
+        throw err;
+      }
+    }
+
+    totalApplied += applied;
+    totalSkipped += skipped;
+    console.log(`[Migrate] ${sqlFileName}: ${applied} applied, ${skipped} skipped`);
   }
 
-  console.log(`[Migrate] Done! Applied ${applied} statements`);
+  console.log(`[Migrate] Done! Total: ${totalApplied} applied, ${totalSkipped} skipped`);
   await client.end();
 }
 

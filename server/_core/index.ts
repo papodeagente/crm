@@ -192,38 +192,53 @@ async function startServer() {
       await client.connect();
       logs.push("Connected");
 
-      // Run migration
-      const sqlFile = path.default.resolve(process.cwd(), "drizzle/0000_tough_kang.sql");
-      logs.push(`SQL path: ${sqlFile}`);
-
-      if (!fs.default.existsSync(sqlFile)) {
-        await client.end();
-        return res.json({ success: false, logs, error: "SQL file not found" });
+      // Run all migrations from drizzle journal
+      const drizzleDir = path.default.resolve(process.cwd(), "drizzle");
+      const journalPath = path.default.join(drizzleDir, "meta", "_journal.json");
+      let migrationFiles: string[] = [];
+      if (fs.default.existsSync(journalPath)) {
+        const journal = JSON.parse(fs.default.readFileSync(journalPath, "utf8"));
+        migrationFiles = (journal.entries || []).map((e: any) => `${e.tag}.sql`);
+      } else {
+        // Fallback: find all .sql files
+        migrationFiles = fs.default.readdirSync(drizzleDir).filter((f: string) => f.endsWith(".sql")).sort();
       }
+      logs.push(`Migration files: ${migrationFiles.join(", ")}`);
 
-      const sqlContent = fs.default.readFileSync(sqlFile, "utf8");
-      const statements = sqlContent.split("--> statement-breakpoint").map((s: string) => s.trim()).filter(Boolean);
-      logs.push(`Statements: ${statements.length}`);
-
-      let applied = 0;
-      let skipped = 0;
-      for (let i = 0; i < statements.length; i++) {
-        try {
-          await client.query(statements[i]);
-          applied++;
-        } catch (err: any) {
-          // Skip "already exists" errors
-          if (err.code === "42710" || err.code === "42P07") {
-            skipped++;
-            continue;
-          }
-          logs.push(`FAIL at ${i + 1}: [${err.code}] ${err.message}`);
-          logs.push(`SQL: ${statements[i].substring(0, 200)}`);
-          await client.end();
-          return res.json({ success: false, logs, applied, skipped, failedAt: i + 1 });
+      let totalApplied = 0;
+      let totalSkipped = 0;
+      for (const sqlFileName of migrationFiles) {
+        const sqlFile = path.default.join(drizzleDir, sqlFileName);
+        if (!fs.default.existsSync(sqlFile)) {
+          logs.push(`SKIP: ${sqlFileName} not found`);
+          continue;
         }
+        const sqlContent = fs.default.readFileSync(sqlFile, "utf8");
+        const statements = sqlContent.split("--> statement-breakpoint").map((s: string) => s.trim()).filter(Boolean);
+
+        let applied = 0;
+        let skipped = 0;
+        for (let i = 0; i < statements.length; i++) {
+          try {
+            await client.query(statements[i]);
+            applied++;
+          } catch (err: any) {
+            // Skip "already exists" errors and "value already exists" for enums
+            if (err.code === "42710" || err.code === "42P07" || err.code === "42701") {
+              skipped++;
+              continue;
+            }
+            logs.push(`FAIL ${sqlFileName} stmt ${i + 1}: [${err.code}] ${err.message}`);
+            logs.push(`SQL: ${statements[i].substring(0, 200)}`);
+            await client.end();
+            return res.json({ success: false, logs, totalApplied, totalSkipped, failedAt: `${sqlFileName}:${i + 1}` });
+          }
+        }
+        totalApplied += applied;
+        totalSkipped += skipped;
+        logs.push(`${sqlFileName}: ${applied} applied, ${skipped} skipped`);
       }
-      logs.push(`Migration done: ${applied} applied, ${skipped} skipped`);
+      logs.push(`Migration done: ${totalApplied} applied, ${totalSkipped} skipped total`);
 
       // Seed admin
       const existing = await client.query("SELECT id FROM crm_users WHERE email = $1", ["bruno@entur.com.br"]);
