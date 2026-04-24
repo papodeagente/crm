@@ -2595,6 +2595,10 @@ export const crmAppointments = pgTable("crm_appointments", {
   recurrenceRule: text("recurrenceRule"),             // RRULE (RFC 5545)
   recurrenceParentId: integer("recurrenceParentId"),  // FK appointment pai
   reminderSentAt: timestamp("reminderSentAt"),
+  reminder24hSentAt: timestamp("reminder24hSentAt"),
+  reminder2hSentAt: timestamp("reminder2hSentAt"),
+  followUpSentAt: timestamp("followUpSentAt"),
+  noShowFollowUpSentAt: timestamp("noShowFollowUpSentAt"),
   notes: text("notes"),
   price: numeric("price", { precision: 12, scale: 2 }),
   professionalId: integer("professionalId"),           // FK crm_users

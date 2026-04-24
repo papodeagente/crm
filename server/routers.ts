@@ -4455,9 +4455,8 @@ ${customInstructions ? `\n--- INSTRUÇÕES PERSONALIZADAS ---\n${customInstructi
       }))
       .query(async ({ ctx, input }) => {
         const { getUnifiedAgenda } = await import("./services/agendaService");
-        const isAdmin = ctx.saasUser?.role === "admin";
-        const userId = isAdmin ? input.userId : ctx.saasUser?.userId;
-        const teamId = isAdmin ? input.teamId : undefined;
+        const userId = input.userId; // All tenant users see all appointments; optional filter via input
+        const teamId = input.teamId;
         return getUnifiedAgenda(getTenantId(ctx), { from: input.from, to: input.to, userId, teamId });
       }),
     syncGoogle: tenantWriteProcedure

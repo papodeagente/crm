@@ -191,8 +191,8 @@ export default function Agenda() {
 
   // Queries
   const agendaQuery = trpc.agenda.unified.useQuery({
-    from: dateRange.from.toISOString().split("T")[0],
-    to: dateRange.to.toISOString().split("T")[0],
+    from: `${dateRange.from.getFullYear()}-${String(dateRange.from.getMonth() + 1).padStart(2, "0")}-${String(dateRange.from.getDate()).padStart(2, "0")}`,
+    to: `${dateRange.to.getFullYear()}-${String(dateRange.to.getMonth() + 1).padStart(2, "0")}-${String(dateRange.to.getDate()).padStart(2, "0")}`,
   });
 
   const tenantUsersQuery = trpc.agenda.tenantUsers.useQuery();
