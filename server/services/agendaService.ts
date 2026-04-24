@@ -125,89 +125,95 @@ export async function getUnifiedAgenda(
 
   const fromDate = filter.from;
   const toDate = filter.to;
-
-  // ── CRM Tasks ──
-  const userFilter = buildTaskUserFilter(filter.userId, userIds);
-
-  const taskRows = await db.execute(sql`
-    SELECT t.id, t.title, t.dueAt, t.priority, t.status, t.taskType,
-           t.entityType, t.entityId, t.description,
-           t.assignedToUserId,
-           d.title AS dealTitle,
-           c.name  AS contactName
-    FROM crm_tasks t
-    LEFT JOIN deals d ON t.entityType = 'deal' AND d.id = t.entityId AND d.tenantId = ${tenantId}
-    LEFT JOIN contacts c ON (
-      (t.entityType = 'contact' AND c.id = t.entityId)
-      OR (t.entityType = 'deal' AND d.contactId IS NOT NULL AND c.id = d.contactId)
-    ) AND c.tenantId = ${tenantId}
-    WHERE t.tenantId = ${tenantId}
-      ${userFilter}
-      AND (
-        (t.dueAt IS NOT NULL AND t.dueAt >= ${fromDate} AND t.dueAt < ${toDate}::date + INTERVAL '1 day')
-        OR (t.dueAt IS NULL AND t.createdAt >= ${fromDate} AND t.createdAt < ${toDate}::date + INTERVAL '1 day')
-      )
-    ORDER BY t.dueAt ASC, t.priority DESC
-  `);
-
   const now = Date.now();
-  const crmItems: AgendaItem[] = extractRows(taskRows).map((t: any) => {
-    const dueMs = t.dueAt ? new Date(t.dueAt).getTime() : new Date(t.createdAt).getTime();
-    const isCompleted = t.status === "done" || t.status === "cancelled";
-    const isOverdue = !isCompleted && t.dueAt && new Date(t.dueAt).getTime() < now;
-    return {
-      id: `task-${t.id}`,
-      source: "crm" as const,
-      title: t.title,
-      description: t.description,
-      startAt: dueMs,
-      endAt: dueMs + 60 * 60 * 1000, // default 1h duration
-      allDay: !t.dueAt,
-      status: t.status,
-      priority: t.priority,
-      taskType: t.taskType,
-      entityType: t.entityType,
-      entityId: t.entityId,
-      dealTitle: t.dealTitle,
-      contactName: t.contactName,
-      isOverdue: !!isOverdue,
-      isCompleted,
-      userId: t.assignedToUserId,
-    };
-  });
 
-  // ── Google Calendar Events ──
-  const gcalUserFilter = buildGcalUserFilter(filter.userId, userIds);
+  // ── CRM Tasks (non-critical — failure should not block appointments) ──
+  let crmItems: AgendaItem[] = [];
+  try {
+    const userFilter = buildTaskUserFilter(filter.userId, userIds);
+    const taskRows = await db.execute(sql`
+      SELECT t.id, t.title, t."dueAt", t.priority, t.status, t."taskType",
+             t."entityType", t."entityId", t.description,
+             t."assignedToUserId",
+             d.title AS "dealTitle",
+             c.name  AS "contactName"
+      FROM crm_tasks t
+      LEFT JOIN deals d ON t."entityType" = 'deal' AND d.id = t."entityId" AND d."tenantId" = ${tenantId}
+      LEFT JOIN contacts c ON (
+        (t."entityType" = 'contact' AND c.id = t."entityId")
+        OR (t."entityType" = 'deal' AND d."contactId" IS NOT NULL AND c.id = d."contactId")
+      ) AND c."tenantId" = ${tenantId}
+      WHERE t."tenantId" = ${tenantId}
+        ${userFilter}
+        AND (
+          (t."dueAt" IS NOT NULL AND t."dueAt" >= ${fromDate} AND t."dueAt" < ${toDate}::date + INTERVAL '1 day')
+          OR (t."dueAt" IS NULL AND t."createdAt" >= ${fromDate} AND t."createdAt" < ${toDate}::date + INTERVAL '1 day')
+        )
+      ORDER BY t."dueAt" ASC, t.priority DESC
+    `);
+    crmItems = extractRows(taskRows).map((t: any) => {
+      const dueMs = t.dueAt ? new Date(t.dueAt).getTime() : new Date(t.createdAt).getTime();
+      const isCompleted = t.status === "done" || t.status === "cancelled";
+      const isOverdue = !isCompleted && t.dueAt && new Date(t.dueAt).getTime() < now;
+      return {
+        id: `task-${t.id}`,
+        source: "crm" as const,
+        title: t.title,
+        description: t.description,
+        startAt: dueMs,
+        endAt: dueMs + 60 * 60 * 1000,
+        allDay: !t.dueAt,
+        status: t.status,
+        priority: t.priority,
+        taskType: t.taskType,
+        entityType: t.entityType,
+        entityId: t.entityId,
+        dealTitle: t.dealTitle,
+        contactName: t.contactName,
+        isOverdue: !!isOverdue,
+        isCompleted,
+        userId: t.assignedToUserId,
+      };
+    });
+  } catch (err: any) {
+    console.error("[Agenda] CRM tasks query failed (non-fatal):", err.message);
+  }
 
-  const gcalRows = await db.execute(sql`
-    SELECT id, title, description, startAt, endAt, allDay, location, status, htmlLink,
-           userId, sourceCalendarId
-    FROM google_calendar_events
-    WHERE tenantId = ${tenantId}
-      ${gcalUserFilter}
-      AND startAt < ${toDate}::date + INTERVAL '1 day'
-      AND endAt >= ${fromDate}
-    ORDER BY startAt ASC
-  `);
+  // ── Google Calendar Events (non-critical) ──
+  let gcalItems: AgendaItem[] = [];
+  try {
+    const gcalUserFilter = buildGcalUserFilter(filter.userId, userIds);
+    const gcalRows = await db.execute(sql`
+      SELECT id, title, description, "startAt", "endAt", "allDay", location, status, "htmlLink",
+             "userId", "sourceCalendarId"
+      FROM google_calendar_events
+      WHERE "tenantId" = ${tenantId}
+        ${gcalUserFilter}
+        AND "startAt" < ${toDate}::date + INTERVAL '1 day'
+        AND "endAt" >= ${fromDate}
+      ORDER BY "startAt" ASC
+    `);
+    gcalItems = extractRows(gcalRows).map((e: any) => ({
+      id: `gcal-${e.id}`,
+      source: "google" as const,
+      title: e.title,
+      description: e.description,
+      startAt: new Date(e.startAt).getTime(),
+      endAt: new Date(e.endAt).getTime(),
+      allDay: !!e.allDay,
+      status: e.status || "confirmed",
+      isOverdue: false,
+      isCompleted: false,
+      location: e.location,
+      htmlLink: e.htmlLink,
+      userId: e.userId,
+      calendarEmail: e.sourceCalendarId,
+    }));
+  } catch (err: any) {
+    console.error("[Agenda] Google Calendar query failed (non-fatal):", err.message);
+  }
 
-  const gcalItems: AgendaItem[] = extractRows(gcalRows).map((e: any) => ({
-    id: `gcal-${e.id}`,
-    source: "google" as const,
-    title: e.title,
-    description: e.description,
-    startAt: new Date(e.startAt).getTime(),
-    endAt: new Date(e.endAt).getTime(),
-    allDay: !!e.allDay,
-    status: e.status || "confirmed",
-    isOverdue: false,
-    isCompleted: false,
-    location: e.location,
-    htmlLink: e.htmlLink,
-    userId: e.userId,
-    calendarEmail: e.sourceCalendarId,
-  }));
-
-  // ── CRM Appointments (manual) — include appointments where user is owner OR participant ──
+  // ── CRM Appointments ──
   const apptUserFilter = buildApptUserFilter(filter.userId, userIds);
 
   const apptRows = await db.execute(sql`
