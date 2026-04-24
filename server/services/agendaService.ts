@@ -511,7 +511,7 @@ export async function createAppointment(
   participantSet.add(userId); // creator is always a participant
   for (const pid of Array.from(participantSet)) {
     await db.execute(sql`
-      INSERT INTO crm_appointment_participants (appointmentId, userId, tenantId)
+      INSERT INTO crm_appointment_participants ("appointmentId", "userId", "tenantId")
       VALUES (${insertId}, ${pid}, ${tenantId})
       ON CONFLICT DO NOTHING
     `);
@@ -587,12 +587,12 @@ export async function updateAppointment(
 
     // Remove old participants
     await db.execute(sql`
-      DELETE FROM crm_appointment_participants WHERE appointmentId = ${input.id}
+      DELETE FROM crm_appointment_participants WHERE "appointmentId" = ${input.id}
     `);
     // Insert new participants
     for (const pid of Array.from(participantSet)) {
       await db.execute(sql`
-        INSERT INTO crm_appointment_participants (appointmentId, userId, tenantId)
+        INSERT INTO crm_appointment_participants ("appointmentId", "userId", "tenantId")
         VALUES (${input.id}, ${pid}, ${tenantId})
         ON CONFLICT DO NOTHING
       `);
