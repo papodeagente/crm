@@ -26,13 +26,14 @@ export interface AgendaItem {
   startAt: number;             // UTC timestamp ms
   endAt: number;               // UTC timestamp ms
   allDay: boolean;
-  status: string;              // pending | in_progress | done | cancelled | confirmed | tentative
+  status: string;              // scheduled | confirmed | in_progress | completed | cancelled | no_show | pending | done
   priority?: string;           // low | medium | high | urgent  (CRM only)
   taskType?: string;           // whatsapp | phone | email | video | task  (CRM only)
   entityType?: string;         // deal | contact  (CRM only)
   entityId?: number;
   dealTitle?: string | null;
   contactName?: string | null;
+  contactId?: number;
   isOverdue: boolean;
   isCompleted: boolean;
   location?: string | null;
@@ -41,6 +42,11 @@ export interface AgendaItem {
   calendarEmail?: string | null;
   color?: string | null;       // appointment color
   participants?: Array<{ userId: number; name: string }>;  // appointment participants
+  serviceType?: string;        // appointment service type
+  notes?: string;              // appointment notes
+  price?: number;              // appointment price
+  professionalId?: number;     // appointment professional
+  contactPhone?: string;       // appointment contact phone
 }
 
 export interface CreateAppointmentInput {
@@ -195,21 +201,22 @@ export async function getUnifiedAgenda(
   const apptUserFilter = buildApptUserFilter(filter.userId, userIds);
 
   const apptRows = await db.execute(sql`
-    SELECT DISTINCT a.id, a.title, a.description, a.startAt, a.endAt, a.allDay,
-           a.location, a.color, a.dealId, a.contactId, a.isCompleted, a.completedAt,
-           a.userId,
-           d.title AS dealTitle,
-           c.name  AS contactName
+    SELECT DISTINCT a.id, a.title, a.description, a."startAt", a."endAt", a."allDay",
+           a.location, a.color, a."dealId", a."contactId", a."isCompleted", a."completedAt",
+           a."userId", a."serviceType", a.status, a.notes, a.price,
+           a."professionalId", a."contactPhone",
+           d.title AS "dealTitle",
+           c.name  AS "contactName"
     FROM crm_appointments a
-    LEFT JOIN crm_appointment_participants cap ON cap.appointmentId = a.id
-    LEFT JOIN deals d ON a.dealId IS NOT NULL AND d.id = a.dealId AND d.tenantId = ${tenantId}
-    LEFT JOIN contacts c ON a.contactId IS NOT NULL AND c.id = a.contactId AND c.tenantId = ${tenantId}
-    WHERE a.tenantId = ${tenantId}
-      AND a.deletedAt IS NULL
+    LEFT JOIN crm_appointment_participants cap ON cap."appointmentId" = a.id
+    LEFT JOIN deals d ON a."dealId" IS NOT NULL AND d.id = a."dealId" AND d."tenantId" = ${tenantId}
+    LEFT JOIN contacts c ON a."contactId" IS NOT NULL AND c.id = a."contactId" AND c."tenantId" = ${tenantId}
+    WHERE a."tenantId" = ${tenantId}
+      AND a."deletedAt" IS NULL
       ${apptUserFilter}
-      AND a.startAt < ${toDate}::date + INTERVAL '1 day'
-      AND a.endAt >= ${fromDate}
-    ORDER BY a.startAt ASC
+      AND a."startAt" < ${toDate}::date + INTERVAL '1 day'
+      AND a."endAt" >= ${fromDate}
+    ORDER BY a."startAt" ASC
   `);
 
   // Fetch participants for each appointment
@@ -219,11 +226,11 @@ export async function getUnifiedAgenda(
     // Build safe IN clause with individual sql params
     const inClause = apptIds.map((_: any, i: number) => i === 0 ? sql`${apptIds[0]}` : sql`${apptIds[i]}`).reduce((acc: any, v: any) => sql`${acc}, ${v}`);
     const partRows = await db.execute(sql`
-      SELECT cap.appointmentId, cap.userId, COALESCE(su.name, u.name, 'Usuário') AS name
+      SELECT cap."appointmentId", cap."userId", COALESCE(su.name, u.name, 'Usuário') AS name
       FROM crm_appointment_participants cap
-      LEFT JOIN crm_users su ON su.userId = cap.userId AND su.tenantId = ${tenantId}
-      LEFT JOIN users u ON u.id = cap.userId
-      WHERE cap.appointmentId IN (${inClause})
+      LEFT JOIN crm_users su ON su."userId" = cap."userId" AND su."tenantId" = ${tenantId}
+      LEFT JOIN users u ON u.id = cap."userId"
+      WHERE cap."appointmentId" IN (${inClause})
     `);
     for (const row of (partRows as unknown as any[])) {
       if (!participantsMap[row.appointmentId]) participantsMap[row.appointmentId] = [];
@@ -234,7 +241,7 @@ export async function getUnifiedAgenda(
   const apptItems: AgendaItem[] = (apptRows as unknown as any[]).map((a: any) => {
     const startMs = new Date(a.startAt).getTime();
     const endMs = new Date(a.endAt).getTime();
-    const isCompleted = !!a.isCompleted;
+    const isCompleted = !!a.isCompleted || a.status === "completed";
     const isOverdue = !isCompleted && endMs < now;
     return {
       id: `appt-${a.id}`,
@@ -244,17 +251,23 @@ export async function getUnifiedAgenda(
       startAt: startMs,
       endAt: endMs,
       allDay: !!a.allDay,
-      status: isCompleted ? "done" : "pending",
+      status: a.status || (isCompleted ? "completed" : "scheduled"),
       isOverdue,
       isCompleted,
       location: a.location,
       dealTitle: a.dealTitle,
       contactName: a.contactName,
+      contactId: a.contactId || undefined,
       entityType: a.dealId ? "deal" : a.contactId ? "contact" : undefined,
       entityId: a.dealId || a.contactId || undefined,
       userId: a.userId,
       color: a.color,
       participants: participantsMap[a.id] || [],
+      serviceType: a.serviceType || undefined,
+      notes: a.notes || undefined,
+      price: a.price ? Number(a.price) : undefined,
+      professionalId: a.professionalId || undefined,
+      contactPhone: a.contactPhone || undefined,
     };
   });
 
@@ -465,10 +478,10 @@ function buildGcalUserFilter(userId?: number, userIds?: number[]) {
 function buildApptUserFilter(userId?: number, userIds?: number[]) {
   if (userIds && userIds.length > 0) {
     const idList = userIds.join(",");
-    return sql.raw(`AND (a.userId IN (${idList}) OR cap.userId IN (${idList}))`);
+    return sql.raw(`AND (a."userId" IN (${idList}) OR cap."userId" IN (${idList}))`);
   }
   if (userId) {
-    return sql`AND (a.userId = ${userId} OR cap.userId = ${userId})`;
+    return sql`AND (a."userId" = ${userId} OR cap."userId" = ${userId})`;
   }
   return sql``;
 }
@@ -646,8 +659,8 @@ export async function deleteAppointment(
   }
 
   await db.execute(sql`
-    UPDATE crm_appointments SET deletedAt = NOW()
-    WHERE id = ${appointmentId} AND tenantId = ${tenantId}
+    UPDATE crm_appointments SET "deletedAt" = NOW()
+    WHERE id = ${appointmentId} AND "tenantId" = ${tenantId}
   `);
 
   console.log(`[Agenda] Deleted appointment ${appointmentId} for user ${userId} (tenant ${tenantId})`);
@@ -666,12 +679,12 @@ export async function getAppointmentParticipants(
   if (!db) return [];
 
   const rows = await db.execute(sql`
-    SELECT cap.userId, COALESCE(su.name, u.name, 'Usuário') AS name
+    SELECT cap."userId", COALESCE(su.name, u.name, 'Usuário') AS name
     FROM crm_appointment_participants cap
-    LEFT JOIN crm_users su ON su.userId = cap.userId AND su.tenantId = ${tenantId}
-    LEFT JOIN users u ON u.id = cap.userId
-    WHERE cap.appointmentId = ${appointmentId} AND cap.tenantId = ${tenantId}
-    ORDER BY cap.createdAt ASC
+    LEFT JOIN crm_users su ON su."userId" = cap."userId" AND su."tenantId" = ${tenantId}
+    LEFT JOIN users u ON u.id = cap."userId"
+    WHERE cap."appointmentId" = ${appointmentId} AND cap."tenantId" = ${tenantId}
+    ORDER BY cap."createdAt" ASC
   `);
 
   return (rows as unknown as any[]).map((r: any) => ({

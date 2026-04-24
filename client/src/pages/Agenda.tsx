@@ -287,7 +287,7 @@ export default function Agenda() {
     return items
       .filter(
         (item: any) =>
-          item.type === "appointment" || item.type === "calendar",
+          item.source === "appointment" || item.source === "google",
       )
       .sort(
         (a: any, b: any) =>
@@ -620,19 +620,24 @@ export default function Agenda() {
                 </Badge>
               </h3>
               <div className="space-y-2">
-                {dayAppointments.map((apt) => (
+                {dayAppointments.map((apt) => {
+                  const numericId = typeof apt.id === "string" && apt.id.startsWith("appt-")
+                    ? Number(apt.id.replace("appt-", ""))
+                    : typeof apt.id === "number" ? apt.id : 0;
+                  return (
                   <AppointmentCard
                     key={apt.id}
                     appointment={apt}
                     professionalName={getProfessionalName(apt.professionalId)}
-                    onConfirm={() => confirmAppointment.mutate({ id: apt.id })}
-                    onComplete={() => completeAppointment.mutate({ id: apt.id })}
-                    onCancel={() => cancelAppointment.mutate({ id: apt.id })}
+                    onConfirm={() => numericId && confirmAppointment.mutate({ id: numericId })}
+                    onComplete={() => numericId && completeAppointment.mutate({ id: numericId })}
+                    onCancel={() => numericId && cancelAppointment.mutate({ id: numericId })}
                     isConfirming={confirmAppointment.isPending}
                     isCompleting={completeAppointment.isPending}
                     isCancelling={cancelAppointment.isPending}
                   />
-                ))}
+                  );
+                })}
               </div>
             </div>
           ))}
