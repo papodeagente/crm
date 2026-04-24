@@ -191,8 +191,8 @@ export default function Agenda() {
 
   // Queries
   const agendaQuery = trpc.agenda.unified.useQuery({
-    from: dateRange.from.getTime(),
-    to: dateRange.to.getTime(),
+    from: dateRange.from.toISOString().split("T")[0],
+    to: dateRange.to.toISOString().split("T")[0],
   });
 
   const tenantUsersQuery = trpc.agenda.tenantUsers.useQuery();
@@ -273,7 +273,7 @@ export default function Agenda() {
       price: formPrice ? parseFloat(formPrice) : undefined,
       location: formLocation.trim() || undefined,
       notes: formNotes.trim() || undefined,
-      professionalId: formProfessionalId
+      professionalId: formProfessionalId && !isNaN(Number(formProfessionalId))
         ? Number(formProfessionalId)
         : undefined,
       recurrenceRule:
@@ -310,7 +310,7 @@ export default function Agenda() {
 
   function getProfessionalName(professionalId: number | null | undefined) {
     if (!professionalId) return "";
-    const user = tenantUsers.find((u: any) => u.id === professionalId);
+    const user = tenantUsers.find((u: any) => u.userId === professionalId);
     return user?.name || user?.email || "";
   }
 
@@ -466,7 +466,7 @@ export default function Agenda() {
                   </SelectTrigger>
                   <SelectContent>
                     {tenantUsers.map((u: any) => (
-                      <SelectItem key={u.id} value={String(u.id)}>
+                      <SelectItem key={u.userId} value={String(u.userId)}>
                         {u.name || u.email}
                       </SelectItem>
                     ))}
