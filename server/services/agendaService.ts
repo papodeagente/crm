@@ -239,18 +239,21 @@ export async function getUnifiedAgenda(
   const apptIds = extractRows(apptRows).map((a: any) => a.id);
   let participantsMap: Record<number, Array<{ userId: number; name: string }>> = {};
   if (apptIds.length > 0) {
-    // Build safe IN clause with individual sql params
-    const inClause = apptIds.map((_: any, i: number) => i === 0 ? sql`${apptIds[0]}` : sql`${apptIds[i]}`).reduce((acc: any, v: any) => sql`${acc}, ${v}`);
-    const partRows = await db.execute(sql`
-      SELECT cap."appointmentId", cap."userId", COALESCE(su.name, u.name, 'Usuário') AS name
-      FROM crm_appointment_participants cap
-      LEFT JOIN crm_users su ON su."userId" = cap."userId" AND su."tenantId" = ${tenantId}
-      LEFT JOIN users u ON u.id = cap."userId"
-      WHERE cap."appointmentId" IN (${inClause})
-    `);
-    for (const row of extractRows(partRows)) {
-      if (!participantsMap[row.appointmentId]) participantsMap[row.appointmentId] = [];
-      participantsMap[row.appointmentId].push({ userId: Number(row.userId), name: row.name });
+    try {
+      const inClause = apptIds.map((_: any, i: number) => sql`${apptIds[i]}`).reduce((acc: any, v: any) => sql`${acc}, ${v}`);
+      const partRows = await db.execute(sql`
+        SELECT cap."appointmentId", cap."userId", COALESCE(cu.name, u.name, 'Usuário') AS name
+        FROM crm_appointment_participants cap
+        LEFT JOIN crm_users cu ON cu.id = cap."userId" AND cu."tenantId" = ${tenantId}
+        LEFT JOIN users u ON u.id = cap."userId"
+        WHERE cap."appointmentId" IN (${inClause})
+      `);
+      for (const row of extractRows(partRows)) {
+        if (!participantsMap[row.appointmentId]) participantsMap[row.appointmentId] = [];
+        participantsMap[row.appointmentId].push({ userId: Number(row.userId), name: row.name });
+      }
+    } catch (err: any) {
+      console.error("[Agenda] Participants query failed (non-fatal):", err.message);
     }
   }
 
@@ -695,9 +698,9 @@ export async function getAppointmentParticipants(
   if (!db) return [];
 
   const rows = await db.execute(sql`
-    SELECT cap."userId", COALESCE(su.name, u.name, 'Usuário') AS name
+    SELECT cap."userId", COALESCE(cu.name, u.name, 'Usuário') AS name
     FROM crm_appointment_participants cap
-    LEFT JOIN crm_users su ON su."userId" = cap."userId" AND su."tenantId" = ${tenantId}
+    LEFT JOIN crm_users cu ON cu.id = cap."userId" AND cu."tenantId" = ${tenantId}
     LEFT JOIN users u ON u.id = cap."userId"
     WHERE cap."appointmentId" = ${appointmentId} AND cap."tenantId" = ${tenantId}
     ORDER BY cap."createdAt" ASC
