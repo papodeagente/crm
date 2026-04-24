@@ -281,6 +281,44 @@ async function startServer() {
     }
   });
 
+  // Debug: test agenda pipeline end-to-end
+  app.get("/api/debug-agenda", async (_req, res) => {
+    try {
+      const { getDb } = await import("../db");
+      const { sql: dsql } = await import("drizzle-orm");
+      const db = await getDb();
+      if (!db) return res.json({ error: "no db" });
+
+      // 1) Raw db.execute result — what type/shape is it?
+      const raw = await db.execute(dsql`SELECT id, title, "startAt", "endAt", status FROM crm_appointments WHERE "deletedAt" IS NULL ORDER BY id DESC LIMIT 3`);
+      const rawType = Object.prototype.toString.call(raw);
+      const isArray = Array.isArray(raw);
+      const hasRows = raw && typeof raw === "object" && "rows" in raw;
+      const keys = raw ? Object.keys(raw) : [];
+
+      // 2) Try extracting rows both ways
+      const viaRows = hasRows ? (raw as any).rows : null;
+      const viaCast = isArray ? raw : null;
+
+      // 3) Call getUnifiedAgenda
+      const { getUnifiedAgenda } = await import("../services/agendaService");
+      const agenda = await getUnifiedAgenda(2, { from: "2026-04-20", to: "2026-04-30" });
+      const appts = agenda.filter((i: any) => i.source === "appointment");
+
+      res.json({
+        rawType, isArray, hasRows, keys: keys.slice(0, 10),
+        viaRowsCount: viaRows?.length ?? "N/A",
+        viaCastCount: viaCast?.length ?? "N/A",
+        viaRowsSample: viaRows?.[0] ?? null,
+        agendaTotal: agenda.length,
+        appointmentsCount: appts.length,
+        appointmentsSample: appts.slice(0, 2),
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message, stack: err.stack?.split("\n").slice(0, 5) });
+    }
+  });
+
   // Debug: query SQL and return rows
   app.post("/api/query-sql", express.json({ limit: "1mb" }), async (req, res) => {
     try {
