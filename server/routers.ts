@@ -4729,6 +4729,275 @@ ${customInstructions ? `\n--- INSTRUÇÕES PERSONALIZADAS ---\n${customInstructi
       }),
   }),
 
+  // ─── Client Evolutions (Evolucoes Clinicas) ───
+  evolutions: router({
+    list: tenantProcedure
+      .input(z.object({ contactId: z.number() }))
+      .query(async ({ ctx, input }) => {
+        const { listEvolutions } = await import("./services/evolutionService");
+        return listEvolutions(getTenantId(ctx), input.contactId);
+      }),
+    create: tenantWriteProcedure
+      .input(z.object({
+        contactId: z.number(),
+        appointmentId: z.number().optional(),
+        treatmentId: z.number().optional(),
+        title: z.string().min(1).max(255),
+        content: z.string().min(1),
+        professionalId: z.number().optional(),
+        photos: z.array(z.string()).optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const { createEvolution } = await import("./services/evolutionService");
+        return createEvolution({ tenantId: getTenantId(ctx), ...input });
+      }),
+    update: tenantWriteProcedure
+      .input(z.object({
+        id: z.number(),
+        title: z.string().optional(),
+        content: z.string().optional(),
+        photos: z.array(z.string()).optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const { updateEvolution } = await import("./services/evolutionService");
+        return updateEvolution(input.id, getTenantId(ctx), input);
+      }),
+    delete: tenantWriteProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        const { deleteEvolution } = await import("./services/evolutionService");
+        return deleteEvolution(input.id, getTenantId(ctx));
+      }),
+  }),
+
+  // ─── Anamnesis (Fichas de Anamnese) ───
+  anamnesis: router({
+    templates: router({
+      list: tenantProcedure.query(async ({ ctx }) => {
+        const { listTemplates } = await import("./services/anamnesisService");
+        return listTemplates(getTenantId(ctx));
+      }),
+      create: tenantWriteProcedure
+        .input(z.object({
+          name: z.string().min(1).max(255),
+          description: z.string().optional(),
+          isDefault: z.boolean().optional(),
+        }))
+        .mutation(async ({ ctx, input }) => {
+          const { createTemplate } = await import("./services/anamnesisService");
+          return createTemplate(getTenantId(ctx), input.name, input.description, input.isDefault);
+        }),
+      update: tenantWriteProcedure
+        .input(z.object({
+          id: z.number(),
+          name: z.string().optional(),
+          description: z.string().optional(),
+          isDefault: z.boolean().optional(),
+          isActive: z.boolean().optional(),
+        }))
+        .mutation(async ({ ctx, input }) => {
+          const { updateTemplate } = await import("./services/anamnesisService");
+          return updateTemplate(input.id, getTenantId(ctx), input);
+        }),
+    }),
+    questions: router({
+      list: tenantProcedure
+        .input(z.object({ templateId: z.number() }))
+        .query(async ({ ctx, input }) => {
+          const { listQuestions } = await import("./services/anamnesisService");
+          return listQuestions(input.templateId, getTenantId(ctx));
+        }),
+      create: tenantWriteProcedure
+        .input(z.object({
+          templateId: z.number(),
+          section: z.string().optional(),
+          question: z.string().min(1),
+          questionType: z.enum(["text", "textarea", "boolean", "select", "multiselect", "number", "date"]),
+          options: z.array(z.string()).optional(),
+          isRequired: z.boolean().optional(),
+          sortOrder: z.number().optional(),
+        }))
+        .mutation(async ({ ctx, input }) => {
+          const { createQuestion } = await import("./services/anamnesisService");
+          return createQuestion(getTenantId(ctx), input.templateId, input);
+        }),
+      update: tenantWriteProcedure
+        .input(z.object({
+          id: z.number(),
+          section: z.string().optional(),
+          question: z.string().optional(),
+          questionType: z.enum(["text", "textarea", "boolean", "select", "multiselect", "number", "date"]).optional(),
+          options: z.array(z.string()).optional(),
+          isRequired: z.boolean().optional(),
+          sortOrder: z.number().optional(),
+        }))
+        .mutation(async ({ ctx, input }) => {
+          const { updateQuestion } = await import("./services/anamnesisService");
+          return updateQuestion(input.id, getTenantId(ctx), input);
+        }),
+      delete: tenantWriteProcedure
+        .input(z.object({ id: z.number() }))
+        .mutation(async ({ ctx, input }) => {
+          const { deleteQuestion } = await import("./services/anamnesisService");
+          return deleteQuestion(input.id, getTenantId(ctx));
+        }),
+    }),
+    responses: router({
+      list: tenantProcedure
+        .input(z.object({ contactId: z.number() }))
+        .query(async ({ ctx, input }) => {
+          const { getContactResponses } = await import("./services/anamnesisService");
+          return getContactResponses(getTenantId(ctx), input.contactId);
+        }),
+      save: tenantWriteProcedure
+        .input(z.object({
+          contactId: z.number(),
+          templateId: z.number(),
+          answers: z.record(z.string(), z.string()),
+        }))
+        .mutation(async ({ ctx, input }) => {
+          const { saveResponse } = await import("./services/anamnesisService");
+          const userId = (ctx as any).session?.userId;
+          return saveResponse(getTenantId(ctx), { ...input, filledByUserId: userId });
+        }),
+    }),
+  }),
+
+  // ─── Client Treatments (Tratamentos) ───
+  treatments: router({
+    list: tenantProcedure
+      .input(z.object({ contactId: z.number() }))
+      .query(async ({ ctx, input }) => {
+        const { listTreatments } = await import("./services/treatmentService");
+        return listTreatments(getTenantId(ctx), input.contactId);
+      }),
+    create: tenantWriteProcedure
+      .input(z.object({
+        contactId: z.number(),
+        dealId: z.number().optional(),
+        name: z.string().min(1).max(255),
+        description: z.string().optional(),
+        totalSessions: z.number().optional(),
+        startDate: z.number().optional(), // timestamp ms
+        endDate: z.number().optional(),
+        valueCents: z.number().optional(),
+        professionalId: z.number().optional(),
+        notes: z.string().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const { createTreatment } = await import("./services/treatmentService");
+        return createTreatment({
+          tenantId: getTenantId(ctx),
+          ...input,
+          startDate: input.startDate ? new Date(input.startDate) : undefined,
+          endDate: input.endDate ? new Date(input.endDate) : undefined,
+        });
+      }),
+    update: tenantWriteProcedure
+      .input(z.object({
+        id: z.number(),
+        name: z.string().optional(),
+        description: z.string().optional(),
+        status: z.enum(["active", "completed", "cancelled", "paused"]).optional(),
+        totalSessions: z.number().optional(),
+        valueCents: z.number().optional(),
+        notes: z.string().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const { updateTreatment } = await import("./services/treatmentService");
+        return updateTreatment(input.id, getTenantId(ctx), input);
+      }),
+    addSession: tenantWriteProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        const { addSession } = await import("./services/treatmentService");
+        return addSession(input.id, getTenantId(ctx));
+      }),
+  }),
+
+  // ─── Client Debits (Debitos Financeiros) ───
+  debits: router({
+    list: tenantProcedure
+      .input(z.object({ contactId: z.number() }))
+      .query(async ({ ctx, input }) => {
+        const { listDebits } = await import("./services/debitService");
+        return listDebits(getTenantId(ctx), input.contactId);
+      }),
+    stats: tenantProcedure
+      .input(z.object({ contactId: z.number() }))
+      .query(async ({ ctx, input }) => {
+        const { getDebitStats } = await import("./services/debitService");
+        return getDebitStats(getTenantId(ctx), input.contactId);
+      }),
+    create: tenantWriteProcedure
+      .input(z.object({
+        contactId: z.number(),
+        dealId: z.number().optional(),
+        treatmentId: z.number().optional(),
+        description: z.string().min(1).max(500),
+        totalCents: z.number().min(1),
+        dueDate: z.number().optional(), // timestamp ms
+        paymentMethod: z.string().optional(),
+        notes: z.string().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const { createDebit } = await import("./services/debitService");
+        return createDebit({
+          tenantId: getTenantId(ctx),
+          ...input,
+          dueDate: input.dueDate ? new Date(input.dueDate) : undefined,
+        });
+      }),
+    addPayment: tenantWriteProcedure
+      .input(z.object({
+        id: z.number(),
+        amountCents: z.number().min(1),
+        paymentMethod: z.string().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const { addPayment } = await import("./services/debitService");
+        return addPayment(input.id, getTenantId(ctx), input.amountCents, input.paymentMethod);
+      }),
+    cancel: tenantWriteProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        const { cancelDebit } = await import("./services/debitService");
+        return cancelDebit(input.id, getTenantId(ctx));
+      }),
+  }),
+
+  // ─── Client Documents (Documentos Categorizados) ───
+  clientDocuments: router({
+    list: tenantProcedure
+      .input(z.object({ contactId: z.number(), category: z.string().optional() }))
+      .query(async ({ ctx, input }) => {
+        const { listDocuments } = await import("./services/clientDocumentService");
+        return listDocuments(getTenantId(ctx), input.contactId, input.category);
+      }),
+    create: tenantWriteProcedure
+      .input(z.object({
+        contactId: z.number(),
+        category: z.enum(["receita", "atestado", "imagem", "contrato", "exame", "consentimento", "outro"]),
+        title: z.string().min(1).max(255),
+        description: z.string().optional(),
+        fileUrl: z.string().min(1),
+        fileName: z.string().min(1),
+        mimeType: z.string().optional(),
+        sizeBytes: z.number().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const { createDocument } = await import("./services/clientDocumentService");
+        const userId = (ctx as any).session?.userId;
+        return createDocument({ tenantId: getTenantId(ctx), ...input, uploadedByUserId: userId });
+      }),
+    delete: tenantWriteProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        const { deleteDocument } = await import("./services/clientDocumentService");
+        return deleteDocument(input.id, getTenantId(ctx));
+      }),
+  }),
+
   superAdminDash: superAdminDashRouter,
   superAdminPlans: superAdminPlansRouter,
   superAdminManagement: superAdminManagementRouter,

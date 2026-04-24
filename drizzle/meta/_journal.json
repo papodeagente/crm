@@ -15,6 +15,13 @@
       "when": 1776719207896,
       "tag": "0001_local_business_migration",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1776805607896,
+      "tag": "0002_client_profile",
+      "breakpoints": true
     }
   ]
 }

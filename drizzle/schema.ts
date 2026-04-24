@@ -2772,3 +2772,170 @@ export const clientPackages = pgTable("client_packages", {
 
 export type ClientPackage = typeof clientPackages.$inferSelect;
 export type InsertClientPackage = typeof clientPackages.$inferInsert;
+
+// ════════════════════════════════════════════════════════════
+// CLIENT EVOLUTIONS (Evolucoes Clinicas - registro de atendimentos)
+// ════════════════════════════════════════════════════════════
+
+export const clientEvolutions = pgTable("client_evolutions", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenantId").notNull(),
+  contactId: integer("contactId").notNull(),
+  appointmentId: integer("appointmentId"),           // FK crm_appointments (opcional)
+  treatmentId: integer("treatmentId"),               // FK client_treatments (opcional)
+  title: varchar("title", { length: 255 }).notNull(),
+  content: text("content").notNull(),                // rich text HTML
+  professionalId: integer("professionalId"),         // FK crm_users
+  photos: json("photos").$type<string[]>(),          // URLs de fotos antes/depois
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+}, (t) => [
+  index("evo_tenant_contact_idx").on(t.tenantId, t.contactId),
+  index("evo_tenant_created_idx").on(t.tenantId, t.createdAt),
+]);
+
+export type ClientEvolution = typeof clientEvolutions.$inferSelect;
+export type InsertClientEvolution = typeof clientEvolutions.$inferInsert;
+
+// ════════════════════════════════════════════════════════════
+// ANAMNESIS TEMPLATES & QUESTIONS (Fichas de Anamnese)
+// ════════════════════════════════════════════════════════════
+
+export const anamnesisQuestionTypeEnum = pgEnum("anamnesis_question_type", ["text", "textarea", "boolean", "select", "multiselect", "number", "date"]);
+
+export const anamnesisTemplates = pgTable("anamnesis_templates", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenantId").notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  isDefault: boolean("isDefault").default(false).notNull(),
+  isActive: boolean("isActive").default(true).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+}, (t) => [
+  index("at_tenant_idx").on(t.tenantId),
+]);
+
+export type AnamnesisTemplate = typeof anamnesisTemplates.$inferSelect;
+export type InsertAnamnesisTemplate = typeof anamnesisTemplates.$inferInsert;
+
+export const anamnesisQuestions = pgTable("anamnesis_questions", {
+  id: serial("id").primaryKey(),
+  templateId: integer("templateId").notNull(),
+  tenantId: integer("tenantId").notNull(),
+  section: varchar("section", { length: 255 }),      // agrupamento (ex: "Saude Geral", "Historico Estetico")
+  question: text("question").notNull(),
+  questionType: anamnesisQuestionTypeEnum("questionType").default("text").notNull(),
+  options: json("options").$type<string[]>(),         // opcoes para select/multiselect
+  isRequired: boolean("isRequired").default(false).notNull(),
+  sortOrder: integer("sortOrder").default(0).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (t) => [
+  index("aq_template_idx").on(t.templateId),
+  index("aq_tenant_idx").on(t.tenantId),
+]);
+
+export type AnamnesisQuestion = typeof anamnesisQuestions.$inferSelect;
+export type InsertAnamnesisQuestion = typeof anamnesisQuestions.$inferInsert;
+
+export const anamnesisResponses = pgTable("anamnesis_responses", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenantId").notNull(),
+  contactId: integer("contactId").notNull(),
+  templateId: integer("templateId").notNull(),
+  answers: json("answers").$type<Record<string, string>>().notNull(), // questionId -> answer
+  filledByUserId: integer("filledByUserId"),
+  filledAt: timestamp("filledAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+}, (t) => [
+  index("ar_tenant_contact_idx").on(t.tenantId, t.contactId),
+  index("ar_template_idx").on(t.templateId),
+]);
+
+export type AnamnesisResponse = typeof anamnesisResponses.$inferSelect;
+export type InsertAnamnesisResponse = typeof anamnesisResponses.$inferInsert;
+
+// ════════════════════════════════════════════════════════════
+// CLIENT TREATMENTS (Tratamentos em andamento)
+// ════════════════════════════════════════════════════════════
+
+export const treatmentStatusEnum = pgEnum("treatment_status", ["active", "completed", "cancelled", "paused"]);
+
+export const clientTreatments = pgTable("client_treatments", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenantId").notNull(),
+  contactId: integer("contactId").notNull(),
+  dealId: integer("dealId"),                          // FK deals (orcamento que gerou)
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  status: treatmentStatusEnum("status").default("active").notNull(),
+  totalSessions: integer("totalSessions"),
+  completedSessions: integer("completedSessions").default(0).notNull(),
+  startDate: timestamp("startDate"),
+  endDate: timestamp("endDate"),
+  valueCents: integer("valueCents"),
+  professionalId: integer("professionalId"),
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+}, (t) => [
+  index("ct_tenant_contact_idx").on(t.tenantId, t.contactId),
+  index("ct_tenant_status_idx").on(t.tenantId, t.status),
+]);
+
+export type ClientTreatment = typeof clientTreatments.$inferSelect;
+export type InsertClientTreatment = typeof clientTreatments.$inferInsert;
+
+// ════════════════════════════════════════════════════════════
+// CLIENT DEBITS (Debitos financeiros do cliente)
+// ════════════════════════════════════════════════════════════
+
+export const debitStatusEnum = pgEnum("debit_status", ["pending", "partial", "paid", "overdue", "cancelled"]);
+
+export const clientDebits = pgTable("client_debits", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenantId").notNull(),
+  contactId: integer("contactId").notNull(),
+  dealId: integer("dealId"),                          // FK deals
+  treatmentId: integer("treatmentId"),                // FK client_treatments
+  description: varchar("description", { length: 500 }).notNull(),
+  totalCents: integer("totalCents").notNull(),
+  paidCents: integer("paidCents").default(0).notNull(),
+  status: debitStatusEnum("status").default("pending").notNull(),
+  dueDate: timestamp("dueDate"),
+  paidAt: timestamp("paidAt"),
+  paymentMethod: varchar("paymentMethod", { length: 64 }),
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+}, (t) => [
+  index("cd_tenant_contact_idx").on(t.tenantId, t.contactId),
+  index("cd_tenant_status_idx").on(t.tenantId, t.status),
+]);
+
+export type ClientDebit = typeof clientDebits.$inferSelect;
+export type InsertClientDebit = typeof clientDebits.$inferInsert;
+
+// ════════════════════════════════════════════════════════════
+// CLIENT DOCUMENTS (Documentos categorizados do cliente)
+// ════════════════════════════════════════════════════════════
+
+export const documentCategoryEnum = pgEnum("document_category", ["receita", "atestado", "imagem", "contrato", "exame", "consentimento", "outro"]);
+
+export const clientDocuments = pgTable("client_documents", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenantId").notNull(),
+  contactId: integer("contactId").notNull(),
+  category: documentCategoryEnum("category").default("outro").notNull(),
+  title: varchar("title", { length: 255 }).notNull(),
+  description: text("description"),
+  fileUrl: text("fileUrl").notNull(),
+  fileName: varchar("fileName", { length: 255 }).notNull(),
+  mimeType: varchar("mimeType", { length: 128 }),
+  sizeBytes: integer("sizeBytes"),
+  uploadedByUserId: integer("uploadedByUserId"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (t) => [
+  index("cdoc_tenant_contact_idx").on(t.tenantId, t.contactId),
+  index("cdoc_tenant_category_idx").on(t.tenantId, t.category),
+]);
