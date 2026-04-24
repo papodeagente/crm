@@ -7,7 +7,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
@@ -19,7 +18,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Plus,
@@ -35,128 +33,69 @@ import {
   CheckCircle2,
   XCircle,
   Loader2,
-  RefreshCw,
 } from "lucide-react";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback, useRef } from "react";
 import { toast } from "sonner";
-import {
-  formatDate,
-  formatTime,
-  formatDateLong,
-  formatMonthYear,
-  formatDateRange,
-} from "../../../shared/dateUtils";
 
-// ─── Types & Config ───
+// ─── Constants ───
 
-type ViewMode = "week" | "day" | "month";
+const HOURS = Array.from({ length: 15 }, (_, i) => i + 7); // 7h–21h
+const HOUR_HEIGHT = 64; // px per hour slot
+const DAYS_PT = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+const MONTHS_PT = [
+  "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+  "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
+];
 
-interface AppointmentItem {
-  id: number;
-  title: string;
-  description?: string | null;
-  startAt: string;
-  endAt?: string | null;
-  location?: string | null;
-  color?: string | null;
-  serviceType?: string | null;
-  status?: string | null;
-  notes?: string | null;
-  price?: number | null;
-  professionalId?: number | null;
-  contactPhone?: string | null;
-  recurrenceRule?: string | null;
-  type?: string;
-  professional?: { id: number; name: string } | null;
-}
+type ViewMode = "day" | "week";
 
-const STATUS_CONFIG: Record<
-  string,
-  { label: string; className: string }
-> = {
-  scheduled: {
-    label: "Agendado",
-    className: "bg-gray-100 text-gray-700 border-gray-200",
-  },
-  confirmed: {
-    label: "Confirmado",
-    className: "bg-blue-100 text-blue-700 border-blue-200",
-  },
-  in_progress: {
-    label: "Em andamento",
-    className: "bg-yellow-100 text-yellow-700 border-yellow-200",
-  },
-  completed: {
-    label: "Concluído",
-    className: "bg-emerald-100 text-emerald-700 border-emerald-200",
-  },
-  cancelled: {
-    label: "Cancelado",
-    className: "bg-red-100 text-red-700 border-red-200",
-  },
-  no_show: {
-    label: "Não compareceu",
-    className: "bg-orange-100 text-orange-700 border-orange-200",
-  },
+const STATUS_COLORS: Record<string, string> = {
+  scheduled: "bg-blue-500/80 border-blue-600",
+  confirmed: "bg-emerald-500/80 border-emerald-600",
+  in_progress: "bg-amber-500/80 border-amber-600",
+  completed: "bg-gray-400/60 border-gray-500",
+  cancelled: "bg-red-400/50 border-red-500 line-through opacity-60",
+  no_show: "bg-orange-400/60 border-orange-500",
 };
 
-const RECURRENCE_OPTIONS = [
-  { value: "none", label: "Sem recorrência" },
-  { value: "INTERVAL:7", label: "Semanal (7 dias)" },
-  { value: "INTERVAL:15", label: "Quinzenal (15 dias)" },
-  { value: "INTERVAL:30", label: "Mensal (30 dias)" },
-];
+const STATUS_LABELS: Record<string, string> = {
+  scheduled: "Agendado",
+  confirmed: "Confirmado",
+  in_progress: "Em andamento",
+  completed: "Concluído",
+  cancelled: "Cancelado",
+  no_show: "Não compareceu",
+};
+
+// ─── Helpers ───
+
+function toLocalDateStr(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function getWeekDays(base: Date): Date[] {
+  const d = new Date(base);
+  d.setDate(d.getDate() - d.getDay()); // Sunday
+  return Array.from({ length: 7 }, (_, i) => {
+    const day = new Date(d);
+    day.setDate(d.getDate() + i);
+    return day;
+  });
+}
+
+function isSameDay(a: Date, b: Date): boolean {
+  return a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate();
+}
+
+function formatHour(h: number): string {
+  return `${String(h).padStart(2, "0")}:00`;
+}
 
 function formatCurrency(amount: number | null | undefined) {
   if (amount == null) return "";
-  return new Intl.NumberFormat("pt-BR", {
-    style: "currency",
-    currency: "BRL",
-  }).format(amount);
-}
-
-function getDateRange(view: ViewMode, baseDate: Date) {
-  const d = new Date(baseDate);
-  if (view === "day") {
-    const start = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-    const end = new Date(start);
-    end.setDate(end.getDate() + 1);
-    end.setMilliseconds(-1);
-    return { from: start, to: end };
-  }
-  if (view === "week") {
-    const start = new Date(d);
-    start.setDate(d.getDate() - d.getDay());
-    start.setHours(0, 0, 0, 0);
-    const end = new Date(start);
-    end.setDate(start.getDate() + 6);
-    end.setHours(23, 59, 59, 999);
-    return { from: start, to: end };
-  }
-  // month
-  const start = new Date(d.getFullYear(), d.getMonth(), 1);
-  const end = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59, 999);
-  return { from: start, to: end };
-}
-
-function getViewTitle(view: ViewMode, baseDate: Date) {
-  if (view === "day") return formatDateLong(baseDate);
-  if (view === "week") {
-    const start = new Date(baseDate);
-    start.setDate(baseDate.getDate() - baseDate.getDay());
-    const end = new Date(start);
-    end.setDate(start.getDate() + 6);
-    return formatDateRange(start, end);
-  }
-  return formatMonthYear(baseDate);
-}
-
-function navigateDate(view: ViewMode, baseDate: Date, dir: number) {
-  const d = new Date(baseDate);
-  if (view === "day") d.setDate(d.getDate() + dir);
-  else if (view === "week") d.setDate(d.getDate() + dir * 7);
-  else d.setMonth(d.getMonth() + dir);
-  return d;
+  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(amount);
 }
 
 // ─── Main Component ───
@@ -164,12 +103,12 @@ function navigateDate(view: ViewMode, baseDate: Date, dir: number) {
 export default function Agenda() {
   const utils = trpc.useUtils();
 
-  // View state
   const [viewMode, setViewMode] = useState<ViewMode>("week");
   const [baseDate, setBaseDate] = useState(() => new Date());
-
-  // Create dialog
   const [createOpen, setCreateOpen] = useState(false);
+  const [detailAppt, setDetailAppt] = useState<any | null>(null);
+
+  // Form state
   const [formTitle, setFormTitle] = useState("");
   const [formContactPhone, setFormContactPhone] = useState("");
   const [formServiceType, setFormServiceType] = useState("");
@@ -183,88 +122,88 @@ export default function Agenda() {
   const [formProfessionalId, setFormProfessionalId] = useState("");
   const [formRecurrence, setFormRecurrence] = useState("none");
 
-  // Computed date range
-  const dateRange = useMemo(
-    () => getDateRange(viewMode, baseDate),
-    [viewMode, baseDate],
-  );
+  // Date range for query
+  const weekDays = useMemo(() => getWeekDays(baseDate), [baseDate]);
+  const queryRange = useMemo(() => {
+    if (viewMode === "day") {
+      const dayAfter = new Date(baseDate);
+      dayAfter.setDate(dayAfter.getDate() + 1);
+      return { from: toLocalDateStr(baseDate), to: toLocalDateStr(dayAfter) };
+    }
+    const start = weekDays[0];
+    const end = new Date(weekDays[6]);
+    end.setDate(end.getDate() + 1);
+    return { from: toLocalDateStr(start), to: toLocalDateStr(end) };
+  }, [viewMode, baseDate, weekDays]);
 
   // Queries
-  const agendaQuery = trpc.agenda.unified.useQuery({
-    from: `${dateRange.from.getFullYear()}-${String(dateRange.from.getMonth() + 1).padStart(2, "0")}-${String(dateRange.from.getDate()).padStart(2, "0")}`,
-    to: `${dateRange.to.getFullYear()}-${String(dateRange.to.getMonth() + 1).padStart(2, "0")}-${String(dateRange.to.getDate()).padStart(2, "0")}`,
+  const agendaQuery = trpc.agenda.unified.useQuery(queryRange, {
+    refetchOnWindowFocus: false,
   });
-
   const tenantUsersQuery = trpc.agenda.tenantUsers.useQuery();
 
   // Mutations
-  const createAppointment = trpc.agenda.createAppointment.useMutation({
+  const createMut = trpc.agenda.createAppointment.useMutation({
     onSuccess: () => {
       utils.agenda.unified.invalidate();
-      toast.success("Agendamento criado com sucesso!");
+      toast.success("Agendamento criado!");
       resetForm();
       setCreateOpen(false);
     },
-    onError: (err) => toast.error(err.message || "Erro ao criar agendamento"),
+    onError: (err: any) => toast.error(err.message || "Erro ao criar"),
   });
 
-  const confirmAppointment = trpc.agenda.confirmAppointment.useMutation({
-    onSuccess: () => {
-      utils.agenda.unified.invalidate();
-      toast.success("Agendamento confirmado!");
-    },
-    onError: (err) => toast.error(err.message || "Erro ao confirmar"),
+  const confirmMut = trpc.agenda.confirmAppointment.useMutation({
+    onSuccess: () => { utils.agenda.unified.invalidate(); setDetailAppt(null); toast.success("Confirmado!"); },
+  });
+  const completeMut = trpc.agenda.completeAppointment.useMutation({
+    onSuccess: () => { utils.agenda.unified.invalidate(); setDetailAppt(null); toast.success("Concluído!"); },
+  });
+  const cancelMut = trpc.agenda.cancelAppointment.useMutation({
+    onSuccess: () => { utils.agenda.unified.invalidate(); setDetailAppt(null); toast.success("Cancelado."); },
   });
 
-  const completeAppointment = trpc.agenda.completeAppointment.useMutation({
-    onSuccess: () => {
-      utils.agenda.unified.invalidate();
-      toast.success("Agendamento concluído!");
-    },
-    onError: (err) => toast.error(err.message || "Erro ao concluir"),
-  });
+  const tenantUsers = (tenantUsersQuery.data as any[]) || [];
 
-  const cancelAppointment = trpc.agenda.cancelAppointment.useMutation({
-    onSuccess: () => {
-      utils.agenda.unified.invalidate();
-      toast.success("Agendamento cancelado.");
-    },
-    onError: (err) => toast.error(err.message || "Erro ao cancelar"),
-  });
+  // Filter appointments from unified data
+  const appointments = useMemo(() => {
+    const items = agendaQuery.data;
+    if (!items || !Array.isArray(items)) return [];
+    return items.filter((item: any) => item.source === "appointment" || item.source === "google");
+  }, [agendaQuery.data]);
 
   // Helpers
   function resetForm() {
-    setFormTitle("");
-    setFormContactPhone("");
-    setFormServiceType("");
-    setFormPrice("");
-    setFormLocation("");
-    setFormNotes("");
-    setFormStartDate("");
-    setFormStartTime("09:00");
-    setFormEndDate("");
-    setFormEndTime("10:00");
-    setFormProfessionalId("");
-    setFormRecurrence("none");
+    setFormTitle(""); setFormContactPhone(""); setFormServiceType("");
+    setFormPrice(""); setFormLocation(""); setFormNotes("");
+    setFormStartDate(""); setFormStartTime("09:00");
+    setFormEndDate(""); setFormEndTime("10:00");
+    setFormProfessionalId(""); setFormRecurrence("none");
+  }
+
+  function openCreate(date?: Date, hour?: number) {
+    const d = date || new Date();
+    setFormStartDate(toLocalDateStr(d));
+    setFormEndDate(toLocalDateStr(d));
+    if (hour !== undefined) {
+      setFormStartTime(`${String(hour).padStart(2, "0")}:00`);
+      setFormEndTime(`${String(hour + 1).padStart(2, "0")}:00`);
+    }
+    setCreateOpen(true);
   }
 
   function handleCreate() {
-    if (!formTitle.trim()) {
-      toast.error("Informe o título do agendamento.");
-      return;
-    }
-    if (!formStartDate || !formStartTime) {
-      toast.error("Informe a data e horário de início.");
-      return;
-    }
+    if (!formTitle.trim()) { toast.error("Informe o título."); return; }
+    if (!formStartDate || !formStartTime) { toast.error("Informe data e horário."); return; }
 
-    const startAt = new Date(`${formStartDate}T${formStartTime}`).getTime();
-    const endAt =
-      formEndDate && formEndTime
-        ? new Date(`${formEndDate}T${formEndTime}`).getTime()
-        : new Date(`${formStartDate}T${formEndTime}`).getTime();
+    const startAt = new Date(`${formStartDate}T${formStartTime}:00`).getTime();
+    const endDate = formEndDate || formStartDate;
+    const endAt = new Date(`${endDate}T${formEndTime}:00`).getTime();
 
-    createAppointment.mutate({
+    if (isNaN(startAt) || isNaN(endAt)) { toast.error("Data/horário inválido."); return; }
+    if (endAt <= startAt) { toast.error("Horário de fim deve ser depois do início."); return; }
+
+    createMut.mutate({
       title: formTitle.trim(),
       startAt,
       endAt,
@@ -273,534 +212,408 @@ export default function Agenda() {
       price: formPrice ? parseFloat(formPrice) : undefined,
       location: formLocation.trim() || undefined,
       notes: formNotes.trim() || undefined,
-      professionalId: formProfessionalId && !isNaN(Number(formProfessionalId))
-        ? Number(formProfessionalId)
-        : undefined,
-      recurrenceRule:
-        formRecurrence !== "none" ? formRecurrence : undefined,
+      professionalId: formProfessionalId ? Number(formProfessionalId) : undefined,
+      recurrenceRule: formRecurrence !== "none" ? formRecurrence : undefined,
     });
   }
 
-  // Filter only appointment items from unified agenda
-  const appointments = useMemo(() => {
-    const items = (agendaQuery.data as any[]) || [];
-    return items
-      .filter(
-        (item: any) =>
-          item.source === "appointment" || item.source === "google",
-      )
-      .sort(
-        (a: any, b: any) =>
-          new Date(a.startAt).getTime() - new Date(b.startAt).getTime(),
-      );
-  }, [agendaQuery.data]);
-
-  // Group appointments by date
-  const groupedByDate = useMemo(() => {
-    const groups: Record<string, AppointmentItem[]> = {};
-    for (const apt of appointments) {
-      const dateKey = formatDate(apt.startAt);
-      if (!groups[dateKey]) groups[dateKey] = [];
-      groups[dateKey].push(apt);
+  function getApptNumericId(appt: any): number {
+    if (typeof appt.id === "string" && appt.id.startsWith("appt-")) {
+      return Number(appt.id.replace("appt-", ""));
     }
-    return groups;
-  }, [appointments]);
-
-  const tenantUsers = (tenantUsersQuery.data as any[]) || [];
-
-  function getProfessionalName(professionalId: number | null | undefined) {
-    if (!professionalId) return "";
-    const user = tenantUsers.find((u: any) => u.userId === professionalId);
-    return user?.name || user?.email || "";
+    return typeof appt.id === "number" ? appt.id : 0;
   }
 
-  // Set default form dates when opening the dialog
-  function handleOpenCreate() {
-    const today = new Date().toISOString().split("T")[0];
-    setFormStartDate(today);
-    setFormEndDate(today);
-    setCreateOpen(true);
+  function getProfName(id: number | null | undefined): string {
+    if (!id) return "";
+    const u = tenantUsers.find((u: any) => u.userId === id);
+    return u?.name || u?.email || "";
   }
+
+  // Navigation
+  function navigate(dir: number) {
+    const d = new Date(baseDate);
+    if (viewMode === "day") d.setDate(d.getDate() + dir);
+    else d.setDate(d.getDate() + dir * 7);
+    setBaseDate(d);
+  }
+
+  function getTitle(): string {
+    if (viewMode === "day") {
+      return baseDate.toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" });
+    }
+    const s = weekDays[0];
+    const e = weekDays[6];
+    if (s.getMonth() === e.getMonth()) {
+      return `${s.getDate()} — ${e.getDate()} de ${MONTHS_PT[s.getMonth()]}`;
+    }
+    return `${s.getDate()} ${MONTHS_PT[s.getMonth()].slice(0, 3)} — ${e.getDate()} ${MONTHS_PT[e.getMonth()].slice(0, 3)}`;
+  }
+
+  // Get appointments for a specific day
+  function getApptsForDay(day: Date) {
+    return appointments.filter((a: any) => {
+      const start = new Date(a.startAt);
+      return isSameDay(start, day);
+    });
+  }
+
+  // Calculate position/height of an appointment block in the calendar
+  function getApptStyle(appt: any) {
+    const start = new Date(appt.startAt);
+    const end = new Date(appt.endAt || start.getTime() + 3600000);
+    const startHour = start.getHours() + start.getMinutes() / 60;
+    const endHour = end.getHours() + end.getMinutes() / 60;
+    const top = (startHour - HOURS[0]) * HOUR_HEIGHT;
+    const height = Math.max((endHour - startHour) * HOUR_HEIGHT, 24);
+    return { top: `${top}px`, height: `${height}px` };
+  }
+
+  const today = new Date();
+  const isLoading = agendaQuery.isLoading;
 
   return (
-    <div className="p-6 lg:px-8 space-y-6">
+    <div className="page-content flex flex-col h-[calc(100vh-80px)]">
       {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-4">
-        <div>
-          <h1 className="text-[20px] font-semibold tracking-tight text-foreground flex items-center gap-2">
-            <CalendarIcon className="h-5 w-5 text-primary" />
-            Agenda
-          </h1>
-          <p className="text-[13px] text-muted-foreground/70 mt-0.5">
-            Gerencie seus agendamentos e compromissos
-          </p>
+      <div className="flex items-center justify-between flex-wrap gap-3 mb-4 shrink-0">
+        <div className="flex items-center gap-3">
+          <CalendarIcon className="h-5 w-5 text-[#2E7D5B]" />
+          <h1 className="text-xl font-semibold tracking-tight">Agenda</h1>
+          <Badge variant="secondary" className="text-xs">
+            {appointments.length} agendamento{appointments.length !== 1 ? "s" : ""}
+          </Badge>
         </div>
-        <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-          <DialogTrigger asChild>
-            <Button
-              size="sm"
-              className="h-9 gap-2 rounded-lg text-[13px]"
-              onClick={handleOpenCreate}
-            >
-              <Plus className="h-4 w-4" />
-              Novo Agendamento
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-[520px] max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Novo Agendamento</DialogTitle>
-            </DialogHeader>
-            <div className="grid gap-4 py-4">
-              {/* Title */}
-              <div className="grid gap-2">
-                <Label htmlFor="apt-title">Título *</Label>
-                <Input
-                  id="apt-title"
-                  placeholder="Ex: Corte de cabelo, Consulta..."
-                  value={formTitle}
-                  onChange={(e) => setFormTitle(e.target.value)}
-                />
-              </div>
-
-              {/* Date / Time row */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="apt-start-date">Data início *</Label>
-                  <Input
-                    id="apt-start-date"
-                    type="date"
-                    value={formStartDate}
-                    onChange={(e) => {
-                      setFormStartDate(e.target.value);
-                      if (!formEndDate) setFormEndDate(e.target.value);
-                    }}
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="apt-start-time">Horário início *</Label>
-                  <Input
-                    id="apt-start-time"
-                    type="time"
-                    value={formStartTime}
-                    onChange={(e) => setFormStartTime(e.target.value)}
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="apt-end-date">Data fim</Label>
-                  <Input
-                    id="apt-end-date"
-                    type="date"
-                    value={formEndDate}
-                    onChange={(e) => setFormEndDate(e.target.value)}
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="apt-end-time">Horário fim</Label>
-                  <Input
-                    id="apt-end-time"
-                    type="time"
-                    value={formEndTime}
-                    onChange={(e) => setFormEndTime(e.target.value)}
-                  />
-                </div>
-              </div>
-
-              {/* Contact phone + service type */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="apt-phone">Telefone do cliente</Label>
-                  <Input
-                    id="apt-phone"
-                    placeholder="(11) 99999-9999"
-                    value={formContactPhone}
-                    onChange={(e) => setFormContactPhone(e.target.value)}
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="apt-service">Tipo de serviço</Label>
-                  <Input
-                    id="apt-service"
-                    placeholder="Ex: Corte, Limpeza..."
-                    value={formServiceType}
-                    onChange={(e) => setFormServiceType(e.target.value)}
-                  />
-                </div>
-              </div>
-
-              {/* Price + Location */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="apt-price">Valor (R$)</Label>
-                  <Input
-                    id="apt-price"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    placeholder="0,00"
-                    value={formPrice}
-                    onChange={(e) => setFormPrice(e.target.value)}
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="apt-location">Local</Label>
-                  <Input
-                    id="apt-location"
-                    placeholder="Sala 1, Consultório..."
-                    value={formLocation}
-                    onChange={(e) => setFormLocation(e.target.value)}
-                  />
-                </div>
-              </div>
-
-              {/* Professional */}
-              <div className="grid gap-2">
-                <Label>Profissional</Label>
-                <Select
-                  value={formProfessionalId}
-                  onValueChange={setFormProfessionalId}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione o profissional" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {tenantUsers.map((u: any) => (
-                      <SelectItem key={u.userId} value={String(u.userId)}>
-                        {u.name || u.email}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Recurrence */}
-              <div className="grid gap-2">
-                <Label>Recorrência</Label>
-                <Select
-                  value={formRecurrence}
-                  onValueChange={setFormRecurrence}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Sem recorrência" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {RECURRENCE_OPTIONS.map((opt) => (
-                      <SelectItem key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Notes */}
-              <div className="grid gap-2">
-                <Label htmlFor="apt-notes">Observações</Label>
-                <Textarea
-                  id="apt-notes"
-                  placeholder="Anotações sobre o agendamento..."
-                  rows={3}
-                  value={formNotes}
-                  onChange={(e) => setFormNotes(e.target.value)}
-                />
-              </div>
-            </div>
-            <DialogFooter>
-              <Button
-                variant="outline"
-                onClick={() => setCreateOpen(false)}
-              >
-                Cancelar
-              </Button>
-              <Button
-                onClick={handleCreate}
-                disabled={createAppointment.isPending}
-              >
-                {createAppointment.isPending && (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                )}
-                Criar Agendamento
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+        <Button size="sm" className="gap-2 bg-[#2E7D5B] hover:bg-[#256B4D]" onClick={() => openCreate()}>
+          <Plus className="h-4 w-4" />
+          Novo Agendamento
+        </Button>
       </div>
 
-      {/* View tabs + Navigation */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <Tabs
-          value={viewMode}
-          onValueChange={(v) => setViewMode(v as ViewMode)}
-        >
-          <TabsList>
-            <TabsTrigger value="day">Dia</TabsTrigger>
-            <TabsTrigger value="week">Semana</TabsTrigger>
-            <TabsTrigger value="month">Mês</TabsTrigger>
-          </TabsList>
-        </Tabs>
-
+      {/* Nav bar */}
+      <div className="flex items-center justify-between mb-3 shrink-0">
+        <div className="flex items-center gap-1">
+          <Button variant={viewMode === "day" ? "default" : "outline"} size="sm" className="h-8 text-xs" onClick={() => setViewMode("day")}>
+            Dia
+          </Button>
+          <Button variant={viewMode === "week" ? "default" : "outline"} size="sm" className="h-8 text-xs" onClick={() => setViewMode("week")}>
+            Semana
+          </Button>
+        </div>
         <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-8 w-8 p-0"
-            onClick={() => setBaseDate(navigateDate(viewMode, baseDate, -1))}
-          >
+          <Button variant="outline" size="sm" className="h-8 w-8 p-0" onClick={() => navigate(-1)}>
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          <span className="text-sm font-medium min-w-[160px] text-center">
-            {getViewTitle(viewMode, baseDate)}
-          </span>
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-8 w-8 p-0"
-            onClick={() => setBaseDate(navigateDate(viewMode, baseDate, 1))}
-          >
+          <span className="text-sm font-medium min-w-[180px] text-center">{getTitle()}</span>
+          <Button variant="outline" size="sm" className="h-8 w-8 p-0" onClick={() => navigate(1)}>
             <ChevronRight className="h-4 w-4" />
           </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-8 text-[13px]"
-            onClick={() => setBaseDate(new Date())}
-          >
+          <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => setBaseDate(new Date())}>
             Hoje
           </Button>
         </div>
       </div>
 
-      {/* Summary badges */}
-      <div className="flex items-center gap-3 flex-wrap">
-        <Badge variant="secondary" className="gap-1.5 py-1 px-3">
-          <CalendarIcon className="h-3.5 w-3.5" />
-          {appointments.length} agendamento{appointments.length !== 1 ? "s" : ""}
-        </Badge>
-        {agendaQuery.isLoading && (
-          <Badge variant="outline" className="gap-1.5 py-1 px-3 text-muted-foreground">
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            Carregando...
-          </Badge>
-        )}
-      </div>
-
-      {/* Appointment list */}
-      {agendaQuery.isLoading ? (
-        <div className="flex items-center justify-center py-16">
+      {/* Calendar Grid */}
+      {isLoading ? (
+        <div className="flex-1 flex items-center justify-center">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </div>
-      ) : appointments.length === 0 ? (
-        <Card className="p-12 text-center">
-          <CalendarIcon className="h-12 w-12 mx-auto text-muted-foreground/40 mb-4" />
-          <h3 className="text-base font-medium text-foreground mb-1">
-            Nenhum agendamento encontrado
-          </h3>
-          <p className="text-sm text-muted-foreground mb-4">
-            Não há agendamentos para o período selecionado.
-          </p>
-          <Button
-            size="sm"
-            className="gap-2"
-            onClick={handleOpenCreate}
-          >
-            <Plus className="h-4 w-4" />
-            Criar Agendamento
-          </Button>
-        </Card>
       ) : (
-        <div className="space-y-6">
-          {Object.entries(groupedByDate).map(([dateLabel, dayAppointments]) => (
-            <div key={dateLabel}>
-              <h3 className="text-sm font-medium text-muted-foreground mb-3 flex items-center gap-2">
-                <CalendarIcon className="h-4 w-4" />
-                {dateLabel}
-                <Badge variant="outline" className="ml-1 text-xs">
-                  {dayAppointments.length}
-                </Badge>
-              </h3>
-              <div className="space-y-2">
-                {dayAppointments.map((apt) => {
-                  const numericId = typeof apt.id === "string" && apt.id.startsWith("appt-")
-                    ? Number(apt.id.replace("appt-", ""))
-                    : typeof apt.id === "number" ? apt.id : 0;
-                  return (
-                  <AppointmentCard
-                    key={apt.id}
-                    appointment={apt}
-                    professionalName={getProfessionalName(apt.professionalId)}
-                    onConfirm={() => numericId && confirmAppointment.mutate({ id: numericId })}
-                    onComplete={() => numericId && completeAppointment.mutate({ id: numericId })}
-                    onCancel={() => numericId && cancelAppointment.mutate({ id: numericId })}
-                    isConfirming={confirmAppointment.isPending}
-                    isCompleting={completeAppointment.isPending}
-                    isCancelling={cancelAppointment.isPending}
-                  />
-                  );
-                })}
-              </div>
+        <div className="flex-1 overflow-auto border rounded-lg bg-card">
+          {/* Day headers */}
+          <div className="flex sticky top-0 z-20 bg-card border-b">
+            {/* Time gutter */}
+            <div className="w-16 shrink-0 border-r" />
+            {/* Day columns */}
+            {(viewMode === "week" ? weekDays : [baseDate]).map((day, i) => {
+              const isToday = isSameDay(day, today);
+              return (
+                <div
+                  key={i}
+                  className={`flex-1 text-center py-2 border-r last:border-r-0 ${isToday ? "bg-[#2E7D5B]/5" : ""}`}
+                >
+                  <p className="text-xs text-muted-foreground">{DAYS_PT[day.getDay()]}</p>
+                  <p className={`text-lg font-semibold ${isToday ? "text-[#2E7D5B]" : "text-foreground"}`}>
+                    {day.getDate()}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Time grid */}
+          <div className="flex relative">
+            {/* Time labels */}
+            <div className="w-16 shrink-0 border-r">
+              {HOURS.map((h) => (
+                <div key={h} className="border-b" style={{ height: `${HOUR_HEIGHT}px` }}>
+                  <span className="text-[11px] text-muted-foreground px-2 -mt-2 block">
+                    {formatHour(h)}
+                  </span>
+                </div>
+              ))}
             </div>
-          ))}
+
+            {/* Day columns with appointments */}
+            {(viewMode === "week" ? weekDays : [baseDate]).map((day, colIdx) => {
+              const dayAppts = getApptsForDay(day);
+              const isToday = isSameDay(day, today);
+              return (
+                <div
+                  key={colIdx}
+                  className={`flex-1 relative border-r last:border-r-0 ${isToday ? "bg-[#2E7D5B]/[0.02]" : ""}`}
+                >
+                  {/* Hour grid lines (clickable) */}
+                  {HOURS.map((h) => (
+                    <div
+                      key={h}
+                      className="border-b border-border/50 cursor-pointer hover:bg-accent/30 transition-colors"
+                      style={{ height: `${HOUR_HEIGHT}px` }}
+                      onClick={() => openCreate(day, h)}
+                    />
+                  ))}
+
+                  {/* Current time indicator */}
+                  {isToday && (() => {
+                    const now = new Date();
+                    const nowHour = now.getHours() + now.getMinutes() / 60;
+                    if (nowHour < HOURS[0] || nowHour > HOURS[HOURS.length - 1] + 1) return null;
+                    const top = (nowHour - HOURS[0]) * HOUR_HEIGHT;
+                    return (
+                      <div
+                        className="absolute left-0 right-0 z-10 pointer-events-none"
+                        style={{ top: `${top}px` }}
+                      >
+                        <div className="flex items-center">
+                          <div className="w-2 h-2 rounded-full bg-red-500 -ml-1" />
+                          <div className="flex-1 h-px bg-red-500" />
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Appointment blocks */}
+                  {dayAppts.map((appt: any, idx: number) => {
+                    const style = getApptStyle(appt);
+                    const status = appt.status || "scheduled";
+                    const colorClass = STATUS_COLORS[status] || STATUS_COLORS.scheduled;
+                    const startDate = new Date(appt.startAt);
+                    const endDate = new Date(appt.endAt || appt.startAt + 3600000);
+                    const timeStr = `${startDate.getHours().toString().padStart(2, "0")}:${startDate.getMinutes().toString().padStart(2, "0")}`;
+                    const endTimeStr = `${endDate.getHours().toString().padStart(2, "0")}:${endDate.getMinutes().toString().padStart(2, "0")}`;
+
+                    return (
+                      <div
+                        key={appt.id}
+                        className={`absolute left-1 right-1 rounded-md border-l-[3px] px-2 py-1 cursor-pointer overflow-hidden text-white shadow-sm hover:shadow-md transition-shadow z-10 ${colorClass}`}
+                        style={{ top: style.top, height: style.height }}
+                        onClick={(e) => { e.stopPropagation(); setDetailAppt(appt); }}
+                      >
+                        <p className="text-[11px] font-semibold truncate leading-tight">
+                          {appt.title}
+                        </p>
+                        <p className="text-[10px] opacity-80 truncate">
+                          {timeStr} — {endTimeStr}
+                        </p>
+                        {appt.serviceType && (
+                          <p className="text-[10px] opacity-70 truncate">{appt.serviceType}</p>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
+
+      {/* Create Dialog */}
+      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+        <DialogContent className="sm:max-w-[520px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Novo Agendamento</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label>Título *</Label>
+              <Input placeholder="Ex: Corte de cabelo, Consulta..." value={formTitle} onChange={(e) => setFormTitle(e.target.value)} />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label>Data início *</Label>
+                <Input type="date" value={formStartDate} onChange={(e) => { setFormStartDate(e.target.value); if (!formEndDate) setFormEndDate(e.target.value); }} />
+              </div>
+              <div className="grid gap-2">
+                <Label>Horário início *</Label>
+                <Input type="time" value={formStartTime} onChange={(e) => setFormStartTime(e.target.value)} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label>Data fim</Label>
+                <Input type="date" value={formEndDate} onChange={(e) => setFormEndDate(e.target.value)} />
+              </div>
+              <div className="grid gap-2">
+                <Label>Horário fim</Label>
+                <Input type="time" value={formEndTime} onChange={(e) => setFormEndTime(e.target.value)} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label>Telefone do cliente</Label>
+                <Input placeholder="(11) 99999-9999" value={formContactPhone} onChange={(e) => setFormContactPhone(e.target.value)} />
+              </div>
+              <div className="grid gap-2">
+                <Label>Tipo de serviço</Label>
+                <Input placeholder="Ex: Corte, Limpeza..." value={formServiceType} onChange={(e) => setFormServiceType(e.target.value)} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label>Valor (R$)</Label>
+                <Input type="number" step="0.01" min="0" placeholder="0,00" value={formPrice} onChange={(e) => setFormPrice(e.target.value)} />
+              </div>
+              <div className="grid gap-2">
+                <Label>Local</Label>
+                <Input placeholder="Sala 1, Consultório..." value={formLocation} onChange={(e) => setFormLocation(e.target.value)} />
+              </div>
+            </div>
+            {tenantUsers.length > 0 && (
+              <div className="grid gap-2">
+                <Label>Profissional</Label>
+                <Select value={formProfessionalId} onValueChange={setFormProfessionalId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {tenantUsers.map((u: any) => (
+                      <SelectItem key={u.userId} value={String(u.userId)}>{u.name || u.email}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            <div className="grid gap-2">
+              <Label>Recorrência</Label>
+              <Select value={formRecurrence} onValueChange={setFormRecurrence}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Sem recorrência" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Sem recorrência</SelectItem>
+                  <SelectItem value="INTERVAL:7">Semanal (7 dias)</SelectItem>
+                  <SelectItem value="INTERVAL:15">Quinzenal (15 dias)</SelectItem>
+                  <SelectItem value="INTERVAL:30">Mensal (30 dias)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-2">
+              <Label>Observações</Label>
+              <Textarea placeholder="Anotações..." rows={3} value={formNotes} onChange={(e) => setFormNotes(e.target.value)} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCreateOpen(false)}>Cancelar</Button>
+            <Button onClick={handleCreate} disabled={createMut.isPending} className="bg-[#2E7D5B] hover:bg-[#256B4D]">
+              {createMut.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Criar Agendamento
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Detail Dialog */}
+      <Dialog open={!!detailAppt} onOpenChange={(open) => { if (!open) setDetailAppt(null); }}>
+        <DialogContent className="sm:max-w-[440px]">
+          {detailAppt && (() => {
+            const status = detailAppt.status || "scheduled";
+            const startDate = new Date(detailAppt.startAt);
+            const endDate = new Date(detailAppt.endAt || detailAppt.startAt + 3600000);
+            const numericId = getApptNumericId(detailAppt);
+            const isTerminal = status === "completed" || status === "cancelled" || status === "no_show";
+
+            return (
+              <>
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2">
+                    {detailAppt.title}
+                    <Badge variant="outline" className="text-[11px]">
+                      {STATUS_LABELS[status] || status}
+                    </Badge>
+                  </DialogTitle>
+                </DialogHeader>
+                <div className="space-y-3 py-2">
+                  <div className="flex items-center gap-2 text-sm">
+                    <Clock className="h-4 w-4 text-muted-foreground" />
+                    <span>
+                      {startDate.toLocaleDateString("pt-BR")} · {startDate.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })} — {endDate.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                    </span>
+                  </div>
+                  {detailAppt.serviceType && (
+                    <div className="flex items-center gap-2 text-sm">
+                      <Scissors className="h-4 w-4 text-muted-foreground" />
+                      <span>{detailAppt.serviceType}</span>
+                    </div>
+                  )}
+                  {detailAppt.contactPhone && (
+                    <div className="flex items-center gap-2 text-sm">
+                      <Phone className="h-4 w-4 text-muted-foreground" />
+                      <span>{detailAppt.contactPhone}</span>
+                    </div>
+                  )}
+                  {detailAppt.contactName && (
+                    <div className="flex items-center gap-2 text-sm">
+                      <User className="h-4 w-4 text-muted-foreground" />
+                      <span>{detailAppt.contactName}</span>
+                    </div>
+                  )}
+                  {detailAppt.location && (
+                    <div className="flex items-center gap-2 text-sm">
+                      <MapPin className="h-4 w-4 text-muted-foreground" />
+                      <span>{detailAppt.location}</span>
+                    </div>
+                  )}
+                  {detailAppt.price != null && detailAppt.price > 0 && (
+                    <div className="flex items-center gap-2 text-sm">
+                      <DollarSign className="h-4 w-4 text-muted-foreground" />
+                      <span className="font-medium text-emerald-600">{formatCurrency(detailAppt.price)}</span>
+                    </div>
+                  )}
+                  {detailAppt.professionalId && (
+                    <div className="flex items-center gap-2 text-sm">
+                      <User className="h-4 w-4 text-muted-foreground" />
+                      <span>Prof: {getProfName(detailAppt.professionalId)}</span>
+                    </div>
+                  )}
+                  {detailAppt.notes && (
+                    <p className="text-sm text-muted-foreground bg-muted/50 rounded-lg p-3">{detailAppt.notes}</p>
+                  )}
+                </div>
+                {!isTerminal && numericId > 0 && (
+                  <DialogFooter className="gap-2 sm:gap-2">
+                    {status === "scheduled" && (
+                      <Button size="sm" variant="outline" className="text-blue-600" onClick={() => confirmMut.mutate({ id: numericId })} disabled={confirmMut.isPending}>
+                        <CheckCircle2 className="h-4 w-4 mr-1" /> Confirmar
+                      </Button>
+                    )}
+                    {(status === "scheduled" || status === "confirmed" || status === "in_progress") && (
+                      <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700" onClick={() => completeMut.mutate({ id: numericId })} disabled={completeMut.isPending}>
+                        <CheckCircle2 className="h-4 w-4 mr-1" /> Concluir
+                      </Button>
+                    )}
+                    {(status === "scheduled" || status === "confirmed") && (
+                      <Button size="sm" variant="outline" className="text-red-600" onClick={() => cancelMut.mutate({ id: numericId })} disabled={cancelMut.isPending}>
+                        <XCircle className="h-4 w-4 mr-1" /> Cancelar
+                      </Button>
+                    )}
+                  </DialogFooter>
+                )}
+              </>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
     </div>
-  );
-}
-
-// ─── Appointment Card ───
-
-function AppointmentCard({
-  appointment,
-  professionalName,
-  onConfirm,
-  onComplete,
-  onCancel,
-  isConfirming,
-  isCompleting,
-  isCancelling,
-}: {
-  appointment: AppointmentItem;
-  professionalName: string;
-  onConfirm: () => void;
-  onComplete: () => void;
-  onCancel: () => void;
-  isConfirming: boolean;
-  isCompleting: boolean;
-  isCancelling: boolean;
-}) {
-  const status = appointment.status || "scheduled";
-  const statusInfo = STATUS_CONFIG[status] || STATUS_CONFIG.scheduled;
-  const isTerminal = status === "completed" || status === "cancelled" || status === "no_show";
-
-  return (
-    <Card className="p-4 hover:shadow-sm transition-shadow">
-      <div className="flex items-start justify-between gap-4">
-        {/* Left: time + info */}
-        <div className="flex gap-3 min-w-0 flex-1">
-          {/* Time block */}
-          <div className="flex flex-col items-center justify-center min-w-[56px] text-center">
-            <span className="text-lg font-semibold text-foreground leading-tight">
-              {formatTime(appointment.startAt)}
-            </span>
-            {appointment.endAt && (
-              <span className="text-xs text-muted-foreground">
-                {formatTime(appointment.endAt)}
-              </span>
-            )}
-          </div>
-
-          {/* Divider */}
-          <div className="w-px bg-border self-stretch" />
-
-          {/* Details */}
-          <div className="min-w-0 flex-1 space-y-1.5">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="font-medium text-sm text-foreground truncate">
-                {appointment.title}
-              </span>
-              <Badge
-                variant="outline"
-                className={`text-[11px] px-1.5 py-0 ${statusInfo.className}`}
-              >
-                {statusInfo.label}
-              </Badge>
-            </div>
-
-            <div className="flex items-center gap-4 flex-wrap text-xs text-muted-foreground">
-              {appointment.serviceType && (
-                <span className="flex items-center gap-1">
-                  <Scissors className="h-3 w-3" />
-                  {appointment.serviceType}
-                </span>
-              )}
-              {appointment.contactPhone && (
-                <span className="flex items-center gap-1">
-                  <Phone className="h-3 w-3" />
-                  {appointment.contactPhone}
-                </span>
-              )}
-              {appointment.price != null && appointment.price > 0 && (
-                <span className="flex items-center gap-1 font-medium text-emerald-600">
-                  <DollarSign className="h-3 w-3" />
-                  {formatCurrency(appointment.price)}
-                </span>
-              )}
-              {professionalName && (
-                <span className="flex items-center gap-1">
-                  <User className="h-3 w-3" />
-                  {professionalName}
-                </span>
-              )}
-              {appointment.location && (
-                <span className="flex items-center gap-1">
-                  <MapPin className="h-3 w-3" />
-                  {appointment.location}
-                </span>
-              )}
-            </div>
-
-            {appointment.notes && (
-              <p className="text-xs text-muted-foreground/70 truncate">
-                {appointment.notes}
-              </p>
-            )}
-          </div>
-        </div>
-
-        {/* Right: actions */}
-        {!isTerminal && (
-          <div className="flex items-center gap-1.5 shrink-0">
-            {status === "scheduled" && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-7 text-xs gap-1 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                onClick={onConfirm}
-                disabled={isConfirming}
-              >
-                {isConfirming ? (
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                ) : (
-                  <CheckCircle2 className="h-3 w-3" />
-                )}
-                Confirmar
-              </Button>
-            )}
-            {(status === "scheduled" || status === "confirmed" || status === "in_progress") && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-7 text-xs gap-1 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
-                onClick={onComplete}
-                disabled={isCompleting}
-              >
-                {isCompleting ? (
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                ) : (
-                  <CheckCircle2 className="h-3 w-3" />
-                )}
-                Concluir
-              </Button>
-            )}
-            {(status === "scheduled" || status === "confirmed") && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-7 text-xs gap-1 text-red-600 hover:text-red-700 hover:bg-red-50"
-                onClick={onCancel}
-                disabled={isCancelling}
-              >
-                {isCancelling ? (
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                ) : (
-                  <XCircle className="h-3 w-3" />
-                )}
-                Cancelar
-              </Button>
-            )}
-          </div>
-        )}
-      </div>
-    </Card>
   );
 }

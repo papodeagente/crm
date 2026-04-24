@@ -83,6 +83,16 @@ export interface AgendaFilter {
 }
 
 // ═══════════════════════════════════════
+// HELPER: Extract rows from db.execute result
+// ═══════════════════════════════════════
+
+function extractRows(result: any): any[] {
+  if (Array.isArray(result)) return result;
+  if (result && Array.isArray(result.rows)) return result.rows;
+  return [];
+}
+
+// ═══════════════════════════════════════
 // HELPER: Resolve team → user IDs
 // ═══════════════════════════════════════
 
@@ -92,7 +102,7 @@ async function getTeamMemberIds(tenantId: number, teamId: number): Promise<numbe
   const rows = await db.execute(sql`
     SELECT userId FROM team_members WHERE tenantId = ${tenantId} AND teamId = ${teamId}
   `);
-  return (rows as unknown as any[]).map((r: any) => Number(r.userId));
+  return extractRows(rows).map((r: any) => Number(r.userId));
 }
 
 // ═══════════════════════════════════════
@@ -141,7 +151,7 @@ export async function getUnifiedAgenda(
   `);
 
   const now = Date.now();
-  const crmItems: AgendaItem[] = (taskRows as unknown as any[]).map((t: any) => {
+  const crmItems: AgendaItem[] = extractRows(taskRows).map((t: any) => {
     const dueMs = t.dueAt ? new Date(t.dueAt).getTime() : new Date(t.createdAt).getTime();
     const isCompleted = t.status === "done" || t.status === "cancelled";
     const isOverdue = !isCompleted && t.dueAt && new Date(t.dueAt).getTime() < now;
@@ -180,7 +190,7 @@ export async function getUnifiedAgenda(
     ORDER BY startAt ASC
   `);
 
-  const gcalItems: AgendaItem[] = (gcalRows as unknown as any[]).map((e: any) => ({
+  const gcalItems: AgendaItem[] = extractRows(gcalRows).map((e: any) => ({
     id: `gcal-${e.id}`,
     source: "google" as const,
     title: e.title,
@@ -220,7 +230,7 @@ export async function getUnifiedAgenda(
   `);
 
   // Fetch participants for each appointment
-  const apptIds = (apptRows as unknown as any[]).map((a: any) => a.id);
+  const apptIds = extractRows(apptRows).map((a: any) => a.id);
   let participantsMap: Record<number, Array<{ userId: number; name: string }>> = {};
   if (apptIds.length > 0) {
     // Build safe IN clause with individual sql params
@@ -232,13 +242,13 @@ export async function getUnifiedAgenda(
       LEFT JOIN users u ON u.id = cap."userId"
       WHERE cap."appointmentId" IN (${inClause})
     `);
-    for (const row of (partRows as unknown as any[])) {
+    for (const row of extractRows(partRows)) {
       if (!participantsMap[row.appointmentId]) participantsMap[row.appointmentId] = [];
       participantsMap[row.appointmentId].push({ userId: Number(row.userId), name: row.name });
     }
   }
 
-  const apptItems: AgendaItem[] = (apptRows as unknown as any[]).map((a: any) => {
+  const apptItems: AgendaItem[] = extractRows(apptRows).map((a: any) => {
     const startMs = new Date(a.startAt).getTime();
     const endMs = new Date(a.endAt).getTime();
     const isCompleted = !!a.isCompleted || a.status === "completed";
@@ -293,7 +303,7 @@ export async function syncGoogleCalendar(
     WHERE tenantId = ${tenantId} AND userId = ${userId} AND isActive = true
     LIMIT 1
   `);
-  const tokens = tokenRows as unknown as any[];
+  const tokens = extractRows(tokenRows);
   if (tokens.length === 0) {
     return { synced: 0, error: "NO_GOOGLE_TOKEN" };
   }
@@ -424,7 +434,7 @@ export async function getGoogleCalendarStatus(
     WHERE tenantId = ${tenantId} AND userId = ${userId} AND isActive = true
     LIMIT 1
   `);
-  const tokens = tokenRows as unknown as any[];
+  const tokens = extractRows(tokenRows);
   if (tokens.length === 0) return { connected: false };
 
   // Get last sync time
@@ -432,7 +442,7 @@ export async function getGoogleCalendarStatus(
     SELECT MAX(syncedAt) AS lastSync FROM google_calendar_events
     WHERE tenantId = ${tenantId} AND userId = ${userId}
   `);
-  const lastSync = (syncRows as unknown as any[])[0]?.lastSync;
+  const lastSync = extractRows(syncRows)[0]?.lastSync;
 
   return {
     connected: true,
@@ -516,8 +526,8 @@ export async function createAppointment(
     RETURNING id
   `);
 
-  const rows = (result as any).rows || result;
-  const insertId = (rows as any[])[0].id;
+  const rows = extractRows(result);
+  const insertId = rows[0].id;
 
   // Insert participants (always include creator)
   const participantSet = new Set(input.participantIds || []);
@@ -553,8 +563,8 @@ export async function updateAppointment(
       SELECT id FROM crm_appointments
       WHERE id = ${input.id} AND "tenantId" = ${tenantId} AND "userId" = ${userId} AND "deletedAt" IS NULL
     `);
-    const checkRows = (checkResult as any).rows || checkResult;
-    if ((checkRows as any[]).length === 0) {
+    const checkRows = extractRows(checkResult);
+    if (checkRows.length === 0) {
       throw new Error("Appointment not found or access denied");
     }
   }
@@ -593,8 +603,8 @@ export async function updateAppointment(
     const ownerResult = await db.execute(sql`
       SELECT "userId" FROM crm_appointments WHERE id = ${input.id} AND "tenantId" = ${tenantId}
     `);
-    const ownerArr = (ownerResult as any).rows || ownerResult;
-    const ownerId = (ownerArr as any[])[0]?.userId;
+    const ownerArr = extractRows(ownerResult);
+    const ownerId = ownerArr[0]?.userId;
     const participantSet = new Set(input.participantIds);
     if (ownerId) participantSet.add(ownerId); // owner always stays
 
@@ -652,8 +662,8 @@ export async function deleteAppointment(
       SELECT id FROM crm_appointments
       WHERE id = ${appointmentId} AND "tenantId" = ${tenantId} AND "userId" = ${userId} AND "deletedAt" IS NULL
     `);
-    const delRows = (delCheck as any).rows || delCheck;
-    if ((delRows as any[]).length === 0) {
+    const delRows = extractRows(delCheck);
+    if (delRows.length === 0) {
       throw new Error("Appointment not found or access denied");
     }
   }
@@ -687,7 +697,7 @@ export async function getAppointmentParticipants(
     ORDER BY cap."createdAt" ASC
   `);
 
-  return (rows as unknown as any[]).map((r: any) => ({
+  return extractRows(rows).map((r: any) => ({
     userId: Number(r.userId),
     name: r.name,
   }));
