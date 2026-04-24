@@ -13,6 +13,8 @@ export const SMART_FILTERS = [
   "potencial_indicador_pos_atendimento",
   "potencial_indicador_fiel",
   "abordagem_nao_cliente",
+  "indicadores_ativos",
+  "indicados_convertidos",
 ] as const;
 
 export type SmartFilter = typeof SMART_FILTERS[number];
@@ -37,6 +39,14 @@ export const SMART_FILTER_CONFIG: Record<SmartFilter, { label: string; descripti
   abordagem_nao_cliente: {
     label: "Abordagem Não Cliente",
     description: "Venda perdida nos últimos 90 dias",
+  },
+  indicadores_ativos: {
+    label: "Indicadores Ativos",
+    description: "Clientes que fizeram pelo menos 1 indicação",
+  },
+  indicados_convertidos: {
+    label: "Indicados Convertidos",
+    description: "Contatos indicados que já compraram",
   },
 };
 
@@ -100,10 +110,16 @@ export function computeFlag(params: {
   diasDesdeUltimaCompra: number;
   totalCompras: number;
   createdAt: Date;
+  referralCount?: number;
 }): string {
-  const { audienceType, totalVendasGanhas, diasDesdeUltimaCompra, totalCompras, createdAt } = params;
+  const { audienceType, totalVendasGanhas, diasDesdeUltimaCompra, totalCompras, createdAt, referralCount = 0 } = params;
   const now = new Date();
   const daysSinceCreation = Math.floor((now.getTime() - createdAt.getTime()) / (1000 * 60 * 60 * 24));
+
+  // Flag 0: Top Indicador (3+ referrals)
+  if (referralCount >= 3) {
+    return "top_indicador";
+  }
 
   // Flag 1: Potencial Indicador
   if (totalVendasGanhas > 0 && diasDesdeUltimaCompra >= 10 && diasDesdeUltimaCompra <= 20) {
@@ -320,6 +336,35 @@ async function getSmartFilterContactIds(db: any, tenantId: number, filter: Smart
       return resultRows.map((r: any) => r.id);
     }
 
+    case "indicadores_ativos": {
+      // Clientes que fizeram pelo menos 1 indicação (referralCount > 0)
+      const rows = await db.execute(sql`
+        SELECT DISTINCT rc.id
+        FROM rfv_contacts rc
+        INNER JOIN contacts c ON c.id = rc."contactId" AND c."tenantId" = ${tenantId}
+        WHERE rc."tenantId" = ${tenantId}
+          AND rc."deletedAt" IS NULL
+          AND COALESCE(c."referralCount", 0) > 0
+      `);
+      const resultRows = (rows as unknown as any[]) || [];
+      return resultRows.map((r: any) => r.id);
+    }
+
+    case "indicados_convertidos": {
+      // Contatos que foram indicados e já compraram (status = 'converted' na tabela referrals)
+      const rows = await db.execute(sql`
+        SELECT DISTINCT rc.id
+        FROM rfv_contacts rc
+        INNER JOIN contacts c ON c.id = rc."contactId" AND c."tenantId" = ${tenantId}
+        INNER JOIN referrals r ON r."referredId" = c.id AND r."tenantId" = ${tenantId}
+        WHERE rc."tenantId" = ${tenantId}
+          AND rc."deletedAt" IS NULL
+          AND r.status = 'converted'
+      `);
+      const resultRows = (rows as unknown as any[]) || [];
+      return resultRows.map((r: any) => r.id);
+    }
+
     default:
       return [];
   }
@@ -364,7 +409,18 @@ export async function getSmartFilterCounts(tenantId: number) {
         INNER JOIN contacts c ON c.id = rc.contactId AND c.tenantId = ${tenantId}
         INNER JOIN deals d ON d.contactId = c.id AND d.tenantId = ${tenantId} AND d.deletedAt IS NULL
         WHERE ${sql.raw(baseWhere)} AND d.status = 'lost' AND d.updatedAt >= ${ninetyDaysAgo}
-      ) AS abordagem_nao_cliente
+      ) AS abordagem_nao_cliente,
+      (
+        SELECT COUNT(DISTINCT rc.id) FROM rfv_contacts rc
+        INNER JOIN contacts c ON c.id = rc."contactId" AND c."tenantId" = ${tenantId}
+        WHERE ${sql.raw(baseWhere)} AND COALESCE(c."referralCount", 0) > 0
+      ) AS indicadores_ativos,
+      (
+        SELECT COUNT(DISTINCT rc.id) FROM rfv_contacts rc
+        INNER JOIN contacts c ON c.id = rc."contactId" AND c."tenantId" = ${tenantId}
+        INNER JOIN referrals r ON r."referredId" = c.id AND r."tenantId" = ${tenantId}
+        WHERE ${sql.raw(baseWhere)} AND r.status = 'converted'
+      ) AS indicados_convertidos
   `);
 
   const row = (result as unknown as any[])?.[0] || {};
@@ -374,6 +430,8 @@ export async function getSmartFilterCounts(tenantId: number) {
     potencial_indicador_pos_atendimento: Number(row.potencial_indicador_pos_atendimento || 0),
     potencial_indicador_fiel: Number(row.potencial_indicador_fiel || 0),
     abordagem_nao_cliente: Number(row.abordagem_nao_cliente || 0),
+    indicadores_ativos: Number(row.indicadores_ativos || 0),
+    indicados_convertidos: Number(row.indicados_convertidos || 0),
   };
 }
 

@@ -36,7 +36,7 @@ const segments = [
   "Clinicas",
 ];
 
-export function TourismSection() {
+export function LocalBusinessSection() {
   return (
     <section className="py-24 sm:py-32 px-5 sm:px-8 relative overflow-hidden">
       <div className="absolute inset-0 pointer-events-none">

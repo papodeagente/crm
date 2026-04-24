@@ -16,7 +16,7 @@ import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/comp
 import {
   ArrowLeft, Plus, Pencil, Trash2, Zap, Clock,
   MessageCircle, Phone, Mail, Video, CheckSquare,
-  CalendarDays, Plane, RotateCcw, GripVertical, Info,
+  CalendarDays, RotateCcw, GripVertical, Info,
 } from "lucide-react";
 import { CRM_DEAL_MESSAGE_TAGS, previewMessage } from "../../../shared/messageTags";
 
@@ -30,8 +30,8 @@ const TASK_TYPE_OPTIONS = [
 
 const DEADLINE_REF_OPTIONS = [
   { value: "current_date", label: "Data atual (ao mover)", icon: CalendarDays },
-  { value: "boarding_date", label: "Data do agendamento", icon: Plane },
-  { value: "return_date", label: "Data do retorno/revisão", icon: RotateCcw },
+  { value: "appointment_date", label: "Data do agendamento", icon: CalendarDays },
+  { value: "follow_up_date", label: "Data do retorno/revisão", icon: RotateCcw },
 ];
 
 interface AutomationFormData {

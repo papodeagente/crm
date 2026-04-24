@@ -64,6 +64,88 @@ export const POST_SALE_PIPELINE_STAGES = [
 ];
 
 // ═══════════════════════════════════════
+// SEGMENT-SPECIFIC PIPELINE STAGES
+// ═══════════════════════════════════════
+
+const SEGMENT_SALES_STAGES: Record<string, typeof SALES_PIPELINE_STAGES> = {
+  estetica: [
+    { name: "Consulta inicial", orderIndex: 0, probabilityDefault: 10, color: "#3b82f6" },
+    { name: "Avaliação", orderIndex: 1, probabilityDefault: 20, color: "#06b6d4" },
+    { name: "Orçamento", orderIndex: 2, probabilityDefault: 40, color: "#8b5cf6" },
+    { name: "Negociação", orderIndex: 3, probabilityDefault: 60, color: "#f59e0b" },
+    { name: "Agendamento", orderIndex: 4, probabilityDefault: 80, color: "#22c55e" },
+    { name: "Fechado", orderIndex: 5, probabilityDefault: 95, color: "#10b981" },
+  ],
+  odontologia: [
+    { name: "Triagem", orderIndex: 0, probabilityDefault: 10, color: "#3b82f6" },
+    { name: "Consulta", orderIndex: 1, probabilityDefault: 20, color: "#06b6d4" },
+    { name: "Plano de tratamento", orderIndex: 2, probabilityDefault: 35, color: "#8b5cf6" },
+    { name: "Orçamento", orderIndex: 3, probabilityDefault: 50, color: "#f59e0b" },
+    { name: "Aprovação", orderIndex: 4, probabilityDefault: 75, color: "#f97316" },
+    { name: "Agendamento", orderIndex: 5, probabilityDefault: 90, color: "#22c55e" },
+  ],
+  salao: [
+    { name: "Novo contato", orderIndex: 0, probabilityDefault: 15, color: "#3b82f6" },
+    { name: "Interesse", orderIndex: 1, probabilityDefault: 30, color: "#06b6d4" },
+    { name: "Agendamento", orderIndex: 2, probabilityDefault: 60, color: "#8b5cf6" },
+    { name: "Confirmado", orderIndex: 3, probabilityDefault: 85, color: "#22c55e" },
+    { name: "Atendido", orderIndex: 4, probabilityDefault: 95, color: "#10b981" },
+  ],
+  advocacia: [
+    { name: "Consulta inicial", orderIndex: 0, probabilityDefault: 10, color: "#3b82f6" },
+    { name: "Análise do caso", orderIndex: 1, probabilityDefault: 25, color: "#06b6d4" },
+    { name: "Proposta de honorários", orderIndex: 2, probabilityDefault: 45, color: "#8b5cf6" },
+    { name: "Negociação", orderIndex: 3, probabilityDefault: 65, color: "#f59e0b" },
+    { name: "Contrato assinado", orderIndex: 4, probabilityDefault: 90, color: "#22c55e" },
+  ],
+  clinica: [
+    { name: "Primeiro contato", orderIndex: 0, probabilityDefault: 10, color: "#3b82f6" },
+    { name: "Consulta", orderIndex: 1, probabilityDefault: 25, color: "#06b6d4" },
+    { name: "Diagnóstico", orderIndex: 2, probabilityDefault: 40, color: "#8b5cf6" },
+    { name: "Orçamento", orderIndex: 3, probabilityDefault: 55, color: "#f59e0b" },
+    { name: "Aprovação", orderIndex: 4, probabilityDefault: 75, color: "#f97316" },
+    { name: "Tratamento", orderIndex: 5, probabilityDefault: 90, color: "#22c55e" },
+  ],
+};
+
+const SEGMENT_POST_SALE_STAGES: Record<string, typeof POST_SALE_PIPELINE_STAGES> = {
+  estetica: [
+    { name: "Procedimento agendado", orderIndex: 0, probabilityDefault: 100, color: "#3b82f6" },
+    { name: "Em execução", orderIndex: 1, probabilityDefault: 100, color: "#06b6d4" },
+    { name: "Pós-procedimento", orderIndex: 2, probabilityDefault: 100, color: "#8b5cf6" },
+    { name: "Retorno agendado", orderIndex: 3, probabilityDefault: 100, color: "#f59e0b" },
+    { name: "Finalizado", orderIndex: 4, probabilityDefault: 100, color: "#10b981" },
+  ],
+  odontologia: [
+    { name: "Tratamento iniciado", orderIndex: 0, probabilityDefault: 100, color: "#3b82f6" },
+    { name: "Em andamento", orderIndex: 1, probabilityDefault: 100, color: "#06b6d4" },
+    { name: "Sessão concluída", orderIndex: 2, probabilityDefault: 100, color: "#8b5cf6" },
+    { name: "Retorno/Revisão", orderIndex: 3, probabilityDefault: 100, color: "#f59e0b" },
+    { name: "Alta", orderIndex: 4, probabilityDefault: 100, color: "#10b981" },
+  ],
+  salao: [
+    { name: "Agendado", orderIndex: 0, probabilityDefault: 100, color: "#3b82f6" },
+    { name: "Em atendimento", orderIndex: 1, probabilityDefault: 100, color: "#06b6d4" },
+    { name: "Concluído", orderIndex: 2, probabilityDefault: 100, color: "#22c55e" },
+    { name: "Reagendamento", orderIndex: 3, probabilityDefault: 100, color: "#10b981" },
+  ],
+  advocacia: [
+    { name: "Caso em andamento", orderIndex: 0, probabilityDefault: 100, color: "#3b82f6" },
+    { name: "Diligências", orderIndex: 1, probabilityDefault: 100, color: "#06b6d4" },
+    { name: "Audiência", orderIndex: 2, probabilityDefault: 100, color: "#8b5cf6" },
+    { name: "Decisão", orderIndex: 3, probabilityDefault: 100, color: "#f59e0b" },
+    { name: "Encerrado", orderIndex: 4, probabilityDefault: 100, color: "#10b981" },
+  ],
+  clinica: [
+    { name: "Tratamento iniciado", orderIndex: 0, probabilityDefault: 100, color: "#3b82f6" },
+    { name: "Sessões em andamento", orderIndex: 1, probabilityDefault: 100, color: "#06b6d4" },
+    { name: "Acompanhamento", orderIndex: 2, probabilityDefault: 100, color: "#8b5cf6" },
+    { name: "Retorno", orderIndex: 3, probabilityDefault: 100, color: "#f59e0b" },
+    { name: "Alta", orderIndex: 4, probabilityDefault: 100, color: "#10b981" },
+  ],
+};
+
+// ═══════════════════════════════════════
 // TENANT ONBOARDING — Create default pipelines
 // ═══════════════════════════════════════
 
@@ -98,8 +180,9 @@ export async function createDefaultPipelines(tenantId: number, segment?: string)
     isDefault: true,
   }).returning({ id: pipelines.id });
 
-  // Create Sales Pipeline Stages
-  for (const stage of SALES_PIPELINE_STAGES) {
+  // Create Sales Pipeline Stages (segment-specific or default)
+  const salesStages = (segment && SEGMENT_SALES_STAGES[segment]) || SALES_PIPELINE_STAGES;
+  for (const stage of salesStages) {
     await db.insert(pipelineStages).values({
       tenantId,
       pipelineId: salesPipeline.id,
@@ -117,9 +200,10 @@ export async function createDefaultPipelines(tenantId: number, segment?: string)
     isDefault: false,
   }).returning({ id: pipelines.id });
 
-  // Create Post-Sale Pipeline Stages
+  // Create Post-Sale Pipeline Stages (segment-specific or default)
+  const postSaleStages = (segment && SEGMENT_POST_SALE_STAGES[segment]) || POST_SALE_PIPELINE_STAGES;
   const postSaleStageIds: number[] = [];
-  for (const stage of POST_SALE_PIPELINE_STAGES) {
+  for (const stage of postSaleStages) {
     const [stageResult] = await db.insert(pipelineStages).values({
       tenantId,
       pipelineId: postSalePipeline.id,

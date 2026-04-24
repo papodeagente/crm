@@ -27,7 +27,7 @@ interface CatalogProduct {
   id: number; tenantId: number; name: string; description: string | null;
   categoryId: number | null; productType: string; basePriceCents: number;
   costPriceCents: number | null; currency: string | null; supplier: string | null;
-  destination: string | null; duration: string | null; imageUrl: string | null;
+  location: string | null; durationMinutes: string | null; imageUrl: string | null;
   sku: string | null; isActive: boolean | number; detailsJson: any;
   createdAt: string | Date; updatedAt: string | Date;
 }
@@ -180,8 +180,8 @@ function ProductFormDialog({
     // Preserve existing values for edit mode (not shown in simplified create form)
     productType: product?.productType || "other",
     categoryId: product?.categoryId ? String(product.categoryId) : "",
-    destination: product?.destination || "",
-    duration: product?.duration || "",
+    location: product?.location || "",
+    durationMinutes: product?.durationMinutes || "",
     sku: product?.sku || "",
     isActive: product ? Boolean(product.isActive) : true,
   });
@@ -207,8 +207,8 @@ function ProductFormDialog({
       // Preserve all existing fields on edit
       data.productType = form.productType as any;
       data.categoryId = form.categoryId ? Number(form.categoryId) : null;
-      data.destination = form.destination || undefined;
-      data.duration = form.duration || undefined;
+      data.location = form.location || undefined;
+      data.durationMinutes = form.durationMinutes || undefined;
       data.sku = form.sku || undefined;
       data.isActive = form.isActive;
       updateProduct.mutate({ ...data, id: product.id });
@@ -230,7 +230,7 @@ function ProductFormDialog({
           {/* Name - only required field */}
           <div>
             <Label>Nome do Produto *</Label>
-            <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Ex: Pacote Paris 7 noites" autoFocus />
+            <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Ex: Limpeza de Pele Premium" autoFocus />
           </div>
           {/* Description */}
           <div>
@@ -295,11 +295,11 @@ function ProductFormDialog({
                   </div>
                   <div>
                     <Label>Local</Label>
-                    <Input value={form.destination} onChange={(e) => setForm({ ...form, destination: e.target.value })} placeholder="Ex: Unidade Centro" />
+                    <Input value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} placeholder="Ex: Unidade Centro" />
                   </div>
                   <div>
                     <Label>Duração</Label>
-                    <Input value={form.duration} onChange={(e) => setForm({ ...form, duration: e.target.value })} placeholder="Ex: 7 noites" />
+                    <Input value={form.durationMinutes} onChange={(e) => setForm({ ...form, durationMinutes: e.target.value })} placeholder="Ex: 30 minutos" />
                   </div>
                   <div>
                     <Label>SKU / Código</Label>
@@ -372,16 +372,16 @@ function ProductCard({
 
       {/* Meta info */}
       <div className="space-y-1.5 mb-3">
-        {product.destination && (
+        {product.location && (
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <MapPin className="h-3 w-3" />
-            <span>{product.destination}</span>
+            <span>{product.location}</span>
           </div>
         )}
-        {product.duration && (
+        {product.durationMinutes && (
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <Clock className="h-3 w-3" />
-            <span>{product.duration}</span>
+            <span>{product.durationMinutes}</span>
           </div>
         )}
         {product.supplier && (
@@ -450,9 +450,9 @@ function ProductRow({
           </div>
           <div className="min-w-0">
             <p className="text-sm font-medium text-foreground truncate">{product.name}</p>
-            {product.destination && (
+            {product.location && (
               <p className="text-xs text-muted-foreground flex items-center gap-1">
-                <MapPin className="h-3 w-3" />{product.destination}
+                <MapPin className="h-3 w-3" />{product.location}
               </p>
             )}
           </div>
@@ -684,7 +684,7 @@ export default function ProductCatalogPage() {
             {hasFilters ? "Nenhum produto encontrado" : "Catálogo vazio"}
           </h3>
           <p className="text-sm text-muted-foreground mb-4">
-            {hasFilters ? "Tente ajustar os filtros de busca" : "Comece adicionando seus produtos turísticos"}
+            {hasFilters ? "Tente ajustar os filtros de busca" : "Comece adicionando seus produtos e servicos"}
           </p>
           {!hasFilters && (
             <Button size="sm" onClick={() => { setEditingProduct(null); setShowProductForm(true); }}>

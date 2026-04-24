@@ -435,6 +435,9 @@ async function startServer() {
     // Recurring appointment generator (daily)
     import("../services/recurringAppointmentService").then(m => m.startRecurringAppointmentScheduler());
 
+    // Reactivation alerts (at-risk clients, expiring packages, referral opportunities)
+    import("../reactivationScheduler").then(m => m.startReactivationScheduler());
+
     // Start Z-API alert monitoring scheduler (disconnections + billing overdue)
     import("../zapiAlertScheduler").then(m => m.startZapiAlertScheduler());
 

@@ -114,7 +114,7 @@ const settingsCategories: SettingsCategory[] = [
   {
     title: "MÓDULOS",
     links: [
-      { icon: ClipboardList, label: "Servicos", path: "/trips", comingSoon: true },
+      { icon: ClipboardList, label: "Servicos", path: "/services", comingSoon: true },
       { icon: FileText, label: "Propostas", path: "/proposals", comingSoon: true },
       { icon: Globe, label: "Portal do Cliente", path: "/portal", comingSoon: true },
       { icon: GraduationCap, label: "Academy", path: "/academy", comingSoon: true },

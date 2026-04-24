@@ -28,7 +28,7 @@ import {
   LayoutDashboard, LogOut, PanelLeft, MessageSquare, Send, Bot, Settings,
   Users, Building2, Target, Inbox, FileText, Globe, BarChart3, GraduationCap,
   Plug, Activity, Shield, Briefcase, Plane, ClipboardList, Bell, Crown, Sparkles, Trash2,
-  CalendarDays, Gift,
+  CalendarDays, Gift, RefreshCw,
 } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
@@ -58,8 +58,9 @@ const menuSections: MenuSection[] = [
       { icon: Users, label: "Clientes", path: "/contacts" },
       { icon: Target, label: "Funil", path: "/pipeline" },
       { icon: CalendarDays, label: "Agenda", path: "/agenda" },
-      { icon: ClipboardList, label: "Servicos", path: "/trips" },
+      { icon: ClipboardList, label: "Servicos", path: "/services" },
       { icon: Gift, label: "Indicações", path: "/referrals" },
+      { icon: RefreshCw, label: "Recorrência", path: "/recurrence" },
       { icon: ClipboardList, label: "Tarefas", path: "/tasks" },
       { icon: Trash2, label: "Lixeira", path: "/trash" },
     ],

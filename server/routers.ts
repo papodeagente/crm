@@ -4998,6 +4998,137 @@ ${customInstructions ? `\n--- INSTRUÇÕES PERSONALIZADAS ---\n${customInstructi
       }),
   }),
 
+  // ─── Recurrence Analytics Dashboard ───
+  recurrenceAnalytics: router({
+    summary: tenantProcedure
+      .input(z.object({ days: z.number().optional() }))
+      .query(async ({ ctx, input }) => {
+        const { getDb } = await import("./db");
+        const { sql } = await import("drizzle-orm");
+        const db = await getDb();
+        if (!db) return null;
+        const tenantId = getTenantId(ctx);
+        const days = input.days || 90;
+        const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+
+        const result = await db.execute(sql`
+          SELECT
+            (SELECT COUNT(DISTINCT "contactId") FROM deals WHERE "tenantId" = ${tenantId} AND status = 'won' AND "deletedAt" IS NULL) AS "totalClientes",
+            (SELECT COUNT(DISTINCT d1."contactId") FROM deals d1
+             WHERE d1."tenantId" = ${tenantId} AND d1.status = 'won' AND d1."deletedAt" IS NULL
+             AND (SELECT COUNT(*) FROM deals d2 WHERE d2."contactId" = d1."contactId" AND d2."tenantId" = ${tenantId} AND d2.status = 'won' AND d2."deletedAt" IS NULL) >= 2
+            ) AS "clientesRecorrentes",
+            (SELECT COALESCE(AVG(sub.cnt), 0) FROM (
+              SELECT COUNT(*) as cnt FROM deals WHERE "tenantId" = ${tenantId} AND status = 'won' AND "deletedAt" IS NULL GROUP BY "contactId"
+            ) sub) AS "mediaComprasPorCliente",
+            (SELECT COALESCE(AVG(sub.total), 0) FROM (
+              SELECT SUM("valueCents") as total FROM deals WHERE "tenantId" = ${tenantId} AND status = 'won' AND "deletedAt" IS NULL GROUP BY "contactId"
+            ) sub) AS "ticketMedioCliente",
+            (SELECT COUNT(*) FROM client_packages WHERE "tenantId" = ${tenantId} AND status = 'active') AS "pacotesAtivos",
+            (SELECT COUNT(*) FROM client_packages WHERE "tenantId" = ${tenantId} AND status = 'completed') AS "pacotesConcluidos",
+            (SELECT COALESCE(SUM("usedSessions"), 0) FROM client_packages WHERE "tenantId" = ${tenantId} AND status IN ('active', 'completed')) AS "sessoesUsadas",
+            (SELECT COALESCE(SUM("totalSessions"), 0) FROM client_packages WHERE "tenantId" = ${tenantId} AND status IN ('active', 'completed')) AS "sessoesTotais",
+            (SELECT COUNT(*) FROM referrals WHERE "tenantId" = ${tenantId}) AS "totalIndicacoes",
+            (SELECT COUNT(*) FROM referrals WHERE "tenantId" = ${tenantId} AND status = 'converted') AS "indicacoesConvertidas"
+        `);
+
+        const row = (result as any).rows?.[0] || {};
+        const totalClientes = Number(row.totalClientes || 0);
+        const clientesRecorrentes = Number(row.clientesRecorrentes || 0);
+        const taxaRetorno = totalClientes > 0 ? Math.round((clientesRecorrentes / totalClientes) * 100) : 0;
+        const sessoesUsadas = Number(row.sessoesUsadas || 0);
+        const sessoesTotais = Number(row.sessoesTotais || 0);
+        const taxaUsoPacotes = sessoesTotais > 0 ? Math.round((sessoesUsadas / sessoesTotais) * 100) : 0;
+
+        return {
+          totalClientes,
+          clientesRecorrentes,
+          taxaRetorno,
+          mediaComprasPorCliente: Number(Number(row.mediaComprasPorCliente || 0).toFixed(1)),
+          ticketMedioCliente: Number(row.ticketMedioCliente || 0),
+          pacotesAtivos: Number(row.pacotesAtivos || 0),
+          pacotesConcluidos: Number(row.pacotesConcluidos || 0),
+          taxaUsoPacotes,
+          totalIndicacoes: Number(row.totalIndicacoes || 0),
+          indicacoesConvertidas: Number(row.indicacoesConvertidas || 0),
+        };
+      }),
+    monthlyRecurrence: tenantProcedure
+      .input(z.object({ months: z.number().optional() }))
+      .query(async ({ ctx, input }) => {
+        const { getDb } = await import("./db");
+        const { sql } = await import("drizzle-orm");
+        const db = await getDb();
+        if (!db) return [];
+        const tenantId = getTenantId(ctx);
+        const months = input.months || 6;
+        const since = new Date();
+        since.setMonth(since.getMonth() - months);
+
+        const result = await db.execute(sql`
+          SELECT
+            TO_CHAR(d."updatedAt", 'YYYY-MM') AS month,
+            COUNT(DISTINCT d."contactId") AS "uniqueClients",
+            COUNT(*) AS "totalDeals",
+            COALESCE(SUM(d."valueCents"), 0) AS "revenue",
+            COUNT(DISTINCT CASE
+              WHEN (SELECT COUNT(*) FROM deals d2 WHERE d2."contactId" = d."contactId" AND d2."tenantId" = ${tenantId} AND d2.status = 'won' AND d2."deletedAt" IS NULL AND d2."updatedAt" < d."updatedAt") > 0
+              THEN d."contactId"
+            END) AS "returningClients"
+          FROM deals d
+          WHERE d."tenantId" = ${tenantId}
+            AND d.status = 'won'
+            AND d."deletedAt" IS NULL
+            AND d."updatedAt" >= ${since}
+          GROUP BY TO_CHAR(d."updatedAt", 'YYYY-MM')
+          ORDER BY month ASC
+        `);
+
+        return ((result as any).rows || []).map((r: any) => ({
+          month: r.month,
+          uniqueClients: Number(r.uniqueClients || 0),
+          totalDeals: Number(r.totalDeals || 0),
+          revenue: Number(r.revenue || 0),
+          returningClients: Number(r.returningClients || 0),
+        }));
+      }),
+    topRecurringClients: tenantProcedure
+      .input(z.object({ limit: z.number().optional() }))
+      .query(async ({ ctx, input }) => {
+        const { getDb } = await import("./db");
+        const { sql } = await import("drizzle-orm");
+        const db = await getDb();
+        if (!db) return [];
+        const tenantId = getTenantId(ctx);
+
+        const result = await db.execute(sql`
+          SELECT
+            c.id, c.name, c.phone,
+            COUNT(d.id) AS "totalPurchases",
+            COALESCE(SUM(d."valueCents"), 0) AS "totalSpent",
+            MAX(d."updatedAt") AS "lastPurchase",
+            COALESCE(c."referralCount", 0) AS "referralCount"
+          FROM contacts c
+          INNER JOIN deals d ON d."contactId" = c.id AND d."tenantId" = ${tenantId} AND d.status = 'won' AND d."deletedAt" IS NULL
+          WHERE c."tenantId" = ${tenantId} AND c."deletedAt" IS NULL
+          GROUP BY c.id, c.name, c.phone, c."referralCount"
+          HAVING COUNT(d.id) >= 2
+          ORDER BY "totalSpent" DESC
+          LIMIT ${input.limit || 10}
+        `);
+
+        return ((result as any).rows || []).map((r: any) => ({
+          id: r.id,
+          name: r.name,
+          phone: r.phone,
+          totalPurchases: Number(r.totalPurchases || 0),
+          totalSpent: Number(r.totalSpent || 0),
+          lastPurchase: r.lastPurchase,
+          referralCount: Number(r.referralCount || 0),
+        }));
+      }),
+  }),
+
   superAdminDash: superAdminDashRouter,
   superAdminPlans: superAdminPlansRouter,
   superAdminManagement: superAdminManagementRouter,

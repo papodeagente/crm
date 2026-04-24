@@ -4,7 +4,7 @@ import { HeroSection } from "@/components/landing/HeroSection";
 import { ProblemSection } from "@/components/landing/ProblemSection";
 import { SolutionSection } from "@/components/landing/SolutionSection";
 import { DifferentialsSection } from "@/components/landing/DifferentialsSection";
-import { TourismSection } from "@/components/landing/TourismSection";
+import { LocalBusinessSection } from "@/components/landing/LocalBusinessSection";
 import { ResultsSection } from "@/components/landing/ResultsSection";
 import { PricingSection } from "@/components/landing/PricingSection";
 import { FinalCTA } from "@/components/landing/FinalCTA";
@@ -36,7 +36,7 @@ export default function Landing() {
       <DifferentialsSection onRegister={() => goToRegister()} />
 
       {/* SECAO 5 — Feito para Negocios Locais */}
-      <TourismSection />
+      <LocalBusinessSection />
 
       {/* SEÇÃO 6 — Resultados */}
       <ResultsSection />

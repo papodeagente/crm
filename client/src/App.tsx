@@ -14,7 +14,7 @@ const Home = lazyWithRetry(() => import("./pages/Home"));
 const Contacts = lazyWithRetry(() => import("./pages/Contacts"));
 const Deals = lazyWithRetry(() => import("./pages/Deals"));
 const Pipeline = lazyWithRetry(() => import("./pages/Pipeline"));
-const Trips = lazyWithRetry(() => import("./pages/Trips"));
+const ServiceDelivery = lazyWithRetry(() => import("./pages/ServiceDelivery"));
 const Tasks = lazyWithRetry(() => import("./pages/Tasks"));
 const InboxPage = lazyWithRetry(() => import("./pages/Inbox"));
 const WhatsApp = lazyWithRetry(() => import("./pages/WhatsApp"));
@@ -59,6 +59,7 @@ const CustomMessages = lazyWithRetry(() => import("./pages/CustomMessages"));
 const Agenda = lazyWithRetry(() => import("./pages/Agenda"));
 const Referrals = lazyWithRetry(() => import("./pages/Referrals"));
 const Analytics = lazyWithRetry(() => import("./pages/Analytics"));
+const RecurrenceDashboard = lazyWithRetry(() => import("./pages/RecurrenceDashboard"));
 const GoalsReport = lazyWithRetry(() => import("./pages/GoalsReport"));
 const CRMLive = lazyWithRetry(() => import("./pages/CRMLive"));
 const SourcesCampaignsReport = lazyWithRetry(() => import("./pages/SourcesCampaignsReport"));
@@ -147,9 +148,10 @@ function AppRouter() {
                 <Route path="/chatbot" component={Chatbot} />
                 <Route path="/proposals" component={Proposals} />
                 <Route path="/portal" component={Portal} />
-                <Route path="/trips" component={Trips} />
+                <Route path="/services" component={ServiceDelivery} />
                 <Route path="/agenda" component={Agenda} />
                 <Route path="/referrals" component={Referrals} />
+                <Route path="/recurrence" component={RecurrenceDashboard} />
                 <Route path="/academy" component={Academy} />
                 <Route path="/integrations" component={Integrations} />
                 <Route path="/admin" component={Admin} />

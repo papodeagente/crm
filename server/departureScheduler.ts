@@ -18,13 +18,13 @@ const CHECK_INTERVAL_MS = 60 * 60 * 1000; // Check every 1 hour
 
 // Track which deal+window combos we've already notified about
 // Format: "dealId:window" e.g. "123:7d", "123:3d", "123:1d", "123:today"
-const notifiedAppointments = new Set<string>();
+export const notifiedAppointments = new Set<string>();
 
 /**
  * Determine which notification window an appointment falls into.
  * Returns null if no notification should be sent.
  */
-function getAppointmentWindow(appointmentDate: Date, now: Date): { key: string; label: string; emoji: string } | null {
+export function getAppointmentWindow(appointmentDate: Date, now: Date): { key: string; label: string; emoji: string } | null {
   const diffMs = appointmentDate.getTime() - now.getTime();
   const diffDays = diffMs / (1000 * 60 * 60 * 24);
 
@@ -130,10 +130,7 @@ export async function checkUpcomingAppointments(): Promise<{ notificationsCreate
   return { notificationsCreated };
 }
 
-// Backward-compatible aliases
-export const checkUpcomingDepartures = checkUpcomingAppointments;
-export const notifiedDepartures = notifiedAppointments;
-export const getDepartureWindow = getAppointmentWindow;
+
 
 /**
  * Start the appointment notification scheduler.
@@ -158,5 +155,3 @@ export function startAppointmentScheduler() {
   console.log("[AppointmentScheduler] Started — checking every 1h for appointments within 7 days");
 }
 
-// Backward-compatible alias
-export const startDepartureScheduler = startAppointmentScheduler;

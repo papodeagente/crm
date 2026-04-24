@@ -33,7 +33,7 @@ function formatDate(d: string | null) {
   return formatDateShort(d) || "—";
 }
 
-export default function Trips() {
+export default function ServiceDelivery() {
   const [, setLocation] = useLocation();
 
   // Find the post_sale pipeline

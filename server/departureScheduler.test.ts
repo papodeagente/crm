@@ -1,5 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { getDepartureWindow, checkUpcomingDepartures, notifiedDepartures } from "./departureScheduler";
+import { getAppointmentWindow as getDepartureWindow, checkUpcomingAppointments as checkUpcomingDepartures, notifiedAppointments as notifiedDepartures } from "./departureScheduler";
+// Uses updated export names — backward-compat aliases removed
 
 // Mock db module
 vi.mock("./db", async (importOriginal) => {
