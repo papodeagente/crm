@@ -281,6 +281,23 @@ async function startServer() {
     }
   });
 
+  // Debug: query SQL and return rows
+  app.post("/api/query-sql", express.json({ limit: "1mb" }), async (req, res) => {
+    try {
+      const { sql: sqlInput, secret } = req.body;
+      if (secret !== "CrmSecure2026!") return res.status(403).json({ error: "Forbidden" });
+      if (!sqlInput) return res.status(400).json({ error: "No sql provided" });
+      const pg = await import("pg");
+      const client = new pg.default.Client({ connectionString: process.env.DATABASE_URL });
+      await client.connect();
+      const result = await client.query(sqlInput);
+      await client.end();
+      res.json({ rows: result.rows, rowCount: result.rowCount });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // Run arbitrary SQL migration via POST body
   app.post("/api/run-sql", express.json({ limit: "1mb" }), async (req, res) => {
     try {
