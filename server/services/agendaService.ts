@@ -503,7 +503,8 @@ export async function createAppointment(
     RETURNING id
   `);
 
-  const insertId = (result as any[])[0].id;
+  const rows = (result as any).rows || result;
+  const insertId = (rows as any[])[0].id;
 
   // Insert participants (always include creator)
   const participantSet = new Set(input.participantIds || []);
@@ -535,11 +536,12 @@ export async function updateAppointment(
 
   // Verify ownership (non-admin can only edit own)
   if (!isAdmin) {
-    const rows = await db.execute(sql`
+    const checkResult = await db.execute(sql`
       SELECT id FROM crm_appointments
-      WHERE id = ${input.id} AND tenantId = ${tenantId} AND userId = ${userId} AND deletedAt IS NULL
+      WHERE id = ${input.id} AND "tenantId" = ${tenantId} AND "userId" = ${userId} AND "deletedAt" IS NULL
     `);
-    if ((rows as unknown as any[]).length === 0) {
+    const checkRows = (checkResult as any).rows || checkResult;
+    if ((checkRows as any[]).length === 0) {
       throw new Error("Appointment not found or access denied");
     }
   }
@@ -575,10 +577,11 @@ export async function updateAppointment(
   // Update participants if provided
   if (input.participantIds !== undefined) {
     // Get the appointment owner
-    const ownerRows = await db.execute(sql`
-      SELECT userId FROM crm_appointments WHERE id = ${input.id} AND tenantId = ${tenantId}
+    const ownerResult = await db.execute(sql`
+      SELECT "userId" FROM crm_appointments WHERE id = ${input.id} AND "tenantId" = ${tenantId}
     `);
-    const ownerId = (ownerRows as unknown as any[])[0]?.userId;
+    const ownerArr = (ownerResult as any).rows || ownerResult;
+    const ownerId = (ownerArr as any[])[0]?.userId;
     const participantSet = new Set(input.participantIds);
     if (ownerId) participantSet.add(ownerId); // owner always stays
 
@@ -632,11 +635,12 @@ export async function deleteAppointment(
   if (!db) throw new Error("Database not available");
 
   if (!isAdmin) {
-    const rows = await db.execute(sql`
+    const delCheck = await db.execute(sql`
       SELECT id FROM crm_appointments
-      WHERE id = ${appointmentId} AND tenantId = ${tenantId} AND userId = ${userId} AND deletedAt IS NULL
+      WHERE id = ${appointmentId} AND "tenantId" = ${tenantId} AND "userId" = ${userId} AND "deletedAt" IS NULL
     `);
-    if ((rows as unknown as any[]).length === 0) {
+    const delRows = (delCheck as any).rows || delCheck;
+    if ((delRows as any[]).length === 0) {
       throw new Error("Appointment not found or access denied");
     }
   }
