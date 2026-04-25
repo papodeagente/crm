@@ -435,6 +435,7 @@ export const contacts = pgTable("contacts", {
   referredBy: varchar("referredBy", { length: 255 }),
   convenioNumero: varchar("convenioNumero", { length: 64 }),
   convenioNome: varchar("convenioNome", { length: 255 }),
+  consultationNotes: json("consultationNotes").$type<{ previsao?: string; executado?: string; proximaPrevisao?: string }>(),
   deletedAt: timestamp("deletedAt"),
 }, (t) => [
   index("contacts_tenant_idx").on(t.tenantId),

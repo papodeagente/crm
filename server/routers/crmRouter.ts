@@ -68,6 +68,7 @@ export const crmRouter = router({
         birthDate: z.string().nullable().optional(), weddingDate: z.string().nullable().optional(),
         gender: z.string().nullable().optional(), referredBy: z.string().nullable().optional(),
         convenioNumero: z.string().nullable().optional(), convenioNome: z.string().nullable().optional(),
+        consultationNotes: z.object({ previsao: z.string().optional(), executado: z.string().optional(), proximaPrevisao: z.string().optional() }).nullable().optional(),
       }))
       .mutation(async ({ ctx, input }) => {
 const tenantId = getTenantId(ctx); const { id, ...data } = input;

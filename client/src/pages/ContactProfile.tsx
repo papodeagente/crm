@@ -336,18 +336,18 @@ export default function ContactProfile() {
                   <span className="font-medium">{contact.phone || "N/A"}</span>
                 </div>
               </div>
-              {contact.gender && (
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Sexo:</span>
-                  <span className="font-medium">{contact.gender}</span>
-                </div>
-              )}
-              {contact.referredBy && (
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Indicado por:</span>
-                  <span className="font-medium truncate ml-2">{contact.referredBy}</span>
-                </div>
-              )}
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Plano:</span>
+                <span className="font-medium">{contact.convenioNome || "Não informado"}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Sexo:</span>
+                <span className="font-medium">{contact.gender || "Não informado"}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Indicado por:</span>
+                <span className="font-medium truncate ml-2">{contact.referredBy || "Não informado"}</span>
+              </div>
 
               <div className="pt-2">
                 <Button
@@ -473,7 +473,7 @@ export default function ContactProfile() {
             </TabsContent>
 
             <TabsContent value="tratamentos">
-              <TratamentosTab contactId={contactId} />
+              <TratamentosTab contactId={contactId} contact={contact} />
             </TabsContent>
 
             <TabsContent value="orcamentos">
