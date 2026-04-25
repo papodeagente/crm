@@ -477,7 +477,7 @@ export default function ContactProfile() {
             </TabsContent>
 
             <TabsContent value="orcamentos">
-              <OrcamentosTab contactId={contactId} deals={deals} isLoading={dealsQ.isLoading} />
+              <OrcamentosTab contactId={contactId} deals={deals} isLoading={dealsQ.isLoading} contact={contact} />
             </TabsContent>
 
             <TabsContent value="anamnese">
