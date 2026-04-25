@@ -195,24 +195,26 @@ export default function Proposals() {
                     <td className="p-3.5">
                       <div className="flex items-center justify-end gap-1.5">
                         <Button
-                          variant="ghost"
+                          variant="outline"
                           size="sm"
-                          className="h-7 w-7 p-0"
+                          className="h-7 gap-1.5 text-[11px]"
                           onClick={() => handleDownloadPdf(p.id)}
                           disabled={pdfBusy === p.id}
-                          title="Baixar PDF"
+                          title="Baixar PDF da proposta"
                         >
                           {pdfBusy === p.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Download className="h-3 w-3" />}
+                          PDF
                         </Button>
                         <Button
-                          variant="ghost"
+                          variant="outline"
                           size="sm"
-                          className="h-7 w-7 p-0 text-emerald-600 hover:text-emerald-700"
+                          className="h-7 gap-1.5 text-[11px] text-emerald-700 border-emerald-200 hover:bg-emerald-50 hover:text-emerald-800"
                           onClick={() => handleSendWhatsApp(p.id)}
                           disabled={waBusy === p.id}
                           title="Enviar PDF + cobrança via WhatsApp"
                         >
                           {waBusy === p.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <MessageCircle className="h-3 w-3" />}
+                          WhatsApp
                         </Button>
                         {p.asaasPaymentId ? (
                           <>
