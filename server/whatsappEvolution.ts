@@ -991,7 +991,7 @@ class WhatsAppEvolutionManager extends EventEmitter {
         // Then, enrich with saved/verified names from DB (these override pushName)
         try {
           const dbContacts = await db.execute(
-            sql`SELECT jid, pushName, savedName, verifiedName FROM wa_contacts WHERE jid LIKE '%@s.whatsapp.net'`
+            sql`SELECT jid, "pushName", "savedName", "verifiedName" FROM wa_contacts WHERE jid LIKE '%@s.whatsapp.net'`
           );
           const dbRows = (dbContacts as any)[0] || [];
           for (const r of dbRows) {
@@ -1006,7 +1006,7 @@ class WhatsAppEvolutionManager extends EventEmitter {
 
         // Get conversations missing real names
         const convsMissingName = await db.execute(
-          sql`SELECT id, remoteJid, contactPushName FROM wa_conversations WHERE sessionId = ${session.sessionId}`
+          sql`SELECT id, "remoteJid", "contactPushName" FROM wa_conversations WHERE "sessionId" = ${session.sessionId}`
         );
         const convRows = (convsMissingName as any)[0] || [];
         let resolved = 0;
@@ -1343,7 +1343,7 @@ class WhatsAppEvolutionManager extends EventEmitter {
           // Get ALL conversations for this session (not just those without names)
           // We also want to replace phone-number-as-name with real names
           const allConvs = await db.execute(
-            sql`SELECT id, remoteJid, contactPushName FROM wa_conversations WHERE sessionId = ${session.sessionId}`
+            sql`SELECT id, "remoteJid", "contactPushName" FROM wa_conversations WHERE "sessionId" = ${session.sessionId}`
           );
           const convRows = (allConvs as any)[0] || [];
           if (convRows.length > 0) {
@@ -1968,9 +1968,20 @@ class WhatsAppEvolutionManager extends EventEmitter {
         const statusPriority: Record<string, number> = { error: 0, pending: 1, sent: 2, delivered: 3, read: 4, played: 5 };
         const newPriority = statusPriority[newStatus] ?? -1;
         if (newPriority >= 0) {
-          // Use SQL FIELD() to only update if new status is strictly higher
+          // Only update if new status is strictly higher (Postgres CASE-based priority)
           await db.execute(
-            sql`UPDATE messages SET status = ${newStatus} WHERE sessionId = ${session.sessionId} AND messageId = ${messageId} AND FIELD(status, 'error','pending','sent','delivered','read','played') < FIELD(${newStatus}, 'error','pending','sent','delivered','read','played')`
+            sql`UPDATE messages SET status = ${newStatus}
+                WHERE "sessionId" = ${session.sessionId}
+                AND "messageId" = ${messageId}
+                AND COALESCE(
+                  CASE status
+                    WHEN 'error' THEN 0
+                    WHEN 'pending' THEN 1
+                    WHEN 'sent' THEN 2
+                    WHEN 'delivered' THEN 3
+                    WHEN 'read' THEN 4
+                    WHEN 'played' THEN 5
+                  END, -1) < ${newPriority}`
           );
         } else {
           // Unknown status, update unconditionally
@@ -2466,7 +2477,7 @@ class WhatsAppEvolutionManager extends EventEmitter {
 
       // ── Step 1: Get MAX(timestamp) from DB for this session (incremental baseline) ──
       const lastTsRows = await db.execute(
-        sql`SELECT MAX(timestamp) as maxTs FROM messages WHERE sessionId = ${session.sessionId}`
+        sql`SELECT MAX(timestamp) as "maxTs" FROM messages WHERE "sessionId" = ${session.sessionId}`
       );
       const lastTsRaw = (lastTsRows as any)[0]?.[0]?.maxTs;
       const lastSyncTimestamp = lastTsRaw ? new Date(lastTsRaw).getTime() / 1000 : 0; // Unix seconds
@@ -2475,7 +2486,7 @@ class WhatsAppEvolutionManager extends EventEmitter {
       // ── Step 2: Pre-load existing messageIds for dedup ──
       const existingMsgIds = new Set<string>();
       const existingRows = await db.execute(
-        sql`SELECT messageId FROM messages WHERE sessionId = ${session.sessionId} AND messageId IS NOT NULL LIMIT 50000`
+        sql`SELECT "messageId" FROM messages WHERE "sessionId" = ${session.sessionId} AND "messageId" IS NOT NULL LIMIT 50000`
       );
       const rows = (existingRows as any)[0] || [];
       for (const r of rows) {
@@ -2719,7 +2730,7 @@ class WhatsAppEvolutionManager extends EventEmitter {
       if (discoveredNames.size > 0) {
         try {
           const allConvs = await db.execute(
-            sql`SELECT id, remoteJid, contactPushName FROM wa_conversations WHERE sessionId = ${session.sessionId}`
+            sql`SELECT id, "remoteJid", "contactPushName" FROM wa_conversations WHERE "sessionId" = ${session.sessionId}`
           );
           const convRows = (allConvs as any)[0] || [];
           let namesUpdated = 0;
@@ -2772,7 +2783,7 @@ class WhatsAppEvolutionManager extends EventEmitter {
       // Get existing messageIds for this session to avoid duplicates
       const existingMsgIds = new Set<string>();
       const existingRows = await db.execute(
-        sql`SELECT messageId FROM messages WHERE sessionId = ${session.sessionId} AND messageId IS NOT NULL LIMIT 50000`
+        sql`SELECT "messageId" FROM messages WHERE "sessionId" = ${session.sessionId} AND "messageId" IS NOT NULL LIMIT 50000`
       );
       const rows = (existingRows as any)[0] || [];
       for (const r of rows) {
@@ -2949,7 +2960,7 @@ class WhatsAppEvolutionManager extends EventEmitter {
       if (discoveredNames.size > 0) {
         try {
           const allConvs = await db.execute(
-            sql`SELECT id, remoteJid, contactPushName FROM wa_conversations WHERE sessionId = ${session.sessionId}`
+            sql`SELECT id, "remoteJid", "contactPushName" FROM wa_conversations WHERE "sessionId" = ${session.sessionId}`
           );
           const convRows = (allConvs as any)[0] || [];
           let namesUpdated = 0;
@@ -2979,7 +2990,7 @@ class WhatsAppEvolutionManager extends EventEmitter {
           let contactsUpdated = 0;
           for (const [jid, name] of Array.from(discoveredNames)) {
             await db.execute(
-              sql`UPDATE wa_contacts SET pushName = ${name} WHERE sessionId = ${session.sessionId} AND jid = ${jid} AND (pushName IS NULL OR pushName = '')`
+              sql`UPDATE wa_contacts SET "pushName" = ${name} WHERE "sessionId" = ${session.sessionId} AND jid = ${jid} AND ("pushName" IS NULL OR "pushName" = '')`
             ).catch(() => null);
             contactsUpdated++;
           }
@@ -3099,7 +3110,7 @@ class WhatsAppEvolutionManager extends EventEmitter {
         // Fetch existing messageIds for THIS specific chat
         try {
           const chatExisting = await db.execute(
-            sql`SELECT messageId FROM messages WHERE sessionId = ${session.sessionId} AND remoteJid = ${remoteJid} AND messageId IS NOT NULL ORDER BY id DESC LIMIT 100`
+            sql`SELECT "messageId" FROM messages WHERE "sessionId" = ${session.sessionId} AND "remoteJid" = ${remoteJid} AND "messageId" IS NOT NULL ORDER BY id DESC LIMIT 100`
           );
           const chatRows = (chatExisting as any)[0] || [];
           for (const r of chatRows) {

@@ -820,15 +820,15 @@ export async function getNextRoundRobinAgent(tenantId: number): Promise<number |
   if (agents.length === 0) return null;
   // Get the agent with the fewest open assignments
   const result = await db.execute(sql`
-    SELECT cu.id, COUNT(ca.id) as assignmentCount
+    SELECT cu.id, COUNT(ca.id) as "assignmentCount"
     FROM crm_users cu
     LEFT JOIN conversation_assignments ca
-      ON ca.assignedUserId = cu.id
-      AND ca.tenantId = ${tenantId}
+      ON ca."assignedUserId" = cu.id
+      AND ca."tenantId" = ${tenantId}
       AND ca.status IN ('open', 'pending')
-    WHERE cu.tenantId = ${tenantId} AND cu.status = 'active' AND cu."isAvailable" = true
+    WHERE cu."tenantId" = ${tenantId} AND cu.status = 'active' AND cu."isAvailable" = true
     GROUP BY cu.id
-    ORDER BY assignmentCount ASC, cu.id ASC
+    ORDER BY "assignmentCount" ASC, cu.id ASC
     LIMIT 1
   `);
   const rows = result as any[];
@@ -1905,73 +1905,73 @@ export async function getWaConversationsList(
   // Target latency: < 15ms.
   // ═══════════════════════════════════════════════════════════════════════
 
-  // Build assignment filter referencing wa_conversations directly (wc.assignedUserId)
+  // Build assignment filter referencing wa_conversations directly (wc."assignedUserId")
   // since helpdesk fields are denormalized into wa_conversations
   let assignmentFilterWc = '';
   if (filter?.assignedUserId) {
-    assignmentFilterWc += ` AND wc.assignedUserId = ${filter.assignedUserId}`;
+    assignmentFilterWc += ` AND "assignedUserId" = ${filter.assignedUserId}`;
   }
   if (filter?.assignedTeamId) {
-    assignmentFilterWc += ` AND wc.assignedTeamId = ${filter.assignedTeamId}`;
+    assignmentFilterWc += ` AND "assignedTeamId" = ${filter.assignedTeamId}`;
   }
   if (filter?.status) {
-    assignmentFilterWc += ` AND wc.status = '${filter.status}'`;
+    assignmentFilterWc += ` AND status = '${filter.status}'`;
   }
   if (filter?.unassignedOnly) {
-    assignmentFilterWc += ` AND wc.assignedUserId IS NULL`;
+    assignmentFilterWc += ` AND "assignedUserId" IS NULL`;
   }
 
   // Optimized: subquery limits to N rows FIRST, then JOINs only those rows
   // This avoids JOINing 2000+ rows when we only need 100
   const result = await db.execute(sql`
-    SELECT 
-      wc.id AS conversationId,
-      wc.sessionId,
-      wc.remoteJid,
-      wc.phoneE164,
-      wc.contactId,
-      wc.contactPushName,
-      wc.lastMessagePreview AS lastMessage,
-      wc.lastMessageType AS lastMessageType,
-      wc.lastFromMe AS lastFromMe,
-      wc.lastMessageAt AS lastTimestamp,
-      wc.lastStatus AS lastStatus,
-      wc.unreadCount,
-      wc.status AS conversationStatus,
-      wc.conversationKey,
-      wc.queuedAt,
-      wc.firstResponseAt,
-      wc.slaDeadlineAt,
-      wc.assignedUserId AS assignedUserId,
-      wc.assignedTeamId AS assignedTeamId,
-      wc.isPinned,
-      wc.isArchived,
-      ca.status AS assignmentStatus,
-      ca.priority AS assignmentPriority,
-      agent.name AS assignedAgentName,
-      agent.avatarUrl AS assignedAgentAvatar,
-      c.name AS contactName,
-      c.email AS contactEmail,
-      c.phone AS contactPhone
+    SELECT
+      wc.id AS "conversationId",
+      wc."sessionId",
+      wc."remoteJid",
+      wc."phoneE164",
+      wc."contactId",
+      wc."contactPushName",
+      wc."lastMessagePreview" AS "lastMessage",
+      wc."lastMessageType" AS "lastMessageType",
+      wc."lastFromMe" AS "lastFromMe",
+      wc."lastMessageAt" AS "lastTimestamp",
+      wc."lastStatus" AS "lastStatus",
+      wc."unreadCount",
+      wc.status AS "conversationStatus",
+      wc."conversationKey",
+      wc."queuedAt",
+      wc."firstResponseAt",
+      wc."slaDeadlineAt",
+      wc."assignedUserId" AS "assignedUserId",
+      wc."assignedTeamId" AS "assignedTeamId",
+      wc."isPinned",
+      wc."isArchived",
+      ca.status AS "assignmentStatus",
+      ca.priority AS "assignmentPriority",
+      agent.name AS "assignedAgentName",
+      agent."avatarUrl" AS "assignedAgentAvatar",
+      c.name AS "contactName",
+      c.email AS "contactEmail",
+      c.phone AS "contactPhone"
     FROM (
       SELECT * FROM wa_conversations
-      WHERE sessionId = ${sessionId}
-      AND tenantId = ${tenantId}
-      AND mergedIntoId IS NULL
-      AND isArchived = 0
-      ${sql.raw(assignmentFilterWc.replace(/wc\./g, ''))}
-      ${filter?.cursor ? sql`AND lastMessageAt < ${new Date(filter.cursor)}` : sql``}
-      ORDER BY isPinned DESC, lastMessageAt DESC
+      WHERE "sessionId" = ${sessionId}
+      AND "tenantId" = ${tenantId}
+      AND "mergedIntoId" IS NULL
+      AND "isArchived" = false
+      ${sql.raw(assignmentFilterWc)}
+      ${filter?.cursor ? sql`AND "lastMessageAt" < ${new Date(filter.cursor)}` : sql``}
+      ORDER BY "isPinned" DESC, "lastMessageAt" DESC
       LIMIT ${filter?.limit ?? 100}
       ${!filter?.cursor && (filter?.offset ?? 0) > 0 ? sql`OFFSET ${filter?.offset ?? 0}` : sql``}
     ) wc
     LEFT JOIN conversation_assignments ca
-      ON ca.sessionId = wc.sessionId
-      AND ca.remoteJid = wc.remoteJid
-      AND ca.tenantId = wc.tenantId
-    LEFT JOIN crm_users agent ON agent.id = wc.assignedUserId
-    LEFT JOIN contacts c ON c.id = wc.contactId
-    ORDER BY wc.isPinned DESC, wc.lastMessageAt DESC
+      ON ca."sessionId" = wc."sessionId"
+      AND ca."remoteJid" = wc."remoteJid"
+      AND ca."tenantId" = wc."tenantId"
+    LEFT JOIN crm_users agent ON agent.id = wc."assignedUserId"
+    LEFT JOIN contacts c ON c.id = wc."contactId"
+    ORDER BY wc."isPinned" DESC, wc."lastMessageAt" DESC
   `);
 
   const rows = result as any[];

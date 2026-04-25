@@ -455,7 +455,7 @@ export async function updateConversationLastMessage(
     .where(
       and(
         eq(waConversations.id, conversationId),
-        sql`(lastMessageAt IS NULL OR lastMessageAt <= ${newTimestamp})`
+        sql`("lastMessageAt" IS NULL OR "lastMessageAt" <= ${newTimestamp})`
       )
     );
 }
