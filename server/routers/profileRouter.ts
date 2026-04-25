@@ -152,6 +152,36 @@ export const profileRouter = router({
       return { success: true, avatarUrl: url };
     }),
 
+  // ─── GET AVAILABILITY (Disponível toggle) ───
+  getAvailability: publicProcedure.query(async ({ ctx }) => {
+    const session = await requireSaasUser(ctx);
+    const { getDb } = await import("../db");
+    const { crmUsers } = await import("../../drizzle/schema");
+    const { eq } = await import("drizzle-orm");
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+    const [row] = await db.select({ isAvailable: crmUsers.isAvailable })
+      .from(crmUsers).where(eq(crmUsers.id, session.userId)).limit(1);
+    return { isAvailable: !!row?.isAvailable };
+  }),
+
+  // ─── SET AVAILABILITY ───
+  setAvailability: publicProcedure
+    .input(z.object({ isAvailable: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      const session = await requireSaasUser(ctx);
+      const { getDb } = await import("../db");
+      const { crmUsers } = await import("../../drizzle/schema");
+      const { eq } = await import("drizzle-orm");
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      await db.update(crmUsers).set({ isAvailable: input.isAvailable })
+        .where(eq(crmUsers.id, session.userId));
+      return { success: true, isAvailable: input.isAvailable };
+    }),
+
   // ─── REMOVE AVATAR ───
   removeAvatar: publicProcedure.mutation(async ({ ctx }) => {
     const session = await requireSaasUser(ctx);

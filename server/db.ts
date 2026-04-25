@@ -814,19 +814,19 @@ export async function getConversationsListMultiAgent(sessionId: string, tenantId
 export async function getNextRoundRobinAgent(tenantId: number): Promise<number | null> {
   const db = await getDb();
   if (!db) return null;
-  // Get all active agents
+  // Get all active + available agents (Disponível toggle)
   const agents = await db.select({ id: crmUsers.id }).from(crmUsers)
-    .where(and(eq(crmUsers.tenantId, tenantId), eq(crmUsers.status, "active")));
+    .where(and(eq(crmUsers.tenantId, tenantId), eq(crmUsers.status, "active"), eq(crmUsers.isAvailable, true)));
   if (agents.length === 0) return null;
   // Get the agent with the fewest open assignments
   const result = await db.execute(sql`
     SELECT cu.id, COUNT(ca.id) as assignmentCount
     FROM crm_users cu
-    LEFT JOIN conversation_assignments ca 
-      ON ca.assignedUserId = cu.id 
+    LEFT JOIN conversation_assignments ca
+      ON ca.assignedUserId = cu.id
       AND ca.tenantId = ${tenantId}
       AND ca.status IN ('open', 'pending')
-    WHERE cu.tenantId = ${tenantId} AND cu.status = 'active'
+    WHERE cu.tenantId = ${tenantId} AND cu.status = 'active' AND cu."isAvailable" = true
     GROUP BY cu.id
     ORDER BY assignmentCount ASC, cu.id ASC
     LIMIT 1

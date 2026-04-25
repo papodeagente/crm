@@ -67,6 +67,17 @@ export default function InboxPage() {
   const [detailsOpen, setDetailsOpen] = useState(() => {
     try { return localStorage.getItem(DETAILS_KEY) !== "false"; } catch { return true; }
   });
+
+  // ─── Availability (Disponível toggle) ───
+  const availabilityQ = trpc.profile.getAvailability.useQuery(undefined, { staleTime: 60_000 });
+  const setAvailabilityM = trpc.profile.setAvailability.useMutation({
+    onSuccess: (data) => {
+      availabilityQ.refetch();
+      toast.success(data.isAvailable ? "Você está disponível" : "Você ficou indisponível");
+    },
+    onError: () => toast.error("Erro ao atualizar disponibilidade"),
+  });
+  const isAvailable = !!availabilityQ.data?.isAvailable;
   const selectedKeyRef = useRef<string | null>(null);
   // Keep ref in sync with state so socket handler closure always has the latest value
   selectedKeyRef.current = selectedKey;
@@ -282,11 +293,11 @@ export default function InboxPage() {
 
   // Contact name map (CRM phone → contact info)
   const contactNameMap = useMemo(() => {
-    const map = new Map<string, { id: number; name: string; phone: string; email?: string; avatarUrl?: string }>();
+    const map = new Map<string, { id: number; name: string; phone: string; email?: string; avatarUrl?: string; lifecycleStage?: string | null }>();
     for (const c of (((contactsQ.data as any)?.items || contactsQ.data || []) as any[])) {
       if (c.phone) {
         const cleaned = c.phone.replace(/\D/g, "");
-        const entry = { id: c.id, name: c.name, phone: c.phone, email: c.email || undefined, avatarUrl: undefined };
+        const entry = { id: c.id, name: c.name, phone: c.phone, email: c.email || undefined, avatarUrl: undefined, lifecycleStage: c.lifecycleStage || null };
         map.set(cleaned, entry);
         if (cleaned.startsWith("55")) map.set(cleaned.substring(2), entry);
         else map.set(`55${cleaned}`, entry);
@@ -760,7 +771,22 @@ export default function InboxPage() {
 
         {/* ── Header (glassmorphism) ── */}
         <div className="h-14 flex items-center justify-between px-4 shrink-0 border-b border-border">
-          <h2 className="text-[15px] font-semibold text-foreground tracking-tight">Conversas</h2>
+          <div className="flex items-center gap-2 min-w-0">
+            <h2 className="text-[15px] font-semibold text-foreground tracking-tight">Conversas</h2>
+            <button
+              onClick={() => setAvailabilityM.mutate({ isAvailable: !isAvailable })}
+              disabled={setAvailabilityM.isPending}
+              title={isAvailable ? "Você está recebendo novas conversas (clique para pausar)" : "Você está pausado (clique para retomar)"}
+              className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium border transition-colors ${
+                isAvailable
+                  ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/25"
+                  : "bg-muted/30 text-muted-foreground border-border hover:bg-muted/50"
+              }`}
+            >
+              <span className={`w-1.5 h-1.5 rounded-full ${isAvailable ? "bg-emerald-400" : "bg-muted-foreground"}`} />
+              {isAvailable ? "Disponível" : "Indisponível"}
+            </button>
+          </div>
           <div className="flex items-center gap-1.5">
             <button
               onClick={() => { setShowNewChat(true); }}

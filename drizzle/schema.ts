@@ -292,6 +292,7 @@ export const crmUsers = pgTable("crm_users", {
   role: crm_user_roleEnum("crm_user_role").default("user").notNull(),
   status: crm_users_statusEnum("status").default("invited").notNull(),
   avatarUrl: text("avatarUrl"),
+  isAvailable: boolean("isAvailable").default(true).notNull(),
   lastLoginAt: timestamp("lastLoginAt"),
   lastActiveAt: timestamp("lastActiveAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),

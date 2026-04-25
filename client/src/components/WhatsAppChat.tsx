@@ -70,7 +70,7 @@ interface Message {
 }
 
 export interface WhatsAppChatProps {
-  contact: { id: number; name: string; phone: string; email?: string; avatarUrl?: string } | null;
+  contact: { id: number; name: string; phone: string; email?: string; avatarUrl?: string; lifecycleStage?: string | null } | null;
   sessionId: string;
   remoteJid: string;
   onCreateDeal?: () => void;
