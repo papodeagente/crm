@@ -2598,14 +2598,6 @@ export async function setContactAsaasCustomerId(tenantId: number, contactId: num
   );
 }
 
-export async function getContactById(tenantId: number, contactId: number) {
-  const db = await getDb(); if (!db) return null;
-  const rows = await db.select().from(contacts).where(
-    and(eq(contacts.id, contactId), eq(contacts.tenantId, tenantId))
-  ).limit(1);
-  return rows[0] || null;
-}
-
 export async function setProposalAsaasPayment(tenantId: number, proposalId: number, data: {
   asaasPaymentId: string;
   asaasInvoiceUrl?: string | null;
