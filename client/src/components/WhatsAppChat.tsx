@@ -152,6 +152,11 @@ export default function WhatsAppChat({
     setShowAgentNamesState(v);
     try { localStorage.setItem(SHOW_AGENT_NAMES_KEY, String(v)); } catch {}
   };
+  // ─── In-conversation search ───
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  // Reset search when switching conversation
+  useEffect(() => { setSearchOpen(false); setSearchQuery(""); }, [remoteJid, sessionId]);
   const [editingNoteId, setEditingNoteId] = useState<number | null>(null);
   const [editingNoteText, setEditingNoteText] = useState("");
   // Tags panel
@@ -633,6 +638,8 @@ export default function WhatsAppChat({
         onSetPriority={(p) => setPriorityMut.mutate({ sessionId, remoteJid, priority: p })}
         onToggleTagsPanel={() => setShowTagsPanel(prev => !prev)}
         onScheduleMessage={() => setShowScheduleModal(true)}
+        searchOpen={searchOpen}
+        onToggleSearch={() => setSearchOpen(v => !v)}
       />
 
       <MessageList
@@ -650,6 +657,10 @@ export default function WhatsAppChat({
         agents={agents}
         agentMap={agentMap}
         showAgentNames={showAgentNames}
+        searchOpen={searchOpen}
+        searchQuery={searchQuery}
+        onSearchQueryChange={setSearchQuery}
+        onCloseSearch={() => { setSearchOpen(false); setSearchQuery(""); }}
         autoTranscribe={!!aiSettingsQ.data?.audioTranscriptionEnabled}
         transcriptions={chat.transcriptions}
         onReply={setReplyTarget}

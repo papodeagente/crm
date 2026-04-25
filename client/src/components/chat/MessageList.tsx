@@ -3,10 +3,11 @@
  * Extracted from WhatsAppChat.tsx lines 2539-2856
  */
 
-import { useState, useEffect, useRef, useCallback, memo } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo, memo } from "react";
 import {
   Send, Loader2, ArrowDown, StickyNote, X, Pencil, Trash2,
   ArrowRightLeft, Users, Check, History, Brain,
+  Search, ChevronUp, ChevronDown,
 } from "lucide-react";
 import MessageBubble from "./MessageBubble";
 import DateSeparator from "./DateSeparator";
@@ -117,6 +118,11 @@ interface MessageListProps {
   timelineEvents: any[] | null;
   // Socket trigger for auto-scroll
   lastMessage: any;
+  // Search
+  searchOpen?: boolean;
+  searchQuery?: string;
+  onSearchQueryChange?: (q: string) => void;
+  onCloseSearch?: () => void;
 }
 
 export default function MessageList({
@@ -133,10 +139,55 @@ export default function MessageList({
   showSummary, summaryText, summaryLoading, onSummarize, onCloseSummary,
   showTimeline, timelineEvents,
   lastMessage,
+  searchOpen, searchQuery, onSearchQueryChange, onCloseSearch,
 }: MessageListProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const [showScrollBtn, setShowScrollBtn] = useState(false);
+  const [currentMatchIdx, setCurrentMatchIdx] = useState(0);
+
+  // ─── Search match computation ───
+  const normalizedQuery = (searchQuery || "").trim().toLowerCase();
+  const matchedMessageIds = useMemo(() => {
+    if (!normalizedQuery) return [] as number[];
+    const ids: number[] = [];
+    for (const m of allMessages) {
+      const haystack = [m.content, m.audioTranscription, m.mediaFileName].filter(Boolean).join(" ").toLowerCase();
+      if (haystack.includes(normalizedQuery)) ids.push(m.id);
+    }
+    return ids;
+  }, [normalizedQuery, allMessages]);
+  const matchedSet = useMemo(() => new Set(matchedMessageIds), [matchedMessageIds]);
+
+  // Reset/clamp current match when matches change
+  useEffect(() => {
+    if (matchedMessageIds.length === 0) { setCurrentMatchIdx(0); return; }
+    setCurrentMatchIdx(idx => Math.min(idx, matchedMessageIds.length - 1));
+  }, [matchedMessageIds.length]);
+
+  // Auto-scroll to current match
+  useEffect(() => {
+    if (!searchOpen || matchedMessageIds.length === 0) return;
+    const targetId = matchedMessageIds[currentMatchIdx];
+    if (!targetId) return;
+    const el = scrollContainerRef.current?.querySelector(`[data-msg-id="${targetId}"]`);
+    if (el) (el as HTMLElement).scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [searchOpen, currentMatchIdx, matchedMessageIds]);
+
+  // Focus search input when bar opens
+  useEffect(() => {
+    if (searchOpen) setTimeout(() => searchInputRef.current?.focus(), 50);
+  }, [searchOpen]);
+
+  const goPrevMatch = useCallback(() => {
+    setCurrentMatchIdx(i => (matchedMessageIds.length === 0 ? 0 : (i - 1 + matchedMessageIds.length) % matchedMessageIds.length));
+  }, [matchedMessageIds.length]);
+  const goNextMatch = useCallback(() => {
+    setCurrentMatchIdx(i => (matchedMessageIds.length === 0 ? 0 : (i + 1) % matchedMessageIds.length));
+  }, [matchedMessageIds.length]);
+
+  const currentMatchId = matchedMessageIds[currentMatchIdx];
 
   const scrollToBottom = useCallback((smooth = true) => {
     messagesEndRef.current?.scrollIntoView({ behavior: smooth ? "smooth" : "instant" });
@@ -234,6 +285,56 @@ export default function MessageList({
               {summaryText}
             </div>
           )}
+        </div>
+      )}
+
+      {/* In-conversation Search Bar */}
+      {searchOpen && (
+        <div className="bg-wa-panel border-b border-wa-divider px-3 py-2 shrink-0 z-10 flex items-center gap-2">
+          <Search className="w-4 h-4 text-muted-foreground shrink-0" />
+          <input
+            ref={searchInputRef}
+            type="text"
+            value={searchQuery || ""}
+            onChange={(e) => onSearchQueryChange?.(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") { e.preventDefault(); onCloseSearch?.(); }
+              else if (e.key === "Enter") {
+                e.preventDefault();
+                if (e.shiftKey) goPrevMatch(); else goNextMatch();
+              }
+            }}
+            placeholder="Buscar nesta conversa..."
+            className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
+          />
+          <span className="text-[11px] text-muted-foreground tabular-nums shrink-0 min-w-[58px] text-right">
+            {matchedMessageIds.length === 0
+              ? (normalizedQuery ? "Nenhum" : "0 de 0")
+              : `${currentMatchIdx + 1} de ${matchedMessageIds.length}`}
+          </span>
+          <button
+            onClick={goPrevMatch}
+            disabled={matchedMessageIds.length === 0}
+            className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-wa-hover disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            title="Anterior (Shift+Enter)"
+          >
+            <ChevronUp className="w-4 h-4 text-muted-foreground" />
+          </button>
+          <button
+            onClick={goNextMatch}
+            disabled={matchedMessageIds.length === 0}
+            className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-wa-hover disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            title="Próximo (Enter)"
+          >
+            <ChevronDown className="w-4 h-4 text-muted-foreground" />
+          </button>
+          <button
+            onClick={onCloseSearch}
+            className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-wa-hover transition-colors"
+            title="Fechar (Esc)"
+          >
+            <X className="w-4 h-4 text-muted-foreground" />
+          </button>
         </div>
       )}
 
@@ -336,6 +437,8 @@ export default function MessageList({
                       reactions={msg.messageId ? reactionsMap[msg.messageId] : undefined}
                       agentMap={agentMap}
                       showAgentNames={showAgentNames}
+                      isMatched={matchedSet.has(msg.id)}
+                      isCurrentMatch={msg.id === currentMatchId}
                     />
                   );
                 })}

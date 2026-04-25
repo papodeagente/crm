@@ -101,6 +101,8 @@ interface ChatHeaderProps {
   onSetPriority: (priority: "low" | "medium" | "high" | "urgent") => void;
   onToggleTagsPanel: () => void;
   onScheduleMessage: () => void;
+  searchOpen?: boolean;
+  onToggleSearch?: () => void;
 }
 
 export default function ChatHeader({
@@ -110,6 +112,7 @@ export default function ChatHeader({
   waConversationId, onTransfer, onImport, onToggleTimeline, showTimeline,
   onSummarize, summaryLoading, onPin, onArchive, onSetPriority,
   onToggleTagsPanel, onScheduleMessage,
+  searchOpen, onToggleSearch,
 }: ChatHeaderProps) {
   const [showAgentDropdown, setShowAgentDropdown] = useState(false);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
@@ -255,9 +258,12 @@ export default function ChatHeader({
           </div>
         )}
         {/* Search button */}
-        <InstantTooltip label="Buscar na conversa">
-          <button className="w-[40px] h-[40px] flex items-center justify-center hover:bg-[var(--wa-hover)] rounded-full transition-colors">
-            <Search className="w-[20px] h-[20px]" style={{ color: 'var(--wa-text-secondary)' }} />
+        <InstantTooltip label={searchOpen ? "Fechar busca" : "Buscar na conversa"}>
+          <button
+            onClick={onToggleSearch}
+            className={`w-[40px] h-[40px] flex items-center justify-center rounded-full transition-colors ${searchOpen ? "bg-[var(--wa-hover)]" : "hover:bg-[var(--wa-hover)]"}`}
+          >
+            <Search className="w-[20px] h-[20px]" style={{ color: searchOpen ? 'var(--wa-tint)' : 'var(--wa-text-secondary)' }} />
           </button>
         </InstantTooltip>
         {/* More menu */}

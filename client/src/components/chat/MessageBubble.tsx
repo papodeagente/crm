@@ -189,7 +189,8 @@ const MessageBubble = memo(({
   msg, isFirst, isLast, allMessages,
   onReply, onReact, onDelete, onEdit, onForward, contactAvatarUrl, myAvatarUrl, onImageClick,
   autoTranscribe, onTranscribe, transcriptions, onRetranscribe, reactions,
-  agentMap, showAgentNames
+  agentMap, showAgentNames,
+  isMatched, isCurrentMatch,
 }: {
   msg: Message; isFirst: boolean; isLast: boolean; allMessages: Message[];
   onReply: (target: ReplyTarget) => void;
@@ -207,6 +208,8 @@ const MessageBubble = memo(({
   reactions?: Array<{ emoji: string; senderJid: string; fromMe: boolean }>;
   agentMap?: Record<number, string>;
   showAgentNames?: boolean;
+  isMatched?: boolean;
+  isCurrentMatch?: boolean;
 }) => {
   const [showMenu, setShowMenu] = useState(false);
   const fromMe = msg.fromMe;
@@ -361,8 +364,8 @@ const MessageBubble = memo(({
   })();
 
   return (
-    <div className={`group flex ${fromMe ? "justify-end" : "justify-start"} px-[63px] mb-[2px] ${isFirst ? "mt-[2px]" : ""}`}>
-      <div className="relative max-w-[65%]">
+    <div data-msg-id={msg.id} className={`group flex ${fromMe ? "justify-end" : "justify-start"} px-[63px] mb-[2px] ${isFirst ? "mt-[2px]" : ""}`}>
+      <div className={`relative max-w-[65%] ${isCurrentMatch ? "ring-2 ring-amber-500 rounded-[9px]" : isMatched ? "ring-1 ring-amber-300 rounded-[9px]" : ""}`}>
         {/* Hover dropdown arrow (WhatsApp Web style) */}
         <button
           onClick={() => setShowMenu(!showMenu)}
