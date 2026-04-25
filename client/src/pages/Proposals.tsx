@@ -3,7 +3,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
   FileText, Plus, Eye, Send as SendIcon, CheckCircle, XCircle, Clock,
-  CreditCard, ExternalLink, RefreshCw, Loader2, Copy,
+  CreditCard, ExternalLink, RefreshCw, Loader2, Copy, Download, MessageCircle,
 } from "lucide-react";
 import { formatDate } from "../../../shared/dateUtils";
 import { toast } from "sonner";
@@ -36,6 +36,41 @@ export default function Proposals() {
   const asaasStatus = trpc.asaas.getStatus.useQuery();
   const utils = trpc.useUtils();
   const [busyId, setBusyId] = useState<number | null>(null);
+  const [pdfBusy, setPdfBusy] = useState<number | null>(null);
+  const [waBusy, setWaBusy] = useState<number | null>(null);
+
+  const sendWhatsApp = trpc.proposals.sendWhatsApp.useMutation({
+    onSuccess: () => {
+      toast.success("Proposta enviada via WhatsApp!");
+      utils.proposals.list.invalidate();
+    },
+    onError: (e) => toast.error(e.message),
+    onSettled: () => setWaBusy(null),
+  });
+
+  const handleDownloadPdf = async (proposalId: number) => {
+    setPdfBusy(proposalId);
+    try {
+      const result = await utils.client.proposals.getPdfBase64.query({ id: proposalId });
+      const bytes = atob(result.base64);
+      const arr = new Uint8Array(bytes.length);
+      for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i);
+      const blob = new Blob([arr], { type: "application/pdf" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = result.fileName; a.click();
+      URL.revokeObjectURL(url);
+    } catch (e: any) {
+      toast.error(e.message || "Falha ao gerar PDF");
+    } finally {
+      setPdfBusy(null);
+    }
+  };
+
+  const handleSendWhatsApp = (proposalId: number) => {
+    setWaBusy(proposalId);
+    sendWhatsApp.mutate({ id: proposalId });
+  };
 
   const generateCharge = trpc.asaas.generateChargeForProposal.useMutation({
     onSuccess: (data) => {
@@ -159,6 +194,26 @@ export default function Proposals() {
                     <td className="p-3.5 text-muted-foreground">{p.createdAt ? formatDate(p.createdAt) : "—"}</td>
                     <td className="p-3.5">
                       <div className="flex items-center justify-end gap-1.5">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 w-7 p-0"
+                          onClick={() => handleDownloadPdf(p.id)}
+                          disabled={pdfBusy === p.id}
+                          title="Baixar PDF"
+                        >
+                          {pdfBusy === p.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Download className="h-3 w-3" />}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 w-7 p-0 text-emerald-600 hover:text-emerald-700"
+                          onClick={() => handleSendWhatsApp(p.id)}
+                          disabled={waBusy === p.id}
+                          title="Enviar PDF + cobrança via WhatsApp"
+                        >
+                          {waBusy === p.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <MessageCircle className="h-3 w-3" />}
+                        </Button>
                         {p.asaasPaymentId ? (
                           <>
                             {p.asaasInvoiceUrl && (

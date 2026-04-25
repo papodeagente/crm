@@ -2669,3 +2669,21 @@ export async function markAsaasWebhookProcessed(id: number, error?: string) {
     error: error || null,
   }).where(eq(asaasWebhookEvents.id, id));
 }
+
+// ─── Tenant branding (clinic name + logo) ─────────────────
+export async function getTenantBranding(tenantId: number): Promise<{ name: string | null; logoUrl: string | null } | null> {
+  const db = await getDb(); if (!db) return null;
+  const rows = await db.select({ name: tenants.name, logoUrl: tenants.logoUrl })
+    .from(tenants)
+    .where(eq(tenants.id, tenantId))
+    .limit(1);
+  return rows[0] || null;
+}
+
+export async function setTenantBranding(tenantId: number, data: { name?: string; logoUrl?: string | null }) {
+  const db = await getDb(); if (!db) return;
+  const patch: Record<string, any> = { updatedAt: new Date() };
+  if (data.name !== undefined) patch.name = data.name;
+  if (data.logoUrl !== undefined) patch.logoUrl = data.logoUrl;
+  await db.update(tenants).set(patch).where(eq(tenants.id, tenantId));
+}

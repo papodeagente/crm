@@ -166,7 +166,7 @@ import { nanoid } from "nanoid";
 import { adminRouter } from "./routers/adminRouter";
 import { crmRouter } from "./routers/crmRouter";
 import { inboxRouter } from "./routers/inboxRouter";
-import { proposalRouter, portalRouter, managementRouter, insightsRouter, academyRouter, integrationHubRouter } from "./routers/featureRouters";
+import { proposalRouter, portalRouter, managementRouter, insightsRouter, academyRouter, integrationHubRouter, tenantBrandingRouter } from "./routers/featureRouters";
 import { asaasRouter } from "./routers/asaasRouter";
 import { productCatalogRouter } from "./routers/productCatalogRouter";
 import { aiAnalysisRouter } from "./routers/aiAnalysisRouter";
@@ -2795,6 +2795,7 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
   inbox: inboxRouter,       // M1: Inbox Omnichannel
   proposals: proposalRouter, // M3: Propostas
   asaas: asaasRouter,       // ASAAS payment integration
+  tenantBranding: tenantBrandingRouter, // Clinic name + logo (used on PDFs)
   portal: portalRouter,     // M4: Portal do Cliente
   management: managementRouter, // M5: Gestão
   insights: insightsRouter, // M6: Insights

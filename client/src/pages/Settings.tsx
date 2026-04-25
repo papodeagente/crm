@@ -6,7 +6,7 @@ import {
   ChevronRight, Users, Tag, GitBranch,
   Megaphone, Target, XCircle, Package,
   Sparkles, UserPlus, Layers, Database, CalendarClock, Zap,
-  Lock, Crown, ShieldAlert, Cake,
+  Lock, Crown, ShieldAlert, Cake, Building2,
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
@@ -69,6 +69,7 @@ const settingsCategories: SettingsCategory[] = [
     title: "SEU TIME",
     links: [
       { icon: Users, label: "Agentes & Equipes", path: "/settings/agents" },
+      { icon: Building2, label: "Marca da Clínica", path: "/settings/branding", adminOnly: true },
       { icon: Shield, label: "Administração", path: "/admin", badge: "Perfis & Auditoria" },
     ],
   },

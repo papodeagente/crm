@@ -44,6 +44,117 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
       .input(z.object({ proposalId: z.number(), title: z.string(), description: z.string().optional(), qty: z.number().optional(), unitPriceCents: z.number().optional(), totalCents: z.number().optional() }))
       .mutation(async ({ input, ctx }) => crm.createProposalItem({ ...input, tenantId: getTenantId(ctx) })),
   }),
+
+  // ─── PDF generation (returns base64 for download) ───
+  getPdfBase64: tenantProcedure
+    .input(z.object({ id: z.number() }))
+    .query(async ({ ctx, input }) => {
+      const { generateProposalPdf } = await import("../services/proposalPdfService");
+      const { buffer, fileName } = await generateProposalPdf(getTenantId(ctx), input.id);
+      return { base64: buffer.toString("base64"), fileName };
+    }),
+
+  // ─── Send proposal PDF + invoice link via WhatsApp ───
+  sendWhatsApp: tenantWriteProcedure
+    .input(z.object({
+      id: z.number(),
+      message: z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const { TRPCError } = await import("@trpc/server");
+      const tenantId = getTenantId(ctx);
+
+      const proposal = await crm.getProposalById(tenantId, input.id);
+      if (!proposal) throw new TRPCError({ code: "NOT_FOUND", message: "Proposta não encontrada" });
+
+      const deal = await crm.getDealById(tenantId, proposal.dealId);
+      if (!deal?.contactId) throw new TRPCError({ code: "BAD_REQUEST", message: "Negócio sem contato vinculado" });
+
+      const contact = await crm.getContactById(tenantId, deal.contactId);
+      if (!contact) throw new TRPCError({ code: "NOT_FOUND", message: "Contato não encontrado" });
+      const phone = contact.phoneE164 || contact.phone || contact.phoneDigits;
+      if (!phone) throw new TRPCError({ code: "BAD_REQUEST", message: "Contato sem telefone — preencha o WhatsApp do cliente" });
+
+      // Find a connected WhatsApp session for this tenant
+      const { getDb } = await import("../db");
+      const { whatsappSessions } = await import("../../drizzle/schema");
+      const { and, eq } = await import("drizzle-orm");
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB indisponível" });
+      const sessions = await db.select().from(whatsappSessions)
+        .where(and(eq(whatsappSessions.tenantId, tenantId), eq(whatsappSessions.status, "connected")))
+        .limit(1);
+      const session = sessions[0];
+      if (!session) {
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Conecte o WhatsApp da clínica em Configurações → WhatsApp antes de enviar." });
+      }
+
+      // Generate PDF
+      const { generateProposalPdf } = await import("../services/proposalPdfService");
+      const { buffer, fileName } = await generateProposalPdf(tenantId, input.id);
+      const pdfDataUrl = `data:application/pdf;base64,${buffer.toString("base64")}`;
+
+      // Build caption
+      const tenant = await crm.getTenantBranding(tenantId);
+      const clinicName = tenant?.name || "Clínica";
+      const greeting = contact.name ? `Olá, ${contact.name.split(" ")[0]}!` : "Olá!";
+      const lines = [
+        input.message?.trim() || `${greeting} Segue a proposta da ${clinicName}.`,
+      ];
+      if (proposal.asaasInvoiceUrl) {
+        lines.push("");
+        lines.push(`Link para pagamento (PIX, boleto ou cartão):`);
+        lines.push(proposal.asaasInvoiceUrl);
+      }
+      const caption = lines.join("\n");
+
+      // Send via Z-API
+      const { whatsappManager } = await import("../whatsappEvolution");
+      try {
+        await whatsappManager.sendMediaMessage(
+          session.sessionId,
+          phone,
+          pdfDataUrl,
+          "document",
+          caption,
+          fileName,
+          undefined,
+          ctx.user.id,
+        );
+      } catch (e: any) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: `Falha ao enviar WhatsApp: ${e.message || e}` });
+      }
+
+      // Mark proposal as sent if still draft
+      if (proposal.status === "draft") {
+        await crm.updateProposal(tenantId, proposal.id, { status: "sent", sentAt: new Date() } as any);
+      }
+
+      return { success: true };
+    }),
+});
+
+// ═══════════════════════════════════════
+// TENANT BRANDING (clinic name + logo)
+// ═══════════════════════════════════════
+export const tenantBrandingRouter = router({
+  get: tenantProcedure.query(async ({ ctx }) => {
+    return crm.getTenantBranding(getTenantId(ctx));
+  }),
+  update: tenantAdminProcedure
+    .input(z.object({
+      name: z.string().min(1).max(255).optional(),
+      logoUrl: z.string().nullable().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      // Validate logo size if data URL (~max 1MB encoded)
+      if (input.logoUrl && input.logoUrl.startsWith("data:") && input.logoUrl.length > 1_400_000) {
+        const { TRPCError } = await import("@trpc/server");
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Logo muito grande. Use uma imagem menor que 1MB." });
+      }
+      await crm.setTenantBranding(getTenantId(ctx), input);
+      return { success: true };
+    }),
 });
 
 // ═══════════════════════════════════════

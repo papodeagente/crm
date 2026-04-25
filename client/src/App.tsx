@@ -48,6 +48,7 @@ const DateAutomationSettings = lazyWithRetry(() => import("./pages/DateAutomatio
 const StageOwnerRuleSettings = lazyWithRetry(() => import("./pages/StageOwnerRuleSettings"));
 const SalesAutomationHub = lazyWithRetry(() => import("./pages/SalesAutomationHub"));
 const AiTrainingSettings = lazyWithRetry(() => import("./pages/AiTrainingSettings"));
+const BrandingSettings = lazyWithRetry(() => import("./pages/BrandingSettings"));
 const RfvMatrix = lazyWithRetry(() => import("./pages/RfvMatrix"));
 const BirthdayCalendar = lazyWithRetry(() => import("./pages/BirthdayCalendar"));
 const Campaigns = lazyWithRetry(() => import("./pages/Campaigns"));
@@ -129,6 +130,7 @@ function AppRouter() {
                 <Route path="/profile" component={Profile} />
                 <Route path="/settings" component={SettingsPage} />
                 <Route path="/settings/agents" component={AgentManagement} />
+                <Route path="/settings/branding" component={BrandingSettings} />
                 <Route path="/settings/custom-fields" component={CustomFieldsSettings} />
                 <Route path="/settings/pipelines" component={PipelineSettings} />
                 <Route path="/settings/products" component={ProductCatalog} />
