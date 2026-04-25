@@ -145,6 +145,10 @@ export const tenantBrandingRouter = router({
     .input(z.object({
       name: z.string().min(1).max(255).optional(),
       logoUrl: z.string().nullable().optional(),
+      whatsappAutoPaid: z.boolean().optional(),
+      whatsappAutoOverdue: z.boolean().optional(),
+      whatsappAutoFollowup: z.boolean().optional(),
+      whatsappFollowupDays: z.number().int().min(1).max(30).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       // Validate logo size if data URL (~max 1MB encoded)

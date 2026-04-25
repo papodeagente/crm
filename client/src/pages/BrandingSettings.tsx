@@ -4,7 +4,8 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Building2, Upload, X, Loader2, Image as ImageIcon } from "lucide-react";
+import { Building2, Upload, X, Loader2, Image as ImageIcon, MessageCircle } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 
 const MAX_LOGO_BYTES = 800 * 1024; // 800KB raw
@@ -32,12 +33,22 @@ export default function BrandingSettings() {
   const [name, setName] = useState("");
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [whatsappAutoPaid, setWhatsappAutoPaid] = useState(true);
+  const [whatsappAutoOverdue, setWhatsappAutoOverdue] = useState(true);
+  const [whatsappAutoFollowup, setWhatsappAutoFollowup] = useState(true);
+  const [whatsappFollowupDays, setWhatsappFollowupDays] = useState(3);
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (branding.data) {
       setName(branding.data.name || "");
       setLogoUrl(branding.data.logoUrl || null);
+      setWhatsappAutoPaid(branding.data.whatsappAutoPaid !== false);
+      setWhatsappAutoOverdue(branding.data.whatsappAutoOverdue !== false);
+      setWhatsappAutoFollowup(branding.data.whatsappAutoFollowup !== false);
+      setWhatsappFollowupDays(
+        typeof branding.data.whatsappFollowupDays === "number" ? branding.data.whatsappFollowupDays : 3
+      );
     }
   }, [branding.data]);
 
@@ -67,6 +78,10 @@ export default function BrandingSettings() {
     update.mutate({
       name: name.trim() || undefined,
       logoUrl: logoUrl,
+      whatsappAutoPaid,
+      whatsappAutoOverdue,
+      whatsappAutoFollowup,
+      whatsappFollowupDays,
     });
   }
 
@@ -134,6 +149,66 @@ export default function BrandingSettings() {
                 </div>
                 <p className="text-[12px] text-muted-foreground">PNG, JPG, SVG ou WEBP — até 800KB. Recomendado fundo transparente.</p>
               </div>
+            </div>
+          </div>
+
+          {/* WhatsApp automation */}
+          <div className="space-y-3 pt-4 border-t border-border/30">
+            <div className="flex items-center gap-2">
+              <MessageCircle className="h-4 w-4 text-emerald-600" />
+              <Label className="text-sm font-semibold">Automações WhatsApp</Label>
+            </div>
+            <p className="text-[12px] text-muted-foreground">
+              Mensagens automáticas para o cliente. Requer sessão WhatsApp conectada.
+            </p>
+
+            <div className="space-y-3 rounded-lg border border-border/40 p-4">
+              <div className="flex items-start justify-between gap-4">
+                <div className="space-y-0.5">
+                  <Label className="text-sm">Confirmar pagamento recebido</Label>
+                  <p className="text-[12px] text-muted-foreground">
+                    Quando o ASAAS confirmar pagamento, envia agradecimento automático.
+                  </p>
+                </div>
+                <Switch checked={whatsappAutoPaid} onCheckedChange={setWhatsappAutoPaid} />
+              </div>
+
+              <div className="flex items-start justify-between gap-4 pt-3 border-t border-border/30">
+                <div className="space-y-0.5">
+                  <Label className="text-sm">Lembrete de pagamento atrasado</Label>
+                  <p className="text-[12px] text-muted-foreground">
+                    Quando o ASAAS marcar como atrasado, envia lembrete educado com link.
+                  </p>
+                </div>
+                <Switch checked={whatsappAutoOverdue} onCheckedChange={setWhatsappAutoOverdue} />
+              </div>
+
+              <div className="flex items-start justify-between gap-4 pt-3 border-t border-border/30">
+                <div className="space-y-0.5">
+                  <Label className="text-sm">Follow-up de proposta sem resposta</Label>
+                  <p className="text-[12px] text-muted-foreground">
+                    Após N dias sem pagamento, envia mensagem de acompanhamento.
+                  </p>
+                </div>
+                <Switch checked={whatsappAutoFollowup} onCheckedChange={setWhatsappAutoFollowup} />
+              </div>
+
+              {whatsappAutoFollowup && (
+                <div className="flex items-center gap-3 pt-3 border-t border-border/30">
+                  <Label htmlFor="followup-days" className="text-sm whitespace-nowrap">
+                    Dias até o follow-up:
+                  </Label>
+                  <Input
+                    id="followup-days"
+                    type="number"
+                    min={1}
+                    max={30}
+                    value={whatsappFollowupDays}
+                    onChange={(e) => setWhatsappFollowupDays(Math.max(1, Math.min(30, Number(e.target.value) || 3)))}
+                    className="w-20"
+                  />
+                </div>
+              )}
             </div>
           </div>
 

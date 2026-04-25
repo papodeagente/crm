@@ -2671,19 +2671,55 @@ export async function markAsaasWebhookProcessed(id: number, error?: string) {
 }
 
 // ─── Tenant branding (clinic name + logo) ─────────────────
-export async function getTenantBranding(tenantId: number): Promise<{ name: string | null; logoUrl: string | null } | null> {
+export async function getTenantBranding(tenantId: number): Promise<{
+  name: string | null;
+  logoUrl: string | null;
+  whatsappAutoPaid: boolean;
+  whatsappAutoOverdue: boolean;
+  whatsappAutoFollowup: boolean;
+  whatsappFollowupDays: number;
+} | null> {
   const db = await getDb(); if (!db) return null;
-  const rows = await db.select({ name: tenants.name, logoUrl: tenants.logoUrl })
+  const rows = await db.select({ name: tenants.name, logoUrl: tenants.logoUrl, settingsJson: tenants.settingsJson })
     .from(tenants)
     .where(eq(tenants.id, tenantId))
     .limit(1);
-  return rows[0] || null;
+  const row = rows[0];
+  if (!row) return null;
+  const s = (row.settingsJson || {}) as any;
+  return {
+    name: row.name,
+    logoUrl: row.logoUrl,
+    whatsappAutoPaid: s.whatsappAutoPaid !== false,
+    whatsappAutoOverdue: s.whatsappAutoOverdue !== false,
+    whatsappAutoFollowup: s.whatsappAutoFollowup !== false,
+    whatsappFollowupDays: typeof s.whatsappFollowupDays === "number" ? s.whatsappFollowupDays : 3,
+  };
 }
 
-export async function setTenantBranding(tenantId: number, data: { name?: string; logoUrl?: string | null }) {
+export async function setTenantBranding(tenantId: number, data: {
+  name?: string;
+  logoUrl?: string | null;
+  whatsappAutoPaid?: boolean;
+  whatsappAutoOverdue?: boolean;
+  whatsappAutoFollowup?: boolean;
+  whatsappFollowupDays?: number;
+}) {
   const db = await getDb(); if (!db) return;
   const patch: Record<string, any> = { updatedAt: new Date() };
   if (data.name !== undefined) patch.name = data.name;
   if (data.logoUrl !== undefined) patch.logoUrl = data.logoUrl;
+
+  const automationKeys = ["whatsappAutoPaid", "whatsappAutoOverdue", "whatsappAutoFollowup", "whatsappFollowupDays"] as const;
+  if (automationKeys.some((k) => data[k] !== undefined)) {
+    const current = await db.select({ settingsJson: tenants.settingsJson })
+      .from(tenants).where(eq(tenants.id, tenantId)).limit(1);
+    const merged: Record<string, any> = { ...(current[0]?.settingsJson || {}) };
+    for (const k of automationKeys) {
+      if (data[k] !== undefined) merged[k] = data[k];
+    }
+    patch.settingsJson = merged;
+  }
+
   await db.update(tenants).set(patch).where(eq(tenants.id, tenantId));
 }
