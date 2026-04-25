@@ -365,7 +365,16 @@ export async function getZapiInstanceForTenant(tenantId: number): Promise<ZapiIn
     )
     .limit(1);
 
-  return rows[0] || null;
+  const inst = rows[0];
+  if (!inst) return null;
+  // Fall back to env-level Client-Token when the row was provisioned before
+  // ZAPI_CLIENT_TOKEN was configured. Z-API requires this header on every
+  // call once the account-level Security Token is enabled.
+  if (!inst.zapiClientToken) {
+    const envToken = process.env.ZAPI_CLIENT_TOKEN || null;
+    if (envToken) inst.zapiClientToken = envToken;
+  }
+  return inst;
 }
 
 /**
