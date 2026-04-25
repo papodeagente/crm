@@ -10,10 +10,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Separator } from "@/components/ui/separator";
 import {
   ChevronRight, DollarSign, Loader2, Plus, ShoppingCart,
-  Eye, EyeOff, Trash2, MousePointer, Pencil, PenTool, Eraser, Undo2
+  Eye, EyeOff, Trash2
 } from "lucide-react";
 import { Link } from "wouter";
 import { toast } from "sonner";
+import FaceMap, { FACE_REGIONS } from "./FaceMap";
 
 interface OrcamentosTabProps {
   contactId: number;
@@ -56,21 +57,7 @@ interface TreatmentItem {
   quantidade: string;
 }
 
-// Face SVG regions
-const FACE_REGIONS = [
-  { id: "testa", label: "Testa", path: "M 100,25 Q 130,10 160,10 Q 190,10 220,25 L 215,55 Q 160,45 105,55 Z", cx: 160, cy: 35 },
-  { id: "glabela", label: "Glabela", path: "M 140,55 L 180,55 L 175,75 L 145,75 Z", cx: 160, cy: 65 },
-  { id: "olho_esq", label: "Olho E", path: "M 105,60 Q 130,55 145,65 Q 130,75 105,70 Z", cx: 125, cy: 65 },
-  { id: "olho_dir", label: "Olho D", path: "M 175,65 Q 190,55 215,60 Q 215,70 190,75 Z", cx: 195, cy: 65 },
-  { id: "nariz", label: "Nariz", path: "M 150,75 L 170,75 L 175,115 Q 160,120 145,115 Z", cx: 160, cy: 95 },
-  { id: "bochecha_esq", label: "Bochecha E", path: "M 85,75 L 140,80 L 135,130 Q 100,135 85,115 Z", cx: 110, cy: 105 },
-  { id: "bochecha_dir", label: "Bochecha D", path: "M 180,80 L 235,75 L 235,115 Q 220,135 185,130 Z", cx: 210, cy: 105 },
-  { id: "labio_sup", label: "Lábio Sup.", path: "M 135,125 Q 160,115 185,125 Q 175,135 145,135 Z", cx: 160, cy: 128 },
-  { id: "labio_inf", label: "Lábio Inf.", path: "M 140,135 Q 160,145 180,135 Q 175,150 145,150 Z", cx: 160, cy: 142 },
-  { id: "queixo", label: "Queixo", path: "M 135,150 Q 160,165 185,150 Q 180,180 160,185 Q 140,180 135,150 Z", cx: 160, cy: 168 },
-  { id: "mandibula_esq", label: "Mandíbula E", path: "M 85,120 Q 90,160 130,175 L 135,155 Q 100,140 85,120 Z", cx: 108, cy: 148 },
-  { id: "mandibula_dir", label: "Mandíbula D", path: "M 185,155 L 190,175 Q 230,160 235,120 Q 220,140 185,155 Z", cx: 212, cy: 148 },
-];
+// FACE_REGIONS imported from FaceMap component
 
 export default function OrcamentosTab({ contactId, deals, isLoading, contact }: OrcamentosTabProps) {
   // Form state
@@ -412,78 +399,12 @@ export default function OrcamentosTab({ contactId, deals, isLoading, contact }: 
                 {showUnits ? "OCULTAR UNIDADES" : "MOSTRAR UNIDADES"}
               </Button>
 
-              {/* Face SVG Map */}
-              <div className="flex gap-4">
-                {/* Drawing tools */}
-                <div className="flex flex-col gap-1.5 pt-2">
-                  {[
-                    { icon: MousePointer, title: "Selecionar" },
-                    { icon: PenTool, title: "Caneta" },
-                    { icon: Pencil, title: "Lápis" },
-                    { icon: Eraser, title: "Borracha" },
-                    { icon: Plus, title: "Adicionar" },
-                    { icon: Undo2, title: "Desfazer" },
-                  ].map((tool, i) => (
-                    <button
-                      key={i}
-                      title={tool.title}
-                      className="h-7 w-7 rounded border border-border/50 flex items-center justify-center hover:bg-muted/50 text-muted-foreground hover:text-foreground transition-colors"
-                    >
-                      <tool.icon className="h-3.5 w-3.5" />
-                    </button>
-                  ))}
-                </div>
-
-                {/* Face diagram */}
-                <div className="flex-1 flex justify-center">
-                  <svg viewBox="0 0 320 210" className="w-full max-w-md" style={{ maxHeight: 340 }}>
-                    {/* Face outline */}
-                    <ellipse cx="160" cy="100" rx="85" ry="105" fill="none" stroke="currentColor" strokeWidth="1" opacity="0.15" />
-                    {/* Hair */}
-                    <path d="M 75,60 Q 80,10 160,5 Q 240,10 245,60 Q 240,30 160,25 Q 80,30 75,60" fill="currentColor" stroke="currentColor" strokeWidth="0.5" opacity="0.1" />
-
-                    {/* Clickable regions */}
-                    {FACE_REGIONS.map(region => {
-                      const isSelected = selectedRegions.includes(region.id);
-                      return (
-                        <g key={region.id} onClick={() => toggleRegion(region.id)} className="cursor-pointer">
-                          <path
-                            d={region.path}
-                            fill={isSelected ? "rgba(46, 125, 91, 0.3)" : "rgba(128, 128, 128, 0.08)"}
-                            stroke={isSelected ? "#2E7D5B" : "rgba(128, 128, 128, 0.3)"}
-                            strokeWidth={isSelected ? "1.5" : "0.5"}
-                            className="transition-all hover:fill-[rgba(46,125,91,0.15)]"
-                          />
-                          {showUnits && (
-                            <text x={region.cx} y={region.cy + 3} textAnchor="middle" fontSize="7" fill="currentColor" opacity="0.6">
-                              {region.label}
-                            </text>
-                          )}
-                        </g>
-                      );
-                    })}
-
-                    {/* Eyes detail */}
-                    <ellipse cx="125" cy="65" rx="10" ry="5" fill="none" stroke="currentColor" strokeWidth="0.5" opacity="0.3" />
-                    <ellipse cx="195" cy="65" rx="10" ry="5" fill="none" stroke="currentColor" strokeWidth="0.5" opacity="0.3" />
-                    <circle cx="125" cy="65" r="2.5" fill="currentColor" opacity="0.2" />
-                    <circle cx="195" cy="65" r="2.5" fill="currentColor" opacity="0.2" />
-
-                    {/* Nose detail */}
-                    <path d="M 155,100 Q 160,105 165,100" fill="none" stroke="currentColor" strokeWidth="0.5" opacity="0.3" />
-
-                    {/* Mouth detail */}
-                    <path d="M 145,132 Q 160,127 175,132" fill="none" stroke="currentColor" strokeWidth="0.5" opacity="0.3" />
-                    <path d="M 148,132 Q 160,140 172,132" fill="none" stroke="currentColor" strokeWidth="0.5" opacity="0.3" />
-
-                    {/* Guide lines */}
-                    <line x1="85" y1="55" x2="235" y2="55" stroke="currentColor" strokeWidth="0.3" opacity="0.1" strokeDasharray="4,4" />
-                    <line x1="85" y1="80" x2="235" y2="80" stroke="currentColor" strokeWidth="0.3" opacity="0.1" strokeDasharray="4,4" />
-                    <line x1="85" y1="120" x2="235" y2="120" stroke="currentColor" strokeWidth="0.3" opacity="0.1" strokeDasharray="4,4" />
-                    <line x1="160" y1="10" x2="160" y2="190" stroke="currentColor" strokeWidth="0.3" opacity="0.1" strokeDasharray="4,4" />
-                  </svg>
-                </div>
-              </div>
+              {/* Face Map */}
+              <FaceMap
+                selectedRegions={selectedRegions}
+                onToggleRegion={toggleRegion}
+                showUnits={showUnits}
+              />
 
               {/* Selected regions list */}
               {selectedRegions.length > 0 && (
