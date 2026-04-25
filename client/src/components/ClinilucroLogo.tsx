@@ -1,70 +1,49 @@
 /**
  * Clinilucro brand assets.
- * Symbol = C aberto + pulso cardíaco que vira seta ascendente.
- * Cores: gradiente esmeralda → mint → lima.
+ * Símbolo: C aberto (navy) + pulso cardíaco que vira seta ascendente (lime).
+ * Light bg: navy + lime. Dark bg: white + lime.
  */
 
 interface MarkProps {
   className?: string;
-  /** When true, uses light/white gradient suited for dark backgrounds. */
+  /** When true, uses white "C" suited for dark backgrounds (pulse stays lime). */
   inverted?: boolean;
 }
 
 interface LogoProps extends MarkProps {
-  /** When true, the wordmark text becomes white (use over dark bg). */
+  /** When true, the wordmark "clini" becomes white (use over dark bg). "lucro" stays lime. */
   textInverted?: boolean;
   /** When true, hides "CRM PARA CLÍNICAS" tagline below the wordmark. */
   hideTagline?: boolean;
 }
 
-let gradientCounter = 0;
-function uid(prefix: string) {
-  // Deterministic per-render is fine — collisions across instances handled by useId in callsites if needed.
-  gradientCounter += 1;
-  return `${prefix}-${gradientCounter}`;
-}
+const NAVY = "#0F172A";
+const LIME = "#65A30D";
 
 export function ClinilucroMark({ className = "h-6 w-auto", inverted = false }: MarkProps) {
-  const gid = uid("cl-mark");
-  // Light gradient for dark backgrounds; brand gradient otherwise.
-  const stops = inverted
-    ? [
-        { offset: "0%", color: "#10B981" },
-        { offset: "100%", color: "#A3E635" },
-      ]
-    : [
-        { offset: "0%", color: "#047857" },
-        { offset: "55%", color: "#10B981" },
-        { offset: "100%", color: "#84CC16" },
-      ];
+  const arcColor = inverted ? "#FFFFFF" : NAVY;
+  const pulseColor = LIME;
 
   return (
     <svg viewBox="60 20 220 110" className={className} fill="none" aria-hidden="true">
-      <defs>
-        <linearGradient id={gid} x1="0%" y1="0%" x2="100%" y2="100%">
-          {stops.map((s) => (
-            <stop key={s.offset} offset={s.offset} stopColor={s.color} />
-          ))}
-        </linearGradient>
-      </defs>
       <g transform="translate(0, 60)">
         <path
           d="M 130 60 A 60 60 0 1 0 130 -60"
-          stroke={`url(#${gid})`}
+          stroke={arcColor}
           strokeWidth="16"
           strokeLinecap="round"
         />
       </g>
       <path
         d="M 130 60 L 156 60 L 170 44 L 184 78 L 202 30 L 226 60 L 268 60"
-        stroke={`url(#${gid})`}
+        stroke={pulseColor}
         strokeWidth="12"
         strokeLinecap="round"
         strokeLinejoin="round"
       />
       <path
         d="M 250 42 L 268 60 L 250 78"
-        stroke={`url(#${gid})`}
+        stroke={pulseColor}
         strokeWidth="12"
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -79,14 +58,15 @@ export function ClinilucroLogo({
   textInverted = false,
   hideTagline = true,
 }: LogoProps) {
-  const baseText = textInverted ? "text-white" : "text-slate-900 dark:text-white";
+  const cliniColor = textInverted ? "text-white" : "text-slate-900 dark:text-white";
+  const lucroStyle = { color: LIME };
   return (
     <span className={`inline-flex items-center gap-2 ${className}`}>
       <ClinilucroMark className="h-full w-auto" inverted={inverted} />
       <span className="inline-flex flex-col leading-none">
-        <span className={`font-semibold tracking-tight ${baseText} text-[1em]`} style={{ fontSize: "1.05em" }}>
+        <span className={`font-semibold tracking-tight ${cliniColor} text-[1em]`} style={{ fontSize: "1.05em" }}>
           clini
-          <span className="font-extrabold bg-gradient-to-r from-[#059669] to-[#65A30D] bg-clip-text text-transparent">
+          <span className="font-extrabold" style={lucroStyle}>
             lucro
           </span>
         </span>
@@ -109,14 +89,15 @@ export function ClinilucroStacked({
   inverted = false,
   textInverted = false,
 }: LogoProps) {
-  const baseText = textInverted ? "text-white" : "text-slate-900 dark:text-white";
+  const cliniColor = textInverted ? "text-white" : "text-slate-900 dark:text-white";
+  const lucroStyle = { color: LIME };
   return (
     <span className={`inline-flex flex-col items-center gap-2 ${className}`}>
       <ClinilucroMark className="h-[55%] w-auto" inverted={inverted} />
       <span className="inline-flex flex-col items-center leading-none">
-        <span className={`font-semibold tracking-tight text-[1.5em] ${baseText}`}>
+        <span className={`font-semibold tracking-tight text-[1.5em] ${cliniColor}`}>
           clini
-          <span className="font-extrabold bg-gradient-to-r from-[#059669] to-[#65A30D] bg-clip-text text-transparent">
+          <span className="font-extrabold" style={lucroStyle}>
             lucro
           </span>
         </span>
