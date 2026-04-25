@@ -12,6 +12,7 @@ import {
   WifiOff, RefreshCw, CheckCircle2,
   Contact2, LayoutGrid,
   Timer,
+  PanelRightOpen,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useIsAdmin } from "@/components/AdminOnlyGuard";
@@ -28,6 +29,7 @@ import CreateContactDialog from "@/components/inbox/CreateContactDialog";
 import CreateDealDialog from "@/components/inbox/CreateDealDialog";
 import NewChatPanel from "@/components/inbox/NewChatPanel";
 import { EmptyChat, NoSession } from "@/components/inbox/EmptyStates";
+import ContactDetailsSidebar from "@/components/inbox/ContactDetailsSidebar";
 
 /* ═══════════════════════════════════════════════════════
    CONSTANTS
@@ -60,6 +62,10 @@ export default function InboxPage() {
   const [showHeaderMenu, setShowHeaderMenu] = useState(false);
   const [isMuted, setIsMuted] = useState(() => {
     try { return localStorage.getItem(MUTE_KEY) === "true"; } catch { return false; }
+  });
+  const DETAILS_KEY = "inbox.detailsSidebarOpen";
+  const [detailsOpen, setDetailsOpen] = useState(() => {
+    try { return localStorage.getItem(DETAILS_KEY) !== "false"; } catch { return true; }
   });
   const selectedKeyRef = useRef<string | null>(null);
   // Keep ref in sync with state so socket handler closure always has the latest value
@@ -1089,6 +1095,17 @@ export default function InboxPage() {
               <ArrowLeft className="w-5 h-5 text-white" />
             </button>
 
+            {!detailsOpen && (
+              <button
+                onClick={() => { setDetailsOpen(true); try { localStorage.setItem(DETAILS_KEY, "true"); } catch {} }}
+                className="hidden md:flex absolute top-[14px] right-[12px] z-30 p-[6px] rounded-full backdrop-blur-sm hover:bg-accent/40"
+                style={{ backgroundColor: 'rgba(0,0,0,0.15)' }}
+                title="Mostrar detalhes do contato"
+              >
+                <PanelRightOpen className="w-5 h-5 text-white" />
+              </button>
+            )}
+
             <WhatsAppChat
               contact={selectedContact}
               sessionId={activeSession.sessionId}
@@ -1117,6 +1134,20 @@ export default function InboxPage() {
           </div>
         )}
       </div>
+
+      {/* ═══ RIGHT SIDEBAR — Contact Details ═══ */}
+      {selectedKey && activeSession && detailsOpen && (
+        <div className="hidden md:flex">
+          <ContactDetailsSidebar
+            contactId={selectedContact?.id && selectedContact.id > 0 ? selectedContact.id : null}
+            fallbackName={selectedContact?.name}
+            fallbackPhone={selectedJid?.split("@")[0]}
+            fallbackAvatarUrl={selectedContact?.avatarUrl}
+            onCollapse={() => { setDetailsOpen(false); try { localStorage.setItem(DETAILS_KEY, "false"); } catch {} }}
+            onCreateContact={() => setShowCreateContact(true)}
+          />
+        </div>
+      )}
 
       {/* ═══ DIALOGS ═══ */}
       {selectedKey && activeSession && (
