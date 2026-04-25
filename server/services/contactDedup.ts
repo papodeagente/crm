@@ -52,7 +52,11 @@ export function extractPhoneLast11(phone: string): string {
 // ─── Duplicate Detection ─────────────────────────────────────
 
 export interface DuplicateMatch {
+  id: number;
   contactId: number;
+  name: string | null;
+  email: string | null;
+  phone: string | null;
   matchType: "email" | "phone" | "email_and_phone";
   matchedEmail?: string;
   matchedPhone?: string;
@@ -119,7 +123,11 @@ export async function findDuplicateContacts(
     }
 
     return {
+      id: c.id,
       contactId: c.id,
+      name: c.name ?? null,
+      email: c.email ?? null,
+      phone: c.phone ?? c.phoneE164 ?? null,
       matchType,
       matchedEmail: emailMatch ? c.email || undefined : undefined,
       matchedPhone: phoneMatch ? (c.phone || c.phoneE164 || undefined) : undefined,
