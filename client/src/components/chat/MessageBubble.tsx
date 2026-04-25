@@ -425,6 +425,16 @@ const MessageBubble = memo(({
               {agentMap[msg.senderAgentId]}
             </p>
           )}
+          {/* External device label — fromMe message without a CRM agent stamp */}
+          {fromMe && !msg.senderAgentId && isFirst && (
+            <p
+              className="text-[10px] italic mb-0.5 truncate"
+              style={{ color: 'rgba(0,0,0,0.45)' }}
+              title="Mensagem enviada pelo aparelho conectado, fora do CRM"
+            >
+              Enviada do dispositivo externo
+            </p>
+          )}
           {renderQuotedMessage()}
           {renderMedia()}
 

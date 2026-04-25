@@ -144,7 +144,14 @@ export default function WhatsAppChat({
   const [showPollModal, setShowPollModal] = useState(false);
   const [editTarget, setEditTarget] = useState<{ messageId: string; text: string } | null>(null);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
-  const [showAgentNames, setShowAgentNames] = useState(true);
+  const SHOW_AGENT_NAMES_KEY = "wa.showAgentNames";
+  const [showAgentNames, setShowAgentNamesState] = useState(() => {
+    try { return localStorage.getItem(SHOW_AGENT_NAMES_KEY) !== "false"; } catch { return true; }
+  });
+  const setShowAgentNames = (v: boolean) => {
+    setShowAgentNamesState(v);
+    try { localStorage.setItem(SHOW_AGENT_NAMES_KEY, String(v)); } catch {}
+  };
   const [editingNoteId, setEditingNoteId] = useState<number | null>(null);
   const [editingNoteText, setEditingNoteText] = useState("");
   // Tags panel
