@@ -3,6 +3,7 @@ import { trpc } from "@/lib/trpc";
 import { useSocket } from "@/hooks/useSocket";
 import { useState, useMemo, useRef, useEffect } from "react";
 import WhatsAppChat from "@/components/WhatsAppChat";
+import { QuickSendDialog } from "@/components/whatsapp/QuickSendDialog";
 import { DealTimeline } from "@/components/DealTimeline";
 import { useRoute, useLocation, Link } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -250,6 +251,7 @@ export default function DealDetail() {
   const [showEditContactDialog, setShowEditContactDialog] = useState(false);
   const [showEditAccountDialog, setShowEditAccountDialog] = useState(false);
   const [contactDraft, setContactDraft] = useState({ name: "", phone: "", email: "" });
+  const [quickSendOpen, setQuickSendOpen] = useState(false);
   const [accountDraft, setAccountDraft] = useState({ name: "" });
   const [contactMode, setContactMode] = useState<"create" | "link">("create");
   const [accountMode, setAccountMode] = useState<"create" | "link">("create");
@@ -1013,6 +1015,16 @@ export default function DealDetail() {
                   </div>
                   {contact.phone && (
                     <ContactInfoRow icon={Phone} value={contact.phone} copyable whatsapp />
+                  )}
+                  {contact.phone && deal.contactId && (
+                    <button
+                      onClick={() => setQuickSendOpen(true)}
+                      className="flex items-center gap-1.5 text-[11px] text-emerald-700 hover:text-emerald-800 transition-colors"
+                      title="Enviar pela conta WhatsApp da clínica"
+                    >
+                      <MessageCircle className="h-3 w-3" />
+                      Enviar WhatsApp pela clínica
+                    </button>
                   )}
                   {contact.email && (
                     <ContactInfoRow icon={Mail} value={contact.email} copyable />
@@ -1895,6 +1907,15 @@ export default function DealDetail() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {deal?.contactId ? (
+        <QuickSendDialog
+          contactId={deal.contactId}
+          contactName={contact?.name}
+          open={quickSendOpen}
+          onOpenChange={setQuickSendOpen}
+        />
+      ) : null}
     </div>
   );
 }

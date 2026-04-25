@@ -18,6 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import DuplicateAlert from "@/components/DuplicateAlert";
+import { QuickSendDialog } from "@/components/whatsapp/QuickSendDialog";
 
 // Tab components
 import SobreTab from "@/components/contact-profile/SobreTab";
@@ -131,6 +132,7 @@ export default function ContactProfile() {
     name: "", email: "", phone: "", birthDate: "", gender: "", referredBy: "",
   });
   const [convenioForm, setConvenioForm] = useState({ numero: "", nome: "" });
+  const [quickSendOpen, setQuickSendOpen] = useState(false);
 
   // Queries
   const contactQ = trpc.crm.contacts.get.useQuery({ id: contactId }, { enabled: !!contactId });
@@ -329,9 +331,14 @@ export default function ContactProfile() {
                 <span className="text-muted-foreground">Contato:</span>
                 <div className="flex items-center gap-1.5">
                   {contact.phone && (
-                    <a href={`https://wa.me/${contact.phone.replace(/\D/g, "")}`} target="_blank" rel="noopener noreferrer">
+                    <button
+                      type="button"
+                      onClick={() => setQuickSendOpen(true)}
+                      title="Enviar WhatsApp pela clínica"
+                      className="hover:scale-110 transition-transform"
+                    >
                       <MessageCircle className="h-3.5 w-3.5 text-green-500 hover:text-green-400 cursor-pointer" />
-                    </a>
+                    </button>
                   )}
                   <span className="font-medium">{contact.phone || "N/A"}</span>
                 </div>
@@ -498,6 +505,13 @@ export default function ContactProfile() {
           </div>
         </Tabs>
       </main>
+
+      <QuickSendDialog
+        contactId={contactId}
+        contactName={contact?.name}
+        open={quickSendOpen}
+        onOpenChange={setQuickSendOpen}
+      />
     </div>
   );
 }

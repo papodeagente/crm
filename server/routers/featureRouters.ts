@@ -162,6 +162,68 @@ export const tenantBrandingRouter = router({
 });
 
 // ═══════════════════════════════════════
+// QUICK SEND — WhatsApp ad-hoc por contato
+// ═══════════════════════════════════════
+export const whatsappQuickRouter = router({
+  // Status + telefone resolvidos para um contato — usado pelos botões de envio rápido
+  contactStatus: tenantProcedure
+    .input(z.object({ contactId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      const tenantId = getTenantId(ctx);
+      const contact = await crm.getContactById(tenantId, input.contactId);
+      if (!contact) return { canSend: false, reason: "contact_not_found" as const };
+      const phone = (contact as any).phoneE164 || contact.phone || (contact as any).phoneDigits;
+      if (!phone) return { canSend: false, reason: "no_phone" as const };
+
+      const { getDb } = await import("../db");
+      const { whatsappSessions } = await import("../../drizzle/schema");
+      const { and, eq } = await import("drizzle-orm");
+      const db = await getDb();
+      if (!db) return { canSend: false, reason: "db_unavailable" as const };
+      const sess = await db.select({ id: whatsappSessions.sessionId }).from(whatsappSessions)
+        .where(and(eq(whatsappSessions.tenantId, tenantId), eq(whatsappSessions.status, "connected")))
+        .limit(1);
+      if (!sess[0]) return { canSend: false, reason: "no_session" as const, phone };
+      return { canSend: true as const, phone };
+    }),
+
+  send: tenantWriteProcedure
+    .input(z.object({
+      contactId: z.number(),
+      message: z.string().min(1).max(4000),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const { TRPCError } = await import("@trpc/server");
+      const tenantId = getTenantId(ctx);
+      const contact = await crm.getContactById(tenantId, input.contactId);
+      if (!contact) throw new TRPCError({ code: "NOT_FOUND", message: "Contato não encontrado" });
+      const phone = (contact as any).phoneE164 || contact.phone || (contact as any).phoneDigits;
+      if (!phone) throw new TRPCError({ code: "BAD_REQUEST", message: "Contato sem telefone" });
+
+      const { getDb } = await import("../db");
+      const { whatsappSessions } = await import("../../drizzle/schema");
+      const { and, eq } = await import("drizzle-orm");
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB indisponível" });
+      const [session] = await db.select().from(whatsappSessions)
+        .where(and(eq(whatsappSessions.tenantId, tenantId), eq(whatsappSessions.status, "connected")))
+        .limit(1);
+      if (!session) {
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Conecte o WhatsApp da clínica antes de enviar." });
+      }
+
+      const { whatsappManager } = await import("../whatsappEvolution");
+      try {
+        await whatsappManager.sendTextMessage(session.sessionId, phone, input.message);
+      } catch (e: any) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: `Falha ao enviar: ${e.message || e}` });
+      }
+      await emitEvent({ tenantId, actorUserId: ctx.user.id, entityType: "contact", entityId: input.contactId, action: "whatsapp_quick_send" });
+      return { success: true };
+    }),
+});
+
+// ═══════════════════════════════════════
 // M4 — PORTAL DO CLIENTE
 // ═══════════════════════════════════════
 export const portalRouter = router({
