@@ -503,6 +503,9 @@ async function startServer() {
     // Start trash auto-purge scheduler (hard-delete items older than 30 days)
     import("../trashAutoPurgeScheduler").then(m => m.startTrashAutoPurgeScheduler());
 
+    // Proposal follow-up scheduler (WhatsApp reminder N days after sent without payment)
+    import("../proposalFollowupScheduler").then(m => m.startProposalFollowupScheduler());
+
     // Start scheduled WhatsApp send worker (checks every 30s for due tasks)
     import("../services/scheduledWhatsAppService").then(m => m.startScheduledWhatsAppWorker()).catch(e => {
       console.warn("[WA-Scheduled] Failed to start worker:", e.message);

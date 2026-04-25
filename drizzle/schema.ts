@@ -935,6 +935,10 @@ export const proposals = pgTable("proposals", {
   asaasPaymentStatus: varchar("asaasPaymentStatus", { length: 32 }),
   asaasDueDate: timestamp("asaasDueDate"),
   asaasPaidAt: timestamp("asaasPaidAt"),
+  // WhatsApp notification idempotency timestamps
+  whatsappFollowupAt: timestamp("whatsappFollowupAt"),
+  whatsappPaidNotifiedAt: timestamp("whatsappPaidNotifiedAt"),
+  whatsappOverdueNotifiedAt: timestamp("whatsappOverdueNotifiedAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
   createdBy: integer("createdBy"),

@@ -132,10 +132,24 @@ export async function handleAsaasWebhook(req: Request, res: Response) {
           await crm.updateProposal(tenantId, proposalId, { status: "accepted", acceptedAt: paidAt || new Date() });
         }
         // Auto-notify client via WhatsApp (best-effort, non-blocking failure)
+        // Idempotent: only fires once per kind per proposal
         if (isPaid || isOverdue) {
           const { sendProposalWhatsAppNotification } = await import("./services/proposalNotifications");
-          sendProposalWhatsAppNotification(tenantId, proposalId, isPaid ? "paid" : "overdue")
-            .catch((e) => console.error("[ASAAS] Auto WhatsApp notify failed:", e?.message || e));
+          const kind = isPaid ? "paid" : "overdue";
+          const alreadyNotified = isPaid
+            ? !!(await crm.getProposalById(tenantId, proposalId))?.whatsappPaidNotifiedAt
+            : !!(await crm.getProposalById(tenantId, proposalId))?.whatsappOverdueNotifiedAt;
+          if (!alreadyNotified) {
+            sendProposalWhatsAppNotification(tenantId, proposalId, kind)
+              .then(async (r) => {
+                if (r.sent) {
+                  await crm.updateProposal(tenantId, proposalId, isPaid
+                    ? { whatsappPaidNotifiedAt: new Date() }
+                    : { whatsappOverdueNotifiedAt: new Date() });
+                }
+              })
+              .catch((e) => console.error("[ASAAS] Auto WhatsApp notify failed:", e?.message || e));
+          }
         }
       } else {
         errorMsg = "Proposal not resolved from webhook payload";

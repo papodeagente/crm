@@ -1028,7 +1028,7 @@ export async function getProposalById(tenantId: number, id: number) {
   const rows = await db.select().from(proposals).where(and(eq(proposals.id, id), eq(proposals.tenantId, tenantId))).limit(1);
   return rows[0] || null;
 }
-export async function updateProposal(tenantId: number, id: number, data: Partial<{ status: "draft" | "sent" | "viewed" | "accepted" | "rejected" | "expired"; totalCents: number; pdfUrl: string; sentAt: Date; acceptedAt: Date }>) {
+export async function updateProposal(tenantId: number, id: number, data: Partial<{ status: "draft" | "sent" | "viewed" | "accepted" | "rejected" | "expired"; totalCents: number; pdfUrl: string; sentAt: Date; acceptedAt: Date; whatsappFollowupAt: Date; whatsappPaidNotifiedAt: Date; whatsappOverdueNotifiedAt: Date }>) {
   const db = await getDb(); if (!db) return;
   await db.update(proposals).set(data).where(and(eq(proposals.id, id), eq(proposals.tenantId, tenantId)));
 }
