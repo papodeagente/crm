@@ -58,134 +58,26 @@ export default function FaceMap({ selectedRegions, onToggleRegion, showUnits }: 
 
       {/* Face diagram */}
       <div className="flex-1 flex justify-center">
-        <svg viewBox="0 0 400 520" className="w-full max-w-sm" style={{ maxHeight: 480 }}>
+        <svg viewBox="0 0 400 520" className="w-full max-w-sm" style={{ maxHeight: 480 }} preserveAspectRatio="xMidYMid meet">
           <defs>
-            {/* Skin gradient */}
-            <radialGradient id="skinGrad" cx="50%" cy="42%" r="55%">
-              <stop offset="0%" stopColor="#f5dcc3" />
-              <stop offset="60%" stopColor="#e8c9a8" />
-              <stop offset="100%" stopColor="#d4a982" />
-            </radialGradient>
-            {/* Shadow */}
-            <radialGradient id="shadowGrad" cx="50%" cy="60%" r="50%">
-              <stop offset="0%" stopColor="transparent" />
-              <stop offset="100%" stopColor="rgba(0,0,0,0.08)" />
-            </radialGradient>
-            {/* Lip gradient */}
-            <linearGradient id="lipGrad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#d4878f" />
-              <stop offset="100%" stopColor="#c47a82" />
-            </linearGradient>
-            {/* Eye gradient */}
-            <radialGradient id="irisGrad" cx="45%" cy="45%" r="50%">
-              <stop offset="0%" stopColor="#7a9e6e" />
-              <stop offset="70%" stopColor="#5a7e4e" />
-              <stop offset="100%" stopColor="#3a5e2e" />
-            </radialGradient>
-            {/* Hair gradient */}
-            <linearGradient id="hairGrad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#8b6f47" />
-              <stop offset="50%" stopColor="#7a5e3a" />
-              <stop offset="100%" stopColor="#6a4e2d" />
-            </linearGradient>
-            <filter id="softShadow" x="-5%" y="-5%" width="110%" height="110%">
-              <feGaussianBlur in="SourceAlpha" stdDeviation="3" />
-              <feOffset dx="0" dy="2" result="shadow" />
-              <feFlood floodColor="rgba(0,0,0,0.15)" />
-              <feComposite in2="shadow" operator="in" />
-              <feMerge><feMergeNode /><feMergeNode in="SourceGraphic" /></feMerge>
-            </filter>
+            <clipPath id="faceAvatarClip">
+              <rect x="0" y="0" width="400" height="520" rx="12" />
+            </clipPath>
           </defs>
 
           {/* Background */}
           <rect width="400" height="520" fill="#f0ede8" rx="12" />
 
-          {/* Neck */}
-          <path d="M 160,395 Q 162,440 155,490 L 245,490 Q 238,440 240,395" fill="url(#skinGrad)" />
-          <path d="M 160,395 Q 162,440 155,490 L 245,490 Q 238,440 240,395" fill="rgba(0,0,0,0.03)" />
-
-          {/* Face shape */}
-          <path
-            d="M 200,55 Q 120,55 95,130 Q 80,180 85,220 Q 88,260 105,300 Q 125,345 155,375 Q 175,395 200,400 Q 225,395 245,375 Q 275,345 295,300 Q 312,260 315,220 Q 320,180 305,130 Q 280,55 200,55"
-            fill="url(#skinGrad)"
-            filter="url(#softShadow)"
+          {/* Patient photo (replaces synthetic SVG avatar) */}
+          <image
+            href="/face-avatar.png"
+            x="0"
+            y="0"
+            width="400"
+            height="520"
+            preserveAspectRatio="xMidYMid slice"
+            clipPath="url(#faceAvatarClip)"
           />
-          {/* Face shading */}
-          <path
-            d="M 200,55 Q 120,55 95,130 Q 80,180 85,220 Q 88,260 105,300 Q 125,345 155,375 Q 175,395 200,400 Q 225,395 245,375 Q 275,345 295,300 Q 312,260 315,220 Q 320,180 305,130 Q 280,55 200,55"
-            fill="url(#shadowGrad)"
-          />
-
-          {/* Hair */}
-          <path
-            d="M 200,20 Q 100,20 78,100 Q 72,130 80,155 Q 90,125 95,105 Q 110,55 200,50 Q 290,55 305,105 Q 310,125 320,155 Q 328,130 322,100 Q 300,20 200,20"
-            fill="url(#hairGrad)"
-          />
-          {/* Hair top */}
-          <path
-            d="M 200,15 Q 130,12 95,40 Q 75,58 72,90 Q 78,55 105,38 Q 140,20 200,18 Q 260,20 295,38 Q 322,55 328,90 Q 325,58 305,40 Q 270,12 200,15"
-            fill="url(#hairGrad)"
-          />
-          {/* Hair sides */}
-          <path d="M 78,100 Q 72,140 75,165 Q 80,155 82,130 Q 84,110 78,100" fill="url(#hairGrad)" opacity="0.8" />
-          <path d="M 322,100 Q 328,140 325,165 Q 320,155 318,130 Q 316,110 322,100" fill="url(#hairGrad)" opacity="0.8" />
-
-          {/* ═══ Eyebrows ═══ */}
-          <path d="M 125,160 Q 140,148 165,150 Q 172,151 178,155" fill="none" stroke="#7a5e3a" strokeWidth="3.5" strokeLinecap="round" />
-          <path d="M 222,155 Q 228,151 235,150 Q 260,148 275,160" fill="none" stroke="#7a5e3a" strokeWidth="3.5" strokeLinecap="round" />
-
-          {/* ═══ Eyes ═══ */}
-          {/* Left eye */}
-          <path d="M 130,182 Q 152,170 175,182 Q 152,192 130,182" fill="white" stroke="#c4a080" strokeWidth="0.5" />
-          <circle cx="152" cy="181" r="8" fill="url(#irisGrad)" />
-          <circle cx="152" cy="181" r="4.5" fill="#1a1a1a" />
-          <circle cx="149" cy="178" r="2" fill="white" opacity="0.8" />
-          <path d="M 130,182 Q 152,170 175,182" fill="none" stroke="#6a4e2d" strokeWidth="1.2" />
-          <path d="M 130,182 Q 152,192 175,182" fill="none" stroke="#c4a080" strokeWidth="0.5" />
-          {/* Left eyelashes */}
-          <path d="M 130,182 Q 128,178 127,175" fill="none" stroke="#4a3520" strokeWidth="0.8" />
-          <path d="M 140,176 Q 138,173 137,170" fill="none" stroke="#4a3520" strokeWidth="0.6" />
-          <path d="M 152,174 Q 152,171 153,168" fill="none" stroke="#4a3520" strokeWidth="0.6" />
-          <path d="M 164,176 Q 166,173 168,171" fill="none" stroke="#4a3520" strokeWidth="0.6" />
-
-          {/* Right eye */}
-          <path d="M 225,182 Q 248,170 270,182 Q 248,192 225,182" fill="white" stroke="#c4a080" strokeWidth="0.5" />
-          <circle cx="248" cy="181" r="8" fill="url(#irisGrad)" />
-          <circle cx="248" cy="181" r="4.5" fill="#1a1a1a" />
-          <circle cx="245" cy="178" r="2" fill="white" opacity="0.8" />
-          <path d="M 225,182 Q 248,170 270,182" fill="none" stroke="#6a4e2d" strokeWidth="1.2" />
-          <path d="M 225,182 Q 248,192 270,182" fill="none" stroke="#c4a080" strokeWidth="0.5" />
-          {/* Right eyelashes */}
-          <path d="M 270,182 Q 272,178 273,175" fill="none" stroke="#4a3520" strokeWidth="0.8" />
-          <path d="M 260,176 Q 262,173 263,170" fill="none" stroke="#4a3520" strokeWidth="0.6" />
-          <path d="M 248,174 Q 248,171 247,168" fill="none" stroke="#4a3520" strokeWidth="0.6" />
-          <path d="M 236,176 Q 234,173 232,171" fill="none" stroke="#4a3520" strokeWidth="0.6" />
-
-          {/* ═══ Nose ═══ */}
-          <path d="M 195,175 Q 192,230 185,265 Q 190,272 200,275 Q 210,272 215,265 Q 208,230 205,175" fill="none" stroke="#c4a080" strokeWidth="0.8" />
-          <path d="M 185,265 Q 178,268 175,262" fill="none" stroke="#c4a080" strokeWidth="0.8" />
-          <path d="M 215,265 Q 222,268 225,262" fill="none" stroke="#c4a080" strokeWidth="0.8" />
-          {/* Nose shadow */}
-          <ellipse cx="188" cy="267" rx="6" ry="4" fill="rgba(0,0,0,0.04)" />
-          <ellipse cx="212" cy="267" rx="6" ry="4" fill="rgba(0,0,0,0.04)" />
-
-          {/* ═══ Lips ═══ */}
-          {/* Upper lip */}
-          <path
-            d="M 170,310 Q 180,300 190,305 Q 200,295 210,305 Q 220,300 230,310 Q 215,315 200,313 Q 185,315 170,310"
-            fill="url(#lipGrad)"
-            stroke="#b06a72"
-            strokeWidth="0.5"
-          />
-          {/* Lower lip */}
-          <path
-            d="M 170,310 Q 185,315 200,313 Q 215,315 230,310 Q 225,330 200,335 Q 175,330 170,310"
-            fill="url(#lipGrad)"
-            stroke="#b06a72"
-            strokeWidth="0.5"
-          />
-          {/* Lip line */}
-          <path d="M 172,310 Q 200,315 228,310" fill="none" stroke="#a0606a" strokeWidth="0.6" />
 
           {/* ═══ TREATMENT GUIDE LINES (white) ═══ */}
           {/* Forehead horizontal lines */}
