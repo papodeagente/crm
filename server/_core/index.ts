@@ -419,6 +419,10 @@ async function startServer() {
   const { handleHotmartWebhook } = await import("../hotmartWebhook");
   app.post("/api/webhooks/hotmart", handleHotmartWebhook);
 
+  // ASAAS webhook for clinic charges (per-tenant)
+  const { handleAsaasWebhook } = await import("../asaasWebhook");
+  app.post("/api/webhooks/asaas", handleAsaasWebhook);
+
   // OAuth callback under /api/oauth/callback
   registerOAuthRoutes(app);
 

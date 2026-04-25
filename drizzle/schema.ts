@@ -424,6 +424,8 @@ export const contacts = pgTable("contacts", {
   lastPurchaseAt: timestamp("lastPurchaseAt"),
   totalPurchases: integer("totalPurchases").default(0).notNull(),
   totalSpentCents: bigint("totalSpentCents", { mode: "number" }).default(0).notNull(),
+  // ASAAS customer linkage (per tenant)
+  asaasCustomerId: varchar("asaasCustomerId", { length: 64 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
   createdBy: integer("createdBy"),
@@ -925,10 +927,31 @@ export const proposals = pgTable("proposals", {
   pdfUrl: text("pdfUrl"),
   sentAt: timestamp("sentAt"),
   acceptedAt: timestamp("acceptedAt"),
+  // ASAAS payment linkage
+  asaasPaymentId: varchar("asaasPaymentId", { length: 64 }),
+  asaasInvoiceUrl: text("asaasInvoiceUrl"),
+  asaasBankSlipUrl: text("asaasBankSlipUrl"),
+  asaasBillingType: varchar("asaasBillingType", { length: 32 }),
+  asaasPaymentStatus: varchar("asaasPaymentStatus", { length: 32 }),
+  asaasDueDate: timestamp("asaasDueDate"),
+  asaasPaidAt: timestamp("asaasPaidAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
   createdBy: integer("createdBy"),
-}, (t) => [index("proposals_tenant_idx").on(t.tenantId)]);
+}, (t) => [index("proposals_tenant_idx").on(t.tenantId), index("proposals_asaas_payment_idx").on(t.asaasPaymentId)]);
+
+// ASAAS webhook event audit + idempotency
+export const asaasWebhookEvents = pgTable("asaas_webhook_events", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenantId"),
+  eventId: varchar("eventId", { length: 128 }).notNull(),
+  eventType: varchar("eventType", { length: 64 }).notNull(),
+  paymentId: varchar("paymentId", { length: 64 }),
+  rawPayload: json("rawPayload"),
+  processedAt: timestamp("processedAt"),
+  error: text("error"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (t) => [index("asaas_evt_eventid_idx").on(t.eventId), index("asaas_evt_payment_idx").on(t.paymentId)]);
 
 export const proposalItems = pgTable("proposal_items", {
   id: serial("id").primaryKey(),

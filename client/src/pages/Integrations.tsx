@@ -10,7 +10,7 @@ import {
   Plug, Plus, Webhook, Zap, Globe, Facebook, Copy, RefreshCw, Check,
   AlertCircle, CheckCircle2, Clock, XCircle, RotateCcw, Eye, EyeOff,
   Link2, ArrowRight, FileText, Filter, Code2, Trash2, Power, Edit2,
-  ExternalLink, Shield, Brain,
+  ExternalLink, Shield, Brain, CreditCard, Loader2, Unplug,
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -852,6 +852,188 @@ function EventLogsTab() { const [sourceFilter, setSourceFilter] = useState<strin
   );
 }
 
+// ─── ASAAS Tab ───────────────────────────────────────────
+
+function AsaasIntegrationTab() {
+  const status = trpc.asaas.getStatus.useQuery();
+  const utils = trpc.useUtils();
+  const [apiKey, setApiKey] = useState("");
+  const [sandbox, setSandbox] = useState(false);
+  const [showKey, setShowKey] = useState(false);
+
+  const connect = trpc.asaas.connect.useMutation({
+    onSuccess: () => {
+      toast.success("ASAAS conectado com sucesso!");
+      setApiKey("");
+      utils.asaas.getStatus.invalidate();
+    },
+    onError: (e) => toast.error(e.message),
+  });
+  const disconnect = trpc.asaas.disconnect.useMutation({
+    onSuccess: () => {
+      toast.success("ASAAS desconectado.");
+      utils.asaas.getStatus.invalidate();
+    },
+    onError: (e) => toast.error(e.message),
+  });
+  const testQuery = trpc.asaas.testConnection.useQuery(undefined, { enabled: false });
+
+  const webhookUrl = `${window.location.origin}/api/webhooks/asaas`;
+  const copyWebhookUrl = () => {
+    navigator.clipboard.writeText(webhookUrl);
+    toast.success("URL do webhook copiada");
+  };
+
+  const handleConnect = () => {
+    if (!apiKey.trim()) {
+      toast.error("Cole a chave de API do ASAAS");
+      return;
+    }
+    connect.mutate({ apiKey: apiKey.trim(), sandbox });
+  };
+
+  const handleTest = async () => {
+    const r = await testQuery.refetch();
+    if (r.data?.ok) {
+      toast.success(`Conexão OK — conta: ${r.data.account?.name || r.data.account?.email}`);
+    } else if (r.error) {
+      toast.error(r.error.message);
+    }
+  };
+
+  const isConnected = status.data?.connected;
+
+  return (
+    <div className="space-y-5">
+      <Card className="border border-border/40 shadow-none rounded-xl">
+        <div className="p-6 space-y-5">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-emerald-500/10 to-lime-500/10 flex items-center justify-center">
+              <CreditCard className="h-5 w-5 text-emerald-600" />
+            </div>
+            <div className="flex-1">
+              <h3 className="text-[15px] font-semibold">ASAAS — Pagamentos</h3>
+              <p className="text-[12px] text-muted-foreground">Gere boletos, PIX e cartão direto da sua conta ASAAS a partir de propostas.</p>
+            </div>
+            {isConnected && (
+              <span className="inline-flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100">
+                <CheckCircle2 className="h-3 w-3" />
+                Conectado{status.data?.sandbox ? " (sandbox)" : ""}
+              </span>
+            )}
+          </div>
+
+          {status.isLoading ? (
+            <div className="py-8 text-center text-[13px] text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin inline mr-2" />Carregando...
+            </div>
+          ) : isConnected ? (
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label className="text-[12px] font-medium text-muted-foreground uppercase tracking-wider">Chave de API</Label>
+                  <Input value={status.data?.maskedApiKey || "•••"} readOnly className="font-mono text-[12px] bg-muted/30" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-[12px] font-medium text-muted-foreground uppercase tracking-wider">Ambiente</Label>
+                  <Input value={status.data?.sandbox ? "Sandbox" : "Produção"} readOnly className="text-[12px] bg-muted/30" />
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                <Button variant="outline" size="sm" onClick={handleTest} disabled={testQuery.isFetching} className="gap-2">
+                  {testQuery.isFetching ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+                  Testar conexão
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => disconnect.mutate()}
+                  disabled={disconnect.isPending}
+                  className="gap-2 text-red-600 hover:text-red-700 hover:bg-red-50"
+                >
+                  <Unplug className="h-3.5 w-3.5" />Desconectar
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label className="text-[12px] font-medium text-muted-foreground uppercase tracking-wider">Chave de API ASAAS</Label>
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <Input
+                      type={showKey ? "text" : "password"}
+                      value={apiKey}
+                      onChange={(e) => setApiKey(e.target.value)}
+                      placeholder="$aact_…"
+                      className="font-mono text-[12px] pr-10"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowKey(!showKey)}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    >
+                      {showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  Pegue em ASAAS → Integrações → API. Use a chave de produção ou sandbox conforme o ambiente abaixo.
+                </p>
+              </div>
+
+              <div className="flex items-center justify-between rounded-lg border border-border/40 p-3 bg-muted/20">
+                <div>
+                  <p className="text-[13px] font-medium">Modo sandbox</p>
+                  <p className="text-[11px] text-muted-foreground">Use para testes sem cobrança real.</p>
+                </div>
+                <Switch checked={sandbox} onCheckedChange={setSandbox} />
+              </div>
+
+              <Button
+                onClick={handleConnect}
+                disabled={connect.isPending || !apiKey.trim()}
+                className="w-full sm:w-auto gap-2"
+              >
+                {connect.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plug className="h-4 w-4" />}
+                Conectar ASAAS
+              </Button>
+            </div>
+          )}
+        </div>
+      </Card>
+
+      <Card className="border border-border/40 shadow-none rounded-xl">
+        <div className="p-6 space-y-3">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-blue-500/10 to-violet-500/10 flex items-center justify-center">
+              <Webhook className="h-5 w-5 text-blue-600" />
+            </div>
+            <div>
+              <h3 className="text-[15px] font-semibold">Webhook ASAAS</h3>
+              <p className="text-[12px] text-muted-foreground">Configure no ASAAS para receber notificações de pagamento.</p>
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label className="text-[12px] font-medium text-muted-foreground uppercase tracking-wider">URL do Webhook</Label>
+            <div className="flex gap-2">
+              <Input value={webhookUrl} readOnly className="font-mono text-[12px] bg-muted/30" />
+              <Button variant="outline" size="sm" onClick={copyWebhookUrl} className="shrink-0 gap-1.5">
+                <Copy className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              No ASAAS, vá em <strong>Integrações → Webhooks</strong>, cole a URL acima, escolha "Pagamentos" e habilite os eventos
+              <span className="font-mono"> PAYMENT_RECEIVED, PAYMENT_CONFIRMED, PAYMENT_OVERDUE, PAYMENT_REFUNDED</span>.
+            </p>
+          </div>
+        </div>
+      </Card>
+    </div>
+  );
+}
+
 // ─── Main Integrations Page ──────────────────────────────
 
 export default function Integrations() {
@@ -903,6 +1085,9 @@ export default function Integrations() {
           </TabsTrigger>
           <TabsTrigger value="connectors" className="rounded-lg text-[13px] data-[state=active]:bg-primary data-[state=active]:text-white gap-1.5">
             <Zap className="h-3.5 w-3.5" />Conectores
+          </TabsTrigger>
+          <TabsTrigger value="asaas" className="rounded-lg text-[13px] data-[state=active]:bg-primary data-[state=active]:text-white gap-1.5">
+            <CreditCard className="h-3.5 w-3.5" />ASAAS
           </TabsTrigger>
           <TabsTrigger value="ai" className="rounded-lg text-[13px] data-[state=active]:bg-primary data-[state=active]:text-white gap-1.5">
             <Brain className="h-3.5 w-3.5" />IA
@@ -959,6 +1144,10 @@ export default function Integrations() {
               ))}
             </div>
           )}
+        </TabsContent>
+
+        <TabsContent value="asaas">
+          <AsaasIntegrationTab />
         </TabsContent>
 
         <TabsContent value="ai">

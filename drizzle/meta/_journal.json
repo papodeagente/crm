@@ -29,6 +29,13 @@
       "when": 1777755600000,
       "tag": "0003_anamnese_extras",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1777929600000,
+      "tag": "0004_asaas_integration",
+      "breakpoints": true
     }
   ]
 }

@@ -5,7 +5,7 @@ import {
   contacts, accounts, deals, dealParticipants, pipelines, pipelineStages, pipelineAutomations, serviceDeliveries, serviceDeliveryItems,
   tasks, taskAssignees, crmNotes, crmAttachments, dealProducts, dealHistory,
   channels, conversations, inboxMessages,
-  proposalTemplates, proposals, proposalItems, proposalSignatures,
+  proposalTemplates, proposals, proposalItems, proposalSignatures, asaasWebhookEvents,
   portalUsers, portalSessions, portalTickets,
   goals, performanceSnapshots, metricsDaily, alerts,
   courses, lessons, enrollments,
@@ -2540,4 +2540,140 @@ export async function getContactsWithDateInMonth(tenantId: number, month: number
       like(col, `${mm}-%`)
     )
   ).orderBy(col);
+}
+
+// ═══════════════════════════════════════
+// ASAAS — credentials, customer, payment linkage
+// ═══════════════════════════════════════
+export async function getAsaasCredential(tenantId: number) {
+  const db = await getDb(); if (!db) return null;
+  const rows = await db.select().from(integrationCredentials).where(
+    and(
+      eq(integrationCredentials.tenantId, tenantId),
+      eq(integrationCredentials.provider, "asaas"),
+      eq(integrationCredentials.status, "active")
+    )
+  ).limit(1);
+  return rows[0] || null;
+}
+
+export async function upsertAsaasCredential(data: {
+  tenantId: number;
+  encryptedSecret: string;
+  metadataJson?: any;
+}) {
+  const db = await getDb(); if (!db) return null;
+  // Revoke existing active credentials for this provider
+  await db.update(integrationCredentials)
+    .set({ status: "revoked" })
+    .where(and(
+      eq(integrationCredentials.tenantId, data.tenantId),
+      eq(integrationCredentials.provider, "asaas"),
+      eq(integrationCredentials.status, "active")
+    ));
+  const [row] = await db.insert(integrationCredentials).values({
+    tenantId: data.tenantId,
+    provider: "asaas",
+    encryptedSecret: data.encryptedSecret,
+    status: "active",
+  }).returning({ id: integrationCredentials.id });
+  return row;
+}
+
+export async function disconnectAsaasCredential(tenantId: number) {
+  const db = await getDb(); if (!db) return;
+  await db.update(integrationCredentials)
+    .set({ status: "revoked" })
+    .where(and(
+      eq(integrationCredentials.tenantId, tenantId),
+      eq(integrationCredentials.provider, "asaas"),
+      eq(integrationCredentials.status, "active")
+    ));
+}
+
+export async function setContactAsaasCustomerId(tenantId: number, contactId: number, asaasCustomerId: string) {
+  const db = await getDb(); if (!db) return;
+  await db.update(contacts).set({ asaasCustomerId }).where(
+    and(eq(contacts.id, contactId), eq(contacts.tenantId, tenantId))
+  );
+}
+
+export async function getContactById(tenantId: number, contactId: number) {
+  const db = await getDb(); if (!db) return null;
+  const rows = await db.select().from(contacts).where(
+    and(eq(contacts.id, contactId), eq(contacts.tenantId, tenantId))
+  ).limit(1);
+  return rows[0] || null;
+}
+
+export async function setProposalAsaasPayment(tenantId: number, proposalId: number, data: {
+  asaasPaymentId: string;
+  asaasInvoiceUrl?: string | null;
+  asaasBankSlipUrl?: string | null;
+  asaasBillingType?: string | null;
+  asaasPaymentStatus?: string | null;
+  asaasDueDate?: Date | null;
+  asaasPaidAt?: Date | null;
+}) {
+  const db = await getDb(); if (!db) return;
+  await db.update(proposals).set(data).where(
+    and(eq(proposals.id, proposalId), eq(proposals.tenantId, tenantId))
+  );
+}
+
+export async function findProposalByAsaasPaymentId(asaasPaymentId: string) {
+  const db = await getDb(); if (!db) return null;
+  const rows = await db.select().from(proposals).where(eq(proposals.asaasPaymentId, asaasPaymentId)).limit(1);
+  return rows[0] || null;
+}
+
+export async function updateProposalFromAsaasStatus(proposalId: number, tenantId: number, data: {
+  asaasPaymentStatus: string;
+  asaasPaidAt?: Date | null;
+  status?: "draft" | "sent" | "viewed" | "accepted" | "rejected" | "expired";
+  acceptedAt?: Date;
+}) {
+  const db = await getDb(); if (!db) return;
+  await db.update(proposals).set(data).where(
+    and(eq(proposals.id, proposalId), eq(proposals.tenantId, tenantId))
+  );
+}
+
+// ═══════════════════════════════════════
+// ASAAS — webhook event audit / idempotency
+// ═══════════════════════════════════════
+export async function findAsaasWebhookEvent(eventId: string) {
+  const db = await getDb(); if (!db) return null;
+  const rows = await db.select().from(asaasWebhookEvents).where(eq(asaasWebhookEvents.eventId, eventId)).limit(1);
+  return rows[0] || null;
+}
+
+export async function recordAsaasWebhookEvent(data: {
+  tenantId?: number | null;
+  eventId: string;
+  eventType: string;
+  paymentId?: string | null;
+  rawPayload: any;
+  processedAt?: Date | null;
+  error?: string | null;
+}) {
+  const db = await getDb(); if (!db) return null;
+  const [row] = await db.insert(asaasWebhookEvents).values({
+    tenantId: data.tenantId ?? null,
+    eventId: data.eventId,
+    eventType: data.eventType,
+    paymentId: data.paymentId ?? null,
+    rawPayload: data.rawPayload,
+    processedAt: data.processedAt ?? null,
+    error: data.error ?? null,
+  }).returning({ id: asaasWebhookEvents.id });
+  return row;
+}
+
+export async function markAsaasWebhookProcessed(id: number, error?: string) {
+  const db = await getDb(); if (!db) return;
+  await db.update(asaasWebhookEvents).set({
+    processedAt: new Date(),
+    error: error || null,
+  }).where(eq(asaasWebhookEvents.id, id));
 }

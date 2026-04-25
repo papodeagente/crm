@@ -1,9 +1,14 @@
 import { trpc } from "@/lib/trpc";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { FileText, Plus, Eye, Send as SendIcon, CheckCircle, XCircle, Clock } from "lucide-react";
+import {
+  FileText, Plus, Eye, Send as SendIcon, CheckCircle, XCircle, Clock,
+  CreditCard, ExternalLink, RefreshCw, Loader2, Copy,
+} from "lucide-react";
 import { formatDate } from "../../../shared/dateUtils";
 import { toast } from "sonner";
+import { useState } from "react";
+
 const statusStyles: Record<string, { bg: string; text: string; dot: string; label: string; icon: any }> = {
   draft: { bg: "bg-slate-50", text: "text-slate-600", dot: "bg-slate-400", label: "Rascunho", icon: Clock },
   sent: { bg: "bg-blue-50", text: "text-blue-700", dot: "bg-blue-500", label: "Enviada", icon: SendIcon },
@@ -13,8 +18,62 @@ const statusStyles: Record<string, { bg: string; text: string; dot: string; labe
   expired: { bg: "bg-slate-50", text: "text-slate-500", dot: "bg-slate-300", label: "Expirada", icon: Clock },
 };
 
+const paidStatuses = new Set(["RECEIVED", "CONFIRMED", "RECEIVED_IN_CASH"]);
+const paymentStatusLabel: Record<string, string> = {
+  PENDING: "Aguardando",
+  RECEIVED: "Pago",
+  CONFIRMED: "Confirmado",
+  RECEIVED_IN_CASH: "Pago (dinheiro)",
+  OVERDUE: "Vencida",
+  REFUNDED: "Estornada",
+  REFUND_REQUESTED: "Estorno solicitado",
+  CHARGEBACK_REQUESTED: "Chargeback",
+  AWAITING_RISK_ANALYSIS: "Análise de risco",
+};
+
 export default function Proposals() {
   const proposals = trpc.proposals.list.useQuery({});
+  const asaasStatus = trpc.asaas.getStatus.useQuery();
+  const utils = trpc.useUtils();
+  const [busyId, setBusyId] = useState<number | null>(null);
+
+  const generateCharge = trpc.asaas.generateChargeForProposal.useMutation({
+    onSuccess: (data) => {
+      toast.success("Cobrança gerada no ASAAS!");
+      if (data.invoiceUrl) {
+        window.open(data.invoiceUrl, "_blank", "noopener");
+      }
+      utils.proposals.list.invalidate();
+    },
+    onError: (e) => toast.error(e.message),
+    onSettled: () => setBusyId(null),
+  });
+
+  const syncCharge = trpc.asaas.syncProposalCharge.useMutation({
+    onSuccess: () => {
+      toast.success("Status atualizado.");
+      utils.proposals.list.invalidate();
+    },
+    onError: (e) => toast.error(e.message),
+    onSettled: () => setBusyId(null),
+  });
+
+  const handleGenerate = (id: number) => {
+    setBusyId(id);
+    generateCharge.mutate({ proposalId: id, billingType: "UNDEFINED" });
+  };
+
+  const handleSync = (id: number) => {
+    setBusyId(id);
+    syncCharge.mutate({ proposalId: id });
+  };
+
+  const copyLink = (url: string) => {
+    navigator.clipboard.writeText(url);
+    toast.success("Link copiado!");
+  };
+
+  const asaasConnected = asaasStatus.data?.connected;
 
   return (
     <div className="p-5 lg:px-8 space-y-5">
@@ -22,12 +81,24 @@ export default function Proposals() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold tracking-tight text-foreground">Propostas</h1>
-          <p className="text-[13px] text-muted-foreground mt-0.5">Crie e acompanhe propostas comerciais.</p>
+          <p className="text-[13px] text-muted-foreground mt-0.5">Crie, envie e cobre suas propostas direto pelo ASAAS.</p>
         </div>
         <Button className="h-9 gap-2 px-5 rounded-lg bg-primary hover:bg-primary/90 shadow-sm text-[13px] font-medium transition-colors" onClick={() => toast("Criação de proposta em breve")}>
           <Plus className="h-4 w-4" />Nova Proposta
         </Button>
       </div>
+
+      {!asaasStatus.isLoading && !asaasConnected && (
+        <Card className="border border-amber-200 bg-amber-50/40 shadow-none rounded-xl">
+          <div className="p-4 flex items-start gap-3">
+            <CreditCard className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+            <div className="flex-1">
+              <p className="text-[13px] font-medium text-amber-900">ASAAS não conectado</p>
+              <p className="text-[12px] text-amber-700/80 mt-0.5">Vá em <strong>Integrações → ASAAS</strong> para conectar sua conta e gerar cobranças automaticamente.</p>
+            </div>
+          </div>
+        </Card>
+      )}
 
       {/* Table */}
       <Card className="border border-border/40 shadow-none rounded-xl overflow-hidden">
@@ -39,19 +110,24 @@ export default function Proposals() {
                 <th className="text-left p-3.5 font-semibold text-muted-foreground">Negócio</th>
                 <th className="text-left p-3.5 font-semibold text-muted-foreground">Valor</th>
                 <th className="text-left p-3.5 font-semibold text-muted-foreground">Status</th>
+                <th className="text-left p-3.5 font-semibold text-muted-foreground">Pagamento</th>
                 <th className="text-left p-3.5 font-semibold text-muted-foreground">Criada em</th>
+                <th className="text-right p-3.5 font-semibold text-muted-foreground">Ações</th>
               </tr>
             </thead>
             <tbody>
               {proposals.isLoading ? (
-                <tr><td colSpan={5} className="p-12 text-center text-muted-foreground text-sm">Carregando...</td></tr>
+                <tr><td colSpan={7} className="p-12 text-center text-muted-foreground text-sm">Carregando...</td></tr>
               ) : !proposals.data?.length ? (
-                <tr><td colSpan={5} className="p-12 text-center text-muted-foreground">
+                <tr><td colSpan={7} className="p-12 text-center text-muted-foreground">
                   <FileText className="h-10 w-10 mx-auto mb-3 text-muted-foreground/30" />
                   <p className="text-sm">Nenhuma proposta encontrada.</p>
                 </td></tr>
               ) : proposals.data.map((p: any) => {
                 const ss = statusStyles[p.status] || statusStyles["draft"];
+                const isPaid = p.asaasPaymentStatus && paidStatuses.has(p.asaasPaymentStatus);
+                const payLabel = p.asaasPaymentStatus ? (paymentStatusLabel[p.asaasPaymentStatus] || p.asaasPaymentStatus) : null;
+                const busy = busyId === p.id && (generateCharge.isPending || syncCharge.isPending);
                 return (
                   <tr key={p.id} className="border-b border-border/20 hover:bg-muted/20 transition-colors">
                     <td className="p-3.5">
@@ -70,7 +146,68 @@ export default function Proposals() {
                         {ss.label}
                       </span>
                     </td>
+                    <td className="p-3.5">
+                      {payLabel ? (
+                        <span className={`inline-flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded-full ${isPaid ? "bg-emerald-50 text-emerald-700" : "bg-blue-50 text-blue-700"}`}>
+                          <CreditCard className="h-3 w-3" />
+                          {payLabel}
+                        </span>
+                      ) : (
+                        <span className="text-[11px] text-muted-foreground/60">—</span>
+                      )}
+                    </td>
                     <td className="p-3.5 text-muted-foreground">{p.createdAt ? formatDate(p.createdAt) : "—"}</td>
+                    <td className="p-3.5">
+                      <div className="flex items-center justify-end gap-1.5">
+                        {p.asaasPaymentId ? (
+                          <>
+                            {p.asaasInvoiceUrl && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-7 gap-1.5 text-[11px]"
+                                onClick={() => window.open(p.asaasInvoiceUrl, "_blank", "noopener")}
+                              >
+                                <ExternalLink className="h-3 w-3" />Ver
+                              </Button>
+                            )}
+                            {p.asaasInvoiceUrl && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 w-7 p-0"
+                                onClick={() => copyLink(p.asaasInvoiceUrl)}
+                                title="Copiar link"
+                              >
+                                <Copy className="h-3 w-3" />
+                              </Button>
+                            )}
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 w-7 p-0"
+                              onClick={() => handleSync(p.id)}
+                              disabled={busy}
+                              title="Atualizar status"
+                            >
+                              {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+                            </Button>
+                          </>
+                        ) : (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-7 gap-1.5 text-[11px]"
+                            onClick={() => handleGenerate(p.id)}
+                            disabled={busy || !asaasConnected || !p.totalCents}
+                            title={!asaasConnected ? "Conecte o ASAAS em Integrações" : !p.totalCents ? "Defina um valor para a proposta" : "Gerar cobrança no ASAAS"}
+                          >
+                            {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <CreditCard className="h-3 w-3" />}
+                            Cobrar
+                          </Button>
+                        )}
+                      </div>
+                    </td>
                   </tr>
                 );
               })}

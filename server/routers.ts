@@ -167,6 +167,7 @@ import { adminRouter } from "./routers/adminRouter";
 import { crmRouter } from "./routers/crmRouter";
 import { inboxRouter } from "./routers/inboxRouter";
 import { proposalRouter, portalRouter, managementRouter, insightsRouter, academyRouter, integrationHubRouter } from "./routers/featureRouters";
+import { asaasRouter } from "./routers/asaasRouter";
 import { productCatalogRouter } from "./routers/productCatalogRouter";
 import { aiAnalysisRouter } from "./routers/aiAnalysisRouter";
 import { utmAnalyticsRouter } from "./routers/utmAnalyticsRouter";
@@ -2793,6 +2794,7 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
   crm: crmRouter,           // M2: CRM (Contacts, Deals, Pipelines, Trips, Tasks, Notes)
   inbox: inboxRouter,       // M1: Inbox Omnichannel
   proposals: proposalRouter, // M3: Propostas
+  asaas: asaasRouter,       // ASAAS payment integration
   portal: portalRouter,     // M4: Portal do Cliente
   management: managementRouter, // M5: Gestão
   insights: insightsRouter, // M6: Insights
