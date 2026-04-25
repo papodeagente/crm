@@ -45,7 +45,7 @@ export default function ResetPassword() {
 
   if (!token) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-purple-50/30 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-emerald-50/40 flex items-center justify-center p-4">
         <Card className="border-0 shadow-xl shadow-slate-200/50 bg-white/80 backdrop-blur-sm max-w-md w-full">
           <CardContent className="pt-8 text-center space-y-4">
             <div className="mx-auto w-16 h-16 bg-red-50 rounded-full flex items-center justify-center">
@@ -55,7 +55,7 @@ export default function ResetPassword() {
             <p className="text-sm text-slate-500">
               Este link de redefinição de senha é inválido ou expirou.
             </p>
-            <Button onClick={() => navigate("/forgot-password")} className="bg-purple-600 hover:bg-purple-700 text-white">
+            <Button onClick={() => navigate("/forgot-password")} className="bg-emerald-600 hover:bg-emerald-700 text-white">
               Solicitar novo link
             </Button>
           </CardContent>
@@ -65,10 +65,10 @@ export default function ResetPassword() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-purple-50/30 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-emerald-50/40 flex items-center justify-center p-4">
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-purple-100/40 rounded-full blur-3xl" />
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-blue-100/40 rounded-full blur-3xl" />
+        <div className="absolute -top-40 -right-40 w-80 h-80 bg-emerald-100/40 rounded-full blur-3xl" />
+        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-lime-100/40 rounded-full blur-3xl" />
       </div>
 
       <div className="w-full max-w-md relative z-10">
@@ -99,7 +99,7 @@ export default function ResetPassword() {
                 </p>
                 <Button
                   onClick={() => navigate("/login")}
-                  className="w-full h-11 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white font-medium"
+                  className="w-full h-11 bg-gradient-to-r from-emerald-600 to-lime-500 hover:from-emerald-700 hover:to-lime-600 text-white font-medium"
                 >
                   Ir para o login
                 </Button>
@@ -117,7 +117,7 @@ export default function ResetPassword() {
                       onChange={(e) => setPassword(e.target.value)}
                       required
                       minLength={6}
-                      className="h-11 bg-slate-50/50 border-slate-200 focus:border-purple-400 focus:ring-purple-400/20 pr-10"
+                      className="h-11 bg-slate-50/50 border-slate-200 focus:border-emerald-400 focus:ring-emerald-400/20 pr-10"
                     />
                     <button
                       type="button"
@@ -139,7 +139,7 @@ export default function ResetPassword() {
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     required
                     minLength={6}
-                    className="h-11 bg-slate-50/50 border-slate-200 focus:border-purple-400 focus:ring-purple-400/20"
+                    className="h-11 bg-slate-50/50 border-slate-200 focus:border-emerald-400 focus:ring-emerald-400/20"
                   />
                   {confirmPassword && password !== confirmPassword && (
                     <p className="text-xs text-red-500">As senhas não coincidem</p>
@@ -148,7 +148,7 @@ export default function ResetPassword() {
 
                 <Button
                   type="submit"
-                  className="w-full h-11 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white font-medium shadow-lg shadow-purple-200/50"
+                  className="w-full h-11 bg-gradient-to-r from-emerald-600 to-lime-500 hover:from-emerald-700 hover:to-lime-600 text-white font-medium shadow-lg shadow-emerald-200/50"
                   disabled={resetMutation.isPending || password !== confirmPassword}
                 >
                   {resetMutation.isPending ? (

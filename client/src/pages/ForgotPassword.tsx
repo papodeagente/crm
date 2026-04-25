@@ -73,7 +73,7 @@ export default function ForgotPassword() {
                   <Button
                     variant="ghost"
                     onClick={() => navigate("/login")}
-                    className="w-full text-purple-600 hover:text-purple-700"
+                    className="w-full text-emerald-600 hover:text-emerald-700"
                   >
                     <ArrowLeft className="w-4 h-4 mr-2" />
                     Voltar ao login
@@ -91,13 +91,13 @@ export default function ForgotPassword() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
-                    className="h-11 bg-slate-50/50 border-slate-200 focus:border-purple-400 focus:ring-purple-400/20"
+                    className="h-11 bg-slate-50/50 border-slate-200 focus:border-emerald-400 focus:ring-emerald-400/20"
                   />
                 </div>
 
                 <Button
                   type="submit"
-                  className="w-full h-11 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white font-medium shadow-lg shadow-purple-200/50"
+                  className="w-full h-11 bg-gradient-to-r from-emerald-600 to-lime-500 hover:from-emerald-700 hover:to-lime-600 text-white font-medium shadow-lg shadow-emerald-200/50"
                   disabled={requestReset.isPending}
                 >
                   {requestReset.isPending ? (
