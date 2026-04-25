@@ -1477,11 +1477,29 @@ class WhatsAppEvolutionManager extends EventEmitter {
               this.syncConversationsBackground(session, isFirstSync);
             }
           } else if (state === "close") {
+            const wasConnected = session.status === "connected";
             session.status = "disconnected";
             session.qrCode = null;
             session.qrDataUrl = null;
             await this.updateSessionInDb(session.sessionId, session.userId, session.tenantId, "disconnected");
             this.emit("status", { sessionId: session.sessionId, status: "disconnected" });
+
+            // Tenant-facing alert: only fire on transition from connected → disconnected
+            // (avoids spam when QR-stage sessions toggle close repeatedly)
+            if (wasConnected && session.tenantId) {
+              try {
+                const { createNotification } = await import("./db");
+                await createNotification(session.tenantId, {
+                  type: "whatsapp_disconnected",
+                  title: "WhatsApp desconectado",
+                  body: "A sessão do WhatsApp da clínica foi desconectada. Mensagens automáticas (confirmação, lembrete e follow-up) estão pausadas até reconectar. Acesse Configurações → WhatsApp para reconectar.",
+                  entityType: "whatsapp_session",
+                  entityId: session.sessionId,
+                });
+              } catch (err) {
+                console.warn("[EvoWA] Failed to create disconnect notification:", err);
+              }
+            }
           }
         }
         break;
