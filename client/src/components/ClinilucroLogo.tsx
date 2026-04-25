@@ -25,26 +25,27 @@ export function ClinilucroMark({ className = "h-6 w-auto", inverted = false }: M
   const pulseColor = LIME;
 
   return (
-    <svg viewBox="60 20 220 110" className={className} fill="none" aria-hidden="true">
-      <g transform="translate(0, 60)">
-        <path
-          d="M 130 60 A 60 60 0 1 0 130 -60"
-          stroke={arcColor}
-          strokeWidth="16"
-          strokeLinecap="round"
-        />
-      </g>
+    <svg viewBox="0 0 220 200" className={className} fill="none" aria-hidden="true">
+      {/* C arc — opens to the right, navy */}
       <path
-        d="M 130 60 L 156 60 L 170 44 L 184 78 L 202 30 L 226 60 L 268 60"
+        d="M 145 30 A 70 70 0 1 0 145 170"
+        stroke={arcColor}
+        strokeWidth="18"
+        strokeLinecap="round"
+      />
+      {/* Pulse line — small wave inside C, tall peak exiting up-right with arrow */}
+      <path
+        d="M 60 110 L 88 110 L 100 90 L 112 130 L 124 80 L 138 110 L 195 50"
         stroke={pulseColor}
-        strokeWidth="12"
+        strokeWidth="16"
         strokeLinecap="round"
         strokeLinejoin="round"
       />
+      {/* Arrow head at (195, 50) — chevron opening down-left */}
       <path
-        d="M 250 42 L 268 60 L 250 78"
+        d="M 173 50 L 195 50 L 195 72"
         stroke={pulseColor}
-        strokeWidth="12"
+        strokeWidth="16"
         strokeLinecap="round"
         strokeLinejoin="round"
       />
