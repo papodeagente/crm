@@ -429,8 +429,12 @@ export const contacts = pgTable("contacts", {
   createdBy: integer("createdBy"),
   updatedBy: integer("updatedBy"),
   // Date fields for birthday/wedding notifications
-  birthDate: varchar("birthDate", { length: 10 }), // MM-DD format
+  birthDate: varchar("birthDate", { length: 10 }), // MM-DD format or YYYY-MM-DD
   weddingDate: varchar("weddingDate", { length: 10 }), // MM-DD format
+  gender: varchar("gender", { length: 32 }),
+  referredBy: varchar("referredBy", { length: 255 }),
+  convenioNumero: varchar("convenioNumero", { length: 64 }),
+  convenioNome: varchar("convenioNome", { length: 255 }),
   deletedAt: timestamp("deletedAt"),
 }, (t) => [
   index("contacts_tenant_idx").on(t.tenantId),

@@ -1,21 +1,22 @@
-import { useState, useMemo, lazy, Suspense } from "react";
+import { useState } from "react";
 import { useRoute, Link } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import {
   ArrowLeft, Mail, Phone, FileText, Calendar, DollarSign,
-  Clock, Edit2, Loader2, User, Activity,
-  ClipboardList, Image, CreditCard, XCircle, AlertCircle,
-  ChevronRight, Tag, Building2, MessageCircle, Stethoscope
+  Loader2, User, Activity, Plus,
+  ClipboardList, CreditCard, XCircle, AlertCircle,
+  MessageCircle,
+  Save, X
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import ConversionHistory from "@/components/ConversionHistory";
-import MergeHistory from "@/components/MergeHistory";
 import DuplicateAlert from "@/components/DuplicateAlert";
 
 // Tab components
@@ -26,7 +27,6 @@ import OrcamentosTab from "@/components/contact-profile/OrcamentosTab";
 import AnamneseTab from "@/components/contact-profile/AnamneseTab";
 import DocumentosTab from "@/components/contact-profile/DocumentosTab";
 import DebitosTab from "@/components/contact-profile/DebitosTab";
-import EvolucoesTab from "@/components/contact-profile/EvolucoesTab";
 import OrcReprovadosTab from "@/components/contact-profile/OrcReprovadosTab";
 
 // ─── Types ───
@@ -82,17 +82,70 @@ function lifecycleColor(stage: string) {
   }
 }
 
+function calculateAge(birthDate: string | null): number | null {
+  if (!birthDate) return null;
+  let year: number, month: number, day: number;
+  if (birthDate.length <= 5) {
+    // MM-DD format — no year, can't calculate age
+    return null;
+  }
+  // Try YYYY-MM-DD or DD/MM/YYYY or DD-MM-YYYY
+  if (birthDate.includes("-") && birthDate.indexOf("-") === 4) {
+    [year, month, day] = birthDate.split("-").map(Number);
+  } else if (birthDate.includes("/")) {
+    [day, month, year] = birthDate.split("/").map(Number);
+  } else {
+    return null;
+  }
+  if (!year || !month || !day) return null;
+  const today = new Date();
+  let age = today.getFullYear() - year;
+  const monthDiff = today.getMonth() + 1 - month;
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < day)) age--;
+  return age >= 0 ? age : null;
+}
+
+function formatBirthDateDisplay(birthDate: string | null): string {
+  if (!birthDate) return "Não informado";
+  // MM-DD format
+  if (birthDate.length <= 5 && birthDate.includes("-")) {
+    const [mm, dd] = birthDate.split("-");
+    return `${dd}/${mm}`;
+  }
+  // YYYY-MM-DD
+  if (birthDate.includes("-") && birthDate.indexOf("-") === 4) {
+    const [y, m, d] = birthDate.split("-");
+    return `${d}/${m}/${y}`;
+  }
+  return birthDate;
+}
+
 // ─── Main Component ───
 export default function ContactProfile() {
   const [, params] = useRoute("/contact/:id");
   const contactId = Number(params?.id);
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState("sobre");
+  const [isEditing, setIsEditing] = useState(false);
+  const [editData, setEditData] = useState({
+    name: "", email: "", phone: "", birthDate: "", gender: "", referredBy: "",
+  });
+  const [convenioForm, setConvenioForm] = useState({ numero: "", nome: "" });
 
   // Queries
   const contactQ = trpc.crm.contacts.get.useQuery({ id: contactId }, { enabled: !!contactId });
   const metricsQ = trpc.contactProfile.getMetrics.useQuery({ contactId }, { enabled: !!contactId });
   const dealsQ = trpc.contactProfile.getDeals.useQuery({ contactId }, { enabled: !!contactId });
+  const utils = trpc.useUtils();
+
+  const updateContact = trpc.crm.contacts.update.useMutation({
+    onSuccess: () => {
+      utils.crm.contacts.get.invalidate({ id: contactId });
+      setIsEditing(false);
+      toast.success("Dados atualizados");
+    },
+    onError: () => toast.error("Erro ao atualizar"),
+  });
 
   const contact = contactQ.data as any;
   const metrics = (metricsQ.data || { totalDeals: 0, wonDeals: 0, totalSpentCents: 0, daysSinceLastPurchase: null }) as ContactMetrics;
@@ -118,13 +171,51 @@ export default function ContactProfile() {
     );
   }
 
+  function startEdit() {
+    setEditData({
+      name: contact.name || "",
+      email: contact.email || "",
+      phone: contact.phone || "",
+      birthDate: contact.birthDate || "",
+      gender: contact.gender || "",
+      referredBy: contact.referredBy || "",
+    });
+    setIsEditing(true);
+  }
+
+  function saveEdit() {
+    updateContact.mutate({
+      id: contactId,
+      name: editData.name || undefined,
+      email: editData.email || undefined,
+      phone: editData.phone || undefined,
+      birthDate: editData.birthDate || null,
+      gender: editData.gender || null,
+      referredBy: editData.referredBy || null,
+    });
+  }
+
+  function saveConvenio() {
+    if (!convenioForm.numero && !convenioForm.nome) {
+      toast.error("Preencha ao menos um campo");
+      return;
+    }
+    updateContact.mutate({
+      id: contactId,
+      convenioNumero: convenioForm.numero || null,
+      convenioNome: convenioForm.nome || null,
+    });
+    setConvenioForm({ numero: "", nome: "" });
+  }
+
+  const age = calculateAge(contact.birthDate);
+
   const tabItems = [
     { id: "sobre", label: "Sobre", icon: User },
     { id: "agendamentos", label: "Agendamentos", icon: Calendar },
     { id: "tratamentos", label: "Tratamentos", icon: Activity },
     { id: "orcamentos", label: "Orçamentos", icon: DollarSign },
     { id: "anamnese", label: "Anamnese", icon: ClipboardList },
-    { id: "evolucoes", label: "Evoluções", icon: Stethoscope },
     { id: "documentos", label: "Documentos", icon: FileText },
     { id: "debitos", label: "Débitos", icon: CreditCard },
     { id: "reprovados", label: "Orç. Reprovados", icon: XCircle },
@@ -134,57 +225,139 @@ export default function ContactProfile() {
     <div className="flex h-[calc(100vh-64px)]">
       {/* ═══ LEFT SIDEBAR ═══ */}
       <aside className="w-72 border-r border-border/50 bg-card/50 flex flex-col shrink-0 overflow-y-auto">
-        {/* Back button + Avatar */}
-        <div className="p-4 space-y-4">
+        {/* Back button */}
+        <div className="p-4 pb-2">
           <Link href="/contacts">
             <Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground">
               <ArrowLeft className="h-3.5 w-3.5 mr-1" /> Contatos
             </Button>
           </Link>
+        </div>
 
-          {/* Avatar + Name */}
-          <div className="text-center space-y-2">
-            <div className="h-20 w-20 rounded-full bg-gradient-to-br from-[#2E7D5B]/30 to-[#2E7D5B]/10 border-2 border-[#2E7D5B]/30 flex items-center justify-center text-3xl font-bold text-[#2E7D5B] mx-auto">
-              {(contact.name || "?")[0]?.toUpperCase()}
-            </div>
-            <div>
-              <h1 className="text-lg font-bold text-foreground truncate">{contact.name}</h1>
-              <div className="flex items-center justify-center gap-2 mt-1">
-                <Badge variant="outline" className={lifecycleColor(contact.lifecycleStage)}>
-                  {lifecycleLabel(contact.lifecycleStage)}
-                </Badge>
-                {contact.type === "company" && (
-                  <Badge variant="outline" className="text-[10px]">
-                    <Building2 className="h-2.5 w-2.5 mr-0.5" /> Empresa
-                  </Badge>
-                )}
-              </div>
-            </div>
+        {/* Avatar + Name */}
+        <div className="px-4 pb-4 text-center space-y-2">
+          <div className="h-20 w-20 rounded-full bg-gradient-to-br from-[#2E7D5B]/30 to-[#2E7D5B]/10 border-2 border-[#2E7D5B]/30 flex items-center justify-center text-3xl font-bold text-[#2E7D5B] mx-auto">
+            {(contact.name || "?")[0]?.toUpperCase()}
           </div>
+          <h1 className="text-lg font-bold text-foreground truncate">{contact.name}</h1>
+          <Button
+            size="sm"
+            variant="outline"
+            className="text-xs h-7 px-3 border-[#2E7D5B]/50 text-[#2E7D5B] hover:bg-[#2E7D5B]/10"
+          >
+            ATUALIZAR AVATAR
+          </Button>
         </div>
 
         <Separator />
 
-        {/* Contact Info */}
+        {/* Dados do Paciente */}
         <div className="p-4 space-y-3">
-          <div className="flex items-center gap-2.5 text-sm">
-            <Mail className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-            <span className="truncate text-xs">{contact.email || <span className="text-muted-foreground italic">Sem email</span>}</span>
-          </div>
-          <div className="flex items-center gap-2.5 text-sm">
-            <Phone className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-            <span className="truncate text-xs">{contact.phone || <span className="text-muted-foreground italic">Sem telefone</span>}</span>
-          </div>
-          {contact.docId && (
-            <div className="flex items-center gap-2.5 text-sm">
-              <FileText className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-              <span className="truncate text-xs">{contact.docId}</span>
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Dados do Paciente</p>
+
+          {isEditing ? (
+            <div className="space-y-3">
+              <div>
+                <label className="text-[10px] text-muted-foreground">Nome</label>
+                <Input value={editData.name} onChange={e => setEditData({ ...editData, name: e.target.value })} className="h-8 text-xs" />
+              </div>
+              <div>
+                <label className="text-[10px] text-muted-foreground">E-mail</label>
+                <Input value={editData.email} onChange={e => setEditData({ ...editData, email: e.target.value })} className="h-8 text-xs" />
+              </div>
+              <div>
+                <label className="text-[10px] text-muted-foreground">Telefone</label>
+                <Input value={editData.phone} onChange={e => setEditData({ ...editData, phone: e.target.value })} className="h-8 text-xs" />
+              </div>
+              <div>
+                <label className="text-[10px] text-muted-foreground">Data de Nascimento</label>
+                <Input
+                  type="date"
+                  value={editData.birthDate.length > 5 ? editData.birthDate : ""}
+                  onChange={e => setEditData({ ...editData, birthDate: e.target.value })}
+                  className="h-8 text-xs"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] text-muted-foreground">Sexo</label>
+                <Select value={editData.gender || "_none"} onValueChange={v => setEditData({ ...editData, gender: v === "_none" ? "" : v })}>
+                  <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="_none">Não informado</SelectItem>
+                    <SelectItem value="Feminino">Feminino</SelectItem>
+                    <SelectItem value="Masculino">Masculino</SelectItem>
+                    <SelectItem value="Outro">Outro</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <label className="text-[10px] text-muted-foreground">Indicado por</label>
+                <Input value={editData.referredBy} onChange={e => setEditData({ ...editData, referredBy: e.target.value })} placeholder="Nome de quem indicou" className="h-8 text-xs" />
+              </div>
+              <div className="flex gap-2">
+                <Button size="sm" variant="ghost" onClick={() => setIsEditing(false)} className="h-7 text-xs flex-1">
+                  <X className="h-3 w-3 mr-1" /> Cancelar
+                </Button>
+                <Button size="sm" onClick={saveEdit} disabled={updateContact.isPending} className="h-7 text-xs flex-1 bg-[#2E7D5B] hover:bg-[#256B4D] text-white">
+                  <Save className="h-3 w-3 mr-1" /> Salvar
+                </Button>
+              </div>
             </div>
-          )}
-          {contact.source && (
-            <div className="flex items-center gap-2.5 text-sm">
-              <Tag className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-              <span className="truncate text-xs">{contact.source}</span>
+          ) : (
+            <div className="space-y-2.5 text-xs">
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">E-mail:</span>
+                <span className="font-medium truncate ml-2">{contact.email || "N/A"}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Status:</span>
+                <Badge variant="outline" className={`text-[10px] ${lifecycleColor(contact.lifecycleStage)}`}>
+                  {lifecycleLabel(contact.lifecycleStage)}
+                </Badge>
+              </div>
+              {age !== null && (
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Idade:</span>
+                  <span className="font-medium">{age}</span>
+                </div>
+              )}
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Data de Nascimento:</span>
+                <span className="font-medium">{formatBirthDateDisplay(contact.birthDate)}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Contato:</span>
+                <div className="flex items-center gap-1.5">
+                  {contact.phone && (
+                    <a href={`https://wa.me/${contact.phone.replace(/\D/g, "")}`} target="_blank" rel="noopener noreferrer">
+                      <MessageCircle className="h-3.5 w-3.5 text-green-500 hover:text-green-400 cursor-pointer" />
+                    </a>
+                  )}
+                  <span className="font-medium">{contact.phone || "N/A"}</span>
+                </div>
+              </div>
+              {contact.gender && (
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Sexo:</span>
+                  <span className="font-medium">{contact.gender}</span>
+                </div>
+              )}
+              {contact.referredBy && (
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Indicado por:</span>
+                  <span className="font-medium truncate ml-2">{contact.referredBy}</span>
+                </div>
+              )}
+
+              <div className="pt-2">
+                <Button
+                  size="sm"
+                  onClick={startEdit}
+                  className="w-full h-8 text-xs bg-[#2E7D5B] hover:bg-[#256B4D] text-white"
+                >
+                  EDITAR
+                </Button>
+              </div>
             </div>
           )}
         </div>
@@ -216,36 +389,50 @@ export default function ContactProfile() {
           </div>
         </div>
 
-        <Separator />
-
-        {/* Quick actions */}
-        <div className="p-4 space-y-1.5">
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Ações Rápidas</p>
-          {contact.phone && (
-            <a href={`https://wa.me/${contact.phone.replace(/\D/g, "")}`} target="_blank" rel="noopener noreferrer">
-              <Button variant="ghost" size="sm" className="w-full justify-start h-8 text-xs">
-                <MessageCircle className="h-3.5 w-3.5 mr-2 text-green-500" /> WhatsApp
-              </Button>
-            </a>
-          )}
-          <Link href="/agenda">
-            <Button variant="ghost" size="sm" className="w-full justify-start h-8 text-xs">
-              <Calendar className="h-3.5 w-3.5 mr-2 text-blue-400" /> Agendar
-            </Button>
-          </Link>
-          <Link href="/pipeline">
-            <Button variant="ghost" size="sm" className="w-full justify-start h-8 text-xs">
-              <DollarSign className="h-3.5 w-3.5 mr-2 text-purple-400" /> Novo Orçamento
-            </Button>
-          </Link>
-        </div>
-
         <div className="flex-1" />
 
-        {/* Created/Updated dates */}
-        <div className="p-4 text-xs text-muted-foreground">
-          <p>Criado: {formatDate(contact.createdAt)}</p>
-          <p>Atualizado: {formatDate(contact.updatedAt)}</p>
+        {/* Cadastrar Convênio */}
+        <div className="p-4 border-t border-border/50">
+          <Card className="border-border/50 bg-muted/20">
+            <CardContent className="p-3 space-y-2">
+              <div className="flex items-center gap-2">
+                <Plus className="h-4 w-4 text-[#2E7D5B]" />
+                <span className="text-xs font-semibold">Cadastrar Convênio</span>
+              </div>
+              <p className="text-[10px] text-muted-foreground">Cadastre o convênio do seu paciente</p>
+              {contact.convenioNumero && (
+                <div className="text-[10px] text-muted-foreground bg-muted/30 rounded p-1.5">
+                  Atual: {contact.convenioNome || "—"} ({contact.convenioNumero})
+                </div>
+              )}
+              <div>
+                <label className="text-[10px] text-muted-foreground">Número:</label>
+                <Input
+                  value={convenioForm.numero}
+                  onChange={e => setConvenioForm({ ...convenioForm, numero: e.target.value })}
+                  className="h-7 text-xs mt-0.5"
+                  placeholder=""
+                />
+              </div>
+              <div>
+                <label className="text-[10px] text-muted-foreground">Nome:</label>
+                <Input
+                  value={convenioForm.nome}
+                  onChange={e => setConvenioForm({ ...convenioForm, nome: e.target.value })}
+                  className="h-7 text-xs mt-0.5"
+                  placeholder=""
+                />
+              </div>
+              <Button
+                size="sm"
+                onClick={saveConvenio}
+                disabled={updateContact.isPending}
+                className="w-full h-8 text-xs bg-[#2E7D5B] hover:bg-[#256B4D] text-white"
+              >
+                CADASTRAR
+              </Button>
+            </CardContent>
+          </Card>
         </div>
       </aside>
 
@@ -295,10 +482,6 @@ export default function ContactProfile() {
 
             <TabsContent value="anamnese">
               <AnamneseTab contactId={contactId} />
-            </TabsContent>
-
-            <TabsContent value="evolucoes">
-              <EvolucoesTab contactId={contactId} />
             </TabsContent>
 
             <TabsContent value="documentos">

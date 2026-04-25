@@ -1,20 +1,14 @@
-import { useState, useMemo } from "react";
+import { useState, useRef } from "react";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
-import { DatePicker } from "@/components/ui/date-picker";
 import {
-  Mail, Phone, FileText, Calendar, Tag, User, Edit2, Save, X,
-  Plus, CheckCircle2, XCircle
+  FileText, Plus, Loader2, Trash2, Calendar, Image, Mic, X
 } from "lucide-react";
 import { toast } from "sonner";
-import { Link } from "wouter";
 
 interface SobreTabProps {
   contact: any;
@@ -22,304 +16,285 @@ interface SobreTabProps {
   metrics: { totalDeals: number; wonDeals: number; totalSpentCents: number; daysSinceLastPurchase: number | null };
 }
 
-function formatCurrency(cents: number, currency = "BRL") {
-  return new Intl.NumberFormat("pt-BR", { style: "currency", currency }).format(cents / 100);
-}
+type EvoType = "resumo" | "nota_pessoal" | "alerta" | "retorno";
+
+const EVO_TYPES: { key: EvoType; label: string; color: string; bgColor: string }[] = [
+  { key: "resumo", label: "Resumo", color: "text-white", bgColor: "bg-[#2E7D5B]" },
+  { key: "nota_pessoal", label: "Nota Pessoal", color: "text-white", bgColor: "bg-[#2E7D5B]" },
+  { key: "alerta", label: "Alerta", color: "text-white", bgColor: "bg-[#D97706]" },
+  { key: "retorno", label: "Retorno", color: "text-white", bgColor: "bg-[#6366F1]" },
+];
 
 function formatDate(d: string | null) {
   if (!d) return "—";
-  return new Date(d).toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric", timeZone: "America/Sao_Paulo" });
+  return new Date(d).toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" });
+}
+
+function todayStr() {
+  const d = new Date();
+  return `${String(d.getDate()).padStart(2, "0")}-${String(d.getMonth() + 1).padStart(2, "0")}-${d.getFullYear()}`;
 }
 
 export default function SobreTab({ contact, contactId, metrics }: SobreTabProps) {
-  const [isEditing, setIsEditing] = useState(false);
-  const [editData, setEditData] = useState({ name: "", email: "", phone: "", notes: "", birthDate: "", weddingDate: "" });
-  const [isEditingCustom, setIsEditingCustom] = useState(false);
-  const [customFieldEdits, setCustomFieldEdits] = useState<Record<number, string>>({});
+  const [selectedType, setSelectedType] = useState<EvoType>("resumo");
+  const [content, setContent] = useState("");
+  const [professionalId, setProfessionalId] = useState<string>("");
+  const [evoDate, setEvoDate] = useState(todayStr());
+  const [photos, setPhotos] = useState<string[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const utils = trpc.useUtils();
-  const customFieldsQ = trpc.customFields.list.useQuery({ entity: "contact" });
-  const customValuesQ = trpc.contactProfile.getCustomFieldValues.useQuery(
-    { entityType: "contact", entityId: contactId },
-    { enabled: !!contactId }
-  );
+  const evolutionsQ = trpc.evolutions.list.useQuery({ contactId });
+  const usersQ = trpc.admin.users.list.useQuery();
 
-  const updateContact = trpc.crm.contacts.update.useMutation({
+  const createMut = trpc.evolutions.create.useMutation({
     onSuccess: () => {
-      utils.crm.contacts.get.invalidate({ id: contactId });
-      setIsEditing(false);
-      toast.success("Contato atualizado");
+      utils.evolutions.list.invalidate({ contactId });
+      setContent("");
+      setPhotos([]);
+      toast.success("Evolução registrada");
     },
-    onError: () => toast.error("Erro ao atualizar contato"),
+    onError: () => toast.error("Erro ao registrar evolução"),
   });
 
-  const setCustomValues = trpc.contactProfile.setCustomFieldValues.useMutation({
+  const deleteMut = trpc.evolutions.delete.useMutation({
     onSuccess: () => {
-      utils.contactProfile.getCustomFieldValues.invalidate({ entityType: "contact", entityId: contactId });
-      setIsEditingCustom(false);
-      toast.success("Campos personalizados salvos");
+      utils.evolutions.list.invalidate({ contactId });
+      toast.success("Evolução removida");
     },
-    onError: () => toast.error("Erro ao salvar campos"),
   });
 
-  const customFields = (customFieldsQ.data || []) as any[];
-  const customValues = (customValuesQ.data || []) as any[];
-  const valueMap = useMemo(() => {
-    const map: Record<number, string> = {};
-    customValues.forEach((v: any) => { map[v.fieldId] = v.value || ""; });
-    return map;
-  }, [customValues]);
-  const visibleFields = useMemo(() => customFields.filter((f: any) => f.isVisibleOnProfile), [customFields]);
+  const evolutions = (evolutionsQ.data || []) as any[];
+  const users = (usersQ.data || []) as any[];
 
-  function startEdit() {
-    setEditData({
-      name: contact.name || "",
-      email: contact.email || "",
-      phone: contact.phone || "",
-      notes: contact.notes || "",
-      birthDate: contact.birthDate || "",
-      weddingDate: contact.weddingDate || "",
-    });
-    setIsEditing(true);
-  }
-
-  function saveEdit() {
-    updateContact.mutate({
-      id: contactId,
-      name: editData.name,
-      email: editData.email || undefined,
-      phone: editData.phone || undefined,
-      birthDate: editData.birthDate || null,
-      weddingDate: editData.weddingDate || null,
+  function handleCreate() {
+    if (!content.trim()) {
+      toast.error("Digite o conteúdo da evolução");
+      return;
+    }
+    const typeLabel = EVO_TYPES.find(t => t.key === selectedType)?.label || "Resumo";
+    createMut.mutate({
+      contactId,
+      title: `${typeLabel} — ${evoDate}`,
+      content: content.trim(),
+      professionalId: professionalId ? Number(professionalId) : undefined,
+      photos: photos.length > 0 ? photos : undefined,
     });
   }
 
-  function startEditCustom() {
-    const edits: Record<number, string> = {};
-    customFields.forEach((f: any) => {
-      edits[f.id] = valueMap[f.id] || f.defaultValue || "";
-    });
-    setCustomFieldEdits(edits);
-    setIsEditingCustom(true);
+  function handleClear() {
+    setContent("");
+    setPhotos([]);
+    setProfessionalId("");
+    setEvoDate(todayStr());
+    setSelectedType("resumo");
   }
 
-  function saveCustomFields() {
-    const values = Object.entries(customFieldEdits).map(([fieldId, value]) => ({
-      fieldId: Number(fieldId),
-      value: value || null,
-    }));
-    setCustomValues.mutate({ entityType: "contact", entityId: contactId, values });
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = e.target.files;
+    if (!files) return;
+    if (photos.length + files.length > 5) {
+      toast.error("Máximo de 5 imagens");
+      return;
+    }
+    for (const file of Array.from(files)) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        setPhotos(prev => [...prev, reader.result as string]);
+      };
+      reader.readAsDataURL(file);
+    }
+    e.target.value = "";
   }
 
-  const conversionRate = metrics.totalDeals > 0 ? Math.round((metrics.wonDeals / metrics.totalDeals) * 100) : 0;
+  function getTypeBadge(title: string) {
+    if (title.startsWith("Alerta")) return { label: "Alerta", color: "bg-amber-500/20 text-amber-500 border-amber-500/30" };
+    if (title.startsWith("Retorno")) return { label: "Retorno", color: "bg-indigo-500/20 text-indigo-400 border-indigo-500/30" };
+    if (title.startsWith("Nota Pessoal")) return { label: "Nota Pessoal", color: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30" };
+    return { label: "Resumo", color: "bg-[#2E7D5B]/20 text-[#2E7D5B] border-[#2E7D5B]/30" };
+  }
 
   return (
     <div className="space-y-6">
-      {/* Summary metrics */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        {[
-          { label: "Negociações", value: String(metrics.totalDeals), sub: `${metrics.wonDeals} fechada(s)`, color: "text-blue-400" },
-          { label: "Conversão", value: `${conversionRate}%`, sub: `${metrics.wonDeals}/${metrics.totalDeals}`, color: "text-emerald-400" },
-          { label: "Total Comprado", value: formatCurrency(metrics.totalSpentCents), sub: "Negociações ganhas", color: "text-purple-400" },
-          { label: "Última Compra", value: metrics.daysSinceLastPurchase !== null ? `${metrics.daysSinceLastPurchase}d` : "—", sub: metrics.daysSinceLastPurchase !== null ? "atrás" : "Nenhuma", color: "text-amber-400" },
-        ].map((m) => (
-          <Card key={m.label} className="border-border/50 bg-card/80">
-            <CardContent className="p-4">
-              <p className="text-xs text-muted-foreground">{m.label}</p>
-              <p className={`text-xl font-bold ${m.color}`}>{m.value}</p>
-              <p className="text-xs text-muted-foreground">{m.sub}</p>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      {/* Contact info */}
+      {/* ═══ Adicionar Evolução ═══ */}
       <Card className="border-border/50 bg-card/80">
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
-            <CardTitle className="text-base font-semibold flex items-center gap-2">
-              <User className="h-4 w-4 text-[#2E7D5B]" /> Dados Pessoais
-            </CardTitle>
-            {!isEditing ? (
-              <Button size="sm" variant="ghost" onClick={startEdit} className="h-7 text-xs">
-                <Edit2 className="h-3 w-3 mr-1" /> Editar
-              </Button>
-            ) : (
-              <div className="flex gap-1">
-                <Button size="sm" variant="ghost" onClick={() => setIsEditing(false)} className="h-7 text-xs">
-                  <X className="h-3 w-3 mr-1" /> Cancelar
-                </Button>
-                <Button size="sm" onClick={saveEdit} disabled={updateContact.isPending} className="h-7 text-xs bg-[#2E7D5B] hover:bg-[#256B4D] text-white">
-                  <Save className="h-3 w-3 mr-1" /> Salvar
-                </Button>
-              </div>
-            )}
+            <CardTitle className="text-base font-semibold">Adicionar Evolução</CardTitle>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="flex items-center gap-3">
-              <Mail className="h-4 w-4 text-muted-foreground shrink-0" />
-              {isEditing ? (
-                <Input type="email" value={editData.email} onChange={(e) => setEditData({ ...editData, email: e.target.value })} placeholder="email@exemplo.com" className="bg-background/50" />
-              ) : (
-                <span className="text-sm">{contact.email || <span className="text-muted-foreground italic">Sem email</span>}</span>
-              )}
+          {/* Type buttons */}
+          <div className="flex flex-wrap gap-2">
+            {EVO_TYPES.map(t => (
+              <Button
+                key={t.key}
+                size="sm"
+                variant={selectedType === t.key ? "default" : "outline"}
+                onClick={() => setSelectedType(t.key)}
+                className={
+                  selectedType === t.key
+                    ? `${t.bgColor} ${t.color} border-transparent h-8 text-xs font-medium`
+                    : "h-8 text-xs font-medium"
+                }
+              >
+                {t.label} {selectedType === t.key ? "✓" : ""}
+              </Button>
+            ))}
+          </div>
+
+          {/* Professional + Date row */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-1 block">Profissional</label>
+              <Select value={professionalId} onValueChange={setProfessionalId}>
+                <SelectTrigger className="bg-background/50 h-9">
+                  <SelectValue placeholder="Selecionar profissional" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="_none">—</SelectItem>
+                  {users.map((u: any) => (
+                    <SelectItem key={u.id} value={String(u.id)}>{u.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-            <div className="flex items-center gap-3">
-              <Phone className="h-4 w-4 text-muted-foreground shrink-0" />
-              {isEditing ? (
-                <Input type="tel" value={editData.phone} onChange={(e) => setEditData({ ...editData, phone: e.target.value })} placeholder="(11) 99999-9999" className="bg-background/50" />
-              ) : (
-                <span className="text-sm">{contact.phone || <span className="text-muted-foreground italic">Sem telefone</span>}</span>
-              )}
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-1 block">Data da Evolução</label>
+              <input
+                type="date"
+                value={evoDate.split("-").reverse().join("-")}
+                onChange={e => {
+                  const parts = e.target.value.split("-");
+                  setEvoDate(`${parts[2]}-${parts[1]}-${parts[0]}`);
+                }}
+                className="flex h-9 w-full rounded-md border border-input bg-background/50 px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              />
             </div>
           </div>
-          {contact.docId && (
-            <div className="flex items-center gap-3">
-              <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
-              <span className="text-sm">{contact.docId}</span>
-            </div>
-          )}
 
-          {isEditing && (
-            <>
-              <Separator />
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-medium text-muted-foreground mb-1 block">Aniversário</label>
-                  <DatePicker value={editData.birthDate} onChange={(v) => setEditData({ ...editData, birthDate: v })} placeholder="Selecionar data" className="bg-background/50 h-9" monthDay />
+          {/* Content textarea */}
+          <Textarea
+            value={content}
+            onChange={e => setContent(e.target.value)}
+            placeholder="Digite a Evolução do Paciente aqui..."
+            className="min-h-[140px] bg-background/50"
+          />
+
+          {/* Photos preview */}
+          {photos.length > 0 && (
+            <div className="flex gap-2 flex-wrap">
+              {photos.map((url, i) => (
+                <div key={i} className="relative group">
+                  <img src={url} alt={`Foto ${i + 1}`} className="h-16 w-16 object-cover rounded-lg border border-border/50" />
+                  <button
+                    onClick={() => setPhotos(prev => prev.filter((_, idx) => idx !== i))}
+                    className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full h-4 w-4 flex items-center justify-center text-[10px] opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    ×
+                  </button>
                 </div>
-                <div>
-                  <label className="text-xs font-medium text-muted-foreground mb-1 block">Casamento</label>
-                  <DatePicker value={editData.weddingDate} onChange={(v) => setEditData({ ...editData, weddingDate: v })} placeholder="Selecionar data" className="bg-background/50 h-9" monthDay />
-                </div>
-              </div>
-              <div>
-                <label className="text-xs font-medium text-muted-foreground mb-1 block">Observações</label>
-                <Textarea value={editData.notes} onChange={(e) => setEditData({ ...editData, notes: e.target.value })} placeholder="Notas sobre o contato..." className="bg-background/50 min-h-[80px]" />
-              </div>
-            </>
-          )}
-
-          {!isEditing && (contact.birthDate || contact.weddingDate) && (
-            <>
-              <Separator />
-              <div className="grid grid-cols-2 gap-3 text-xs">
-                {contact.birthDate && (
-                  <div>
-                    <span className="text-muted-foreground">Aniversário</span>
-                    <p className="text-foreground font-medium flex items-center gap-1"><Calendar className="h-3 w-3" /> {contact.birthDate}</p>
-                  </div>
-                )}
-                {contact.weddingDate && (
-                  <div>
-                    <span className="text-muted-foreground">Casamento</span>
-                    <p className="text-foreground font-medium flex items-center gap-1"><Calendar className="h-3 w-3" /> {contact.weddingDate}</p>
-                  </div>
-                )}
-              </div>
-            </>
-          )}
-
-          {!isEditing && contact.notes && (
-            <>
-              <Separator />
-              <div>
-                <label className="text-xs font-medium text-muted-foreground mb-1 block">Observações</label>
-                <p className="text-sm whitespace-pre-wrap">{contact.notes}</p>
-              </div>
-            </>
-          )}
-
-          <Separator />
-          <div className="grid grid-cols-2 gap-3 text-xs">
-            <div>
-              <span className="text-muted-foreground">Criado em</span>
-              <p className="text-foreground font-medium">{formatDate(contact.createdAt)}</p>
+              ))}
             </div>
-            <div>
-              <span className="text-muted-foreground">Atualizado em</span>
-              <p className="text-foreground font-medium">{formatDate(contact.updatedAt)}</p>
+          )}
+
+          {/* Action buttons */}
+          <div className="flex items-center justify-between pt-1">
+            <div className="flex items-center gap-2">
+              <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleFileChange} />
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => fileInputRef.current?.click()}
+                className="h-8 text-xs gap-1.5"
+                disabled={photos.length >= 5}
+              >
+                <Image className="h-3.5 w-3.5" /> ANEXAR IMAGENS (MAX. 5)
+              </Button>
+              <Button size="sm" variant="ghost" onClick={handleClear} className="h-8 text-xs text-muted-foreground">
+                LIMPAR
+              </Button>
+              <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-muted-foreground">
+                <Mic className="h-4 w-4" />
+              </Button>
             </div>
+            <Button
+              size="sm"
+              onClick={handleCreate}
+              disabled={createMut.isPending || !content.trim()}
+              className="h-8 text-xs bg-[#2E7D5B] hover:bg-[#256B4D] text-white px-4"
+            >
+              {createMut.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "ADICIONAR EVOLUÇÃO"}
+            </Button>
           </div>
         </CardContent>
       </Card>
 
-      {/* Custom Fields */}
-      {(visibleFields.length > 0 || customFields.length > 0) && (
-        <Card className="border-border/50 bg-card/80">
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-base font-semibold flex items-center gap-2">
-                <Tag className="h-4 w-4 text-[#2E7D5B]" /> Campos Personalizados
-              </CardTitle>
-              {!isEditingCustom ? (
-                <Button size="sm" variant="ghost" onClick={startEditCustom} className="h-7 text-xs">
-                  <Edit2 className="h-3 w-3 mr-1" /> Editar
-                </Button>
-              ) : (
-                <div className="flex gap-1">
-                  <Button size="sm" variant="ghost" onClick={() => setIsEditingCustom(false)} className="h-7 text-xs">
-                    <X className="h-3 w-3 mr-1" /> Cancelar
-                  </Button>
-                  <Button size="sm" onClick={saveCustomFields} disabled={setCustomValues.isPending} className="h-7 text-xs bg-[#2E7D5B] hover:bg-[#256B4D] text-white">
-                    <Save className="h-3 w-3 mr-1" /> Salvar
-                  </Button>
-                </div>
-              )}
-            </div>
-          </CardHeader>
-          <CardContent>
-            {customFields.length === 0 ? (
-              <div className="text-center py-6">
-                <Tag className="h-8 w-8 text-muted-foreground/50 mx-auto mb-2" />
-                <p className="text-sm text-muted-foreground">Nenhum campo personalizado</p>
-                <Link href="/settings/custom-fields">
-                  <Button variant="link" size="sm" className="mt-1 text-xs"><Plus className="h-3 w-3 mr-1" /> Configurar</Button>
-                </Link>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {(isEditingCustom ? customFields : visibleFields).map((field: any) => (
-                  <div key={field.id}>
-                    <label className="text-xs font-medium text-muted-foreground mb-1 block">{field.label}</label>
-                    {isEditingCustom ? (
-                      field.fieldType === "select" ? (
-                        <Select value={customFieldEdits[field.id] || "_none_"} onValueChange={(v) => setCustomFieldEdits({ ...customFieldEdits, [field.id]: v === "_none_" ? "" : v })}>
-                          <SelectTrigger className="bg-background/50"><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="_none_">Nenhum</SelectItem>
-                            {(Array.isArray(field.optionsJson) ? field.optionsJson : []).map((opt: string) => (
-                              <SelectItem key={opt} value={opt}>{opt}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      ) : field.fieldType === "checkbox" ? (
-                        <div className="flex items-center gap-2 pt-1">
-                          <Checkbox checked={customFieldEdits[field.id] === "true"} onCheckedChange={(c) => setCustomFieldEdits({ ...customFieldEdits, [field.id]: c ? "true" : "false" })} />
-                          <span className="text-sm">{field.label}</span>
+      {/* ═══ Evoluções List ═══ */}
+      <div>
+        <h3 className="text-base font-semibold mb-4">Evoluções</h3>
+
+        {evolutionsQ.isLoading ? (
+          <div className="flex justify-center py-12">
+            <Loader2 className="h-6 w-6 animate-spin text-[#2E7D5B]" />
+          </div>
+        ) : evolutions.length === 0 ? (
+          <Card className="border-border/50 bg-card/80">
+            <CardContent className="text-center py-10">
+              <FileText className="h-10 w-10 text-muted-foreground/30 mx-auto mb-3" />
+              <p className="text-sm text-muted-foreground">Nenhuma evolução registrada para este paciente.</p>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="space-y-3">
+            {evolutions.map((evo: any) => {
+              const badge = getTypeBadge(evo.title);
+              return (
+                <Card key={evo.id} className="border-border/50 bg-card/80">
+                  <CardContent className="p-4 space-y-2">
+                    <div className="flex items-start justify-between">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full border ${badge.color}`}>
+                            {badge.label}
+                          </span>
+                          <p className="font-semibold text-sm">{evo.title}</p>
                         </div>
-                      ) : field.fieldType === "textarea" ? (
-                        <Textarea value={customFieldEdits[field.id] || ""} onChange={(e) => setCustomFieldEdits({ ...customFieldEdits, [field.id]: e.target.value })} className="bg-background/50 min-h-[60px]" />
-                      ) : (
-                        <Input value={customFieldEdits[field.id] || ""} onChange={(e) => setCustomFieldEdits({ ...customFieldEdits, [field.id]: e.target.value })} className="bg-background/50" />
-                      )
-                    ) : (
-                      <span className="text-sm">
-                        {field.fieldType === "checkbox"
-                          ? (valueMap[field.id] === "true" ? <CheckCircle2 className="h-4 w-4 text-emerald-400" /> : <XCircle className="h-4 w-4 text-muted-foreground" />)
-                          : (valueMap[field.id] || <span className="text-muted-foreground italic">Não preenchido</span>)
-                        }
-                      </span>
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <Calendar className="h-3 w-3" />
+                          <span>{formatDate(evo.createdAt)}</span>
+                          {evo.professionalName && <span>• {evo.professionalName}</span>}
+                        </div>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 w-7 p-0 text-red-400 hover:text-red-500"
+                        onClick={() => deleteMut.mutate({ id: evo.id })}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                    <div
+                      className="text-sm text-foreground whitespace-pre-wrap bg-muted/30 rounded-lg p-3"
+                      dangerouslySetInnerHTML={{ __html: evo.content }}
+                    />
+                    {evo.photos && evo.photos.length > 0 && (
+                      <div className="flex gap-2 pt-2">
+                        {evo.photos.map((url: string, i: number) => (
+                          <a key={i} href={url} target="_blank" rel="noopener noreferrer">
+                            <img src={url} alt={`Foto ${i + 1}`} className="h-16 w-16 object-cover rounded-lg border border-border/50" />
+                          </a>
+                        ))}
+                      </div>
                     )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

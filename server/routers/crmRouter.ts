@@ -66,6 +66,8 @@ export const crmRouter = router({
         phone: z.string().optional(), lifecycleStage: z.enum(["lead", "prospect", "customer", "churned"]).optional(),
         notes: z.string().optional(), ownerUserId: z.number().optional(),
         birthDate: z.string().nullable().optional(), weddingDate: z.string().nullable().optional(),
+        gender: z.string().nullable().optional(), referredBy: z.string().nullable().optional(),
+        convenioNumero: z.string().nullable().optional(), convenioNome: z.string().nullable().optional(),
       }))
       .mutation(async ({ ctx, input }) => {
 const tenantId = getTenantId(ctx); const { id, ...data } = input;

@@ -187,7 +187,7 @@ export async function listContacts(tenantId: number, opts?: { search?: string; s
   }
   return db.select().from(contacts).where(and(...conditions)).orderBy(desc(contacts.updatedAt)).limit(opts?.limit || 50).offset(opts?.offset || 0);
 }
-export async function updateContact(tenantId: number, id: number, data: Partial<{ name: string; email: string; phone: string; lifecycleStage: "lead" | "prospect" | "customer" | "churned"; notes: string; ownerUserId: number; updatedBy: number; birthDate: string | null; weddingDate: string | null }>) {
+export async function updateContact(tenantId: number, id: number, data: Partial<{ name: string; email: string; phone: string; lifecycleStage: "lead" | "prospect" | "customer" | "churned"; notes: string; ownerUserId: number; updatedBy: number; birthDate: string | null; weddingDate: string | null; gender: string | null; referredBy: string | null; convenioNumero: string | null; convenioNome: string | null }>) {
   const db = await getDb(); if (!db) return;
   // Normalize phone to canonical Brazilian format (+55DDNNNNNNNNN)
   if (data.phone) {
