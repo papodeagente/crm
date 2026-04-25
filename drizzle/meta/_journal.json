@@ -22,6 +22,13 @@
       "when": 1776805607896,
       "tag": "0002_client_profile",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1777755600000,
+      "tag": "0003_anamnese_extras",
+      "breakpoints": true
     }
   ]
 }

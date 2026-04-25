@@ -4853,6 +4853,8 @@ ${customInstructions ? `\n--- INSTRUÇÕES PERSONALIZADAS ---\n${customInstructi
           contactId: z.number(),
           templateId: z.number(),
           answers: z.record(z.string(), z.string()),
+          observation: z.string().optional(),
+          filledByMode: z.enum(["professional", "patient"]).optional(),
         }))
         .mutation(async ({ ctx, input }) => {
           const { saveResponse } = await import("./services/anamnesisService");

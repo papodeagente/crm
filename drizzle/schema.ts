@@ -2815,6 +2815,7 @@ export const anamnesisQuestionTypeEnum = pgEnum("anamnesis_question_type", ["tex
 export const anamnesisTemplates = pgTable("anamnesis_templates", {
   id: serial("id").primaryKey(),
   tenantId: integer("tenantId").notNull(),
+  slug: varchar("slug", { length: 64 }),               // identificador estavel (hof, estetica, co2)
   name: varchar("name", { length: 255 }).notNull(),
   description: text("description"),
   isDefault: boolean("isDefault").default(false).notNull(),
@@ -2823,6 +2824,7 @@ export const anamnesisTemplates = pgTable("anamnesis_templates", {
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 }, (t) => [
   index("at_tenant_idx").on(t.tenantId),
+  index("at_tenant_slug_idx").on(t.tenantId, t.slug),
 ]);
 
 export type AnamnesisTemplate = typeof anamnesisTemplates.$inferSelect;
@@ -2837,6 +2839,8 @@ export const anamnesisQuestions = pgTable("anamnesis_questions", {
   questionType: anamnesisQuestionTypeEnum("questionType").default("text").notNull(),
   options: json("options").$type<string[]>(),         // opcoes para select/multiselect
   isRequired: boolean("isRequired").default(false).notNull(),
+  hasExtraField: boolean("hasExtraField").default(false).notNull(),
+  extraFieldLabel: varchar("extraFieldLabel", { length: 128 }), // ex: "Quais?", "Informações adicionais"
   sortOrder: integer("sortOrder").default(0).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 }, (t) => [
@@ -2852,7 +2856,9 @@ export const anamnesisResponses = pgTable("anamnesis_responses", {
   tenantId: integer("tenantId").notNull(),
   contactId: integer("contactId").notNull(),
   templateId: integer("templateId").notNull(),
-  answers: json("answers").$type<Record<string, string>>().notNull(), // questionId -> answer
+  answers: json("answers").$type<Record<string, string>>().notNull(), // questionId -> answer; chave "{id}_extra" guarda texto complementar
+  observation: text("observation"),                    // campo livre de observacoes finais
+  filledByMode: varchar("filledByMode", { length: 16 }).default("professional").notNull(), // "professional" | "patient"
   filledByUserId: integer("filledByUserId"),
   filledAt: timestamp("filledAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),

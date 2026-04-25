@@ -12,6 +12,18 @@ export async function listTemplates(tenantId: number) {
   const db = await getDb();
   if (!db) return [];
 
+  // Auto-seed: se nao existem templates para este tenant, popula com as 3 anamneses padrao (HOF/Estetica/CO2)
+  const existing = await db.execute(sql`SELECT COUNT(*)::int as cnt FROM anamnesis_templates WHERE "tenantId" = ${tenantId}`);
+  const cnt = ((existing.rows as any[])[0]?.cnt ?? 0) as number;
+  if (cnt === 0) {
+    try {
+      const { seedDefaultAnamneseTemplates } = await import("./anamnesisSeeds");
+      await seedDefaultAnamneseTemplates(tenantId);
+    } catch (err) {
+      console.error("[anamnesis] auto-seed failed", err);
+    }
+  }
+
   const result = await db.execute(sql`
     SELECT t.*,
       (SELECT COUNT(*) FROM anamnesis_questions WHERE "templateId" = t.id)::int as "questionCount"
@@ -141,10 +153,14 @@ export async function saveResponse(tenantId: number, data: {
   contactId: number;
   templateId: number;
   answers: Record<string, string>;
+  observation?: string;
+  filledByMode?: "professional" | "patient";
   filledByUserId?: number;
 }) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
+
+  const mode = data.filledByMode === "patient" ? "patient" : "professional";
 
   // Upsert: if response for this contact+template exists, update; otherwise insert
   const existing = await db.execute(sql`
@@ -158,6 +174,8 @@ export async function saveResponse(tenantId: number, data: {
     await db.execute(sql`
       UPDATE anamnesis_responses
       SET "answers" = ${JSON.stringify(data.answers)}::json,
+          "observation" = ${data.observation ?? null},
+          "filledByMode" = ${mode},
           "filledByUserId" = ${data.filledByUserId || null},
           "updatedAt" = NOW()
       WHERE id = ${id}
@@ -166,8 +184,8 @@ export async function saveResponse(tenantId: number, data: {
   }
 
   const result = await db.execute(sql`
-    INSERT INTO anamnesis_responses ("tenantId", "contactId", "templateId", "answers", "filledByUserId")
-    VALUES (${tenantId}, ${data.contactId}, ${data.templateId}, ${JSON.stringify(data.answers)}::json, ${data.filledByUserId || null})
+    INSERT INTO anamnesis_responses ("tenantId", "contactId", "templateId", "answers", "observation", "filledByMode", "filledByUserId")
+    VALUES (${tenantId}, ${data.contactId}, ${data.templateId}, ${JSON.stringify(data.answers)}::json, ${data.observation ?? null}, ${mode}, ${data.filledByUserId || null})
     RETURNING id
   `);
 
