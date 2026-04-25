@@ -125,7 +125,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <div className="flex flex-col items-center gap-3">
             <ThemedLogo className="h-10 object-contain" />
             <p className="text-sm text-muted-foreground text-center max-w-sm">
-              Plataforma completa de CRM para negocios locais. Faca login para acessar o painel.
+              Plataforma completa de CRM para clínicas. Faca login para acessar o painel.
             </p>
           </div>
           <Button

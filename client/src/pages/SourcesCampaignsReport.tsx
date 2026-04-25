@@ -311,7 +311,7 @@ export default function SourcesCampaignsReport() {
                 </SelectContent>
               </Select>
             </div>
-            {/* Fonte Padrão Entur OS */}
+            {/* Fonte Padrão Clinilucro */}
             <div className="space-y-1">
               <Label className="text-[10px] font-medium text-muted-foreground uppercase">Fonte (Entur)</Label>
               <Select value={leadSource || "_all"} onValueChange={v => { setLeadSource(v === "_all" ? "" : v); setDealPage(1); }}>
@@ -322,7 +322,7 @@ export default function SourcesCampaignsReport() {
                 </SelectContent>
               </Select>
             </div>
-            {/* Campanha Padrão Entur OS */}
+            {/* Campanha Padrão Clinilucro */}
             <div className="space-y-1">
               <Label className="text-[10px] font-medium text-muted-foreground uppercase">Campanha (Entur)</Label>
               <Select value={campaignName || "_all"} onValueChange={v => { setCampaignName(v === "_all" ? "" : v); setDealPage(1); }}>

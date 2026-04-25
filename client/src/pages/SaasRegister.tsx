@@ -7,6 +7,7 @@ import { useLocation } from "wouter";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2, Eye, EyeOff, Check } from "lucide-react";
 import { toast } from "sonner";
+import { StaticLogo } from "@/components/ThemedLogo";
 
 export default function SaasRegister() {
   const [, navigate] = useLocation();
@@ -21,7 +22,7 @@ export default function SaasRegister() {
 
   const registerMutation = trpc.saasAuth.register.useMutation({
     onSuccess: () => {
-      toast.success("Conta criada com sucesso! Bem-vindo ao ENTUR OS!");
+      toast.success("Conta criada com sucesso! Bem-vindo ao Clinilucro!");
       window.location.href = "/dashboard";
     },
     onError: (error) => {
@@ -44,30 +45,30 @@ export default function SaasRegister() {
 
   const benefits = [
     "7 dias grátis para testar tudo",
-    "CRM completo para negocios locais",
+    "CRM completo para clínicas",
     "Pipeline de vendas ilimitado",
     "WhatsApp integrado com IA",
-    "Gestão de contatos e empresas",
+    "Gestão de pacientes e fichas de anamnese",
     "Relatórios e análises avançadas",
   ];
 
   return (
-    <div className="min-h-screen bg-[#0a0a12] flex items-center justify-center p-4 relative overflow-hidden">
+    <div className="min-h-screen bg-[#06140F] flex items-center justify-center p-4 relative overflow-hidden">
       {/* Background decoration */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-96 h-96 bg-purple-600/10 rounded-full blur-3xl" />
-        <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-purple-800/10 rounded-full blur-3xl" />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-purple-500/5 rounded-full blur-3xl" />
+        <div className="absolute -top-40 -right-40 w-96 h-96 bg-emerald-600/10 rounded-full blur-3xl" />
+        <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-lime-500/10 rounded-full blur-3xl" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-emerald-500/5 rounded-full blur-3xl" />
       </div>
 
       <div className="w-full max-w-5xl relative z-10 grid md:grid-cols-2 gap-8 items-center">
         {/* Left side - Benefits */}
         <div className="hidden md:block">
           <div className="inline-flex items-center gap-2 mb-6">
-            <img src="https://d2xsxph8kpxj0f.cloudfront.net/310519663249817763/EKvcVicuVoUxTnzjSKzgdk/logo-light_c3efa809.webp" alt="enturOS CRM" className="h-10 object-contain" />
+            <StaticLogo className="h-10" variant="dark" />
           </div>
           <h2 className="text-2xl font-bold text-white mb-2">
-            O sistema que seu negocio precisa
+            O sistema que sua clínica precisa
           </h2>
           <p className="text-white/50 mb-8">
             Comece agora com 7 dias grátis. Sem cartão de crédito.
@@ -95,7 +96,7 @@ export default function SaasRegister() {
         <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-8">
           <div className="md:hidden text-center mb-4">
             <div className="inline-flex items-center gap-2">
-              <img src="https://d2xsxph8kpxj0f.cloudfront.net/310519663249817763/EKvcVicuVoUxTnzjSKzgdk/logo-light_c3efa809.webp" alt="enturOS CRM" className="h-7 object-contain" />
+              <StaticLogo className="h-7" variant="dark" />
             </div>
           </div>
           <div className="text-center mb-6">
@@ -107,20 +108,20 @@ export default function SaasRegister() {
 
           <form onSubmit={handleSubmit} className="space-y-3">
             <div className="space-y-1.5">
-              <Label htmlFor="companyName" className="text-sm font-medium text-white/70">Nome do negocio</Label>
+              <Label htmlFor="companyName" className="text-sm font-medium text-white/70">Nome da clínica</Label>
               <Input
                 id="companyName"
-                placeholder="Minha Clinica"
+                placeholder="Minha Clínica"
                 value={companyName}
                 onChange={(e) => setCompanyName(e.target.value)}
                 required
-                className="h-10 bg-white/5 border-white/10 text-white placeholder:text-gray-500 focus:border-purple-500 focus:ring-purple-500/20"
+                className="h-10 bg-white/5 border-white/10 text-white placeholder:text-gray-500 focus:border-emerald-500 focus:ring-emerald-500/20"
               />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-sm font-medium text-white/70">Segmento do negócio</Label>
+              <Label className="text-sm font-medium text-white/70">Segmento da clínica</Label>
               <Select value={segment} onValueChange={setSegment}>
-                <SelectTrigger className="h-10 bg-white/5 border-white/10 text-white focus:border-purple-500 focus:ring-purple-500/20">
+                <SelectTrigger className="h-10 bg-white/5 border-white/10 text-white focus:border-emerald-500 focus:ring-emerald-500/20">
                   <SelectValue placeholder="Selecione seu segmento" />
                 </SelectTrigger>
                 <SelectContent>
@@ -141,7 +142,7 @@ export default function SaasRegister() {
                 value={userName}
                 onChange={(e) => setUserName(e.target.value)}
                 required
-                className="h-10 bg-white/5 border-white/10 text-white placeholder:text-gray-500 focus:border-purple-500 focus:ring-purple-500/20"
+                className="h-10 bg-white/5 border-white/10 text-white placeholder:text-gray-500 focus:border-emerald-500 focus:ring-emerald-500/20"
               />
             </div>
             <div className="grid grid-cols-2 gap-3">
@@ -154,7 +155,7 @@ export default function SaasRegister() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
-                  className="h-10 bg-white/5 border-white/10 text-white placeholder:text-gray-500 focus:border-purple-500 focus:ring-purple-500/20"
+                  className="h-10 bg-white/5 border-white/10 text-white placeholder:text-gray-500 focus:border-emerald-500 focus:ring-emerald-500/20"
                 />
               </div>
               <div className="space-y-1.5">
@@ -164,7 +165,7 @@ export default function SaasRegister() {
                   placeholder="(11) 99999-9999"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
-                  className="h-10 bg-white/5 border-white/10 text-white placeholder:text-gray-500 focus:border-purple-500 focus:ring-purple-500/20"
+                  className="h-10 bg-white/5 border-white/10 text-white placeholder:text-gray-500 focus:border-emerald-500 focus:ring-emerald-500/20"
                 />
               </div>
             </div>
@@ -179,7 +180,7 @@ export default function SaasRegister() {
                   onChange={(e) => setPassword(e.target.value)}
                   required
                   minLength={6}
-                  className="h-10 bg-white/5 border-white/10 text-white placeholder:text-gray-500 focus:border-purple-500 focus:ring-purple-500/20 pr-10"
+                  className="h-10 bg-white/5 border-white/10 text-white placeholder:text-gray-500 focus:border-emerald-500 focus:ring-emerald-500/20 pr-10"
                 />
                 <button
                   type="button"
@@ -199,13 +200,13 @@ export default function SaasRegister() {
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 required
-                className="h-10 bg-white/5 border-white/10 text-white placeholder:text-gray-500 focus:border-purple-500 focus:ring-purple-500/20"
+                className="h-10 bg-white/5 border-white/10 text-white placeholder:text-gray-500 focus:border-emerald-500 focus:ring-emerald-500/20"
               />
             </div>
 
             <Button
               type="submit"
-              className="w-full h-11 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-500 hover:to-purple-600 text-white font-medium shadow-lg shadow-purple-500/20 mt-2 transition-all"
+              className="w-full h-11 bg-gradient-to-r from-emerald-600 to-lime-500 hover:from-emerald-500 hover:to-lime-400 text-white font-medium shadow-lg shadow-emerald-500/20 mt-2 transition-all"
               disabled={registerMutation.isPending}
             >
               {registerMutation.isPending ? (

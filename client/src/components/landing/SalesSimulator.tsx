@@ -107,14 +107,14 @@ export function SalesSimulator({ onCTA }: SalesSimulatorProps) {
                       </div>
                     </div>
 
-                    {/* Conexão com ENTUR OS */}
+                    {/* Conexão com Clinilucro */}
                     <div className="bg-violet-500/[0.05] border border-violet-500/15 rounded-xl p-5">
                       <p className="text-sm text-white/60 leading-relaxed">
                         <span className="text-white font-medium">Essas vendas não estão perdidas.</span>{" "}
                         Elas apenas ficaram esquecidas na sua base de clientes.
                       </p>
                       <p className="text-sm text-white/50 leading-relaxed mt-3">
-                        O <span className="text-violet-300 font-semibold">ENTUR OS</span> usa a{" "}
+                        O <span className="text-violet-300 font-semibold">Clinilucro</span> usa a{" "}
                         <span className="text-white/70 font-medium">Matriz RFV</span> (Recência, Frequência e Valor)
                         para identificar automaticamente quais clientes têm maior
                         probabilidade de comprar novamente.

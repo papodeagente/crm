@@ -14,7 +14,7 @@ export function DemoSection() {
         <FadeIn>
           <div className="text-center mb-10">
             <h2 className="text-3xl sm:text-4xl font-bold text-white mb-3 tracking-tight">
-              Veja o ENTUR OS funcionando na prática
+              Veja o Clinilucro funcionando na prática
             </h2>
             <p className="text-lg text-white/40">
               Assista uma demonstração rápida e veja como organizar suas vendas
@@ -25,12 +25,12 @@ export function DemoSection() {
         <FadeIn delay={0.2}>
           <div className="relative group cursor-pointer">
             <div className="absolute -inset-4 bg-gradient-to-r from-violet-600/15 via-purple-600/10 to-indigo-600/15 rounded-3xl blur-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-            <div className="relative bg-[#12121a] rounded-2xl border border-white/[0.08] overflow-hidden shadow-2xl shadow-black/40">
+            <div className="relative bg-[#0B1F18] rounded-2xl border border-white/[0.08] overflow-hidden shadow-2xl shadow-black/40">
               <div className="flex items-center gap-1.5 px-5 py-3 bg-white/[0.03] border-b border-white/[0.06]">
                 <div className="w-3 h-3 rounded-full bg-red-500/60" />
                 <div className="w-3 h-3 rounded-full bg-yellow-500/60" />
                 <div className="w-3 h-3 rounded-full bg-green-500/60" />
-                <span className="ml-4 text-xs text-white/25 font-mono">Demonstração do ENTUR OS</span>
+                <span className="ml-4 text-xs text-white/25 font-mono">Demonstração do Clinilucro</span>
               </div>
               <div className="relative">
                 <img

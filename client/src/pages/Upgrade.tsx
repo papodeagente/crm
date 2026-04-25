@@ -2,10 +2,11 @@ import { useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useLocation } from "wouter";
-import { Plane, Lock, Check, ArrowRight, Crown, Building2, Zap, Rocket, Clock, ExternalLink, MessageSquare, Loader2 } from "lucide-react";
+import { Lock, Check, ArrowRight, Crown, Building2, Zap, Rocket, Clock, ExternalLink, MessageSquare, Loader2 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
+import { StaticLogo } from "@/components/ThemedLogo";
 
-const SCALE_WHATSAPP_URL = "https://wa.me/551151982627?text=Quero%20conhecer%20o%20Plano%20Elite%20do%20Entur%20OS.%20Pode%20me%20ajudar%3F";
+const SCALE_WHATSAPP_URL = "https://wa.me/551151982627?text=Quero%20conhecer%20o%20Plano%20Elite%20do%20Clinilucro.%20Pode%20me%20ajudar%3F";
 
 // ─── Types ───
 interface DynamicPlan {
@@ -30,18 +31,18 @@ interface DynamicPlan {
 const planIconsByIndex = [Zap, Rocket, Building2];
 const planColorsByIndex = [
   {
-    border: "border-purple-500/30",
-    bg: "bg-purple-500/15",
+    border: "border-emerald-500/30",
+    bg: "bg-emerald-500/15",
     text: "text-white/70",
     badge: "bg-white/10 text-white/70",
-    btn: "bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-500 hover:to-purple-600 shadow-lg shadow-purple-900/30",
+    btn: "bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 shadow-lg shadow-emerald-900/30",
   },
   {
-    border: "border-violet-500/40",
-    bg: "bg-violet-500/15",
+    border: "border-lime-500/40",
+    bg: "bg-lime-500/15",
     text: "text-white/70",
     badge: "bg-white/10 text-white/70",
-    btn: "bg-gradient-to-r from-violet-600 to-violet-700 hover:from-violet-500 hover:to-violet-600 shadow-lg shadow-violet-900/30",
+    btn: "bg-gradient-to-r from-emerald-600 to-lime-500 hover:from-emerald-500 hover:to-lime-400 shadow-lg shadow-lime-900/30",
   },
   {
     border: "border-amber-500/30",
@@ -110,28 +111,25 @@ export default function Upgrade() {
 
   if (plansQuery.isLoading) {
     return (
-      <div className="min-h-screen bg-[#0a0a12] flex items-center justify-center">
+      <div className="min-h-screen bg-[#06140F] flex items-center justify-center">
         <Loader2 className="w-8 h-8 text-white/60 animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#0a0a12] flex flex-col items-center justify-center p-4">
+    <div className="min-h-screen bg-[#06140F] flex flex-col items-center justify-center p-4">
       {/* Background decoration */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-purple-900/20 rounded-full blur-3xl" />
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-violet-900/20 rounded-full blur-3xl" />
+        <div className="absolute -top-40 -right-40 w-80 h-80 bg-emerald-700/20 rounded-full blur-3xl" />
+        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-lime-700/20 rounded-full blur-3xl" />
       </div>
 
       <div className="relative z-10 w-full max-w-5xl">
         {/* Header */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center gap-2 mb-4">
-            <div className="w-10 h-10 bg-gradient-to-br from-purple-600 to-purple-700 rounded-xl flex items-center justify-center shadow-lg shadow-purple-900/30">
-              <Plane className="w-5 h-5 text-white" />
-            </div>
-            <span className="text-2xl font-bold text-white">Entur OS</span>
+          <div className="inline-flex items-center justify-center gap-2 mb-4">
+            <StaticLogo className="h-9" variant="dark" />
           </div>
 
           {isRestricted ? (
@@ -141,7 +139,7 @@ export default function Upgrade() {
                 {billing?.billingStatus === "expired" ? "Sua assinatura expirou" : "Acesso restrito"}
               </div>
               <h1 className="text-3xl font-bold text-white mb-2">
-                Continue usando o Entur OS
+                Continue usando o Clinilucro
               </h1>
               <p className="text-white/50 max-w-lg mx-auto">
                 {billing?.message || "Assine um plano para continuar gerenciando suas vendas e clientes sem interrupção."}
@@ -154,10 +152,10 @@ export default function Upgrade() {
                 Período de teste ativo
               </div>
               <h1 className="text-3xl font-bold text-white mb-2">
-                Escolha o plano ideal para seu negocio
+                Escolha o plano ideal para sua clínica
               </h1>
               <p className="text-white/50 max-w-lg mx-auto">
-                Garanta acesso contínuo ao Entur OS. Assine antes do fim do período de teste.
+                Garanta acesso contínuo ao Clinilucro. Assine antes do fim do período de teste.
               </p>
             </>
           ) : (
@@ -166,7 +164,7 @@ export default function Upgrade() {
                 Escolha o plano ideal
               </h1>
               <p className="text-white/50 max-w-lg mx-auto">
-                Potencialize seu negocio com as ferramentas certas
+                Potencialize sua clínica com as ferramentas certas
               </p>
             </>
           )}

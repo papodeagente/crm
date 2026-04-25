@@ -59,17 +59,24 @@
   --color-wa-date-pill: var(--wa-date-pill);
   --color-wa-date-pill-text: var(--wa-date-pill-text);
   --color-wa-chat-compose-bg: var(--wa-chat-compose-bg);
-  /* ENTUR Brand Colors */
-  --color-entur-bg: #06091A;
-  --color-entur-roxo: #600FED;
-  --color-entur-magenta: #DC00E7;
-  --color-entur-vermelho: #FF2B61;
-  --color-entur-coral: #FF614C;
-  --color-entur-peach: #FFC7AC;
-  --color-entur-lima: #C4ED0F;
+  /* Clinilucro Brand Colors */
+  --color-brand-bg: #06140F;
+  --color-brand-emerald: #047857;
+  --color-brand-mint: #10B981;
+  --color-brand-lime: #84CC16;
+  --color-brand-ink: #0F172A;
+  --color-brand-neutral: #F1F5F9;
+  /* Aliases mantidos p/ compatibilidade com código legado */
+  --color-entur-bg: #06140F;
+  --color-entur-roxo: #047857;
+  --color-entur-magenta: #10B981;
+  --color-entur-vermelho: #84CC16;
+  --color-entur-coral: #10B981;
+  --color-entur-peach: #A7F3D0;
+  --color-entur-lima: #84CC16;
 }
 
-/* ─── ENTUR OS — Light Theme ─── */
+/* ─── Clinilucro — Light Theme ─── */
 :root {
   --radius: 0.625rem;
 
@@ -82,39 +89,41 @@
   --popover: oklch(0.995 0 0);
   --popover-foreground: oklch(0.18 0.02 260);
 
-  --primary: oklch(0.55 0.22 290);
+  /* Esmeralda #047857 → oklch(0.508 0.118 162) */
+  --primary: oklch(0.508 0.118 162);
   --primary-foreground: oklch(1.0 0 0);
 
-  --secondary: oklch(0.955 0.006 250);
-  --secondary-foreground: oklch(0.25 0.015 260);
+  --secondary: oklch(0.955 0.006 160);
+  --secondary-foreground: oklch(0.25 0.015 160);
 
-  --muted: oklch(0.950 0.006 250);
-  --muted-foreground: oklch(0.42 0.012 260);
+  --muted: oklch(0.950 0.006 160);
+  --muted-foreground: oklch(0.42 0.012 160);
 
-  --accent: oklch(0.945 0.015 290);
-  --accent-foreground: oklch(0.20 0.015 260);
+  --accent: oklch(0.945 0.04 162);
+  --accent-foreground: oklch(0.20 0.04 162);
 
   --destructive: oklch(0.58 0.24 25);
   --destructive-foreground: oklch(1.0 0 0);
 
-  --border: oklch(0.86 0.008 250);
-  --input: oklch(0.86 0.008 250);
-  --ring: oklch(0.55 0.22 290);
+  --border: oklch(0.86 0.008 160);
+  --input: oklch(0.86 0.008 160);
+  --ring: oklch(0.508 0.118 162);
 
-  --chart-1: oklch(0.55 0.22 290);
-  --chart-2: oklch(0.55 0.25 290);
-  --chart-3: oklch(0.50 0.25 330);
-  --chart-4: oklch(0.62 0.18 150);
-  --chart-5: oklch(0.45 0.22 270);
+  /* Charts: gradiente esmeralda → mint → lima + neutros */
+  --chart-1: oklch(0.508 0.118 162); /* #047857 esmeralda */
+  --chart-2: oklch(0.696 0.144 163); /* #10B981 mint */
+  --chart-3: oklch(0.760 0.180 124); /* #84CC16 lima */
+  --chart-4: oklch(0.55 0.10 200);   /* azul suave para contraste */
+  --chart-5: oklch(0.78 0.13 80);    /* âmbar suave para contraste */
 
-  --sidebar: oklch(0.97 0.002 250);
-  --sidebar-foreground: oklch(0.35 0.01 260);
-  --sidebar-primary: oklch(0.55 0.22 290);
+  --sidebar: oklch(0.97 0.002 160);
+  --sidebar-foreground: oklch(0.35 0.01 160);
+  --sidebar-primary: oklch(0.508 0.118 162);
   --sidebar-primary-foreground: oklch(1.0 0 0);
-  --sidebar-accent: oklch(0.945 0.015 290);
-  --sidebar-accent-foreground: oklch(0.20 0.015 260);
-  --sidebar-border: oklch(0.88 0.006 250);
-  --sidebar-ring: oklch(0.55 0.22 290);
+  --sidebar-accent: oklch(0.945 0.04 162);
+  --sidebar-accent-foreground: oklch(0.20 0.04 162);
+  --sidebar-border: oklch(0.88 0.006 160);
+  --sidebar-ring: oklch(0.508 0.118 162);
 
   /* WhatsApp Inbox — Light (WhatsApp Web exact) */
   --wa-panel: #ffffff;
@@ -142,60 +151,60 @@
   /* Inbox Design System — Light */
   --inbox-glass-bg: #ffffff;
   --inbox-glass-border: #e9edef;
-  --inbox-conv-active-bg: rgba(96, 15, 237, 0.06);
-  --inbox-conv-active-border: rgba(96, 15, 237, 0.15);
-  --inbox-conv-active-shadow: 0 0 20px rgba(96, 15, 237, 0.04);
-  --inbox-glow-1: rgba(96, 15, 237, 0.03);
-  --inbox-glow-2: rgba(0, 168, 132, 0.02);
-  --inbox-badge-shadow: 0 0 8px rgba(96, 15, 237, 0.2);
-  --inbox-focus-ring: rgba(96, 15, 237, 0.15);
-  --inbox-focus-border: rgba(96, 15, 237, 0.3);
+  --inbox-conv-active-bg: rgba(4, 120, 87, 0.06);
+  --inbox-conv-active-border: rgba(4, 120, 87, 0.15);
+  --inbox-conv-active-shadow: 0 0 20px rgba(4, 120, 87, 0.04);
+  --inbox-glow-1: rgba(4, 120, 87, 0.03);
+  --inbox-glow-2: rgba(132, 204, 22, 0.03);
+  --inbox-badge-shadow: 0 0 8px rgba(4, 120, 87, 0.2);
+  --inbox-focus-ring: rgba(4, 120, 87, 0.15);
+  --inbox-focus-border: rgba(4, 120, 87, 0.3);
 }
 
-/* ─── ENTUR OS — Dark Theme (Brand Colors) ─── */
+/* ─── Clinilucro — Dark Theme (Brand Colors) ─── */
 .dark {
-  --background: #06091A;
-  --foreground: oklch(0.93 0.005 260);
+  --background: #06140F;
+  --foreground: oklch(0.93 0.005 160);
 
-  --card: #0D1129;
-  --card-foreground: oklch(0.93 0.005 260);
+  --card: #0B1F18;
+  --card-foreground: oklch(0.93 0.005 160);
 
-  --popover: #0D1129;
-  --popover-foreground: oklch(0.93 0.005 260);
+  --popover: #0B1F18;
+  --popover-foreground: oklch(0.93 0.005 160);
 
-  --primary: #600FED;
-  --primary-foreground: oklch(1.0 0 0);
+  --primary: #10B981;
+  --primary-foreground: #06140F;
 
-  --secondary: #121736;
-  --secondary-foreground: oklch(0.88 0.005 260);
+  --secondary: #102E25;
+  --secondary-foreground: oklch(0.88 0.005 160);
 
-  --muted: #121736;
-  --muted-foreground: oklch(0.62 0.012 260);
+  --muted: #102E25;
+  --muted-foreground: oklch(0.66 0.012 160);
 
-  --accent: #1A1F45;
-  --accent-foreground: oklch(0.93 0.005 260);
+  --accent: #133D32;
+  --accent-foreground: oklch(0.93 0.005 160);
 
-  --destructive: #FF2B61;
+  --destructive: #EF4444;
   --destructive-foreground: oklch(1.0 0 0);
 
-  --border: #1E2350;
-  --input: #161B3D;
-  --ring: #600FED;
+  --border: #1B4438;
+  --input: #102E25;
+  --ring: #10B981;
 
-  --chart-1: #600FED;
-  --chart-2: #DC00E7;
-  --chart-3: #FF2B61;
-  --chart-4: #C4ED0F;
-  --chart-5: #FF614C;
+  --chart-1: #047857;
+  --chart-2: #10B981;
+  --chart-3: #84CC16;
+  --chart-4: #38BDF8;
+  --chart-5: #FBBF24;
 
-  --sidebar: #080C1F;
-  --sidebar-foreground: oklch(0.68 0.008 260);
-  --sidebar-primary: #600FED;
-  --sidebar-primary-foreground: oklch(1.0 0 0);
-  --sidebar-accent: #121736;
-  --sidebar-accent-foreground: oklch(0.93 0.005 260);
-  --sidebar-border: #1A1F45;
-  --sidebar-ring: #600FED;
+  --sidebar: #07120D;
+  --sidebar-foreground: oklch(0.68 0.008 160);
+  --sidebar-primary: #10B981;
+  --sidebar-primary-foreground: #06140F;
+  --sidebar-accent: #102E25;
+  --sidebar-accent-foreground: oklch(0.93 0.005 160);
+  --sidebar-border: #1B4438;
+  --sidebar-ring: #10B981;
 
   /* WhatsApp Inbox — Dark (WhatsApp Web exact) */
   --wa-panel: #111b21;
@@ -221,16 +230,16 @@
   --wa-doodle-url: url('https://d2xsxph8kpxj0f.cloudfront.net/310519663249817763/EKvcVicuVoUxTnzjSKzgdk/wa-bg-light_474b376c.png');
 
   /* Inbox Design System — Dark */
-  --inbox-glass-bg: #1b2228;
-  --inbox-glass-border: #2a3942;
-  --inbox-conv-active-bg: rgba(96, 15, 237, 0.08);
-  --inbox-conv-active-border: rgba(96, 15, 237, 0.2);
-  --inbox-conv-active-shadow: 0 0 24px rgba(96, 15, 237, 0.06);
-  --inbox-glow-1: rgba(96, 15, 237, 0.04);
-  --inbox-glow-2: rgba(0, 168, 132, 0.03);
-  --inbox-badge-shadow: 0 0 10px rgba(96, 15, 237, 0.3);
-  --inbox-focus-ring: rgba(96, 15, 237, 0.12);
-  --inbox-focus-border: rgba(96, 15, 237, 0.4);
+  --inbox-glass-bg: #0F2A22;
+  --inbox-glass-border: #1B4438;
+  --inbox-conv-active-bg: rgba(16, 185, 129, 0.08);
+  --inbox-conv-active-border: rgba(16, 185, 129, 0.2);
+  --inbox-conv-active-shadow: 0 0 24px rgba(16, 185, 129, 0.06);
+  --inbox-glow-1: rgba(16, 185, 129, 0.04);
+  --inbox-glow-2: rgba(132, 204, 22, 0.03);
+  --inbox-badge-shadow: 0 0 10px rgba(16, 185, 129, 0.3);
+  --inbox-focus-ring: rgba(16, 185, 129, 0.12);
+  --inbox-focus-border: rgba(16, 185, 129, 0.4);
 }
 
 @layer base {
@@ -311,9 +320,9 @@
     border-color: var(--border);
   }
   .inbox-conv-item.active {
-    background: rgba(99, 102, 241, 0.1);
-    border-color: rgba(99, 102, 241, 0.2);
-    box-shadow: 0 0 20px rgba(99, 102, 241, 0.06);
+    background: rgba(16, 185, 129, 0.1);
+    border-color: rgba(16, 185, 129, 0.2);
+    box-shadow: 0 0 20px rgba(16, 185, 129, 0.06);
   }
 
   /* ═══ Glass Panels ═══ */
@@ -330,8 +339,8 @@
     transition: all 0.2s;
   }
   .inbox-search:focus-within {
-    border-color: rgba(99, 102, 241, 0.3);
-    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.06);
+    border-color: rgba(16, 185, 129, 0.3);
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.06);
   }
 
   /* ═══ Tab Pill ═══ */
@@ -350,7 +359,7 @@
 
   /* ═══ Unread Badge ═══ */
   .inbox-unread-badge {
-    background: linear-gradient(135deg, #7c3aed, #6366f1);
+    background: linear-gradient(135deg, #047857, #10B981);
     color: #fff;
     font-size: 10px;
     font-weight: 700;
@@ -362,7 +371,7 @@
     justify-content: center;
     padding: 0 5px;
     line-height: 1;
-    box-shadow: 0 0 10px rgba(99, 102, 241, 0.25);
+    box-shadow: 0 0 10px rgba(16, 185, 129, 0.25);
   }
 
   /* ═══ Input Area ═══ */
@@ -375,8 +384,8 @@
     color: var(--foreground);
   }
   .inbox-input:focus, .inbox-input:focus-within {
-    border-color: rgba(99, 102, 241, 0.4);
-    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.08);
+    border-color: rgba(16, 185, 129, 0.4);
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.08);
     outline: none;
   }
 
@@ -386,7 +395,7 @@
     transition: box-shadow 0.2s;
   }
   .inbox-conv-item.active .inbox-avatar-ring {
-    box-shadow: 0 0 0 2px var(--background), 0 0 0 3.5px rgba(99, 102, 241, 0.3);
+    box-shadow: 0 0 0 2px var(--background), 0 0 0 3.5px rgba(16, 185, 129, 0.3);
   }
 
   /* ═══ Empty State ═══ */
@@ -401,10 +410,10 @@
     margin-bottom: 16px;
   }
   .dark .inbox-empty-icon {
-    background: rgba(96, 15, 237, 0.12);
+    background: rgba(16, 185, 129, 0.12);
   }
 
-  /* ENTUR OS surface card — theme-aware */
+  /* Clinilucro surface card — theme-aware */
   .surface {
     @apply bg-card border border-border;
     border-radius: 0.875rem;
@@ -427,7 +436,7 @@
       0 0 0 0.5px rgba(255, 255, 255, 0.05),
       0 2px 4px rgba(0, 0, 0, 0.35),
       0 6px 20px rgba(0, 0, 0, 0.25),
-      0 0 40px rgba(96, 15, 237, 0.06);
+      0 0 40px rgba(16, 185, 129, 0.06);
   }
 
   /* Glassmorphism — theme-aware */
@@ -445,7 +454,7 @@
   }
   .input-inset:focus-within {
     @apply bg-background border-primary/50;
-    box-shadow: 0 0 0 3px rgba(96, 15, 237, 0.2);
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
   }
 
   /* Section label */
@@ -459,9 +468,9 @@
     margin-bottom: 0.25rem;
   }
 
-  /* ENTUR OS gradient badge — brand gradient */
+  /* Clinilucro gradient badge — brand gradient */
   .badge-gradient {
-    background: linear-gradient(135deg, #600FED, #DC00E7, #FF2B61);
+    background: linear-gradient(135deg, #047857, #10B981, #84CC16);
     color: white;
     font-size: 0.6875rem;
     font-weight: 600;
@@ -469,18 +478,31 @@
     border-radius: 9999px;
   }
 
-  /* ENTUR OS brand gradient for accents */
+  /* Clinilucro brand gradient for accents */
+  .brand-gradient {
+    background: linear-gradient(135deg, #047857, #10B981, #84CC16);
+  }
+  .brand-gradient-text {
+    background: linear-gradient(135deg, #047857, #10B981, #84CC16);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .brand-gradient-reverse {
+    background: linear-gradient(135deg, #84CC16, #10B981, #047857);
+  }
+  /* Aliases legados (mantidos para compat com código existente) */
   .entur-gradient {
-    background: linear-gradient(135deg, #FFC7AC, #FF614C, #FF2B61, #DC00E7, #600FED);
+    background: linear-gradient(135deg, #047857, #10B981, #84CC16);
   }
   .entur-gradient-text {
-    background: linear-gradient(135deg, #FFC7AC, #FF614C, #FF2B61, #DC00E7, #600FED);
+    background: linear-gradient(135deg, #047857, #10B981, #84CC16);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
   }
   .entur-gradient-reverse {
-    background: linear-gradient(135deg, #600FED, #DC00E7, #FF2B61, #FF614C, #FFC7AC);
+    background: linear-gradient(135deg, #84CC16, #10B981, #047857);
   }
 }
 
@@ -488,10 +510,10 @@
   /* Thin scrollbar — theme-aware */
   .scrollbar-thin {
     scrollbar-width: thin;
-    scrollbar-color: oklch(0.80 0.005 270) transparent;
+    scrollbar-color: oklch(0.80 0.005 160) transparent;
   }
   .dark .scrollbar-thin {
-    scrollbar-color: #1E2350 transparent;
+    scrollbar-color: #1B4438 transparent;
   }
   .scrollbar-thin::-webkit-scrollbar {
     width: 6px;
@@ -501,17 +523,17 @@
     background: transparent;
   }
   .scrollbar-thin::-webkit-scrollbar-thumb {
-    background-color: oklch(0.80 0.005 270);
+    background-color: oklch(0.80 0.005 160);
     border-radius: 10px;
   }
   .dark .scrollbar-thin::-webkit-scrollbar-thumb {
-    background-color: #1E2350;
+    background-color: #1B4438;
   }
   .scrollbar-thin::-webkit-scrollbar-thumb:hover {
-    background-color: oklch(0.70 0.005 270);
+    background-color: oklch(0.70 0.005 160);
   }
   .dark .scrollbar-thin::-webkit-scrollbar-thumb:hover {
-    background-color: #2A3060;
+    background-color: #265B4B;
   }
 
   /* Hide scrollbar but keep scrolling */

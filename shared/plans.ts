@@ -1,5 +1,5 @@
 /**
- * FALLBACK ESTÁTICO — Definição centralizada dos planos do ENTUR OS.
+ * FALLBACK ESTÁTICO — Definição centralizada dos planos do Clinilucro.
  *
  * IMPORTANTE: O sistema agora consome planos dinamicamente do banco de dados
  * via `server/services/dynamicPlanService.ts`. Este arquivo serve apenas como

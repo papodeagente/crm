@@ -6,54 +6,54 @@ const cards = [
     icon: CalendarCheck,
     title: "Agendamento inteligente",
     description:
-      "Controle datas de servico, retorno e revisao de cada cliente. Saiba exatamente quem atender e quando.",
+      "Controle datas de procedimento, retorno e revisão de cada paciente. Saiba exatamente quem atender e quando.",
   },
   {
     icon: MessageCircle,
     title: "WhatsApp integrado",
     description:
-      "Converse com seus clientes direto pelo CRM. Historico completo, mensagens rapidas e follow-up automatico.",
+      "Converse com seus pacientes direto pelo CRM. Histórico completo, mensagens rápidas e follow-up automático.",
   },
   {
     icon: UserPlus,
-    title: "Indicacoes e captacao",
+    title: "Indicações e captação",
     description:
-      "Rastreie a origem de cada cliente — indicacao, Instagram, Google. Saiba de onde vem seus melhores resultados.",
+      "Rastreie a origem de cada paciente — indicação, Instagram, Google. Saiba de onde vêm seus melhores resultados.",
   },
   {
     icon: Heart,
-    title: "Fidelizacao e recorrencia",
+    title: "Fidelização e recorrência",
     description:
-      "Classifique clientes, acompanhe frequencia de retorno e crie campanhas para manter sua base ativa.",
+      "Classifique pacientes, acompanhe frequência de retorno e crie campanhas para manter sua base ativa.",
   },
 ];
 
 const segments = [
-  "Estetica",
+  "Estética",
   "Odontologia",
-  "Salao",
-  "Advocacia",
-  "Clinicas",
+  "Dermatologia",
+  "Fisioterapia",
+  "Clínicas Médicas",
 ];
 
 export function LocalBusinessSection() {
   return (
     <section className="py-24 sm:py-32 px-5 sm:px-8 relative overflow-hidden">
       <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute top-1/3 right-0 w-[600px] h-[500px] bg-gradient-to-l from-violet-600/8 via-purple-600/5 to-transparent rounded-full blur-[120px]" />
+        <div className="absolute top-1/3 right-0 w-[600px] h-[500px] bg-gradient-to-l from-emerald-600/8 via-lime-500/5 to-transparent rounded-full blur-[120px]" />
       </div>
 
       <div className="max-w-5xl mx-auto relative z-10">
         <FadeIn>
           <div className="text-center mb-14">
             <p className="text-sm font-medium text-white/60 uppercase tracking-wider mb-4">
-              Feito para negocios locais
+              Feito para clínicas
             </p>
             <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white tracking-tight leading-tight">
-              CRM feito para negocios locais.{" "}
+              CRM feito para clínicas.{" "}
               <br className="hidden sm:block" />
-              <span className="bg-gradient-to-r from-[#FFC7AC] via-[#FF614C] to-[#FF2B61] bg-clip-text text-transparent">
-                Agendamento, WhatsApp, indicacoes e fidelizacao.
+              <span className="bg-gradient-to-r from-[#A7F3D0] via-[#10B981] to-[#84CC16] bg-clip-text text-transparent">
+                Agendamento, WhatsApp, indicações e fidelização.
               </span>
             </h2>
           </div>
@@ -90,7 +90,7 @@ export function LocalBusinessSection() {
               ))}
             </div>
             <p className="text-base text-white/40 max-w-2xl mx-auto leading-relaxed">
-              Ideal para qualquer negocio local que precisa de agenda,
+              Ideal para qualquer clínica que precisa de agenda,
               relacionamento e vendas organizadas.
             </p>
           </div>

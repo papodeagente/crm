@@ -1,28 +1,37 @@
+import { ClinilucroLogo, ClinilucroMark } from "./ClinilucroLogo";
 import { useTheme } from "@/contexts/ThemeContext";
-
-// Logo preta (para fundo claro / tema light)
-const LOGO_LIGHT = "https://d2xsxph8kpxj0f.cloudfront.net/310519663249817763/EKvcVicuVoUxTnzjSKzgdk/logo-dark_2e24a3dc.webp";
-// Logo branca (para fundo escuro / tema dark)
-const LOGO_DARK = "https://d2xsxph8kpxj0f.cloudfront.net/310519663249817763/EKvcVicuVoUxTnzjSKzgdk/logo-light_c3efa809.webp";
 
 interface ThemedLogoProps {
   className?: string;
   /** Force a specific variant regardless of theme */
   variant?: "light" | "dark";
+  /** Render only the symbol mark (no wordmark). */
+  markOnly?: boolean;
 }
 
-export function ThemedLogo({ className = "h-5 object-contain", variant }: ThemedLogoProps) {
+/**
+ * Theme-aware Clinilucro logo. Replaces the previous CDN <img> implementation.
+ * On dark backgrounds, the mark uses a brighter mint→lime gradient and the
+ * wordmark renders in white. On light backgrounds, the mark uses the deeper
+ * emerald→lime gradient and the wordmark renders in slate-900.
+ */
+export function ThemedLogo({ className = "h-5", variant, markOnly = false }: ThemedLogoProps) {
   const { theme } = useTheme();
   const effectiveTheme = variant || theme;
-  const src = effectiveTheme === "dark" ? LOGO_DARK : LOGO_LIGHT;
+  const isDark = effectiveTheme === "dark";
 
-  return <img src={src} alt="enturOS CRM" className={className} />;
+  if (markOnly) {
+    return <ClinilucroMark className={className} inverted={isDark} />;
+  }
+
+  return <ClinilucroLogo className={className} inverted={isDark} textInverted={isDark} />;
 }
 
-/** Use outside ThemeProvider (landing page, login, etc.) — always dark bg */
-export function StaticLogo({ className = "h-5 object-contain", variant = "dark" }: ThemedLogoProps) {
-  const src = variant === "dark" ? LOGO_DARK : LOGO_LIGHT;
-  return <img src={src} alt="enturOS CRM" className={className} />;
+/** Use outside ThemeProvider (landing page, login, etc.) — defaults to dark variant suitable for dark hero backgrounds. */
+export function StaticLogo({ className = "h-5", variant = "dark", markOnly = false }: ThemedLogoProps) {
+  const isDark = variant === "dark";
+  if (markOnly) {
+    return <ClinilucroMark className={className} inverted={isDark} />;
+  }
+  return <ClinilucroLogo className={className} inverted={isDark} textInverted={isDark} />;
 }
-
-export { LOGO_DARK, LOGO_LIGHT };

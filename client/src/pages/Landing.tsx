@@ -14,7 +14,7 @@ export default function Landing() {
   const [, navigate] = useLocation();
 
   useEffect(() => {
-    document.title = "Entur OS — CRM para Negocios Locais";
+    document.title = "Clinilucro — CRM para Clínicas";
   }, []);
 
   const goToRegister = (plan?: string) => {
@@ -22,7 +22,7 @@ export default function Landing() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0a0a12] text-white overflow-x-hidden">
+    <div className="min-h-screen bg-[#06140F] text-white overflow-x-hidden">
       {/* SEÇÃO 1 — Hero */}
       <HeroSection onRegister={() => goToRegister()} />
 
@@ -35,7 +35,7 @@ export default function Landing() {
       {/* SEÇÃO 4 — Diferenciais (id=como-funciona) */}
       <DifferentialsSection onRegister={() => goToRegister()} />
 
-      {/* SECAO 5 — Feito para Negocios Locais */}
+      {/* SECAO 5 — Feito para Clínicas */}
       <LocalBusinessSection />
 
       {/* SEÇÃO 6 — Resultados */}

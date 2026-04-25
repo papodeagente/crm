@@ -373,7 +373,7 @@ export function PricingSection({ onSelectPlan }: PricingSectionProps) {
     <>
       <section id="planos" className="py-24 sm:py-32 px-5 sm:px-8 relative overflow-hidden">
         <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[600px] bg-gradient-to-b from-violet-600/15 via-purple-600/10 to-transparent rounded-full blur-[120px]" />
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[600px] bg-gradient-to-b from-emerald-600/15 via-emerald-500/10 to-transparent rounded-full blur-[120px]" />
         </div>
 
         <div className="max-w-5xl mx-auto relative z-10">
@@ -381,8 +381,8 @@ export function PricingSection({ onSelectPlan }: PricingSectionProps) {
             <div className="text-center mb-14">
               <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white mb-4 tracking-tight leading-tight">
                 Escolha o plano{" "}
-                <span className="bg-gradient-to-r from-[#FFC7AC] via-[#FF614C] to-[#FF2B61] bg-clip-text text-transparent">
-                  do seu negócio
+                <span className="bg-gradient-to-r from-[#A7F3D0] via-[#10B981] to-[#84CC16] bg-clip-text text-transparent">
+                  da sua clínica
                 </span>
               </h2>
               <p className="text-lg text-white/40 max-w-xl mx-auto">

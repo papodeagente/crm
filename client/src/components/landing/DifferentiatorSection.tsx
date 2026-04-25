@@ -20,13 +20,13 @@ export function DifferentiatorSection() {
           <div className="text-center mb-12">
             <div className="inline-flex items-center gap-2 bg-fuchsia-500/10 text-fuchsia-300 px-4 py-1.5 rounded-full text-sm font-medium mb-5 border border-fuchsia-500/15">
               <Plane className="w-4 h-4" />
-              Feito para negocios locais
+              Feito para clínicas
             </div>
             <h2 className="text-3xl sm:text-4xl font-bold text-white mb-4 tracking-tight">
               Não é um CRM genérico
             </h2>
             <p className="text-lg text-white/45 max-w-2xl mx-auto leading-relaxed">
-              Foi criado especificamente para negocios locais.
+              Foi criado especificamente para clínicas.
               Porque atender clientes envolve:
             </p>
           </div>

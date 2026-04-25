@@ -2788,7 +2788,7 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
       }),
   }),
 
-  // ─── ENTUR OS CRM Modules ───
+  // ─── Clinilucro CRM Modules ───
   admin: adminRouter,       // M0: Admin/IAM
   crm: crmRouter,           // M2: CRM (Contacts, Deals, Pipelines, Trips, Tasks, Notes)
   inbox: inboxRouter,       // M1: Inbox Omnichannel
@@ -3662,7 +3662,7 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
       }),
   }),
 
-  // ── Field Mappings (RD Station ↔ Entur OS) ──
+  // ── Field Mappings (RD Station ↔ Clinilucro) ──
   fieldMappings: router({
     list: tenantAdminProcedure
       .query(async ({ input, ctx }) => {
@@ -3729,7 +3729,7 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
         return { success: true };
       }),
 
-    // Lista campos padrão do Entur OS disponíveis para mapeamento
+    // Lista campos padrão do Clinilucro disponíveis para mapeamento
     enturStandardFields: tenantAdminProcedure
       .query(async () => {
         return [
@@ -3749,7 +3749,7 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
         ];
       }),
 
-    // Lista campos personalizados do Entur OS disponíveis para mapeamento
+    // Lista campos personalizados do Clinilucro disponíveis para mapeamento
     enturCustomFields: tenantAdminProcedure
       .query(async ({ input, ctx }) => {
         const db = await getDb();

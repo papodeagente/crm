@@ -439,7 +439,7 @@ export default function RDCrmImport() {
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-2xl font-semibold tracking-tight text-foreground">Migrar para o Entur OS</h1>
+              <h1 className="text-2xl font-semibold tracking-tight text-foreground">Migrar para o Clinilucro</h1>
             </div>
             <p className="text-[13px] text-muted-foreground mt-0.5">
               Importe seus dados com máxima fidelidade e continue sua operação sem interrupção
@@ -787,7 +787,7 @@ export default function RDCrmImport() {
                   {cleanBeforeImport && (
                     <div className="mt-3 flex items-start gap-2 p-2 rounded-lg bg-destructive/10 border border-destructive/20">
                       <AlertTriangle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
-                      <p className="text-[11px] text-destructive">Todos os dados previamente importados do RD Station serão removidos antes da nova importação. Os dados criados manualmente no Entur OS não serão afetados.</p>
+                      <p className="text-[11px] text-destructive">Todos os dados previamente importados do RD Station serão removidos antes da nova importação. Os dados criados manualmente no Clinilucro não serão afetados.</p>
                     </div>
                   )}
                 </CardContent>
@@ -940,7 +940,7 @@ export default function RDCrmImport() {
                     {totalErrorsSoFar > 0 && <span className="text-red-400"> · {totalErrorsSoFar} erros</span>}
                   </p>
                   <p className="text-xs text-muted-foreground mt-2">
-                    Sua operação do RD Station CRM foi transferida para o Entur OS. Verifique seus funis e negociações.
+                    Sua operação do RD Station CRM foi transferida para o Clinilucro. Verifique seus funis e negociações.
                   </p>
                 </CardContent>
               </Card>

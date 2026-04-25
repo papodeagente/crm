@@ -59,7 +59,7 @@ export function ProblemSection() {
 
         <FadeIn delay={0.5}>
           <p className="text-center text-base sm:text-lg text-white/60 max-w-3xl mx-auto leading-relaxed font-medium">
-            A ENTUR OS foi construído para resolver esses três problemas
+            A Clinilucro foi construído para resolver esses três problemas
             e transformar a operação de negócios locais.
           </p>
         </FadeIn>

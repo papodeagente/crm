@@ -107,7 +107,7 @@ export default function RDFieldMappings() {
               </div>
               <div>
                 <h1 className="text-lg font-bold text-foreground">Mapeamento de Campos</h1>
-                <p className="text-xs text-muted-foreground">RD Station Marketing ↔ Entur OS</p>
+                <p className="text-xs text-muted-foreground">RD Station Marketing ↔ Clinilucro</p>
               </div>
             </div>
           </div>
@@ -123,7 +123,7 @@ export default function RDFieldMappings() {
               <p className="text-sm font-medium text-foreground">Como funciona o mapeamento?</p>
               <p className="text-xs text-muted-foreground leading-relaxed">
                 Quando um lead chega do RD Station via webhook, o sistema verifica os mapeamentos configurados aqui.
-                Para cada campo do RD Station mapeado, o valor é automaticamente copiado para o campo correspondente no Entur OS.
+                Para cada campo do RD Station mapeado, o valor é automaticamente copiado para o campo correspondente no Clinilucro.
                 Isso permite que <strong>campos personalizados</strong> do RD Station (como interesse, orçamento, destino preferido)
                 sejam vinculados a campos do seu CRM sem intervenção manual.
               </p>
@@ -170,7 +170,7 @@ export default function RDFieldMappings() {
           <div className="text-center py-12 bg-card border border-dashed border-border rounded-xl">
             <Unlink className="h-10 w-10 mx-auto mb-3 text-muted-foreground/30" />
             <p className="text-sm font-medium text-muted-foreground">Nenhum mapeamento configurado</p>
-            <p className="text-xs text-muted-foreground mt-1">Crie mapeamentos para vincular campos do RD Station aos campos do Entur OS</p>
+            <p className="text-xs text-muted-foreground mt-1">Crie mapeamentos para vincular campos do RD Station aos campos do Clinilucro</p>
             <Button size="sm" className="mt-4" onClick={() => setShowAdd(true)}>
               <Plus className="h-3.5 w-3.5 mr-1" /> Criar primeiro mapeamento
             </Button>
@@ -181,7 +181,7 @@ export default function RDFieldMappings() {
             <div className="grid grid-cols-[1fr_40px_1fr_100px] gap-3 px-4 py-2 text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
               <span>Campo RD Station</span>
               <span></span>
-              <span>Campo Entur OS</span>
+              <span>Campo Clinilucro</span>
               <span className="text-right">Ações</span>
             </div>
 
@@ -213,7 +213,7 @@ export default function RDFieldMappings() {
                     <ArrowRight className={`h-4 w-4 ${m.isActive ? "text-primary" : "text-muted-foreground/40"}`} />
                   </div>
 
-                  {/* Entur OS Field */}
+                  {/* Clinilucro Field */}
                   <div className="flex items-center gap-2">
                     <div className="w-7 h-7 rounded bg-primary/10 flex items-center justify-center shrink-0">
                       <span className="text-[10px] font-bold text-primary">EN</span>
@@ -476,13 +476,13 @@ function MappingDialog({
             </div>
           </div>
 
-          {/* Entur OS Field */}
+          {/* Clinilucro Field */}
           <div className="space-y-3">
             <div className="flex items-center gap-2">
               <div className="w-6 h-6 rounded bg-primary/10 flex items-center justify-center">
                 <span className="text-[9px] font-bold text-primary">EN</span>
               </div>
-              <h3 className="text-sm font-semibold">Campo do Entur OS</h3>
+              <h3 className="text-sm font-semibold">Campo do Clinilucro</h3>
             </div>
 
             <div>

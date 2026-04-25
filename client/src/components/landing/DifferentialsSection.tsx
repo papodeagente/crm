@@ -15,7 +15,7 @@ const differentials = [
     icon: LayoutDashboard,
     title: "Funil de vendas específico",
     description:
-      "O funil de vendas do Entur OS e pensado especificamente na rotina de negocios locais, por isso gera mais resultado.",
+      "O funil de vendas do Clinilucro e pensado especificamente na rotina de clínicas, por isso gera mais resultado.",
   },
   {
     icon: MessageCircle,
@@ -66,7 +66,7 @@ export function DifferentialsSection({ onRegister }: DifferentialsSectionProps) 
               O que muda na sua operação
             </p>
             <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white tracking-tight leading-tight">
-              Seis coisas que o ENTUR OS faz{" "}
+              Seis coisas que o Clinilucro faz{" "}
               <br className="hidden sm:block" />
               e nenhum CRM genérico oferece
             </h2>

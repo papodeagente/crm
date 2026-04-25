@@ -2,8 +2,8 @@ import { Resend } from "resend";
 
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 
-const FROM_EMAIL = process.env.EMAIL_FROM || "Entur OS <noreply@enturos.com>";
-const APP_NAME = "Entur OS";
+const FROM_EMAIL = process.env.EMAIL_FROM || "Clinilucro <noreply@clinilucro.app>";
+const APP_NAME = "Clinilucro";
 
 // ═══════════════════════════════════════
 // SEND EMAIL HELPER

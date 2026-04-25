@@ -4,8 +4,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useLocation } from "wouter";
-import { Loader2, Eye, EyeOff, Plane } from "lucide-react";
+import { Loader2, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
+import { StaticLogo } from "@/components/ThemedLogo";
 
 export default function SaasLogin() {
   const [, navigate] = useLocation();
@@ -60,7 +61,7 @@ export default function SaasLogin() {
   // Show loading while checking session
   if (checkingSession) {
     return (
-      <div className="min-h-screen bg-[#0a0a12] flex items-center justify-center">
+      <div className="min-h-screen bg-[#06140F] flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
           <Loader2 className="w-8 h-8 animate-spin text-white/60" />
           <p className="text-sm text-white/50">Verificando sessão...</p>
@@ -70,21 +71,21 @@ export default function SaasLogin() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0a0a12] flex items-center justify-center p-4 relative overflow-hidden">
+    <div className="min-h-screen bg-[#06140F] flex items-center justify-center p-4 relative overflow-hidden">
       {/* Background decoration */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-96 h-96 bg-purple-600/10 rounded-full blur-3xl" />
-        <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-purple-800/10 rounded-full blur-3xl" />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-purple-500/5 rounded-full blur-3xl" />
+        <div className="absolute -top-40 -right-40 w-96 h-96 bg-emerald-600/10 rounded-full blur-3xl" />
+        <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-lime-500/10 rounded-full blur-3xl" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-emerald-500/5 rounded-full blur-3xl" />
       </div>
 
       <div className="w-full max-w-md relative z-10">
         {/* Logo */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center gap-2 mb-2">
-            <img src="https://d2xsxph8kpxj0f.cloudfront.net/310519663249817763/EKvcVicuVoUxTnzjSKzgdk/logo-light_c3efa809.webp" alt="enturOS CRM" className="h-9 object-contain" />
+          <div className="inline-flex items-center justify-center gap-2 mb-2">
+            <StaticLogo className="h-9" variant="dark" />
           </div>
-          <p className="text-sm text-white/50">CRM para negocios locais</p>
+          <p className="text-sm text-white/50">CRM para clínicas</p>
         </div>
 
         {/* Card */}
@@ -106,7 +107,7 @@ export default function SaasLogin() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                className="h-11 bg-white/5 border-white/10 text-white placeholder:text-gray-500 focus:border-purple-500 focus:ring-purple-500/20"
+                className="h-11 bg-white/5 border-white/10 text-white placeholder:text-gray-500 focus:border-emerald-500 focus:ring-emerald-500/20"
               />
             </div>
             <div className="space-y-2">
@@ -119,7 +120,7 @@ export default function SaasLogin() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  className="h-11 bg-white/5 border-white/10 text-white placeholder:text-gray-500 focus:border-purple-500 focus:ring-purple-500/20 pr-10"
+                  className="h-11 bg-white/5 border-white/10 text-white placeholder:text-gray-500 focus:border-emerald-500 focus:ring-emerald-500/20 pr-10"
                 />
                 <button
                   type="button"
@@ -143,7 +144,7 @@ export default function SaasLogin() {
 
             <Button
               type="submit"
-              className="w-full h-11 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-500 hover:to-purple-600 text-white font-medium shadow-lg shadow-purple-500/20 transition-all"
+              className="w-full h-11 bg-gradient-to-r from-emerald-600 to-lime-500 hover:from-emerald-500 hover:to-lime-400 text-white font-medium shadow-lg shadow-emerald-500/20 transition-all"
               disabled={loginMutation.isPending}
             >
               {loginMutation.isPending ? (

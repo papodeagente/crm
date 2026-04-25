@@ -7,7 +7,7 @@ const TESTIMONIALS = [
     city: "São Paulo, SP",
     photo: "https://d2xsxph8kpxj0f.cloudfront.net/310519663249817763/EKvcVicuVoUxTnzjSKzgdk/testimonial-woman-1_42afe008.jpg",
     result: "Aumentou conversão em 35%",
-    text: "Antes do ENTUR OS, eu perdia clientes porque esquecia de fazer follow-up. Agora tenho visão completa de cada negociação e minha conversão subiu de 12% para 35% em 6 meses.",
+    text: "Antes do Clinilucro, eu perdia clientes porque esquecia de fazer follow-up. Agora tenho visão completa de cada negociação e minha conversão subiu de 12% para 35% em 6 meses.",
   },
   {
     name: "Carlos Mendes",
