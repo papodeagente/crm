@@ -12,16 +12,12 @@ export async function listTemplates(tenantId: number) {
   const db = await getDb();
   if (!db) return [];
 
-  // Auto-seed: se nao existem templates para este tenant, popula com as 3 anamneses padrao (HOF/Estetica/CO2)
-  const existing = await db.execute(sql`SELECT COUNT(*)::int as cnt FROM anamnesis_templates WHERE "tenantId" = ${tenantId}`);
-  const cnt = ((existing.rows as any[])[0]?.cnt ?? 0) as number;
-  if (cnt === 0) {
-    try {
-      const { seedDefaultAnamneseTemplates } = await import("./anamnesisSeeds");
-      await seedDefaultAnamneseTemplates(tenantId);
-    } catch (err) {
-      console.error("[anamnesis] auto-seed failed", err);
-    }
+  // Auto-seed idempotente por slug — garante que os 3 templates padrao (HOF/Estetica/CO2) existam para o tenant
+  try {
+    const { seedDefaultAnamneseTemplates } = await import("./anamnesisSeeds");
+    await seedDefaultAnamneseTemplates(tenantId);
+  } catch (err) {
+    console.error("[anamnesis] auto-seed failed", err);
   }
 
   const result = await db.execute(sql`
