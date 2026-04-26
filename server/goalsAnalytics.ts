@@ -141,7 +141,7 @@ export async function getGoalsReport(tenantId: number): Promise<GoalsReportData>
 
       if (goal.metricKey === 'total_sold') {
         const [rows] = await db.execute(
-          sql`SELECT COALESCE(SUM(d.valueCents), 0) as total FROM deals d WHERE ${sql.raw(whereClause)} AND d.status = 'won'`
+          sql`SELECT COALESCE(SUM(d."valueCents"), 0) as total FROM deals d WHERE ${sql.raw(whereClause)} AND d.status = 'won'`
         );
         currentValue = Number((rows as any)[0]?.total ?? 0);
       } else if (goal.metricKey === 'deals_count') {
@@ -196,13 +196,13 @@ export async function getGoalsReport(tenantId: number): Promise<GoalsReportData>
       SUM(CASE WHEN status = 'won' THEN 1 ELSE 0 END) as wonDeals,
       SUM(CASE WHEN status = 'lost' THEN 1 ELSE 0 END) as lostDeals,
       SUM(CASE WHEN status = 'open' THEN 1 ELSE 0 END) as openDeals,
-      COALESCE(SUM(valueCents), 0) as totalValueCents,
-      COALESCE(SUM(CASE WHEN status = 'won' THEN valueCents ELSE 0 END), 0) as wonValueCents
+      COALESCE(SUM("valueCents"), 0) as totalValueCents,
+      COALESCE(SUM(CASE WHEN status = 'won' THEN "valueCents" ELSE 0 END), 0) as wonValueCents
     FROM deals
-    WHERE tenantId = ${tenantId}
-      AND deletedAt IS NULL
-      AND createdAt >= ${sql.raw(`'${mStart}'`)}
-      AND createdAt <= ${sql.raw(`'${mEnd}'`)}
+    WHERE "tenantId" = ${tenantId}
+      AND "deletedAt" IS NULL
+      AND "createdAt" >= ${sql.raw(`'${mStart}'`)}
+      AND "createdAt" <= ${sql.raw(`'${mEnd}'`)}
   `);
   const dm = (dealRows as any)[0] || {};
   const totalDeals = Number(dm.totalDeals ?? 0);
@@ -225,14 +225,14 @@ export async function getGoalsReport(tenantId: number): Promise<GoalsReportData>
       dp.name,
       dp.category,
       SUM(dp.quantity) as qty,
-      SUM(dp.finalPriceCents) as totalValue
+      SUM(dp."finalPriceCents") as totalValue
     FROM deal_products dp
-    JOIN deals d ON dp.dealId = d.id AND dp.tenantId = d.tenantId
-    WHERE dp.tenantId = ${tenantId}
+    JOIN deals d ON dp."dealId" = d.id AND dp."tenantId" = d."tenantId"
+    WHERE dp."tenantId" = ${tenantId}
       AND d.status = 'won'
-      AND d.deletedAt IS NULL
-      AND d.createdAt >= ${sql.raw(`'${mStart}'`)}
-      AND d.createdAt <= ${sql.raw(`'${mEnd}'`)}
+      AND d."deletedAt" IS NULL
+      AND d."createdAt" >= ${sql.raw(`'${mStart}'`)}
+      AND d."createdAt" <= ${sql.raw(`'${mEnd}'`)}
     GROUP BY dp.name, dp.category
     ORDER BY totalValue DESC
     LIMIT 5

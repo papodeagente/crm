@@ -13,7 +13,7 @@
  *   2. Script de migração one-time → tenants existentes recebem o padrão
  */
 
-import { getDb } from "../db";
+import { getDb, rowsOf } from "../db";
 import { rdFieldMappings } from "../../drizzle/schema";
 import { eq, and, sql } from "drizzle-orm";
 
@@ -144,8 +144,7 @@ export async function seedUtmMappingsForAllTenants(): Promise<{
 
   // Get all tenant IDs
   const rows = await db.execute(sql`SELECT id FROM tenants ORDER BY id`);
-  const tenantIds = (rows as unknown as any[])[0]?.map?.((r: any) => r.id) 
-    ?? (rows as unknown as any[]).map((r: any) => r.id);
+  const tenantIds = rowsOf(rows).map((r: any) => r.id);
 
   let tenantsProvisioned = 0;
   let tenantsSkipped = 0;

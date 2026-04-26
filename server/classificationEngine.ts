@@ -437,10 +437,10 @@ export async function processReferralWindows(tenantId: number) {
   // Find contacts with expired referral windows
   await db.execute(sql`
     UPDATE contacts 
-    SET referralWindowStart = NULL
-    WHERE tenantId = ${tenantId}
-      AND referralWindowStart IS NOT NULL
-      AND referralWindowStart < ${cutoff}
+    SET "referralWindowStart" = NULL
+    WHERE "tenantId" = ${tenantId}
+      AND "referralWindowStart" IS NOT NULL
+      AND "referralWindowStart" < ${cutoff}
   `);
 }
 
@@ -458,29 +458,29 @@ export async function processInactiveClients(tenantId: number, inactivityDays: n
   // Update clients who have been inactive beyond the threshold
   await db.execute(sql`
     UPDATE contacts 
-    SET stageClassification = 'ex_cliente',
-        lifecycleStage = 'churned'
-    WHERE tenantId = ${tenantId}
-      AND totalPurchases > 0
-      AND lastPurchaseAt IS NOT NULL
-      AND lastPurchaseAt < ${cutoff}
-      AND stageClassification IN ('cliente_primeira_compra', 'cliente_ativo', 'cliente_recorrente')
-      AND stageClassification != 'promotor'
+    SET "stageClassification" = 'ex_cliente',
+        "lifecycleStage" = 'churned'
+    WHERE "tenantId" = ${tenantId}
+      AND "totalPurchases" > 0
+      AND "lastPurchaseAt" IS NOT NULL
+      AND "lastPurchaseAt" < ${cutoff}
+      AND "stageClassification" IN ('cliente_primeira_compra', 'cliente_ativo', 'cliente_recorrente')
+      AND "stageClassification" != 'promotor'
   `);
 
   // Update active clients (within cycle)
   await db.execute(sql`
     UPDATE contacts 
-    SET stageClassification = CASE 
-        WHEN totalPurchases = 1 THEN 'cliente_primeira_compra'
-        WHEN totalPurchases > 1 THEN 'cliente_recorrente'
-        ELSE stageClassification
+    SET "stageClassification" = CASE 
+        WHEN "totalPurchases" = 1 THEN 'cliente_primeira_compra'
+        WHEN "totalPurchases" > 1 THEN 'cliente_recorrente'
+        ELSE "stageClassification"
       END
-    WHERE tenantId = ${tenantId}
-      AND totalPurchases > 0
-      AND lastPurchaseAt IS NOT NULL
-      AND lastPurchaseAt >= ${cutoff}
-      AND stageClassification = 'ex_cliente'
+    WHERE "tenantId" = ${tenantId}
+      AND "totalPurchases" > 0
+      AND "lastPurchaseAt" IS NOT NULL
+      AND "lastPurchaseAt" >= ${cutoff}
+      AND "stageClassification" = 'ex_cliente'
   `);
 }
 

@@ -9,7 +9,7 @@
  * - homeFilterOptions: list of users and teams for admin filter
  */
 
-import { getDb } from "../db";
+import { getDb, rowsOf } from "../db";
 import { sql } from "drizzle-orm";
 
 // ═══════════════════════════════════════
@@ -20,9 +20,9 @@ async function getTeamMemberIds(tenantId: number, teamId: number): Promise<numbe
   const db = await getDb();
   if (!db) return [];
   const rows = await db.execute(sql`
-    SELECT userId FROM team_members WHERE tenantId = ${tenantId} AND teamId = ${teamId}
+    SELECT "userId" FROM team_members WHERE "tenantId" = ${tenantId} AND "teamId" = ${teamId}
   `);
-  return (rows as unknown as any[]).map((r: any) => Number(r.userId));
+  return rowsOf(rows).map((r: any) => Number(r.userId));
 }
 
 // ═══════════════════════════════════════
@@ -37,7 +37,7 @@ function buildOwnerFilter(userId?: number, userIds?: number[]) {
     return sql.raw(`AND d.ownerUserId IN (${idList})`);
   }
   if (userId) {
-    return sql`AND d.ownerUserId = ${userId}`;
+    return sql`AND d."ownerUserId" = ${userId}`;
   }
   return sql``;
 }
@@ -53,9 +53,9 @@ function buildTaskUserFilter(userId?: number, userIds?: number[]) {
   }
   if (userId) {
     return sql`AND (
-      t.assignedToUserId = ${userId}
-      OR t.createdByUserId = ${userId}
-      OR t.id IN (SELECT taskId FROM task_assignees WHERE userId = ${userId})
+      t."assignedToUserId" = ${userId}
+      OR t."createdByUserId" = ${userId}
+      OR t.id IN (SELECT "taskId" FROM task_assignees WHERE "userId" = ${userId})
     )`;
   }
   return sql``;
@@ -70,17 +70,17 @@ export async function getHomeFilterOptions(tenantId: number) {
   if (!db) return { users: [], teams: [] };
 
   const userRows = await db.execute(sql`
-    SELECT id, name, email, crm_user_role as role, avatarUrl
+    SELECT id, name, email, crm_user_role as role, "avatarUrl"
     FROM crm_users
-    WHERE tenantId = ${tenantId} AND status = 'active'
+    WHERE "tenantId" = ${tenantId} AND status = 'active'
     ORDER BY name ASC
   `);
 
   const teamRows = await db.execute(sql`
     SELECT t.id, t.name, t.color,
-      (SELECT COUNT(*) FROM team_members tm WHERE tm.teamId = t.id AND tm.tenantId = ${tenantId}) as memberCount
+      (SELECT COUNT(*) FROM team_members tm WHERE tm."teamId" = t.id AND tm."tenantId" = ${tenantId}) as memberCount
     FROM teams t
-    WHERE t.tenantId = ${tenantId}
+    WHERE t."tenantId" = ${tenantId}
     ORDER BY t.name ASC
   `);
 
@@ -162,11 +162,11 @@ export async function getHomeExecutive(tenantId: number, userId?: number, teamId
   const activeResult = await db.execute(sql`
     SELECT
       COUNT(*) as activeDeals,
-      COALESCE(SUM(d.valueCents), 0) as activeValueCents
+      COALESCE(SUM(d."valueCents"), 0) as activeValueCents
     FROM deals d
-    JOIN pipelines p ON p.id = d.pipelineId AND p.pipelineType = 'sales'
-    WHERE d.tenantId = ${tenantId}
-      AND d.deletedAt IS NULL
+    JOIN pipelines p ON p.id = d."pipelineId" AND p."pipelineType" = 'sales'
+    WHERE d."tenantId" = ${tenantId}
+      AND d."deletedAt" IS NULL
       AND d.status = 'open'
       ${ownerFilter}
   `);
@@ -179,12 +179,12 @@ export async function getHomeExecutive(tenantId: number, userId?: number, teamId
     SELECT
       SUM(CASE WHEN d.status = 'won' THEN 1 ELSE 0 END) as wonDeals,
       SUM(CASE WHEN d.status = 'lost' THEN 1 ELSE 0 END) as lostDeals,
-      COALESCE(SUM(CASE WHEN d.status = 'won' THEN d.valueCents ELSE 0 END), 0) as wonValueCents
+      COALESCE(SUM(CASE WHEN d.status = 'won' THEN d."valueCents" ELSE 0 END), 0) as wonValueCents
     FROM deals d
-    JOIN pipelines p ON p.id = d.pipelineId AND p.pipelineType = 'sales'
-    WHERE d.tenantId = ${tenantId}
-      AND d.deletedAt IS NULL
-      AND d.updatedAt >= ${monthStart}
+    JOIN pipelines p ON p.id = d."pipelineId" AND p."pipelineType" = 'sales'
+    WHERE d."tenantId" = ${tenantId}
+      AND d."deletedAt" IS NULL
+      AND d."updatedAt" >= ${monthStart}
       AND d.status IN ('won', 'lost')
       ${ownerFilter}
   `);
@@ -200,26 +200,26 @@ export async function getHomeExecutive(tenantId: number, userId?: number, teamId
 
   // 3. Deals without any pending/in_progress task
   const noTaskResult = await db.execute(sql`
-    SELECT d.id, d.title, d.valueCents, d.ownerUserId, d.stageId, d.createdAt, d.lastActivityAt,
+    SELECT d.id, d.title, d."valueCents", d."ownerUserId", d."stageId", d."createdAt", d."lastActivityAt",
            ps.name as stageName,
            c.name as contactName,
            u.name as ownerName
     FROM deals d
-    JOIN pipelines p ON p.id = d.pipelineId AND p.pipelineType = 'sales'
-    LEFT JOIN pipeline_stages ps ON ps.id = d.stageId
-    LEFT JOIN contacts c ON c.id = d.contactId
-    LEFT JOIN crm_users u ON u.id = d.ownerUserId AND u.tenantId = ${tenantId}
-    WHERE d.tenantId = ${tenantId}
-      AND d.deletedAt IS NULL
+    JOIN pipelines p ON p.id = d."pipelineId" AND p."pipelineType" = 'sales'
+    LEFT JOIN pipeline_stages ps ON ps.id = d."stageId"
+    LEFT JOIN contacts c ON c.id = d."contactId"
+    LEFT JOIN crm_users u ON u.id = d."ownerUserId" AND u."tenantId" = ${tenantId}
+    WHERE d."tenantId" = ${tenantId}
+      AND d."deletedAt" IS NULL
       AND d.status = 'open'
       ${ownerFilter}
       AND d.id NOT IN (
-        SELECT DISTINCT t.entityId FROM crm_tasks t
-        WHERE t.tenantId = ${tenantId}
-          AND t.entityType = 'deal'
+        SELECT DISTINCT t."entityId" FROM crm_tasks t
+        WHERE t."tenantId" = ${tenantId}
+          AND t."entityType" = 'deal'
           AND t.status IN ('pending', 'in_progress')
       )
-    ORDER BY d.lastActivityAt ASC
+    ORDER BY d."lastActivityAt" ASC
     LIMIT 100
   `);
   const dealsWithoutTaskList = (noTaskResult as any[]).map((r: any) => ({
@@ -234,21 +234,21 @@ export async function getHomeExecutive(tenantId: number, userId?: number, teamId
 
   // 4. Cooling deals — uses per-stage coolingEnabled + coolingDays from pipeline config
   const coolingResult = await db.execute(sql`
-    SELECT d.id, d.title, d.valueCents, d.ownerUserId, d.stageId, d.createdAt, d.lastActivityAt,
-           ps.name as stageName, ps.coolingDays,
+    SELECT d.id, d.title, d."valueCents", d."ownerUserId", d."stageId", d."createdAt", d."lastActivityAt",
+           ps.name as stageName, ps."coolingDays",
            c.name as contactName,
            u.name as ownerName
     FROM deals d
-    JOIN pipelines p ON p.id = d.pipelineId AND p.pipelineType = 'sales'
-    INNER JOIN pipeline_stages ps ON ps.id = d.stageId AND ps.coolingEnabled = true
-    LEFT JOIN contacts c ON c.id = d.contactId
-    LEFT JOIN crm_users u ON u.id = d.ownerUserId AND u.tenantId = ${tenantId}
-    WHERE d.tenantId = ${tenantId}
-      AND d.deletedAt IS NULL
+    JOIN pipelines p ON p.id = d."pipelineId" AND p."pipelineType" = 'sales'
+    INNER JOIN pipeline_stages ps ON ps.id = d."stageId" AND ps."coolingEnabled" = true
+    LEFT JOIN contacts c ON c.id = d."contactId"
+    LEFT JOIN crm_users u ON u.id = d."ownerUserId" AND u."tenantId" = ${tenantId}
+    WHERE d."tenantId" = ${tenantId}
+      AND d."deletedAt" IS NULL
       AND d.status = 'open'
       ${ownerFilter}
-      AND COALESCE(d.lastActivityAt, d.createdAt) < NOW() - INTERVAL '1 day' * COALESCE(ps.coolingDays, 3)
-    ORDER BY COALESCE(d.lastActivityAt, d.createdAt) ASC
+      AND COALESCE(d."lastActivityAt", d."createdAt") < NOW() - INTERVAL '1 day' * COALESCE(ps."coolingDays", 3)
+    ORDER BY COALESCE(d."lastActivityAt", d."createdAt") ASC
     LIMIT 100
   `);
   const coolingDealsList = (coolingResult as any[]).map((r: any) => ({
@@ -305,39 +305,39 @@ export async function getHomeTasks(tenantId: number, userId?: number, limit = 15
   const userFilter = buildTaskUserFilter(userId, userIds);
 
   const rows = await db.execute(sql`
-    SELECT t.id, t.title, t.dueAt, t.priority, t.status, t.taskType,
-           t.entityType, t.entityId, t.description,
+    SELECT t.id, t.title, t."dueAt", t.priority, t.status, t."taskType",
+           t."entityType", t."entityId", t.description,
            d.title as dealTitle,
-           d.valueCents as dealValueCents,
+           d."valueCents" as dealValueCents,
            c.name as contactName,
            a.name as accountName
     FROM crm_tasks t
-    LEFT JOIN deals d ON t.entityType = 'deal' AND d.id = t.entityId AND d.tenantId = ${tenantId}
+    LEFT JOIN deals d ON t."entityType" = 'deal' AND d.id = t."entityId" AND d."tenantId" = ${tenantId}
     LEFT JOIN contacts c ON (
-      (t.entityType = 'contact' AND c.id = t.entityId)
-      OR (t.entityType = 'deal' AND d.contactId IS NOT NULL AND c.id = d.contactId)
-    ) AND c.tenantId = ${tenantId}
-    LEFT JOIN accounts a ON t.entityType = 'deal' AND d.accountId IS NOT NULL AND a.id = d.accountId AND a.tenantId = ${tenantId}
-    WHERE t.tenantId = ${tenantId}
+      (t."entityType" = 'contact' AND c.id = t."entityId")
+      OR (t."entityType" = 'deal' AND d."contactId" IS NOT NULL AND c.id = d."contactId")
+    ) AND c."tenantId" = ${tenantId}
+    LEFT JOIN accounts a ON t."entityType" = 'deal' AND d."accountId" IS NOT NULL AND a.id = d."accountId" AND a."tenantId" = ${tenantId}
+    WHERE t."tenantId" = ${tenantId}
       AND t.status IN ('pending', 'in_progress')
       ${userFilter}
       AND (
-        t.dueAt IS NULL
-        OR t.dueAt < ${futureLimit}
+        t."dueAt" IS NULL
+        OR t."dueAt" < ${futureLimit}
       )
     ORDER BY
       CASE
-        WHEN t.dueAt IS NOT NULL AND t.dueAt < ${now} THEN 0
-        WHEN t.dueAt IS NOT NULL AND t.dueAt < ${todayEnd} THEN 1
-        WHEN t.dueAt IS NOT NULL THEN 2
+        WHEN t."dueAt" IS NOT NULL AND t."dueAt" < ${now} THEN 0
+        WHEN t."dueAt" IS NOT NULL AND t."dueAt" < ${todayEnd} THEN 1
+        WHEN t."dueAt" IS NOT NULL THEN 2
         ELSE 3
       END ASC,
       CASE
-        WHEN t.dueAt IS NOT NULL AND t.dueAt < ${now} THEN t.dueAt
+        WHEN t."dueAt" IS NOT NULL AND t."dueAt" < ${now} THEN t."dueAt"
         ELSE NULL
       END ASC,
       CASE
-        WHEN t.dueAt IS NOT NULL AND t.dueAt >= ${now} THEN t.dueAt
+        WHEN t."dueAt" IS NOT NULL AND t."dueAt" >= ${now} THEN t."dueAt"
         ELSE NULL
       END ASC,
       CASE t.priority
@@ -349,7 +349,7 @@ export async function getHomeTasks(tenantId: number, userId?: number, limit = 15
     LIMIT ${limit}
   `);
 
-  return (rows as any[]).map((r: any) => ({
+  return rowsOf(rows).map((r: any) => ({
     id: Number(r.id),
     title: String(r.title),
     description: r.description ? String(r.description) : null,
@@ -389,19 +389,19 @@ export async function getHomeRFV(tenantId: number) {
     SELECT
       (
         SELECT COUNT(*) FROM rfv_contacts rc
-        WHERE rc.tenantId = ${tenantId} AND rc.deletedAt IS NULL AND rc.fScore > 0 AND rc.lastPurchaseAt >= ${thirtyDaysAgo}
+        WHERE rc."tenantId" = ${tenantId} AND rc."deletedAt" IS NULL AND rc."fScore" > 0 AND rc."lastPurchaseAt" >= ${thirtyDaysAgo}
       ) AS indicacao,
       (
         SELECT COUNT(*) FROM rfv_contacts rc
-        WHERE rc.tenantId = ${tenantId} AND rc.deletedAt IS NULL AND rc.fScore = 0 AND rc.lastPurchaseAt >= ${ninetyDaysAgo} AND rc.lastPurchaseAt < ${thirtyDaysAgo}
+        WHERE rc."tenantId" = ${tenantId} AND rc."deletedAt" IS NULL AND rc."fScore" = 0 AND rc."lastPurchaseAt" >= ${ninetyDaysAgo} AND rc."lastPurchaseAt" < ${thirtyDaysAgo}
       ) AS recuperacao,
       (
         SELECT COUNT(*) FROM rfv_contacts rc
-        WHERE rc.tenantId = ${tenantId} AND rc.deletedAt IS NULL AND rc.fScore > 1
+        WHERE rc."tenantId" = ${tenantId} AND rc."deletedAt" IS NULL AND rc."fScore" > 1
       ) AS recorrencia
   `);
 
-  const row = (result as any[])[0] || {};
+  const row = rowsOf(result)[0] || {};
   return {
     indicacao: Number(row.indicacao) || 0,
     recuperacao: Number(row.recuperacao) || 0,
@@ -446,27 +446,27 @@ export async function getHomeOnboarding(tenantId: number) {
   // Auto-detect completion based on real data
   const checks = await db.execute(sql`
     SELECT
-      (SELECT COUNT(*) FROM crm_users WHERE tenantId = ${tenantId}) as userCount,
-      (SELECT COUNT(*) FROM pipelines WHERE tenantId = ${tenantId}) as pipelineCount,
-      (SELECT COUNT(*) FROM pipeline_stages WHERE tenantId = ${tenantId}) as stageCount,
-      (SELECT COUNT(*) FROM product_catalog WHERE tenantId = ${tenantId} AND isActive = true) as productCount,
-      (SELECT COUNT(*) FROM loss_reasons WHERE tenantId = ${tenantId} AND deletedAt IS NULL) as lossReasonCount,
-      (SELECT COUNT(*) FROM contacts WHERE tenantId = ${tenantId} AND deletedAt IS NULL) as contactCount,
-      (SELECT COUNT(*) FROM custom_fields WHERE tenantId = ${tenantId}) as customFieldCount,
-      (SELECT COUNT(*) FROM goals WHERE tenantId = ${tenantId}) as goalCount,
-      (SELECT COUNT(*) FROM pipeline_automations WHERE tenantId = ${tenantId}) as automationCount,
-      (SELECT COUNT(*) FROM deals WHERE tenantId = ${tenantId} AND deletedAt IS NULL) as dealCount,
-      (SELECT COUNT(*) FROM crm_tasks WHERE tenantId = ${tenantId}) as taskCount,
-      (SELECT COUNT(*) FROM rfv_contacts WHERE tenantId = ${tenantId} AND deletedAt IS NULL) as rfvCount,
-      (SELECT COUNT(*) FROM whatsapp_sessions WHERE tenantId = ${tenantId}) as channelCount
+      (SELECT COUNT(*) FROM crm_users WHERE "tenantId" = ${tenantId}) as userCount,
+      (SELECT COUNT(*) FROM pipelines WHERE "tenantId" = ${tenantId}) as pipelineCount,
+      (SELECT COUNT(*) FROM pipeline_stages WHERE "tenantId" = ${tenantId}) as stageCount,
+      (SELECT COUNT(*) FROM product_catalog WHERE "tenantId" = ${tenantId} AND "isActive" = true) as productCount,
+      (SELECT COUNT(*) FROM loss_reasons WHERE "tenantId" = ${tenantId} AND "deletedAt" IS NULL) as lossReasonCount,
+      (SELECT COUNT(*) FROM contacts WHERE "tenantId" = ${tenantId} AND "deletedAt" IS NULL) as contactCount,
+      (SELECT COUNT(*) FROM custom_fields WHERE "tenantId" = ${tenantId}) as customFieldCount,
+      (SELECT COUNT(*) FROM goals WHERE "tenantId" = ${tenantId}) as goalCount,
+      (SELECT COUNT(*) FROM pipeline_automations WHERE "tenantId" = ${tenantId}) as automationCount,
+      (SELECT COUNT(*) FROM deals WHERE "tenantId" = ${tenantId} AND "deletedAt" IS NULL) as dealCount,
+      (SELECT COUNT(*) FROM crm_tasks WHERE "tenantId" = ${tenantId}) as taskCount,
+      (SELECT COUNT(*) FROM rfv_contacts WHERE "tenantId" = ${tenantId} AND "deletedAt" IS NULL) as rfvCount,
+      (SELECT COUNT(*) FROM whatsapp_sessions WHERE "tenantId" = ${tenantId}) as channelCount
   `);
 
   const data = (checks as any[])[0] || {};
   
   // Also check for manually dismissed items from user_preferences
   const prefRows = await db.execute(sql`
-    SELECT prefValue FROM user_preferences
-    WHERE tenantId = ${tenantId} AND prefKey = 'onboarding_completed_steps'
+    SELECT "prefValue" FROM user_preferences
+    WHERE "tenantId" = ${tenantId} AND "prefKey" = 'onboarding_completed_steps'
     LIMIT 1
   `);
   const manuallyCompleted: string[] = (() => {
@@ -514,8 +514,8 @@ export async function toggleOnboardingStep(tenantId: number, userId: number, ste
 
   // Get current manually completed steps
   const prefRows = await db.execute(sql`
-    SELECT prefValue FROM user_preferences
-    WHERE tenantId = ${tenantId} AND prefKey = 'onboarding_completed_steps'
+    SELECT "prefValue" FROM user_preferences
+    WHERE "tenantId" = ${tenantId} AND "prefKey" = 'onboarding_completed_steps'
     LIMIT 1
   `);
 
@@ -536,18 +536,18 @@ export async function toggleOnboardingStep(tenantId: number, userId: number, ste
   // Upsert
   const existing = await db.execute(sql`
     SELECT id FROM user_preferences
-    WHERE tenantId = ${tenantId} AND prefKey = 'onboarding_completed_steps'
+    WHERE "tenantId" = ${tenantId} AND "prefKey" = 'onboarding_completed_steps'
     LIMIT 1
   `);
 
   if ((existing as any[]).length > 0) {
     await db.execute(sql`
-      UPDATE user_preferences SET prefValue = ${value}, updatedAt = NOW()
-      WHERE tenantId = ${tenantId} AND prefKey = 'onboarding_completed_steps'
+      UPDATE user_preferences SET "prefValue" = ${value}, "updatedAt" = NOW()
+      WHERE "tenantId" = ${tenantId} AND "prefKey" = 'onboarding_completed_steps'
     `);
   } else {
     await db.execute(sql`
-      INSERT INTO user_preferences (userId, tenantId, prefKey, prefValue, createdAt, updatedAt)
+      INSERT INTO user_preferences ("userId", "tenantId", "prefKey", "prefValue", "createdAt", "updatedAt")
       VALUES (${userId}, ${tenantId}, 'onboarding_completed_steps', ${value}, NOW(), NOW())
     `);
   }
@@ -561,18 +561,18 @@ export async function dismissOnboarding(tenantId: number, userId: number) {
 
   const existing = await db.execute(sql`
     SELECT id FROM user_preferences
-    WHERE tenantId = ${tenantId} AND prefKey = 'onboarding_dismissed'
+    WHERE "tenantId" = ${tenantId} AND "prefKey" = 'onboarding_dismissed'
     LIMIT 1
   `);
 
   if ((existing as any[]).length > 0) {
     await db.execute(sql`
-      UPDATE user_preferences SET prefValue = 'true', updatedAt = NOW()
-      WHERE tenantId = ${tenantId} AND prefKey = 'onboarding_dismissed'
+      UPDATE user_preferences SET "prefValue" = 'true', "updatedAt" = NOW()
+      WHERE "tenantId" = ${tenantId} AND "prefKey" = 'onboarding_dismissed'
     `);
   } else {
     await db.execute(sql`
-      INSERT INTO user_preferences (userId, tenantId, prefKey, prefValue, createdAt, updatedAt)
+      INSERT INTO user_preferences ("userId", "tenantId", "prefKey", "prefValue", "createdAt", "updatedAt")
       VALUES (${userId}, ${tenantId}, 'onboarding_dismissed', 'true', NOW(), NOW())
     `);
   }
@@ -585,12 +585,12 @@ export async function isOnboardingDismissed(tenantId: number) {
   if (!db) return false;
 
   const rows = await db.execute(sql`
-    SELECT prefValue FROM user_preferences
-    WHERE tenantId = ${tenantId} AND prefKey = 'onboarding_dismissed'
+    SELECT "prefValue" FROM user_preferences
+    WHERE "tenantId" = ${tenantId} AND "prefKey" = 'onboarding_dismissed'
     LIMIT 1
   `);
 
-  return (rows as any[])[0]?.prefValue === 'true';
+  return rowsOf(rows)[0]?.prefValue === 'true';
 }
 
 
@@ -620,7 +620,7 @@ export async function getUpcomingAppointments(
     SELECT
       d.id,
       d.title,
-      d.valueCents,
+      d."valueCents",
       d."appointmentDate",
       d."followUpDate",
       d."ownerUserId",
@@ -645,7 +645,7 @@ export async function getUpcomingAppointments(
     LIMIT ${limit}
   `);
 
-  return (rows as any[]).map((r: any) => ({
+  return rowsOf(rows).map((r: any) => ({
     id: r.id,
     title: r.title,
     valueCents: Number(r.valueCents || 0),

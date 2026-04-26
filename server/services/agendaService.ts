@@ -100,7 +100,7 @@ async function getTeamMemberIds(tenantId: number, teamId: number): Promise<numbe
   const db = await getDb();
   if (!db) return [];
   const rows = await db.execute(sql`
-    SELECT userId FROM team_members WHERE tenantId = ${tenantId} AND teamId = ${teamId}
+    SELECT "userId" FROM team_members WHERE "tenantId" = ${tenantId} AND "teamId" = ${teamId}
   `);
   return extractRows(rows).map((r: any) => Number(r.userId));
 }
@@ -308,8 +308,8 @@ export async function syncGoogleCalendar(
 
   // Check if user has Google Calendar token
   const tokenRows = await db.execute(sql`
-    SELECT id, calendarEmail FROM google_calendar_tokens
-    WHERE tenantId = ${tenantId} AND userId = ${userId} AND isActive = true
+    SELECT id, "calendarEmail" FROM google_calendar_tokens
+    WHERE "tenantId" = ${tenantId} AND "userId" = ${userId} AND "isActive" = true
     LIMIT 1
   `);
   const tokens = extractRows(tokenRows);
@@ -356,22 +356,22 @@ export async function syncGoogleCalendar(
       // Upsert: INSERT ... ON CONFLICT DO UPDATE
       await db.execute(sql`
         INSERT INTO google_calendar_events
-          (tenantId, userId, googleEventId, title, description, startAt, endAt, allDay, location, status, htmlLink, sourceCalendarId, rawJson, syncedAt)
+          ("tenantId", "userId", "googleEventId", title, description, "startAt", "endAt", "allDay", location, status, "htmlLink", "sourceCalendarId", "rawJson", "syncedAt")
         VALUES
           (${tenantId}, ${userId}, ${googleEventId}, ${evt.summary || "(Sem título)"}, ${evt.description || null},
            ${startAt}, ${endAt}, ${isAllDay}, ${evt.location || null}, ${evt.status || "confirmed"},
            ${evt.htmlLink || null}, ${calendarEmail}, ${JSON.stringify(evt)}, ${syncedAt})
-        ON CONFLICT (tenantId, userId, googleEventId) DO UPDATE SET
+        ON CONFLICT ("tenantId", "userId", "googleEventId") DO UPDATE SET
           title = EXCLUDED.title,
           description = EXCLUDED.description,
-          startAt = EXCLUDED.startAt,
-          endAt = EXCLUDED.endAt,
-          allDay = EXCLUDED.allDay,
+          "startAt" = EXCLUDED."startAt",
+          "endAt" = EXCLUDED."endAt",
+          "allDay" = EXCLUDED."allDay",
           location = EXCLUDED.location,
           status = EXCLUDED.status,
-          htmlLink = EXCLUDED.htmlLink,
-          rawJson = EXCLUDED.rawJson,
-          syncedAt = EXCLUDED.syncedAt
+          "htmlLink" = EXCLUDED."htmlLink",
+          "rawJson" = EXCLUDED."rawJson",
+          "syncedAt" = EXCLUDED."syncedAt"
       `);
       syncCount++;
     }
@@ -383,11 +383,11 @@ export async function syncGoogleCalendar(
       const placeholders = fetchedIds.map(() => "?").join(",");
       await db.execute(sql`
         DELETE FROM google_calendar_events
-        WHERE tenantId = ${tenantId}
-          AND userId = ${userId}
-          AND startAt >= ${timeMin}
-          AND endAt <= ${timeMax}
-          AND googleEventId NOT IN (${sql.raw(fetchedIds.map(id => `'${id!.replace(/'/g, "''")}'`).join(","))})
+        WHERE "tenantId" = ${tenantId}
+          AND "userId" = ${userId}
+          AND "startAt" >= ${timeMin}
+          AND "endAt" <= ${timeMax}
+          AND "googleEventId" NOT IN (${sql.raw(fetchedIds.map(id => `'${id!.replace(/'/g, "''")}'`).join(","))})
       `);
     }
 
@@ -413,14 +413,14 @@ export async function disconnectGoogleCalendar(
   // Remove cached events
   await db.execute(sql`
     DELETE FROM google_calendar_events
-    WHERE tenantId = ${tenantId} AND userId = ${userId}
+    WHERE "tenantId" = ${tenantId} AND "userId" = ${userId}
   `);
 
   // Deactivate token
   await db.execute(sql`
     UPDATE google_calendar_tokens
-    SET isActive = false
-    WHERE tenantId = ${tenantId} AND userId = ${userId}
+    SET "isActive" = false
+    WHERE "tenantId" = ${tenantId} AND "userId" = ${userId}
   `);
 
   console.log(`[Agenda] Disconnected Google Calendar for user ${userId} (tenant ${tenantId})`);
@@ -439,8 +439,8 @@ export async function getGoogleCalendarStatus(
   if (!db) return { connected: false };
 
   const tokenRows = await db.execute(sql`
-    SELECT calendarEmail FROM google_calendar_tokens
-    WHERE tenantId = ${tenantId} AND userId = ${userId} AND isActive = true
+    SELECT "calendarEmail" FROM google_calendar_tokens
+    WHERE "tenantId" = ${tenantId} AND "userId" = ${userId} AND "isActive" = true
     LIMIT 1
   `);
   const tokens = extractRows(tokenRows);
@@ -448,8 +448,8 @@ export async function getGoogleCalendarStatus(
 
   // Get last sync time
   const syncRows = await db.execute(sql`
-    SELECT MAX(syncedAt) AS lastSync FROM google_calendar_events
-    WHERE tenantId = ${tenantId} AND userId = ${userId}
+    SELECT MAX("syncedAt") AS lastSync FROM google_calendar_events
+    WHERE "tenantId" = ${tenantId} AND "userId" = ${userId}
   `);
   const lastSync = extractRows(syncRows)[0]?.lastSync;
 
@@ -475,9 +475,9 @@ function buildTaskUserFilter(userId?: number, userIds?: number[]) {
   }
   if (userId) {
     return sql`AND (
-      t.assignedToUserId = ${userId}
-      OR t.createdByUserId = ${userId}
-      OR t.id IN (SELECT taskId FROM task_assignees WHERE userId = ${userId})
+      t."assignedToUserId" = ${userId}
+      OR t."createdByUserId" = ${userId}
+      OR t.id IN (SELECT "taskId" FROM task_assignees WHERE "userId" = ${userId})
     )`;
   }
   return sql``;
@@ -489,7 +489,7 @@ function buildGcalUserFilter(userId?: number, userIds?: number[]) {
     return sql.raw(`AND userId IN (${idList})`);
   }
   if (userId) {
-    return sql`AND userId = ${userId}`;
+    return sql`AND "userId" = ${userId}`;
   }
   return sql``;
 }

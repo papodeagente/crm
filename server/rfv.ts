@@ -2,7 +2,7 @@
  * RFV (Recência, Frequência, Valor) — Backend Logic
  * Classificação automática de contatos em 9 públicos comerciais
  */
-import { getDb } from "./db";
+import { getDb, rowsOf } from "./db";
 import { rfvContacts, contactActionLogs, deals, type RfvContact, type NewRfvContact } from "../drizzle/schema";
 import { eq, and, sql, desc, asc, like, isNull, or, lte, gte, between, inArray, gt, not } from "drizzle-orm";
 
@@ -294,10 +294,10 @@ async function getSmartFilterContactIds(db: any, tenantId: number, filter: Smart
       const dealRows = await db.execute(sql`
         SELECT DISTINCT rc.id
         FROM rfv_contacts rc
-        INNER JOIN contacts c ON c.id = rc.contactId AND c.tenantId = ${tenantId}
-        INNER JOIN deals d ON d.contactId = c.id AND d.tenantId = ${tenantId} AND d.deletedAt IS NULL
-        WHERE rc.tenantId = ${tenantId}
-          AND rc.deletedAt IS NULL
+        INNER JOIN contacts c ON c.id = rc."contactId" AND c."tenantId" = ${tenantId}
+        INNER JOIN deals d ON d."contactId" = c.id AND d."tenantId" = ${tenantId} AND d."deletedAt" IS NULL
+        WHERE rc."tenantId" = ${tenantId}
+          AND rc."deletedAt" IS NULL
           AND d.status = 'won'
           AND d."followUpDate" IS NOT NULL
           AND d."followUpDate" BETWEEN ${windowStart} AND ${windowEnd}
@@ -325,12 +325,12 @@ async function getSmartFilterContactIds(db: any, tenantId: number, filter: Smart
       const dealRows = await db.execute(sql`
         SELECT DISTINCT rc.id
         FROM rfv_contacts rc
-        INNER JOIN contacts c ON c.id = rc.contactId AND c.tenantId = ${tenantId}
-        INNER JOIN deals d ON d.contactId = c.id AND d.tenantId = ${tenantId} AND d.deletedAt IS NULL
-        WHERE rc.tenantId = ${tenantId}
-          AND rc.deletedAt IS NULL
+        INNER JOIN contacts c ON c.id = rc."contactId" AND c."tenantId" = ${tenantId}
+        INNER JOIN deals d ON d."contactId" = c.id AND d."tenantId" = ${tenantId} AND d."deletedAt" IS NULL
+        WHERE rc."tenantId" = ${tenantId}
+          AND rc."deletedAt" IS NULL
           AND d.status = 'lost'
-          AND d.updatedAt >= ${ninetyDaysAgo}
+          AND d."updatedAt" >= ${ninetyDaysAgo}
       `);
       const resultRows = (dealRows as unknown as any[]) || [];
       return resultRows.map((r: any) => r.id);
@@ -346,7 +346,7 @@ async function getSmartFilterContactIds(db: any, tenantId: number, filter: Smart
           AND rc."deletedAt" IS NULL
           AND COALESCE(c."referralCount", 0) > 0
       `);
-      const resultRows = (rows as unknown as any[]) || [];
+      const resultRows = rowsOf(rows);
       return resultRows.map((r: any) => r.id);
     }
 
@@ -361,7 +361,7 @@ async function getSmartFilterContactIds(db: any, tenantId: number, filter: Smart
           AND rc."deletedAt" IS NULL
           AND r.status = 'converted'
       `);
-      const resultRows = (rows as unknown as any[]) || [];
+      const resultRows = rowsOf(rows);
       return resultRows.map((r: any) => r.id);
     }
 
@@ -387,28 +387,28 @@ export async function getSmartFilterCounts(tenantId: number) {
     SELECT
       (
         SELECT COUNT(*) FROM rfv_contacts rc
-        WHERE ${sql.raw(baseWhere)} AND rc.rScore BETWEEN 250 AND 350 AND rc.fScore > 0
+        WHERE ${sql.raw(baseWhere)} AND rc."rScore" BETWEEN 250 AND 350 AND rc."fScore" > 0
       ) AS potencial_ex_cliente,
       (
         SELECT COUNT(*) FROM rfv_contacts rc
-        WHERE ${sql.raw(baseWhere)} AND rc.fScore > 0 AND rc.lastPurchaseAt >= ${thirtyDaysAgo}
+        WHERE ${sql.raw(baseWhere)} AND rc."fScore" > 0 AND rc."lastPurchaseAt" >= ${thirtyDaysAgo}
       ) AS potencial_indicador,
       (
         SELECT COUNT(DISTINCT rc.id) FROM rfv_contacts rc
-        INNER JOIN contacts c ON c.id = rc.contactId AND c.tenantId = ${tenantId}
-        INNER JOIN deals d ON d.contactId = c.id AND d.tenantId = ${tenantId} AND d.deletedAt IS NULL
+        INNER JOIN contacts c ON c.id = rc."contactId" AND c."tenantId" = ${tenantId}
+        INNER JOIN deals d ON d."contactId" = c.id AND d."tenantId" = ${tenantId} AND d."deletedAt" IS NULL
         WHERE ${sql.raw(baseWhere)} AND d.status = 'won' AND d."followUpDate" IS NOT NULL
           AND d."followUpDate" BETWEEN ${windowStart} AND ${windowEnd}
       ) AS potencial_indicador_pos_atendimento,
       (
         SELECT COUNT(*) FROM rfv_contacts rc
-        WHERE ${sql.raw(baseWhere)} AND rc.fScore > 1
+        WHERE ${sql.raw(baseWhere)} AND rc."fScore" > 1
       ) AS potencial_indicador_fiel,
       (
         SELECT COUNT(DISTINCT rc.id) FROM rfv_contacts rc
-        INNER JOIN contacts c ON c.id = rc.contactId AND c.tenantId = ${tenantId}
-        INNER JOIN deals d ON d.contactId = c.id AND d.tenantId = ${tenantId} AND d.deletedAt IS NULL
-        WHERE ${sql.raw(baseWhere)} AND d.status = 'lost' AND d.updatedAt >= ${ninetyDaysAgo}
+        INNER JOIN contacts c ON c.id = rc."contactId" AND c."tenantId" = ${tenantId}
+        INNER JOIN deals d ON d."contactId" = c.id AND d."tenantId" = ${tenantId} AND d."deletedAt" IS NULL
+        WHERE ${sql.raw(baseWhere)} AND d.status = 'lost' AND d."updatedAt" >= ${ninetyDaysAgo}
       ) AS abordagem_nao_cliente,
       (
         SELECT COUNT(DISTINCT rc.id) FROM rfv_contacts rc
@@ -423,7 +423,7 @@ export async function getSmartFilterCounts(tenantId: number) {
       ) AS indicados_convertidos
   `);
 
-  const row = (result as unknown as any[])?.[0] || {};
+  const row = rowsOf(result)[0] || {};
   return {
     potencial_ex_cliente: Number(row.potencial_ex_cliente || 0),
     potencial_indicador: Number(row.potencial_indicador || 0),
@@ -490,7 +490,7 @@ export async function getAlertaDinheiroParado(tenantId: number) {
         lte(rfvContacts.lastActionDate, sevenDaysAgo),
       ),
       // Focus audiences only
-      sql`audienceType IN ('oportunidade', 'cliente_primeira_compra', 'cliente_recorrente', 'nao_cliente')`,
+      sql`"audienceType" IN ('oportunidade', 'cliente_primeira_compra', 'cliente_recorrente', 'nao_cliente')`,
     ))
     .groupBy(rfvContacts.audienceType);
 
@@ -635,15 +635,15 @@ export async function recalculateRfvFromDeals(tenantId: number) {
       COUNT(d.id) as totalAtendimentos,
       SUM(CASE WHEN d.status = 'won' THEN 1 ELSE 0 END) as totalVendasGanhas,
       SUM(CASE WHEN d.status = 'lost' THEN 1 ELSE 0 END) as totalVendasPerdidas,
-      COALESCE(SUM(CASE WHEN d.status = 'won' THEN d.valueCents ELSE 0 END), 0) as totalValor,
-      MAX(CASE WHEN d.status = 'won' THEN d.updatedAt ELSE NULL END) as ultimaCompraDate,
-      (SELECT d2.status FROM deals d2 WHERE d2.contactId = c.id AND d2.tenantId = ${tenantId} AND d2.deletedAt IS NULL ORDER BY d2.updatedAt DESC LIMIT 1) as estadoMaisRecente,
-      MAX(d.updatedAt) as lastActionDate,
-      c.createdAt as contactCreatedAt
+      COALESCE(SUM(CASE WHEN d.status = 'won' THEN d."valueCents" ELSE 0 END), 0) as totalValor,
+      MAX(CASE WHEN d.status = 'won' THEN d."updatedAt" ELSE NULL END) as ultimaCompraDate,
+      (SELECT d2.status FROM deals d2 WHERE d2."contactId" = c.id AND d2."tenantId" = ${tenantId} AND d2."deletedAt" IS NULL ORDER BY d2."updatedAt" DESC LIMIT 1) as estadoMaisRecente,
+      MAX(d."updatedAt") as lastActionDate,
+      c."createdAt" as contactCreatedAt
     FROM contacts c
-    LEFT JOIN deals d ON d.contactId = c.id AND d.tenantId = ${tenantId} AND d.deletedAt IS NULL
-    WHERE c.tenantId = ${tenantId} AND c.deletedAt IS NULL
-    GROUP BY c.id, c.name, c.email, c.phone, c.createdAt
+    LEFT JOIN deals d ON d."contactId" = c.id AND d."tenantId" = ${tenantId} AND d."deletedAt" IS NULL
+    WHERE c."tenantId" = ${tenantId} AND c."deletedAt" IS NULL
+    GROUP BY c.id, c.name, c.email, c.phone, c."createdAt"
   `);
 
   const rows = (contactDeals as unknown as any[]) || [];

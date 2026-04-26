@@ -63,53 +63,53 @@ export const superAdminDashRouter = router({
         -- Tenants
         (SELECT COUNT(*) FROM tenants WHERE status = 'active') AS tenantsActive,
         (SELECT COUNT(*) FROM tenants) AS tenantsTotal,
-        (SELECT COUNT(*) FROM tenants WHERE billingStatus = 'trialing') AS tenantsTrial,
-        (SELECT COUNT(*) FROM tenants WHERE billingStatus IN ('active') AND plan != 'free') AS tenantsPaying,
-        (SELECT COUNT(*) FROM tenants WHERE billingStatus IN ('past_due', 'restricted')) AS tenantsOverdue,
-        (SELECT COUNT(*) FROM tenants WHERE billingStatus IN ('cancelled', 'expired')) AS tenantsChurned,
+        (SELECT COUNT(*) FROM tenants WHERE "billingStatus" = 'trialing') AS tenantsTrial,
+        (SELECT COUNT(*) FROM tenants WHERE "billingStatus" IN ('active') AND plan != 'free') AS tenantsPaying,
+        (SELECT COUNT(*) FROM tenants WHERE "billingStatus" IN ('past_due', 'restricted')) AS tenantsOverdue,
+        (SELECT COUNT(*) FROM tenants WHERE "billingStatus" IN ('cancelled', 'expired')) AS tenantsChurned,
         
         -- Users
         (SELECT COUNT(*) FROM crm_users WHERE status = 'active') AS usersActive,
-        (SELECT COUNT(DISTINCT cu.id) FROM crm_users cu WHERE cu.lastActiveAt >= ${sevenDaysAgo}) AS usersActive7d,
+        (SELECT COUNT(DISTINCT cu.id) FROM crm_users cu WHERE cu."lastActiveAt" >= ${sevenDaysAgo}) AS usersActive7d,
         
         -- Deals this month
-        (SELECT COUNT(*) FROM deals WHERE createdAt >= ${monthStart} AND deletedAt IS NULL) AS dealsCreatedMonth,
-        (SELECT COUNT(*) FROM deals WHERE status = 'won' AND updatedAt >= ${monthStart} AND deletedAt IS NULL) AS dealsWonMonth,
-        (SELECT COUNT(*) FROM deals WHERE status = 'lost' AND updatedAt >= ${monthStart} AND deletedAt IS NULL) AS dealsLostMonth,
-        (SELECT COALESCE(SUM(valueCents), 0) FROM deals WHERE status = 'won' AND updatedAt >= ${monthStart} AND deletedAt IS NULL) AS wonCentsMonth,
+        (SELECT COUNT(*) FROM deals WHERE "createdAt" >= ${monthStart} AND "deletedAt" IS NULL) AS dealsCreatedMonth,
+        (SELECT COUNT(*) FROM deals WHERE status = 'won' AND "updatedAt" >= ${monthStart} AND "deletedAt" IS NULL) AS dealsWonMonth,
+        (SELECT COUNT(*) FROM deals WHERE status = 'lost' AND "updatedAt" >= ${monthStart} AND "deletedAt" IS NULL) AS dealsLostMonth,
+        (SELECT COALESCE(SUM("valueCents"), 0) FROM deals WHERE status = 'won' AND "updatedAt" >= ${monthStart} AND "deletedAt" IS NULL) AS wonCentsMonth,
         
         -- Deals total
-        (SELECT COUNT(*) FROM deals WHERE status = 'open' AND deletedAt IS NULL) AS dealsOpenTotal,
-        (SELECT COALESCE(AVG(valueCents), 0) FROM deals WHERE status = 'won' AND deletedAt IS NULL AND valueCents > 0) AS avgTicketCents,
+        (SELECT COUNT(*) FROM deals WHERE status = 'open' AND "deletedAt" IS NULL) AS dealsOpenTotal,
+        (SELECT COALESCE(AVG("valueCents"), 0) FROM deals WHERE status = 'won' AND "deletedAt" IS NULL AND "valueCents" > 0) AS avgTicketCents,
         
         -- WhatsApp
         (SELECT COUNT(*) FROM whatsapp_sessions WHERE status = 'connected') AS waConnected,
         (SELECT COUNT(*) FROM whatsapp_sessions) AS waTotal,
-        (SELECT COUNT(*) FROM messages WHERE createdAt >= ${monthStart}) AS waMessagesMonth,
+        (SELECT COUNT(*) FROM messages WHERE "createdAt" >= ${monthStart}) AS waMessagesMonth,
         
         -- Contacts
-        (SELECT COUNT(*) FROM contacts WHERE deletedAt IS NULL) AS contactsTotal,
+        (SELECT COUNT(*) FROM contacts WHERE "deletedAt" IS NULL) AS contactsTotal,
         
         -- Integrations
         (SELECT COUNT(*) FROM integrations WHERE status = 'active') AS integrationsActive,
         
         -- Tasks
-        (SELECT COUNT(*) FROM crm_tasks WHERE createdAt >= ${monthStart}) AS tasksCreatedMonth,
+        (SELECT COUNT(*) FROM crm_tasks WHERE "createdAt" >= ${monthStart}) AS tasksCreatedMonth,
         
         -- AI usage (chatbot_settings via whatsapp_sessions join)
-        (SELECT COUNT(DISTINCT ws2.tenantId) FROM chatbot_settings cs JOIN whatsapp_sessions ws2 ON ws2.sessionId = cs.sessionId WHERE cs.enabled = true) AS tenantsWithAI,
+        (SELECT COUNT(DISTINCT ws2."tenantId") FROM chatbot_settings cs JOIN whatsapp_sessions ws2 ON ws2."sessionId" = cs."sessionId" WHERE cs.enabled = true) AS tenantsWithAI,
         
         -- Subscriptions MRR
-        (SELECT COALESCE(SUM(priceInCents), 0) FROM subscriptions WHERE status = 'active') AS mrrCents,
+        (SELECT COALESCE(SUM("priceInCents"), 0) FROM subscriptions WHERE status = 'active') AS mrrCents,
         
         -- Tenants without recent use (no user active in 30 days)
         (SELECT COUNT(*) FROM tenants t WHERE t.status = 'active' AND NOT EXISTS (
-          SELECT 1 FROM crm_users cu WHERE cu.tenantId = t.id AND cu.lastActiveAt >= ${thirtyDaysAgo}
+          SELECT 1 FROM crm_users cu WHERE cu."tenantId" = t.id AND cu."lastActiveAt" >= ${thirtyDaysAgo}
         )) AS tenantsNoRecentUse,
         
         -- Previous month deals for comparison
-        (SELECT COUNT(*) FROM deals WHERE createdAt >= ${prevMonthStart} AND createdAt < ${monthStart} AND deletedAt IS NULL) AS dealsCreatedPrevMonth,
-        (SELECT COALESCE(SUM(valueCents), 0) FROM deals WHERE status = 'won' AND updatedAt >= ${prevMonthStart} AND updatedAt < ${monthStart} AND deletedAt IS NULL) AS wonCentsPrevMonth
+        (SELECT COUNT(*) FROM deals WHERE "createdAt" >= ${prevMonthStart} AND "createdAt" < ${monthStart} AND "deletedAt" IS NULL) AS dealsCreatedPrevMonth,
+        (SELECT COALESCE(SUM("valueCents"), 0) FROM deals WHERE status = 'won' AND "updatedAt" >= ${prevMonthStart} AND "updatedAt" < ${monthStart} AND "deletedAt" IS NULL) AS wonCentsPrevMonth
     `) as any;
 
     const row = Array.isArray(result) ? result[0] : result;
@@ -160,16 +160,16 @@ export const superAdminDashRouter = router({
     const tenantsPerMonth = await db.execute(sql`
       SELECT TO_CHAR("createdAt", 'YYYY-MM') AS month, COUNT(*) AS count
       FROM tenants
-      WHERE createdAt >= NOW() - INTERVAL '12 months'
+      WHERE "createdAt" >= NOW() - INTERVAL '12 months'
       GROUP BY month ORDER BY month
     `) as any;
 
     // Deals created per month (last 12 months)
     const dealsPerMonth = await db.execute(sql`
       SELECT TO_CHAR("createdAt", 'YYYY-MM') AS month, COUNT(*) AS count,
-             SUM(CASE WHEN status = 'won' THEN COALESCE(valueCents, 0) ELSE 0 END) AS wonCents
+             SUM(CASE WHEN status = 'won' THEN COALESCE("valueCents", 0) ELSE 0 END) AS wonCents
       FROM deals
-      WHERE createdAt >= NOW() - INTERVAL '12 months' AND deletedAt IS NULL
+      WHERE "createdAt" >= NOW() - INTERVAL '12 months' AND "deletedAt" IS NULL
       GROUP BY month ORDER BY month
     `) as any;
 
@@ -177,7 +177,7 @@ export const superAdminDashRouter = router({
     const waPerMonth = await db.execute(sql`
       SELECT TO_CHAR("createdAt", 'YYYY-MM') AS month, COUNT(*) AS count
       FROM messages
-      WHERE createdAt >= NOW() - INTERVAL '6 months'
+      WHERE "createdAt" >= NOW() - INTERVAL '6 months'
       GROUP BY month ORDER BY month
     `) as any;
 
@@ -207,8 +207,8 @@ export const superAdminDashRouter = router({
     const waDisconnected = await db.execute(sql`
       SELECT t.id, t.name, t.plan FROM tenants t
       WHERE t.status = 'active'
-        AND EXISTS (SELECT 1 FROM whatsapp_sessions ws WHERE ws.tenantId = t.id)
-        AND NOT EXISTS (SELECT 1 FROM whatsapp_sessions ws WHERE ws.tenantId = t.id AND ws.status = 'connected')
+        AND EXISTS (SELECT 1 FROM whatsapp_sessions ws WHERE ws."tenantId" = t.id)
+        AND NOT EXISTS (SELECT 1 FROM whatsapp_sessions ws WHERE ws."tenantId" = t.id AND ws.status = 'connected')
       LIMIT 20
     `) as any;
 
@@ -216,22 +216,22 @@ export const superAdminDashRouter = router({
     const noActivity = await db.execute(sql`
       SELECT t.id, t.name, t.plan FROM tenants t
       WHERE t.status = 'active'
-        AND NOT EXISTS (SELECT 1 FROM crm_users cu WHERE cu.tenantId = t.id AND cu.lastActiveAt >= ${thirtyDaysAgo})
+        AND NOT EXISTS (SELECT 1 FROM crm_users cu WHERE cu."tenantId" = t.id AND cu."lastActiveAt" >= ${thirtyDaysAgo})
       LIMIT 20
     `) as any;
 
     // Tenants with overdue billing
     const overdue = await db.execute(sql`
-      SELECT t.id, t.name, t.plan, t.billingStatus FROM tenants t
-      WHERE t.billingStatus IN ('past_due', 'restricted')
+      SELECT t.id, t.name, t.plan, t."billingStatus" FROM tenants t
+      WHERE t."billingStatus" IN ('past_due', 'restricted')
       LIMIT 20
     `) as any;
 
     // Tenants with many users but low deal count
     const lowAdoption = await db.execute(sql`
       SELECT t.id, t.name, t.plan,
-        (SELECT COUNT(*) FROM crm_users cu WHERE cu.tenantId = t.id AND cu.status = 'active') AS userCount,
-        (SELECT COUNT(*) FROM deals d WHERE d.tenantId = t.id AND d.deletedAt IS NULL AND d.createdAt >= ${thirtyDaysAgo}) AS recentDeals
+        (SELECT COUNT(*) FROM crm_users cu WHERE cu."tenantId" = t.id AND cu.status = 'active') AS userCount,
+        (SELECT COUNT(*) FROM deals d WHERE d."tenantId" = t.id AND d."deletedAt" IS NULL AND d."createdAt" >= ${thirtyDaysAgo}) AS recentDeals
       FROM tenants t
       WHERE t.status = 'active'
       HAVING userCount >= 2 AND recentDeals <= 1
@@ -391,53 +391,53 @@ export const superAdminDashRouter = router({
 
       const result = await db.execute(sql`
         SELECT
-          t.id, t.name, t.plan, t.status, t.billingStatus, t.createdAt, t.freemiumDays, t.freemiumExpiresAt,
+          t.id, t.name, t.plan, t.status, t."billingStatus", t."createdAt", t."freemiumDays", t."freemiumExpiresAt",
           
           -- Users
-          (SELECT COUNT(*) FROM crm_users WHERE tenantId = ${tid} AND status = 'active') AS usersActive,
-          (SELECT COUNT(*) FROM crm_users WHERE tenantId = ${tid}) AS usersTotal,
-          (SELECT COUNT(DISTINCT id) FROM crm_users WHERE tenantId = ${tid} AND lastActiveAt >= ${sevenDaysAgo}) AS usersActive7d,
-          (SELECT COUNT(DISTINCT id) FROM crm_users WHERE tenantId = ${tid} AND lastActiveAt >= ${thirtyDaysAgo}) AS usersActive30d,
+          (SELECT COUNT(*) FROM crm_users WHERE "tenantId" = ${tid} AND status = 'active') AS usersActive,
+          (SELECT COUNT(*) FROM crm_users WHERE "tenantId" = ${tid}) AS usersTotal,
+          (SELECT COUNT(DISTINCT id) FROM crm_users WHERE "tenantId" = ${tid} AND "lastActiveAt" >= ${sevenDaysAgo}) AS usersActive7d,
+          (SELECT COUNT(DISTINCT id) FROM crm_users WHERE "tenantId" = ${tid} AND "lastActiveAt" >= ${thirtyDaysAgo}) AS usersActive30d,
           
           -- Deals
-          (SELECT COUNT(*) FROM deals WHERE tenantId = ${tid} AND status = 'open' AND deletedAt IS NULL) AS dealsOpen,
-          (SELECT COUNT(*) FROM deals WHERE tenantId = ${tid} AND status = 'won' AND updatedAt >= ${monthStart} AND deletedAt IS NULL) AS dealsWonMonth,
-          (SELECT COUNT(*) FROM deals WHERE tenantId = ${tid} AND status = 'lost' AND updatedAt >= ${monthStart} AND deletedAt IS NULL) AS dealsLostMonth,
-          (SELECT COALESCE(SUM(valueCents), 0) FROM deals WHERE tenantId = ${tid} AND status = 'won' AND updatedAt >= ${monthStart} AND deletedAt IS NULL) AS wonCentsMonth,
-          (SELECT COALESCE(AVG(valueCents), 0) FROM deals WHERE tenantId = ${tid} AND status = 'won' AND deletedAt IS NULL AND valueCents > 0) AS avgTicket,
-          (SELECT COUNT(*) FROM deals WHERE tenantId = ${tid} AND deletedAt IS NULL) AS dealsTotal,
+          (SELECT COUNT(*) FROM deals WHERE "tenantId" = ${tid} AND status = 'open' AND "deletedAt" IS NULL) AS dealsOpen,
+          (SELECT COUNT(*) FROM deals WHERE "tenantId" = ${tid} AND status = 'won' AND "updatedAt" >= ${monthStart} AND "deletedAt" IS NULL) AS dealsWonMonth,
+          (SELECT COUNT(*) FROM deals WHERE "tenantId" = ${tid} AND status = 'lost' AND "updatedAt" >= ${monthStart} AND "deletedAt" IS NULL) AS dealsLostMonth,
+          (SELECT COALESCE(SUM("valueCents"), 0) FROM deals WHERE "tenantId" = ${tid} AND status = 'won' AND "updatedAt" >= ${monthStart} AND "deletedAt" IS NULL) AS wonCentsMonth,
+          (SELECT COALESCE(AVG("valueCents"), 0) FROM deals WHERE "tenantId" = ${tid} AND status = 'won' AND "deletedAt" IS NULL AND "valueCents" > 0) AS avgTicket,
+          (SELECT COUNT(*) FROM deals WHERE "tenantId" = ${tid} AND "deletedAt" IS NULL) AS dealsTotal,
           
           -- Contacts
-          (SELECT COUNT(*) FROM contacts WHERE tenantId = ${tid} AND deletedAt IS NULL) AS contactsTotal,
+          (SELECT COUNT(*) FROM contacts WHERE "tenantId" = ${tid} AND "deletedAt" IS NULL) AS contactsTotal,
           
           -- Tasks
-          (SELECT COUNT(*) FROM crm_tasks WHERE tenantId = ${tid} AND createdAt >= ${monthStart}) AS tasksCreatedMonth,
-          (SELECT COUNT(*) FROM crm_tasks WHERE tenantId = ${tid} AND status = 'done') AS tasksDone,
+          (SELECT COUNT(*) FROM crm_tasks WHERE "tenantId" = ${tid} AND "createdAt" >= ${monthStart}) AS tasksCreatedMonth,
+          (SELECT COUNT(*) FROM crm_tasks WHERE "tenantId" = ${tid} AND status = 'done') AS tasksDone,
           
           -- WhatsApp
-          (SELECT COUNT(*) FROM whatsapp_sessions WHERE tenantId = ${tid} AND status = 'connected') AS waConnected,
-          (SELECT COUNT(*) FROM whatsapp_sessions WHERE tenantId = ${tid}) AS waTotal,
-          (SELECT COUNT(*) FROM messages WHERE sessionId IN (SELECT sessionId FROM whatsapp_sessions WHERE tenantId = ${tid}) AND createdAt >= ${monthStart}) AS waMessagesMonth,
+          (SELECT COUNT(*) FROM whatsapp_sessions WHERE "tenantId" = ${tid} AND status = 'connected') AS waConnected,
+          (SELECT COUNT(*) FROM whatsapp_sessions WHERE "tenantId" = ${tid}) AS waTotal,
+          (SELECT COUNT(*) FROM messages WHERE "sessionId" IN (SELECT "sessionId" FROM whatsapp_sessions WHERE "tenantId" = ${tid}) AND "createdAt" >= ${monthStart}) AS waMessagesMonth,
           
           -- Integrations
-          (SELECT COUNT(*) FROM integrations WHERE tenantId = ${tid} AND status = 'active') AS integrationsActive,
+          (SELECT COUNT(*) FROM integrations WHERE "tenantId" = ${tid} AND status = 'active') AS integrationsActive,
           
           -- AI (via whatsapp_sessions join)
-          (SELECT COUNT(*) FROM chatbot_settings cs JOIN whatsapp_sessions ws2 ON ws2.sessionId = cs.sessionId WHERE ws2.tenantId = ${tid} AND cs.enabled = true) AS aiEnabled,
+          (SELECT COUNT(*) FROM chatbot_settings cs JOIN whatsapp_sessions ws2 ON ws2."sessionId" = cs."sessionId" WHERE ws2."tenantId" = ${tid} AND cs.enabled = true) AS aiEnabled,
           
           -- Pipelines
-          (SELECT COUNT(*) FROM pipelines WHERE tenantId = ${tid}) AS pipelinesCount,
+          (SELECT COUNT(*) FROM pipelines WHERE "tenantId" = ${tid}) AS pipelinesCount,
           
           -- Automations
-          (SELECT COUNT(*) FROM pipeline_automations WHERE tenantId = ${tid} AND isActive = true) AS automationsActive,
+          (SELECT COUNT(*) FROM pipeline_automations WHERE "tenantId" = ${tid} AND "isActive" = true) AS automationsActive,
           
           -- Proposals
-          (SELECT COUNT(*) FROM proposals WHERE tenantId = ${tid}) AS proposalsTotal,
+          (SELECT COUNT(*) FROM proposals WHERE "tenantId" = ${tid}) AS proposalsTotal,
           
           -- Subscription
-          (SELECT s.plan FROM subscriptions s WHERE s.tenantId = ${tid} AND s.status = 'active' LIMIT 1) AS subPlan,
-          (SELECT s.status FROM subscriptions s WHERE s.tenantId = ${tid} ORDER BY s.createdAt DESC LIMIT 1) AS subStatus,
-          (SELECT s.priceInCents FROM subscriptions s WHERE s.tenantId = ${tid} AND s.status = 'active' LIMIT 1) AS subPriceCents
+          (SELECT s.plan FROM subscriptions s WHERE s."tenantId" = ${tid} AND s.status = 'active' LIMIT 1) AS subPlan,
+          (SELECT s.status FROM subscriptions s WHERE s."tenantId" = ${tid} ORDER BY s."createdAt" DESC LIMIT 1) AS subStatus,
+          (SELECT s."priceInCents" FROM subscriptions s WHERE s."tenantId" = ${tid} AND s.status = 'active' LIMIT 1) AS subPriceCents
           
         FROM tenants t WHERE t.id = ${tid}
       `) as any;
@@ -556,16 +556,16 @@ export const superAdminDashRouter = router({
 
     const result = await db.execute(sql`
       SELECT
-        (SELECT COUNT(DISTINCT tenantId) FROM contacts WHERE deletedAt IS NULL) AS tenantsWithContacts,
-        (SELECT COUNT(DISTINCT tenantId) FROM deals WHERE deletedAt IS NULL) AS tenantsWithDeals,
-        (SELECT COUNT(DISTINCT tenantId) FROM pipelines) AS tenantsWithPipelines,
-        (SELECT COUNT(DISTINCT tenantId) FROM crm_tasks) AS tenantsWithTasks,
-        (SELECT COUNT(DISTINCT tenantId) FROM pipeline_automations WHERE isActive = true) AS tenantsWithAutomations,
-        (SELECT COUNT(DISTINCT tenantId) FROM whatsapp_sessions WHERE status = 'connected') AS tenantsWithWA,
-        (SELECT COUNT(DISTINCT ws2.tenantId) FROM chatbot_settings cs JOIN whatsapp_sessions ws2 ON ws2.sessionId = cs.sessionId WHERE cs.enabled = true) AS tenantsWithAI,
-        (SELECT COUNT(DISTINCT tenantId) FROM integrations WHERE status = 'active') AS tenantsWithIntegrations,
-        (SELECT COUNT(DISTINCT tenantId) FROM proposals) AS tenantsWithProposals,
-        (SELECT COUNT(DISTINCT tenantId) FROM courses) AS tenantsWithAcademy,
+        (SELECT COUNT(DISTINCT "tenantId") FROM contacts WHERE "deletedAt" IS NULL) AS tenantsWithContacts,
+        (SELECT COUNT(DISTINCT "tenantId") FROM deals WHERE "deletedAt" IS NULL) AS tenantsWithDeals,
+        (SELECT COUNT(DISTINCT "tenantId") FROM pipelines) AS tenantsWithPipelines,
+        (SELECT COUNT(DISTINCT "tenantId") FROM crm_tasks) AS tenantsWithTasks,
+        (SELECT COUNT(DISTINCT "tenantId") FROM pipeline_automations WHERE "isActive" = true) AS tenantsWithAutomations,
+        (SELECT COUNT(DISTINCT "tenantId") FROM whatsapp_sessions WHERE status = 'connected') AS tenantsWithWA,
+        (SELECT COUNT(DISTINCT ws2."tenantId") FROM chatbot_settings cs JOIN whatsapp_sessions ws2 ON ws2."sessionId" = cs."sessionId" WHERE cs.enabled = true) AS tenantsWithAI,
+        (SELECT COUNT(DISTINCT "tenantId") FROM integrations WHERE status = 'active') AS tenantsWithIntegrations,
+        (SELECT COUNT(DISTINCT "tenantId") FROM proposals) AS tenantsWithProposals,
+        (SELECT COUNT(DISTINCT "tenantId") FROM courses) AS tenantsWithAcademy,
         (SELECT COUNT(*) FROM tenants WHERE status = 'active') AS totalActive
     `) as any;
 
@@ -606,7 +606,7 @@ export const superAdminDashRouter = router({
     const result = await db.execute(sql`
       SELECT
         -- Jobs
-        (SELECT COUNT(*) FROM jobs WHERE status = 'failed' AND createdAt >= ${oneDayAgo}) AS jobsFailed24h,
+        (SELECT COUNT(*) FROM jobs WHERE status = 'failed' AND "createdAt" >= ${oneDayAgo}) AS jobsFailed24h,
         (SELECT COUNT(*) FROM jobs WHERE status = 'pending') AS jobsPending,
         (SELECT COUNT(*) FROM job_dlq) AS jobsDlq,
         
@@ -617,8 +617,8 @@ export const superAdminDashRouter = router({
         -- Integration errors
         (SELECT COUNT(*) FROM integration_connections WHERE status = 'error') AS integErrors,
         
-        -- Webhook failures (webhook_config has no lastError column, count inactive instead)
-        (SELECT COUNT(*) FROM webhook_config WHERE isActive = 0) AS webhookErrors
+        -- Webhook failures (webhook_config has no "lastError" column, count inactive instead)
+        (SELECT COUNT(*) FROM webhook_config WHERE "isActive" = 0) AS webhookErrors
     `) as any;
 
     const row = Array.isArray(result) ? result[0] : result;
@@ -647,22 +647,22 @@ export const superAdminDashRouter = router({
 
     // Trial tenants with details
     const trials = await db.execute(sql`
-      SELECT t.id, t.name, t.plan, t.freemiumExpiresAt, t.createdAt,
-        (SELECT COUNT(*) FROM crm_users cu WHERE cu.tenantId = t.id AND cu.status = 'active') AS userCount,
-        (SELECT COUNT(*) FROM deals d WHERE d.tenantId = t.id AND d.deletedAt IS NULL) AS dealsCount,
-        (SELECT COUNT(*) FROM whatsapp_sessions ws WHERE ws.tenantId = t.id AND ws.status = 'connected') AS waConnected
+      SELECT t.id, t.name, t.plan, t."freemiumExpiresAt", t."createdAt",
+        (SELECT COUNT(*) FROM crm_users cu WHERE cu."tenantId" = t.id AND cu.status = 'active') AS userCount,
+        (SELECT COUNT(*) FROM deals d WHERE d."tenantId" = t.id AND d."deletedAt" IS NULL) AS dealsCount,
+        (SELECT COUNT(*) FROM whatsapp_sessions ws WHERE ws."tenantId" = t.id AND ws.status = 'connected') AS waConnected
       FROM tenants t
-      WHERE t.billingStatus = 'trialing'
-      ORDER BY t.freemiumExpiresAt ASC
+      WHERE t."billingStatus" = 'trialing'
+      ORDER BY t."freemiumExpiresAt" ASC
       LIMIT 50
     `) as any;
 
     // Tenants with upgrade potential (high usage on low plan)
     const upgradeCandiates = await db.execute(sql`
       SELECT t.id, t.name, t.plan,
-        (SELECT COUNT(*) FROM crm_users cu WHERE cu.tenantId = t.id AND cu.status = 'active') AS userCount,
-        (SELECT COUNT(*) FROM deals d WHERE d.tenantId = t.id AND d.deletedAt IS NULL) AS dealsCount,
-        (SELECT COALESCE(SUM(d.valueCents), 0) FROM deals d WHERE d.tenantId = t.id AND d.status = 'won' AND d.deletedAt IS NULL) AS totalWonCents
+        (SELECT COUNT(*) FROM crm_users cu WHERE cu."tenantId" = t.id AND cu.status = 'active') AS userCount,
+        (SELECT COUNT(*) FROM deals d WHERE d."tenantId" = t.id AND d."deletedAt" IS NULL) AS dealsCount,
+        (SELECT COALESCE(SUM(d."valueCents"), 0) FROM deals d WHERE d."tenantId" = t.id AND d.status = 'won' AND d."deletedAt" IS NULL) AS totalWonCents
       FROM tenants t
       WHERE t.plan IN ('free', 'start') AND t.status = 'active'
       HAVING userCount >= 2 OR dealsCount >= 10
@@ -673,11 +673,11 @@ export const superAdminDashRouter = router({
     // Churn risk (active but no recent activity)
     const churnRisk = await db.execute(sql`
       SELECT t.id, t.name, t.plan,
-        (SELECT MAX(cu.lastActiveAt) FROM crm_users cu WHERE cu.tenantId = t.id) AS lastActivity,
-        (SELECT COUNT(*) FROM crm_users cu WHERE cu.tenantId = t.id AND cu.status = 'active') AS userCount
+        (SELECT MAX(cu."lastActiveAt") FROM crm_users cu WHERE cu."tenantId" = t.id) AS lastActivity,
+        (SELECT COUNT(*) FROM crm_users cu WHERE cu."tenantId" = t.id AND cu.status = 'active') AS userCount
       FROM tenants t
-      WHERE t.status = 'active' AND t.billingStatus NOT IN ('cancelled', 'expired')
-        AND NOT EXISTS (SELECT 1 FROM crm_users cu WHERE cu.tenantId = t.id AND cu.lastActiveAt >= ${thirtyDaysAgo})
+      WHERE t.status = 'active' AND t."billingStatus" NOT IN ('cancelled', 'expired')
+        AND NOT EXISTS (SELECT 1 FROM crm_users cu WHERE cu."tenantId" = t.id AND cu."lastActiveAt" >= ${thirtyDaysAgo})
       ORDER BY lastActivity ASC
       LIMIT 30
     `) as any;
@@ -718,19 +718,19 @@ export const superAdminDashRouter = router({
       const result = await db.execute(sql`
         SELECT
           t.name, t.plan,
-          (SELECT COUNT(*) FROM crm_users WHERE tenantId = ${tid} AND status = 'active') AS usersActive,
-          (SELECT COUNT(*) FROM deals WHERE tenantId = ${tid} AND deletedAt IS NULL) AS dealsTotal,
-          (SELECT COUNT(*) FROM deals WHERE tenantId = ${tid} AND status = 'open' AND deletedAt IS NULL) AS dealsOpen,
-          (SELECT COUNT(*) FROM deals WHERE tenantId = ${tid} AND status = 'won' AND deletedAt IS NULL) AS dealsWon,
-          (SELECT COUNT(*) FROM deals WHERE tenantId = ${tid} AND status = 'lost' AND deletedAt IS NULL) AS dealsLost,
-          (SELECT COUNT(*) FROM contacts WHERE tenantId = ${tid} AND deletedAt IS NULL) AS contacts,
-          (SELECT COUNT(*) FROM crm_tasks WHERE tenantId = ${tid} AND createdAt >= ${monthStart}) AS tasksMonth,
-          (SELECT COUNT(*) FROM pipelines WHERE tenantId = ${tid}) AS pipelines,
-          (SELECT COUNT(*) FROM pipeline_automations WHERE tenantId = ${tid} AND isActive = true) AS automations,
-          (SELECT COUNT(*) FROM whatsapp_sessions WHERE tenantId = ${tid} AND status = 'connected') AS waConnected,
-          (SELECT COUNT(*) FROM chatbot_settings cs JOIN whatsapp_sessions ws2 ON ws2.sessionId = cs.sessionId WHERE ws2.tenantId = ${tid} AND cs.enabled = true) AS aiEnabled,
-          (SELECT COUNT(*) FROM integrations WHERE tenantId = ${tid} AND status = 'active') AS integrations,
-          (SELECT COUNT(*) FROM proposals WHERE tenantId = ${tid}) AS proposals
+          (SELECT COUNT(*) FROM crm_users WHERE "tenantId" = ${tid} AND status = 'active') AS usersActive,
+          (SELECT COUNT(*) FROM deals WHERE "tenantId" = ${tid} AND "deletedAt" IS NULL) AS dealsTotal,
+          (SELECT COUNT(*) FROM deals WHERE "tenantId" = ${tid} AND status = 'open' AND "deletedAt" IS NULL) AS dealsOpen,
+          (SELECT COUNT(*) FROM deals WHERE "tenantId" = ${tid} AND status = 'won' AND "deletedAt" IS NULL) AS dealsWon,
+          (SELECT COUNT(*) FROM deals WHERE "tenantId" = ${tid} AND status = 'lost' AND "deletedAt" IS NULL) AS dealsLost,
+          (SELECT COUNT(*) FROM contacts WHERE "tenantId" = ${tid} AND "deletedAt" IS NULL) AS contacts,
+          (SELECT COUNT(*) FROM crm_tasks WHERE "tenantId" = ${tid} AND "createdAt" >= ${monthStart}) AS tasksMonth,
+          (SELECT COUNT(*) FROM pipelines WHERE "tenantId" = ${tid}) AS pipelines,
+          (SELECT COUNT(*) FROM pipeline_automations WHERE "tenantId" = ${tid} AND "isActive" = true) AS automations,
+          (SELECT COUNT(*) FROM whatsapp_sessions WHERE "tenantId" = ${tid} AND status = 'connected') AS waConnected,
+          (SELECT COUNT(*) FROM chatbot_settings cs JOIN whatsapp_sessions ws2 ON ws2."sessionId" = cs."sessionId" WHERE ws2."tenantId" = ${tid} AND cs.enabled = true) AS aiEnabled,
+          (SELECT COUNT(*) FROM integrations WHERE "tenantId" = ${tid} AND status = 'active') AS integrations,
+          (SELECT COUNT(*) FROM proposals WHERE "tenantId" = ${tid}) AS proposals
         FROM tenants t WHERE t.id = ${tid}
       `) as any;
 
@@ -798,8 +798,8 @@ export const superAdminDashRouter = router({
       const db = await getDatabase();
 
       const [rows] = await db.execute(sql`
-        SELECT id, name, email, crm_user_role AS role, status, lastActiveAt, lastLoginAt, createdAt
-        FROM crm_users WHERE tenantId = ${input.tenantId}
+        SELECT id, name, email, crm_user_role AS role, status, "lastActiveAt", "lastLoginAt", "createdAt"
+        FROM crm_users WHERE "tenantId" = ${input.tenantId}
         ORDER BY "lastActiveAt" IS NULL, "lastActiveAt" DESC
         LIMIT 100
       `) as any;

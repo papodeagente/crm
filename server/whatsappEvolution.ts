@@ -1020,7 +1020,7 @@ class WhatsAppEvolutionManager extends EventEmitter {
             // Update if: no name, or current name is just a phone number
             if (newName && (!isRealName(currentName))) {
               updates.push(
-                db.execute(sql`UPDATE wa_conversations SET contactPushName = ${newName} WHERE id = ${row.id}`)
+                db.execute(sql`UPDATE wa_conversations SET "contactPushName" = ${newName} WHERE id = ${row.id}`)
                   .then(() => { resolved++; })
                   .catch(() => {})
               );
@@ -1358,7 +1358,7 @@ class WhatsAppEvolutionManager extends EventEmitter {
                   const currentName = row.contactPushName;
                   if (!isRealName(currentName) || currentName !== newName) {
                     updates.push(
-                      db.execute(sql`UPDATE wa_conversations SET contactPushName = ${newName} WHERE id = ${row.id}`)
+                      db.execute(sql`UPDATE wa_conversations SET "contactPushName" = ${newName} WHERE id = ${row.id}`)
                         .then(() => { updated++; })
                         .catch(() => {})
                     );
@@ -2739,7 +2739,7 @@ class WhatsAppEvolutionManager extends EventEmitter {
             const name = discoveredNames.get(row.remoteJid);
             if (name && isRealName(name) && !isRealName(row.contactPushName)) {
               await db.execute(
-                sql`UPDATE wa_conversations SET contactPushName = ${name} WHERE id = ${row.id}`
+                sql`UPDATE wa_conversations SET "contactPushName" = ${name} WHERE id = ${row.id}`
               ).catch(() => {});
               namesUpdated++;
             }
@@ -2969,7 +2969,7 @@ class WhatsAppEvolutionManager extends EventEmitter {
             const name = discoveredNames.get(row.remoteJid);
             if (name && isRealName(name) && !isRealName(row.contactPushName)) {
               await db.execute(
-                sql`UPDATE wa_conversations SET contactPushName = ${name} WHERE id = ${row.id}`
+                sql`UPDATE wa_conversations SET "contactPushName" = ${name} WHERE id = ${row.id}`
               ).catch(() => {});
               namesUpdated++;
             }

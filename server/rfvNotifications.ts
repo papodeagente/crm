@@ -39,9 +39,9 @@ export async function checkTenantRfvFilters(tenantId: number): Promise<FilterCha
 
   // 2. Get stored snapshots
   const snapResult = await db.execute(sql`
-    SELECT filterKey, currentCount
+    SELECT "filterKey", "currentCount"
     FROM rfv_filter_snapshots
-    WHERE tenantId = ${tenantId}
+    WHERE "tenantId" = ${tenantId}
   `);
   const snapRows = (snapResult as unknown as any[][])[0] || [];
   const snapshots = new Map<string, number>();
@@ -69,14 +69,14 @@ export async function checkTenantRfvFilters(tenantId: number): Promise<FilterCha
     if (snapshots.has(filterKey)) {
       await db.execute(sql`
         UPDATE rfv_filter_snapshots
-        SET previousCount = currentCount,
-            currentCount = ${current},
-            lastCheckedAt = NOW()
-        WHERE tenantId = ${tenantId} AND filterKey = ${filterKey}
+        SET "previousCount" = "currentCount",
+            "currentCount" = ${current},
+            "lastCheckedAt" = NOW()
+        WHERE "tenantId" = ${tenantId} AND "filterKey" = ${filterKey}
       `);
     } else {
       await db.execute(sql`
-        INSERT INTO rfv_filter_snapshots (tenantId, filterKey, previousCount, currentCount, lastCheckedAt)
+        INSERT INTO rfv_filter_snapshots ("tenantId", "filterKey", "previousCount", "currentCount", "lastCheckedAt")
         VALUES (${tenantId}, ${filterKey}, 0, ${current}, NOW())
       `);
     }
@@ -173,10 +173,10 @@ export async function getRfvFilterSnapshots(tenantId: number) {
   if (!db) return [];
 
   const result = await db.execute(sql`
-    SELECT filterKey, previousCount, currentCount, lastCheckedAt
+    SELECT "filterKey", "previousCount", "currentCount", "lastCheckedAt"
     FROM rfv_filter_snapshots
-    WHERE tenantId = ${tenantId}
-    ORDER BY filterKey
+    WHERE "tenantId" = ${tenantId}
+    ORDER BY "filterKey"
   `);
   const rows = (result as unknown as any[][])[0] || [];
 

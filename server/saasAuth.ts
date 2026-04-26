@@ -659,24 +659,24 @@ export async function getTenantMetricsAdmin(): Promise<TenantMetrics[]> {
     FROM tenants t
     LEFT JOIN (
       SELECT
-        tenantId,
-        SUM(CASE WHEN status = 'open' AND deletedAt IS NULL THEN 1 ELSE 0 END) AS dealsOpen,
-        SUM(CASE WHEN deletedAt IS NULL THEN 1 ELSE 0 END) AS dealsTotal,
-        SUM(CASE WHEN status = 'won' AND deletedAt IS NULL AND updatedAt >= ${monthStart} THEN COALESCE(valueCents, 0) ELSE 0 END) AS wonThisMonthCents
+        "tenantId",
+        SUM(CASE WHEN status = 'open' AND "deletedAt" IS NULL THEN 1 ELSE 0 END) AS dealsOpen,
+        SUM(CASE WHEN "deletedAt" IS NULL THEN 1 ELSE 0 END) AS dealsTotal,
+        SUM(CASE WHEN status = 'won' AND "deletedAt" IS NULL AND "updatedAt" >= ${monthStart} THEN COALESCE("valueCents", 0) ELSE 0 END) AS wonThisMonthCents
       FROM deals
-      GROUP BY tenantId
-    ) d ON d.tenantId = t.id
+      GROUP BY "tenantId"
+    ) d ON d."tenantId" = t.id
     LEFT JOIN (
-      SELECT tenantId, COUNT(*) AS contactsTotal
+      SELECT "tenantId", COUNT(*) AS contactsTotal
       FROM contacts
-      WHERE deletedAt IS NULL
-      GROUP BY tenantId
-    ) c ON c.tenantId = t.id
+      WHERE "deletedAt" IS NULL
+      GROUP BY "tenantId"
+    ) c ON c."tenantId" = t.id
     LEFT JOIN (
-      SELECT tenantId, SUM(CASE WHEN status = 'connected' THEN 1 ELSE 0 END) AS connectedCount
+      SELECT "tenantId", SUM(CASE WHEN status = 'connected' THEN 1 ELSE 0 END) AS connectedCount
       FROM whatsapp_sessions
-      GROUP BY tenantId
-    ) w ON w.tenantId = t.id
+      GROUP BY "tenantId"
+    ) w ON w."tenantId" = t.id
   `) as unknown as any[][];
 
   const resultRows = rows[0] || [];
@@ -727,7 +727,7 @@ export async function deleteTenantCompletely(tenantId: number): Promise<{
   let sessionIds: string[] = [];
   try {
     const sessions = await db.execute(
-      sql`SELECT sessionId FROM whatsapp_sessions WHERE tenantId = ${tenantId}`
+      sql`SELECT "sessionId" FROM whatsapp_sessions WHERE "tenantId" = ${tenantId}`
     );
     sessionIds = ((sessions as unknown as any[][])[0] || []).map((r: any) => r.sessionId);
   } catch (e: any) {
@@ -738,7 +738,7 @@ export async function deleteTenantCompletely(tenantId: number): Promise<{
   let userIds: number[] = [];
   try {
     const users = await db.execute(
-      sql`SELECT id FROM crm_users WHERE tenantId = ${tenantId}`
+      sql`SELECT id FROM crm_users WHERE "tenantId" = ${tenantId}`
     );
     userIds = ((users as unknown as any[][])[0] || []).map((r: any) => r.id);
   } catch (e: any) {
@@ -872,7 +872,7 @@ export async function deleteTenantCompletely(tenantId: number): Promise<{
 
   for (const table of tenantTables) {
     try {
-      await db.execute(sql`DELETE FROM ${sql.identifier(table)} WHERE tenantId = ${tenantId}`);
+      await db.execute(sql`DELETE FROM ${sql.identifier(table)} WHERE "tenantId" = ${tenantId}`);
       deletedTables.push(table);
     } catch (e: any) {
       errors.push(`${table}: ${e.message}`);
@@ -891,7 +891,7 @@ export async function deleteTenantCompletely(tenantId: number): Promise<{
     for (const table of sessionLinkedTables) {
       try {
         for (const sid of sessionIds) {
-          await db.execute(sql`DELETE FROM ${sql.identifier(table)} WHERE sessionId = ${sid}`);
+          await db.execute(sql`DELETE FROM ${sql.identifier(table)} WHERE "sessionId" = ${sid}`);
         }
         deletedTables.push(table);
       } catch (e: any) {
@@ -902,7 +902,7 @@ export async function deleteTenantCompletely(tenantId: number): Promise<{
     // Delete messages linked by sessionId
     try {
       for (const sid of sessionIds) {
-        await db.execute(sql`DELETE FROM messages WHERE sessionId = ${sid}`);
+        await db.execute(sql`DELETE FROM messages WHERE "sessionId" = ${sid}`);
       }
       deletedTables.push("messages");
     } catch (e: any) {
@@ -912,7 +912,7 @@ export async function deleteTenantCompletely(tenantId: number): Promise<{
 
   // ─── Phase 3: Delete whatsapp_sessions for this tenant ───
   try {
-    await db.execute(sql`DELETE FROM whatsapp_sessions WHERE tenantId = ${tenantId}`);
+    await db.execute(sql`DELETE FROM whatsapp_sessions WHERE "tenantId" = ${tenantId}`);
     deletedTables.push("whatsapp_sessions");
   } catch (e: any) {
     errors.push(`whatsapp_sessions: ${e.message}`);
@@ -922,7 +922,7 @@ export async function deleteTenantCompletely(tenantId: number): Promise<{
   if (userIds.length > 0) {
     try {
       for (const uid of userIds) {
-        await db.execute(sql`DELETE FROM password_reset_tokens WHERE userId = ${uid}`);
+        await db.execute(sql`DELETE FROM password_reset_tokens WHERE "userId" = ${uid}`);
       }
       deletedTables.push("password_reset_tokens");
     } catch (e: any) {
@@ -932,7 +932,7 @@ export async function deleteTenantCompletely(tenantId: number): Promise<{
 
   // ─── Phase 5: Delete crm_users for this tenant ───
   try {
-    await db.execute(sql`DELETE FROM crm_users WHERE tenantId = ${tenantId}`);
+    await db.execute(sql`DELETE FROM crm_users WHERE "tenantId" = ${tenantId}`);
     deletedTables.push("crm_users");
   } catch (e: any) {
     errors.push(`crm_users: ${e.message}`);

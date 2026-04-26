@@ -14,6 +14,15 @@ let _db: ReturnType<typeof drizzle> | null = null;
  * Converting to Date objects lets superjson serialize them with type metadata,
  * so the frontend receives proper Date objects that are timezone-aware.
  */
+/**
+ * `db.execute(sql\`...\`)` from drizzle-orm/node-postgres returns the raw pg
+ * QueryResult `{ rows, rowCount, fields, ... }` for raw SQL, NOT an array.
+ * This helper unwraps to rows safely.
+ */
+export function rowsOf<T = any>(result: any): T[] {
+  return Array.isArray(result) ? result : (result?.rows ?? []);
+}
+
 function fixTimestampFields(rows: any[]): any[] {
   const tsFields = ['lastTimestamp', 'lastMessageAt', 'queuedAt', 'firstResponseAt', 'slaDeadlineAt', 'waitingSince', 'oldestEntry'];
   return rows.map((row: any) => {
@@ -498,7 +507,7 @@ export async function getConversationsList(sessionId: string) {
     ORDER BY m.timestamp DESC
   `);
   
-  const rows = result as any[];
+  const rows = rowsOf(result);
   return dedupConversations(fixTimestampFields(rows));
 }
 
@@ -883,7 +892,7 @@ export async function getConversationsListMultiAgent(sessionId: string, tenantId
     ORDER BY m.timestamp DESC
   `);
   
-   const rows = result as any[];
+   const rows = rowsOf(result);
   return dedupConversations(fixTimestampFields(rows));
 }
 // Round-robin assignment: get next agent for a tenant
@@ -907,7 +916,7 @@ export async function getNextRoundRobinAgent(tenantId: number): Promise<number |
     ORDER BY "assignmentCount" ASC, cu.id ASC
     LIMIT 1
   `);
-  const rows = result as any[];
+  const rows = rowsOf(result);
   return rows?.[0]?.id || null;
 }
 
@@ -1035,7 +1044,7 @@ export async function getDashboardMetrics(tenantId: number, userId?: number, pip
         WHERE d_inner."tenantId" = ${tenantId} AND d_inner."deletedAt" IS NULL ${statusFilter} ${pipelineFilter} ${ownerFilter} ${dealDateFilter}) AS totalDealValueCents
   `);
 
-  const row = (result as any[])[0] || {};
+  const row = rowsOf(result)[0] || {};
 
   function calcChange(current: number, previous: number): number {
     if (previous === 0) return current > 0 ? 100 : 0;
@@ -1096,7 +1105,7 @@ export async function getPipelineSummary(tenantId: number, userId?: number, pipe
     ORDER BY ps."orderIndex" ASC
   `);
 
-  return (rows as unknown as any[]).map((r: any) => ({
+  return rowsOf(rows).map((r: any) => ({
     stageId: Number(r.stageId),
     stageName: String(r.stageName),
     stageColor: r.stageColor ? String(r.stageColor) : null,
@@ -1128,7 +1137,7 @@ export async function getRecentActivity(tenantId: number, limit = 8, dateFrom?: 
     LIMIT ${limit}
   `);
 
-  return (rows as unknown as any[]).map((r: any) => ({
+  return rowsOf(rows).map((r: any) => ({
     id: Number(r.id),
     dealId: Number(r.dealId),
     action: String(r.action),
@@ -1183,7 +1192,7 @@ export async function getUpcomingTasks(tenantId: number, userId?: number, limit 
     LIMIT ${limit}
   `);
 
-  return (rows as unknown as any[]).map((r: any) => ({
+  return rowsOf(rows).map((r: any) => ({
     id: Number(r.id),
     title: String(r.title),
     dueAt: r.dueAt ? new Date(r.dueAt).getTime() : null,
@@ -1407,7 +1416,7 @@ export async function getNotifications(tenantId: number, opts?: { onlyUnread?: b
     `);
   }
 
-  return (rows as unknown as any[]).map((r: any) => ({
+  return rowsOf(rows).map((r: any) => ({
     id: Number(r.id),
     tenantId: Number(r.tenantId),
     type: String(r.type),
@@ -1429,7 +1438,7 @@ export async function getUnreadNotificationCount(tenantId: number): Promise<numb
     WHERE "tenantId" = ${tenantId} AND "isRead" = false
   `);
 
-  return Number((rows as unknown as any[])[0]?.cnt) || 0;
+  return Number(rowsOf(rows)[0]?.cnt) || 0;
 }
 
 export async function markNotificationRead(id: number) {
@@ -1463,7 +1472,7 @@ export async function createTeam(tenantId: number, data: { name: string; descrip
     VALUES (${tenantId}, ${data.name}, ${data.description || null}, ${data.color || "#6366f1"}, ${data.maxMembers || 50})
     RETURNING id
   `);
-  const insertId = (result as any[])[0]?.id;
+  const insertId = rowsOf(result)[0]?.id;
   return { id: insertId, tenantId, ...data };
 }
 
@@ -1553,7 +1562,7 @@ export async function addTeamMember(tenantId: number, teamId: number, userId: nu
     VALUES (${tenantId}, ${teamId}, ${userId}, ${role})
     RETURNING id
   `);
-  return { id: (result as any[])[0]?.id, tenantId, teamId, userId, role };
+  return { id: rowsOf(result)[0]?.id, tenantId, teamId, userId, role };
 }
 
 export async function removeTeamMember(tenantId: number, teamId: number, userId: number) {
@@ -1593,7 +1602,7 @@ export async function getAgentsWithTeams(tenantId: number) {
     WHERE cu."tenantId" = ${tenantId}
     ORDER BY cu.status ASC, cu.name ASC
   `);
-  return (rows as unknown as any[]).map((r: any) => ({
+  return rowsOf(rows).map((r: any) => ({
     id: Number(r.id),
     name: String(r.name),
     email: String(r.email),
@@ -1633,7 +1642,7 @@ export async function getDistributionRules(tenantId: number) {
     WHERE dr."tenantId" = ${tenantId}
     ORDER BY dr.priority DESC, dr."createdAt" ASC
   `);
-  return (rows as unknown as any[]).map((r: any) => ({
+  return rowsOf(rows).map((r: any) => ({
     id: Number(r.id),
     tenantId: Number(r.tenantId),
     name: String(r.name),
@@ -1675,7 +1684,7 @@ export async function createDistributionRule(tenantId: number, data: {
             ${data.isActive !== false}, ${data.isDefault || false}, ${data.priority || 0}, ${data.configJson ? JSON.stringify(data.configJson) : null})
     RETURNING id
   `);
-  return { id: (result as any[])[0]?.id, tenantId, ...data };
+  return { id: rowsOf(result)[0]?.id, tenantId, ...data };
 }
 
 export async function updateDistributionRule(id: number, tenantId: number, data: {
@@ -2050,7 +2059,7 @@ export async function getWaConversationsList(
     ORDER BY wc."isPinned" DESC, wc."lastMessageAt" DESC
   `);
 
-  const rows = result as any[];
+  const rows = rowsOf(result);
   return dedupConversations(fixTimestampFields(rows));
 }
 
@@ -2135,7 +2144,7 @@ export async function getMessageStatusMetrics(sessionId: string, periodDays: num
     GROUP BY statusGroup
     ORDER BY count DESC
   `);
-  return result as any[];
+  return rowsOf(result);
 }
 
 /**
@@ -2166,7 +2175,7 @@ export async function getMessageVolumeOverTime(sessionId: string, periodDays: nu
     GROUP BY timeBucket
     ORDER BY timeBucket ASC
   `);
-  return result as any[];
+  return rowsOf(result);
 }
 
 /**
@@ -2196,7 +2205,7 @@ export async function getDeliveryRateMetrics(sessionId: string, periodDays: numb
       AND "remoteJid" != 'status@broadcast'
       AND "messageType" NOT IN ('protocolMessage','senderKeyDistributionMessage','messageContextInfo','reactionMessage','ephemeralMessage','deviceSentMessage','bcallMessage','callLogMesssage','keepInChatMessage','encReactionMessage','editedMessage','viewOnceMessageV2Extension')
   `);
-  const rows = result as any[];
+  const rows = rowsOf(result);
   return rows[0] || null;
 }
 
@@ -2227,7 +2236,7 @@ export async function getRecentMessageActivity(sessionId: string, limit: number 
     ORDER BY m.timestamp DESC
     LIMIT ${limit}
   `);
-  return result as any[];
+  return rowsOf(result);
 }
 
 /**
@@ -2256,7 +2265,7 @@ export async function getMessageTypeDistribution(sessionId: string, periodDays: 
     GROUP BY "messageType"
     ORDER BY count DESC
   `);
-  return result as any[];
+  return rowsOf(result);
 }
 
 /**
@@ -2296,7 +2305,7 @@ export async function getTopContactsByVolume(sessionId: string, periodDays: numb
     ORDER BY totalMessages DESC
     LIMIT ${limit}
   `);
-  return result as any[];
+  return rowsOf(result);
 }
 
 /**
@@ -2338,7 +2347,7 @@ export async function getResponseTimeMetrics(sessionId: string, periodDays: numb
       GROUP BY m_in."remoteJid", m_in.id, m_in.timestamp
     ) response_data
   `);
-  const rows = result as any[];
+  const rows = rowsOf(result);
   return rows[0] || null;
 }
 
@@ -2499,7 +2508,7 @@ export async function getDashboardDealsTimeline(tenantId: number, days = 30) {
     ORDER BY dt ASC
   `);
 
-  return (rows as unknown as any[]).map((r: any) => ({
+  return rowsOf(rows).map((r: any) => ({
     date: new Date(r.dt).toISOString().split("T")[0],
     newDeals: Number(r.newDeals) || 0,
     wonDeals: Number(r.wonDeals) || 0,
@@ -2609,7 +2618,7 @@ export async function getDashboardAllPipelines(tenantId: number) {
     SELECT id, name FROM pipelines WHERE "tenantId" = ${tenantId} ORDER BY id ASC
   `);
 
-  return (rows as unknown as any[]).map((r: any) => ({
+  return rowsOf(rows).map((r: any) => ({
     id: Number(r.id),
     name: String(r.name),
   }));
@@ -2809,7 +2818,7 @@ export async function getInternalNotes(tenantId: number, waConversationId: numbe
   // WITHOUT timezone info. Drizzle select().from() treats these as UTC, so we must do
   // the same: append 'Z' to force UTC interpretation, matching how messages are handled.
   // Without 'Z', new Date(str) interprets as server local time (EDT), causing a 4h shift.
-  const rows = result as any[];
+  const rows = rowsOf(result);
   return rows.map((row: any) => ({
     ...row,
     createdAt: row.createdAt instanceof Date
@@ -2843,7 +2852,7 @@ export async function getCustomerGlobalNotes(tenantId: number, remoteJid: string
   `);
   // Convert string timestamps to Date objects for proper Superjson serialization.
   // Append 'Z' to treat as UTC (matching Drizzle select().from() behavior for messages).
-  const rows = result as any[];
+  const rows = rowsOf(result);
   return rows.map((row: any) => ({
     ...row,
     createdAt: row.createdAt instanceof Date
@@ -2913,7 +2922,7 @@ export async function getConversationEvents(tenantId: number, waConversationId: 
     AND e."waConversationId" = ${waConversationId}
     ORDER BY e."createdAt" ASC
   `);
-  return result as any[];
+  return rowsOf(result);
 }
 
 export async function logConversationEvent(
@@ -2989,7 +2998,7 @@ export async function getQueueConversations(sessionId: string, tenantId: number,
     ORDER BY COALESCE(wc."queuedAt", lm.timestamp, wc."lastMessageAt", wc."createdAt") DESC
     LIMIT ${limit}
   `);
-  return dedupConversations(fixTimestampFields(result as any[]));
+  return dedupConversations(fixTimestampFields(rowsOf(result)));
 }
 
 export async function claimConversation(tenantId: number, sessionId: string, remoteJid: string, userId: number) {
@@ -3062,7 +3071,7 @@ export async function getAgentWorkload(tenantId: number, sessionId: string) {
     GROUP BY cu.id, cu.name, cu.email, cu."avatarUrl", cu.status, cu."lastActiveAt"
     ORDER BY isOnline DESC, activeConversations DESC
   `);
-  return result as any[];
+  return rowsOf(result);
 }
 
 export async function getAgentConversations(tenantId: number, sessionId: string, agentId: number, limit = 10) {
@@ -3103,7 +3112,7 @@ export async function getAgentConversations(tenantId: number, sessionId: string,
     ORDER BY COALESCE(lm.timestamp, wc."lastMessageAt", wc."createdAt") DESC
     LIMIT ${limit}
   `);
-  return dedupConversations(fixTimestampFields(result as any[]));
+  return dedupConversations(fixTimestampFields(rowsOf(result)));
 }
 
 export async function getQueueStats(tenantId: number, sessionId: string) {

@@ -431,7 +431,7 @@ export async function updateConversationLastMessage(
 
   if (isIncrementOnly) {
     await db.update(waConversations)
-      .set({ unreadCount: sql`unreadCount + 1` })
+      .set({ unreadCount: sql`"unreadCount" + 1` })
       .where(eq(waConversations.id, conversationId));
     return;
   }
@@ -453,7 +453,7 @@ export async function updateConversationLastMessage(
   };
 
   if (data.incrementUnread && !data.fromMe) {
-    updateData.unreadCount = sql`unreadCount + 1`;
+    updateData.unreadCount = sql`"unreadCount" + 1`;
   }
 
   // Only update preview if this message is newer than the current lastMessageAt
@@ -610,8 +610,8 @@ export async function reconcileGhostThreads(
     for (const ghostId of ghostIds) {
       // Atualizar mensagens
       await db.execute(sql`
-        UPDATE messages SET waConversationId = ${canonicalId}
-        WHERE waConversationId = ${ghostId}
+        UPDATE messages SET "waConversationId" = ${canonicalId}
+        WHERE "waConversationId" = ${ghostId}
       `);
 
       // Marcar conversa fantasma como mesclada
@@ -621,8 +621,8 @@ export async function reconcileGhostThreads(
 
       // Reatribuir deals
       await db.execute(sql`
-        UPDATE deals SET waConversationId = ${canonicalId}
-        WHERE waConversationId = ${ghostId}
+        UPDATE deals SET "waConversationId" = ${canonicalId}
+        WHERE "waConversationId" = ${ghostId}
       `);
 
       mergedCount++;
@@ -667,19 +667,19 @@ export async function migrateExistingData(tenantId: number): Promise<{ conversat
 
   // Buscar todas as conversas distintas na tabela messages
   const distinctConvs = await db.execute(sql`
-    SELECT sessionId, remoteJid, 
+    SELECT "sessionId", "remoteJid", 
            COUNT(*) as msgCount,
            MAX(timestamp) as lastTs,
-           (SELECT m2.pushName FROM messages m2 
-            WHERE m2.sessionId = m.sessionId AND m2.remoteJid = m.remoteJid 
+           (SELECT m2."pushName" FROM messages m2 
+            WHERE m2."sessionId" = m."sessionId" AND m2."remoteJid" = m."remoteJid" 
             AND m2."fromMe" = false AND m2."pushName" IS NOT NULL AND m2."pushName" != ''
             ORDER BY m2.id DESC LIMIT 1) as pushName
     FROM messages m
-    WHERE tenantId = ${tenantId}
-    AND remoteJid NOT LIKE '%@g.us'
-    AND remoteJid != 'status@broadcast'
-    AND waConversationId IS NULL
-    GROUP BY sessionId, remoteJid
+    WHERE "tenantId" = ${tenantId}
+    AND "remoteJid" NOT LIKE '%@g.us'
+    AND "remoteJid" != 'status@broadcast'
+    AND "waConversationId" IS NULL
+    GROUP BY "sessionId", "remoteJid"
   `);
 
   const rows = (distinctConvs as any) || [];
@@ -699,10 +699,10 @@ export async function migrateExistingData(tenantId: number): Promise<{ conversat
       for (const jid of jidVariants) {
         const updateResult = await db.execute(sql`
           UPDATE messages 
-          SET waConversationId = ${resolved.conversationId}
-          WHERE sessionId = ${sessionId}
-          AND remoteJid = ${jid}
-          AND waConversationId IS NULL
+          SET "waConversationId" = ${resolved.conversationId}
+          WHERE "sessionId" = ${sessionId}
+          AND "remoteJid" = ${jid}
+          AND "waConversationId" IS NULL
         `);
         messagesLinked += ((updateResult as any).rowCount) || 0;
       }

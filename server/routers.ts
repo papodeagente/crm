@@ -194,7 +194,7 @@ import {
   disconnectMeta,
 } from "./leadProcessor";
 import { randomBytes } from "crypto";
-import { getDb } from "./db";
+import { getDb, rowsOf } from "./db";
 import { trackingTokens, rdStationConfig, rdStationWebhookLog, rdFieldMappings, customFields, crmUsers as crmUsersSchema, pipelines, pipelineStages, whatsappSessions, rdStationConfigTasks, productCatalog } from "../drizzle/schema";
 import { generateTrackerScript } from "./tracker-script";
 import { eq, and, desc, asc, sql, lt } from "drizzle-orm";
@@ -1596,7 +1596,7 @@ export const appRouter = router({
             for (const conv of contaminated) {
               if (!nameMap.has(conv.remoteJid)) {
                 const msgRows = await db.execute(
-                  sql`SELECT pushName FROM messages WHERE sessionId = ${session.sessionId} AND remoteJid = ${conv.remoteJid} AND fromMe = false AND pushName IS NOT NULL AND pushName != '' AND pushName != ${ownerName} ORDER BY id DESC LIMIT 1`
+                  sql`SELECT "pushName" FROM messages WHERE "sessionId" = ${session.sessionId} AND "remoteJid" = ${conv.remoteJid} AND "fromMe" = false AND "pushName" IS NOT NULL AND "pushName" != '' AND "pushName" != ${ownerName} ORDER BY id DESC LIMIT 1`
                 );
                 const msgData = msgRows as any[];
                 if (msgData?.[0]?.pushName) {
@@ -1710,12 +1710,12 @@ export const appRouter = router({
         // Find contacts with source="whatsapp" that have NO associated deals
         // A contact has a deal if deals.contactId matches the contact.id
         const syncedContacts = await db.execute(
-          sql`SELECT c.id, c.name, c.phone, c.phoneE164, c.source, c.createdAt
+          sql`SELECT c.id, c.name, c.phone, c."phoneE164", c.source, c."createdAt"
               FROM contacts c
-              WHERE c.tenantId = ${getTenantId(ctx)}
+              WHERE c."tenantId" = ${getTenantId(ctx)}
                 AND c.source = 'whatsapp'
                 AND c.id NOT IN (
-                  SELECT DISTINCT d.contactId FROM deals d WHERE d.tenantId = ${getTenantId(ctx)} AND d.contactId IS NOT NULL
+                  SELECT DISTINCT d."contactId" FROM deals d WHERE d."tenantId" = ${getTenantId(ctx)} AND d."contactId" IS NOT NULL
                 )`
         );
 
@@ -1888,7 +1888,7 @@ export const appRouter = router({
           if (db) {
             try {
               const rows = await db.execute(sql`SELECT name FROM crm_users WHERE id = ${s.userId} LIMIT 1`);
-              const row = (rows as unknown as any[])[0];
+              const row = rowsOf(rows)[0];
               if (row?.name) ownerName = String(row.name);
             } catch { /* ignore */ }
           }
@@ -1915,7 +1915,7 @@ export const appRouter = router({
           const db = await getDb();
           if (db) {
             const rows = await db.execute(sql`SELECT name FROM crm_users WHERE id = ${share.sourceUserId} LIMIT 1`);
-            const row = (rows as unknown as any[])[0];
+            const row = rowsOf(rows)[0];
             if (row?.name) ownerName = String(row.name);
           }
         } catch { /* ignore */ }

@@ -1,5 +1,5 @@
 import { eq, and, or, desc, asc, like, sql, inArray, count, sum, gte, lt, lte, ne, isNull, isNotNull } from "drizzle-orm";
-import { getDb } from "./db";
+import { getDb , rowsOf } from "./db";
 import {
   tenants, crmUsers, teams, teamMembers, roles, permissions, rolePermissions, userRoles, apiKeys,
   contacts, accounts, deals, dealParticipants, pipelines, pipelineStages, pipelineAutomations, serviceDeliveries, serviceDeliveryItems,
@@ -181,7 +181,7 @@ export async function listContacts(tenantId: number, opts?: { search?: string; s
   if (opts?.customFieldFilters && opts.customFieldFilters.length > 0) {
     for (const cf of opts.customFieldFilters) {
       conditions.push(
-        sql`${contacts.id} IN (SELECT entityId FROM custom_field_values WHERE tenantId = ${tenantId} AND entityType = 'contact' AND fieldId = ${cf.fieldId} AND value LIKE ${'%' + cf.value + '%'})`
+        sql`${contacts.id} IN (SELECT "entityId" FROM custom_field_values WHERE "tenantId" = ${tenantId} AND "entityType" = 'contact' AND "fieldId" = ${cf.fieldId} AND value LIKE ${'%' + cf.value + '%'})`
       );
     }
   }
@@ -240,7 +240,7 @@ export async function countContacts(tenantId: number, opts?: { search?: string; 
   if (opts?.customFieldFilters && opts.customFieldFilters.length > 0) {
     for (const cf of opts.customFieldFilters) {
       conditions.push(
-        sql`${contacts.id} IN (SELECT entityId FROM custom_field_values WHERE tenantId = ${tenantId} AND entityType = 'contact' AND fieldId = ${cf.fieldId} AND value LIKE ${'%' + cf.value + '%'})`
+        sql`${contacts.id} IN (SELECT "entityId" FROM custom_field_values WHERE "tenantId" = ${tenantId} AND "entityType" = 'contact' AND "fieldId" = ${cf.fieldId} AND value LIKE ${'%' + cf.value + '%'})`
       );
     }
   }
@@ -373,11 +373,11 @@ export async function listDeals(tenantId: number, opts?: {
   if (opts?.lastActivityDateTo) conditions.push(lte(deals.lastActivityAt, new Date(opts.lastActivityDateTo + "T23:59:59")));
   // Product filter — deals that contain a specific product
   if (opts?.productId) {
-    conditions.push(sql`${deals.id} IN (SELECT dealId FROM deal_products WHERE productId = ${opts.productId} AND tenantId = ${tenantId})`);
+    conditions.push(sql`${deals.id} IN (SELECT "dealId" FROM deal_products WHERE "productId" = ${opts.productId} AND "tenantId" = ${tenantId})`);
   }
   // No tasks filter
   if (opts?.noTasks) {
-    conditions.push(sql`${deals.id} NOT IN (SELECT entityId FROM crm_tasks WHERE entityType = 'deal' AND tenantId = ${tenantId} AND status IN ('pending','in_progress'))`);
+    conditions.push(sql`${deals.id} NOT IN (SELECT "entityId" FROM crm_tasks WHERE "entityType" = 'deal' AND "tenantId" = ${tenantId} AND status IN ('pending','in_progress'))`);
   }
   // Owner user filter (ownerUserIds takes precedence for visibility)
   if (opts?.ownerUserIds && opts.ownerUserIds.length > 0) {
@@ -389,7 +389,7 @@ export async function listDeals(tenantId: number, opts?: {
   if (opts?.customFieldFilters && opts.customFieldFilters.length > 0) {
     for (const cf of opts.customFieldFilters) {
       conditions.push(
-        sql`${deals.id} IN (SELECT entityId FROM custom_field_values WHERE tenantId = ${tenantId} AND entityType = 'deal' AND fieldId = ${cf.fieldId} AND value LIKE ${'%' + cf.value + '%'})`
+        sql`${deals.id} IN (SELECT "entityId" FROM custom_field_values WHERE "tenantId" = ${tenantId} AND "entityType" = 'deal' AND "fieldId" = ${cf.fieldId} AND value LIKE ${'%' + cf.value + '%'})`
       );
     }
   }
@@ -484,7 +484,7 @@ export async function countDeals(tenantId: number, status?: string, opts?: { pip
   if (opts?.customFieldFilters && opts.customFieldFilters.length > 0) {
     for (const cf of opts.customFieldFilters) {
       conditions.push(
-        sql`${deals.id} IN (SELECT entityId FROM custom_field_values WHERE tenantId = ${tenantId} AND entityType = 'deal' AND fieldId = ${cf.fieldId} AND value LIKE ${'%' + cf.value + '%'})`
+        sql`${deals.id} IN (SELECT "entityId" FROM custom_field_values WHERE "tenantId" = ${tenantId} AND "entityType" = 'deal' AND "fieldId" = ${cf.fieldId} AND value LIKE ${'%' + cf.value + '%'})`
       );
     }
   }
@@ -804,11 +804,11 @@ export async function listTasks(tenantId: number, opts?: { entityType?: string; 
   
   // If filtering by assignee, join with task_assignees
   if (opts?.assigneeUserId) {
-    conditions.push(sql`${tasks.id} IN (SELECT taskId FROM task_assignees WHERE userId = ${opts.assigneeUserId})`);
+    conditions.push(sql`${tasks.id} IN (SELECT "taskId" FROM task_assignees WHERE "userId" = ${opts.assigneeUserId})`);
   }
   // If filtering by creator (for non-admin users: see own tasks + tasks assigned to them)
   if (opts?.createdByUserId) {
-    conditions.push(sql`(${tasks.createdByUserId} = ${opts.createdByUserId} OR ${tasks.assignedToUserId} = ${opts.createdByUserId} OR ${tasks.id} IN (SELECT taskId FROM task_assignees WHERE userId = ${opts.createdByUserId}))`);
+    conditions.push(sql`(${tasks.createdByUserId} = ${opts.createdByUserId} OR ${tasks.assignedToUserId} = ${opts.createdByUserId} OR ${tasks.id} IN (SELECT "taskId" FROM task_assignees WHERE "userId" = ${opts.createdByUserId}))`);
   }
   
   const whereClause = and(...conditions);
@@ -1136,9 +1136,9 @@ async function calculateGoalProgress(db: any, goal: any): Promise<number> {
     if (metricKey === 'total_sold') {
       // Sum valueCents of won deals within the period
       const rows = await db.execute(
-        sql`SELECT COALESCE(SUM(d.valueCents), 0) as total FROM deals d WHERE ${sql.raw(whereClause)} AND d.status = 'won'`
+        sql`SELECT COALESCE(SUM(d."valueCents"), 0) as total FROM deals d WHERE ${sql.raw(whereClause)} AND d.status = 'won'`
       );
-      return Number((rows as any[])[0]?.total ?? 0);
+      return Number(rowsOf(rows)[0]?.total ?? 0);
     }
 
     if (metricKey === 'deals_count') {
@@ -1146,7 +1146,7 @@ async function calculateGoalProgress(db: any, goal: any): Promise<number> {
       const rows = await db.execute(
         sql`SELECT COUNT(*) as total FROM deals d WHERE ${sql.raw(whereClause)}`
       );
-      return Number((rows as any[])[0]?.total ?? 0);
+      return Number(rowsOf(rows)[0]?.total ?? 0);
     }
 
     if (metricKey === 'conversion_rate') {
@@ -1154,8 +1154,8 @@ async function calculateGoalProgress(db: any, goal: any): Promise<number> {
       const rows = await db.execute(
         sql`SELECT COUNT(*) as total, SUM(CASE WHEN d.status = 'won' THEN 1 ELSE 0 END) as won FROM deals d WHERE ${sql.raw(whereClause)}`
       );
-      const total = Number((rows as any[])[0]?.total ?? 0);
-      const won = Number((rows as any[])[0]?.won ?? 0);
+      const total = Number(rowsOf(rows)[0]?.total ?? 0);
+      const won = Number(rowsOf(rows)[0]?.won ?? 0);
       if (total === 0) return 0;
       return Math.round((won / total) * 100 * 10) / 10; // one decimal place
     }
@@ -1520,54 +1520,54 @@ export async function countCatalogProducts(tenantId: number, isActive?: boolean)
 export async function getProductAnalyticsMostSold(tenantId: number, limit = 10) {
   const db = await getDb(); if (!db) return [];
   const rows = await db.execute(sql`
-    SELECT dp.name, dp.category, dp.catalogProductId,
+    SELECT dp.name, dp.category, dp."catalogProductId",
            COUNT(*) as dealCount,
            SUM(dp.quantity) as totalQuantity,
-           SUM(dp.unitPriceCents * dp.quantity - COALESCE(dp.discountCents, 0)) as totalRevenueCents
+           SUM(dp."unitPriceCents" * dp.quantity - COALESCE(dp."discountCents", 0)) as totalRevenueCents
     FROM deal_products dp
-    INNER JOIN deals d ON dp.dealId = d.id AND dp.tenantId = d.tenantId
-    WHERE dp.tenantId = ${tenantId} AND d.status = 'won'
-    GROUP BY dp.name, dp.category, dp.catalogProductId
+    INNER JOIN deals d ON dp."dealId" = d.id AND dp."tenantId" = d."tenantId"
+    WHERE dp."tenantId" = ${tenantId} AND d.status = 'won'
+    GROUP BY dp.name, dp.category, dp."catalogProductId"
     ORDER BY totalQuantity DESC
     LIMIT ${limit}
   `);
-  return rows as any[] || [];
+  return rowsOf(rows);
 }
 
 /** Most lost products: products in deals with status='lost' */
 export async function getProductAnalyticsMostLost(tenantId: number, limit = 10) {
   const db = await getDb(); if (!db) return [];
   const rows = await db.execute(sql`
-    SELECT dp.name, dp.category, dp.catalogProductId,
+    SELECT dp.name, dp.category, dp."catalogProductId",
            COUNT(*) as dealCount,
            SUM(dp.quantity) as totalQuantity,
-           SUM(dp.unitPriceCents * dp.quantity - COALESCE(dp.discountCents, 0)) as totalValueCents
+           SUM(dp."unitPriceCents" * dp.quantity - COALESCE(dp."discountCents", 0)) as totalValueCents
     FROM deal_products dp
-    INNER JOIN deals d ON dp.dealId = d.id AND dp.tenantId = d.tenantId
-    WHERE dp.tenantId = ${tenantId} AND d.status = 'lost'
-    GROUP BY dp.name, dp.category, dp.catalogProductId
+    INNER JOIN deals d ON dp."dealId" = d.id AND dp."tenantId" = d."tenantId"
+    WHERE dp."tenantId" = ${tenantId} AND d.status = 'lost'
+    GROUP BY dp.name, dp.category, dp."catalogProductId"
     ORDER BY totalQuantity DESC
     LIMIT ${limit}
   `);
-  return rows as any[] || [];
+  return rowsOf(rows);
 }
 
 /** Most requested products: all products across all deals regardless of status */
 export async function getProductAnalyticsMostRequested(tenantId: number, limit = 10) {
   const db = await getDb(); if (!db) return [];
   const rows = await db.execute(sql`
-    SELECT dp.name, dp.category, dp.catalogProductId,
+    SELECT dp.name, dp.category, dp."catalogProductId",
            COUNT(*) as dealCount,
            SUM(dp.quantity) as totalQuantity,
-           SUM(dp.unitPriceCents * dp.quantity - COALESCE(dp.discountCents, 0)) as totalValueCents
+           SUM(dp."unitPriceCents" * dp.quantity - COALESCE(dp."discountCents", 0)) as totalValueCents
     FROM deal_products dp
-    INNER JOIN deals d ON dp.dealId = d.id AND dp.tenantId = d.tenantId
-    WHERE dp.tenantId = ${tenantId}
-    GROUP BY dp.name, dp.category, dp.catalogProductId
+    INNER JOIN deals d ON dp."dealId" = d.id AND dp."tenantId" = d."tenantId"
+    WHERE dp."tenantId" = ${tenantId}
+    GROUP BY dp.name, dp.category, dp."catalogProductId"
     ORDER BY totalQuantity DESC
     LIMIT ${limit}
   `);
-  return rows as any[] || [];
+  return rowsOf(rows);
 }
 
 /** Revenue by product type (category) */
@@ -1577,33 +1577,33 @@ export async function getProductAnalyticsRevenueByType(tenantId: number) {
     SELECT dp.category,
            COUNT(DISTINCT d.id) as dealCount,
            SUM(dp.quantity) as totalQuantity,
-           SUM(dp.unitPriceCents * dp.quantity - COALESCE(dp.discountCents, 0)) as totalRevenueCents
+           SUM(dp."unitPriceCents" * dp.quantity - COALESCE(dp."discountCents", 0)) as totalRevenueCents
     FROM deal_products dp
-    INNER JOIN deals d ON dp.dealId = d.id AND dp.tenantId = d.tenantId
-    WHERE dp.tenantId = ${tenantId} AND d.status = 'won'
+    INNER JOIN deals d ON dp."dealId" = d.id AND dp."tenantId" = d."tenantId"
+    WHERE dp."tenantId" = ${tenantId} AND d.status = 'won'
     GROUP BY dp.category
     ORDER BY totalRevenueCents DESC
   `);
-  return rows as any[] || [];
+  return rowsOf(rows);
 }
 
 /** Conversion rate by product: won vs total deals containing each product */
 export async function getProductAnalyticsConversionRate(tenantId: number, limit = 10) {
   const db = await getDb(); if (!db) return [];
   const rows = await db.execute(sql`
-    SELECT dp.name, dp.category, dp.catalogProductId,
+    SELECT dp.name, dp.category, dp."catalogProductId",
            COUNT(DISTINCT d.id) as totalDeals,
            SUM(CASE WHEN d.status = 'won' THEN 1 ELSE 0 END) as wonDeals,
            ROUND(SUM(CASE WHEN d.status = 'won' THEN 1 ELSE 0 END) * 100.0 / COUNT(DISTINCT d.id), 1) as conversionRate
     FROM deal_products dp
-    INNER JOIN deals d ON dp.dealId = d.id AND dp.tenantId = d.tenantId
-    WHERE dp.tenantId = ${tenantId}
-    GROUP BY dp.name, dp.category, dp.catalogProductId
+    INNER JOIN deals d ON dp."dealId" = d.id AND dp."tenantId" = d."tenantId"
+    WHERE dp."tenantId" = ${tenantId}
+    GROUP BY dp.name, dp.category, dp."catalogProductId"
     HAVING COUNT(DISTINCT d.id) >= 1
     ORDER BY conversionRate DESC
     LIMIT ${limit}
   `);
-  return rows as any[] || [];
+  return rowsOf(rows);
 }
 
 /** Product analytics summary: total products, active, avg price, total revenue */
@@ -1616,11 +1616,11 @@ export async function getProductAnalyticsSummary(tenantId: number) {
   }).from(productCatalog).where(eq(productCatalog.tenantId, tenantId));
 
   const revRows = await db.execute(sql`
-    SELECT COALESCE(SUM(dp.unitPriceCents * dp.quantity - COALESCE(dp.discountCents, 0)), 0) as totalRevenueCents,
-           COALESCE(COUNT(DISTINCT dp.dealId), 0) as dealsWithProducts
+    SELECT COALESCE(SUM(dp."unitPriceCents" * dp.quantity - COALESCE(dp."discountCents", 0)), 0) as totalRevenueCents,
+           COALESCE(COUNT(DISTINCT dp."dealId"), 0) as dealsWithProducts
     FROM deal_products dp
-    INNER JOIN deals d ON dp.dealId = d.id AND dp.tenantId = d.tenantId
-    WHERE dp.tenantId = ${tenantId} AND d.status = 'won'
+    INNER JOIN deals d ON dp."dealId" = d.id AND dp."tenantId" = d."tenantId"
+    WHERE dp."tenantId" = ${tenantId} AND d.status = 'won'
   `);
   const rev = (revRows as any[])[0] || {};
 
@@ -1639,14 +1639,14 @@ export async function getProductAnalyticsTopLocations(tenantId: number, limit = 
   const rows = await db.execute(sql`
     SELECT pc.location,
            COUNT(*) as productCount,
-           SUM(pc.basePriceCents) as totalBasePriceCents
+           SUM(pc."basePriceCents") as totalBasePriceCents
     FROM product_catalog pc
-    WHERE pc.tenantId = ${tenantId} AND pc.isActive = true AND pc.location IS NOT NULL AND pc.location != ''
+    WHERE pc."tenantId" = ${tenantId} AND pc."isActive" = true AND pc.location IS NOT NULL AND pc.location != ''
     GROUP BY pc.location
     ORDER BY productCount DESC
     LIMIT ${limit}
   `);
-  return rows as any[] || [];
+  return rowsOf(rows);
 }
 // Backward-compatible alias
 export const getProductAnalyticsTopDestinations = getProductAnalyticsTopLocations;

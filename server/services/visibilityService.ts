@@ -11,7 +11,7 @@
  * Default for any user without a preference set: "geral" (backward compatible).
  */
 
-import { getDb } from "../db";
+import { getDb, rowsOf } from "../db";
 import { getUserPreference } from "../db";
 import { sql } from "drizzle-orm";
 
@@ -100,13 +100,13 @@ export async function getTeamMateIds(
 
   // Find all teams the user belongs to, then find all members of those teams
   const rows = await db.execute(sql`
-    SELECT DISTINCT tm2.userId
+    SELECT DISTINCT tm2."userId"
     FROM team_members tm1
-    JOIN team_members tm2 ON tm1.teamId = tm2.teamId AND tm2.tenantId = ${tenantId}
-    WHERE tm1.userId = ${userId} AND tm1.tenantId = ${tenantId}
+    JOIN team_members tm2 ON tm1."teamId" = tm2."teamId" AND tm2."tenantId" = ${tenantId}
+    WHERE tm1."userId" = ${userId} AND tm1."tenantId" = ${tenantId}
   `);
 
-  const ids = (rows as unknown as any[][])[0]?.map((r: any) => Number(r.userId)) || [];
+  const ids = rowsOf(rows).map((r: any) => Number(r.userId));
   // Always include the user themselves
   if (!ids.includes(userId)) ids.push(userId);
   return ids;
