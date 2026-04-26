@@ -78,6 +78,7 @@ export interface UseChatActionsOptions {
   msgLimit: number;
   socketConnected: boolean;
   onOptimisticSend?: (msg: { content: string; messageType?: string }) => void;
+  onStatusConfirmed?: (data: { messageId: string; status: string }) => void;
   onNotesChanged?: () => void;
   onMessagesChanged?: () => void;
 }
@@ -132,7 +133,7 @@ export interface UseChatActionsResult {
 // ── Hook ────────────────────────────────────────────────
 
 export function useChatActions(opts: UseChatActionsOptions): UseChatActionsResult {
-  const { sessionId, remoteJid, contactPhone, waConversationId, msgLimit, socketConnected, onOptimisticSend, onNotesChanged, onMessagesChanged } = opts;
+  const { sessionId, remoteJid, contactPhone, waConversationId, msgLimit, socketConnected, onOptimisticSend, onStatusConfirmed, onNotesChanged, onMessagesChanged } = opts;
 
   const utils = trpc.useUtils();
 
@@ -201,6 +202,9 @@ export function useChatActions(opts: UseChatActionsOptions): UseChatActionsResul
           return old.map((m: any) => m.messageId === clientMsgId ? { ...m, messageId: result.messageId, status: "sent" } : m);
         });
       }
+      if (result.messageId) {
+        onStatusConfirmed?.({ messageId: result.messageId, status: "sent" });
+      }
       delayedRefetch();
     },
     onError: () => {
@@ -227,6 +231,9 @@ export function useChatActions(opts: UseChatActionsOptions): UseChatActionsResul
           return old.map((m: any) => m.messageId === clientMsgId ? { ...m, messageId: result.messageId, status: "sent" } : m);
         });
       }
+      if (result.messageId) {
+        onStatusConfirmed?.({ messageId: result.messageId, status: "sent" });
+      }
       delayedRefetch();
       setReplyTarget(null);
     },
@@ -241,13 +248,35 @@ export function useChatActions(opts: UseChatActionsOptions): UseChatActionsResul
   });
 
   const uploadMedia = trpc.whatsapp.uploadMedia.useMutation();
+  const lastMediaClientMsgIdRef = useRef<string | null>(null);
   const sendMedia = trpc.whatsapp.sendMedia.useMutation({
     onMutate: (vars) => {
       const mediaLabel = vars.mediaType === "image" ? "Imagem" : vars.mediaType === "video" ? "Video" : vars.mediaType === "audio" ? "Audio" : "Documento";
+      const clientMsgId = addOptimisticMessage(mediaLabel);
+      lastMediaClientMsgIdRef.current = clientMsgId;
       onOptimisticSend?.({ content: mediaLabel, messageType: vars.mediaType || "document" });
     },
-    onSuccess: () => delayedRefetch(),
-    onError: () => toast.error("Erro ao enviar midia"),
+    onSuccess: (result) => {
+      const clientMsgId = lastMediaClientMsgIdRef.current;
+      if (result.messageId && clientMsgId) {
+        utils.whatsapp.messagesByContact.setData(queryKey, (old: any) => {
+          if (!old) return old;
+          return old.map((m: any) => m.messageId === clientMsgId ? { ...m, messageId: result.messageId, status: "sent" } : m);
+        });
+      }
+      if (result.messageId) {
+        onStatusConfirmed?.({ messageId: result.messageId, status: "sent" });
+      }
+      delayedRefetch();
+    },
+    onError: () => {
+      const clientMsgId = lastMediaClientMsgIdRef.current;
+      utils.whatsapp.messagesByContact.setData(queryKey, (old: any) => {
+        if (!old) return old;
+        return clientMsgId ? old.filter((m: any) => m.messageId !== clientMsgId) : old;
+      });
+      toast.error("Erro ao enviar midia");
+    },
   });
 
   const sendReaction = trpc.whatsapp.sendReaction.useMutation({
@@ -366,13 +395,12 @@ export function useChatActions(opts: UseChatActionsOptions): UseChatActionsResul
       setIsSending(true);
       try {
         const base64 = await fileToBase64(file);
-        const { url } = await uploadMedia.mutateAsync({ fileName: file.name, fileBase64: base64, contentType: file.type });
+        const dataUri = `data:${file.type};base64,${base64}`;
         let mediaType: "image" | "video" | "document" = "document";
         if (file.type.startsWith("image/")) mediaType = "image";
         else if (file.type.startsWith("video/")) mediaType = "video";
-        await sendMedia.mutateAsync({ sessionId, number: contactPhone, mediaUrl: url, mediaType, fileName: file.name, mimetype: file.type });
-        toast.success("Midia enviada");
-      } catch { toast.error("Erro ao enviar arquivo"); }
+        await sendMedia.mutateAsync({ sessionId, number: contactPhone, mediaUrl: dataUri, mediaType, fileName: file.name, mimetype: file.type });
+      } catch { /* onError do mutation já mostra toast */ }
       finally { setIsSending(false); }
     }
     e.target.value = "";
@@ -385,10 +413,9 @@ export function useChatActions(opts: UseChatActionsOptions): UseChatActionsResul
       setIsSending(true);
       try {
         const base64 = await fileToBase64(file);
-        const { url } = await uploadMedia.mutateAsync({ fileName: file.name, fileBase64: base64, contentType: file.type });
-        await sendMedia.mutateAsync({ sessionId, number: contactPhone, mediaUrl: url, mediaType: "document", fileName: file.name, mimetype: file.type });
-        toast.success("Documento enviado");
-      } catch { toast.error("Erro ao enviar documento"); }
+        const dataUri = `data:${file.type || "application/octet-stream"};base64,${base64}`;
+        await sendMedia.mutateAsync({ sessionId, number: contactPhone, mediaUrl: dataUri, mediaType: "document", fileName: file.name, mimetype: file.type });
+      } catch { /* onError do mutation já mostra toast */ }
       finally { setIsSending(false); }
     }
     e.target.value = "";
@@ -399,10 +426,10 @@ export function useChatActions(opts: UseChatActionsOptions): UseChatActionsResul
     setIsSending(true);
     try {
       const base64 = await blobToBase64(blob);
-      const { url } = await uploadMedia.mutateAsync({ fileName: `voice-${Date.now()}.webm`, fileBase64: base64, contentType: "audio/webm;codecs=opus" });
-      await sendMedia.mutateAsync({ sessionId, number: contactPhone, mediaUrl: url, mediaType: "audio", ptt: true, mimetype: "audio/ogg; codecs=opus", duration });
-      toast.success("Audio enviado");
-    } catch { toast.error("Erro ao enviar audio"); }
+      const mime = blob.type || "audio/ogg;codecs=opus";
+      const dataUri = `data:${mime};base64,${base64}`;
+      await sendMedia.mutateAsync({ sessionId, number: contactPhone, mediaUrl: dataUri, mediaType: "audio", ptt: true, mimetype: mime, duration });
+    } catch { /* onError do mutation já mostra toast */ }
     finally { setIsSending(false); }
   }, [sessionId, contactPhone]);
 

@@ -8,11 +8,13 @@ import { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 import { useSocket } from "@/hooks/useSocket";
 import { useTenantId } from "@/hooks/useTenantId";
+import { useAuth } from "@/_core/hooks/useAuth";
 import { useChatMessages } from "@/hooks/useChatMessages";
 import { toast } from "sonner";
 import {
-  Loader2, X, Check, CalendarClock,
+  Loader2, X, Check, CalendarClock, Paperclip, Send,
 } from "lucide-react";
+import { usePresenceTracking } from "@/hooks/usePresenceTracking";
 import ChatHeader from "./chat/ChatHeader";
 import MessageList from "./chat/MessageList";
 import ChatInput from "./chat/ChatInput";
@@ -23,6 +25,8 @@ import EditMessageModal from "./chat/EditMessageModal";
 import ImageLightbox from "./chat/ImageLightbox";
 import TransferDialog from "./TransferDialog";
 import ImportConversationDialog from "@/components/ImportConversationDialog";
+import InteractiveMessageComposer from "./chat/InteractiveMessageComposer";
+import WhatsAppLabelsSection from "./inbox/WhatsAppLabelsSection";
 
 /* ─── Types ─── */
 interface AssignmentInfo {
@@ -70,7 +74,7 @@ interface Message {
 }
 
 export interface WhatsAppChatProps {
-  contact: { id: number; name: string; phone: string; email?: string; avatarUrl?: string; lifecycleStage?: string | null } | null;
+  contact: { id: number; name: string; phone: string; email?: string; avatarUrl?: string } | null;
   sessionId: string;
   remoteJid: string;
   onCreateDeal?: () => void;
@@ -88,11 +92,19 @@ export interface WhatsAppChatProps {
   dealStageName?: string;
   companyName?: string;
   onOptimisticSend?: (msg: { content: string; messageType?: string }) => void;
+  onStatusConfirmed?: (data: { messageId: string; status: string }) => void;
   autoOpenAssign?: boolean;
   onAutoOpenAssignConsumed?: () => void;
+  onToggleSidebar?: () => void;
+  sidebarOpen?: boolean;
+  pendingFile?: File | null;
+  onClearPendingFile?: () => void;
 }
 
 /* ─── Utilities ─── */
+type PreviewItem = { file: File; dataUri: string; mediaType: "image" | "video" | "document"; caption: string };
+const MAX_FILES = 30;
+
 function fileToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -110,6 +122,23 @@ function blobToBase64(blob: Blob): Promise<string> {
   });
 }
 
+function detectMediaType(file: File, forceDoc?: boolean): "image" | "video" | "document" {
+  if (forceDoc) return "document";
+  if (file.type.startsWith("image/")) return "image";
+  if (file.type.startsWith("video/")) return "video";
+  return "document";
+}
+
+async function filesToPreviewItems(files: File[], forceDoc?: boolean): Promise<PreviewItem[]> {
+  const items: PreviewItem[] = [];
+  for (const file of files.slice(0, MAX_FILES)) {
+    const base64 = await fileToBase64(file);
+    const dataUri = `data:${file.type || "application/octet-stream"};base64,${base64}`;
+    items.push({ file, dataUri, mediaType: detectMediaType(file, forceDoc), caption: "" });
+  }
+  return items;
+}
+
 /* ═══════════════════════════════════════════════════════
    MAIN CHAT COMPONENT
    ═══════════════════════════════════════════════════════ */
@@ -120,14 +149,39 @@ export default function WhatsAppChat({
   assignment, agents, onAssign, onStatusChange,
   myAvatarUrl, waConversationId,
   dealId, dealTitle, dealValueCents, dealStageName, companyName,
-  onOptimisticSend, autoOpenAssign, onAutoOpenAssignConsumed,
+  onOptimisticSend, onStatusConfirmed, autoOpenAssign, onAutoOpenAssignConsumed,
+  onToggleSidebar, sidebarOpen,
+  pendingFile, onClearPendingFile,
 }: WhatsAppChatProps) {
   const tenantId = useTenantId();
+  const { user: authUser } = useAuth();
   const { lastMessage, isConnected: socketConnected } = useSocket();
   const utils = trpc.useUtils();
 
   /* ── Chat messages hook (queries, socket, reactions, status, transcriptions, notes) ── */
   const chat = useChatMessages({ sessionId, remoteJid, waConversationId, socketConnected });
+
+  /* ── Presence tracking (typing indicator) ── */
+  const contactPhone = contact?.phone?.replace(/\D/g, "") || "";
+  const { remotePresence } = usePresenceTracking({ sessionId, remoteJid, contactPhone });
+
+  /**
+   * Número canônico pra ENVIO de mensagem. SEMPRE deriva do remoteJid
+   * da conversa — essa é a fonte de verdade, vinda do webhook Z-API.
+   *
+   * NUNCA usar contact.phone aqui. Razão: se o contato foi salvo com
+   * phone errado (ex: CRM prefixou +55 num número de Portugal +351),
+   * o envio vai pro JID errado e a Z-API cria conversa duplicada no
+   * número inexistente. Regressão real reportada com cliente portuguesa:
+   * conversa 351937914301@... foi duplicada em 55351937914301@... e a
+   * mensagem da atendente jamais chegou.
+   *
+   * Se o remoteJid for LID (@lid), usa só a parte numérica — a Z-API
+   * resolve o phone real a partir do LID.
+   */
+  const sendNumber = (remoteJid || "").split("@")[0].replace(/\D/g, "")
+    || contact?.phone?.replace(/\D/g, "")
+    || "";
 
   /* ── UI toggle state ── */
   const [isSending, setIsSending] = useState(false);
@@ -142,21 +196,10 @@ export default function WhatsAppChat({
   const [showLocationModal, setShowLocationModal] = useState(false);
   const [showContactModal, setShowContactModal] = useState(false);
   const [showPollModal, setShowPollModal] = useState(false);
+  const [showInteractiveComposer, setShowInteractiveComposer] = useState(false);
   const [editTarget, setEditTarget] = useState<{ messageId: string; text: string } | null>(null);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
-  const SHOW_AGENT_NAMES_KEY = "wa.showAgentNames";
-  const [showAgentNames, setShowAgentNamesState] = useState(() => {
-    try { return localStorage.getItem(SHOW_AGENT_NAMES_KEY) !== "false"; } catch { return true; }
-  });
-  const setShowAgentNames = (v: boolean) => {
-    setShowAgentNamesState(v);
-    try { localStorage.setItem(SHOW_AGENT_NAMES_KEY, String(v)); } catch {}
-  };
-  // ─── In-conversation search ───
-  const [searchOpen, setSearchOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
-  // Reset search when switching conversation
-  useEffect(() => { setSearchOpen(false); setSearchQuery(""); }, [remoteJid, sessionId]);
+  const [showAgentNames, setShowAgentNames] = useState(true);
   const [editingNoteId, setEditingNoteId] = useState<number | null>(null);
   const [editingNoteText, setEditingNoteText] = useState("");
   // Tags panel
@@ -169,6 +212,14 @@ export default function WhatsAppChat({
   const [scheduleTime, setScheduleTime] = useState("");
   // Schedule message text (shared with ChatInput messageText for schedule modal)
   const [scheduleMessageText, setScheduleMessageText] = useState("");
+  // Drag-and-drop state
+  const [isDragOver, setIsDragOver] = useState(false);
+  const dragCounter = useRef(0);
+  // Media preview before sending (multi-file carousel)
+  const [previewFiles, setPreviewFiles] = useState<PreviewItem[]>([]);
+  const [activePreviewIndex, setActivePreviewIndex] = useState(0);
+  const [sendProgress, setSendProgress] = useState(0); // 0 = not sending, N = Nth file sent
+  const addFileInputRef = useRef<HTMLInputElement>(null);
 
   /* ── Agent map for MessageList ── */
   const agentMap = useMemo(() => {
@@ -207,7 +258,8 @@ export default function WhatsAppChat({
       timestamp: new Date().toISOString(),
       createdAt: new Date().toISOString(),
       quotedMessageId: quotedId || null,
-    };
+      senderAgentId: authUser?.id || null,
+    } as any;
     utils.whatsapp.messagesByContact.setData(queryKey, (old: any) => {
       if (!old) return [optimistic];
       return [optimistic, ...old];
@@ -220,8 +272,30 @@ export default function WhatsAppChat({
   }, [sessionId, remoteJid, utils, chat.msgLimit]);
 
   const delayedRefetch = useCallback(() => {
-    if (!socketConnected) setTimeout(() => chat.refetchMessages(), 400);
-  }, [chat.refetchMessages, socketConnected]);
+    // Smart refetch: preserve recently-sent messages that the server might not have yet.
+    // The server socket event provides real-time confirmation, but the refetch syncs DB metadata.
+    setTimeout(async () => {
+      const queryKey = { sessionId, remoteJid, limit: chat.msgLimit };
+      // Snapshot sent messages before refetch
+      const before = utils.whatsapp.messagesByContact.getData(queryKey);
+      const recentSent = (before || []).filter((m: any) =>
+        m.fromMe && Date.now() - new Date(m.timestamp || m.createdAt).getTime() < 30000
+      );
+
+      await chat.refetchMessages();
+
+      // Re-add any recently-sent messages that the refetch dropped
+      if (recentSent.length > 0) {
+        utils.whatsapp.messagesByContact.setData(queryKey, (current: any) => {
+          if (!current) return current;
+          const currentIds = new Set(current.map((m: any) => m.messageId));
+          const missing = recentSent.filter((m: any) => m.messageId && !currentIds.has(m.messageId));
+          if (missing.length === 0) return current;
+          return [...missing, ...current];
+        });
+      }
+    }, 2000);
+  }, [chat.refetchMessages, sessionId, remoteJid, chat.msgLimit, utils]);
 
   /* ── Send message ── */
   const lastClientMsgIdRef = useRef<string | null>(null);
@@ -241,6 +315,9 @@ export default function WhatsAppChat({
             m.messageId === clientMsgId ? { ...m, messageId: result.messageId, status: "sent" } : m,
           );
         });
+      }
+      if (result.messageId) {
+        onStatusConfirmed?.({ messageId: result.messageId, status: "sent" });
       }
       delayedRefetch();
     },
@@ -276,6 +353,9 @@ export default function WhatsAppChat({
           );
         });
       }
+      if (result.messageId) {
+        onStatusConfirmed?.({ messageId: result.messageId, status: "sent" });
+      }
       delayedRefetch();
       setReplyTarget(null);
     },
@@ -300,7 +380,6 @@ export default function WhatsAppChat({
       onOptimisticSend?.({ content: mediaLabel, messageType: vars.mediaType || "document" });
     },
     onSuccess: () => delayedRefetch(),
-    onError: () => toast.error("Erro ao enviar mídia"),
   });
 
   /* ── Reaction / Delete / Edit ── */
@@ -327,14 +406,29 @@ export default function WhatsAppChat({
     onError: () => toast.error("Erro ao enviar localização"),
   });
   const sendContactMut = trpc.whatsapp.sendContact.useMutation({
-    onMutate: () => { onOptimisticSend?.({ content: "👤 Cliente", messageType: "contactMessage" }); },
-    onSuccess: () => { chat.refetchMessages(); toast.success("Cliente enviado"); },
-    onError: () => toast.error("Erro ao enviar cliente"),
+    onMutate: () => { onOptimisticSend?.({ content: "👤 Passageiro", messageType: "contactMessage" }); },
+    onSuccess: () => { chat.refetchMessages(); toast.success("Passageiro enviado"); },
+    onError: () => toast.error("Erro ao enviar passageiro"),
   });
   const sendPollMut = trpc.whatsapp.sendPoll.useMutation({
     onMutate: () => { onOptimisticSend?.({ content: "📊 Enquete", messageType: "pollCreationMessage" }); },
     onSuccess: () => { chat.refetchMessages(); toast.success("Enquete enviada"); },
     onError: () => toast.error("Erro ao enviar enquete"),
+  });
+  const sendButtonListMut = trpc.whatsapp.sendButtonList.useMutation({
+    onMutate: () => { onOptimisticSend?.({ content: "🔘 Mensagem com botões", messageType: "buttonsMessage" }); },
+    onSuccess: () => { chat.refetchMessages(); toast.success("Mensagem com botões enviada"); },
+    onError: (e) => toast.error(e.message || "Erro ao enviar botões"),
+  });
+  const sendOptionListMut = trpc.whatsapp.sendOptionList.useMutation({
+    onMutate: () => { onOptimisticSend?.({ content: "📋 Lista de opções", messageType: "listMessage" }); },
+    onSuccess: () => { chat.refetchMessages(); toast.success("Lista de opções enviada"); },
+    onError: (e) => toast.error(e.message || "Erro ao enviar lista"),
+  });
+  const sendCarouselMut = trpc.whatsapp.sendCarousel.useMutation({
+    onMutate: () => { onOptimisticSend?.({ content: "🎠 Carousel", messageType: "interactiveMessage" }); },
+    onSuccess: () => { chat.refetchMessages(); toast.success("Carousel enviado"); },
+    onError: (e) => toast.error(e.message || "Erro ao enviar carousel"),
   });
 
   /* ── Notes CRUD ── */
@@ -368,6 +462,22 @@ export default function WhatsAppChat({
     onSuccess: () => toast.success("Prioridade atualizada"),
     onError: (e) => toast.error(e.message),
   });
+  const readChatMut = trpc.whatsapp.readChat.useMutation({
+    onSuccess: () => toast.success("Conversa marcada como lida"),
+    onError: (e) => toast.error(e.message || "Erro ao marcar como lida"),
+  });
+  const clearChatMut = trpc.whatsapp.clearChat.useMutation({
+    onSuccess: () => toast.success("Conversa limpa"),
+    onError: (e) => toast.error(e.message || "Erro ao limpar conversa"),
+  });
+  const setChatExpirationMut = trpc.whatsapp.setChatExpiration.useMutation({
+    onSuccess: () => toast.success("Mensagens temporárias atualizadas"),
+    onError: (e) => toast.error(e.message || "Erro ao configurar mensagens temporárias"),
+  });
+  const addChatNotesMut = trpc.whatsapp.addChatNotes.useMutation({
+    onSuccess: () => toast.success("Nota adicionada ao chat"),
+    onError: (e) => toast.error(e.message || "Erro ao adicionar nota"),
+  });
 
   /* ── Tags ── */
   const tagsQ = trpc.whatsapp.conversationTags.list.useQuery(undefined, { staleTime: 5 * 60 * 1000 });
@@ -386,8 +496,10 @@ export default function WhatsAppChat({
   });
 
   /* ── Scheduled messages ── */
+  // Filtra por sessionId + remoteJid — só as agendadas pro contato aberto.
+  // Antes listava TODAS do tenant, aparecia no contato errado.
   const scheduledQ = trpc.whatsapp.scheduledMessages.list.useQuery(
-    { status: "pending" },
+    { status: "pending", sessionId, remoteJid } as any,
     { enabled: showScheduleModal },
   );
   const createScheduledMut = trpc.whatsapp.scheduledMessages.create.useMutation({
@@ -477,28 +589,28 @@ export default function WhatsAppChat({
      ══════════════════════════════════════════════════════ */
 
   const sendPresenceComposing = useCallback(() => {
-    const number = contact?.phone?.replace(/\D/g, "") || "";
+    const number = sendNumber;
     if (!number || !sessionId) return;
     sendPresenceMut.mutate({ sessionId, number, presence: "composing" });
-  }, [sessionId, contact]);
+  }, [sessionId, sendNumber, sendPresenceMut]);
 
   const sendPresencePaused = useCallback(() => {
-    const number = contact?.phone?.replace(/\D/g, "") || "";
+    const number = sendNumber;
     if (!number || !sessionId) return;
     sendPresenceMut.mutate({ sessionId, number, presence: "paused" });
-  }, [sessionId, contact]);
+  }, [sessionId, sendNumber, sendPresenceMut]);
 
   const handleSend = useCallback((text: string) => {
-    const number = contact?.phone?.replace(/\D/g, "") || "";
+    const number = sendNumber;
     if (!number) return;
     sendMessage.mutate({ sessionId, number, message: text });
-  }, [sessionId, contact, sendMessage]);
+  }, [sessionId, sendNumber, sendMessage]);
 
   const handleSendWithQuote = useCallback((text: string, quotedMessageId: string, quotedText: string) => {
-    const number = contact?.phone?.replace(/\D/g, "") || "";
+    const number = sendNumber;
     if (!number) return;
     sendTextWithQuote.mutate({ sessionId, number, message: text, quotedMessageId, quotedText });
-  }, [sessionId, contact, sendTextWithQuote]);
+  }, [sessionId, sendNumber, sendTextWithQuote]);
 
   const handleCreateNote = useCallback((data: { content: string; category: string; priority: string; isGlobal: boolean; mentions: number[] }) => {
     if (!waConversationId) return;
@@ -514,63 +626,53 @@ export default function WhatsAppChat({
     });
   }, [waConversationId, sessionId, remoteJid, createNoteMut]);
 
+  const addPreviewFiles = useCallback(async (newFiles: File[], forceDoc?: boolean) => {
+    const items = await filesToPreviewItems(newFiles, forceDoc);
+    setPreviewFiles(prev => {
+      const combined = [...prev, ...items].slice(0, MAX_FILES);
+      if (prev.length + items.length > MAX_FILES) {
+        toast.warning(`Limite de ${MAX_FILES} arquivos por envio`);
+      }
+      return combined;
+    });
+    // If preview was empty, reset index to 0
+    setActivePreviewIndex(prev => prev === 0 ? 0 : prev);
+  }, []);
+
   const handleFileSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files?.length) return;
-    const number = contact?.phone?.replace(/\D/g, "") || "";
-    if (!number) return;
-    for (const file of Array.from(files)) {
-      setIsSending(true);
-      try {
-        const base64 = await fileToBase64(file);
-        const { url } = await uploadMedia.mutateAsync({ fileName: file.name, fileBase64: base64, contentType: file.type });
-        let mediaType: "image" | "video" | "document" = "document";
-        if (file.type.startsWith("image/")) mediaType = "image";
-        else if (file.type.startsWith("video/")) mediaType = "video";
-        await sendMedia.mutateAsync({ sessionId, number, mediaUrl: url, mediaType, fileName: file.name, mimetype: file.type });
-        toast.success("Mídia enviada");
-      } catch { toast.error("Erro ao enviar arquivo"); }
-      finally { setIsSending(false); }
-    }
+    await addPreviewFiles(Array.from(files));
     e.target.value = "";
-  }, [sessionId, contact]);
+  }, [addPreviewFiles]);
 
   const handleDocSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files?.length) return;
-    const number = contact?.phone?.replace(/\D/g, "") || "";
-    if (!number) return;
-    for (const file of Array.from(files)) {
-      setIsSending(true);
-      try {
-        const base64 = await fileToBase64(file);
-        const { url } = await uploadMedia.mutateAsync({ fileName: file.name, fileBase64: base64, contentType: file.type });
-        await sendMedia.mutateAsync({ sessionId, number, mediaUrl: url, mediaType: "document", fileName: file.name, mimetype: file.type });
-        toast.success("Documento enviado");
-      } catch { toast.error("Erro ao enviar documento"); }
-      finally { setIsSending(false); }
-    }
+    await addPreviewFiles(Array.from(files), true);
     e.target.value = "";
-  }, [sessionId, contact]);
+  }, [addPreviewFiles]);
 
   const handleVoiceSend = useCallback(async (blob: Blob, duration: number) => {
-    const number = contact?.phone?.replace(/\D/g, "") || "";
+    const number = sendNumber;
     if (!number) return;
     setIsSending(true);
     try {
       const base64 = await blobToBase64(blob);
-      const { url } = await uploadMedia.mutateAsync({ fileName: `voice-${Date.now()}.webm`, fileBase64: base64, contentType: "audio/webm;codecs=opus" });
-      await sendMedia.mutateAsync({ sessionId, number, mediaUrl: url, mediaType: "audio", ptt: true, mimetype: "audio/ogg; codecs=opus", duration });
+      const mime = blob.type || "audio/ogg;codecs=opus";
+      const dataUri = `data:${mime};base64,${base64}`;
+      await sendMedia.mutateAsync({ sessionId, number, mediaUrl: dataUri, mediaType: "audio", ptt: true, mimetype: mime, duration });
       toast.success("Áudio enviado");
     } catch { toast.error("Erro ao enviar áudio"); }
     finally { setIsSending(false); }
-  }, [sessionId, contact]);
+  }, [sessionId, sendNumber, sendMedia]);
 
   const handleAttachSelect = useCallback((type: string) => {
     // "image", "camera", "document" are handled by ChatInput's internal file inputs
     if (type === "location") setShowLocationModal(true);
     else if (type === "contact") setShowContactModal(true);
     else if (type === "poll") setShowPollModal(true);
+    else if (type === "interactive") setShowInteractiveComposer(true);
   }, []);
 
   const handleReact = useCallback((key: { remoteJid: string; fromMe: boolean; id: string }, emoji: string) => {
@@ -588,12 +690,10 @@ export default function WhatsAppChat({
   }, []);
 
   const handleEditSave = useCallback((newText: string) => {
-    if (!editTarget) return;
-    const number = contact?.phone?.replace(/\D/g, "") || "";
-    if (!number) return;
-    editMessageMut.mutate({ sessionId, number, messageId: editTarget.messageId, newText });
+    if (!editTarget || !remoteJid) return;
+    editMessageMut.mutate({ sessionId, number: remoteJid, messageId: editTarget.messageId, newText });
     setEditTarget(null);
-  }, [editTarget, sessionId, contact, editMessageMut]);
+  }, [editTarget, sessionId, remoteJid, editMessageMut]);
 
   const handleForward = useCallback((msg: Message) => {
     const content = msg.content || msg.mediaUrl || "";
@@ -602,15 +702,115 @@ export default function WhatsAppChat({
   }, []);
 
   const handleStartRecording = useCallback(() => {
-    sendPresenceMut.mutate({ sessionId, number: contact?.phone?.replace(/\D/g, "") || "", presence: "recording" });
-  }, [sessionId, contact, sendPresenceMut]);
+    if (!sendNumber) return;
+    sendPresenceMut.mutate({ sessionId, number: sendNumber, presence: "recording" });
+  }, [sessionId, sendNumber, sendPresenceMut]);
+
+  /* ── Drag-and-drop handlers ── */
+  const handleDragEnter = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounter.current++;
+    if (e.dataTransfer.types.includes("Files")) setIsDragOver(true);
+  }, []);
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounter.current--;
+    if (dragCounter.current === 0) setIsDragOver(false);
+  }, []);
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  }, []);
+  const handleDrop = useCallback(async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounter.current = 0;
+    setIsDragOver(false);
+    const files = e.dataTransfer.files;
+    if (!files?.length) return;
+    await addPreviewFiles(Array.from(files));
+  }, [addPreviewFiles]);
+
+  /* ── Media preview send handler (sequential multi-file) ── */
+  const handlePreviewSend = useCallback(async () => {
+    if (!previewFiles.length) return;
+    const number = sendNumber;
+    if (!number) return;
+    setIsSending(true);
+    setSendProgress(0);
+    let sent = 0;
+    try {
+      for (const item of previewFiles) {
+        await sendMedia.mutateAsync({
+          sessionId, number,
+          mediaUrl: item.dataUri,
+          mediaType: item.mediaType,
+          fileName: item.file.name,
+          mimetype: item.file.type,
+          caption: item.caption || undefined,
+        });
+        sent++;
+        setSendProgress(sent);
+      }
+      toast.success(previewFiles.length === 1 ? "Mídia enviada" : `${sent} arquivos enviados`);
+      setPreviewFiles([]);
+      setActivePreviewIndex(0);
+    } catch {
+      toast.error(sent > 0 ? `Erro após ${sent}/${previewFiles.length} arquivos` : "Erro ao enviar arquivo");
+    } finally {
+      setIsSending(false);
+      setSendProgress(0);
+    }
+  }, [previewFiles, sessionId, contact, sendMedia]);
+
+  /* ── Paste file handler (Ctrl+V / Cmd+V) — supports multiple files ── */
+  useEffect(() => {
+    const handlePaste = async (e: ClipboardEvent) => {
+      if (!remoteJid) return;
+      const items = e.clipboardData?.items;
+      if (!items?.length) return;
+
+      const pastedFiles: File[] = [];
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].kind === "file") {
+          const f = items[i].getAsFile();
+          if (f) pastedFiles.push(f);
+        }
+      }
+      if (!pastedFiles.length) return;
+
+      e.preventDefault();
+      addPreviewFiles(pastedFiles);
+    };
+    document.addEventListener("paste", handlePaste);
+    return () => document.removeEventListener("paste", handlePaste);
+  }, [remoteJid, addPreviewFiles]);
+
+  /* ── Pending file from drag-drop on conversation list ── */
+  const pendingFileProcessed = useRef(false);
+  useEffect(() => {
+    if (pendingFile && !pendingFileProcessed.current) {
+      pendingFileProcessed.current = true;
+      addPreviewFiles([pendingFile]);
+      onClearPendingFile?.();
+    }
+    if (!pendingFile) pendingFileProcessed.current = false;
+  }, [pendingFile, onClearPendingFile, addPreviewFiles]);
 
   /* ══════════════════════════════════════════════════════
      RENDER
      ══════════════════════════════════════════════════════ */
 
   return (
-    <div className="flex flex-col h-full overflow-hidden relative">
+    <div
+      className="flex flex-col h-full overflow-hidden relative"
+      onDragEnter={handleDragEnter}
+      onDragLeave={handleDragLeave}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
+    >
       <ChatHeader
         contact={contact}
         sessionId={sessionId}
@@ -633,13 +833,11 @@ export default function WhatsAppChat({
         showTimeline={showTimeline}
         onSummarize={handleSummarize}
         summaryLoading={summaryLoading}
-        onPin={() => pinMut.mutate({ sessionId, remoteJid, pin: true })}
-        onArchive={() => archiveMut.mutate({ sessionId, remoteJid, archive: true })}
         onSetPriority={(p) => setPriorityMut.mutate({ sessionId, remoteJid, priority: p })}
-        onToggleTagsPanel={() => setShowTagsPanel(prev => !prev)}
         onScheduleMessage={() => setShowScheduleModal(true)}
-        searchOpen={searchOpen}
-        onToggleSearch={() => setSearchOpen(v => !v)}
+        remotePresence={remotePresence}
+        onToggleSidebar={onToggleSidebar}
+        sidebarOpen={sidebarOpen}
       />
 
       <MessageList
@@ -652,15 +850,12 @@ export default function WhatsAppChat({
         contactAvatarUrl={contact?.avatarUrl}
         myAvatarUrl={myAvatarUrl}
         sessionId={sessionId}
+        remoteJid={remoteJid}
         localStatusUpdates={chat.localStatusUpdates}
         reactionsMap={chat.reactionsMap}
         agents={agents}
         agentMap={agentMap}
         showAgentNames={showAgentNames}
-        searchOpen={searchOpen}
-        searchQuery={searchQuery}
-        onSearchQueryChange={setSearchQuery}
-        onCloseSearch={() => { setSearchOpen(false); setSearchQuery(""); }}
         autoTranscribe={!!aiSettingsQ.data?.audioTranscriptionEnabled}
         transcriptions={chat.transcriptions}
         onReply={setReplyTarget}
@@ -728,7 +923,7 @@ export default function WhatsAppChat({
       {showLocationModal && (
         <LocationModal
           onSend={(lat, lng, name, address) => {
-            const number = contact?.phone?.replace(/\D/g, "") || "";
+            const number = sendNumber;
             if (!number) return;
             sendLocationMut.mutate({ sessionId, number, latitude: lat, longitude: lng, name, address });
           }}
@@ -738,7 +933,7 @@ export default function WhatsAppChat({
       {showContactModal && (
         <ContactModal
           onSend={(contacts) => {
-            const number = contact?.phone?.replace(/\D/g, "") || "";
+            const number = sendNumber;
             if (!number) return;
             sendContactMut.mutate({ sessionId, number, contacts });
           }}
@@ -748,11 +943,31 @@ export default function WhatsAppChat({
       {showPollModal && (
         <PollModal
           onSend={(name, values, selectableCount) => {
-            const number = contact?.phone?.replace(/\D/g, "") || "";
+            const number = sendNumber;
             if (!number) return;
             sendPollMut.mutate({ sessionId, number, name, values, selectableCount });
           }}
           onClose={() => setShowPollModal(false)}
+        />
+      )}
+      {showInteractiveComposer && (
+        <InteractiveMessageComposer
+          onSendButtons={(data) => {
+            const number = sendNumber;
+            if (!number) return;
+            sendButtonListMut.mutate({ sessionId, number, ...data });
+          }}
+          onSendList={(data) => {
+            const number = sendNumber;
+            if (!number) return;
+            sendOptionListMut.mutate({ sessionId, number, ...data });
+          }}
+          onSendCarousel={(data) => {
+            const number = sendNumber;
+            if (!number) return;
+            sendCarouselMut.mutate({ sessionId, number, ...data });
+          }}
+          onClose={() => setShowInteractiveComposer(false)}
         />
       )}
       {editTarget && (
@@ -871,6 +1086,8 @@ export default function WhatsAppChat({
               </button>
             </div>
           </div>
+          {/* WhatsApp Business Labels (Z-API native) */}
+          <WhatsAppLabelsSection sessionId={sessionId} remoteJid={remoteJid} />
         </div>
       )}
 
@@ -960,6 +1177,200 @@ export default function WhatsAppChat({
       {lightboxUrl && (
         <ImageLightbox url={lightboxUrl} onClose={() => setLightboxUrl(null)} />
       )}
+
+      {/* ─── Drag-and-drop overlay ─── */}
+      {isDragOver && (
+        <div className="absolute inset-0 bg-primary/10 backdrop-blur-sm flex items-center justify-center z-40 border-2 border-dashed border-primary rounded-lg pointer-events-none">
+          <div className="bg-card rounded-xl px-8 py-5 shadow-xl flex flex-col items-center gap-2 border border-primary/30">
+            <Paperclip className="w-8 h-8 text-primary" />
+            <span className="text-sm font-medium text-foreground">Solte o arquivo aqui</span>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Multi-file media preview carousel ─── */}
+      {previewFiles.length > 0 && (() => {
+        const active = previewFiles[activePreviewIndex] || previewFiles[0];
+        const total = previewFiles.length;
+        return (
+          <div
+            className="fixed inset-0 bg-black/60 flex items-center justify-center z-50"
+            onClick={() => { if (!isSending) { setPreviewFiles([]); setActivePreviewIndex(0); } }}
+            onKeyDown={(e) => {
+              if (e.key === "Escape" && !isSending) { setPreviewFiles([]); setActivePreviewIndex(0); }
+              if (e.key === "ArrowLeft") setActivePreviewIndex(i => Math.max(0, i - 1));
+              if (e.key === "ArrowRight") setActivePreviewIndex(i => Math.min(total - 1, i + 1));
+              if (e.key === "Delete" || e.key === "Backspace") {
+                if (isSending) return;
+                // Only remove if focus is not on the caption input
+                if ((e.target as HTMLElement)?.tagName === "INPUT") return;
+                setPreviewFiles(prev => {
+                  const next = prev.filter((_, idx) => idx !== activePreviewIndex);
+                  setActivePreviewIndex(i => Math.min(i, Math.max(0, next.length - 1)));
+                  return next;
+                });
+              }
+            }}
+            tabIndex={-1}
+          >
+            <div className="bg-card border border-border rounded-xl shadow-2xl w-[520px] max-w-[95vw] max-h-[85vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
+              {/* Header */}
+              <div className="flex items-center justify-between px-5 py-3 border-b border-border">
+                <h3 className="text-[14px] font-semibold truncate">
+                  {total > 1 ? `${total} arquivos` : active?.file.name}
+                </h3>
+                <div className="flex items-center gap-1">
+                  {!isSending && (
+                    <button
+                      onClick={() => addFileInputRef.current?.click()}
+                      className="p-1.5 hover:bg-muted rounded text-muted-foreground"
+                      title="Adicionar mais arquivos"
+                    >
+                      <Paperclip className="w-4 h-4" />
+                    </button>
+                  )}
+                  <button
+                    onClick={() => { if (!isSending) { setPreviewFiles([]); setActivePreviewIndex(0); } }}
+                    className="p-1.5 hover:bg-muted rounded"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Main preview area */}
+              {active && (
+                <div className="flex-1 flex items-center justify-center p-4 bg-muted/30 min-h-[200px] max-h-[50vh] overflow-auto relative">
+                  {active.mediaType === "image" ? (
+                    <img src={active.dataUri} alt="Preview" className="max-w-full max-h-[45vh] rounded-lg object-contain" />
+                  ) : active.mediaType === "video" ? (
+                    <video src={active.dataUri} controls className="max-w-full max-h-[45vh] rounded-lg" />
+                  ) : (
+                    <div className="flex flex-col items-center gap-2 text-muted-foreground py-8">
+                      <Paperclip className="w-12 h-12" />
+                      <span className="text-sm font-medium">{active.file.name}</span>
+                      <span className="text-xs">{active.file.size >= 1048576 ? `${(active.file.size / 1048576).toFixed(1)} MB` : `${(active.file.size / 1024).toFixed(1)} KB`}</span>
+                    </div>
+                  )}
+                  {/* Sent checkmark overlay */}
+                  {isSending && sendProgress > activePreviewIndex && (
+                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center rounded-lg">
+                      <Check className="w-10 h-10 text-green-400" />
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Thumbnail strip (only when multiple files) */}
+              {total > 1 && (
+                <div className="px-4 py-2 border-t border-border flex items-center gap-2 overflow-x-auto">
+                  {previewFiles.map((item, idx) => (
+                    <div
+                      key={idx}
+                      className={`relative shrink-0 w-14 h-14 rounded-lg overflow-hidden cursor-pointer border-2 transition-all ${
+                        idx === activePreviewIndex ? "border-primary ring-1 ring-primary/30" : "border-transparent hover:border-muted-foreground/30"
+                      }`}
+                      onClick={() => setActivePreviewIndex(idx)}
+                    >
+                      {item.mediaType === "image" ? (
+                        <img src={item.dataUri} alt="" className="w-full h-full object-cover" />
+                      ) : item.mediaType === "video" ? (
+                        <div className="w-full h-full bg-muted flex items-center justify-center">
+                          <span className="text-[10px] text-muted-foreground font-medium">VID</span>
+                        </div>
+                      ) : (
+                        <div className="w-full h-full bg-muted flex items-center justify-center">
+                          <Paperclip className="w-4 h-4 text-muted-foreground" />
+                        </div>
+                      )}
+                      {/* Remove button */}
+                      {!isSending && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setPreviewFiles(prev => {
+                              const next = prev.filter((_, i) => i !== idx);
+                              setActivePreviewIndex(i => Math.min(i, Math.max(0, next.length - 1)));
+                              return next;
+                            });
+                          }}
+                          className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-destructive text-white rounded-full flex items-center justify-center text-[10px] leading-none shadow"
+                        >
+                          <X className="w-2.5 h-2.5" />
+                        </button>
+                      )}
+                      {/* Sent checkmark on thumbnail */}
+                      {isSending && sendProgress > idx && (
+                        <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                          <Check className="w-4 h-4 text-green-400" />
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Caption + send */}
+              <div className="px-4 py-3 border-t border-border space-y-3">
+                {active && (
+                  <input
+                    type="text"
+                    value={active.caption}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setPreviewFiles(prev => prev.map((item, idx) => idx === activePreviewIndex ? { ...item, caption: val } : item));
+                    }}
+                    placeholder={total > 1 ? `Legenda para ${active.file.name}...` : "Adicionar legenda..."}
+                    className="w-full rounded-lg bg-muted/50 border border-border px-3 py-2 text-[13px] outline-none focus:ring-1 ring-primary"
+                    onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) handlePreviewSend(); }}
+                    disabled={isSending}
+                    autoFocus
+                  />
+                )}
+                <div className="flex justify-end gap-2">
+                  <button
+                    onClick={() => { if (!isSending) { setPreviewFiles([]); setActivePreviewIndex(0); } }}
+                    className="px-4 py-2 text-[13px] text-muted-foreground hover:bg-muted rounded-lg"
+                    disabled={isSending}
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={handlePreviewSend}
+                    disabled={isSending}
+                    className="px-4 py-2 text-[13px] bg-primary text-white rounded-lg font-medium hover:opacity-90 disabled:opacity-40 flex items-center gap-2"
+                  >
+                    {isSending ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        {total > 1 ? `Enviando ${sendProgress}/${total}...` : "Enviando..."}
+                      </>
+                    ) : (
+                      <>
+                        <Send className="w-4 h-4" />
+                        {total > 1 ? `Enviar ${total}` : "Enviar"}
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Hidden file input for adding more files */}
+            <input
+              ref={addFileInputRef}
+              type="file"
+              accept="image/*,video/*,application/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv,.zip,.rar"
+              multiple
+              className="hidden"
+              onChange={async (e) => {
+                if (e.target.files?.length) await addPreviewFiles(Array.from(e.target.files));
+                e.target.value = "";
+              }}
+            />
+          </div>
+        );
+      })()}
     </div>
   );
 }

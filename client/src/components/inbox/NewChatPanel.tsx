@@ -6,7 +6,7 @@ import { WaAvatar, formatPhoneNumber } from "./ConversationItem";
 interface NewChatPanelProps {
   open: boolean;
   onClose: () => void;
-  onSelectJid: (jid: string, name: string) => void;
+  onSelectJid: (jid: string, name: string, contactId?: number) => void;
   sessionId: string;
 }
 
@@ -27,12 +27,12 @@ export default function NewChatPanel({
     return list.filter((c) => c.phone && (c.name.toLowerCase().includes(q) || (c.phone && c.phone.includes(q)) || (c.accountName && c.accountName.toLowerCase().includes(q))));
   }, [contactsQ.data, searchTerm]);
 
-  const handleSelectContact = async (contact: { name: string; phone?: string | null }) => {
+  const handleSelectContact = async (contact: { id: number; name: string; phone?: string | null }) => {
     if (!contact.phone) return;
     setResolving(true); setResolveError("");
     try {
       const result = await trpcUtils.whatsapp.resolveJid.fetch({ sessionId, phone: contact.phone });
-      if (result.jid) { onSelectJid(result.jid, contact.name); onClose(); }
+      if (result.jid) { onSelectJid(result.jid, contact.name, contact.id); onClose(); }
       else setResolveError(`${contact.name} não está no WhatsApp`);
     } catch { setResolveError("Erro ao verificar número no WhatsApp"); }
     finally { setResolving(false); }

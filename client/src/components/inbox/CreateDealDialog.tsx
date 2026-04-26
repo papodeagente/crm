@@ -1,10 +1,47 @@
 import { useState, useEffect, useMemo, useRef } from "react"
 import { trpc } from "@/lib/trpc"
-import { Briefcase, X, Search, Loader2 } from "lucide-react"
+import { Briefcase, X, Search } from "lucide-react"
 import { toast } from "sonner"
 import { useLocation } from "wouter"
-import CustomFieldRenderer, { customFieldValuesToArray } from "@/components/CustomFieldRenderer"
-import type { CustomFieldDef } from "@/components/CustomFieldRenderer"
+
+function PriceInput({ cents, onChange }: { cents: number; onChange: (cents: number) => void }) {
+  const [editing, setEditing] = useState(false);
+  const [text, setText] = useState("");
+
+  const displayValue = (cents / 100).toFixed(2).replace(".", ",");
+
+  return (
+    <div className="flex items-center gap-0.5">
+      <span className="text-xs text-muted-foreground">R$</span>
+      {editing ? (
+        <input
+          type="text"
+          inputMode="decimal"
+          autoFocus
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onBlur={() => {
+            const parsed = Math.round(parseFloat(text.replace(",", ".") || "0") * 100);
+            if (!isNaN(parsed) && parsed >= 0) onChange(parsed);
+            setEditing(false);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+          }}
+          className="w-20 px-1.5 py-0.5 text-xs text-right border border-primary rounded-md bg-background focus:outline-none focus:ring-1 focus:ring-primary/30 transition-colors"
+        />
+      ) : (
+        <button
+          type="button"
+          onClick={() => { setText(displayValue); setEditing(true); }}
+          className="w-20 px-1.5 py-0.5 text-xs text-right border border-border rounded-md bg-background hover:border-primary/50 transition-colors cursor-text"
+        >
+          {displayValue}
+        </button>
+      )}
+    </div>
+  );
+}
 
 interface CreateDealDialogProps {
   open: boolean;
@@ -13,15 +50,16 @@ interface CreateDealDialogProps {
   contactPhone: string;
   contactJid: string;
   sessionId: string;
+  contactId?: number;
+  skipNavigation?: boolean;
 }
 
 function CreateDealDialog({
-  open, onClose, contactName, contactPhone, contactJid, sessionId,
+  open, onClose, contactName, contactPhone, contactJid, sessionId, contactId, skipNavigation,
 }: CreateDealDialogProps) {
   const [, navigate] = useLocation();
   const [title, setTitle] = useState(`Negociação - ${contactName}`);
-  const [customFieldValues, setCustomFieldValues] = useState<Record<number, string>>({});
-  const [selectedProducts, setSelectedProducts] = useState<Array<{ productId: number; name: string; basePriceCents: number; quantity: number }>>([]);
+  const [selectedProducts, setSelectedProducts] = useState<Array<{ productId: number; name: string; basePriceCents: number; unitPriceCents: number; quantity: number }>>([]);
   const [productSearch, setProductSearch] = useState("");
   const [showProductDropdown, setShowProductDropdown] = useState(false);
 
@@ -66,10 +104,10 @@ function CreateDealDialog({
     return () => document.removeEventListener("mousedown", handler);
   }, [showProductDropdown]);
 
+  const utils = trpc.useUtils();
   const createDeal = trpc.crm.deals.create.useMutation();
   const createContact = trpc.crm.contacts.create.useMutation();
   const contactsQ = trpc.crm.contacts.list.useQuery({ limit: 500 });
-  const setFieldValues = trpc.contactProfile.setCustomFieldValues.useMutation();
 
   // Product catalog query
   const catalogQ = trpc.productCatalog.products.list.useQuery(
@@ -88,6 +126,7 @@ function CreateDealDialog({
       productId: product.id,
       name: product.name,
       basePriceCents: product.basePriceCents || 0,
+      unitPriceCents: product.basePriceCents || 0,
       quantity: 1,
     }]);
     setProductSearch("");
@@ -102,53 +141,60 @@ function CreateDealDialog({
     setSelectedProducts(prev => prev.map(p => p.productId === productId ? { ...p, quantity: Math.max(1, qty) } : p));
   };
 
-  const totalCents = useMemo(() => selectedProducts.reduce((sum, p) => sum + p.basePriceCents * p.quantity, 0), [selectedProducts]);
-
-  // Load custom fields for deals
-  const dealCustomFields = trpc.customFields.list.useQuery(
-    { entity: "deal" as const },
-    { enabled: open }
-  );
-  const formFields = useMemo(() => {
-    return ((dealCustomFields.data || []) as CustomFieldDef[]).filter(f => f.isVisibleOnForm);
-  }, [dealCustomFields.data]);
+  const totalCents = useMemo(() => selectedProducts.reduce((sum, p) => sum + p.unitPriceCents * p.quantity, 0), [selectedProducts]);
 
   const handleCreate = async () => {
     if (!title.trim() || !selectedPipelineId || !selectedStageId) return;
     try {
-      const cleaned = contactPhone.replace(/\D/g, "");
-      const formatted = cleaned.startsWith("55") ? `+${cleaned}` : `+55${cleaned}`;
-      const contacts = ((contactsQ.data as any)?.items || contactsQ.data || []) as any[];
-      let contactId = contacts.find((c: any) => {
-        const cPhone = c.phone?.replace(/\D/g, "") || "";
-        return cPhone === cleaned || cPhone === cleaned.replace(/^55/, "") || `55${cPhone}` === cleaned;
-      })?.id;
+      // Use existing contact ID if provided (from inbox contact panel)
+      let resolvedContactId = contactId;
 
-      if (!contactId) {
-        const newContact = await createContact.mutateAsync({ name: contactName, phone: formatted,
-        });
-        contactId = (newContact as any).id;
+      if (!resolvedContactId) {
+        const cleaned = contactPhone.replace(/\D/g, "");
+        const formatted = cleaned.startsWith("55") ? `+${cleaned}` : `+55${cleaned}`;
+        const contactsList = ((contactsQ.data as any)?.items || contactsQ.data || []) as any[];
+
+        // 1. Busca local (rápida)
+        resolvedContactId = contactsList.find((c: any) => {
+          const cPhone = c.phone?.replace(/\D/g, "") || "";
+          return cPhone === cleaned || cPhone === cleaned.replace(/^55/, "") || `55${cPhone}` === cleaned;
+        })?.id;
+
+        // 2. Se não encontrou localmente, buscar no servidor por telefone
+        if (!resolvedContactId) {
+          const serverResults = await utils.crm.contacts.list.fetch({ search: cleaned, limit: 5 });
+          const serverContacts = ((serverResults as any)?.items || serverResults || []) as any[];
+          resolvedContactId = serverContacts.find((c: any) => {
+            const cPhone = c.phone?.replace(/\D/g, "") || "";
+            return cPhone === cleaned || cPhone === cleaned.replace(/^55/, "") || `55${cPhone}` === cleaned;
+          })?.id;
+        }
+
+        // 3. Só cria contato novo se realmente não existe
+        if (!resolvedContactId) {
+          const newContact = await createContact.mutateAsync({ name: contactName, phone: formatted });
+          resolvedContactId = (newContact as any).id;
+        }
       }
 
       const deal = await createDeal.mutateAsync({ title: title.trim(),
         pipelineId: selectedPipelineId, stageId: selectedStageId,
-        contactId: contactId || undefined,
+        contactId: resolvedContactId || undefined,
         products: selectedProducts.length > 0 ? selectedProducts.map(p => ({
           productId: p.productId,
           quantity: p.quantity,
+          unitPriceCents: p.unitPriceCents,
         })) : undefined,
       });
-      // Save custom field values for the deal
-      const cfEntries = customFieldValuesToArray(customFieldValues).filter(v => v.value);
-      if (cfEntries.length > 0 && (deal as any)?.id) {
-        await setFieldValues.mutateAsync({ entityType: "deal",
-          entityId: (deal as any).id,
-          values: cfEntries,
-        });
-      }
+      // Invalidate sidebar queries so they update immediately
+      utils.contactProfile.getDeals.invalidate();
+      utils.contactProfile.getMetrics.invalidate();
+      utils.crm.contacts.list.invalidate();
       toast.success("Negociação criada com sucesso!");
       onClose();
-      navigate(`/deal/${(deal as any).id}`);
+      if (!skipNavigation) {
+        navigate(`/deal/${(deal as any).id}`);
+      }
     } catch (e: any) {
       toast.error(e?.message || "Erro ao criar negociação");
     }
@@ -158,7 +204,7 @@ function CreateDealDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={onClose}>
-      <div className="bg-card rounded-2xl shadow-2xl w-full max-w-md mx-4 border border-border/50" onClick={(e) => e.stopPropagation()}>
+      <div className="bg-card rounded-2xl shadow-2xl w-full max-w-md mx-4 border border-border/50 max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-full bg-primary flex items-center justify-center">
@@ -170,7 +216,7 @@ function CreateDealDialog({
             <X className="w-5 h-5 text-muted-foreground" />
           </button>
         </div>
-        <div className="px-5 py-4 space-y-4">
+        <div className="px-5 py-4 space-y-4 overflow-y-auto flex-1">
           <div>
             <label className="text-[13px] text-muted-foreground mb-1.5 block font-medium">Título *</label>
             <input type="text" value={title} onChange={(e) => setTitle(e.target.value)}
@@ -229,9 +275,15 @@ function CreateDealDialog({
                       <button type="button" onClick={() => updateProductQty(p.productId, p.quantity + 1)}
                         className="w-6 h-6 rounded-md bg-background border border-border flex items-center justify-center text-xs hover:bg-muted transition-colors">+</button>
                     </div>
-                    <span className="text-xs text-muted-foreground whitespace-nowrap">
-                      {((p.basePriceCents * p.quantity) / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
-                    </span>
+                    <PriceInput
+                      cents={p.unitPriceCents}
+                      onChange={(cents) => setSelectedProducts(prev => prev.map(sp => sp.productId === p.productId ? { ...sp, unitPriceCents: cents } : sp))}
+                    />
+                    {p.quantity > 1 && (
+                      <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+                        = {((p.unitPriceCents * p.quantity) / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                      </span>
+                    )}
                     <button type="button" onClick={() => removeProduct(p.productId)}
                       className="p-0.5 hover:bg-destructive/10 rounded transition-colors">
                       <X className="w-3.5 h-3.5 text-muted-foreground hover:text-destructive" />
@@ -262,19 +314,6 @@ function CreateDealDialog({
                 className="w-full px-3 py-2.5 border border-border rounded-xl text-sm text-foreground bg-background focus:outline-none focus:border-primary">
                 {stages.map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
               </select>
-            </div>
-          )}
-          {/* Custom Fields */}
-          {formFields.length > 0 && (
-            <div className="border-t border-border pt-3">
-              <p className="text-[13px] text-muted-foreground mb-2 font-medium">Campos Personalizados</p>
-              <CustomFieldRenderer
-                fields={formFields}
-                values={customFieldValues}
-                onChange={(fieldId, value) => setCustomFieldValues(prev => ({ ...prev, [fieldId]: value }))}
-                mode="form"
-                compact
-              />
             </div>
           )}
         </div>

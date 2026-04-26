@@ -26,11 +26,11 @@ export function formatConversationTime(date: string | Date | null | undefined): 
 
 export function formatPhoneNumber(jid: string): string {
   if (!jid) return "Desconhecido";
-  // LID JIDs don't contain phone numbers - show friendly label
-  if (jid.endsWith("@lid")) return "Cliente WhatsApp";
+  // LID JIDs don't contain phone numbers
+  if (jid.endsWith("@lid")) return "Contato WhatsApp";
   const phone = jid.split("@")[0];
   // Skip non-numeric strings (corrupted JIDs)
-  if (!/^\d+$/.test(phone)) return "Cliente WhatsApp";
+  if (!/^\d+$/.test(phone)) return "Contato WhatsApp";
   if (phone.startsWith("55") && phone.length >= 12) {
     const ddd = phone.substring(2, 4);
     const num = phone.substring(4);
@@ -102,7 +102,7 @@ export const StatusTick = memo(({ status, fromMe }: { status: string | null; fro
     case "pending": return <Clock className="w-[16px] h-[16px] shrink-0" />;
     case "sent": return <Check className="w-[16px] h-[16px] shrink-0" />;
     case "delivered": return <CheckCheck className="w-[16px] h-[16px] shrink-0" />;
-    case "read": case "played": return <CheckCheck className="w-[16px] h-[16px] shrink-0 text-blue-400" />;
+    case "read": case "played": return <CheckCheck className="w-[16px] h-[16px] shrink-0 text-wa-tick-read" />;
     default: return <Check className="w-[16px] h-[16px] shrink-0" />;
   }
 });
@@ -260,13 +260,19 @@ export interface ConvItem {
   lastSenderAgentId?: number | null;
   // Fields from wa_conversations
   conversationId?: number;
+  contactId?: number | null;
   contactName?: string | null;
   contactEmail?: string | null;
   contactPhone?: string | null;
+  // Avatar persistido em contacts.avatarUrl — usado como fallback quando
+  // cache Z-API (profilePictures) expira. Ver specs/domains/inbox.spec.md.
+  contactAvatarUrl?: string | null;
   queuedAt?: string | Date | null;
   // Pin / Archive / Priority
   isPinned?: boolean | number;
   isArchived?: boolean | number;
+  // LID resolution
+  resolvedPhone?: string | null;
 }
 
 // Priority colors for badges
@@ -307,11 +313,12 @@ StatusDot.displayName = "StatusDot";
 
 const ConversationItem = memo(({
   conv, isActive, contactName, pictureUrl, onClick, waitLabel, showTimer, showFinish, onFinish,
-  onTransfer, onAssignClick,
+  onTransfer, onAssignClick, onFileDrop, isDragTarget,
 }: {
   conv: ConvItem; isActive: boolean; contactName: string; pictureUrl?: string | null; onClick: () => void;
   waitLabel?: string; showTimer?: boolean; showFinish?: boolean; onFinish?: () => void;
   onTransfer?: () => void; onAssignClick?: () => void;
+  onFileDrop?: (file: File) => void; isDragTarget?: boolean;
 }) => {
   const fromMe = conv.lastFromMe === true || conv.lastFromMe === 1;
   const unread = Number(conv.unreadCount) || 0;
@@ -322,7 +329,15 @@ const ConversationItem = memo(({
   return (
     <div
       onClick={onClick}
-      className={`inbox-conv-item group/conv flex items-center gap-3 px-3.5 py-3 cursor-pointer ${isActive ? "active" : ""}`}
+      onDragOver={(e) => { if (e.dataTransfer.types.includes("Files")) { e.preventDefault(); e.stopPropagation(); } }}
+      onDragEnter={(e) => { if (e.dataTransfer.types.includes("Files")) { e.preventDefault(); e.stopPropagation(); } }}
+      onDrop={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const file = e.dataTransfer.files?.[0];
+        if (file && onFileDrop) onFileDrop(file);
+      }}
+      className={`inbox-conv-item group/conv flex items-center gap-3 px-3.5 py-3 cursor-pointer ${isActive ? "active" : ""} ${isDragTarget ? "ring-2 ring-primary ring-inset bg-primary/5" : ""}`}
     >
       {/* Avatar with channel badge + ring */}
       <div className="relative shrink-0">
@@ -331,8 +346,8 @@ const ConversationItem = memo(({
         </div>
         {/* WhatsApp channel badge */}
         <div className="absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-full bg-[#25D366] flex items-center justify-center ring-2 ring-background">
-          <svg className="w-3 h-3 text-white" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/>
+          <svg className="w-3 h-3 text-white" viewBox="0 0 308 308" fill="currentColor">
+            <path d="M227.904 176.981c-.6-.288-23.054-11.345-26.693-12.637-3.629-1.303-6.277-1.938-8.917 1.944-2.641 3.886-10.233 12.637-12.547 15.246-2.313 2.598-4.627 2.914-8.582.926-3.955-1.999-16.697-6.13-31.811-19.546-11.747-10.442-19.67-23.338-21.984-27.296-2.313-3.948-.243-6.09 1.74-8.053 1.782-1.764 3.955-4.6 5.932-6.899 1.977-2.31 2.63-3.957 3.955-6.555 1.303-2.609.652-4.897-.326-6.866-.976-1.957-8.917-21.426-12.222-29.34-3.218-7.704-6.488-6.665-8.917-6.787-2.314-.109-4.954-.131-7.595-.131-2.641 0-6.928.976-10.557 4.897-3.629 3.909-13.862 13.49-13.862 32.903 0 19.413 14.188 38.174 16.166 40.804 1.977 2.609 27.92 42.532 67.63 59.644 9.447 4.063 16.826 6.494 22.576 8.313 9.486 3.003 18.12 2.581 24.94 1.563 7.605-1.13 23.053-9.403 26.318-18.492 3.264-9.089 3.264-16.882 2.314-18.492-.976-1.631-3.629-2.598-7.595-4.568zM156.734 0C73.318 0 5.454 67.354 5.454 150.143c0 26.777 7.166 52.988 20.741 75.928L.045 308l84.047-25.65c21.886 11.683 46.583 17.83 71.642 17.83h.065c83.349 0 151.213-67.354 151.213-150.143C307.012 67.354 240.083 0 156.734 0zm0 275.631h-.054c-22.646 0-44.84-6.082-64.154-17.563l-4.605-2.729-47.71 12.456 12.73-46.318-3.004-4.762C36.327 196.123 29.7 173.574 29.7 150.143 29.7 80.575 86.57 24.214 156.8 24.214c34.013 0 65.955 13.203 90.004 37.18 24.049 23.978 37.296 55.853 37.282 89.749-.065 69.568-56.935 125.488-127.352 125.488z"/>
           </svg>
         </div>
         {conv.assignmentStatus && conv.assignmentStatus !== "open" && (
@@ -400,25 +415,14 @@ const ConversationItem = memo(({
                 {unread > 99 ? "99+" : unread}
               </span>
             )}
-            {/* Action buttons */}
+            {/* Action buttons — always visible */}
             {onTransfer && (
               <InstantTooltip label="Transferir">
                 <button
                   onClick={(e) => { e.stopPropagation(); onTransfer(); }}
-                  className="w-7 h-7 flex items-center justify-center rounded-md shrink-0 text-muted-foreground hover:bg-primary/10 hover:text-primary transition-all opacity-0 group-hover/conv:opacity-100"
+                  className="w-7 h-7 flex items-center justify-center rounded-md shrink-0 text-muted-foreground hover:bg-primary/10 hover:text-primary transition-all"
                 >
                   <ArrowRightLeft className="w-3.5 h-3.5" />
-                </button>
-              </InstantTooltip>
-            )}
-            {onAssignClick && (
-              <InstantTooltip label={conv.assignedAgentName ? `Atribu\u00EDdo: ${conv.assignedAgentName}` : "Atribuir"}>
-                <button
-                  onClick={(e) => { e.stopPropagation(); onAssignClick(); }}
-                  className="w-7 h-7 flex items-center justify-center rounded-md shrink-0 text-muted-foreground hover:bg-primary/10 hover:text-primary transition-all opacity-0 group-hover/conv:opacity-100"
-                  style={{ color: conv.assignedAgentName ? 'var(--primary)' : undefined }}
-                >
-                  <Users className="w-3.5 h-3.5" />
                 </button>
               </InstantTooltip>
             )}
@@ -426,7 +430,7 @@ const ConversationItem = memo(({
               <InstantTooltip label="Finalizar">
                 <button
                   onClick={(e) => { e.stopPropagation(); onFinish(); }}
-                  className="w-7 h-7 flex items-center justify-center rounded-md shrink-0 text-emerald-400 hover:bg-emerald-500/15 transition-all opacity-0 group-hover/conv:opacity-100"
+                  className="w-7 h-7 flex items-center justify-center rounded-md shrink-0 text-emerald-400 hover:bg-emerald-500/15 transition-all"
                 >
                   <CheckCircle2 className="w-3.5 h-3.5" />
                 </button>

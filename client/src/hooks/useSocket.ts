@@ -24,6 +24,11 @@ interface WhatsAppMessageEvent {
   timestamp: number;
   status?: string;   // Backend now sends status ("sent" | "received") in socket event
   isSync?: boolean;
+  mediaUrl?: string | null;
+  mediaMimeType?: string | null;
+  mediaFileName?: string | null;
+  mediaDuration?: number | null;
+  isVoiceNote?: boolean;
 }
 
 export interface WhatsAppMessageStatusEvent {
@@ -86,6 +91,9 @@ class SocketManager {
   private _lastConversationUpdate: ConversationUpdatedEvent | null = null;
   private _lastTranscriptionUpdate: TranscriptionUpdateEvent | null = null;
   private _lastReaction: ReactionEvent | null = null;
+  private _lastEditedMessage: { sessionId: string; messageId: string; remoteJid?: string; newText: string; timestamp: number } | null = null;
+  private _lastPresenceUpdate: { userId: number; availabilityStatus: string; tenantId: number; timestamp: number } | null = null;
+  private _lastSlaBreached: { conversationId: number; sessionId: string; remoteJid: string; tenantId: number; breachType: string; assignedUserId: number | null; timestamp: number } | null = null;
   private refCount = 0;
 
   subscribe(listener: () => void) {
@@ -105,7 +113,6 @@ class SocketManager {
 
   private ensureConnected() {
     if (this.socket) return;
-    console.log("[Socket] Creating singleton connection");
     const socket = io(window.location.origin, {
       path: "/api/socket.io",
       transports: ["websocket", "polling"],
@@ -118,13 +125,11 @@ class SocketManager {
     this.socket = socket;
 
     socket.on("connect", () => {
-      console.log("[Socket] Connected:", socket.id);
       this._isConnected = true;
       this.notify();
     });
 
-    socket.on("disconnect", (reason) => {
-      console.log("[Socket] Disconnected:", reason);
+    socket.on("disconnect", () => {
       this._isConnected = false;
       this.notify();
     });
@@ -143,10 +148,6 @@ class SocketManager {
     });
 
     socket.on("whatsapp:message", (data: WhatsAppMessageEvent) => {
-      const _socketIoReceiveTime = Date.now();
-      const _emitAt = (data as any)._traceEmitAt;
-      console.log(`[TRACE][SOCKETIO_DELIVER] timestamp: ${_socketIoReceiveTime} | transport_latency: ${_emitAt ? _socketIoReceiveTime - _emitAt : 'N/A'}ms | msgId: ${(data as any).messageId || 'N/A'} | remoteJid: ${data.remoteJid?.substring(0, 15)}`);
-      console.log("[Socket] Message received:", data.remoteJid, data.fromMe, data.content?.substring(0, 30));
       this._lastMessage = data;
       this.notify();
     });
@@ -164,21 +165,36 @@ class SocketManager {
 
     // Audio transcription completed
     socket.on("whatsapp:transcription", (data: TranscriptionUpdateEvent) => {
-      console.log("[Socket] Transcription update:", data.messageId, data.status);
       this._lastTranscriptionUpdate = data;
       this.notify();
     });
 
     // Reaction on a message
     socket.on("whatsapp:reaction", (data: ReactionEvent) => {
-      console.log("[Socket] Reaction received:", data.emoji, "on", data.targetMessageId);
       this._lastReaction = data;
+      this.notify();
+    });
+
+    socket.on("whatsapp:message:edited", (data: { sessionId: string; messageId: string; newText: string; timestamp: number }) => {
+      this._lastEditedMessage = data;
       this.notify();
     });
 
     // Conversation updated (internal notes, assignments, etc.)
     socket.on("conversationUpdated", (data: ConversationUpdatedEvent) => {
       this._lastConversationUpdate = data;
+      this.notify();
+    });
+
+    // Agent presence/availability changed
+    socket.on("agentPresenceChanged", (data: any) => {
+      this._lastPresenceUpdate = data;
+      this.notify();
+    });
+
+    // SLA breached
+    socket.on("slaBreached", (data: any) => {
+      this._lastSlaBreached = data;
       this.notify();
     });
   }
@@ -194,6 +210,9 @@ class SocketManager {
       lastConversationUpdate: this._lastConversationUpdate,
       lastTranscriptionUpdate: this._lastTranscriptionUpdate,
       lastReaction: this._lastReaction,
+      lastEditedMessage: this._lastEditedMessage,
+      lastPresenceUpdate: this._lastPresenceUpdate,
+      lastSlaBreached: this._lastSlaBreached,
     };
   }
 
@@ -225,7 +244,10 @@ function getSnapshot() {
     next.lastMediaUpdate !== snapshotCache.lastMediaUpdate ||
     next.lastConversationUpdate !== snapshotCache.lastConversationUpdate ||
     next.lastTranscriptionUpdate !== snapshotCache.lastTranscriptionUpdate ||
-    next.lastReaction !== snapshotCache.lastReaction
+    next.lastReaction !== snapshotCache.lastReaction ||
+    next.lastEditedMessage !== snapshotCache.lastEditedMessage ||
+    next.lastPresenceUpdate !== snapshotCache.lastPresenceUpdate ||
+    next.lastSlaBreached !== snapshotCache.lastSlaBreached
   ) {
     snapshotCache = next;
   }
@@ -256,6 +278,9 @@ export function useSocket() {
     lastConversationUpdate: state.lastConversationUpdate,
     lastTranscriptionUpdate: state.lastTranscriptionUpdate,
     lastReaction: state.lastReaction,
+    lastEditedMessage: state.lastEditedMessage,
+    lastPresenceUpdate: state.lastPresenceUpdate,
+    lastSlaBreached: state.lastSlaBreached,
     clearQr,
   };
 }

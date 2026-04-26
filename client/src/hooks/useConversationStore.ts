@@ -82,6 +82,7 @@ export interface ConvEntry {
   contactName?: string | null;
   contactEmail?: string | null;
   contactPhone?: string | null;
+  contactAvatarUrl?: string | null;
   queuedAt?: string | Date | null;
   isPinned?: boolean | number;
   isArchived?: boolean | number;
@@ -118,6 +119,28 @@ export function getSessionFromKey(key: string): string {
   return idx >= 0 ? key.slice(0, idx) : "";
 }
 
+/**
+ * Generate JID variants for Brazilian 9th digit matching.
+ * E.g., "558496441702@s.whatsapp.net" ↔ "5584996441702@s.whatsapp.net"
+ */
+function getJidVariants(jid: string): string[] {
+  const suffix = jid.includes("@") ? jid.slice(jid.indexOf("@")) : "";
+  const digits = jid.replace(/@.*$/, "");
+  if (!digits.startsWith("55") || digits.length < 12) return [jid];
+  const ddd = digits.substring(2, 4);
+  const rest = digits.substring(4);
+  const variants = [jid];
+  // Add version with 9th digit
+  if (rest.length === 8) {
+    variants.push(`55${ddd}9${rest}${suffix}`);
+  }
+  // Add version without 9th digit
+  if (rest.length === 9 && rest.startsWith("9")) {
+    variants.push(`55${ddd}${rest.substring(1)}${suffix}`);
+  }
+  return variants;
+}
+
 // Export for testing
 export { STATUS_ORDER, getStatusOrder, isStatusHigher, maxStatus };
 
@@ -128,6 +151,26 @@ class ConversationStore {
     version: 0,
   };
   private listeners = new Set<Listener>();
+
+  /**
+   * Find conversation key by trying JID variants (9th digit).
+   * Returns the matching key and entry, or null if not found.
+   */
+  private findByJidVariants(sessionId: string, remoteJid: string): { key: string; entry: ConvEntry } | null {
+    // Try exact match first (O(1))
+    const exactKey = makeConvKey(sessionId, remoteJid);
+    const exact = this.state.conversationMap.get(exactKey);
+    if (exact) return { key: exactKey, entry: exact };
+
+    // Try JID variants (9th digit)
+    for (const variant of getJidVariants(remoteJid)) {
+      if (variant === remoteJid) continue; // skip exact (already tried)
+      const vKey = makeConvKey(sessionId, variant);
+      const found = this.state.conversationMap.get(vKey);
+      if (found) return { key: vKey, entry: found };
+    }
+    return null;
+  }
 
   subscribe = (listener: Listener) => {
     this.listeners.add(listener);
@@ -208,6 +251,12 @@ class ConversationStore {
               assignedUserId: existing.assignedUserId,
               assignmentStatus: existing.assignmentStatus,
             };
+          }
+
+          // Preserve _lastOutgoingMessageId across rehidration so the
+          // messageId guard in handleStatusUpdate keeps working correctly
+          if (existing._lastOutgoingMessageId) {
+            entry = { ...entry, _lastOutgoingMessageId: existing._lastOutgoingMessageId };
           }
 
           // If the existing entry is optimistic (user just sent a message),
@@ -328,12 +377,15 @@ class ConversationStore {
     messageId?: string;
     pushName?: string;
   }, activeKey: string | null): boolean {
-    const key = makeConvKey(msg.sessionId, msg.remoteJid);
-    if (!key || !msg.remoteJid) return false;
+    if (!msg.remoteJid) return false;
 
     const oldMap = this.state.conversationMap;
     const oldIds = this.state.sortedIds;
-    const existing = oldMap.get(key);
+
+    // Use variant lookup to handle Brazilian 9th digit JID mismatches
+    const match = this.findByJidVariants(msg.sessionId, msg.remoteJid);
+    let existing = match?.entry || null;
+    let effectiveKey = match?.key || makeConvKey(msg.sessionId, msg.remoteJid);
 
     if (!existing) {
       return false; // new conversation — caller should fetch from server
@@ -364,7 +416,7 @@ class ConversationStore {
         _optimistic: false, // confirmed by server
       };
       const newMap = new Map(oldMap);
-      newMap.set(key, updated);
+      newMap.set(effectiveKey, updated);
       this.commit(newMap, [...oldIds]);
       return true;
     }
@@ -377,8 +429,8 @@ class ConversationStore {
     // Determine unread count
     let newUnread: number;
     if (msg.fromMe) {
-      newUnread = activeKey === key ? 0 : Number(existing.unreadCount) || 0;
-    } else if (activeKey === key) {
+      newUnread = activeKey === effectiveKey ? 0 : Number(existing.unreadCount) || 0;
+    } else if (activeKey === effectiveKey) {
       newUnread = 0;
     } else {
       newUnread = (Number(existing.unreadCount) || 0) + 1;
@@ -430,17 +482,17 @@ class ConversationStore {
 
     // NEW Map reference with updated entry
     const newMap = new Map(oldMap);
-    newMap.set(key, updated);
+    newMap.set(effectiveKey, updated);
 
     // NEW array reference with conversation moved to top
-    const currentIdx = oldIds.indexOf(key);
+    const currentIdx = oldIds.indexOf(effectiveKey);
     let newIds: string[];
     if (currentIdx === 0) {
       newIds = [...oldIds];
     } else if (currentIdx > 0) {
-      newIds = [key, ...oldIds.slice(0, currentIdx), ...oldIds.slice(currentIdx + 1)];
+      newIds = [effectiveKey, ...oldIds.slice(0, currentIdx), ...oldIds.slice(currentIdx + 1)];
     } else {
-      newIds = [key, ...oldIds];
+      newIds = [effectiveKey, ...oldIds];
     }
 
     this.commit(newMap, newIds);
@@ -456,39 +508,28 @@ class ConversationStore {
    * This is the PRIMARY defense against status regression.
    */
   handleStatusUpdate(update: { sessionId: string; remoteJid: string; status: string; messageId?: string }) {
-    const key = makeConvKey(update.sessionId, update.remoteJid);
-    if (!key) return;
-
-    const existing = this.state.conversationMap.get(key);
-    if (!existing) return;
+    // Use variant lookup to handle Brazilian 9th digit JID mismatches
+    const match = this.findByJidVariants(update.sessionId, update.remoteJid);
+    if (!match) return;
+    const { key, entry: existing } = match;
 
     // lastFromMe can be boolean (true) or number (1) from MySQL
     const isFromMe = existing.lastFromMe === true || existing.lastFromMe === 1;
-    
-    // If the last message is NOT fromMe, we don't update the conversation status.
-    // Status ticks only apply to outgoing messages.
+
+    // Status ticks only apply to outgoing messages
     if (!isFromMe) return;
 
-    // CRITICAL: If we know the last outgoing messageId, only accept status updates
-    // for THAT specific message. This prevents status updates for older messages
-    // from corrupting the sidebar preview (e.g., old message's "read" overwriting
-    // new message's "sent").
-    if (existing._lastOutgoingMessageId && update.messageId && 
+    // Only accept status updates for the LAST outgoing message
+    if (existing._lastOutgoingMessageId && update.messageId &&
         existing._lastOutgoingMessageId !== update.messageId) {
-      // Status update is for a DIFFERENT (older) message — ignore it
       return;
     }
 
-    // MONOTONIC ENFORCEMENT — the core rule
-    // Status can ONLY go forward: error → pending → sending → sent → delivered → read → played
+    // MONOTONIC ENFORCEMENT — status can ONLY go forward
     const currentOrder = getStatusOrder(existing.lastStatus);
     const newOrder = getStatusOrder(update.status);
-    
-    if (newOrder <= currentOrder) {
-      // Would regress — SKIP silently
-      return;
-    }
 
+    if (newOrder <= currentOrder) return;
     const newMap = new Map(this.state.conversationMap);
     newMap.set(key, {
       ...existing,
@@ -497,6 +538,36 @@ class ConversationStore {
     });
 
     // Do NOT change sortedIds — status updates never re-sort
+    this.commit(newMap, [...this.state.sortedIds]);
+  }
+
+  /**
+   * Fallback: find conversation by _lastOutgoingMessageId when remoteJid is unavailable.
+   * Scans the map (O(n)) but only used as fallback when the primary O(1) path fails.
+   */
+  handleStatusUpdateByMessageId(update: { sessionId: string; messageId: string; status: string }) {
+    for (const [, conv] of Array.from(this.state.conversationMap.entries())) {
+      if (conv._lastOutgoingMessageId === update.messageId && conv.remoteJid) {
+        this.handleStatusUpdate({ sessionId: update.sessionId, remoteJid: conv.remoteJid, status: update.status, messageId: update.messageId });
+        return;
+      }
+    }
+  }
+
+  /**
+   * Confirm a sent message: update _lastOutgoingMessageId with the real Z-API messageId
+   * and set lastStatus to "sent" (replacing the optimistic "sending" clock).
+   */
+  confirmSentMessageId(conversationKey: string, messageId: string) {
+    const existing = this.state.conversationMap.get(conversationKey);
+    if (!existing) return;
+    const newMap = new Map(this.state.conversationMap);
+    newMap.set(conversationKey, {
+      ...existing,
+      _lastOutgoingMessageId: messageId,
+      lastStatus: "sent",
+      _optimistic: false,
+    });
     this.commit(newMap, [...this.state.sortedIds]);
   }
 
@@ -517,12 +588,36 @@ class ConversationStore {
    * Update assignment fields for a conversation using conversationKey.
    */
   updateAssignment(conversationKey: string, fields: Partial<Pick<ConvEntry, 'assignedUserId' | 'assignedAgentName' | 'assignmentStatus' | 'assignmentPriority' | 'assignedAgentAvatar'>>) {
-    const existing = this.state.conversationMap.get(conversationKey);
-    if (!existing) return;
+    let existing = this.state.conversationMap.get(conversationKey);
+    let resolvedKey = conversationKey;
+
+    // Fallback: try JID variants (9th digit) if exact key not found
+    if (!existing) {
+      const sessionId = getSessionFromKey(conversationKey);
+      const jid = getJidFromKey(conversationKey);
+      const match = this.findByJidVariants(sessionId, jid);
+      if (!match) return;
+      existing = match.entry;
+      resolvedKey = match.key;
+    }
 
     const newMap = new Map(this.state.conversationMap);
-    newMap.set(conversationKey, { ...existing, ...fields });
+    newMap.set(resolvedKey, { ...existing, ...fields });
 
+    this.commit(newMap, [...this.state.sortedIds]);
+  }
+
+  /**
+   * Update the preview text when a message is edited.
+   * Only updates if the last message in the conversation was fromMe.
+   */
+  updateEditedPreview(sessionId: string, remoteJid: string, newText: string) {
+    const match = this.findByJidVariants(sessionId, remoteJid);
+    if (!match) return;
+    const { key, entry } = match;
+    if (!entry.lastFromMe) return;
+    const newMap = new Map(this.state.conversationMap);
+    newMap.set(key, { ...entry, lastMessage: newText });
     this.commit(newMap, [...this.state.sortedIds]);
   }
 
@@ -598,6 +693,14 @@ export function useConversationStore() {
     store.handleStatusUpdate(update);
   }, [store]);
 
+  const handleStatusUpdateByMessageId = useCallback((update: { sessionId: string; messageId: string; status: string }) => {
+    store.handleStatusUpdateByMessageId(update);
+  }, [store]);
+
+  const confirmSentMessageId = useCallback((key: string, messageId: string) => {
+    store.confirmSentMessageId(key, messageId);
+  }, [store]);
+
   const markRead = useCallback((conversationKey: string) => {
     store.markRead(conversationKey);
   }, [store]);
@@ -633,6 +736,10 @@ export function useConversationStore() {
     handleMessage,
     /** Handle message status update (only updates status, never re-sorts) */
     handleStatusUpdate,
+    /** Fallback: find conversation by messageId when remoteJid is unavailable */
+    handleStatusUpdateByMessageId,
+    /** Confirm sent message: update _lastOutgoingMessageId and set status to "sent" */
+    confirmSentMessageId,
     /** Mark conversation as read (by conversationKey) */
     markRead,
     /** Update assignment fields (by conversationKey) */

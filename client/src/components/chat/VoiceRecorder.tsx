@@ -19,9 +19,14 @@ export default function VoiceRecorder({ onSend, onCancel }: VoiceRecorderProps) 
 
   // Start recording immediately on mount
   useEffect(() => {
-    recorder.startRecording().then(success => {
-      if (!success) {
-        toast.error("Não foi possível acessar o microfone");
+    recorder.startRecording().then(result => {
+      if (!result.ok) {
+        // Mostra a causa específica (PERMISSION_DENIED / NO_MICROPHONE / MIC_IN_USE / etc).
+        // Antes era genérico "Não foi possível acessar" — usuário não sabia por onde começar.
+        toast.error(result.errorMessage || "Não foi possível acessar o microfone", {
+          description: result.errorCode ? `Código: ${result.errorCode}` : undefined,
+          duration: 8000,
+        });
         onCancel();
       }
     });

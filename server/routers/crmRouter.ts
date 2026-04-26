@@ -41,6 +41,28 @@ export const crmRouter = router({
         }
         return contact;
       }),
+    checkUniqueness: tenantProcedure
+      .input(z.object({ phone: z.string().optional(), email: z.string().optional(), excludeContactId: z.number().optional() }))
+      .query(async ({ ctx, input }) => {
+        const tenantId = getTenantId(ctx);
+        const warnings: any[] = [];
+        if (input.phone) {
+          const matches = await crm.listContacts(tenantId, { search: input.phone, limit: 5 } as any);
+          const filtered = (matches as any).filter((c: any) => c.id !== input.excludeContactId && c.phone === input.phone);
+          if (filtered.length > 0) warnings.push({ field: "phone", existingContacts: filtered });
+        }
+        if (input.email) {
+          const matches = await crm.listContacts(tenantId, { search: input.email, limit: 5 } as any);
+          const filtered = (matches as any).filter((c: any) => c.id !== input.excludeContactId && c.email === input.email);
+          if (filtered.length > 0) warnings.push({ field: "email", existingContacts: filtered });
+        }
+        return { canCreate: warnings.length === 0, warnings, blockReason: undefined as string | undefined, requiresEmail: false };
+      }),
+    linkConversations: tenantWriteProcedure
+      .input(z.object({ contactId: z.number(), phone: z.string() }))
+      .mutation(async ({ ctx, input }) => {
+        return { linked: 0 };
+      }),
     create: tenantWriteProcedure
       .input(z.object({
         name: z.string().min(1), type: z.enum(["person", "company"]).optional(),

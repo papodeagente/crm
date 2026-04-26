@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { normalizeForSearch } from "../utils/searchUtils";
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -28,9 +29,11 @@ export interface ConvItem {
   contactName?: string | null;
   contactEmail?: string | null;
   contactPhone?: string | null;
+  contactAvatarUrl?: string | null;
   queuedAt?: string | Date | null;
   isPinned?: boolean | number;
   isArchived?: boolean | number;
+  resolvedPhone?: string | null;
 }
 
 export interface WaContact {
@@ -76,7 +79,7 @@ function matchesSearch(
   term: string,
   getDisplayName: (jid: string, conv?: ConvItem) => string,
 ): boolean {
-  const name = getDisplayName(conv.remoteJid, conv).toLowerCase();
+  const name = normalizeForSearch(getDisplayName(conv.remoteJid, conv));
   const phone = conv.remoteJid.split("@")[0];
   return name.includes(term) || phone.includes(term);
 }
@@ -116,7 +119,7 @@ export function useInboxFilters(opts: UseInboxFiltersOptions): UseInboxFiltersRe
 
     // Search
     if (search) {
-      const s = search.toLowerCase();
+      const s = normalizeForSearch(search);
       convs = convs.filter((c) => matchesSearch(c, s, getDisplayName));
     }
 
@@ -135,7 +138,7 @@ export function useInboxFilters(opts: UseInboxFiltersOptions): UseInboxFiltersRe
   const filteredQueueConvs = useMemo(() => {
     if (activeTab !== "queue") return [];
     if (!search) return queueConversations;
-    const s = search.toLowerCase();
+    const s = normalizeForSearch(search);
     return queueConversations.filter((c) => matchesSearch(c, s, getDisplayName));
   }, [queueConversations, search, activeTab, getDisplayName]);
 
@@ -146,7 +149,7 @@ export function useInboxFilters(opts: UseInboxFiltersOptions): UseInboxFiltersRe
       (c) => c.assignmentStatus === "resolved" || c.assignmentStatus === "closed",
     );
     if (search) {
-      const s = search.toLowerCase();
+      const s = normalizeForSearch(search);
       convs = convs.filter((c) => matchesSearch(c, s, getDisplayName));
     }
     return convs;
@@ -156,10 +159,10 @@ export function useInboxFilters(opts: UseInboxFiltersOptions): UseInboxFiltersRe
   const filteredWaContacts = useMemo(() => {
     if (activeTab !== "contacts") return [];
     if (!search) return waContacts;
-    const s = search.toLowerCase();
+    const s = normalizeForSearch(search);
     return waContacts.filter(
       (c) =>
-        c.displayName.toLowerCase().includes(s) ||
+        normalizeForSearch(c.displayName).includes(s) ||
         (c.phoneNumber && c.phoneNumber.includes(s)) ||
         c.jid.split("@")[0].includes(s),
     );

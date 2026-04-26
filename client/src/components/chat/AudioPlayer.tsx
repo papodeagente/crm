@@ -32,27 +32,56 @@ const AudioPlayer = memo(({ src, duration, isVoice, fromMe, avatarUrl }: {
   const barCount = 28;
   const [bars] = useState(() => generateWaveformBars(barCount, Math.round((duration || 10) * 137)));
 
+  const [loadError, setLoadError] = useState<string | null>(null);
+
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
     const onTimeUpdate = () => setCurrentTime(audio.currentTime);
     const onLoadedMetadata = () => { if (audio.duration && isFinite(audio.duration)) setTotalDuration(audio.duration); };
     const onEnded = () => { setIsPlaying(false); setCurrentTime(0); };
+    const onError = () => {
+      const mediaError = audio.error;
+      const code = mediaError?.code ?? 0;
+      const codeName = ({ 1: "ABORTED", 2: "NETWORK", 3: "DECODE", 4: "SRC_NOT_SUPPORTED" } as Record<number, string>)[code] || `code=${code}`;
+      console.error("[AudioPlayer] load error:", codeName, mediaError?.message, "src:", audio.currentSrc);
+      setLoadError(codeName);
+      setIsPlaying(false);
+    };
+    const onPlay = () => setIsPlaying(true);
+    const onPause = () => setIsPlaying(false);
     audio.addEventListener("timeupdate", onTimeUpdate);
     audio.addEventListener("loadedmetadata", onLoadedMetadata);
     audio.addEventListener("ended", onEnded);
+    audio.addEventListener("error", onError);
+    audio.addEventListener("play", onPlay);
+    audio.addEventListener("pause", onPause);
     return () => {
       audio.removeEventListener("timeupdate", onTimeUpdate);
       audio.removeEventListener("loadedmetadata", onLoadedMetadata);
       audio.removeEventListener("ended", onEnded);
+      audio.removeEventListener("error", onError);
+      audio.removeEventListener("play", onPlay);
+      audio.removeEventListener("pause", onPause);
     };
   }, []);
 
   const togglePlay = useCallback(() => {
     const audio = audioRef.current;
     if (!audio) return;
-    if (isPlaying) { audio.pause(); } else { audio.playbackRate = playbackRate; audio.play(); }
-    setIsPlaying(!isPlaying);
+    if (isPlaying) {
+      audio.pause();
+      return;
+    }
+    audio.playbackRate = playbackRate;
+    const result = audio.play();
+    if (result && typeof result.then === "function") {
+      result.catch((err) => {
+        console.error("[AudioPlayer] play() rejected:", err?.name, err?.message, "src:", audio.currentSrc);
+        setLoadError(err?.name || "play-failed");
+        setIsPlaying(false);
+      });
+    }
   }, [isPlaying, playbackRate]);
 
   const cycleSpeed = useCallback(() => {
@@ -81,8 +110,8 @@ const AudioPlayer = memo(({ src, duration, isVoice, fromMe, avatarUrl }: {
   };
 
   const progress = totalDuration > 0 ? currentTime / totalDuration : 0;
-  const accentColor = fromMe ? "#53bdeb" : "#00a884";
-  const unplayedColor = fromMe ? "rgba(83,189,235,0.3)" : "rgba(0,168,132,0.25)";
+  const accentColor = fromMe ? "#8B5CF6" : "#600FED";
+  const unplayedColor = fromMe ? "rgba(139,92,246,0.3)" : "rgba(96,15,237,0.25)";
 
   return (
     <div className="flex items-center gap-2.5 min-w-0 sm:min-w-[250px] max-w-full sm:max-w-[340px] py-1">
@@ -94,7 +123,7 @@ const AudioPlayer = memo(({ src, duration, isVoice, fromMe, avatarUrl }: {
           <img src={avatarUrl} alt="" className="w-[52px] h-[52px] rounded-full object-cover shadow-sm" />
         ) : (
           <div className="w-[52px] h-[52px] rounded-full flex items-center justify-center bg-gradient-to-br shadow-sm"
-            style={{ background: fromMe ? "linear-gradient(135deg, #53bdeb 0%, #3a9fd4 100%)" : "linear-gradient(135deg, #25d366 0%, #00a884 100%)" }}>
+            style={{ background: fromMe ? "linear-gradient(135deg, #8B5CF6 0%, #7C3AED 100%)" : "linear-gradient(135deg, #600FED 0%, #4C0FBD 100%)" }}>
             <Mic className="w-6 h-6 text-white" />
           </div>
         )}

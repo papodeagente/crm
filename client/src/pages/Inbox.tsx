@@ -1,4 +1,6 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
+import { normalizeForSearch } from "@/utils/searchUtils";
+import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { useSocket } from "@/hooks/useSocket";
 import { useConversationStore, makeConvKey, getJidFromKey } from "@/hooks/useConversationStore";
@@ -12,11 +14,11 @@ import {
   WifiOff, RefreshCw, CheckCircle2,
   Contact2, LayoutGrid,
   Timer,
-  PanelRightOpen,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useIsAdmin } from "@/components/AdminOnlyGuard";
-import { Inbox as InboxIcon, ListOrdered } from "lucide-react";
+import { Inbox as InboxIcon, ListOrdered, Headphones } from "lucide-react";
+import { AgentStatusSelector } from "@/components/AgentStatusSelector";
 
 /* ─── Extracted components ─── */
 import { playNotification, MUTE_KEY } from "@/components/inbox/NotificationSound";
@@ -29,7 +31,7 @@ import CreateContactDialog from "@/components/inbox/CreateContactDialog";
 import CreateDealDialog from "@/components/inbox/CreateDealDialog";
 import NewChatPanel from "@/components/inbox/NewChatPanel";
 import { EmptyChat, NoSession } from "@/components/inbox/EmptyStates";
-import ContactDetailsSidebar from "@/components/inbox/ContactDetailsSidebar";
+import CrmSidebar from "@/components/inbox/sidebar/CrmSidebar";
 
 /* ═══════════════════════════════════════════════════════
    CONSTANTS
@@ -43,8 +45,9 @@ type InboxTab = "mine" | "queue" | "contacts" | "all" | "finished";
 type AgentFilter = "all" | "unread" | "mine" | "unassigned";
 
 export default function InboxPage() {
+  const [, setLocation] = useLocation();
   const trpcUtils = trpc.useUtils();
-  const { lastMessage, lastStatusUpdate, lastConversationUpdate, isConnected: socketConnected } = useSocket();
+  const { lastMessage, lastStatusUpdate, lastConversationUpdate, lastEditedMessage, isConnected: socketConnected } = useSocket();
   // selectedKey = conversationKey (sessionId:remoteJid) — primary selection state
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   // selectedJid = remoteJid only — derived for API calls that need just the JID
@@ -54,30 +57,27 @@ export default function InboxPage() {
   const [showMobileChat, setShowMobileChat] = useState(false);
   const [activeTab, setActiveTab] = useState<InboxTab>("mine");
   const [filter, setFilter] = useState<AgentFilter>("all");
-  const isAdmin = useIsAdmin();
+  const { isAdmin } = useIsAdmin();
   const [showCreateDeal, setShowCreateDeal] = useState(false);
   const [showCreateContact, setShowCreateContact] = useState(false);
   const [showNewChat, setShowNewChat] = useState(false);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [dragOverJid, setDragOverJid] = useState<string | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(() => {
+    try { return localStorage.getItem("inbox-sidebar-open") !== "false"; } catch { return true; }
+  });
+  const toggleSidebar = useCallback(() => {
+    setSidebarOpen(prev => {
+      const next = !prev;
+      try { localStorage.setItem("inbox-sidebar-open", String(next)); } catch {}
+      return next;
+    });
+  }, []);
   const [showAssignPanel, setShowAssignPanel] = useState(false);
   const [showHeaderMenu, setShowHeaderMenu] = useState(false);
   const [isMuted, setIsMuted] = useState(() => {
     try { return localStorage.getItem(MUTE_KEY) === "true"; } catch { return false; }
   });
-  const DETAILS_KEY = "inbox.detailsSidebarOpen";
-  const [detailsOpen, setDetailsOpen] = useState(() => {
-    try { return localStorage.getItem(DETAILS_KEY) !== "false"; } catch { return true; }
-  });
-
-  // ─── Availability (Disponível toggle) ───
-  const availabilityQ = trpc.profile.getAvailability.useQuery(undefined, { staleTime: 60_000 });
-  const setAvailabilityM = trpc.profile.setAvailability.useMutation({
-    onSuccess: (data) => {
-      availabilityQ.refetch();
-      toast.success(data.isAvailable ? "Você está disponível" : "Você ficou indisponível");
-    },
-    onError: () => toast.error("Erro ao atualizar disponibilidade"),
-  });
-  const isAvailable = !!availabilityQ.data?.isAvailable;
   const selectedKeyRef = useRef<string | null>(null);
   // Keep ref in sync with state so socket handler closure always has the latest value
   selectedKeyRef.current = selectedKey;
@@ -87,8 +87,12 @@ export default function InboxPage() {
   const soundSuppressedUntilRef = useRef<number>(0);
   // Track processed message signatures to avoid duplicate sounds
   const processedMsgRef = useRef<Set<string>>(new Set());
+  // Debounced refetch for conversation list sync after new messages
+  const debouncedMsgRefetchRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   // ─── Data queries ───
+  const assignmentQ = trpc.whatsapp.hasInstanceAssignment.useQuery(undefined, { staleTime: 30_000 });
+  const canConnect = isAdmin || assignmentQ.data?.hasAssignment || assignmentQ.data?.hasActiveShare;
   const sessionsQ = trpc.whatsapp.sessions.useQuery();
   // Find connected session first, otherwise use any session for offline history viewing
   const activeSession = useMemo(
@@ -137,13 +141,13 @@ export default function InboxPage() {
     // - Socket disconnected: aggressive polling every 15s to catch up
     // - Socket connected: lightweight reconciliation every 60s to fix any drift
     //   (e.g., missed socket events, race conditions, stale preview/status)
-    const interval = socketConnected ? 60000 : 15000;
+    const interval = socketConnected ? 120000 : 15000;
     bgSyncRef.current = setInterval(() => {
       conversationsQ.refetch().then((result) => {
         if (result.data) {
           convStore.hydrate(result.data as ConvEntry[]);
         }
-      });
+      }).catch(() => {});
     }, interval);
 
     return () => { if (bgSyncRef.current) clearInterval(bgSyncRef.current); };
@@ -156,11 +160,11 @@ export default function InboxPage() {
   // Queue conversations
   const queueQ = trpc.whatsapp.queue.list.useQuery(
     { sessionId: activeSession?.sessionId || "", limit: 100 },
-    { enabled: !!activeSession?.sessionId && (activeTab === "queue" || activeTab === "all"), refetchInterval: socketConnected ? 30000 : 20000, staleTime: 10000, refetchIntervalInBackground: false }
+    { enabled: !!activeSession?.sessionId && (activeTab === "queue" || activeTab === "all"), refetchInterval: socketConnected ? 30000 : 10000, staleTime: 10000, refetchIntervalInBackground: false }
   );
   const queueStatsQ = trpc.whatsapp.queue.stats.useQuery(
     { sessionId: activeSession?.sessionId || "" },
-    { enabled: !!activeSession?.sessionId, refetchInterval: socketConnected ? 60000 : 30000, staleTime: 15000, refetchIntervalInBackground: false }
+    { enabled: !!activeSession?.sessionId, refetchInterval: socketConnected ? 60000 : 15000, staleTime: 15000, refetchIntervalInBackground: false }
   );
   const claimMutation = trpc.whatsapp.queue.claim.useMutation({
     onSuccess: (_data, variables) => {
@@ -241,23 +245,38 @@ export default function InboxPage() {
   const updateStatusMutation = trpc.whatsapp.updateAssignmentStatus.useMutation({});
 
   const contactsQ = trpc.crm.contacts.list.useQuery(
-    { limit: 500 },
+    { limit: 5000 },
     { enabled: true, staleTime: 5 * 60 * 1000 }
   );
 
+  const linkConversationsMut = trpc.crm.contacts.linkConversations.useMutation();
+
   // Profile pictures — derive from store (no dependency on conversationsQ.data)
   const convJids = useMemo(() => {
-    return convStore.sortedIds.map(key => getJidFromKey(key));
-  }, [convStore.sortedIds]);
+    const storeJids = convStore.sortedIds.map(key => getJidFromKey(key));
+    // Include queue conversation JIDs so their profile pics are also loaded
+    const queueJids = ((queueQ.data || []) as ConvItem[]).map(c => c.remoteJid).filter(Boolean);
+    const set = new Set([...storeJids, ...queueJids]);
+    return Array.from(set);
+  }, [convStore.sortedIds, queueQ.data]);
 
   // Fetch profile pics from DB (fast query, no API calls) — can handle more
-  const visibleJids = useMemo(() => convJids.slice(0, 100), [convJids]);
+  const visibleJids = useMemo(() => convJids.slice(0, 150), [convJids]);
   const profilePicsQ = trpc.whatsapp.profilePictures.useQuery(
     { sessionId: activeSession?.sessionId || "", jids: visibleJids },
-    { enabled: !!activeSession?.sessionId && visibleJids.length > 0, staleTime: 60_000, refetchInterval: 30_000, refetchIntervalInBackground: false }
+    { enabled: !!activeSession?.sessionId && visibleJids.length > 0, staleTime: 60_000, refetchInterval: 60_000, refetchIntervalInBackground: false }
   );
 
-  const profilePicMap = useMemo(() => (profilePicsQ.data || {}) as Record<string, string | null>, [profilePicsQ.data]);
+  // CUMULATIVE profile pic map — accumulates fetched photos across query key changes.
+  // Also accepts null to clear expired/removed photos from the accumulator.
+  const profilePicAccumRef = useRef<Record<string, string | null>>({});
+  const profilePicMap = useMemo(() => {
+    const incoming = (profilePicsQ.data || {}) as Record<string, string | null>;
+    for (const [jid, url] of Object.entries(incoming)) {
+      profilePicAccumRef.current[jid] = url; // Accept null too — clears expired URLs
+    }
+    return { ...profilePicAccumRef.current };
+  }, [profilePicsQ.data]);
 
   // WA Contacts map (LID ↔ Phone resolution from Baileys contacts sync)
   const waContactsMapQ = trpc.whatsapp.waContactsMap.useQuery(
@@ -292,15 +311,32 @@ export default function InboxPage() {
   });
 
   // Contact name map (CRM phone → contact info)
+  // Handles Brazilian 9th digit: stores both 12-digit (without 9) and 13-digit (with 9) variants
   const contactNameMap = useMemo(() => {
-    const map = new Map<string, { id: number; name: string; phone: string; email?: string; avatarUrl?: string; lifecycleStage?: string | null }>();
+    const map = new Map<string, { id: number; name: string; phone: string; email?: string; avatarUrl?: string }>();
     for (const c of (((contactsQ.data as any)?.items || contactsQ.data || []) as any[])) {
       if (c.phone) {
         const cleaned = c.phone.replace(/\D/g, "");
-        const entry = { id: c.id, name: c.name, phone: c.phone, email: c.email || undefined, avatarUrl: undefined, lifecycleStage: c.lifecycleStage || null };
+        const entry = { id: c.id, name: c.name, phone: c.phone, email: c.email || undefined, avatarUrl: undefined };
         map.set(cleaned, entry);
-        if (cleaned.startsWith("55")) map.set(cleaned.substring(2), entry);
-        else map.set(`55${cleaned}`, entry);
+        if (cleaned.startsWith("55")) {
+          map.set(cleaned.substring(2), entry);
+          // Brazilian 9th digit variants: 5584999838420 ↔ 558499838420
+          const afterCC = cleaned.substring(2); // e.g. "84999838420"
+          if (afterCC.length === 11 && afterCC[2] === "9") {
+            // Has 9th digit → also store without it (remove 3rd char)
+            const without9 = `55${afterCC.substring(0, 2)}${afterCC.substring(3)}`;
+            map.set(without9, entry);
+            map.set(without9.substring(2), entry);
+          } else if (afterCC.length === 10) {
+            // Missing 9th digit → also store with it
+            const with9 = `55${afterCC.substring(0, 2)}9${afterCC.substring(2)}`;
+            map.set(with9, entry);
+            map.set(with9.substring(2), entry);
+          }
+        } else {
+          map.set(`55${cleaned}`, entry);
+        }
       }
     }
     return map;
@@ -328,29 +364,40 @@ export default function InboxPage() {
   }, []);
 
   const getDisplayName = useCallback((jid: string, conv?: ConvItem) => {
-    // 1. CRM contact match — only use if the name is a real name (not just a phone number)
+    // Prioridade alinhada com identityResolver.NAME_PRIORITY:
+    // 1. CRM (edição manual no CRM — nameSource='crm')  — vence TUDO
+    // 2. WA profile (senderName, nome do perfil WA do remetente)
+    // 3. Agenda do dono (chatName) / WA contacts local — último fallback
+    //
+    // conv.contactName vem de contacts.name que já respeita NAME_PRIORITY no backend,
+    // então se foi editado manual no CRM ele vence; se não, foi populado via
+    // senderName (whatsapp_profile) — em ambos os casos esse valor é o correto.
+    //
+    // Ver specs/domains/inbox.spec.md e specs/domains/whatsapp.spec.md.
+
+    // 1. contactName — contacts.name (CRM-owned, respeita NAME_PRIORITY).
+    if (conv?.contactName && isRealName(conv.contactName)) return conv.contactName;
+    // 2. Contato CRM via cache client-side (mesma fonte).
     const contact = getContactForJid(jid);
     if (contact && isRealName(contact.name)) return contact.name;
-    // 2. contactName from wa_conversations JOIN with contacts table
-    if (conv?.contactName && isRealName(conv.contactName)) return conv.contactName;
-    // 3. WA Contacts map (savedName > verifiedName > pushName)
+    // 3. pushName — webhook.senderName (perfil WA real do remetente).
+    const pushName = pushNameMap.get(jid);
+    if (isRealName(pushName)) return pushName!;
+    // 4. WA Contacts map local (agenda do dono — último recurso antes de LID/phone).
     const waContact = waContactsMap[jid];
     if (waContact) {
       if (isRealName(waContact.savedName)) return waContact.savedName!;
       if (isRealName(waContact.verifiedName)) return waContact.verifiedName!;
       if (isRealName(waContact.pushName)) return waContact.pushName!;
     }
-    // 4. PushName from conversation data (contactPushName in wa_conversations)
-    const pushName = pushNameMap.get(jid);
-    if (isRealName(pushName)) return pushName!;
-    // 5. CRM contact name as fallback (even if it's a phone number, it's still better than raw JID)
-    if (contact) return contact.name;
-    // 6. For LID JIDs, try to show a resolved phone number instead of the LID
+    // 5. Para LID JIDs, mostra telefone resolvido em vez do LID cru.
     if (jid.endsWith("@lid")) {
+      if (conv?.resolvedPhone) return formatPhoneNumber(conv.resolvedPhone);
       if (waContact?.phoneNumber) return formatPhoneNumber(waContact.phoneNumber);
-      return "Cliente WhatsApp";
+      return "Contato WhatsApp";
     }
-    // 7. Format the phone number from the JID
+    // 6. Último recurso: formato do número.
+    if (contact) return contact.name;
     return formatPhoneNumber(jid);
   }, [getContactForJid, pushNameMap, waContactsMap, isRealName]);
 
@@ -359,22 +406,18 @@ export default function InboxPage() {
   // No refetch, no polling, no full sort. Target: < 20ms per update.
   useEffect(() => {
     if (!lastMessage) return;
-    const _traceReceiveTime = Date.now();
-    const _traceEmitAt = (lastMessage as any)._traceEmitAt;
-    const _traceMsgId = (lastMessage as any).messageId || 'N/A';
-    console.log(`[TRACE][FRONTEND_SOCKET_RECEIVED] timestamp: ${_traceReceiveTime} | delta_from_emit: ${_traceEmitAt ? _traceReceiveTime - _traceEmitAt : 'N/A'}ms | msgId: ${_traceMsgId} | remoteJid: ${lastMessage.remoteJid?.substring(0, 15)}`);
 
-    // ── Validation — ignore events without required fields ──
+    // Validation — ignore events without required fields
     if (!lastMessage.remoteJid || !lastMessage.timestamp) {
-      console.log(`[TRACE][FILTER_DROPPED] reason: missing_fields | remoteJid: ${lastMessage.remoteJid} | timestamp: ${lastMessage.timestamp} | msgId: ${_traceMsgId}`);
       prevMessageRef.current = lastMessage;
       return;
     }
 
-    // ── Strict Message Ownership — validate sessionId matches active session ──
+    // Strict Message Ownership — validate sessionId matches active session
+    // With Socket.IO tenant rooms, only events from our tenant arrive here,
+    // but we still validate sessionId for correctness (multi-session within same tenant)
     const currentSessionId = activeSession?.sessionId || "";
     if (lastMessage.sessionId && currentSessionId && lastMessage.sessionId !== currentSessionId) {
-      console.log(`[TRACE][FILTER_DROPPED] reason: session_mismatch | msg_session: ${lastMessage.sessionId} | active_session: ${currentSessionId} | msgId: ${_traceMsgId}`);
       prevMessageRef.current = lastMessage;
       return;
     }
@@ -400,9 +443,6 @@ export default function InboxPage() {
     // ── INSTANT UPDATE via deterministic store ──
     // handleMessage: O(1) map update + O(n) splice for moveToTop
     // No full sort, no refetch, no cache invalidation
-    const _traceStoreStart = Date.now();
-    // CRITICAL: Use content directly from socket event — backend guarantees it matches DB preview.
-    // No more frontend-side preview generation that could diverge from the DB.
     const handled = convStore.handleMessage({
       sessionId: lastMessage.sessionId || currentSessionId,
       remoteJid: lastMessage.remoteJid,
@@ -410,24 +450,32 @@ export default function InboxPage() {
       fromMe: lastMessage.fromMe,
       messageType: lastMessage.messageType,
       timestamp: lastMessage.timestamp,
-      status: (lastMessage as any).status,  // Backend now sends status in socket event
+      status: (lastMessage as any).status,
       isSync: (lastMessage as any).isSync,
-      messageId: lastMessage.messageId || undefined,  // Track which message the lastStatus belongs to
+      messageId: lastMessage.messageId || undefined,
       pushName: (lastMessage as any).pushName || undefined,
     }, selectedKeyRef.current);
-    const _traceStoreEnd = Date.now();
-    console.log(`[TRACE][STORE_UPDATED] timestamp: ${_traceStoreEnd} | delta: ${_traceStoreEnd - _traceStoreStart}ms | handled: ${handled} | msgId: ${_traceMsgId}`);
-    console.log(`[TRACE][TOTAL_FRONTEND] timestamp: ${_traceStoreEnd} | total_frontend_processing: ${_traceStoreEnd - _traceReceiveTime}ms | total_from_emit: ${_traceEmitAt ? _traceStoreEnd - _traceEmitAt : 'N/A'}ms | msgId: ${_traceMsgId}`);
 
     // If conversation is new (not in store), do a one-time fetch
     if (!handled) {
-      console.log(`[TRACE][NEW_CONV_REFETCH] timestamp: ${Date.now()} | msgId: ${_traceMsgId} — conversation not in store, triggering refetch`);
       conversationsQ.refetch().then((result) => {
         if (result.data) convStore.hydrate(result.data as ConvEntry[]);
-        console.log(`[TRACE][NEW_CONV_REFETCH_DONE] timestamp: ${Date.now()} | msgId: ${_traceMsgId}`);
-      });
+      }).catch(() => {});
       // Refresh contacts map so new contact name/picture show immediately
-      waContactsMapQ.refetch();
+      waContactsMapQ.refetch().catch(() => {});
+      // Fetch profile pic for the new contact immediately
+      profilePicsQ.refetch().catch(() => {});
+      // New conversation likely goes to queue — refresh it immediately
+      queueQ.refetch().catch(() => {});
+      queueStatsQ.refetch().catch(() => {});
+    } else {
+      // Debounced refetch to sync sidebar with DB (ensures preview, status, timestamp are accurate)
+      if (debouncedMsgRefetchRef.current) clearTimeout(debouncedMsgRefetchRef.current);
+      debouncedMsgRefetchRef.current = setTimeout(() => {
+        conversationsQ.refetch().then((result) => {
+          if (result.data) convStore.hydrate(result.data as ConvEntry[]);
+        }).catch(() => {});
+      }, 500);
     }
 
     // ────────────────────────────────────────────────────────────────────────────────
@@ -478,13 +526,25 @@ export default function InboxPage() {
   }, [lastMessage]);
 
   // Status update via deterministic store — O(1)
+  // No refetch needed: store updates instantly, background sync handles drift
   useEffect(() => {
     if (!lastStatusUpdate) return;
     const remoteJid = lastStatusUpdate.remoteJid;
-    if (!remoteJid) return;
     const sid = lastStatusUpdate.sessionId || activeSession?.sessionId || "";
-    convStore.handleStatusUpdate({ sessionId: sid, remoteJid, status: lastStatusUpdate.status, messageId: lastStatusUpdate.messageId });
+
+    if (remoteJid) {
+      convStore.handleStatusUpdate({ sessionId: sid, remoteJid, status: lastStatusUpdate.status, messageId: lastStatusUpdate.messageId });
+    } else if (lastStatusUpdate.messageId) {
+      convStore.handleStatusUpdateByMessageId({ sessionId: sid, messageId: lastStatusUpdate.messageId, status: lastStatusUpdate.status });
+    }
   }, [lastStatusUpdate]);
+
+  // ── Edited message → update sidebar preview if it was the last message ──
+  useEffect(() => {
+    if (!lastEditedMessage || !lastEditedMessage.remoteJid) return;
+    const sid = lastEditedMessage.sessionId || activeSession?.sessionId || "";
+    (convStore as any).updateEditedPreview(sid, lastEditedMessage.remoteJid, lastEditedMessage.newText);
+  }, [lastEditedMessage]);
 
   // ── Assignment/ownership changes via socket — instant tab movement ──
   useEffect(() => {
@@ -512,7 +572,7 @@ export default function InboxPage() {
       });
     } else if (type === "reopened") {
       convStore.updateAssignment(key, {
-        assignedUserId: null,
+        assignedUserId: assignedUserId ?? null,
         assignmentStatus: "open",
       });
     } else if (type === "status_change") {
@@ -521,7 +581,8 @@ export default function InboxPage() {
       });
     }
 
-    // Invalidate queue stats for instant badge update
+    // Invalidate queue for instant update
+    queueQ.refetch();
     queueStatsQ.refetch();
   }, [lastConversationUpdate]);
 
@@ -561,6 +622,31 @@ export default function InboxPage() {
     }
   }, [activeSession?.sessionId, markRead, syncOnOpen, convStore]);
 
+  // ─── Auto-open conversation from ?phone= query param (e.g. from RFV page) ───
+  const phoneParamHandled = useRef(false);
+  useEffect(() => {
+    if (phoneParamHandled.current) return;
+    if (!activeSession?.sessionId) return;
+    const params = new URLSearchParams(window.location.search);
+    const phone = params.get("phone");
+    if (!phone) return;
+    phoneParamHandled.current = true;
+    // Clear query params from URL
+    setLocation("/inbox", { replace: true });
+    // Resolve phone → JID and open conversation
+    trpcUtils.whatsapp.resolveJid.fetch({ sessionId: activeSession.sessionId, phone })
+      .then((result) => {
+        if (result.jid) {
+          handleSelectConv(result.jid);
+        } else {
+          toast.error("Número não encontrado no WhatsApp");
+        }
+      })
+      .catch(() => {
+        toast.error("Erro ao verificar número no WhatsApp");
+      });
+  }, [activeSession?.sessionId, handleSelectConv, trpcUtils, setLocation]);
+
   // View queue conversation WITHOUT auto-claiming
   const handleSelectQueueConv = useCallback((jid: string) => {
     const key = makeConvKey(activeSession?.sessionId || "", jid);
@@ -584,7 +670,11 @@ export default function InboxPage() {
     let convs = dedupedConvs;
     // Tab-based primary filter
     if (activeTab === "mine") {
-      convs = convs.filter((c) => c.assignedUserId === myUserId);
+      convs = convs.filter((c) =>
+        c.assignedUserId === myUserId &&
+        c.assignmentStatus !== "resolved" &&
+        c.assignmentStatus !== "closed"
+      );
     } else if (activeTab === "queue") {
       // Queue tab uses its own data source, return empty for main list
       return [];
@@ -655,9 +745,9 @@ export default function InboxPage() {
   const filteredWaContacts = useMemo(() => {
     if (activeTab !== "contacts") return [];
     if (!search) return waContactsList;
-    const s = search.toLowerCase();
+    const s = normalizeForSearch(search);
     return waContactsList.filter((c) => {
-      return c.displayName.toLowerCase().includes(s) ||
+      return normalizeForSearch(c.displayName).includes(s) ||
         (c.phoneNumber && c.phoneNumber.includes(s)) ||
         c.jid.split("@")[0].includes(s);
     });
@@ -722,6 +812,44 @@ export default function InboxPage() {
     return !!getContactForJid(jid);
   }, [selectedKey, getContactForJid]);
 
+  // CRM contact ID for sidebar — prefer DB-linked contactId, fallback to client-side phone matching
+  const selectedCrmContactId = useMemo(() => {
+    if (!selectedKey) return null;
+    // 1. DB-linked contactId (authoritative — set by server-side linking)
+    const conv = convStore.getConversation(selectedKey) as ConvItem | undefined;
+    if (conv?.contactId) return conv.contactId;
+    // 2. Fallback: client-side phone matching
+    const jid = getJidFromKey(selectedKey);
+    const c = getContactForJid(jid);
+    return c?.id || null;
+  }, [selectedKey, getContactForJid, convStore.version]);
+
+  // Auto-link: if frontend matched a contact via phone fallback but the DB conversation
+  // has no contactId, persist the link so it works in future sessions
+  useEffect(() => {
+    if (!selectedKey || !selectedCrmContactId) return;
+    const conv = convStore.getConversation(selectedKey) as ConvItem | undefined;
+    if (conv && !conv.contactId) {
+      const jid = getJidFromKey(selectedKey);
+      const phone = jid.split("@")[0];
+      if (phone && !/^lid:/.test(phone)) {
+        linkConversationsMut.mutate({ contactId: selectedCrmContactId, phone });
+      }
+    }
+  }, [selectedCrmContactId, selectedKey]);
+
+  // Push name for sidebar — prefer real WhatsApp pushName over saved contact name
+  const selectedPushName = useMemo(() => {
+    if (!selectedKey) return null;
+    const jid = getJidFromKey(selectedKey);
+    // 1. waContactsMap has pushName from Z-API /contacts (the real WhatsApp profile name)
+    const waContact = waContactsMap[jid];
+    if (waContact?.pushName) return waContact.pushName;
+    // 2. Fallback to contactPushName from conversation (webhook notify field)
+    const conv = convStore.getConversation(selectedKey) as ConvItem | undefined;
+    return conv?.contactPushName || null;
+  }, [selectedKey, convStore.version, waContactsMap]);
+
   // Get waConversationId for selected conversation (O(1) from store)
   const selectedWaConversationId = useMemo(() => {
     if (!selectedKey) return undefined;
@@ -739,7 +867,7 @@ export default function InboxPage() {
 
   // No session state
   if (!activeSession && !sessionsQ.isLoading) {
-    return <div className="h-full"><NoSession /></div>;
+    return <div className="h-full"><NoSession canConnect={canConnect} /></div>;
   }
 
   return (
@@ -759,33 +887,39 @@ export default function InboxPage() {
       <div className="flex flex-1 overflow-hidden">
       {/* ═══ LEFT PANEL: Conversations List ═══ */}
       <div
-        className={`w-full md:w-[360px] lg:w-[380px] flex flex-col border-r border-border shrink-0 inbox-glass ${showMobileChat ? "hidden md:flex" : "flex"}`}
+        className={`w-full md:w-[360px] lg:w-[380px] flex flex-col border-r border-border shrink-0 inbox-glass inbox-panel-glass ${showMobileChat ? "hidden md:flex" : "flex"}`}
       >
         {/* New Chat Panel (slide-over) */}
         <NewChatPanel
           open={showNewChat}
           onClose={() => setShowNewChat(false)}
-          onSelectJid={(jid) => { handleSelectConv(jid); setShowNewChat(false); }}
+          onSelectJid={(jid, _name, contactId) => {
+            handleSelectConv(jid);
+            setShowNewChat(false);
+            // Vincular conversa ao contato selecionado imediatamente
+            if (contactId) {
+              const phone = jid.split("@")[0];
+              if (phone && !/^lid:/.test(phone)) {
+                linkConversationsMut.mutate({ contactId, phone });
+              }
+            }
+          }}
           sessionId={activeSession?.sessionId || ""}
         />
 
         {/* ── Header (glassmorphism) ── */}
-        <div className="h-14 flex items-center justify-between px-4 shrink-0 border-b border-border">
-          <div className="flex items-center gap-2 min-w-0">
-            <h2 className="text-[15px] font-semibold text-foreground tracking-tight">Conversas</h2>
-            <button
-              onClick={() => setAvailabilityM.mutate({ isAvailable: !isAvailable })}
-              disabled={setAvailabilityM.isPending}
-              title={isAvailable ? "Você está recebendo novas conversas (clique para pausar)" : "Você está pausado (clique para retomar)"}
-              className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium border transition-colors ${
-                isAvailable
-                  ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/25"
-                  : "bg-muted/30 text-muted-foreground border-border hover:bg-muted/50"
-              }`}
-            >
-              <span className={`w-1.5 h-1.5 rounded-full ${isAvailable ? "bg-emerald-400" : "bg-muted-foreground"}`} />
-              {isAvailable ? "Disponível" : "Indisponível"}
-            </button>
+        <div className="h-14 flex items-center justify-between px-4 shrink-0 inbox-header-glass">
+          <div className="flex items-center gap-2">
+            {isAdmin && (
+              <button
+                onClick={() => setLocation("/supervision")}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-semibold text-white bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 rounded-lg shadow-sm shadow-violet-500/25 transition-all"
+              >
+                <Headphones className="w-3.5 h-3.5" />
+                Supervisão
+              </button>
+            )}
+            <AgentStatusSelector sessionId={activeSession?.sessionId} />
           </div>
           <div className="flex items-center gap-1.5">
             <button
@@ -795,7 +929,6 @@ export default function InboxPage() {
             >
               <Plus className="w-4 h-4" />
             </button>
-            <span className="text-[11px] text-muted-foreground bg-accent px-2 py-0.5 rounded-full">{dedupedConvs.length}</span>
             <div className="relative">
               <button
                 onClick={() => setShowHeaderMenu(!showHeaderMenu)}
@@ -864,13 +997,13 @@ export default function InboxPage() {
           </div>
         </div>
 
-        {/* ── Tabs (pill style like MKT) ── */}
-        <div className="flex items-center gap-1 px-3 py-1.5 shrink-0 border-b border-border/50">
+        {/* ── Tabs ── */}
+        <div className="grid grid-cols-4 gap-1 mx-3 my-2 p-1 bg-muted/40 dark:bg-white/[0.04] rounded-xl shrink-0" style={{ gridTemplateColumns: isAdmin ? "repeat(5, 1fr)" : "repeat(4, 1fr)" }}>
           {([
             { id: "mine" as InboxTab, label: "Meus", badge: myConvsCount, icon: InboxIcon },
             { id: "queue" as InboxTab, label: "Fila", badge: queueCount, icon: ListOrdered },
             { id: "all" as InboxTab, label: "Todos", badge: 0, icon: LayoutGrid },
-            { id: "finished" as InboxTab, label: "Finalizados", badge: 0, icon: CheckCircle2 },
+            { id: "finished" as InboxTab, label: "Fin.", badge: 0, icon: CheckCircle2 },
             { id: "contacts" as InboxTab, label: "Contatos", badge: 0, icon: Contact2 },
           ]).map((tab) => {
             const active = activeTab === tab.id;
@@ -880,19 +1013,19 @@ export default function InboxPage() {
               <button
                 key={tab.id}
                 onClick={() => { setActiveTab(tab.id); setFilter("all"); }}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[12px] font-medium transition-all ${
-                  active
-                    ? "bg-primary/15 text-primary"
-                    : "text-muted-foreground hover:text-foreground hover:bg-accent"
+                className={`inbox-tab flex flex-col items-center justify-center gap-0.5 py-1.5 px-1 text-[11px] font-medium rounded-lg transition-all min-w-0 ${
+                  active ? "active" : "text-muted-foreground hover:text-foreground"
                 }`}
               >
-                <TabIcon className="w-3.5 h-3.5" />
-                {tab.label}
-                {tab.badge > 0 && (
-                  <span className="inbox-unread-badge !h-[16px] !min-w-[16px] !text-[9px] !px-1">
-                    {tab.badge > 99 ? "99+" : tab.badge}
-                  </span>
-                )}
+                <span className="relative flex items-center justify-center">
+                  <TabIcon className="w-4 h-4 shrink-0" />
+                  {tab.badge > 0 && (
+                    <span className="inbox-unread-badge absolute -top-1.5 -right-3 !h-[14px] !min-w-[14px] !text-[8px] !px-0.5">
+                      {tab.badge > 99 ? "99+" : tab.badge}
+                    </span>
+                  )}
+                </span>
+                <span className="truncate max-w-full leading-tight">{tab.label}</span>
               </button>
             );
           })}
@@ -928,13 +1061,17 @@ export default function InboxPage() {
                     conv={conv}
                     isActive={selectedKey === ck}
                     contactName={getDisplayName(conv.remoteJid, conv)}
-                    pictureUrl={profilePicMap[conv.remoteJid]}
+                    // Cascade: profilePicturesQ (Z-API live) > contacts.avatarUrl (persistido).
+                    // Evita avatar sumir quando cache Z-API vence (24h).
+                    pictureUrl={profilePicMap[conv.remoteJid] ?? (conv as any).contactAvatarUrl ?? null}
                     onClick={() => handleSelectConv(conv.remoteJid)}
                     showTimer={activeTab === "mine"}
                     showFinish={activeTab === "mine"}
                     onFinish={() => handleFinishAttendance(conv.remoteJid)}
                     onTransfer={() => handleSelectConv(conv.remoteJid)}
                     onAssignClick={() => { handleSelectConv(conv.remoteJid); setAutoOpenAssign(true); }}
+                    isDragTarget={dragOverJid === conv.remoteJid}
+                    onFileDrop={(file) => { handleSelectConv(conv.remoteJid); setPendingFile(file); setDragOverJid(null); }}
                   />
                   );
                 })
@@ -968,15 +1105,18 @@ export default function InboxPage() {
                   <div
                     key={conv.remoteJid}
                     onClick={() => handleSelectQueueConv(conv.remoteJid)}
+                    onDragOver={(e) => { if (e.dataTransfer.types.includes("Files")) e.preventDefault(); }}
+                    onDragEnter={(e) => { if (e.dataTransfer.types.includes("Files")) e.preventDefault(); }}
+                    onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files?.[0]; if (f) { handleSelectQueueConv(conv.remoteJid); setPendingFile(f); } }}
                     className={`inbox-conv-item flex items-center gap-3 px-3.5 py-3 cursor-pointer ${isActiveQueue ? "active" : ""}`}
                   >
                     <div className="relative shrink-0">
                       <div className="inbox-avatar-ring rounded-full">
-                        <WaAvatar name={getDisplayName(conv.remoteJid, conv)} size={46} pictureUrl={profilePicMap[conv.remoteJid]} />
+                        <WaAvatar name={getDisplayName(conv.remoteJid, conv)} size={46} pictureUrl={profilePicMap[conv.remoteJid] ?? (conv as any).contactAvatarUrl ?? null} />
                       </div>
                       <div className="absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-full bg-[#25D366] flex items-center justify-center ring-2 ring-background">
-                        <svg className="w-3 h-3 text-white" viewBox="0 0 24 24" fill="currentColor">
-                          <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/>
+                        <svg className="w-3 h-3 text-white" viewBox="0 0 308 308" fill="currentColor">
+                          <path d="M227.904 176.981c-.6-.288-23.054-11.345-26.693-12.637-3.629-1.303-6.277-1.938-8.917 1.944-2.641 3.886-10.233 12.637-12.547 15.246-2.313 2.598-4.627 2.914-8.582.926-3.955-1.999-16.697-6.13-31.811-19.546-11.747-10.442-19.67-23.338-21.984-27.296-2.313-3.948-.243-6.09 1.74-8.053 1.782-1.764 3.955-4.6 5.932-6.899 1.977-2.31 2.63-3.957 3.955-6.555 1.303-2.609.652-4.897-.326-6.866-.976-1.957-8.917-21.426-12.222-29.34-3.218-7.704-6.488-6.665-8.917-6.787-2.314-.109-4.954-.131-7.595-.131-2.641 0-6.928.976-10.557 4.897-3.629 3.909-13.862 13.49-13.862 32.903 0 19.413 14.188 38.174 16.166 40.804 1.977 2.609 27.92 42.532 67.63 59.644 9.447 4.063 16.826 6.494 22.576 8.313 9.486 3.003 18.12 2.581 24.94 1.563 7.605-1.13 23.053-9.403 26.318-18.492 3.264-9.089 3.264-16.882 2.314-18.492-.976-1.631-3.629-2.598-7.595-4.568zM156.734 0C73.318 0 5.454 67.354 5.454 150.143c0 26.777 7.166 52.988 20.741 75.928L.045 308l84.047-25.65c21.886 11.683 46.583 17.83 71.642 17.83h.065c83.349 0 151.213-67.354 151.213-150.143C307.012 67.354 240.083 0 156.734 0zm0 275.631h-.054c-22.646 0-44.84-6.082-64.154-17.563l-4.605-2.729-47.71 12.456 12.73-46.318-3.004-4.762C36.327 196.123 29.7 173.574 29.7 150.143 29.7 80.575 86.57 24.214 156.8 24.214c34.013 0 65.955 13.203 90.004 37.18 24.049 23.978 37.296 55.853 37.282 89.749-.065 69.568-56.935 125.488-127.352 125.488z"/>
                         </svg>
                       </div>
                     </div>
@@ -1013,7 +1153,7 @@ export default function InboxPage() {
                         }
                       }}
                       disabled={claimMutation.isPending}
-                      className="shrink-0 px-2.5 py-1.5 text-[11px] font-medium bg-primary/15 text-primary rounded-md hover:bg-primary/25 transition-colors"
+                      className="inbox-claim-btn shrink-0 px-2.5 py-1.5 text-[11px] font-medium rounded-md transition-colors"
                       title="Atender conversa"
                     >
                       {claimMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <UserPlus className="w-3.5 h-3.5" />}
@@ -1052,6 +1192,8 @@ export default function InboxPage() {
                       contactName={getDisplayName(conv.remoteJid, conv)}
                       pictureUrl={profilePicMap[conv.remoteJid]}
                       onClick={() => handleSelectConv(conv.remoteJid)}
+                      isDragTarget={dragOverJid === conv.remoteJid}
+                      onFileDrop={(file) => { handleSelectConv(conv.remoteJid); setPendingFile(file); setDragOverJid(null); }}
                     />
                   );
                 })
@@ -1086,8 +1228,8 @@ export default function InboxPage() {
                     <div className="relative shrink-0">
                       <WaAvatar name={contact.displayName} size={42} pictureUrl={profilePicMap[contact.jid]} />
                       <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-[#25D366] flex items-center justify-center ring-2 ring-background">
-                        <svg className="w-2.5 h-2.5 text-white" viewBox="0 0 24 24" fill="currentColor">
-                          <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/>
+                        <svg className="w-2.5 h-2.5 text-white" viewBox="0 0 308 308" fill="currentColor">
+                          <path d="M227.904 176.981c-.6-.288-23.054-11.345-26.693-12.637-3.629-1.303-6.277-1.938-8.917 1.944-2.641 3.886-10.233 12.637-12.547 15.246-2.313 2.598-4.627 2.914-8.582.926-3.955-1.999-16.697-6.13-31.811-19.546-11.747-10.442-19.67-23.338-21.984-27.296-2.313-3.948-.243-6.09 1.74-8.053 1.782-1.764 3.955-4.6 5.932-6.899 1.977-2.31 2.63-3.957 3.955-6.555 1.303-2.609.652-4.897-.326-6.866-.976-1.957-8.917-21.426-12.222-29.34-3.218-7.704-6.488-6.665-8.917-6.787-2.314-.109-4.954-.131-7.595-.131-2.641 0-6.928.976-10.557 4.897-3.629 3.909-13.862 13.49-13.862 32.903 0 19.413 14.188 38.174 16.166 40.804 1.977 2.609 27.92 42.532 67.63 59.644 9.447 4.063 16.826 6.494 22.576 8.313 9.486 3.003 18.12 2.581 24.94 1.563 7.605-1.13 23.053-9.403 26.318-18.492 3.264-9.089 3.264-16.882 2.314-18.492-.976-1.631-3.629-2.598-7.595-4.568zM156.734 0C73.318 0 5.454 67.354 5.454 150.143c0 26.777 7.166 52.988 20.741 75.928L.045 308l84.047-25.65c21.886 11.683 46.583 17.83 71.642 17.83h.065c83.349 0 151.213-67.354 151.213-150.143C307.012 67.354 240.083 0 156.734 0zm0 275.631h-.054c-22.646 0-44.84-6.082-64.154-17.563l-4.605-2.729-47.71 12.456 12.73-46.318-3.004-4.762C36.327 196.123 29.7 173.574 29.7 150.143 29.7 80.575 86.57 24.214 156.8 24.214c34.013 0 65.955 13.203 90.004 37.18 24.049 23.978 37.296 55.853 37.282 89.749-.065 69.568-56.935 125.488-127.352 125.488z"/>
                         </svg>
                       </div>
                     </div>
@@ -1121,17 +1263,6 @@ export default function InboxPage() {
               <ArrowLeft className="w-5 h-5 text-white" />
             </button>
 
-            {!detailsOpen && (
-              <button
-                onClick={() => { setDetailsOpen(true); try { localStorage.setItem(DETAILS_KEY, "true"); } catch {} }}
-                className="hidden md:flex absolute top-[14px] right-[12px] z-30 p-[6px] rounded-full backdrop-blur-sm hover:bg-accent/40"
-                style={{ backgroundColor: 'rgba(0,0,0,0.15)' }}
-                title="Mostrar detalhes do contato"
-              >
-                <PanelRightOpen className="w-5 h-5 text-white" />
-              </button>
-            )}
-
             <WhatsAppChat
               contact={selectedContact}
               sessionId={activeSession.sessionId}
@@ -1147,6 +1278,8 @@ export default function InboxPage() {
               waConversationId={selectedWaConversationId}
               autoOpenAssign={autoOpenAssign}
               onAutoOpenAssignConsumed={() => setAutoOpenAssign(false)}
+              onToggleSidebar={toggleSidebar}
+              sidebarOpen={sidebarOpen}
               onOptimisticSend={(msg) => {
                 if (!activeSession?.sessionId || !selectedJid) return;
                 convStore.handleOptimisticSend({
@@ -1156,23 +1289,30 @@ export default function InboxPage() {
                   messageType: msg.messageType,
                 });
               }}
+              onStatusConfirmed={(data) => {
+                if (!activeSession?.sessionId || !selectedJid) return;
+                const key = makeConvKey(activeSession.sessionId, selectedJid);
+                convStore.confirmSentMessageId(key, data.messageId);
+              }}
+              pendingFile={pendingFile}
+              onClearPendingFile={() => setPendingFile(null)}
             />
           </div>
         )}
       </div>
 
-      {/* ═══ RIGHT SIDEBAR — Contact Details ═══ */}
-      {selectedKey && activeSession && detailsOpen && (
-        <div className="hidden md:flex">
-          <ContactDetailsSidebar
-            contactId={selectedContact?.id && selectedContact.id > 0 ? selectedContact.id : null}
-            fallbackName={selectedContact?.name}
-            fallbackPhone={selectedJid?.split("@")[0]}
-            fallbackAvatarUrl={selectedContact?.avatarUrl}
-            onCollapse={() => { setDetailsOpen(false); try { localStorage.setItem(DETAILS_KEY, "false"); } catch {} }}
-            onCreateContact={() => setShowCreateContact(true)}
-          />
-        </div>
+      {/* ═══ CRM SIDEBAR ═══ */}
+      {selectedKey && activeSession && (
+        <CrmSidebar
+          open={sidebarOpen}
+          onToggle={toggleSidebar}
+          selectedJid={selectedJid}
+          crmContactId={selectedCrmContactId}
+          pushName={selectedPushName}
+          avatarUrl={selectedContact?.avatarUrl || null}
+          onCreateContact={() => setShowCreateContact(true)}
+          onCreateDeal={() => setShowCreateDeal(true)}
+        />
       )}
 
       {/* ═══ DIALOGS ═══ */}
@@ -1180,10 +1320,12 @@ export default function InboxPage() {
         <CreateDealDialog
           open={showCreateDeal}
           onClose={() => setShowCreateDeal(false)}
-          contactName={selectedContact?.name || "Cliente"}
+          contactName={selectedContact?.name || "Passageiro"}
           contactPhone={selectedJid?.split("@")[0] || ""}
           contactJid={selectedJid || ""}
           sessionId={activeSession.sessionId}
+          contactId={selectedCrmContactId || undefined}
+          skipNavigation
         />
       )}
       {selectedKey && (

@@ -457,6 +457,14 @@ export const appRouter = router({
         }
         return { success: true };
       }),
+    hasInstanceAssignment: tenantProcedure.query(async ({ ctx }) => {
+      const tenantId = getTenantId(ctx);
+      const userId = ctx.saasUser?.userId || ctx.user.id;
+      const sessions = await getSessionsByUser(userId);
+      const hasOwnSession = sessions.length > 0;
+      const activeShare = tenantId > 0 ? await getActiveShareForUser(tenantId, userId) : null;
+      return { hasAssignment: hasOwnSession, hasActiveShare: !!activeShare };
+    }),
     sessions: tenantProcedure.query(async ({ ctx }) => {
       // Each user has their own WhatsApp instance (Evolution API)
       // Filter by the CRM userId (saasUser.id) so users only see their own sessions
@@ -657,6 +665,246 @@ export const appRouter = router({
           catalogDescription: input.catalogDescription,
         });
         return { success: true, messageId: result?.key?.id };
+      }),
+    sendButtonList: sessionTenantWriteProcedure
+      .input(z.object({
+        sessionId: z.string(),
+        number: z.string().min(1),
+        title: z.string().optional(),
+        message: z.string().min(1),
+        footer: z.string().optional(),
+        buttons: z.array(z.object({ id: z.string(), label: z.string() })).min(1).max(3),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const result = await zapiProvider.sendButtons(
+          input.sessionId, input.number,
+          input.title || "", input.message, input.footer || "",
+          input.buttons.map(b => ({ buttonId: b.id, buttonText: { displayText: b.label } }))
+        );
+        return { success: true, messageId: result?.key?.id };
+      }),
+    sendOptionList: sessionTenantWriteProcedure
+      .input(z.object({
+        sessionId: z.string(),
+        number: z.string().min(1),
+        title: z.string().min(1),
+        message: z.string().min(1),
+        footer: z.string().optional(),
+        buttonLabel: z.string().min(1),
+        sections: z.array(z.object({
+          title: z.string(),
+          rows: z.array(z.object({ id: z.string(), title: z.string(), description: z.string().optional() })),
+        })).min(1),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const result = await zapiProvider.sendList(
+          input.sessionId, input.number,
+          input.title, input.message, input.buttonLabel, input.footer || "",
+          input.sections.map(s => ({ title: s.title, rows: s.rows.map(r => ({ title: r.title, description: r.description, rowId: r.id })) }))
+        );
+        return { success: true, messageId: result?.key?.id };
+      }),
+    sendCarousel: sessionTenantWriteProcedure
+      .input(z.object({
+        sessionId: z.string(),
+        number: z.string().min(1),
+        cards: z.array(z.object({
+          header: z.object({ type: z.enum(["image", "video"]), value: z.string() }),
+          body: z.string().min(1),
+          footer: z.string().optional(),
+          buttons: z.array(z.union([
+            z.object({ id: z.string(), label: z.string() }),
+            z.object({ label: z.string(), url: z.string() }),
+          ])).min(1),
+        })).min(1).max(10),
+      }))
+      .mutation(async ({ input }) => {
+        const result = await zapiProvider.sendCarousel(input.sessionId, input.number, input.cards);
+        return { success: true, messageId: result?.key?.id };
+      }),
+    readChat: sessionTenantWriteProcedure
+      .input(z.object({ sessionId: z.string(), remoteJid: z.string() }))
+      .mutation(async ({ input }) => {
+        await zapiProvider.readChat(input.sessionId, input.remoteJid);
+        return { success: true };
+      }),
+    clearChat: sessionTenantWriteProcedure
+      .input(z.object({ sessionId: z.string(), remoteJid: z.string() }))
+      .mutation(async ({ input }) => {
+        await zapiProvider.clearChat(input.sessionId, input.remoteJid);
+        return { success: true };
+      }),
+    setChatExpiration: sessionTenantWriteProcedure
+      .input(z.object({
+        sessionId: z.string(),
+        remoteJid: z.string(),
+        expiration: z.number().refine(v => [0, 86400, 604800, 7776000].includes(v), { message: "Valor deve ser 0, 86400, 604800 ou 7776000" }),
+      }))
+      .mutation(async ({ input }) => {
+        await zapiProvider.setChatExpiration(input.sessionId, input.remoteJid, input.expiration);
+        return { success: true };
+      }),
+    addChatNotes: sessionTenantWriteProcedure
+      .input(z.object({ sessionId: z.string(), remoteJid: z.string(), note: z.string().min(1) }))
+      .mutation(async ({ input }) => {
+        await zapiProvider.addChatNotes(input.sessionId, input.remoteJid, input.note);
+        return { success: true };
+      }),
+    // ─── WHATSAPP BUSINESS LABELS (Z-API) ───
+    getLabels: sessionTenantProcedure
+      .input(z.object({ sessionId: z.string() }))
+      .query(async ({ input }) => {
+        return zapiProvider.getTags(input.sessionId);
+      }),
+    createLabel: sessionTenantWriteProcedure
+      .input(z.object({ sessionId: z.string(), name: z.string().min(1), color: z.number() }))
+      .mutation(async ({ input }) => {
+        return zapiProvider.createTag(input.sessionId, input.name, input.color);
+      }),
+    updateLabel: sessionTenantWriteProcedure
+      .input(z.object({ sessionId: z.string(), tagId: z.string(), name: z.string().min(1), color: z.number() }))
+      .mutation(async ({ input }) => {
+        return zapiProvider.editTag(input.sessionId, input.tagId, input.name, input.color);
+      }),
+    deleteLabel: sessionTenantWriteProcedure
+      .input(z.object({ sessionId: z.string(), tagId: z.string() }))
+      .mutation(async ({ input }) => {
+        return zapiProvider.deleteTag(input.sessionId, input.tagId);
+      }),
+    addLabelToChat: sessionTenantWriteProcedure
+      .input(z.object({ sessionId: z.string(), chatId: z.string(), tagId: z.string() }))
+      .mutation(async ({ input }) => {
+        return zapiProvider.addTagToChat(input.sessionId, input.chatId, input.tagId);
+      }),
+    removeLabelFromChat: sessionTenantWriteProcedure
+      .input(z.object({ sessionId: z.string(), chatId: z.string(), tagId: z.string() }))
+      .mutation(async ({ input }) => {
+        return zapiProvider.removeTagFromChat(input.sessionId, input.chatId, input.tagId);
+      }),
+    getLabelColors: sessionTenantProcedure
+      .input(z.object({ sessionId: z.string() }))
+      .query(async ({ input }) => {
+        return zapiProvider.getTagColors(input.sessionId);
+      }),
+    // ─── STATUS/STORIES (Z-API) ───
+    sendStatusText: sessionTenantWriteProcedure
+      .input(z.object({
+        sessionId: z.string(),
+        message: z.string().min(1),
+        backgroundColor: z.string().optional(),
+        font: z.number().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        return zapiProvider.sendStatusText(input.sessionId, input.message, {
+          backgroundColor: input.backgroundColor,
+          font: input.font,
+        });
+      }),
+    sendStatusImage: sessionTenantWriteProcedure
+      .input(z.object({ sessionId: z.string(), image: z.string(), caption: z.string().optional() }))
+      .mutation(async ({ input }) => {
+        return zapiProvider.sendStatusImage(input.sessionId, input.image, input.caption);
+      }),
+    sendStatusVideo: sessionTenantWriteProcedure
+      .input(z.object({ sessionId: z.string(), video: z.string(), caption: z.string().optional() }))
+      .mutation(async ({ input }) => {
+        return zapiProvider.sendStatusVideo(input.sessionId, input.video, input.caption);
+      }),
+    // ─── BUSINESS PROFILE (Z-API) ───
+    getBusinessProfileInfo: sessionTenantProcedure
+      .input(z.object({ sessionId: z.string() }))
+      .query(async ({ input }) => {
+        return zapiProvider.getBusinessProfileInfo(input.sessionId);
+      }),
+    updateCompanyAddress: sessionTenantWriteProcedure
+      .input(z.object({ sessionId: z.string(), address: z.string() }))
+      .mutation(async ({ input }) => {
+        return zapiProvider.updateCompanyAddress(input.sessionId, input.address);
+      }),
+    updateCompanyEmail: sessionTenantWriteProcedure
+      .input(z.object({ sessionId: z.string(), email: z.string().email() }))
+      .mutation(async ({ input }) => {
+        return zapiProvider.updateCompanyEmail(input.sessionId, input.email);
+      }),
+    updateCompanyWebsites: sessionTenantWriteProcedure
+      .input(z.object({ sessionId: z.string(), websites: z.array(z.string().url()).max(5) }))
+      .mutation(async ({ input }) => {
+        return zapiProvider.updateCompanyWebsites(input.sessionId, input.websites);
+      }),
+    updateCompanyBio: sessionTenantWriteProcedure
+      .input(z.object({ sessionId: z.string(), description: z.string().max(500) }))
+      .mutation(async ({ input }) => {
+        return zapiProvider.updateCompanyDescription(input.sessionId, input.description);
+      }),
+    updateBusinessHours: sessionTenantWriteProcedure
+      .input(z.object({ sessionId: z.string(), hours: z.any() }))
+      .mutation(async ({ input }) => {
+        return zapiProvider.updateBusinessHours(input.sessionId, input.hours);
+      }),
+    getAvailableCategories: sessionTenantProcedure
+      .input(z.object({ sessionId: z.string() }))
+      .query(async ({ input }) => {
+        return zapiProvider.getAvailableCategories(input.sessionId);
+      }),
+    assignCategories: sessionTenantWriteProcedure
+      .input(z.object({ sessionId: z.string(), categories: z.array(z.string()).min(1) }))
+      .mutation(async ({ input }) => {
+        return zapiProvider.assignCategories(input.sessionId, input.categories);
+      }),
+    // ─── PRIVACY SETTINGS (Z-API) ───
+    setPrivacySetting: sessionTenantWriteProcedure
+      .input(z.object({
+        sessionId: z.string(),
+        setting: z.enum(["last-seen", "photo-visualization", "description", "online", "read-receipts", "group-add-permission", "messages-duration"]),
+        value: z.string(),
+      }))
+      .mutation(async ({ input }) => {
+        return zapiProvider.setPrivacySetting(input.sessionId, input.setting, input.value);
+      }),
+    getDisallowedContacts: sessionTenantProcedure
+      .input(z.object({ sessionId: z.string(), type: z.string() }))
+      .query(async ({ input }) => {
+        return zapiProvider.getDisallowedContacts(input.sessionId, input.type);
+      }),
+    // ─── NEWSLETTERS/CHANNELS (Z-API) ───
+    createNewsletter: sessionTenantWriteProcedure
+      .input(z.object({ sessionId: z.string(), name: z.string().min(1), description: z.string().optional() }))
+      .mutation(async ({ input }) => {
+        return zapiProvider.createNewsletter(input.sessionId, input.name, input.description);
+      }),
+    deleteNewsletter: sessionTenantWriteProcedure
+      .input(z.object({ sessionId: z.string(), newsletterId: z.string() }))
+      .mutation(async ({ input }) => {
+        return zapiProvider.deleteNewsletter(input.sessionId, input.newsletterId);
+      }),
+    getNewsletterList: sessionTenantProcedure
+      .input(z.object({ sessionId: z.string() }))
+      .query(async ({ input }) => {
+        return zapiProvider.getNewsletterList(input.sessionId);
+      }),
+    getNewsletterMetadata: sessionTenantProcedure
+      .input(z.object({ sessionId: z.string(), newsletterId: z.string() }))
+      .query(async ({ input }) => {
+        return zapiProvider.getNewsletterMetadata(input.sessionId, input.newsletterId);
+      }),
+    updateNewsletter: sessionTenantWriteProcedure
+      .input(z.object({
+        sessionId: z.string(),
+        newsletterId: z.string(),
+        name: z.string().optional(),
+        description: z.string().optional(),
+        imageUrl: z.string().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        if (input.name) await zapiProvider.updateNewsletterName(input.sessionId, input.newsletterId, input.name);
+        if (input.description) await zapiProvider.updateNewsletterDescription(input.sessionId, input.newsletterId, input.description);
+        if (input.imageUrl) await zapiProvider.updateNewsletterPicture(input.sessionId, input.newsletterId, input.imageUrl);
+        return { success: true };
+      }),
+    sendNewsletterAdminInvite: sessionTenantWriteProcedure
+      .input(z.object({ sessionId: z.string(), newsletterId: z.string(), phone: z.string() }))
+      .mutation(async ({ input }) => {
+        return zapiProvider.sendNewsletterAdminInvite(input.sessionId, input.newsletterId, input.phone);
       }),
     deleteMessage: sessionTenantWriteProcedure
       .input(z.object({

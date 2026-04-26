@@ -103,19 +103,25 @@ export default function MediaLoader({
   }
 
   if (unavailable) {
+    // Nao mostra "expirado" — a causa real geralmente e falha de download.
+    // Permite retry manual: usuario toca e tentamos de novo (cooldown de 10min no backend).
     return (
-      <div className="flex items-center gap-2 p-2 -mx-0.5 rounded-md bg-foreground/5 mb-1 min-w-[160px]">
-        {isAudio ? <Mic className="w-4 h-4 text-muted-foreground/60" /> :
-         isImage ? <ImageIcon className="w-4 h-4 text-muted-foreground/60" /> :
-         isVideo ? <Play className="w-4 h-4 text-muted-foreground/60" /> :
-         isDocument ? <FileText className="w-4 h-4 text-muted-foreground/60" /> :
-         <Download className="w-4 h-4 text-muted-foreground/60" />}
-        <span className="text-xs text-muted-foreground/60 italic">
+      <button
+        onClick={() => { setUnavailable(false); handleLoad(); }}
+        className="flex items-center gap-2 p-2 -mx-0.5 rounded-md bg-foreground/5 hover:bg-foreground/10 transition-colors mb-1 min-w-[200px]"
+        title="Toque pra tentar de novo"
+      >
+        {isAudio ? <Mic className="w-4 h-4 text-muted-foreground" /> :
+         isImage ? <ImageIcon className="w-4 h-4 text-muted-foreground" /> :
+         isVideo ? <Play className="w-4 h-4 text-muted-foreground" /> :
+         isDocument ? <FileText className="w-4 h-4 text-muted-foreground" /> :
+         <Download className="w-4 h-4 text-muted-foreground" />}
+        <span className="text-xs text-muted-foreground italic">
           {isAudio ? `Áudio${mediaDuration ? ` (${Math.floor(mediaDuration / 60)}:${(mediaDuration % 60).toString().padStart(2, "0")})` : ""}` :
            isImage ? "Imagem" : isVideo ? "Vídeo" : isDocument ? (mediaFileName || "Documento") : "Mídia"}
-          {" "}— expirado
+          {" "}— toque para tentar de novo
         </span>
-      </div>
+      </button>
     );
   }
 

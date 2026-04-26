@@ -3,7 +3,7 @@
  * Extracted from WhatsAppChat.tsx lines 1018-1046
  */
 
-import { Image as ImageIcon, Camera, FileText, MapPin, Contact, BarChart3 } from "lucide-react";
+import { Image as ImageIcon, Camera, FileText, Contact } from "lucide-react";
 
 interface AttachMenuProps {
   onSelect: (type: string) => void;
@@ -14,9 +14,7 @@ const items = [
   { type: "image", icon: ImageIcon, label: "Fotos e Vídeos", color: "#7C3AED" },
   { type: "camera", icon: Camera, label: "Câmera", color: "#EC4899" },
   { type: "document", icon: FileText, label: "Documento", color: "#6366F1" },
-  { type: "location", icon: MapPin, label: "Localização", color: "#10B981" },
-  { type: "contact", icon: Contact, label: "Cliente", color: "#3B82F6" },
-  { type: "poll", icon: BarChart3, label: "Enquete", color: "#F59E0B" },
+  { type: "contact", icon: Contact, label: "Passageiro", color: "#3B82F6" },
 ];
 
 export default function AttachMenu({ onSelect, onClose }: AttachMenuProps) {

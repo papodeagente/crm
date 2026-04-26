@@ -1,6 +1,7 @@
 import { useState, memo } from "react";
-import { Check, CheckCheck, Clock, Download, FileText, Mic, Image as ImageIcon, Play, ChevronDown, MapPin, Contact, BarChart3, Loader2 } from "lucide-react";
+import { Check, CheckCheck, Clock, Download, FileText, Mic, Image as ImageIcon, Play, ChevronDown, MapPin, Contact, BarChart3, Loader2, Sparkles } from "lucide-react";
 import { formatTime } from "../../../../shared/dateUtils";
+import { isRehostedMediaUrl } from "../../../../shared/mediaUrl";
 import { toast } from "sonner";
 import MediaLoader from "./MediaLoader";
 import AudioPlayer from "./AudioPlayer";
@@ -28,6 +29,7 @@ export interface Message {
   structuredData?: any | null;
   audioTranscription?: string | null;
   audioTranscriptionStatus?: string | null;
+  audioTranscriptionError?: string | null;
   senderAgentId?: number | null;
 }
 
@@ -145,7 +147,7 @@ export const MessageStatus = memo(({ status, isFromMe }: { status: string | null
     case "pending": return <Clock className="w-[13px] h-[13px] text-muted-foreground/60 inline-block ml-1" />;
     case "sent": return <Check className="w-[14px] h-[14px] text-muted-foreground/60 inline-block ml-1" />;
     case "delivered": return <CheckCheck className="w-[14px] h-[14px] text-muted-foreground/60 inline-block ml-1" />;
-    case "read": case "played": return <CheckCheck className="w-[14px] h-[14px] text-wa-tint inline-block ml-1" />;
+    case "read": case "played": return <CheckCheck className="w-[14px] h-[14px] text-wa-tick-read inline-block ml-1" />;
     default: return <Check className="w-[14px] h-[14px] text-muted-foreground/60 inline-block ml-1" />;
   }
 });
@@ -189,8 +191,7 @@ const MessageBubble = memo(({
   msg, isFirst, isLast, allMessages,
   onReply, onReact, onDelete, onEdit, onForward, contactAvatarUrl, myAvatarUrl, onImageClick,
   autoTranscribe, onTranscribe, transcriptions, onRetranscribe, reactions,
-  agentMap, showAgentNames,
-  isMatched, isCurrentMatch,
+  agentMap, showAgentNames
 }: {
   msg: Message; isFirst: boolean; isLast: boolean; allMessages: Message[];
   onReply: (target: ReplyTarget) => void;
@@ -208,8 +209,6 @@ const MessageBubble = memo(({
   reactions?: Array<{ emoji: string; senderJid: string; fromMe: boolean }>;
   agentMap?: Record<number, string>;
   showAgentNames?: boolean;
-  isMatched?: boolean;
-  isCurrentMatch?: boolean;
 }) => {
   const [showMenu, setShowMenu] = useState(false);
   const fromMe = msg.fromMe;
@@ -226,17 +225,19 @@ const MessageBubble = memo(({
   const isPtv = msg.messageType === "ptvMessage"; // Video message (round video)
   // Detect media by messageType (not just mediaUrl), since most messages have mediaUrl=null
   const isMediaType = isImage || isVideo || isAudio || isDocument || isSticker;
-  // Only treat permanent S3/CDN URLs as valid; WhatsApp CDN URLs (mmg.whatsapp.net, web.whatsapp.net) expire
-  const hasMediaUrl = !!msg.mediaUrl && !msg.mediaUrl.includes('whatsapp.net');
+  // URL so eh confiavel se ja foi rehospedada em nosso S3. URLs de whatsapp.net
+  // ou backblazeb2 temp-file-download expiram — neste caso cai no MediaLoader
+  // que re-baixa via provider e rehosts.
+  const hasMediaUrl = isRehostedMediaUrl(msg.mediaUrl);
   const hasMedia = hasMediaUrl || isMediaType;
 
   const bubbleBase = fromMe
-    ? "bg-wa-bubble-out text-foreground"
-    : "bg-wa-bubble-in text-foreground";
+    ? "bg-wa-bubble-out text-foreground inbox-bubble-glass-me"
+    : "bg-wa-bubble-in text-foreground inbox-bubble-glass";
 
   const bubbleRadius = fromMe
-    ? `rounded-[7.5px] ${isFirst ? "rounded-tr-none" : ""}`
-    : `rounded-[7.5px] ${isFirst ? "rounded-tl-none" : ""}`;
+    ? `rounded-[12px] ${isFirst ? "rounded-tr-none" : ""}`
+    : `rounded-[12px] ${isFirst ? "rounded-tl-none" : ""}`;
 
   // Find quoted message
   const quotedMsg = msg.quotedMessageId
@@ -247,12 +248,12 @@ const MessageBubble = memo(({
     if (!quotedMsg) return null;
     const quotedContent = quotedMsg.content || (quotedMsg.mediaUrl ? "[Mídia]" : "");
     return (
-      <div className="rounded-[7.5px] mb-[3px] -mx-[1px] cursor-pointer overflow-hidden" style={{
+      <div className="rounded-[12px] mb-[3px] -mx-[1px] cursor-pointer overflow-hidden" style={{
         backgroundColor: fromMe ? 'rgba(0,0,0,0.06)' : 'rgba(0,0,0,0.06)',
         borderLeft: '4px solid var(--wa-tint)',
         padding: '5px 12px 7px 8px',
       }}>
-        <p className="text-[12.5px] font-medium" style={{ color: 'var(--wa-tint)' }}>{quotedMsg.fromMe ? "Voce" : "Cliente"}</p>
+        <p className="text-[12.5px] font-medium" style={{ color: 'var(--wa-tint)' }}>{quotedMsg.fromMe ? "Você" : "Passageiro"}</p>
         <p className="text-[12.5px] truncate max-w-full sm:max-w-[300px]" style={{ color: 'var(--wa-text-secondary)' }}>{quotedContent}</p>
       </div>
     );
@@ -281,7 +282,7 @@ const MessageBubble = memo(({
           <Contact className="w-8 h-8 text-wa-tint" />
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium">{msg.content}</p>
-            <p className="text-[11px] text-muted-foreground">Cliente</p>
+            <p className="text-[11px] text-muted-foreground">Passageiro</p>
           </div>
         </div>
       );
@@ -364,8 +365,8 @@ const MessageBubble = memo(({
   })();
 
   return (
-    <div data-msg-id={msg.id} className={`group flex ${fromMe ? "justify-end" : "justify-start"} px-[63px] mb-[2px] ${isFirst ? "mt-[2px]" : ""}`}>
-      <div className={`relative max-w-[65%] ${isCurrentMatch ? "ring-2 ring-amber-500 rounded-[9px]" : isMatched ? "ring-1 ring-amber-300 rounded-[9px]" : ""}`}>
+    <div className={`group flex ${fromMe ? "justify-end" : "justify-start"} px-[63px] mb-[2px] ${isFirst ? "mt-[2px]" : ""}`}>
+      <div className="relative max-w-[65%]">
         {/* Hover dropdown arrow (WhatsApp Web style) */}
         <button
           onClick={() => setShowMenu(!showMenu)}
@@ -408,7 +409,7 @@ const MessageBubble = memo(({
           />
         )}
 
-        <div className={`relative px-[9px] pt-[6px] pb-[8px] ${bubbleBase} ${bubbleRadius}`} style={{ minWidth: "80px", boxShadow: '0 1px 0.5px var(--wa-msg-shadow)' }}>
+        <div className={`relative px-[9px] pt-[6px] pb-[8px] ${bubbleBase} ${bubbleRadius}`} style={{ minWidth: "80px" }}>
           {/* Tail SVG */}
           {isFirst && (
             <div className={`absolute top-0 ${fromMe ? "-right-[8px]" : "-left-[8px]"}`} style={{ width: 8, height: 13 }}>
@@ -428,13 +429,24 @@ const MessageBubble = memo(({
               {agentMap[msg.senderAgentId]}
             </p>
           )}
-          {/* External device label — fromMe message without a CRM agent stamp */}
-          {fromMe && !msg.senderAgentId && isFirst && (
-            <p
-              className="text-[10px] italic mb-0.5 truncate"
-              style={{ color: 'rgba(0,0,0,0.45)' }}
-              title="Mensagem enviada pelo aparelho conectado, fora do CRM"
-            >
+          {/* Scheduled task label */}
+          {fromMe && (msg as any).structuredData?.scheduledTask && isFirst && (
+            <p className="text-[10px] mb-0.5 flex items-center gap-1 text-amber-500 font-medium">
+              <Clock size={10} />
+              Tarefa agendada
+            </p>
+          )}
+          {/* AI Suggestion label */}
+          {fromMe && (msg as any).structuredData?.aiSuggestion && isFirst && (
+            <p className="text-[10px] mb-0.5 flex items-center gap-1 text-blue-500 font-medium">
+              <Sparkles size={10} />
+              Sugestão IA
+            </p>
+          )}
+          {/* External device label — fromMe but no agent (sent from phone/WhatsApp Web) */}
+          {fromMe && !msg.senderAgentId && !(msg as any).structuredData?.scheduledTask && !(msg as any).structuredData?.aiSuggestion && isFirst && (
+            <p className="text-[10px] mb-0.5 flex items-center gap-1 opacity-70">
+              <Clock size={10} />
               Enviada do dispositivo externo
             </p>
           )}
@@ -468,11 +480,22 @@ const MessageBubble = memo(({
                 <Loader2 className="h-3 w-3 animate-spin" /> Transcrevendo...
               </div>
             );
+            if (msg.audioTranscriptionStatus === "no_api_key") return (
+              <div className="mt-1 px-2 py-1.5 bg-amber-50 dark:bg-amber-950/20 rounded text-[11px] text-amber-700 dark:text-amber-500 flex items-start gap-1.5">
+                <FileText className="h-3 w-3 mt-0.5 shrink-0" />
+                <div className="flex-1">
+                  <span>Transcrição indisponível — </span>
+                  <a href="/integrations?tab=ai" className="underline font-medium hover:text-amber-800">
+                    configure sua OpenAI
+                  </a>
+                </div>
+              </div>
+            );
             if (msg.audioTranscriptionStatus === "failed") return (
-              <div className="mt-1 px-2 py-1 bg-red-50 dark:bg-red-950/20 rounded text-[11px] text-red-500 flex items-center justify-between">
-                <span>Erro na transcrição</span>
+              <div className="mt-1 px-2 py-1 bg-red-50 dark:bg-red-950/20 rounded text-[11px] text-red-500 flex items-start justify-between gap-2">
+                <span className="flex-1">{msg.audioTranscriptionError || "Erro na transcrição"}</span>
                 {onTranscribe && msg.mediaUrl && (
-                  <button onClick={() => onTranscribe(msg.id, msg.mediaUrl!)} className="text-violet-500 hover:text-violet-600 ml-2">Tentar novamente</button>
+                  <button onClick={() => onTranscribe(msg.id, msg.mediaUrl!)} className="text-violet-500 hover:text-violet-600 shrink-0">Tentar novamente</button>
                 )}
               </div>
             );
@@ -498,7 +521,7 @@ const MessageBubble = memo(({
               </div>
             );
             // Priority 3: Manual transcribe button (if no auto-transcription)
-            if (!autoTranscribe && onTranscribe && msg.mediaUrl && !msg.mediaUrl.includes('whatsapp.net')) return (
+            if (!autoTranscribe && onTranscribe && isRehostedMediaUrl(msg.mediaUrl)) return (
               <button
                 onClick={() => onTranscribe(msg.id, msg.mediaUrl!)}
                 className="mt-1 text-[11px] text-violet-500 hover:text-violet-600 flex items-center gap-1 transition-colors"
@@ -513,9 +536,12 @@ const MessageBubble = memo(({
             <span className="text-[14.2px] leading-[19px] whitespace-pre-wrap break-words">{formatWhatsAppText(textContent)}</span>
           )}
 
-          {/* Time + Status (WhatsApp Web style) */}
+          {/* Time + Edited + Status (WhatsApp Web style) */}
           <span className="float-right ml-[4px] mt-[3px] flex items-center gap-[3px] relative -bottom-[1px]">
-            <span className="text-[11px] leading-none tabular-nums" style={{ color: fromMe ? 'rgba(0,0,0,0.45)' : 'var(--wa-text-secondary)', fontSize: '11px' }}>{time}</span>
+            {((msg as any)._edited || (msg as any).structuredData?.edited) && (
+              <span className="text-[10px] italic leading-none" style={{ color: fromMe ? 'var(--wa-bubble-out-time)' : 'var(--wa-text-secondary)' }}>editada</span>
+            )}
+            <span className="text-[11px] leading-none tabular-nums" style={{ color: fromMe ? 'var(--wa-bubble-out-time)' : 'var(--wa-text-secondary)', fontSize: '11px' }}>{time}</span>
             <MessageStatus status={msg.status} isFromMe={fromMe} />
           </span>
         </div>

@@ -98,7 +98,7 @@ export function useChatMessages({
   waConversationId,
   socketConnected,
 }: UseChatMessagesOptions): UseChatMessagesResult {
-  const { lastMessage, lastStatusUpdate, lastMediaUpdate, lastConversationUpdate, lastTranscriptionUpdate, lastReaction } = useSocket();
+  const { lastMessage, lastStatusUpdate, lastMediaUpdate, lastConversationUpdate, lastTranscriptionUpdate, lastReaction, lastEditedMessage } = useSocket();
   const utils = trpc.useUtils();
 
   /* ── Pagination ── */
@@ -237,13 +237,29 @@ export function useChatMessages({
             messageId: lastMessage.messageId || old[optIdx].messageId,
             status: "sent",
             id: (lastMessage as any).id || old[optIdx].id,
+            senderAgentId: (lastMessage as any).senderAgentId || old[optIdx].senderAgentId,
           };
           const updated = [...old];
           updated[optIdx] = reconciled;
           return updated;
         }
-        // Deduplicate by messageId
-        if (old.some((m: any) => m.messageId === lastMessage.messageId)) return old;
+        // Deduplicate by messageId — but merge senderAgentId/structuredData if new event has them
+        if (old.some((m: any) => m.messageId === lastMessage.messageId)) {
+          const newAgentId = (lastMessage as any).senderAgentId;
+          const newStructured = (lastMessage as any).structuredData;
+          if (newAgentId || newStructured) {
+            return old.map((m: any) =>
+              m.messageId === lastMessage.messageId
+                ? {
+                    ...m,
+                    ...(newAgentId && !m.senderAgentId ? { senderAgentId: newAgentId } : {}),
+                    ...(newStructured && !m.structuredData ? { structuredData: newStructured } : {}),
+                  }
+                : m
+            );
+          }
+          return old;
+        }
         // New fromMe from another device/tab
         const socketMsg = {
           id: (lastMessage as any).id || -Date.now(),
@@ -257,6 +273,12 @@ export function useChatMessages({
           timestamp: lastMessage.timestamp ? new Date(lastMessage.timestamp).toISOString() : new Date().toISOString(),
           createdAt: new Date().toISOString(),
           quotedMessageId: null,
+          mediaUrl: (lastMessage as any).mediaUrl || null,
+          mediaMimeType: (lastMessage as any).mediaMimeType || null,
+          mediaFileName: (lastMessage as any).mediaFileName || null,
+          mediaDuration: (lastMessage as any).mediaDuration || null,
+          isVoiceNote: (lastMessage as any).isVoiceNote || false,
+          senderAgentId: (lastMessage as any).senderAgentId || null,
         };
         return [socketMsg, ...old].slice(0, msgLimit + 20);
       });
@@ -274,6 +296,11 @@ export function useChatMessages({
         timestamp: lastMessage.timestamp ? new Date(lastMessage.timestamp).toISOString() : new Date().toISOString(),
         createdAt: new Date().toISOString(),
         quotedMessageId: null,
+        mediaUrl: (lastMessage as any).mediaUrl || null,
+        mediaMimeType: (lastMessage as any).mediaMimeType || null,
+        mediaFileName: (lastMessage as any).mediaFileName || null,
+        mediaDuration: (lastMessage as any).mediaDuration || null,
+        isVoiceNote: (lastMessage as any).isVoiceNote || false,
       };
       utils.whatsapp.messagesByContact.setData(queryKey, (old: any) => {
         if (!old) return [socketMsg];
@@ -294,6 +321,20 @@ export function useChatMessages({
       notesQ.refetch();
     }
   }, [lastConversationUpdate, remoteJid]);
+
+  /* ── Socket message edited → update message content in cache ── */
+  useEffect(() => {
+    if (!lastEditedMessage) return;
+    const queryKey = { sessionId, remoteJid, limit: msgLimit };
+    utils.whatsapp.messagesByContact.setData(queryKey, (old: any) => {
+      if (!old) return old;
+      return old.map((m: any) =>
+        m.messageId === lastEditedMessage.messageId
+          ? { ...m, content: lastEditedMessage.newText, _edited: true }
+          : m
+      );
+    });
+  }, [lastEditedMessage, sessionId, remoteJid, msgLimit, utils]);
 
   /* ── groupedMessages memo — merge messages + notes, filter, group by date ── */
   const groupedMessages = useMemo(() => {

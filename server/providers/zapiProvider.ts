@@ -129,7 +129,7 @@ export function getZApiSession(instanceName: string): ZApiSessionConfig | undefi
 // ════════════════════════════════════════════════════════════
 
 interface ZApiFetchOpts {
-  method?: "GET" | "POST" | "PUT" | "DELETE";
+  method?: "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
   body?: any;
   timeout?: number;
 }
@@ -1459,6 +1459,292 @@ export class ZApiProvider implements WhatsAppProvider {
     return zapiFetch(instanceName, "leave-group", {
       method: "POST",
       body: { groupId },
+    });
+  }
+
+  // ─── Send Carousel / Chat Management ───
+
+  async sendCarousel(
+    instanceName: string,
+    number: string,
+    cards: Array<{
+      header: { type: "image" | "video"; value: string };
+      body: string;
+      footer?: string;
+      buttons: Array<{ id: string; label: string } | { label: string; url: string }>;
+    }>
+  ): Promise<WASendResult> {
+    const phone = jidToPhone(number);
+    const result = await zapiFetch(instanceName, "send-carousel", {
+      method: "POST",
+      body: {
+        phone,
+        cards: cards.map((card) => ({
+          header: card.header,
+          body: card.body,
+          footer: card.footer || "",
+          buttons: card.buttons.map((b) =>
+            "url" in b
+              ? { type: "URL", label: b.label, url: b.url }
+              : { type: "QUICK_REPLY", id: b.id, label: b.label }
+          ),
+        })),
+      },
+    });
+    return zapiSendResultToCanonical(result, phone);
+  }
+
+  async sendButtonImage(
+    instanceName: string,
+    number: string,
+    image: string,
+    buttons: Array<{ id: string; label: string }>,
+    caption?: string,
+    footer?: string
+  ): Promise<WASendResult> {
+    const phone = jidToPhone(number);
+    const result = await zapiFetch(instanceName, "send-button-image", {
+      method: "POST",
+      body: { phone, image, caption: caption || "", footer: footer || "", buttons },
+    });
+    return zapiSendResultToCanonical(result, phone);
+  }
+
+  async sendButtonVideo(
+    instanceName: string,
+    number: string,
+    video: string,
+    buttons: Array<{ id: string; label: string }>,
+    caption?: string,
+    footer?: string
+  ): Promise<WASendResult> {
+    const phone = jidToPhone(number);
+    const result = await zapiFetch(instanceName, "send-button-video", {
+      method: "POST",
+      body: { phone, video, caption: caption || "", footer: footer || "", buttons },
+    });
+    return zapiSendResultToCanonical(result, phone);
+  }
+
+  async readChat(instanceName: string, remoteJid: string): Promise<void> {
+    const phone = jidToPhone(remoteJid);
+    await zapiFetch(instanceName, "read-chat", {
+      method: "POST",
+      body: { phone },
+    });
+  }
+
+  async clearChat(instanceName: string, remoteJid: string): Promise<void> {
+    const phone = jidToPhone(remoteJid);
+    await zapiFetch(instanceName, "clear-chat", {
+      method: "POST",
+      body: { phone },
+    });
+  }
+
+  async setChatExpiration(instanceName: string, remoteJid: string, expiration: number): Promise<void> {
+    const phone = jidToPhone(remoteJid);
+    await zapiFetch(instanceName, "send-chat-expiration", {
+      method: "POST",
+      body: { phone, expiration },
+    });
+  }
+
+  async addChatNotes(instanceName: string, remoteJid: string, notes: string): Promise<void> {
+    const phone = jidToPhone(remoteJid);
+    await zapiFetch(instanceName, "add-chat-notes", {
+      method: "POST",
+      body: { phone, notes },
+    });
+  }
+
+  // ─── WhatsApp Business Labels/Tags ───
+
+  async getTags(instanceName: string): Promise<any[]> {
+    const result = await zapiFetch(instanceName, "business/get-tags");
+    return result || [];
+  }
+
+  async createTag(instanceName: string, name: string, color: number): Promise<any> {
+    return zapiFetch(instanceName, "business/create-tag", {
+      method: "POST",
+      body: { name, color },
+    });
+  }
+
+  async editTag(instanceName: string, tagId: string, name: string, color: number): Promise<any> {
+    return zapiFetch(instanceName, "business/edit-tag", {
+      method: "PATCH",
+      body: { tagId, name, color },
+    });
+  }
+
+  async deleteTag(instanceName: string, tagId: string): Promise<any> {
+    return zapiFetch(instanceName, "business/delete-tag", {
+      method: "DELETE",
+      body: { tagId },
+    });
+  }
+
+  async addTagToChat(instanceName: string, chatId: string, tagId: string): Promise<any> {
+    return zapiFetch(instanceName, "add-tag-chat", {
+      method: "POST",
+      body: { chatId, tagId },
+    });
+  }
+
+  async removeTagFromChat(instanceName: string, chatId: string, tagId: string): Promise<any> {
+    return zapiFetch(instanceName, "remove-tag-chat", {
+      method: "POST",
+      body: { chatId, tagId },
+    });
+  }
+
+  async getTagColors(instanceName: string): Promise<any[]> {
+    const result = await zapiFetch(instanceName, "tag-colors");
+    return result || [];
+  }
+
+  // ─── Status/Stories ───
+
+  async sendStatusText(instanceName: string, message: string, opts?: { backgroundColor?: string; font?: number }): Promise<any> {
+    return zapiFetch(instanceName, "send-status-text", {
+      method: "POST",
+      body: { message, ...opts },
+    });
+  }
+
+  async sendStatusImage(instanceName: string, image: string, caption?: string): Promise<any> {
+    return zapiFetch(instanceName, "send-status-image", {
+      method: "POST",
+      body: { image, caption: caption || "" },
+    });
+  }
+
+  async sendStatusVideo(instanceName: string, video: string, caption?: string): Promise<any> {
+    return zapiFetch(instanceName, "send-status-video", {
+      method: "POST",
+      body: { video, caption: caption || "" },
+    });
+  }
+
+  // ─── Business Profile ───
+
+  async getBusinessProfileInfo(instanceName: string): Promise<any> {
+    return zapiFetch(instanceName, "business-profile");
+  }
+
+  async updateCompanyAddress(instanceName: string, address: string): Promise<any> {
+    return zapiFetch(instanceName, "update-company-address", {
+      method: "PATCH",
+      body: { address },
+    });
+  }
+
+  async updateCompanyEmail(instanceName: string, email: string): Promise<any> {
+    return zapiFetch(instanceName, "update-company-email", {
+      method: "PATCH",
+      body: { email },
+    });
+  }
+
+  async updateCompanyWebsites(instanceName: string, websites: string[]): Promise<any> {
+    return zapiFetch(instanceName, "update-company-websites", {
+      method: "PATCH",
+      body: { websites },
+    });
+  }
+
+  async updateCompanyDescription(instanceName: string, description: string): Promise<any> {
+    return zapiFetch(instanceName, "update-company-description", {
+      method: "PATCH",
+      body: { description },
+    });
+  }
+
+  async updateBusinessHours(instanceName: string, hours: any): Promise<any> {
+    return zapiFetch(instanceName, "update-business-hours", {
+      method: "PATCH",
+      body: hours,
+    });
+  }
+
+  async getAvailableCategories(instanceName: string): Promise<any[]> {
+    const result = await zapiFetch(instanceName, "available-categories");
+    return result || [];
+  }
+
+  async assignCategories(instanceName: string, categories: string[]): Promise<any> {
+    return zapiFetch(instanceName, "assign-categories", {
+      method: "POST",
+      body: { categories },
+    });
+  }
+
+  // ─── Privacy Settings ───
+
+  async setPrivacySetting(instanceName: string, setting: string, value: string): Promise<any> {
+    return zapiFetch(instanceName, `privacy/${setting}`, {
+      method: "PATCH",
+      body: { value },
+    });
+  }
+
+  async getDisallowedContacts(instanceName: string, type: string): Promise<any[]> {
+    const result = await zapiFetch(instanceName, `privacy/disallowed-contacts?type=${type}`);
+    return result || [];
+  }
+
+  // ─── Newsletters/Channels ───
+
+  async createNewsletter(instanceName: string, name: string, description?: string): Promise<any> {
+    return zapiFetch(instanceName, "create-newsletter", {
+      method: "POST",
+      body: { name, description: description || "" },
+    });
+  }
+
+  async deleteNewsletter(instanceName: string, newsletterId: string): Promise<any> {
+    return zapiFetch(instanceName, "delete-newsletter", {
+      method: "DELETE",
+      body: { newsletterId },
+    });
+  }
+
+  async getNewsletterList(instanceName: string): Promise<any[]> {
+    const result = await zapiFetch(instanceName, "get-newsletter-list");
+    return result || [];
+  }
+
+  async getNewsletterMetadata(instanceName: string, newsletterId: string): Promise<any> {
+    return zapiFetch(instanceName, `newsletter-metadata/${newsletterId}`);
+  }
+
+  async updateNewsletterName(instanceName: string, newsletterId: string, name: string): Promise<any> {
+    return zapiFetch(instanceName, "update-newsletter-name", {
+      method: "PATCH",
+      body: { newsletterId, name },
+    });
+  }
+
+  async updateNewsletterDescription(instanceName: string, newsletterId: string, description: string): Promise<any> {
+    return zapiFetch(instanceName, "update-newsletter-description", {
+      method: "PATCH",
+      body: { newsletterId, description },
+    });
+  }
+
+  async updateNewsletterPicture(instanceName: string, newsletterId: string, imageUrl: string): Promise<any> {
+    return zapiFetch(instanceName, "update-newsletter-picture", {
+      method: "PATCH",
+      body: { newsletterId, image: imageUrl },
+    });
+  }
+
+  async sendNewsletterAdminInvite(instanceName: string, newsletterId: string, phone: string): Promise<any> {
+    return zapiFetch(instanceName, "send-newsletter-admin-invite", {
+      method: "POST",
+      body: { newsletterId, phone: jidToPhone(phone) },
     });
   }
 

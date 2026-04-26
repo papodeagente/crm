@@ -26,22 +26,33 @@ export function EmptyChat() {
   );
 }
 
-export function NoSession() {
+export function NoSession({ canConnect = true }: { canConnect?: boolean }) {
   return (
     <div className="flex h-full items-center justify-center bg-background">
       <div className="text-center max-w-md px-6">
         <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
           <MessageSquare className="w-10 h-10 text-primary" />
         </div>
-        <h2 className="text-xl font-medium text-foreground mb-2">WhatsApp não conectado</h2>
-        <p className="text-[14px] text-muted-foreground mb-4">
-          Conecte seu WhatsApp para enviar e receber mensagens diretamente pelo sistema.
-        </p>
-        <a href="/whatsapp"
-          className="inline-flex items-center gap-2 px-4 py-2.5 bg-primary text-white rounded-xl text-sm font-medium hover:opacity-90 transition-all">
-          <Phone className="w-4 h-4" />
-          Conectar WhatsApp
-        </a>
+        {canConnect ? (
+          <>
+            <h2 className="text-xl font-medium text-foreground mb-2">WhatsApp não conectado</h2>
+            <p className="text-[14px] text-muted-foreground mb-4">
+              Conecte seu WhatsApp para enviar e receber mensagens diretamente pelo sistema.
+            </p>
+            <a href="/whatsapp"
+              className="inline-flex items-center gap-2 px-4 py-2.5 bg-primary text-white rounded-xl text-sm font-medium hover:opacity-90 transition-all">
+              <Phone className="w-4 h-4" />
+              Conectar WhatsApp
+            </a>
+          </>
+        ) : (
+          <>
+            <h2 className="text-xl font-medium text-foreground mb-2">WhatsApp não disponível</h2>
+            <p className="text-[14px] text-muted-foreground mb-4">
+              Solicite ao administrador para liberar seu acesso ao WhatsApp.
+            </p>
+          </>
+        )}
       </div>
     </div>
   );

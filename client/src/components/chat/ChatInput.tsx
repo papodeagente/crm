@@ -97,6 +97,18 @@ export default function ChatInput({
   const [quickReplyFilter, setQuickReplyFilter] = useState("");
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  // Auto-focus textarea when conversation changes
+  useEffect(() => {
+    if (remoteJid) {
+      setTimeout(() => textareaRef.current?.focus(), 100);
+    }
+  }, [remoteJid]);
+  // Auto-focus textarea when user clicks "Responder"
+  useEffect(() => {
+    if (replyTarget) {
+      setTimeout(() => textareaRef.current?.focus(), 50);
+    }
+  }, [replyTarget]);
   const emojiPickerRef = useRef<HTMLDivElement>(null);
   const attachMenuRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -221,7 +233,7 @@ export default function ChatInput({
           <div className="rounded-[8px] overflow-hidden flex items-stretch" style={{ backgroundColor: 'var(--wa-input-bg)' }}>
             <div style={{ width: 4, backgroundColor: 'var(--wa-tint)', flexShrink: 0 }} />
             <div className="flex-1 px-[12px] py-[7px] min-w-0">
-              <p className="text-[12.5px] font-medium" style={{ color: 'var(--wa-tint)' }}>{replyTarget.fromMe ? "Voce" : contact?.name || "Cliente"}</p>
+              <p className="text-[12.5px] font-medium" style={{ color: 'var(--wa-tint)' }}>{replyTarget.fromMe ? "Você" : contact?.name || "Passageiro"}</p>
               <p className="text-[13px] truncate" style={{ color: 'var(--wa-text-secondary)' }}>{replyTarget.content}</p>
             </div>
             <button onClick={onClearReply} className="px-[12px] flex items-center justify-center hover:opacity-70 transition-opacity">
@@ -236,7 +248,8 @@ export default function ChatInput({
         <div className="bg-amber-400/20 border-t border-amber-400/40 px-3 py-2 z-10 shrink-0">
           <div className="flex items-center gap-2 flex-wrap">
             <StickyNote className="w-4 h-4 text-amber-600 shrink-0" />
-            <span className="text-[13px] font-medium text-amber-700">Nota Interna</span>
+            <span className="text-[13px] font-medium text-amber-700">Nota interna no chat</span>
+            <span className="text-[11px] text-amber-600/70">(só a equipe vê)</span>
             <select
               value={noteCategory}
               onChange={(e) => setNoteCategory(e.target.value)}
@@ -293,7 +306,7 @@ export default function ChatInput({
       )}
 
       {/* Input Area */}
-      <div className={`px-[10px] py-[5px] z-10 shrink-0 transition-colors ${isNoteMode ? "bg-amber-50 dark:bg-amber-950/30" : ""}`} style={isNoteMode ? {} : { backgroundColor: 'var(--wa-chat-compose-bg)' }}>
+      <div className={`px-[10px] py-[5px] z-10 shrink-0 transition-colors ${isNoteMode ? "bg-amber-50 dark:bg-amber-950/30" : "inbox-compose-glass"}`}>
         {isRecording ? (
           <VoiceRecorder onSend={handleVoiceSend} onCancel={() => setIsRecording(false)} />
         ) : (
@@ -377,7 +390,7 @@ export default function ChatInput({
                   remoteJid={remoteJid}
                   contactName={contact?.name}
                   onUseText={(text) => { setMessageText(text); setShowAiSuggestion(false); textareaRef.current?.focus(); }}
-                  onSendBroken={() => { setShowAiSuggestion(false); setTimeout(() => onRefetchMessages(), 2000); }}
+                  onSendBroken={() => { onRefetchMessages(); }}
                   onClose={() => setShowAiSuggestion(false)}
                 />
               )}
@@ -472,8 +485,8 @@ export default function ChatInput({
             {/* Send / Mic button */}
             {messageText.trim() ? (
               <button onClick={handleSend} disabled={sendPending || isSending || createNotePending}
-                className="w-[42px] h-[42px] flex items-center justify-center rounded-full transition-all shrink-0 self-end disabled:opacity-50 hover:opacity-90"
-                style={{ backgroundColor: isNoteMode ? '#f59e0b' : 'var(--wa-tint)' }}>
+                className={`w-[42px] h-[42px] flex items-center justify-center rounded-full transition-all shrink-0 self-end disabled:opacity-50 hover:opacity-90 ${!isNoteMode ? "inbox-send-glow" : ""}`}
+                style={{ background: isNoteMode ? '#f59e0b' : 'linear-gradient(135deg, #600FED, #8B5CF6)' }}>
                 {sendPending || isSending || createNotePending
                   ? <Loader2 className="w-5 h-5 text-white animate-spin" />
                   : isNoteMode
@@ -492,7 +505,7 @@ export default function ChatInput({
 
       {/* Hidden file inputs */}
       <input ref={fileInputRef} type="file" accept="image/*,video/*" multiple className="hidden" onChange={onFileSelect} />
-      <input ref={docInputRef} type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip,.rar" multiple className="hidden" onChange={onDocSelect} />
+      <input ref={docInputRef} type="file" accept="*/*" multiple className="hidden" onChange={onDocSelect} />
     </>
   );
 }
