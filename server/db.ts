@@ -1581,16 +1581,16 @@ export async function getAgentsWithTeams(tenantId: number) {
   const db = await getDb();
   if (!db) return [];
   const rows = await db.execute(sql`
-    SELECT cu.id, cu.name, cu.email, cu.phone, cu.avatarUrl, cu.status, cu.crm_user_role, cu.lastLoginAt, cu.createdAt,
+    SELECT cu.id, cu.name, cu.email, cu.phone, cu."avatarUrl", cu.status, cu.crm_user_role, cu."lastLoginAt", cu."createdAt",
       (SELECT STRING_AGG(t.id || ':' || t.name || ':' || COALESCE(t.color, '#6366f1'), '|')
-       FROM team_members tm JOIN teams t ON t.id = tm.teamId
-       WHERE tm.userId = cu.id AND tm.tenantId = ${tenantId}
-      ) AS teamsList,
+       FROM team_members tm JOIN teams t ON t.id = tm."teamId"
+       WHERE tm."userId" = cu.id AND tm."tenantId" = ${tenantId}
+      ) AS "teamsList",
       (SELECT COUNT(*) FROM conversation_assignments ca
-       WHERE ca.assignedUserId = cu.id AND ca.tenantId = ${tenantId} AND ca.status IN ('open', 'pending')
-      ) AS openAssignments
+       WHERE ca."assignedUserId" = cu.id AND ca."tenantId" = ${tenantId} AND ca.status IN ('open', 'pending')
+      ) AS "openAssignments"
     FROM crm_users cu
-    WHERE cu.tenantId = ${tenantId}
+    WHERE cu."tenantId" = ${tenantId}
     ORDER BY cu.status ASC, cu.name ASC
   `);
   return (rows as unknown as any[]).map((r: any) => ({

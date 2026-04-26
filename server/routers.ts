@@ -234,6 +234,12 @@ export const appRouter = router({
           ...opts.ctx.user,
           tenantId: opts.ctx.saasUser.tenantId,
           saasEmail: opts.ctx.saasUser.email,
+          saasUser: {
+            userId: opts.ctx.saasUser.userId,
+            tenantId: opts.ctx.saasUser.tenantId,
+            email: opts.ctx.saasUser.email,
+            role: (opts.ctx.saasUser as any).role,
+          },
         };
       }
       // For Manus OAuth users (owner), try to find their CRM user to get tenantId
@@ -242,7 +248,7 @@ export const appRouter = router({
           const db = await getDb();
           if (db && opts.ctx.user.email) {
             const crmUser = await db.execute(
-              sql`SELECT id, tenantId FROM crm_users WHERE email = ${opts.ctx.user.email} LIMIT 1`
+              sql`SELECT id, "tenantId" FROM crm_users WHERE email = ${opts.ctx.user.email} LIMIT 1`
             );
             const row = (crmUser as unknown as any[])[0];
             if (row?.tenantId) {
