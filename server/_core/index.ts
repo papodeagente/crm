@@ -377,6 +377,26 @@ async function startServer() {
     }
   });
 
+  // Debug: inspect current session (cookie-based) — gated by secret
+  app.get("/api/debug-whoami", async (req, res) => {
+    try {
+      const secret = req.query.secret;
+      if (secret !== "CrmSecure2026!") return res.status(403).json({ error: "Forbidden" });
+      const { parse: parseCookieHeader } = await import("cookie");
+      const { verifySaasSession, SAAS_COOKIE } = await import("../saasAuth");
+      const cookies = parseCookieHeader(req.headers.cookie || "");
+      const saasToken = cookies[SAAS_COOKIE];
+      const session = saasToken ? await verifySaasSession(saasToken) : null;
+      res.json({
+        hasCookie: !!saasToken,
+        session,
+        manusCookie: !!cookies["mgx_session"] || !!cookies["entur_session"],
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // REST API endpoints for external integration
   app.get("/api/v1/status/:sessionId", (req, res) => {
     const session = whatsappManager.getSession(req.params.sessionId);
