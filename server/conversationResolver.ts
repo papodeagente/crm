@@ -150,22 +150,23 @@ export async function resolveContact(
     .limit(1);
 
   if (existing.length > 0) {
-    // Update contact name if a real name is provided and current name is just a phone number
+    // Update contact name usando NAME_PRIORITY centralizado (porta entur-os-crm).
+    // Webhook handler só passa body.senderName como pushName (perfil WA do remetente),
+    // que classifica como "whatsapp_profile" e NÃO sobrescreve "crm" (edit manual no CRM).
     if (name) {
-      const cleanedName = name.replace(/[\s\-\(\)\+]/g, '');
-      const isRealName = !/^\d+$/.test(cleanedName) && name !== 'Voc\u00ea' && name !== 'You';
-      if (isRealName) {
-        // Check if current name is just a phone number
-        const currentContact = await db.select({ name: contacts.name })
+      const { isValidName, shouldUpdateName } = await import("./identityResolver");
+      if (isValidName(name)) {
+        const currentContact = await db.select({
+          nameSource: contacts.nameSource,
+        })
           .from(contacts)
           .where(eq(contacts.id, existing[0].id))
           .limit(1);
-        const currentName = currentContact[0]?.name || '';
-        const currentCleaned = currentName.replace(/[\s\-\(\)\+]/g, '');
-        const currentIsPhone = /^\d+$/.test(currentCleaned) || !currentName;
-        if (currentIsPhone) {
+        const currentSource = (currentContact[0]?.nameSource || null) as any;
+        const newSource = "whatsapp_profile" as const;
+        if (shouldUpdateName(currentSource, newSource)) {
           await db.update(contacts)
-            .set({ name, updatedAt: new Date() })
+            .set({ name, nameSource: newSource, updatedAt: new Date() })
             .where(eq(contacts.id, existing[0].id));
         }
       }
@@ -297,7 +298,12 @@ export async function resolveConversation(
   remoteJid: string,
   contactId?: number | null,
   pushName?: string | null,
+  chatLid?: string | null,
 ): Promise<{ conversationId: number; isNew: boolean; conversationKey: string }> {
+  // Normalize chatLid to always carry @lid suffix (porta entur-os-crm)
+  const normalizedChatLid = chatLid
+    ? (chatLid.includes("@") ? chatLid : `${chatLid.replace(/\D/g, "")}@lid`)
+    : null;
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
@@ -346,6 +352,7 @@ export async function resolveConversation(
       }
     }
     if (contactId) updateData.contactId = contactId;
+    if (normalizedChatLid) updateData.chatLid = normalizedChatLid;
     // Always update remoteJid with the RAW JID from WhatsApp
     // This ensures replies go to the correct JID
     updateData.remoteJid = remoteJid;
@@ -374,6 +381,7 @@ export async function resolveConversation(
       phoneLast11: phone.valid ? phone.last11BR : null,
       status: "open",
       contactPushName: pushName || null,
+      chatLid: normalizedChatLid,
       unreadCount: 0,
     });
 
@@ -493,7 +501,7 @@ export async function resolveInbound(
   sessionId: string,
   remoteJid: string,
   pushName?: string | null,
-  options?: { skipContactCreation?: boolean },
+  options?: { skipContactCreation?: boolean; chatLid?: string | null },
 ): Promise<ResolvedConversation> {
   // LID detection: @lid JIDs are WhatsApp Linked IDs, NOT phone numbers.
   // Don't run normalizePhone on LID digits — they are opaque identifiers.
@@ -518,8 +526,8 @@ export async function resolveInbound(
   // Resolver identidade — pass raw JID so it's stored as-is
   const identity = await resolveIdentity(tenantId, sessionId, remoteJid, contactId, phone.valid ? phone.phoneE164 : null);
 
-  // Resolver conversa — pass raw JID so it's stored as-is
-  const conversation = await resolveConversation(tenantId, sessionId, remoteJid, contactId, pushName);
+  // Resolver conversa — pass raw JID + chatLid (porta entur-os-crm — pareamento LID↔phone)
+  const conversation = await resolveConversation(tenantId, sessionId, remoteJid, contactId, pushName, options?.chatLid ?? null);
 
   // Audit log
   await logAudit(tenantId, "conversation_resolved", "wa_conversation", String(conversation.conversationId), {

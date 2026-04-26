@@ -50,6 +50,41 @@
       "when": 1777949600000,
       "tag": "0006_user_availability",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1777959600000,
+      "tag": "0007_ai_usage_extraction",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1777969600000,
+      "tag": "0008_deal_message_link",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1777979600000,
+      "tag": "0009_channel_identities",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1777989600000,
+      "tag": "0010_inbox_helpdesk_columns",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1777999600000,
+      "tag": "0011_wa_evolution_columns",
+      "breakpoints": true
     }
   ]
 }

@@ -34,11 +34,66 @@ import type {
   WAWebhookEventType,
 } from "./types";
 
+import IORedis from "ioredis";
+
 // ════════════════════════════════════════════════════════════
 // CONFIGURATION
 // ════════════════════════════════════════════════════════════
 
 const ZAPI_BASE_URL = "https://api.z-api.io";
+
+// ── Redis cache pra enrichment de contato (getContactProfile / phoneExists) ──
+const PROFILE_CACHE_TTL_SEC = 24 * 60 * 60;
+let _redisCache: IORedis | null = null;
+let _redisCacheInitTried = false;
+
+function getRedisCache(): IORedis | null {
+  if (_redisCache) return _redisCache;
+  if (_redisCacheInitTried) return null;
+  _redisCacheInitTried = true;
+  const url = process.env.REDIS_URL;
+  if (!url) return null;
+  try {
+    _redisCache = new IORedis(url, {
+      maxRetriesPerRequest: 3,
+      enableReadyCheck: true,
+      lazyConnect: true,
+      connectTimeout: 5000,
+      retryStrategy: (times) => (times > 3 ? null : Math.min(times * 200, 2000)),
+    });
+    let errorLogged = false;
+    _redisCache.on("error", (err) => {
+      if (!errorLogged) {
+        console.warn("[Z-API cache] Redis error:", err.message);
+        errorLogged = true;
+      }
+    });
+    _redisCache.connect().catch(() => {});
+    return _redisCache;
+  } catch {
+    return null;
+  }
+}
+
+async function getCache<T>(key: string): Promise<T | null | undefined> {
+  const r = getRedisCache();
+  if (!r) return undefined;
+  try {
+    const raw = await r.get(key);
+    if (raw === null) return undefined;
+    return JSON.parse(raw) as T | null;
+  } catch {
+    return undefined;
+  }
+}
+
+async function setCache(key: string, value: unknown, ttlSec: number): Promise<void> {
+  const r = getRedisCache();
+  if (!r) return;
+  try {
+    await r.set(key, JSON.stringify(value), "EX", ttlSec);
+  } catch {}
+}
 
 /**
  * Z-API session config stored in DB per whatsapp_session.
@@ -1651,6 +1706,63 @@ export class ZApiProvider implements WhatsAppProvider {
       default:
         console.warn(`[Z-API] Unknown webhook type: ${rawPayload.type}`);
         return null;
+    }
+  }
+
+  // ─── Contact enrichment (porta entur-os-crm — usado por identityResolver) ───
+
+  /**
+   * Perfil do contato: nome (vname > notify), phone, imgUrl, lid.
+   * Aceita phone ("5511999") ou LID ("43100@lid").
+   */
+  async getContactProfile(
+    instanceName: string,
+    phoneOrLid: string,
+  ): Promise<{ name: string | null; phone: string | null; imgUrl: string | null; lid: string | null } | null> {
+    if (!phoneOrLid) return null;
+    const cacheKey = `zapi:profile:${instanceName}:${phoneOrLid}`;
+    const cached = await getCache<{ name: string | null; phone: string | null; imgUrl: string | null; lid: string | null }>(cacheKey);
+    if (cached !== undefined) return cached;
+
+    try {
+      const data = await zapiFetch(instanceName, `contacts/${encodeURIComponent(phoneOrLid)}`);
+      let result = {
+        name: data?.vname || data?.notify || null,
+        phone: data?.phone || null,
+        imgUrl: data?.imgUrl || null,
+        lid: data?.lid || null,
+      };
+      if (phoneOrLid.endsWith("@lid") && !result.phone) {
+        try {
+          const chat = await zapiFetch(instanceName, `chats/${encodeURIComponent(phoneOrLid)}`);
+          if (chat?.phone) result = { ...result, phone: chat.phone };
+        } catch {}
+      }
+      await setCache(cacheKey, result, PROFILE_CACHE_TTL_SEC);
+      return result;
+    } catch (err: any) {
+      console.warn(`[Z-API] getContactProfile failed for ${phoneOrLid}: ${err.message}`);
+      await setCache(cacheKey, null, 300);
+      return null;
+    }
+  }
+
+  /** Checa se phone existe no WhatsApp e retorna o LID associado. */
+  async phoneExists(instanceName: string, phone: string): Promise<{ exists: boolean; lid: string | null }> {
+    if (!phone) return { exists: false, lid: null };
+    const clean = phone.replace(/\D/g, "");
+    const cacheKey = `zapi:phone-exists:${instanceName}:${clean}`;
+    const cached = await getCache<{ exists: boolean; lid: string | null }>(cacheKey);
+    if (cached !== undefined && cached !== null) return cached;
+
+    try {
+      const data = await zapiFetch(instanceName, `phone-exists/${clean}`);
+      const result = { exists: !!data?.exists, lid: data?.lid || null };
+      await setCache(cacheKey, result, PROFILE_CACHE_TTL_SEC);
+      return result;
+    } catch (err: any) {
+      console.warn(`[Z-API] phoneExists failed for ${phone}: ${err.message}`);
+      return { exists: false, lid: null };
     }
   }
 }

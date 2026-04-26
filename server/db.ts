@@ -47,6 +47,8 @@ function dedupConversations(rows: any[]): any[] {
   return Array.from(map.values());
 }
 
+let _autoLinkTriggerInstalled = false;
+
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
     try {
@@ -58,6 +60,80 @@ export async function getDb() {
       _db = null;
     }
   }
+
+  // ── Auto-link de mensagens em deals abertos via trigger Postgres ──
+  // Cobre TODOS os INSERTs em "messages" (in + out) sem precisar editar callsites.
+  // Trata 9º dígito brasileiro: candidata `com 9` (11) e `sem 9` (10) do nacional.
+  // Defensivo: EXCEPTION WHEN OTHERS THEN RETURN NEW — nunca quebra INSERT da mensagem.
+  if (_db && !_autoLinkTriggerInstalled) {
+    _autoLinkTriggerInstalled = true;
+    _db.execute(sql`
+      CREATE OR REPLACE FUNCTION trg_auto_link_message_to_deals_fn()
+      RETURNS TRIGGER AS $$
+      DECLARE
+        jid_digits TEXT;
+        national TEXT;
+        candidate_a TEXT;
+        candidate_b TEXT;
+        effective_tenant INTEGER;
+      BEGIN
+        IF NEW."remoteJid" IS NULL THEN RETURN NEW; END IF;
+
+        jid_digits := REGEXP_REPLACE(SPLIT_PART(NEW."remoteJid", '@', 1), '[^0-9]', '', 'g');
+        IF LENGTH(jid_digits) < 10 THEN RETURN NEW; END IF;
+
+        IF LEFT(jid_digits, 2) = '55' AND LENGTH(jid_digits) >= 12 THEN
+          national := SUBSTRING(jid_digits, 3);
+        ELSE
+          national := jid_digits;
+        END IF;
+
+        candidate_a := NULL;
+        candidate_b := NULL;
+        IF LENGTH(national) = 11 AND SUBSTRING(national, 3, 1) = '9' THEN
+          candidate_a := national;
+          candidate_b := SUBSTRING(national, 1, 2) || SUBSTRING(national, 4);
+        ELSIF LENGTH(national) = 10 THEN
+          candidate_b := national;
+          candidate_a := SUBSTRING(national, 1, 2) || '9' || SUBSTRING(national, 3);
+        ELSE
+          candidate_a := RIGHT(national, 11);
+        END IF;
+
+        IF NEW."tenantId" IS NOT NULL AND NEW."tenantId" > 0 THEN
+          effective_tenant := NEW."tenantId";
+        ELSE
+          SELECT "tenantId" INTO effective_tenant
+          FROM whatsapp_sessions WHERE "sessionId" = NEW."sessionId" LIMIT 1;
+        END IF;
+        IF effective_tenant IS NULL THEN RETURN NEW; END IF;
+
+        INSERT INTO deal_message_links ("tenantId", "dealId", "messageDbId", "linkedBy")
+        SELECT effective_tenant, d.id, NEW.id, 'auto'
+        FROM deals d
+        INNER JOIN contacts c ON c.id = d."contactId"
+        WHERE d."tenantId" = effective_tenant
+          AND d.status = 'open'
+          AND (
+            (candidate_a IS NOT NULL AND c."phoneLast11" = candidate_a)
+            OR (candidate_b IS NOT NULL AND c."phoneLast11" = candidate_b)
+          )
+        ON CONFLICT ("dealId", "messageDbId") DO NOTHING;
+
+        RETURN NEW;
+      EXCEPTION WHEN OTHERS THEN
+        RETURN NEW;
+      END;
+      $$ LANGUAGE plpgsql;
+    `).catch((e: any) => console.warn("[Migration] auto-link trigger fn:", e?.message));
+    _db.execute(sql`DROP TRIGGER IF EXISTS trg_auto_link_message_to_deals ON "messages"`).catch(() => {});
+    _db.execute(sql`
+      CREATE TRIGGER trg_auto_link_message_to_deals
+      AFTER INSERT ON "messages"
+      FOR EACH ROW EXECUTE FUNCTION trg_auto_link_message_to_deals_fn()
+    `).catch((e: any) => console.warn("[Migration] auto-link trigger:", e?.message));
+  }
+
   return _db;
 }
 
@@ -3731,12 +3807,20 @@ export interface TenantAiCallOptions {
       schema: Record<string, unknown>;
     };
   };
+  /** Override: usa essa integracao especifica (em vez da primeira ativa) */
+  integrationId?: number;
+  /** Override: usa esse modelo (em vez do default da integracao/tenant) */
+  overrideModel?: string;
 }
 
 export interface TenantAiCallResult {
   content: string;
   provider: string;
   model: string;
+  /** Tokens consumidos — usado pelo aiUsageLog. undef quando provider não retornou. */
+  inputTokens?: number;
+  outputTokens?: number;
+  totalTokens?: number;
 }
 
 /**
@@ -3745,13 +3829,23 @@ export interface TenantAiCallResult {
  * Falls back gracefully if no integration is configured.
  */
 export async function callTenantAi(opts: TenantAiCallOptions): Promise<TenantAiCallResult> {
-  const integration = await getAnyActiveAiIntegration(opts.tenantId);
+  let integration = opts.integrationId
+    ? await getAiIntegration(opts.tenantId, opts.integrationId)
+    : null;
+
+  if (!integration) {
+    integration = await getAnyActiveAiIntegration(opts.tenantId);
+  }
   if (!integration) {
     throw new Error("NO_AI_CONFIGURED");
   }
 
+  if (!integration.isActive) {
+    throw new Error("NO_AI_CONFIGURED");
+  }
+
   const settings = await getTenantAiSettings(opts.tenantId);
-  const model = settings.defaultAiModel || integration.defaultModel;
+  const model = opts.overrideModel || settings.defaultAiModel || integration.defaultModel;
 
   if (integration.provider === "openai") {
     return callOpenAiForTenant(integration.apiKey, model, opts);
@@ -3811,10 +3905,17 @@ async function callOpenAiForTenant(
     }
 
     const data = await res.json();
+    const inputTokens = data.usage?.prompt_tokens;
+    const outputTokens = data.usage?.completion_tokens;
+    const totalTokens = data.usage?.total_tokens
+      ?? (typeof inputTokens === "number" && typeof outputTokens === "number" ? inputTokens + outputTokens : undefined);
     return {
       content: data.choices?.[0]?.message?.content || "",
       provider: "openai",
       model: data.model || model,
+      inputTokens,
+      outputTokens,
+      totalTokens,
     };
   } catch (err: any) {
     clearTimeout(timeout);
@@ -3868,10 +3969,18 @@ async function callAnthropicForTenant(
     }
 
     const data = await res.json();
+    const inputTokens = data.usage?.input_tokens;
+    const outputTokens = data.usage?.output_tokens;
+    const totalTokens = typeof inputTokens === "number" && typeof outputTokens === "number"
+      ? inputTokens + outputTokens
+      : undefined;
     return {
       content: data.content?.[0]?.text || "",
       provider: "anthropic",
       model: data.model || model,
+      inputTokens,
+      outputTokens,
+      totalTokens,
     };
   } catch (err: any) {
     clearTimeout(timeout);
@@ -3927,4 +4036,240 @@ export async function countDealFiles(tenantId: number, dealId: number) {
   const [result] = await db.select({ count: sql<number>`count(*)` }).from(dealFiles)
     .where(and(eq(dealFiles.tenantId, tenantId), eq(dealFiles.dealId, dealId), isNull(dealFiles.deletedAt)));
   return result?.count || 0;
+}
+
+// ════════════════════════════════════════════════════════════
+// HELPDESK — Agent Availability & Presence
+// (porta entur-os-crm — Phase 6, exposto via tRPC whatsapp.supervision.{set,get}Availability)
+// ════════════════════════════════════════════════════════════
+
+export type AvailabilityStatus = "auto" | "available" | "away" | "busy" | "offline";
+
+export async function updateAgentAvailability(tenantId: number, userId: number, status: AvailabilityStatus) {
+  const db = await getDb();
+  if (!db) return null;
+  await db.update(crmUsers)
+    .set({ availabilityStatus: status })
+    .where(and(eq(crmUsers.tenantId, tenantId), eq(crmUsers.id, userId)));
+  try {
+    const { emitToTenant } = await import("./socketSingleton");
+    emitToTenant("agentPresenceChanged", { userId, availabilityStatus: status, tenantId, timestamp: Date.now() }, tenantId);
+  } catch {}
+  return { userId, availabilityStatus: status };
+}
+
+export async function getAgentAvailability(tenantId: number, userId: number): Promise<AvailabilityStatus> {
+  const db = await getDb();
+  if (!db) return "auto";
+  const [row] = await db.select({ availabilityStatus: crmUsers.availabilityStatus })
+    .from(crmUsers)
+    .where(and(eq(crmUsers.tenantId, tenantId), eq(crmUsers.id, userId)))
+    .limit(1);
+  return (row?.availabilityStatus as AvailabilityStatus) || "auto";
+}
+
+export async function getAvailableAgentIds(tenantId: number): Promise<number[]> {
+  const db = await getDb();
+  if (!db) return [];
+  const result = await db.execute(sql`
+    SELECT cu.id FROM crm_users cu
+    WHERE cu."tenantId" = ${tenantId}
+      AND cu.status = 'active'
+      AND (
+        cu."availabilityStatus" = 'available'
+        OR (cu."availabilityStatus" = 'auto' AND cu."lastActiveAt" >= NOW() - INTERVAL '5 minutes')
+      )
+  `);
+  const rows = (result as any).rows || (result as any) || [];
+  return rows.map((r: any) => Number(r.id));
+}
+
+// ════════════════════════════════════════════════════════════
+// HELPDESK — Settings + SLA + queue distribution + idle agents
+// (porta entur-os-crm — usado por slaEnforcement / idleAgent / helpdeskDistribution schedulers)
+// ════════════════════════════════════════════════════════════
+
+export interface HelpdeskSettings {
+  autoDistributionEnabled: boolean;
+  slaFirstResponseMinutes: number;
+  slaResolutionMinutes: number;
+  idleAgentTimeoutMinutes: number;
+  slaBreachAction: "notify" | "reassign" | "escalate";
+}
+
+const HELPDESK_DEFAULTS: HelpdeskSettings = {
+  autoDistributionEnabled: false,
+  slaFirstResponseMinutes: 30,
+  slaResolutionMinutes: 480,
+  idleAgentTimeoutMinutes: 0,
+  slaBreachAction: "notify",
+};
+
+function sanitizeHelpdeskSettingsJson(raw: unknown): Record<string, unknown> {
+  if (!raw) return {};
+  if (typeof raw === "string") {
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        return sanitizeHelpdeskSettingsJson(parsed);
+      }
+    } catch {}
+    return {};
+  }
+  if (typeof raw !== "object") return {};
+  return raw as Record<string, unknown>;
+}
+
+export async function getHelpdeskSettings(tenantId: number): Promise<HelpdeskSettings> {
+  const db = await getDb();
+  if (!db) return { ...HELPDESK_DEFAULTS };
+  const rows = await db.select({ settingsJson: tenants.settingsJson }).from(tenants).where(eq(tenants.id, tenantId)).limit(1);
+  const raw = sanitizeHelpdeskSettingsJson(rows[0]?.settingsJson);
+  const h = (raw.helpdesk || {}) as Partial<HelpdeskSettings>;
+  return { ...HELPDESK_DEFAULTS, ...h };
+}
+
+export async function updateHelpdeskSettings(tenantId: number, patch: Partial<HelpdeskSettings>) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const rows = await db.select({ settingsJson: tenants.settingsJson }).from(tenants).where(eq(tenants.id, tenantId)).limit(1);
+  const existing = sanitizeHelpdeskSettingsJson(rows[0]?.settingsJson);
+  const currentHelpdesk = (existing.helpdesk || {}) as Partial<HelpdeskSettings>;
+  const merged = { ...existing, helpdesk: { ...HELPDESK_DEFAULTS, ...currentHelpdesk, ...patch } };
+  await db.update(tenants).set({ settingsJson: merged }).where(eq(tenants.id, tenantId));
+  return merged.helpdesk;
+}
+
+export async function getQueuedConversationsForDistribution(tenantId: number, limit = 50) {
+  const db = await getDb();
+  if (!db) return [];
+  const result = await db.execute(sql`
+    SELECT wc.id, wc."tenantId", wc."sessionId", wc."remoteJid", wc."queuedAt"
+    FROM wa_conversations wc
+    WHERE wc."tenantId" = ${tenantId}
+      AND wc."assignedUserId" IS NULL
+      AND wc."queuedAt" IS NOT NULL
+      AND wc.status IN ('open', 'pending')
+      AND wc."mergedIntoId" IS NULL
+    ORDER BY wc."queuedAt" ASC
+    LIMIT ${limit}
+  `);
+  return (result as any).rows || (result as any) || [];
+}
+
+export async function getTenantsWithAutoDistribution(): Promise<{ id: number }[]> {
+  const db = await getDb();
+  if (!db) return [];
+  const result = await db.execute(sql`
+    SELECT id FROM tenants
+    WHERE "settingsJson"->>'helpdesk' IS NOT NULL
+      AND ("settingsJson"->'helpdesk'->>'autoDistributionEnabled')::boolean = true
+  `);
+  return ((result as any).rows || (result as any) || []) as { id: number }[];
+}
+
+export async function setSlaDeadline(tenantId: number, conversationId: number) {
+  const db = await getDb();
+  if (!db) return;
+  const settings = await getHelpdeskSettings(tenantId);
+  if (!settings.slaFirstResponseMinutes && !settings.slaResolutionMinutes) return;
+
+  const [conv] = await db.select({ firstResponseAt: waConversations.firstResponseAt })
+    .from(waConversations).where(eq(waConversations.id, conversationId)).limit(1);
+
+  const minutes = conv?.firstResponseAt ? settings.slaResolutionMinutes : settings.slaFirstResponseMinutes;
+  if (!minutes) return;
+
+  const deadline = new Date(Date.now() + minutes * 60 * 1000);
+  await db.update(waConversations).set({ slaDeadlineAt: deadline }).where(eq(waConversations.id, conversationId));
+}
+
+export async function getTenantsWithSla(): Promise<{ id: number }[]> {
+  const db = await getDb();
+  if (!db) return [];
+  const result = await db.execute(sql`
+    SELECT id FROM tenants
+    WHERE "settingsJson"->>'helpdesk' IS NOT NULL
+      AND (
+        COALESCE(("settingsJson"->'helpdesk'->>'slaFirstResponseMinutes')::int, 0) > 0
+        OR COALESCE(("settingsJson"->'helpdesk'->>'slaResolutionMinutes')::int, 0) > 0
+      )
+  `);
+  return ((result as any).rows || (result as any) || []) as { id: number }[];
+}
+
+export async function getBreachedConversations(tenantId: number, limit = 100) {
+  const db = await getDb();
+  if (!db) return [];
+  const result = await db.execute(sql`
+    SELECT wc.id, wc."tenantId", wc."sessionId", wc."remoteJid", wc."slaDeadlineAt",
+           wc."assignedUserId", wc."firstResponseAt"
+    FROM wa_conversations wc
+    WHERE wc."tenantId" = ${tenantId}
+      AND wc."slaDeadlineAt" IS NOT NULL
+      AND wc."slaDeadlineAt" <= NOW()
+      AND wc."slaBreachedAt" IS NULL
+      AND wc.status IN ('open', 'pending')
+      AND wc."mergedIntoId" IS NULL
+    LIMIT ${limit}
+  `);
+  return (result as any).rows || (result as any) || [];
+}
+
+export async function markSlaBreached(conversationId: number) {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(waConversations).set({ slaBreachedAt: new Date() }).where(eq(waConversations.id, conversationId));
+}
+
+export async function updateFirstResponseAt(tenantId: number) {
+  const db = await getDb();
+  if (!db) return 0;
+  const result = await db.execute(sql`
+    UPDATE wa_conversations wc
+    SET "firstResponseAt" = sub.first_out
+    FROM (
+      SELECT wm."waConversationId", MIN(wm.timestamp) AS first_out
+      FROM messages wm
+      JOIN wa_conversations wc2 ON wc2.id = wm."waConversationId"
+      WHERE wc2."tenantId" = ${tenantId}
+        AND wc2."firstResponseAt" IS NULL
+        AND wc2."assignedUserId" IS NOT NULL
+        AND wc2.status IN ('open', 'pending')
+        AND wm."fromMe" = true
+      GROUP BY wm."waConversationId"
+    ) sub
+    WHERE wc.id = sub."waConversationId"
+      AND wc."firstResponseAt" IS NULL
+  `);
+  return (result as any).rowCount || 0;
+}
+
+export async function getIdleAgentConversations(tenantId: number, timeoutMinutes: number) {
+  const db = await getDb();
+  if (!db) return [];
+  const result = await db.execute(sql`
+    SELECT wc.id, wc."sessionId", wc."remoteJid", wc."assignedUserId"
+    FROM wa_conversations wc
+    JOIN crm_users cu ON cu.id = wc."assignedUserId" AND cu."tenantId" = ${tenantId}
+    WHERE wc."tenantId" = ${tenantId}
+      AND wc."assignedUserId" IS NOT NULL
+      AND wc.status IN ('open', 'pending')
+      AND wc."mergedIntoId" IS NULL
+      AND cu."lastActiveAt" < NOW() - INTERVAL '1 minute' * ${timeoutMinutes}
+      AND cu."availabilityStatus" IN ('auto', 'offline')
+    ORDER BY wc."queuedAt" ASC NULLS LAST
+  `);
+  return (result as any).rows || (result as any) || [];
+}
+
+export async function getTenantsWithIdleTimeout(): Promise<{ id: number }[]> {
+  const db = await getDb();
+  if (!db) return [];
+  const result = await db.execute(sql`
+    SELECT id FROM tenants
+    WHERE "settingsJson"->>'helpdesk' IS NOT NULL
+      AND COALESCE(("settingsJson"->'helpdesk'->>'idleAgentTimeoutMinutes')::int, 0) > 0
+  `);
+  return ((result as any).rows || (result as any) || []) as { id: number }[];
 }

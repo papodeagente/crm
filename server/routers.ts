@@ -1841,6 +1841,22 @@ export const appRouter = router({
 
     // ─── Helpdesk: Supervision Dashboard ───
     supervision: router({
+    // ─── Agent Availability (any agent — self) ───
+    setAvailability: sessionTenantProcedure
+      .input(z.object({ status: z.enum(["available", "away", "busy", "offline", "auto"]) }))
+      .mutation(async ({ ctx, input }) => {
+        const tenantId = getTenantId(ctx);
+        const userId = (ctx as any).saasUser?.userId || (ctx as any).user?.id;
+        const { updateAgentAvailability } = await import("./db");
+        return updateAgentAvailability(tenantId, userId, input.status as any);
+      }),
+    getMyAvailability: sessionTenantProcedure
+      .query(async ({ ctx }) => {
+        const tenantId = getTenantId(ctx);
+        const userId = (ctx as any).saasUser?.userId || (ctx as any).user?.id;
+        const { getAgentAvailability } = await import("./db");
+        return { availabilityStatus: await getAgentAvailability(tenantId, userId) };
+      }),
     agentWorkload: sessionTenantAdminProcedure
       .input(z.object({ sessionId: z.string() }))
       .query(async ({ ctx, input }) => {
@@ -4422,6 +4438,229 @@ ${customInstructions ? `\n--- INSTRUÇÕES PERSONALIZADAS ---\n${customInstructi
           }
           throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Erro ao gerar resumo: ${err.message}` });
         }
+      }),
+
+    // ════════════════════════════════════════════════════════════
+    // AI Deal Intelligence — Phase 6 (lead scoring, summary, entity extraction)
+    // ════════════════════════════════════════════════════════════
+
+    /** Lightweight endpoint for any tenant user — returns active integrations (no keys). */
+    availableModels: tenantProcedure
+      .query(async ({ ctx }) => {
+        const tenantId = getTenantId(ctx);
+        const integrations = await listAiIntegrations(tenantId);
+        const settings = await getTenantAiSettings(tenantId);
+        return {
+          models: integrations
+            .filter((i: any) => i.isActive)
+            .map((i: any) => ({ id: i.id, provider: i.provider, defaultModel: i.defaultModel })),
+          defaultProvider: settings.defaultAiProvider || null,
+          defaultModel: settings.defaultAiModel || null,
+        };
+      }),
+
+    /** Gera/atualiza resumo dinâmico de uma deal. Persiste em deals.aiSummary. */
+    refreshDealSummary: tenantProcedure
+      .input(z.object({
+        dealId: z.number(),
+        integrationId: z.number().optional(),
+        overrideModel: z.string().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const tenantId = getTenantId(ctx);
+        const userId = (ctx as any).saasUser?.userId || (ctx as any).user?.id;
+        try {
+          const { recordAiCall } = await import("./aiRateLimiter");
+          recordAiCall(userId);
+          const { refreshDealSummary } = await import("./aiSummaryService");
+          return await refreshDealSummary({
+            tenantId,
+            dealId: input.dealId,
+            integrationId: input.integrationId,
+            overrideModel: input.overrideModel,
+            userId,
+          });
+        } catch (err: any) {
+          const { mapAiError } = await import("./aiErrorMap");
+          const mapped = mapAiError(err);
+          const trpcCode =
+            mapped.code === "DEAL_NOT_FOUND" ? "NOT_FOUND"
+            : mapped.code === "DEAL_SUMMARY_DISABLED" || mapped.code === "NO_AI_CONFIGURED" ? "PRECONDITION_FAILED"
+            : mapped.code === "RATE_LIMIT_DEAL" || mapped.code === "RATE_LIMIT_USER" ? "TOO_MANY_REQUESTS"
+            : "INTERNAL_SERVER_ERROR";
+          throw new TRPCError({
+            code: trpcCode as any,
+            message: mapped.message,
+            cause: { code: mapped.code, userAction: mapped.userAction },
+          });
+        }
+      }),
+
+    /** Classifica uma deal em hot/warm/cold on-demand. Persiste em deals.aiLeadScore. */
+    rescoreDeal: tenantProcedure
+      .input(z.object({
+        dealId: z.number(),
+        integrationId: z.number().optional(),
+        overrideModel: z.string().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const tenantId = getTenantId(ctx);
+        const userId = (ctx as any).saasUser?.userId || (ctx as any).user?.id;
+        try {
+          const { recordAiCall } = await import("./aiRateLimiter");
+          recordAiCall(userId);
+          const { scoreDeal } = await import("./aiLeadScoringService");
+          return await scoreDeal({
+            tenantId,
+            dealId: input.dealId,
+            integrationId: input.integrationId,
+            overrideModel: input.overrideModel,
+            userId,
+          });
+        } catch (err: any) {
+          const { mapAiError } = await import("./aiErrorMap");
+          const mapped = mapAiError(err);
+          const trpcCode =
+            mapped.code === "DEAL_NOT_FOUND" ? "NOT_FOUND"
+            : mapped.code === "LEAD_SCORING_DISABLED" || mapped.code === "NO_AI_CONFIGURED" || mapped.code === "INSUFFICIENT_DATA" ? "PRECONDITION_FAILED"
+            : mapped.code === "RATE_LIMIT_DEAL" || mapped.code === "RATE_LIMIT_USER" ? "TOO_MANY_REQUESTS"
+            : "INTERNAL_SERVER_ERROR";
+          throw new TRPCError({
+            code: trpcCode as any,
+            message: mapped.message,
+            cause: { code: mapped.code, userAction: mapped.userAction },
+          });
+        }
+      }),
+
+    /** Dispara extração de entidades. Assíncrona quando Redis disponível. */
+    extractEntities: tenantProcedure
+      .input(z.object({
+        dealId: z.number(),
+        integrationId: z.number().optional(),
+        overrideModel: z.string().optional(),
+        wait: z.boolean().optional().default(false),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const tenantId = getTenantId(ctx);
+        try {
+          if (input.wait) {
+            const { extractDealEntities } = await import("./aiEntityExtractionService");
+            const result = await extractDealEntities({
+              tenantId,
+              dealId: input.dealId,
+              integrationId: input.integrationId,
+              overrideModel: input.overrideModel,
+            });
+            return { queued: false, ...result };
+          }
+          const { enqueueEntityExtraction } = await import("./aiEntityExtractionWorker");
+          const { async } = await enqueueEntityExtraction({
+            tenantId,
+            dealId: input.dealId,
+            integrationId: input.integrationId,
+            overrideModel: input.overrideModel,
+            requestedByUserId: (ctx as any).user?.id,
+          });
+          return { queued: async };
+        } catch (err: any) {
+          if (err.message === "NO_AI_CONFIGURED") {
+            throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Nenhum provedor de IA configurado. Acesse Integrações > IA para configurar." });
+          }
+          if (err.message === "NO_MESSAGES") {
+            throw new TRPCError({ code: "BAD_REQUEST", message: "Nenhuma mensagem WhatsApp encontrada para esta deal." });
+          }
+          if (err.message === "DEAL_NOT_FOUND") {
+            throw new TRPCError({ code: "NOT_FOUND", message: "Negociação não encontrada." });
+          }
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Erro ao extrair entidades: ${err.message}` });
+        }
+      }),
+
+    /** Lista entidades já extraídas pra uma deal. */
+    listExtractedEntities: tenantProcedure
+      .input(z.object({ dealId: z.number() }))
+      .query(async ({ ctx, input }) => {
+        const tenantId = getTenantId(ctx);
+        const { listExtractedEntities } = await import("./aiEntityExtractionService");
+        return listExtractedEntities(tenantId, input.dealId);
+      }),
+
+    /** Aceita uma entidade extraída. */
+    acceptEntity: tenantProcedure
+      .input(z.object({ dealId: z.number(), entityId: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        const tenantId = getTenantId(ctx);
+        const userId = (ctx as any).user?.id ?? 0;
+        const { acceptExtractedEntity } = await import("./aiEntityExtractionService");
+        await acceptExtractedEntity({ tenantId, dealId: input.dealId, entityId: input.entityId, userId });
+        return { success: true };
+      }),
+
+    /** Dispensa uma entidade extraída. */
+    dismissEntity: tenantProcedure
+      .input(z.object({ dealId: z.number(), entityId: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        const tenantId = getTenantId(ctx);
+        const { dismissExtractedEntity } = await import("./aiEntityExtractionService");
+        await dismissExtractedEntity({ tenantId, dealId: input.dealId, entityId: input.entityId });
+        return { success: true };
+      }),
+
+    /** Lê as flags de IA do tenant (todos usuários podem ler). */
+    getFeatureFlags: tenantProcedure.query(async ({ ctx }) => {
+      const { getAiFeatureFlags } = await import("./aiSettings");
+      return getAiFeatureFlags(getTenantId(ctx));
+    }),
+
+    /** Atualiza flags (só admin). */
+    setFeatureFlags: tenantAdminProcedure
+      .input(z.object({
+        leadScoringEnabled: z.boolean().optional(),
+        dealSummaryEnabled: z.boolean().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const { setAiFeatureFlags, getAiFeatureFlags } = await import("./aiSettings");
+        const userId = (ctx as any).saasUser?.userId || (ctx as any).user?.id;
+        await setAiFeatureFlags(getTenantId(ctx), input, userId);
+        return getAiFeatureFlags(getTenantId(ctx));
+      }),
+
+    /** Histórico das últimas N chamadas de IA (admin only). */
+    listUsage: tenantAdminProcedure
+      .input(z.object({ limit: z.number().min(1).max(500).optional() }))
+      .query(async ({ ctx, input }) => {
+        const { listRecentUsage } = await import("./aiUsageLog");
+        return listRecentUsage(getTenantId(ctx), input.limit ?? 100);
+      }),
+
+    /** Agregado por feature em um período (admin only). */
+    usageByFeature: tenantAdminProcedure
+      .input(z.object({ daysBack: z.number().min(1).max(365).optional() }))
+      .query(async ({ ctx, input }) => {
+        const { aggregateUsageByFeature } = await import("./aiUsageLog");
+        return aggregateUsageByFeature(getTenantId(ctx), input.daysBack ?? 30);
+      }),
+
+    /** Detalhe de uma pontuação (popover rich do badge). */
+    getLeadScoreDetail: tenantProcedure
+      .input(z.object({ dealId: z.number() }))
+      .query(async ({ ctx, input }) => {
+        const { getDb } = await import("./db");
+        const { aiUsageLog } = await import("../drizzle/schema");
+        const db = await getDb();
+        if (!db) return null;
+        const [row] = await db.select()
+          .from(aiUsageLog)
+          .where(and(
+            eq(aiUsageLog.tenantId, getTenantId(ctx)),
+            eq(aiUsageLog.dealId, input.dealId),
+            eq(aiUsageLog.feature, "lead_scoring"),
+            eq(aiUsageLog.success, true),
+          ))
+          .orderBy(desc(aiUsageLog.createdAt))
+          .limit(1);
+        return row || null;
       }),
   }),
 

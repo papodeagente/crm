@@ -119,6 +119,8 @@ export const whatsappSessions = pgTable("whatsapp_sessions", {
   providerToken: text("providerToken"),
   /** Z-API client/security token (only for zapi provider) */
   providerClientToken: text("providerClientToken"),
+  /** Prefixar nome do agente nas mensagens enviadas (porta entur-os-crm) */
+  showAgentNamePrefix: boolean("showAgentNamePrefix").default(false).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 }, (t) => [
@@ -150,6 +152,10 @@ export const waMessages = pgTable("messages", {
   audioTranscriptionStatus: audio_transcription_statusEnum("audio_transcription_status"),
   audioTranscriptionLanguage: varchar("audio_transcription_language", { length: 16 }),
   audioTranscriptionDuration: integer("audio_transcription_duration"),
+  /** Tentativas de download de mídia (porta entur-os-crm) */
+  mediaDownloadAttempts: integer("media_download_attempts").default(0).notNull(),
+  /** Quando a mídia foi marcada indisponível (cooldown 10min) */
+  mediaUnavailableSince: timestamp("media_unavailable_since"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 }, (t) => [
   index("msg_tenant_idx").on(t.tenantId),
@@ -293,6 +299,9 @@ export const crmUsers = pgTable("crm_users", {
   status: crm_users_statusEnum("status").default("invited").notNull(),
   avatarUrl: text("avatarUrl"),
   isAvailable: boolean("isAvailable").default(true).notNull(),
+  /** Helpdesk: capacidade do agente (load balancing) */
+  availabilityStatus: varchar("availabilityStatus", { length: 16 }).default("auto").notNull(),
+  maxConcurrentChats: integer("maxConcurrentChats"),
   lastLoginAt: timestamp("lastLoginAt"),
   lastActiveAt: timestamp("lastActiveAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -439,6 +448,14 @@ export const contacts = pgTable("contacts", {
   convenioNumero: varchar("convenioNumero", { length: 64 }),
   convenioNome: varchar("convenioNome", { length: 255 }),
   consultationNotes: json("consultationNotes").$type<{ previsao?: string; executado?: string; proximaPrevisao?: string }>(),
+  /** Avatar/foto WA — refrescado por profilePicRefresher (porta entur-os-crm) */
+  avatarUrl: text("avatarUrl"),
+  /** LID WhatsApp do contato — fast-path resolver via índice */
+  whatsappLid: varchar("whatsappLid", { length: 128 }),
+  whatsappLidCheckedAt: timestamp("whatsappLidCheckedAt"),
+  /** Origem do nome — controla prioridade de sobrescrita (ver identityResolver) */
+  nameSource: varchar("nameSource", { length: 32 }),
+  profilePicUpdatedAt: timestamp("profilePicUpdatedAt"),
   deletedAt: timestamp("deletedAt"),
 }, (t) => [
   index("contacts_tenant_idx").on(t.tenantId),
@@ -448,6 +465,7 @@ export const contacts = pgTable("contacts", {
   index("idx_contacts_phone").on(t.tenantId, t.phoneE164),
   index("idx_contacts_phone_last11").on(t.tenantId, t.phoneLast11),
   index("idx_contacts_merged").on(t.mergedIntoContactId),
+  index("contacts_whatsapp_lid_idx").on(t.tenantId, t.whatsappLid),
 ]);
 
 export const accounts = pgTable("accounts", {
@@ -559,6 +577,12 @@ export const deals = pgTable("deals", {
   lastUtmMedium: varchar("lastUtmMedium", { length: 255 }),
   lastUtmCampaign: varchar("lastUtmCampaign", { length: 255 }),
   conversionCount: integer("conversionCount").notNull().default(1),
+  /** AI deal intelligence (port from entur-os-crm) */
+  aiSummary: text("aiSummary"),
+  aiSummaryUpdatedAt: timestamp("aiSummaryUpdatedAt"),
+  aiLeadScore: varchar("aiLeadScore", { length: 16 }),
+  aiLeadScoreReason: text("aiLeadScoreReason"),
+  aiLeadScoreAt: timestamp("aiLeadScoreAt"),
 }, (t) => [
   index("deals_tenant_pipeline_idx").on(t.tenantId, t.pipelineId, t.stageId),
   index("deals_tenant_status_idx").on(t.tenantId, t.status, t.lastActivityAt),
@@ -1395,6 +1419,10 @@ export const waConversations = pgTable("wa_conversations", {
   queuedAt: timestamp("queuedAt"),
   firstResponseAt: timestamp("firstResponseAt"),
   slaDeadlineAt: timestamp("slaDeadlineAt"),
+  /** SLA breach tracking (porta entur-os-crm) */
+  slaBreachedAt: timestamp("slaBreachedAt"),
+  /** LID cross-reference (porta entur-os-crm) */
+  chatLid: varchar("chatLid", { length: 128 }),
   waChannelId: integer("waChannelId"), // Part 2: links to wa_channels for channel-based identity
   isPinned: boolean("isPinned").default(false).notNull(),
   isArchived: boolean("isArchived").default(false).notNull(),
@@ -1860,6 +1888,8 @@ export const waContacts = pgTable("wa_contacts", {
   savedName: varchar("savedName", { length: 255 }),           // Name saved in phone contacts
   verifiedName: varchar("verifiedName", { length: 255 }),     // Business verified name
   profilePictureUrl: text("profilePictureUrl"),
+  /** Quando o avatar foi atualizado pela última vez (porta profilePicRefresher) */
+  profilePicUpdatedAt: timestamp("profilePicUpdatedAt"),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 }, (t) => [
   index("wac_session_jid_idx").on(t.sessionId, t.jid),
@@ -2981,4 +3011,80 @@ export const clientDocuments = pgTable("client_documents", {
 }, (t) => [
   index("cdoc_tenant_contact_idx").on(t.tenantId, t.contactId),
   index("cdoc_tenant_category_idx").on(t.tenantId, t.category),
+]);
+
+// ════════════════════════════════════════════════════════════
+// PORTS FROM ENTUR-OS-CRM (merge feat/merge-from-entur)
+// IA + nego↔WA + LID identity
+// ════════════════════════════════════════════════════════════
+
+export const aiUsageLog = pgTable("ai_usage_log", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenantId").notNull(),
+  feature: varchar("feature", { length: 32 }).notNull(),
+  provider: varchar("provider", { length: 32 }).notNull(),
+  model: varchar("model", { length: 128 }).notNull(),
+  inputTokens: integer("inputTokens"),
+  outputTokens: integer("outputTokens"),
+  totalTokens: integer("totalTokens"),
+  estimatedCostCents: integer("estimatedCostCents"),
+  dealId: integer("dealId"),
+  userId: integer("userId"),
+  durationMs: integer("durationMs"),
+  success: boolean("success").default(false).notNull(),
+  errorCode: varchar("errorCode", { length: 64 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (t) => [
+  index("ai_usage_tenant_created_idx").on(t.tenantId, t.createdAt),
+  index("ai_usage_tenant_feature_idx").on(t.tenantId, t.feature, t.createdAt),
+]);
+
+export type AiUsageLog = typeof aiUsageLog.$inferSelect;
+export type InsertAiUsageLog = typeof aiUsageLog.$inferInsert;
+
+export const dealExtractedEntities = pgTable("deal_extracted_entities", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenantId").notNull(),
+  dealId: integer("dealId").notNull(),
+  fieldKey: varchar("fieldKey", { length: 64 }).notNull(),
+  value: text("value"),
+  confidence: integer("confidence").default(0),
+  source: varchar("source", { length: 32 }).default("whatsapp").notNull(),
+  acceptedByUserId: integer("acceptedByUserId"),
+  acceptedAt: timestamp("acceptedAt"),
+  dismissedAt: timestamp("dismissedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+}, (t) => [
+  index("dee_tenant_deal_idx").on(t.tenantId, t.dealId),
+  uniqueIndex("dee_deal_field_unique").on(t.dealId, t.fieldKey),
+]);
+
+export type DealExtractedEntity = typeof dealExtractedEntities.$inferSelect;
+
+export const dealMessageLinks = pgTable("deal_message_links", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenantId").notNull(),
+  dealId: integer("dealId").notNull(),
+  messageDbId: integer("messageDbId").notNull(),
+  linkedAt: timestamp("linkedAt").defaultNow().notNull(),
+  linkedBy: varchar("linkedBy", { length: 32 }).default("auto").notNull(),
+}, (t) => [
+  uniqueIndex("idx_dml_unique").on(t.dealId, t.messageDbId),
+  index("idx_dml_deal").on(t.tenantId, t.dealId),
+  index("idx_dml_msg").on(t.messageDbId),
+]);
+
+export type DealMessageLink = typeof dealMessageLinks.$inferSelect;
+
+export const channelIdentities = pgTable("channel_identities", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenantId").notNull(),
+  contactId: integer("contactId").notNull(),
+  channel: varchar("channel", { length: 32 }).notNull(), // "whatsapp_unofficial"
+  externalId: varchar("externalId", { length: 512 }).notNull(), // LID ou equivalente
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (t) => [
+  uniqueIndex("channel_identities_channel_external_idx").on(t.channel, t.externalId),
+  index("channel_identities_tenant_contact_idx").on(t.tenantId, t.contactId),
 ]);

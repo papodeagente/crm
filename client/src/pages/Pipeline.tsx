@@ -25,6 +25,7 @@ import { HoverCard, HoverCardTrigger, HoverCardContent } from "@/components/ui/h
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import DealFiltersPanel, { useDealFilters, DealFilterButton } from "@/components/DealFiltersPanel";
+import { LeadScoreBadge } from "@/components/LeadScoreBadge";
 import SaleCelebration from "@/components/SaleCelebration";
 import ClassificationBadge from "@/components/ClassificationBadge";
 import CustomFieldRenderer from "@/components/CustomFieldRenderer";
@@ -1095,10 +1096,13 @@ function DealCard({ deal, contacts, accounts, overdueData, pendingCount, waUnrea
         </HoverCard>
       </div>
 
-      {/* Row 2: Deal title (bold, clickable) */}
-      <p className="font-bold text-[13px] leading-snug text-foreground cursor-pointer hover:text-primary transition-colors" onClick={onOpenDeal}>
-        {deal.title}
-      </p>
+      {/* Row 2: Deal title (bold, clickable) + LeadScore badge */}
+      <div className="flex items-start gap-1.5">
+        <p className="font-bold text-[13px] leading-snug text-foreground cursor-pointer hover:text-primary transition-colors flex-1" onClick={onOpenDeal}>
+          {deal.title}
+        </p>
+        <LeadScoreBadge score={(deal as any).aiLeadScore} reason={(deal as any).aiLeadScoreReason} size="sm" showLabel={false} className="shrink-0 mt-0.5" />
+      </div>
 
       {/* Row 2b: Contact name */}
       {contact && (

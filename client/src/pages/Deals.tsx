@@ -12,6 +12,7 @@ import { useState, useMemo } from "react";
 import DateRangeFilter, { useDateFilter } from "@/components/DateRangeFilter";
 import { formatDate } from "../../../shared/dateUtils";
 import DealFiltersPanel, { useDealFilters, DealFilterButton } from "@/components/DealFiltersPanel";
+import { LeadScoreBadge } from "@/components/LeadScoreBadge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -331,6 +332,7 @@ export default function Deals() {
                           {d.title?.charAt(0)?.toUpperCase() || "N"}
                         </div>
                         <span className={`font-semibold ${showTrash ? "text-muted-foreground line-through" : ""}`}>{d.title}</span>
+                        <LeadScoreBadge score={(d as any).aiLeadScore} reason={(d as any).aiLeadScoreReason} size="sm" />
                       </div>
                     </td>
                     <td className="p-3.5">

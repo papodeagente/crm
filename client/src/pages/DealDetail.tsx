@@ -31,6 +31,8 @@ import TaskFormDialog from "@/components/TaskFormDialog";
 import DealFilesPanel from "@/components/DealFilesPanel";
 import TaskActionPopover from "@/components/TaskActionPopover";
 import SaleCelebration from "@/components/SaleCelebration";
+import { DealAiSummaryStrip } from "@/components/DealAiSummaryStrip";
+import { DealAiExtractedEntities } from "@/components/DealAiExtractedEntities";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Pencil } from "lucide-react";
 import CustomFieldRenderer from "@/components/CustomFieldRenderer";
@@ -218,7 +220,7 @@ export default function DealDetail() {
 
   /* ─── Sidebar collapsed sections ─── */
   const [sidebarSections, setSidebarSections] = useState({
-    deal: true, travel: true, contact: true, company: true, responsible: true, utm: true, rdFields: false, custom: false, contactCustom: false, companyCustom: false,
+    deal: true, travel: true, contact: true, company: true, responsible: true, utm: true, rdFields: false, custom: false, contactCustom: false, companyCustom: false, aiEntities: true,
   });
   const toggleSection = (key: keyof typeof sidebarSections) =>
     setSidebarSections((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -941,6 +943,17 @@ export default function DealDetail() {
 
             <SidebarDivider />
 
+            {/* ── Dados detectados pela IA (entity extraction) ── */}
+            <SidebarSection
+              title="🤖 Dados detectados pela IA"
+              open={sidebarSections.aiEntities}
+              onToggle={() => toggleSection("aiEntities")}
+            >
+              <DealAiExtractedEntities dealId={dealId} />
+            </SidebarSection>
+
+            <SidebarDivider />
+
             {/* ── Datas do Servico ── */}
             <SidebarSection
               title="Datas do Servico"
@@ -1259,6 +1272,18 @@ export default function DealDetail() {
 
         {/* ─── RIGHT CONTENT ─── */}
         <div className="flex-1 flex flex-col overflow-hidden">
+          {/* ── AI Summary Strip (resumo dinâmico + termômetro) ── */}
+          {!isWhatsAppTab && dealQ.data && (
+            <DealAiSummaryStrip
+              dealId={dealId}
+              aiSummary={(dealQ.data as any).aiSummary}
+              aiSummaryUpdatedAt={(dealQ.data as any).aiSummaryUpdatedAt}
+              aiLeadScore={(dealQ.data as any).aiLeadScore}
+              aiLeadScoreReason={(dealQ.data as any).aiLeadScoreReason}
+              aiLeadScoreAt={(dealQ.data as any).aiLeadScoreAt}
+              onRefetch={() => dealQ.refetch()}
+            />
+          )}
           {/* ── Próximas Tarefas (top card, hidden when WhatsApp tab active) ── */}
           {!isWhatsAppTab && (
           <div className="shrink-0 border-b border-border bg-card p-3 sm:p-5">
