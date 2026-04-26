@@ -1248,7 +1248,7 @@ export async function globalSearch(tenantId: number, query: string, limit = 5) {
     LIMIT ${limit}
   `);
 
-  const contacts = (contactRows as unknown as any[]).map((r: any) => ({
+  const contacts = rowsOf(contactRows).map((r: any) => ({
     id: Number(r.id),
     name: String(r.name),
     email: r.email ? String(r.email) : null,
@@ -1257,7 +1257,7 @@ export async function globalSearch(tenantId: number, query: string, limit = 5) {
     lifecycleStage: String(r.lifecycleStage),
   }));
 
-  const deals = (dealRows as unknown as any[]).map((r: any) => ({
+  const deals = rowsOf(dealRows).map((r: any) => ({
     id: Number(r.id),
     title: String(r.title),
     valueCents: Number(r.valueCents) || 0,
@@ -1265,7 +1265,7 @@ export async function globalSearch(tenantId: number, query: string, limit = 5) {
     stageName: r.stageName ? String(r.stageName) : null,
   }));
 
-  const tasks = (taskRows as unknown as any[]).map((r: any) => ({
+  const tasks = rowsOf(taskRows).map((r: any) => ({
     id: Number(r.id),
     title: String(r.title),
     dueAt: r.dueAt ? new Date(r.dueAt).getTime() : null,
@@ -1340,7 +1340,7 @@ export async function globalSearchWithVisibility(
     LIMIT ${limit}
   `);
 
-  const contacts = (contactRows as unknown as any[]).map((r: any) => ({
+  const contacts = rowsOf(contactRows).map((r: any) => ({
     id: Number(r.id),
     name: String(r.name),
     email: r.email ? String(r.email) : null,
@@ -1349,7 +1349,7 @@ export async function globalSearchWithVisibility(
     lifecycleStage: String(r.lifecycleStage),
   }));
 
-  const deals = (dealRows as unknown as any[]).map((r: any) => ({
+  const deals = rowsOf(dealRows).map((r: any) => ({
     id: Number(r.id),
     title: String(r.title),
     valueCents: Number(r.valueCents) || 0,
@@ -1357,7 +1357,7 @@ export async function globalSearchWithVisibility(
     stageName: r.stageName ? String(r.stageName) : null,
   }));
 
-  const tasks = (taskRows as unknown as any[]).map((r: any) => ({
+  const tasks = rowsOf(taskRows).map((r: any) => ({
     id: Number(r.id),
     title: String(r.title),
     dueAt: r.dueAt ? new Date(r.dueAt).getTime() : null,
@@ -1517,7 +1517,7 @@ export async function getTeamWithMembers(teamId: number, tenantId: number) {
     SELECT id, "tenantId", name, description, color, "maxMembers", "createdAt", "updatedAt"
     FROM teams WHERE id = ${teamId} AND "tenantId" = ${tenantId} LIMIT 1
   `);
-  const team = (teamRows as unknown as any[])[0];
+  const team = rowsOf(teamRows)[0];
   if (!team) return null;
   
   const memberRows = await db.execute(sql`
@@ -1531,7 +1531,7 @@ export async function getTeamWithMembers(teamId: number, tenantId: number) {
   
   return {
     ...team,
-    members: (memberRows as unknown as any[]).map((m: any) => ({
+    members: rowsOf(memberRows).map((m: any) => ({
       membershipId: Number(m.membershipId),
       userId: Number(m.userId),
       role: String(m.role),
@@ -1555,7 +1555,7 @@ export async function addTeamMember(tenantId: number, teamId: number, userId: nu
   const existing = await db.execute(sql`
     SELECT id FROM team_members WHERE "tenantId" = ${tenantId} AND "teamId" = ${teamId} AND "userId" = ${userId} LIMIT 1
   `);
-  if ((existing as unknown as any[]).length > 0) return { alreadyMember: true };
+  if (rowsOf(existing).length > 0) return { alreadyMember: true };
   
   const result = await db.execute(sql`
     INSERT INTO team_members ("tenantId", "teamId", "userId", role)
@@ -1741,7 +1741,7 @@ export async function getContactMetrics(tenantId: number, contactId: number) {
   const db = await getDb();
   if (!db) return { totalDeals: 0, wonDeals: 0, totalSpentCents: 0, daysSinceLastPurchase: null };
 
-  const rows = (await db.execute(sql`
+  const rows = rowsOf(await db.execute(sql`
     SELECT
       COUNT(*) as totalDeals,
       SUM(CASE WHEN status = 'won' THEN 1 ELSE 0 END) as wonDeals,
@@ -1749,9 +1749,9 @@ export async function getContactMetrics(tenantId: number, contactId: number) {
       MAX(CASE WHEN status = 'won' THEN "updatedAt" ELSE NULL END) as lastPurchaseDate
     FROM deals
     WHERE "tenantId" = ${tenantId} AND "contactId" = ${contactId}
-  `)) as unknown as any[];
+  `));
 
-  const row = rows?.[0]?.[0] || {};
+  const row = rows[0] || {};
   const lastPurchaseDate = row.lastPurchaseDate ? new Date(row.lastPurchaseDate) : null;
   const daysSinceLastPurchase = lastPurchaseDate
     ? Math.floor((Date.now() - lastPurchaseDate.getTime()) / (1000 * 60 * 60 * 24))
@@ -1769,7 +1769,7 @@ export async function getContactDeals(tenantId: number, contactId: number) {
   const db = await getDb();
   if (!db) return [];
 
-  const rows = (await db.execute(sql`
+  const rows = rowsOf(await db.execute(sql`
     SELECT
       d.id, d.title, d.status, d."valueCents", d.currency, d.probability,
       d."expectedCloseAt", d."createdAt", d."updatedAt", d."lastActivityAt",
@@ -1779,9 +1779,9 @@ export async function getContactDeals(tenantId: number, contactId: number) {
     LEFT JOIN pipelines p ON p.id = d."pipelineId" AND p."tenantId" = ${tenantId}
     WHERE d."tenantId" = ${tenantId} AND d."contactId" = ${contactId}
     ORDER BY d."updatedAt" DESC
-  `)) as unknown as any[];
+  `));
 
-  return rows?.[0] || [];
+  return rows;
 }
 
 // ════════════════════════════════════════════════════════════
@@ -1810,25 +1810,24 @@ export async function listCustomFields(tenantId: number, entity: string) {
   const db = await getDb();
   if (!db) return [];
 
-  const rows = (await db.execute(sql`
+  const rows = rowsOf(await db.execute(sql`
     SELECT * FROM custom_fields
     WHERE "tenantId" = ${tenantId} AND entity = ${entity}
     ORDER BY "sortOrder" ASC, id ASC
-  `)) as unknown as any[];
+  `));
 
-  const list = rows?.[0] || [];
-  return list.map(normalizeCustomField);
+  return rows.map(normalizeCustomField);
 }
 
 export async function getCustomFieldById(tenantId: number, id: number) {
   const db = await getDb();
   if (!db) return null;
 
-  const rows = (await db.execute(sql`
+  const rows = rowsOf(await db.execute(sql`
     SELECT * FROM custom_fields WHERE "tenantId" = ${tenantId} AND id = ${id} LIMIT 1
-  `)) as unknown as any[];
+  `));
 
-  const row = rows?.[0]?.[0] || null;
+  const row = rows[0] || null;
   return row ? normalizeCustomField(row) : null;
 }
 
@@ -1853,8 +1852,8 @@ export async function createCustomField(data: {
     )
   `);
 
-  const rows = (await db.execute(sql`SELECT * FROM custom_fields WHERE "tenantId" = ${data.tenantId} AND name = ${data.name} AND entity = ${data.entity} ORDER BY id DESC LIMIT 1`)) as unknown as any[];
-  const row = rows?.[0]?.[0] || null;
+  const rows = rowsOf(await db.execute(sql`SELECT * FROM custom_fields WHERE "tenantId" = ${data.tenantId} AND name = ${data.name} AND entity = ${data.entity} ORDER BY id DESC LIMIT 1`));
+  const row = rows[0] || null;
   return row ? normalizeCustomField(row) : null;
 }
 
@@ -1917,16 +1916,15 @@ export async function getCustomFieldValues(tenantId: number, entityType: string,
   const db = await getDb();
   if (!db) return [];
 
-  const rows = (await db.execute(sql`
+  const rows = rowsOf(await db.execute(sql`
     SELECT cfv.*, cf.name as fieldName, cf.label as fieldLabel, cf."fieldType", cf."optionsJson", cf."isRequired", cf."isVisibleOnForm", cf."isVisibleOnProfile", cf."groupName"
     FROM custom_field_values cfv
     JOIN custom_fields cf ON cf.id = cfv."fieldId" AND cf."tenantId" = cfv."tenantId"
     WHERE cfv."tenantId" = ${tenantId} AND cfv."entityType" = ${entityType} AND cfv."entityId" = ${entityId}
     ORDER BY cf."sortOrder" ASC
-  `)) as unknown as any[];
+  `));
 
-  const list = rows?.[0] || [];
-  return list.map(normalizeCustomField);
+  return rows.map(normalizeCustomField);
 }
 
 export async function setCustomFieldValue(tenantId: number, fieldId: number, entityType: string, entityId: number, value: string | null) {
@@ -1934,13 +1932,13 @@ export async function setCustomFieldValue(tenantId: number, fieldId: number, ent
   if (!db) return;
 
   // Upsert: check if exists
-  const existing = (await db.execute(sql`
+  const existing = rowsOf(await db.execute(sql`
     SELECT id FROM custom_field_values
     WHERE "tenantId" = ${tenantId} AND "fieldId" = ${fieldId} AND "entityType" = ${entityType} AND "entityId" = ${entityId}
     LIMIT 1
-  `)) as unknown as any[];
+  `));
 
-  if (existing?.[0]?.[0]) {
+  if (existing[0]) {
     await db.execute(sql`
       UPDATE custom_field_values SET value = ${value}
       WHERE "tenantId" = ${tenantId} AND "fieldId" = ${fieldId} AND "entityType" = ${entityType} AND "entityId" = ${entityId}
@@ -2470,8 +2468,8 @@ export async function getDashboardWhatsAppMetrics(tenantId: number) {
     ORDER BY dt ASC
   `);
 
-  const totals = (totalResult as unknown as any[])[0] || {};
-  const convTotals = (convResult as unknown as any[])[0] || {};
+  const totals = rowsOf(totalResult)[0] || {};
+  const convTotals = rowsOf(convResult)[0] || {};
 
   return {
     totalMessages: Number(totals.totalMessages) || 0,
@@ -2479,7 +2477,7 @@ export async function getDashboardWhatsAppMetrics(tenantId: number) {
     receivedMessages: Number(totals.receivedMessages) || 0,
     totalConversations: Number(convTotals.totalConversations) || 0,
     unreadConversations: Number(convTotals.unreadConversations) || 0,
-    messagesByDay: (msgsByDay as unknown as any[]).map((r: any) => ({
+    messagesByDay: rowsOf(msgsByDay).map((r: any) => ({
       date: new Date(r.dt).toISOString().split("T")[0],
       sent: Number(r.sent) || 0,
       received: Number(r.received) || 0,
@@ -2545,7 +2543,7 @@ export async function getDashboardConversionRates(tenantId: number) {
     LIMIT 5
   `);
 
-  const row = (statusResult as unknown as any[])[0] || {};
+  const row = rowsOf(statusResult)[0] || {};
   const total = Number(row.totalDeals) || 0;
   const won = Number(row.wonDeals) || 0;
   const closed = won + (Number(row.lostDeals) || 0);
@@ -2557,7 +2555,7 @@ export async function getDashboardConversionRates(tenantId: number) {
     openDeals: Number(row.openDeals) || 0,
     conversionRate: closed > 0 ? Math.round((won / closed) * 100) : 0,
     avgDealValueCents: Math.round(Number(row.avgDealValueCents) || 0),
-    topLeadSources: (leadSources as unknown as any[]).map((r: any) => ({
+    topLeadSources: rowsOf(leadSources).map((r: any) => ({
       source: String(r.source),
       count: Number(r.cnt) || 0,
     })),
@@ -2580,7 +2578,7 @@ export async function getDashboardFunnelData(tenantId: number, pipelineId?: numb
     LIMIT 1
   `);
 
-  const pipeline = (pipelineRows as unknown as any[])[0];
+  const pipeline = rowsOf(pipelineRows)[0];
   if (!pipeline) return { pipelineName: "", stages: [] };
 
   const stageRows = await db.execute(sql`
@@ -2597,7 +2595,7 @@ export async function getDashboardFunnelData(tenantId: number, pipelineId?: numb
 
   return {
     pipelineName: String(pipeline.name),
-    stages: (stageRows as unknown as any[]).map((r: any) => ({
+    stages: rowsOf(stageRows).map((r: any) => ({
       id: Number(r.id),
       name: String(r.name),
       color: r.color ? String(r.color) : null,
@@ -3144,7 +3142,7 @@ export async function getQueueStats(tenantId: number, sessionId: string) {
     AND wc."mergedIntoId" IS NULL
     AND (wc."unreadCount" > 0 OR wc."queuedAt" IS NOT NULL)
   `);
-  const countRows = countResult as any[];
+  const countRows = rowsOf(countResult);
   // Get queue items with details — derive preview from wa_messages
   const itemsResult = await db.execute(sql`
     SELECT 
@@ -3181,7 +3179,7 @@ export async function getQueueStats(tenantId: number, sessionId: string) {
   `);
   // Fix timestamp strings from db.execute for both count and items
   const fixedCount = fixTimestampFields(countRows);
-  const fixedItems = dedupConversations(fixTimestampFields(itemsResult as any[]));
+  const fixedItems = dedupConversations(fixTimestampFields(rowsOf(itemsResult)));
   return {
     total: Number(fixedCount[0]?.total || 0),
     oldest: fixedCount[0]?.oldestEntry || null,

@@ -250,7 +250,7 @@ export const appRouter = router({
             const crmUser = await db.execute(
               sql`SELECT id, "tenantId" FROM crm_users WHERE email = ${opts.ctx.user.email} LIMIT 1`
             );
-            const row = (crmUser as unknown as any[])[0];
+            const row = rowsOf(crmUser)[0];
             if (row?.tenantId) {
               return {
                 ...opts.ctx.user,
@@ -516,7 +516,7 @@ export const appRouter = router({
               const db = await getDb();
               if (db) {
                 const ownerRows = await db.execute(sql`SELECT name FROM crm_users WHERE id = ${activeShare.sourceUserId} LIMIT 1`);
-                const ownerRow = (ownerRows as unknown as any[])[0];
+                const ownerRow = rowsOf(ownerRows)[0];
                 if (ownerRow?.name) sharedByName = String(ownerRow.name);
               }
             } catch { /* ignore */ }
@@ -1598,7 +1598,7 @@ export const appRouter = router({
                 const msgRows = await db.execute(
                   sql`SELECT "pushName" FROM messages WHERE "sessionId" = ${session.sessionId} AND "remoteJid" = ${conv.remoteJid} AND "fromMe" = false AND "pushName" IS NOT NULL AND "pushName" != '' AND "pushName" != ${ownerName} ORDER BY id DESC LIMIT 1`
                 );
-                const msgData = msgRows as any[];
+                const msgData = rowsOf(msgRows);
                 if (msgData?.[0]?.pushName) {
                   nameMap.set(conv.remoteJid, msgData[0].pushName);
                 }
@@ -1719,7 +1719,7 @@ export const appRouter = router({
                 )`
         );
 
-        const toDelete = (syncedContacts as any[]) || [];
+        const toDelete = rowsOf(syncedContacts) || [];
         const count = toDelete.length;
 
         if (input.dryRun) {
@@ -1782,7 +1782,7 @@ export const appRouter = router({
         const userIds = Array.from(new Set([...shares.map(s => s.targetUserId), ...shares.map(s => s.sourceUserId), ...shares.map(s => s.sharedBy)]));
         if (userIds.length === 0) return [];
         const userRows = await db.execute(sql`SELECT id, name, email FROM crm_users WHERE id IN (${sql.join(userIds.map(id => sql`${id}`), sql`, `)})`);
-        const userMap = new Map((userRows as unknown as any[]).map((u: any) => [Number(u.id), { name: String(u.name), email: String(u.email) }]));
+        const userMap = new Map(rowsOf(userRows).map((u: any) => [Number(u.id), { name: String(u.name), email: String(u.email) }]));
         return shares.map(s => ({
           ...s,
           targetUserName: userMap.get(s.targetUserId)?.name || null,

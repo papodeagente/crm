@@ -1622,7 +1622,7 @@ export async function getProductAnalyticsSummary(tenantId: number) {
     INNER JOIN deals d ON dp."dealId" = d.id AND dp."tenantId" = d."tenantId"
     WHERE dp."tenantId" = ${tenantId} AND d.status = 'won'
   `);
-  const rev = (revRows as any[])[0] || {};
+  const rev = rowsOf(revRows)[0] || {};
 
   return {
     totalProducts: catRow?.total || 0,

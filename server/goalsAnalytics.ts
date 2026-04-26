@@ -3,7 +3,7 @@
  * Queries goals + deals data and provides AI-powered commercial analysis.
  * Does NOT modify any existing module.
  */
-import { getDb } from "./db";
+import { getDb, rowsOf } from "./db";
 import { sql, eq, and, gte, lte, desc, inArray } from "drizzle-orm";
 import { goals, deals, dealProducts, crmUsers } from "../drizzle/schema";
 import { callTenantAi, getAiTrainingConfig } from "./db";
@@ -237,7 +237,7 @@ export async function getGoalsReport(tenantId: number): Promise<GoalsReportData>
     ORDER BY totalValue DESC
     LIMIT 5
   `);
-  const topProducts = (prodRows as unknown as any[]).map((r: any) => ({
+  const topProducts = rowsOf(prodRows).map((r: any) => ({
     name: r.name,
     category: r.category,
     quantity: Number(r.qty ?? 0),

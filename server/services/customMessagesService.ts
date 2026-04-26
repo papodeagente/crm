@@ -1,5 +1,5 @@
 import { eq, and, asc } from "drizzle-orm";
-import { getDb } from "../db";
+import { getDb, rowsOf } from "../db";
 import { customMessages, type InsertCustomMessage } from "../../drizzle/schema";
 
 export const CUSTOM_MESSAGE_CATEGORIES = [
@@ -42,7 +42,7 @@ export async function createCustomMessage(data: InsertCustomMessage) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
   const result = await db.insert(customMessages).values(data).returning({ id: customMessages.id });
-  return { id: (result as any[])[0].id };
+  return { id: rowsOf(result)[0].id };
 }
 
 export async function updateCustomMessage(

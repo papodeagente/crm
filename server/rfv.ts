@@ -302,7 +302,7 @@ async function getSmartFilterContactIds(db: any, tenantId: number, filter: Smart
           AND d."followUpDate" IS NOT NULL
           AND d."followUpDate" BETWEEN ${windowStart} AND ${windowEnd}
       `);
-      const resultRows = (dealRows as unknown as any[]) || [];
+      const resultRows = rowsOf(dealRows) || [];
       return resultRows.map((r: any) => r.id);
     }
 
@@ -332,7 +332,7 @@ async function getSmartFilterContactIds(db: any, tenantId: number, filter: Smart
           AND d.status = 'lost'
           AND d."updatedAt" >= ${ninetyDaysAgo}
       `);
-      const resultRows = (dealRows as unknown as any[]) || [];
+      const resultRows = rowsOf(dealRows) || [];
       return resultRows.map((r: any) => r.id);
     }
 
@@ -646,7 +646,7 @@ export async function recalculateRfvFromDeals(tenantId: number) {
     GROUP BY c.id, c.name, c.email, c.phone, c."createdAt"
   `);
 
-  const rows = (contactDeals as unknown as any[]) || [];
+  const rows = rowsOf(contactDeals) || [];
   const now = new Date();
   const statusMap: Record<string, string> = { open: "em andamento", won: "vendido", lost: "perdido" };
 

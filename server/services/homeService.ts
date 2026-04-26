@@ -85,14 +85,14 @@ export async function getHomeFilterOptions(tenantId: number) {
   `);
 
   return {
-    users: (userRows as unknown as any[]).map((r: any) => ({
+    users: rowsOf(userRows).map((r: any) => ({
       id: Number(r.id),
       name: String(r.name || ""),
       email: String(r.email || ""),
       role: String(r.role || "user"),
       avatarUrl: r.avatarUrl ? String(r.avatarUrl) : null,
     })),
-    teams: (teamRows as unknown as any[]).map((r: any) => ({
+    teams: rowsOf(teamRows).map((r: any) => ({
       id: Number(r.id),
       name: String(r.name || ""),
       color: r.color ? String(r.color) : "#6366f1",
@@ -170,7 +170,7 @@ export async function getHomeExecutive(tenantId: number, userId?: number, teamId
       AND d.status = 'open'
       ${ownerFilter}
   `);
-  const active = (activeResult as unknown as any[])[0] || {};
+  const active = rowsOf(activeResult)[0] || {};
   const activeDeals = Number(active.activeDeals) || 0;
   const activeValueCents = Number(active.activeValueCents) || 0;
 
@@ -188,7 +188,7 @@ export async function getHomeExecutive(tenantId: number, userId?: number, teamId
       AND d.status IN ('won', 'lost')
       ${ownerFilter}
   `);
-  const month = (monthResult as unknown as any[])[0] || {};
+  const month = rowsOf(monthResult)[0] || {};
   const wonDeals = Number(month.wonDeals) || 0;
   const lostDeals = Number(month.lostDeals) || 0;
   const wonValueCents = Number(month.wonValueCents) || 0;
@@ -222,7 +222,7 @@ export async function getHomeExecutive(tenantId: number, userId?: number, teamId
     ORDER BY d."lastActivityAt" ASC
     LIMIT 100
   `);
-  const dealsWithoutTaskList = (noTaskResult as any[]).map((r: any) => ({
+  const dealsWithoutTaskList = rowsOf(noTaskResult).map((r: any) => ({
     id: Number(r.id),
     title: String(r.title || ""),
     valueCents: Number(r.valueCents) || 0,
@@ -251,7 +251,7 @@ export async function getHomeExecutive(tenantId: number, userId?: number, teamId
     ORDER BY COALESCE(d."lastActivityAt", d."createdAt") ASC
     LIMIT 100
   `);
-  const coolingDealsList = (coolingResult as any[]).map((r: any) => ({
+  const coolingDealsList = rowsOf(coolingResult).map((r: any) => ({
     id: Number(r.id),
     title: String(r.title || ""),
     valueCents: Number(r.valueCents) || 0,
@@ -461,7 +461,7 @@ export async function getHomeOnboarding(tenantId: number) {
       (SELECT COUNT(*) FROM whatsapp_sessions WHERE "tenantId" = ${tenantId}) as channelCount
   `);
 
-  const data = (checks as any[])[0] || {};
+  const data = rowsOf(checks)[0] || {};
   
   // Also check for manually dismissed items from user_preferences
   const prefRows = await db.execute(sql`
@@ -471,7 +471,7 @@ export async function getHomeOnboarding(tenantId: number) {
   `);
   const manuallyCompleted: string[] = (() => {
     try {
-      const val = (prefRows as any[])[0]?.prefValue;
+      const val = rowsOf(prefRows)[0]?.prefValue;
       return val ? JSON.parse(val) : [];
     } catch { return []; }
   })();
@@ -521,7 +521,7 @@ export async function toggleOnboardingStep(tenantId: number, userId: number, ste
 
   let steps: string[] = [];
   try {
-    const val = (prefRows as any[])[0]?.prefValue;
+    const val = rowsOf(prefRows)[0]?.prefValue;
     steps = val ? JSON.parse(val) : [];
   } catch { steps = []; }
 
@@ -540,7 +540,7 @@ export async function toggleOnboardingStep(tenantId: number, userId: number, ste
     LIMIT 1
   `);
 
-  if ((existing as any[]).length > 0) {
+  if (rowsOf(existing).length > 0) {
     await db.execute(sql`
       UPDATE user_preferences SET "prefValue" = ${value}, "updatedAt" = NOW()
       WHERE "tenantId" = ${tenantId} AND "prefKey" = 'onboarding_completed_steps'
@@ -565,7 +565,7 @@ export async function dismissOnboarding(tenantId: number, userId: number) {
     LIMIT 1
   `);
 
-  if ((existing as any[]).length > 0) {
+  if (rowsOf(existing).length > 0) {
     await db.execute(sql`
       UPDATE user_preferences SET "prefValue" = 'true', "updatedAt" = NOW()
       WHERE "tenantId" = ${tenantId} AND "prefKey" = 'onboarding_dismissed'
