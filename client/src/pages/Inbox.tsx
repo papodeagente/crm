@@ -175,8 +175,14 @@ export default function InboxPage() {
         assignedUserId: myUserId,
         assignmentStatus: "open",
       });
-      // Delay refetch to avoid overwriting the optimistic update with stale DB data
-      setTimeout(() => conversationsQ.refetch(), 2500);
+      // Refetch + rehydrate so the claimed conversation lands in the store
+      // (when claimed from queue, it may not exist in convStore yet — updateAssignment
+      // would silently no-op in that case).
+      setTimeout(() => {
+        conversationsQ.refetch().then((result) => {
+          if (result.data) convStore.hydrate(result.data as ConvEntry[]);
+        }).catch(() => {});
+      }, 500);
       toast.success("Conversa atribuída a você");
     },
     onError: (e) => toast.error(e.message || "Erro ao puxar conversa"),
