@@ -153,6 +153,17 @@ export default function InboxPage() {
     return () => { if (bgSyncRef.current) clearInterval(bgSyncRef.current); };
   }, [activeSession?.sessionId, socketConnected]);
 
+  // On socket reconnect: force one fresh hydrate to recover from any missed events.
+  const wasConnectedRef = useRef(false);
+  useEffect(() => {
+    if (socketConnected && !wasConnectedRef.current && hydrationDoneRef.current) {
+      conversationsQ.refetch().then((result) => {
+        if (result.data) convStore.hydrate(result.data as ConvEntry[]);
+      }).catch(() => {});
+    }
+    wasConnectedRef.current = socketConnected;
+  }, [socketConnected]);
+
   // Agents list for assignment
   const agentsQ = trpc.whatsapp.agents.useQuery(undefined, { staleTime: 5 * 60 * 1000 });
   const agents = useMemo(() => (agentsQ.data || []) as Array<{ id: number; name: string; email: string; avatarUrl?: string | null; status: string }>, [agentsQ.data]);
@@ -267,7 +278,7 @@ export default function InboxPage() {
   }, [convStore.sortedIds, queueQ.data]);
 
   // Fetch profile pics from DB (fast query, no API calls) — can handle more
-  const visibleJids = useMemo(() => convJids.slice(0, 150), [convJids]);
+  const visibleJids = useMemo(() => convJids.slice(0, 100), [convJids]);
   const profilePicsQ = trpc.whatsapp.profilePictures.useQuery(
     { sessionId: activeSession?.sessionId || "", jids: visibleJids },
     { enabled: !!activeSession?.sessionId && visibleJids.length > 0, staleTime: 60_000, refetchInterval: 60_000, refetchIntervalInBackground: false }
@@ -663,7 +674,8 @@ export default function InboxPage() {
 
   // Current user ID for filtering "mine" tab
   const meQ = trpc.auth.me.useQuery();
-  const myUserId = useMemo(() => (meQ.data as any)?.saasUser?.userId || (meQ.data as any)?.id || 0, [meQ.data]);
+  // CRM user id — must match conversation_assignments.assignedUserId (FK to crm_users.id)
+  const myUserId = useMemo(() => (meQ.data as any)?.id || 0, [meQ.data]);
 
   // ─── Render from deterministic store (pre-sorted, pre-deduped) ───
   // Store already maintains sorted order via moveToTop. No full sort needed.

@@ -312,14 +312,20 @@ class ConversationStore {
     messageType?: string;
   }): boolean {
     const key = makeConvKey(msg.sessionId, msg.remoteJid);
-    if (!key || !msg.remoteJid) return false;
+    if (!key || !msg.remoteJid) {
+      // eslint-disable-next-line no-console
+      console.warn("[convStore] handleOptimisticSend: missing sessionId/jid", msg);
+      return false;
+    }
 
     const oldMap = this.state.conversationMap;
     const oldIds = this.state.sortedIds;
     const existing = oldMap.get(key);
 
     if (!existing) {
-      return false; // conversation not in store
+      // eslint-disable-next-line no-console
+      console.warn("[convStore] handleOptimisticSend: conv not in store — optimistic preview skipped", { key });
+      return false;
     }
 
     const now = Date.now();
@@ -587,7 +593,7 @@ class ConversationStore {
   /**
    * Update assignment fields for a conversation using conversationKey.
    */
-  updateAssignment(conversationKey: string, fields: Partial<Pick<ConvEntry, 'assignedUserId' | 'assignedAgentName' | 'assignmentStatus' | 'assignmentPriority' | 'assignedAgentAvatar'>>) {
+  updateAssignment(conversationKey: string, fields: Partial<Pick<ConvEntry, 'assignedUserId' | 'assignedAgentName' | 'assignmentStatus' | 'assignmentPriority' | 'assignedAgentAvatar'>>): boolean {
     let existing = this.state.conversationMap.get(conversationKey);
     let resolvedKey = conversationKey;
 
@@ -596,7 +602,11 @@ class ConversationStore {
       const sessionId = getSessionFromKey(conversationKey);
       const jid = getJidFromKey(conversationKey);
       const match = this.findByJidVariants(sessionId, jid);
-      if (!match) return;
+      if (!match) {
+        // eslint-disable-next-line no-console
+        console.warn("[convStore] updateAssignment: conv not in store — caller should refetch", { conversationKey, fields });
+        return false;
+      }
       existing = match.entry;
       resolvedKey = match.key;
     }
@@ -605,6 +615,7 @@ class ConversationStore {
     newMap.set(resolvedKey, { ...existing, ...fields });
 
     this.commit(newMap, [...this.state.sortedIds]);
+    return true;
   }
 
   /**

@@ -71,7 +71,7 @@ vi.mock("./middleware/eventLog", () => ({
 
 vi.mock("./db", () => ({
   getDb: vi.fn().mockResolvedValue({
-    execute: vi.fn().mockResolvedValue([[]]),
+    execute: vi.fn().mockResolvedValue({ rows: [], rowCount: 0 }),
     select: vi.fn().mockReturnValue({ from: vi.fn().mockReturnValue({ where: vi.fn().mockReturnValue({ limit: vi.fn().mockResolvedValue([]) }) }) }),
     update: vi.fn().mockReturnValue({ set: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue(undefined) }) }),
   }),

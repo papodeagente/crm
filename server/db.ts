@@ -802,99 +802,6 @@ export async function getTeamsForTenant(tenantId: number) {
   return db.select().from(teams).where(eq(teams.tenantId, tenantId));
 }
 
-// Get conversations list with assignment info (multi-agent aware)
-// Uses normalization to merge conversations that differ only by 9th digit
-export async function getConversationsListMultiAgent(sessionId: string, tenantId: number, filter?: { assignedUserId?: number; assignedTeamId?: number; status?: string; unassignedOnly?: boolean }) {
-  const db = await getDb();
-  if (!db) return [];
-  const skipTypes = [
-    'protocolMessage','senderKeyDistributionMessage','messageContextInfo',
-    'reactionMessage','ephemeralMessage','deviceSentMessage',
-    'bcallMessage','callLogMesssage','keepInChatMessage',
-    'encReactionMessage','editedMessage','viewOnceMessageV2Extension'
-  ];
-  const skipTypesSQL = skipTypes.map(t => `'${t}'`).join(',');
-  
-  // Build WHERE clause for assignment filters
-  let assignmentFilter = '';
-  if (filter?.assignedUserId) {
-    assignmentFilter += ` AND ca.assignedUserId = ${filter.assignedUserId}`;
-  }
-  if (filter?.assignedTeamId) {
-    assignmentFilter += ` AND ca.assignedTeamId = ${filter.assignedTeamId}`;
-  }
-  if (filter?.status) {
-    assignmentFilter += ` AND ca.status = '${filter.status}'`;
-  }
-  if (filter?.unassignedOnly) {
-    assignmentFilter += ` AND ca.assignedUserId IS NULL`;
-  }
-
-  // JIDs are now pre-normalized in the database (migration applied),
-  // so we can use simple GROUP BY without expensive CASE WHEN expressions
-  const result = await db.execute(sql`
-    SELECT 
-      m."remoteJid",
-      m.content AS lastMessage,
-      m."messageType" AS lastMessageType,
-      m."fromMe" AS lastFromMe,
-      m.timestamp AS lastTimestamp,
-      m.status AS lastStatus,
-      m."senderAgentId" AS lastSenderAgentId,
-      (
-        SELECT m4."pushName" FROM messages m4 
-        WHERE m4."sessionId" = ${sessionId} 
-        AND m4."remoteJid" = m."remoteJid"
-        AND m4."fromMe" = false
-        AND m4."pushName" IS NOT NULL 
-        AND m4."pushName" != ''
-        ORDER BY m4.id DESC LIMIT 1
-      ) AS contactPushName,
-      (
-        SELECT COUNT(*) FROM messages m2 
-        WHERE m2."sessionId" = ${sessionId} 
-        AND m2."remoteJid" = m."remoteJid"
-        AND m2."fromMe" = false
-        AND (m2.status IS NULL OR m2.status = 'received')
-        AND m2."messageType" NOT IN (${sql.raw(skipTypesSQL)})
-      ) AS unreadCount,
-      (
-        SELECT COUNT(*) FROM messages m3 
-        WHERE m3."sessionId" = ${sessionId} 
-        AND m3."remoteJid" = m."remoteJid"
-        AND m3."messageType" NOT IN (${sql.raw(skipTypesSQL)})
-      ) AS totalMessages,
-      ca."assignedUserId",
-      ca."assignedTeamId",
-      ca.status AS assignmentStatus,
-      ca.priority AS assignmentPriority,
-      agent.name AS assignedAgentName,
-      agent."avatarUrl" AS assignedAgentAvatar
-    FROM messages m
-    INNER JOIN (
-      SELECT "remoteJid", MAX(id) AS maxId
-      FROM messages
-      WHERE "sessionId" = ${sessionId}
-      AND "remoteJid" NOT LIKE '%@g.us'
-      AND "remoteJid" != 'status@broadcast'
-      AND "messageType" NOT IN (${sql.raw(skipTypesSQL)})
-      GROUP BY "remoteJid"
-    ) latest ON m."remoteJid" = latest."remoteJid" AND m.id = latest.maxId
-    LEFT JOIN conversation_assignments ca 
-      ON ca."sessionId" = ${sessionId}
-      AND ca."remoteJid" = m."remoteJid"
-      AND ca."tenantId" = ${tenantId}
-    LEFT JOIN crm_users agent ON agent.id = ca."assignedUserId"
-    WHERE m."sessionId" = ${sessionId}
-    AND m."remoteJid" NOT LIKE '%@g.us'
-    AND m."remoteJid" != 'status@broadcast'
-    ${sql.raw(assignmentFilter)}
-    ORDER BY m.timestamp DESC
-  `);
-  
-   const rows = rowsOf(result);
-  return dedupConversations(fixTimestampFields(rows));
-}
 // Round-robin assignment: get next agent for a tenant
 export async function getNextRoundRobinAgent(tenantId: number): Promise<number | null> {
   const db = await getDb();
@@ -1998,7 +1905,11 @@ export async function getWaConversationsList(
     assignmentFilterWc += ` AND "assignedTeamId" = ${filter.assignedTeamId}`;
   }
   if (filter?.status) {
-    assignmentFilterWc += ` AND status = '${filter.status}'`;
+    // status comes from a validated enum upstream; re-validate as defense-in-depth
+    const allowed = new Set(["open", "pending", "resolved", "closed"]);
+    if (allowed.has(filter.status)) {
+      assignmentFilterWc += ` AND status = '${filter.status}'`;
+    }
   }
   if (filter?.unassignedOnly) {
     assignmentFilterWc += ` AND "assignedUserId" IS NULL`;

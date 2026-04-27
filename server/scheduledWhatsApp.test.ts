@@ -258,7 +258,7 @@ describe("scheduledWhatsAppService", () => {
 
   describe("processScheduledWhatsAppTasks", () => {
     it("should return zero counts when no tasks are due", async () => {
-      mockDbObj.execute.mockResolvedValueOnce([{ affectedRows: 0 }]);
+      mockDbObj.execute.mockResolvedValueOnce({ rows: [], rowCount: 0 });
 
       const result = await processScheduledWhatsAppTasks();
       expect(result).toEqual({ processed: 0, sent: 0, failed: 0 });

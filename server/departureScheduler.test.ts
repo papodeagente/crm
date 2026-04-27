@@ -8,7 +8,7 @@ vi.mock("./db", async (importOriginal) => {
   return {
     ...actual,
     getDb: vi.fn().mockResolvedValue({
-      execute: vi.fn().mockResolvedValue([[], []]),
+      execute: vi.fn().mockResolvedValue({ rows: [], rowCount: 0 }),
     }),
     createNotification: vi.fn().mockResolvedValue({ insertId: 1 }),
   };

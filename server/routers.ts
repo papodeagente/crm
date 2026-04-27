@@ -37,7 +37,6 @@ import {
   markNotificationRead,
   markAllNotificationsRead,
   // Multi-agent / SaaS
-  // getConversationsListMultiAgent, // DEPRECATED: redirected to getWaConversationsList
   assignConversation,
   updateAssignmentStatus,
   finishAttendance,
@@ -1380,7 +1379,7 @@ export const appRouter = router({
       }),
     // Get profile pictures for multiple JIDs (batch)
     profilePictures: sessionTenantProcedure
-      .input(z.object({ sessionId: z.string(), jids: z.array(z.string()).max(100) }))
+      .input(z.object({ sessionId: z.string(), jids: z.array(z.string()).max(200) }))
       .query(async ({ input, ctx }) => {
         // Fast DB query first
         const dbResult = await getProfilePicturesFromDb(input.sessionId, input.jids);
