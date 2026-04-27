@@ -1948,14 +1948,21 @@ export async function getWaConversationsList(
       c.email AS "contactEmail",
       c.phone AS "contactPhone"
     FROM (
-      SELECT * FROM wa_conversations
-      WHERE "sessionId" = ${sessionId}
-      AND "tenantId" = ${tenantId}
-      AND "mergedIntoId" IS NULL
-      AND "isArchived" = false
+      SELECT wac.* FROM wa_conversations wac
+      WHERE wac."sessionId" = ${sessionId}
+      AND wac."tenantId" = ${tenantId}
+      AND wac."mergedIntoId" IS NULL
+      AND wac."isArchived" = false
+      -- Exclude ghost conversations: convs that have no real message AND aren't explicitly assigned.
+      -- A periodic backfill bulk-stamps lastMessageAt on contact-imported placeholders, so we
+      -- can't trust that column alone — require either an actual message OR an explicit assignment.
+      AND (
+        EXISTS (SELECT 1 FROM messages m WHERE m."sessionId" = wac."sessionId" AND m."remoteJid" = wac."remoteJid")
+        OR wac."assignedUserId" IS NOT NULL
+      )
       ${sql.raw(assignmentFilterWc)}
-      ${filter?.cursor ? sql`AND "lastMessageAt" < ${new Date(filter.cursor)}` : sql``}
-      ORDER BY "isPinned" DESC, "lastMessageAt" DESC
+      ${filter?.cursor ? sql`AND wac."lastMessageAt" < ${new Date(filter.cursor)}` : sql``}
+      ORDER BY wac."isPinned" DESC, wac."lastMessageAt" DESC NULLS LAST, wac.id DESC
       LIMIT ${filter?.limit ?? 100}
       ${!filter?.cursor && (filter?.offset ?? 0) > 0 ? sql`OFFSET ${filter?.offset ?? 0}` : sql``}
     ) wc
@@ -1965,7 +1972,7 @@ export async function getWaConversationsList(
       AND ca."tenantId" = wc."tenantId"
     LEFT JOIN crm_users agent ON agent.id = wc."assignedUserId"
     LEFT JOIN contacts c ON c.id = wc."contactId"
-    ORDER BY wc."isPinned" DESC, wc."lastMessageAt" DESC
+    ORDER BY wc."isPinned" DESC, wc."lastMessageAt" DESC, wc.id DESC
   `);
 
   const rows = rowsOf(result);
