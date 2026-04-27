@@ -2956,21 +2956,21 @@ export async function getAgentWorkload(tenantId: number, sessionId: string) {
   const db = await getDb();
   if (!db) return [];
   const result = await db.execute(sql`
-    SELECT 
-      cu.id AS agentId,
-      cu.name AS agentName,
-      cu.email AS agentEmail,
-      cu."avatarUrl" AS agentAvatar,
-      cu.status AS agentStatus,
-      cu."lastActiveAt" AS lastActiveAt,
-      CASE WHEN cu."lastActiveAt" >= NOW() - INTERVAL '5 minutes' THEN 1 ELSE 0 END AS isOnline,
-      COUNT(CASE WHEN wc.status IN ('open', 'pending') THEN 1 END) AS activeConversations,
-      COUNT(CASE WHEN wc."unreadCount" > 0 THEN 1 END) AS unreadConversations,
-      MIN(wc."lastMessageAt") AS oldestConversation,
-      MAX(wc."lastMessageAt") AS newestConversation
+    SELECT
+      cu.id AS "agentId",
+      cu.name AS "agentName",
+      cu.email AS "agentEmail",
+      cu."avatarUrl" AS "agentAvatar",
+      cu.status AS "agentStatus",
+      cu."lastActiveAt" AS "lastActiveAt",
+      CASE WHEN cu."lastActiveAt" >= NOW() - INTERVAL '5 minutes' THEN 1 ELSE 0 END AS "isOnline",
+      COUNT(CASE WHEN wc.status IN ('open', 'pending') THEN 1 END) AS "activeConversations",
+      COUNT(CASE WHEN wc."unreadCount" > 0 THEN 1 END) AS "unreadConversations",
+      MIN(wc."lastMessageAt") AS "oldestConversation",
+      MAX(wc."lastMessageAt") AS "newestConversation"
     FROM crm_users cu
-    LEFT JOIN wa_conversations wc 
-      ON wc."assignedUserId" = cu.id 
+    LEFT JOIN wa_conversations wc
+      ON wc."assignedUserId" = cu.id
       AND wc."tenantId" = ${tenantId}
       AND wc."sessionId" = ${sessionId}
       AND wc.status IN ('open', 'pending')
@@ -2978,7 +2978,7 @@ export async function getAgentWorkload(tenantId: number, sessionId: string) {
     WHERE cu."tenantId" = ${tenantId}
     AND cu.status = 'active'
     GROUP BY cu.id, cu.name, cu.email, cu."avatarUrl", cu.status, cu."lastActiveAt"
-    ORDER BY isOnline DESC, activeConversations DESC
+    ORDER BY "isOnline" DESC, "activeConversations" DESC
   `);
   return rowsOf(result);
 }
@@ -2988,16 +2988,16 @@ export async function getAgentConversations(tenantId: number, sessionId: string,
   if (!db) return [];
   // Part 1 fix: Derive preview from the REAL last message in wa_messages
   const result = await db.execute(sql`
-    SELECT 
-      wc.id AS conversationId,
+    SELECT
+      wc.id AS "conversationId",
       wc."sessionId",
       wc."remoteJid",
       wc."contactPushName",
-      lm.content AS lastMessage,
-      lm.timestamp AS lastTimestamp,
+      lm.content AS "lastMessage",
+      lm.timestamp AS "lastTimestamp",
       wc."unreadCount",
-      wc.status AS conversationStatus,
-      c.name AS contactName
+      wc.status AS "conversationStatus",
+      c.name AS "contactName"
     FROM wa_conversations wc
     LEFT JOIN (
       SELECT m1."sessionId", m1."remoteJid", m1.content, m1.timestamp
@@ -3029,9 +3029,9 @@ export async function getQueueStats(tenantId: number, sessionId: string) {
   if (!db) return { total: 0, oldest: null, items: [] };
   // Get count + oldest — derive from wa_messages, not cached fields
   const countResult = await db.execute(sql`
-    SELECT 
+    SELECT
       COUNT(*) AS total,
-      MIN(COALESCE(wc."queuedAt", lm.timestamp)) AS oldestEntry
+      MIN(COALESCE(wc."queuedAt", lm.timestamp)) AS "oldestEntry"
     FROM wa_conversations wc
     LEFT JOIN (
       SELECT m1."sessionId", m1."remoteJid", m1.timestamp
@@ -3056,14 +3056,14 @@ export async function getQueueStats(tenantId: number, sessionId: string) {
   const countRows = rowsOf(countResult);
   // Get queue items with details — derive preview from wa_messages
   const itemsResult = await db.execute(sql`
-    SELECT 
+    SELECT
       wc."remoteJid",
       wc."contactPushName",
-      lm.content AS lastMessage,
-      lm.timestamp AS lastMessageAt,
+      lm.content AS "lastMessage",
+      lm.timestamp AS "lastMessageAt",
       wc."unreadCount",
-      COALESCE(wc."queuedAt", lm.timestamp) AS waitingSince,
-      c.name AS contactName
+      COALESCE(wc."queuedAt", lm.timestamp) AS "waitingSince",
+      c.name AS "contactName"
     FROM wa_conversations wc
     LEFT JOIN (
       SELECT m1."sessionId", m1."remoteJid", m1.content, m1.timestamp
