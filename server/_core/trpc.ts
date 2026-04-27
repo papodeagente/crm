@@ -11,20 +11,21 @@ export const router = t.router;
 export const publicProcedure = t.procedure;
 
 // ─── Presence tracking: update lastActiveAt with 60s debounce ───
-const lastActiveCache = new Map<number, number>(); // userId -> lastUpdateTimestamp
+const lastActiveCache = new Map<string, number>(); // key (email or userId) -> lastUpdateTimestamp
 const PRESENCE_DEBOUNCE_MS = 60_000; // Only update DB once per minute per user
 
-async function touchPresence(userId: number) {
+async function touchPresenceByEmail(email: string) {
+  const key = `email:${email.toLowerCase()}`;
   const now = Date.now();
-  const lastUpdate = lastActiveCache.get(userId) || 0;
-  if (now - lastUpdate < PRESENCE_DEBOUNCE_MS) return; // skip if updated recently
-  lastActiveCache.set(userId, now);
+  const lastUpdate = lastActiveCache.get(key) || 0;
+  if (now - lastUpdate < PRESENCE_DEBOUNCE_MS) return;
+  lastActiveCache.set(key, now);
   try {
     const { getDb } = await import("../db");
     const db = await getDb();
     if (db) {
       const { sql } = await import("drizzle-orm");
-      await db.execute(sql`UPDATE crm_users SET lastActiveAt = NOW() WHERE id = ${userId}`);
+      await db.execute(sql`UPDATE crm_users SET "lastActiveAt" = NOW() WHERE email = ${email}`);
     }
   } catch (_) { /* non-critical */ }
 }
@@ -36,9 +37,10 @@ const requireUser = t.middleware(async opts => {
     throw new TRPCError({ code: "UNAUTHORIZED", message: UNAUTHED_ERR_MSG });
   }
 
-  // Track presence (fire-and-forget, non-blocking)
-  if (ctx.saasUser?.userId) {
-    touchPresence(ctx.saasUser.userId).catch(() => {});
+  // Track presence (fire-and-forget, non-blocking) — works for both SaaS and OAuth users.
+  // Email is keyed instead of id because ctx.user.id is the auth-provider id, not crm_users.id for OAuth.
+  if (ctx.user?.email) {
+    touchPresenceByEmail(ctx.user.email).catch(() => {});
   }
 
   return next({
@@ -153,7 +155,7 @@ const requireTenantAndSession = t.middleware(async opts => {
   }
 
   // Track presence
-  touchPresence(ctx.saasUser.userId).catch(() => {});
+  touchPresenceByEmail(ctx.user.email).catch(() => {});
 
   return next({
     ctx: {
@@ -208,7 +210,7 @@ const requireTenantSessionAndAdmin = t.middleware(async opts => {
     });
   }
 
-  touchPresence(ctx.saasUser.userId).catch(() => {});
+  touchPresenceByEmail(ctx.user.email).catch(() => {});
 
   return next({
     ctx: {
@@ -261,7 +263,7 @@ const requireTenant = t.middleware(async opts => {
   }
 
   // Track presence
-  touchPresence(ctx.saasUser.userId).catch(() => {});
+  touchPresenceByEmail(ctx.user.email).catch(() => {});
 
   return next({
     ctx: {
@@ -328,7 +330,7 @@ const requireTenantAdmin = t.middleware(async opts => {
   }
 
   const tenantId = ctx.saasUser.tenantId;
-  touchPresence(ctx.saasUser.userId).catch(() => {});
+  touchPresenceByEmail(ctx.user.email).catch(() => {});
 
   return next({
     ctx: {
