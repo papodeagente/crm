@@ -231,6 +231,9 @@ export const appRouter = router({
       if (opts.ctx.saasUser && opts.ctx.user) {
         return {
           ...opts.ctx.user,
+          // crmUserId: the CRM user record id used by conversation_assignments and other CRM tables.
+          // For SaaS users this matches saasUser.userId.
+          crmUserId: opts.ctx.saasUser.userId,
           tenantId: opts.ctx.saasUser.tenantId,
           saasEmail: opts.ctx.saasUser.email,
           saasUser: {
@@ -241,7 +244,7 @@ export const appRouter = router({
           },
         };
       }
-      // For Manus OAuth users (owner), try to find their CRM user to get tenantId
+      // For Manus OAuth users (owner), look up their CRM user to expose tenantId AND crmUserId
       if (opts.ctx.user && !opts.ctx.saasUser) {
         try {
           const db = await getDb();
@@ -253,6 +256,7 @@ export const appRouter = router({
             if (row?.tenantId) {
               return {
                 ...opts.ctx.user,
+                crmUserId: Number(row.id),
                 tenantId: Number(row.tenantId),
               };
             }

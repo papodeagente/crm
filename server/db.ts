@@ -2865,24 +2865,24 @@ export async function getQueueConversations(sessionId: string, tenantId: number,
   if (!db) return [];
   // Part 1 fix: Derive preview from the REAL last message in wa_messages
   const result = await db.execute(sql`
-    SELECT 
-      wc.id AS conversationId,
+    SELECT
+      wc.id AS "conversationId",
       wc."sessionId",
       wc."remoteJid",
       wc."phoneE164",
       wc."contactId",
       wc."contactPushName",
-      lm.content AS lastMessage,
-      lm."messageType" AS lastMessageType,
-      lm."fromMe" AS lastFromMe,
-      lm.timestamp AS lastTimestamp,
+      lm.content AS "lastMessage",
+      lm."messageType" AS "lastMessageType",
+      lm."fromMe" AS "lastFromMe",
+      lm.timestamp AS "lastTimestamp",
       wc."unreadCount",
-      wc.status AS conversationStatus,
+      wc.status AS "conversationStatus",
       wc."conversationKey",
       wc."queuedAt",
-      c.name AS contactName,
-      c.email AS contactEmail,
-      c.phone AS contactPhone
+      c.name AS "contactName",
+      c.email AS "contactEmail",
+      c.phone AS "contactPhone"
     FROM wa_conversations wc
     LEFT JOIN (
       SELECT m1."sessionId", m1."remoteJid", m1.content, m1."messageType", m1."fromMe", m1.timestamp, m1.status

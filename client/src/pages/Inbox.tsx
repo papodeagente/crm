@@ -674,8 +674,9 @@ export default function InboxPage() {
 
   // Current user ID for filtering "mine" tab
   const meQ = trpc.auth.me.useQuery();
-  // CRM user id — must match conversation_assignments.assignedUserId (FK to crm_users.id)
-  const myUserId = useMemo(() => (meQ.data as any)?.id || 0, [meQ.data]);
+  // CRM user id — must match conversation_assignments.assignedUserId (FK to crm_users.id).
+  // auth.me now exposes crmUserId explicitly for both SaaS and OAuth users.
+  const myUserId = useMemo(() => (meQ.data as any)?.crmUserId || (meQ.data as any)?.id || 0, [meQ.data]);
 
   // ─── Render from deterministic store (pre-sorted, pre-deduped) ───
   // Store already maintains sorted order via moveToTop. No full sort needed.
