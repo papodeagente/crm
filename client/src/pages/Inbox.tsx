@@ -206,8 +206,20 @@ export default function InboxPage() {
   const [assigningQueueJid, setAssigningQueueJid] = useState<string | null>(null);
   const [selectedAgentForQueue, setSelectedAgentForQueue] = useState<number | null>(null);
   const assignFromQueueMut = trpc.whatsapp.supervision.assignToAgent.useMutation({
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       queueQ.refetch(); queueStatsQ.refetch();
+      // Optimistically reflect assignment in convStore so it lands in MEUS for the assignee.
+      const key = makeConvKey(variables.sessionId, variables.remoteJid);
+      convStore.updateAssignment(key, {
+        assignedUserId: variables.agentId,
+        assignmentStatus: "open",
+      });
+      // Refetch + rehydrate so MEUS reflects the change for the assignee
+      setTimeout(() => {
+        conversationsQ.refetch().then((result) => {
+          if (result.data) convStore.hydrate(result.data as ConvEntry[]);
+        }).catch(() => {});
+      }, 500);
       toast.success("Conversa atribuída ao agente");
       setAssigningQueueJid(null); setSelectedAgentForQueue(null);
     },
@@ -256,7 +268,22 @@ export default function InboxPage() {
 
   // Assignment mutations
   const assignMutation = trpc.whatsapp.assignConversation.useMutation({
-    onSuccess: () => { queueQ.refetch(); queueStatsQ.refetch(); toast.success("Conversa atribuída com sucesso"); },
+    onSuccess: (_data, variables) => {
+      queueQ.refetch(); queueStatsQ.refetch();
+      // Optimistically reflect assignment in convStore.
+      const key = makeConvKey(variables.sessionId, variables.remoteJid);
+      convStore.updateAssignment(key, {
+        assignedUserId: variables.assignedUserId ?? null,
+        assignmentStatus: "open",
+      });
+      // Refetch + rehydrate
+      setTimeout(() => {
+        conversationsQ.refetch().then((result) => {
+          if (result.data) convStore.hydrate(result.data as ConvEntry[]);
+        }).catch(() => {});
+      }, 500);
+      toast.success("Conversa atribuída com sucesso");
+    },
     onError: (e) => toast.error(e.message || "Erro ao atribuir conversa"),
   });
   const updateStatusMutation = trpc.whatsapp.updateAssignmentStatus.useMutation({});
