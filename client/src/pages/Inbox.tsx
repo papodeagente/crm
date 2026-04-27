@@ -117,7 +117,10 @@ export default function InboxPage() {
 
   // Initial load only — fetch conversations once from server
   const conversationsQ = trpc.whatsapp.waConversations.useQuery(
-    { sessionId: activeSession?.sessionId || ""},
+    // Default server limit is 100 (sorted by lastMessageAt DESC), which can hide older
+    // conversations that are assigned to the current user. Bump to 500 so MEUS captures
+    // all assignments without a separate query.
+    { sessionId: activeSession?.sessionId || "", limit: 500 },
     { enabled: !!activeSession?.sessionId && !hydrationDoneRef.current, staleTime: Infinity, refetchInterval: false, refetchOnWindowFocus: false }
   );
 

@@ -1208,6 +1208,7 @@ export const appRouter = router({
         status: z.enum(["open", "pending", "resolved", "closed"]).optional(),
         unassignedOnly: z.boolean().optional(),
         cursor: z.string().optional(), // ISO timestamp for cursor-based pagination
+        limit: z.number().min(1).max(1000).optional(),
       }))
       .query(async ({ input, ctx }) => {
         const { sessionId, ...filter } = input;
