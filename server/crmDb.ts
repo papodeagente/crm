@@ -2619,6 +2619,38 @@ export async function findProposalByAsaasPaymentId(asaasPaymentId: string) {
   return rows[0] || null;
 }
 
+// ─── Asaas charges em deals (cobrança gerada após o deal ser ganho) ───
+
+export async function setDealAsaasPayment(tenantId: number, dealId: number, data: {
+  asaasPaymentId: string;
+  asaasInvoiceUrl?: string | null;
+  asaasBankSlipUrl?: string | null;
+  asaasBillingType?: string | null;
+  asaasPaymentStatus?: string | null;
+  asaasDueDate?: Date | null;
+  asaasPaidAt?: Date | null;
+  asaasLinkSentToWhatsappAt?: Date | null;
+}) {
+  const db = await getDb(); if (!db) return;
+  await db.update(deals).set(data).where(
+    and(eq(deals.id, dealId), eq(deals.tenantId, tenantId))
+  );
+}
+
+export async function findDealByAsaasPaymentId(asaasPaymentId: string) {
+  const db = await getDb(); if (!db) return null;
+  const rows = await db.select().from(deals).where(eq(deals.asaasPaymentId, asaasPaymentId)).limit(1);
+  return rows[0] || null;
+}
+
+export async function updateDealFromAsaasStatus(dealId: number, tenantId: number, data: {
+  asaasPaymentStatus: string;
+  asaasPaidAt?: Date | null;
+}) {
+  const db = await getDb(); if (!db) return;
+  await db.update(deals).set(data).where(and(eq(deals.id, dealId), eq(deals.tenantId, tenantId)));
+}
+
 export async function updateProposalFromAsaasStatus(proposalId: number, tenantId: number, data: {
   asaasPaymentStatus: string;
   asaasPaidAt?: Date | null;

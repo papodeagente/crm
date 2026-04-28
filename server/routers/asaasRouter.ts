@@ -5,6 +5,7 @@ import * as crm from "../crmDb";
 import { emitEvent } from "../middleware/eventLog";
 import { encryptSecret, decryptSecret, maskApiKey } from "../services/asaasEncryption";
 import { createAsaasClient, AsaasError, type AsaasBillingType } from "../services/asaasService";
+import { resolveAsaasCustomerForContact } from "../services/asaasCustomerResolver";
 
 const billingTypeEnum = z.enum(["BOLETO", "CREDIT_CARD", "PIX", "UNDEFINED"]);
 
@@ -131,45 +132,7 @@ export const asaasRouter = router({
       if (!contact.name) throw new TRPCError({ code: "BAD_REQUEST", message: "Contato sem nome — preencha antes de gerar cobrança." });
 
       const { client } = await loadClient(tenantId);
-
-      // Resolve customer: reuse cached id, search by docId/email, or create.
-      let customerId = contact.asaasCustomerId;
-      if (!customerId) {
-        if (contact.docId) {
-          try {
-            const found = await client.findCustomerByCpfCnpj(contact.docId);
-            if (found.data?.[0]) customerId = found.data[0].id;
-          } catch { /* fall through to create */ }
-        }
-        if (!customerId && contact.email) {
-          try {
-            const found = await client.findCustomerByEmail(contact.email);
-            if (found.data?.[0]) customerId = found.data[0].id;
-          } catch { /* fall through to create */ }
-        }
-        if (!customerId) {
-          try {
-            const created = await client.createCustomer({
-              name: contact.name,
-              cpfCnpj: contact.docId || undefined,
-              email: contact.email || undefined,
-              mobilePhone: contact.phoneE164 || contact.phone || undefined,
-              externalReference: `contact:${contact.id}`,
-            });
-            customerId = created.id;
-          } catch (err: any) {
-            const msg = err instanceof AsaasError ? err.message : err.message;
-            throw new TRPCError({ code: "BAD_REQUEST", message: `Falha ao criar cliente no ASAAS: ${msg}` });
-          }
-        }
-        if (customerId) {
-          await crm.setContactAsaasCustomerId(tenantId, contact.id, customerId);
-        }
-      }
-
-      if (!customerId) {
-        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Não foi possível resolver o cliente ASAAS." });
-      }
+      const customerId = await resolveAsaasCustomerForContact(tenantId, contact, client);
 
       const dueDate = input.dueDateISO
         ? new Date(input.dueDateISO)
@@ -222,6 +185,150 @@ export const asaasRouter = router({
         status: payment.status,
         billingType: payment.billingType,
         dueDate: payment.dueDate,
+      };
+    }),
+
+  // ─── Charge from a Deal (após venda ganha) ────────────────
+  generateChargeForDeal: tenantWriteProcedure
+    .input(z.object({
+      dealId: z.number().int(),
+      billingType: billingTypeEnum.default("PIX"),
+      dueDateISO: z.string().optional(),
+      valueCents: z.number().int().positive().optional(),
+      description: z.string().max(500).optional(),
+      sendViaWhatsApp: z.boolean().default(false),
+      whatsappMessage: z.string().max(2000).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const tenantId = getTenantId(ctx);
+      const deal = await crm.getDealById(tenantId, input.dealId);
+      if (!deal) throw new TRPCError({ code: "NOT_FOUND", message: "Negócio não encontrado." });
+      if (!deal.contactId) throw new TRPCError({ code: "BAD_REQUEST", message: "Negócio sem contato vinculado." });
+      if (deal.asaasPaymentId) {
+        throw new TRPCError({ code: "CONFLICT", message: "Este negócio já possui uma cobrança ASAAS." });
+      }
+
+      const valueCents = input.valueCents ?? Number(deal.valueCents ?? 0);
+      if (!valueCents || valueCents <= 0) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Valor inválido — defina o valor do negócio antes de gerar cobrança." });
+      }
+
+      const contact = await crm.getContactById(tenantId, deal.contactId);
+      if (!contact) throw new TRPCError({ code: "NOT_FOUND", message: "Contato do negócio não encontrado." });
+      if (!contact.email && !contact.docId) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Contato precisa ter pelo menos e-mail OU CPF/CNPJ para gerar cobrança." });
+      }
+
+      const { client } = await loadClient(tenantId);
+      const customerId = await resolveAsaasCustomerForContact(tenantId, contact, client);
+
+      const dueDate = input.dueDateISO
+        ? new Date(input.dueDateISO)
+        : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+      const dueDateStr = dueDate.toISOString().slice(0, 10);
+      const value = Number((valueCents / 100).toFixed(2));
+
+      let payment;
+      try {
+        payment = await client.createPayment({
+          customer: customerId,
+          billingType: input.billingType,
+          value,
+          dueDate: dueDateStr,
+          description: input.description || deal.title,
+          externalReference: `deal:${deal.id}`,
+        });
+      } catch (err: any) {
+        const msg = err instanceof AsaasError ? err.message : err.message;
+        throw new TRPCError({ code: "BAD_REQUEST", message: `Falha ao criar cobrança ASAAS: ${msg}` });
+      }
+
+      let whatsappSent = false;
+      let whatsappError: string | null = null;
+      let linkSentAt: Date | null = null;
+
+      if (input.sendViaWhatsApp) {
+        const targetUrl = payment.invoiceUrl || payment.bankSlipUrl || "";
+        const firstName = (contact.name || "").split(/\s+/)[0] || "";
+        const valueFmt = value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+        const dueFmt = dueDate.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
+        const defaultMsg = `Olá, ${firstName}! Aqui está o link de pagamento referente a *${deal.title}* (${valueFmt}):\n\n${targetUrl}\n\nVencimento: ${dueFmt}. Qualquer dúvida, é só me chamar.`;
+        const msg = input.whatsappMessage
+          ? input.whatsappMessage
+              .replace(/\{primeiroNome\}/g, firstName)
+              .replace(/\{nome\}/g, contact.name || "")
+              .replace(/\{dealTitle\}/g, deal.title)
+              .replace(/\{invoiceUrl\}/g, targetUrl)
+              .replace(/\{valor\}/g, valueFmt)
+              .replace(/\{vencimento\}/g, dueFmt)
+              .replace(/\{data\}/g, dueFmt)
+          : defaultMsg;
+
+        try {
+          const { getSessionsByTenant, getDb } = await import("../db");
+          const sessions = await getSessionsByTenant(tenantId);
+          const activeSession = sessions.find((s: any) => s.status === "connected") || sessions[0];
+          if (!activeSession) {
+            whatsappError = "Nenhuma sessão WhatsApp ativa para este tenant.";
+          } else {
+            // JID: prefere a conversa existente (já lida com variantes do 9º dígito);
+            // fallback para phoneE164 montando JID padrão.
+            let jid: string | null = null;
+            if (deal.waConversationId) {
+              const db = await getDb();
+              if (db) {
+                const { sql } = await import("drizzle-orm");
+                const r = await db.execute(sql`SELECT "remoteJid" FROM wa_conversations WHERE id = ${deal.waConversationId} LIMIT 1`);
+                const row = ((r as any).rows ?? r)?.[0];
+                jid = row?.remoteJid || null;
+              }
+            }
+            if (!jid) {
+              const digits = (contact.phoneE164 || contact.phone || "").replace(/\D/g, "");
+              if (digits) jid = `${digits}@s.whatsapp.net`;
+            }
+            if (!jid) {
+              whatsappError = "Contato sem telefone WhatsApp.";
+            } else {
+              const { whatsappManager } = await import("../whatsappEvolution");
+              await whatsappManager.sendTextMessage(activeSession.sessionId, jid, msg);
+              whatsappSent = true;
+              linkSentAt = new Date();
+            }
+          }
+        } catch (err: any) {
+          whatsappError = err?.message || "Falha ao enviar WhatsApp";
+        }
+      }
+
+      await crm.setDealAsaasPayment(tenantId, deal.id, {
+        asaasPaymentId: payment.id,
+        asaasInvoiceUrl: payment.invoiceUrl ?? null,
+        asaasBankSlipUrl: payment.bankSlipUrl ?? null,
+        asaasBillingType: payment.billingType,
+        asaasPaymentStatus: payment.status,
+        asaasDueDate: payment.dueDate ? new Date(payment.dueDate) : null,
+        asaasLinkSentToWhatsappAt: linkSentAt,
+      });
+
+      await emitEvent({
+        tenantId,
+        actorUserId: ctx.user.id,
+        entityType: "deal",
+        entityId: deal.id,
+        action: "asaas_charge_created",
+      });
+
+      return {
+        success: true as const,
+        paymentId: payment.id,
+        invoiceUrl: payment.invoiceUrl,
+        bankSlipUrl: payment.bankSlipUrl,
+        status: payment.status,
+        billingType: payment.billingType,
+        dueDate: payment.dueDate,
+        whatsappSent,
+        whatsappError,
       };
     }),
 

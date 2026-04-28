@@ -31,6 +31,8 @@ import TaskFormDialog from "@/components/TaskFormDialog";
 import DealFilesPanel from "@/components/DealFilesPanel";
 import TaskActionPopover from "@/components/TaskActionPopover";
 import SaleCelebration from "@/components/SaleCelebration";
+import GenerateChargeDialog from "@/components/deal/GenerateChargeDialog";
+import DealChargeStatusPill from "@/components/deal/DealChargeStatusPill";
 import { DealAiSummaryStrip } from "@/components/DealAiSummaryStrip";
 import { DealAiExtractedEntities } from "@/components/DealAiExtractedEntities";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -281,6 +283,7 @@ export default function DealDetail() {
   /* ─── Status dialogs ─── */
   const [showWonDialog, setShowWonDialog] = useState(false);
   const [showCelebration, setShowCelebration] = useState(false);
+  const [showChargeDialog, setShowChargeDialog] = useState(false);
   const [showLostDialog, setShowLostDialog] = useState(false);
   const [lostReason, setLostReason] = useState("");
   const [selectedLossReasonId, setSelectedLossReasonId] = useState<number | null>(null);
@@ -359,6 +362,10 @@ export default function DealDetail() {
       onSuccess: () => {
         dealQ.refetch(); historyQ.refetch();
         setShowCelebration(true);
+        // Sem cobrança ainda? Abre diálogo Asaas para o usuário decidir.
+        if (!deal.asaasPaymentId) {
+          setTimeout(() => setShowChargeDialog(true), 800);
+        }
       },
     });
     setShowWonDialog(false);
@@ -477,6 +484,25 @@ export default function DealDetail() {
                       ? (pipeline?.pipelineType === "post_sale" ? "FINALIZADA" : pipeline?.pipelineType === "support" ? "RESOLVIDO" : "GANHA")
                       : (pipeline?.pipelineType === "post_sale" ? "CANCELADA" : pipeline?.pipelineType === "support" ? "NÃO RESOLVIDO" : "PERDIDA")}
                   </Badge>
+                )}
+                {deal.asaasPaymentId && (
+                  <DealChargeStatusPill
+                    asaasPaymentId={deal.asaasPaymentId}
+                    asaasPaymentStatus={deal.asaasPaymentStatus}
+                    asaasInvoiceUrl={deal.asaasInvoiceUrl}
+                    asaasBankSlipUrl={deal.asaasBankSlipUrl}
+                    asaasBillingType={deal.asaasBillingType}
+                    asaasDueDate={deal.asaasDueDate}
+                  />
+                )}
+                {deal.status === "won" && !deal.asaasPaymentId && (
+                  <button
+                    type="button"
+                    onClick={() => setShowChargeDialog(true)}
+                    className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-md border border-primary/40 text-primary hover:bg-primary/10 transition-colors"
+                  >
+                    Gerar cobrança
+                  </button>
                 )}
               </div>
             </div>
@@ -1544,6 +1570,13 @@ export default function DealDetail() {
         onClose={() => setShowCelebration(false)}
         dealTitle={deal.title}
         dealValue={deal.valueCents ? new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(deal.valueCents / 100) : undefined}
+      />
+
+      {/* ── Asaas: gerar cobrança após venda ganha ── */}
+      <GenerateChargeDialog
+        dealId={deal.id}
+        open={showChargeDialog}
+        onOpenChange={setShowChargeDialog}
       />
 
       {/* ── Delete Confirmation Dialog ── */}

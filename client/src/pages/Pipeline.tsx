@@ -27,6 +27,7 @@ import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuIte
 import DealFiltersPanel, { useDealFilters, DealFilterButton } from "@/components/DealFiltersPanel";
 import { LeadScoreBadge } from "@/components/LeadScoreBadge";
 import SaleCelebration from "@/components/SaleCelebration";
+import GenerateChargeDialog from "@/components/deal/GenerateChargeDialog";
 import ClassificationBadge from "@/components/ClassificationBadge";
 import CustomFieldRenderer from "@/components/CustomFieldRenderer";
 import { DatePicker } from "@/components/ui/date-picker";
@@ -386,6 +387,8 @@ export default function Pipeline() {
 
   const handleDragLeave = useCallback(() => { setDragOverStageId(null); }, []);
 
+  const [chargeDialogDealId, setChargeDialogDealId] = useState<number | null>(null);
+
   const handleDrop = useCallback((e: React.DragEvent, toStageId: number) => {
     e.preventDefault();
     setDragOverStageId(null);
@@ -399,6 +402,13 @@ export default function Pipeline() {
     moveStage.mutate({
       dealId, fromStageId: deal.stageId, toStageId,
       fromStageName: fromStage?.name || "Desconhecida", toStageName: toStage?.name || "Desconhecida",
+    }, {
+      onSuccess: () => {
+        // Se a etapa de destino marca como ganho e o deal ainda não tem cobrança, abre dialog
+        if (toStage?.isWon && !deal.asaasPaymentId) {
+          setChargeDialogDealId(dealId);
+        }
+      },
     });
     toast.success(`Movido para "${toStage?.name}"`);
   }, [sortedDeals, stages.data, moveStage]);
@@ -942,6 +952,11 @@ export default function Pipeline() {
         onClose={() => setCelebration({ open: false })}
         dealTitle={celebration.title}
         dealValue={celebration.value}
+      />
+      <GenerateChargeDialog
+        dealId={chargeDialogDealId}
+        open={!!chargeDialogDealId}
+        onOpenChange={(o) => { if (!o) setChargeDialogDealId(null); }}
       />
       <CreateDealDialog open={showCreateDeal} onOpenChange={setShowCreateDeal} pipelineId={activePipeline?.id} stages={stages.data || []} contacts={(contacts.data as any)?.items || contacts.data || []} accounts={allAccounts.data || []} pipelines={pipelines.data?.filter((p: any) => !p.isArchived) || []} />
       {showTaskForm && (

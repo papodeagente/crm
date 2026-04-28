@@ -62,6 +62,12 @@ function parseProposalIdFromExternalRef(ref?: string): number | null {
   return match ? Number(match[1]) : null;
 }
 
+function parseDealIdFromExternalRef(ref?: string): number | null {
+  if (!ref) return null;
+  const match = ref.match(/^deal:(\d+)$/);
+  return match ? Number(match[1]) : null;
+}
+
 export async function handleAsaasWebhook(req: Request, res: Response) {
   try {
     if (!authorize(req)) {
@@ -83,24 +89,39 @@ export async function handleAsaasWebhook(req: Request, res: Response) {
       return res.status(200).json({ ok: true, idempotent: true });
     }
 
-    // Find proposal via externalReference or stored asaasPaymentId
+    // Find proposal OR deal via externalReference or stored asaasPaymentId
     let tenantId: number | null = null;
     let proposalId: number | null = parseProposalIdFromExternalRef(payload.payment?.externalReference);
+    let dealId: number | null = parseDealIdFromExternalRef(payload.payment?.externalReference);
 
-    if (paymentId && !proposalId) {
+    if (paymentId && !proposalId && !dealId) {
       const proposal = await crm.findProposalByAsaasPaymentId(paymentId);
       if (proposal) {
         proposalId = proposal.id;
         tenantId = proposal.tenantId;
+      } else {
+        const deal = await crm.findDealByAsaasPaymentId(paymentId);
+        if (deal) {
+          dealId = deal.id;
+          tenantId = deal.tenantId;
+        }
       }
     } else if (proposalId) {
-      // We have proposalId but need tenant — query proposal directly.
       const { getDb } = await import("./db");
       const { proposals } = await import("../drizzle/schema");
       const { eq } = await import("drizzle-orm");
       const db = await getDb();
       if (db) {
         const rows = await db.select().from(proposals).where(eq(proposals.id, proposalId)).limit(1);
+        if (rows[0]) tenantId = rows[0].tenantId;
+      }
+    } else if (dealId) {
+      const { getDb } = await import("./db");
+      const { deals } = await import("../drizzle/schema");
+      const { eq } = await import("drizzle-orm");
+      const db = await getDb();
+      if (db) {
+        const rows = await db.select().from(deals).where(eq(deals.id, dealId)).limit(1);
         if (rows[0]) tenantId = rows[0].tenantId;
       }
     }
@@ -151,8 +172,15 @@ export async function handleAsaasWebhook(req: Request, res: Response) {
               .catch((e) => console.error("[ASAAS] Auto WhatsApp notify failed:", e?.message || e));
           }
         }
+      } else if (dealId && tenantId && payload.payment) {
+        const isPaid = PAID_STATUSES.has(payload.payment.status);
+        const paidAt = isPaid && payload.payment.paymentDate ? new Date(payload.payment.paymentDate) : null;
+        await crm.updateDealFromAsaasStatus(dealId, tenantId, {
+          asaasPaymentStatus: payload.payment.status,
+          asaasPaidAt: paidAt,
+        });
       } else {
-        errorMsg = "Proposal not resolved from webhook payload";
+        errorMsg = "Charge not resolved from webhook payload (proposal nor deal)";
         console.warn("[ASAAS] Webhook unresolved:", { event: payload.event, paymentId, externalRef: payload.payment?.externalReference });
       }
     } catch (err: any) {

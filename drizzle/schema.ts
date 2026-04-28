@@ -583,6 +583,15 @@ export const deals = pgTable("deals", {
   aiLeadScore: varchar("aiLeadScore", { length: 16 }),
   aiLeadScoreReason: text("aiLeadScoreReason"),
   aiLeadScoreAt: timestamp("aiLeadScoreAt"),
+  /** Asaas charge (cobrança gerada após o deal ser ganho) */
+  asaasPaymentId: varchar("asaasPaymentId", { length: 64 }),
+  asaasInvoiceUrl: text("asaasInvoiceUrl"),
+  asaasBankSlipUrl: text("asaasBankSlipUrl"),
+  asaasBillingType: varchar("asaasBillingType", { length: 32 }),
+  asaasPaymentStatus: varchar("asaasPaymentStatus", { length: 32 }),
+  asaasDueDate: timestamp("asaasDueDate"),
+  asaasPaidAt: timestamp("asaasPaidAt"),
+  asaasLinkSentToWhatsappAt: timestamp("asaasLinkSentToWhatsappAt"),
 }, (t) => [
   index("deals_tenant_pipeline_idx").on(t.tenantId, t.pipelineId, t.stageId),
   index("deals_tenant_status_idx").on(t.tenantId, t.status, t.lastActivityAt),
@@ -590,6 +599,7 @@ export const deals = pgTable("deals", {
   index("idx_deals_wa_conv").on(t.waConversationId),
   index("deals_tenant_contact_status_idx").on(t.tenantId, t.contactId, t.status),
   index("deals_tenant_contact_pipeline_idx").on(t.tenantId, t.contactId, t.pipelineId, t.status),
+  index("deals_asaas_payment_idx").on(t.asaasPaymentId),
 ]);
 
 // ═══════════════════════════════════════
