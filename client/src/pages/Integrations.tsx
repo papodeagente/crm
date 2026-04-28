@@ -1069,23 +1069,8 @@ export default function Integrations() {
         </div>
       </div>
 
-      <Tabs defaultValue="webhook" className="space-y-4">
+      <Tabs defaultValue="asaas" className="space-y-4">
         <TabsList className="bg-muted/30 border-0 rounded-lg p-1">
-          <TabsTrigger value="webhook" className="rounded-lg text-[13px] data-[state=active]:bg-primary data-[state=active]:text-white gap-1.5">
-            <Webhook className="h-3.5 w-3.5" />Landing Page
-          </TabsTrigger>
-          <TabsTrigger value="meta" className="rounded-lg text-[13px] data-[state=active]:bg-primary data-[state=active]:text-white gap-1.5">
-            <Facebook className="h-3.5 w-3.5" />Meta Lead Ads
-          </TabsTrigger>
-          <TabsTrigger value="logs" className="rounded-lg text-[13px] data-[state=active]:bg-primary data-[state=active]:text-white gap-1.5">
-            <FileText className="h-3.5 w-3.5" />Event Logs
-          </TabsTrigger>
-          <TabsTrigger value="tracking" className="rounded-lg text-[13px] data-[state=active]:bg-primary data-[state=active]:text-white gap-1.5">
-            <Code2 className="h-3.5 w-3.5" />Tracking Script
-          </TabsTrigger>
-          <TabsTrigger value="connectors" className="rounded-lg text-[13px] data-[state=active]:bg-primary data-[state=active]:text-white gap-1.5">
-            <Zap className="h-3.5 w-3.5" />Conectores
-          </TabsTrigger>
           <TabsTrigger value="asaas" className="rounded-lg text-[13px] data-[state=active]:bg-primary data-[state=active]:text-white gap-1.5">
             <CreditCard className="h-3.5 w-3.5" />ASAAS
           </TabsTrigger>
@@ -1093,58 +1078,6 @@ export default function Integrations() {
             <Brain className="h-3.5 w-3.5" />IA
           </TabsTrigger>
         </TabsList>
-
-        <TabsContent value="webhook">
-          <WebhookConfigTab />
-        </TabsContent>
-
-        <TabsContent value="meta">
-          <MetaLeadAdsTab />
-        </TabsContent>
-
-        <TabsContent value="logs">
-          <EventLogsTab />
-        </TabsContent>
-
-        <TabsContent value="tracking">
-          <TrackingScriptTab />
-        </TabsContent>
-
-        <TabsContent value="connectors">
-          {integrations.isLoading ? (
-            <p className="text-[13px] text-muted-foreground text-center py-12">Carregando...</p>
-          ) : !integrations.data?.length ? (
-            <Card className="border border-border/40 shadow-none rounded-xl">
-              <div className="p-12 text-center text-muted-foreground">
-                <Plug className="h-12 w-12 mx-auto mb-4 text-muted-foreground/20" />
-                <p className="text-[14px] font-medium text-muted-foreground/60">Nenhuma integração configurada</p>
-                <p className="text-[13px] text-muted-foreground/40 mt-1">Conecte serviços como Stripe, Google Calendar, etc.</p>
-              </div>
-            </Card>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {integrations.data.map((i: any) => (
-                <Card key={i.id} className="border border-border/40 shadow-none rounded-xl hover:shadow-md transition-shadow cursor-pointer group">
-                  <div className="p-5">
-                    <div className="flex items-center gap-3.5">
-                      <div className="h-11 w-11 rounded-xl bg-gradient-to-br from-amber-50 to-orange-50 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-                        <Zap className="h-5 w-5 text-amber-600" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-[14px] font-semibold group-hover:text-primary transition-colors">{i.name}</p>
-                        <p className="text-[12px] text-muted-foreground">{i.provider}</p>
-                      </div>
-                      <span className={`inline-flex items-center gap-1.5 text-[10px] font-medium px-2 py-0.5 rounded-full ${i.status === "active" ? "bg-emerald-50 text-emerald-700" : "bg-slate-50 text-slate-600"}`}>
-                        <span className={`h-1 w-1 rounded-full ${i.status === "active" ? "bg-emerald-500" : "bg-slate-400"}`} />
-                        {i.status === "active" ? "Ativo" : i.status || "—"}
-                      </span>
-                    </div>
-                  </div>
-                </Card>
-              ))}
-            </div>
-          )}
-        </TabsContent>
 
         <TabsContent value="asaas">
           <AsaasIntegrationTab />
