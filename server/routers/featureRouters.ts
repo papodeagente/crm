@@ -162,6 +162,84 @@ export const proposalRouter = router({
       }),
   }),
 
+  /** Envia a proposta por email com PDF anexo. */
+  sendEmail: tenantWriteProcedure
+    .input(z.object({
+      id: z.number(),
+      to: z.string().email().optional(),  // se omitido, usa o email do contato
+      message: z.string().max(2000).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const { TRPCError } = await import("@trpc/server");
+      const tenantId = getTenantId(ctx);
+
+      const proposal = await crm.getProposalById(tenantId, input.id);
+      if (!proposal) throw new TRPCError({ code: "NOT_FOUND", message: "Proposta não encontrada" });
+
+      const deal = await crm.getDealById(tenantId, proposal.dealId);
+      const contact = deal?.contactId ? await crm.getContactById(tenantId, deal.contactId) : null;
+
+      const recipient = input.to || contact?.email;
+      if (!recipient) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Sem email destino — preencha o email do contato ou informe um destinatário." });
+      }
+
+      const branding = await crm.getTenantBranding(tenantId);
+
+      // Gerar PDF
+      const { generateProposalPdf } = await import("../services/proposalPdfService");
+      const { buffer } = await generateProposalPdf(tenantId, input.id);
+      const pdfBase64 = buffer.toString("base64");
+
+      // URLs
+      const origin = (ctx as any).req?.headers?.origin || (ctx as any).req?.headers?.referer?.split("/").slice(0, 3).join("/") || "";
+      const publicUrl = proposal.publicToken && origin ? `${origin}/p/${proposal.publicToken}` : null;
+      const totalText = ((Number(proposal.totalCents ?? 0) || 0) / 100).toLocaleString("pt-BR", { style: "currency", currency: proposal.currency || "BRL" });
+
+      const { sendProposalEmail } = await import("../emailService");
+      const result = await sendProposalEmail({
+        to: recipient,
+        clientName: contact?.name || "Cliente",
+        proposalId: proposal.id,
+        totalText,
+        publicUrl,
+        paymentUrl: proposal.asaasInvoiceUrl,
+        customMessage: input.message,
+        branding: {
+          name: branding?.name,
+          primaryColor: branding?.primaryColor,
+          logoUrl: branding?.logoUrl,
+        },
+        pdfBase64,
+      });
+
+      if (!result.success) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: `Falha ao enviar email: ${result.error}` });
+      }
+
+      // Marca como enviada se ainda em draft
+      if (proposal.status === "draft") {
+        await crm.updateProposal(tenantId, proposal.id, { status: "sent", sentAt: new Date() } as any);
+      }
+
+      await emitEvent({ tenantId, actorUserId: ctx.user.id, entityType: "proposal", entityId: proposal.id, action: "send_email" });
+      return { success: true, to: recipient };
+    }),
+
+  /** Cria uma nova versão (cópia draft) da proposta. */
+  duplicate: tenantWriteProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const tenantId = getTenantId(ctx);
+      const created = await crm.duplicateProposal(tenantId, input.id, ctx.user.id);
+      if (!created?.id) {
+        const { TRPCError } = await import("@trpc/server");
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Falha ao duplicar proposta." });
+      }
+      await emitEvent({ tenantId, actorUserId: ctx.user.id, entityType: "proposal", entityId: created.id, action: "duplicate" });
+      return { id: created.id };
+    }),
+
   /** Gera (ou retorna o existente) token público e marca como enviada. */
   publish: tenantWriteProcedure
     .input(z.object({ id: z.number() }))
@@ -376,6 +454,8 @@ export const publicProposalRouter = router({
       token: z.string().min(8).max(64),
       signerName: z.string().min(1).max(255),
       signerEmail: z.string().email().optional(),
+      /** PNG data URL (canvas exportado) — opcional. */
+      signatureDataUrl: z.string().max(500_000).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const proposal = await crm.findProposalByPublicToken(input.token);
@@ -401,6 +481,26 @@ export const publicProposalRouter = router({
         acceptedClientEmail: input.signerEmail ?? null,
         acceptedClientIp: ip ?? null,
       } as any);
+      // Persiste registro de assinatura (com ou sem PNG)
+      try {
+        const { getDb } = await import("../db");
+        const { proposalSignatures } = await import("../../drizzle/schema");
+        const db = await getDb();
+        if (db) {
+          await db.insert(proposalSignatures).values({
+            tenantId: proposal.tenantId,
+            proposalId: proposal.id,
+            signerName: input.signerName,
+            signerEmail: input.signerEmail ?? null,
+            signatureDataUrl: input.signatureDataUrl ?? null,
+            signedAt: new Date(),
+            ip: ip ?? null,
+          } as any);
+        }
+      } catch (e: any) {
+        // Não falhar o aceite se assinatura não persistir
+        console.warn("[publicProposal.accept] signature persist failed:", e?.message);
+      }
       return { success: true, asaasInvoiceUrl: proposal.asaasInvoiceUrl };
     }),
 });

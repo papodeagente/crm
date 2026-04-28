@@ -18,10 +18,11 @@ import {
 } from "@/components/ui/dialog";
 import {
   ArrowLeft, Plus, Trash2, GripVertical, Eye, Send, Download,
-  Loader2, Package, Copy, MessageCircle, CheckCircle2, FileText, Sparkles,
+  Loader2, Package, Copy, MessageCircle, CheckCircle2, FileText, Sparkles, FilePlus2, Mail,
 } from "lucide-react";
 import { toast } from "sonner";
 import ProductPickerDialog from "@/components/proposals/ProductPickerDialog";
+import ProposalView, { type ProposalViewData } from "@/components/proposals/ProposalView";
 
 interface Item {
   id: number;
@@ -143,9 +144,32 @@ export default function ProposalEditor() {
     onSuccess: () => toast.success("Proposta enviada por WhatsApp ✓"),
     onError: (e: any) => toast.error(e.message),
   });
+  const duplicateMut = trpc.proposals.duplicate.useMutation({
+    onSuccess: (data: any) => {
+      utils.proposals.list.invalidate();
+      toast.success("Nova versão criada como rascunho");
+      if (data?.id) navigate(`/proposals/${data.id}`);
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+  const sendEmailMut = trpc.proposals.sendEmail.useMutation({
+    onSuccess: (data: any) => {
+      toast.success(`Email enviado para ${data.to} ✓`);
+      setShowEmailDialog(false);
+      utils.proposals.get.invalidate({ id: proposalId! });
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const [showEmailDialog, setShowEmailDialog] = useState(false);
+  const [emailTo, setEmailTo] = useState("");
+  const [emailMessage, setEmailMessage] = useState("");
 
   const [showPicker, setShowPicker] = useState(false);
   const [showPublishDialog, setShowPublishDialog] = useState(false);
+  const [view, setView] = useState<"edit" | "preview">("edit");
+
+  const brandingQ = trpc.tenantBranding.get.useQuery(undefined, { enabled: view === "preview" });
 
   // Drag-drop reorder
   const [draggedId, setDraggedId] = useState<number | null>(null);
@@ -226,6 +250,35 @@ export default function ProposalEditor() {
           )}
         </div>
         <div className="flex items-center gap-2">
+          {/* Toggle Editar / Visualizar */}
+          <div className="flex items-center bg-muted rounded-md p-0.5 mr-1">
+            <button
+              type="button"
+              onClick={() => setView("edit")}
+              className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${view === "edit" ? "bg-card shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+            >
+              Editar
+            </button>
+            <button
+              type="button"
+              onClick={() => setView("preview")}
+              className={`px-2.5 py-1 rounded text-xs font-medium inline-flex items-center gap-1 transition-colors ${view === "preview" ? "bg-card shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+            >
+              <Eye className="h-3 w-3" /> Visualizar
+            </button>
+          </div>
+          {isReadOnly && (
+            <Button
+              variant="outline" size="sm"
+              onClick={() => duplicateMut.mutate({ id: proposalId! })}
+              disabled={duplicateMut.isPending}
+              className="gap-2"
+              title="Cria uma nova versão deste documento como rascunho editável"
+            >
+              {duplicateMut.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FilePlus2 className="h-3.5 w-3.5" />}
+              Duplicar
+            </Button>
+          )}
           <Button variant="outline" size="sm" onClick={handleDownloadPdf} className="gap-2">
             <Download className="h-3.5 w-3.5" /> PDF
           </Button>
@@ -250,10 +303,60 @@ export default function ProposalEditor() {
               <MessageCircle className="h-3.5 w-3.5" /> WhatsApp
             </Button>
           )}
+          <Button
+            size="sm" variant="outline"
+            onClick={() => {
+              setEmailTo(contact?.email || "");
+              setEmailMessage("");
+              setShowEmailDialog(true);
+            }}
+            className="gap-2"
+          >
+            <Mail className="h-3.5 w-3.5" /> Email
+          </Button>
         </div>
       </div>
 
       <div className="flex-1 overflow-y-auto">
+        {view === "preview" ? (
+          <div className="max-w-3xl mx-auto p-4 sm:p-8">
+            <ProposalView
+              data={{
+                id: proposal.id,
+                status: proposal.status,
+                currency: proposal.currency,
+                subtotalCents,
+                discountCents,
+                taxCents,
+                totalCents,
+                notes: notes || null,
+                validUntil: validUntil || null,
+                sentAt: proposal.sentAt,
+                client: contact ? {
+                  name: contact.name,
+                  email: contact.email,
+                  phone: contact.phoneE164 || contact.phone,
+                  docId: contact.docId,
+                } : null,
+                asaasInvoiceUrl: proposal.asaasInvoiceUrl,
+                items: items.map(i => ({
+                  id: i.id,
+                  title: i.title || "—",
+                  description: i.description,
+                  qty: i.qty,
+                  unit: i.unit,
+                  unitPriceCents: i.unitPriceCents,
+                  discountCents: i.discountCents,
+                  totalCents: i.totalCents,
+                })),
+                branding: brandingQ.data as any,
+              } as ProposalViewData}
+            />
+            <p className="text-xs text-center text-muted-foreground mt-4">
+              É exatamente isso que o cliente verá no link público e no PDF.
+            </p>
+          </div>
+        ) : (
         <div className="max-w-6xl mx-auto p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6">
 
           {/* ── Centro: tabela de items ── */}
@@ -505,6 +608,7 @@ export default function ProposalEditor() {
             )}
           </aside>
         </div>
+        )}
       </div>
 
       {/* Picker de produtos */}
@@ -518,6 +622,48 @@ export default function ProposalEditor() {
       )}
 
       {/* Publish dialog */}
+      <Dialog open={showEmailDialog} onOpenChange={setShowEmailDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Enviar proposta por email</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <Label className="text-xs">Para</Label>
+              <Input
+                type="email"
+                value={emailTo}
+                onChange={(e) => setEmailTo(e.target.value)}
+                placeholder="cliente@exemplo.com"
+              />
+            </div>
+            <div>
+              <Label className="text-xs">Mensagem (opcional)</Label>
+              <Textarea
+                rows={4}
+                value={emailMessage}
+                onChange={(e) => setEmailMessage(e.target.value)}
+                placeholder={`Olá ${contact?.name?.split(" ")[0] || ""}, segue a proposta comercial.`}
+              />
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              O PDF será gerado e anexado automaticamente. O cliente também recebe links para visualizar e pagar (se cobrança Asaas estiver gerada).
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setShowEmailDialog(false)}>Cancelar</Button>
+            <Button
+              onClick={() => sendEmailMut.mutate({ id: proposalId!, to: emailTo || undefined, message: emailMessage || undefined })}
+              disabled={sendEmailMut.isPending || !emailTo}
+              className="gap-2"
+            >
+              {sendEmailMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
+              Enviar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={showPublishDialog} onOpenChange={setShowPublishDialog}>
         <DialogContent>
           <DialogHeader>

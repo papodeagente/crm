@@ -9,24 +9,91 @@ const APP_NAME = "Clinilucro";
 // SEND EMAIL HELPER
 // ═══════════════════════════════════════
 
-async function sendEmail(opts: { to: string; subject: string; html: string }) {
+async function sendEmail(opts: {
+  to: string;
+  subject: string;
+  html: string;
+  from?: string;
+  attachments?: Array<{ filename: string; content: string | Buffer }>;
+}) {
   if (!process.env.RESEND_API_KEY) {
     console.warn("[Email] RESEND_API_KEY not configured, skipping email to:", opts.to);
     return { success: false, error: "RESEND_API_KEY not configured" };
   }
   try {
-    const result = await resend.emails.send({
-      from: FROM_EMAIL,
+    const payload: any = {
+      from: opts.from || FROM_EMAIL,
       to: opts.to,
       subject: opts.subject,
       html: opts.html,
-    });
+    };
+    if (opts.attachments?.length) payload.attachments = opts.attachments;
+    const result = await resend!.emails.send(payload);
     console.log("[Email] Sent to:", opts.to, "subject:", opts.subject);
     return { success: true, data: result };
   } catch (error) {
     console.error("[Email] Failed to send to:", opts.to, error);
     return { success: false, error: String(error) };
   }
+}
+
+/**
+ * Envia a proposta por email com PDF anexo.
+ * Branding (cor primária, nome) é aplicado no template.
+ */
+export async function sendProposalEmail(opts: {
+  to: string;
+  clientName: string;
+  proposalId: number;
+  totalText: string;       // ex.: "R$ 1.250,00"
+  publicUrl?: string | null;
+  paymentUrl?: string | null;
+  customMessage?: string;
+  branding: {
+    name?: string | null;
+    primaryColor?: string | null;
+    logoUrl?: string | null;
+  };
+  pdfBase64: string;
+}) {
+  const primary = opts.branding.primaryColor || "#5A8A1F";
+  const clinic = opts.branding.name || APP_NAME;
+  const intro = (opts.customMessage && opts.customMessage.trim())
+    || `Olá ${opts.clientName.split(" ")[0]}, segue a proposta comercial da ${clinic}.`;
+
+  const ctaButtons = [
+    opts.publicUrl ? `<a href="${opts.publicUrl}" style="display:inline-block;margin:6px 4px;background:${primary};color:#fff;text-decoration:none;padding:12px 22px;border-radius:10px;font-weight:600;font-size:14px;">Ver proposta</a>` : "",
+    opts.paymentUrl ? `<a href="${opts.paymentUrl}" style="display:inline-block;margin:6px 4px;background:#0A0A0A;color:#fff;text-decoration:none;padding:12px 22px;border-radius:10px;font-weight:600;font-size:14px;">Pagar agora</a>` : "",
+  ].join("");
+
+  const html = `
+<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:#f8fafc;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+  <div style="max-width:560px;margin:0 auto;padding:40px 20px;">
+    <div style="height:6px;background:${primary};border-radius:6px 6px 0 0;"></div>
+    <div style="background:#fff;border-radius:0 0 12px 12px;padding:32px;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
+      ${opts.branding.logoUrl ? `<img src="${opts.branding.logoUrl}" alt="${clinic}" style="max-height:48px;margin-bottom:16px;">` : ""}
+      <h1 style="margin:0 0 12px 0;font-size:18px;color:#0f172a;">Proposta #${opts.proposalId}</h1>
+      <p style="margin:0 0 16px 0;color:#475569;font-size:14px;line-height:1.6;">${intro.replace(/\n/g, "<br>")}</p>
+      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:16px;margin:18px 0;">
+        <p style="margin:0;font-size:12px;color:#64748b;text-transform:uppercase;letter-spacing:.05em;">Total</p>
+        <p style="margin:4px 0 0 0;font-size:24px;font-weight:700;color:${primary};">${opts.totalText}</p>
+      </div>
+      <p style="margin:0 0 12px 0;color:#475569;font-size:13px;">O PDF detalhado da proposta está anexo a este email.</p>
+      <div style="text-align:center;margin-top:20px;">${ctaButtons}</div>
+    </div>
+    <div style="text-align:center;margin-top:24px;color:#94a3b8;font-size:12px;">
+      <p>${clinic}</p>
+    </div>
+  </div>
+</body></html>`;
+
+  return sendEmail({
+    to: opts.to,
+    subject: `Proposta #${opts.proposalId} — ${clinic}`,
+    html,
+    attachments: [{ filename: `proposta-${opts.proposalId}.pdf`, content: opts.pdfBase64 }],
+  });
 }
 
 // ═══════════════════════════════════════

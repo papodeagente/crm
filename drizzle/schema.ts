@@ -1043,10 +1043,11 @@ export const proposalSignatures = pgTable("proposal_signatures", {
   proposalId: integer("proposalId").notNull(),
   signerName: varchar("signerName", { length: 255 }).notNull(),
   signerEmail: varchar("signerEmail", { length: 320 }),
+  signatureDataUrl: text("signatureDataUrl"), // PNG base64 da assinatura desenhada
   signedAt: timestamp("signedAt"),
   ip: varchar("ip", { length: 64 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-}, (t) => [index("psig_tenant_idx").on(t.tenantId)]);
+}, (t) => [index("psig_tenant_idx").on(t.tenantId), index("psig_proposal_idx").on(t.proposalId)]);
 
 // ════════════════════════════════════════════════════════════
 // M4 — PORTAL DO CLIENTE

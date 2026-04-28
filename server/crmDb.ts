@@ -1135,6 +1135,51 @@ export async function findProposalByPublicToken(token: string) {
   const rows = await db.select().from(proposals).where(eq(proposals.publicToken, token)).limit(1);
   return rows[0] || null;
 }
+
+/** Cria uma nova versão da proposta copiando items, sem token público (vai ter o seu próprio quando publicar). */
+export async function duplicateProposal(tenantId: number, sourceId: number, createdBy?: number) {
+  const db = await getDb(); if (!db) return null;
+  const source = await getProposalById(tenantId, sourceId);
+  if (!source) return null;
+  const sourceItems = await listProposalItems(tenantId, sourceId);
+
+  const [newProposal] = await db.insert(proposals).values({
+    tenantId,
+    dealId: source.dealId,
+    version: (source.version ?? 1) + 1,
+    status: "draft",
+    totalCents: source.totalCents,
+    subtotalCents: source.subtotalCents,
+    discountCents: source.discountCents,
+    taxCents: source.taxCents,
+    currency: source.currency ?? "BRL",
+    notes: source.notes,
+    validUntil: source.validUntil,
+    templateId: source.templateId,
+    createdBy: createdBy ?? null,
+  } as any).returning({ id: proposals.id });
+
+  if (!newProposal?.id) return null;
+
+  // Copiar items
+  for (const item of sourceItems) {
+    await db.insert(proposalItems).values({
+      tenantId,
+      proposalId: newProposal.id,
+      title: item.title,
+      description: item.description,
+      qty: item.qty,
+      unit: (item as any).unit,
+      unitPriceCents: item.unitPriceCents,
+      discountCents: (item as any).discountCents ?? 0,
+      totalCents: item.totalCents,
+      productId: (item as any).productId,
+      orderIndex: (item as any).orderIndex ?? 0,
+    } as any);
+  }
+
+  return newProposal;
+}
 export async function listProposalTemplates(tenantId: number) {
   const db = await getDb(); if (!db) return [];
   return db.select().from(proposalTemplates).where(eq(proposalTemplates.tenantId, tenantId));
