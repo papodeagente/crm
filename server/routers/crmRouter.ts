@@ -66,7 +66,9 @@ export const crmRouter = router({
     create: tenantWriteProcedure
       .input(z.object({
         name: z.string().min(1), type: z.enum(["person", "company"]).optional(),
-        email: z.string().optional(), phone: z.string().optional(), source: z.string().optional(),
+        email: z.string().optional(), phone: z.string().optional(),
+        docId: z.string().optional(),       // CPF (11 dígitos) ou CNPJ (14 dígitos) — usado p/ Asaas
+        source: z.string().optional(),
         ownerUserId: z.number().optional(), teamId: z.number().optional(),
       }))
       .mutation(async ({ ctx, input }) => {
@@ -85,7 +87,9 @@ export const crmRouter = router({
     update: tenantWriteProcedure
       .input(z.object({
         id: z.number(), name: z.string().optional(), email: z.string().optional(),
-        phone: z.string().optional(), lifecycleStage: z.enum(["lead", "prospect", "customer", "churned"]).optional(),
+        phone: z.string().optional(),
+        docId: z.string().nullable().optional(),  // CPF/CNPJ — usado p/ cliente Asaas
+        lifecycleStage: z.enum(["lead", "prospect", "customer", "churned"]).optional(),
         notes: z.string().optional(), ownerUserId: z.number().optional(),
         birthDate: z.string().nullable().optional(), weddingDate: z.string().nullable().optional(),
         gender: z.string().nullable().optional(), referredBy: z.string().nullable().optional(),

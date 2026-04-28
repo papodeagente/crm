@@ -21,6 +21,7 @@ function CreateContactDialog({
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phoneValue, setPhoneValue] = useState("");
+  const [docId, setDocId] = useState("");
   const [creating, setCreating] = useState(false);
   const [customFieldValues, setCustomFieldValues] = useState<Record<number, string>>({});
   const [debouncedPhone, setDebouncedPhone] = useState("");
@@ -45,6 +46,7 @@ function CreateContactDialog({
     if (open) {
       setName(pushName || "");
       setEmail("");
+      setDocId("");
       const raw = phone.replace(/\D/g, "");
       const formattedPhone = raw ? (raw.startsWith("+") ? raw : `+${raw.startsWith("55") ? raw : `55${raw}`}`) : "";
       setPhoneValue(formattedPhone);
@@ -109,6 +111,7 @@ function CreateContactDialog({
         name: name.trim(),
         phone: phoneValue || undefined,
         email: email.trim() || undefined,
+        docId: docId ? docId.replace(/\D/g, "") : undefined,
       });
 
       // Save custom field values
@@ -233,6 +236,16 @@ function CreateContactDialog({
                 {phoneMatchRequiresEmail && !email.trim() && (
                   <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-1">Informe um email para diferenciar do passageiro existente</p>
                 )}
+              </div>
+              <div>
+                <label className={labelCls}>CPF / CNPJ <span className="text-muted-foreground/70">(usado em cobranças Asaas)</span></label>
+                <input
+                  value={docId}
+                  onChange={e => setDocId(e.target.value)}
+                  placeholder="000.000.000-00 ou 00.000.000/0000-00"
+                  inputMode="numeric"
+                  className={`${inputCls} font-mono`}
+                />
               </div>
             </div>
           </section>

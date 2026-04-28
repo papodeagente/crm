@@ -64,6 +64,14 @@ function formatDate(d: string | null) {
   return new Date(d).toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric", timeZone: "America/Sao_Paulo" });
 }
 
+function formatDocId(raw: string | null | undefined): string {
+  if (!raw) return "Não informado";
+  const d = String(raw).replace(/\D/g, "");
+  if (d.length === 11) return `${d.slice(0,3)}.${d.slice(3,6)}.${d.slice(6,9)}-${d.slice(9)}`;
+  if (d.length === 14) return `${d.slice(0,2)}.${d.slice(2,5)}.${d.slice(5,8)}/${d.slice(8,12)}-${d.slice(12)}`;
+  return raw;
+}
+
 function lifecycleLabel(stage: string) {
   switch (stage) {
     case "lead": return "Lead";
@@ -130,7 +138,7 @@ export default function ContactProfile() {
   const [activeTab, setActiveTab] = useState("sobre");
   const [isEditing, setIsEditing] = useState(false);
   const [editData, setEditData] = useState({
-    name: "", email: "", phone: "", birthDate: "", gender: "", referredBy: "",
+    name: "", email: "", phone: "", docId: "", birthDate: "", gender: "", referredBy: "",
   });
   const [convenioForm, setConvenioForm] = useState({ numero: "", nome: "" });
   const [quickSendOpen, setQuickSendOpen] = useState(false);
@@ -179,6 +187,7 @@ export default function ContactProfile() {
       name: contact.name || "",
       email: contact.email || "",
       phone: contact.phone || "",
+      docId: contact.docId || "",
       birthDate: contact.birthDate || "",
       gender: contact.gender || "",
       referredBy: contact.referredBy || "",
@@ -192,6 +201,7 @@ export default function ContactProfile() {
       name: editData.name || undefined,
       email: editData.email || undefined,
       phone: editData.phone || undefined,
+      docId: editData.docId ? editData.docId.replace(/\D/g, "") : null,
       birthDate: editData.birthDate || null,
       gender: editData.gender || null,
       referredBy: editData.referredBy || null,
@@ -274,6 +284,16 @@ export default function ContactProfile() {
                 <Input value={editData.phone} onChange={e => setEditData({ ...editData, phone: e.target.value })} className="h-8 text-xs" />
               </div>
               <div>
+                <label className="text-[10px] text-muted-foreground">CPF / CNPJ <span className="text-muted-foreground/60">(usado p/ cobranças Asaas)</span></label>
+                <Input
+                  value={editData.docId}
+                  onChange={e => setEditData({ ...editData, docId: e.target.value })}
+                  placeholder="000.000.000-00 ou 00.000.000/0000-00"
+                  className="h-8 text-xs font-mono"
+                  inputMode="numeric"
+                />
+              </div>
+              <div>
                 <label className="text-[10px] text-muted-foreground">Data de Nascimento</label>
                 <Input
                   type="date"
@@ -344,6 +364,10 @@ export default function ContactProfile() {
                   )}
                   <span className="font-medium">{contact.phone || "N/A"}</span>
                 </div>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">CPF/CNPJ:</span>
+                <span className="font-medium font-mono text-[11px]">{formatDocId(contact.docId)}</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">Plano:</span>

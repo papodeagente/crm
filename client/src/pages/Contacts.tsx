@@ -48,6 +48,7 @@ export default function Contacts() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
+  const [docId, setDocId] = useState("");
   const [customFieldValues, setCustomFieldValues] = useState<Record<number, string>>({});
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [showTrash, setShowTrash] = useState(false);
@@ -126,7 +127,7 @@ export default function Contacts() {
         } catch (e) { console.error("Error saving custom fields:", e); }
       }
       utils.crm.contacts.list.invalidate();
-      setOpen(false); setName(""); setEmail(""); setPhone(""); setCustomFieldValues({});
+      setOpen(false); setName(""); setEmail(""); setPhone(""); setDocId(""); setCustomFieldValues({});
       toast.success("Cliente criado!");
     },
   });
@@ -236,6 +237,16 @@ export default function Contacts() {
                     <Label className="text-[12px] font-medium text-muted-foreground">Telefone</Label>
                     <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+55 11 99999-9999" className="mt-1.5 h-10 rounded-lg" />
                   </div>
+                  <div>
+                    <Label className="text-[12px] font-medium text-muted-foreground">CPF / CNPJ <span className="text-muted-foreground/70">(usado em cobranças Asaas)</span></Label>
+                    <Input
+                      value={docId}
+                      onChange={(e) => setDocId(e.target.value)}
+                      placeholder="000.000.000-00 ou 00.000.000/0000-00"
+                      inputMode="numeric"
+                      className="mt-1.5 h-10 rounded-lg font-mono"
+                    />
+                  </div>
                   {/* Campos Personalizados */}
                   {visibleFormFields.length > 0 && (
                     <div className="border border-border/40 rounded-xl p-4 bg-muted/20 space-y-3">
@@ -253,7 +264,7 @@ export default function Contacts() {
                   <Button
                     className="w-full h-10 rounded-lg text-[13px] font-medium bg-primary hover:bg-primary/90 shadow-sm transition-colors"
                     disabled={!name || createContact.isPending}
-                    onClick={() => createContact.mutate({ name, email: email || undefined, phone: phone || undefined })}
+                    onClick={() => createContact.mutate({ name, email: email || undefined, phone: phone || undefined, docId: docId ? docId.replace(/\D/g, "") : undefined })}
                   >
                     {createContact.isPending ? "Criando..." : "Criar Cliente"}
                   </Button>

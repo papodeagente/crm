@@ -146,7 +146,15 @@ export async function assignPermissionToRole(data: { tenantId: number; roleId: n
 // ═══════════════════════════════════════
 // CONTACTS
 // ═══════════════════════════════════════
-export async function createContact(data: { tenantId: number; name: string; type?: "person" | "company"; email?: string; phone?: string; source?: string; ownerUserId?: number; teamId?: number; createdBy?: number }) {
+function sanitizeDocId(raw: string | null | undefined): string | undefined {
+  if (!raw) return undefined;
+  const digits = raw.replace(/\D/g, "");
+  if (!digits) return undefined;
+  if (digits.length !== 11 && digits.length !== 14) return undefined; // CPF=11, CNPJ=14
+  return digits;
+}
+
+export async function createContact(data: { tenantId: number; name: string; type?: "person" | "company"; email?: string; phone?: string; docId?: string; source?: string; ownerUserId?: number; teamId?: number; createdBy?: number }) {
   const db = await getDb(); if (!db) return null;
   // Normalize phone to canonical Brazilian format (+55DDNNNNNNNNN)
   if (data.phone) {
@@ -154,7 +162,10 @@ export async function createContact(data: { tenantId: number; name: string; type
     const normalized = normalizeBrazilianPhone(data.phone);
     if (normalized) data.phone = `+${normalized}`;
   }
-  const [result] = await db.insert(contacts).values(data).returning({ id: contacts.id });
+  const sanitized = sanitizeDocId(data.docId);
+  const insertData: any = { ...data };
+  if (sanitized) insertData.docId = sanitized; else delete insertData.docId;
+  const [result] = await db.insert(contacts).values(insertData).returning({ id: contacts.id });
   return result;
 }
 export async function getContactById(tenantId: number, id: number) {
@@ -187,7 +198,7 @@ export async function listContacts(tenantId: number, opts?: { search?: string; s
   }
   return db.select().from(contacts).where(and(...conditions)).orderBy(desc(contacts.updatedAt)).limit(opts?.limit || 50).offset(opts?.offset || 0);
 }
-export async function updateContact(tenantId: number, id: number, data: Partial<{ name: string; email: string; phone: string; lifecycleStage: "lead" | "prospect" | "customer" | "churned"; notes: string; ownerUserId: number; updatedBy: number; birthDate: string | null; weddingDate: string | null; gender: string | null; referredBy: string | null; convenioNumero: string | null; convenioNome: string | null; consultationNotes: any }>) {
+export async function updateContact(tenantId: number, id: number, data: Partial<{ name: string; email: string; phone: string; docId: string | null; lifecycleStage: "lead" | "prospect" | "customer" | "churned"; notes: string; ownerUserId: number; updatedBy: number; birthDate: string | null; weddingDate: string | null; gender: string | null; referredBy: string | null; convenioNumero: string | null; convenioNome: string | null; consultationNotes: any }>) {
   const db = await getDb(); if (!db) return;
   // Normalize phone to canonical Brazilian format (+55DDNNNNNNNNN)
   if (data.phone) {
@@ -195,7 +206,13 @@ export async function updateContact(tenantId: number, id: number, data: Partial<
     const normalized = normalizeBrazilianPhone(data.phone);
     if (normalized) data.phone = `+${normalized}`;
   }
-  await db.update(contacts).set(data).where(and(eq(contacts.id, id), eq(contacts.tenantId, tenantId)));
+  // Sanitize CPF/CNPJ to digits-only (Asaas exige sem máscara)
+  const cleaned: any = { ...data };
+  if (data.docId !== undefined) {
+    const sanitized = sanitizeDocId(data.docId as any);
+    cleaned.docId = sanitized ?? null;
+  }
+  await db.update(contacts).set(cleaned).where(and(eq(contacts.id, id), eq(contacts.tenantId, tenantId)));
 }
 export async function deleteContact(tenantId: number, id: number) {
   const db = await getDb(); if (!db) return;
