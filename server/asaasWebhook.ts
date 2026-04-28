@@ -179,6 +179,18 @@ export async function handleAsaasWebhook(req: Request, res: Response) {
           asaasPaymentStatus: payload.payment.status,
           asaasPaidAt: paidAt,
         });
+        try {
+          const { emitToTenant } = await import("./socketSingleton");
+          emitToTenant("dealChargeUpdated", {
+            dealId,
+            paymentId: payload.payment.id,
+            status: payload.payment.status,
+            paid: isPaid,
+            paidAt: paidAt?.toISOString() || null,
+          }, tenantId);
+        } catch (e: any) {
+          console.warn("[ASAAS] socket emit failed:", e?.message);
+        }
       } else {
         errorMsg = "Charge not resolved from webhook payload (proposal nor deal)";
         console.warn("[ASAAS] Webhook unresolved:", { event: payload.event, paymentId, externalRef: payload.payment?.externalReference });

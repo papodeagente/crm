@@ -2783,6 +2783,20 @@ export async function findDealByAsaasPaymentId(asaasPaymentId: string) {
   return rows[0] || null;
 }
 
+export async function clearDealAsaasPayment(tenantId: number, dealId: number) {
+  const db = await getDb(); if (!db) return;
+  await db.update(deals).set({
+    asaasPaymentId: null,
+    asaasInvoiceUrl: null,
+    asaasBankSlipUrl: null,
+    asaasBillingType: null,
+    asaasPaymentStatus: null,
+    asaasDueDate: null,
+    asaasPaidAt: null,
+    asaasLinkSentToWhatsappAt: null,
+  }).where(and(eq(deals.id, dealId), eq(deals.tenantId, tenantId)));
+}
+
 export async function updateDealFromAsaasStatus(dealId: number, tenantId: number, data: {
   asaasPaymentStatus: string;
   asaasPaidAt?: Date | null;

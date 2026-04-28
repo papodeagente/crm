@@ -487,6 +487,7 @@ export default function DealDetail() {
                 )}
                 {deal.asaasPaymentId && (
                   <DealChargeStatusPill
+                    dealId={deal.id}
                     asaasPaymentId={deal.asaasPaymentId}
                     asaasPaymentStatus={deal.asaasPaymentStatus}
                     asaasInvoiceUrl={deal.asaasInvoiceUrl}

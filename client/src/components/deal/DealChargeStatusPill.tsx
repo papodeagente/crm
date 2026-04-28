@@ -6,14 +6,16 @@
  */
 
 import { useState } from "react";
-import { CheckCircle2, AlertTriangle, Clock, ExternalLink, Copy } from "lucide-react";
+import { CheckCircle2, AlertTriangle, Clock, ExternalLink, Copy, Send, RefreshCcw, Trash2, Loader2 } from "lucide-react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { trpc } from "@/lib/trpc";
 
 interface Props {
+  dealId?: number;
   asaasPaymentId: string | null | undefined;
   asaasPaymentStatus: string | null | undefined;
   asaasInvoiceUrl: string | null | undefined;
@@ -36,10 +38,24 @@ function statusInfo(status: string | null | undefined) {
 }
 
 export default function DealChargeStatusPill({
-  asaasPaymentId, asaasPaymentStatus, asaasInvoiceUrl, asaasBankSlipUrl,
+  dealId, asaasPaymentId, asaasPaymentStatus, asaasInvoiceUrl, asaasBankSlipUrl,
   asaasBillingType, asaasDueDate, className = "",
 }: Props) {
   const [open, setOpen] = useState(false);
+  const utils = trpc.useUtils();
+  const isPaid = PAID.includes(asaasPaymentStatus || "");
+  const resend = trpc.asaas.resendDealChargeWhatsapp.useMutation({
+    onSuccess: () => { toast.success("Link reenviado no WhatsApp"); utils.crm.deals.invalidate(); },
+    onError: (e) => toast.error(e.message),
+  });
+  const sync = trpc.asaas.syncDealCharge.useMutation({
+    onSuccess: (r) => { toast.success(`Status sincronizado: ${r.status}`); utils.crm.deals.invalidate(); },
+    onError: (e) => toast.error(e.message),
+  });
+  const cancel = trpc.asaas.cancelDealCharge.useMutation({
+    onSuccess: () => { toast.success("Cobrança cancelada"); utils.crm.deals.invalidate(); setOpen(false); },
+    onError: (e) => toast.error(e.message),
+  });
   if (!asaasPaymentId) return null;
   const info = statusInfo(asaasPaymentStatus);
   const link = asaasInvoiceUrl || asaasBankSlipUrl || "";
@@ -91,6 +107,44 @@ export default function DealChargeStatusPill({
               </div>
             )}
           </div>
+          {dealId && (
+            <div className="flex flex-wrap gap-2 pt-2 border-t">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => resend.mutate({ dealId })}
+                disabled={resend.isPending || !link}
+              >
+                {resend.isPending ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Send className="h-3.5 w-3.5 mr-1" />}
+                Reenviar WhatsApp
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => sync.mutate({ dealId })}
+                disabled={sync.isPending}
+              >
+                {sync.isPending ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <RefreshCcw className="h-3.5 w-3.5 mr-1" />}
+                Sincronizar
+              </Button>
+              {!isPaid && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="text-red-600 hover:text-red-700"
+                  onClick={() => {
+                    if (confirm("Cancelar esta cobrança no Asaas? Esta ação não pode ser desfeita.")) {
+                      cancel.mutate({ dealId });
+                    }
+                  }}
+                  disabled={cancel.isPending}
+                >
+                  {cancel.isPending ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Trash2 className="h-3.5 w-3.5 mr-1" />}
+                  Cancelar
+                </Button>
+              )}
+            </div>
+          )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)}>Fechar</Button>
           </DialogFooter>

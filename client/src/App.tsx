@@ -8,6 +8,7 @@ import TopNavLayout from "./components/TopNavLayout";
 import { Suspense } from "react";
 import { Loader2 } from "lucide-react";
 import { lazyWithRetry } from "./lib/lazyWithRetry";
+import { useDealChargeNotifications } from "./hooks/useDealChargeNotifications";
 
 // Lazy load pages with automatic retry on chunk load failure
 const Home = lazyWithRetry(() => import("./pages/Home"));
@@ -99,6 +100,7 @@ function PageLoader() {
 }
 
 function AppRouter() {
+  useDealChargeNotifications();
   return (
     <Suspense fallback={<PageLoader />}>
       <Switch>

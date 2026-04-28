@@ -365,6 +365,109 @@ export const asaasRouter = router({
       };
     }),
 
+  // ─── Cancelar cobrança de um deal (DELETE no Asaas + limpa colunas) ──
+  cancelDealCharge: tenantWriteProcedure
+    .input(z.object({ dealId: z.number().int() }))
+    .mutation(async ({ ctx, input }) => {
+      const tenantId = getTenantId(ctx);
+      const deal = await crm.getDealById(tenantId, input.dealId);
+      if (!deal?.asaasPaymentId) throw new TRPCError({ code: "NOT_FOUND", message: "Negócio sem cobrança ASAAS." });
+      const PAID = ["RECEIVED", "CONFIRMED", "RECEIVED_IN_CASH"];
+      if (deal.asaasPaymentStatus && PAID.includes(deal.asaasPaymentStatus)) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Cobrança já paga não pode ser cancelada." });
+      }
+      const { client } = await loadClient(tenantId);
+      try {
+        await client.deletePayment(deal.asaasPaymentId);
+      } catch (err: any) {
+        const msg = err instanceof AsaasError ? err.message : err.message;
+        throw new TRPCError({ code: "BAD_REQUEST", message: `Falha ao cancelar no ASAAS: ${msg}` });
+      }
+      await crm.clearDealAsaasPayment(tenantId, deal.id);
+      await emitEvent({ tenantId, actorUserId: ctx.user.id, entityType: "deal", entityId: deal.id, action: "asaas_charge_cancelled" });
+      return { ok: true as const };
+    }),
+
+  // ─── Reenviar link da cobrança no WhatsApp ───────────────
+  resendDealChargeWhatsapp: tenantWriteProcedure
+    .input(z.object({ dealId: z.number().int(), message: z.string().max(2000).optional() }))
+    .mutation(async ({ ctx, input }) => {
+      const tenantId = getTenantId(ctx);
+      const deal = await crm.getDealById(tenantId, input.dealId);
+      if (!deal?.asaasPaymentId) throw new TRPCError({ code: "NOT_FOUND", message: "Negócio sem cobrança." });
+      if (!deal.contactId) throw new TRPCError({ code: "BAD_REQUEST", message: "Negócio sem contato." });
+      const contact = await crm.getContactById(tenantId, deal.contactId);
+      if (!contact) throw new TRPCError({ code: "NOT_FOUND", message: "Contato não encontrado." });
+
+      const targetUrl = deal.asaasInvoiceUrl || deal.asaasBankSlipUrl || "";
+      if (!targetUrl) throw new TRPCError({ code: "BAD_REQUEST", message: "Sem link de pagamento disponível." });
+
+      const firstName = (contact.name || "").split(/\s+/)[0] || "";
+      const valueFmt = (Number(deal.valueCents ?? 0) / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+      const dueFmt = deal.asaasDueDate ? new Date(deal.asaasDueDate).toLocaleDateString("pt-BR") : "";
+      const defaultMsg = `Olá, ${firstName}! Reenviando o link de pagamento referente a *${deal.title}* (${valueFmt}):\n\n${targetUrl}${dueFmt ? `\n\nVencimento: ${dueFmt}.` : ""}`;
+      const msg = input.message
+        ? input.message
+            .replace(/\{primeiroNome\}/g, firstName)
+            .replace(/\{nome\}/g, contact.name || "")
+            .replace(/\{dealTitle\}/g, deal.title)
+            .replace(/\{invoiceUrl\}/g, targetUrl)
+            .replace(/\{valor\}/g, valueFmt)
+            .replace(/\{vencimento\}/g, dueFmt)
+            .replace(/\{data\}/g, dueFmt)
+        : defaultMsg;
+
+      const { getSessionsByTenant, getDb } = await import("../db");
+      const sessions = await getSessionsByTenant(tenantId);
+      const activeSession = sessions.find((s: any) => s.status === "connected") || sessions[0];
+      if (!activeSession) throw new TRPCError({ code: "BAD_REQUEST", message: "Nenhuma sessão WhatsApp ativa." });
+
+      let jid: string | null = null;
+      if (deal.waConversationId) {
+        const db = await getDb();
+        if (db) {
+          const { sql } = await import("drizzle-orm");
+          const r = await db.execute(sql`SELECT "remoteJid" FROM wa_conversations WHERE id = ${deal.waConversationId} LIMIT 1`);
+          const row = ((r as any).rows ?? r)?.[0];
+          jid = row?.remoteJid || null;
+        }
+      }
+      if (!jid) {
+        const digits = (contact.phoneE164 || contact.phone || "").replace(/\D/g, "");
+        if (digits) jid = `${digits}@s.whatsapp.net`;
+      }
+      if (!jid) throw new TRPCError({ code: "BAD_REQUEST", message: "Contato sem telefone WhatsApp." });
+
+      const { whatsappManager } = await import("../whatsappEvolution");
+      await whatsappManager.sendTextMessage(activeSession.sessionId, jid, msg);
+      await crm.setDealAsaasPayment(tenantId, deal.id, {
+        asaasPaymentId: deal.asaasPaymentId,
+        asaasLinkSentToWhatsappAt: new Date(),
+      });
+      return { ok: true as const, sentAt: new Date().toISOString() };
+    }),
+
+  // ─── Sincronizar status de uma cobrança de deal sob demanda ─
+  syncDealCharge: tenantWriteProcedure
+    .input(z.object({ dealId: z.number().int() }))
+    .mutation(async ({ ctx, input }) => {
+      const tenantId = getTenantId(ctx);
+      const deal = await crm.getDealById(tenantId, input.dealId);
+      if (!deal?.asaasPaymentId) throw new TRPCError({ code: "NOT_FOUND", message: "Negócio sem cobrança ASAAS." });
+      const { client } = await loadClient(tenantId);
+      const payment = await client.getPayment(deal.asaasPaymentId);
+      const isPaid = ["RECEIVED", "CONFIRMED", "RECEIVED_IN_CASH"].includes(payment.status);
+      await crm.setDealAsaasPayment(tenantId, deal.id, {
+        asaasPaymentId: payment.id,
+        asaasInvoiceUrl: payment.invoiceUrl ?? null,
+        asaasBankSlipUrl: payment.bankSlipUrl ?? null,
+        asaasBillingType: payment.billingType,
+        asaasPaymentStatus: payment.status,
+        asaasPaidAt: isPaid && payment.paymentDate ? new Date(payment.paymentDate) : null,
+      });
+      return { ok: true as const, status: payment.status, paid: isPaid };
+    }),
+
   // ─── Sync charge status from ASAAS ────────────────────────
   syncProposalCharge: tenantWriteProcedure
     .input(z.object({ proposalId: z.number() }))
