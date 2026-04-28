@@ -1,8 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <rect width="64" height="64" rx="14" fill="#0F172A"/>
-  <g transform="translate(32, 32) scale(0.22) translate(-110, -100)">
-    <path d="M 145 30 A 70 70 0 1 0 145 170" fill="none" stroke="#FFFFFF" stroke-width="18" stroke-linecap="round"/>
-    <path d="M 60 110 L 88 110 L 100 90 L 112 130 L 124 80 L 138 110 L 195 50" fill="none" stroke="#65A30D" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
-    <path d="M 173 50 L 195 50 L 195 72" fill="none" stroke="#65A30D" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
-  </g>
+  <rect width="64" height="64" rx="14" fill="#0A0A0A"/>
+  <text x="50%" y="56%" text-anchor="middle" dominant-baseline="middle"
+        font-family="Inter, system-ui, sans-serif" font-weight="300"
+        font-size="42" letter-spacing="-2" fill="#B8FF29">l</text>
 </svg>

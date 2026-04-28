@@ -59,21 +59,24 @@
   --color-wa-date-pill: var(--wa-date-pill);
   --color-wa-date-pill-text: var(--wa-date-pill-text);
   --color-wa-chat-compose-bg: var(--wa-chat-compose-bg);
-  /* Clinilucro Brand Colors */
-  --color-brand-bg: #06140F;
-  --color-brand-emerald: #047857;
-  --color-brand-mint: #10B981;
-  --color-brand-lime: #84CC16;
-  --color-brand-ink: #0F172A;
+  /* Clinilucro Brand Colors — Neon Edition */
+  --color-brand-bg: #0A0A0A;          /* preto profundo (fundo dark hero) */
+  --color-brand-neon: #B8FF29;        /* verde lima fluorescente — cor primária */
+  --color-brand-neon-soft: #D9FF7A;   /* hover/focus */
+  --color-brand-ink: #0A0A0A;
+  --color-brand-paper: #F2F2F0;       /* fundo claro neutro */
   --color-brand-neutral: #F1F5F9;
-  /* Aliases mantidos p/ compatibilidade com código legado */
-  --color-entur-bg: #06140F;
-  --color-entur-roxo: #047857;
-  --color-entur-magenta: #10B981;
-  --color-entur-vermelho: #84CC16;
-  --color-entur-coral: #10B981;
-  --color-entur-peach: #A7F3D0;
-  --color-entur-lima: #84CC16;
+  /* Aliases mantidos p/ compatibilidade com código legado (apontam para neon) */
+  --color-brand-emerald: #B8FF29;
+  --color-brand-mint: #B8FF29;
+  --color-brand-lime: #B8FF29;
+  --color-entur-bg: #0A0A0A;
+  --color-entur-roxo: #B8FF29;
+  --color-entur-magenta: #B8FF29;
+  --color-entur-vermelho: #B8FF29;
+  --color-entur-coral: #B8FF29;
+  --color-entur-peach: #D9FF7A;
+  --color-entur-lima: #B8FF29;
 }
 
 /* ─── Clinilucro — Light Theme ─── */
@@ -89,41 +92,42 @@
   --popover: oklch(0.995 0 0);
   --popover-foreground: oklch(0.18 0.02 260);
 
-  /* Esmeralda #047857 → oklch(0.508 0.118 162) */
-  --primary: oklch(0.508 0.118 162);
-  --primary-foreground: oklch(1.0 0 0);
+  /* Neon lima #B8FF29 → oklch(~0.93 0.25 124). Foreground preto p/ contraste em botões. */
+  --primary: oklch(0.93 0.25 124);
+  --primary-foreground: oklch(0.10 0 0);
 
-  --secondary: oklch(0.955 0.006 160);
-  --secondary-foreground: oklch(0.25 0.015 160);
+  --secondary: oklch(0.955 0.005 124);
+  --secondary-foreground: oklch(0.18 0.01 124);
 
-  --muted: oklch(0.950 0.006 160);
-  --muted-foreground: oklch(0.42 0.012 160);
+  --muted: oklch(0.95 0.005 124);
+  --muted-foreground: oklch(0.42 0.008 124);
 
-  --accent: oklch(0.945 0.04 162);
-  --accent-foreground: oklch(0.20 0.04 162);
+  /* Accent suave (verde-lima muito claro) p/ hovers e estados ativos */
+  --accent: oklch(0.97 0.08 124);
+  --accent-foreground: oklch(0.18 0.02 124);
 
   --destructive: oklch(0.58 0.24 25);
   --destructive-foreground: oklch(1.0 0 0);
 
-  --border: oklch(0.86 0.008 160);
-  --input: oklch(0.86 0.008 160);
-  --ring: oklch(0.508 0.118 162);
+  --border: oklch(0.88 0.005 124);
+  --input: oklch(0.88 0.005 124);
+  --ring: oklch(0.93 0.25 124);
 
-  /* Charts: gradiente esmeralda → mint → lima + neutros */
-  --chart-1: oklch(0.508 0.118 162); /* #047857 esmeralda */
-  --chart-2: oklch(0.696 0.144 163); /* #10B981 mint */
-  --chart-3: oklch(0.760 0.180 124); /* #84CC16 lima */
-  --chart-4: oklch(0.55 0.10 200);   /* azul suave para contraste */
-  --chart-5: oklch(0.78 0.13 80);    /* âmbar suave para contraste */
+  /* Charts: neon lead + tons neutros e cores secundárias para contraste */
+  --chart-1: oklch(0.93 0.25 124);   /* #B8FF29 neon */
+  --chart-2: oklch(0.55 0.10 200);   /* azul */
+  --chart-3: oklch(0.78 0.13 80);    /* âmbar */
+  --chart-4: oklch(0.45 0.12 320);   /* magenta */
+  --chart-5: oklch(0.30 0.02 124);   /* cinza-esverdeado escuro */
 
-  --sidebar: oklch(0.97 0.002 160);
-  --sidebar-foreground: oklch(0.35 0.01 160);
-  --sidebar-primary: oklch(0.508 0.118 162);
-  --sidebar-primary-foreground: oklch(1.0 0 0);
-  --sidebar-accent: oklch(0.945 0.04 162);
-  --sidebar-accent-foreground: oklch(0.20 0.04 162);
-  --sidebar-border: oklch(0.88 0.006 160);
-  --sidebar-ring: oklch(0.508 0.118 162);
+  --sidebar: oklch(0.97 0.002 124);
+  --sidebar-foreground: oklch(0.30 0.01 124);
+  --sidebar-primary: oklch(0.93 0.25 124);
+  --sidebar-primary-foreground: oklch(0.10 0 0);
+  --sidebar-accent: oklch(0.97 0.08 124);
+  --sidebar-accent-foreground: oklch(0.18 0.02 124);
+  --sidebar-border: oklch(0.88 0.005 124);
+  --sidebar-ring: oklch(0.93 0.25 124);
 
   /* WhatsApp Inbox — Light (WhatsApp Web exact) */
   --wa-panel: #ffffff;
@@ -151,14 +155,14 @@
   /* Inbox Design System — Light */
   --inbox-glass-bg: #ffffff;
   --inbox-glass-border: #e9edef;
-  --inbox-conv-active-bg: rgba(4, 120, 87, 0.06);
-  --inbox-conv-active-border: rgba(4, 120, 87, 0.15);
-  --inbox-conv-active-shadow: 0 0 20px rgba(4, 120, 87, 0.04);
-  --inbox-glow-1: rgba(4, 120, 87, 0.03);
-  --inbox-glow-2: rgba(132, 204, 22, 0.03);
-  --inbox-badge-shadow: 0 0 8px rgba(4, 120, 87, 0.2);
-  --inbox-focus-ring: rgba(4, 120, 87, 0.15);
-  --inbox-focus-border: rgba(4, 120, 87, 0.3);
+  --inbox-conv-active-bg: rgba(184, 255, 41, 0.10);
+  --inbox-conv-active-border: rgba(184, 255, 41, 0.40);
+  --inbox-conv-active-shadow: 0 0 20px rgba(184, 255, 41, 0.10);
+  --inbox-glow-1: rgba(184, 255, 41, 0.05);
+  --inbox-glow-2: rgba(184, 255, 41, 0.05);
+  --inbox-badge-shadow: 0 0 10px rgba(184, 255, 41, 0.45);
+  --inbox-focus-ring: rgba(184, 255, 41, 0.30);
+  --inbox-focus-border: rgba(184, 255, 41, 0.55);
 }
 
 /* ─── Clinilucro — Dark Theme (Brand Colors) ─── */
@@ -172,39 +176,39 @@
   --popover: #0B1F18;
   --popover-foreground: oklch(0.93 0.005 160);
 
-  --primary: #10B981;
-  --primary-foreground: #06140F;
+  --primary: #B8FF29;
+  --primary-foreground: #0A0A0A;
 
-  --secondary: #102E25;
-  --secondary-foreground: oklch(0.88 0.005 160);
+  --secondary: #1A1A1A;
+  --secondary-foreground: oklch(0.93 0 0);
 
-  --muted: #102E25;
-  --muted-foreground: oklch(0.66 0.012 160);
+  --muted: #161616;
+  --muted-foreground: oklch(0.66 0 0);
 
-  --accent: #133D32;
-  --accent-foreground: oklch(0.93 0.005 160);
+  --accent: #1F2410;
+  --accent-foreground: #B8FF29;
 
   --destructive: #EF4444;
   --destructive-foreground: oklch(1.0 0 0);
 
-  --border: #1B4438;
-  --input: #102E25;
-  --ring: #10B981;
+  --border: #1F1F1F;
+  --input: #1A1A1A;
+  --ring: #B8FF29;
 
-  --chart-1: #047857;
-  --chart-2: #10B981;
-  --chart-3: #84CC16;
-  --chart-4: #38BDF8;
-  --chart-5: #FBBF24;
+  --chart-1: #B8FF29;
+  --chart-2: #38BDF8;
+  --chart-3: #FBBF24;
+  --chart-4: #F472B6;
+  --chart-5: #94A3B8;
 
-  --sidebar: #07120D;
-  --sidebar-foreground: oklch(0.68 0.008 160);
-  --sidebar-primary: #10B981;
-  --sidebar-primary-foreground: #06140F;
-  --sidebar-accent: #102E25;
-  --sidebar-accent-foreground: oklch(0.93 0.005 160);
-  --sidebar-border: #1B4438;
-  --sidebar-ring: #10B981;
+  --sidebar: #0A0A0A;
+  --sidebar-foreground: oklch(0.78 0 0);
+  --sidebar-primary: #B8FF29;
+  --sidebar-primary-foreground: #0A0A0A;
+  --sidebar-accent: #1A1A1A;
+  --sidebar-accent-foreground: #B8FF29;
+  --sidebar-border: #1F1F1F;
+  --sidebar-ring: #B8FF29;
 
   /* WhatsApp Inbox — Dark (WhatsApp Web exact) */
   --wa-panel: #111b21;
@@ -359,7 +363,7 @@
 
   /* ═══ Unread Badge ═══ */
   .inbox-unread-badge {
-    background: linear-gradient(135deg, #047857, #10B981);
+    background: linear-gradient(135deg, #0A0A0A, #B8FF29);
     color: #fff;
     font-size: 10px;
     font-weight: 700;
@@ -470,7 +474,7 @@
 
   /* Clinilucro gradient badge — brand gradient */
   .badge-gradient {
-    background: linear-gradient(135deg, #047857, #10B981, #84CC16);
+    background: linear-gradient(135deg, #B8FF29, #D9FF7A, #B8FF29);
     color: white;
     font-size: 0.6875rem;
     font-weight: 600;
@@ -480,29 +484,29 @@
 
   /* Clinilucro brand gradient for accents */
   .brand-gradient {
-    background: linear-gradient(135deg, #047857, #10B981, #84CC16);
+    background: linear-gradient(135deg, #B8FF29, #D9FF7A, #B8FF29);
   }
   .brand-gradient-text {
-    background: linear-gradient(135deg, #047857, #10B981, #84CC16);
+    background: linear-gradient(135deg, #B8FF29, #D9FF7A, #B8FF29);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
   }
   .brand-gradient-reverse {
-    background: linear-gradient(135deg, #84CC16, #10B981, #047857);
+    background: linear-gradient(135deg, #B8FF29, #D9FF7A, #B8FF29);
   }
   /* Aliases legados (mantidos para compat com código existente) */
   .entur-gradient {
-    background: linear-gradient(135deg, #047857, #10B981, #84CC16);
+    background: linear-gradient(135deg, #B8FF29, #D9FF7A, #B8FF29);
   }
   .entur-gradient-text {
-    background: linear-gradient(135deg, #047857, #10B981, #84CC16);
+    background: linear-gradient(135deg, #B8FF29, #D9FF7A, #B8FF29);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
   }
   .entur-gradient-reverse {
-    background: linear-gradient(135deg, #84CC16, #10B981, #047857);
+    background: linear-gradient(135deg, #B8FF29, #D9FF7A, #B8FF29);
   }
 }
 

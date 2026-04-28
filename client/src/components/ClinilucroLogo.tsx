@@ -1,115 +1,128 @@
 /**
- * Clinilucro brand assets.
- * Símbolo: C aberto (navy) + pulso cardíaco que vira seta ascendente (lime).
- * Light bg: navy + lime. Dark bg: white + lime.
+ * Clinilucro brand assets — Neon Edition.
+ *
+ * Identidade:
+ *   - Wordmark "clinilucro" em Inter Light (200), letter-spacing apertado.
+ *   - Acento neon (#B8FF29) na sílaba "lucro".
+ *   - Glow sutil em fundo escuro (text-shadow).
+ *
+ * Uso:
+ *   - <ClinilucroLogo />: wordmark com acento (default — recomendado para dashboard/leitura).
+ *   - <ClinilucroLogo variant="mono" />: wordmark inteiro em neon (impacto/marketing).
+ *   - <ClinilucroMark />: símbolo compacto (favicon, avatar, app icon).
  */
 
 interface MarkProps {
   className?: string;
-  /** When true, uses white "C" suited for dark backgrounds (pulse stays lime). */
   inverted?: boolean;
 }
 
 interface LogoProps extends MarkProps {
-  /** When true, the wordmark "clini" becomes white (use over dark bg). "lucro" stays lime. */
+  /** "accent" (default): clini base + lucro neon. "mono": tudo em neon. */
+  variant?: "accent" | "mono";
   textInverted?: boolean;
-  /** When true, hides "CRM PARA CLÍNICAS" tagline below the wordmark. */
   hideTagline?: boolean;
 }
 
-const NAVY = "#0F172A";
-const LIME = "#65A30D";
+export const NEON = "#B8FF29";
+export const BLACK = "#0A0A0A";
+const GLOW_TEXT_SHADOW =
+  "0 0 20px rgba(184, 255, 41, 0.35), 0 0 40px rgba(184, 255, 41, 0.15)";
+const GLOW_TEXT_SHADOW_SOFT =
+  "0 0 12px rgba(184, 255, 41, 0.30)";
 
+/**
+ * Símbolo compacto: bloco arredondado neon com letra "L" em preto.
+ * Usado em favicon, app icon, situações sem espaço para wordmark.
+ */
 export function ClinilucroMark({ className = "h-6 w-auto", inverted = false }: MarkProps) {
-  const arcColor = inverted ? "#FFFFFF" : NAVY;
-  const pulseColor = LIME;
-
+  // inverted=true → fundo preto com "L" neon. Caso contrário: fundo neon + "L" preto.
+  const bg = inverted ? BLACK : NEON;
+  const fg = inverted ? NEON : BLACK;
   return (
-    <svg viewBox="0 0 220 200" className={className} fill="none" aria-hidden="true">
-      {/* C arc — opens to the right, navy */}
-      <path
-        d="M 145 30 A 70 70 0 1 0 145 170"
-        stroke={arcColor}
-        strokeWidth="18"
-        strokeLinecap="round"
-      />
-      {/* Pulse line — small wave inside C, tall peak exiting up-right with arrow */}
-      <path
-        d="M 60 110 L 88 110 L 100 90 L 112 130 L 124 80 L 138 110 L 195 50"
-        stroke={pulseColor}
-        strokeWidth="16"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      {/* Arrow head at (195, 50) — chevron opening down-left */}
-      <path
-        d="M 173 50 L 195 50 L 195 72"
-        stroke={pulseColor}
-        strokeWidth="16"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
+    <svg viewBox="0 0 64 64" className={className} aria-hidden="true">
+      <rect x="2" y="2" width="60" height="60" rx="14" fill={bg} />
+      <text
+        x="50%"
+        y="54%"
+        textAnchor="middle"
+        dominantBaseline="middle"
+        fontFamily="Inter, system-ui, sans-serif"
+        fontWeight={300}
+        fontSize="42"
+        letterSpacing="-2"
+        fill={fg}
+      >
+        l
+      </text>
     </svg>
   );
 }
 
+/**
+ * Wordmark Clinilucro — Inter Light, com acento neon na sílaba "lucro".
+ * Em fundo escuro (textInverted), aplica glow no acento.
+ */
 export function ClinilucroLogo({
   className = "h-6",
-  inverted = false,
+  variant = "accent",
   textInverted = false,
   hideTagline = true,
 }: LogoProps) {
-  const cliniColor = textInverted ? "text-white" : "text-slate-900 dark:text-white";
-  const lucroStyle = { color: LIME };
+  const baseColor = textInverted ? "#FAFAFA" : BLACK;
+  const accentStyle: React.CSSProperties = {
+    color: NEON,
+    fontWeight: 200,
+    letterSpacing: "-0.05em",
+    ...(textInverted ? { textShadow: GLOW_TEXT_SHADOW } : {}),
+  };
+  const baseStyle: React.CSSProperties = {
+    color: variant === "mono" ? NEON : baseColor,
+    fontWeight: 200,
+    letterSpacing: "-0.05em",
+    ...(variant === "mono" && textInverted ? { textShadow: GLOW_TEXT_SHADOW } : {}),
+  };
+
   return (
-    <span className={`inline-flex items-center gap-2 ${className}`}>
-      <ClinilucroMark className="h-full w-auto" inverted={inverted} />
-      <span className="inline-flex flex-col leading-none">
-        <span className={`font-semibold tracking-tight ${cliniColor} text-[1em]`} style={{ fontSize: "1.05em" }}>
-          clini
-          <span className="font-extrabold" style={lucroStyle}>
-            lucro
-          </span>
-        </span>
-        {!hideTagline && (
-          <span
-            className={`mt-0.5 text-[0.42em] font-medium tracking-[0.3em] ${
-              textInverted ? "text-slate-300" : "text-slate-500 dark:text-slate-400"
-            }`}
-          >
-            CRM PARA CLÍNICAS
-          </span>
-        )}
+    <span
+      className={`inline-flex flex-col leading-none ${className}`}
+      style={{ fontFamily: "Inter, system-ui, sans-serif" }}
+    >
+      <span className="text-[1em]" style={{ fontSize: "1.6em" }}>
+        <span style={baseStyle}>clini</span>
+        <span style={variant === "accent" ? accentStyle : baseStyle}>lucro</span>
       </span>
+      {!hideTagline && (
+        <span
+          className="mt-1 text-[0.42em] tracking-[0.3em]"
+          style={{
+            color: textInverted ? "#9CA3AF" : "#5A8A1F",
+            fontWeight: 500,
+          }}
+        >
+          CRM PARA CLÍNICAS
+        </span>
+      )}
     </span>
   );
 }
 
+/** Versão empilhada (mark + wordmark verticalmente). Usada em telas vazias e onboarding. */
 export function ClinilucroStacked({
   className = "h-16",
+  variant = "accent",
   inverted = false,
   textInverted = false,
 }: LogoProps) {
-  const cliniColor = textInverted ? "text-white" : "text-slate-900 dark:text-white";
-  const lucroStyle = { color: LIME };
   return (
-    <span className={`inline-flex flex-col items-center gap-2 ${className}`}>
-      <ClinilucroMark className="h-[55%] w-auto" inverted={inverted} />
-      <span className="inline-flex flex-col items-center leading-none">
-        <span className={`font-semibold tracking-tight text-[1.5em] ${cliniColor}`}>
-          clini
-          <span className="font-extrabold" style={lucroStyle}>
-            lucro
-          </span>
-        </span>
-        <span
-          className={`mt-1 text-[0.55em] font-medium tracking-[0.35em] ${
-            textInverted ? "text-slate-300" : "text-slate-500 dark:text-slate-400"
-          }`}
-        >
-          CRM PARA CLÍNICAS
-        </span>
-      </span>
+    <span className={`inline-flex flex-col items-center gap-3 ${className}`}>
+      <ClinilucroMark className="h-[45%] w-auto" inverted={inverted} />
+      <ClinilucroLogo
+        className="h-[45%]"
+        variant={variant}
+        textInverted={textInverted}
+        hideTagline={false}
+      />
     </span>
   );
 }
