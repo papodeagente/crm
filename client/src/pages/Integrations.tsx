@@ -860,11 +860,13 @@ function AsaasIntegrationTab() {
   const [apiKey, setApiKey] = useState("");
   const [sandbox, setSandbox] = useState(false);
   const [showKey, setShowKey] = useState(false);
+  const [forceShowInput, setForceShowInput] = useState(false);
 
   const connect = trpc.asaas.connect.useMutation({
     onSuccess: () => {
       toast.success("ASAAS conectado com sucesso!");
       setApiKey("");
+      setForceShowInput(false);
       utils.asaas.getStatus.invalidate();
     },
     onError: (e) => toast.error(e.message),
@@ -927,7 +929,7 @@ function AsaasIntegrationTab() {
             <div className="py-8 text-center text-[13px] text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin inline mr-2" />Carregando...
             </div>
-          ) : isConnected ? (
+          ) : isConnected && !forceShowInput ? (
             <div className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
@@ -948,6 +950,14 @@ function AsaasIntegrationTab() {
                 <Button
                   variant="outline"
                   size="sm"
+                  onClick={() => { setSandbox(!!status.data?.sandbox); setForceShowInput(true); }}
+                  className="gap-2"
+                >
+                  <RefreshCw className="h-3.5 w-3.5" />Trocar chave
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
                   onClick={() => disconnect.mutate()}
                   disabled={disconnect.isPending}
                   className="gap-2 text-red-600 hover:text-red-700 hover:bg-red-50"
@@ -963,11 +973,27 @@ function AsaasIntegrationTab() {
                 <div className="flex gap-2">
                   <div className="relative flex-1">
                     <Input
-                      type={showKey ? "text" : "password"}
+                      type="text"
                       value={apiKey}
                       onChange={(e) => setApiKey(e.target.value)}
+                      onPaste={(e) => {
+                        // Garante que o paste sempre funcione, mesmo se algum extension/listener tentar bloquear
+                        const pasted = e.clipboardData.getData("text");
+                        if (pasted) {
+                          e.preventDefault();
+                          setApiKey(pasted.trim());
+                        }
+                      }}
                       placeholder="$aact_…"
+                      autoComplete="off"
+                      autoCorrect="off"
+                      autoCapitalize="off"
+                      spellCheck={false}
+                      data-1p-ignore="true"
+                      data-lpignore="true"
+                      data-form-type="other"
                       className="font-mono text-[12px] pr-10"
+                      style={!showKey ? { WebkitTextSecurity: "disc", textSecurity: "disc" } as React.CSSProperties : undefined}
                     />
                     <button
                       type="button"
@@ -991,14 +1017,21 @@ function AsaasIntegrationTab() {
                 <Switch checked={sandbox} onCheckedChange={setSandbox} />
               </div>
 
-              <Button
-                onClick={handleConnect}
-                disabled={connect.isPending || !apiKey.trim()}
-                className="w-full sm:w-auto gap-2"
-              >
-                {connect.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plug className="h-4 w-4" />}
-                Conectar ASAAS
-              </Button>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  onClick={handleConnect}
+                  disabled={connect.isPending || !apiKey.trim()}
+                  className="gap-2"
+                >
+                  {connect.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plug className="h-4 w-4" />}
+                  {isConnected ? "Salvar nova chave" : "Conectar ASAAS"}
+                </Button>
+                {forceShowInput && (
+                  <Button variant="ghost" onClick={() => { setForceShowInput(false); setApiKey(""); }}>
+                    Cancelar
+                  </Button>
+                )}
+              </div>
             </div>
           )}
         </div>
