@@ -840,9 +840,24 @@ class WhatsAppManager extends EventEmitter {
 
         this.emit("message", { sessionId, message: msg, content, fromMe, remoteJid, messageType, mediaUrl, mediaMimeType, mediaFileName, mediaDuration, isVoiceNote, status: initialStatus });
 
-        // Chatbot auto-reply
+        // AI Agent dispatch (substitui handleChatbot legacy). Fire-and-forget; gating dentro do dispatcher.
         if (!fromMe && content && type === "notify") {
-          await this.handleChatbot(sessionId, remoteJid, content, sock);
+          const sessTenantId = this.sessions.get(sessionId)?.tenantId ?? resolvedTenantId ?? 0;
+          if (sessTenantId > 0) {
+            import("./services/ai/agentDispatcher")
+              .then(({ dispatchAgent }) =>
+                dispatchAgent({
+                  tenantId: sessTenantId,
+                  sessionId,
+                  remoteJid,
+                  triggerMessageId: msg.key?.id ?? undefined,
+                  triggerText: content,
+                  fromMe: false,
+                  isGroup: remoteJid.endsWith("@g.us"),
+                })
+              )
+              .catch(e => console.error("[WA] agentDispatcher failed:", e?.message ?? e));
+          }
         }
 
         // Notificação apenas in-app (notifyOwner/email desativado)

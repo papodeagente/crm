@@ -19,6 +19,7 @@ const Tasks = lazyWithRetry(() => import("./pages/Tasks"));
 const InboxPage = lazyWithRetry(() => import("./pages/Inbox"));
 const WhatsApp = lazyWithRetry(() => import("./pages/WhatsApp"));
 const Chatbot = lazyWithRetry(() => import("./pages/Chatbot"));
+const Agentes = lazyWithRetry(() => import("./pages/Agentes"));
 const Proposals = lazyWithRetry(() => import("./pages/Proposals"));
 const Portal = lazyWithRetry(() => import("./pages/Portal"));
 const Insights = lazyWithRetry(() => import("./pages/Insights"));
@@ -148,6 +149,7 @@ function AppRouter() {
                 <Route path="/campaigns/:id" component={CampaignDetail} />
                 <Route path="/whatsapp" component={WhatsApp} />
                 <Route path="/chatbot" component={Chatbot} />
+                <Route path="/agentes" component={Agentes} />
                 <Route path="/proposals" component={Proposals} />
                 <Route path="/portal" component={Portal} />
                 <Route path="/services" component={ServiceDelivery} />

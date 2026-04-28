@@ -3088,3 +3088,118 @@ export const channelIdentities = pgTable("channel_identities", {
   uniqueIndex("channel_identities_channel_external_idx").on(t.channel, t.externalId),
   index("channel_identities_tenant_contact_idx").on(t.tenantId, t.contactId),
 ]);
+
+// ════════════════════════════════════════════════════════════
+// AGENTES IA (substitui chatbotSettings/chatbotRules)
+// ════════════════════════════════════════════════════════════
+
+export const agentModeEnum = pgEnum("agent_mode", ["autonomous", "off", "paused"]);
+export const agentRunOutcomeEnum = pgEnum("agent_run_outcome", ["replied", "handed_off", "no_action", "errored"]);
+export const agentStateStatusEnum = pgEnum("agent_state_status", ["active", "paused_by_user", "handed_off", "ended"]);
+export const agentKillScopeEnum = pgEnum("agent_kill_scope", ["tenant", "session", "conversation"]);
+
+export const agents = pgTable("agents", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenantId").notNull(),
+  sessionId: varchar("sessionId", { length: 128 }), // null = aplica a todos os canais do tenant
+  name: varchar("name", { length: 128 }).default("Agente IA").notNull(),
+  enabled: boolean("enabled").default(false).notNull(),
+  modeSwitch: agentModeEnum("modeSwitch").default("off").notNull(),
+  systemPrompt: text("systemPrompt"),
+  provider: varchar("provider", { length: 32 }).default("tenant_default").notNull(),
+  model: varchar("model", { length: 64 }),
+  temperature: numeric("temperature", { precision: 3, scale: 2 }).default("0.50"),
+  maxTokens: integer("maxTokens").default(800).notNull(),
+  toolsAllowed: json("toolsAllowed").$type<string[]>().default(["lookup_crm", "qualify", "deal", "handoff"]).notNull(),
+  // Filtros (porta da config antiga)
+  respondGroups: boolean("respondGroups").default(false).notNull(),
+  respondPrivate: boolean("respondPrivate").default(true).notNull(),
+  onlyWhenMentioned: boolean("onlyWhenMentioned").default(false).notNull(),
+  // Auto messages
+  greeting: text("greeting"),
+  away: text("away"),
+  // Business hours
+  businessHoursEnabled: boolean("businessHoursEnabled").default(false).notNull(),
+  businessHoursStart: varchar("businessHoursStart", { length: 5 }).default("09:00"),
+  businessHoursEnd: varchar("businessHoursEnd", { length: 5 }).default("18:00"),
+  businessHoursDays: varchar("businessHoursDays", { length: 32 }).default("1,2,3,4,5"),
+  businessHoursTimezone: varchar("businessHoursTimezone", { length: 64 }).default("America/Sao_Paulo"),
+  // Loop e qualidade
+  maxTurns: integer("maxTurns").default(8).notNull(),
+  escalateConfidenceBelow: numeric("escalateConfidenceBelow", { precision: 3, scale: 2 }).default("0.60"),
+  contextMessageCount: integer("contextMessageCount").default(10).notNull(),
+  replyDelayMs: integer("replyDelayMs").default(0).notNull(),
+  // Rate limits
+  rateLimitPerContactPerHour: integer("rateLimitPerContactPerHour").default(20).notNull(),
+  rateLimitPerTenantPerHour: integer("rateLimitPerTenantPerHour").default(500).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+}, (t) => [
+  uniqueIndex("agents_tenant_session_unique").on(t.tenantId, t.sessionId),
+  index("agents_tenant_idx").on(t.tenantId),
+]);
+
+export type Agent = typeof agents.$inferSelect;
+
+export const agentConversationState = pgTable("agent_conversation_state", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenantId").notNull(),
+  sessionId: varchar("sessionId", { length: 128 }).notNull(),
+  remoteJid: varchar("remoteJid", { length: 128 }).notNull(),
+  agentId: integer("agentId").notNull(),
+  status: agentStateStatusEnum("status").default("active").notNull(),
+  turnsCount: integer("turnsCount").default(0).notNull(),
+  goal: varchar("goal", { length: 64 }), // "qualifying" | "scheduling" | "supporting"
+  qualifiedFields: json("qualifiedFields").$type<Record<string, unknown>>(),
+  lastRunId: integer("lastRunId"),
+  lastRunAt: timestamp("lastRunAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+}, (t) => [
+  uniqueIndex("agent_state_unique").on(t.tenantId, t.sessionId, t.remoteJid),
+  index("agent_state_tenant_idx").on(t.tenantId),
+]);
+
+export type AgentConversationState = typeof agentConversationState.$inferSelect;
+
+export const agentRuns = pgTable("agent_runs", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenantId").notNull(),
+  agentId: integer("agentId").notNull(),
+  conversationStateId: integer("conversationStateId"),
+  sessionId: varchar("sessionId", { length: 128 }).notNull(),
+  remoteJid: varchar("remoteJid", { length: 128 }).notNull(),
+  triggerMessageId: varchar("triggerMessageId", { length: 256 }),
+  inputText: text("inputText"),
+  outcome: agentRunOutcomeEnum("outcome").notNull(),
+  replyText: text("replyText"),
+  toolCalls: json("toolCalls").$type<Array<{ tool: string; input: unknown; output: unknown; durationMs: number }>>().default([]),
+  modelMessages: json("modelMessages").$type<unknown[]>(),
+  inputTokens: integer("inputTokens"),
+  outputTokens: integer("outputTokens"),
+  costCents: integer("costCents"),
+  durationMs: integer("durationMs"),
+  errorMessage: text("errorMessage"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (t) => [
+  index("agent_runs_tenant_created_idx").on(t.tenantId, t.createdAt),
+  index("agent_runs_agent_idx").on(t.agentId),
+  index("agent_runs_conv_idx").on(t.tenantId, t.sessionId, t.remoteJid),
+]);
+
+export type AgentRun = typeof agentRuns.$inferSelect;
+
+export const agentKillSwitches = pgTable("agent_kill_switches", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenantId").notNull(),
+  scope: agentKillScopeEnum("scope").notNull(),
+  sessionId: varchar("sessionId", { length: 128 }),
+  remoteJid: varchar("remoteJid", { length: 128 }),
+  pausedBy: integer("pausedBy"),
+  pausedAt: timestamp("pausedAt").defaultNow().notNull(),
+  reason: text("reason"),
+}, (t) => [
+  index("agent_kill_lookup_idx").on(t.tenantId, t.scope, t.sessionId, t.remoteJid),
+]);
+
+export type AgentKillSwitch = typeof agentKillSwitches.$inferSelect;

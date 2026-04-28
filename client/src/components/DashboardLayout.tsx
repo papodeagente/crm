@@ -69,7 +69,7 @@ const menuSections: MenuSection[] = [
     label: "Comunicação",
     items: [
       { icon: Send, label: "WhatsApp", path: "/whatsapp" },
-      { icon: Bot, label: "Chatbot IA", path: "/chatbot" },
+      { icon: Bot, label: "Agentes IA", path: "/agentes", adminOnly: true },
       { icon: Users, label: "Supervisão", path: "/supervision", adminOnly: true },
     ],
   },

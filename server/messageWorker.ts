@@ -905,6 +905,23 @@ async function processNewMessage(session: SessionInfo, data: any, workerStartTim
 
     // ── Step 5: Background tasks (non-blocking) ──
 
+    // 5z. AI Agent dispatch — fire-and-forget, gating happens inside dispatchAgent.
+    if (!fromMe && content) {
+      import("./services/ai/agentDispatcher")
+        .then(({ dispatchAgent }) =>
+          dispatchAgent({
+            tenantId: session.tenantId,
+            sessionId: session.sessionId,
+            remoteJid,
+            triggerMessageId: messageId ?? undefined,
+            triggerText: content,
+            fromMe,
+            isGroup: remoteJid.endsWith("@g.us"),
+          })
+        )
+        .catch(e => console.error("[Worker] agentDispatcher failed:", e?.message ?? e));
+    }
+
     // 5a. Download media and upload to S3
     const mediaMessageTypes = ["imageMessage", "videoMessage", "audioMessage", "documentMessage", "stickerMessage", "pttMessage"];
     const hasMediaType = mediaMessageTypes.includes(messageType);
