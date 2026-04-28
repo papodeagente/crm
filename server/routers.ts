@@ -59,6 +59,7 @@ import {
   toggleDistributionRule,
   // Contact profile & custom fields
   getContactMetrics,
+  getContactCommercialMetrics,
   getContactDeals,
   listCustomFields,
   getCustomFieldById,
@@ -3049,6 +3050,11 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
       .input(z.object({ contactId: z.number() }))
       .query(async ({ input, ctx }) => {
         return getContactDeals(getTenantId(ctx), input.contactId);
+      }),
+    getCommercialMetrics: tenantProcedure
+      .input(z.object({ contactId: z.number() }))
+      .query(async ({ input, ctx }) => {
+        return getContactCommercialMetrics(getTenantId(ctx), input.contactId);
       }),
     getCustomFieldValues: tenantProcedure
       .input(z.object({ entityType: z.enum(["contact", "deal", "company"]), entityId: z.number() }))

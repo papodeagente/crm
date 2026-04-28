@@ -4,7 +4,7 @@ import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import {
   ArrowLeft, Mail, Phone, FileText, Calendar, DollarSign,
-  Loader2, User, Activity, Plus,
+  Loader2, User, Activity, Plus, TrendingUp,
   ClipboardList, CreditCard, XCircle, AlertCircle,
   MessageCircle,
   Save, X
@@ -25,6 +25,7 @@ import SobreTab from "@/components/contact-profile/SobreTab";
 import AgendamentosTab from "@/components/contact-profile/AgendamentosTab";
 import TratamentosTab from "@/components/contact-profile/TratamentosTab";
 import OrcamentosTab from "@/components/contact-profile/OrcamentosTab";
+import NegociacoesTab from "@/components/contact-profile/NegociacoesTab";
 import AnamneseTab from "@/components/contact-profile/AnamneseTab";
 import DocumentosTab from "@/components/contact-profile/DocumentosTab";
 import DebitosTab from "@/components/contact-profile/DebitosTab";
@@ -214,6 +215,7 @@ export default function ContactProfile() {
 
   const tabItems = [
     { id: "sobre", label: "Sobre", icon: User },
+    { id: "negociacoes", label: "Negociações", icon: TrendingUp },
     { id: "agendamentos", label: "Agendamentos", icon: Calendar },
     { id: "tratamentos", label: "Tratamentos", icon: Activity },
     { id: "orcamentos", label: "Orçamentos", icon: DollarSign },
@@ -473,6 +475,10 @@ export default function ContactProfile() {
           <div className="px-6 py-4 flex-1">
             <TabsContent value="sobre">
               <SobreTab contact={contact} contactId={contactId} metrics={metrics} />
+            </TabsContent>
+
+            <TabsContent value="negociacoes">
+              <NegociacoesTab contactId={contactId} />
             </TabsContent>
 
             <TabsContent value="agendamentos">

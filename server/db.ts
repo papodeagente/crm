@@ -1672,6 +1672,104 @@ export async function getContactMetrics(tenantId: number, contactId: number) {
   };
 }
 
+/**
+ * Métricas comerciais agregadas do contato — KPIs para a aba "Negociações".
+ * Cobre volume, receita, conversão, ticket médio, ciclo de venda, recência.
+ */
+export async function getContactCommercialMetrics(tenantId: number, contactId: number) {
+  const db = await getDb();
+  if (!db) {
+    return {
+      totalDeals: 0,
+      openDeals: 0,
+      wonDeals: 0,
+      lostDeals: 0,
+      totalNegotiatedCents: 0,
+      totalWonCents: 0,
+      totalLostCents: 0,
+      totalOpenCents: 0,
+      conversionRate: null as number | null,
+      avgTicketCents: null as number | null,
+      avgSalesCycleDays: null as number | null,
+      lastDealCreatedAt: null as string | null,
+      lastWonAt: null as string | null,
+      daysSinceLastDeal: null as number | null,
+      daysSinceLastWon: null as number | null,
+      lostByStage: [] as Array<{ stageName: string; count: number; valueCents: number }>,
+    };
+  }
+
+  const aggRows = rowsOf(await db.execute(sql`
+    SELECT
+      COUNT(*)::int AS "totalDeals",
+      COUNT(*) FILTER (WHERE status = 'open')::int AS "openDeals",
+      COUNT(*) FILTER (WHERE status = 'won')::int AS "wonDeals",
+      COUNT(*) FILTER (WHERE status = 'lost')::int AS "lostDeals",
+      COALESCE(SUM("valueCents"), 0)::bigint AS "totalNegotiatedCents",
+      COALESCE(SUM(CASE WHEN status = 'won' THEN "valueCents" ELSE 0 END), 0)::bigint AS "totalWonCents",
+      COALESCE(SUM(CASE WHEN status = 'lost' THEN "valueCents" ELSE 0 END), 0)::bigint AS "totalLostCents",
+      COALESCE(SUM(CASE WHEN status = 'open' THEN "valueCents" ELSE 0 END), 0)::bigint AS "totalOpenCents",
+      MAX("createdAt") AS "lastDealCreatedAt",
+      MAX(CASE WHEN status = 'won' THEN "updatedAt" END) AS "lastWonAt",
+      AVG(CASE WHEN status = 'won' THEN EXTRACT(EPOCH FROM ("updatedAt" - "createdAt")) / 86400 END) AS "avgSalesCycleDays"
+    FROM deals
+    WHERE "tenantId" = ${tenantId} AND "contactId" = ${contactId} AND "deletedAt" IS NULL
+  `));
+  const a = aggRows[0] || {} as any;
+
+  const lostByStageRows = rowsOf(await db.execute(sql`
+    SELECT
+      COALESCE(ps.name, 'Sem etapa') AS "stageName",
+      COUNT(*)::int AS count,
+      COALESCE(SUM(d."valueCents"), 0)::bigint AS "valueCents"
+    FROM deals d
+    LEFT JOIN pipeline_stages ps ON ps.id = d."stageId"
+    WHERE d."tenantId" = ${tenantId} AND d."contactId" = ${contactId}
+      AND d.status = 'lost' AND d."deletedAt" IS NULL
+    GROUP BY ps.name
+    ORDER BY count DESC, "valueCents" DESC
+    LIMIT 5
+  `));
+
+  const wonDeals = Number(a.wonDeals || 0);
+  const lostDeals = Number(a.lostDeals || 0);
+  const decided = wonDeals + lostDeals;
+  const conversionRate = decided > 0 ? wonDeals / decided : null;
+  const avgTicketCents = wonDeals > 0 ? Math.round(Number(a.totalWonCents || 0) / wonDeals) : null;
+
+  const lastDealCreatedAt = a.lastDealCreatedAt ? new Date(a.lastDealCreatedAt) : null;
+  const lastWonAt = a.lastWonAt ? new Date(a.lastWonAt) : null;
+  const daysSinceLastDeal = lastDealCreatedAt
+    ? Math.floor((Date.now() - lastDealCreatedAt.getTime()) / 86_400_000)
+    : null;
+  const daysSinceLastWon = lastWonAt
+    ? Math.floor((Date.now() - lastWonAt.getTime()) / 86_400_000)
+    : null;
+
+  return {
+    totalDeals: Number(a.totalDeals || 0),
+    openDeals: Number(a.openDeals || 0),
+    wonDeals,
+    lostDeals,
+    totalNegotiatedCents: Number(a.totalNegotiatedCents || 0),
+    totalWonCents: Number(a.totalWonCents || 0),
+    totalLostCents: Number(a.totalLostCents || 0),
+    totalOpenCents: Number(a.totalOpenCents || 0),
+    conversionRate,
+    avgTicketCents,
+    avgSalesCycleDays: a.avgSalesCycleDays ? Math.round(Number(a.avgSalesCycleDays)) : null,
+    lastDealCreatedAt: lastDealCreatedAt?.toISOString() ?? null,
+    lastWonAt: lastWonAt?.toISOString() ?? null,
+    daysSinceLastDeal,
+    daysSinceLastWon,
+    lostByStage: lostByStageRows.map((r: any) => ({
+      stageName: String(r.stageName),
+      count: Number(r.count),
+      valueCents: Number(r.valueCents),
+    })),
+  };
+}
+
 export async function getContactDeals(tenantId: number, contactId: number) {
   const db = await getDb();
   if (!db) return [];
