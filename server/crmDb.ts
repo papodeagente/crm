@@ -18,6 +18,7 @@ import {
   taskAutomations,
   dateAutomations,
   stageOwnerRules,
+  agentKnowledgeEntries,
 } from "../drizzle/schema";
 
 // ═══════════════════════════════════════
@@ -2934,4 +2935,52 @@ export async function setTenantBranding(tenantId: number, data: {
   }
 
   await db.update(tenants).set(patch).where(eq(tenants.id, tenantId));
+}
+
+// ═══════════════════════════════════════
+// AGENT KNOWLEDGE BASE
+// ═══════════════════════════════════════
+
+export async function listAgentKnowledge(tenantId: number, opts?: { agentId?: number | null; activeOnly?: boolean }) {
+  const db = await getDb(); if (!db) return [];
+  const conds: any[] = [eq(agentKnowledgeEntries.tenantId, tenantId)];
+  if (opts?.activeOnly !== false) conds.push(eq(agentKnowledgeEntries.isActive, true));
+  return db.select().from(agentKnowledgeEntries)
+    .where(and(...conds))
+    .orderBy(agentKnowledgeEntries.orderIndex, agentKnowledgeEntries.id);
+}
+
+export async function createAgentKnowledge(data: {
+  tenantId: number; agentId?: number | null; title: string; content: string;
+  sourceType?: "faq" | "policy" | "product_info"; tags?: string | null;
+  isActive?: boolean; orderIndex?: number;
+}) {
+  const db = await getDb(); if (!db) return null;
+  const [result] = await db.insert(agentKnowledgeEntries).values({
+    tenantId: data.tenantId,
+    agentId: data.agentId ?? null,
+    title: data.title,
+    content: data.content,
+    sourceType: data.sourceType ?? "faq",
+    tags: data.tags ?? null,
+    isActive: data.isActive !== false,
+    orderIndex: data.orderIndex ?? 0,
+  } as any).returning({ id: agentKnowledgeEntries.id });
+  return result;
+}
+
+export async function updateAgentKnowledge(tenantId: number, id: number, data: Partial<{
+  title: string; content: string;
+  sourceType: "faq" | "policy" | "product_info"; tags: string | null;
+  isActive: boolean; orderIndex: number;
+}>) {
+  const db = await getDb(); if (!db) return;
+  await db.update(agentKnowledgeEntries).set({ ...data, updatedAt: new Date() })
+    .where(and(eq(agentKnowledgeEntries.id, id), eq(agentKnowledgeEntries.tenantId, tenantId)));
+}
+
+export async function deleteAgentKnowledge(tenantId: number, id: number) {
+  const db = await getDb(); if (!db) return;
+  await db.delete(agentKnowledgeEntries)
+    .where(and(eq(agentKnowledgeEntries.id, id), eq(agentKnowledgeEntries.tenantId, tenantId)));
 }

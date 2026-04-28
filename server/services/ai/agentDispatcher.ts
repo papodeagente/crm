@@ -89,10 +89,37 @@ export async function dispatchAgent(input: DispatchInput): Promise<{ outcome: Di
     agentId: agentRow.id,
     conversationStateId: state.id,
   };
+
+  // Injeta knowledge base (FAQ/policy/product_info) ativos no system prompt
+  let augmentedSystemPrompt = agentRow.systemPrompt as string | null;
+  try {
+    const { listAgentKnowledge } = await import("../../crmDb");
+    const entries = await listAgentKnowledge(input.tenantId, { activeOnly: true });
+    if (entries.length > 0) {
+      const groups: Record<string, string[]> = { faq: [], policy: [], product_info: [] };
+      for (const e of entries as any[]) {
+        const t = e.sourceType || "faq";
+        if (!groups[t]) groups[t] = [];
+        groups[t].push(`- ${e.title}: ${e.content}`);
+      }
+      const sections: string[] = [];
+      if (groups.policy?.length) sections.push(`## Políticas e regras\n${groups.policy.join("\n")}`);
+      if (groups.product_info?.length) sections.push(`## Informações de produtos/serviços\n${groups.product_info.join("\n")}`);
+      if (groups.faq?.length) sections.push(`## Perguntas frequentes (use para responder dúvidas comuns)\n${groups.faq.join("\n")}`);
+      const kbBlock = sections.join("\n\n");
+      if (kbBlock) {
+        const base = augmentedSystemPrompt || "";
+        augmentedSystemPrompt = `${base ? base + "\n\n" : ""}${kbBlock}\n\nSe a pergunta do cliente é coberta por essas informações, responda diretamente sem precisar usar tools.`;
+      }
+    }
+  } catch (e: any) {
+    console.warn("[agentDispatcher] knowledge injection failed:", e?.message);
+  }
+
   const result = await runAgent({
     agent: {
       id: agentRow.id,
-      systemPrompt: agentRow.systemPrompt,
+      systemPrompt: augmentedSystemPrompt,
       model: agentRow.model,
       temperature: agentRow.temperature,
       maxTokens: agentRow.maxTokens,

@@ -6,7 +6,7 @@
  */
 
 import { useState, useMemo } from "react";
-import { Card } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,7 +16,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Bot, Save, Sparkles, Wrench, Clock, Activity, ShieldAlert } from "lucide-react";
+import { Bot, Save, Sparkles, Wrench, Clock, Activity, ShieldAlert, BookOpen, Plus, Trash2, Edit2, Loader2 } from "lucide-react";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+} from "@/components/ui/dialog";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { useIsAdmin } from "@/components/AdminOnlyGuard";
@@ -137,6 +140,7 @@ export default function Agentes() {
           <TabsTrigger value="tools"><Wrench className="h-3.5 w-3.5 mr-1" />Tools</TabsTrigger>
           <TabsTrigger value="horarios"><Clock className="h-3.5 w-3.5 mr-1" />Horários</TabsTrigger>
           <TabsTrigger value="runs"><Activity className="h-3.5 w-3.5 mr-1" />Runs</TabsTrigger>
+          <TabsTrigger value="knowledge"><BookOpen className="h-3.5 w-3.5 mr-1" />Conhecimento</TabsTrigger>
         </TabsList>
 
         {/* Geral */}
@@ -323,6 +327,11 @@ export default function Agentes() {
         <TabsContent value="runs">
           <RunsTable />
         </TabsContent>
+
+        {/* Knowledge */}
+        <TabsContent value="knowledge">
+          <KnowledgeTab />
+        </TabsContent>
       </Tabs>
     </div>
   );
@@ -387,4 +396,180 @@ function OutcomeBadge({ outcome }: { outcome: string }) {
   };
   const m = map[outcome] || { label: outcome, cls: "bg-slate-100" };
   return <span className={`px-2 py-0.5 rounded text-xs font-semibold ${m.cls}`}>{m.label}</span>;
+}
+
+function KnowledgeTab() {
+  const listQ = trpc.agents.knowledge.list.useQuery();
+  const utils = trpc.useUtils();
+  const createMut = trpc.agents.knowledge.create.useMutation({
+    onSuccess: () => { utils.agents.knowledge.list.invalidate(); toast.success("Item adicionado"); setEditingItem(null); setShowDialog(false); },
+    onError: (e: any) => toast.error(e.message),
+  });
+  const updateMut = trpc.agents.knowledge.update.useMutation({
+    onSuccess: () => { utils.agents.knowledge.list.invalidate(); toast.success("Atualizado"); setEditingItem(null); setShowDialog(false); },
+    onError: (e: any) => toast.error(e.message),
+  });
+  const deleteMut = trpc.agents.knowledge.delete.useMutation({
+    onSuccess: () => { utils.agents.knowledge.list.invalidate(); toast.success("Removido"); },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const [showDialog, setShowDialog] = useState(false);
+  const [editingItem, setEditingItem] = useState<any | null>(null);
+  const [title, setTitle] = useState("");
+  const [content, setContent] = useState("");
+  const [sourceType, setSourceType] = useState<"faq" | "policy" | "product_info">("faq");
+  const [tags, setTags] = useState("");
+
+  function startNew() {
+    setEditingItem(null);
+    setTitle(""); setContent(""); setSourceType("faq"); setTags("");
+    setShowDialog(true);
+  }
+  function startEdit(item: any) {
+    setEditingItem(item);
+    setTitle(item.title || "");
+    setContent(item.content || "");
+    setSourceType(item.sourceType || "faq");
+    setTags(item.tags || "");
+    setShowDialog(true);
+  }
+  function save() {
+    if (!title.trim() || !content.trim()) { toast.error("Título e conteúdo são obrigatórios"); return; }
+    if (editingItem) {
+      updateMut.mutate({ id: editingItem.id, title: title.trim(), content: content.trim(), sourceType, tags: tags || null });
+    } else {
+      createMut.mutate({ title: title.trim(), content: content.trim(), sourceType, tags: tags || null });
+    }
+  }
+
+  const items = (listQ.data as any[]) || [];
+  const grouped = items.reduce((acc: Record<string, any[]>, item: any) => {
+    const k = item.sourceType || "faq";
+    (acc[k] = acc[k] || []).push(item);
+    return acc;
+  }, {});
+
+  const groupLabel: Record<string, { label: string; description: string; cls: string }> = {
+    faq: { label: "Perguntas frequentes", description: "Respostas para dúvidas comuns dos clientes.", cls: "border-blue-300 bg-blue-50/50 dark:bg-blue-950/20" },
+    policy: { label: "Políticas e regras", description: "Regras da empresa que o agente deve seguir (cancelamento, desconto, etc).", cls: "border-amber-300 bg-amber-50/50 dark:bg-amber-950/20" },
+    product_info: { label: "Informações de produtos/serviços", description: "Detalhes sobre os produtos e serviços oferecidos.", cls: "border-emerald-300 bg-emerald-50/50 dark:bg-emerald-950/20" },
+  };
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardContent className="p-4 flex items-start gap-3 bg-primary/5 border-primary/30">
+          <BookOpen className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <p className="text-sm font-semibold">Como funciona</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Tudo que você cadastrar aqui é injetado automaticamente no system prompt do agente.
+              Use para FAQ, políticas (cancelamento, reembolso, horário), informações específicas de produtos/serviços que o agente deve saber.
+              O agente prefere essas respostas em vez de recorrer a tools quando a pergunta é coberta.
+            </p>
+          </div>
+          <Button size="sm" onClick={startNew} className="gap-2 shrink-0">
+            <Plus className="h-3.5 w-3.5" /> Adicionar
+          </Button>
+        </CardContent>
+      </Card>
+
+      {listQ.isLoading ? (
+        <div className="text-center py-8 text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin mx-auto" /></div>
+      ) : items.length === 0 ? (
+        <Card><CardContent className="p-8 text-center text-muted-foreground text-sm">
+          Nenhum conhecimento cadastrado ainda. Comece adicionando uma FAQ ou política.
+        </CardContent></Card>
+      ) : (
+        ["policy", "product_info", "faq"].map((type) => {
+          const list = grouped[type];
+          if (!list?.length) return null;
+          const meta = groupLabel[type];
+          return (
+            <Card key={type} className={`border ${meta.cls}`}>
+              <CardContent className="p-4">
+                <div className="mb-3">
+                  <p className="text-sm font-bold">{meta.label}</p>
+                  <p className="text-xs text-muted-foreground">{meta.description}</p>
+                </div>
+                <div className="space-y-2">
+                  {list.map((item: any) => (
+                    <div key={item.id} className="bg-card rounded-lg border p-3 group">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-sm">{item.title}</p>
+                          <p className="text-xs text-muted-foreground mt-1 line-clamp-2 whitespace-pre-wrap">{item.content}</p>
+                          {item.tags && (
+                            <div className="flex flex-wrap gap-1 mt-1.5">
+                              {item.tags.split(",").map((t: string, i: number) => (
+                                <span key={i} className="text-[10px] bg-muted px-1.5 py-0.5 rounded">{t.trim()}</span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button type="button" onClick={() => startEdit(item)} className="p-1.5 hover:bg-muted rounded" title="Editar">
+                            <Edit2 className="h-3.5 w-3.5 text-muted-foreground" />
+                          </button>
+                          <button type="button" onClick={() => { if (confirm(`Remover "${item.title}"?`)) deleteMut.mutate({ id: item.id }); }} className="p-1.5 hover:bg-red-100 dark:hover:bg-red-900/30 rounded" title="Remover">
+                            <Trash2 className="h-3.5 w-3.5 text-red-600" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })
+      )}
+
+      <Dialog open={showDialog} onOpenChange={setShowDialog}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{editingItem ? "Editar conhecimento" : "Adicionar conhecimento"}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <Label className="text-xs">Tipo</Label>
+              <Select value={sourceType} onValueChange={(v) => setSourceType(v as any)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="faq">Pergunta frequente</SelectItem>
+                  <SelectItem value="policy">Política / regra</SelectItem>
+                  <SelectItem value="product_info">Informação de produto/serviço</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-xs">Título</Label>
+              <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Ex.: Política de cancelamento" />
+            </div>
+            <div>
+              <Label className="text-xs">Conteúdo</Label>
+              <Textarea
+                rows={6}
+                value={content} onChange={(e) => setContent(e.target.value)}
+                placeholder="Texto que será injetado no contexto do agente. Seja claro e direto."
+              />
+            </div>
+            <div>
+              <Label className="text-xs">Tags (opcional)</Label>
+              <Input value={tags} onChange={(e) => setTags(e.target.value)} placeholder="cancelamento, reembolso, prazo" />
+              <p className="text-[10px] text-muted-foreground mt-1">Separadas por vírgula. Para organização interna apenas.</p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setShowDialog(false)}>Cancelar</Button>
+            <Button onClick={save} disabled={createMut.isPending || updateMut.isPending} className="gap-2">
+              {(createMut.isPending || updateMut.isPending) && <Loader2 className="h-4 w-4 animate-spin" />}
+              {editingItem ? "Salvar" : "Adicionar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
 }

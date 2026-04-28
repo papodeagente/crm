@@ -3246,3 +3246,29 @@ export const agentKillSwitches = pgTable("agent_kill_switches", {
 ]);
 
 export type AgentKillSwitch = typeof agentKillSwitches.$inferSelect;
+
+/**
+ * Knowledge base por tenant — entries injetadas no system prompt do agente IA.
+ * Tipos: faq (P&R), policy (regra/política), product_info (info de produto/serviço).
+ */
+export const agentKnowledgeEntries = pgTable("agent_knowledge_entries", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenantId").notNull(),
+  /** Quando null, aplica a todos os agentes do tenant. */
+  agentId: integer("agentId"),
+  title: varchar("title", { length: 255 }).notNull(),
+  content: text("content").notNull(),
+  /** "faq" | "policy" | "product_info" — controla o cabeçalho na injeção. */
+  sourceType: varchar("sourceType", { length: 32 }).default("faq").notNull(),
+  /** Tags para filtro futuro (ex: "horário,preço,reembolso"). */
+  tags: varchar("tags", { length: 255 }),
+  isActive: boolean("isActive").default(true).notNull(),
+  orderIndex: integer("orderIndex").default(0).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+}, (t) => [
+  index("agent_kb_tenant_idx").on(t.tenantId, t.isActive),
+  index("agent_kb_agent_idx").on(t.agentId),
+]);
+
+export type AgentKnowledgeEntry = typeof agentKnowledgeEntries.$inferSelect;

@@ -188,6 +188,56 @@ export const agentsRouter = router({
       `);
       return ((rows as any).rows ?? (rows as any))?.[0] ?? null;
     }),
+
+  /** Knowledge base entries (FAQ / policy / product info) injetadas no system prompt. */
+  knowledge: router({
+    list: tenantAdminProcedure
+      .query(async ({ ctx }) => {
+        const tenantId = getTenantId(ctx);
+        const { listAgentKnowledge } = await import("../crmDb");
+        return listAgentKnowledge(tenantId, { activeOnly: false });
+      }),
+    create: tenantAdminProcedure
+      .input(z.object({
+        agentId: z.number().int().nullable().optional(),
+        title: z.string().min(1).max(255),
+        content: z.string().min(1).max(8000),
+        sourceType: z.enum(["faq", "policy", "product_info"]).default("faq"),
+        tags: z.string().nullable().optional(),
+        isActive: z.boolean().default(true),
+        orderIndex: z.number().int().default(0),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const tenantId = getTenantId(ctx);
+        const { createAgentKnowledge } = await import("../crmDb");
+        return createAgentKnowledge({ ...input, tenantId });
+      }),
+    update: tenantAdminProcedure
+      .input(z.object({
+        id: z.number().int(),
+        title: z.string().min(1).max(255).optional(),
+        content: z.string().min(1).max(8000).optional(),
+        sourceType: z.enum(["faq", "policy", "product_info"]).optional(),
+        tags: z.string().nullable().optional(),
+        isActive: z.boolean().optional(),
+        orderIndex: z.number().int().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const tenantId = getTenantId(ctx);
+        const { id, ...patch } = input;
+        const { updateAgentKnowledge } = await import("../crmDb");
+        await updateAgentKnowledge(tenantId, id, patch as any);
+        return { ok: true };
+      }),
+    delete: tenantAdminProcedure
+      .input(z.object({ id: z.number().int() }))
+      .mutation(async ({ ctx, input }) => {
+        const tenantId = getTenantId(ctx);
+        const { deleteAgentKnowledge } = await import("../crmDb");
+        await deleteAgentKnowledge(tenantId, input.id);
+        return { ok: true };
+      }),
+  }),
 });
 
 export type AgentsRouter = typeof agentsRouter;
