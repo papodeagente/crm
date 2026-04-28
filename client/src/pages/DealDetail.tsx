@@ -79,6 +79,21 @@ function fmtDateTime(d: string | Date | null | undefined): string {
   if (!d) return "—";
   return formatDateTime(d) || "—";
 }
+function fmtDueRelative(d: string | Date | null | undefined): { label: string; overdue: boolean } | null {
+  if (!d) return null;
+  const due = new Date(d).getTime();
+  const diffMs = due - Date.now();
+  const overdue = diffMs < 0;
+  const abs = Math.abs(diffMs);
+  const min = Math.floor(abs / 60000);
+  const h = Math.floor(min / 60);
+  const days = Math.floor(h / 24);
+  let unit: string;
+  if (min < 60) unit = `${min}min`;
+  else if (h < 48) unit = `${h}h`;
+  else unit = `${days}d`;
+  return { label: overdue ? `atrasada ${unit}` : `vence em ${unit}`, overdue };
+}
 function daysInStage(d: string | Date | null | undefined): string {
   if (!d) return "";
   const diff = Math.floor((Date.now() - new Date(d).getTime()) / 86400000);
@@ -1311,36 +1326,16 @@ export default function DealDetail() {
               onRefetch={() => dealQ.refetch()}
             />
           )}
-          {/* ── Próximas Tarefas (top card, hidden when WhatsApp tab active) ── */}
+          {/* ── Próximas Tarefas (linha condensada, oculta na aba WhatsApp) ── */}
           {!isWhatsAppTab && (
-          <div className="shrink-0 border-b border-border bg-card p-3 sm:p-5">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-[13px] font-semibold text-foreground flex items-center gap-2">
-                <ClipboardList className="h-4 w-4 text-primary/60" />
-                Próximas tarefas
-              </h3>
-              <CreateTaskButton dealId={dealId} onCreated={() => tasksQ.refetch()} />
-            </div>
-            {pendingTasks.length === 0 ? (
-              <div className="flex items-center gap-2 py-2">
-                <div className="w-8 h-8 rounded-lg bg-muted/50 flex items-center justify-center">
-                  <Check className="h-4 w-4 text-muted-foreground" />
-                </div>
-                <p className="text-xs text-muted-foreground">Nenhuma tarefa pendente</p>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                <TaskRow key={pendingTasks[0].id} task={pendingTasks[0]} onUpdate={() => tasksQ.refetch()} onEdit={handleInlineEditTask} />
-                {pendingTasks.length > 1 && (
-                  <button
-                    onClick={() => handleSetActiveTab("tasks")}
-                    className="w-full text-center text-xs text-primary hover:text-primary/80 font-medium py-1.5 rounded-md hover:bg-primary/5 transition-colors"
-                  >
-                    Ver todas ({pendingTasks.length} tarefas pendentes)
-                  </button>
-                )}
-              </div>
-            )}
+          <div className="shrink-0 border-b border-border bg-card px-3 sm:px-5 py-2">
+            <UpcomingTasksLine
+              tasks={pendingTasks}
+              dealId={dealId}
+              onUpdate={() => tasksQ.refetch()}
+              onEditTask={handleInlineEditTask}
+              onSeeAll={() => handleSetActiveTab("tasks")}
+            />
           </div>
           )}
 
@@ -2199,6 +2194,72 @@ function CreateTaskButton({ dealId, onCreated, dealTitle }: { dealId: number; on
   );
 }
 
+function UpcomingTasksLine({
+  tasks, dealId, onUpdate, onEditTask, onSeeAll,
+}: {
+  tasks: any[];
+  dealId: number;
+  onUpdate: () => void;
+  onEditTask: (task: any) => void;
+  onSeeAll: () => void;
+}) {
+  const updateTask = trpc.crm.tasks.update.useMutation({
+    onSuccess: () => { onUpdate(); toast.success("Tarefa concluída"); },
+  });
+
+  if (tasks.length === 0) {
+    return (
+      <div className="flex items-center gap-2 text-[13px] text-muted-foreground">
+        <ClipboardList className="h-4 w-4 text-muted-foreground/60 shrink-0" />
+        <span className="flex-1 min-w-0 truncate">Nenhuma tarefa pendente</span>
+        <CreateTaskButton dealId={dealId} onCreated={onUpdate} />
+      </div>
+    );
+  }
+
+  const t = tasks[0];
+  const due = fmtDueRelative(t.dueAt);
+
+  return (
+    <div className="flex items-center gap-2 text-[13px]">
+      <ClipboardList className="h-4 w-4 text-primary/70 shrink-0" />
+      <span className="text-muted-foreground shrink-0 hidden sm:inline">Próxima:</span>
+      <button
+        type="button"
+        onClick={() => onEditTask(t)}
+        className="min-w-0 flex-1 truncate text-left font-medium text-foreground hover:text-primary transition-colors"
+        title={t.title}
+      >
+        {t.title}
+      </button>
+      {due && (
+        <span className={`shrink-0 text-[11px] px-1.5 py-0.5 rounded ${due.overdue ? "bg-red-500/15 text-red-600" : "bg-muted text-muted-foreground"}`}>
+          {due.label}
+        </span>
+      )}
+      <button
+        type="button"
+        onClick={() => updateTask.mutate({ id: t.id, status: "done" })}
+        className="shrink-0 p-1 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 rounded transition-colors"
+        title="Concluir tarefa"
+        disabled={updateTask.isPending}
+      >
+        <Check className="h-3.5 w-3.5 text-emerald-600" />
+      </button>
+      <CreateTaskButton dealId={dealId} onCreated={onUpdate} />
+      {tasks.length > 1 && (
+        <button
+          type="button"
+          onClick={onSeeAll}
+          className="shrink-0 text-[11px] text-primary hover:text-primary/80 font-medium px-1.5 py-0.5 rounded hover:bg-primary/5 transition-colors"
+        >
+          +{tasks.length - 1} pendentes →
+        </button>
+      )}
+    </div>
+  );
+}
+
 function TaskRow({ task, onUpdate, onEdit }: { task: any; onUpdate: () => void; onEdit?: (task: any) => void }) {
   const updateTask = trpc.crm.tasks.update.useMutation({
     onSuccess: () => { onUpdate(); toast.success("Tarefa atualizada"); },
@@ -2278,9 +2339,29 @@ function HistoryPanel({ history, notes, dealId, contactName, onNoteCreated }: {
   history: any[]; notes: any[]; dealId: number; contactName: string; onNoteCreated: () => void;
 }) {
   const [newNote, setNewNote] = useState("");
+  const [noteExpanded, setNoteExpanded] = useState(false);
+  const noteRef = useRef<HTMLTextAreaElement>(null);
   const createNote = trpc.crm.notes.create.useMutation({
-    onSuccess: () => { onNoteCreated(); setNewNote(""); toast.success("Anotação criada"); },
+    onSuccess: () => {
+      onNoteCreated();
+      setNewNote("");
+      setNoteExpanded(false);
+      toast.success("Anotação criada");
+    },
   });
+
+  function expandNote() {
+    setNoteExpanded(true);
+    setTimeout(() => noteRef.current?.focus(), 0);
+  }
+  function cancelNote() {
+    setNewNote("");
+    setNoteExpanded(false);
+  }
+  function submitNote() {
+    if (!newNote.trim() || createNote.isPending) return;
+    createNote.mutate({ entityType: "deal", entityId: dealId, body: newNote });
+  }
 
   // Merge history + notes into unified timeline
   const timeline = useMemo(() => {
@@ -2326,26 +2407,41 @@ function HistoryPanel({ history, notes, dealId, contactName, onNoteCreated }: {
 
   return (
     <div className="p-5">
-      {/* Create note */}
-      <div className="flex flex-col sm:flex-row sm:items-start gap-2 sm:gap-3 mb-6">
-        <div className="flex-1">
+      {/* Create note — colapsado por padrão, expande ao clicar */}
+      {!noteExpanded ? (
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={expandNote}
+          className="mb-6 w-full justify-start text-muted-foreground hover:text-foreground border border-dashed border-border hover:border-primary/40 hover:bg-primary/5"
+        >
+          <MessageSquarePlus className="h-3.5 w-3.5 mr-2" />
+          Adicionar anotação
+        </Button>
+      ) : (
+        <div className="mb-6 space-y-2">
           <Textarea
+            ref={noteRef}
             value={newNote}
             onChange={(e) => setNewNote(e.target.value)}
-            placeholder="Criar anotação..."
-            className="min-h-[60px] text-sm resize-none"
+            onKeyDown={(e) => {
+              if (e.key === "Escape") { e.preventDefault(); cancelNote(); }
+              else if ((e.metaKey || e.ctrlKey) && e.key === "Enter") { e.preventDefault(); submitNote(); }
+            }}
+            placeholder="Escreva sua anotação… (Ctrl+Enter salva · Esc cancela)"
+            className="min-h-[80px] text-sm resize-none"
           />
+          <div className="flex items-center justify-end gap-2">
+            <Button variant="ghost" size="sm" onClick={cancelNote} disabled={createNote.isPending}>
+              Cancelar
+            </Button>
+            <Button size="sm" onClick={submitNote} disabled={!newNote.trim() || createNote.isPending}>
+              <MessageSquarePlus className="h-3.5 w-3.5 mr-1" />
+              Salvar
+            </Button>
+          </div>
         </div>
-        <Button
-          size="sm"
-          disabled={!newNote.trim() || createNote.isPending}
-          onClick={() => createNote.mutate({ entityType: "deal", entityId: dealId, body: newNote })}
-          className="self-end sm:self-start sm:mt-0"
-        >
-          <MessageSquarePlus className="h-3.5 w-3.5 mr-1" />
-          Criar anotação
-        </Button>
-      </div>
+      )}
 
       {/* Timeline */}
       {timeline.length === 0 ? (
