@@ -2409,15 +2409,12 @@ function HistoryPanel({ history, notes, dealId, contactName, onNoteCreated }: {
     <div className="p-5">
       {/* Create note — colapsado por padrão, expande ao clicar */}
       {!noteExpanded ? (
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={expandNote}
-          className="mb-6 w-full justify-start text-muted-foreground hover:text-foreground border border-dashed border-border hover:border-primary/40 hover:bg-primary/5"
-        >
-          <MessageSquarePlus className="h-3.5 w-3.5 mr-2" />
-          Adicionar anotação
-        </Button>
+        <div className="mb-4">
+          <Button size="sm" onClick={expandNote}>
+            <MessageSquarePlus className="h-3.5 w-3.5 mr-1.5" />
+            Adicionar anotação
+          </Button>
+        </div>
       ) : (
         <div className="mb-6 space-y-2">
           <Textarea
