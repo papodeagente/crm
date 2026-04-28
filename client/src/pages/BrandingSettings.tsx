@@ -4,7 +4,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Building2, Upload, X, Loader2, Image as ImageIcon, MessageCircle } from "lucide-react";
+import { Building2, Upload, X, Loader2, Image as ImageIcon, MessageCircle, Palette, FileText } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 
@@ -33,6 +33,13 @@ export default function BrandingSettings() {
   const [name, setName] = useState("");
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [primaryColor, setPrimaryColor] = useState("#5A8A1F");
+  const [accentColor, setAccentColor] = useState("#0A0A0A");
+  const [fontFamily, setFontFamily] = useState("Inter");
+  const [footerText, setFooterText] = useState("");
+  const [address, setAddress] = useState("");
+  const [phone, setPhone] = useState("");
+  const [website, setWebsite] = useState("");
   const [whatsappAutoPaid, setWhatsappAutoPaid] = useState(true);
   const [whatsappAutoOverdue, setWhatsappAutoOverdue] = useState(true);
   const [whatsappAutoFollowup, setWhatsappAutoFollowup] = useState(true);
@@ -41,14 +48,20 @@ export default function BrandingSettings() {
 
   useEffect(() => {
     if (branding.data) {
-      setName(branding.data.name || "");
-      setLogoUrl(branding.data.logoUrl || null);
-      setWhatsappAutoPaid(branding.data.whatsappAutoPaid !== false);
-      setWhatsappAutoOverdue(branding.data.whatsappAutoOverdue !== false);
-      setWhatsappAutoFollowup(branding.data.whatsappAutoFollowup !== false);
-      setWhatsappFollowupDays(
-        typeof branding.data.whatsappFollowupDays === "number" ? branding.data.whatsappFollowupDays : 3
-      );
+      const d = branding.data as any;
+      setName(d.name || "");
+      setLogoUrl(d.logoUrl || null);
+      setPrimaryColor(d.primaryColor || "#5A8A1F");
+      setAccentColor(d.accentColor || "#0A0A0A");
+      setFontFamily(d.fontFamily || "Inter");
+      setFooterText(d.footerText || "");
+      setAddress(d.address || "");
+      setPhone(d.phone || "");
+      setWebsite(d.website || "");
+      setWhatsappAutoPaid(d.whatsappAutoPaid !== false);
+      setWhatsappAutoOverdue(d.whatsappAutoOverdue !== false);
+      setWhatsappAutoFollowup(d.whatsappAutoFollowup !== false);
+      setWhatsappFollowupDays(typeof d.whatsappFollowupDays === "number" ? d.whatsappFollowupDays : 3);
     }
   }, [branding.data]);
 
@@ -78,6 +91,13 @@ export default function BrandingSettings() {
     update.mutate({
       name: name.trim() || undefined,
       logoUrl: logoUrl,
+      primaryColor: primaryColor || undefined,
+      accentColor: accentColor || undefined,
+      fontFamily: fontFamily.trim() || undefined,
+      footerText: footerText.trim() || null,
+      address: address.trim() || null,
+      phone: phone.trim() || null,
+      website: website.trim() || null,
       whatsappAutoPaid,
       whatsappAutoOverdue,
       whatsappAutoFollowup,
@@ -148,6 +168,97 @@ export default function BrandingSettings() {
                   )}
                 </div>
                 <p className="text-[12px] text-muted-foreground">PNG, JPG, SVG ou WEBP — até 800KB. Recomendado fundo transparente.</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Cores e fonte (aplicado em propostas e link público) */}
+          <div className="space-y-4 pt-4 border-t border-border/30">
+            <div className="flex items-center gap-2">
+              <Palette className="h-4 w-4" style={{ color: primaryColor }} />
+              <Label className="text-sm font-semibold">Identidade visual</Label>
+            </div>
+            <p className="text-[12px] text-muted-foreground">
+              Aparece no PDF da proposta, no link público e nos comprovantes.
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label className="text-xs">Cor primária</Label>
+                <div className="flex gap-2 items-center">
+                  <input
+                    type="color"
+                    value={primaryColor}
+                    onChange={(e) => setPrimaryColor(e.target.value)}
+                    className="h-9 w-12 rounded border cursor-pointer"
+                  />
+                  <Input
+                    value={primaryColor}
+                    onChange={(e) => setPrimaryColor(e.target.value)}
+                    placeholder="#5A8A1F"
+                    className="font-mono text-xs flex-1"
+                  />
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Cor de acento</Label>
+                <div className="flex gap-2 items-center">
+                  <input
+                    type="color"
+                    value={accentColor}
+                    onChange={(e) => setAccentColor(e.target.value)}
+                    className="h-9 w-12 rounded border cursor-pointer"
+                  />
+                  <Input
+                    value={accentColor}
+                    onChange={(e) => setAccentColor(e.target.value)}
+                    placeholder="#0A0A0A"
+                    className="font-mono text-xs flex-1"
+                  />
+                </div>
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Fonte (apenas no link público / PDF usa Helvetica)</Label>
+              <Input
+                value={fontFamily}
+                onChange={(e) => setFontFamily(e.target.value)}
+                placeholder="Inter"
+                className="text-sm"
+              />
+            </div>
+
+            {/* Preview da identidade */}
+            <div className="rounded-xl border p-4" style={{ borderColor: `${primaryColor}40` }}>
+              <div className="h-1.5 -mx-4 -mt-4 mb-3" style={{ backgroundColor: primaryColor }} />
+              <p className="text-xs uppercase tracking-wider text-muted-foreground">Preview</p>
+              <p className="text-base font-bold mt-1" style={{ color: accentColor }}>{name || "Nome da empresa"}</p>
+              <p className="text-sm mt-2">Total da proposta: <strong style={{ color: primaryColor }}>R$ 2.450,00</strong></p>
+            </div>
+          </div>
+
+          {/* Dados de contato no PDF/link público */}
+          <div className="space-y-3 pt-4 border-t border-border/30">
+            <div className="flex items-center gap-2">
+              <FileText className="h-4 w-4 text-muted-foreground" />
+              <Label className="text-sm font-semibold">Rodapé do PDF</Label>
+            </div>
+            <p className="text-[12px] text-muted-foreground">Aparece no rodapé das propostas e na página pública.</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs">Endereço</Label>
+                <Input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Rua X, 123 — Cidade/UF" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Telefone</Label>
+                <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+55 11 ..." />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Website</Label>
+                <Input value={website} onChange={(e) => setWebsite(e.target.value)} placeholder="empresa.com.br" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Texto adicional</Label>
+                <Input value={footerText} onChange={(e) => setFooterText(e.target.value)} placeholder="CNPJ 00.000.000/0001-00" />
               </div>
             </div>
           </div>

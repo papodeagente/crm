@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { tenantProcedure, tenantWriteProcedure, tenantAdminProcedure, getTenantId, router } from "../_core/trpc";
+import { tenantProcedure, tenantWriteProcedure, tenantAdminProcedure, publicProcedure, getTenantId, router } from "../_core/trpc";
 import * as crm from "../crmDb";
 import { emitEvent } from "../middleware/eventLog";
 
@@ -29,21 +29,179 @@ export const proposalRouter = router({
       return result;
     }),
   update: tenantWriteProcedure
-    .input(z.object({ id: z.number(), status: z.enum(["draft", "sent", "viewed", "accepted", "rejected", "expired"]).optional(), totalCents: z.number().optional(), pdfUrl: z.string().optional() }))
+    .input(z.object({
+      id: z.number(),
+      status: z.enum(["draft", "sent", "viewed", "accepted", "rejected", "expired"]).optional(),
+      totalCents: z.number().optional(),
+      discountCents: z.number().int().min(0).optional(),
+      taxCents: z.number().int().min(0).optional(),
+      pdfUrl: z.string().optional(),
+      notes: z.string().nullable().optional(),
+      validUntil: z.string().nullable().optional(),
+    }))
     .mutation(async ({ ctx, input }) => {
-const tenantId = getTenantId(ctx); const { id, ...data } = input;
+      const tenantId = getTenantId(ctx);
+      const { id, validUntil, ...rest } = input;
+      const data: any = { ...rest };
+      if (validUntil !== undefined) data.validUntil = validUntil ? new Date(validUntil) : null;
       await crm.updateProposal(tenantId, id, data);
+      // Recalc total se discount/tax mudaram
+      if (input.discountCents !== undefined || input.taxCents !== undefined) {
+        await crm.recalcProposalTotal(tenantId, id);
+      }
       await emitEvent({ tenantId, actorUserId: ctx.user.id, entityType: "proposal", entityId: id, action: "update" });
       return { success: true };
     }),
+
   items: router({
     list: tenantProcedure
       .input(z.object({ proposalId: z.number() }))
       .query(async ({ input, ctx }) => crm.listProposalItems(getTenantId(ctx), input.proposalId)),
     create: tenantWriteProcedure
-      .input(z.object({ proposalId: z.number(), title: z.string(), description: z.string().optional(), qty: z.number().optional(), unitPriceCents: z.number().optional(), totalCents: z.number().optional() }))
-      .mutation(async ({ input, ctx }) => crm.createProposalItem({ ...input, tenantId: getTenantId(ctx) })),
+      .input(z.object({
+        proposalId: z.number(),
+        title: z.string().min(1),
+        description: z.string().optional(),
+        qty: z.number().int().min(1).default(1),
+        unit: z.string().max(16).optional(),
+        unitPriceCents: z.number().int().min(0).default(0),
+        discountCents: z.number().int().min(0).default(0),
+        productId: z.number().int().optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const tenantId = getTenantId(ctx);
+        const lineTotal = Math.max(0, (input.qty ?? 1) * (input.unitPriceCents ?? 0) - (input.discountCents ?? 0));
+        const result = await crm.createProposalItem({ ...input, tenantId, totalCents: lineTotal });
+        await crm.recalcProposalTotal(tenantId, input.proposalId);
+        return result;
+      }),
+    update: tenantWriteProcedure
+      .input(z.object({
+        id: z.number(),
+        proposalId: z.number(),
+        title: z.string().optional(),
+        description: z.string().nullable().optional(),
+        qty: z.number().int().min(1).optional(),
+        unit: z.string().max(16).nullable().optional(),
+        unitPriceCents: z.number().int().min(0).optional(),
+        discountCents: z.number().int().min(0).optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const tenantId = getTenantId(ctx);
+        const { id, proposalId, ...rest } = input;
+        // Recalcula totalCents da linha quando qty/unit/disc mudou
+        const items = await crm.listProposalItems(tenantId, proposalId);
+        const current = items.find(i => i.id === id);
+        if (current) {
+          const qty = rest.qty ?? Number(current.qty ?? 1);
+          const unitPrice = rest.unitPriceCents ?? Number(current.unitPriceCents ?? 0);
+          const discount = rest.discountCents ?? Number(current.discountCents ?? 0);
+          (rest as any).totalCents = Math.max(0, qty * unitPrice - discount);
+        }
+        await crm.updateProposalItem(tenantId, id, rest as any);
+        await crm.recalcProposalTotal(tenantId, proposalId);
+        return { success: true };
+      }),
+    delete: tenantWriteProcedure
+      .input(z.object({ id: z.number(), proposalId: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        const tenantId = getTenantId(ctx);
+        await crm.deleteProposalItem(tenantId, input.id);
+        await crm.recalcProposalTotal(tenantId, input.proposalId);
+        return { success: true };
+      }),
+    reorder: tenantWriteProcedure
+      .input(z.object({ proposalId: z.number(), ids: z.array(z.number()) }))
+      .mutation(async ({ input, ctx }) => {
+        const tenantId = getTenantId(ctx);
+        await crm.reorderProposalItems(tenantId, input.proposalId, input.ids);
+        return { success: true };
+      }),
+    addFromCatalog: tenantWriteProcedure
+      .input(z.object({
+        proposalId: z.number(),
+        products: z.array(z.object({ productId: z.number(), qty: z.number().int().min(1).default(1) })).min(1),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const tenantId = getTenantId(ctx);
+        const { getDb } = await import("../db");
+        const { productCatalog } = await import("../../drizzle/schema");
+        const { and, eq, inArray } = await import("drizzle-orm");
+        const db = await getDb();
+        if (!db) return { added: 0 };
+
+        const productIds = input.products.map(p => p.productId);
+        const products = await db.select().from(productCatalog)
+          .where(and(eq(productCatalog.tenantId, tenantId), inArray(productCatalog.id, productIds)));
+
+        // Determinar próximo orderIndex
+        const existing = await crm.listProposalItems(tenantId, input.proposalId);
+        let nextOrder = existing.length;
+
+        for (const p of input.products) {
+          const product = products.find((pr: any) => pr.id === p.productId);
+          if (!product) continue;
+          const unitPrice = Number(product.basePriceCents ?? 0);
+          const lineTotal = unitPrice * p.qty;
+          await crm.createProposalItem({
+            tenantId,
+            proposalId: input.proposalId,
+            title: product.name,
+            description: product.description ?? undefined,
+            qty: p.qty,
+            unit: product.productType === "servico" ? "h" : "un",
+            unitPriceCents: unitPrice,
+            discountCents: 0,
+            totalCents: lineTotal,
+            productId: product.id,
+            orderIndex: nextOrder++,
+          });
+        }
+        await crm.recalcProposalTotal(tenantId, input.proposalId);
+        return { added: input.products.length };
+      }),
   }),
+
+  /** Gera (ou retorna o existente) token público e marca como enviada. */
+  publish: tenantWriteProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const tenantId = getTenantId(ctx);
+      const proposal = await crm.getProposalById(tenantId, input.id);
+      if (!proposal) {
+        const { TRPCError } = await import("@trpc/server");
+        throw new TRPCError({ code: "NOT_FOUND", message: "Proposta não encontrada" });
+      }
+      const items = await crm.listProposalItems(tenantId, input.id);
+      if (items.length === 0) {
+        const { TRPCError } = await import("@trpc/server");
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Adicione ao menos um item antes de publicar" });
+      }
+      // Snapshot do cliente
+      const deal = await crm.getDealById(tenantId, proposal.dealId);
+      const contact = deal?.contactId ? await crm.getContactById(tenantId, deal.contactId) : null;
+      const snapshot = contact ? {
+        name: contact.name,
+        email: contact.email,
+        phone: contact.phoneE164 || contact.phone,
+        docId: contact.docId,
+      } : null;
+
+      let publicToken = proposal.publicToken;
+      if (!publicToken) {
+        const { randomBytes } = await import("crypto");
+        publicToken = randomBytes(24).toString("base64url");
+      }
+      await crm.updateProposal(tenantId, input.id, {
+        publicToken,
+        clientSnapshotJson: snapshot,
+        status: proposal.status === "draft" ? "sent" : proposal.status,
+        sentAt: proposal.sentAt || new Date(),
+      } as any);
+      return { publicToken, publicUrl: publicToken ? `/p/${publicToken}` : null };
+    }),
+
+
 
   // ─── PDF generation (returns base64 for download) ───
   getPdfBase64: tenantProcedure
@@ -145,6 +303,13 @@ export const tenantBrandingRouter = router({
     .input(z.object({
       name: z.string().min(1).max(255).optional(),
       logoUrl: z.string().nullable().optional(),
+      primaryColor: z.string().regex(/^#[0-9a-fA-F]{6}$/, "Cor deve estar no formato #RRGGBB").optional(),
+      accentColor: z.string().regex(/^#[0-9a-fA-F]{6}$/, "Cor deve estar no formato #RRGGBB").optional(),
+      fontFamily: z.string().max(64).optional(),
+      footerText: z.string().max(500).nullable().optional(),
+      address: z.string().max(255).nullable().optional(),
+      phone: z.string().max(64).nullable().optional(),
+      website: z.string().max(255).nullable().optional(),
       whatsappAutoPaid: z.boolean().optional(),
       whatsappAutoOverdue: z.boolean().optional(),
       whatsappAutoFollowup: z.boolean().optional(),
@@ -158,6 +323,85 @@ export const tenantBrandingRouter = router({
       }
       await crm.setTenantBranding(getTenantId(ctx), input);
       return { success: true };
+    }),
+});
+
+// ═══════════════════════════════════════
+// PUBLIC PROPOSAL VIEW (sem auth, em /p/:token)
+// ═══════════════════════════════════════
+export const publicProposalRouter = router({
+  /** Retorna proposta + items + branding para exibição pública. */
+  get: publicProcedure
+    .input(z.object({ token: z.string().min(8).max(64) }))
+    .query(async ({ input }) => {
+      const proposal = await crm.findProposalByPublicToken(input.token);
+      if (!proposal) {
+        const { TRPCError } = await import("@trpc/server");
+        throw new TRPCError({ code: "NOT_FOUND", message: "Proposta não encontrada ou link inválido." });
+      }
+      const tenantId = proposal.tenantId;
+      const items = await crm.listProposalItems(tenantId, proposal.id);
+      const branding = await crm.getTenantBranding(tenantId);
+      const isExpired = proposal.validUntil ? new Date(proposal.validUntil) < new Date() : false;
+      return {
+        id: proposal.id,
+        status: proposal.status,
+        currency: proposal.currency,
+        subtotalCents: Number(proposal.subtotalCents ?? 0),
+        discountCents: Number(proposal.discountCents ?? 0),
+        taxCents: Number(proposal.taxCents ?? 0),
+        totalCents: Number(proposal.totalCents ?? 0),
+        notes: proposal.notes,
+        validUntil: proposal.validUntil,
+        sentAt: proposal.sentAt,
+        acceptedAt: proposal.acceptedAt,
+        client: proposal.clientSnapshotJson,
+        asaasInvoiceUrl: proposal.asaasInvoiceUrl,
+        asaasPaymentStatus: proposal.asaasPaymentStatus,
+        items: items.map((i: any) => ({
+          id: i.id, title: i.title, description: i.description,
+          qty: Number(i.qty ?? 1), unit: i.unit,
+          unitPriceCents: Number(i.unitPriceCents ?? 0),
+          discountCents: Number(i.discountCents ?? 0),
+          totalCents: Number(i.totalCents ?? 0),
+          orderIndex: Number(i.orderIndex ?? 0),
+        })),
+        branding,
+        isExpired,
+      };
+    }),
+
+  accept: publicProcedure
+    .input(z.object({
+      token: z.string().min(8).max(64),
+      signerName: z.string().min(1).max(255),
+      signerEmail: z.string().email().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const proposal = await crm.findProposalByPublicToken(input.token);
+      if (!proposal) {
+        const { TRPCError } = await import("@trpc/server");
+        throw new TRPCError({ code: "NOT_FOUND", message: "Proposta não encontrada." });
+      }
+      if (proposal.status === "accepted") {
+        return { success: true, alreadyAccepted: true };
+      }
+      const isExpired = proposal.validUntil ? new Date(proposal.validUntil) < new Date() : false;
+      if (isExpired) {
+        const { TRPCError } = await import("@trpc/server");
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Esta proposta está vencida." });
+      }
+      const ip = ((ctx as any).req?.headers?.["x-forwarded-for"] as string)?.split(",")[0]?.trim()
+        || (ctx as any).req?.socket?.remoteAddress
+        || null;
+      await crm.updateProposal(proposal.tenantId, proposal.id, {
+        status: "accepted",
+        acceptedAt: new Date(),
+        acceptedClientName: input.signerName,
+        acceptedClientEmail: input.signerEmail ?? null,
+        acceptedClientIp: ip ?? null,
+      } as any);
+      return { success: true, asaasInvoiceUrl: proposal.asaasInvoiceUrl };
     }),
 });
 

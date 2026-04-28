@@ -2,12 +2,17 @@ import { trpc } from "@/lib/trpc";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import {
   FileText, Plus, Eye, Send as SendIcon, CheckCircle, XCircle, Clock,
-  CreditCard, ExternalLink, RefreshCw, Loader2, Copy, Download, MessageCircle,
+  CreditCard, ExternalLink, RefreshCw, Loader2, Copy, Download, MessageCircle, Pencil,
 } from "lucide-react";
 import { formatDate } from "../../../shared/dateUtils";
 import { toast } from "sonner";
-import { useState } from "react";
+import { useState, useMemo } from "react";
+import { Link, useLocation } from "wouter";
 
 const statusStyles: Record<string, { bg: string; text: string; dot: string; label: string; icon: any }> = {
   draft: { bg: "bg-slate-50", text: "text-slate-600", dot: "bg-slate-400", label: "Rascunho", icon: Clock },
@@ -35,9 +40,35 @@ export default function Proposals() {
   const proposals = trpc.proposals.list.useQuery({});
   const asaasStatus = trpc.asaas.getStatus.useQuery();
   const utils = trpc.useUtils();
+  const [, navigate] = useLocation();
   const [busyId, setBusyId] = useState<number | null>(null);
   const [pdfBusy, setPdfBusy] = useState<number | null>(null);
   const [waBusy, setWaBusy] = useState<number | null>(null);
+  const [showNewDialog, setShowNewDialog] = useState(false);
+  const [dealSearch, setDealSearch] = useState("");
+
+  const dealsQ = trpc.crm.deals.list.useQuery(
+    { limit: 100 } as any,
+    { enabled: showNewDialog }
+  );
+  const deals = useMemo(() => {
+    const list = (dealsQ.data as any)?.items || (dealsQ.data as any) || [];
+    if (!dealSearch) return list.slice(0, 50);
+    const q = dealSearch.toLowerCase();
+    return list.filter((d: any) =>
+      String(d.title || "").toLowerCase().includes(q) ||
+      String(d.contactName || "").toLowerCase().includes(q)
+    ).slice(0, 50);
+  }, [dealsQ.data, dealSearch]);
+
+  const createMut = trpc.proposals.create.useMutation({
+    onSuccess: (data: any) => {
+      setShowNewDialog(false);
+      utils.proposals.list.invalidate();
+      if (data?.id) navigate(`/proposals/${data.id}`);
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
 
   const sendWhatsApp = trpc.proposals.sendWhatsApp.useMutation({
     onSuccess: () => {
@@ -118,7 +149,7 @@ export default function Proposals() {
           <h1 className="text-xl font-bold tracking-tight text-foreground">Propostas</h1>
           <p className="text-[13px] text-muted-foreground mt-0.5">Crie, envie e cobre suas propostas direto pelo ASAAS.</p>
         </div>
-        <Button className="h-9 gap-2 px-5 rounded-lg bg-primary hover:bg-primary/90 shadow-sm text-[13px] font-medium transition-colors" onClick={() => toast("Criação de proposta em breve")}>
+        <Button className="h-9 gap-2 px-5 rounded-lg bg-primary hover:bg-primary/90 shadow-sm text-[13px] font-medium transition-colors" onClick={() => setShowNewDialog(true)}>
           <Plus className="h-4 w-4" />Nova Proposta
         </Button>
       </div>
@@ -194,6 +225,17 @@ export default function Proposals() {
                     <td className="p-3.5 text-muted-foreground">{p.createdAt ? formatDate(p.createdAt) : "—"}</td>
                     <td className="p-3.5">
                       <div className="flex items-center justify-end gap-1.5">
+                        <Link href={`/proposals/${p.id}`}>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-7 gap-1.5 text-[11px]"
+                            title="Editar proposta"
+                          >
+                            <Pencil className="h-3 w-3" />
+                            Editar
+                          </Button>
+                        </Link>
                         <Button
                           variant="outline"
                           size="sm"
@@ -272,6 +314,47 @@ export default function Proposals() {
           </table>
         </div>
       </Card>
+
+      <Dialog open={showNewDialog} onOpenChange={setShowNewDialog}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Nova proposta</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">Selecione o negócio que será origem desta proposta.</p>
+            <Input
+              placeholder="Buscar por título ou cliente..."
+              value={dealSearch}
+              onChange={(e) => setDealSearch(e.target.value)}
+            />
+            <div className="border rounded-lg max-h-72 overflow-y-auto">
+              {dealsQ.isLoading ? (
+                <div className="flex items-center justify-center py-8 text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" /> Carregando...
+                </div>
+              ) : deals.length === 0 ? (
+                <p className="text-center text-sm text-muted-foreground py-8">Nenhum negócio encontrado.</p>
+              ) : (
+                deals.map((d: any) => (
+                  <button
+                    key={d.id}
+                    type="button"
+                    onClick={() => createMut.mutate({ dealId: d.id })}
+                    disabled={createMut.isPending}
+                    className="w-full text-left px-3 py-2 border-b last:border-0 hover:bg-accent/40 transition-colors"
+                  >
+                    <p className="text-sm font-medium truncate">{d.title}</p>
+                    <p className="text-xs text-muted-foreground">{d.contactName || "Sem contato"} · #{d.id}</p>
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setShowNewDialog(false)}>Cancelar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

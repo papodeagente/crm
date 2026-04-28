@@ -1045,18 +1045,95 @@ export async function getProposalById(tenantId: number, id: number) {
   const rows = await db.select().from(proposals).where(and(eq(proposals.id, id), eq(proposals.tenantId, tenantId))).limit(1);
   return rows[0] || null;
 }
-export async function updateProposal(tenantId: number, id: number, data: Partial<{ status: "draft" | "sent" | "viewed" | "accepted" | "rejected" | "expired"; totalCents: number; pdfUrl: string; sentAt: Date; acceptedAt: Date; whatsappFollowupAt: Date; whatsappPaidNotifiedAt: Date; whatsappOverdueNotifiedAt: Date }>) {
+export async function updateProposal(tenantId: number, id: number, data: Partial<{
+  status: "draft" | "sent" | "viewed" | "accepted" | "rejected" | "expired";
+  totalCents: number; subtotalCents: number; discountCents: number; taxCents: number;
+  pdfUrl: string;
+  sentAt: Date; acceptedAt: Date;
+  validUntil: Date | null; notes: string | null; templateId: number | null;
+  publicToken: string | null;
+  clientSnapshotJson: any;
+  acceptedClientName: string | null; acceptedClientEmail: string | null; acceptedClientIp: string | null;
+  whatsappFollowupAt: Date; whatsappPaidNotifiedAt: Date; whatsappOverdueNotifiedAt: Date;
+}>) {
   const db = await getDb(); if (!db) return;
-  await db.update(proposals).set(data).where(and(eq(proposals.id, id), eq(proposals.tenantId, tenantId)));
+  await db.update(proposals).set({ ...data, updatedAt: new Date() }).where(and(eq(proposals.id, id), eq(proposals.tenantId, tenantId)));
 }
-export async function createProposalItem(data: { tenantId: number; proposalId: number; title: string; description?: string; qty?: number; unitPriceCents?: number; totalCents?: number }) {
+
+export async function createProposalItem(data: {
+  tenantId: number; proposalId: number; title: string; description?: string;
+  qty?: number; unit?: string;
+  unitPriceCents?: number; discountCents?: number; totalCents?: number;
+  productId?: number; orderIndex?: number;
+}) {
   const db = await getDb(); if (!db) return null;
   const [result] = await db.insert(proposalItems).values(data).returning({ id: proposalItems.id });
   return result;
 }
+
+export async function updateProposalItem(tenantId: number, id: number, data: Partial<{
+  title: string; description: string | null;
+  qty: number; unit: string | null;
+  unitPriceCents: number; discountCents: number; totalCents: number;
+  orderIndex: number;
+}>) {
+  const db = await getDb(); if (!db) return;
+  await db.update(proposalItems).set(data).where(and(eq(proposalItems.id, id), eq(proposalItems.tenantId, tenantId)));
+}
+
+export async function deleteProposalItem(tenantId: number, id: number) {
+  const db = await getDb(); if (!db) return;
+  await db.delete(proposalItems).where(and(eq(proposalItems.id, id), eq(proposalItems.tenantId, tenantId)));
+}
+
 export async function listProposalItems(tenantId: number, proposalId: number) {
   const db = await getDb(); if (!db) return [];
-  return db.select().from(proposalItems).where(and(eq(proposalItems.tenantId, tenantId), eq(proposalItems.proposalId, proposalId)));
+  return db.select().from(proposalItems)
+    .where(and(eq(proposalItems.tenantId, tenantId), eq(proposalItems.proposalId, proposalId)))
+    .orderBy(proposalItems.orderIndex, proposalItems.id);
+}
+
+/** Recalcula subtotal/total da proposta a partir dos items + discount + tax. */
+export async function recalcProposalTotal(tenantId: number, proposalId: number) {
+  const db = await getDb(); if (!db) return;
+  const items = await listProposalItems(tenantId, proposalId);
+  const subtotal = items.reduce((acc, i) => {
+    const qty = Number(i.qty ?? 1);
+    const unit = Number(i.unitPriceCents ?? 0);
+    const disc = Number(i.discountCents ?? 0);
+    const lineTotal = Math.max(0, qty * unit - disc);
+    return acc + lineTotal;
+  }, 0);
+  const proposal = await getProposalById(tenantId, proposalId);
+  const discount = Number(proposal?.discountCents ?? 0);
+  const tax = Number(proposal?.taxCents ?? 0);
+  const total = Math.max(0, subtotal - discount + tax);
+  await db.update(proposals).set({
+    subtotalCents: subtotal,
+    totalCents: total,
+    updatedAt: new Date(),
+  }).where(and(eq(proposals.id, proposalId), eq(proposals.tenantId, tenantId)));
+  return { subtotalCents: subtotal, totalCents: total };
+}
+
+/** Atualiza orderIndex dos items conforme a lista de IDs (drag-drop). */
+export async function reorderProposalItems(tenantId: number, proposalId: number, ids: number[]) {
+  const db = await getDb(); if (!db) return;
+  for (let i = 0; i < ids.length; i++) {
+    await db.update(proposalItems)
+      .set({ orderIndex: i })
+      .where(and(
+        eq(proposalItems.id, ids[i]),
+        eq(proposalItems.tenantId, tenantId),
+        eq(proposalItems.proposalId, proposalId),
+      ));
+  }
+}
+
+export async function findProposalByPublicToken(token: string) {
+  const db = await getDb(); if (!db) return null;
+  const rows = await db.select().from(proposals).where(eq(proposals.publicToken, token)).limit(1);
+  return rows[0] || null;
 }
 export async function listProposalTemplates(tenantId: number) {
   const db = await getDb(); if (!db) return [];
@@ -2720,14 +2797,33 @@ export async function markAsaasWebhookProcessed(id: number, error?: string) {
 }
 
 // ─── Tenant branding (clinic name + logo) ─────────────────
-export async function getTenantBranding(tenantId: number): Promise<{
+export interface TenantBranding {
   name: string | null;
   logoUrl: string | null;
+  primaryColor: string;
+  accentColor: string;
+  fontFamily: string;
+  footerText: string | null;
+  address: string | null;
+  phone: string | null;
+  website: string | null;
   whatsappAutoPaid: boolean;
   whatsappAutoOverdue: boolean;
   whatsappAutoFollowup: boolean;
   whatsappFollowupDays: number;
-} | null> {
+}
+
+const DEFAULT_BRANDING = {
+  primaryColor: "#5A8A1F",
+  accentColor: "#0A0A0A",
+  fontFamily: "Inter",
+  footerText: null as string | null,
+  address: null as string | null,
+  phone: null as string | null,
+  website: null as string | null,
+};
+
+export async function getTenantBranding(tenantId: number): Promise<TenantBranding | null> {
   const db = await getDb(); if (!db) return null;
   const rows = await db.select({ name: tenants.name, logoUrl: tenants.logoUrl, settingsJson: tenants.settingsJson })
     .from(tenants)
@@ -2736,9 +2832,17 @@ export async function getTenantBranding(tenantId: number): Promise<{
   const row = rows[0];
   if (!row) return null;
   const s = (row.settingsJson || {}) as any;
+  const branding = (s.branding || {}) as Record<string, any>;
   return {
     name: row.name,
     logoUrl: row.logoUrl,
+    primaryColor: typeof branding.primaryColor === "string" ? branding.primaryColor : DEFAULT_BRANDING.primaryColor,
+    accentColor: typeof branding.accentColor === "string" ? branding.accentColor : DEFAULT_BRANDING.accentColor,
+    fontFamily: typeof branding.fontFamily === "string" ? branding.fontFamily : DEFAULT_BRANDING.fontFamily,
+    footerText: typeof branding.footerText === "string" ? branding.footerText : DEFAULT_BRANDING.footerText,
+    address: typeof branding.address === "string" ? branding.address : DEFAULT_BRANDING.address,
+    phone: typeof branding.phone === "string" ? branding.phone : DEFAULT_BRANDING.phone,
+    website: typeof branding.website === "string" ? branding.website : DEFAULT_BRANDING.website,
     whatsappAutoPaid: s.whatsappAutoPaid !== false,
     whatsappAutoOverdue: s.whatsappAutoOverdue !== false,
     whatsappAutoFollowup: s.whatsappAutoFollowup !== false,
@@ -2749,6 +2853,13 @@ export async function getTenantBranding(tenantId: number): Promise<{
 export async function setTenantBranding(tenantId: number, data: {
   name?: string;
   logoUrl?: string | null;
+  primaryColor?: string;
+  accentColor?: string;
+  fontFamily?: string;
+  footerText?: string | null;
+  address?: string | null;
+  phone?: string | null;
+  website?: string | null;
   whatsappAutoPaid?: boolean;
   whatsappAutoOverdue?: boolean;
   whatsappAutoFollowup?: boolean;
@@ -2759,11 +2870,18 @@ export async function setTenantBranding(tenantId: number, data: {
   if (data.name !== undefined) patch.name = data.name;
   if (data.logoUrl !== undefined) patch.logoUrl = data.logoUrl;
 
+  const brandingKeys = ["primaryColor", "accentColor", "fontFamily", "footerText", "address", "phone", "website"] as const;
   const automationKeys = ["whatsappAutoPaid", "whatsappAutoOverdue", "whatsappAutoFollowup", "whatsappFollowupDays"] as const;
-  if (automationKeys.some((k) => data[k] !== undefined)) {
+  const touchesSettings = brandingKeys.some(k => data[k] !== undefined) || automationKeys.some(k => data[k] !== undefined);
+  if (touchesSettings) {
     const current = await db.select({ settingsJson: tenants.settingsJson })
       .from(tenants).where(eq(tenants.id, tenantId)).limit(1);
     const merged: Record<string, any> = { ...(current[0]?.settingsJson || {}) };
+    const branding: Record<string, any> = { ...(merged.branding || {}) };
+    for (const k of brandingKeys) {
+      if (data[k] !== undefined) branding[k] = data[k];
+    }
+    if (Object.keys(branding).length > 0) merged.branding = branding;
     for (const k of automationKeys) {
       if (data[k] !== undefined) merged[k] = data[k];
     }

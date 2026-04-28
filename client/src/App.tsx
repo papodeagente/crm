@@ -20,6 +20,8 @@ const InboxPage = lazyWithRetry(() => import("./pages/Inbox"));
 const WhatsApp = lazyWithRetry(() => import("./pages/WhatsApp"));
 const Agentes = lazyWithRetry(() => import("./pages/Agentes"));
 const Proposals = lazyWithRetry(() => import("./pages/Proposals"));
+const ProposalEditor = lazyWithRetry(() => import("./pages/ProposalEditor"));
+const PublicProposal = lazyWithRetry(() => import("./pages/PublicProposal"));
 const Portal = lazyWithRetry(() => import("./pages/Portal"));
 const Insights = lazyWithRetry(() => import("./pages/Insights"));
 const Goals = lazyWithRetry(() => import("./pages/Goals"));
@@ -107,6 +109,7 @@ function AppRouter() {
         <Route path="/upgrade" component={Upgrade} />
         <Route path="/forgot-password" component={ForgotPassword} />
         <Route path="/reset-password" component={ResetPassword} />
+        <Route path="/p/:token" component={PublicProposal} />
 
         {/* App pages (with TopNavLayout) */}
         <Route>
@@ -149,6 +152,7 @@ function AppRouter() {
                 <Route path="/whatsapp" component={WhatsApp} />
                 <Route path="/chatbot">{() => <Redirect to="/agentes" />}</Route>
                 <Route path="/agentes" component={Agentes} />
+                <Route path="/proposals/:id" component={ProposalEditor} />
                 <Route path="/proposals" component={Proposals} />
                 <Route path="/portal" component={Portal} />
                 <Route path="/services" component={ServiceDelivery} />

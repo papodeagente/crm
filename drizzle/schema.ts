@@ -958,10 +958,29 @@ export const proposals = pgTable("proposals", {
   version: integer("version").default(1).notNull(),
   status: proposals_statusEnum("status").default("draft").notNull(),
   totalCents: bigint("totalCents", { mode: "number" }).default(0),
+  /** Soma dos itens (qty * unitPriceCents - itemDiscount). */
+  subtotalCents: bigint("subtotalCents", { mode: "number" }).default(0),
+  /** Desconto adicional aplicado sobre o subtotal. */
+  discountCents: bigint("discountCents", { mode: "number" }).default(0),
+  /** Tributos / taxa adicional. */
+  taxCents: bigint("taxCents", { mode: "number" }).default(0),
   currency: varchar("currency", { length: 3 }).default("BRL"),
   pdfUrl: text("pdfUrl"),
+  /** Token público p/ exibição em /p/:token (cliente sem login). */
+  publicToken: varchar("publicToken", { length: 48 }),
+  /** Snapshot dos dados do cliente no momento do envio. */
+  clientSnapshotJson: json("clientSnapshotJson"),
+  /** Notas livres / observações públicas (aparecem na proposta). */
+  notes: text("notes"),
+  /** Validade da proposta. */
+  validUntil: timestamp("validUntil"),
+  /** Template (futuro: layouts diferentes). */
+  templateId: integer("templateId"),
   sentAt: timestamp("sentAt"),
   acceptedAt: timestamp("acceptedAt"),
+  acceptedClientName: varchar("acceptedClientName", { length: 255 }),
+  acceptedClientEmail: varchar("acceptedClientEmail", { length: 320 }),
+  acceptedClientIp: varchar("acceptedClientIp", { length: 64 }),
   // ASAAS payment linkage
   asaasPaymentId: varchar("asaasPaymentId", { length: 64 }),
   asaasInvoiceUrl: text("asaasInvoiceUrl"),
@@ -977,7 +996,11 @@ export const proposals = pgTable("proposals", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
   createdBy: integer("createdBy"),
-}, (t) => [index("proposals_tenant_idx").on(t.tenantId), index("proposals_asaas_payment_idx").on(t.asaasPaymentId)]);
+}, (t) => [
+  index("proposals_tenant_idx").on(t.tenantId),
+  index("proposals_asaas_payment_idx").on(t.asaasPaymentId),
+  uniqueIndex("proposals_public_token_idx").on(t.publicToken),
+]);
 
 // ASAAS webhook event audit + idempotency
 export const asaasWebhookEvents = pgTable("asaas_webhook_events", {
@@ -999,11 +1022,20 @@ export const proposalItems = pgTable("proposal_items", {
   title: varchar("title", { length: 255 }).notNull(),
   description: text("description"),
   qty: integer("qty").default(1).notNull(),
+  unit: varchar("unit", { length: 16 }), // "un", "h", "sessão", "kg" — exibido na coluna Unidade
   unitPriceCents: bigint("unitPriceCents", { mode: "number" }).default(0),
+  discountCents: bigint("discountCents", { mode: "number" }).default(0),
   totalCents: bigint("totalCents", { mode: "number" }).default(0),
+  /** FK opcional para product_catalog quando importado. */
+  productId: integer("productId"),
+  /** Ordenação manual (drag-drop). */
+  orderIndex: integer("orderIndex").default(0).notNull(),
   metaJson: json("metaJson"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-}, (t) => [index("pi_tenant_idx").on(t.tenantId)]);
+}, (t) => [
+  index("pi_tenant_idx").on(t.tenantId),
+  index("pi_proposal_order_idx").on(t.proposalId, t.orderIndex),
+]);
 
 export const proposalSignatures = pgTable("proposal_signatures", {
   id: serial("id").primaryKey(),

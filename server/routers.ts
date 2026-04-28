@@ -162,7 +162,7 @@ import { nanoid } from "nanoid";
 import { adminRouter } from "./routers/adminRouter";
 import { crmRouter } from "./routers/crmRouter";
 import { inboxRouter } from "./routers/inboxRouter";
-import { proposalRouter, portalRouter, managementRouter, insightsRouter, academyRouter, integrationHubRouter, tenantBrandingRouter, whatsappQuickRouter } from "./routers/featureRouters";
+import { proposalRouter, portalRouter, managementRouter, insightsRouter, academyRouter, integrationHubRouter, tenantBrandingRouter, whatsappQuickRouter, publicProposalRouter } from "./routers/featureRouters";
 import { asaasRouter } from "./routers/asaasRouter";
 import { productCatalogRouter } from "./routers/productCatalogRouter";
 import { aiAnalysisRouter } from "./routers/aiAnalysisRouter";
@@ -3018,6 +3018,7 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
   crm: crmRouter,           // M2: CRM (Contacts, Deals, Pipelines, Trips, Tasks, Notes)
   inbox: inboxRouter,       // M1: Inbox Omnichannel
   proposals: proposalRouter, // M3: Propostas
+  publicProposal: publicProposalRouter, // /p/:token (sem auth)
   asaas: asaasRouter,       // ASAAS payment integration
   tenantBranding: tenantBrandingRouter, // Clinic name + logo (used on PDFs)
   whatsappQuick: whatsappQuickRouter, // Envio rápido de WhatsApp por contato
