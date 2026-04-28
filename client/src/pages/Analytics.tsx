@@ -14,7 +14,7 @@ import {
   BarChart3, TrendingUp, TrendingDown, DollarSign, Target,
   Trophy, XCircle, Clock, Briefcase, Filter,
   ChevronRight, Loader2, AlertTriangle, Package, Users as UsersIcon, Activity, Megaphone,
-  Plane, LifeBuoy,
+  Plane, LifeBuoy, Crown, Globe, Sparkles, AlertCircle,
 } from "lucide-react";
 import DateRangeFilter, { useDateFilter } from "@/components/DateRangeFilter";
 import {
@@ -101,6 +101,20 @@ export default function Analytics() {
   const summaryQ = trpc.crmAnalytics.summary.useQuery(filterInput);
   const lossReasonsQ = trpc.crmAnalytics.topLossReasons.useQuery({ ...filterInput, limit: 5 });
   const dealsByPeriodQ = trpc.crmAnalytics.dealsByPeriod.useQuery(filterInput);
+  // Indicadores estendidos
+  const rankingQ = trpc.crmAnalytics.salesRanking.useQuery({ ...filterInput, limit: 10 });
+  const sourcesQ = trpc.crmAnalytics.leadSources.useQuery({ ...filterInput, limit: 8 });
+  const forecastQ = trpc.crmAnalytics.forecast.useQuery({
+    pipelineId: filterInput.pipelineId,
+    ownerUserId: filterInput.ownerUserId,
+    pipelineType: filterInput.pipelineType,
+  });
+  const stagnationQ = trpc.crmAnalytics.stagnation.useQuery({
+    pipelineId: filterInput.pipelineId,
+    ownerUserId: filterInput.ownerUserId,
+    pipelineType: filterInput.pipelineType,
+    thresholdDays: 14,
+  });
 
   // Funnel pipeline: default to first pipeline, allow switching
   const defaultPipelineId = salesPipelines[0]?.id;
@@ -633,6 +647,165 @@ export default function Analytics() {
             </CardContent>
           </Card>
         )}
+
+        {/* ─── Forecast + Risco do Pipeline ─── */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+          <Card className="border-border/50">
+            <CardHeader className="px-5 pt-5 pb-3">
+              <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-primary" />
+                Receita projetada (forecast ponderado)
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="px-5 pb-5 pt-0">
+              {forecastQ.isLoading ? (
+                <div className="flex items-center justify-center h-[160px]"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+              ) : (() => {
+                const f = forecastQ.data;
+                if (!f) return null;
+                return (
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-3 gap-3">
+                      <div>
+                        <p className="text-[11px] text-muted-foreground uppercase tracking-wider">Pipeline aberto</p>
+                        <p className="text-lg font-bold tabular-nums">{f.openDeals}</p>
+                        <p className="text-[11px] text-muted-foreground">{formatCurrency(f.openValueCents)}</p>
+                      </div>
+                      <div>
+                        <p className="text-[11px] text-muted-foreground uppercase tracking-wider">Probabilidade média</p>
+                        <p className="text-lg font-bold tabular-nums">{f.avgProbability}%</p>
+                      </div>
+                      <div>
+                        <p className="text-[11px] text-muted-foreground uppercase tracking-wider">Forecast (×prob.)</p>
+                        <p className="text-lg font-bold tabular-nums text-primary">{formatCurrency(f.weightedForecastCents)}</p>
+                      </div>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground">
+                      Soma do valor de cada deal aberto multiplicado pela probabilidade da etapa. Visão conservadora do quanto deve fechar.
+                    </p>
+                  </div>
+                );
+              })()}
+            </CardContent>
+          </Card>
+
+          <Card className="border-border/50">
+            <CardHeader className="px-5 pt-5 pb-3">
+              <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                <AlertCircle className="h-4 w-4 text-amber-500" />
+                Negociações em risco (≥ 14 dias sem atividade)
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="px-5 pb-5 pt-0">
+              {stagnationQ.isLoading ? (
+                <div className="flex items-center justify-center h-[160px]"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+              ) : (() => {
+                const s = stagnationQ.data;
+                if (!s) return null;
+                const pct = s.totalOpen > 0 ? Math.round((s.stagnantCount / s.totalOpen) * 100) : 0;
+                return (
+                  <div className="space-y-3">
+                    <div className="flex items-baseline gap-3">
+                      <p className="text-3xl font-bold tabular-nums text-amber-600">{s.stagnantCount}</p>
+                      <p className="text-sm text-muted-foreground">de {s.totalOpen} abertas ({pct}%)</p>
+                    </div>
+                    {s.topStagnant.length > 0 ? (
+                      <div className="space-y-1.5 max-h-44 overflow-y-auto pr-1">
+                        {s.topStagnant.slice(0, 6).map((d: any) => (
+                          <div key={d.id} className="flex items-center justify-between text-xs gap-2 border-b border-border/30 last:border-0 pb-1.5">
+                            <span className="truncate flex-1">{d.title}</span>
+                            <span className="text-muted-foreground shrink-0">{d.daysSinceActivity}d</span>
+                            <span className="font-medium tabular-nums shrink-0">{formatCurrency(d.valueCents)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">Nenhuma estagnada no período. 🎯</p>
+                    )}
+                  </div>
+                );
+              })()}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* ─── Ranking de vendedores + Origem dos leads ─── */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+          <Card className="border-border/50">
+            <CardHeader className="px-5 pt-5 pb-3">
+              <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                <Crown className="h-4 w-4 text-amber-500" />
+                Ranking de vendedores
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="px-5 pb-5 pt-0">
+              {rankingQ.isLoading ? (
+                <div className="flex items-center justify-center h-[200px]"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+              ) : !rankingQ.data?.length ? (
+                <p className="text-sm text-muted-foreground py-6 text-center">Sem dados no período.</p>
+              ) : (
+                <div className="space-y-2">
+                  {rankingQ.data.slice(0, 10).map((r: any, i: number) => (
+                    <div key={r.ownerUserId} className="flex items-center gap-3 py-1.5 border-b border-border/30 last:border-0">
+                      <span className={`text-xs font-bold tabular-nums w-5 text-center ${i === 0 ? "text-amber-500" : i === 1 ? "text-slate-400" : i === 2 ? "text-orange-700" : "text-muted-foreground"}`}>
+                        {i + 1}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{r.ownerName}</p>
+                        <p className="text-[11px] text-muted-foreground">
+                          {r.wonDeals} ganhas · {r.lostDeals} perdidas · {formatPercent(r.conversionRate)}
+                        </p>
+                      </div>
+                      <span className="text-sm font-bold tabular-nums shrink-0">{formatCompact(r.wonValueCents)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="border-border/50">
+            <CardHeader className="px-5 pt-5 pb-3">
+              <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                <Globe className="h-4 w-4 text-primary" />
+                Origem dos leads
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="px-5 pb-5 pt-0">
+              {sourcesQ.isLoading ? (
+                <div className="flex items-center justify-center h-[200px]"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+              ) : !sourcesQ.data?.length ? (
+                <p className="text-sm text-muted-foreground py-6 text-center">Sem dados no período.</p>
+              ) : (() => {
+                const total = sourcesQ.data.reduce((s: number, r: any) => s + r.totalDeals, 0);
+                return (
+                  <div className="space-y-3">
+                    {sourcesQ.data.slice(0, 8).map((src: any) => {
+                      const pct = total > 0 ? (src.totalDeals / total) * 100 : 0;
+                      return (
+                        <div key={src.source} className="space-y-1.5">
+                          <div className="flex items-center justify-between gap-2 text-sm">
+                            <span className="font-medium truncate">{src.source}</span>
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground shrink-0">
+                              <span>{src.totalDeals}</span>
+                              <Badge variant="outline" className="text-[10px] px-1.5 py-0.5">{Math.round(pct)}%</Badge>
+                            </div>
+                          </div>
+                          <div className="relative h-2 bg-muted rounded-full overflow-hidden">
+                            <div className="absolute inset-y-0 left-0 rounded-full bg-primary/70 transition-all duration-700" style={{ width: `${pct}%` }} />
+                          </div>
+                          <p className="text-[11px] text-muted-foreground/70">
+                            {src.wonDeals} ganhas · {formatPercent(src.conversionRate)} conv. · {formatCurrency(src.wonValueCents)}
+                          </p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
+            </CardContent>
+          </Card>
+        </div>
 
         {/* ─── Quick Navigation to Other Reports ─── */}
         <div className="pt-2">

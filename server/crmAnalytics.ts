@@ -3,7 +3,7 @@
  * Does NOT modify any existing table or query. Read-only aggregations.
  */
 import { eq, and, sql, gte, lte, isNull, desc } from "drizzle-orm";
-import { getDb } from "./db";
+import { getDb, rowsOf } from "./db";
 import { deals, lossReasons, pipelines, pipelineStages } from "../drizzle/schema";
 
 /* ─── Types ─── */
@@ -73,6 +73,45 @@ export interface DealsByPeriod {
   open: number;
   wonValueCents: number;
   lostValueCents: number;
+}
+
+export interface SalesRankingRow {
+  ownerUserId: number;
+  ownerName: string;
+  totalDeals: number;
+  wonDeals: number;
+  lostDeals: number;
+  wonValueCents: number;
+  conversionRate: number;
+}
+
+export interface LeadSourceRow {
+  source: string;        // ex.: "whatsapp", "instagram", "ads"; "—" para vazio
+  totalDeals: number;
+  wonDeals: number;
+  wonValueCents: number;
+  conversionRate: number;
+}
+
+export interface ForecastResult {
+  openDeals: number;
+  openValueCents: number;
+  weightedForecastCents: number;  // soma de open × probability
+  avgProbability: number;          // % média ponderada
+}
+
+export interface StagnationResult {
+  stagnantCount: number;        // open deals sem atividade há > thresholdDays
+  thresholdDays: number;
+  totalOpen: number;
+  topStagnant: Array<{
+    id: number;
+    title: string;
+    valueCents: number;
+    stageName: string | null;
+    ownerName: string | null;
+    daysSinceActivity: number;
+  }>;
 }
 
 /* ─── Helpers ─── */
@@ -348,4 +387,211 @@ export async function getFunnelConversion(f: AnalyticsFilters & { pipelineId: nu
   const finalConversionRate = decided > 0 ? Math.round((totalWon / decided) * 10000) / 100 : 0;
 
   return { stages, totalDeals, totalWon, totalLost, finalConversionRate };
+}
+
+/* ─── helpers de sanitização para sql.raw ─── */
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const PIPELINE_TYPES = new Set(["sales", "post_sale", "support"]);
+function safeDate(s: string | undefined): string | undefined {
+  return s && ISO_DATE_RE.test(s) ? s : undefined;
+}
+function safePipelineType(s: string | undefined): string | undefined {
+  return s && PIPELINE_TYPES.has(s) ? s : undefined;
+}
+function safeInt(n: number | undefined): number | undefined {
+  return Number.isInteger(n) ? n : undefined;
+}
+
+/* ─── 6. Sales Ranking — top vendedores por valor ganho ─── */
+export async function getSalesRanking(f: AnalyticsFilters, limit = 10): Promise<SalesRankingRow[]> {
+  const db = await getDb();
+  if (!db) return [];
+
+  const tenantId = safeInt(f.tenantId)!;
+  const dateFrom = safeDate(f.dateFrom);
+  const dateTo = safeDate(f.dateTo);
+  const pipelineId = safeInt(f.pipelineId);
+  const pipelineType = safePipelineType(f.pipelineType);
+  const safeLimit = Math.min(Math.max(safeInt(limit) ?? 10, 1), 50);
+
+  const conds: string[] = [`d."tenantId" = ${tenantId}`, `d."deletedAt" IS NULL`];
+  if (dateFrom) conds.push(`d."createdAt" >= '${dateFrom} 00:00:00'`);
+  if (dateTo) conds.push(`d."createdAt" <= '${dateTo} 23:59:59'`);
+  if (pipelineId) conds.push(`d."pipelineId" = ${pipelineId}`);
+  const pipelineJoin = pipelineType ? `INNER JOIN pipelines p ON p.id = d."pipelineId" AND p."pipelineType" = '${pipelineType}'` : '';
+
+  const result = await db.execute(sql.raw(`
+    SELECT
+      d."ownerUserId",
+      COALESCE(u.name, '—') AS "ownerName",
+      COUNT(*)::int AS "totalDeals",
+      COUNT(*) FILTER (WHERE d.status = 'won')::int AS "wonDeals",
+      COUNT(*) FILTER (WHERE d.status = 'lost')::int AS "lostDeals",
+      COALESCE(SUM(CASE WHEN d.status = 'won' THEN d."valueCents" ELSE 0 END), 0)::bigint AS "wonValueCents"
+    FROM deals d
+    ${pipelineJoin}
+    LEFT JOIN crm_users u ON u.id = d."ownerUserId"
+    WHERE ${conds.join(' AND ')} AND d."ownerUserId" IS NOT NULL
+    GROUP BY d."ownerUserId", u.name
+    ORDER BY "wonValueCents" DESC, "wonDeals" DESC
+    LIMIT ${safeLimit}
+  `));
+
+  return rowsOf(result).map((r: any) => {
+    const won = Number(r.wonDeals || 0);
+    const lost = Number(r.lostDeals || 0);
+    const decided = won + lost;
+    return {
+      ownerUserId: Number(r.ownerUserId),
+      ownerName: String(r.ownerName || '—'),
+      totalDeals: Number(r.totalDeals || 0),
+      wonDeals: won,
+      lostDeals: lost,
+      wonValueCents: Number(r.wonValueCents || 0),
+      conversionRate: decided > 0 ? Math.round((won / decided) * 10000) / 100 : 0,
+    };
+  });
+}
+
+/* ─── 7. Lead Sources — top origens de leads ─── */
+export async function getLeadSources(f: AnalyticsFilters, limit = 8): Promise<LeadSourceRow[]> {
+  const db = await getDb();
+  if (!db) return [];
+
+  const tenantId = safeInt(f.tenantId)!;
+  const dateFrom = safeDate(f.dateFrom);
+  const dateTo = safeDate(f.dateTo);
+  const pipelineId = safeInt(f.pipelineId);
+  const ownerUserId = safeInt(f.ownerUserId);
+  const pipelineType = safePipelineType(f.pipelineType);
+  const safeLimit = Math.min(Math.max(safeInt(limit) ?? 8, 1), 30);
+
+  const conds: string[] = [`d."tenantId" = ${tenantId}`, `d."deletedAt" IS NULL`];
+  if (dateFrom) conds.push(`d."createdAt" >= '${dateFrom} 00:00:00'`);
+  if (dateTo) conds.push(`d."createdAt" <= '${dateTo} 23:59:59'`);
+  if (pipelineId) conds.push(`d."pipelineId" = ${pipelineId}`);
+  if (ownerUserId) conds.push(`d."ownerUserId" = ${ownerUserId}`);
+  const pipelineJoin = pipelineType ? `INNER JOIN pipelines p ON p.id = d."pipelineId" AND p."pipelineType" = '${pipelineType}'` : '';
+
+  const result = await db.execute(sql.raw(`
+    SELECT
+      COALESCE(NULLIF(TRIM(d."leadSource"), ''), '—') AS source,
+      COUNT(*)::int AS "totalDeals",
+      COUNT(*) FILTER (WHERE d.status = 'won')::int AS "wonDeals",
+      COALESCE(SUM(CASE WHEN d.status = 'won' THEN d."valueCents" ELSE 0 END), 0)::bigint AS "wonValueCents",
+      COUNT(*) FILTER (WHERE d.status IN ('won','lost'))::int AS decided
+    FROM deals d
+    ${pipelineJoin}
+    WHERE ${conds.join(' AND ')}
+    GROUP BY COALESCE(NULLIF(TRIM(d."leadSource"), ''), '—')
+    ORDER BY "totalDeals" DESC, "wonValueCents" DESC
+    LIMIT ${safeLimit}
+  `));
+
+  return rowsOf(result).map((r: any) => {
+    const won = Number(r.wonDeals || 0);
+    const decided = Number(r.decided || 0);
+    return {
+      source: String(r.source),
+      totalDeals: Number(r.totalDeals || 0),
+      wonDeals: won,
+      wonValueCents: Number(r.wonValueCents || 0),
+      conversionRate: decided > 0 ? Math.round((won / decided) * 10000) / 100 : 0,
+    };
+  });
+}
+
+/* ─── 8. Forecast — projeção ponderada do pipeline aberto ─── */
+export async function getForecast(f: AnalyticsFilters): Promise<ForecastResult> {
+  const db = await getDb();
+  if (!db) return { openDeals: 0, openValueCents: 0, weightedForecastCents: 0, avgProbability: 0 };
+
+  const tenantId = safeInt(f.tenantId)!;
+  const pipelineId = safeInt(f.pipelineId);
+  const ownerUserId = safeInt(f.ownerUserId);
+  const pipelineType = safePipelineType(f.pipelineType);
+
+  const conds: string[] = [`d."tenantId" = ${tenantId}`, `d."deletedAt" IS NULL`, `d.status = 'open'`];
+  if (pipelineId) conds.push(`d."pipelineId" = ${pipelineId}`);
+  if (ownerUserId) conds.push(`d."ownerUserId" = ${ownerUserId}`);
+  const pipelineJoin = pipelineType ? `INNER JOIN pipelines p ON p.id = d."pipelineId" AND p."pipelineType" = '${pipelineType}'` : '';
+
+  const result = await db.execute(sql.raw(`
+    SELECT
+      COUNT(*)::int AS "openDeals",
+      COALESCE(SUM(d."valueCents"), 0)::bigint AS "openValueCents",
+      COALESCE(SUM(d."valueCents" * COALESCE(d.probability, 0) / 100.0), 0)::bigint AS "weightedForecastCents",
+      COALESCE(AVG(NULLIF(d.probability, 0)), 0) AS "avgProbability"
+    FROM deals d
+    ${pipelineJoin}
+    WHERE ${conds.join(' AND ')}
+  `));
+
+  const r = rowsOf(result)[0] as any || {};
+  return {
+    openDeals: Number(r.openDeals || 0),
+    openValueCents: Number(r.openValueCents || 0),
+    weightedForecastCents: Number(r.weightedForecastCents || 0),
+    avgProbability: Math.round(Number(r.avgProbability || 0)),
+  };
+}
+
+/* ─── 9. Stagnation — open deals sem atividade há > thresholdDays ─── */
+export async function getStagnation(f: AnalyticsFilters, thresholdDays = 14, listLimit = 10): Promise<StagnationResult> {
+  const db = await getDb();
+  if (!db) return { stagnantCount: 0, thresholdDays, totalOpen: 0, topStagnant: [] };
+
+  const tenantId = safeInt(f.tenantId)!;
+  const pipelineId = safeInt(f.pipelineId);
+  const ownerUserId = safeInt(f.ownerUserId);
+  const pipelineType = safePipelineType(f.pipelineType);
+  const safeThreshold = Math.min(Math.max(safeInt(thresholdDays) ?? 14, 1), 365);
+  const safeListLimit = Math.min(Math.max(safeInt(listLimit) ?? 10, 1), 50);
+
+  const conds: string[] = [`d."tenantId" = ${tenantId}`, `d."deletedAt" IS NULL`, `d.status = 'open'`];
+  if (pipelineId) conds.push(`d."pipelineId" = ${pipelineId}`);
+  if (ownerUserId) conds.push(`d."ownerUserId" = ${ownerUserId}`);
+  const pipelineJoin = pipelineType ? `INNER JOIN pipelines p ON p.id = d."pipelineId" AND p."pipelineType" = '${pipelineType}'` : '';
+
+  const aggResult = await db.execute(sql.raw(`
+    SELECT
+      COUNT(*)::int AS "totalOpen",
+      COUNT(*) FILTER (
+        WHERE COALESCE(d."lastActivityAt", d."updatedAt", d."createdAt") < NOW() - INTERVAL '${safeThreshold} days'
+      )::int AS "stagnantCount"
+    FROM deals d
+    ${pipelineJoin}
+    WHERE ${conds.join(' AND ')}
+  `));
+  const agg = rowsOf(aggResult)[0] as any || {};
+
+  const topResult = await db.execute(sql.raw(`
+    SELECT
+      d.id, d.title, d."valueCents",
+      ps.name AS "stageName",
+      u.name AS "ownerName",
+      EXTRACT(EPOCH FROM (NOW() - COALESCE(d."lastActivityAt", d."updatedAt", d."createdAt"))) / 86400 AS "daysSinceActivity"
+    FROM deals d
+    ${pipelineJoin}
+    LEFT JOIN pipeline_stages ps ON ps.id = d."stageId"
+    LEFT JOIN crm_users u ON u.id = d."ownerUserId"
+    WHERE ${conds.join(' AND ')}
+      AND COALESCE(d."lastActivityAt", d."updatedAt", d."createdAt") < NOW() - INTERVAL '${safeThreshold} days'
+    ORDER BY d."valueCents" DESC NULLS LAST, "daysSinceActivity" DESC
+    LIMIT ${listLimit}
+  `));
+
+  return {
+    thresholdDays,
+    totalOpen: Number(agg.totalOpen || 0),
+    stagnantCount: Number(agg.stagnantCount || 0),
+    topStagnant: rowsOf(topResult).map((r: any) => ({
+      id: Number(r.id),
+      title: String(r.title || ''),
+      valueCents: Number(r.valueCents || 0),
+      stageName: r.stageName || null,
+      ownerName: r.ownerName || null,
+      daysSinceActivity: Math.floor(Number(r.daysSinceActivity || 0)),
+    })),
+  };
 }

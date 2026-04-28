@@ -5,7 +5,7 @@
 import { z } from "zod";
 import { router } from "../_core/trpc";
 import { tenantProcedure, tenantWriteProcedure, getTenantId } from "../_core/trpc";
-import { getAnalyticsSummary, getTopLossReasons, getPipelineFunnel, getDealsByPeriod, getFunnelConversion } from "../crmAnalytics";
+import { getAnalyticsSummary, getTopLossReasons, getPipelineFunnel, getDealsByPeriod, getFunnelConversion, getSalesRanking, getLeadSources, getForecast, getStagnation } from "../crmAnalytics";
 import { getGoalsReport, generateGoalsAIAnalysis } from "../goalsAnalytics";
 import { getCrmLiveCover, getCrmLiveOperation } from "../crmLive";
 
@@ -147,5 +147,76 @@ export const analyticsRouter = router({
         pipelineId: input.pipelineId,
         ownerUserId: input.ownerUserId,
       }, input.tab);
+    }),
+
+  /* ─── Indicadores estendidos ─── */
+
+  salesRanking: tenantProcedure
+    .input(z.object({
+      dateFrom: z.string().optional(),
+      dateTo: z.string().optional(),
+      pipelineId: z.number().optional(),
+      pipelineType: z.enum(["sales", "post_sale", "support"]).optional(),
+      limit: z.number().min(1).max(50).default(10),
+    }).optional())
+    .query(async ({ input, ctx }) => {
+      return getSalesRanking({
+        tenantId: getTenantId(ctx),
+        dateFrom: input?.dateFrom,
+        dateTo: input?.dateTo,
+        pipelineId: input?.pipelineId,
+        pipelineType: input?.pipelineType,
+      }, input?.limit ?? 10);
+    }),
+
+  leadSources: tenantProcedure
+    .input(z.object({
+      dateFrom: z.string().optional(),
+      dateTo: z.string().optional(),
+      pipelineId: z.number().optional(),
+      ownerUserId: z.number().optional(),
+      pipelineType: z.enum(["sales", "post_sale", "support"]).optional(),
+      limit: z.number().min(1).max(30).default(8),
+    }).optional())
+    .query(async ({ input, ctx }) => {
+      return getLeadSources({
+        tenantId: getTenantId(ctx),
+        dateFrom: input?.dateFrom,
+        dateTo: input?.dateTo,
+        pipelineId: input?.pipelineId,
+        ownerUserId: input?.ownerUserId,
+        pipelineType: input?.pipelineType,
+      }, input?.limit ?? 8);
+    }),
+
+  forecast: tenantProcedure
+    .input(z.object({
+      pipelineId: z.number().optional(),
+      ownerUserId: z.number().optional(),
+      pipelineType: z.enum(["sales", "post_sale", "support"]).optional(),
+    }).optional())
+    .query(async ({ input, ctx }) => {
+      return getForecast({
+        tenantId: getTenantId(ctx),
+        pipelineId: input?.pipelineId,
+        ownerUserId: input?.ownerUserId,
+        pipelineType: input?.pipelineType,
+      });
+    }),
+
+  stagnation: tenantProcedure
+    .input(z.object({
+      pipelineId: z.number().optional(),
+      ownerUserId: z.number().optional(),
+      pipelineType: z.enum(["sales", "post_sale", "support"]).optional(),
+      thresholdDays: z.number().min(1).max(365).default(14),
+    }).optional())
+    .query(async ({ input, ctx }) => {
+      return getStagnation({
+        tenantId: getTenantId(ctx),
+        pipelineId: input?.pipelineId,
+        ownerUserId: input?.ownerUserId,
+        pipelineType: input?.pipelineType,
+      }, input?.thresholdDays ?? 14, 10);
     }),
 });
