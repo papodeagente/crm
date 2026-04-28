@@ -89,7 +89,7 @@ const settingsCategories: SettingsCategory[] = [
       { icon: Headphones, label: "Supervisão", path: "/supervision", adminOnly: true },
       { icon: MessageSquare, label: "WhatsApp", path: "/whatsapp" },
       { icon: FileText, label: "Mensagens personalizadas", path: "/settings/custom-messages" },
-      { icon: Bot, label: "Chatbot IA", path: "/chatbot", adminOnly: true },
+      { icon: Bot, label: "Agentes IA", path: "/agentes", adminOnly: true },
       { icon: Cake, label: "Datas Comemorativas", path: "/birthdays" },
     ],
   },

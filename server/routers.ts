@@ -19,11 +19,6 @@ import {
   getReactionsForMessages,
   getLogs,
   getAllLogs,
-  getChatbotSettings,
-  upsertChatbotSettings,
-  getChatbotRules,
-  addChatbotRule,
-  removeChatbotRule,
   // getConversationsList, // DEPRECATED: redirected to getWaConversationsList
   markConversationRead,
   getDashboardMetrics,
@@ -1130,54 +1125,7 @@ export const appRouter = router({
     logs: sessionTenantProcedure
       .input(z.object({ sessionId: z.string().optional(), limit: z.number().min(1).max(500).default(100) }))
       .query(async ({ input, ctx }) => input.sessionId ? getLogs(input.sessionId, input.limit) : getAllLogs(input.limit)),
-    getChatbotSettings: sessionTenantAdminProcedure
-      .input(z.object({ sessionId: z.string() }))
-      .query(async ({ input, ctx }) => getChatbotSettings(input.sessionId)),
-    updateChatbotSettings: sessionTenantAdminProcedure
-      .input(z.object({
-        sessionId: z.string(),
-        enabled: z.boolean().optional(),
-        systemPrompt: z.string().optional(),
-        maxTokens: z.number().min(50).max(4000).optional(),
-        mode: z.enum(["all", "whitelist", "blacklist"]).optional(),
-        respondGroups: z.boolean().optional(),
-        respondPrivate: z.boolean().optional(),
-        onlyWhenMentioned: z.boolean().optional(),
-        triggerWords: z.string().nullable().optional(),
-        welcomeMessage: z.string().nullable().optional(),
-        awayMessage: z.string().nullable().optional(),
-        businessHoursEnabled: z.boolean().optional(),
-        businessHoursStart: z.string().optional(),
-        businessHoursEnd: z.string().optional(),
-        businessHoursDays: z.string().optional(),
-        businessHoursTimezone: z.string().optional(),
-        replyDelay: z.number().min(0).max(60).optional(),
-        contextMessageCount: z.number().min(1).max(50).optional(),
-        rateLimitPerHour: z.number().min(0).optional(),
-        rateLimitPerDay: z.number().min(0).optional(),
-        temperature: z.string().optional(),
-      }))
-      .mutation(async ({ input, ctx }) => {
-        const { sessionId, ...data } = input;
-        await upsertChatbotSettings(sessionId, data as any);
-        return { success: true };
-      }),
-    // Chatbot Rules (whitelist/blacklist)
-    getChatbotRules: sessionTenantAdminProcedure
-      .input(z.object({ sessionId: z.string(), ruleType: z.enum(["whitelist", "blacklist"]).optional() }))
-      .query(async ({ input, ctx }) => getChatbotRules(input.sessionId, input.ruleType)),
-    addChatbotRule: sessionTenantAdminProcedure
-      .input(z.object({ sessionId: z.string(), remoteJid: z.string().min(1), ruleType: z.enum(["whitelist", "blacklist"]), contactName: z.string().optional() }))
-      .mutation(async ({ input, ctx }) => {
-        await addChatbotRule(input.sessionId, input.remoteJid, input.ruleType, input.contactName);
-        return { success: true };
-      }),
-    removeChatbotRule: tenantAdminProcedure
-      .input(z.object({ id: z.number() }))
-      .mutation(async ({ input, ctx }) => {
-        await removeChatbotRule(input.id);
-        return { success: true };
-      }),
+    // Endpoints chatbot.* removidos. Substituídos por agents.* (router separado).
     // Conversations list — LEGACY (redirects to optimized wa_conversations query)
     // Kept for backward compatibility; frontend should use waConversations instead
     conversations: sessionTenantProcedure

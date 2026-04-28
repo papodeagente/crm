@@ -1,7 +1,7 @@
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/NotFound";
-import { Route, Switch } from "wouter";
+import { Route, Switch, Redirect } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import TopNavLayout from "./components/TopNavLayout";
@@ -18,7 +18,6 @@ const ServiceDelivery = lazyWithRetry(() => import("./pages/ServiceDelivery"));
 const Tasks = lazyWithRetry(() => import("./pages/Tasks"));
 const InboxPage = lazyWithRetry(() => import("./pages/Inbox"));
 const WhatsApp = lazyWithRetry(() => import("./pages/WhatsApp"));
-const Chatbot = lazyWithRetry(() => import("./pages/Chatbot"));
 const Agentes = lazyWithRetry(() => import("./pages/Agentes"));
 const Proposals = lazyWithRetry(() => import("./pages/Proposals"));
 const Portal = lazyWithRetry(() => import("./pages/Portal"));
@@ -148,7 +147,7 @@ function AppRouter() {
                 <Route path="/campaigns" component={Campaigns} />
                 <Route path="/campaigns/:id" component={CampaignDetail} />
                 <Route path="/whatsapp" component={WhatsApp} />
-                <Route path="/chatbot" component={Chatbot} />
+                <Route path="/chatbot">{() => <Redirect to="/agentes" />}</Route>
                 <Route path="/agentes" component={Agentes} />
                 <Route path="/proposals" component={Proposals} />
                 <Route path="/portal" component={Portal} />
