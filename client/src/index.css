@@ -424,6 +424,8 @@
   .surface {
     @apply bg-card border border-border;
     border-radius: 0.875rem;
+    /* Mantém faixas de destaque (accent strips) dentro dos cantos arredondados */
+    overflow: hidden;
     box-shadow: 0 1px 3px oklch(0 0 0 / 0.04), 0 2px 8px oklch(0 0 0 / 0.03);
     transition: box-shadow 0.25s ease, transform 0.25s ease;
   }
