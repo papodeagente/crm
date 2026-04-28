@@ -3,7 +3,7 @@
  *
  * Identidade:
  *   - Wordmark "clinilucro" em Inter Light (200), letter-spacing apertado.
- *   - Acento neon (#B8FF29) na sílaba "lucro".
+ *   - Acento verde lima (#5A8A1F) na sílaba "lucro" — legível em fundo branco.
  *   - Glow sutil em fundo escuro (text-shadow).
  *
  * Uso:
@@ -24,12 +24,13 @@ interface LogoProps extends MarkProps {
   hideTagline?: boolean;
 }
 
-export const NEON = "#B8FF29";
+// Verde primário — versão escura, legível em fundo branco. Passa WCAG AA.
+export const NEON = "#5A8A1F";
 export const BLACK = "#0A0A0A";
 const GLOW_TEXT_SHADOW =
-  "0 0 20px rgba(184, 255, 41, 0.35), 0 0 40px rgba(184, 255, 41, 0.15)";
+  "0 0 20px rgba(90, 138, 31, 0.45), 0 0 40px rgba(90, 138, 31, 0.20)";
 const GLOW_TEXT_SHADOW_SOFT =
-  "0 0 12px rgba(184, 255, 41, 0.30)";
+  "0 0 12px rgba(90, 138, 31, 0.35)";
 
 /**
  * Símbolo compacto: bloco arredondado neon com letra "L" em preto.
