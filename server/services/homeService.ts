@@ -631,7 +631,7 @@ export async function getUpcomingAppointments(
       p.name   AS "pipelineName",
       s.name   AS "stageName"
     FROM deals d
-    LEFT JOIN crm_contacts c ON c.id = d."contactId" AND c."tenantId" = ${tenantId}
+    LEFT JOIN contacts c ON c.id = d."contactId" AND c."tenantId" = ${tenantId}
     LEFT JOIN crm_users u ON u.id = d."ownerUserId" AND u."tenantId" = ${tenantId}
     LEFT JOIN pipelines p ON p.id = d."pipelineId" AND p."tenantId" = ${tenantId}
     LEFT JOIN pipeline_stages s ON s.id = d."stageId"

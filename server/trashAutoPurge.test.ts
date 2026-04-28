@@ -85,6 +85,6 @@ describe("Trash Auto-Purge Scheduler", () => {
 
     // Second call: contacts DELETE
     const secondCall = mockExecute.mock.calls[1][0];
-    expect(secondCall.strings.join("")).toContain("DELETE FROM crm_contacts");
+    expect(secondCall.strings.join("")).toContain("DELETE FROM contacts");
   });
 });

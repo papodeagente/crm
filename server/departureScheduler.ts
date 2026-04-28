@@ -72,7 +72,7 @@ export async function checkUpcomingAppointments(): Promise<{ notificationsCreate
         c.name AS "contactName",
         u.name AS "ownerName"
       FROM deals d
-      LEFT JOIN crm_contacts c ON c.id = d."contactId" AND c."tenantId" = d."tenantId"
+      LEFT JOIN contacts c ON c.id = d."contactId" AND c."tenantId" = d."tenantId"
       LEFT JOIN crm_users u ON u.id = d."ownerUserId" AND u."tenantId" = d."tenantId"
       WHERE d.status = 'won'
         AND d."appointmentDate" IS NOT NULL

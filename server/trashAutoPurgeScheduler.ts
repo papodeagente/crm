@@ -37,7 +37,7 @@ export async function purgeExpiredTrashItems(): Promise<{
 
     // Hard-delete contacts that have been in trash for more than 30 days
     const contactResult = await db.execute(sql`
-      DELETE FROM crm_contacts
+      DELETE FROM contacts
       WHERE "deletedAt" IS NOT NULL
         AND "deletedAt" < NOW() - INTERVAL '1 day' * ${PURGE_AFTER_DAYS}
     `);
