@@ -863,8 +863,12 @@ function AsaasIntegrationTab() {
   const [forceShowInput, setForceShowInput] = useState(false);
 
   const connect = trpc.asaas.connect.useMutation({
-    onSuccess: () => {
-      toast.success("ASAAS conectado com sucesso!");
+    onSuccess: (data: any) => {
+      if (data?.envFlipped) {
+        toast.success(`ASAAS conectado em ${data.sandbox ? "sandbox" : "produção"} (ajustamos o ambiente automaticamente).`);
+      } else {
+        toast.success("ASAAS conectado com sucesso!");
+      }
       setApiKey("");
       setForceShowInput(false);
       utils.asaas.getStatus.invalidate();

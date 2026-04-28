@@ -52,18 +52,46 @@ export const asaasRouter = router({
     .mutation(async ({ ctx, input }) => {
       const tenantId = getTenantId(ctx);
       const apiKey = input.apiKey.trim();
-      // Validate by calling /myAccount
-      const client = createAsaasClient({ apiKey, sandbox: input.sandbox });
-      let account;
-      try {
-        account = await client.getCurrentAccount();
-      } catch (err: any) {
-        const msg = err instanceof AsaasError
-          ? `ASAAS rejeitou a chave: ${err.message}`
-          : `Falha ao validar chave: ${err.message}`;
-        throw new TRPCError({ code: "BAD_REQUEST", message: msg });
+
+      // Tenta autenticar no ambiente escolhido. Se falhar com 401/invalid_access_token,
+      // tenta o OUTRO ambiente — Asaas distribui keys de sandbox e produção em hosts
+      // diferentes; é comum o usuário errar o toggle.
+      async function tryAuth(sandbox: boolean) {
+        const client = createAsaasClient({ apiKey, sandbox });
+        const account = await client.getCurrentAccount();
+        return { account, sandbox };
       }
-      const encrypted = encryptSecret(JSON.stringify({ apiKey, sandbox: input.sandbox }));
+
+      let resolved: { account: any; sandbox: boolean };
+      let firstError: AsaasError | Error | null = null;
+      try {
+        resolved = await tryAuth(input.sandbox);
+      } catch (err: any) {
+        firstError = err;
+        // Se for erro de auth, vale tentar o outro ambiente
+        const isAuthError = err instanceof AsaasError && (err.status === 401 || err.code === "invalid_access_token");
+        if (isAuthError) {
+          try {
+            resolved = await tryAuth(!input.sandbox);
+          } catch (err2: any) {
+            // Os dois falharam — devolve mensagem clara do erro original
+            const msg = firstError instanceof AsaasError
+              ? `ASAAS rejeitou a chave: ${firstError.message}. Verifique se a chave está correta e se foi gerada para ${input.sandbox ? "sandbox" : "produção"}.`
+              : `Falha ao validar chave: ${(firstError as Error).message}`;
+            throw new TRPCError({ code: "BAD_REQUEST", message: msg });
+          }
+        } else {
+          // Erro não-auth (rede, timeout, etc.) — não tenta outro ambiente
+          const msg = err instanceof AsaasError
+            ? `ASAAS rejeitou a chave: ${err.message}`
+            : `Falha ao validar chave: ${err.message}`;
+          throw new TRPCError({ code: "BAD_REQUEST", message: msg });
+        }
+      }
+
+      const detectedSandbox = resolved.sandbox;
+      const envFlipped = detectedSandbox !== input.sandbox;
+      const encrypted = encryptSecret(JSON.stringify({ apiKey, sandbox: detectedSandbox }));
       await crm.upsertAsaasCredential({ tenantId, encryptedSecret: encrypted });
       await emitEvent({
         tenantId,
@@ -72,7 +100,12 @@ export const asaasRouter = router({
         entityId: 0,
         action: "asaas_connect",
       });
-      return { success: true, account };
+      return {
+        success: true,
+        account: resolved.account,
+        sandbox: detectedSandbox,
+        envFlipped,
+      };
     }),
 
   disconnect: tenantWriteProcedure.mutation(async ({ ctx }) => {
@@ -95,7 +128,7 @@ export const asaasRouter = router({
       return { ok: true as const, sandbox, account };
     } catch (err: any) {
       throw new TRPCError({
-        code: "FAILED_PRECONDITION",
+        code: "PRECONDITION_FAILED",
         message: err instanceof AsaasError ? err.message : `Falha ASAAS: ${err.message}`,
       });
     }
