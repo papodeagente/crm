@@ -1104,11 +1104,11 @@ function DealCard({ deal, contacts, accounts, overdueData, pendingCount, waUnrea
         <LeadScoreBadge score={(deal as any).aiLeadScore} reason={(deal as any).aiLeadScoreReason} size="sm" showLabel={false} className="shrink-0 mt-0.5" />
       </div>
 
-      {/* Row 2b: Contact name */}
-      {contact && (
+      {/* Row 2b: Contact name — prefer deal.contactName from server JOIN (always present) */}
+      {(deal.contactName || contact?.name) && (
         <p className="text-[11.5px] text-muted-foreground truncate mb-1.5">
           <User className="inline h-3 w-3 mr-1 -mt-0.5" />
-          {contact.name || "Sem nome"}
+          {deal.contactName || contact?.name || "Sem nome"}
         </p>
       )}
 
