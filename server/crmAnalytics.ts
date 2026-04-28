@@ -136,7 +136,7 @@ export async function getAnalyticsSummary(f: AnalyticsFilters): Promise<Analytic
     status: deals.status,
     cnt: sql<number>`COUNT(*)`,
     val: sql<number>`COALESCE(SUM(${deals.valueCents}), 0)`,
-    avgCycle: sql<number>`COALESCE(AVG(DATEDIFF(${deals.updatedAt}, ${deals.createdAt})), 0)`,
+    avgCycle: sql<number>`COALESCE(AVG(EXTRACT(EPOCH FROM (${deals.updatedAt} - ${deals.createdAt})) / 86400.0), 0)`,
   }).from(deals);
   if (f.pipelineType) q = q.innerJoin(pipelines, eq(deals.pipelineId, pipelines.id)) as any;
   const rows = await q.where(where).groupBy(deals.status);
