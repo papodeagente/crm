@@ -14,7 +14,7 @@ import { trpc } from "@/lib/trpc";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { Sparkles, RefreshCw, AlertTriangle, ArrowRight, Loader2, Thermometer } from "lucide-react";
+import { Sparkles, RefreshCw, Loader2, Thermometer } from "lucide-react";
 import { LeadScoreBadge } from "./LeadScoreBadge";
 import { formatDateTime } from "../../../shared/dateUtils";
 
@@ -61,49 +61,12 @@ export function DealAiSummaryStrip({
     onError: (err) => toast.error(err.message),
   });
 
-  // Caso A: sem integração AI configurada e sem resumo histórico → CTA pra configurar.
-  if (!hasIntegration && !aiSummary) {
-    return (
-      <div className="shrink-0 border-b border-amber-500/20 bg-amber-500/5 px-3 py-2">
-        <div className="flex items-center gap-2 text-xs">
-          <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0" />
-          <span className="text-muted-foreground flex-1">
-            Configure uma IA em Integrações pra ativar resumo automático da deal.
-          </span>
-          <Button
-            size="sm"
-            variant="ghost"
-            className="h-7 text-xs text-amber-600 hover:text-amber-700 hover:bg-amber-500/10 gap-1"
-            onClick={() => setLocation("/settings/integrations")}
-          >
-            Configurar IA <ArrowRight className="h-3 w-3" />
-          </Button>
-        </div>
-      </div>
-    );
-  }
+  // Sem integração e sem dados históricos → não renderiza nada (CTA de config fica em Configurações → IA).
+  if (!hasIntegration && !aiSummary && !aiLeadScore) return null;
 
-  // Caso B: tem integração mas admin ainda não habilitou NENHUMA feature de IA → banner com CTA.
-  if (hasIntegration && !leadScoringOn && !dealSummaryOn && !aiSummary && !aiLeadScore) {
-    return (
-      <div className="shrink-0 border-b border-violet-500/20 bg-violet-500/5 px-3 py-2">
-        <div className="flex items-center gap-2 text-xs">
-          <Sparkles className="h-4 w-4 text-violet-500 shrink-0" />
-          <span className="text-muted-foreground flex-1">
-            IA configurada. Ative os recursos de IA (Termômetro e Resumo) em Configurações → IA.
-          </span>
-          <Button
-            size="sm"
-            variant="ghost"
-            className="h-7 text-xs text-violet-600 hover:text-violet-700 hover:bg-violet-500/10 gap-1"
-            onClick={() => setLocation("/settings/integrations")}
-          >
-            Ativar recursos <ArrowRight className="h-3 w-3" />
-          </Button>
-        </div>
-      </div>
-    );
-  }
+  // Tem integração mas nenhuma feature ativa e sem dados históricos → também esconde.
+  // Quando o admin ativar uma feature em Configurações → IA, a faixa volta automaticamente.
+  if (hasIntegration && !leadScoringOn && !dealSummaryOn && !aiSummary && !aiLeadScore) return null;
 
   const updatedLabel = aiSummaryUpdatedAt ? formatDateTime(aiSummaryUpdatedAt) : null;
   const loading = refreshSummary.isPending || rescore.isPending;
