@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import { trpc } from "@/lib/trpc";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
@@ -253,12 +253,15 @@ export function DealTimeline({ dealId }: { dealId: number }) {
   const [limit, setLimit] = useState(50);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [newNote, setNewNote] = useState("");
+  const [noteExpanded, setNoteExpanded] = useState(false);
+  const noteRef = useRef<HTMLTextAreaElement>(null);
   const [showAiAnalysis, setShowAiAnalysis] = useState(false);
 
   const utils = trpc.useUtils();
   const createNote = trpc.crm.notes.create.useMutation({
     onSuccess: () => {
       setNewNote("");
+      setNoteExpanded(false);
       toast.success("Anotação criada");
       utils.crm.deals.timeline.invalidate({ dealId });
     },
@@ -268,6 +271,14 @@ export function DealTimeline({ dealId }: { dealId: number }) {
   const handleCreateNote = () => {
     if (!newNote.trim()) return;
     createNote.mutate({ entityType: "deal", entityId: dealId, body: newNote.trim() });
+  };
+  const expandNote = () => {
+    setNoteExpanded(true);
+    setTimeout(() => noteRef.current?.focus(), 0);
+  };
+  const cancelNote = () => {
+    setNewNote("");
+    setNoteExpanded(false);
   };
 
   const { data, isLoading, isFetching } = trpc.crm.deals.timeline.useQuery(
@@ -419,39 +430,41 @@ export function DealTimeline({ dealId }: { dealId: number }) {
         </div>
       )}
 
-      {/* Create note */}
-      <div className="px-4 py-3 border-b border-border/50">
-        <div className="flex items-start gap-2">
-          <div className="flex-1">
-            <Textarea
-              value={newNote}
-              onChange={(e) => setNewNote(e.target.value)}
-              placeholder="Criar anotação..."
-              className="min-h-[52px] max-h-[120px] text-sm resize-none"
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-                  e.preventDefault();
-                  handleCreateNote();
-                }
-              }}
-            />
-          </div>
-          <Button
-            size="sm"
-            disabled={!newNote.trim() || createNote.isPending}
-            onClick={handleCreateNote}
-            className="shrink-0 mt-0.5 gap-1.5"
-          >
-            {createNote.isPending ? (
-              <Clock className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <Send className="h-3.5 w-3.5" />
-            )}
-            <span className="hidden sm:inline">Anotar</span>
+      {/* Create note — colapsado por padrão, expande ao clicar */}
+      {!noteExpanded ? (
+        <div className="px-4 py-2 border-b border-border/50">
+          <Button size="sm" onClick={expandNote}>
+            <MessageSquarePlus className="h-3.5 w-3.5 mr-1.5" />
+            Adicionar anotação
           </Button>
         </div>
-        <p className="text-[10px] text-muted-foreground mt-1">Ctrl+Enter para enviar</p>
-      </div>
+      ) : (
+        <div className="px-4 py-3 border-b border-border/50 space-y-2">
+          <Textarea
+            ref={noteRef}
+            value={newNote}
+            onChange={(e) => setNewNote(e.target.value)}
+            placeholder="Escreva sua anotação… (Ctrl+Enter salva · Esc cancela)"
+            className="min-h-[80px] max-h-[160px] text-sm resize-none"
+            onKeyDown={(e) => {
+              if (e.key === "Escape") { e.preventDefault(); cancelNote(); }
+              else if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                e.preventDefault();
+                handleCreateNote();
+              }
+            }}
+          />
+          <div className="flex items-center justify-end gap-2">
+            <Button variant="ghost" size="sm" onClick={cancelNote} disabled={createNote.isPending}>
+              Cancelar
+            </Button>
+            <Button size="sm" onClick={handleCreateNote} disabled={!newNote.trim() || createNote.isPending} className="gap-1.5">
+              {createNote.isPending ? <Clock className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
+              Salvar
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Timeline content */}
       <ScrollArea className="flex-1">
