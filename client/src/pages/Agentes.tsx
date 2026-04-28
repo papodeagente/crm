@@ -343,6 +343,7 @@ function RunsTable() {
   const m = (metricsQ.data as any) ?? {};
   const total = Number(m.replied ?? 0) + Number(m.handed_off ?? 0);
   const containment = total > 0 ? ((Number(m.replied) / total) * 100).toFixed(0) + "%" : "—";
+  const [selectedRunId, setSelectedRunId] = useState<number | null>(null);
 
   return (
     <div className="space-y-4">
@@ -367,7 +368,7 @@ function RunsTable() {
           </thead>
           <tbody>
             {(runsQ.data as any[] || []).map((r: any) => (
-              <tr key={r.id} className="border-t hover:bg-accent/30">
+              <tr key={r.id} className="border-t hover:bg-accent/30 cursor-pointer" onClick={() => setSelectedRunId(r.id)}>
                 <td className="p-2 text-xs whitespace-nowrap">{new Date(r.createdAt).toLocaleString()}</td>
                 <td className="p-2 text-xs font-mono">{String(r.remoteJid).split("@")[0]}</td>
                 <td className="p-2"><OutcomeBadge outcome={r.outcome} /></td>
@@ -383,7 +384,110 @@ function RunsTable() {
           </tbody>
         </table>
       </Card>
+      {selectedRunId !== null && <RunDetailDialog runId={selectedRunId} onClose={() => setSelectedRunId(null)} />}
     </div>
+  );
+}
+
+function RunDetailDialog({ runId, onClose }: { runId: number; onClose: () => void }) {
+  const runQ = trpc.agents.getRun.useQuery({ id: runId });
+  const utils = trpc.useUtils();
+  const r = runQ.data as any;
+  const createKb = trpc.agents.knowledge.create.useMutation({
+    onSuccess: () => { utils.agents.knowledge.list.invalidate(); toast.success("Salvo na base de conhecimento"); },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  function saveAsKnowledge() {
+    if (!r?.inputText) return;
+    const title = r.inputText.length > 80 ? r.inputText.slice(0, 77) + "..." : r.inputText;
+    const content = r.replyText || "[escreva aqui a resposta correta]";
+    createKb.mutate({ title, content, sourceType: "faq", isActive: true, orderIndex: 0 });
+  }
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Run #{runId}</DialogTitle>
+        </DialogHeader>
+        {runQ.isLoading && <div className="flex items-center gap-2 text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Carregando…</div>}
+        {r && (
+          <div className="space-y-4 text-sm">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+              <div><p className="text-muted-foreground">Quando</p><p className="font-medium">{new Date(r.createdAt).toLocaleString()}</p></div>
+              <div><p className="text-muted-foreground">Outcome</p><div className="mt-1"><OutcomeBadge outcome={r.outcome} /></div></div>
+              <div><p className="text-muted-foreground">Tokens</p><p className="font-medium">{(r.inputTokens || 0) + (r.outputTokens || 0)} ({r.inputTokens ?? 0} in / {r.outputTokens ?? 0} out)</p></div>
+              <div><p className="text-muted-foreground">Latência</p><p className="font-medium">{r.durationMs ? `${r.durationMs}ms` : "—"}</p></div>
+              <div className="col-span-2"><p className="text-muted-foreground">JID</p><p className="font-mono text-xs">{r.remoteJid}</p></div>
+              <div className="col-span-2"><p className="text-muted-foreground">Sessão</p><p className="font-mono text-xs">{r.sessionId}</p></div>
+            </div>
+
+            <div>
+              <p className="text-xs text-muted-foreground mb-1">Mensagem do cliente</p>
+              <Card className="p-3 bg-muted/30 whitespace-pre-wrap text-sm">{r.inputText || "—"}</Card>
+            </div>
+
+            {r.replyText && (
+              <div>
+                <p className="text-xs text-muted-foreground mb-1">Resposta do agente</p>
+                <Card className="p-3 bg-emerald-50 dark:bg-emerald-950/20 whitespace-pre-wrap text-sm">{r.replyText}</Card>
+              </div>
+            )}
+
+            {r.errorMessage && (
+              <div>
+                <p className="text-xs text-red-600 mb-1">Erro</p>
+                <Card className="p-3 bg-red-50 dark:bg-red-950/20 whitespace-pre-wrap text-xs font-mono">{r.errorMessage}</Card>
+              </div>
+            )}
+
+            {Array.isArray(r.toolCalls) && r.toolCalls.length > 0 && (
+              <div>
+                <p className="text-xs text-muted-foreground mb-1">Ferramentas chamadas ({r.toolCalls.length})</p>
+                <div className="space-y-2">
+                  {r.toolCalls.map((tc: any, i: number) => (
+                    <details key={i} className="border rounded-md">
+                      <summary className="p-2 cursor-pointer flex items-center justify-between text-xs">
+                        <span className="font-mono font-medium">{tc.tool}</span>
+                        <span className="text-muted-foreground">{tc.durationMs ?? "—"}ms</span>
+                      </summary>
+                      <div className="p-2 border-t space-y-2 text-xs">
+                        <div>
+                          <p className="text-muted-foreground mb-1">Input</p>
+                          <pre className="bg-muted/40 p-2 rounded overflow-x-auto">{JSON.stringify(tc.input, null, 2)}</pre>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground mb-1">Output</p>
+                          <pre className="bg-muted/40 p-2 rounded overflow-x-auto">{JSON.stringify(tc.output, null, 2)}</pre>
+                        </div>
+                      </div>
+                    </details>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {Array.isArray(r.modelMessages) && r.modelMessages.length > 0 && (
+              <details className="border rounded-md">
+                <summary className="p-2 cursor-pointer text-xs text-muted-foreground">Transcript completo do modelo ({r.modelMessages.length} mensagens)</summary>
+                <div className="p-2 border-t">
+                  <pre className="bg-muted/40 p-2 rounded text-xs overflow-x-auto max-h-96">{JSON.stringify(r.modelMessages, null, 2)}</pre>
+                </div>
+              </details>
+            )}
+          </div>
+        )}
+        <DialogFooter>
+          {r?.inputText && (
+            <Button variant="outline" onClick={saveAsKnowledge} disabled={createKb.isPending}>
+              <BookOpen className="h-4 w-4 mr-1" /> Salvar como conhecimento
+            </Button>
+          )}
+          <Button onClick={onClose}>Fechar</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
