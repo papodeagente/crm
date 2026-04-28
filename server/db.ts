@@ -3561,20 +3561,17 @@ export async function deleteAiIntegration(tenantId: number, id: number) {
     .where(and(eq(aiIntegrations.id, id), eq(aiIntegrations.tenantId, tenantId)));
 }
 
-export async function testAiApiKey(provider: "openai" | "anthropic", apiKey: string, model: string): Promise<{ success: boolean; error?: string }> {
+/**
+ * Valida a API key chamando o endpoint /v1/models do provider.
+ * Apenas auth — sem custo de tokens, sem dependência de um modelo específico
+ * (a lista de modelos disponíveis varia por conta/preview).
+ */
+export async function testAiApiKey(provider: "openai" | "anthropic", apiKey: string, _model: string): Promise<{ success: boolean; error?: string }> {
   try {
     if (provider === "openai") {
-      const res = await fetch("https://api.openai.com/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify({
-          model,
-          messages: [{ role: "user", content: "Say hello" }],
-          max_completion_tokens: 5,
-        }),
+      const res = await fetch("https://api.openai.com/v1/models", {
+        method: "GET",
+        headers: { "Authorization": `Bearer ${apiKey}` },
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
@@ -3582,18 +3579,12 @@ export async function testAiApiKey(provider: "openai" | "anthropic", apiKey: str
       }
       return { success: true };
     } else {
-      const res = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
+      const res = await fetch("https://api.anthropic.com/v1/models", {
+        method: "GET",
         headers: {
-          "Content-Type": "application/json",
           "x-api-key": apiKey,
           "anthropic-version": "2023-06-01",
         },
-        body: JSON.stringify({
-          model,
-          messages: [{ role: "user", content: "Say hello" }],
-          max_tokens: 5,
-        }),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
