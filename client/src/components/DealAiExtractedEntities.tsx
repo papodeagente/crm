@@ -14,15 +14,24 @@ import { toast } from "sonner";
 import { Check, X, Sparkles, RefreshCw, Loader2, AlertTriangle, ArrowRight } from "lucide-react";
 
 const FIELD_LABELS: Record<string, string> = {
+  procedimento: "Procedimento de interesse",
+  area_corpo: "Área do corpo",
+  objetivo: "Objetivo",
+  urgencia: "Urgência",
+  orcamento: "Orçamento",
+  agendamento_desejado: "Agendamento desejado",
+  contraindicacoes: "Contraindicações",
+  ja_realizou: "Já realizou antes",
+  preferencias: "Preferências",
+  // Legados (turismo) — mantidos para exibir entries antigas se houver
   destino: "Destino",
   origem: "Origem",
   data_ida: "Data de ida",
   data_volta: "Data de volta",
   passageiros_adultos: "Adultos",
   passageiros_criancas: "Crianças",
-  orcamento_max: "Orçamento",
+  orcamento_max: "Orçamento (legado)",
   ocasiao: "Ocasião",
-  preferencias: "Preferências",
 };
 
 interface DealAiExtractedEntitiesProps {

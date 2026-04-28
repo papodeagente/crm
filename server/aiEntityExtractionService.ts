@@ -41,15 +41,15 @@ export interface ExtractionInput {
 
 /** Campos padrão que sempre pedimos pra IA tentar extrair. Tenant pode estender via training config. */
 const DEFAULT_FIELD_KEYS = [
-  "destino",
-  "data_ida",
-  "data_volta",
-  "passageiros_adultos",
-  "passageiros_criancas",
-  "orcamento_max",
-  "ocasiao",
+  "procedimento",
+  "area_corpo",
+  "objetivo",
+  "urgencia",
+  "orcamento",
+  "agendamento_desejado",
+  "contraindicacoes",
+  "ja_realizou",
   "preferencias",
-  "origem",
 ] as const;
 
 export async function extractDealEntities(input: ExtractionInput): Promise<ExtractionResult> {
@@ -90,30 +90,30 @@ export async function extractDealEntities(input: ExtractionInput): Promise<Extra
     console.warn("[entityExtraction] training config indisponível, seguindo sem custom instructions:", e?.message);
   }
 
-  const systemPrompt = `Você extrai dados estruturados de viagem de uma conversa WhatsApp entre agente e cliente.
+  const systemPrompt = `Você extrai dados estruturados de uma conversa WhatsApp entre clínica/consultório e paciente interessado em procedimento estético/clínico.
 Extraia APENAS o que foi mencionado explicitamente — NUNCA invente dados.
 
 Campos a procurar (padrão):
-- destino: cidade/país principal mencionado pelo cliente
-- origem: cidade de partida
-- data_ida: data de embarque (formato YYYY-MM-DD quando possível, ou "Mar/2026")
-- data_volta: data de retorno (mesmo formato)
-- passageiros_adultos: número de adultos
-- passageiros_criancas: número de crianças
-- orcamento_max: orçamento em reais mencionado (apenas número, sem "R$")
-- ocasiao: lua de mel, aniversário, férias família, formatura, etc.
-- preferencias: praia, cidade, aventura, luxo, econômico, all-inclusive, etc. (lista separada por vírgula)
+- procedimento: procedimento ou tratamento de interesse (ex: "harmonização facial", "botox", "preenchimento labial", "limpeza de pele", "laser", "drenagem")
+- area_corpo: região anatômica mencionada (ex: "face", "lábios", "abdômen", "pernas", "rosto inteiro")
+- objetivo: motivação/resultado esperado pelo paciente (ex: "rejuvenescer", "reduzir gordura localizada", "tirar manchas", "casamento em 3 meses")
+- urgencia: prazo desejado para realizar (ex: "essa semana", "mês que vem", "antes de evento X em DD/MM"). Se houver data específica, use formato YYYY-MM-DD
+- orcamento: valor mencionado pelo paciente em reais (apenas número, sem "R$"). Pode ser teto ("até 3000") ou faixa ("entre 1500 e 2500")
+- agendamento_desejado: data/horário preferido para a consulta/sessão (formato YYYY-MM-DD ou "manhã/tarde de DD/MM")
+- contraindicacoes: condições mencionadas pelo paciente que podem contraindicar — gravidez, amamentação, alergias, uso de medicamento (ex: isotretinoína, anticoagulante), doenças crônicas, cirurgia recente
+- ja_realizou: sim/não/qual — se já fez o procedimento antes ou outros similares. Inclua o que foi feito e quando se mencionado
+- preferencias: profissional preferido, turno (manhã/tarde/noite), forma de pagamento, particularidades (ex: "só anestesia local", "sem agulha")
 
 Para cada campo extraído, atribua uma confiança (0-100):
-- 90+: cliente afirmou de forma explícita ("vamos dia 15 de março")
-- 50-89: mencionado mas sem certeza ("acho que março")
+- 90+: paciente afirmou de forma explícita ("quero fazer botox na testa")
+- 50-89: mencionado mas sem certeza ("estou pensando em harmonização")
 - 0-49: inferência indireta (melhor dispensar)
 
 Responda EXCLUSIVAMENTE com JSON válido no formato:
 {
   "entities": [
-    { "fieldKey": "destino", "value": "Cancún, México", "confidence": 95 },
-    { "fieldKey": "data_ida", "value": "2026-11-15", "confidence": 80 }
+    { "fieldKey": "procedimento", "value": "Harmonização facial", "confidence": 95 },
+    { "fieldKey": "agendamento_desejado", "value": "2026-05-10", "confidence": 80 }
   ]
 }
 
@@ -121,6 +121,7 @@ Regras:
 - Não incluir campos que não foram mencionados
 - Confiança < 40 não inclui no resultado
 - Datas sempre em ISO quando houver dia exato
+- Em "contraindicacoes", se o paciente mencionar várias, separe por vírgula
 ${customInstructions ? `\n--- INSTRUÇÕES DO GESTOR ---\n${customInstructions}` : ""}`;
 
   const userPrompt = `## Conversa (${messages.length} mensagens)
