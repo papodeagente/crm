@@ -80,8 +80,15 @@ export async function extractDealEntities(input: ExtractionInput): Promise<Extra
     })
     .join("\n");
 
-  const trainingConfig = await getAiTrainingConfig(tenantId, "extraction" as any);
-  const customInstructions = trainingConfig?.instructions || "";
+  // Training config para "extraction" é opcional. Em deploys antigos o enum
+  // configType pode não ter "extraction" — degrada gracefully sem instruções custom.
+  let customInstructions = "";
+  try {
+    const trainingConfig = await getAiTrainingConfig(tenantId, "extraction" as any);
+    customInstructions = trainingConfig?.instructions || "";
+  } catch (e: any) {
+    console.warn("[entityExtraction] training config indisponível, seguindo sem custom instructions:", e?.message);
+  }
 
   const systemPrompt = `Você extrai dados estruturados de viagem de uma conversa WhatsApp entre agente e cliente.
 Extraia APENAS o que foi mencionado explicitamente — NUNCA invente dados.

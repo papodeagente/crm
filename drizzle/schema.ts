@@ -6,7 +6,7 @@ import { integer, pgEnum, pgTable, text, timestamp, varchar, boolean, json, bigi
 
 export const visibilityScopeEnum = pgEnum("visibilityScope", ["personal", "team", "global"]);
 export const ai_integrations_providerEnum = pgEnum("ai_integrations_provider", ["openai", "anthropic"]);
-export const configTypeEnum = pgEnum("configType", ["suggestion", "summary", "analysis"]);
+export const configTypeEnum = pgEnum("configType", ["suggestion", "summary", "analysis", "extraction"]);
 export const alerts_statusEnum = pgEnum("alerts_status", ["active", "resolved", "dismissed"]);
 export const bulk_campaign_messages_statusEnum = pgEnum("bulk_campaign_messages_status", ["pending", "sending", "sent", "delivered", "read", "failed", "skipped"]);
 export const bulk_campaigns_statusEnum = pgEnum("bulk_campaigns_status", ["running", "completed", "cancelled", "failed"]);
