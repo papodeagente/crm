@@ -297,6 +297,8 @@ export const crmUsers = pgTable("crm_users", {
   passwordHash: varchar("passwordHash", { length: 512 }),
   role: crm_user_roleEnum("crm_user_role").default("user").notNull(),
   status: crm_users_statusEnum("status").default("invited").notNull(),
+  /** Plataforma: gerenciar Super Admins do SaaS (independente de tenant). */
+  isSuperAdmin: boolean("isSuperAdmin").default(false).notNull(),
   avatarUrl: text("avatarUrl"),
   isAvailable: boolean("isAvailable").default(true).notNull(),
   /** Helpdesk: capacidade do agente (load balancing) */

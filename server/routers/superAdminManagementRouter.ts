@@ -8,7 +8,7 @@ import { publicProcedure, router } from "../_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { verifySaasSession, isSuperAdminAsync, SAAS_COOKIE } from "../saasAuth";
 import { getDb } from "../db";
-import { users } from "../../drizzle/schema";
+import { crmUsers as users } from "../../drizzle/schema";
 import { eq, and, sql } from "drizzle-orm";
 
 const PROTECTED_EMAIL = "bruno@entur.com.br";
@@ -49,7 +49,7 @@ export const superAdminManagementRouter = router({
         email: users.email,
         isSuperAdmin: users.isSuperAdmin,
         createdAt: users.createdAt,
-        lastSignedIn: users.lastSignedIn,
+        lastSignedIn: users.lastLoginAt,
       })
       .from(users)
       .where(eq(users.isSuperAdmin, true))

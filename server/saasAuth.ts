@@ -343,12 +343,13 @@ export async function isSuperAdminAsync(email: string): Promise<boolean> {
   if (email.toLowerCase() === PROTECTED_SUPERADMIN_EMAIL) return true;
   const db = await getDb();
   if (!db) return false;
-  const { users } = await import("../drizzle/schema");
+  // Super Admin SaaS é flag em crm_users (única tabela de usuários autenticáveis).
+  const { crmUsers } = await import("../drizzle/schema");
   const { eq: eqOp, and: andOp } = await import("drizzle-orm");
   const [user] = await db
-    .select({ isSuperAdmin: users.isSuperAdmin })
-    .from(users)
-    .where(andOp(eqOp(users.email, email.toLowerCase()), eqOp(users.isSuperAdmin, true)))
+    .select({ isSuperAdmin: crmUsers.isSuperAdmin })
+    .from(crmUsers)
+    .where(andOp(eqOp(crmUsers.email, email.toLowerCase()), eqOp(crmUsers.isSuperAdmin, true)))
     .limit(1);
   return !!user;
 }
