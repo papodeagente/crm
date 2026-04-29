@@ -4341,20 +4341,47 @@ REGRAS:
         audioUrl: z.string(),
       }))
       .mutation(async ({ input, ctx }) => {
-        // Check if tenant has OpenAI integration (optional — Forge API is fallback)
         const integration = await getActiveAiIntegration(getTenantId(ctx), "openai");
         const hasTenantKey = !!(integration?.apiKey);
 
+        // Sem chave OpenAI E sem Forge configurado → mensagem acionável.
+        const forgeReady = !!(process.env.BUILT_IN_FORGE_API_URL && process.env.BUILT_IN_FORGE_API_KEY);
+        if (!hasTenantKey && !forgeReady) {
+          throw new TRPCError({
+            code: "PRECONDITION_FAILED",
+            message: "Conecte uma chave OpenAI em Integrações → IA para habilitar transcrição de áudio.",
+          });
+        }
+
         try {
           if (hasTenantKey) {
-            // Use tenant's OpenAI Whisper API
+            // ── OpenAI Whisper (tenant key) ──
             const audioRes = await fetch(input.audioUrl);
-            if (!audioRes.ok) throw new Error(`Failed to download audio: ${audioRes.status}`);
+            if (!audioRes.ok) {
+              throw new Error(`Falha ao baixar áudio (${audioRes.status}). O link do WhatsApp pode ter expirado.`);
+            }
             const audioBuffer = await audioRes.arrayBuffer();
-            const audioBlob = new Blob([audioBuffer]);
+            // Whisper exige mime type reconhecido — usa o do response, com fallback
+            const respMime = audioRes.headers.get("content-type") || "";
+            const mimeType = respMime.split(";")[0].trim() || "audio/ogg";
+            const audioBlob = new Blob([new Uint8Array(audioBuffer)], { type: mimeType });
 
-            const urlPath = new URL(input.audioUrl).pathname;
-            const ext = urlPath.split(".").pop() || "ogg";
+            // Mapeia mime → extensão (Whisper rejeita extensões desconhecidas)
+            const mimeToExt: Record<string, string> = {
+              "audio/ogg": "ogg", "audio/mpeg": "mp3", "audio/mp3": "mp3",
+              "audio/wav": "wav", "audio/x-wav": "wav", "audio/webm": "webm",
+              "audio/mp4": "m4a", "audio/x-m4a": "m4a", "audio/aac": "aac",
+              "audio/flac": "flac",
+            };
+            let ext = mimeToExt[mimeType] || "";
+            if (!ext) {
+              try {
+                const urlPath = new URL(input.audioUrl).pathname;
+                const guessed = urlPath.split(".").pop()?.toLowerCase() || "";
+                if (["ogg","mp3","wav","webm","m4a","aac","flac","mpga","mpeg"].includes(guessed)) ext = guessed;
+              } catch { /* URL inválida — segue com default */ }
+            }
+            if (!ext) ext = "ogg";
 
             const formData = new FormData();
             formData.append("file", audioBlob, `audio.${ext}`);
@@ -4370,13 +4397,14 @@ REGRAS:
 
             if (!whisperRes.ok) {
               const body = await whisperRes.json().catch(() => ({}));
-              throw new Error(body?.error?.message || `Whisper API error: ${whisperRes.status}`);
+              const detail = body?.error?.message || `${whisperRes.status} ${whisperRes.statusText}`;
+              throw new Error(`Whisper: ${detail}`);
             }
 
             const result = await whisperRes.json();
             return { text: result.text || "", language: result.language || "pt" };
           } else {
-            // Fallback: use built-in Forge API (free, platform-provided)
+            // ── Forge fallback (apenas quando configurado) ──
             const { transcribeAudio } = await import("./_core/voiceTranscription");
             const forgeResult = await transcribeAudio({
               audioUrl: input.audioUrl,
@@ -4384,14 +4412,14 @@ REGRAS:
               prompt: "Transcreva o áudio do usuário para texto.",
             });
             if ("error" in forgeResult) {
-              throw new Error(`Forge API error: ${(forgeResult as any).error}`);
+              throw new Error(`Transcrição falhou: ${(forgeResult as any).error}`);
             }
             const result = forgeResult as { text: string; language?: string };
             return { text: result.text || "", language: result.language || "pt" };
           }
         } catch (err: any) {
           if (err instanceof TRPCError) throw err;
-          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: err.message || "Transcription failed" });
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: err.message || "Falha ao transcrever áudio" });
         }
       }),
 

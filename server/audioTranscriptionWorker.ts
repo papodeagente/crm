@@ -537,20 +537,25 @@ export async function reprocessStuckTranscriptions(tenantId?: number): Promise<{
 // ── Helpers ────────────────────────────────────────────────────
 
 function getFileExtension(mimeType: string): string {
+  // Normaliza: remove parâmetros (ex.: "audio/ogg; codecs=opus" → "audio/ogg")
+  const base = (mimeType || "").split(";")[0].trim().toLowerCase();
   const mimeToExt: Record<string, string> = {
     "audio/webm": "webm",
     "audio/mp3": "mp3",
     "audio/mpeg": "mp3",
+    "audio/mpga": "mp3",
     "audio/wav": "wav",
     "audio/wave": "wav",
+    "audio/x-wav": "wav",
     "audio/ogg": "ogg",
     "audio/m4a": "m4a",
+    "audio/x-m4a": "m4a",
     "audio/mp4": "m4a",
     "audio/aac": "aac",
     "audio/opus": "ogg",
-    "audio/ogg; codecs=opus": "ogg",
+    "audio/flac": "flac",
   };
-  return mimeToExt[mimeType] || "ogg";
+  return mimeToExt[base] || "ogg";
 }
 
 // ── Graceful Shutdown ──────────────────────────────────────────
