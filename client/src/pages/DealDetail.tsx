@@ -2049,12 +2049,45 @@ function EditableSidebarField({ label, value, className, isEditing, onStartEdit,
   );
 }
 
+/**
+ * Normaliza telefone para E.164 sem o "+":
+ *   "(11) 99999-9999" → "5511999999999"
+ *   "+55 84 99710-4899" → "5584997104899"
+ *   "0 84 99710-4899" → "5584997104899"
+ *
+ * Heurística: se já vier com + (E.164), strip apenas o "+" e dígitos.
+ * Senão: strip não-dígitos. Se 10-11 dígitos (DDD+número BR), prepende "55".
+ * Se começa com "0" (número local), troca por "55".
+ * Retorna null se ficar com menos de 8 dígitos (provavelmente inválido).
+ */
+function normalizeWhatsAppPhone(raw: string): string | null {
+  if (!raw) return null;
+  const trimmed = raw.trim();
+  let digits = trimmed.startsWith("+")
+    ? trimmed.slice(1).replace(/\D/g, "")
+    : trimmed.replace(/\D/g, "");
+  if (!digits) return null;
+  if (!trimmed.startsWith("+")) {
+    if (digits.startsWith("0") && digits.length >= 11) digits = "55" + digits.slice(1);
+    else if (digits.length === 10 || digits.length === 11) digits = "55" + digits;
+  }
+  return digits.length >= 8 ? digits : null;
+}
+
 function ContactInfoRow({ icon: Icon, value, copyable, whatsapp }: {
   icon: typeof Phone; value: string; copyable?: boolean; whatsapp?: boolean;
 }) {
   const handleCopy = () => {
     navigator.clipboard.writeText(value);
     toast.success("Copiado!");
+  };
+  const handleOpenWhatsApp = () => {
+    const e164 = normalizeWhatsAppPhone(value);
+    if (!e164) {
+      toast.error("Número inválido para abrir o WhatsApp");
+      return;
+    }
+    window.open(`https://wa.me/${e164}`, "_blank", "noopener");
   };
   return (
     <div className="flex items-center gap-2 group">
@@ -2068,7 +2101,7 @@ function ContactInfoRow({ icon: Icon, value, copyable, whatsapp }: {
         )}
         {whatsapp && (
           <button
-            onClick={() => window.open(`https://wa.me/${value.replace(/\D/g, "")}`, "_blank")}
+            onClick={handleOpenWhatsApp}
             className="p-0.5 hover:bg-muted/60 rounded"
             title="Abrir WhatsApp"
           >
