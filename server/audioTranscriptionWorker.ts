@@ -181,9 +181,12 @@ async function processTranscriptionJob(data: AudioTranscriptionJob): Promise<voi
   console.log(`[AudioTranscription] Processing msg ${messageId} (tenant ${tenantId}, session ${sessionId})`);
 
   // ── Step 1: Check tenant AI settings ──
+  // Default-on: só pula se o admin explicitamente desativou (=== false).
+  // Antes era `if (!aiSettings.audioTranscriptionEnabled)` que falhava silenciosamente
+  // em tenants sem o campo no settingsJson.
   const aiSettings = await getTenantAiSettings(tenantId);
-  if (!aiSettings.audioTranscriptionEnabled) {
-    console.log(`[AudioTranscription] Transcription disabled for tenant ${tenantId}, skipping`);
+  if (aiSettings.audioTranscriptionEnabled === false) {
+    console.log(`[AudioTranscription] Transcription explicitly disabled for tenant ${tenantId}, skipping`);
     await db.update(waMessages)
       .set({ audioTranscriptionStatus: "failed" })
       .where(eq(waMessages.id, messageId));
