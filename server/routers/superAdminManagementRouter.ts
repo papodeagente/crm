@@ -8,7 +8,7 @@ import { publicProcedure, router } from "../_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { verifySaasSession, isSuperAdminAsync, SAAS_COOKIE } from "../saasAuth";
 import { getDb } from "../db";
-import { crmUsers as users } from "../../drizzle/schema";
+import { crmUsers as users, tenants } from "../../drizzle/schema";
 import { eq, and, sql } from "drizzle-orm";
 
 const PROTECTED_EMAIL = "bruno@entur.com.br";
@@ -209,6 +209,69 @@ export const superAdminManagementRouter = router({
       console.log(`[SuperAdmin] ${session.email} removeu ${user.email} de super admin`);
 
       return { success: true, email: user.email, name: user.name };
+    }),
+
+  /**
+   * Lista de tenants (id + name) para o seletor.
+   */
+  listTenants: publicProcedure.query(async ({ ctx }) => {
+    await requireSuperAdmin(ctx);
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB indisponível" });
+    return db.select({ id: tenants.id, name: tenants.name, slug: tenants.slug })
+      .from(tenants)
+      .orderBy(tenants.id);
+  }),
+
+  /**
+   * Cria usuário diretamente em qualquer tenant — bypassa o fluxo de
+   * convite/email. Útil para suporte: senha já definida, status active.
+   */
+  createUserInTenant: publicProcedure
+    .input(z.object({
+      tenantId: z.number().int(),
+      name: z.string().min(1).max(255),
+      email: z.string().email(),
+      password: z.string().min(8).max(128),
+      role: z.enum(["admin", "user"]).default("admin"),
+      phone: z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const session = await requireSuperAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB indisponível" });
+
+      const emailLower = input.email.toLowerCase();
+
+      // Tenant existe?
+      const [tenant] = await db.select({ id: tenants.id, name: tenants.name }).from(tenants).where(eq(tenants.id, input.tenantId)).limit(1);
+      if (!tenant) throw new TRPCError({ code: "NOT_FOUND", message: "Tenant não encontrado" });
+
+      // Email já existe nesse tenant?
+      const [existing] = await db
+        .select({ id: users.id })
+        .from(users)
+        .where(and(eq(users.tenantId, input.tenantId), eq(users.email, emailLower)))
+        .limit(1);
+      if (existing) {
+        throw new TRPCError({ code: "CONFLICT", message: "Esse email já está cadastrado nesse tenant" });
+      }
+
+      const { hashPassword } = await import("../saasAuth");
+      const passwordHash = await hashPassword(input.password);
+
+      const [created] = await db.insert(users).values({
+        tenantId: input.tenantId,
+        name: input.name,
+        email: emailLower,
+        phone: input.phone || null,
+        passwordHash,
+        role: input.role,
+        status: "active",
+      }).returning({ id: users.id, email: users.email, role: users.role });
+
+      console.log(`[SuperAdmin] ${session.email} criou usuário ${created.email} (role=${created.role}) no tenant ${tenant.id} (${tenant.name})`);
+      return { success: true, userId: created.id, email: created.email, tenantId: tenant.id, tenantName: tenant.name };
     }),
 
   /**

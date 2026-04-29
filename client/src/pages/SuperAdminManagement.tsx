@@ -123,6 +123,42 @@ export default function SuperAdminManagement() {
     setResetConfirm({ email, password: resetPassword });
   };
 
+  // ─── Criar usuário em qualquer tenant ───
+  const tenantsListQ = trpc.superAdminManagement.listTenants.useQuery();
+  const [newUserTenantId, setNewUserTenantId] = useState<string>("");
+  const [newUserName, setNewUserName] = useState("");
+  const [newUserEmail, setNewUserEmail] = useState("");
+  const [newUserPassword, setNewUserPassword] = useState("");
+  const [newUserRole, setNewUserRole] = useState<"admin" | "user">("admin");
+  const [newUserShowPwd, setNewUserShowPwd] = useState(false);
+  const createUserMut = trpc.superAdminManagement.createUserInTenant.useMutation({
+    onSuccess: (data) => {
+      toast.success(`${data.email} criado em ${data.tenantName} (tenant ${data.tenantId})`);
+      setNewUserTenantId("");
+      setNewUserName("");
+      setNewUserEmail("");
+      setNewUserPassword("");
+      setNewUserRole("admin");
+      setNewUserShowPwd(false);
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const handleCreateUserSubmit = () => {
+    const tid = Number(newUserTenantId);
+    if (!tid) return toast.error("Escolha um tenant");
+    if (!newUserName.trim()) return toast.error("Informe o nome");
+    if (!newUserEmail.trim() || !newUserEmail.includes("@")) return toast.error("Email inválido");
+    if (newUserPassword.length < 8) return toast.error("Senha precisa ter pelo menos 8 caracteres");
+    createUserMut.mutate({
+      tenantId: tid,
+      name: newUserName.trim(),
+      email: newUserEmail.trim().toLowerCase(),
+      password: newUserPassword,
+      role: newUserRole,
+    });
+  };
+
   const handlePromote = () => {
     if (!emailInput.trim()) {
       toast.error("Informe um email válido");
@@ -366,6 +402,104 @@ export default function SuperAdminManagement() {
                 </li>
               </ul>
             </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* ─── Criar Usuário em Qualquer Tenant ─── */}
+      <Card className="border-border/50">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base font-semibold flex items-center gap-2">
+            <UserPlus className="w-4 h-4 text-emerald-400" />
+            Criar usuário em qualquer tenant
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-xs text-muted-foreground">
+            Cria diretamente no banco com a senha informada — sem passar pelo fluxo de convite/email.
+            O status já vai como <strong>active</strong>. Use para suporte ou onboarding manual.
+          </p>
+          <div className="grid sm:grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="new-tenant">Tenant *</Label>
+              <select
+                id="new-tenant"
+                value={newUserTenantId}
+                onChange={(e) => setNewUserTenantId(e.target.value)}
+                className="w-full h-9 px-3 rounded-md border border-input bg-background text-sm"
+              >
+                <option value="">Selecione...</option>
+                {(tenantsListQ.data || []).map((t: any) => (
+                  <option key={t.id} value={t.id}>
+                    {t.id} — {t.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="new-role">Permissão</Label>
+              <select
+                id="new-role"
+                value={newUserRole}
+                onChange={(e) => setNewUserRole(e.target.value as "admin" | "user")}
+                className="w-full h-9 px-3 rounded-md border border-input bg-background text-sm"
+              >
+                <option value="admin">Administrador</option>
+                <option value="user">Usuário</option>
+              </select>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="new-name">Nome *</Label>
+              <Input
+                id="new-name"
+                placeholder="Nome completo"
+                value={newUserName}
+                onChange={(e) => setNewUserName(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="new-email">Email *</Label>
+              <Input
+                id="new-email"
+                type="email"
+                placeholder="usuario@cliente.com"
+                value={newUserEmail}
+                onChange={(e) => setNewUserEmail(e.target.value)}
+                autoComplete="off"
+              />
+            </div>
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label htmlFor="new-password">Senha (mín. 8 caracteres) *</Label>
+              <div className="relative">
+                <Input
+                  id="new-password"
+                  type={newUserShowPwd ? "text" : "password"}
+                  placeholder="••••••••"
+                  value={newUserPassword}
+                  onChange={(e) => setNewUserPassword(e.target.value)}
+                  autoComplete="new-password"
+                  className="pr-9"
+                />
+                <button
+                  type="button"
+                  onClick={() => setNewUserShowPwd(v => !v)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-muted-foreground hover:text-foreground"
+                  title={newUserShowPwd ? "Ocultar" : "Mostrar"}
+                >
+                  {newUserShowPwd ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+          </div>
+          <div className="flex justify-end">
+            <Button
+              onClick={handleCreateUserSubmit}
+              disabled={createUserMut.isPending}
+              className="gap-2"
+            >
+              {createUserMut.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />}
+              Criar usuário
+            </Button>
           </div>
         </CardContent>
       </Card>
