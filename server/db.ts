@@ -2023,7 +2023,20 @@ export async function getWaConversationsList(
       wc."phoneE164",
       wc."contactId",
       wc."contactPushName",
-      wc."lastMessagePreview" AS "lastMessage",
+      -- Quando lastMessagePreview está vazio/null (bug histórico em algumas convs),
+      -- faz fallback pegando o conteúdo da mensagem mais recente.
+      COALESCE(
+        NULLIF(wc."lastMessagePreview", ''),
+        (
+          SELECT m.content FROM messages m
+          WHERE m."sessionId" = wc."sessionId"
+            AND m."remoteJid" = wc."remoteJid"
+            AND m.content IS NOT NULL
+            AND m.content <> ''
+          ORDER BY m.timestamp DESC NULLS LAST, m.id DESC
+          LIMIT 1
+        )
+      ) AS "lastMessage",
       wc."lastMessageType" AS "lastMessageType",
       wc."lastFromMe" AS "lastFromMe",
       wc."lastMessageAt" AS "lastTimestamp",
