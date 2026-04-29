@@ -269,7 +269,7 @@ export default function DealDetail() {
   const [showAccountDialog, setShowAccountDialog] = useState(false);
   const [showEditContactDialog, setShowEditContactDialog] = useState(false);
   const [showEditAccountDialog, setShowEditAccountDialog] = useState(false);
-  const [contactDraft, setContactDraft] = useState({ name: "", phone: "", email: "" });
+  const [contactDraft, setContactDraft] = useState({ name: "", phone: "", email: "", docId: "" });
   const [quickSendOpen, setQuickSendOpen] = useState(false);
   const [accountDraft, setAccountDraft] = useState({ name: "" });
   const [contactMode, setContactMode] = useState<"create" | "link">("create");
@@ -1055,7 +1055,7 @@ export default function DealDetail() {
                     </div>
                     <div className="flex items-center gap-1">
                       <button
-                        onClick={() => { setShowEditContactDialog(true); setContactDraft({ name: contact.name, phone: contact.phone || "", email: contact.email || "" }); }}
+                        onClick={() => { setShowEditContactDialog(true); setContactDraft({ name: contact.name, phone: contact.phone || "", email: contact.email || "", docId: (contact as any).docId || "" }); }}
                         className="p-1 hover:bg-muted/60 rounded" title="Editar cliente"
                       >
                         <Edit2 className="h-3.5 w-3.5 text-muted-foreground" />
@@ -1092,7 +1092,7 @@ export default function DealDetail() {
                   )}
                   {/* ── Botao Adicionar Cliente ── */}
                   <button
-                    onClick={() => { setShowContactDialog(true); setContactMode("create"); setContactDraft({ name: "", phone: "", email: "" }); setSelectedContactId(null); }}
+                    onClick={() => { setShowContactDialog(true); setContactMode("create"); setContactDraft({ name: "", phone: "", email: "", docId: "" }); setSelectedContactId(null); }}
                     className="flex items-center gap-1.5 text-xs text-primary hover:text-primary/80 transition-colors mt-2"
                   >
                     <Plus className="h-3 w-3" />
@@ -1114,7 +1114,7 @@ export default function DealDetail() {
                 </div>
               ) : (
                 <button
-                  onClick={() => { setShowContactDialog(true); setContactMode("create"); setContactDraft({ name: "", phone: "", email: "" }); setSelectedContactId(null); }}
+                  onClick={() => { setShowContactDialog(true); setContactMode("create"); setContactDraft({ name: "", phone: "", email: "", docId: "" }); setSelectedContactId(null); }}
                   className="flex items-center gap-1.5 text-sm text-primary hover:text-primary/80 transition-colors"
                 >
                   <Plus className="h-3.5 w-3.5" />
@@ -1789,6 +1789,16 @@ export default function DealDetail() {
                   <label className="text-xs font-medium text-muted-foreground">Email</label>
                   <Input value={contactDraft.email} onChange={(e) => setContactDraft(d => ({ ...d, email: e.target.value }))} placeholder="email@exemplo.com" />
                 </div>
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground">CPF / CNPJ <span className="text-muted-foreground/70 font-normal">(opcional, usado em cobranças)</span></label>
+                  <Input
+                    value={contactDraft.docId}
+                    onChange={(e) => setContactDraft(d => ({ ...d, docId: e.target.value }))}
+                    placeholder="000.000.000-00 ou 00.000.000/0000-00"
+                    inputMode="numeric"
+                    className="font-mono"
+                  />
+                </div>
               </div>
             ) : (
               <div>
@@ -1813,7 +1823,13 @@ export default function DealDetail() {
               onClick={() => {
                 if (contactMode === "create") {
                   if (!contactDraft.name.trim()) { toast.error("Nome é obrigatório"); return; }
-                  createContact.mutate({ name: contactDraft.name.trim(), phone: contactDraft.phone || undefined, email: contactDraft.email || undefined });
+                  const docDigits = contactDraft.docId.replace(/\D/g, "");
+                  createContact.mutate({
+                    name: contactDraft.name.trim(),
+                    phone: contactDraft.phone || undefined,
+                    email: contactDraft.email || undefined,
+                    docId: docDigits || undefined,
+                  });
                 } else {
                   if (!selectedContactId) { toast.error("Selecione um cliente"); return; }
                   updateDeal.mutate({ id: dealId, contactId: selectedContactId });
@@ -1850,6 +1866,16 @@ export default function DealDetail() {
               <label className="text-xs font-medium text-muted-foreground">Email</label>
               <Input value={contactDraft.email} onChange={(e) => setContactDraft(d => ({ ...d, email: e.target.value }))} />
             </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">CPF / CNPJ <span className="text-muted-foreground/70 font-normal">(opcional)</span></label>
+              <Input
+                value={contactDraft.docId}
+                onChange={(e) => setContactDraft(d => ({ ...d, docId: e.target.value }))}
+                placeholder="000.000.000-00 ou 00.000.000/0000-00"
+                inputMode="numeric"
+                className="font-mono"
+              />
+            </div>
           </div>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setShowEditContactDialog(false)}>Cancelar</Button>
@@ -1857,7 +1883,14 @@ export default function DealDetail() {
               onClick={() => {
                 if (!contactDraft.name.trim()) { toast.error("Nome é obrigatório"); return; }
                 const cId = deal?.contactId;
-                if (cId) updateContact.mutate({ id: cId, name: contactDraft.name.trim(), phone: contactDraft.phone || undefined, email: contactDraft.email || undefined });
+                const docDigits = contactDraft.docId.replace(/\D/g, "");
+                if (cId) updateContact.mutate({
+                  id: cId,
+                  name: contactDraft.name.trim(),
+                  phone: contactDraft.phone || undefined,
+                  email: contactDraft.email || undefined,
+                  docId: docDigits || null,
+                } as any);
                 setShowEditContactDialog(false);
               }}
               disabled={updateContact.isPending}

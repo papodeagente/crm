@@ -59,6 +59,7 @@ function CreateDealDialog({
 }: CreateDealDialogProps) {
   const [, navigate] = useLocation();
   const [title, setTitle] = useState(`Negociação - ${contactName}`);
+  const [docId, setDocId] = useState("");
   const [selectedProducts, setSelectedProducts] = useState<Array<{ productId: number; name: string; basePriceCents: number; unitPriceCents: number; quantity: number }>>([]);
   const [productSearch, setProductSearch] = useState("");
   const [showProductDropdown, setShowProductDropdown] = useState(false);
@@ -107,6 +108,7 @@ function CreateDealDialog({
   const utils = trpc.useUtils();
   const createDeal = trpc.crm.deals.create.useMutation();
   const createContact = trpc.crm.contacts.create.useMutation();
+  const updateContact = trpc.crm.contacts.update.useMutation();
   const contactsQ = trpc.crm.contacts.list.useQuery({ limit: 500 });
 
   // Product catalog query
@@ -172,9 +174,30 @@ function CreateDealDialog({
 
         // 3. Só cria contato novo se realmente não existe
         if (!resolvedContactId) {
-          const newContact = await createContact.mutateAsync({ name: contactName, phone: formatted });
+          const docDigits = docId.replace(/\D/g, "");
+          const newContact = await createContact.mutateAsync({
+            name: contactName,
+            phone: formatted,
+            docId: docDigits || undefined,
+          });
           resolvedContactId = (newContact as any).id;
+        } else if (docId.replace(/\D/g, "")) {
+          // Contato já existe — se usuário preencheu CPF/CNPJ aqui, salva no contato.
+          try {
+            await updateContact.mutateAsync({
+              id: resolvedContactId,
+              docId: docId.replace(/\D/g, ""),
+            } as any);
+          } catch { /* não bloqueia criação da deal */ }
         }
+      } else if (docId.replace(/\D/g, "")) {
+        // contactId veio por prop (inbox) — também atualiza CPF/CNPJ se preenchido.
+        try {
+          await updateContact.mutateAsync({
+            id: resolvedContactId!,
+            docId: docId.replace(/\D/g, ""),
+          } as any);
+        } catch { /* idem */ }
       }
 
       const deal = await createDeal.mutateAsync({ title: title.trim(),
@@ -221,6 +244,19 @@ function CreateDealDialog({
             <label className="text-[13px] text-muted-foreground mb-1.5 block font-medium">Título *</label>
             <input type="text" value={title} onChange={(e) => setTitle(e.target.value)}
               className="w-full px-3 py-2.5 border border-border rounded-xl text-sm text-foreground bg-background focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/30 transition-colors" />
+          </div>
+          <div>
+            <label className="text-[13px] text-muted-foreground mb-1.5 block font-medium">
+              CPF / CNPJ <span className="text-muted-foreground/70 font-normal">(opcional — facilita cobranças futuras)</span>
+            </label>
+            <input
+              type="text"
+              value={docId}
+              onChange={(e) => setDocId(e.target.value)}
+              placeholder="000.000.000-00 ou 00.000.000/0000-00"
+              inputMode="numeric"
+              className="w-full px-3 py-2.5 border border-border rounded-xl text-sm text-foreground bg-background font-mono focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/30 transition-colors"
+            />
           </div>
           {/* Product Selection */}
           <div>
