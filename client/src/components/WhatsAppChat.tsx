@@ -733,7 +733,13 @@ export default function WhatsAppChat({
     await addPreviewFiles(Array.from(files));
   }, [addPreviewFiles]);
 
-  /* ── Media preview send handler (sequential multi-file) ── */
+  /* ── Media preview send handler (sequential multi-file) ──
+   *
+   * Estratégia: tenta primeiro fazer upload pro storage e enviar URL
+   * pública ao Z-API (mais rápido, payload tRPC pequeno, Z-API processa
+   * URL com mais confiabilidade). Se o uploadMedia falhar (storage não
+   * configurado, rede, etc.), faz fallback pro data URI inline.
+   */
   const handlePreviewSend = useCallback(async () => {
     if (!previewFiles.length) return;
     const number = sendNumber;
@@ -741,29 +747,55 @@ export default function WhatsAppChat({
     setIsSending(true);
     setSendProgress(0);
     let sent = 0;
+    let lastError: string | null = null;
     try {
       for (const item of previewFiles) {
-        await sendMedia.mutateAsync({
-          sessionId, number,
-          mediaUrl: item.dataUri,
-          mediaType: item.mediaType,
-          fileName: item.file.name,
-          mimetype: item.file.type,
-          caption: item.caption || undefined,
-        });
-        sent++;
-        setSendProgress(sent);
+        // Extrai base64 puro do data URI (separa o prefixo "data:...;base64,")
+        const base64Match = item.dataUri.match(/^data:([^;]+);base64,(.+)$/);
+        const fileBase64 = base64Match?.[2] || "";
+        const contentType = base64Match?.[1] || item.file.type || "application/octet-stream";
+
+        let mediaUrl = item.dataUri;
+        if (fileBase64) {
+          try {
+            const uploaded = await uploadMedia.mutateAsync({
+              fileName: item.file.name || "arquivo",
+              fileBase64,
+              contentType,
+            });
+            if (uploaded?.url) mediaUrl = uploaded.url;
+          } catch (err: any) {
+            console.warn("[handlePreviewSend] uploadMedia falhou, usando dataUri inline:", err?.message);
+          }
+        }
+
+        try {
+          await sendMedia.mutateAsync({
+            sessionId, number,
+            mediaUrl,
+            mediaType: item.mediaType,
+            fileName: item.file.name,
+            mimetype: item.file.type,
+            caption: item.caption || undefined,
+          });
+          sent++;
+          setSendProgress(sent);
+        } catch (err: any) {
+          lastError = err?.message || "Falha ao enviar";
+          throw err;
+        }
       }
       toast.success(previewFiles.length === 1 ? "Mídia enviada" : `${sent} arquivos enviados`);
       setPreviewFiles([]);
       setActivePreviewIndex(0);
-    } catch {
-      toast.error(sent > 0 ? `Erro após ${sent}/${previewFiles.length} arquivos` : "Erro ao enviar arquivo");
+    } catch (err: any) {
+      const msg = lastError || err?.message || "Erro ao enviar arquivo";
+      toast.error(sent > 0 ? `Erro após ${sent}/${previewFiles.length}: ${msg}` : `Erro ao enviar arquivo: ${msg}`);
     } finally {
       setIsSending(false);
       setSendProgress(0);
     }
-  }, [previewFiles, sessionId, contact, sendMedia]);
+  }, [previewFiles, sessionId, sendNumber, sendMedia, uploadMedia]);
 
   /* ── Paste file handler (Ctrl+V / Cmd+V) — supports multiple files ── */
   useEffect(() => {
