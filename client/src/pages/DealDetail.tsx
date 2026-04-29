@@ -1425,6 +1425,10 @@ export default function DealDetail() {
               <WhatsAppPanel
                 contact={contact}
                 dealId={dealId}
+                dealTitle={deal?.title}
+                dealValueCents={deal?.valueCents ?? null}
+                dealStageName={currentStage?.name}
+                companyName={account?.name}
                 isFullscreen={chatFullscreen}
                 onToggleFullscreen={() => setChatFullscreen(f => !f)}
                 onOpenSidebar={() => setWaSidebarDrawerOpen(true)}
@@ -3637,8 +3641,12 @@ function AiAnalysisPanel({ dealId, contactName }: { dealId: number; contactName:
    WHATSAPP PANEL
    ═══════════════════════════════════════════════════════════════════ */
 
-function WhatsAppPanel({ contact, dealId, isFullscreen, onToggleFullscreen, onOpenSidebar }: {
+function WhatsAppPanel({ contact, dealId, dealTitle, dealValueCents, dealStageName, companyName, isFullscreen, onToggleFullscreen, onOpenSidebar }: {
   contact: any; dealId: number;
+  dealTitle?: string;
+  dealValueCents?: number | null;
+  dealStageName?: string;
+  companyName?: string;
   isFullscreen?: boolean; onToggleFullscreen?: () => void; onOpenSidebar?: () => void;
 }) {
   const [viewMode, setViewMode] = useState<"history" | "live">("history");
@@ -3872,10 +3880,10 @@ function WhatsAppPanel({ contact, dealId, isFullscreen, onToggleFullscreen, onOp
                remoteJid={remoteJid}
                myAvatarUrl={activeSession.user?.imgUrl}
                dealId={dealId}
-               dealTitle={deal?.title}
-               dealValueCents={deal?.valueCents}
-               dealStageName={currentStage?.name}
-               companyName={account?.name}
+               dealTitle={dealTitle}
+               dealValueCents={dealValueCents ?? undefined}
+               dealStageName={dealStageName}
+               companyName={companyName}
              />
           </div>
         ) : (
