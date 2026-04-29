@@ -499,6 +499,11 @@ async function startServer() {
     // Start date-based automation scheduler
     import("../dateAutomationScheduler").then(m => m.startDateAutomationScheduler());
 
+    // Start WhatsApp message automation worker (data-driven scheduled WA messages)
+    import("../automationRuleWorker").then(m => m.initAutomationWorker()).catch(e => {
+      console.warn("[Automation] Failed to init worker:", e.message);
+    });
+
     // Start RFV notification scheduler
     import("../rfvNotificationScheduler").then(m => m.startRfvNotificationScheduler());
 

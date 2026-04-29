@@ -20,6 +20,7 @@ const Tasks = lazyWithRetry(() => import("./pages/Tasks"));
 const InboxPage = lazyWithRetry(() => import("./pages/Inbox"));
 const WhatsApp = lazyWithRetry(() => import("./pages/WhatsApp"));
 const Agentes = lazyWithRetry(() => import("./pages/Agentes"));
+const Automacoes = lazyWithRetry(() => import("./pages/Automacoes"));
 const Proposals = lazyWithRetry(() => import("./pages/Proposals"));
 const ProposalEditor = lazyWithRetry(() => import("./pages/ProposalEditor"));
 const PublicProposal = lazyWithRetry(() => import("./pages/PublicProposal"));
@@ -154,6 +155,7 @@ function AppRouter() {
                 <Route path="/whatsapp" component={WhatsApp} />
                 <Route path="/chatbot">{() => <Redirect to="/agentes" />}</Route>
                 <Route path="/agentes" component={Agentes} />
+                <Route path="/automacoes" component={Automacoes} />
                 <Route path="/proposals/:id" component={ProposalEditor} />
                 <Route path="/proposals" component={Proposals} />
                 <Route path="/portal" component={Portal} />

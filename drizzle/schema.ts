@@ -2829,6 +2829,60 @@ export type ScheduledMessage = typeof scheduledMessages.$inferSelect;
 export type InsertScheduledMessage = typeof scheduledMessages.$inferInsert;
 
 // ════════════════════════════════════════════════════════════
+// AUTOMATION RULES — agendamento por gatilho de data
+// ════════════════════════════════════════════════════════════
+// Permite criar regras tipo "X dias antes do aniversário, mande Y mensagem".
+// triggerField: birthDate (anual MM-DD), weddingDate (anual MM-DD),
+// appointmentDate (data exata), followUpDate (data exata).
+// offsetDays: negativo = ANTES, positivo = DEPOIS, 0 = no dia.
+
+export const automation_trigger_fieldEnum = pgEnum("automation_trigger_field", [
+  "birthDate",        // contacts.birthDate (MM-DD ou YYYY-MM-DD)
+  "weddingDate",      // contacts.weddingDate
+  "appointmentDate",  // deals.appointmentDate (timestamp)
+  "followUpDate",     // deals.followUpDate (timestamp)
+]);
+
+export const automationRules = pgTable("automation_rules", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenantId").notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  triggerField: automation_trigger_fieldEnum("triggerField").notNull(),
+  /** Negativo = antes; positivo = depois; 0 = no dia. */
+  offsetDays: integer("offsetDays").notNull().default(0),
+  /** Hora local de envio (HH:MM, 24h). Default 09:00. */
+  timeOfDay: varchar("timeOfDay", { length: 5 }).notNull().default("09:00"),
+  /** Template com placeholders: {nome}, {primeiroNome}, {clinica}, {data}, {dealTitle}. */
+  messageTemplate: text("messageTemplate").notNull(),
+  isActive: boolean("isActive").notNull().default(true),
+  createdBy: integer("createdBy"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+}, (t) => [
+  index("ar_tenant_active_idx").on(t.tenantId, t.isActive),
+]);
+
+/** Idempotência: 1 envio por (regra, alvo, data de execução). */
+export const automationRuleRuns = pgTable("automation_rule_runs", {
+  id: serial("id").primaryKey(),
+  ruleId: integer("ruleId").notNull(),
+  tenantId: integer("tenantId").notNull(),
+  /** Tipo do alvo: "contact" ou "deal" (origem do triggerField). */
+  targetType: varchar("targetType", { length: 16 }).notNull(),
+  targetId: integer("targetId").notNull(),
+  /** Data em que a regra disparou (YYYY-MM-DD local). */
+  runDate: varchar("runDate", { length: 10 }).notNull(),
+  scheduledMessageId: integer("scheduledMessageId"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (t) => [
+  uniqueIndex("arr_unique_run").on(t.ruleId, t.targetType, t.targetId, t.runDate),
+  index("arr_tenant_idx").on(t.tenantId),
+]);
+
+export type AutomationRule = typeof automationRules.$inferSelect;
+export type InsertAutomationRule = typeof automationRules.$inferInsert;
+
+// ════════════════════════════════════════════════════════════
 // REFERRALS (Sistema de Indicacoes)
 // ════════════════════════════════════════════════════════════
 

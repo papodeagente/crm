@@ -51,6 +51,7 @@ const quickNavPages = [
 
   { icon: TrendingUp, label: "RFV", path: "/rfv" },
   { icon: BarChart3, label: "Análises", path: "/analytics" },
+  { icon: Bell, label: "Automações", path: "/automacoes" },
   { icon: Bell, label: "Notificações", path: "/notifications" },
   { icon: Settings, label: "Configurações", path: "/settings" },
 ];

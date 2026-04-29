@@ -5,6 +5,7 @@ import { superAdminDashRouter } from "./routers/superAdminDashRouter";
 import { superAdminPlansRouter } from "./routers/superAdminPlansRouter";
 import { superAdminManagementRouter } from "./routers/superAdminManagementRouter";
 import { agentsRouter } from "./routers/agentsRouter";
+import { automationRouter } from "./routers/automationRouter";
 import { publicProcedure, tenantProcedure, tenantWriteProcedure, tenantAdminProcedure, sessionTenantProcedure, sessionTenantWriteProcedure, sessionTenantAdminProcedure, getTenantId, router } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
@@ -3022,6 +3023,7 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
   asaas: asaasRouter,       // ASAAS payment integration
   tenantBranding: tenantBrandingRouter, // Clinic name + logo (used on PDFs)
   whatsappQuick: whatsappQuickRouter, // Envio rápido de WhatsApp por contato
+  automation: automationRouter,        // Automações de mensagens por gatilho de data
   portal: portalRouter,     // M4: Portal do Cliente
   management: managementRouter, // M5: Gestão
   insights: insightsRouter, // M6: Insights
