@@ -60,20 +60,28 @@ export default function CrmSidebar({
 
   return (
     <>
-      <div className={`inbox-sidebar-glass scrollbar-thin shrink-0 hidden lg:flex flex-col ${!open ? "collapsed" : ""}`}>
-        {/* Header */}
-        <div className="inbox-sidebar-header h-[59px] flex items-center justify-between px-4 shrink-0">
-          <h3 className="text-[13px] font-semibold text-foreground">Detalhes do Contato</h3>
-          <button
-            onClick={onToggle}
-            className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-          >
-            <PanelRightClose className="w-4 h-4" />
-          </button>
-        </div>
+      <aside
+        className={`shrink-0 hidden lg:flex flex-col bg-card border-l border-border overflow-hidden transition-[width] duration-200 ease-out ${
+          open ? "w-[320px] xl:w-[340px]" : "w-0"
+        }`}
+        aria-hidden={!open}
+      >
+        {/* Inner wrapper with fixed width prevents content reflow during collapse animation */}
+        <div className="w-[320px] xl:w-[340px] h-full flex flex-col">
+          {/* Header */}
+          <div className="h-[59px] flex items-center justify-between px-4 shrink-0 border-b border-border">
+            <h3 className="text-[13px] font-semibold text-foreground truncate">Detalhes do Contato</h3>
+            <button
+              onClick={onToggle}
+              className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors shrink-0"
+              title="Recolher painel"
+            >
+              <PanelRightClose className="w-4 h-4" />
+            </button>
+          </div>
 
-        {/* Scrollable content */}
-        <div className="flex-1 overflow-y-auto overflow-x-hidden scrollbar-thin">
+          {/* Scrollable content */}
+          <div className="flex-1 overflow-y-auto overflow-x-hidden scrollbar-thin">
           {!crmContactId || (contactQ.isFetched && !contact) ? (
             /* ═══ Contact NOT in CRM OR deletado/órfão ═══ */
             <SidebarSaveContact
@@ -139,8 +147,9 @@ export default function CrmSidebar({
               <div className="h-20 bg-muted rounded-lg" />
             </div>
           ) : null}
+          </div>
         </div>
-      </div>
+      </aside>
 
       {/* ═══ DIALOGS — rendered outside sidebar for proper z-index ═══ */}
       {crmContactId && (
