@@ -212,6 +212,45 @@ export const superAdminManagementRouter = router({
     }),
 
   /**
+   * Reset manual de senha de qualquer usuário em qualquer tenant.
+   * Apenas Super Admin. Audit log via console (depois pode virar tabela).
+   */
+  resetUserPassword: publicProcedure
+    .input(z.object({
+      email: z.string().email(),
+      newPassword: z.string().min(8).max(128),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const session = await requireSuperAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB indisponível" });
+
+      const emailLower = input.email.toLowerCase();
+      const [user] = await db
+        .select({ id: users.id, email: users.email, name: users.name, tenantId: users.tenantId })
+        .from(users)
+        .where(eq(users.email, emailLower))
+        .limit(1);
+
+      if (!user) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Usuário não encontrado com esse email.",
+        });
+      }
+
+      const { hashPassword } = await import("../saasAuth");
+      const passwordHash = await hashPassword(input.newPassword);
+      await db
+        .update(users)
+        .set({ passwordHash, updatedAt: new Date() } as any)
+        .where(eq(users.id, user.id));
+
+      console.log(`[SuperAdmin] ${session.email} resetou senha de ${user.email} (tenant ${user.tenantId})`);
+      return { success: true, email: user.email, name: user.name, tenantId: user.tenantId };
+    }),
+
+  /**
    * Contagem de super admins
    */
   count: publicProcedure.query(async ({ ctx }) => {

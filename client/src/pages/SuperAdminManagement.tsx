@@ -37,6 +37,9 @@ import {
   Crown,
   Users,
   AlertTriangle,
+  KeyRound,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 
 function formatDate(d: string | Date | number | null | undefined): string {
@@ -87,6 +90,38 @@ export default function SuperAdminManagement() {
     },
     onError: (e) => toast.error(e.message),
   });
+
+  // ─── Reset de senha manual ───
+  const [resetEmail, setResetEmail] = useState("");
+  const [resetPassword, setResetPassword] = useState("");
+  const [resetShowPwd, setResetShowPwd] = useState(false);
+  const [resetConfirm, setResetConfirm] = useState<{ email: string; password: string } | null>(null);
+  const resetPasswordMut = trpc.superAdminManagement.resetUserPassword.useMutation({
+    onSuccess: (data) => {
+      toast.success(`Senha de ${data.email} (tenant ${data.tenantId}) atualizada`);
+      setResetEmail("");
+      setResetPassword("");
+      setResetShowPwd(false);
+      setResetConfirm(null);
+    },
+    onError: (e) => {
+      toast.error(e.message);
+      setResetConfirm(null);
+    },
+  });
+
+  const handleResetSubmit = () => {
+    const email = resetEmail.trim().toLowerCase();
+    if (!email || !email.includes("@")) {
+      toast.error("Informe um email válido");
+      return;
+    }
+    if (resetPassword.length < 8) {
+      toast.error("Senha precisa ter pelo menos 8 caracteres");
+      return;
+    }
+    setResetConfirm({ email, password: resetPassword });
+  };
 
   const handlePromote = () => {
     if (!emailInput.trim()) {
@@ -334,6 +369,95 @@ export default function SuperAdminManagement() {
           </div>
         </CardContent>
       </Card>
+
+      {/* ─── Reset Manual de Senha ─── */}
+      <Card className="border-border/50">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base font-semibold flex items-center gap-2">
+            <KeyRound className="w-4 h-4 text-amber-400" />
+            Resetar senha de usuário
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-xs text-muted-foreground">
+            Defina manualmente uma nova senha para qualquer usuário em qualquer tenant.
+            Use apenas para suporte. A nova senha entra em vigor imediatamente — comunique pelo canal seguro.
+          </p>
+          <div className="grid sm:grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="reset-email">Email do usuário</Label>
+              <Input
+                id="reset-email"
+                type="email"
+                placeholder="usuario@cliente.com"
+                value={resetEmail}
+                onChange={(e) => setResetEmail(e.target.value)}
+                autoComplete="off"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="reset-password">Nova senha (mín. 8 caracteres)</Label>
+              <div className="relative">
+                <Input
+                  id="reset-password"
+                  type={resetShowPwd ? "text" : "password"}
+                  placeholder="••••••••"
+                  value={resetPassword}
+                  onChange={(e) => setResetPassword(e.target.value)}
+                  autoComplete="new-password"
+                  className="pr-9"
+                />
+                <button
+                  type="button"
+                  onClick={() => setResetShowPwd(v => !v)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-muted-foreground hover:text-foreground"
+                  title={resetShowPwd ? "Ocultar" : "Mostrar"}
+                >
+                  {resetShowPwd ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+          </div>
+          <div className="flex justify-end">
+            <Button
+              onClick={handleResetSubmit}
+              disabled={!resetEmail.trim() || !resetPassword || resetPasswordMut.isPending}
+              className="gap-2"
+            >
+              {resetPasswordMut.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <KeyRound className="w-4 h-4" />}
+              Definir nova senha
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Confirmação de reset de senha */}
+      <AlertDialog open={!!resetConfirm} onOpenChange={(o) => !o && setResetConfirm(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <KeyRound className="w-5 h-5 text-amber-400" />
+              Confirmar reset de senha
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Você vai definir uma nova senha para <strong>{resetConfirm?.email}</strong>.
+              O usuário perde acesso à senha atual no momento da confirmação. Continuar?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (resetConfirm) {
+                  resetPasswordMut.mutate({ email: resetConfirm.email, newPassword: resetConfirm.password });
+                }
+              }}
+            >
+              Confirmar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Add Super Admin Dialog */}
       <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
