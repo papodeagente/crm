@@ -699,6 +699,14 @@ export const productCatalog = pgTable("product_catalog", {
   isRecurring: boolean("isRecurring").default(false).notNull(),
   recurringIntervalDays: integer("recurringIntervalDays"),
   sessionsIncluded: integer("sessionsIncluded"),
+  /** Especialidade médica/área (campo livre — ex.: "Estética facial", "Harmonização"). */
+  specialty: varchar("specialty", { length: 128 }),
+  /** Texto livre de contraindicações (gravidez, alergias, medicamentos, etc.). */
+  contraindications: text("contraindications"),
+  /** Lembrete de retorno em dias após a aplicação. Alimenta a automação de WhatsApp. */
+  returnReminderDays: integer("returnReminderDays"),
+  /** Complexidade do procedimento — usado para precificação e prazos. */
+  complexity: varchar("complexity", { length: 16 }), // "low" | "medium" | "high"
   detailsJson: json("detailsJson"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
@@ -707,6 +715,7 @@ export const productCatalog = pgTable("product_catalog", {
   index("pcat_tenant_type_idx").on(t.tenantId, t.productType),
   index("pcat_tenant_cat_idx").on(t.tenantId, t.categoryId),
   index("pcat_tenant_active_idx").on(t.tenantId, t.isActive),
+  index("pcat_tenant_specialty_idx").on(t.tenantId, t.specialty),
 ]);
 
 // ════════════════════════════════════════════════════════════

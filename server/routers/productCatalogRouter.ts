@@ -86,6 +86,11 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
         sku: z.string().max(64).optional(),
         isActive: z.boolean().optional(),
         detailsJson: z.any().optional(),
+        // Campos de tratamento estético
+        specialty: z.string().max(128).nullable().optional(),
+        contraindications: z.string().nullable().optional(),
+        returnReminderDays: z.number().int().min(0).max(3650).nullable().optional(),
+        complexity: z.enum(["low", "medium", "high"]).nullable().optional(),
       }))
       .mutation(async ({ input, ctx }) => {
         const { categoryId, costPriceCents, ...rest } = input;
@@ -113,6 +118,10 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
         sku: z.string().max(64).optional(),
         isActive: z.boolean().optional(),
         detailsJson: z.any().optional(),
+        specialty: z.string().max(128).nullable().optional(),
+        contraindications: z.string().nullable().optional(),
+        returnReminderDays: z.number().int().min(0).max(3650).nullable().optional(),
+        complexity: z.enum(["low", "medium", "high"]).nullable().optional(),
       }))
       .mutation(async ({ input, ctx }) => {
 const tenantId = getTenantId(ctx); const { id, ...data } = input;

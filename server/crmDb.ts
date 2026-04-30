@@ -1625,9 +1625,11 @@ export async function createCatalogProduct(data: {
   basePriceCents?: number; costPriceCents?: number; currency?: string;
   professional?: string; location?: string; durationMinutes?: number;
   imageUrl?: string; sku?: string; isActive?: boolean; detailsJson?: any;
+  specialty?: string | null; contraindications?: string | null;
+  returnReminderDays?: number | null; complexity?: "low" | "medium" | "high" | null;
 }) {
   const db = await getDb(); if (!db) return null;
-  const [result] = await db.insert(productCatalog).values(data).returning({ id: productCatalog.id });
+  const [result] = await db.insert(productCatalog).values(data as any).returning({ id: productCatalog.id });
   return result;
 }
 export async function updateCatalogProduct(tenantId: number, id: number, data: Partial<{
@@ -1636,9 +1638,11 @@ export async function updateCatalogProduct(tenantId: number, id: number, data: P
   basePriceCents: number; costPriceCents: number; currency: string;
   professional: string; location: string; durationMinutes: number;
   imageUrl: string; sku: string; isActive: boolean; detailsJson: any;
+  specialty: string | null; contraindications: string | null;
+  returnReminderDays: number | null; complexity: "low" | "medium" | "high" | null;
 }>) {
   const db = await getDb(); if (!db) return;
-  await db.update(productCatalog).set(data).where(and(eq(productCatalog.id, id), eq(productCatalog.tenantId, tenantId)));
+  await db.update(productCatalog).set(data as any).where(and(eq(productCatalog.id, id), eq(productCatalog.tenantId, tenantId)));
 }
 export async function deleteCatalogProduct(tenantId: number, id: number) {
   const db = await getDb(); if (!db) return;

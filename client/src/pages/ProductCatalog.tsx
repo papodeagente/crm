@@ -177,6 +177,11 @@ function ProductFormDialog({
     basePriceCents: product?.basePriceCents ? String(product.basePriceCents / 100) : "",
     costPriceCents: product?.costPriceCents ? String(product.costPriceCents / 100) : "",
     supplier: product?.supplier || "",
+    // Treatment fields (estética)
+    specialty: (product as any)?.specialty || "",
+    contraindications: (product as any)?.contraindications || "",
+    returnReminderDays: (product as any)?.returnReminderDays != null ? String((product as any).returnReminderDays) : "",
+    complexity: (product as any)?.complexity || "",
     // Preserve existing values for edit mode (not shown in simplified create form)
     productType: product?.productType || "other",
     categoryId: product?.categoryId ? String(product.categoryId) : "",
@@ -202,13 +207,17 @@ function ProductFormDialog({
       basePriceCents: Math.round(Number(form.basePriceCents || 0) * 100),
       costPriceCents: form.costPriceCents ? Math.round(Number(form.costPriceCents) * 100) : null,
       supplier: form.supplier || undefined,
+      specialty: form.specialty.trim() || null,
+      contraindications: form.contraindications.trim() || null,
+      returnReminderDays: form.returnReminderDays ? Number(form.returnReminderDays) : null,
+      complexity: form.complexity || null,
     };
     if (isEditing) {
       // Preserve all existing fields on edit
       data.productType = form.productType as any;
       data.categoryId = form.categoryId ? Number(form.categoryId) : null;
       data.location = form.location || undefined;
-      data.durationMinutes = form.durationMinutes || undefined;
+      data.durationMinutes = form.durationMinutes ? Number(form.durationMinutes) : undefined;
       data.sku = form.sku || undefined;
       data.isActive = form.isActive;
       updateProduct.mutate({ ...data, id: product.id });
@@ -217,38 +226,113 @@ function ProductFormDialog({
     }
   }
 
+  // Opções pré-definidas para "Aviso de retorno"
+  const RETURN_OPTIONS = [
+    { value: "5", label: "5 dias" },
+    { value: "15", label: "15 dias" },
+    { value: "30", label: "1 mês" },
+    { value: "60", label: "2 meses" },
+    { value: "90", label: "3 meses" },
+    { value: "120", label: "4 meses" },
+    { value: "150", label: "5 meses" },
+    { value: "180", label: "6 meses" },
+    { value: "210", label: "7 meses" },
+    { value: "240", label: "8 meses" },
+    { value: "270", label: "9 meses" },
+    { value: "300", label: "10 meses" },
+    { value: "330", label: "11 meses" },
+    { value: "365", label: "12 meses" },
+  ];
+
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Package className="h-5 w-5 text-primary" />
-            {isEditing ? "Editar Produto" : "Novo Produto"}
+            {isEditing ? "Editar Tratamento" : "Novo Tratamento"}
           </DialogTitle>
+          <p className="text-xs text-muted-foreground">Preencha as informações do procedimento ou serviço.</p>
         </DialogHeader>
-        <div className="space-y-4">
-          {/* Name - only required field */}
+        <div className="space-y-3">
+          {/* Especialidade — campo livre */}
           <div>
-            <Label>Nome do Produto *</Label>
-            <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Ex: Limpeza de Pele Premium" autoFocus />
+            <Label>Especialidade</Label>
+            <Input
+              value={form.specialty}
+              onChange={(e) => setForm({ ...form, specialty: e.target.value })}
+              placeholder="Ex: Estética facial, Harmonização, Tecnologia"
+              maxLength={128}
+              list="specialty-suggestions"
+            />
+            <datalist id="specialty-suggestions">
+              <option value="Ativos" />
+              <option value="Tecnologia" />
+              <option value="Harmonização facial" />
+              <option value="Estética facial" />
+              <option value="Estética corporal" />
+              <option value="Procedimentos injetáveis" />
+              <option value="Skincare" />
+              <option value="Outros" />
+            </datalist>
           </div>
-          {/* Description */}
+          {/* Nome */}
+          <div>
+            <Label>Nome do tratamento *</Label>
+            <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Ex: SKINVIVE" autoFocus />
+          </div>
+          {/* Descrição */}
           <div>
             <Label>Descrição</Label>
-            <Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Detalhes do produto (opcional)" rows={2} />
+            <Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Detalhes do procedimento" rows={2} />
           </div>
-          {/* Prices */}
-          <div className="grid grid-cols-2 gap-3">
+          {/* Contraindicações */}
+          <div>
+            <Label>Contraindicações</Label>
+            <Textarea
+              value={form.contraindications}
+              onChange={(e) => setForm({ ...form, contraindications: e.target.value })}
+              placeholder="Ex: gravidez, alergia a anestésico, isotretinoína em uso"
+              rows={2}
+            />
+          </div>
+          {/* Aviso de retorno */}
+          <div>
+            <Label>Aviso de retorno</Label>
+            <Select value={form.returnReminderDays || "none"} onValueChange={(v) => setForm({ ...form, returnReminderDays: v === "none" ? "" : v })}>
+              <SelectTrigger><SelectValue placeholder="Sem retorno automático" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Sem retorno automático</SelectItem>
+                {RETURN_OPTIONS.map(o => (
+                  <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-[10px] text-muted-foreground mt-1">Tempo após a aplicação para a clínica enviar lembrete de retorno.</p>
+          </div>
+          {/* Complexidade + Custo + Valor */}
+          <div className="grid grid-cols-3 gap-2">
             <div>
-              <Label>Preço Base (R$)</Label>
-              <Input type="number" step="0.01" min="0" value={form.basePriceCents} onChange={(e) => setForm({ ...form, basePriceCents: e.target.value })} placeholder="0,00" />
+              <Label>Complexidade</Label>
+              <Select value={form.complexity || "low"} onValueChange={(v) => setForm({ ...form, complexity: v })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="low">Baixo</SelectItem>
+                  <SelectItem value="medium">Médio</SelectItem>
+                  <SelectItem value="high">Alto</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div>
-              <Label>Preço de Custo (R$)</Label>
-              <Input type="number" step="0.01" min="0" value={form.costPriceCents} onChange={(e) => setForm({ ...form, costPriceCents: e.target.value })} placeholder="0,00" />
+              <Label>Custo Estimado</Label>
+              <Input type="number" step="0.01" min="0" value={form.costPriceCents} onChange={(e) => setForm({ ...form, costPriceCents: e.target.value })} placeholder="R$ 0,00" />
+            </div>
+            <div>
+              <Label>Valor/Preço</Label>
+              <Input type="number" step="0.01" min="0" value={form.basePriceCents} onChange={(e) => setForm({ ...form, basePriceCents: e.target.value })} placeholder="R$ 0,00" />
             </div>
           </div>
-          {/* Auto margin display */}
+          {/* Margem auto-calculada */}
           {marginPercent !== null && (
             <div className={`text-xs px-3 py-1.5 rounded-md ${marginPercent >= 0 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}`}>
               Margem: {marginPercent >= 0 ? '+' : ''}{marginPercent.toFixed(1)}%
@@ -259,11 +343,13 @@ function ProductFormDialog({
               )}
             </div>
           )}
-          {/* Supplier */}
-          <div>
-            <Label>Fornecedor</Label>
-            <Input value={form.supplier} onChange={(e) => setForm({ ...form, supplier: e.target.value })} placeholder="Nome do fornecedor (opcional)" />
-          </div>
+          {/* Fornecedor (mantido em modo edit) */}
+          {isEditing && (
+            <div>
+              <Label>Fornecedor</Label>
+              <Input value={form.supplier} onChange={(e) => setForm({ ...form, supplier: e.target.value })} placeholder="Nome do fornecedor (opcional)" />
+            </div>
+          )}
           {/* Additional fields only in edit mode */}
           {isEditing && (
             <>
