@@ -483,15 +483,6 @@ export async function listDeletedDeals(tenantId: number, limit = 50) {
 export async function updateDeal(tenantId: number, id: number, data: Partial<{ title: string; pipelineId: number; stageId: number; status: "open" | "won" | "lost"; valueCents: number; probability: number; ownerUserId: number; updatedBy: number; contactId: number | null; accountId: number | null; expectedCloseAt: Date | null; channelOrigin: string | null; leadSource: string | null; appointmentDate: Date | null; followUpDate: Date | null; lossReasonId: number | null; lossNotes: string | null; utmCampaign: string | null; utmSource: string | null; utmMedium: string | null; utmTerm: string | null; utmContent: string | null; rdCustomFields: Record<string, string> | null }>) {
   const db = await getDb(); if (!db) return;
   await db.update(deals).set({ ...data, lastActivityAt: new Date() }).where(and(eq(deals.id, id), eq(deals.tenantId, tenantId)));
-  // Quando atendente seta/muda appointmentDate (e não fixou followUpDate manual no mesmo update),
-  // recalcula followUpDate a partir dos produtos da deal.
-  if (data.appointmentDate !== undefined && data.followUpDate === undefined) {
-    try {
-      await recalcDealFollowUpFromProducts(tenantId, id);
-    } catch (e: any) {
-      console.warn("[updateDeal] recalcDealFollowUp failed:", e?.message);
-    }
-  }
 }
 export async function countDeals(tenantId: number, status?: string, opts?: { pipelineId?: number; stageId?: number; titleSearch?: string; dateFrom?: string; dateTo?: string; ownerUserId?: number; ownerUserIds?: number[]; customFieldFilters?: { fieldId: number; value: string }[] }) {
   const db = await getDb(); if (!db) return 0;
@@ -568,19 +559,34 @@ export async function searchAccounts(tenantId: number, search: string, opts?: { 
 // ═══════════════════════════════════════
 // DEAL PRODUCTS
 // ═══════════════════════════════════════
-export async function createDealProduct(data: { tenantId: number; dealId: number; productId: number; name: string; description?: string; category?: "servico" | "pacote" | "consulta" | "procedimento" | "assinatura" | "produto" | "other"; quantity?: number; unitPriceCents?: number; discountCents?: number; finalPriceCents?: number; professional?: string; serviceStart?: Date; serviceEnd?: Date; notes?: string }) {
+export async function createDealProduct(data: { tenantId: number; dealId: number; productId: number; name: string; description?: string; category?: "servico" | "pacote" | "consulta" | "procedimento" | "assinatura" | "produto" | "other"; quantity?: number; unitPriceCents?: number; discountCents?: number; finalPriceCents?: number; professional?: string; serviceStart?: Date; serviceEnd?: Date; notes?: string; createdByUserId?: number }) {
   const db = await getDb(); if (!db) return null;
   const qty = data.quantity || 1;
   const unit = data.unitPriceCents || 0;
   const discount = data.discountCents || 0;
   const finalPrice = data.finalPriceCents ?? (qty * unit - discount);
-  const [result] = await db.insert(dealProducts).values({ ...data, finalPriceCents: finalPrice }).returning({ id: dealProducts.id });
-  // Auto-popular followUpDate da deal a partir do returnReminderDays do produto.
-  // Só seta se a deal ainda não tem followUpDate manual.
+  const insertData: any = { ...data };
+  delete insertData.createdByUserId;
+  const [result] = await db.insert(dealProducts).values({ ...insertData, finalPriceCents: finalPrice }).returning({ id: dealProducts.id });
+
+  // Se o produto tem prazo de retorno configurado, cria tarefa de "Agendar retorno em 3 dias"
   try {
-    await recalcDealFollowUpFromProducts(data.tenantId, data.dealId);
+    const [pcRow] = await db.select({ rrd: productCatalog.returnReminderDays })
+      .from(productCatalog)
+      .where(eq(productCatalog.id, data.productId))
+      .limit(1);
+    const rrd = pcRow?.rrd;
+    if (rrd && rrd > 0) {
+      await createReturnReminderTask({
+        tenantId: data.tenantId,
+        dealId: data.dealId,
+        productName: data.name,
+        returnReminderDays: rrd,
+        createdByUserId: data.createdByUserId,
+      });
+    }
   } catch (e: any) {
-    console.warn("[createDealProduct] recalcDealFollowUp failed:", e?.message);
+    console.warn("[createDealProduct] return reminder task failed:", e?.message);
   }
   return result;
 }
@@ -615,47 +621,64 @@ export async function recalcDealValue(tenantId: number, dealId: number) {
 }
 
 /**
- * Recalcula deals.followUpDate com base no maior returnReminderDays entre os
- * produtos da deal. Base = appointmentDate (se houver) ou hoje.
+ * Cria uma tarefa de "Agendar retorno" 3 dias antes da data de retorno
+ * estimada (baseDate + returnReminderDays do produto - 3).
  *
- * Política de sobrescrita:
- *  - Se followUpDate ainda é null → seta automaticamente
- *  - Se já existe → NÃO sobrescreve (respeita ajuste manual do atendente)
+ * Idempotência: se já existe tarefa do mesmo tipo+título para a mesma deal
+ * com data próxima, NÃO duplica.
  *
- * Chamado de createDealProduct e quando appointmentDate é atualizada.
+ * Chamado por createDealProduct quando o produto adicionado tem
+ * returnReminderDays definido.
  */
-export async function recalcDealFollowUpFromProducts(tenantId: number, dealId: number) {
+export async function createReturnReminderTask(args: {
+  tenantId: number;
+  dealId: number;
+  productName: string;
+  returnReminderDays: number;
+  createdByUserId?: number;
+}) {
   const db = await getDb(); if (!db) return null;
+  const { tenantId, dealId, productName, returnReminderDays, createdByUserId } = args;
+  if (!returnReminderDays || returnReminderDays <= 0) return null;
 
-  // Maior returnReminderDays entre os produtos da deal (JOIN com product_catalog)
-  const reminderResult = await db.execute(sql`
-    SELECT MAX(pc."returnReminderDays")::int AS max_reminder
-    FROM deal_products dp
-    LEFT JOIN product_catalog pc ON pc.id = dp."productId"
-    WHERE dp."tenantId" = ${tenantId} AND dp."dealId" = ${dealId}
-      AND pc."returnReminderDays" IS NOT NULL
-  `);
-  const maxReminder = Number(((reminderResult as any).rows ?? reminderResult)?.[0]?.max_reminder);
-  if (!maxReminder || maxReminder <= 0) return null;
-
-  // Pega appointmentDate atual e followUpDate atual
+  // Base = deal.appointmentDate (se houver) ou hoje. Tarefa vence 3 dias ANTES do retorno.
   const [dealRow] = await db.select({
     appointmentDate: deals.appointmentDate,
-    followUpDate: deals.followUpDate,
+    ownerUserId: deals.ownerUserId,
   }).from(deals).where(and(eq(deals.id, dealId), eq(deals.tenantId, tenantId))).limit(1);
   if (!dealRow) return null;
 
-  // Não sobrescreve se atendente já setou manual
-  if (dealRow.followUpDate) return dealRow.followUpDate;
-
   const baseDate = dealRow.appointmentDate ? new Date(dealRow.appointmentDate) : new Date();
-  baseDate.setHours(0, 0, 0, 0);
-  const followUpDate = new Date(baseDate);
-  followUpDate.setDate(followUpDate.getDate() + maxReminder);
+  baseDate.setHours(9, 0, 0, 0); // Vence às 09:00
+  const dueAt = new Date(baseDate);
+  dueAt.setDate(dueAt.getDate() + returnReminderDays - 3);
 
-  await db.update(deals).set({ followUpDate, lastActivityAt: new Date() })
-    .where(and(eq(deals.id, dealId), eq(deals.tenantId, tenantId)));
-  return followUpDate;
+  const title = "Agendar retorno em 3 dias";
+  const description = `Cliente deve retornar em 3 dias, verifique se já foi agendado o retorno.${productName ? ` (Tratamento: ${productName})` : ""}`;
+
+  // Idempotência: se já existe tarefa idêntica em aberto pra essa deal, não cria
+  const existing = await db.select({ id: tasks.id }).from(tasks).where(and(
+    eq(tasks.tenantId, tenantId),
+    eq(tasks.entityType, "deal"),
+    eq(tasks.entityId, dealId),
+    eq(tasks.title, title),
+    eq(tasks.status, "pending"),
+  )).limit(1);
+  if (existing.length > 0) return existing[0];
+
+  const assignee = dealRow.ownerUserId ?? createdByUserId;
+  return createTask({
+    tenantId,
+    entityType: "deal",
+    entityId: dealId,
+    title,
+    description,
+    taskType: "task",
+    dueAt,
+    priority: "medium",
+    assignedToUserId: assignee ?? undefined,
+    createdByUserId,
+  });
 }
 
 // ═══════════════════════════════════════
