@@ -483,6 +483,15 @@ export async function listDeletedDeals(tenantId: number, limit = 50) {
 export async function updateDeal(tenantId: number, id: number, data: Partial<{ title: string; pipelineId: number; stageId: number; status: "open" | "won" | "lost"; valueCents: number; probability: number; ownerUserId: number; updatedBy: number; contactId: number | null; accountId: number | null; expectedCloseAt: Date | null; channelOrigin: string | null; leadSource: string | null; appointmentDate: Date | null; followUpDate: Date | null; lossReasonId: number | null; lossNotes: string | null; utmCampaign: string | null; utmSource: string | null; utmMedium: string | null; utmTerm: string | null; utmContent: string | null; rdCustomFields: Record<string, string> | null }>) {
   const db = await getDb(); if (!db) return;
   await db.update(deals).set({ ...data, lastActivityAt: new Date() }).where(and(eq(deals.id, id), eq(deals.tenantId, tenantId)));
+  // Quando atendente seta/muda appointmentDate (e não fixou followUpDate manual no mesmo update),
+  // recalcula followUpDate a partir dos produtos da deal.
+  if (data.appointmentDate !== undefined && data.followUpDate === undefined) {
+    try {
+      await recalcDealFollowUpFromProducts(tenantId, id);
+    } catch (e: any) {
+      console.warn("[updateDeal] recalcDealFollowUp failed:", e?.message);
+    }
+  }
 }
 export async function countDeals(tenantId: number, status?: string, opts?: { pipelineId?: number; stageId?: number; titleSearch?: string; dateFrom?: string; dateTo?: string; ownerUserId?: number; ownerUserIds?: number[]; customFieldFilters?: { fieldId: number; value: string }[] }) {
   const db = await getDb(); if (!db) return 0;
@@ -566,6 +575,13 @@ export async function createDealProduct(data: { tenantId: number; dealId: number
   const discount = data.discountCents || 0;
   const finalPrice = data.finalPriceCents ?? (qty * unit - discount);
   const [result] = await db.insert(dealProducts).values({ ...data, finalPriceCents: finalPrice }).returning({ id: dealProducts.id });
+  // Auto-popular followUpDate da deal a partir do returnReminderDays do produto.
+  // Só seta se a deal ainda não tem followUpDate manual.
+  try {
+    await recalcDealFollowUpFromProducts(data.tenantId, data.dealId);
+  } catch (e: any) {
+    console.warn("[createDealProduct] recalcDealFollowUp failed:", e?.message);
+  }
   return result;
 }
 export async function listDealProducts(tenantId: number, dealId: number) {
@@ -596,6 +612,50 @@ export async function recalcDealValue(tenantId: number, dealId: number) {
   await db.update(deals).set({ valueCents: totalCents, lastActivityAt: new Date() })
     .where(and(eq(deals.id, dealId), eq(deals.tenantId, tenantId)));
   return totalCents;
+}
+
+/**
+ * Recalcula deals.followUpDate com base no maior returnReminderDays entre os
+ * produtos da deal. Base = appointmentDate (se houver) ou hoje.
+ *
+ * Política de sobrescrita:
+ *  - Se followUpDate ainda é null → seta automaticamente
+ *  - Se já existe → NÃO sobrescreve (respeita ajuste manual do atendente)
+ *
+ * Chamado de createDealProduct e quando appointmentDate é atualizada.
+ */
+export async function recalcDealFollowUpFromProducts(tenantId: number, dealId: number) {
+  const db = await getDb(); if (!db) return null;
+
+  // Maior returnReminderDays entre os produtos da deal (JOIN com product_catalog)
+  const reminderResult = await db.execute(sql`
+    SELECT MAX(pc."returnReminderDays")::int AS max_reminder
+    FROM deal_products dp
+    LEFT JOIN product_catalog pc ON pc.id = dp."productId"
+    WHERE dp."tenantId" = ${tenantId} AND dp."dealId" = ${dealId}
+      AND pc."returnReminderDays" IS NOT NULL
+  `);
+  const maxReminder = Number(((reminderResult as any).rows ?? reminderResult)?.[0]?.max_reminder);
+  if (!maxReminder || maxReminder <= 0) return null;
+
+  // Pega appointmentDate atual e followUpDate atual
+  const [dealRow] = await db.select({
+    appointmentDate: deals.appointmentDate,
+    followUpDate: deals.followUpDate,
+  }).from(deals).where(and(eq(deals.id, dealId), eq(deals.tenantId, tenantId))).limit(1);
+  if (!dealRow) return null;
+
+  // Não sobrescreve se atendente já setou manual
+  if (dealRow.followUpDate) return dealRow.followUpDate;
+
+  const baseDate = dealRow.appointmentDate ? new Date(dealRow.appointmentDate) : new Date();
+  baseDate.setHours(0, 0, 0, 0);
+  const followUpDate = new Date(baseDate);
+  followUpDate.setDate(followUpDate.getDate() + maxReminder);
+
+  await db.update(deals).set({ followUpDate, lastActivityAt: new Date() })
+    .where(and(eq(deals.id, dealId), eq(deals.tenantId, tenantId)));
+  return followUpDate;
 }
 
 // ═══════════════════════════════════════
