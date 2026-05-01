@@ -568,7 +568,18 @@ const NUMERIC_STATUS_MAP: Record<number, string> = {
 const STRING_STATUS_MAP: Record<string, string> = {
   "ERROR": "error", "PENDING": "pending", "SENT": "sent",
   "SERVER_ACK": "sent", "DELIVERY_ACK": "delivered", "DELIVERED": "delivered",
-  "READ": "read", "PLAYED": "played", "DELETED": "deleted",
+  // Z-API envia "RECEIVED" para indicar "entregue ao dispositivo" — equivalente
+  // ao 2º check cinza. Sem esse mapping, mensagens enviadas ficavam travadas
+  // em "sent" (1 check) mesmo após entrega/leitura.
+  "RECEIVED": "delivered",
+  "READ": "read",
+  // Z-API usa sufixo "-SELF" para acks emitidos pelo nosso próprio aparelho
+  // (multi-device), comportamento similar ao read em outros sistemas.
+  "READ-SELF": "read",
+  "VIEWED": "read",
+  "PLAYED": "played",
+  "PLAYED-SELF": "played",
+  "DELETED": "deleted",
 };
 
 // ── Preview Text Generator ────────────────────────────────────
@@ -1050,7 +1061,14 @@ async function processStatusUpdate(session: SessionInfo, data: any): Promise<voi
       if (typeof rawStatus === "number") {
         newStatus = NUMERIC_STATUS_MAP[rawStatus];
       } else if (typeof rawStatus === "string") {
-        newStatus = STRING_STATUS_MAP[rawStatus.toUpperCase()] || rawStatus.toLowerCase();
+        const upper = rawStatus.toUpperCase();
+        newStatus = STRING_STATUS_MAP[upper];
+        if (!newStatus) {
+          // Loga status desconhecido para descobrirmos novos valores Z-API.
+          // Cai pra lowercase (compatibilidade com formatos legacy) mas marca log.
+          console.warn(`[Worker] Unknown status string "${rawStatus}" — fallback lowercase`);
+          newStatus = rawStatus.toLowerCase();
+        }
       }
 
       if (!messageId || !newStatus) {

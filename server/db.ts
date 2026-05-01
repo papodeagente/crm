@@ -3019,9 +3019,17 @@ export async function getQueueConversations(sessionId: string, tenantId: number,
     WHERE wc."sessionId" = ${sessionId}
     AND wc."tenantId" = ${tenantId}
     AND wc."mergedIntoId" IS NULL
-    AND (wc."assignedUserId" IS NULL)
+    AND wc."isArchived" = false
+    AND wc."assignedUserId" IS NULL
     AND wc.status IN ('open', 'pending')
-    AND (wc."unreadCount" > 0 OR wc."queuedAt" IS NOT NULL)
+    -- Filtro anti-ghost: precisa ter pelo menos 1 mensagem real.
+    -- Antes exigia (unreadCount > 0 OR queuedAt IS NOT NULL), o que tirava
+    -- da fila qualquer conversa não-atribuída depois que era marcada como lida.
+    AND EXISTS (
+      SELECT 1 FROM messages m
+      WHERE m."sessionId" = wc."sessionId"
+        AND m."remoteJid" = wc."remoteJid"
+    )
     ORDER BY COALESCE(wc."queuedAt", lm.timestamp, wc."lastMessageAt", wc."createdAt") DESC
     LIMIT ${limit}
   `);

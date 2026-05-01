@@ -255,6 +255,67 @@ export async function backgroundResolveExtras(
         .onConflictDoNothing();
     }
 
+    // ── Merge proativo LID ↔ phone ──
+    // Quando descobrimos o LID de um contato com phone, qualquer conversa
+    // separada criada pelo LID (ex.: "12345@lid") é mesclada na canônica
+    // do phoneE164. Sem esse merge, a Inbox mostra a conversa duplicada.
+    if (profile.lid) {
+      try {
+        const lidJid = profile.lid.includes("@") ? profile.lid : `${profile.lid.replace(/\D/g, "")}@lid`;
+        // Acha conversa com remoteJid igual ao LID (não mesclada)
+        const lidConvs = await db.execute(sql`
+          SELECT id, "sessionId", "remoteJid", "phoneE164" FROM wa_conversations
+          WHERE "tenantId" = ${tenantId}
+            AND ("remoteJid" = ${lidJid} OR "chatLid" = ${lidJid})
+            AND "mergedIntoId" IS NULL
+        `);
+        const lidRows = ((lidConvs as any).rows ?? lidConvs) as any[];
+
+        for (const lidRow of lidRows) {
+          // Procura conversa canônica (pelo phoneE164 do contato) na mesma sessão
+          const [contactRow] = await db
+            .select({ phoneE164: contacts.phoneE164 })
+            .from(contacts)
+            .where(and(eq(contacts.id, contactId), eq(contacts.tenantId, tenantId)))
+            .limit(1);
+          const phoneE164 = contactRow?.phoneE164;
+          if (!phoneE164) continue;
+
+          const canonicalRows = await db.execute(sql`
+            SELECT id FROM wa_conversations
+            WHERE "tenantId" = ${tenantId}
+              AND "sessionId" = ${lidRow.sessionId}
+              AND "phoneE164" = ${phoneE164}
+              AND id <> ${lidRow.id}
+              AND "mergedIntoId" IS NULL
+            ORDER BY id ASC LIMIT 1
+          `);
+          const canonical = ((canonicalRows as any).rows ?? canonicalRows)?.[0];
+          if (!canonical) {
+            // Não há canônica ainda — apenas grava phoneE164 na LID conv pra
+            // virar canônica em si.
+            await db.execute(sql`
+              UPDATE wa_conversations SET "phoneE164" = ${phoneE164}
+              WHERE id = ${lidRow.id}
+            `);
+            continue;
+          }
+
+          // Merge: reatribui mensagens e marca a LID conv como ghost.
+          await db.execute(sql`UPDATE messages SET "waConversationId" = ${canonical.id} WHERE "waConversationId" = ${lidRow.id}`);
+          await db.execute(sql`UPDATE deals SET "waConversationId" = ${canonical.id} WHERE "waConversationId" = ${lidRow.id}`);
+          await db.execute(sql`
+            UPDATE wa_conversations
+            SET "mergedIntoId" = ${canonical.id}, status = 'closed', "updatedAt" = NOW()
+            WHERE id = ${lidRow.id}
+          `);
+          console.log(`[IdentityResolver] merged LID conv #${lidRow.id} → canonical #${canonical.id} (contact=${contactId})`);
+        }
+      } catch (mergeErr: any) {
+        console.warn(`[IdentityResolver] LID merge failed contact=${contactId}:`, mergeErr.message);
+      }
+    }
+
     console.log(`[IdentityResolver] enriched contact=${contactId} tenant=${tenantId} lid=${profile.lid || "none"} avatar=${!!updates.avatarUrl}`);
   } catch (err: any) {
     console.warn(`[IdentityResolver] backgroundResolveExtras failed for contact=${contactId}:`, err.message);

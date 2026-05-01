@@ -383,6 +383,9 @@ export async function resolveConversation(
       contactPushName: pushName || null,
       chatLid: normalizedChatLid,
       unreadCount: 0,
+      // Conversa nova nasce na fila pra atendimento. Se já tem assignedUserId
+      // (caso de criar manualmente atribuído), não seta queuedAt.
+      queuedAt: new Date(),
     });
 
     const insertId = (result as any).id ?? (result as any)[0]?.id;
