@@ -516,6 +516,11 @@ async function startServer() {
     // Appointment reminder scheduler (24h and 2h before)
     import("../appointmentReminderScheduler").then(m => m.startAppointmentReminderScheduler());
 
+    // WhatsApp session status reconciliation (Z-API polling, every 2 min)
+    import("../whatsappSessionStatusScheduler").then(m => m.startWhatsAppStatusScheduler()).catch(e => {
+      console.warn("[WaStatusSched] init fail:", e?.message);
+    });
+
     // Recurring appointment generator (daily)
     import("../services/recurringAppointmentService").then(m => m.startRecurringAppointmentScheduler());
 
