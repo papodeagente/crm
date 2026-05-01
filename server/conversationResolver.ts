@@ -386,9 +386,16 @@ export async function resolveConversation(
       // Conversa nova nasce na fila pra atendimento. Se já tem assignedUserId
       // (caso de criar manualmente atribuído), não seta queuedAt.
       queuedAt: new Date(),
-    });
+    }).returning({ id: waConversations.id });
 
-    const insertId = (result as any).id ?? (result as any)[0]?.id;
+    // PostgreSQL retorna o ID via .returning(). Sem isso, result.id é undefined
+    // e qualquer chamada subsequente (updateConversationLastMessage, vínculo
+    // de waConversationId em messages, etc.) opera num ID inexistente e falha
+    // silenciosamente — bug histórico que deixava conversas sem preview/unread.
+    const insertId = (result as any[])[0]?.id;
+    if (!insertId) {
+      throw new Error(`[ConvResolver] INSERT returned no id for conversationKey ${conversationKey}`);
+    }
     return { conversationId: insertId, isNew: true, conversationKey };
   } catch (err: any) {
     // PostgreSQL unique_violation (23505) — another request created the conversation first.
