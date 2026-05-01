@@ -1427,12 +1427,18 @@ class WhatsAppEvolutionManager extends EventEmitter {
       // This populates the wa_contacts table which the Inbox uses for name resolution
       await this.syncContactsFromEvolution(session);
 
-      // ─── QUICK SYNC: Fetch recent messages for active conversations ───
-      // Instead of deep sync (which takes too long), fetch the last 3 pages of messages
-      // for each conversation to catch up on recent activity
-      this.quickSyncRecentMessages(session, individualChats).catch(e =>
-        console.error("[EvoWA QuickSync] Background error:", e)
-      );
+      // ─── QUICK SYNC DESLIGADO ───
+      // O endpoint /chat-messages da Z-API foi descontinuado para WhatsApp
+      // multi-device (que é praticamente todo número moderno) e retorna 400
+      // "Does not work in multi device version" em massa, poluindo logs e
+      // consumindo rate limit sem nenhum dado útil.
+      //
+      // O fluxo de mensagens em tempo real via webhook (on-message-received)
+      // já cobre todo o cenário operacional. Histórico antigo deve ser
+      // implementado sob demanda usando endpoints multi-device da Z-API.
+      //
+      // Mantemos quickSyncRecentMessages como código histórico, mas a chamada
+      // foi removida do fluxo de connect.
 
     } catch (error) {
       console.error("[EvoWA Sync] Error:", error);
