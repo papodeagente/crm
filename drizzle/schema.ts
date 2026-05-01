@@ -125,6 +125,10 @@ export const whatsappSessions = pgTable("whatsapp_sessions", {
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 }, (t) => [
   index("ws_tenant_idx").on(t.tenantId),
+  // 1 sessão por (tenant, user). Antes não havia constraint, e o sistema
+  // criou sessões legacy "zapi-{tenantId}-{ts}" + canônica "crm-{tenantId}-{userId}"
+  // pro mesmo usuário, gerando dropdown duplicado.
+  uniqueIndex("ws_tenant_user_unique").on(t.tenantId, t.userId),
 ]);
 
 export const waMessages = pgTable("messages", {
