@@ -18,8 +18,9 @@ import {
   Smartphone, Wifi, WifiOff, QrCode,
   ShieldAlert, Loader2, RefreshCw, CheckCircle2,
   Settings2, Trash2, Users, Info, Share2, Mic, Brain, AlertTriangle,
-  Zap, Server
+  Zap, Server, UserCircle2
 } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
@@ -649,6 +650,9 @@ export default function WhatsApp() {
         </Card>
       </div>
 
+      {/* ─── IDENTIFICAÇÃO DO ATENDENTE ─── */}
+      {mySession?.sessionId && <AgentNamePrefixCard sessionId={mySession.sessionId} />}
+
       {/* ─── TRANSCRIÇÃO DE ÁUDIOS COM IA ─── */}
       <div className="mt-8">
         <div className="flex items-center gap-2 mb-4">
@@ -697,6 +701,153 @@ export default function WhatsApp() {
           </div>
         </Card>
       </div>
+    </div>
+  );
+}
+
+/**
+ * Card de configuração da assinatura do atendente nas mensagens enviadas.
+ * Toggle pra ligar/desligar + input de template com tokens {nome}, {primeiroNome}.
+ * Mostra preview ao vivo.
+ */
+function AgentNamePrefixCard({ sessionId }: { sessionId: string }) {
+  const utils = trpc.useUtils();
+  const settingsQ = trpc.whatsapp.getAgentNameSettings.useQuery({ sessionId });
+  const saveMut = trpc.whatsapp.saveAgentNameSettings.useMutation({
+    onSuccess: () => {
+      toast.success("Configuração salva");
+      utils.whatsapp.getAgentNameSettings.invalidate({ sessionId });
+    },
+    onError: (e) => toast.error(e.message || "Erro ao salvar"),
+  });
+
+  const [enabled, setEnabled] = useState<boolean>(false);
+  const [template, setTemplate] = useState<string>("*{nome}:* ");
+
+  useEffect(() => {
+    if (settingsQ.data) {
+      setEnabled(settingsQ.data.showAgentNamePrefix);
+      setTemplate(settingsQ.data.agentNameTemplate);
+    }
+  }, [settingsQ.data]);
+
+  const exampleName = "Bruno Barbosa";
+  const exampleFirst = "Bruno";
+  const renderedPrefix = template
+    .replace(/\{nome\}/g, exampleName)
+    .replace(/\{primeiroNome\}/g, exampleFirst);
+  const examplePreview = `${renderedPrefix}Olá! Como posso te ajudar hoje?`;
+
+  const dirty =
+    settingsQ.data &&
+    (settingsQ.data.showAgentNamePrefix !== enabled || settingsQ.data.agentNameTemplate !== template);
+
+  return (
+    <div className="mt-8">
+      <div className="flex items-center gap-2 mb-4">
+        <UserCircle2 className="h-5 w-5 text-muted-foreground" />
+        <h2 className="text-[15px] font-semibold text-foreground">Identificação do atendente</h2>
+      </div>
+
+      <Card className="border border-border/40 shadow-none rounded-xl">
+        <div className="p-5 space-y-4">
+          {/* Toggle */}
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex gap-3 items-start">
+              <div className="h-9 w-9 rounded-lg bg-blue-50 flex items-center justify-center shrink-0 mt-0.5">
+                <UserCircle2 className="h-4.5 w-4.5 text-blue-600" />
+              </div>
+              <div>
+                <Label htmlFor="agent-name-toggle" className="text-[13px] font-medium text-foreground cursor-pointer">
+                  Mostrar nome do atendente nas mensagens
+                </Label>
+                <p className="text-[12px] text-muted-foreground mt-1 leading-relaxed max-w-md">
+                  Quando ativado, todas as mensagens de texto enviadas pela equipe levam um prefixo
+                  com o nome de quem está respondendo. Útil para o cliente saber com quem está falando.
+                </p>
+              </div>
+            </div>
+            <Switch
+              id="agent-name-toggle"
+              checked={enabled}
+              onCheckedChange={setEnabled}
+              disabled={settingsQ.isLoading}
+              className="shrink-0 mt-1"
+            />
+          </div>
+
+          {/* Template editor */}
+          <div className={`pt-4 border-t border-border/50 space-y-3 ${enabled ? "" : "opacity-60 pointer-events-none"}`}>
+            <div>
+              <Label htmlFor="agent-template" className="text-[13px] font-medium text-foreground">
+                Como o nome aparece
+              </Label>
+              <Input
+                id="agent-template"
+                value={template}
+                onChange={(e) => setTemplate(e.target.value)}
+                placeholder="*{nome}:* "
+                className="mt-1.5 font-mono text-[13px]"
+                maxLength={255}
+              />
+              <div className="flex flex-wrap gap-1 mt-2">
+                {[
+                  { token: "{nome}", desc: "Nome completo" },
+                  { token: "{primeiroNome}", desc: "Só o primeiro nome" },
+                ].map((t) => (
+                  <button
+                    key={t.token}
+                    type="button"
+                    onClick={() => setTemplate((prev) => prev + t.token)}
+                    className="text-[10px] px-2 py-0.5 rounded bg-muted hover:bg-muted/70 transition-colors font-mono"
+                    title={t.desc}
+                  >
+                    {t.token}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Preview */}
+            <div>
+              <Label className="text-[13px] font-medium text-foreground">Pré-visualização</Label>
+              <div className="mt-1.5 rounded-lg border border-border/50 bg-muted/30 p-3">
+                <div className="rounded-lg bg-emerald-100 dark:bg-emerald-950/30 px-3 py-2 text-[13px] text-foreground max-w-md ml-auto whitespace-pre-wrap">
+                  {examplePreview}
+                </div>
+                <p className="text-[10px] text-muted-foreground mt-2 text-right">
+                  Exemplo com nome "{exampleName}"
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Save */}
+          <div className="flex items-center justify-end gap-2 pt-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                if (settingsQ.data) {
+                  setEnabled(settingsQ.data.showAgentNamePrefix);
+                  setTemplate(settingsQ.data.agentNameTemplate);
+                }
+              }}
+              disabled={!dirty || saveMut.isPending}
+            >
+              Reverter
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => saveMut.mutate({ sessionId, showAgentNamePrefix: enabled, agentNameTemplate: template.trim() || "*{nome}:* " })}
+              disabled={!dirty || saveMut.isPending}
+            >
+              {saveMut.isPending ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null}
+              Salvar
+            </Button>
+          </div>
+        </div>
+      </Card>
     </div>
   );
 }

@@ -1653,6 +1653,46 @@ export const appRouter = router({
         await db.update(tenants).set({ settingsJson: currentSettings }).where(eq(tenants.id, getTenantId(ctx)));
         return { success: true };
       }),
+    // ─── Identificação do atendente nas mensagens (prefixo) ───
+    getAgentNameSettings: sessionTenantProcedure
+      .input(z.object({ sessionId: z.string() }))
+      .query(async ({ input, ctx }) => {
+        const db = await (await import("./db")).getDb();
+        if (!db) return { showAgentNamePrefix: false, agentNameTemplate: "*{nome}:* " };
+        const { whatsappSessions } = await import("../drizzle/schema");
+        const { eq, and } = await import("drizzle-orm");
+        const [row] = await db.select({
+          showAgentNamePrefix: whatsappSessions.showAgentNamePrefix,
+          agentNameTemplate: whatsappSessions.agentNameTemplate,
+        }).from(whatsappSessions)
+          .where(and(eq(whatsappSessions.sessionId, input.sessionId), eq(whatsappSessions.tenantId, getTenantId(ctx))))
+          .limit(1);
+        return {
+          showAgentNamePrefix: row?.showAgentNamePrefix ?? false,
+          agentNameTemplate: row?.agentNameTemplate ?? "*{nome}:* ",
+        };
+      }),
+    saveAgentNameSettings: sessionTenantWriteProcedure
+      .input(z.object({
+        sessionId: z.string(),
+        showAgentNamePrefix: z.boolean(),
+        agentNameTemplate: z.string().min(1).max(255),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const db = await (await import("./db")).getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB indisponível" });
+        const { whatsappSessions } = await import("../drizzle/schema");
+        const { eq, and } = await import("drizzle-orm");
+        await db.update(whatsappSessions).set({
+          showAgentNamePrefix: input.showAgentNamePrefix,
+          agentNameTemplate: input.agentNameTemplate,
+          updatedAt: new Date(),
+        }).where(and(
+          eq(whatsappSessions.sessionId, input.sessionId),
+          eq(whatsappSessions.tenantId, getTenantId(ctx))
+        ));
+        return { success: true };
+      }),
     // Cleanup synced contacts: remove contacts with source="whatsapp" that have NO deals and were NOT manually created
     cleanupSyncedContacts: tenantWriteProcedure
       .input(z.object({ dryRun: z.boolean().default(true) }))

@@ -315,10 +315,52 @@ class WhatsAppEvolutionManager extends EventEmitter {
 
   // ─── SEND MESSAGES ───
 
+  /**
+   * Aplica o prefixo de identificação do atendente no texto, se configurado
+   * para a sessão. Faz lookup do nome do agente e renderiza o template
+   * (tokens {nome}, {primeiroNome}). Usado em sendText/sendMedia.
+   *
+   * Retorna texto original se: feature off, sem agentId, agente sem nome.
+   */
+  private async applyAgentNamePrefix(sessionId: string, text: string, senderAgentId?: number): Promise<string> {
+    if (!senderAgentId) return text;
+    try {
+      const db = await getDb();
+      if (!db) return text;
+      const settings = await db.execute(sql`
+        SELECT "showAgentNamePrefix", "agentNameTemplate"
+        FROM whatsapp_sessions WHERE "sessionId" = ${sessionId} LIMIT 1
+      `);
+      const row = ((settings as any).rows ?? settings)?.[0];
+      if (!row?.showAgentNamePrefix) return text;
+      const template = (row.agentNameTemplate || "*{nome}:* ") as string;
+
+      const userRow = await db.execute(sql`
+        SELECT name FROM crm_users WHERE id = ${senderAgentId} LIMIT 1
+      `);
+      const fullName = (((userRow as any).rows ?? userRow)?.[0]?.name || "").trim();
+      if (!fullName) return text;
+      const firstName = fullName.split(/\s+/)[0];
+
+      const prefix = template
+        .replace(/\{nome\}/g, fullName)
+        .replace(/\{primeiroNome\}/g, firstName);
+      // Se template já termina com espaço/quebra-de-linha, não força extra.
+      return text ? `${prefix}${text}` : text;
+    } catch (e: any) {
+      console.warn("[applyAgentNamePrefix] fallback sem prefixo:", e?.message);
+      return text;
+    }
+  }
+
   async sendTextMessage(sessionId: string, jid: string, text: string, senderAgentId?: number): Promise<any> {
     const session = this.sessions.get(sessionId);
     if (!session) throw new Error(`Sessão não encontrada. Conecte seu WhatsApp primeiro.`);
     if (session.status !== "connected") throw new Error(`WhatsApp não está conectado. Reconecte seu WhatsApp.`);
+
+    // Aplica prefixo de identificação ANTES de enviar — texto que vai pro Z-API
+    // e que é gravado em messages.content é o mesmo (cliente vê = histórico vê).
+    text = await this.applyAgentNamePrefix(sessionId, text, senderAgentId);
 
     const number = this.jidToNumber(jid);
 
@@ -389,6 +431,12 @@ class WhatsAppEvolutionManager extends EventEmitter {
     if (session.status !== "connected") throw new Error(`WhatsApp não está conectado. Reconecte seu WhatsApp.`);
 
     const number = this.jidToNumber(jid);
+
+    // Aplica prefixo de identificação na caption (se houver). Imagens/vídeos
+    // sem caption ficam como estão — não criamos caption só pra prefixar.
+    if (caption) {
+      caption = await this.applyAgentNamePrefix(sessionId, caption, senderAgentId);
+    }
 
     let result: any;
     console.log(`[SendMedia] Using Z-API provider for session ${sessionId}`);
@@ -527,6 +575,7 @@ class WhatsAppEvolutionManager extends EventEmitter {
     const session = this.sessions.get(sessionId);
     if (!session) throw new Error(`Sessão não encontrada.`);
     if (session.status !== "connected") throw new Error(`WhatsApp não está conectado.`);
+    text = await this.applyAgentNamePrefix(sessionId, text, senderAgentId);
     const number = this.jidToNumber(jid);
     let result: any;
     const zapiResult = await zapiProvider.sendTextWithQuote(sessionId, number, text, {

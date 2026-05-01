@@ -121,6 +121,8 @@ export const whatsappSessions = pgTable("whatsapp_sessions", {
   providerClientToken: text("providerClientToken"),
   /** Prefixar nome do agente nas mensagens enviadas (porta entur-os-crm) */
   showAgentNamePrefix: boolean("showAgentNamePrefix").default(false).notNull(),
+  /** Template do prefixo. Tokens: {nome}, {primeiroNome}. Default: "*{nome}:* " */
+  agentNameTemplate: varchar("agentNameTemplate", { length: 255 }).default("*{nome}:* ").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 }, (t) => [
