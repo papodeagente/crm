@@ -257,10 +257,12 @@ export function startMessageWorker(processor: MessageProcessor): Worker | null {
       },
       {
         connection: redis,
-        concurrency: 5, // Process up to 5 messages in parallel
+        // 15 = headroom seguro contra rate limit Z-API (~100/min) e DB (~50 conn pool).
+        // Antes: 5 concorrência. Bottleneck visível em rajadas de mensagens.
+        concurrency: 15,
         limiter: {
-          max: 50,      // Max 50 jobs
-          duration: 1000, // per second
+          max: 60,        // 60 jobs/s (Z-API permite muito mais, mas DB connection pool limita)
+          duration: 1000,
         },
       }
     );
@@ -284,7 +286,7 @@ export function startMessageWorker(processor: MessageProcessor): Worker | null {
       }
     });
 
-    console.log("[Queue] Message worker started (concurrency: 5)");
+    console.log("[Queue] Message worker started (concurrency: 15)");
     return messageWorker;
   } catch (e: any) {
     console.warn("[Queue] Failed to start worker:", e.message);

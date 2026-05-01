@@ -1261,8 +1261,12 @@ async function handleZApiWebhook(req: Request, res: Response) {
       return res.status(400).json({ error: "Missing sessionId in path" });
     }
 
+    // Redact PII em logs públicos: telefone reduzido a 4 primeiros dígitos.
+    // Mantém o suficiente pra correlacionar tracing sem expor o número inteiro.
+    const safePhone = body?.phone ? `${String(body.phone).substring(0, 4)}***` : "EMPTY";
+    const safeMsgId = body?.messageId ? `${String(body.messageId).substring(0, 8)}…` : "EMPTY";
     console.log(`[Webhook /zapi] Received | Session: ${sessionId} | Path: ${req.path} | Event: ${eventType || 'auto-detect'}`);
-    console.log(`[Webhook /zapi] RAW PAYLOAD | phone: ${body?.phone || 'EMPTY'} | chatId: ${body?.chatId || 'EMPTY'} | messageId: ${body?.messageId || 'EMPTY'} | fromMe: ${body?.fromMe} | type: ${body?.type || 'EMPTY'} | keys: ${Object.keys(body || {}).join(',')}`);
+    console.log(`[Webhook /zapi] RAW PAYLOAD | phone: ${safePhone} | chatId: ${body?.chatId ? '***' : 'EMPTY'} | messageId: ${safeMsgId} | fromMe: ${body?.fromMe} | type: ${body?.type || 'EMPTY'} | keys: ${Object.keys(body || {}).join(',')}`);
 
     // Verify this session is actually using Z-API provider
     const providerType = await resolveProviderTypeForSession(sessionId);

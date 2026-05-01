@@ -35,12 +35,26 @@ import type {
 } from "./types";
 
 import IORedis from "ioredis";
+import { Agent as HttpsAgent } from "node:https";
 
 // ════════════════════════════════════════════════════════════
 // CONFIGURATION
 // ════════════════════════════════════════════════════════════
 
 const ZAPI_BASE_URL = "https://api.z-api.io";
+
+// HTTPS keep-alive agent — reaproveita conexão TCP entre requisições.
+// Sem keep-alive, cada call à Z-API faz 3-way handshake + TLS (~80-150ms extra).
+// Com 50 req/min em pico, isso era ~5-7s/min de overhead. node-fetch (undici)
+// já reusa por padrão a partir do Node 18, mas declarar agent explícito garante
+// keepAlive=true e tunelamento estável atrás de proxy.
+const zapiHttpsAgent = new HttpsAgent({
+  keepAlive: true,
+  keepAliveMsecs: 30_000,
+  maxSockets: 50,
+  maxFreeSockets: 10,
+  timeout: 30_000,
+});
 
 // ── Redis cache pra enrichment de contato (getContactProfile / phoneExists) ──
 const PROFILE_CACHE_TTL_SEC = 24 * 60 * 60;
@@ -175,12 +189,16 @@ async function zapiFetch(
         headers,
         body: opts.body ? JSON.stringify(opts.body) : undefined,
         signal: controller.signal,
+        // @ts-expect-error - Node fetch supports `agent` for keep-alive
+        agent: zapiHttpsAgent,
       });
 
       clearTimeout(timer);
 
       if (!response.ok) {
-        const text = await response.text().catch(() => "");
+        const rawText = await response.text().catch(() => "");
+        // Redact possíveis tokens em mensagens de erro (defense-in-depth p/ logs).
+        const text = rawText.replace(/([A-F0-9]{20,}|"token"\s*:\s*"[^"]+"|"clientToken"\s*:\s*"[^"]+")/gi, "[REDACTED]");
         const status = response.status;
         // Retry on 429 (rate limit) and 5xx (server errors)
         if ((status === 429 || status >= 500) && attempt < maxRetries) {
