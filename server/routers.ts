@@ -1653,30 +1653,29 @@ export const appRouter = router({
         await db.update(tenants).set({ settingsJson: currentSettings }).where(eq(tenants.id, getTenantId(ctx)));
         return { success: true };
       }),
-    // ─── Identificação do atendente nas mensagens (prefixo) ───
+    // ─── Identificação do atendente nas mensagens (negrito acima do texto) ───
+    // Formato: *Nome do Atendente*\nMensagem (WhatsApp renderiza nome em negrito).
+    // Sem template/tags — usa o nome direto do user. Toggle on/off por sessão.
     getAgentNameSettings: sessionTenantProcedure
       .input(z.object({ sessionId: z.string() }))
       .query(async ({ input, ctx }) => {
         const db = await (await import("./db")).getDb();
-        if (!db) return { showAgentNamePrefix: false, agentNameTemplate: "*{nome}:* " };
+        if (!db) return { showAgentNamePrefix: false };
         const { whatsappSessions } = await import("../drizzle/schema");
         const { eq, and } = await import("drizzle-orm");
         const [row] = await db.select({
           showAgentNamePrefix: whatsappSessions.showAgentNamePrefix,
-          agentNameTemplate: whatsappSessions.agentNameTemplate,
         }).from(whatsappSessions)
           .where(and(eq(whatsappSessions.sessionId, input.sessionId), eq(whatsappSessions.tenantId, getTenantId(ctx))))
           .limit(1);
         return {
           showAgentNamePrefix: row?.showAgentNamePrefix ?? false,
-          agentNameTemplate: row?.agentNameTemplate ?? "*{nome}:* ",
         };
       }),
     saveAgentNameSettings: sessionTenantWriteProcedure
       .input(z.object({
         sessionId: z.string(),
         showAgentNamePrefix: z.boolean(),
-        agentNameTemplate: z.string().min(1).max(255),
       }))
       .mutation(async ({ input, ctx }) => {
         const db = await (await import("./db")).getDb();
@@ -1685,7 +1684,6 @@ export const appRouter = router({
         const { eq, and } = await import("drizzle-orm");
         await db.update(whatsappSessions).set({
           showAgentNamePrefix: input.showAgentNamePrefix,
-          agentNameTemplate: input.agentNameTemplate,
           updatedAt: new Date(),
         }).where(and(
           eq(whatsappSessions.sessionId, input.sessionId),

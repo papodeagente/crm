@@ -79,7 +79,7 @@ describe("[T2] Status update — RECEIVED, READ, READ-SELF mapeados", () => {
   });
 });
 
-describe("[T3] Envio outbound + prefixo de agente", () => {
+describe("[T3] Envio outbound + identificação do atendente (negrito acima da msg)", () => {
   const evo = read("server/whatsappEvolution.ts");
   const routers = read("server/routers.ts");
 
@@ -88,9 +88,16 @@ describe("[T3] Envio outbound + prefixo de agente", () => {
     expect(evo).toMatch(/SELECT name FROM crm_users WHERE id = \$\{senderAgentId\}/);
   });
 
-  it("applyAgentNamePrefix renderiza tokens {nome} e {primeiroNome}", () => {
-    expect(evo).toMatch(/\.replace\(\/\\\{nome\\\}\/g,\s*fullName\)/);
-    expect(evo).toMatch(/\.replace\(\/\\\{primeiroNome\\\}\/g,\s*firstName\)/);
+  it("applyAgentNamePrefix gera formato '*Nome*\\nmensagem' (negrito + linha nova)", () => {
+    // Formato WhatsApp: *texto* = negrito; \n = quebra de linha → nome em linha própria.
+    expect(evo).toMatch(/return\s+`\*\$\{fullName\}\*\\n\$\{text\}`/);
+  });
+
+  it("applyAgentNamePrefix NÃO usa mais template de tags ({nome}/{primeiroNome})", () => {
+    const fn = evo.match(/private async applyAgentNamePrefix[\s\S]*?\n  \}/)?.[0] || "";
+    expect(fn).not.toMatch(/\{nome\}/);
+    expect(fn).not.toMatch(/\{primeiroNome\}/);
+    expect(fn).not.toMatch(/agentNameTemplate/);
   });
 
   it("sendTextMessage chama applyAgentNamePrefix antes de enviar", () => {
@@ -107,13 +114,17 @@ describe("[T3] Envio outbound + prefixo de agente", () => {
     expect(fn).toMatch(/applyAgentNamePrefix\(sessionId,\s*text,\s*senderAgentId\)/);
   });
 
-  it("Endpoint tRPC saveAgentNameSettings persiste showAgentNamePrefix + agentNameTemplate", () => {
+  it("Endpoint tRPC saveAgentNameSettings persiste apenas showAgentNamePrefix (sem template)", () => {
     expect(routers).toMatch(/saveAgentNameSettings:[\s\S]*?showAgentNamePrefix:\s*input\.showAgentNamePrefix/);
-    expect(routers).toMatch(/saveAgentNameSettings:[\s\S]*?agentNameTemplate:\s*input\.agentNameTemplate/);
+    // Não pode mais aceitar/persistir template
+    const fn = routers.match(/saveAgentNameSettings:[\s\S]*?return\s*\{\s*success:\s*true\s*\}/)?.[0] || "";
+    expect(fn).not.toMatch(/agentNameTemplate/);
   });
 
-  it("Endpoint tRPC getAgentNameSettings retorna defaults se row não existe", () => {
+  it("Endpoint tRPC getAgentNameSettings retorna apenas showAgentNamePrefix", () => {
     expect(routers).toMatch(/getAgentNameSettings:[\s\S]*?return\s*\{\s*showAgentNamePrefix:\s*row\?\.showAgentNamePrefix\s*\?\?\s*false/);
+    const fn = routers.match(/getAgentNameSettings:[\s\S]*?\}\),/)?.[0] || "";
+    expect(fn).not.toMatch(/agentNameTemplate:\s*row/);
   });
 });
 

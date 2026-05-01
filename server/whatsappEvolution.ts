@@ -316,37 +316,34 @@ class WhatsAppEvolutionManager extends EventEmitter {
   // ─── SEND MESSAGES ───
 
   /**
-   * Aplica o prefixo de identificação do atendente no texto, se configurado
-   * para a sessão. Faz lookup do nome do agente e renderiza o template
-   * (tokens {nome}, {primeiroNome}). Usado em sendText/sendMedia.
+   * Prefixa o nome do atendente em negrito, em linha própria acima do texto:
+   *   *Bruno Barbosa*
+   *   conteúdo da mensagem
    *
-   * Retorna texto original se: feature off, sem agentId, agente sem nome.
+   * O WhatsApp renderiza *texto* como negrito. Sem template/tags — usa o nome
+   * direto de crm_users.name. Gated pela flag whatsapp_sessions.showAgentNamePrefix.
+   * Coluna agentNameTemplate é mantida no schema apenas por compat de migração;
+   * não é mais lida.
    */
   private async applyAgentNamePrefix(sessionId: string, text: string, senderAgentId?: number): Promise<string> {
-    if (!senderAgentId) return text;
+    if (!senderAgentId || !text) return text;
     try {
       const db = await getDb();
       if (!db) return text;
       const settings = await db.execute(sql`
-        SELECT "showAgentNamePrefix", "agentNameTemplate"
+        SELECT "showAgentNamePrefix"
         FROM whatsapp_sessions WHERE "sessionId" = ${sessionId} LIMIT 1
       `);
       const row = ((settings as any).rows ?? settings)?.[0];
       if (!row?.showAgentNamePrefix) return text;
-      const template = (row.agentNameTemplate || "*{nome}:* ") as string;
 
       const userRow = await db.execute(sql`
         SELECT name FROM crm_users WHERE id = ${senderAgentId} LIMIT 1
       `);
       const fullName = (((userRow as any).rows ?? userRow)?.[0]?.name || "").trim();
       if (!fullName) return text;
-      const firstName = fullName.split(/\s+/)[0];
 
-      const prefix = template
-        .replace(/\{nome\}/g, fullName)
-        .replace(/\{primeiroNome\}/g, firstName);
-      // Se template já termina com espaço/quebra-de-linha, não força extra.
-      return text ? `${prefix}${text}` : text;
+      return `*${fullName}*\n${text}`;
     } catch (e: any) {
       console.warn("[applyAgentNamePrefix] fallback sem prefixo:", e?.message);
       return text;

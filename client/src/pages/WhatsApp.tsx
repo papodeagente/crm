@@ -20,7 +20,6 @@ import {
   Settings2, Trash2, Users, Info, Share2, Mic, Brain, AlertTriangle,
   Zap, Server, UserCircle2
 } from "lucide-react";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
@@ -706,9 +705,9 @@ export default function WhatsApp() {
 }
 
 /**
- * Card de configuração da assinatura do atendente nas mensagens enviadas.
- * Toggle pra ligar/desligar + input de template com tokens {nome}, {primeiroNome}.
- * Mostra preview ao vivo.
+ * Card de configuração da assinatura do atendente. Toggle simples — quando
+ * ligado, prefixa "*Nome do Atendente*\n" antes da mensagem (WhatsApp renderiza
+ * o nome em negrito, em linha própria acima do texto). Sem template/tags.
  */
 function AgentNamePrefixCard({ sessionId }: { sessionId: string }) {
   const utils = trpc.useUtils();
@@ -722,25 +721,14 @@ function AgentNamePrefixCard({ sessionId }: { sessionId: string }) {
   });
 
   const [enabled, setEnabled] = useState<boolean>(false);
-  const [template, setTemplate] = useState<string>("*{nome}:* ");
 
   useEffect(() => {
     if (settingsQ.data) {
       setEnabled(settingsQ.data.showAgentNamePrefix);
-      setTemplate(settingsQ.data.agentNameTemplate);
     }
   }, [settingsQ.data]);
 
-  const exampleName = "Bruno Barbosa";
-  const exampleFirst = "Bruno";
-  const renderedPrefix = template
-    .replace(/\{nome\}/g, exampleName)
-    .replace(/\{primeiroNome\}/g, exampleFirst);
-  const examplePreview = `${renderedPrefix}Olá! Como posso te ajudar hoje?`;
-
-  const dirty =
-    settingsQ.data &&
-    (settingsQ.data.showAgentNamePrefix !== enabled || settingsQ.data.agentNameTemplate !== template);
+  const dirty = settingsQ.data && settingsQ.data.showAgentNamePrefix !== enabled;
 
   return (
     <div className="mt-8">
@@ -762,8 +750,9 @@ function AgentNamePrefixCard({ sessionId }: { sessionId: string }) {
                   Mostrar nome do atendente nas mensagens
                 </Label>
                 <p className="text-[12px] text-muted-foreground mt-1 leading-relaxed max-w-md">
-                  Quando ativado, todas as mensagens de texto enviadas pela equipe levam um prefixo
-                  com o nome de quem está respondendo. Útil para o cliente saber com quem está falando.
+                  Quando ativado, cada mensagem enviada começa com o nome de quem respondeu, em
+                  <span className="font-bold"> negrito </span>
+                  numa linha acima do texto. O nome usado é o do perfil de cada atendente.
                 </p>
               </div>
             </div>
@@ -776,49 +765,17 @@ function AgentNamePrefixCard({ sessionId }: { sessionId: string }) {
             />
           </div>
 
-          {/* Template editor */}
-          <div className={`pt-4 border-t border-border/50 space-y-3 ${enabled ? "" : "opacity-60 pointer-events-none"}`}>
-            <div>
-              <Label htmlFor="agent-template" className="text-[13px] font-medium text-foreground">
-                Como o nome aparece
-              </Label>
-              <Input
-                id="agent-template"
-                value={template}
-                onChange={(e) => setTemplate(e.target.value)}
-                placeholder="*{nome}:* "
-                className="mt-1.5 font-mono text-[13px]"
-                maxLength={255}
-              />
-              <div className="flex flex-wrap gap-1 mt-2">
-                {[
-                  { token: "{nome}", desc: "Nome completo" },
-                  { token: "{primeiroNome}", desc: "Só o primeiro nome" },
-                ].map((t) => (
-                  <button
-                    key={t.token}
-                    type="button"
-                    onClick={() => setTemplate((prev) => prev + t.token)}
-                    className="text-[10px] px-2 py-0.5 rounded bg-muted hover:bg-muted/70 transition-colors font-mono"
-                    title={t.desc}
-                  >
-                    {t.token}
-                  </button>
-                ))}
+          {/* Preview */}
+          <div className={`pt-4 border-t border-border/50 ${enabled ? "" : "opacity-60"}`}>
+            <Label className="text-[13px] font-medium text-foreground">Pré-visualização</Label>
+            <div className="mt-1.5 rounded-lg border border-border/50 bg-muted/30 p-3">
+              <div className="rounded-lg bg-emerald-100 dark:bg-emerald-950/30 px-3 py-2 text-[13px] text-foreground max-w-md ml-auto whitespace-pre-wrap">
+                <span className="font-bold">Bruno Barbosa</span>
+                {"\n"}Olá! Como posso te ajudar hoje?
               </div>
-            </div>
-
-            {/* Preview */}
-            <div>
-              <Label className="text-[13px] font-medium text-foreground">Pré-visualização</Label>
-              <div className="mt-1.5 rounded-lg border border-border/50 bg-muted/30 p-3">
-                <div className="rounded-lg bg-emerald-100 dark:bg-emerald-950/30 px-3 py-2 text-[13px] text-foreground max-w-md ml-auto whitespace-pre-wrap">
-                  {examplePreview}
-                </div>
-                <p className="text-[10px] text-muted-foreground mt-2 text-right">
-                  Exemplo com nome "{exampleName}"
-                </p>
-              </div>
+              <p className="text-[10px] text-muted-foreground mt-2 text-right">
+                Exemplo — cada atendente vê o próprio nome
+              </p>
             </div>
           </div>
 
@@ -830,7 +787,6 @@ function AgentNamePrefixCard({ sessionId }: { sessionId: string }) {
               onClick={() => {
                 if (settingsQ.data) {
                   setEnabled(settingsQ.data.showAgentNamePrefix);
-                  setTemplate(settingsQ.data.agentNameTemplate);
                 }
               }}
               disabled={!dirty || saveMut.isPending}
@@ -839,7 +795,7 @@ function AgentNamePrefixCard({ sessionId }: { sessionId: string }) {
             </Button>
             <Button
               size="sm"
-              onClick={() => saveMut.mutate({ sessionId, showAgentNamePrefix: enabled, agentNameTemplate: template.trim() || "*{nome}:* " })}
+              onClick={() => saveMut.mutate({ sessionId, showAgentNamePrefix: enabled })}
               disabled={!dirty || saveMut.isPending}
             >
               {saveMut.isPending ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null}
