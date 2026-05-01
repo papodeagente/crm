@@ -1351,10 +1351,19 @@ async function handleZApiWebhook(req: Request, res: Response) {
 
     console.log(`[Webhook /zapi] Normalized: ${zapiEvent} → ${normalized.event} | Instance: ${instanceName} | JID: ${normalized.data?.key?.remoteJid || 'N/A'}`);
 
-    // Deduplication: skip if we've seen this exact event recently
+    // Deduplication: skip if we've seen this exact event recently.
+    //
+    // Status updates (messages.update) precisam incluir o status no key —
+    // Z-API manda vários webhooks pra mesma mensagem (sent → delivered →
+    // read). Sem incluir status, qualquer transição depois da primeira é
+    // marcada como duplicate, e mensagens ficam travadas no 1º estado.
     const msgId = normalized.data?.key?.id;
     if (msgId) {
-      const dedupKey = `${sessionId}:${normalized.event}:${msgId}`;
+      let dedupKey = `${sessionId}:${normalized.event}:${msgId}`;
+      if (normalized.event === "messages.update") {
+        const statusVal = normalized.data?.update?.status ?? normalized.data?.status ?? "_";
+        dedupKey = `${sessionId}:messages.update:${msgId}:${statusVal}`;
+      }
       if (isDuplicateWebhook(dedupKey)) {
         console.log(`[Webhook /zapi] Duplicate skipped: ${dedupKey}`);
         return res.status(200).json({ received: true, duplicate: true });
