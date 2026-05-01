@@ -829,25 +829,18 @@ export class ZApiProvider implements WhatsAppProvider {
   }
 
   async findMessages(
-    instanceName: string,
-    remoteJid: string,
-    opts?: { limit?: number; page?: number; lastMessageId?: string }
+    _instanceName: string,
+    _remoteJid: string,
+    _opts?: { limit?: number; page?: number; lastMessageId?: string }
   ): Promise<WAMessage[]> {
-    const phone = jidToPhone(remoteJid);
-    const amount = opts?.limit || 20;
-
-    // Z-API: GET /chat-messages/{phone}?amount=X&lastMessageId=Y
-    // Docs: https://developer.z-api.io/chats/get-message-chats
-    // Without lastMessageId, always returns the latest N messages.
-    // With lastMessageId, returns N messages older than the given message.
-    let url = `chat-messages/${phone}?amount=${amount}`;
-    if (opts?.lastMessageId) {
-      url += `&lastMessageId=${encodeURIComponent(opts.lastMessageId)}`;
-    }
-    const result = await zapiFetch(instanceName, url);
-    const messages = Array.isArray(result) ? result : [];
-
-    return messages.map(zapiMessageToCanonical);
+    // Z-API multi-device não expõe GET /chat-messages — retorna 400. Catch-up de
+    // mensagens hoje vem 100% por webhook (on-message-received). Manter a chamada
+    // só polui logs e métricas, então short-circuit aqui.
+    try {
+      const { metric } = await import("../metrics");
+      metric.inc("zapi_findmessages_skipped");
+    } catch { /* opcional */ }
+    return [];
   }
 
   // ─── Chat Actions ───

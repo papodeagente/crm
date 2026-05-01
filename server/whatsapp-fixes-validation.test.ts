@@ -201,3 +201,24 @@ describe("[Bonus] Conformidade Z-API aplicada", () => {
     expect(schema).toMatch(/uniqueIndex\("ws_tenant_user_unique"\)\.on\(t\.tenantId,\s*t\.userId\)/);
   });
 });
+
+describe("[F5] zapiProvider.findMessages — short-circuit para Z-API multi-device", () => {
+  const provider = read("server/providers/zapiProvider.ts");
+
+  it("findMessages NÃO chama mais zapiFetch('chat-messages/...')", () => {
+    const fn = provider.match(/async findMessages\([\s\S]*?\n  \}/)?.[0] || "";
+    expect(fn).toBeTruthy();
+    expect(fn).not.toMatch(/zapiFetch\(/);
+    expect(fn).not.toMatch(/chat-messages\//);
+  });
+
+  it("findMessages retorna [] (vazio) para evitar 400 em multi-device", () => {
+    const fn = provider.match(/async findMessages\([\s\S]*?\n  \}/)?.[0] || "";
+    expect(fn).toMatch(/return \[\];/);
+  });
+
+  it("emite métrica zapi_findmessages_skipped pra observabilidade", () => {
+    const fn = provider.match(/async findMessages\([\s\S]*?\n  \}/)?.[0] || "";
+    expect(fn).toMatch(/zapi_findmessages_skipped/);
+  });
+});
