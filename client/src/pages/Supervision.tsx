@@ -59,7 +59,11 @@ export default function Supervision() {
   const sessionsQ = trpc.whatsapp.sessions.useQuery();
   const sessions = (sessionsQ.data as any[] || []);
   const onlineSessions = sessions.filter((s: any) => s.status === "open" || s.status === "connected");
-  const activeSessionId = selectedSession || onlineSessions[0]?.sessionId || "";
+  // Fallback: se não há sessão conectada, usa qualquer sessão do tenant (mostra
+  // agentes mesmo offline em vez de tela em branco). Evita confusão "sumiu todo
+  // mundo" quando o WA cai.
+  const activeSessionId = selectedSession || onlineSessions[0]?.sessionId || sessions[0]?.sessionId || "";
+  const activeSessionOffline = activeSessionId && !onlineSessions.find((s: any) => s.sessionId === activeSessionId);
 
   // Get agent workload
   const workloadQ = trpc.whatsapp.supervision.agentWorkload.useQuery(
@@ -187,21 +191,40 @@ export default function Supervision() {
             </div>
           </div>
 
-          {/* Session selector */}
-          {onlineSessions.length > 1 && (
+          {/* Session selector — mostra sempre que há mais de 1 sessão (online ou não) */}
+          {sessions.length > 1 && (
             <select
               value={activeSessionId}
               onChange={(e) => setSelectedSession(e.target.value)}
               className="px-3 py-2 bg-muted/50 border border-border rounded-lg text-[13px] text-foreground outline-none"
             >
-              {onlineSessions.map((s: any) => (
-                <option key={s.sessionId} value={s.sessionId}>
-                  {s.instanceName || s.sessionId}
-                </option>
-              ))}
+              {sessions.map((s: any) => {
+                const online = s.status === "open" || s.status === "connected";
+                return (
+                  <option key={s.sessionId} value={s.sessionId}>
+                    {online ? "🟢" : "⚪"} {s.instanceName || s.sessionId}
+                  </option>
+                );
+              })}
             </select>
           )}
         </div>
+
+        {/* Banner: WhatsApp desconectado */}
+        {activeSessionOffline && (
+          <div className="mb-3 flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[12px]">
+            <AlertCircle className="h-4 w-4 text-amber-500 shrink-0" />
+            <span className="text-amber-700 dark:text-amber-200 flex-1">
+              WhatsApp desconectado. Os dados de atendimento abaixo refletem o estado atual, mas mensagens novas estão pausadas.
+            </span>
+            <button
+              onClick={() => setLocation("/whatsapp")}
+              className="text-[11px] font-semibold text-amber-700 dark:text-amber-200 hover:underline shrink-0"
+            >
+              Reconectar
+            </button>
+          </div>
+        )}
 
         {/* ─── KPI Cards ─── */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
