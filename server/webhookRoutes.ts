@@ -1261,6 +1261,15 @@ async function handleZApiWebhook(req: Request, res: Response) {
       return res.status(400).json({ error: "Missing sessionId in path" });
     }
 
+    // Métrica: contagem de webhooks recebidos por (event, session)
+    try {
+      const { metric } = await import("./metrics");
+      metric.inc("webhook_received", {
+        event: eventType || body?.type || "unknown",
+        session: sessionId,
+      });
+    } catch { /* metrics opcional, jamais bloqueia webhook */ }
+
     // Redact PII em logs públicos: telefone reduzido a 4 primeiros dígitos.
     // Mantém o suficiente pra correlacionar tracing sem expor o número inteiro.
     const safePhone = body?.phone ? `${String(body.phone).substring(0, 4)}***` : "EMPTY";

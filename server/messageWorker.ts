@@ -1063,6 +1063,10 @@ async function processStatusUpdate(session: SessionInfo, data: any): Promise<voi
         // que ainda não mapeamos). Pula em vez de assumir "sent".
         if (rawStatus < 0) {
           console.warn(`[Worker] Unknown numeric status ${rawStatus} — skipping update for ${messageId}`);
+          try {
+            const { metric } = await import("./metrics");
+            metric.inc("status_update_dropped", { reason: "unknown_numeric" });
+          } catch { /* opcional */ }
           continue;
         }
         newStatus = NUMERIC_STATUS_MAP[rawStatus];
@@ -1105,6 +1109,17 @@ async function processStatusUpdate(session: SessionInfo, data: any): Promise<voi
         const currentOrder = STATUS_ORDER[currentMsg.status || ""] ?? -1;
         if (newStatusOrder <= currentOrder) {
           console.log(`[Worker] Status update SKIPPED (monotonic): ${messageId} ${currentMsg.status}(${currentOrder}) -> ${newStatus}(${newStatusOrder}) — would regress`);
+          // Métrica: contagem de status updates dropados por motivo.
+          // Se o número crescer fora de proporção, é sinal de bug
+          // (ex.: novo status Z-API que não mapeamos).
+          try {
+            const { metric } = await import("./metrics");
+            metric.inc("status_update_dropped", {
+              reason: "monotonic",
+              from: currentMsg.status || "null",
+              to: newStatus || "null",
+            });
+          } catch { /* opcional */ }
           continue;
         }
       }
@@ -1116,6 +1131,10 @@ async function processStatusUpdate(session: SessionInfo, data: any): Promise<voi
           eq(waMessages.sessionId, sessionId),
           eq(waMessages.messageId, messageId)
         ));
+      try {
+        const { metric } = await import("./metrics");
+        metric.inc("status_update_applied", { status: newStatus });
+      } catch { /* opcional */ }
 
       // Update lastStatus in wa_conversations ONLY if this message is the LAST outgoing message.
       // This prevents status updates for older messages from corrupting the preview.

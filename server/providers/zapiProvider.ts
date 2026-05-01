@@ -182,6 +182,7 @@ async function zapiFetch(
 
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeout);
+    const callStart = Date.now();
 
     try {
       const response = await fetch(url, {
@@ -194,6 +195,18 @@ async function zapiFetch(
       });
 
       clearTimeout(timer);
+
+      // Métrica: latência da chamada Z-API agrupada por endpoint family
+      // (separar query strings/IDs pra não explodir cardinality).
+      try {
+        const endpointKey = endpoint.split("/")[0].split("?")[0];
+        const { metric } = await import("../metrics");
+        metric.timing("zapi_call_ms", Date.now() - callStart, {
+          endpoint: endpointKey,
+          method,
+          status: response.status,
+        });
+      } catch { /* opcional */ }
 
       if (!response.ok) {
         const rawText = await response.text().catch(() => "");

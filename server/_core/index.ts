@@ -521,6 +521,9 @@ async function startServer() {
       console.warn("[WaStatusSched] init fail:", e?.message);
     });
 
+    // Metrics flush — emite [METRIC] no log a cada 60s
+    import("../metrics").then(m => m.startMetricsFlush()).catch(() => {});
+
     // Recurring appointment generator (daily)
     import("../services/recurringAppointmentService").then(m => m.startRecurringAppointmentScheduler());
 
