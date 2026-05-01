@@ -564,25 +564,11 @@ async function startServer() {
       whatsappManager.autoRestoreSessions().catch(e => {
         console.error("[WA AutoRestore] Error:", e);
       });
-      // Start fast polling (60s) — PRIMARY mechanism for near-real-time messages
-      // Evolution API webhooks are unreliable, so we poll the most recent chats frequently
-      // Increased from 30s to 60s to reduce Evolution API load (~50% reduction)
-      whatsappManager.startFastPoll(60 * 1000); // Every 60 seconds
-
-      // Start periodic deep sync to catch anything FastPoll missed
-      // Increased from 5min to 10min to reduce Evolution API load
-      whatsappManager.startPeriodicSync(10 * 60 * 1000); // Every 10 minutes
-
-      // Start safe message reconciliation (every 3 min, max 20 convs, 10 msgs/conv)
-      import("../messageReconciliation").then(({ startReconciliation }) => {
-        startReconciliation(() => {
-          const sessMap = new Map<string, { sessionId: string; tenantId: number; instanceName: string; status: string }>();
-          for (const s of whatsappManager.getAllSessions()) {
-            sessMap.set(s.sessionId, { sessionId: s.sessionId, tenantId: s.tenantId, instanceName: s.instanceName, status: s.status });
-          }
-          return sessMap;
-        });
-      }).catch(e => console.error("[Reconciliation] Failed to start:", e));
+      // [F6] Catch-up via polling/sync/reconciliation desativado.
+      // Z-API multi-device não expõe /chat-messages (findMessages é no-op em F5),
+      // então fastPoll, periodicSync e reconciliation só consumiam CPU sem inserir
+      // nada. Webhooks são a única fonte de mensagens novas (validado em smoke
+      // test E2E). Para reativar (ex.: novo provider), restaurar este bloco.
     }, 10_000);
   });
 }
