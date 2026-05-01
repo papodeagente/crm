@@ -1,14 +1,17 @@
 import { describe, expect, it, beforeEach, vi } from "vitest";
-import { metric, _snapshot, stopMetricsFlush } from "./metrics";
+import { metric, _snapshot, _totalSnapshot, _resetForTests, renderPrometheus, stopMetricsFlush } from "./metrics";
 
 describe("metrics", () => {
   beforeEach(() => {
-    // Limpa o estado entre testes (flush final + clear)
+    // Limpa o estado entre testes (window + totais)
     stopMetricsFlush();
-    // Snapshot zero
+    _resetForTests();
     const snap = _snapshot();
     expect(Object.keys(snap.counters).length).toBe(0);
     expect(Object.keys(snap.histograms).length).toBe(0);
+    const total = _totalSnapshot();
+    expect(Object.keys(total.counters).length).toBe(0);
+    expect(Object.keys(total.histograms).length).toBe(0);
   });
 
   it("inc agrega counters por tags", () => {
@@ -63,5 +66,52 @@ describe("metrics", () => {
     const snap = _snapshot();
     // Mesma chave canônica
     expect(snap.counters["evt|a=1|b=2"]).toBe(2);
+  });
+
+  // ─── [F7] Totais cumulativos + Prometheus ───
+  it("totais NÃO zeram após flush (counters monotônicos)", () => {
+    metric.inc("hits", { route: "/x" }, 7);
+    metric.timing("dur_ms", 100, { route: "/x" });
+
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    stopMetricsFlush(); // dispara flush e zera window
+    logSpy.mockRestore();
+
+    // Window zerou
+    const win = _snapshot();
+    expect(Object.keys(win.counters).length).toBe(0);
+    expect(Object.keys(win.histograms).length).toBe(0);
+
+    // Totais permanecem
+    const total = _totalSnapshot();
+    expect(total.counters["hits|route=/x"]).toBe(7);
+    expect(total.histograms["dur_ms|route=/x"].count).toBe(1);
+    expect(total.histograms["dur_ms|route=/x"].sum).toBe(100);
+  });
+
+  it("renderPrometheus produz formato exposition válido", () => {
+    metric.inc("requests_total", { method: "POST", status: "200" }, 3);
+    metric.timing("latency_ms", 150, { route: "send-text" });
+    metric.timing("latency_ms", 250, { route: "send-text" });
+
+    const out = renderPrometheus();
+    // Tipos declarados
+    expect(out).toContain("# TYPE requests_total counter");
+    expect(out).toContain("# TYPE latency_ms_count counter");
+    expect(out).toContain("# TYPE crm_metrics_uptime_seconds gauge");
+    // Valores com labels formatados (key="value")
+    expect(out).toMatch(/requests_total\{method="POST",status="200"\} 3/);
+    expect(out).toMatch(/latency_ms_count\{route="send-text"\} 2/);
+    expect(out).toMatch(/latency_ms_sum\{route="send-text"\} 400/);
+    expect(out).toMatch(/latency_ms_max\{route="send-text"\} 250/);
+    // Heartbeat presente
+    expect(out).toMatch(/crm_metrics_uptime_seconds \d+/);
+  });
+
+  it("renderPrometheus escapa aspas e barras em label values", () => {
+    metric.inc("evt", { msg: 'a"b\\c' });
+    const out = renderPrometheus();
+    // \" e \\
+    expect(out).toContain('msg="a\\"b\\\\c"');
   });
 });

@@ -397,6 +397,27 @@ async function startServer() {
     }
   });
 
+  // [F7] Métricas cumulativas estilo Prometheus.
+  // Auth: header "Authorization: Bearer <METRICS_TOKEN>" OU query ?token=...
+  // Default response: text/plain Prometheus exposition. Use ?format=json para JSON.
+  app.get("/api/metrics", async (req, res) => {
+    const expected = process.env.METRICS_TOKEN;
+    if (!expected) {
+      return res.status(503).type("text/plain").send("METRICS_TOKEN não configurado\n");
+    }
+    const headerToken = (req.headers.authorization || "").replace(/^Bearer\s+/i, "");
+    const queryToken = typeof req.query.token === "string" ? req.query.token : "";
+    const provided = headerToken || queryToken;
+    if (provided !== expected) {
+      return res.status(401).type("text/plain").send("Unauthorized\n");
+    }
+    const { renderPrometheus, _totalSnapshot } = await import("../metrics");
+    if (req.query.format === "json") {
+      return res.json(_totalSnapshot());
+    }
+    res.type("text/plain; version=0.0.4").send(renderPrometheus());
+  });
+
   // REST API endpoints for external integration
   app.get("/api/v1/status/:sessionId", (req, res) => {
     const session = whatsappManager.getSession(req.params.sessionId);

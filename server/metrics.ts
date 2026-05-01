@@ -27,6 +27,11 @@ interface HistogramBucket {
 
 const counters = new Map<CounterKey, number>();
 const histograms = new Map<CounterKey, HistogramBucket>();
+// Totais cumulativos desde o boot — não zeram no flush. Servem ao endpoint
+// /api/metrics (estilo Prometheus, que espera counters monotônicos).
+const totalCounters = new Map<CounterKey, number>();
+const totalHistograms = new Map<CounterKey, HistogramBucket>();
+const bootedAt = new Date();
 const FLUSH_INTERVAL_MS = 60_000;
 let flushHandle: NodeJS.Timeout | null = null;
 
@@ -47,25 +52,31 @@ function parseKey(key: string): { name: string; tagsStr: string } {
   };
 }
 
+function bumpHistogram(map: Map<CounterKey, HistogramBucket>, key: string, valueMs: number): void {
+  let h = map.get(key);
+  if (!h) {
+    h = { count: 0, sum: 0, min: valueMs, max: valueMs };
+    map.set(key, h);
+  }
+  h.count++;
+  h.sum += valueMs;
+  if (valueMs < h.min) h.min = valueMs;
+  if (valueMs > h.max) h.max = valueMs;
+}
+
 export const metric = {
-  /** Incrementa um counter. */
+  /** Incrementa um counter (atualiza window flush + total cumulativo). */
   inc(name: string, tags?: Tags, by = 1): void {
     const key = makeKey(name, tags);
     counters.set(key, (counters.get(key) ?? 0) + by);
+    totalCounters.set(key, (totalCounters.get(key) ?? 0) + by);
   },
 
   /** Registra um valor numérico (latência, tamanho, etc). */
   timing(name: string, valueMs: number, tags?: Tags): void {
     const key = makeKey(name, tags);
-    let h = histograms.get(key);
-    if (!h) {
-      h = { count: 0, sum: 0, min: valueMs, max: valueMs };
-      histograms.set(key, h);
-    }
-    h.count++;
-    h.sum += valueMs;
-    if (valueMs < h.min) h.min = valueMs;
-    if (valueMs > h.max) h.max = valueMs;
+    bumpHistogram(histograms, key, valueMs);
+    bumpHistogram(totalHistograms, key, valueMs);
   },
 };
 
@@ -105,11 +116,90 @@ export function stopMetricsFlush(): void {
   flush(); // flush final
 }
 
-/** Snapshot pra debug/tests sem zerar. */
+/** Reseta tudo (window + totais). Apenas para testes. */
+export function _resetForTests(): void {
+  counters.clear();
+  histograms.clear();
+  totalCounters.clear();
+  totalHistograms.clear();
+}
+
+/** Snapshot pra debug/tests sem zerar (window de 60s). */
 export function _snapshot(): { counters: Record<string, number>; histograms: Record<string, HistogramBucket> } {
   const c: Record<string, number> = {};
   const h: Record<string, HistogramBucket> = {};
   for (const [k, v] of counters) c[k] = v;
   for (const [k, v] of histograms) h[k] = { ...v };
   return { counters: c, histograms: h };
+}
+
+/** Snapshot dos totais cumulativos (não zera). Pra endpoint HTTP estilo Prometheus. */
+export function _totalSnapshot(): {
+  counters: Record<string, number>;
+  histograms: Record<string, HistogramBucket>;
+  bootedAt: string;
+} {
+  const c: Record<string, number> = {};
+  const h: Record<string, HistogramBucket> = {};
+  for (const [k, v] of totalCounters) c[k] = v;
+  for (const [k, v] of totalHistograms) h[k] = { ...v };
+  return { counters: c, histograms: h, bootedAt: bootedAt.toISOString() };
+}
+
+function escapeLabelValue(v: string): string {
+  return v.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\n/g, "\\n");
+}
+
+function keyToPromLabels(key: string): { name: string; labels: string } {
+  const idx = key.indexOf("|");
+  if (idx < 0) return { name: key, labels: "" };
+  const name = key.slice(0, idx);
+  const pairs = key
+    .slice(idx + 1)
+    .split("|")
+    .map(p => {
+      const eq = p.indexOf("=");
+      if (eq < 0) return null;
+      const k = p.slice(0, eq);
+      const v = p.slice(eq + 1);
+      return `${k}="${escapeLabelValue(v)}"`;
+    })
+    .filter(Boolean) as string[];
+  return { name, labels: pairs.length ? `{${pairs.join(",")}}` : "" };
+}
+
+/** Renderiza totais no formato text/plain do Prometheus exposition. */
+export function renderPrometheus(): string {
+  const lines: string[] = [];
+  const seenCounter = new Set<string>();
+  for (const [k, v] of totalCounters) {
+    const { name, labels } = keyToPromLabels(k);
+    if (!seenCounter.has(name)) {
+      lines.push(`# TYPE ${name} counter`);
+      seenCounter.add(name);
+    }
+    lines.push(`${name}${labels} ${v}`);
+  }
+
+  const seenSummary = new Set<string>();
+  for (const [k, h] of totalHistograms) {
+    const { name, labels } = keyToPromLabels(k);
+    if (!seenSummary.has(name)) {
+      lines.push(`# TYPE ${name}_count counter`);
+      lines.push(`# TYPE ${name}_sum counter`);
+      lines.push(`# TYPE ${name}_min gauge`);
+      lines.push(`# TYPE ${name}_max gauge`);
+      seenSummary.add(name);
+    }
+    lines.push(`${name}_count${labels} ${h.count}`);
+    lines.push(`${name}_sum${labels} ${h.sum}`);
+    lines.push(`${name}_min${labels} ${h.min}`);
+    lines.push(`${name}_max${labels} ${h.max}`);
+  }
+
+  // Heartbeat + uptime pra confirmar que o endpoint tá vivo
+  lines.push(`# TYPE crm_metrics_uptime_seconds gauge`);
+  lines.push(`crm_metrics_uptime_seconds ${Math.floor((Date.now() - bootedAt.getTime()) / 1000)}`);
+
+  return lines.join("\n") + "\n";
 }
