@@ -281,14 +281,21 @@ function mapStatusToNumber(status?: string): number {
       return 2; // SERVER_ACK
     case "DELIVERED":
     case "DELIVERY_ACK":
+    case "RECEIVED": // Z-API real envia "RECEIVED" para device-delivered
       return 3; // DELIVERY_ACK
     case "READ":
     case "READ_ACK":
+    case "READ-SELF": // multi-device ack — equivalente a READ
+    case "VIEWED":
       return 4; // READ
     case "PLAYED":
+    case "PLAYED-SELF":
       return 5; // PLAYED
     default:
-      return 2;
+      // Status desconhecido: NÃO assume "sent" (=2), retorna -1 pra
+      // sinalizar pro worker e o log de "Unknown status string" disparar.
+      // Antes: default 2 mascarava bugs novos da Z-API.
+      return -1;
   }
 }
 

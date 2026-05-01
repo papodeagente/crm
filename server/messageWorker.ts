@@ -1059,6 +1059,12 @@ async function processStatusUpdate(session: SessionInfo, data: any): Promise<voi
       let newStatus: string | undefined;
       const rawStatus = update?.update?.status ?? update?.status;
       if (typeof rawStatus === "number") {
+        // -1 = desconhecido vindo do normalizer (sinal explícito de status novo
+        // que ainda não mapeamos). Pula em vez de assumir "sent".
+        if (rawStatus < 0) {
+          console.warn(`[Worker] Unknown numeric status ${rawStatus} — skipping update for ${messageId}`);
+          continue;
+        }
         newStatus = NUMERIC_STATUS_MAP[rawStatus];
       } else if (typeof rawStatus === "string") {
         const upper = rawStatus.toUpperCase();
