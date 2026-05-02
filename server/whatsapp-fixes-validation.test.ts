@@ -213,6 +213,38 @@ describe("[Bonus] Conformidade Z-API aplicada", () => {
   });
 });
 
+describe("[Home] Agenda da Clínica substitui RFV (única fonte: crm_appointments)", () => {
+  const home = read("client/src/pages/Home.tsx");
+  const widget = read("client/src/components/home/HomeAgendaWidget.tsx");
+  const dialog = read("client/src/components/home/HomeAppointmentDialog.tsx");
+
+  it("Home importa HomeAgendaWidget e NÃO usa mais home.rfv", () => {
+    expect(home).toMatch(/import\s+HomeAgendaWidget\s+from/);
+    expect(home).toMatch(/<HomeAgendaWidget\s*\/>/);
+    expect(home).not.toMatch(/trpc\.home\.rfv\.useQuery/);
+    expect(home).not.toMatch(/Oportunidades RFV/);
+  });
+
+  it("Widget consome agenda.unified (mesma fonte da página /agenda)", () => {
+    expect(widget).toMatch(/trpc\.agenda\.unified\.useQuery/);
+  });
+
+  it("Dialog exige contato + negociação para habilitar 'Salvar'", () => {
+    // canSubmit precisa ter título, contactId, dealId, data e horários.
+    expect(dialog).toMatch(/canSubmit\s*=\s*[\s\S]*?title\.trim\(\)\.length\s*>\s*0[\s\S]*?!!contactId[\s\S]*?!!dealId/);
+  });
+
+  it("Dialog persiste em agenda.createAppointment (crm_appointments) com contactId+dealId", () => {
+    expect(dialog).toMatch(/trpc\.agenda\.createAppointment\.useMutation/);
+    expect(dialog).toMatch(/contactId,\s*\n\s*dealId,/);
+  });
+
+  it("Dialog mostra atalhos para /contatos e /negociacoes quando faltam", () => {
+    expect(dialog).toMatch(/href="\/contatos"/);
+    expect(dialog).toMatch(/href="\/negociacoes"/);
+  });
+});
+
 describe("[Inbox] Política de reabertura: cliente volta a falar → cai na FILA", () => {
   const dbFile = read("server/db.ts");
   const evo = read("server/whatsappEvolution.ts");

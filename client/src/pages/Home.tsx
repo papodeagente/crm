@@ -26,6 +26,7 @@ import {
   DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent,
 } from "@/components/ui/dropdown-menu";
 import TrialCountdownBanner from "@/components/TrialCountdownBanner";
+import HomeAgendaWidget from "@/components/home/HomeAgendaWidget";
 
 /* ─── Polling interval for real-time sync (60 seconds) ─── */
 const REFETCH_INTERVAL = 60_000;
@@ -406,11 +407,9 @@ export default function Home() {
     staleTime: 30000,
     refetchIntervalInBackground: false,
   });
-  const rfvQ = trpc.home.rfv.useQuery(undefined, {
-    refetchInterval: REFETCH_INTERVAL,
-    staleTime: 60000,
-    refetchIntervalInBackground: false,
-  });
+  // [Agenda Geral] RFV foi removido em prol da Agenda da Clínica — única fonte
+  // unificada (crm_appointments). HomeAgendaWidget cuida da query/renderização
+  // própria. Manter apenas o que ainda é consumido por outras seções.
   const departuresQ = trpc.home.upcomingDepartures.useQuery(execFilterInput, {
     refetchInterval: REFETCH_INTERVAL,
     staleTime: 60000,
@@ -429,7 +428,6 @@ export default function Home() {
 
   const exec = execQ.data;
   const tasks = tasksQ.data;
-  const rfv = rfvQ.data;
   const departures = departuresQ.data;
   const onboarding = onboardingQ.data;
   const loading = execQ.isLoading;
@@ -878,68 +876,10 @@ export default function Home() {
           </div>
         </section>
 
-        {/* ─── BLOCO 3: Oportunidades de Receita — RFV (4 cols) ─── */}
-        <section className="lg:col-span-4">
-          <div className="surface p-5 h-full">
-            <div className="flex items-center gap-2.5 mb-5">
-              <div className="h-9 w-9 rounded-xl flex items-center justify-center bg-emerald-500/10">
-                <Sparkles className="h-4.5 w-4.5 text-emerald-500" />
-              </div>
-              <div>
-                <h2 className="text-[14px] font-bold text-foreground tracking-tight">Oportunidades RFV</h2>
-                <p className="text-[11px] text-muted-foreground">Ações comerciais imediatas</p>
-              </div>
-            </div>
-
-            {rfvQ.isLoading ? (
-              <div className="space-y-4">
-                {[1, 2, 3].map(i => <Skeleton key={i} className="h-20 w-full" />)}
-              </div>
-            ) : rfv ? (
-              <div className="space-y-3">
-                {/* Janela de Indicação */}
-                <Link href="/rfv?smartFilter=potencial_indicador">
-                  <div className="p-4 rounded-xl bg-emerald-500/5 border border-emerald-500/15 hover:bg-emerald-500/10 hover:border-emerald-500/25 transition-all cursor-pointer group">
-                    <div className="flex items-center justify-between mb-1.5">
-                      <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">Indicação</span>
-                      <ArrowRight className="h-3.5 w-3.5 text-emerald-500 opacity-0 group-hover:opacity-100 transition-opacity" />
-                    </div>
-                    <span className="text-[32px] font-extrabold text-foreground leading-none">{rfv.indicacao}</span>
-                    <p className="text-[11px] text-muted-foreground mt-1">Clientes prontos para indicar</p>
-                  </div>
-                </Link>
-
-                {/* Janela de Recuperação */}
-                <Link href="/rfv?smartFilter=potencial_ex_cliente">
-                  <div className="p-4 rounded-xl bg-amber-500/5 border border-amber-500/15 hover:bg-amber-500/10 hover:border-amber-500/25 transition-all cursor-pointer group">
-                    <div className="flex items-center justify-between mb-1.5">
-                      <span className="text-[11px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider">Recuperação</span>
-                      <ArrowRight className="h-3.5 w-3.5 text-amber-500 opacity-0 group-hover:opacity-100 transition-opacity" />
-                    </div>
-                    <span className="text-[32px] font-extrabold text-foreground leading-none">{rfv.recuperacao}</span>
-                    <p className="text-[11px] text-muted-foreground mt-1">Ex-clientes na janela de retorno</p>
-                  </div>
-                </Link>
-
-                {/* Janela de Recorrência */}
-                <Link href="/rfv?smartFilter=potencial_indicador_fiel">
-                  <div className="p-4 rounded-xl bg-purple-500/5 border border-purple-500/15 hover:bg-purple-500/10 hover:border-purple-500/25 transition-all cursor-pointer group">
-                    <div className="flex items-center justify-between mb-1.5">
-                      <span className="text-[11px] font-bold text-purple-600 dark:text-purple-400 uppercase tracking-wider">Recorrência</span>
-                      <ArrowRight className="h-3.5 w-3.5 text-purple-500 opacity-0 group-hover:opacity-100 transition-opacity" />
-                    </div>
-                    <span className="text-[32px] font-extrabold text-foreground leading-none">{rfv.recorrencia}</span>
-                    <p className="text-[11px] text-muted-foreground mt-1">Clientes fiéis com potencial</p>
-                  </div>
-                </Link>
-              </div>
-            ) : (
-              <div className="py-8 text-center text-muted-foreground text-sm">
-                RFV não configurado
-              </div>
-            )}
-          </div>
-        </section>
+        {/* ─── BLOCO 3: Agenda da Clínica (4 cols) ─── */}
+        {/* Espelho da única fonte de agenda (crm_appointments). Marcar consulta
+            por aqui exige contato + negociação — regra reforçada no dialog. */}
+        <HomeAgendaWidget />
       </div>
 
 
