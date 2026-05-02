@@ -3,7 +3,7 @@ import { trpc } from "@/lib/trpc";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Calendar, Clock, MapPin, User, CheckCircle2, Loader2 } from "lucide-react";
+import { Calendar, Clock, MapPin, User, CheckCircle2, XCircle, AlertTriangle, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import AppointmentDialog from "@/components/agenda/AppointmentDialog";
 
@@ -46,6 +46,12 @@ export default function AgendamentosTab({ contactId }: AgendamentosTabProps) {
   });
   const completeMut = trpc.agenda.completeAppointment.useMutation({
     onSuccess: () => { utils.agenda.unified.invalidate(); toast.success("Concluído"); },
+  });
+  const cancelMut = trpc.agenda.cancelAppointment.useMutation({
+    onSuccess: () => { utils.agenda.unified.invalidate(); toast.success("Cancelado"); },
+  });
+  const noShowMut = trpc.agenda.markNoShowAppointment.useMutation({
+    onSuccess: () => { utils.agenda.unified.invalidate(); toast.success("Marcado como falta"); },
   });
 
   // Filter only appointments for this contact
@@ -113,7 +119,7 @@ export default function AgendamentosTab({ contactId }: AgendamentosTabProps) {
                             {appt.location && <span className="flex items-center gap-1"><MapPin className="h-3 w-3" /> {appt.location}</span>}
                           </div>
                         </div>
-                        <div className="flex gap-1">
+                        <div className="flex gap-1 flex-wrap justify-end">
                           {(appt.status === "scheduled" || !appt.status) && (
                             <Button size="sm" variant="ghost" className="h-7 text-xs text-emerald-400" onClick={() => confirmMut.mutate({ id: appt.id })}>
                               <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Confirmar
@@ -121,7 +127,17 @@ export default function AgendamentosTab({ contactId }: AgendamentosTabProps) {
                           )}
                           {(appt.status === "scheduled" || appt.status === "confirmed" || !appt.status) && (
                             <Button size="sm" variant="ghost" className="h-7 text-xs text-blue-400" onClick={() => completeMut.mutate({ id: appt.id })}>
-                              Concluir
+                              <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Concluir
+                            </Button>
+                          )}
+                          {(appt.status === "scheduled" || appt.status === "confirmed") && (
+                            <Button size="sm" variant="ghost" className="h-7 text-xs text-orange-400" onClick={() => noShowMut.mutate({ id: appt.id })}>
+                              <AlertTriangle className="h-3.5 w-3.5 mr-1" /> Falta
+                            </Button>
+                          )}
+                          {(appt.status === "scheduled" || appt.status === "confirmed") && (
+                            <Button size="sm" variant="ghost" className="h-7 text-xs text-red-400" onClick={() => cancelMut.mutate({ id: appt.id })}>
+                              <XCircle className="h-3.5 w-3.5 mr-1" /> Cancelar
                             </Button>
                           )}
                         </div>

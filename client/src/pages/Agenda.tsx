@@ -32,6 +32,7 @@ import {
   DollarSign,
   CheckCircle2,
   XCircle,
+  AlertTriangle,
   Loader2,
 } from "lucide-react";
 import { useState, useMemo, useCallback, useRef } from "react";
@@ -161,6 +162,9 @@ export default function Agenda() {
   });
   const cancelMut = trpc.agenda.cancelAppointment.useMutation({
     onSuccess: () => { utils.agenda.unified.invalidate(); setDetailAppt(null); toast.success("Cancelado."); },
+  });
+  const noShowMut = trpc.agenda.markNoShowAppointment.useMutation({
+    onSuccess: () => { utils.agenda.unified.invalidate(); setDetailAppt(null); toast.success("Marcado como falta."); },
   });
 
   const tenantUsers = (tenantUsersQuery.data as any[]) || [];
@@ -600,6 +604,11 @@ export default function Agenda() {
                     {(status === "scheduled" || status === "confirmed" || status === "in_progress") && (
                       <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700" onClick={() => completeMut.mutate({ id: numericId })} disabled={completeMut.isPending}>
                         <CheckCircle2 className="h-4 w-4 mr-1" /> Concluir
+                      </Button>
+                    )}
+                    {(status === "scheduled" || status === "confirmed") && (
+                      <Button size="sm" variant="outline" className="text-orange-600" onClick={() => noShowMut.mutate({ id: numericId })} disabled={noShowMut.isPending}>
+                        <AlertTriangle className="h-4 w-4 mr-1" /> Falta
                       </Button>
                     )}
                     {(status === "scheduled" || status === "confirmed") && (

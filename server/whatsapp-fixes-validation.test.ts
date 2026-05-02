@@ -213,6 +213,71 @@ describe("[Bonus] Conformidade Z-API aplicada", () => {
   });
 });
 
+describe("[Agenda] 4 gatilhos de status (Confirmar/Concluir/Falta/Cancelar) + relatório", () => {
+  const routers = read("server/routers.ts");
+  const analyticsRouter = read("server/routers/analyticsRouter.ts");
+  const analyticsSvc = read("server/crmAnalytics.ts");
+  const tab = read("client/src/components/contact-profile/AgendamentosTab.tsx");
+  const agendaPage = read("client/src/pages/Agenda.tsx");
+  const reportPage = read("client/src/pages/AppointmentAnalytics.tsx");
+  const app = read("client/src/App.tsx");
+
+  it("Servidor: mutation agenda.markNoShowAppointment cria status no_show", () => {
+    expect(routers).toMatch(/markNoShowAppointment:\s*tenantWriteProcedure[\s\S]*?status:\s*"no_show"/);
+  });
+
+  it("AgendamentosTab tem os 4 botões: Confirmar / Concluir / Falta / Cancelar", () => {
+    expect(tab).toMatch(/confirmMut/);
+    expect(tab).toMatch(/completeMut/);
+    expect(tab).toMatch(/cancelMut/);
+    expect(tab).toMatch(/noShowMut/);
+    expect(tab).toMatch(/markNoShowAppointment/);
+    // Botões na UI
+    expect(tab).toMatch(/Confirmar/);
+    expect(tab).toMatch(/Concluir/);
+    expect(tab).toMatch(/Falta/);
+    expect(tab).toMatch(/Cancelar/);
+  });
+
+  it("Página /agenda modal tem botão Falta além dos 3 existentes", () => {
+    expect(agendaPage).toMatch(/noShowMut\s*=\s*trpc\.agenda\.markNoShowAppointment/);
+    expect(agendaPage).toMatch(/Falta/);
+  });
+
+  it("Servidor: procedure crmAnalytics.appointmentVendings exposta", () => {
+    expect(analyticsRouter).toMatch(/appointmentVendings:\s*tenantProcedure/);
+    expect(analyticsRouter).toMatch(/getAppointmentsAnalytics/);
+  });
+
+  it("Service: getAppointmentsAnalytics correlaciona crm_appointments e deals (won/lost) via dealId", () => {
+    expect(analyticsSvc).toMatch(/export async function getAppointmentsAnalytics/);
+    expect(analyticsSvc).toMatch(/LEFT JOIN deals d ON d\.id = ca\."dealId"/);
+    expect(analyticsSvc).toMatch(/d\.status = 'won'/);
+    expect(analyticsSvc).toMatch(/noShowRecoveredCount/);
+    // KPIs operacionais e comerciais
+    expect(analyticsSvc).toMatch(/attendanceRate/);
+    expect(analyticsSvc).toMatch(/noShowRate/);
+    expect(analyticsSvc).toMatch(/conversionRate/);
+    expect(analyticsSvc).toMatch(/wonRevenueCents/);
+    expect(analyticsSvc).toMatch(/potentialLossCents/);
+  });
+
+  it("Front: página AppointmentAnalytics consome a procedure e tem narrativa de gestor sênior", () => {
+    expect(reportPage).toMatch(/trpc\.crmAnalytics\.appointmentVendings\.useQuery/);
+    expect(reportPage).toMatch(/Diagnóstico do gestor/);
+    expect(reportPage).toMatch(/Próximas ações/);
+    // KPIs presentes
+    expect(reportPage).toMatch(/Comparecimento/);
+    expect(reportPage).toMatch(/No-show/);
+    expect(reportPage).toMatch(/Conversão pós-consulta/);
+    expect(reportPage).toMatch(/Recovery de no-show/);
+  });
+
+  it("App.tsx registra rota /analytics/appointments", () => {
+    expect(app).toMatch(/Route path="\/analytics\/appointments"/);
+  });
+});
+
 describe("[Agenda] Caixa única (AppointmentDialog) com inline-create em todos os pontos", () => {
   const home = read("client/src/pages/Home.tsx");
   const widget = read("client/src/components/home/HomeAgendaWidget.tsx");

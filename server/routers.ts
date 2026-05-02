@@ -5095,6 +5095,16 @@ ${customInstructions ? `\n--- INSTRUÇÕES PERSONALIZADAS ---\n${customInstructi
         const userId = ctx.saasUser?.userId || ctx.user!.id;
         return updateAppointment(getTenantId(ctx), userId, true, { id: input.id, status: "cancelled" } as any);
       }),
+    // [Falta] Marca a consulta como no_show (paciente não compareceu).
+    // Diferente de cancelled (cancelamento prévio): no_show conta na taxa
+    // de absenteísmo do relatório de Análises.
+    markNoShowAppointment: tenantWriteProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        const { updateAppointment } = await import("./services/agendaService");
+        const userId = ctx.saasUser?.userId || ctx.user!.id;
+        return updateAppointment(getTenantId(ctx), userId, true, { id: input.id, status: "no_show" } as any);
+      }),
     deleteAppointment: tenantWriteProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ ctx, input }) => {

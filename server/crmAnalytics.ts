@@ -595,3 +595,203 @@ export async function getStagnation(f: AnalyticsFilters, thresholdDays = 14, lis
     })),
   };
 }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   APPOINTMENTS × VENDAS — Análise correlacionando agenda e conversão
+   ═══════════════════════════════════════════════════════════════════════
+   Métricas pensadas para um gestor sênior de clínicas:
+   - Comparecimento, no-show, cancelamento (operacional)
+   - Conversão appointment → deal won (comercial)
+   - Recovery: clientes que faltaram e mesmo assim viraram venda
+   - Receita ganha e potencial perdido
+   ═══════════════════════════════════════════════════════════════════════ */
+
+export interface AppointmentStatusBreakdown {
+  status: string;
+  count: number;
+  withDeal: number;        // quantos têm dealId vinculado
+  wonDealsCount: number;   // dentre os que tinham deal, quantos viraram won
+  wonValueCents: number;   // receita gerada por esses wons
+}
+
+export interface AppointmentsAnalytics {
+  // Operacional
+  totalAppointments: number;          // todos no período (não cancelled-archived)
+  scheduled: number;
+  confirmed: number;
+  completed: number;
+  cancelled: number;
+  noShow: number;
+  inProgress: number;
+
+  // Taxas (em % com 1 casa decimal)
+  attendanceRate: number;             // completed / (completed + noShow) — só do que era pra acontecer
+  noShowRate: number;                 // noShow / (completed + noShow)
+  cancellationRate: number;           // cancelled / total
+  confirmationRate: number;           // confirmed+completed / scheduled+confirmed+completed+noShow
+
+  // Comercial: correlação com vendas
+  appointmentsWithDeal: number;       // têm dealId
+  wonDealsFromAppointments: number;   // appointments cujo deal é won
+  lostDealsFromAppointments: number;
+  openDealsFromAppointments: number;
+  conversionRate: number;             // won / (won+lost) dentre os que têm deal
+  wonRevenueCents: number;            // soma do valueCents dos deals won
+  potentialLossCents: number;         // soma do valueCents dos deals won/abertos perdidos por no_show
+  avgDaysAppointmentToWon: number;    // ciclo médio (do appointment até deal.updatedAt em won)
+
+  // Recovery
+  noShowRecoveredCount: number;       // appointments com status no_show cujo deal virou won
+  noShowRecoveryRate: number;         // recovered / total noShow
+
+  // Quebra por status
+  byStatus: AppointmentStatusBreakdown[];
+}
+
+export async function getAppointmentsAnalytics(f: AnalyticsFilters): Promise<AppointmentsAnalytics> {
+  const empty: AppointmentsAnalytics = {
+    totalAppointments: 0, scheduled: 0, confirmed: 0, completed: 0, cancelled: 0, noShow: 0, inProgress: 0,
+    attendanceRate: 0, noShowRate: 0, cancellationRate: 0, confirmationRate: 0,
+    appointmentsWithDeal: 0, wonDealsFromAppointments: 0, lostDealsFromAppointments: 0, openDealsFromAppointments: 0,
+    conversionRate: 0, wonRevenueCents: 0, potentialLossCents: 0, avgDaysAppointmentToWon: 0,
+    noShowRecoveredCount: 0, noShowRecoveryRate: 0,
+    byStatus: [],
+  };
+
+  const db = await getDb();
+  if (!db) return empty;
+
+  const tenantId = safeInt(f.tenantId);
+  if (!tenantId) return empty;
+
+  // Window: usa startAt do appointment para o filtro de data.
+  const dateFromCond = f.dateFrom ? `AND ca."startAt" >= '${f.dateFrom} 00:00:00'` : "";
+  const dateToCond = f.dateTo ? `AND ca."startAt" <= '${f.dateTo} 23:59:59'` : "";
+
+  // Agregada por status, com join opcional em deals.
+  const result = await db.execute(sql.raw(`
+    SELECT
+      ca.status AS status,
+      COUNT(*)::int AS count,
+      COUNT(ca."dealId") FILTER (WHERE ca."dealId" IS NOT NULL)::int AS "withDeal",
+      COUNT(*) FILTER (WHERE d.status = 'won')::int AS "wonDealsCount",
+      COUNT(*) FILTER (WHERE d.status = 'lost')::int AS "lostDealsCount",
+      COUNT(*) FILTER (WHERE d.status = 'open')::int AS "openDealsCount",
+      COALESCE(SUM(d."valueCents") FILTER (WHERE d.status = 'won'), 0)::bigint AS "wonValueCents",
+      COALESCE(AVG(EXTRACT(EPOCH FROM (d."updatedAt" - ca."startAt")) / 86400.0)
+        FILTER (WHERE d.status = 'won'), 0)::float AS "avgDaysToWon"
+    FROM crm_appointments ca
+    LEFT JOIN deals d ON d.id = ca."dealId" AND d."deletedAt" IS NULL
+    WHERE ca."tenantId" = ${tenantId}
+      AND ca."deletedAt" IS NULL
+      ${dateFromCond}
+      ${dateToCond}
+    GROUP BY ca.status
+  `));
+
+  const rows = rowsOf(result) as any[];
+  const byStatus: AppointmentStatusBreakdown[] = [];
+
+  let scheduled = 0, confirmed = 0, completed = 0, cancelled = 0, noShow = 0, inProgress = 0;
+  let total = 0;
+  let appointmentsWithDeal = 0;
+  let wonDealsFromAppointments = 0, lostDealsFromAppointments = 0, openDealsFromAppointments = 0;
+  let wonRevenueCents = 0;
+  let potentialLossCents = 0;
+  let weightedAvgDays = 0;
+
+  for (const r of rows) {
+    const cnt = Number(r.count) || 0;
+    const withDeal = Number(r.withDeal) || 0;
+    const won = Number(r.wonDealsCount) || 0;
+    const lost = Number(r.lostDealsCount) || 0;
+    const open = Number(r.openDealsCount) || 0;
+    const wonVal = Number(r.wonValueCents) || 0;
+    const avgD = Number(r.avgDaysToWon) || 0;
+
+    total += cnt;
+    appointmentsWithDeal += withDeal;
+    wonDealsFromAppointments += won;
+    lostDealsFromAppointments += lost;
+    openDealsFromAppointments += open;
+    wonRevenueCents += wonVal;
+    weightedAvgDays += avgD * won; // ponderado pelo número de wons em cada bucket
+
+    if (r.status === "scheduled") scheduled = cnt;
+    else if (r.status === "confirmed") confirmed = cnt;
+    else if (r.status === "completed") completed = cnt;
+    else if (r.status === "cancelled") cancelled = cnt;
+    else if (r.status === "no_show") noShow = cnt;
+    else if (r.status === "in_progress") inProgress = cnt;
+
+    byStatus.push({
+      status: String(r.status),
+      count: cnt,
+      withDeal,
+      wonDealsCount: won,
+      wonValueCents: wonVal,
+    });
+  }
+
+  // Recovery: deals won mesmo após no_show.
+  const recoveredRow = rowsOf(await db.execute(sql.raw(`
+    SELECT
+      COUNT(DISTINCT ca.id)::int AS cnt
+    FROM crm_appointments ca
+    INNER JOIN deals d ON d.id = ca."dealId" AND d."deletedAt" IS NULL AND d.status = 'won'
+    WHERE ca."tenantId" = ${tenantId}
+      AND ca."deletedAt" IS NULL
+      AND ca.status = 'no_show'
+      ${dateFromCond}
+      ${dateToCond}
+  `)))[0] as any;
+  const noShowRecoveredCount = Number(recoveredRow?.cnt) || 0;
+
+  // Loss potencial = valor de deals NÃO won (open+lost) em appointments no_show + cancelled.
+  const potentialRow = rowsOf(await db.execute(sql.raw(`
+    SELECT
+      COALESCE(SUM(d."valueCents"), 0)::bigint AS "potentialCents"
+    FROM crm_appointments ca
+    INNER JOIN deals d ON d.id = ca."dealId" AND d."deletedAt" IS NULL AND d.status IN ('open', 'lost')
+    WHERE ca."tenantId" = ${tenantId}
+      AND ca."deletedAt" IS NULL
+      AND ca.status IN ('no_show', 'cancelled')
+      ${dateFromCond}
+      ${dateToCond}
+  `)))[0] as any;
+  potentialLossCents = Number(potentialRow?.potentialCents) || 0;
+
+  // Cálculo das taxas.
+  const realised = completed + noShow; // o que era pra acontecer e aconteceu (ou não)
+  const attendanceRate = realised > 0 ? Math.round((completed / realised) * 1000) / 10 : 0;
+  const noShowRate = realised > 0 ? Math.round((noShow / realised) * 1000) / 10 : 0;
+  const cancellationRate = total > 0 ? Math.round((cancelled / total) * 1000) / 10 : 0;
+  const confirmedOrPast = confirmed + completed + noShow + scheduled;
+  const confirmationRate = confirmedOrPast > 0
+    ? Math.round(((confirmed + completed + noShow) / confirmedOrPast) * 1000) / 10
+    : 0;
+
+  const decided = wonDealsFromAppointments + lostDealsFromAppointments;
+  const conversionRate = decided > 0
+    ? Math.round((wonDealsFromAppointments / decided) * 1000) / 10
+    : 0;
+
+  const avgDaysAppointmentToWon = wonDealsFromAppointments > 0
+    ? Math.round(weightedAvgDays / wonDealsFromAppointments * 10) / 10
+    : 0;
+
+  const noShowRecoveryRate = noShow > 0
+    ? Math.round((noShowRecoveredCount / noShow) * 1000) / 10
+    : 0;
+
+  return {
+    totalAppointments: total,
+    scheduled, confirmed, completed, cancelled, noShow, inProgress,
+    attendanceRate, noShowRate, cancellationRate, confirmationRate,
+    appointmentsWithDeal,
+    wonDealsFromAppointments, lostDealsFromAppointments, openDealsFromAppointments,
+    conversionRate, wonRevenueCents, potentialLossCents, avgDaysAppointmentToWon,
+    noShowRecoveredCount, noShowRecoveryRate,
+    byStatus,
+  };
+}

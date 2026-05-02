@@ -5,7 +5,7 @@
 import { z } from "zod";
 import { router } from "../_core/trpc";
 import { tenantProcedure, tenantWriteProcedure, getTenantId } from "../_core/trpc";
-import { getAnalyticsSummary, getTopLossReasons, getPipelineFunnel, getDealsByPeriod, getFunnelConversion, getSalesRanking, getLeadSources, getForecast, getStagnation } from "../crmAnalytics";
+import { getAnalyticsSummary, getTopLossReasons, getPipelineFunnel, getDealsByPeriod, getFunnelConversion, getSalesRanking, getLeadSources, getForecast, getStagnation, getAppointmentsAnalytics } from "../crmAnalytics";
 import { getGoalsReport, generateGoalsAIAnalysis } from "../goalsAnalytics";
 import { getCrmLiveCover, getCrmLiveOperation } from "../crmLive";
 
@@ -218,5 +218,23 @@ export const analyticsRouter = router({
         ownerUserId: input?.ownerUserId,
         pipelineType: input?.pipelineType,
       }, input?.thresholdDays ?? 14, 10);
+    }),
+
+  /**
+   * Análise de Agendamentos × Vendas. Correlaciona status do appointment
+   * (confirmado/concluído/cancelado/falta) com a tabela de deals via dealId
+   * para gerar KPIs comerciais usados no relatório de Análises.
+   */
+  appointmentVendings: tenantProcedure
+    .input(z.object({
+      dateFrom: z.string().optional(),
+      dateTo: z.string().optional(),
+    }).optional())
+    .query(async ({ input, ctx }) => {
+      return getAppointmentsAnalytics({
+        tenantId: getTenantId(ctx),
+        dateFrom: input?.dateFrom,
+        dateTo: input?.dateTo,
+      });
     }),
 });
