@@ -213,6 +213,48 @@ describe("[Bonus] Conformidade Z-API aplicada", () => {
   });
 });
 
+describe("[Inbox] Badge da Fila bate com a lista (mesmos filtros)", () => {
+  const dbFile = read("server/db.ts");
+
+  // Conjunto de filtros que define "estar na fila" — fonte única de verdade.
+  // Se algum dia for preciso mudar, mude TUDO de uma vez (count + list +
+  // este teste). Evita o bug do "99+" com lista vazia (ghost rows).
+  const requiredFilters = [
+    /AND wc\."mergedIntoId" IS NULL/,
+    /AND wc\."isArchived" = false/,
+    /AND wc\."assignedUserId" IS NULL/,
+    /AND wc\.status IN \('open', 'pending'\)/,
+    /AND EXISTS \(\s*SELECT 1 FROM messages m\s*WHERE m\."sessionId" = wc\."sessionId"\s*AND m\."remoteJid" = wc\."remoteJid"\s*\)/,
+  ];
+
+  it("getQueueConversations (LIST) usa todos os filtros canônicos", () => {
+    const fn = dbFile.match(/export async function getQueueConversations[\s\S]*?^}/m)?.[0] || "";
+    expect(fn).toBeTruthy();
+    for (const re of requiredFilters) {
+      expect(fn).toMatch(re);
+    }
+  });
+
+  it("getQueueStats (COUNT + items) usa todos os filtros canônicos", () => {
+    const fn = dbFile.match(/export async function getQueueStats[\s\S]*?^}/m)?.[0] || "";
+    expect(fn).toBeTruthy();
+    // O count e a lista de items dentro de getQueueStats devem ambos satisfazer.
+    // Cada filtro precisa aparecer pelo menos 2x (count + items).
+    for (const re of requiredFilters) {
+      const matches = fn.match(new RegExp(re.source, "g"));
+      expect(matches, `filtro ${re} deve aparecer 2x em getQueueStats (count + items)`).toBeTruthy();
+      expect(matches!.length, `filtro ${re} aparece ${matches?.length}x em getQueueStats — esperado 2`).toBeGreaterThanOrEqual(2);
+    }
+  });
+
+  it("getQueueStats NÃO usa o filtro legado restritivo que causava o bug do 99+", () => {
+    const fn = dbFile.match(/export async function getQueueStats[\s\S]*?^}/m)?.[0] || "";
+    // Filtro antigo: '(wc."unreadCount" > 0 OR wc."queuedAt" IS NOT NULL)'.
+    // Foi removido da list em fix anterior; o stats ficou pra trás.
+    expect(fn).not.toMatch(/wc\."unreadCount" > 0 OR wc\."queuedAt" IS NOT NULL/);
+  });
+});
+
 describe("[DealDetail] Datas do Serviço espelham na agenda (sem botão redundante)", () => {
   const dealDetail = read("client/src/pages/DealDetail.tsx");
   const crmRouter = read("server/routers/crmRouter.ts");

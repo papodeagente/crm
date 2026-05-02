@@ -3174,12 +3174,20 @@ export async function getQueueStats(tenantId: number, sessionId: string) {
       WHERE m1."sessionId" = ${sessionId}
       AND m1."messageType" NOT IN ('protocolMessage','senderKeyDistributionMessage','messageContextInfo','reactionMessage','ephemeralMessage')
     ) lm ON lm."sessionId" = wc."sessionId" AND lm."remoteJid" = wc."remoteJid"
+    -- IMPORTANTE: filtros têm que ser idênticos aos de getQueueConversations
+    -- senão o badge "99+" aparece com lista vazia (ghost rows). Se mudar
+    -- aqui, mude lá também (e atualize o teste de regressão).
     WHERE wc."tenantId" = ${tenantId}
     AND wc."sessionId" = ${sessionId}
+    AND wc."mergedIntoId" IS NULL
+    AND wc."isArchived" = false
     AND wc."assignedUserId" IS NULL
     AND wc.status IN ('open', 'pending')
-    AND wc."mergedIntoId" IS NULL
-    AND (wc."unreadCount" > 0 OR wc."queuedAt" IS NOT NULL)
+    AND EXISTS (
+      SELECT 1 FROM messages m
+      WHERE m."sessionId" = wc."sessionId"
+        AND m."remoteJid" = wc."remoteJid"
+    )
   `);
   const countRows = rowsOf(countResult);
   // Get queue items with details — derive preview from wa_messages
@@ -3207,12 +3215,18 @@ export async function getQueueStats(tenantId: number, sessionId: string) {
       AND m1."messageType" NOT IN ('protocolMessage','senderKeyDistributionMessage','messageContextInfo','reactionMessage','ephemeralMessage')
     ) lm ON lm."sessionId" = wc."sessionId" AND lm."remoteJid" = wc."remoteJid"
     LEFT JOIN contacts c ON c.id = wc."contactId"
+    -- Mesmos filtros do count e do getQueueConversations.
     WHERE wc."tenantId" = ${tenantId}
     AND wc."sessionId" = ${sessionId}
+    AND wc."mergedIntoId" IS NULL
+    AND wc."isArchived" = false
     AND wc."assignedUserId" IS NULL
     AND wc.status IN ('open', 'pending')
-    AND wc."mergedIntoId" IS NULL
-    AND (wc."unreadCount" > 0 OR wc."queuedAt" IS NOT NULL)
+    AND EXISTS (
+      SELECT 1 FROM messages m
+      WHERE m."sessionId" = wc."sessionId"
+        AND m."remoteJid" = wc."remoteJid"
+    )
     ORDER BY COALESCE(wc."queuedAt", lm.timestamp, wc."lastMessageAt", wc."createdAt") ASC
     LIMIT 50
   `);
