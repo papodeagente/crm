@@ -4,6 +4,7 @@ import { useSocket } from "@/hooks/useSocket";
 import { useState, useMemo, useRef, useEffect } from "react";
 import WhatsAppChat from "@/components/WhatsAppChat";
 import { QuickSendDialog } from "@/components/whatsapp/QuickSendDialog";
+import AppointmentDialog from "@/components/agenda/AppointmentDialog";
 import { DealTimeline } from "@/components/DealTimeline";
 import { useRoute, useLocation, Link } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -271,6 +272,7 @@ export default function DealDetail() {
   const [showEditAccountDialog, setShowEditAccountDialog] = useState(false);
   const [contactDraft, setContactDraft] = useState({ name: "", phone: "", email: "", docId: "" });
   const [quickSendOpen, setQuickSendOpen] = useState(false);
+  const [appointmentDialogOpen, setAppointmentDialogOpen] = useState(false);
   const [accountDraft, setAccountDraft] = useState({ name: "" });
   const [contactMode, setContactMode] = useState<"create" | "link">("create");
   const [accountMode, setAccountMode] = useState<"create" | "link">("create");
@@ -1072,14 +1074,24 @@ export default function DealDetail() {
                     <ContactInfoRow icon={Phone} value={contact.phone} copyable whatsapp />
                   )}
                   {contact.phone && deal.contactId && (
-                    <button
-                      onClick={() => setQuickSendOpen(true)}
-                      className="flex items-center gap-1.5 text-[11px] text-emerald-700 hover:text-emerald-800 transition-colors"
-                      title="Enviar pela conta WhatsApp da clínica"
-                    >
-                      <MessageCircle className="h-3 w-3" />
-                      Enviar WhatsApp pela clínica
-                    </button>
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <button
+                        onClick={() => setQuickSendOpen(true)}
+                        className="flex items-center gap-1.5 text-[11px] text-emerald-700 hover:text-emerald-800 transition-colors"
+                        title="Enviar pela conta WhatsApp da clínica"
+                      >
+                        <MessageCircle className="h-3 w-3" />
+                        Enviar WhatsApp pela clínica
+                      </button>
+                      <button
+                        onClick={() => setAppointmentDialogOpen(true)}
+                        className="flex items-center gap-1.5 text-[11px] text-blue-600 hover:text-blue-700 transition-colors"
+                        title="Marcar consulta vinculada a esta negociação"
+                      >
+                        <Calendar className="h-3 w-3" />
+                        Marcar consulta
+                      </button>
+                    </div>
                   )}
                   {contact.email && (
                     <ContactInfoRow icon={Mail} value={contact.email} copyable />
@@ -2007,6 +2019,20 @@ export default function DealDetail() {
           onOpenChange={setQuickSendOpen}
         />
       ) : null}
+
+      {/* Marcar consulta — pré-preenche contato e negociação atuais.
+          Mesma fonte (crm_appointments) — aparece em /agenda, no widget
+          da home e no tab "Agendamentos" do contato. */}
+      {deal?.contactId && deal?.id && (
+        <AppointmentDialog
+          open={appointmentDialogOpen}
+          onClose={() => setAppointmentDialogOpen(false)}
+          defaultContactId={deal.contactId}
+          defaultDealId={deal.id}
+          defaultContactName={contact?.name || undefined}
+          defaultContactPhone={contact?.phone || undefined}
+        />
+      )}
     </div>
   );
 }

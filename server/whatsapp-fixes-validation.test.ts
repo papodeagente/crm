@@ -213,6 +213,30 @@ describe("[Bonus] Conformidade Z-API aplicada", () => {
   });
 });
 
+describe("[DealDetail] Botão 'Marcar consulta' ao lado do WhatsApp", () => {
+  const dealDetail = read("client/src/pages/DealDetail.tsx");
+  const dialog = read("client/src/components/agenda/AppointmentDialog.tsx");
+
+  it("AppointmentDialog aceita defaultDealId para pré-selecionar negociação", () => {
+    expect(dialog).toMatch(/defaultDealId\?:\s*number\s*\|\s*null/);
+    expect(dialog).toMatch(/setDealId\(defaultDealId\s*\|\|\s*null\)/);
+  });
+
+  it("DealDetail importa o dialog e tem state appointmentDialogOpen", () => {
+    expect(dealDetail).toMatch(/import\s+AppointmentDialog\s+from\s+"@\/components\/agenda\/AppointmentDialog"/);
+    expect(dealDetail).toMatch(/appointmentDialogOpen/);
+  });
+
+  it("DealDetail renderiza botão 'Marcar consulta' próximo ao 'Enviar WhatsApp'", () => {
+    // Bloco com os dois botões na mesma row.
+    expect(dealDetail).toMatch(/Enviar WhatsApp pela cl[ií]nica[\s\S]{0,400}Marcar consulta/);
+  });
+
+  it("DealDetail passa contato e negociação atuais como defaults", () => {
+    expect(dealDetail).toMatch(/<AppointmentDialog[\s\S]*?defaultContactId=\{deal\.contactId\}[\s\S]*?defaultDealId=\{deal\.id\}/);
+  });
+});
+
 describe("[Agenda] 4 gatilhos de status (Confirmar/Concluir/Falta/Cancelar) + relatório", () => {
   const routers = read("server/routers.ts");
   const analyticsRouter = read("server/routers/analyticsRouter.ts");

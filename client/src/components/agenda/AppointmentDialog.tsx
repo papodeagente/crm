@@ -27,6 +27,8 @@ interface AppointmentDialogProps {
   defaultDate?: Date;
   /** Pré-seleciona contato (ex.: ao abrir do tab do contato ou do inbox). */
   defaultContactId?: number | null;
+  /** Pré-seleciona negociação (ex.: ao abrir do detalhe da negociação). */
+  defaultDealId?: number | null;
   /** Pré-preenche o formulário de "criar contato" (ex.: telefone do whatsapp). */
   defaultContactPhone?: string;
   defaultContactName?: string;
@@ -48,6 +50,7 @@ export default function AppointmentDialog({
   onClose,
   defaultDate,
   defaultContactId,
+  defaultDealId,
   defaultContactPhone,
   defaultContactName,
   onSaved,
@@ -117,19 +120,21 @@ export default function AppointmentDialog({
     setNewContactPhone(defaultContactPhone || "");
     setNewDealTitle("");
     setContactId(defaultContactId || null);
-    setDealId(null);
+    setDealId(defaultDealId || null);
     const base = defaultDate || new Date();
     setDateStr(toLocalDateStr(base));
     const startHour = base.getHours() >= 7 && base.getHours() <= 20 ? base.getHours() : 9;
     setStartTime(`${String(startHour).padStart(2, "0")}:00`);
     setEndTime(`${String(startHour + 1).padStart(2, "0")}:00`);
-  }, [open, defaultDate, defaultContactId, defaultContactPhone, defaultContactName]);
+  }, [open, defaultDate, defaultContactId, defaultDealId, defaultContactPhone, defaultContactName]);
 
-  // Reset deal when contact changes (deal pertence ao contato selecionado)
+  // Reset deal quando o contato muda — exceto se o pai pré-selecionou
+  // contato + deal vinculados (caso do botão "Marcar consulta" no DealDetail).
   useEffect(() => {
+    if (defaultDealId && contactId === defaultContactId) return;
     setDealId(null);
     setDealMode("select");
-  }, [contactId]);
+  }, [contactId, defaultDealId, defaultContactId]);
 
   // Inline-create handlers
   const handleCreateContact = async () => {
