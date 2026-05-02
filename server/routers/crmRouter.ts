@@ -575,6 +575,25 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
           entityType: "deal",
           entityId: String(result?.id),
         });
+
+        // [Agenda Geral] Se a negociação nasceu já com Datas do Serviço,
+        // espelha em crm_appointments. Mesma lógica do update.
+        if (result?.id && (appointmentDate || followUpDate)) {
+          try {
+            const { syncDealServiceDates } = await import("../services/agendaService");
+            await syncDealServiceDates(getTenantId(ctx), {
+              dealId: result.id,
+              contactId: dealInput.contactId ?? null,
+              ownerUserId: dealInput.ownerUserId || ctx.saasUser?.userId || ctx.user.id,
+              dealTitle: input.title,
+              appointmentDate: appointmentDate ? new Date(appointmentDate) : null,
+              followUpDate: followUpDate ? new Date(followUpDate) : null,
+            });
+          } catch (e) {
+            console.error("[Agenda] syncDealServiceDates falhou (deal create):", e);
+          }
+        }
+
         return result;
       }),
     update: tenantWriteProcedure
@@ -623,6 +642,34 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
           updatePayload.expectedCloseAt = expectedCloseAt ? new Date(expectedCloseAt) : null;
         }
         await crm.updateDeal(tenantId, id, updatePayload);
+
+        // [Agenda Geral] Sincroniza Datas do Serviço (appointmentDate / followUpDate)
+        // com crm_appointments. Mesma fonte da agenda da home, /agenda e tab do contato.
+        // Datas tocadas neste update viram appointments auto-gerenciados (serviceType
+        // marca pra distinguir dos manuais — não atrapalha consultas criadas via dialog).
+        if (appointmentDate !== undefined || followUpDate !== undefined) {
+          try {
+            const refreshed = await crm.getDealById(tenantId, id);
+            if (refreshed) {
+              const { syncDealServiceDates } = await import("../services/agendaService");
+              await syncDealServiceDates(tenantId, {
+                dealId: id,
+                contactId: refreshed.contactId ?? null,
+                ownerUserId: refreshed.ownerUserId || ctx.user.id,
+                dealTitle: refreshed.title || `Negociação #${id}`,
+                appointmentDate: appointmentDate === undefined
+                  ? undefined
+                  : (appointmentDate ? new Date(appointmentDate) : null),
+                followUpDate: followUpDate === undefined
+                  ? undefined
+                  : (followUpDate ? new Date(followUpDate) : null),
+              });
+            }
+          } catch (e) {
+            console.error("[Agenda] syncDealServiceDates falhou (deal update):", e);
+            // Não falha o update da negociação se a sync der erro.
+          }
+        }
 
         // Log field changes in history
         if (currentDeal) {

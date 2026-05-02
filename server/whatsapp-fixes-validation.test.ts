@@ -213,39 +213,37 @@ describe("[Bonus] Conformidade Z-API aplicada", () => {
   });
 });
 
-describe("[DealDetail] Botão 'Consulta' na barra de tabs ao lado do WhatsApp", () => {
+describe("[DealDetail] Datas do Serviço espelham na agenda (sem botão redundante)", () => {
   const dealDetail = read("client/src/pages/DealDetail.tsx");
-  const dialog = read("client/src/components/agenda/AppointmentDialog.tsx");
+  const crmRouter = read("server/routers/crmRouter.ts");
+  const agendaSvc = read("server/services/agendaService.ts");
 
-  it("AppointmentDialog aceita defaultDealId para pré-selecionar negociação", () => {
-    expect(dialog).toMatch(/defaultDealId\?:\s*number\s*\|\s*null/);
-    expect(dialog).toMatch(/setDealId\(defaultDealId\s*\|\|\s*null\)/);
+  it("Botão 'Consulta' foi removido do DealDetail (redundância eliminada)", () => {
+    expect(dealDetail).not.toMatch(/<span>Consulta<\/span>/);
+    expect(dealDetail).not.toMatch(/AppointmentDialog/);
+    expect(dealDetail).not.toMatch(/appointmentDialogOpen/);
   });
 
-  it("DealDetail importa o dialog e tem state appointmentDialogOpen", () => {
-    expect(dealDetail).toMatch(/import\s+AppointmentDialog\s+from\s+"@\/components\/agenda\/AppointmentDialog"/);
-    expect(dealDetail).toMatch(/appointmentDialogOpen/);
+  it("Service: syncDealServiceDates upsert/soft-delete por dealId+serviceType", () => {
+    expect(agendaSvc).toMatch(/export async function syncDealServiceDates/);
+    // Identificadores que distinguem auto-criados dos manuais
+    expect(agendaSvc).toMatch(/SERVICE_TYPE_APPT\s*=\s*"deal_appointment"/);
+    expect(agendaSvc).toMatch(/SERVICE_TYPE_FOLLOWUP\s*=\s*"deal_followup"/);
+    // Soft-delete quando data é nula
+    expect(agendaSvc).toMatch(/SET "deletedAt" = NOW\(\)/);
+    // Upsert
+    expect(agendaSvc).toMatch(/INSERT INTO crm_appointments/);
   });
 
-  it("Botão 'Consulta' fica na tab bar logo depois do WhatsApp (mesma <div>)", () => {
-    // Última tab é WhatsApp; logo após o .map() vem o botão Consulta como
-    // sibling direto. Verifica que NÃO existe "/* ── Tab content ── */" ANTES
-    // do botão Consulta — ou seja, o botão tá DENTRO da tab bar.
-    const tabBarSection = dealDetail.match(/key:\s*"whatsapp"[\s\S]*?Tab content/);
-    expect(tabBarSection).toBeTruthy();
-    expect(tabBarSection![0]).toMatch(/<span>Consulta<\/span>/);
+  it("Router crm.deals.update chama syncDealServiceDates ao tocar nas datas", () => {
+    // Não dá pra confundir com outros 'update:' do arquivo: a string só
+    // aparece no bloco da deals.update (única referência no router).
+    expect(crmRouter).toMatch(/appointmentDate !== undefined \|\| followUpDate !== undefined/);
+    expect(crmRouter).toMatch(/syncDealServiceDates\(tenantId,/);
   });
 
-  it("Botão Consulta abre o AppointmentDialog (não é uma tab nova)", () => {
-    expect(dealDetail).toMatch(/onClick=\{\(\)\s*=>\s*setAppointmentDialogOpen\(true\)\}[\s\S]{0,400}<span>Consulta<\/span>/);
-  });
-
-  it("Removeu o antigo 'Marcar consulta' do card de contato", () => {
-    expect(dealDetail).not.toMatch(/Marcar consulta/);
-  });
-
-  it("DealDetail passa contato e negociação atuais como defaults", () => {
-    expect(dealDetail).toMatch(/<AppointmentDialog[\s\S]*?defaultContactId=\{deal\.contactId\}[\s\S]*?defaultDealId=\{deal\.id\}/);
+  it("Router crm.deals.create também sincroniza quando há datas", () => {
+    expect(crmRouter).toMatch(/Se a negociação nasceu já com Datas do Serviço[\s\S]{0,500}syncDealServiceDates/);
   });
 });
 

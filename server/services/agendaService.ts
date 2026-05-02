@@ -711,3 +711,119 @@ export async function getAppointmentParticipants(
     name: r.name,
   }));
 }
+
+// ═══════════════════════════════════════
+// 9. SYNC: Datas do Serviço (deal) ↔ Agenda
+// ═══════════════════════════════════════
+// Mantém crm_appointments em sincronia com deal.appointmentDate / deal.followUpDate.
+// Marcadores de serviceType isolam os auto-criados dos manuais (criados via dialog).
+//
+// Comportamentos:
+//  - Data preenchida: insere se não existe, atualiza startAt/endAt se já existe.
+//  - Data nula: soft-delete (deletedAt = NOW) do auto-criado correspondente.
+//  - Status do appointment é preservado entre updates (ex.: se atendente já
+//    confirmou, mudar a data não retrocede para "scheduled").
+//
+// Identificação por (tenantId, dealId, serviceType IN ('deal_appointment', 'deal_followup')).
+
+const SERVICE_TYPE_APPT = "deal_appointment";
+const SERVICE_TYPE_FOLLOWUP = "deal_followup";
+
+interface SyncDealServiceDatesInput {
+  dealId: number;
+  contactId: number | null;
+  ownerUserId: number;
+  dealTitle: string;
+  appointmentDate: Date | null | undefined; // undefined = não tocou no campo
+  followUpDate: Date | null | undefined;
+}
+
+async function upsertDealServiceAppointment(
+  tenantId: number,
+  serviceType: string,
+  defaultTitle: string,
+  date: Date | null | undefined,
+  ctx: { dealId: number; contactId: number | null; ownerUserId: number },
+): Promise<void> {
+  if (date === undefined) return; // campo não foi tocado nesta atualização
+  const db = await getDb();
+  if (!db) return;
+
+  // Procura o appointment auto-gerado existente (não deletado).
+  const existingRow = extractRows(await db.execute(sql`
+    SELECT id FROM crm_appointments
+    WHERE "tenantId" = ${tenantId}
+      AND "dealId" = ${ctx.dealId}
+      AND "serviceType" = ${serviceType}
+      AND "deletedAt" IS NULL
+    LIMIT 1
+  `))[0] as any;
+
+  if (date === null) {
+    // Usuário limpou a data → soft-delete do auto-criado.
+    if (existingRow?.id) {
+      await db.execute(sql`
+        UPDATE crm_appointments
+        SET "deletedAt" = NOW(), "updatedAt" = NOW()
+        WHERE id = ${Number(existingRow.id)}
+      `);
+    }
+    return;
+  }
+
+  // Data preenchida — calcula startAt/endAt como dia inteiro (allDay=true).
+  // Front passa só YYYY-MM-DD; agenda exibe na coluna do dia.
+  const startAt = new Date(date);
+  startAt.setHours(0, 0, 0, 0);
+  const endAt = new Date(date);
+  endAt.setHours(23, 59, 59, 999);
+
+  if (existingRow?.id) {
+    await db.execute(sql`
+      UPDATE crm_appointments
+      SET "startAt" = ${startAt},
+          "endAt" = ${endAt},
+          "allDay" = true,
+          "title" = ${defaultTitle},
+          "deletedAt" = NULL,
+          "updatedAt" = NOW()
+      WHERE id = ${Number(existingRow.id)}
+    `);
+    return;
+  }
+
+  // Insere novo auto-gerado.
+  await db.execute(sql`
+    INSERT INTO crm_appointments
+      ("tenantId", "userId", "title", "startAt", "endAt", "allDay",
+       "color", "dealId", "contactId", "serviceType", "status")
+    VALUES
+      (${tenantId}, ${ctx.ownerUserId}, ${defaultTitle},
+       ${startAt}, ${endAt}, true,
+       'emerald', ${ctx.dealId}, ${ctx.contactId},
+       ${serviceType}, 'scheduled')
+  `);
+}
+
+export async function syncDealServiceDates(
+  tenantId: number,
+  input: SyncDealServiceDatesInput,
+): Promise<void> {
+  const titleAppt = `Consulta — ${input.dealTitle}`.slice(0, 500);
+  const titleFollowup = `Retorno/Revisão — ${input.dealTitle}`.slice(0, 500);
+
+  await upsertDealServiceAppointment(
+    tenantId,
+    SERVICE_TYPE_APPT,
+    titleAppt,
+    input.appointmentDate,
+    { dealId: input.dealId, contactId: input.contactId, ownerUserId: input.ownerUserId },
+  );
+  await upsertDealServiceAppointment(
+    tenantId,
+    SERVICE_TYPE_FOLLOWUP,
+    titleFollowup,
+    input.followUpDate,
+    { dealId: input.dealId, contactId: input.contactId, ownerUserId: input.ownerUserId },
+  );
+}
