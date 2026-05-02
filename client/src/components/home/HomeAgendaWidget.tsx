@@ -4,7 +4,7 @@ import { CalendarDays, Plus, ArrowRight, Clock } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import HomeAppointmentDialog from "./HomeAppointmentDialog";
+import AppointmentDialog from "@/components/agenda/AppointmentDialog";
 
 /**
  * Widget de agenda da clínica na página inicial.
@@ -178,7 +178,7 @@ export default function HomeAgendaWidget() {
         </Link>
       </div>
 
-      <HomeAppointmentDialog
+      <AppointmentDialog
         open={showCreate}
         onClose={() => setShowCreate(false)}
         onSaved={() => agendaQ.refetch()}

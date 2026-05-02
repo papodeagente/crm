@@ -25,6 +25,7 @@ import EditMessageModal from "./chat/EditMessageModal";
 import ImageLightbox from "./chat/ImageLightbox";
 import TransferDialog from "./TransferDialog";
 import ImportConversationDialog from "@/components/ImportConversationDialog";
+import AppointmentDialog from "@/components/agenda/AppointmentDialog";
 import InteractiveMessageComposer from "./chat/InteractiveMessageComposer";
 import WhatsAppLabelsSection from "./inbox/WhatsAppLabelsSection";
 
@@ -204,6 +205,7 @@ export default function WhatsAppChat({
     }
   }, [autoOpenTransfer, waConversationId, onAutoOpenTransferConsumed]);
   const [showImportDialog, setShowImportDialog] = useState(false);
+  const [showAppointmentDialog, setShowAppointmentDialog] = useState(false);
   const [showLocationModal, setShowLocationModal] = useState(false);
   const [showContactModal, setShowContactModal] = useState(false);
   const [showPollModal, setShowPollModal] = useState(false);
@@ -878,6 +880,7 @@ export default function WhatsAppChat({
         summaryLoading={summaryLoading}
         onSetPriority={(p) => setPriorityMut.mutate({ sessionId, remoteJid, priority: p })}
         onScheduleMessage={() => setShowScheduleModal(true)}
+        onScheduleAppointment={() => setShowAppointmentDialog(true)}
         remotePresence={remotePresence}
         onToggleSidebar={onToggleSidebar}
         sidebarOpen={sidebarOpen}
@@ -1043,6 +1046,17 @@ export default function WhatsAppChat({
           contactName={contact?.name || remoteJid.split("@")[0]}
         />
       )}
+
+      {/* ─── Appointment Dialog (Marcar consulta a partir do Inbox) ─── */}
+      {/* Pré-seleciona contato CRM da conversa; o usuário só precisa escolher
+          ou criar a negociação + datas. Mesma fonte (crm_appointments). */}
+      <AppointmentDialog
+        open={showAppointmentDialog}
+        onClose={() => setShowAppointmentDialog(false)}
+        defaultContactId={contact?.id}
+        defaultContactName={contact?.name}
+        defaultContactPhone={contact?.phone}
+      />
 
       {/* ─── Import Conversation Dialog ─── */}
       <ImportConversationDialog

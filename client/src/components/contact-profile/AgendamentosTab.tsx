@@ -1,11 +1,11 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Calendar, Clock, MapPin, User, CheckCircle2, Loader2 } from "lucide-react";
-import { Link } from "wouter";
 import { toast } from "sonner";
+import AppointmentDialog from "@/components/agenda/AppointmentDialog";
 
 interface AgendamentosTabProps {
   contactId: number;
@@ -33,6 +33,7 @@ function statusConfig(s: string) {
 }
 
 export default function AgendamentosTab({ contactId }: AgendamentosTabProps) {
+  const [showCreate, setShowCreate] = useState(false);
   const now = new Date();
   const from = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
   const to = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
@@ -65,12 +66,23 @@ export default function AgendamentosTab({ contactId }: AgendamentosTabProps) {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Agendamentos ({appointments.length})</h3>
-        <Link href="/agenda">
-          <Button size="sm" className="bg-[#2E7D5B] hover:bg-[#256B4D] text-white h-8 text-xs">
-            <Calendar className="h-3.5 w-3.5 mr-1" /> Agendar
-          </Button>
-        </Link>
+        <Button
+          size="sm"
+          className="bg-[#2E7D5B] hover:bg-[#256B4D] text-white h-8 text-xs"
+          onClick={() => setShowCreate(true)}
+        >
+          <Calendar className="h-3.5 w-3.5 mr-1" /> Agendar
+        </Button>
       </div>
+
+      <AppointmentDialog
+        open={showCreate}
+        onClose={() => setShowCreate(false)}
+        defaultContactId={contactId}
+        onSaved={() => {
+          utils.agenda.unified.invalidate();
+        }}
+      />
 
       {appointments.length === 0 ? (
         <Card className="border-border/50 bg-card/80">

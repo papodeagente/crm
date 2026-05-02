@@ -213,35 +213,65 @@ describe("[Bonus] Conformidade Z-API aplicada", () => {
   });
 });
 
-describe("[Home] Agenda da Clínica substitui RFV (única fonte: crm_appointments)", () => {
+describe("[Agenda] Caixa única (AppointmentDialog) com inline-create em todos os pontos", () => {
   const home = read("client/src/pages/Home.tsx");
   const widget = read("client/src/components/home/HomeAgendaWidget.tsx");
-  const dialog = read("client/src/components/home/HomeAppointmentDialog.tsx");
+  const dialog = read("client/src/components/agenda/AppointmentDialog.tsx");
+  const calendar = read("client/src/components/AgendaCalendar.tsx");
+  const tab = read("client/src/components/contact-profile/AgendamentosTab.tsx");
+  const header = read("client/src/components/chat/ChatHeader.tsx");
+  const chat = read("client/src/components/WhatsAppChat.tsx");
 
-  it("Home importa HomeAgendaWidget e NÃO usa mais home.rfv", () => {
+  it("Home substitui RFV pelo widget de agenda", () => {
     expect(home).toMatch(/import\s+HomeAgendaWidget\s+from/);
     expect(home).toMatch(/<HomeAgendaWidget\s*\/>/);
     expect(home).not.toMatch(/trpc\.home\.rfv\.useQuery/);
     expect(home).not.toMatch(/Oportunidades RFV/);
   });
 
-  it("Widget consome agenda.unified (mesma fonte da página /agenda)", () => {
+  it("Widget e dialog consomem mesma fonte (agenda.unified / agenda.createAppointment)", () => {
     expect(widget).toMatch(/trpc\.agenda\.unified\.useQuery/);
-  });
-
-  it("Dialog exige contato + negociação para habilitar 'Salvar'", () => {
-    // canSubmit precisa ter título, contactId, dealId, data e horários.
-    expect(dialog).toMatch(/canSubmit\s*=\s*[\s\S]*?title\.trim\(\)\.length\s*>\s*0[\s\S]*?!!contactId[\s\S]*?!!dealId/);
-  });
-
-  it("Dialog persiste em agenda.createAppointment (crm_appointments) com contactId+dealId", () => {
     expect(dialog).toMatch(/trpc\.agenda\.createAppointment\.useMutation/);
-    expect(dialog).toMatch(/contactId,\s*\n\s*dealId,/);
   });
 
-  it("Dialog mostra atalhos para /contatos e /negociacoes quando faltam", () => {
-    expect(dialog).toMatch(/href="\/contatos"/);
-    expect(dialog).toMatch(/href="\/negociacoes"/);
+  it("AppointmentDialog exige contato + negociação para 'Salvar'", () => {
+    expect(dialog).toMatch(/canSubmit\s*=\s*[\s\S]*?!!contactId[\s\S]*?!!dealId/);
+    // E NÃO permite submeter enquanto está no modo de inline-create.
+    expect(dialog).toMatch(/contactMode\s*===\s*"select"/);
+    expect(dialog).toMatch(/dealMode\s*===\s*"select"/);
+  });
+
+  it("AppointmentDialog suporta inline-create de contato e negociação", () => {
+    expect(dialog).toMatch(/handleCreateContact/);
+    expect(dialog).toMatch(/handleCreateDeal/);
+    expect(dialog).toMatch(/trpc\.crm\.contacts\.create\.useMutation/);
+    expect(dialog).toMatch(/trpc\.crm\.deals\.create\.useMutation/);
+    // Pipeline + estágio default vêm da primeira pipeline cadastrada.
+    expect(dialog).toMatch(/pipelinesQ\.data\?\.\[0\]\?\.id/);
+  });
+
+  it("AppointmentDialog aceita defaults de contato (uso pelo Inbox/Tab)", () => {
+    expect(dialog).toMatch(/defaultContactId\?:\s*number\s*\|\s*null/);
+    expect(dialog).toMatch(/defaultContactPhone\?:\s*string/);
+    expect(dialog).toMatch(/defaultContactName\?:\s*string/);
+  });
+
+  it("AgendaCalendar usa AppointmentDialog no fluxo de CREATE (mantém modal antigo só para EDIT)", () => {
+    expect(calendar).toMatch(/import\s+AppointmentDialog\s+from\s+"@\/components\/agenda\/AppointmentDialog"/);
+    expect(calendar).toMatch(/editItem\s*\?\s*\(\s*<AppointmentModal/);
+    expect(calendar).toMatch(/<AppointmentDialog/);
+  });
+
+  it("AgendamentosTab abre o dialog inline com contactId pré-preenchido", () => {
+    expect(tab).toMatch(/import\s+AppointmentDialog\s+from\s+"@\/components\/agenda\/AppointmentDialog"/);
+    expect(tab).toMatch(/<AppointmentDialog[\s\S]*?defaultContactId=\{contactId\}/);
+  });
+
+  it("Inbox (ChatHeader + WhatsAppChat) tem botão 'Marcar Consulta' que abre o dialog", () => {
+    expect(header).toMatch(/onScheduleAppointment\?:\s*\(\)\s*=>\s*void/);
+    expect(header).toMatch(/Marcar Consulta/);
+    expect(chat).toMatch(/showAppointmentDialog/);
+    expect(chat).toMatch(/<AppointmentDialog[\s\S]*?defaultContactId=\{contact\?\.id\}/);
   });
 });
 

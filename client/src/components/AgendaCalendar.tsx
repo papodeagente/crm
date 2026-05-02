@@ -48,6 +48,7 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { formatTime, SYSTEM_TIMEZONE, SYSTEM_LOCALE } from "../../../shared/dateUtils";
+import AppointmentDialog from "@/components/agenda/AppointmentDialog";
 
 // ═══════════════════════════════════════
 // TYPES
@@ -1124,15 +1125,29 @@ export default function AgendaCalendar({ filterUserId, filterTeamId }: AgendaCal
         </div>
       </div>
 
-      {/* Appointment Modal */}
-      <AppointmentModal
-        open={modalOpen}
-        onClose={() => { setModalOpen(false); setEditItem(null); }}
-        editItem={editItem}
-        defaultDate={currentDate}
-        defaultHour={defaultHour}
-        onSaved={() => agendaQ.refetch()}
-      />
+      {/* Edit usa o modal antigo (preserva participants/color/recorrência).
+          Create usa o AppointmentDialog unificado — exige contato + negociação. */}
+      {editItem ? (
+        <AppointmentModal
+          open={modalOpen}
+          onClose={() => { setModalOpen(false); setEditItem(null); }}
+          editItem={editItem}
+          defaultDate={currentDate}
+          defaultHour={defaultHour}
+          onSaved={() => agendaQ.refetch()}
+        />
+      ) : (
+        <AppointmentDialog
+          open={modalOpen}
+          onClose={() => { setModalOpen(false); setEditItem(null); }}
+          defaultDate={(() => {
+            const base = new Date(currentDate);
+            if (defaultHour !== undefined) base.setHours(defaultHour, 0, 0, 0);
+            return base;
+          })()}
+          onSaved={() => { agendaQ.refetch(); setModalOpen(false); setEditItem(null); }}
+        />
+      )}
     </section>
   );
 }

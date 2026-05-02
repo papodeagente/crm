@@ -7,7 +7,7 @@ import { useState, useEffect } from "react";
 import {
   Search, X, Users, MoreVertical, Check, UserPlus, Briefcase,
   ArrowRightLeft, FileText, History, Brain,
-  CalendarClock, PanelRightOpen,
+  CalendarClock, CalendarPlus, PanelRightOpen,
 } from "lucide-react";
 import InstantTooltip from "@/components/InstantTooltip";
 import PhoneDisplay from "@/components/ui/PhoneDisplay";
@@ -52,6 +52,8 @@ interface ChatHeaderProps {
   summaryLoading: boolean;
   onSetPriority: (priority: "low" | "medium" | "high" | "urgent") => void;
   onScheduleMessage: () => void;
+  /** Abre o AppointmentDialog para marcar consulta com contato pré-selecionado. */
+  onScheduleAppointment?: () => void;
   remotePresence?: "composing" | "recording" | "paused" | "available" | null;
   onToggleSidebar?: () => void;
   sidebarOpen?: boolean;
@@ -63,7 +65,7 @@ export default function ChatHeader({
   onAutoOpenAssignConsumed, onCreateDeal, onCreateContact, hasCrmContact,
   waConversationId, onTransfer, onImport, onToggleTimeline, showTimeline,
   onSummarize, summaryLoading, onSetPriority,
-  onScheduleMessage, remotePresence,
+  onScheduleMessage, onScheduleAppointment, remotePresence,
   onToggleSidebar, sidebarOpen,
 }: ChatHeaderProps) {
   const [showAgentDropdown, setShowAgentDropdown] = useState(false);
@@ -312,6 +314,16 @@ export default function ChatHeader({
                   })}
                 </div>
               </div>
+              {/* Schedule appointment (consulta na agenda da clínica) */}
+              {onScheduleAppointment && hasCrmContact && (
+                <button
+                  onClick={() => { onScheduleAppointment(); setShowMoreMenu(false); }}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-muted/50 transition-colors text-left text-[13px] text-foreground border-t border-border"
+                >
+                  <CalendarPlus className="w-4 h-4 text-emerald-500" />
+                  Marcar Consulta
+                </button>
+              )}
               {/* Schedule message */}
               <button
                 onClick={() => { onScheduleMessage(); setShowMoreMenu(false); }}
