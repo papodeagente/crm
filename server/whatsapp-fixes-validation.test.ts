@@ -213,34 +213,24 @@ describe("[Bonus] Conformidade Z-API aplicada", () => {
   });
 });
 
-describe("[Inbox] Política de reabertura: volta para o último atendente", () => {
+describe("[Inbox] Política de reabertura: cliente volta a falar → cai na FILA", () => {
   const dbFile = read("server/db.ts");
   const evo = read("server/whatsappEvolution.ts");
-  const schema = read("drizzle/schema.ts");
 
-  it("schema declara lastAssignedUserId em waConversations", () => {
-    expect(schema).toMatch(/lastAssignedUserId:\s*integer\("lastAssignedUserId"\)/);
+  it("finishAttendance limpa assignedUserId (sem persistir último atendente)", () => {
+    // O atendimento foi feito pela equipe — não atrelado a uma pessoa.
+    expect(dbFile).toMatch(/finishAttendance[\s\S]*?assignedUserId:\s*null,\s*assignedTeamId:\s*null,\s*status:\s*"resolved"/);
+    // E NÃO pode introduzir tracking de lastAssignedUserId.
+    expect(dbFile).not.toMatch(/lastAssignedUserId/);
   });
 
-  it("finishAttendance preserva assignedUserId em lastAssignedUserId via COALESCE", () => {
-    // Pelo menos uma das duas updates (caminho principal ou fallback por digits)
-    // tem que setar lastAssignedUserId = COALESCE("assignedUserId", "lastAssignedUserId").
-    expect(dbFile).toMatch(/"lastAssignedUserId"\s*=\s*COALESCE\("assignedUserId",\s*"lastAssignedUserId"\)/);
-    // E NÃO pode mais limpar tudo direto sem preservar.
-    expect(dbFile).not.toMatch(/SET assignedUserId: null, assignedTeamId: null, status: "resolved", queuedAt: null/);
-  });
-
-  it("reopen lê lastAssignedUserId e roteia para o último atendente quando existe", () => {
-    expect(evo).toMatch(/COALESCE\("lastAssignedUserId",\s*"assignedUserId"\)\s+AS\s+"lastAssignedUserId"/);
-    expect(evo).toMatch(/Routing to last agent/);
-    // Caminho com último atendente: assigna direto, não vai pra fila.
+  it("reopen ao receber inbound em conversa resolved/closed → manda pra fila", () => {
     const reopenBlock = evo.match(/AUTO-REOPEN[\s\S]*?Error checking\/reopening/)?.[0] || "";
-    expect(reopenBlock).toMatch(/if\s*\(lastAgentId\)\s*\{[\s\S]*?assignedUserId:\s*lastAgentId[\s\S]*?queuedAt:\s*null/);
-  });
-
-  it("reopen mantém fallback para fila quando não há último atendente", () => {
-    const reopenBlock = evo.match(/AUTO-REOPEN[\s\S]*?Error checking\/reopening/)?.[0] || "";
-    expect(reopenBlock).toMatch(/else\s*\{[\s\S]*?assignedUserId:\s*null[\s\S]*?queuedAt:\s*new Date\(\)/);
+    expect(reopenBlock).toMatch(/reopening to queue/);
+    // Sempre limpa assignedUserId e seta queuedAt.
+    expect(reopenBlock).toMatch(/assignedUserId:\s*null,\s*assignedTeamId:\s*null,\s*queuedAt:\s*new Date\(\)/);
+    // Não pode rotear pra "último atendente".
+    expect(reopenBlock).not.toMatch(/lastAssignedUserId/);
   });
 });
 

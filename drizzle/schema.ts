@@ -1475,13 +1475,6 @@ export const waConversations = pgTable("wa_conversations", {
   mergedIntoId: integer("mergedIntoId"),
   // Helpdesk fields (denormalized from conversation_assignments)
   assignedUserId: integer("assignedUserId"),
-  /**
-   * Último atendente que tinha a conversa quando ela foi finalizada/closed.
-   * Usado para que, se o cliente voltar a falar, a conversa volte para o
-   * "Meus" desse atendente em vez de cair na fila. Permanece preenchido
-   * mesmo quando assignedUserId vai pra NULL.
-   */
-  lastAssignedUserId: integer("lastAssignedUserId"),
   assignedTeamId: integer("assignedTeamId"),
   queuedAt: timestamp("queuedAt"),
   firstResponseAt: timestamp("firstResponseAt"),
@@ -1502,7 +1495,6 @@ export const waConversations = pgTable("wa_conversations", {
   index("idx_wc_phone").on(t.tenantId, t.phoneE164),
   index("idx_wc_merged").on(t.mergedIntoId),
   index("idx_wc_assigned_user").on(t.tenantId, t.assignedUserId),
-  index("idx_wc_last_assigned_user").on(t.tenantId, t.lastAssignedUserId),
   index("idx_wc_queued").on(t.tenantId, t.queuedAt),
   uniqueIndex("idx_wc_conv_key").on(t.conversationKey),
 ]);
