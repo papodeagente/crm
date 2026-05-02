@@ -1706,43 +1706,70 @@ class WhatsAppEvolutionManager extends EventEmitter {
             incrementUnread: !fromMe,
           });
 
-          // *** AUTO-REOPEN: If conversation is resolved/closed and a NEW inbound message arrives, reopen it ***
+          // *** AUTO-REOPEN: cliente voltou a falar numa conversa resolvida/fechada.
+          // Política: rotear de volta para o "Meus" do último atendente (lendo
+          // lastAssignedUserId, persistido em finishAttendance). Se não houver
+          // último atendente registrado (conversa antiga, pré-migração), volta
+          // pra fila como antes. ***
           if (!fromMe) {
             try {
               const db2 = await getDb();
               if (db2) {
                 const { conversationAssignments } = await import("../drizzle/schema");
-                // Check current conversation status
-                const [conv] = await db2.select({
-                  id: waConversations.id,
-                  status: waConversations.status,
-                  assignedUserId: waConversations.assignedUserId,
-                }).from(waConversations)
-                  .where(eq(waConversations.id, resolved.conversationId))
-                  .limit(1);
+                // Lê status + lastAssignedUserId via SQL bruto (coluna pode não
+                // existir em schemas antigos — COALESCE no SELECT garante fallback).
+                const convRows: any = await db2.execute(sql`
+                  SELECT id, status, "assignedUserId",
+                         COALESCE("lastAssignedUserId", "assignedUserId") AS "lastAssignedUserId"
+                  FROM wa_conversations WHERE id = ${resolved.conversationId} LIMIT 1
+                `);
+                const conv = (convRows.rows ?? convRows ?? [])[0];
 
                 if (conv && (conv.status === "resolved" || conv.status === "closed")) {
-                  const lastAgentId = conv.assignedUserId;
-                  console.log(`[EvoWA Reopen] Conversation ${resolved.conversationId} was ${conv.status}, reopening to queue. Last agent: ${lastAgentId || 'none'}`);
+                  const lastAgentId: number | null = conv.lastAssignedUserId ?? conv.assignedUserId ?? null;
+                  console.log(`[EvoWA Reopen] Conversation ${resolved.conversationId} was ${conv.status}, reopening. Routing to last agent: ${lastAgentId || 'queue (none)'}`);
 
-                  // Reopen wa_conversations: set status to open, clear assignment, set queuedAt
-                  await db2.update(waConversations)
-                    .set({
-                      status: "open",
-                      assignedUserId: null,
-                      assignedTeamId: null,
-                      queuedAt: new Date(),
-                    })
-                    .where(eq(waConversations.id, resolved.conversationId));
+                  // Reopen wa_conversations: se houver último atendente, devolve
+                  // pra ele (assignedUserId set + sem queuedAt → cai em "Meus").
+                  // Caso contrário, vai pra fila (queuedAt set, sem assigned).
+                  if (lastAgentId) {
+                    await db2.update(waConversations)
+                      .set({
+                        status: "open",
+                        assignedUserId: lastAgentId,
+                        queuedAt: null,
+                      })
+                      .where(eq(waConversations.id, resolved.conversationId));
+                  } else {
+                    await db2.update(waConversations)
+                      .set({
+                        status: "open",
+                        assignedUserId: null,
+                        assignedTeamId: null,
+                        queuedAt: new Date(),
+                      })
+                      .where(eq(waConversations.id, resolved.conversationId));
+                  }
 
-                  // Reopen conversation_assignments too
-                  await db2.update(conversationAssignments)
-                    .set({ status: "open", resolvedAt: null })
-                    .where(and(
-                      eq(conversationAssignments.tenantId, session.tenantId),
-                      eq(conversationAssignments.sessionId, session.sessionId),
-                      eq(conversationAssignments.remoteJid, remoteJid)
-                    ));
+                  // Reopen conversation_assignments — se houver último agente,
+                  // restaura o assignment dele; caso contrário, só limpa status.
+                  if (lastAgentId) {
+                    await db2.update(conversationAssignments)
+                      .set({ status: "open", resolvedAt: null, assignedUserId: lastAgentId, lastAssignedAt: new Date() })
+                      .where(and(
+                        eq(conversationAssignments.tenantId, session.tenantId),
+                        eq(conversationAssignments.sessionId, session.sessionId),
+                        eq(conversationAssignments.remoteJid, remoteJid)
+                      ));
+                  } else {
+                    await db2.update(conversationAssignments)
+                      .set({ status: "open", resolvedAt: null })
+                      .where(and(
+                        eq(conversationAssignments.tenantId, session.tenantId),
+                        eq(conversationAssignments.sessionId, session.sessionId),
+                        eq(conversationAssignments.remoteJid, remoteJid)
+                      ));
+                  }
 
                   // Log the reopen event with last agent info
                   await logConversationEvent(
@@ -1752,6 +1779,7 @@ class WhatsAppEvolutionManager extends EventEmitter {
                       metadata: {
                         reason: "inbound_message_after_resolve",
                         lastAgentUserId: lastAgentId,
+                        routedTo: lastAgentId ? "last_agent" : "queue",
                         reopenedAt: new Date().toISOString(),
                       },
                     }
@@ -1765,6 +1793,7 @@ class WhatsAppEvolutionManager extends EventEmitter {
                     conversationId: resolved.conversationId,
                     type: "reopened",
                     lastAgentUserId: lastAgentId,
+                    assignedUserId: lastAgentId,
                   });
                 }
               }

@@ -95,6 +95,8 @@ export interface WhatsAppChatProps {
   onStatusConfirmed?: (data: { messageId: string; status: string }) => void;
   autoOpenAssign?: boolean;
   onAutoOpenAssignConsumed?: () => void;
+  autoOpenTransfer?: boolean;
+  onAutoOpenTransferConsumed?: () => void;
   onToggleSidebar?: () => void;
   sidebarOpen?: boolean;
   pendingFile?: File | null;
@@ -150,6 +152,7 @@ export default function WhatsAppChat({
   myAvatarUrl, waConversationId,
   dealId, dealTitle, dealValueCents, dealStageName, companyName,
   onOptimisticSend, onStatusConfirmed, autoOpenAssign, onAutoOpenAssignConsumed,
+  autoOpenTransfer, onAutoOpenTransferConsumed,
   onToggleSidebar, sidebarOpen,
   pendingFile, onClearPendingFile,
 }: WhatsAppChatProps) {
@@ -192,6 +195,14 @@ export default function WhatsAppChat({
   const [summaryText, setSummaryText] = useState("");
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [showTransfer, setShowTransfer] = useState(false);
+  // Inbox dispara abertura direta do TransferDialog clicando no botão de
+  // transferir do item da lista. Uma vez consumido, avisa o pai pra resetar.
+  useEffect(() => {
+    if (autoOpenTransfer && waConversationId) {
+      setShowTransfer(true);
+      onAutoOpenTransferConsumed?.();
+    }
+  }, [autoOpenTransfer, waConversationId, onAutoOpenTransferConsumed]);
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [showLocationModal, setShowLocationModal] = useState(false);
   const [showContactModal, setShowContactModal] = useState(false);

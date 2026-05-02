@@ -204,6 +204,8 @@ export default function InboxPage() {
 
   // Auto-open agent assignment dropdown in WhatsAppChat
   const [autoOpenAssign, setAutoOpenAssign] = useState(false);
+  // Auto-open transfer dialog em WhatsAppChat (botão da listinha → abre direto)
+  const [autoOpenTransfer, setAutoOpenTransfer] = useState(false);
 
   // Assign from queue to specific agent (admin only)
   const [assigningQueueJid, setAssigningQueueJid] = useState<string | null>(null);
@@ -250,24 +252,86 @@ export default function InboxPage() {
     finishMut.mutate({ sessionId: activeSession.sessionId, remoteJid});
   }, [activeSession?.sessionId, finishMut]);
 
+  // CRM contacts query — declarado aqui (antes de waContactsList) porque a
+  // aba "Contatos" mescla agenda WA com contatos do CRM (precisa do data dos dois).
+  const contactsQ = trpc.crm.contacts.list.useQuery(
+    { limit: 5000 },
+    { enabled: true, staleTime: 5 * 60 * 1000 }
+  );
+
   // WA Contacts for Contacts tab (reuse waContactsMap but as a list)
   const waContactsForTabQ = trpc.whatsapp.waContactsMap.useQuery(
     { sessionId: activeSession?.sessionId || "" },
     { enabled: !!activeSession?.sessionId && activeTab === "contacts", staleTime: 5 * 60 * 1000 }
   );
+  // Lista combinada: agenda do WhatsApp (waContactsMap) + contatos do CRM com
+  // telefone preenchido. Dedup por phone digits (mantém a entrada que tiver
+  // mais informação — WA tem JID + foto, CRM tem nome do cadastro). Origens
+  // marcadas em `sources` para a UI distinguir visualmente.
   const waContactsList = useMemo(() => {
-    const map = waContactsForTabQ.data || {};
-    return Object.entries(map)
-      .map(([jid, c]) => ({
+    type Entry = {
+      jid: string;
+      phoneNumber: string | null;
+      pushName: string | null;
+      savedName: string | null;
+      verifiedName: string | null;
+      displayName: string;
+      crmContactId?: number;
+      sources: ("wa" | "crm")[];
+    };
+    const byKey = new Map<string, Entry>();
+    const phoneKey = (digits: string) => digits.replace(/\D/g, "").slice(-11) || digits;
+
+    // 1) Agenda do WhatsApp
+    const waMap = waContactsForTabQ.data || {};
+    for (const [jid, c] of Object.entries(waMap)) {
+      const digits = (c.phoneNumber || jid.split("@")[0]).replace(/\D/g, "");
+      const k = phoneKey(digits);
+      const display = c.savedName || c.verifiedName || c.pushName || formatPhoneNumber(jid);
+      byKey.set(k, {
         jid,
         phoneNumber: c.phoneNumber,
         pushName: c.pushName,
         savedName: c.savedName,
         verifiedName: c.verifiedName,
-        displayName: c.savedName || c.verifiedName || c.pushName || formatPhoneNumber(jid),
-      }))
-      .sort((a, b) => a.displayName.localeCompare(b.displayName));
-  }, [waContactsForTabQ.data]);
+        displayName: display,
+        sources: ["wa"],
+      });
+    }
+
+    // 2) Contatos do CRM com telefone — mescla quando há match, adiciona quando falta.
+    const crmContacts = ((contactsQ.data as any)?.items || contactsQ.data || []) as any[];
+    for (const c of crmContacts) {
+      if (!c.phone) continue;
+      const digits = c.phone.replace(/\D/g, "");
+      if (digits.length < 8) continue;
+      const k = phoneKey(digits);
+      const existing = byKey.get(k);
+      if (existing) {
+        // Match com agenda WA: prefere o nome do CRM (mais oficial),
+        // mas mantém o JID e foto que vêm da agenda.
+        existing.displayName = c.name || existing.displayName;
+        existing.savedName = existing.savedName || c.name || null;
+        existing.crmContactId = c.id;
+        if (!existing.sources.includes("crm")) existing.sources.push("crm");
+      } else {
+        // Só CRM — sintetiza JID a partir dos dígitos para abrir chat.
+        const synthJid = `${digits}@s.whatsapp.net`;
+        byKey.set(k, {
+          jid: synthJid,
+          phoneNumber: c.phone,
+          pushName: null,
+          savedName: c.name || null,
+          verifiedName: null,
+          displayName: c.name || formatPhoneNumber(c.phone),
+          crmContactId: c.id,
+          sources: ["crm"],
+        });
+      }
+    }
+
+    return Array.from(byKey.values()).sort((a, b) => a.displayName.localeCompare(b.displayName));
+  }, [waContactsForTabQ.data, contactsQ.data]);
 
   // Assignment mutations
   const assignMutation = trpc.whatsapp.assignConversation.useMutation({
@@ -290,11 +354,6 @@ export default function InboxPage() {
     onError: (e) => toast.error(e.message || "Erro ao atribuir conversa"),
   });
   const updateStatusMutation = trpc.whatsapp.updateAssignmentStatus.useMutation({});
-
-  const contactsQ = trpc.crm.contacts.list.useQuery(
-    { limit: 5000 },
-    { enabled: true, staleTime: 5 * 60 * 1000 }
-  );
 
   const linkConversationsMut = trpc.crm.contacts.linkConversations.useMutation();
 
@@ -1117,7 +1176,7 @@ export default function InboxPage() {
                     showTimer={activeTab === "mine"}
                     showFinish={activeTab === "mine"}
                     onFinish={() => handleFinishAttendance(conv.remoteJid)}
-                    onTransfer={() => handleSelectConv(conv.remoteJid)}
+                    onTransfer={() => { handleSelectConv(conv.remoteJid); setAutoOpenTransfer(true); }}
                     onAssignClick={() => { handleSelectConv(conv.remoteJid); setAutoOpenAssign(true); }}
                     isDragTarget={dragOverJid === conv.remoteJid}
                     onFileDrop={(file) => { handleSelectConv(conv.remoteJid); setPendingFile(file); setDragOverJid(null); }}
@@ -1250,10 +1309,10 @@ export default function InboxPage() {
             </>
           )}
 
-          {/* CONTACTS tab: show WA contacts */}
+          {/* CONTACTS tab: agenda do WhatsApp + contatos do CRM com telefone */}
           {activeTab === "contacts" && (
             <>
-              {waContactsForTabQ.isLoading ? (
+              {(waContactsForTabQ.isLoading || contactsQ.isLoading) ? (
                 <div className="flex items-center justify-center py-16">
                   <Loader2 className="w-6 h-6 text-primary animate-spin" />
                 </div>
@@ -1263,12 +1322,15 @@ export default function InboxPage() {
                     <Contact2 className="w-6 h-6 text-primary/60" />
                   </div>
                   <p className="text-[14px] font-medium">
-                    {search ? "Nenhum contato encontrado" : "Nenhum contato do WhatsApp"}
+                    {search ? "Nenhum contato encontrado" : "Nenhum contato disponível"}
                   </p>
-                  <p className="text-[12px] mt-1.5">Sincronize os contatos na página WhatsApp</p>
+                  <p className="text-[12px] mt-1.5">Sincronize a agenda do WhatsApp ou cadastre contatos no CRM com telefone</p>
                 </div>
               ) : (
-                filteredWaContacts.map((contact) => (
+                filteredWaContacts.map((contact) => {
+                  const hasCrm = contact.sources.includes("crm");
+                  const hasWa = contact.sources.includes("wa");
+                  return (
                   <div
                     key={contact.jid}
                     className="flex items-center gap-3 px-3.5 py-3 cursor-pointer hover:bg-accent/50 transition-colors border-b border-border/30"
@@ -1283,14 +1345,27 @@ export default function InboxPage() {
                       </div>
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-[14px] text-foreground truncate">{contact.displayName}</p>
+                      <div className="flex items-center gap-1.5">
+                        <p className="text-[14px] text-foreground truncate">{contact.displayName}</p>
+                        {hasCrm && (
+                          <span className="text-[9px] px-1.5 py-[1px] rounded bg-emerald-500/15 text-emerald-500 font-semibold uppercase tracking-wide shrink-0" title="Cadastrado no CRM">
+                            CRM
+                          </span>
+                        )}
+                        {!hasWa && hasCrm && (
+                          <span className="text-[9px] px-1.5 py-[1px] rounded bg-muted text-muted-foreground font-medium shrink-0" title="Sem agenda do WhatsApp — número será buscado ao abrir">
+                            só CRM
+                          </span>
+                        )}
+                      </div>
                       <p className="text-[12px] text-muted-foreground">
                         {contact.phoneNumber ? formatPhoneNumber(contact.phoneNumber) : formatPhoneNumber(contact.jid)}
                       </p>
                     </div>
                     <MessageSquare className="w-4 h-4 text-muted-foreground/40 shrink-0" />
                   </div>
-                ))
+                  );
+                })
               )}
             </>
           )}
@@ -1327,6 +1402,8 @@ export default function InboxPage() {
               waConversationId={selectedWaConversationId}
               autoOpenAssign={autoOpenAssign}
               onAutoOpenAssignConsumed={() => setAutoOpenAssign(false)}
+              autoOpenTransfer={autoOpenTransfer}
+              onAutoOpenTransferConsumed={() => setAutoOpenTransfer(false)}
               onToggleSidebar={toggleSidebar}
               sidebarOpen={sidebarOpen}
               onOptimisticSend={(msg) => {

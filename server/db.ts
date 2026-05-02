@@ -685,17 +685,26 @@ export async function finishAttendance(tenantId: number, sessionId: string, remo
     }
   }
   
-  // Clear assignedUserId and set status on wa_conversations so it leaves "Meus Chats"
+  // Clear assignedUserId and set status on wa_conversations so it leaves "Meus Chats".
+  // PRESERVA o atendente atual em "lastAssignedUserId" via SQL bruto (a coluna pode
+  // não estar migrada ainda em ambientes legados; COALESCE garante fallback). Quando
+  // o cliente voltar a falar, a reabertura usará esse campo para rotear de volta ao
+  // último atendente em vez de mandar pra fila.
   let wcAffected = 0;
   for (const jid of jidVariants) {
-    const wcResult = await db.update(waConversations)
-      .set({ assignedUserId: null, assignedTeamId: null, status: "resolved", queuedAt: null })
-      .where(and(
-        eq(waConversations.tenantId, tenantId),
-        eq(waConversations.sessionId, sessionId),
-        eq(waConversations.remoteJid, jid)
-      ));
-    wcAffected = (wcResult as any).rowCount ?? 0;
+    const wcResult = await db.execute(sql`
+      UPDATE wa_conversations
+      SET "lastAssignedUserId" = COALESCE("assignedUserId", "lastAssignedUserId"),
+          "assignedUserId" = NULL,
+          "assignedTeamId" = NULL,
+          "status" = 'resolved',
+          "queuedAt" = NULL,
+          "updatedAt" = NOW()
+      WHERE "tenantId" = ${tenantId}
+        AND "sessionId" = ${sessionId}
+        AND "remoteJid" = ${jid}
+    `);
+    wcAffected = (wcResult as any).rowCount ?? (Array.isArray(wcResult) ? wcResult.length : 0) ?? 0;
     if (wcAffected > 0) {
       console.log(`[finishAttendance] wa_conversations resolved: ${wcAffected} rows (jid: ${jid})`);
       break;
@@ -719,9 +728,17 @@ export async function finishAttendance(tenantId: number, sessionId: string, remo
       if (matchByDigits.length > 0) {
         const matchedJid = matchByDigits[0].remoteJid;
         console.log(`[finishAttendance] Found by digits: id=${matchByDigits[0].id} jid=${matchedJid}`);
-        await db.update(waConversations)
-          .set({ assignedUserId: null, assignedTeamId: null, status: "resolved", queuedAt: null })
-          .where(eq(waConversations.id, matchByDigits[0].id));
+        // Mesma lógica de preservar lastAssignedUserId do caminho principal.
+        await db.execute(sql`
+          UPDATE wa_conversations
+          SET "lastAssignedUserId" = COALESCE("assignedUserId", "lastAssignedUserId"),
+              "assignedUserId" = NULL,
+              "assignedTeamId" = NULL,
+              "status" = 'resolved',
+              "queuedAt" = NULL,
+              "updatedAt" = NOW()
+          WHERE id = ${matchByDigits[0].id}
+        `);
         // Also update assignment
         await db.update(conversationAssignments)
           .set({ status: "resolved", resolvedAt: new Date() })
