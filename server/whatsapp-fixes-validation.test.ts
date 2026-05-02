@@ -213,7 +213,7 @@ describe("[Bonus] Conformidade Z-API aplicada", () => {
   });
 });
 
-describe("[DealDetail] Botão 'Marcar consulta' ao lado do WhatsApp", () => {
+describe("[DealDetail] Botão 'Consulta' na barra de tabs ao lado do WhatsApp", () => {
   const dealDetail = read("client/src/pages/DealDetail.tsx");
   const dialog = read("client/src/components/agenda/AppointmentDialog.tsx");
 
@@ -227,9 +227,21 @@ describe("[DealDetail] Botão 'Marcar consulta' ao lado do WhatsApp", () => {
     expect(dealDetail).toMatch(/appointmentDialogOpen/);
   });
 
-  it("DealDetail renderiza botão 'Marcar consulta' próximo ao 'Enviar WhatsApp'", () => {
-    // Bloco com os dois botões na mesma row.
-    expect(dealDetail).toMatch(/Enviar WhatsApp pela cl[ií]nica[\s\S]{0,400}Marcar consulta/);
+  it("Botão 'Consulta' fica na tab bar logo depois do WhatsApp (mesma <div>)", () => {
+    // Última tab é WhatsApp; logo após o .map() vem o botão Consulta como
+    // sibling direto. Verifica que NÃO existe "/* ── Tab content ── */" ANTES
+    // do botão Consulta — ou seja, o botão tá DENTRO da tab bar.
+    const tabBarSection = dealDetail.match(/key:\s*"whatsapp"[\s\S]*?Tab content/);
+    expect(tabBarSection).toBeTruthy();
+    expect(tabBarSection![0]).toMatch(/<span>Consulta<\/span>/);
+  });
+
+  it("Botão Consulta abre o AppointmentDialog (não é uma tab nova)", () => {
+    expect(dealDetail).toMatch(/onClick=\{\(\)\s*=>\s*setAppointmentDialogOpen\(true\)\}[\s\S]{0,400}<span>Consulta<\/span>/);
+  });
+
+  it("Removeu o antigo 'Marcar consulta' do card de contato", () => {
+    expect(dealDetail).not.toMatch(/Marcar consulta/);
   });
 
   it("DealDetail passa contato e negociação atuais como defaults", () => {

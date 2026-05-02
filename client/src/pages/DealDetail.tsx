@@ -1074,24 +1074,14 @@ export default function DealDetail() {
                     <ContactInfoRow icon={Phone} value={contact.phone} copyable whatsapp />
                   )}
                   {contact.phone && deal.contactId && (
-                    <div className="flex items-center gap-3 flex-wrap">
-                      <button
-                        onClick={() => setQuickSendOpen(true)}
-                        className="flex items-center gap-1.5 text-[11px] text-emerald-700 hover:text-emerald-800 transition-colors"
-                        title="Enviar pela conta WhatsApp da clínica"
-                      >
-                        <MessageCircle className="h-3 w-3" />
-                        Enviar WhatsApp pela clínica
-                      </button>
-                      <button
-                        onClick={() => setAppointmentDialogOpen(true)}
-                        className="flex items-center gap-1.5 text-[11px] text-blue-600 hover:text-blue-700 transition-colors"
-                        title="Marcar consulta vinculada a esta negociação"
-                      >
-                        <Calendar className="h-3 w-3" />
-                        Marcar consulta
-                      </button>
-                    </div>
+                    <button
+                      onClick={() => setQuickSendOpen(true)}
+                      className="flex items-center gap-1.5 text-[11px] text-emerald-700 hover:text-emerald-800 transition-colors"
+                      title="Enviar pela conta WhatsApp da clínica"
+                    >
+                      <MessageCircle className="h-3 w-3" />
+                      Enviar WhatsApp pela clínica
+                    </button>
                   )}
                   {contact.email && (
                     <ContactInfoRow icon={Mail} value={contact.email} copyable />
@@ -1397,6 +1387,20 @@ export default function DealDetail() {
                 </button>
               );
             })}
+            {/* Botão "Consulta" ao lado do WhatsApp — abre o AppointmentDialog
+                já com contato e negociação pré-preenchidos. Não é uma tab
+                (não tem conteúdo próprio): a consulta criada aparece em
+                /agenda, no widget da home e no tab Agendamentos do contato. */}
+            {deal?.contactId && deal?.id && (
+              <button
+                onClick={() => setAppointmentDialogOpen(true)}
+                className="flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-4 py-2.5 sm:py-3 text-[12px] sm:text-[13px] font-medium transition-all whitespace-nowrap text-emerald-600 hover:text-emerald-700"
+                title="Agendar consulta para esta negociação"
+              >
+                <Calendar className="h-3.5 w-3.5 shrink-0" />
+                <span>Consulta</span>
+              </button>
+            )}
           </div>
 
           {/* ── Tab content ── */}
@@ -2020,7 +2024,7 @@ export default function DealDetail() {
         />
       ) : null}
 
-      {/* Marcar consulta — pré-preenche contato e negociação atuais.
+      {/* Consulta — abre o AppointmentDialog pré-preenchendo contato e negociação.
           Mesma fonte (crm_appointments) — aparece em /agenda, no widget
           da home e no tab "Agendamentos" do contato. */}
       {deal?.contactId && deal?.id && (
