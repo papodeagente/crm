@@ -416,6 +416,68 @@ describe("[Agenda] Caixa única (AppointmentDialog) com inline-create em todos o
   });
 });
 
+describe("[Inbox] Ciclo de vida — auditoria das 4 transições", () => {
+  const dbFile = read("server/db.ts");
+  const evo = read("server/whatsappEvolution.ts");
+  const resolver = read("server/conversationResolver.ts");
+
+  // 1) Mensagem nova → Fila
+  it("Conversa nova nasce na fila (queuedAt=NOW, status=open, assignedUserId=null)", () => {
+    expect(resolver).toMatch(/db\.insert\(waConversations\)\.values\(\{[\s\S]*?queuedAt:\s*new Date\(\)/);
+    // Não pode auto-atribuir ninguém ao criar.
+    const insertBlock = resolver.match(/db\.insert\(waConversations\)\.values\(\{[\s\S]*?\}\)\.returning/)?.[0] || "";
+    expect(insertBlock).not.toMatch(/assignedUserId:\s*\d/);
+  });
+
+  // 2) Atribuir → Meus (com status alinhado)
+  it("assignConversation força status='open' e zera queuedAt ao atribuir", () => {
+    const fn = dbFile.match(/export async function assignConversation[\s\S]*?^\}/m)?.[0] || "";
+    expect(fn).toBeTruthy();
+    expect(fn).toMatch(/queuedAt:\s*assignedUserId\s*\?\s*null\s*:\s*undefined/);
+    // Status forçado a open quando há agente — fix da race com auto-reopen.
+    expect(fn).toMatch(/if\s*\(assignedUserId\)\s*wcUpdate\.status\s*=\s*"open"/);
+    // conversation_assignments também sobe pra open + resolvedAt=null.
+    expect(fn).toMatch(/conversationAssignments[\s\S]*?status:\s*"open",\s*resolvedAt:\s*null/);
+  });
+
+  // 3) Finalizar → Fin
+  it("finishAttendance limpa wa_conversations + conversation_assignments completos", () => {
+    const fn = dbFile.match(/export async function finishAttendance[\s\S]*?^\}/m)?.[0] || "";
+    expect(fn).toBeTruthy();
+    expect(fn).toMatch(/assignedUserId:\s*null,\s*assignedTeamId:\s*null,\s*status:\s*"resolved",\s*queuedAt:\s*null/);
+    expect(fn).toMatch(/conversationAssignments[\s\S]*?status:\s*"resolved",\s*resolvedAt:\s*new Date\(\)/);
+  });
+
+  it("finishAttendance fallback ignora mergedIntoId e arquivadas (não finaliza errado)", () => {
+    const fn = dbFile.match(/export async function finishAttendance[\s\S]*?^\}/m)?.[0] || "";
+    expect(fn).toMatch(/isNull\(waConversations\.mergedIntoId\)/);
+    expect(fn).toMatch(/eq\(waConversations\.isArchived,\s*false\)/);
+  });
+
+  // 4) Cliente volta a falar → Fila (atômico)
+  it("Auto-reopen é ATÔMICO (UPDATE só se status ainda resolved/closed)", () => {
+    const reopenBlock = evo.match(/AUTO-REOPEN[\s\S]*?Error checking\/reopening/)?.[0] || "";
+    expect(reopenBlock).toBeTruthy();
+    // wa_conversations: WHERE id=X AND status IN ('resolved','closed')
+    expect(reopenBlock).toMatch(/eq\(waConversations\.id,\s*resolved\.conversationId\)[\s\S]{0,200}?waConversations\.status[\s\S]{0,80}?IN \('resolved',\s*'closed'\)/);
+    // conversation_assignments: mesma trava
+    expect(reopenBlock).toMatch(/conversationAssignments\.status[\s\S]{0,80}?IN \('resolved',\s*'closed'\)/);
+  });
+
+  it("Auto-reopen vai sempre pra FILA (não tracking de last agent)", () => {
+    const reopenBlock = evo.match(/AUTO-REOPEN[\s\S]*?Error checking\/reopening/)?.[0] || "";
+    // Sempre seta assignedUserId=null e queuedAt=NOW.
+    expect(reopenBlock).toMatch(/assignedUserId:\s*null,\s*assignedTeamId:\s*null,\s*queuedAt:\s*new Date\(\)/);
+    // Não restaura nenhum lastAssignedUserId (decisão de produto).
+    expect(reopenBlock).not.toMatch(/lastAssignedUserId/);
+  });
+
+  it("Auto-reopen só dispara para mensagens inbound (!fromMe)", () => {
+    // O comentário AUTO-REOPEN vem ANTES do if (!fromMe).
+    expect(evo).toMatch(/AUTO-REOPEN[\s\S]{0,400}?if\s*\(!fromMe\)\s*\{/);
+  });
+});
+
 describe("[Inbox] Política de reabertura: cliente volta a falar → cai na FILA", () => {
   const dbFile = read("server/db.ts");
   const evo = read("server/whatsappEvolution.ts");

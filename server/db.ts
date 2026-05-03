@@ -589,9 +589,15 @@ export async function assignConversation(tenantId: number, sessionId: string, re
       eq(conversationAssignments.sessionId, sessionId),
       eq(conversationAssignments.remoteJid, remoteJid)
     ));
-  // Denormalize to wa_conversations
+  // Denormalize to wa_conversations.
+  // IMPORTANTE: ao atribuir, força status='open'. Sem isso, uma conversa
+  // resolved que é re-atribuída fica com (assignedUserId=X, status='resolved')
+  // — estado inconsistente que faz o auto-reopen do webhook sobrescrever a
+  // atribuição na próxima mensagem (race condition real). A regra é simples:
+  // tem agente => não está fechada.
   const wcUpdate: any = { assignedUserId, queuedAt: assignedUserId ? null : undefined };
   if (assignedTeamId !== undefined) wcUpdate.assignedTeamId = assignedTeamId;
+  if (assignedUserId) wcUpdate.status = "open";
   await db.update(waConversations)
     .set(wcUpdate)
     .where(and(
@@ -599,6 +605,16 @@ export async function assignConversation(tenantId: number, sessionId: string, re
       eq(waConversations.sessionId, sessionId),
       eq(waConversations.remoteJid, remoteJid)
     ));
+  // Mantém conversation_assignments.status = 'open' alinhado.
+  if (assignedUserId) {
+    await db.update(conversationAssignments)
+      .set({ status: "open", resolvedAt: null })
+      .where(and(
+        eq(conversationAssignments.tenantId, tenantId),
+        eq(conversationAssignments.sessionId, sessionId),
+        eq(conversationAssignments.remoteJid, remoteJid)
+      ));
+  }
   // Log event
   const waConv = await db.select({ id: waConversations.id }).from(waConversations)
     .where(and(eq(waConversations.tenantId, tenantId), eq(waConversations.sessionId, sessionId), eq(waConversations.remoteJid, remoteJid)))
@@ -709,14 +725,20 @@ export async function finishAttendance(tenantId: number, sessionId: string, remo
     const jidDigits = remoteJid.replace(/@.*$/, '').replace(/\D/g, '');
     console.log(`[finishAttendance] WARNING: 0 rows matched by exact JID, trying digits fallback: ${jidDigits}`);
     if (jidDigits) {
-      // Find the conversation by phone digits
+      // Find the conversation by phone digits.
+      // SEGURANÇA: ignora ghost-threads (mergedIntoId IS NOT NULL) e arquivadas
+      // — o fallback estava finalizando a conversa errada quando havia
+      // duplicata mesclada para o mesmo telefone.
       const matchByDigits = await db.select({ id: waConversations.id, remoteJid: waConversations.remoteJid })
         .from(waConversations)
         .where(and(
           eq(waConversations.tenantId, tenantId),
           eq(waConversations.sessionId, sessionId),
-          sql`("phoneDigits" = ${jidDigits} OR "phoneLast11" = ${jidDigits.slice(-11)})`
+          sql`("phoneDigits" = ${jidDigits} OR "phoneLast11" = ${jidDigits.slice(-11)})`,
+          isNull(waConversations.mergedIntoId),
+          eq(waConversations.isArchived, false),
         ))
+        .orderBy(desc(waConversations.lastMessageAt))
         .limit(1);
       if (matchByDigits.length > 0) {
         const matchedJid = matchByDigits[0].remoteJid;

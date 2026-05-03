@@ -1727,7 +1727,11 @@ class WhatsAppEvolutionManager extends EventEmitter {
                   const lastAgentId = conv.assignedUserId;
                   console.log(`[EvoWA Reopen] Conversation ${resolved.conversationId} was ${conv.status}, reopening to queue. Last agent: ${lastAgentId || 'none'}`);
 
-                  // Reopen wa_conversations: status open + queuedAt set + sem assigned → cai na fila.
+                  // Reopen wa_conversations ATÔMICO: WHERE inclui o status
+                  // visto no SELECT. Se um atendente puxou a conversa entre
+                  // o SELECT e este UPDATE (claim → status='open'), o filtro
+                  // não casa e este UPDATE vira no-op — preserva a atribuição
+                  // recém-feita. Sem isso, race condition em alta concorrência.
                   await db2.update(waConversations)
                     .set({
                       status: "open",
@@ -1735,15 +1739,21 @@ class WhatsAppEvolutionManager extends EventEmitter {
                       assignedTeamId: null,
                       queuedAt: new Date(),
                     })
-                    .where(eq(waConversations.id, resolved.conversationId));
+                    .where(and(
+                      eq(waConversations.id, resolved.conversationId),
+                      sql`${waConversations.status} IN ('resolved', 'closed')`,
+                    ));
 
-                  // Reopen conversation_assignments
+                  // conversation_assignments: idem — só reabre se ainda
+                  // estiver resolvido (assign mais recente teria mudado
+                  // pra 'open' na hora do claim).
                   await db2.update(conversationAssignments)
                     .set({ status: "open", resolvedAt: null })
                     .where(and(
                       eq(conversationAssignments.tenantId, session.tenantId),
                       eq(conversationAssignments.sessionId, session.sessionId),
-                      eq(conversationAssignments.remoteJid, remoteJid)
+                      eq(conversationAssignments.remoteJid, remoteJid),
+                      sql`${conversationAssignments.status} IN ('resolved', 'closed')`,
                     ));
 
                   // Log the reopen event
