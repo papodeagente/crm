@@ -1161,10 +1161,11 @@ export async function createProposal(data: { tenantId: number; dealId: number; t
   const [result] = await db.insert(proposals).values(data).returning({ id: proposals.id });
   return result;
 }
-export async function listProposals(tenantId: number, opts?: { dealId?: number; status?: string }) {
+export async function listProposals(tenantId: number, opts?: { dealId?: number; dealIds?: number[]; status?: string }) {
   const db = await getDb(); if (!db) return [];
   const conditions = [eq(proposals.tenantId, tenantId)];
   if (opts?.dealId) conditions.push(eq(proposals.dealId, opts.dealId));
+  if (opts?.dealIds && opts.dealIds.length > 0) conditions.push(inArray(proposals.dealId, opts.dealIds));
   return db.select().from(proposals).where(and(...conditions)).orderBy(desc(proposals.createdAt));
 }
 export async function getProposalById(tenantId: number, id: number) {
@@ -1176,11 +1177,14 @@ export async function updateProposal(tenantId: number, id: number, data: Partial
   status: "draft" | "sent" | "viewed" | "accepted" | "rejected" | "expired";
   totalCents: number; subtotalCents: number; discountCents: number; taxCents: number;
   pdfUrl: string;
-  sentAt: Date; acceptedAt: Date;
+  sentAt: Date | null; acceptedAt: Date | null;
   validUntil: Date | null; notes: string | null; templateId: number | null;
   publicToken: string | null;
   clientSnapshotJson: any;
   acceptedClientName: string | null; acceptedClientEmail: string | null; acceptedClientIp: string | null;
+  rejectedAt: Date | null;
+  rejectedClientName: string | null; rejectedClientEmail: string | null; rejectedClientIp: string | null;
+  rejectionReason: string | null;
   whatsappFollowupAt: Date; whatsappPaidNotifiedAt: Date; whatsappOverdueNotifiedAt: Date;
 }>) {
   const db = await getDb(); if (!db) return;

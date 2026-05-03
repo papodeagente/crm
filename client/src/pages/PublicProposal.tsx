@@ -13,10 +13,11 @@ import { Input } from "@/components/ui/input";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
-import { CheckCircle2, AlertCircle, Loader2, Sparkles } from "lucide-react";
+import { CheckCircle2, AlertCircle, Loader2, Sparkles, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import ProposalView, { type ProposalViewData } from "@/components/proposals/ProposalView";
 import SignaturePad from "@/components/proposals/SignaturePad";
+import { Textarea } from "@/components/ui/textarea";
 
 export default function PublicProposal() {
   const [, params] = useRoute("/p/:token");
@@ -26,12 +27,17 @@ export default function PublicProposal() {
     { enabled: !!token, retry: false, refetchOnWindowFocus: false }
   );
   const acceptMut = trpc.publicProposal.accept.useMutation();
+  const rejectMut = trpc.publicProposal.reject.useMutation();
 
   const [showAccept, setShowAccept] = useState(false);
+  const [showReject, setShowReject] = useState(false);
   const [signerName, setSignerName] = useState("");
   const [signerEmail, setSignerEmail] = useState("");
   const [signatureDataUrl, setSignatureDataUrl] = useState<string | null>(null);
   const [accepted, setAccepted] = useState(false);
+  const [rejected, setRejected] = useState(false);
+  const [rejectName, setRejectName] = useState("");
+  const [rejectReason, setRejectReason] = useState("");
   const [paymentUrl, setPaymentUrl] = useState<string | null>(null);
 
   if (proposalQ.isLoading) {
@@ -56,7 +62,8 @@ export default function PublicProposal() {
   const branding = p.branding || {};
   const primary = branding.primaryColor || "#5A8A1F";
   const isAccepted = (p as any).status === "accepted" || accepted;
-  const isExpired = (p as any).isExpired && !isAccepted;
+  const isRejected = (p as any).status === "rejected" || rejected;
+  const isExpired = (p as any).isExpired && !isAccepted && !isRejected;
 
   async function handleAccept() {
     if (!signerName.trim()) {
@@ -79,6 +86,21 @@ export default function PublicProposal() {
     }
   }
 
+  async function handleReject() {
+    try {
+      await rejectMut.mutateAsync({
+        token,
+        rejectedClientName: rejectName.trim() || undefined,
+        rejectionReason: rejectReason.trim() || undefined,
+      });
+      setRejected(true);
+      setShowReject(false);
+      toast.success("Sua resposta foi registrada.");
+    } catch (e: any) {
+      toast.error(e.message || "Erro ao registrar a rejeição");
+    }
+  }
+
   // Banner notes (status / expired)
   const statusBanner = isAccepted ? (
     <div className="bg-emerald-50 border-b border-emerald-200 dark:bg-emerald-950/30 dark:border-emerald-700/40 px-6 py-3 flex items-center gap-3">
@@ -86,6 +108,14 @@ export default function PublicProposal() {
       <div className="flex-1">
         <p className="font-semibold text-emerald-700 dark:text-emerald-400">Proposta aceita</p>
         <p className="text-xs text-muted-foreground">Obrigado! A equipe entrará em contato em breve.</p>
+      </div>
+    </div>
+  ) : isRejected ? (
+    <div className="bg-rose-50 border-b border-rose-200 dark:bg-rose-950/30 dark:border-rose-700/40 px-6 py-3 flex items-center gap-3">
+      <XCircle className="h-5 w-5 text-rose-600 dark:text-rose-400 shrink-0" />
+      <div className="flex-1">
+        <p className="font-semibold text-rose-700 dark:text-rose-400">Proposta recusada</p>
+        <p className="text-xs text-muted-foreground">Sua resposta foi registrada. Se quiser conversar, entre em contato com a clínica.</p>
       </div>
     </div>
   ) : isExpired ? (
@@ -111,18 +141,29 @@ export default function PublicProposal() {
         )}
         <ProposalView
           data={proposalData}
-          bottomSlot={!isAccepted && !isExpired ? (
+          bottomSlot={!isAccepted && !isRejected && !isExpired ? (
             <div className="p-6 sm:p-8 border-t bg-slate-50/50 dark:bg-slate-800/20 text-center">
-              <p className="text-sm text-muted-foreground mb-3">Confirme abaixo se aceita a proposta nas condições descritas:</p>
-              <Button
-                size="lg"
-                onClick={() => setShowAccept(true)}
-                style={{ backgroundColor: primary }}
-                className="gap-2 text-white hover:opacity-90"
-              >
-                <Sparkles className="h-4 w-4" />
-                Aceitar proposta
-              </Button>
+              <p className="text-sm text-muted-foreground mb-3">Você gostaria de aceitar esta proposta?</p>
+              <div className="flex flex-col sm:flex-row gap-2 justify-center">
+                <Button
+                  size="lg"
+                  onClick={() => setShowAccept(true)}
+                  style={{ backgroundColor: primary }}
+                  className="gap-2 text-white hover:opacity-90"
+                >
+                  <Sparkles className="h-4 w-4" />
+                  Orçamento aceito
+                </Button>
+                <Button
+                  size="lg"
+                  variant="outline"
+                  onClick={() => setShowReject(true)}
+                  className="gap-2 text-rose-600 border-rose-300 hover:bg-rose-50 dark:hover:bg-rose-950/30"
+                >
+                  <XCircle className="h-4 w-4" />
+                  Orçamento rejeitado
+                </Button>
+              </div>
             </div>
           ) : null}
         />
@@ -160,6 +201,44 @@ export default function PublicProposal() {
             >
               {acceptMut.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CheckCircle2 className="h-4 w-4 mr-2" />}
               Confirmar aceite
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog de rejeição — pede nome (opcional) e motivo (opcional) */}
+      <Dialog open={showReject} onOpenChange={setShowReject}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Rejeitar proposta #{p.id}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Sua resposta será registrada. Se quiser, conte rapidamente o motivo — isso ajuda a clínica a melhorar.
+            </p>
+            <div>
+              <label className="text-xs text-muted-foreground">Seu nome (opcional)</label>
+              <Input value={rejectName} onChange={(e) => setRejectName(e.target.value)} placeholder="Como aparece no documento" />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground">Motivo (opcional)</label>
+              <Textarea
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value)}
+                placeholder="Ex.: pretendo decidir mais à frente, valor acima do esperado, etc."
+                rows={3}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setShowReject(false)}>Cancelar</Button>
+            <Button
+              variant="destructive"
+              onClick={handleReject}
+              disabled={rejectMut.isPending}
+            >
+              {rejectMut.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <XCircle className="h-4 w-4 mr-2" />}
+              Confirmar rejeição
             </Button>
           </DialogFooter>
         </DialogContent>

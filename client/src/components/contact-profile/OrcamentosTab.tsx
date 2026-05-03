@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -9,10 +9,13 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import {
-  ChevronRight, DollarSign, Loader2, Plus, ShoppingCart,
-  Eye, EyeOff, Trash2
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  ChevronRight, DollarSign, Loader2, Plus, ShoppingCart, FileText,
+  Eye, EyeOff, Trash2, CheckCircle2, XCircle, ExternalLink, Send,
 } from "lucide-react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { toast } from "sonner";
 import FaceMap, { FACE_REGIONS } from "./FaceMap";
 
@@ -463,6 +466,9 @@ export default function OrcamentosTab({ contactId, deals, isLoading, contact }: 
 
       <Separator className="my-4" />
 
+      {/* ═══ PROPOSTAS (orçamentos visuais enviados ao cliente) ═══ */}
+      <ProposalsSection contactId={contactId} deals={deals} />
+
       {/* ═══ EXISTING DEALS / ORÇAMENTOS ═══ */}
       {displayDeals.length > 0 && (
         <div className="space-y-3">
@@ -499,6 +505,218 @@ export default function OrcamentosTab({ contactId, deals, isLoading, contact }: 
           })}
         </div>
       )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// ProposalsSection — integra Produtos × Orçamentos visuais.
+// Para cada deal do contato, mostra propostas existentes (com status,
+// valor e botões Aceitar/Rejeitar) e atalho "Gerar orçamento" que cria
+// uma proposal automaticamente a partir dos produtos do deal.
+// ═══════════════════════════════════════════════════════════════════
+function proposalStatusConfig(s: string) {
+  switch (s) {
+    case "draft": return { label: "Rascunho", color: "bg-slate-500/15 text-slate-400 border-slate-500/30" };
+    case "sent": return { label: "Enviada", color: "bg-blue-500/15 text-blue-400 border-blue-500/30" };
+    case "viewed": return { label: "Visualizada", color: "bg-cyan-500/15 text-cyan-400 border-cyan-500/30" };
+    case "accepted": return { label: "Aceita", color: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30" };
+    case "rejected": return { label: "Rejeitada", color: "bg-rose-500/15 text-rose-400 border-rose-500/30" };
+    case "expired": return { label: "Expirada", color: "bg-amber-500/15 text-amber-400 border-amber-500/30" };
+    default: return { label: s, color: "bg-muted text-muted-foreground" };
+  }
+}
+
+function ProposalsSection({ contactId: _contactId, deals }: { contactId: number; deals: any[] }) {
+  const [, setLocation] = useLocation();
+  const utils = trpc.useUtils();
+  const dealIds = useMemo(() => (deals || []).map((d: any) => d.id), [deals]);
+  const proposalsQ = trpc.proposals.list.useQuery(
+    { dealIds: dealIds.length > 0 ? dealIds : undefined },
+    { enabled: dealIds.length > 0, staleTime: 30_000 },
+  );
+  const proposalsList = (proposalsQ.data || []) as any[];
+
+  // Mapa dealId → array de proposals
+  const byDeal = useMemo(() => {
+    const m = new Map<number, any[]>();
+    for (const p of proposalsList) {
+      const arr = m.get(p.dealId) || [];
+      arr.push(p);
+      m.set(p.dealId, arr);
+    }
+    return m;
+  }, [proposalsList]);
+
+  const createFromDealMut = trpc.proposals.createFromDeal.useMutation({
+    onSuccess: (res: any) => {
+      toast.success(`Orçamento gerado com ${res.items} item(s) — abrindo editor`);
+      utils.proposals.list.invalidate();
+      setLocation(`/proposals/${res.id}`);
+    },
+    onError: (e) => toast.error(e.message || "Erro ao gerar orçamento"),
+  });
+  const acceptMut = trpc.proposals.accept.useMutation({
+    onSuccess: () => { toast.success("Orçamento aceito"); utils.proposals.list.invalidate(); },
+    onError: (e) => toast.error(e.message || "Erro"),
+  });
+  const rejectMut = trpc.proposals.reject.useMutation({
+    onSuccess: () => { toast.success("Orçamento rejeitado"); utils.proposals.list.invalidate(); },
+    onError: (e) => toast.error(e.message || "Erro"),
+  });
+
+  // Reject dialog state
+  const [rejectingId, setRejectingId] = useState<number | null>(null);
+  const [rejectReason, setRejectReason] = useState("");
+
+  const activeDeals = (deals || []).filter((d: any) => d.status === "open" || d.status === "won");
+
+  if (activeDeals.length === 0) return null;
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+          <FileText className="h-3.5 w-3.5" />
+          Orçamentos visuais
+        </h3>
+      </div>
+
+      {activeDeals.map((deal: any) => {
+        const dealProposals = byDeal.get(deal.id) || [];
+        return (
+          <Card key={deal.id} className="border-border/50">
+            <CardContent className="p-4 space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium truncate">{deal.title}</p>
+                  <p className="text-[11px] text-muted-foreground">
+                    {formatCurrency(deal.valueCents || 0, deal.currency)} · {dealProposals.length} {dealProposals.length === 1 ? "proposta" : "propostas"}
+                  </p>
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-8 text-[12px]"
+                  disabled={createFromDealMut.isPending}
+                  onClick={() => createFromDealMut.mutate({ dealId: deal.id })}
+                >
+                  {createFromDealMut.isPending ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <Plus className="w-3.5 h-3.5 mr-1" />}
+                  Gerar orçamento
+                </Button>
+              </div>
+
+              {dealProposals.length > 0 && (
+                <div className="space-y-1.5">
+                  {dealProposals.map((p: any) => {
+                    const sc = proposalStatusConfig(p.status);
+                    const isFinal = p.status === "accepted" || p.status === "rejected";
+                    return (
+                      <div key={p.id} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/40 border border-border/30">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-[12.5px] font-medium">Orçamento #{p.id}</span>
+                            <Badge variant="outline" className={`text-[10px] ${sc.color}`}>{sc.label}</Badge>
+                            <span className="text-[11px] text-muted-foreground">
+                              {formatCurrency(Number(p.totalCents) || 0)}
+                            </span>
+                          </div>
+                          <p className="text-[10.5px] text-muted-foreground">
+                            {formatDate(p.createdAt)}
+                            {p.publicToken && (
+                              <>
+                                {" · "}
+                                <a
+                                  href={`/p/${p.publicToken}`}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="text-emerald-500 hover:underline inline-flex items-center gap-0.5"
+                                >
+                                  link público <ExternalLink className="h-2.5 w-2.5" />
+                                </a>
+                              </>
+                            )}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 px-2 text-[11px]"
+                            onClick={() => setLocation(`/proposals/${p.id}`)}
+                          >
+                            Editar
+                          </Button>
+                          {!isFinal && (
+                            <>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 px-2 text-[11px] text-emerald-500"
+                                disabled={acceptMut.isPending}
+                                onClick={() => acceptMut.mutate({ id: p.id })}
+                              >
+                                <CheckCircle2 className="w-3.5 h-3.5 mr-0.5" />
+                                Aceito
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 px-2 text-[11px] text-rose-500"
+                                onClick={() => { setRejectingId(p.id); setRejectReason(""); }}
+                              >
+                                <XCircle className="w-3.5 h-3.5 mr-0.5" />
+                                Rejeitar
+                              </Button>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        );
+      })}
+
+      {/* Dialog de rejeição interna (back-office) */}
+      <Dialog open={rejectingId !== null} onOpenChange={(o) => !o && setRejectingId(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Rejeitar orçamento #{rejectingId}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            <p className="text-sm text-muted-foreground">
+              Marca o orçamento como rejeitado. Opcionalmente registre o motivo (cliente desistiu, valor, prazo, etc.).
+            </p>
+            <Textarea
+              value={rejectReason}
+              onChange={(e) => setRejectReason(e.target.value)}
+              placeholder="Motivo (opcional)"
+              rows={3}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setRejectingId(null)}>Cancelar</Button>
+            <Button
+              variant="destructive"
+              disabled={rejectMut.isPending}
+              onClick={() => {
+                if (!rejectingId) return;
+                rejectMut.mutate(
+                  { id: rejectingId, rejectionReason: rejectReason.trim() || undefined },
+                  { onSuccess: () => setRejectingId(null) },
+                );
+              }}
+            >
+              {rejectMut.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <XCircle className="w-4 h-4 mr-2" />}
+              Confirmar rejeição
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

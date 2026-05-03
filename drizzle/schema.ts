@@ -1019,6 +1019,13 @@ export const proposals = pgTable("proposals", {
   acceptedClientName: varchar("acceptedClientName", { length: 255 }),
   acceptedClientEmail: varchar("acceptedClientEmail", { length: 320 }),
   acceptedClientIp: varchar("acceptedClientIp", { length: 64 }),
+  // Rejeição (espelha o aceite). Pode ser preenchido tanto pelo cliente
+  // (via /p/:token) quanto pelo back-office (botão "Rejeitar" no editor).
+  rejectedAt: timestamp("rejectedAt"),
+  rejectedClientName: varchar("rejectedClientName", { length: 255 }),
+  rejectedClientEmail: varchar("rejectedClientEmail", { length: 320 }),
+  rejectedClientIp: varchar("rejectedClientIp", { length: 64 }),
+  rejectionReason: text("rejectionReason"),
   // ASAAS payment linkage
   asaasPaymentId: varchar("asaasPaymentId", { length: 64 }),
   asaasInvoiceUrl: text("asaasInvoiceUrl"),

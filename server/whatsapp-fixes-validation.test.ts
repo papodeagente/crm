@@ -416,6 +416,73 @@ describe("[Agenda] Caixa única (AppointmentDialog) com inline-create em todos o
   });
 });
 
+describe("[Orçamentos] Integração Produtos × Propostas + Aceitar/Rejeitar", () => {
+  const schema = read("drizzle/schema.ts");
+  const featureRouters = read("server/routers/featureRouters.ts");
+  const orcTab = read("client/src/components/contact-profile/OrcamentosTab.tsx");
+  const publicProposal = read("client/src/pages/PublicProposal.tsx");
+  const crmDb = read("server/crmDb.ts");
+
+  it("Schema declara campos de rejeição em proposals", () => {
+    const block = schema.match(/export const proposals = pgTable[\s\S]*?\]\)/m)?.[0] || "";
+    expect(block).toMatch(/rejectedAt:\s*timestamp\("rejectedAt"\)/);
+    expect(block).toMatch(/rejectionReason:\s*text\("rejectionReason"\)/);
+    expect(block).toMatch(/rejectedClientName:\s*varchar/);
+    expect(block).toMatch(/rejectedClientEmail:\s*varchar/);
+    expect(block).toMatch(/rejectedClientIp:\s*varchar/);
+  });
+
+  it("Backend: proposals.accept (back-office) limpa rejeição prévia", () => {
+    const acceptBlock = featureRouters.match(/accept:\s*tenantWriteProcedure[\s\S]*?\n    \}\),/m)?.[0] || "";
+    expect(acceptBlock).toBeTruthy();
+    expect(acceptBlock).toMatch(/status:\s*"accepted"/);
+    expect(acceptBlock).toMatch(/rejectedAt:\s*null/);
+  });
+
+  it("Backend: proposals.reject (back-office) limpa aceite prévio", () => {
+    const rejectBlock = featureRouters.match(/reject:\s*tenantWriteProcedure[\s\S]*?\n    \}\),/m)?.[0] || "";
+    expect(rejectBlock).toBeTruthy();
+    expect(rejectBlock).toMatch(/status:\s*"rejected"/);
+    expect(rejectBlock).toMatch(/acceptedAt:\s*null/);
+  });
+
+  it("Backend: publicProposal.reject (cliente via /p/:token) com IP + nome opcional", () => {
+    expect(featureRouters).toMatch(/reject:\s*publicProcedure[\s\S]{0,500}token:\s*z\.string/);
+    expect(featureRouters).toMatch(/findProposalByPublicToken/);
+    expect(featureRouters).toMatch(/rejectedClientIp/);
+  });
+
+  it("Backend: proposals.createFromDeal importa dealProducts como itens", () => {
+    expect(featureRouters).toMatch(/createFromDeal:\s*tenantWriteProcedure/);
+    expect(featureRouters).toMatch(/listDealProducts/);
+    expect(featureRouters).toMatch(/createProposalItem/);
+    // Preserva pricingMode per_unit (qty real em quantityPerUnit)
+    expect(featureRouters).toMatch(/isPerUnit\s*=\s*dp\.pricingMode === "per_unit"/);
+  });
+
+  it("Backend: listProposals aceita dealIds (lista por contato)", () => {
+    expect(crmDb).toMatch(/dealIds\?:\s*number\[\]/);
+    expect(featureRouters).toMatch(/dealIds:\s*z\.array\(z\.number\(\)\)\.optional\(\)/);
+  });
+
+  it("Front: PublicProposal tem botão 'Orçamento rejeitado' e dialog", () => {
+    expect(publicProposal).toMatch(/publicProposal\.reject\.useMutation/);
+    expect(publicProposal).toMatch(/Orçamento rejeitado/);
+    expect(publicProposal).toMatch(/Orçamento aceito/);
+    expect(publicProposal).toMatch(/showReject/);
+    expect(publicProposal).toMatch(/handleReject/);
+  });
+
+  it("Front: OrcamentosTab tem ProposalsSection com Aceitar/Rejeitar e Gerar do deal", () => {
+    expect(orcTab).toMatch(/function ProposalsSection/);
+    expect(orcTab).toMatch(/proposals\.list\.useQuery/);
+    expect(orcTab).toMatch(/proposals\.createFromDeal\.useMutation/);
+    expect(orcTab).toMatch(/proposals\.accept\.useMutation/);
+    expect(orcTab).toMatch(/proposals\.reject\.useMutation/);
+    expect(orcTab).toMatch(/Gerar orçamento/);
+  });
+});
+
 describe("[Pipeline] Card mostra produto acima do valor", () => {
   const crmDb = read("server/crmDb.ts");
   const pipeline = read("client/src/pages/Pipeline.tsx");

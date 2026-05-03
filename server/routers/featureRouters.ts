@@ -16,7 +16,7 @@ export const proposalRouter = router({
       .mutation(async ({ input, ctx }) => crm.createProposalTemplate({ ...input, tenantId: getTenantId(ctx) })),
   }),
   list: tenantProcedure
-    .input(z.object({ dealId: z.number().optional(), status: z.string().optional() }))
+    .input(z.object({ dealId: z.number().optional(), dealIds: z.array(z.number()).optional(), status: z.string().optional() }))
     .query(async ({ input, ctx }) => crm.listProposals(getTenantId(ctx), input)),
   get: tenantProcedure
     .input(z.object({ id: z.number() }))
@@ -290,7 +290,125 @@ export const proposalRouter = router({
       return { publicToken, publicUrl: publicToken ? `/p/${publicToken}` : null };
     }),
 
+  /**
+   * Aceitar proposta pelo back-office (sem assinatura). Útil quando o
+   * cliente confirma por WhatsApp/telefone e o atendente registra
+   * manualmente. Idempotente — se já estava aceita, não falha.
+   */
+  accept: tenantWriteProcedure
+    .input(z.object({
+      id: z.number(),
+      acceptedClientName: z.string().max(255).optional(),
+      acceptedClientEmail: z.string().email().max(320).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const tenantId = getTenantId(ctx);
+      const proposal = await crm.getProposalById(tenantId, input.id);
+      if (!proposal) {
+        const { TRPCError } = await import("@trpc/server");
+        throw new TRPCError({ code: "NOT_FOUND", message: "Proposta não encontrada" });
+      }
+      if (proposal.status === "accepted") return { success: true, alreadyAccepted: true };
+      await crm.updateProposal(tenantId, input.id, {
+        status: "accepted",
+        acceptedAt: new Date(),
+        acceptedClientName: input.acceptedClientName ?? proposal.acceptedClientName ?? null,
+        acceptedClientEmail: input.acceptedClientEmail ?? proposal.acceptedClientEmail ?? null,
+        // Limpa rejeição se voltou de rejected → accepted (correção manual).
+        rejectedAt: null,
+        rejectionReason: null,
+      } as any);
+      await emitEvent({ tenantId, actorUserId: ctx.user.id, entityType: "proposal", entityId: input.id, action: "accept" });
+      return { success: true };
+    }),
 
+  /**
+   * Rejeitar proposta pelo back-office. Pede motivo opcional.
+   */
+  reject: tenantWriteProcedure
+    .input(z.object({
+      id: z.number(),
+      rejectionReason: z.string().max(2000).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const tenantId = getTenantId(ctx);
+      const proposal = await crm.getProposalById(tenantId, input.id);
+      if (!proposal) {
+        const { TRPCError } = await import("@trpc/server");
+        throw new TRPCError({ code: "NOT_FOUND", message: "Proposta não encontrada" });
+      }
+      if (proposal.status === "rejected") return { success: true, alreadyRejected: true };
+      await crm.updateProposal(tenantId, input.id, {
+        status: "rejected",
+        rejectedAt: new Date(),
+        rejectionReason: input.rejectionReason || null,
+        // Limpa aceite se voltou de accepted → rejected (correção manual).
+        acceptedAt: null,
+        acceptedClientName: null,
+        acceptedClientEmail: null,
+      } as any);
+      await emitEvent({ tenantId, actorUserId: ctx.user.id, entityType: "proposal", entityId: input.id, action: "reject" });
+      return { success: true };
+    }),
+
+  /**
+   * Cria uma proposta a partir dos produtos da negociação. Atalho que
+   * une as áreas Produtos × Orçamentos: usuário não precisa importar do
+   * catálogo — o que está no deal vira o orçamento.
+   */
+  createFromDeal: tenantWriteProcedure
+    .input(z.object({ dealId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const tenantId = getTenantId(ctx);
+      const deal = await crm.getDealById(tenantId, input.dealId);
+      if (!deal) {
+        const { TRPCError } = await import("@trpc/server");
+        throw new TRPCError({ code: "NOT_FOUND", message: "Negociação não encontrada" });
+      }
+      const dealProductsList = await crm.listDealProducts(tenantId, input.dealId);
+      // Cria a proposta vazia
+      const created = await (crm as any).createProposal({
+        tenantId,
+        dealId: input.dealId,
+        createdBy: ctx.user.id,
+      });
+      if (!created?.id) {
+        const { TRPCError } = await import("@trpc/server");
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Falha ao criar proposta" });
+      }
+      // Importa cada deal_product como item da proposta — preserva snapshot
+      // (preço, modo per_unit, imagem) sem depender do catálogo atual.
+      let order = 0;
+      for (const dp of dealProductsList as any[]) {
+        const isPerUnit = dp.pricingMode === "per_unit" && dp.pricePerUnitCents;
+        const qty = isPerUnit
+          ? Number(dp.quantityPerUnit ?? 1)
+          : Number(dp.quantity ?? 1);
+        const unitPrice = isPerUnit
+          ? Number(dp.pricePerUnitCents)
+          : Number(dp.unitPriceCents ?? 0);
+        const unit = isPerUnit ? (dp.unitOfMeasure || "un") : "un";
+        const lineTotal = Number(dp.finalPriceCents ?? Math.round(qty * unitPrice));
+        await (crm as any).createProposalItem({
+          tenantId,
+          proposalId: created.id,
+          title: dp.name,
+          description: dp.description ?? undefined,
+          qty: isPerUnit ? 1 : qty,
+          unit,
+          unitPriceCents: unitPrice,
+          discountCents: Number(dp.discountCents ?? 0),
+          totalCents: lineTotal,
+          productId: dp.productId,
+          imageUrl: dp.imageUrl ?? null,
+          quantityPerUnit: isPerUnit ? qty : null,
+          orderIndex: order++,
+        });
+      }
+      await crm.recalcProposalTotal(tenantId, created.id);
+      await emitEvent({ tenantId, actorUserId: ctx.user.id, entityType: "proposal", entityId: created.id, action: "create" });
+      return { id: created.id, items: dealProductsList.length };
+    }),
 
   // ─── PDF generation (returns base64 for download) ───
   getPdfBase64: tenantProcedure
@@ -513,6 +631,40 @@ export const publicProposalRouter = router({
         console.warn("[publicProposal.accept] signature persist failed:", e?.message);
       }
       return { success: true, asaasInvoiceUrl: proposal.asaasInvoiceUrl };
+    }),
+
+  /**
+   * Rejeitar proposta pelo cliente (via /p/:token). Sem auth — registra
+   * IP + nome (se informado) + motivo opcional. Idempotente.
+   */
+  reject: publicProcedure
+    .input(z.object({
+      token: z.string().min(8).max(64),
+      rejectedClientName: z.string().max(255).optional(),
+      rejectionReason: z.string().max(2000).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const proposal = await crm.findProposalByPublicToken(input.token);
+      if (!proposal) {
+        const { TRPCError } = await import("@trpc/server");
+        throw new TRPCError({ code: "NOT_FOUND", message: "Proposta não encontrada." });
+      }
+      if (proposal.status === "rejected") return { success: true, alreadyRejected: true };
+      if (proposal.status === "accepted") {
+        const { TRPCError } = await import("@trpc/server");
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Esta proposta já foi aceita — não é possível rejeitar." });
+      }
+      const ip = ((ctx as any).req?.headers?.["x-forwarded-for"] as string)?.split(",")[0]?.trim()
+        || (ctx as any).req?.socket?.remoteAddress
+        || null;
+      await crm.updateProposal(proposal.tenantId, proposal.id, {
+        status: "rejected",
+        rejectedAt: new Date(),
+        rejectedClientName: input.rejectedClientName ?? null,
+        rejectedClientIp: ip ?? null,
+        rejectionReason: input.rejectionReason ?? null,
+      } as any);
+      return { success: true };
     }),
 });
 
