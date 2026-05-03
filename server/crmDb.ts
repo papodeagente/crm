@@ -559,14 +559,38 @@ export async function searchAccounts(tenantId: number, search: string, opts?: { 
 // ═══════════════════════════════════════
 // DEAL PRODUCTS
 // ═══════════════════════════════════════
-export async function createDealProduct(data: { tenantId: number; dealId: number; productId: number; name: string; description?: string; category?: "servico" | "pacote" | "consulta" | "procedimento" | "assinatura" | "produto" | "other"; quantity?: number; unitPriceCents?: number; discountCents?: number; finalPriceCents?: number; professional?: string; serviceStart?: Date; serviceEnd?: Date; notes?: string; createdByUserId?: number }) {
+export async function createDealProduct(data: {
+  tenantId: number; dealId: number; productId: number; name: string;
+  description?: string;
+  category?: "servico" | "pacote" | "consulta" | "procedimento" | "assinatura" | "produto" | "other";
+  quantity?: number; unitPriceCents?: number; discountCents?: number; finalPriceCents?: number;
+  professional?: string; serviceStart?: Date; serviceEnd?: Date; notes?: string;
+  imageUrl?: string | null;
+  pricingMode?: "fixed" | "per_unit";
+  unitOfMeasure?: string | null;
+  quantityPerUnit?: number | null;     // mL aplicado quando pricingMode='per_unit'
+  pricePerUnitCents?: number | null;   // snapshot do preço por unidade
+  createdByUserId?: number;
+}) {
   const db = await getDb(); if (!db) return null;
   const qty = data.quantity || 1;
   const unit = data.unitPriceCents || 0;
   const discount = data.discountCents || 0;
-  const finalPrice = data.finalPriceCents ?? (qty * unit - discount);
+  // Cálculo do preço final: por unidade quando pricingMode='per_unit',
+  // senão fórmula clássica (qty × unitPrice − discount).
+  let finalPrice: number;
+  if (data.pricingMode === "per_unit" && data.quantityPerUnit && data.pricePerUnitCents) {
+    const totalUnits = Number(data.quantityPerUnit);
+    finalPrice = Math.max(0, Math.round(totalUnits * data.pricePerUnitCents) - discount);
+  } else {
+    finalPrice = data.finalPriceCents ?? (qty * unit - discount);
+  }
   const insertData: any = { ...data };
   delete insertData.createdByUserId;
+  // Drizzle numeric column expects string for decimals — converte se vier number.
+  if (insertData.quantityPerUnit !== undefined && insertData.quantityPerUnit !== null) {
+    insertData.quantityPerUnit = String(insertData.quantityPerUnit);
+  }
   const [result] = await db.insert(dealProducts).values({ ...insertData, finalPriceCents: finalPrice }).returning({ id: dealProducts.id });
 
   // Se o produto tem prazo de retorno configurado, cria tarefa de "Agendar retorno em 3 dias"
@@ -594,9 +618,23 @@ export async function listDealProducts(tenantId: number, dealId: number) {
   const db = await getDb(); if (!db) return [];
   return db.select().from(dealProducts).where(and(eq(dealProducts.tenantId, tenantId), eq(dealProducts.dealId, dealId))).orderBy(desc(dealProducts.createdAt));
 }
-export async function updateDealProduct(tenantId: number, id: number, data: Partial<{ name: string; description: string; category: "servico" | "pacote" | "consulta" | "procedimento" | "assinatura" | "produto" | "other"; quantity: number; unitPriceCents: number; discountCents: number; finalPriceCents: number; professional: string; serviceStart: Date; serviceEnd: Date; notes: string }>) {
+export async function updateDealProduct(tenantId: number, id: number, data: Partial<{
+  name: string; description: string;
+  category: "servico" | "pacote" | "consulta" | "procedimento" | "assinatura" | "produto" | "other";
+  quantity: number; unitPriceCents: number; discountCents: number; finalPriceCents: number;
+  professional: string; serviceStart: Date; serviceEnd: Date; notes: string;
+  imageUrl: string | null;
+  pricingMode: "fixed" | "per_unit";
+  unitOfMeasure: string | null;
+  quantityPerUnit: number | null;
+  pricePerUnitCents: number | null;
+}>) {
   const db = await getDb(); if (!db) return;
-  await db.update(dealProducts).set(data).where(and(eq(dealProducts.id, id), eq(dealProducts.tenantId, tenantId)));
+  const patch: any = { ...data };
+  if (patch.quantityPerUnit !== undefined && patch.quantityPerUnit !== null) {
+    patch.quantityPerUnit = String(patch.quantityPerUnit);
+  }
+  await db.update(dealProducts).set(patch).where(and(eq(dealProducts.id, id), eq(dealProducts.tenantId, tenantId)));
 }
 export async function getDealProduct(tenantId: number, id: number) {
   const db = await getDb(); if (!db) return null;
@@ -1149,9 +1187,15 @@ export async function createProposalItem(data: {
   qty?: number; unit?: string;
   unitPriceCents?: number; discountCents?: number; totalCents?: number;
   productId?: number; orderIndex?: number;
+  imageUrl?: string | null;
+  quantityPerUnit?: number | null;
 }) {
   const db = await getDb(); if (!db) return null;
-  const [result] = await db.insert(proposalItems).values(data).returning({ id: proposalItems.id });
+  const insertData: any = { ...data };
+  if (insertData.quantityPerUnit !== undefined && insertData.quantityPerUnit !== null) {
+    insertData.quantityPerUnit = String(insertData.quantityPerUnit);
+  }
+  const [result] = await db.insert(proposalItems).values(insertData).returning({ id: proposalItems.id });
   return result;
 }
 
@@ -1707,9 +1751,12 @@ export async function createCatalogProduct(data: {
   productType?: "servico" | "pacote" | "consulta" | "procedimento" | "assinatura" | "produto" | "other";
   basePriceCents?: number; costPriceCents?: number; currency?: string;
   professional?: string; location?: string; durationMinutes?: number;
-  imageUrl?: string; sku?: string; isActive?: boolean; detailsJson?: any;
+  imageUrl?: string | null; sku?: string; isActive?: boolean; detailsJson?: any;
   specialty?: string | null; contraindications?: string | null;
   returnReminderDays?: number | null; complexity?: "low" | "medium" | "high" | null;
+  pricingMode?: "fixed" | "per_unit";
+  unitOfMeasure?: string | null;
+  pricePerUnitCents?: number | null;
 }) {
   const db = await getDb(); if (!db) return null;
   const [result] = await db.insert(productCatalog).values(data as any).returning({ id: productCatalog.id });
@@ -1720,9 +1767,12 @@ export async function updateCatalogProduct(tenantId: number, id: number, data: P
   productType: "servico" | "pacote" | "consulta" | "procedimento" | "assinatura" | "produto" | "other";
   basePriceCents: number; costPriceCents: number; currency: string;
   professional: string; location: string; durationMinutes: number;
-  imageUrl: string; sku: string; isActive: boolean; detailsJson: any;
+  imageUrl: string | null; sku: string; isActive: boolean; detailsJson: any;
   specialty: string | null; contraindications: string | null;
   returnReminderDays: number | null; complexity: "low" | "medium" | "high" | null;
+  pricingMode: "fixed" | "per_unit";
+  unitOfMeasure: string | null;
+  pricePerUnitCents: number | null;
 }>) {
   const db = await getDb(); if (!db) return;
   await db.update(productCatalog).set(data as any).where(and(eq(productCatalog.id, id), eq(productCatalog.tenantId, tenantId)));

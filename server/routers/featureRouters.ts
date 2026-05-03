@@ -139,21 +139,32 @@ export const proposalRouter = router({
         let nextOrder = existing.length;
 
         for (const p of input.products) {
-          const product = products.find((pr: any) => pr.id === p.productId);
+          const product: any = products.find((pr: any) => pr.id === p.productId);
           if (!product) continue;
-          const unitPrice = Number(product.basePriceCents ?? 0);
+          // Para produtos por unidade (mL/g), o "preço unitário" do orçamento
+          // é o preço por unidade; a coluna unit guarda mL/g/etc.
+          const isPerUnit = product.pricingMode === "per_unit"
+            && product.pricePerUnitCents
+            && product.unitOfMeasure;
+          const unitPrice = isPerUnit
+            ? Number(product.pricePerUnitCents)
+            : Number(product.basePriceCents ?? 0);
+          const unit = isPerUnit
+            ? product.unitOfMeasure
+            : (product.productType === "servico" ? "h" : "un");
           const lineTotal = unitPrice * p.qty;
-          await crm.createProposalItem({
+          await (crm as any).createProposalItem({
             tenantId,
             proposalId: input.proposalId,
             title: product.name,
             description: product.description ?? undefined,
             qty: p.qty,
-            unit: product.productType === "servico" ? "h" : "un",
+            unit,
             unitPriceCents: unitPrice,
             discountCents: 0,
             totalCents: lineTotal,
             productId: product.id,
+            imageUrl: product.imageUrl ?? null,
             orderIndex: nextOrder++,
           });
         }

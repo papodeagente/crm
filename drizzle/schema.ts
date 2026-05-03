@@ -713,6 +713,16 @@ export const productCatalog = pgTable("product_catalog", {
   returnReminderDays: integer("returnReminderDays"),
   /** Complexidade do procedimento — usado para precificação e prazos. */
   complexity: varchar("complexity", { length: 16 }), // "low" | "medium" | "high"
+  /**
+   * Modo de precificação. "fixed" (padrão) usa basePriceCents direto.
+   * "per_unit" cobra (quantidade × pricePerUnitCents) — útil pra estética
+   * que vende por mL de seringa, gramas, sessões fracionadas, etc.
+   */
+  pricingMode: varchar("pricingMode", { length: 16 }).default("fixed").notNull(),
+  /** Unidade de medida quando pricingMode='per_unit' (ex.: "mL", "g", "h"). */
+  unitOfMeasure: varchar("unitOfMeasure", { length: 32 }),
+  /** Preço por unidade em centavos (ex.: R$ 50/mL → 5000). */
+  pricePerUnitCents: bigint("pricePerUnitCents", { mode: "number" }),
   detailsJson: json("detailsJson"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
@@ -746,6 +756,17 @@ export const dealProducts = pgTable("deal_products", {
   serviceEnd: timestamp("serviceEnd"),
   catalogProductId: integer("catalogProductId"),              // mantido para compatibilidade (deprecated)
   notes: text("notes"),
+  /** Snapshot do imageUrl do produto (cliente vê no orçamento). */
+  imageUrl: text("imageUrl"),
+  /** Snapshot do modo de preço (fixed | per_unit). Default fixed. */
+  pricingMode: varchar("pricingMode", { length: 16 }).default("fixed").notNull(),
+  unitOfMeasure: varchar("unitOfMeasure", { length: 32 }),
+  /**
+   * Quantos mL/g/etc foram aplicados. Aceita decimais (ex.: 0.5 mL).
+   * Substitui 'quantity' como base do cálculo quando pricingMode='per_unit'.
+   */
+  quantityPerUnit: numeric("quantityPerUnit", { precision: 10, scale: 3 }),
+  pricePerUnitCents: bigint("pricePerUnitCents", { mode: "number" }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 }, (t) => [
@@ -1045,6 +1066,11 @@ export const proposalItems = pgTable("proposal_items", {
   totalCents: bigint("totalCents", { mode: "number" }).default(0),
   /** FK opcional para product_catalog quando importado. */
   productId: integer("productId"),
+  /** Snapshot do imageUrl do produto — exibido no orçamento que vai pro cliente. */
+  imageUrl: text("imageUrl"),
+  /** Quantidade fracionada (mL/g/etc) — opcional. Se preenchido, totalCents é
+   *  calculado por (quantityPerUnit × unitPriceCents). */
+  quantityPerUnit: numeric("quantityPerUnit", { precision: 10, scale: 3 }),
   /** Ordenação manual (drag-drop). */
   orderIndex: integer("orderIndex").default(0).notNull(),
   metaJson: json("metaJson"),

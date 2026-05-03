@@ -416,6 +416,79 @@ describe("[Agenda] Caixa única (AppointmentDialog) com inline-create em todos o
   });
 });
 
+describe("[Produtos] Precificação por mL/g + foto no orçamento", () => {
+  const schema = read("drizzle/schema.ts");
+  const crmDb = read("server/crmDb.ts");
+  const crmRouter = read("server/routers/crmRouter.ts");
+  const productRouter = read("server/routers/productCatalogRouter.ts");
+  const featureRouters = read("server/routers/featureRouters.ts");
+  const dialog = read("client/src/components/inbox/sidebar/DealProductsDialog.tsx");
+  const productCatalog = read("client/src/pages/ProductCatalog.tsx");
+  const proposalView = read("client/src/components/proposals/ProposalView.tsx");
+
+  it("Schema declara pricingMode/unitOfMeasure/pricePerUnitCents em productCatalog", () => {
+    const block = schema.match(/export const productCatalog[\s\S]*?\]\)/m)?.[0] || "";
+    expect(block).toMatch(/pricingMode:\s*varchar\("pricingMode"/);
+    expect(block).toMatch(/unitOfMeasure:\s*varchar\("unitOfMeasure"/);
+    expect(block).toMatch(/pricePerUnitCents:\s*bigint\("pricePerUnitCents"/);
+  });
+
+  it("Schema declara pricingMode + quantityPerUnit + imageUrl em dealProducts", () => {
+    const block = schema.match(/export const dealProducts[\s\S]*?\]\)/m)?.[0] || "";
+    expect(block).toMatch(/imageUrl:\s*text\("imageUrl"\)/);
+    expect(block).toMatch(/pricingMode:\s*varchar\("pricingMode"/);
+    expect(block).toMatch(/quantityPerUnit:\s*numeric\("quantityPerUnit"/);
+    expect(block).toMatch(/pricePerUnitCents:\s*bigint\("pricePerUnitCents"/);
+  });
+
+  it("Schema declara imageUrl + quantityPerUnit em proposalItems", () => {
+    const block = schema.match(/export const proposalItems[\s\S]*?\]\)/m)?.[0] || "";
+    expect(block).toMatch(/imageUrl:\s*text\("imageUrl"\)/);
+    expect(block).toMatch(/quantityPerUnit:\s*numeric\("quantityPerUnit"/);
+  });
+
+  it("Backend: createDealProduct calcula final por (qty × pricePerUnit) quando per_unit", () => {
+    expect(crmDb).toMatch(/data\.pricingMode === "per_unit"/);
+    expect(crmDb).toMatch(/Math\.round\(totalUnits \* data\.pricePerUnitCents\)/);
+  });
+
+  it("Backend: deals.products.create aceita quantityPerUnit e copia imageUrl do catálogo", () => {
+    expect(crmRouter).toMatch(/quantityPerUnit:\s*z\.number\(\)\.positive\(\)\.optional\(\)/);
+    expect(crmRouter).toMatch(/isPerUnit\s*=\s*catalogProduct\.pricingMode === "per_unit"/);
+    expect(crmRouter).toMatch(/imageUrl:\s*catalogProduct\.imageUrl/);
+  });
+
+  it("Backend: productCatalog.uploadImage existe e valida tipo + tamanho", () => {
+    expect(productRouter).toMatch(/uploadImage:\s*tenantWriteProcedure/);
+    expect(productRouter).toMatch(/contentType:\s*z\.string\(\)\.regex\(\/\^image\\\//);
+    expect(productRouter).toMatch(/2 \* 1024 \* 1024/);
+    expect(productRouter).toMatch(/storagePut\(fileKey/);
+  });
+
+  it("Backend: proposals.addFromCatalog copia imageUrl + usa pricePerUnit pra produtos per_unit", () => {
+    expect(featureRouters).toMatch(/isPerUnit\s*=\s*product\.pricingMode === "per_unit"/);
+    expect(featureRouters).toMatch(/imageUrl:\s*product\.imageUrl/);
+  });
+
+  it("Front: ProductCatalog form tem pricingMode + upload de foto", () => {
+    expect(productCatalog).toMatch(/pricingMode:\s*\(\(product as any\)\?\.pricingMode \|\| "fixed"\)/);
+    expect(productCatalog).toMatch(/uploadImageMut\s*=\s*trpc\.productCatalog\.products\.uploadImage\.useMutation/);
+    expect(productCatalog).toMatch(/Como o produto é cobrado\?/);
+    expect(productCatalog).toMatch(/Foto do produto/);
+  });
+
+  it("Front: DealProductsDialog tem prompt inline de quantidade pra produtos per_unit", () => {
+    expect(dialog).toMatch(/pendingPerUnit/);
+    expect(dialog).toMatch(/product\.pricingMode === "per_unit"/);
+    expect(dialog).toMatch(/quantityPerUnit:\s*qty/);
+  });
+
+  it("Front: ProposalView renderiza imagem do produto quando presente", () => {
+    expect(proposalView).toMatch(/imageUrl\s*=\s*\(item as any\)\.imageUrl/);
+    expect(proposalView).toMatch(/<img[\s\S]{0,200}src=\{imageUrl\}/);
+  });
+});
+
 describe("[Inbox] Preview da última mensagem é fonte-de-verdade messages table", () => {
   const dbFile = read("server/db.ts");
   const evo = read("server/whatsappEvolution.ts");

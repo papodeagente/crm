@@ -189,7 +189,49 @@ function ProductFormDialog({
     durationMinutes: product?.durationMinutes || "",
     sku: product?.sku || "",
     isActive: product ? Boolean(product.isActive) : true,
+    // Precificação por unidade (mL/g/etc) — produtos de estética vendidos por seringa
+    pricingMode: ((product as any)?.pricingMode || "fixed") as "fixed" | "per_unit",
+    unitOfMeasure: (product as any)?.unitOfMeasure || "mL",
+    pricePerUnitCents: (product as any)?.pricePerUnitCents != null ? String((product as any).pricePerUnitCents / 100) : "",
+    // Foto do produto (aparece no orçamento que vai pro cliente)
+    imageUrl: (product as any)?.imageUrl || "",
   });
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const uploadImageMut = trpc.productCatalog.products.uploadImage.useMutation();
+
+  const handleImageFile = async (file: File) => {
+    if (!file.type.startsWith("image/")) {
+      toast.error("Selecione uma imagem (JPG/PNG)");
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error("Imagem muito grande — máximo 2 MB");
+      return;
+    }
+    setUploadingImage(true);
+    try {
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const r = new FileReader();
+        r.onload = () => {
+          const s = (r.result as string) || "";
+          resolve(s.split(",")[1] || "");
+        };
+        r.onerror = reject;
+        r.readAsDataURL(file);
+      });
+      const res = await uploadImageMut.mutateAsync({
+        fileName: file.name,
+        fileBase64: base64,
+        contentType: file.type,
+      });
+      setForm((f) => ({ ...f, imageUrl: res.url }));
+      toast.success("Foto carregada");
+    } catch (e: any) {
+      toast.error(e.message || "Erro ao carregar foto");
+    } finally {
+      setUploadingImage(false);
+    }
+  };
 
   const isEditing = !!product;
   const isPending = createProduct.isPending || updateProduct.isPending;
@@ -201,6 +243,10 @@ function ProductFormDialog({
 
   function handleSubmit() {
     if (!form.name.trim()) { toast.error("Nome é obrigatório"); return; }
+    if (form.pricingMode === "per_unit" && (!form.pricePerUnitCents || Number(form.pricePerUnitCents) <= 0)) {
+      toast.error("Informe o preço por " + (form.unitOfMeasure || "unidade"));
+      return;
+    }
     const data: any = {
       name: form.name.trim(),
       description: form.description || undefined,
@@ -211,6 +257,12 @@ function ProductFormDialog({
       contraindications: form.contraindications.trim() || null,
       returnReminderDays: form.returnReminderDays ? Number(form.returnReminderDays) : null,
       complexity: form.complexity || null,
+      pricingMode: form.pricingMode,
+      unitOfMeasure: form.pricingMode === "per_unit" ? (form.unitOfMeasure || "mL") : null,
+      pricePerUnitCents: form.pricingMode === "per_unit" && form.pricePerUnitCents
+        ? Math.round(Number(form.pricePerUnitCents) * 100)
+        : null,
+      imageUrl: form.imageUrl || null,
     };
     if (isEditing) {
       // Preserve all existing fields on edit
@@ -328,8 +380,130 @@ function ProductFormDialog({
               <Input type="number" step="0.01" min="0" value={form.costPriceCents} onChange={(e) => setForm({ ...form, costPriceCents: e.target.value })} placeholder="R$ 0,00" />
             </div>
             <div>
-              <Label>Valor/Preço</Label>
+              <Label>{form.pricingMode === "per_unit" ? `Preço cheio (referência)` : "Valor/Preço"}</Label>
               <Input type="number" step="0.01" min="0" value={form.basePriceCents} onChange={(e) => setForm({ ...form, basePriceCents: e.target.value })} placeholder="R$ 0,00" />
+            </div>
+          </div>
+
+          {/* Modo de precificação: fixo OU por mL/unidade. Para produtos de
+              estética vendidos por seringa, usa-se "por mL" — o atendente
+              informa quantos mL aplicou na hora de adicionar ao orçamento. */}
+          <div className="rounded-lg border border-border/40 bg-muted/30 p-3 space-y-2">
+            <div>
+              <Label className="text-[12.5px] font-semibold">Como o produto é cobrado?</Label>
+              <p className="text-[10.5px] text-muted-foreground">
+                Use "por unidade" para seringas/cremes vendidos por mL ou g — o atendente informa a quantidade aplicada no orçamento.
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setForm({ ...form, pricingMode: "fixed" })}
+                className={`flex-1 px-3 py-2 rounded-md text-[12px] font-medium border transition-colors ${
+                  form.pricingMode === "fixed"
+                    ? "bg-emerald-500/10 border-emerald-500/40 text-emerald-600"
+                    : "bg-background border-border text-muted-foreground hover:border-border/60"
+                }`}
+              >
+                Preço fixo
+              </button>
+              <button
+                type="button"
+                onClick={() => setForm({ ...form, pricingMode: "per_unit" })}
+                className={`flex-1 px-3 py-2 rounded-md text-[12px] font-medium border transition-colors ${
+                  form.pricingMode === "per_unit"
+                    ? "bg-emerald-500/10 border-emerald-500/40 text-emerald-600"
+                    : "bg-background border-border text-muted-foreground hover:border-border/60"
+                }`}
+              >
+                Por unidade (mL/g/etc)
+              </button>
+            </div>
+            {form.pricingMode === "per_unit" && (
+              <div className="grid grid-cols-2 gap-2 pt-1">
+                <div>
+                  <Label className="text-[11px]">Unidade</Label>
+                  <Select value={form.unitOfMeasure || "mL"} onValueChange={(v) => setForm({ ...form, unitOfMeasure: v })}>
+                    <SelectTrigger className="h-9 text-[13px]"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="mL">mL (mililitro)</SelectItem>
+                      <SelectItem value="g">g (grama)</SelectItem>
+                      <SelectItem value="UI">UI (unidade internacional)</SelectItem>
+                      <SelectItem value="sessão">sessão</SelectItem>
+                      <SelectItem value="h">h (hora)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-[11px]">Preço por {form.unitOfMeasure || "unidade"} *</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={form.pricePerUnitCents}
+                    onChange={(e) => setForm({ ...form, pricePerUnitCents: e.target.value })}
+                    placeholder="R$ 0,00"
+                    className="h-9"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Foto do produto — aparece no orçamento enviado ao cliente */}
+          <div className="rounded-lg border border-border/40 p-3 space-y-2">
+            <div>
+              <Label className="text-[12.5px] font-semibold">Foto do produto</Label>
+              <p className="text-[10.5px] text-muted-foreground">
+                Aparece no orçamento que o cliente recebe. JPG/PNG até 2 MB.
+              </p>
+            </div>
+            <div className="flex items-start gap-3">
+              {form.imageUrl ? (
+                <div className="relative shrink-0">
+                  <img src={form.imageUrl} alt="Produto" className="w-20 h-20 object-cover rounded-lg border border-border" />
+                  <button
+                    type="button"
+                    onClick={() => setForm({ ...form, imageUrl: "" })}
+                    className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-red-500 text-white text-[10px] flex items-center justify-center hover:bg-red-600"
+                    aria-label="Remover foto"
+                  >
+                    ×
+                  </button>
+                </div>
+              ) : (
+                <div className="w-20 h-20 rounded-lg border-2 border-dashed border-border flex items-center justify-center text-muted-foreground shrink-0">
+                  <Package className="w-7 h-7 opacity-30" />
+                </div>
+              )}
+              <div className="flex-1 flex flex-col gap-1.5">
+                <input
+                  type="file"
+                  accept="image/*"
+                  id="product-image-input"
+                  className="hidden"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) handleImageFile(f);
+                    e.target.value = "";
+                  }}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-8 text-[12px] w-full justify-start"
+                  disabled={uploadingImage}
+                  onClick={() => document.getElementById("product-image-input")?.click()}
+                >
+                  {uploadingImage ? (
+                    <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> Enviando…</>
+                  ) : form.imageUrl ? "Trocar foto" : "Selecionar foto"}
+                </Button>
+                <p className="text-[10.5px] text-muted-foreground">
+                  {uploadingImage ? "Salvando no servidor…" : "Recomendado: 800×800px"}
+                </p>
+              </div>
             </div>
           </div>
           {/* Margem auto-calculada */}

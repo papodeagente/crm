@@ -150,18 +150,33 @@ export default function ProposalView({
                     Nenhum item.
                   </td>
                 </tr>
-              ) : data.items.map((item, idx) => (
+              ) : data.items.map((item, idx) => {
+                const imageUrl = (item as any).imageUrl as string | null | undefined;
+                return (
                 <tr key={item.id} className={`border-t ${idx % 2 ? "bg-slate-50/50 dark:bg-slate-800/30" : ""}`}>
                   <td className="px-4 py-3">
-                    <p className="font-medium">{item.title}</p>
-                    {item.description && <p className="text-xs text-muted-foreground mt-0.5">{item.description}</p>}
+                    <div className="flex items-start gap-3">
+                      {imageUrl && (
+                        <img
+                          src={imageUrl}
+                          alt={item.title}
+                          className="w-12 h-12 rounded-lg object-cover border border-border/50 shrink-0"
+                          loading="lazy"
+                        />
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <p className="font-medium">{item.title}</p>
+                        {item.description && <p className="text-xs text-muted-foreground mt-0.5">{item.description}</p>}
+                      </div>
+                    </div>
                   </td>
                   <td className="text-center px-2 py-3 tabular-nums">{item.qty}</td>
                   <td className="text-center px-2 py-3 text-muted-foreground hidden sm:table-cell">{item.unit || "un"}</td>
                   <td className="text-right px-2 py-3 hidden sm:table-cell tabular-nums">{brl(item.unitPriceCents, currency)}</td>
                   <td className="text-right px-3 py-3 font-bold tabular-nums">{brl(item.totalCents, currency)}</td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>

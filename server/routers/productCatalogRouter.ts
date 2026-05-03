@@ -1,6 +1,8 @@
 import { z } from "zod";
 import { tenantProcedure, tenantWriteProcedure, getTenantId, router } from "../_core/trpc";
 import * as crm from "../crmDb";
+import { storagePut } from "../storage";
+import { nanoid } from "nanoid";
 
 const productTypeEnum = z.enum(["servico", "pacote", "consulta", "procedimento", "assinatura", "produto", "other"]);
 
@@ -82,7 +84,7 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
         professional: z.string().max(255).optional(),
         location: z.string().max(255).optional(),
         durationMinutes: z.number().optional(),
-        imageUrl: z.string().optional(),
+        imageUrl: z.string().nullable().optional(),
         sku: z.string().max(64).optional(),
         isActive: z.boolean().optional(),
         detailsJson: z.any().optional(),
@@ -91,6 +93,10 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
         contraindications: z.string().nullable().optional(),
         returnReminderDays: z.number().int().min(0).max(3650).nullable().optional(),
         complexity: z.enum(["low", "medium", "high"]).nullable().optional(),
+        // Precificação por unidade (mL/g/etc)
+        pricingMode: z.enum(["fixed", "per_unit"]).optional(),
+        unitOfMeasure: z.string().max(32).nullable().optional(),
+        pricePerUnitCents: z.number().nullable().optional(),
       }))
       .mutation(async ({ input, ctx }) => {
         const { categoryId, costPriceCents, ...rest } = input;
@@ -114,12 +120,16 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
         professional: z.string().max(255).optional(),
         location: z.string().max(255).optional(),
         durationMinutes: z.number().optional(),
-        imageUrl: z.string().optional(),
+        imageUrl: z.string().nullable().optional(),
         sku: z.string().max(64).optional(),
         isActive: z.boolean().optional(),
         detailsJson: z.any().optional(),
         specialty: z.string().max(128).nullable().optional(),
         contraindications: z.string().nullable().optional(),
+        // Precificação por unidade
+        pricingMode: z.enum(["fixed", "per_unit"]).optional(),
+        unitOfMeasure: z.string().max(32).nullable().optional(),
+        pricePerUnitCents: z.number().nullable().optional(),
         returnReminderDays: z.number().int().min(0).max(3650).nullable().optional(),
         complexity: z.enum(["low", "medium", "high"]).nullable().optional(),
       }))
@@ -138,6 +148,28 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
       .input(z.object({ isActive: z.boolean().optional() }))
       .query(async ({ input, ctx }) => {
         return crm.countCatalogProducts(getTenantId(ctx), input.isActive);
+      }),
+    /**
+     * Upload de imagem do produto. Recebe base64 do arquivo (≤2MB), salva via
+     * storagePut e devolve a URL pública. Front-end depois chama products.update
+     * com imageUrl=URL retornada.
+     */
+    uploadImage: tenantWriteProcedure
+      .input(z.object({
+        fileName: z.string().max(255),
+        fileBase64: z.string(),
+        contentType: z.string().regex(/^image\//, "Apenas imagens"),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const tenantId = getTenantId(ctx);
+        const buffer = Buffer.from(input.fileBase64, "base64");
+        if (buffer.length > 2 * 1024 * 1024) {
+          throw new Error("Imagem muito grande — máximo 2 MB");
+        }
+        const ext = (input.fileName.match(/\.([^.]+)$/)?.[1] || "jpg").toLowerCase().slice(0, 5);
+        const fileKey = `product-images/${tenantId}/${nanoid()}.${ext}`;
+        const { url } = await storagePut(fileKey, buffer, input.contentType);
+        return { url };
       }),
   }),
 

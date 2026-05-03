@@ -1033,16 +1033,34 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
           discountCents: z.number().optional(),
           professional: z.string().optional(),
           serviceStart: z.string().optional(), serviceEnd: z.string().optional(), notes: z.string().optional(),
+          // Precificação por unidade (mL/g/etc) — quando produto é do tipo per_unit,
+          // o atendente informa quantos ml estão sendo aplicados nesta negociação.
+          quantityPerUnit: z.number().positive().optional(),
         }))
         .mutation(async ({ ctx, input }) => {
           // Buscar produto do catálogo para snapshot
-          const catalogProduct = await crm.getCatalogProductById(getTenantId(ctx), input.productId);
+          const catalogProduct: any = await crm.getCatalogProductById(getTenantId(ctx), input.productId);
           if (!catalogProduct) throw new TRPCError({ code: "NOT_FOUND", message: "Produto não encontrado no catálogo" });
           if (!catalogProduct.isActive) throw new TRPCError({ code: "BAD_REQUEST", message: "Produto desativado. Não é possível adicionar a novas negociações." });
 
-          const unitPrice = input.unitPriceCents ?? catalogProduct.basePriceCents;
+          const isPerUnit = catalogProduct.pricingMode === "per_unit"
+            && !!catalogProduct.pricePerUnitCents
+            && !!catalogProduct.unitOfMeasure;
+
           const discount = input.discountCents || 0;
-          const finalPrice = input.quantity * unitPrice - discount;
+          let unitPrice: number;
+          let finalPrice: number;
+          let qtyPerUnit: number | null = null;
+          if (isPerUnit) {
+            // Modo por unidade: cliente informa quantos mL/g aplicou.
+            qtyPerUnit = input.quantityPerUnit ?? 1;
+            const pricePerUnit = catalogProduct.pricePerUnitCents as number;
+            unitPrice = pricePerUnit; // snapshot do preço por mL
+            finalPrice = Math.max(0, Math.round(qtyPerUnit * pricePerUnit) - discount);
+          } else {
+            unitPrice = input.unitPriceCents ?? catalogProduct.basePriceCents;
+            finalPrice = input.quantity * unitPrice - discount;
+          }
 
           const result = await crm.createDealProduct({
             tenantId: getTenantId(ctx),
@@ -1055,14 +1073,21 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
             unitPriceCents: unitPrice,
             discountCents: discount,
             finalPriceCents: finalPrice,
-            professional: input.professional || catalogProduct.professional || undefined,
+            professional: input.professional || undefined,
             serviceStart: input.serviceStart ? new Date(input.serviceStart) : undefined,
             serviceEnd: input.serviceEnd ? new Date(input.serviceEnd) : undefined,
             notes: input.notes,
+            imageUrl: catalogProduct.imageUrl || null,
+            pricingMode: isPerUnit ? "per_unit" : "fixed",
+            unitOfMeasure: isPerUnit ? catalogProduct.unitOfMeasure : null,
+            quantityPerUnit: qtyPerUnit,
+            pricePerUnitCents: isPerUnit ? catalogProduct.pricePerUnitCents : null,
           });
           await crm.createDealHistory({
             tenantId: getTenantId(ctx), dealId: input.dealId, action: "product_added",
-            description: `Produto "${catalogProduct.name}" adicionado ao orçamento (${(unitPrice / 100).toFixed(2)})`,
+            description: isPerUnit
+              ? `Produto "${catalogProduct.name}" adicionado: ${qtyPerUnit}${catalogProduct.unitOfMeasure} × R$ ${((catalogProduct.pricePerUnitCents as number) / 100).toFixed(2)} = R$ ${(finalPrice / 100).toFixed(2)}`
+              : `Produto "${catalogProduct.name}" adicionado ao orçamento (R$ ${(unitPrice / 100).toFixed(2)})`,
             actorUserId: ctx.user.id, actorName: ctx.user.name || "Sistema",
           });
           // Recalcular valor total da negociação
@@ -1075,16 +1100,26 @@ const tenantId = getTenantId(ctx); const { id, ...data } = input;
           quantity: z.number().optional(), unitPriceCents: z.number().optional(),
           discountCents: z.number().optional(), professional: z.string().optional(),
           serviceStart: z.string().optional(), serviceEnd: z.string().optional(), notes: z.string().optional(),
+          quantityPerUnit: z.number().positive().optional(),
         }))
         .mutation(async ({ ctx, input }) => {
 const tenantId = getTenantId(ctx); const { id, dealId, serviceStart, serviceEnd, ...data } = input;
-          // Recalcular finalPriceCents se quantidade ou preço mudou
-          const existing = await crm.getDealProduct(tenantId, id);
-          const qty = data.quantity ?? existing?.quantity ?? 1;
-          const unit = data.unitPriceCents ?? existing?.unitPriceCents ?? 0;
+          // Recalcular finalPriceCents conforme o modo de preço da linha.
+          const existing: any = await crm.getDealProduct(tenantId, id);
+          const isPerUnit = existing?.pricingMode === "per_unit"
+            && existing?.pricePerUnitCents;
           const disc = data.discountCents ?? existing?.discountCents ?? 0;
-          const finalPrice = qty * unit - disc;
-          
+          let finalPrice: number;
+          if (isPerUnit) {
+            const qpu = data.quantityPerUnit ?? Number(existing.quantityPerUnit ?? 1);
+            const ppu = existing.pricePerUnitCents as number;
+            finalPrice = Math.max(0, Math.round(qpu * ppu) - disc);
+          } else {
+            const qty = data.quantity ?? existing?.quantity ?? 1;
+            const unit = data.unitPriceCents ?? existing?.unitPriceCents ?? 0;
+            finalPrice = qty * unit - disc;
+          }
+
           await crm.updateDealProduct(tenantId, id, {
             ...data,
             finalPriceCents: finalPrice,
