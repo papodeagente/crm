@@ -416,6 +416,44 @@ describe("[Agenda] Caixa única (AppointmentDialog) com inline-create em todos o
   });
 });
 
+describe("[Inbox] Preview da última mensagem é fonte-de-verdade messages table", () => {
+  const dbFile = read("server/db.ts");
+  const evo = read("server/whatsappEvolution.ts");
+
+  it("getWaConversationsList deriva lastMessage da tabela messages (LEFT JOIN), não só do denorm", () => {
+    const fn = dbFile.match(/export async function getWaConversationsList[\s\S]*?^}/m)?.[0] || "";
+    expect(fn).toBeTruthy();
+    // JOIN com a última mensagem por remoteJid
+    expect(fn).toMatch(/LEFT JOIN \(\s*--[\s\S]*?SELECT m1\."sessionId"[\s\S]*?MAX\(timestamp\) AS maxTs/);
+    // Exclui non-preview types
+    expect(fn).toMatch(/messageType" NOT IN \(\$\{sql\.raw\(NON_PREVIEW_TYPES_SQL\)\}\)/);
+    // Campos de "última mensagem" usam COALESCE com lm.* primeiro
+    expect(fn).toMatch(/COALESCE\(lm\.content,\s*NULLIF\(wc\."lastMessagePreview"/);
+    expect(fn).toMatch(/COALESCE\(lm\."messageType",\s*wc\."lastMessageType"\)/);
+    expect(fn).toMatch(/COALESCE\(lm\.timestamp,\s*wc\."lastMessageAt"\)/);
+    // ORDER BY usa o timestamp REAL (lm) com fallback
+    expect(fn).toMatch(/ORDER BY wc\."isPinned" DESC,\s*COALESCE\(lm\.timestamp,\s*wc\."lastMessageAt"\) DESC/);
+  });
+
+  it("Lista de NON_PREVIEW_TYPES_SQL inclui reactions/protocol/edits", () => {
+    const decl = dbFile.match(/NON_PREVIEW_TYPES_SQL\s*=\s*`[^`]+`/)?.[0] || "";
+    expect(decl).toBeTruthy();
+    expect(decl).toContain("reactionMessage");
+    expect(decl).toContain("protocolMessage");
+    expect(decl).toContain("editedMessage");
+    expect(decl).toContain("messageContextInfo");
+  });
+
+  it("handleIncomingMessage filtra non-preview types antes de chamar updateConversationLastMessage", () => {
+    expect(evo).toMatch(/const NON_PREVIEW_TYPES = new Set\(\[[\s\S]{0,300}reactionMessage/);
+    expect(evo).toMatch(/const isPreviewWorthy = !NON_PREVIEW_TYPES\.has\(messageType\)/);
+    // Só chama updateConversationLastMessage com preview se isPreviewWorthy
+    expect(evo).toMatch(/if\s*\(resolved\s*&&\s*isPreviewWorthy\)\s*\{[\s\S]{0,400}updateConversationLastMessage/);
+    // Fallback: incrementa unread sem tocar em preview
+    expect(evo).toMatch(/else if\s*\(resolved\s*&&\s*!isPreviewWorthy\s*&&\s*!fromMe\)\s*\{[\s\S]{0,200}incrementUnread:\s*true/);
+  });
+});
+
 describe("[Inbox] Ciclo de vida — auditoria das 4 transições", () => {
   const dbFile = read("server/db.ts");
   const evo = read("server/whatsappEvolution.ts");

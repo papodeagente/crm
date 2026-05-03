@@ -2012,10 +2012,13 @@ export async function getWaConversationsList(
   if (!db) return [];
 
   // ═══════════════════════════════════════════════════════════════════════
-  // INSTANT INBOX: Single-table query — NO JOIN with wa_messages.
-  // All preview data is pre-computed in wa_conversations at write time.
-  // Target latency: < 15ms.
+  // FONTE DE VERDADE: messages table (igual getQueueConversations).
+  // Antes: lia de wa_conversations.lastMessagePreview/At denormalizados.
+  // Bug: se o denorm ficou stale (race, reaction, edit, etc.), a lista
+  // mostrava preview velho mesmo com mensagens novas no chat. Agora deriva
+  // de messages real — JOIN indexado, custo aceitável.
   // ═══════════════════════════════════════════════════════════════════════
+  const NON_PREVIEW_TYPES_SQL = `'protocolMessage','senderKeyDistributionMessage','messageContextInfo','reactionMessage','ephemeralMessage','editedMessage','deviceSentMessage'`;
 
   // Build assignment filter referencing wa_conversations directly (wc."assignedUserId")
   // since helpdesk fields are denormalized into wa_conversations
@@ -2047,24 +2050,15 @@ export async function getWaConversationsList(
       wc."phoneE164",
       wc."contactId",
       wc."contactPushName",
-      -- Quando lastMessagePreview está vazio/null (bug histórico em algumas convs),
-      -- faz fallback pegando o conteúdo da mensagem mais recente.
-      COALESCE(
-        NULLIF(wc."lastMessagePreview", ''),
-        (
-          SELECT m.content FROM messages m
-          WHERE m."sessionId" = wc."sessionId"
-            AND m."remoteJid" = wc."remoteJid"
-            AND m.content IS NOT NULL
-            AND m.content <> ''
-          ORDER BY m.timestamp DESC NULLS LAST, m.id DESC
-          LIMIT 1
-        )
-      ) AS "lastMessage",
-      wc."lastMessageType" AS "lastMessageType",
-      wc."lastFromMe" AS "lastFromMe",
-      wc."lastMessageAt" AS "lastTimestamp",
-      wc."lastStatus" AS "lastStatus",
+      -- Deriva os campos de "última mensagem" da tabela messages real (não
+      -- do denormalizado em wa_conversations). Reactions/protocol/edit não
+      -- contam como preview. Se nenhuma msg preview-worthy existe, cai pro
+      -- denormalizado como último recurso.
+      COALESCE(lm.content, NULLIF(wc."lastMessagePreview", '')) AS "lastMessage",
+      COALESCE(lm."messageType", wc."lastMessageType") AS "lastMessageType",
+      COALESCE(lm."fromMe", wc."lastFromMe") AS "lastFromMe",
+      COALESCE(lm.timestamp, wc."lastMessageAt") AS "lastTimestamp",
+      COALESCE(lm.status, wc."lastStatus") AS "lastStatus",
       wc."unreadCount",
       wc.status AS "conversationStatus",
       wc."conversationKey",
@@ -2101,13 +2095,34 @@ export async function getWaConversationsList(
       LIMIT ${filter?.limit ?? 100}
       ${!filter?.cursor && (filter?.offset ?? 0) > 0 ? sql`OFFSET ${filter?.offset ?? 0}` : sql``}
     ) wc
+    LEFT JOIN (
+      -- última mensagem preview-worthy por conversa (igual padrão de
+      -- getQueueConversations). Exclui types que não devem virar preview.
+      SELECT m1."sessionId", m1."remoteJid", m1.content, m1."messageType",
+             m1."fromMe", m1.timestamp, m1.status
+      FROM messages m1
+      INNER JOIN (
+        SELECT "sessionId", "remoteJid", MAX(timestamp) AS maxTs
+        FROM messages
+        WHERE "sessionId" = ${sessionId}
+          AND "messageType" NOT IN (${sql.raw(NON_PREVIEW_TYPES_SQL)})
+        GROUP BY "sessionId", "remoteJid"
+      ) m2 ON m1."sessionId" = m2."sessionId"
+          AND m1."remoteJid" = m2."remoteJid"
+          AND m1.timestamp = m2.maxTs
+      WHERE m1."sessionId" = ${sessionId}
+        AND m1."messageType" NOT IN (${sql.raw(NON_PREVIEW_TYPES_SQL)})
+    ) lm
+      ON lm."sessionId" = wc."sessionId"
+      AND lm."remoteJid" = wc."remoteJid"
     LEFT JOIN conversation_assignments ca
       ON ca."sessionId" = wc."sessionId"
       AND ca."remoteJid" = wc."remoteJid"
       AND ca."tenantId" = wc."tenantId"
     LEFT JOIN crm_users agent ON agent.id = wc."assignedUserId"
     LEFT JOIN contacts c ON c.id = wc."contactId"
-    ORDER BY wc."isPinned" DESC, wc."lastMessageAt" DESC, wc.id DESC
+    -- Ordena pelo timestamp REAL (lm.timestamp tem prioridade sobre o denorm).
+    ORDER BY wc."isPinned" DESC, COALESCE(lm.timestamp, wc."lastMessageAt") DESC, wc.id DESC
   `);
 
   const rows = rowsOf(result);

@@ -1692,11 +1692,20 @@ class WhatsAppEvolutionManager extends EventEmitter {
         quotedMessageId: mediaInfo.quotedMessageId || null,
       }).onConflictDoNothing();
 
-      // Resolve conversation (update last message, unread count)
+      // Resolve conversation (update last message, unread count).
+      // Tipos não-preview (reactions, protocol, edits) NÃO podem sobrescrever
+      // o preview da conversa — apenas incrementam unread quando inbound. Sem
+      // esse filtro, uma reaction recebida poderia "limpar" o preview.
+      const NON_PREVIEW_TYPES = new Set([
+        "reactionMessage", "protocolMessage", "senderKeyDistributionMessage",
+        "messageContextInfo", "ephemeralMessage", "editedMessage",
+        "deviceSentMessage",
+      ]);
+      const isPreviewWorthy = !NON_PREVIEW_TYPES.has(messageType);
       try {
         const contactPushName = fromMe ? null : pushName;
         const resolved = await resolveInbound(session.tenantId, session.sessionId, remoteJid, contactPushName, { skipContactCreation: true });
-        if (resolved) {
+        if (resolved && isPreviewWorthy) {
           await updateConversationLastMessage(resolved.conversationId, {
             content: content || "",
             messageType,
@@ -1705,6 +1714,13 @@ class WhatsAppEvolutionManager extends EventEmitter {
             timestamp: new Date(timestamp),
             incrementUnread: !fromMe,
           });
+        } else if (resolved && !isPreviewWorthy && !fromMe) {
+          // Inbound não-preview: só incrementa unread, não toca em preview.
+          await updateConversationLastMessage(resolved.conversationId, {
+            incrementUnread: true,
+          });
+        }
+        if (resolved) {
 
           // *** AUTO-REOPEN: cliente voltou a falar numa conversa resolvida/fechada.
           // Política: cair de volta na FILA. O atendimento foi finalizado pela
