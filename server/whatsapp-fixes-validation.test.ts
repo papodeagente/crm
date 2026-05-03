@@ -481,6 +481,14 @@ describe("[Orçamentos] Integração Produtos × Propostas + Aceitar/Rejeitar", 
     expect(orcTab).toMatch(/proposals\.reject\.useMutation/);
     expect(orcTab).toMatch(/Gerar orçamento/);
   });
+
+  it("Front: DealDetail também tem botão Gerar orçamento no ProductsPanel", () => {
+    const dealDetail = read("client/src/pages/DealDetail.tsx");
+    expect(dealDetail).toMatch(/function GenerateProposalFromDealButton/);
+    expect(dealDetail).toMatch(/proposals\.createFromDeal\.useMutation/);
+    expect(dealDetail).toMatch(/<GenerateProposalFromDealButton/);
+    expect(dealDetail).toMatch(/Gerar or\u00e7amento/);
+  });
 });
 
 describe("[Pipeline] Card mostra produto acima do valor", () => {

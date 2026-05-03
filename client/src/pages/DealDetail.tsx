@@ -2792,9 +2792,14 @@ function ProductsPanel({ products, dealId, onRefresh }: { products: any[]; dealI
           <h3 className="text-sm font-semibold">Produtos e Serviços</h3>
           <p className="text-xs text-muted-foreground mt-0.5">{products.length} itens — Total: {fmt$(total)}</p>
         </div>
-        <Button size="sm" variant="outline" className="self-start sm:self-auto" onClick={() => { setShowAdd(true); setSelectedProduct(null); setSearchTerm(""); }}>
-          <Plus className="h-3.5 w-3.5 mr-1" /> Adicionar do Catálogo
-        </Button>
+        <div className="flex flex-wrap gap-2 self-start sm:self-auto">
+          <Button size="sm" variant="outline" onClick={() => { setShowAdd(true); setSelectedProduct(null); setSearchTerm(""); }}>
+            <Plus className="h-3.5 w-3.5 mr-1" /> Adicionar do Catálogo
+          </Button>
+          {/* Gera proposta visual a partir destes produtos. Atalho que une
+              área de Produtos × Orçamentos — abre o editor pra ajustar. */}
+          <GenerateProposalFromDealButton dealId={dealId} hasProducts={products.length > 0} />
+        </div>
       </div>
 
       {products.length === 0 ? (
@@ -3905,5 +3910,35 @@ function WhatsAppPanel({ contact, dealId, dealTitle, dealValueCents, dealStageNa
         )
       )}
     </div>
+  );
+}
+
+/**
+ * Botão "Gerar orçamento" no header do ProductsPanel.
+ * Cria uma proposal visual a partir dos produtos do deal (snapshot real)
+ * e abre o editor para ajustes finais antes de enviar ao cliente.
+ */
+function GenerateProposalFromDealButton({ dealId, hasProducts }: { dealId: number; hasProducts: boolean }) {
+  const [, navigate] = useLocation();
+  const utils = trpc.useUtils();
+  const createMut = trpc.proposals.createFromDeal.useMutation({
+    onSuccess: (res: any) => {
+      toast.success(`Orçamento gerado com ${res.items} item(s)`);
+      utils.proposals.list.invalidate();
+      navigate(`/proposals/${res.id}`);
+    },
+    onError: (e) => toast.error(e.message || "Erro ao gerar orçamento"),
+  });
+  return (
+    <Button
+      size="sm"
+      className="bg-emerald-500 hover:bg-emerald-600 text-white"
+      disabled={!hasProducts || createMut.isPending}
+      onClick={() => createMut.mutate({ dealId })}
+      title={hasProducts ? "Gera proposta visual com os produtos atuais" : "Adicione ao menos um produto antes"}
+    >
+      {createMut.isPending ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <FileText className="h-3.5 w-3.5 mr-1" />}
+      Gerar orçamento
+    </Button>
   );
 }
