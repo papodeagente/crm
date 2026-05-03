@@ -90,7 +90,7 @@ export default function HomeAgendaWidget() {
   const totalUpcoming = groupedDays.reduce((acc, g) => acc + g.items.length, 0);
 
   return (
-    <section className="lg:col-span-4">
+    <section className="lg:col-span-6">
       <div className="surface p-5 h-full flex flex-col">
         {/* Header */}
         <div className="flex items-start justify-between gap-3 mb-4">

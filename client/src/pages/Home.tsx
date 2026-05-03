@@ -825,8 +825,8 @@ export default function Home() {
           ═══════════════════════════════════════════════════════ */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-5 mb-6 sm:mb-8">
 
-        {/* ─── BLOCO 2: Prioridades de Ação (8 cols) ─── */}
-        <section className="lg:col-span-8">
+        {/* ─── BLOCO 2: Prioridades de Ação (6 cols — meio a meio com Agenda) ─── */}
+        <section className="lg:col-span-6">
           <div className="surface p-5">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
               <div className="flex items-center gap-2.5">
