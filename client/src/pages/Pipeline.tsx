@@ -1127,6 +1127,18 @@ function DealCard({ deal, contacts, accounts, overdueData, pendingCount, waUnrea
         </p>
       )}
 
+      {/* Row 2c: Produto vinculado (acima do valor). Mostra o primeiro
+          produto da negociação + contagem quando há mais. */}
+      {deal.firstProductName && (
+        <p className="text-[11.5px] text-foreground/90 truncate mb-1 flex items-center gap-1">
+          <Package className="inline h-3 w-3 text-emerald-500 shrink-0" />
+          <span className="truncate font-medium">{deal.firstProductName}</span>
+          {Number(deal.productsCount || 0) > 1 && (
+            <span className="text-muted-foreground text-[10.5px] shrink-0">+{Number(deal.productsCount) - 1}</span>
+          )}
+        </p>
+      )}
+
       {/* Row 3: Value + Date on same line */}
       <div className="flex items-center gap-3 text-[11px] text-muted-foreground mb-2">
         {deal.valueCents > 0 && (

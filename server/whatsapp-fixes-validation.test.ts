@@ -416,6 +416,27 @@ describe("[Agenda] Caixa única (AppointmentDialog) com inline-create em todos o
   });
 });
 
+describe("[Pipeline] Card mostra produto acima do valor", () => {
+  const crmDb = read("server/crmDb.ts");
+  const pipeline = read("client/src/pages/Pipeline.tsx");
+
+  it("listDeals expõe firstProductName e productsCount via subquery", () => {
+    expect(crmDb).toMatch(/firstProductName/);
+    expect(crmDb).toMatch(/SELECT name FROM deal_products WHERE "dealId" =/);
+    expect(crmDb).toMatch(/productsCount/);
+    expect(crmDb).toMatch(/SELECT COUNT\(\*\)::int FROM deal_products WHERE "dealId" =/);
+  });
+
+  it("Pipeline DealCard renderiza firstProductName ANTES da row de valor", () => {
+    // Bloco do produto deve aparecer antes do bloco "Row 3: Value + Date"
+    const cardChunk = pipeline.match(/firstProductName[\s\S]{0,1000}?Row 3: Value/)?.[0] || "";
+    expect(cardChunk).toBeTruthy();
+    expect(cardChunk).toMatch(/<Package/);
+    // Indicador de "+N" quando há mais de um produto
+    expect(cardChunk).toMatch(/Number\(deal\.productsCount[\s\S]{0,200}>\s*1/);
+  });
+});
+
 describe("[Produtos] Precificação por mL/g + foto no orçamento", () => {
   const schema = read("drizzle/schema.ts");
   const crmDb = read("server/crmDb.ts");

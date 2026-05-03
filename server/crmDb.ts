@@ -449,6 +449,11 @@ export async function listDeals(tenantId: number, opts?: {
     contactName: contacts.name,
     contactPhone: contacts.phone,
     stageName: pipelineStages.name,
+    // Resumo dos produtos vinculados — primeiro nome + total. Subquery
+    // correlacionada (uma chamada por deal); barata com índice em "dealId".
+    // Usado pelo card do pipeline pra exibir o produto acima do valor.
+    firstProductName: sql<string | null>`(SELECT name FROM deal_products WHERE "dealId" = ${deals.id} ORDER BY id ASC LIMIT 1)`.as("firstProductName"),
+    productsCount: sql<number>`(SELECT COUNT(*)::int FROM deal_products WHERE "dealId" = ${deals.id})`.as("productsCount"),
   })
     .from(deals)
     .leftJoin(contacts, eq(deals.contactId, contacts.id))
