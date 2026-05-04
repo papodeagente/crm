@@ -370,8 +370,9 @@ function ProductFormDialog({
             </Select>
             <p className="text-[10px] text-muted-foreground mt-1">Tempo após a aplicação para a clínica enviar lembrete de retorno.</p>
           </div>
-          {/* Complexidade + Custo + Valor */}
-          <div className="grid grid-cols-3 gap-2">
+          {/* Complexidade + Custo + Valor — quando pricingMode='per_unit' os
+              campos de preço fixo somem (custo/venda vivem no bloco "Por unidade"). */}
+          <div className={form.pricingMode === "per_unit" ? "grid grid-cols-1 gap-2" : "grid grid-cols-3 gap-2"}>
             <div>
               <Label>Complexidade</Label>
               <Select value={form.complexity || "low"} onValueChange={(v) => setForm({ ...form, complexity: v })}>
@@ -383,14 +384,18 @@ function ProductFormDialog({
                 </SelectContent>
               </Select>
             </div>
-            <div>
-              <Label>Custo Estimado</Label>
-              <Input type="number" step="0.01" min="0" value={form.costPriceCents} onChange={(e) => setForm({ ...form, costPriceCents: e.target.value })} placeholder="R$ 0,00" />
-            </div>
-            <div>
-              <Label>{form.pricingMode === "per_unit" ? `Preço cheio (referência)` : "Valor/Preço"}</Label>
-              <Input type="number" step="0.01" min="0" value={form.basePriceCents} onChange={(e) => setForm({ ...form, basePriceCents: e.target.value })} placeholder="R$ 0,00" />
-            </div>
+            {form.pricingMode === "fixed" && (
+              <>
+                <div>
+                  <Label>Custo Estimado</Label>
+                  <Input type="number" step="0.01" min="0" value={form.costPriceCents} onChange={(e) => setForm({ ...form, costPriceCents: e.target.value })} placeholder="R$ 0,00" />
+                </div>
+                <div>
+                  <Label>Valor/Preço</Label>
+                  <Input type="number" step="0.01" min="0" value={form.basePriceCents} onChange={(e) => setForm({ ...form, basePriceCents: e.target.value })} placeholder="R$ 0,00" />
+                </div>
+              </>
+            )}
           </div>
 
           {/* Modo de precificação: fixo OU por mL/unidade. Para produtos de
@@ -554,8 +559,9 @@ function ProductFormDialog({
               </div>
             </div>
           </div>
-          {/* Margem auto-calculada */}
-          {marginPercent !== null && (
+          {/* Margem auto-calculada (modo fixo). No per_unit, a margem por mL/g
+              aparece dentro do próprio bloco "Por unidade". */}
+          {form.pricingMode === "fixed" && marginPercent !== null && (
             <div className={`text-xs px-3 py-1.5 rounded-md ${marginPercent >= 0 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}`}>
               Margem: {marginPercent >= 0 ? '+' : ''}{marginPercent.toFixed(1)}%
               {basePrice > 0 && costPrice > 0 && (

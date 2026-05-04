@@ -584,6 +584,15 @@ describe("[Produtos] Precificação por mL/g + foto no orçamento", () => {
     expect(productCatalog).toMatch(/Margem por \{form\.unitOfMeasure/);
   });
 
+  it("Front: campos Custo Estimado/Valor base só aparecem em pricingMode='fixed'", () => {
+    // Custo Estimado wrapped in pricingMode === "fixed" condition
+    expect(productCatalog).toMatch(/form\.pricingMode === "fixed"\s*&&\s*\([\s\S]{0,400}Custo Estimado/);
+    // Margem (modo fixo) também só aparece em fixed
+    expect(productCatalog).toMatch(/form\.pricingMode === "fixed"\s*&&\s*marginPercent !== null/);
+    // Grid muda pra 1 col quando per_unit
+    expect(productCatalog).toMatch(/form\.pricingMode === "per_unit"\s*\?\s*"grid grid-cols-1/);
+  });
+
   it("Front: ProductCatalog removeu o bloco 'Campos adicionais'", () => {
     expect(productCatalog).not.toMatch(/Campos adicionais/);
     // Os campos individuais não aparecem mais (só permanece o toggle Ativo).
