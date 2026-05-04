@@ -516,7 +516,7 @@ export default function ProductReports() {
 
           {/* Footer button — link para catálogo */}
           <div className="flex justify-center pt-2">
-            <Button variant="outline" onClick={() => navigate("/products")}>
+            <Button variant="outline" onClick={() => navigate("/settings/products")}>
               <Award className="h-4 w-4 mr-1" />
               Gerenciar catálogo de produtos
             </Button>
